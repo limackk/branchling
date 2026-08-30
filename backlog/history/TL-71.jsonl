@@ -1,0 +1,5 @@
+{"id":"01M1E066RD1NT96EHVHD8EFTXJ","ts":"2026-09-01T08:08:22.541Z","task":"TL-71","field":"__created__","from":"","to":"Serwer nie wie, czyj backlog trzyma — ping bez katalogu","actor":"unknown","source":"external"}
+{"id":"01M1E69RE2DZS666K800T547RT","ts":"2026-09-01T09:55:10.402Z","task":"TL-71","field":"related_docs","from":["docs/tasklog-global-tool.md"],"to":["docs/worktrail-global-tool.md"],"actor":"unknown","source":"external"}
+{"id":"01M1EEXDQN96FVKBPQQ551FQJX","ts":"2026-09-01T12:25:43.413Z","task":"TL-71","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1EEXDQN8SFWW4T4FQC6DKJS","ts":"2026-09-01T12:25:43.413Z","task":"TL-71","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1EFGS0AGF331D2N2HY7VES9","ts":"2026-09-01T12:36:17.546Z","task":"TL-71","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

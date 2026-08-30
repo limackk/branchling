@@ -1,0 +1,7 @@
+{"id":"01M1E3KM2PB843PP2ZHCN5Z001","ts":"2026-09-01T09:08:07.894Z","task":"TL-112","field":"__created__","from":"","to":"Model kontrybucji i granica open/chmura — decyzja z terminem ważności","actor":"unknown","source":"external"}
+{"id":"01M1E3NG509WDRP6FW8QY2FEGY","ts":"2026-09-01T09:09:09.408Z","task":"TL-112","field":"confidence","from":"","to":"high","actor":"unknown","source":"external"}
+{"id":"01M1E3NG50E1VZHXR1TKQV8S3V","ts":"2026-09-01T09:09:09.408Z","task":"TL-112","field":"labels","from":[],"to":["pre-launch"],"actor":"unknown","source":"external"}
+{"id":"01M1E3NG50ERX3DFTXH3DMZDZT","ts":"2026-09-01T09:09:09.408Z","task":"TL-112","field":"blocks","from":[],"to":["TL-1463"],"actor":"unknown","source":"external"}
+{"id":"01M1E3NG506T1VBRYRN0PD0D96","ts":"2026-09-01T09:09:09.408Z","task":"TL-112","field":"related_docs","from":[],"to":[".claude/skills/tasklog-release/SKILL.md"],"actor":"unknown","source":"external"}
+{"id":"01M1E69RE2H7NE7R0GHPC5FVYY","ts":"2026-09-01T09:55:10.402Z","task":"TL-112","field":"related_docs","from":[".claude/skills/tasklog-release/SKILL.md"],"to":[".claude/skills/worktrail-release/SKILL.md"],"actor":"unknown","source":"external"}
+{"id":"01M1F5BNKGPZN6GBV742Z2DA9G","ts":"2026-09-01T18:57:58.896Z","task":"TL-112","field":"blocks","from":["TL-1463"],"to":["TL-53"],"actor":"unknown","source":"external","reason":"unknown"}

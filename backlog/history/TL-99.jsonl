@@ -1,0 +1,36 @@
+{"id":"01M1E066RDQP7BR8JPAKQZAYPW","ts":"2026-09-01T08:08:22.541Z","task":"TL-99","field":"__created__","from":"","to":"tasklog handoff — przekazanie taska z powodem i sladem","actor":"unknown","source":"external"}
+{"id":"01M1E4Z7981A8DXWGN1DMQHWG9","ts":"2026-09-01T09:31:56.584Z","task":"TL-99","field":"blocks","from":[],"to":["TL-1524"],"actor":"unknown","source":"external"}
+{"id":"01M1E69RE2WCJENH80TEFPWJWE","ts":"2026-09-01T09:55:10.402Z","task":"TL-99","field":"title","from":"tasklog handoff — przekazanie taska z powodem i sladem","to":"worktrail handoff — przekazanie taska z powodem i sladem","actor":"unknown","source":"external"}
+{"id":"01M1E69RE2RJ17YBNKKF05YYNC","ts":"2026-09-01T09:55:10.402Z","task":"TL-99","field":"related_docs","from":["docs/backlog-field-editing-history.md","docs/tasklog-state-and-sync.md"],"to":["docs/backlog-field-editing-history.md","docs/worktrail-state-and-sync.md"],"actor":"unknown","source":"external"}
+{"id":"01M1EWSX42R03HD977W3G1W0Z1","ts":"2026-09-01T16:28:28.162Z","task":"TL-99","field":"status","from":"blocked","to":"pending","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EX8JGDA8PCHW0E37JJS1CC","ts":"2026-09-01T16:36:28.813Z","task":"TL-99","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1EX8JGD264W63Y31T02Q2AS","ts":"2026-09-01T16:36:28.813Z","task":"TL-99","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1EYBDEBGT4SPPKTQBPK7A1R","ts":"2026-09-01T16:55:30.507Z","task":"TL-99","field":"title","from":"worktrail handoff — przekazanie taska z powodem i sladem","to":"","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EYBDEBSJNHR9QXNG89VW5M","ts":"2026-09-01T16:55:30.507Z","task":"TL-99","field":"status","from":"in_progress","to":"","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EYBDEBNN2BN0CSYJWDTV8S","ts":"2026-09-01T16:55:30.507Z","task":"TL-99","field":"priority","from":"P1","to":"","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EYBDEBSVMWFSGHQ0QPE941","ts":"2026-09-01T16:55:30.507Z","task":"TL-99","field":"type","from":"task","to":"","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EYBDEBG00ZER52PED5R6N6","ts":"2026-09-01T16:55:30.507Z","task":"TL-99","field":"owner","from":"agent:claude","to":"","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EYBDEBN2SEPS583WA0Y4EV","ts":"2026-09-01T16:55:30.507Z","task":"TL-99","field":"estimate","from":"4h","to":"","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EYBDEB9EBPFWC329T9CWSA","ts":"2026-09-01T16:55:30.507Z","task":"TL-99","field":"confidence","from":"medium","to":"","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EYBDEBBJZQ83QYF05B6EXF","ts":"2026-09-01T16:55:30.507Z","task":"TL-99","field":"board","from":"main","to":"","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EYBDEBQD65QM662AM0K6G2","ts":"2026-09-01T16:55:30.507Z","task":"TL-99","field":"epic","from":"Wyróżniki agentowe","to":"","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EYBDEBHRN4AV00T6Q5F1JE","ts":"2026-09-01T16:55:30.507Z","task":"TL-99","field":"blocked_by","from":["TL-1497","TL-1507"],"to":[],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EYBDEBKEH550DYRFPB2B2V","ts":"2026-09-01T16:55:30.507Z","task":"TL-99","field":"blocks","from":["TL-1524"],"to":[],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EYBDEBF18DHDAJEX8RGXNF","ts":"2026-09-01T16:55:30.507Z","task":"TL-99","field":"related_docs","from":["docs/backlog-field-editing-history.md","docs/worktrail-state-and-sync.md"],"to":[],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EYBDEBEJ2W77ZN8NSHS6FG","ts":"2026-09-01T16:55:30.507Z","task":"TL-99","field":"created","from":"2026-08-31","to":"","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EYD2F12Y8VBHCFPZQTGJE8","ts":"2026-09-01T16:56:24.801Z","task":"TL-99","field":"title","from":"","to":"worktrail handoff — przekazanie taska z powodem i sladem","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EYD2F14BH2Z1AV5T4S4YAB","ts":"2026-09-01T16:56:24.801Z","task":"TL-99","field":"status","from":"","to":"in_progress","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EYD2F1JBQMVH061CBEHQHG","ts":"2026-09-01T16:56:24.801Z","task":"TL-99","field":"priority","from":"","to":"P1","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EYD2F1RZS2C0K3JHCY7KYW","ts":"2026-09-01T16:56:24.801Z","task":"TL-99","field":"type","from":"","to":"task","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EYD2F1GWTM2DAS001KPYWS","ts":"2026-09-01T16:56:24.801Z","task":"TL-99","field":"owner","from":"","to":"agent:claude","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EYD2F1FEVDEZ6SY19XP7H5","ts":"2026-09-01T16:56:24.801Z","task":"TL-99","field":"estimate","from":"","to":"4h","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EYD2F1AJ85VAGXK0A5XP2Z","ts":"2026-09-01T16:56:24.801Z","task":"TL-99","field":"confidence","from":"","to":"medium","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EYD2F1P84PQ0T88Z6CSJVC","ts":"2026-09-01T16:56:24.801Z","task":"TL-99","field":"board","from":"","to":"main","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EYD2F1MDAVA9F0X8E22SRM","ts":"2026-09-01T16:56:24.801Z","task":"TL-99","field":"epic","from":"","to":"Wyróżniki agentowe","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EYD2F1T5N2EP7AVCBXXR55","ts":"2026-09-01T16:56:24.801Z","task":"TL-99","field":"blocked_by","from":[],"to":["TL-1497","TL-1507"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EYD2F1XFWMR2YN3DGX4Y2V","ts":"2026-09-01T16:56:24.801Z","task":"TL-99","field":"blocks","from":[],"to":["TL-1524"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EYD2F14Q4R0J7TRNHFTYCC","ts":"2026-09-01T16:56:24.801Z","task":"TL-99","field":"related_docs","from":[],"to":["docs/backlog-field-editing-history.md","docs/worktrail-state-and-sync.md"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EYD2F1GTJK31QQTPXTERM0","ts":"2026-09-01T16:56:24.801Z","task":"TL-99","field":"created","from":"","to":"2026-08-31","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EYPSSXDGKA003JE3Y6AF0K","ts":"2026-09-01T17:01:43.613Z","task":"TL-99","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
+{"id":"01M1F5BNKGPBDW0S7B6GTB56YG","ts":"2026-09-01T18:57:58.896Z","task":"TL-99","field":"blocked_by","from":["TL-1497","TL-1507"],"to":["TL-87","TL-97"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1F5BNKG7M9CPD4Z20C1W1W0","ts":"2026-09-01T18:57:58.896Z","task":"TL-99","field":"blocks","from":["TL-1524"],"to":["TL-114"],"actor":"unknown","source":"external","reason":"unknown"}

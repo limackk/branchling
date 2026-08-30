@@ -1,0 +1,6 @@
+{"id":"01M1EWW042G0ZH8Y7M6QATJ3N4","ts":"2026-09-01T16:29:36.770Z","task":"TL-130","field":"__created__","from":"","to":"Reconcile serwera podpisuje cudze zmiany jako unknown/external, zanim sesja zdazy je przypisac","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EWXQ30V5YZGHB2D1QXXN0N","ts":"2026-09-01T16:30:33.056Z","task":"TL-130","field":"priority","from":"P1","to":"P2","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EWXQ30307E2GX01XBVEBJ7","ts":"2026-09-01T16:30:33.056Z","task":"TL-130","field":"estimate","from":"2h","to":"4h","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EWXQ30FGZ3A5WMVFPE2GD7","ts":"2026-09-01T16:30:33.056Z","task":"TL-130","field":"confidence","from":"","to":"medium","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EWXQ30G8AEVW0CKPVTSW36","ts":"2026-09-01T16:30:33.056Z","task":"TL-130","field":"epic","from":"","to":"Historia i atrybucja","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EWXQ308GS3N7NDB0WPVECM","ts":"2026-09-01T16:30:33.056Z","task":"TL-130","field":"related_docs","from":[],"to":["docs/backlog-field-editing-history.md"],"actor":"unknown","source":"external","reason":"unknown"}

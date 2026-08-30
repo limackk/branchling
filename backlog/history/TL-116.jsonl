@@ -1,0 +1,5 @@
+{"id":"01M1E4TJRWVQ1RZ4109BS15HSG","ts":"2026-09-01T09:29:24.508Z","task":"TL-116","field":"__created__","from":"","to":"Graf zmian taska w viewerze z osi historii","actor":"unknown","source":"external"}
+{"id":"01M1E4Z0NBDF69EPZZ72ZBSXE0","ts":"2026-09-01T09:31:49.803Z","task":"TL-116","field":"status","from":"pending","to":"blocked","actor":"unknown","source":"external"}
+{"id":"01M1E4Z0NBP880C71QB8VBESZ7","ts":"2026-09-01T09:31:49.803Z","task":"TL-116","field":"blocked_by","from":[],"to":["TL-1524"],"actor":"unknown","source":"external"}
+{"id":"01M1E4Z0NB9KDAYXKW7JFCJ2KM","ts":"2026-09-01T09:31:49.803Z","task":"TL-116","field":"related_docs","from":[],"to":["docs/backlog-human-agent-decisions.md","docs/backlog-field-editing-history.md"],"actor":"unknown","source":"external"}
+{"id":"01M1F5BNKGV013DX2RZ3X0VY2Q","ts":"2026-09-01T18:57:58.896Z","task":"TL-116","field":"blocked_by","from":["TL-1524"],"to":["TL-114"],"actor":"unknown","source":"external","reason":"unknown"}

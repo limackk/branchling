@@ -1,0 +1,5 @@
+{"id":"01M1E066RD2864WJE4CEEHSJZZ","ts":"2026-09-01T08:08:22.541Z","task":"TL-98","field":"__created__","from":"","to":"Role w dyspozytorze i petli: next --role, agent per rola","actor":"unknown","source":"external"}
+{"id":"01M1E4Z798H7DDSBMBHNHC7RBW","ts":"2026-09-01T09:31:56.584Z","task":"TL-98","field":"blocks","from":[],"to":["TL-1523"],"actor":"unknown","source":"external"}
+{"id":"01M1E69RE2JND04HX3W2MF29AV","ts":"2026-09-01T09:55:10.402Z","task":"TL-98","field":"related_docs","from":["docs/tasklog-global-tool.md"],"to":["docs/worktrail-global-tool.md"],"actor":"unknown","source":"external"}
+{"id":"01M1F5BNKGRJGM7YKK8YBP23BC","ts":"2026-09-01T18:57:58.896Z","task":"TL-98","field":"blocked_by","from":["TL-1497","TL-1506","TL-1507"],"to":["TL-87","TL-96","TL-97"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1F5BNKGRVMEFMP4X83S66W1","ts":"2026-09-01T18:57:58.896Z","task":"TL-98","field":"blocks","from":["TL-1523"],"to":["TL-113"],"actor":"unknown","source":"external","reason":"unknown"}

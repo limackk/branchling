@@ -1,0 +1,3 @@
+{"id":"01M1CEPQY6VZ7YEH00GMMCGPKR","ts":"2026-08-31T17:43:35.622Z","task":"TL-84","field":"__created__","from":"","to":"Rozstrzygnąć i zapisać: czy ręczna edycja pliku taska jest drogą wspieraną","actor":"agent:claude","source":"manual"}
+{"id":"01M1E69RE202FJS9H9HXPF5E4R","ts":"2026-09-01T09:55:10.402Z","task":"TL-84","field":"epic","from":"tasklog — narzędzie","to":"worktrail — narzędzie","actor":"unknown","source":"external"}
+{"id":"01M1E69RE2VB84W906R1EMM03G","ts":"2026-09-01T09:55:10.402Z","task":"TL-84","field":"related_docs","from":["CLAUDE.md","docs/tasklog-global-tool.md"],"to":["CLAUDE.md","docs/worktrail-global-tool.md"],"actor":"unknown","source":"external"}

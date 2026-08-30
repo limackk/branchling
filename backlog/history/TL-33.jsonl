@@ -1,0 +1,5 @@
+{"id":"01M19X67JWSN1G81GB2H34Y3VG","ts":"2026-08-30T17:58:59.932Z","task":"TL-33","field":"__created__","from":"","to":"Packaging — instalacja globalna i npx","actor":"unknown","source":"external"}
+{"id":"01M1A0KG6QNT18FG51V93GMZE0","ts":"2026-08-30T18:58:40.471Z","task":"TL-33","field":"status","from":"pending","to":"done","actor":"agent:claude","source":"hook"}
+{"id":"01M1A0KG6QVG0Y6VEB0KX741R9","ts":"2026-08-30T18:58:40.471Z","task":"TL-33","field":"owner","from":"unassigned","to":"claude","actor":"agent:claude","source":"hook"}
+{"id":"01M1E69RE2EY3ZQE4ETNW1S6EH","ts":"2026-09-01T09:55:10.402Z","task":"TL-33","field":"related_docs","from":["docs/tasklog-global-tool.md"],"to":["docs/worktrail-global-tool.md"],"actor":"unknown","source":"external"}
+{"id":"01M1F5BNKGN55C2JB301RGDBGP","ts":"2026-09-01T18:57:58.896Z","task":"TL-33","field":"blocks","from":["TL-1440"],"to":["TL-34"],"actor":"unknown","source":"external","reason":"unknown"}

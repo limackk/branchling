@@ -1,0 +1,3 @@
+{"id":"01M1E066RDTK9SVVPP3NCPYAGR","ts":"2026-09-01T08:08:22.541Z","task":"TL-88","field":"__created__","from":"","to":"tasklog quote — prognoza czasu i kosztu taska","actor":"unknown","source":"external"}
+{"id":"01M1E69RE25P76M9YKJ1G38YRF","ts":"2026-09-01T09:55:10.402Z","task":"TL-88","field":"title","from":"tasklog quote — prognoza czasu i kosztu taska","to":"worktrail quote — prognoza czasu i kosztu taska","actor":"unknown","source":"external"}
+{"id":"01M1F5BNKG2CK2PKTWMJHMDSS0","ts":"2026-09-01T18:57:58.896Z","task":"TL-88","field":"blocked_by","from":["TL-1426"],"to":["TL-29"],"actor":"unknown","source":"external","reason":"unknown"}

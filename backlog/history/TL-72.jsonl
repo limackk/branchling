@@ -1,0 +1,5 @@
+{"id":"01M1E04664DAKG84HCRG8A9DRY","ts":"2026-09-01T08:07:16.420Z","task":"TL-72","field":"__created__","from":"","to":"Koperta JSON: wersjonowany kontrakt zamiast gołej tablicy","actor":"unknown","source":"external"}
+{"id":"01M1E69RE25WQ2JHKEGHZ6RVEW","ts":"2026-09-01T09:55:10.402Z","task":"TL-72","field":"related_docs","from":["docs/tasklog-global-tool.md"],"to":["docs/worktrail-global-tool.md"],"actor":"unknown","source":"external"}
+{"id":"01M1EFWBNKCZ2E9SKPJ1FFRDQY","ts":"2026-09-01T12:42:37.107Z","task":"TL-72","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1EFWBNKFYJJZCM59WD0YGR3","ts":"2026-09-01T12:42:37.107Z","task":"TL-72","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1EGFDWR512B78YSGAG3R6JG","ts":"2026-09-01T12:53:01.976Z","task":"TL-72","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

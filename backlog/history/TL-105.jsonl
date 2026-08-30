@@ -1,0 +1,4 @@
+{"id":"01M1DVSP6XGPGSX2F2WYKYEBNY","ts":"2026-09-01T06:51:38.077Z","task":"TL-105","field":"__created__","from":"","to":"Uzasadnienie zmiany jedzie z zapisem — dziś ## Log ma zerową adopcję","actor":"agent:claude","source":"manual"}
+{"id":"01M1EB3NACP07XEJ6BZN1WGMQG","ts":"2026-09-01T11:19:13.484Z","task":"TL-105","field":"status","from":"pending","to":"in_progress","actor":"unknown","source":"external"}
+{"id":"01M1EB3NAC8TNVP08FABYNW5NM","ts":"2026-09-01T11:19:13.484Z","task":"TL-105","field":"owner","from":"unassigned","to":"agent:claude","actor":"unknown","source":"external"}
+{"id":"01M1EC4YKJK8HDCP5HN5NR8TT4","ts":"2026-09-01T11:37:24.338Z","task":"TL-105","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

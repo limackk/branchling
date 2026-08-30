@@ -1,0 +1,4 @@
+{"id":"01M1E066RDDKNNZQWPNDG3ZX90","ts":"2026-09-01T08:08:22.541Z","task":"TL-95","field":"__created__","from":"","to":"Adapter LLM do seeda: opis projektu w plan taskow","actor":"unknown","source":"external"}
+{"id":"01M1E69RE2H13VYJB75NMNZ9W2","ts":"2026-09-01T09:55:10.402Z","task":"TL-95","field":"related_docs","from":["docs/tasklog-global-tool.md"],"to":["docs/worktrail-global-tool.md"],"actor":"unknown","source":"external"}
+{"id":"01M1F3N6R8PQFKQ9JWVJNFHKGE","ts":"2026-09-01T18:28:14.216Z","task":"TL-95","field":"status","from":"blocked","to":"pending","actor":"agent:claude","source":"cli","reason":"blocked_by w całości zamknięte — status blocked był zwietrzały i wykluczał task z next"}
+{"id":"01M1F5BNKGY6G3GHQP191CPZ02","ts":"2026-09-01T18:57:58.896Z","task":"TL-95","field":"blocked_by","from":["TL-1504"],"to":["TL-94"],"actor":"unknown","source":"external","reason":"unknown"}

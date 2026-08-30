@@ -1,0 +1,5 @@
+{"id":"01M1DYPX4RF6A4C127TYBCSN1V","ts":"2026-09-01T07:42:32.600Z","task":"TL-111","field":"__created__","from":"","to":"migrate-prefix zostawia historie pod starym ID","actor":"unknown","source":"external"}
+{"id":"01M1DYSTZ722CFNREQ0H5S4XWD","ts":"2026-09-01T07:44:08.679Z","task":"TL-111","field":"title","from":"migrate-prefix zostawia historie pod starym ID","to":"migrate-prefix zostawia historię pod starym ID","actor":"unknown","source":"external"}
+{"id":"01M1ECEEQV0KX43NA8X8BBRPZ9","ts":"2026-09-01T11:42:35.771Z","task":"TL-111","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"manual","reason":"unknown"}
+{"id":"01M1ECEEQVM0DRX3B7NJNZ36A7","ts":"2026-09-01T11:42:35.771Z","task":"TL-111","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"manual","reason":"unknown"}
+{"id":"01M1ECSBPRK4BJB1KQNWSD7YTS","ts":"2026-09-01T11:48:33.112Z","task":"TL-111","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

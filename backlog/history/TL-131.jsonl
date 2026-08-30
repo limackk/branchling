@@ -1,0 +1,4 @@
+{"id":"01M1EYFGGBK5GNT9XZTDVG4VF7","ts":"2026-09-01T16:57:44.715Z","task":"TL-131","field":"__created__","from":"","to":"Guard --language nie widzi polskich etykiet w viewerze","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EYH29VE4BWTS5S62PD0Z3S","ts":"2026-09-01T16:58:35.707Z","task":"TL-131","field":"priority","from":"P1","to":"P2","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EYH29V363Z85NM5A1MXE57","ts":"2026-09-01T16:58:35.707Z","task":"TL-131","field":"confidence","from":"","to":"medium","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EYH29VFCN8XD7HJ0CHNKBP","ts":"2026-09-01T16:58:35.707Z","task":"TL-131","field":"epic","from":"","to":"Backlog viewer","actor":"unknown","source":"external","reason":"unknown"}

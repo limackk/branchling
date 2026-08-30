@@ -1,0 +1,6 @@
+{"id":"01M1DXJDP98VYC8VEJZ41KTFDJ","ts":"2026-09-01T07:22:37.129Z","task":"TL-109","field":"__created__","from":"","to":"Widok Execution w viewerze: fale, graf, linia teraz","actor":"unknown","source":"external"}
+{"id":"01M1DXP3TQF26VRFWT544B58C4","ts":"2026-09-01T07:24:38.103Z","task":"TL-109","field":"epic","from":"","to":"Plan wykonania","actor":"unknown","source":"external"}
+{"id":"01M1DXP3TQ0CRF7H7VP8VEGYC9","ts":"2026-09-01T07:24:38.103Z","task":"TL-109","field":"blocked_by","from":[],"to":["TL-1517"],"actor":"unknown","source":"external"}
+{"id":"01M1DXP3TQ09GWFP2J8P6VBCAM","ts":"2026-09-01T07:24:38.103Z","task":"TL-109","field":"blocks","from":[],"to":["TL-1520"],"actor":"unknown","source":"external"}
+{"id":"01M1F5BNKGFBK7F1BSYMN441FF","ts":"2026-09-01T18:57:58.896Z","task":"TL-109","field":"blocked_by","from":["TL-1517"],"to":["TL-107"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1F5BNKG1EPSR7QES5R6J1BG","ts":"2026-09-01T18:57:58.896Z","task":"TL-109","field":"blocks","from":["TL-1520"],"to":["TL-110"],"actor":"unknown","source":"external","reason":"unknown"}

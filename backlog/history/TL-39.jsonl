@@ -1,0 +1,2 @@
+{"id":"01M1B42152KQY7J8B4TBEF58MX","ts":"2026-08-31T05:18:16.738Z","task":"TL-39","field":"__created__","from":"","to":"Rekoncyliacja w drugim checkoucie dubluje __created__","actor":"unknown","source":"boot"}
+{"id":"01M1E69RE2HFVSJEZNED9DZE1A","ts":"2026-09-01T09:55:10.402Z","task":"TL-39","field":"related_docs","from":["docs/backlog-field-editing-history.md","docs/tasklog-state-and-sync.md"],"to":["docs/backlog-field-editing-history.md","docs/worktrail-state-and-sync.md"],"actor":"unknown","source":"external"}

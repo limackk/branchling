@@ -1,0 +1,4 @@
+{"id":"01M1DX1VJ5X93C3Y3EXJ7EYS9N","ts":"2026-09-01T07:13:34.277Z","task":"TL-48","field":"__created__","from":"","to":"LICENSE i metadane pakietu — dziś nikt nie może tego użyć","actor":"unknown","source":"boot"}
+{"id":"01M1E190S5TPRVAHVBE23ZQ0X1","ts":"2026-09-01T08:27:23.301Z","task":"TL-48","field":"status","from":"pending","to":"in_progress","actor":"unknown","source":"external"}
+{"id":"01M1E190S5AD92WHYH7KGS14R0","ts":"2026-09-01T08:27:23.301Z","task":"TL-48","field":"owner","from":"unassigned","to":"agent:claude","actor":"unknown","source":"external"}
+{"id":"01M1E69RE2DMMWQYW6VX6WQDVE","ts":"2026-09-01T09:55:10.402Z","task":"TL-48","field":"related_docs","from":["docs/tasklog-global-tool.md",".claude/skills/tasklog-release/SKILL.md"],"to":["docs/worktrail-global-tool.md",".claude/skills/worktrail-release/SKILL.md"],"actor":"unknown","source":"external"}

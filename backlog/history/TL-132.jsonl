@@ -1,0 +1,6 @@
+{"id":"01M1EYFGGB9HQ57XWZ23FH1WR2","ts":"2026-09-01T16:57:44.715Z","task":"TL-132","field":"__created__","from":"","to":"Przewodnik task-execution nie mówi o handoffie","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EYH29VF6V2AB55Q22FPPZH","ts":"2026-09-01T16:58:35.707Z","task":"TL-132","field":"priority","from":"P1","to":"P2","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EYH29VJ29VH9FYBZ89M42M","ts":"2026-09-01T16:58:35.707Z","task":"TL-132","field":"confidence","from":"","to":"medium","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EYH29VE7DT4463FYR9SW0A","ts":"2026-09-01T16:58:35.707Z","task":"TL-132","field":"epic","from":"","to":"Wyróżniki agentowe","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EYH29VRV25790G9KKMPY66","ts":"2026-09-01T16:58:35.707Z","task":"TL-132","field":"blocked_by","from":[],"to":["TL-1509"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1F5BNKGZV7FCXBJFVZ310C9","ts":"2026-09-01T18:57:58.896Z","task":"TL-132","field":"blocked_by","from":["TL-1509"],"to":["TL-99"],"actor":"unknown","source":"external","reason":"unknown"}

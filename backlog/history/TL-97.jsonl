@@ -1,0 +1,5 @@
+{"id":"01M1E066RD9QEQR7G4J2AG9G18","ts":"2026-09-01T08:08:22.541Z","task":"TL-97","field":"__created__","from":"","to":"Pole role taska: wymog roli ze slownika konfiguracji","actor":"unknown","source":"external"}
+{"id":"01M1EW001JYAB8QRS1F28HMC6E","ts":"2026-09-01T16:14:19.186Z","task":"TL-97","field":"status","from":"pending","to":"in_progress","actor":"agent:claude-code","source":"next","reason":"unknown"}
+{"id":"01M1EW001JPV5B56YRYM66MYSE","ts":"2026-09-01T16:14:19.186Z","task":"TL-97","field":"owner","from":"unassigned","to":"agent:claude-code","actor":"agent:claude-code","source":"next","reason":"unknown"}
+{"id":"01M1EWR6FCTHGFHDV6A9Z66564","ts":"2026-09-01T16:27:32.204Z","task":"TL-97","field":"status","from":"in_progress","to":"done","actor":"agent:claude-code","source":"done","reason":"proven"}
+{"id":"01M1F5BNKG4YZ6ZWC3QS11QPFX","ts":"2026-09-01T18:57:58.896Z","task":"TL-97","field":"blocks","from":["TL-1508","TL-1509","TL-1510"],"to":["TL-98","TL-99","TL-100"],"actor":"unknown","source":"external","reason":"unknown"}

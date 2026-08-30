@@ -1,0 +1,5 @@
+{"id":"01M18SRBQGNKPFC1T6CM1JNWYN","ts":"2026-08-30T07:39:45.264Z","task":"TL-25","field":"__created__","from":"","to":"Domknij walidację flag w 5 komendach tasklog (build/viewer/next-id/board/history)","actor":"unknown","source":"external"}
+{"id":"01M18TMRANTH88VJEYX3YYEYJG","ts":"2026-08-30T07:55:15.669Z","task":"TL-25","field":"status","from":"pending","to":"done","actor":"unknown","source":"external"}
+{"id":"01M18TMRAN8EWAMYW6CSJCC271","ts":"2026-08-30T07:55:15.669Z","task":"TL-25","field":"owner","from":"unassigned","to":"claude","actor":"unknown","source":"external"}
+{"id":"01M1E69RE2XBCFC3C7GVSBT7JP","ts":"2026-09-01T09:55:10.402Z","task":"TL-25","field":"title","from":"Domknij walidację flag w 5 komendach tasklog (build/viewer/next-id/board/history)","to":"Domknij walidację flag w 5 komendach worktrail (build/viewer/next-id/board/history)","actor":"unknown","source":"external"}
+{"id":"01M1E69RE2AVT992V89E4XH86A","ts":"2026-09-01T09:55:10.402Z","task":"TL-25","field":"epic","from":"tasklog — narzędzie","to":"worktrail — narzędzie","actor":"unknown","source":"external"}

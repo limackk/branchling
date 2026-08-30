@@ -1,0 +1,4 @@
+{"id":"01M1DX1VJ58D0MFWQFKE1AA1CS","ts":"2026-09-01T07:13:34.277Z","task":"TL-70","field":"__created__","from":"","to":"Komentarz przy polu szablonu wchodzi do wartości pola","actor":"unknown","source":"boot"}
+{"id":"01M1DZE3RZXNG9989TNVCEYB1W","ts":"2026-09-01T07:55:13.055Z","task":"TL-70","field":"status","from":"pending","to":"in_progress","actor":"unknown","source":"external"}
+{"id":"01M1DZE3RZWE3FDW0HGTCZRN14","ts":"2026-09-01T07:55:13.055Z","task":"TL-70","field":"owner","from":"unassigned","to":"agent:claude","actor":"unknown","source":"external"}
+{"id":"01M1DZTCBEDSNEMT2XGCFBC0EC","ts":"2026-09-01T08:01:55.054Z","task":"TL-70","field":"status","from":"in_progress","to":"done","actor":"unknown","source":"external"}

@@ -1,0 +1,7 @@
+{"id":"01M1EWNT5GAPT7Z2TC7JM7RQNN","ts":"2026-09-01T16:26:14.064Z","task":"TL-128","field":"__created__","from":"","to":"Polskie komunikaty asercji w scripts/tests/ wbrew konwencji \"cały kod po angielsku\"","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EWPS1SDAD5HGC6J5FCCYTV","ts":"2026-09-01T16:26:45.689Z","task":"TL-128","field":"priority","from":"P1","to":"P3","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EWPS1SBB6BDS7HBCK7X2N4","ts":"2026-09-01T16:26:45.689Z","task":"TL-128","field":"estimate","from":"2h","to":"30m","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EWPS1SGXEXSNA0ZDBFHC09","ts":"2026-09-01T16:26:45.689Z","task":"TL-128","field":"confidence","from":"","to":"high","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EWPS1SPAJTRHVKPBQRZG2Y","ts":"2026-09-01T16:26:45.689Z","task":"TL-128","field":"epic","from":"","to":"Higiena repozytorium","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EWPS1SKEKXGB89X5MXARWH","ts":"2026-09-01T16:26:45.689Z","task":"TL-128","field":"related_docs","from":[],"to":["CLAUDE.md"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1EWQ4HRY4BXWFDY0TC1176G","ts":"2026-09-01T16:26:57.464Z","task":"TL-128","field":"epic","from":"Higiena repozytorium","to":"worktrail — narzędzie","actor":"unknown","source":"external","reason":"unknown"}

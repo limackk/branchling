@@ -1,0 +1,4 @@
+{"id":"01M18SK529AR2ZSSHEMSWNP5CE","ts":"2026-08-30T07:36:54.601Z","task":"TL-23","field":"__created__","from":"","to":"tasklog init i stats — założenie backlogu i jego stan w terminalu","actor":"agent:claude","source":"cli"}
+{"id":"01M1E69RE2ZA3YZWF3A9W6F9Y5","ts":"2026-09-01T09:55:10.402Z","task":"TL-23","field":"title","from":"tasklog init i stats — założenie backlogu i jego stan w terminalu","to":"worktrail init i stats — założenie backlogu i jego stan w terminalu","actor":"unknown","source":"external"}
+{"id":"01M1E69RE2MRVPR3CFXXM461JZ","ts":"2026-09-01T09:55:10.402Z","task":"TL-23","field":"epic","from":"tasklog — narzędzie","to":"worktrail — narzędzie","actor":"unknown","source":"external"}
+{"id":"01M1E69RE2YCCXVGYQJ522E12P","ts":"2026-09-01T09:55:10.402Z","task":"TL-23","field":"related_docs","from":["backlog/README.md","docs/tasklog-state-and-sync.md"],"to":["backlog/README.md","docs/worktrail-state-and-sync.md"],"actor":"unknown","source":"external"}

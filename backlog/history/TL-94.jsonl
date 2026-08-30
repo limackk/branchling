@@ -1,0 +1,7 @@
+{"id":"01M1E066RDQ8E8XM0W8PZ54T3V","ts":"2026-09-01T08:08:22.541Z","task":"TL-94","field":"__created__","from":"","to":"tasklog seed — plan projektu jako wejście do backlogu","actor":"unknown","source":"external"}
+{"id":"01M1E69RE27KTMAPBRZ33ZN5A9","ts":"2026-09-01T09:55:10.402Z","task":"TL-94","field":"title","from":"tasklog seed — plan projektu jako wejście do backlogu","to":"worktrail seed — plan projektu jako wejście do backlogu","actor":"unknown","source":"external"}
+{"id":"01M1E69RE2XJ72YHVKTNGJYYN6","ts":"2026-09-01T09:55:10.402Z","task":"TL-94","field":"related_docs","from":["docs/tasklog-global-tool.md"],"to":["docs/worktrail-global-tool.md"],"actor":"unknown","source":"external"}
+{"id":"01M1ETDZARJYPC2D0GRZFE7WSX","ts":"2026-09-01T15:47:00.056Z","task":"TL-94","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1ETDZAR30HF8DX163TBXZSP","ts":"2026-09-01T15:47:00.056Z","task":"TL-94","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1EVGTMYE6F6A6DR5EF7FBE8","ts":"2026-09-01T16:06:02.142Z","task":"TL-94","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
+{"id":"01M1F5BNKGB316F5VARZTTB8TH","ts":"2026-09-01T18:57:58.896Z","task":"TL-94","field":"blocks","from":["TL-1505"],"to":["TL-95"],"actor":"unknown","source":"external","reason":"unknown"}

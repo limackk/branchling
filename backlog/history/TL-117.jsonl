@@ -1,0 +1,11 @@
+{"id":"01M1E6FKWFNHBPMVPPQPR6CP4M","ts":"2026-09-01T09:58:22.351Z","task":"TL-117","field":"__created__","from":"","to":"Nazwa produktu z jednej stałej, a nie z literału","actor":"unknown","source":"external"}
+{"id":"01M1E6GZ32SGAEESZKEJ7E3TM1","ts":"2026-09-01T09:59:06.594Z","task":"TL-117","field":"epic","from":"","to":"Backlog — publikacja open source","actor":"unknown","source":"external"}
+{"id":"01M1E6GZ32Q68W5Z5JJ8TCGBVH","ts":"2026-09-01T09:59:06.594Z","task":"TL-117","field":"labels","from":[],"to":["pre-launch"],"actor":"unknown","source":"external"}
+{"id":"01M1E6GZ32N0FX1WX4BYJV25TB","ts":"2026-09-01T09:59:06.594Z","task":"TL-117","field":"related_docs","from":[],"to":["CLAUDE.md"],"actor":"unknown","source":"external"}
+{"id":"01M1E6MKJYNYD294QDG9A7AYH5","ts":"2026-09-01T10:01:05.886Z","task":"TL-117","field":"__deleted__","from":"Nazwa produktu z jednej stałej, a nie z literału","to":"","actor":"unknown","source":"external"}
+{"id":"01M1E6MTK2RBRGYTMSHM6JWQJV","ts":"2026-09-01T10:01:13.058Z","task":"TL-117","field":"__created__","from":"","to":"Nazwa produktu z jednej stałej, a nie z literału","actor":"unknown","source":"external"}
+{"id":"01M1E6N37XZ56MNY5Q0CCGRVDG","ts":"2026-09-01T10:01:21.917Z","task":"TL-117","field":"__deleted__","from":"Nazwa produktu z jednej stałej, a nie z literału","to":"","actor":"unknown","source":"external"}
+{"id":"01M1E6NAGCHC5RJZPS743RTBY8","ts":"2026-09-01T10:01:29.356Z","task":"TL-117","field":"__created__","from":"","to":"Nazwa produktu z jednej stałej, a nie z literału","actor":"unknown","source":"external"}
+{"id":"01M1EA1E0JRXZNWZV3DRZ6XGRT","ts":"2026-09-01T11:00:31.890Z","task":"TL-117","field":"status","from":"pending","to":"in_progress","actor":"unknown","source":"external"}
+{"id":"01M1EA1E0J188F57SK4VDSJ6DQ","ts":"2026-09-01T11:00:31.890Z","task":"TL-117","field":"owner","from":"unassigned","to":"agent:claude","actor":"unknown","source":"external"}
+{"id":"01M1EAP7CXNWQ39JEWQ6M9JCX7","ts":"2026-09-01T11:11:53.245Z","task":"TL-117","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done"}

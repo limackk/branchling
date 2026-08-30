@@ -1,0 +1,3 @@
+{"id":"01M19X67JWTGFHX3SV3NCKNYDM","ts":"2026-08-30T17:58:59.932Z","task":"TL-35","field":"__created__","from":"","to":"Surowy log aktywności do katalogu domowego","actor":"unknown","source":"external"}
+{"id":"01M1E69RE28WQZHQMBT5KZJM0Q","ts":"2026-09-01T09:55:10.402Z","task":"TL-35","field":"related_docs","from":["docs/tasklog-global-tool.md","docs/backlog-time-tracking.md"],"to":["docs/worktrail-global-tool.md","docs/backlog-time-tracking.md"],"actor":"unknown","source":"external"}
+{"id":"01M1F5BNKGK0EQFSBKRGG8ZEKA","ts":"2026-09-01T18:57:58.896Z","task":"TL-35","field":"blocked_by","from":["TL-1425","TL-1440"],"to":["TL-28","TL-34"],"actor":"unknown","source":"external","reason":"unknown"}

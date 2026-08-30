@@ -1,0 +1,73 @@
+# Backlog configuration — this project's vocabularies.
+# The code knows the SHAPE of a field, this file knows the VALUES. An unknown
+# key fails the build.
+#
+# Everything in this repository is written in English, this file included. The
+# boundary is not what ships in the tarball but what a stranger reads when they
+# open the repository, and a configuration whose comments explain what a change
+# COSTS is exactly what such a reader needs. `worktrail check --language`
+# enforces this over the source (TL-32); the rest is a rule in CLAUDE.md,
+# because a guard cannot read intent.
+
+project_name: "worktrail"
+
+# The task id prefix (BL-1452). A project VALUE, not a fact about the code —
+# every pattern in the tool is built from it. Changing this line WITHOUT
+# renumbering the tree makes the tool stop seeing its own tasks; the way to
+# change it is `worktrail migrate-prefix --to <NEW>` (with `--dry-run` first).
+# To close gaps in the NUMBERS while keeping the prefix: `worktrail renumber`.
+task_id_prefix: TL
+
+
+# Task statuses. The ORDER matters — it is how the views are sorted.
+statuses: [pending, in_progress, blocked, done, cancelled]
+# Which statuses drop out of INDEX into archive/ and stop counting for the queue.
+archived_statuses: [done, cancelled]
+
+# Statuses that may not be entered without a stated reason (TL-105). The code
+# knows the SHAPE of the rule, this line knows the VALUES. With the key absent
+# the rule falls back to `archived_statuses` — leaving the queue is a decision
+# whose "why" cannot be reconstructed afterwards.
+#
+# This project deliberately does NOT list `done` here: the way into `done` is
+# `worktrail done`, which RUNS the verification and refuses on the first
+# failure, so the reason for that transition is the run itself, recorded beside
+# it as `proven`. Demanding a sentence here would produce "done" in the reason
+# field, which is noise. `blocked` and `cancelled` are the opposite case: there
+# the reason IS the whole content of the event.
+reason_required_statuses: [blocked, cancelled]
+
+priorities: [P0, P1, P2, P3]
+
+# Task kinds (TL-56). The values come from the TREE, not from the tool's
+# default: `types: [task]` stood here from the first commit and was never true —
+# tasks with `type: code` were already on disk by then. A placeholder rather
+# than a decision, so the reconciliation went the tree's way.
+#
+# `code` and `task` mean the SAME thing TODAY — ordinary work — and both are
+# actively written. That synonymy stays deliberately: collapsing it is a
+# migration over 59 files and a separate decision about the vocabulary, not a
+# side effect of fixing the mismatch (TL-123).
+#
+# `manual` is NOT a value here, although the tree carried it once: `manual` is a
+# kind of VERIFICATION (`verification: - manual:`), not a kind of task. Its only
+# carrier, TL-20, had a `manual:` entry in its `verification:` and purely code
+# work — the word crossed between axes and was corrected, not admitted to the
+# vocabulary.
+types: [task, code, bug]
+
+# Labels. `labels_closed: true` turns a typo into a build failure instead of a
+# new, silent label.
+labels: []
+labels_closed: false
+
+owners: [unassigned]
+estimates: [30m, 2h, 1d, 1w]
+
+# History actors — the namespace is mandatory:
+#   local:<nick>  declared locally, unverified
+#   agent:<name>  an automated write (a hook, CI)
+#   user:<id>     an authenticated account
+actors: [local:me, agent:claude]
+
+title_max_length: 60

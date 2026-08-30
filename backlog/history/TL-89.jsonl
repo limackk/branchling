@@ -1,0 +1,2 @@
+{"id":"01M1E066RD9HTDWJA2SMZ73NK1","ts":"2026-09-01T08:08:22.541Z","task":"TL-89","field":"__created__","from":"","to":"Komentarz PR z dowodami pracy: GitHub Action","actor":"unknown","source":"external"}
+{"id":"01M1E69RE2NFNNCMC5D6MPBQRE","ts":"2026-09-01T09:55:10.402Z","task":"TL-89","field":"related_docs","from":["docs/tasklog-state-and-sync.md","docs/backlog-time-tracking.md"],"to":["docs/worktrail-state-and-sync.md","docs/backlog-time-tracking.md"],"actor":"unknown","source":"external"}

@@ -1,0 +1,5 @@
+{"id":"01M1CEPQY6D9RBB0FR3R8Z9E79","ts":"2026-08-31T17:43:35.622Z","task":"TL-74","field":"estimate","from":"4h","to":"1d","actor":"agent:claude","source":"manual"}
+{"id":"01M1E69RE2RX7CPW2SAQRW7HDH","ts":"2026-09-01T09:55:10.402Z","task":"TL-74","field":"title","from":"tasklog instructions — instrukcje workflow wydaje CLI, nie plik w cudzym repo","to":"worktrail instructions — instrukcje workflow wydaje CLI, nie plik w cudzym repo","actor":"unknown","source":"external"}
+{"id":"01M1EJCJEEX0ZX63AXQZKE5CGC","ts":"2026-09-01T13:26:25.486Z","task":"TL-74","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1EJCJEE9T52JQEG6TCNXPVD","ts":"2026-09-01T13:26:25.486Z","task":"TL-74","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1EK8EC5QTWAZYSDW9MYB52C","ts":"2026-09-01T13:41:38.821Z","task":"TL-74","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

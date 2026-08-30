@@ -1,0 +1,4 @@
+{"id":"01M19PNBM1GRMRR6ESPZDVFDE6","ts":"2026-08-30T16:04:55.553Z","task":"TL-29","field":"__created__","from":"","to":"Kalibracja estymat z danych rzeczywistych","actor":"unknown","source":"external"}
+{"id":"01M1E066RDGEE02J0VP0TQFZDD","ts":"2026-09-01T08:08:22.541Z","task":"TL-29","field":"blocks","from":[],"to":["TL-1498"],"actor":"unknown","source":"external"}
+{"id":"01M1F5BNKGZRRE01RJZTG76GZD","ts":"2026-09-01T18:57:58.896Z","task":"TL-29","field":"blocked_by","from":["TL-1425"],"to":["TL-28"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1F5BNKGQ54N1VWH7G11M4DM","ts":"2026-09-01T18:57:58.896Z","task":"TL-29","field":"blocks","from":["TL-1498"],"to":["TL-88"],"actor":"unknown","source":"external","reason":"unknown"}

@@ -1,0 +1,4 @@
+{"id":"01M18TMRAN39YP96WSF0SDGJC8","ts":"2026-08-30T07:55:15.669Z","task":"TL-26","field":"__created__","from":"","to":"next-backlog-id.mjs nie znajduje niczego, gdy backlog jest korzeniem repozytorium git","actor":"unknown","source":"external"}
+{"id":"01M18V2AK1PG7Z43BH1MCAF3DD","ts":"2026-08-30T08:02:40.353Z","task":"TL-26","field":"status","from":"pending","to":"done","actor":"unknown","source":"external"}
+{"id":"01M18V2AK1X52MYNT06E9G7S66","ts":"2026-08-30T08:02:40.353Z","task":"TL-26","field":"owner","from":"unassigned","to":"claude","actor":"unknown","source":"external"}
+{"id":"01M1E69RE2QBDNTWEGC77P372D","ts":"2026-09-01T09:55:10.402Z","task":"TL-26","field":"epic","from":"tasklog — narzędzie","to":"worktrail — narzędzie","actor":"unknown","source":"external"}

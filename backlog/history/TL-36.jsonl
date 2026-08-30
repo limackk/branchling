@@ -1,0 +1,3 @@
+{"id":"01M19X67JWJ2XST7252V3KCNRY","ts":"2026-08-30T17:58:59.932Z","task":"TL-36","field":"__created__","from":"","to":"Widok przekrojowy nad wieloma projektami","actor":"unknown","source":"external"}
+{"id":"01M1E69RE2Z9F0J197B66NEYX9","ts":"2026-09-01T09:55:10.402Z","task":"TL-36","field":"related_docs","from":["docs/tasklog-global-tool.md"],"to":["docs/worktrail-global-tool.md"],"actor":"unknown","source":"external"}
+{"id":"01M1F5BNKG1EMN2TMTPVF6QC89","ts":"2026-09-01T18:57:58.896Z","task":"TL-36","field":"blocked_by","from":["TL-1440"],"to":["TL-34"],"actor":"unknown","source":"external","reason":"unknown"}

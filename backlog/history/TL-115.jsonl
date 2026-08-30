@@ -1,0 +1,5 @@
+{"id":"01M1E4TJRWWEPQKCN8FNM397DJ","ts":"2026-09-01T09:29:24.508Z","task":"TL-115","field":"__created__","from":"","to":"Panel decyzyjny w viewerze: co czeka na czlowieka","actor":"unknown","source":"external"}
+{"id":"01M1E4Y3GJJ3F0C5J0VMPCSTSN","ts":"2026-09-01T09:31:19.954Z","task":"TL-115","field":"status","from":"pending","to":"blocked","actor":"unknown","source":"external"}
+{"id":"01M1E4Y3GJNMD99YERS7WHGVX8","ts":"2026-09-01T09:31:19.954Z","task":"TL-115","field":"blocked_by","from":[],"to":["TL-1523","TL-1524"],"actor":"unknown","source":"external"}
+{"id":"01M1E4Y3GJZBBZVZWAXFMZ7P4Q","ts":"2026-09-01T09:31:19.954Z","task":"TL-115","field":"related_docs","from":[],"to":["docs/backlog-human-agent-decisions.md"],"actor":"unknown","source":"external"}
+{"id":"01M1F5BNKGTVBFFD4CS26TSTTM","ts":"2026-09-01T18:57:58.896Z","task":"TL-115","field":"blocked_by","from":["TL-1523","TL-1524"],"to":["TL-113","TL-114"],"actor":"unknown","source":"external","reason":"unknown"}

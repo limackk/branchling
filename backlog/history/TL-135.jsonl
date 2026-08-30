@@ -1,0 +1,8 @@
+{"id":"01M1F4K7XDH6A3M4JZNJR1W8M6","ts":"2026-09-01T18:44:38.445Z","task":"TL-135","field":"__created__","from":"","to":"Renumeracja backlogu od 1: mapa, migracja i przekierowania","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1F4N8G84F8PRFTXS04AEK25","ts":"2026-09-01T18:45:44.584Z","task":"TL-135","field":"priority","from":"P1","to":"P3","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1F4N8G8CNYNS2MQJYXGH2X6","ts":"2026-09-01T18:45:44.584Z","task":"TL-135","field":"estimate","from":"2h","to":"1w","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1F4N8G84HB8MCM5Z424JKH0","ts":"2026-09-01T18:45:44.584Z","task":"TL-135","field":"epic","from":"","to":"Integralność danych","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1F4T6PCBS8G4B4EZWSFRGXH","ts":"2026-09-01T18:48:26.572Z","task":"TL-135","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M1F4T6PCEE0T48QE7EKNC8NE","ts":"2026-09-01T18:48:26.572Z","task":"TL-135","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M1F5M6Q4T6J9S8AX6YJFGMZM","ts":"2026-09-01T19:02:38.564Z","task":"TL-135","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
+{"id":"01M1F5M6Q8YVT62Y888SQP39R0","ts":"2026-09-01T19:02:38.568Z","task":"TL-135","field":"__verified__","from":"","to":"W tym pliku stoi rozstrzygnięcie WARIANTU (A/B/C) z uzasadnieniem, albo task jest cancelled z powodem.","actor":"agent:claude","source":"done","reason":"proven"}

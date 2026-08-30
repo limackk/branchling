@@ -1,0 +1,104 @@
+---
+name: worktrail-cli
+description: Add or change a command in the worktrail CLI, or change anything it prints. Covers the command table in scripts/cli.mjs, flag validation, --help, --json, --dir, exit codes, error message shape, and the terminal output style (color, symbols, alignment, TTY and NO_COLOR handling). Use this skill whenever work touches scripts/cli.mjs, a scripts/*.mjs command, bin/worktrail.mjs, or anything a user reads in the terminal — including requests like "add a command", "the help is wrong", "add colors", "make the output prettier", "this error is unclear", "add --json to X".
+---
+
+# Building worktrail's terminal surface
+
+The CLI is what a developer meets before anything else, and this project is
+betting on developers liking it enough to push for it at work. That makes output
+a feature, not decoration. It is also the only surface where a mistake is
+invisible: a command that silently ignores a flag looks exactly like a command
+that worked.
+
+## How the CLI is wired
+
+`bin/worktrail.mjs` is a shim with no logic. `scripts/cli.mjs` holds the `COMMANDS`
+table and `resolveCommand()`, which is pure so tests can assert that `frobnicate`
+fails without launching anything. Each command is a standalone program in
+`scripts/`, spawned as a child process with its exit code propagated.
+
+That boundary is deliberate: **the command table, help and dispatch live in
+`cli.mjs`; flag validation and exit codes live in the command.** Keep it. Do not
+turn a command into an imported library "while you're in there" — that is a
+separate piece of work with its own test surface.
+
+## Adding a command
+
+1. Write `scripts/<name>.mjs` as a program that runs standalone.
+2. Register it in `COMMANDS` with a `summary` (one line, lowercase, says what it
+   does — this is what `worktrail --help` prints) and a `usage` string built from
+   the `PRODUCT_NAME` import, never a `"worktrail"` literal.
+3. Validate flags against an explicit allow-list and exit 2 on anything unknown,
+   naming the available flags. Copy the shape used in `query.mjs`.
+4. Accept `--dir` via `takeDirFlag()` from `paths.mjs`, and resolve the data
+   directory with `resolveBacklogDir()`. Never compute it with your own
+   `join(__dirname, "..")` — that is co-location pretending to be a rule, and it
+   breaks the moment the tool is installed globally.
+5. Handle `--help` yourself, printing the same `usage` text the table carries.
+6. If the command reads, give it `--json`. If it writes, make every input
+   reachable from flags. That is the whole extensibility model — there is no
+   plugin API.
+7. Add a test under `scripts/tests/`. Take the backlog directory from
+   `tests/_repo.mjs`, never by walking up from the test file.
+8. Update the command table row and any usage line in `README.md`.
+
+Run `node --test scripts/tests/*.test.mjs` before you call it done.
+
+## The contract every command owes the user
+
+| Concern | Rule |
+|---|---|
+| stdout | The answer, and only the answer. Pipeable. |
+| stderr | Diagnostics, warnings, errors. Never the answer. |
+| exit 0 | The question was answered — including "zero matches". |
+| exit 1 | The operation failed (I/O, guard violation, inconsistent state). |
+| exit 2 | The invocation was wrong (unknown flag, missing value, bad argument). |
+| `--json` | Same data as the human output, stable field names, nothing else on stdout. |
+| `--help` | Exits 0, prints to stdout, shows the command's own flags. |
+| unknown flag | Exits 2 and names the alternatives. Never ignored. |
+
+"Zero matches" exiting 0 matters: a script that treats an empty result as a
+failure will retry forever, and a person reading `exit 2` will look for a typo
+that isn't there.
+
+## Known gaps in the current implementation
+
+Measured on the tree, worth fixing before publication rather than after:
+
+- **`worktrail <command> --help` fails for most commands.** The top-level help
+  promises it; `build`, `viewer`, `next-id`, `board`, `history`, `new`, `init`
+  and `stats` answer with "unknown flag" and exit 2. Only `query`, `check` and
+  `migrate-prefix` honour it.
+- **`query --help` prints the module's source comment**, shebang line included.
+  It reads as an internal note, because it is one.
+- **Error prefixes leak internal script names**: `[build-backlog]`,
+  `[backlog-viewer]`, `next-backlog-id:`, `[backlog-history]`. A user who typed
+  `worktrail build` should be told `worktrail build:`.
+- **There is no color anywhere**, and therefore no `NO_COLOR` handling either.
+
+## Output style
+
+The full contract — palette, symbols, alignment, error anatomy, help layout, and
+how to detect whether coloring is allowed — is in
+[references/output-style.md](references/output-style.md). Read it before writing
+anything that prints, and before adding the first escape sequence to this
+codebase.
+
+Two rules worth carrying without opening the file:
+
+**Color is emphasis, never information.** Anything a color says must also be
+said by a word or a symbol, because the output will be read through a pipe, in a
+CI log, and by people who cannot distinguish the hues.
+
+**Style belongs in one module.** The moment a second file writes its own escape
+sequence, `NO_COLOR` becomes a per-file promise nobody can verify. Put it in
+`scripts/ui.mjs`, import it, and let the tests assert one thing.
+
+## Language
+
+Code and comments are English. User-facing strings are still Polish across most
+commands and are scheduled to become English before publication — when you touch
+a message, write the new one in English rather than adding to the debt, and keep
+the reasoning that the Polish comments carry. Those `PO CO` / `DLACZEGO` blocks
+hold measured justifications that will not survive being summarized.

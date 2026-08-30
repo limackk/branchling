@@ -1,0 +1,4 @@
+{"id":"01M1F602DAFFS0HBSZ2AV36KCQ","ts":"2026-09-01T19:09:07.370Z","task":"TL-137","field":"__created__","from":"","to":"Task bodies are Polish while the rule says English","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1F611S7GSJHF6GRYN0X4ZT9","ts":"2026-09-01T19:09:39.495Z","task":"TL-137","field":"estimate","from":"2h","to":"1w","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1F611S7JTDZVVWHBNVKQFVX","ts":"2026-09-01T19:09:39.495Z","task":"TL-137","field":"epic","from":"","to":"Backlog — publikacja open source","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1F6EAB8FJ9WH80DAD5HV0TM","ts":"2026-09-01T19:16:54.248Z","task":"TL-137","field":"title","from":"Task bodies are Polish while the rule says English","to":"Translate the last two Polish directories: tasks and docs","actor":"unknown","source":"external","reason":"unknown"}

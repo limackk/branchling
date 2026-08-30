@@ -1,0 +1,18 @@
+node_modules/
+*.tgz
+
+# The views are GENERATED from backlog/tasks/*.md — rebuild them with
+# `worktrail build`. The reason is not cosmetic: INDEX.yaml and
+# archive/done.yaml are sorted aggregates of ALL tasks, so every branch rewrites
+# the same file and two branches conflict even when they share no task.
+backlog/INDEX.yaml
+backlog/NOW.yaml
+backlog/archive/done.yaml
+backlog/boards/*/INDEX.yaml
+backlog/boards/*/NOW.yaml
+backlog/viewer.html
+
+# The local reconciliation reference point — NOT a source of truth.
+backlog/history/.snapshot.json
+
+.DS_Store

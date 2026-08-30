@@ -1,0 +1,7 @@
+{"id":"01M1ERWC7PHMVHZSY9JFJX63D7","ts":"2026-09-01T15:19:54.870Z","task":"TL-125","field":"__created__","from":"","to":"TL-1506 i TL-1511 wolaja worktrail close — komendy o tej nazwie nie ma","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1ERX7CFVZ7N63W0R60DF9VY","ts":"2026-09-01T15:20:22.671Z","task":"TL-125","field":"priority","from":"P1","to":"P2","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1ERX7CFAMYAFYT2F1159PS0","ts":"2026-09-01T15:20:22.671Z","task":"TL-125","field":"estimate","from":"2h","to":"30m","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1ERX7CFA5NWNK0DP3A81005","ts":"2026-09-01T15:20:22.671Z","task":"TL-125","field":"epic","from":"","to":"Wyróżniki agentowe","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1ERX7CF14G6E08C0YP6VRRP","ts":"2026-09-01T15:20:22.671Z","task":"TL-125","field":"blocks","from":[],"to":["TL-1506","TL-1511"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1F5BNKGR2GRY1ZT67G34JQV","ts":"2026-09-01T18:57:58.896Z","task":"TL-125","field":"title","from":"TL-1506 i TL-1511 wolaja worktrail close — komendy o tej nazwie nie ma","to":"TL-96 i TL-101 wolaja worktrail close — komendy o tej nazwie nie ma","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1F5BNKGQTV2455H7MBQEB8S","ts":"2026-09-01T18:57:58.896Z","task":"TL-125","field":"blocks","from":["TL-1506","TL-1511"],"to":["TL-96","TL-101"],"actor":"unknown","source":"external","reason":"unknown"}

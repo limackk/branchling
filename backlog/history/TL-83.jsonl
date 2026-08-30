@@ -1,0 +1,2 @@
+{"id":"01M1CEPQY6TQFJ34CDAFW24SFV","ts":"2026-08-31T17:43:35.622Z","task":"TL-83","field":"__created__","from":"","to":"Wejście komend piszących: enumy ze słowników i --append- zamiast wieloliniowych stringów","actor":"agent:claude","source":"manual"}
+{"id":"01M1E69RE2YJQZDS5CM0E54T84","ts":"2026-09-01T09:55:10.402Z","task":"TL-83","field":"related_docs","from":["docs/tasklog-global-tool.md"],"to":["docs/worktrail-global-tool.md"],"actor":"unknown","source":"external"}

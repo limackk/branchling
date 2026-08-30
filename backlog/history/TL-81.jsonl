@@ -1,0 +1,6 @@
+{"id":"01M1E046640FJWA2HMQAK4CCK3","ts":"2026-09-01T08:07:16.420Z","task":"TL-81","field":"__created__","from":"","to":"Kanały dystrybucji i kolizja nazwy tasklog w npx","actor":"unknown","source":"external"}
+{"id":"01M1E3NZRMW2RF24QMZMR33Z6K","ts":"2026-09-01T09:09:25.396Z","task":"TL-81","field":"priority","from":"P1","to":"P0","actor":"unknown","source":"external"}
+{"id":"01M1E69RE23PQ0XF17B9GHCZRT","ts":"2026-09-01T09:55:10.402Z","task":"TL-81","field":"title","from":"Kanały dystrybucji i kolizja nazwy tasklog w npx","to":"Kanały dystrybucji i kolizja nazwy worktrail w npx","actor":"unknown","source":"external"}
+{"id":"01M1E8KXFJJRDVRTHYM5YWXJG4","ts":"2026-09-01T10:35:40.402Z","task":"TL-81","field":"status","from":"pending","to":"in_progress","actor":"unknown","source":"external"}
+{"id":"01M1E8KXFJ3YF67BPD8DJ2H8N2","ts":"2026-09-01T10:35:40.402Z","task":"TL-81","field":"owner","from":"unassigned","to":"agent:claude","actor":"unknown","source":"external"}
+{"id":"01M1E8SJAFACPMED5Z51W178YP","ts":"2026-09-01T10:38:45.583Z","task":"TL-81","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done"}

@@ -1,0 +1,3 @@
+{"id":"01M1DX1VJ5FYZFEZBDA0ATES6P","ts":"2026-09-01T07:13:34.277Z","task":"TL-65","field":"__created__","from":"","to":"Rozstrzygnij import z istniejącego trackera zadań","actor":"unknown","source":"boot"}
+{"id":"01M1E69RE2TM0HQ90B5C9X3YXY","ts":"2026-09-01T09:55:10.402Z","task":"TL-65","field":"related_docs","from":["docs/tasklog-global-tool.md","docs/tasklog-state-and-sync.md"],"to":["docs/worktrail-global-tool.md","docs/worktrail-state-and-sync.md"],"actor":"unknown","source":"external"}
+{"id":"01M1F5BNKGY6M1HVY8NFC5JYRJ","ts":"2026-09-01T18:57:58.896Z","task":"TL-65","field":"blocks","from":["TL-1477"],"to":["TL-67"],"actor":"unknown","source":"external","reason":"unknown"}

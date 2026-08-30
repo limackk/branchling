@@ -1,0 +1,3 @@
+{"id":"01M1DX1VJ5VSEQJ6DMEZW21MR7","ts":"2026-09-01T07:13:34.277Z","task":"TL-58","field":"__created__","from":"","to":"Wartość zaczynająca się od myślnika oblewa w tasklog new","actor":"unknown","source":"boot"}
+{"id":"01M1E69RE2HG15K89J9ZA7NP8E","ts":"2026-09-01T09:55:10.402Z","task":"TL-58","field":"title","from":"Wartość zaczynająca się od myślnika oblewa w tasklog new","to":"Wartość zaczynająca się od myślnika oblewa w worktrail new","actor":"unknown","source":"external"}
+{"id":"01M1E69RE229SGVHM89WVD1VMD","ts":"2026-09-01T09:55:10.402Z","task":"TL-58","field":"related_docs","from":[".claude/skills/tasklog-cli/SKILL.md"],"to":[".claude/skills/worktrail-cli/SKILL.md"],"actor":"unknown","source":"external"}

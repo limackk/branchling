@@ -1,0 +1,318 @@
+#!/usr/bin/env node
+/**
+ * The `doctor` command — one answer to the question "is this set up correctly
+ * i co dalej" (TL-62).
+ *
+ * WHY. Adapting the tool to a project means editing `config.yaml`, and until
+ * TL-62 there was no way to check whether it had worked: you had to run one of
+ * the commands and hope that this particular one would notice the problem.
+ * Spreading the diagnostics across the guards is deliberate — they have different
+ * scopes — but there was no entry point that COLLECTS them and speaks plainly.
+ *
+ * DOCTOR FIXES NOTHING. A command that "while it is here" corrects somebody's
+ * configuration stops being a diagnosis and becomes a change nobody decided on.
+ * What it does give is the repair command next to each item — that is the
+ * difference between `doctor` and a `fix`, and the second one is a separate
+ * decision. This is why it reads the git rules from `git-rules.mjs` (reads only)
+ * and not from `init-backlog.mjs`, which knows how to write.
+ *
+ * THE CHECKS ARE CALLED, NOT REWRITTEN. A second set of rules would drift away
+ * from the first, and then `doctor` would say something different from `check` —
+ * which would be worse than not having it at all.
+ *
+ * EXIT CODES: 0 = no errors (warnings allowed), 1 = there is an error. A warning
+ * does NOT fail, because a `doctor` in CI that fails over a detail gets switched
+ * off, and then nobody sees anything.
+ *
+ * Testy: `node --test scripts/tests/doctor.test.mjs`
+ */
+
+import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { ConfigError, formatConfigError, loadConfig } from "./config.mjs";
+import { ATTRIBUTE_RULES, IGNORE_RULES, hasUnionMerge, insideGitRepo, trackedViews, unignoredViews } from "./git-rules.mjs";
+import { SNAPSHOT_FILE, loadSnapshot, readMigrations } from "./history.mjs";
+import { printJson } from "./json-envelope.mjs";
+import { PRODUCT_NAME as N } from "./product.mjs";
+import { MARK as UI_MARK, color, errColor, heading } from "./ui.mjs";
+import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { summarize } from "./stats.mjs";
+import { auditVocabulary } from "./task-fields.mjs";
+import { detectPrefixMismatch, taskIdPatterns } from "./task-id.mjs";
+import { listTaskFileNames, readTaskMetas } from "./task-io.mjs";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+
+export const USAGE = [
+  `${N} doctor [--dir <path>] [--json]`,
+  "",
+  "  collects the configuration, tree and git checks into one answer",
+  "  it fixes NOTHING — it prints the repair command next to each problem",
+  "  exit code: 0 = no errors (warnings allowed), 1 = there is an error",
+].join("\n");
+
+const OK = "ok";
+const WARN = "warn";
+const ERR = "error";
+const INFO = "info";
+
+// The symbol carries the meaning, the colour only emphasises it — a `doctor` row
+// read without colour (in a pipe, in CI) has to mean exactly the same thing.
+const MARK = {
+  [OK]: color.ok(UI_MARK.ok),
+  [WARN]: color.warn(UI_MARK.warn),
+  [ERR]: color.err(UI_MARK.err),
+  [INFO]: color.dim(UI_MARK.bullet),
+};
+/** The width of the symbol WITHOUT the escape sequence — otherwise colour throws
+ *  the column alignment out. */
+const MARK_WIDTH = 1;
+
+function check(id, title, status, detail, fix) {
+  return { id, title, status, detail: detail || "", fix: fix || null };
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Pojedyncze sprawdzenia
+// ──────────────────────────────────────────────────────────────────────────
+
+function checkConfig(root) {
+  try {
+    const config = loadConfig(root);
+    const keys = existsSync(backlogPaths(root).configPath) ? "config.yaml reads in full" : "no config.yaml — the built-in defaults apply";
+    return { config, row: check("config", "configuration", OK, keys) };
+  } catch (e) {
+    if (!(e instanceof ConfigError)) throw e;
+    return {
+      config: null,
+      row: check("config", "configuration", ERR, e.problems.join("; "), "fix " + e.configPath),
+      error: e,
+    };
+  }
+}
+
+function checkVocabulary(root, config) {
+  const metas = readTaskMetas(backlogPaths(root).tasksDir, config);
+  const divergent = auditVocabulary(metas, config);
+  if (!divergent.length) return { metas, row: check("vocabulary", "vocabulary vs tree", OK, "the field values fit inside the vocabularies") };
+
+  const first = divergent[0];
+  const detail = divergent
+    .map((d) => "`" + d.field + "`: " + d.found.map((f) => f.value + " ×" + f.count).join(", ") + " outside [" + d.allowed.join(", ") + "]")
+    .join("; ");
+  return {
+    metas,
+    row: check("vocabulary", "vocabulary vs tree", ERR, detail,
+      "add the missing values to `" + first.dictionary + ":` in config.yaml, or correct the tasks"),
+  };
+}
+
+function checkPrefix(root, config) {
+  const names = listTaskFileNames(backlogPaths(root).tasksDir, { taskId: { file: /.*/ } });
+  const mismatch = detectPrefixMismatch(names, config.taskIdPrefix);
+  if (mismatch.ok) {
+    return check("prefix", "id prefix", OK, "config.yaml and the tree both say `" + config.taskIdPrefix + "`");
+  }
+  return check("prefix", "id prefix", ERR,
+    "config.yaml says `" + mismatch.expected + "`, the tree uses `" + mismatch.found.join("`, `") + "`",
+    N + " migrate-prefix --to " + mismatch.expected + " --dry-run");
+}
+
+/**
+ * Is the history's reference point keyed by the prefix the tree actually uses?
+ *
+ * WHY THIS ROW EXISTS (TL-111). A snapshot left on the previous prefix does not
+ * break anything visibly — it makes the NEXT reconcile record the whole backlog
+ * as deleted and created again, into a versioned log that merges by union and
+ * therefore keeps the tombstones for good. That is a defect noticed by a human
+ * reading `git status`, which is exactly the kind the tool should notice first.
+ *
+ * WHY IT DOES NOT REPORT DRIFT IN GENERAL. A snapshot missing a task added five
+ * minutes ago is the normal state between two reconciles, and a row that is
+ * amber whenever somebody is working would be read as noise within a day. Only
+ * a PREFIX that no longer matches is reported, because only that one is a
+ * migration that did not finish.
+ */
+function checkSnapshot(root, config) {
+  const snapshot = loadSnapshot(root);
+  if (!snapshot) {
+    return check("snapshot", "history reference point", INFO,
+      "no " + SNAPSHOT_FILE + " yet — the first run writes one and records no entries");
+  }
+  const pat = taskIdPatterns(config.taskIdPrefix);
+  const foreign = Object.keys(snapshot.tasks || {}).filter((id) => !pat.id.test(id));
+  if (!foreign.length) {
+    return check("snapshot", "history reference point", OK,
+      "keyed by `" + config.taskIdPrefix + "`, the same prefix as the tree");
+  }
+
+  // A record covering them means the repointing is already decided and the next
+  // reconcile carries it out — a fact in transit, not a problem.
+  const records = readMigrations(root).filter((m) => m.to === config.taskIdPrefix);
+  const uncovered = foreign.filter((id) => !records.some((m) => taskIdPatterns(m.from).id.test(id)));
+  if (!uncovered.length) {
+    return check("snapshot", "history reference point", INFO,
+      foreign.length + " key(s) still on a previous prefix — the recorded migration repoints them on the next run");
+  }
+  return check("snapshot", "history reference point", WARN,
+    uncovered.length + " key(s) under a prefix the tree does not use (" + uncovered.slice(0, 3).join(", ") +
+      ") and no migration record explains it — the next reconcile will log them as deleted",
+    "rm " + join("history", SNAPSHOT_FILE) + "   # drop the stale reference point instead of recording tombstones");
+}
+
+function checkGitIgnore(root) {
+  if (!insideGitRepo(root)) {
+    return [check("git-repo", "git", INFO, "this is not a repository — the rules have nothing to apply to")];
+  }
+  const rows = [];
+  const unignored = unignoredViews(root);
+  const tracked = trackedViews(root);
+  const stillUnignored = unignored.filter((p) => tracked.indexOf(p) < 0);
+
+  if (stillUnignored.length) {
+    rows.push(check("git-ignore", "git ignores the views", ERR,
+      "not ignored: " + stillUnignored.join(", ") + " — a committed aggregate conflicts between branches that share no task",
+      "add to .gitignore: " + IGNORE_RULES.join(" ")));
+  } else {
+    rows.push(check("git-ignore", "git ignores the views", OK, "INDEX.yaml, NOW.yaml, viewer.html and the rest are outside git"));
+  }
+
+  if (tracked.length) {
+    rows.push(check("git-tracked", "views out of the index", ERR,
+      "already tracked: " + tracked.join(", ") + " — ignore rules will not undo that",
+      "git rm --cached " + tracked.join(" ")));
+  }
+
+  rows.push(hasUnionMerge(root)
+    ? check("git-merge", "history merges by union of lines", OK, ATTRIBUTE_RULES[0])
+    : check("git-merge", "history merges by union of lines", WARN,
+        "no `merge=union` — an append-only log will conflict on a merge",
+        "add to .gitattributes: " + ATTRIBUTE_RULES[0]));
+  return rows;
+}
+
+function checkGuards(root) {
+  const r = spawnSync(process.execPath, [join(HERE, "cli.mjs"), "check", "--dir", root], { encoding: "utf8", timeout: 60_000 });
+  if (r.status === 0) return check("guards", "backlog guards", OK, "id collisions, boards, references — all green");
+  const firstProblem = String(r.stderr || r.stdout || "").split("\n").filter(Boolean)[0] || "a guard failed";
+  return check("guards", "backlog guards", ERR, firstProblem, N + " check");
+}
+
+function checkVolume(metas, config) {
+  const s = summarize(metas, config);
+  return check("volume", "tasks", INFO,
+    s.total + " (" + s.active + " active, " + s.archived + " archived)");
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// The run
+// ──────────────────────────────────────────────────────────────────────────
+
+export function diagnose(root) {
+  const rows = [];
+  const { config, row: configRow } = checkConfig(root);
+  rows.push(configRow);
+
+  if (!config) {
+    // Without a configuration that could be read, the remaining questions make no
+    // sense: they would be counting under a vocabulary we do not know. "Not
+    // checked" is more honest than a result.
+    for (const [id, title] of [["vocabulary", "vocabulary vs tree"], ["prefix", "id prefix"], ["snapshot", "history reference point"], ["guards", "backlog guards"], ["volume", "tasks"]]) {
+      rows.push(check(id, title, INFO, "not checked — the configuration comes first"));
+    }
+    rows.push(...checkGitIgnore(root));
+    return rows;
+  }
+
+  const { metas, row: vocabRow } = checkVocabulary(root, config);
+  rows.push(vocabRow);
+  rows.push(checkPrefix(root, config));
+  rows.push(checkSnapshot(root, config));
+  rows.push(...checkGitIgnore(root));
+  rows.push(checkGuards(root));
+  rows.push(checkVolume(metas, config));
+  return rows;
+}
+
+/** What to do next — depending on what doctor saw. */
+export function nextStep(rows) {
+  if (rows.some((r) => r.status === ERR)) return N + " doctor   # once it is fixed";
+  const volume = rows.find((r) => r.id === "volume");
+  if (volume && /^0 /.test(volume.detail)) return N + ' new --title "…"   # the backlog is empty';
+  return N + "   # the viewer, in your browser";
+}
+
+/** Singular or plural, spelled out. Written as a function rather than an inline
+ *  `n === 1 ? …` because "1 error(s)" is not text — it is a programmer's note
+ *  seen by a user. */
+function plural(n, one, many) {
+  return n === 1 ? one : many;
+}
+
+function render(root, rows) {
+  const width = Math.max(...rows.map((r) => r.title.length));
+  const out = [heading(N + " doctor — " + root), ""];
+  for (const r of rows) {
+    out.push("  " + MARK[r.status] + " " + r.title.padEnd(width) + "  " + r.detail);
+    if (r.fix) out.push("      " + color.id(UI_MARK.arrow + " " + r.fix));
+  }
+  const errors = rows.filter((r) => r.status === ERR).length;
+  const warns = rows.filter((r) => r.status === WARN).length;
+  out.push("");
+  out.push("  " + (errors ? errors + " " + plural(errors, "error", "errors") : "no errors") +
+    (warns ? ", " + warns + " " + plural(warns, "warning", "warnings") : ""));
+  out.push("  next: " + nextStep(rows));
+  return out.join("\n");
+}
+
+const KNOWN_FLAGS = ["--json", "--help", "-h"];
+
+export function main(argv) {
+  const cli = takeDirFlag(argv);
+  for (const a of cli.argv) {
+    if (KNOWN_FLAGS.indexOf(a) < 0) {
+      console.error(N + " doctor: unknown flag: " + a);
+      console.error("  available: " + KNOWN_FLAGS.join(" ") + " --dir <path>");
+      return 2;
+    }
+  }
+  if (cli.argv.some((a) => a === "--help" || a === "-h")) {
+    console.log(USAGE);
+    return 0;
+  }
+  const asJson = cli.argv.includes("--json");
+
+  let root;
+  try {
+    root = resolveBacklogDir({ dir: cli.dir, moduleDir: HERE }).root;
+  } catch {
+    // A missing backlog is an ANSWER here, not a crash — this is the command
+    // somebody who has just installed the tool will reach for by reflex.
+    const rows = [check("backlog", "backlog", ERR, "no backlog directory found", N + " init --dir ./backlog")];
+    if (asJson) printJson("doctor", { ok: false, root: null, next: nextStep(rows), checks: rows });
+    else {
+      console.error(errColor.err(UI_MARK.err) + " " + errColor.bold(N + " doctor") + ": no backlog here");
+      console.error("  → create one:            " + N + " init --dir ./backlog");
+      console.error("  → or point at an existing one: " + N + " doctor --dir <path>");
+    }
+    return 1;
+  }
+
+  const rows = diagnose(root);
+  const ok = !rows.some((r) => r.status === ERR);
+
+  if (asJson) {
+    // No ornament and no colour — this is the entry point for CI, not for the eye.
+    printJson("doctor", { ok, root, next: nextStep(rows), checks: rows });
+  } else {
+    console.log(render(root, rows));
+  }
+  return ok ? 0 : 1;
+}
+
+if (process.argv[1] && process.argv[1].endsWith("doctor.mjs")) {
+  process.exit(main(process.argv.slice(2)));
+}

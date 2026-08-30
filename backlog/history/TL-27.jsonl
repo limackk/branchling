@@ -1,0 +1,3 @@
+{"id":"01M19PNBM1MXAX7KXVDC2W1F9W","ts":"2026-08-30T16:04:55.553Z","task":"TL-27","field":"__created__","from":"","to":"Pomiar czasu pracy — fundament i uczciwy punkt zero","actor":"unknown","source":"external"}
+{"id":"01M19QJREHCPGXEZY505990QNJ","ts":"2026-08-30T16:20:58.961Z","task":"TL-27","field":"blocks","from":["BL-1425"],"to":["BL-1425","BL-1429"],"actor":"unknown","source":"external"}
+{"id":"01M1F5BNKGD4V050W7G1T22307","ts":"2026-09-01T18:57:58.896Z","task":"TL-27","field":"blocks","from":["TL-1425","TL-1429"],"to":["TL-28","TL-31"],"actor":"unknown","source":"external","reason":"unknown"}

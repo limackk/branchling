@@ -1,0 +1,7 @@
+{"id":"01M1DXJDP9N2E99DP7M2AHJJ47","ts":"2026-09-01T07:22:37.129Z","task":"TL-107","field":"__created__","from":"","to":"Plan wykonania: plan.yaml, parser i guard spójności","actor":"unknown","source":"external"}
+{"id":"01M1DXM24BY1VV9DGH5TGG43PZ","ts":"2026-09-01T07:23:30.827Z","task":"TL-107","field":"epic","from":"","to":"Plan wykonania","actor":"unknown","source":"external"}
+{"id":"01M1DXM24BTC86EN1ZMGG5E6S7","ts":"2026-09-01T07:23:30.827Z","task":"TL-107","field":"blocks","from":[],"to":["TL-1518","TL-1519"],"actor":"unknown","source":"external"}
+{"id":"01M1F25000VFZJ53PV3CPSWC75","ts":"2026-09-01T18:01:54.432Z","task":"TL-107","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1F250004C0X3AD2K4M30E3R","ts":"2026-09-01T18:01:54.432Z","task":"TL-107","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1F2GSJH3AJEFFAVBHBS60J2","ts":"2026-09-01T18:08:21.073Z","task":"TL-107","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
+{"id":"01M1F5BNKGRA87RTG2580J51EW","ts":"2026-09-01T18:57:58.896Z","task":"TL-107","field":"blocks","from":["TL-1518","TL-1519"],"to":["TL-108","TL-109"],"actor":"unknown","source":"external","reason":"unknown"}

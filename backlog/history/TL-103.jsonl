@@ -1,0 +1,2 @@
+{"id":"01M1DSM4P7N4YDFE341RYM0JQP","ts":"2026-09-01T06:13:39.143Z","task":"TL-103","field":"__created__","from":"","to":"Materiał launchowy — pomiar 27% jako teza i Show HN","actor":"agent:claude","source":"manual"}
+{"id":"01M1F5BNKG7GAYB91P0FA8S596","ts":"2026-09-01T18:57:58.896Z","task":"TL-103","field":"blocked_by","from":["TL-1512"],"to":["TL-102"],"actor":"unknown","source":"external","reason":"unknown"}

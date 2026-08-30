@@ -1,0 +1,2 @@
+{"id":"01M1DX1VJ55KWA2QEVQB7AY7ZJ","ts":"2026-09-01T07:13:34.277Z","task":"TL-55","field":"__created__","from":"","to":"Eksport viewera do jednego pliku do wysłania","actor":"unknown","source":"boot"}
+{"id":"01M1E69RE2NSKZA4SZ818J7Z2M","ts":"2026-09-01T09:55:10.402Z","task":"TL-55","field":"related_docs","from":[".claude/skills/tasklog-viewer/SKILL.md"],"to":[".claude/skills/worktrail-viewer/SKILL.md"],"actor":"unknown","source":"external"}

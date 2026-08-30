@@ -1,0 +1,6 @@
+{"id":"01M1E066RDFSYHSG52QQ3HWJZV","ts":"2026-09-01T08:08:22.541Z","task":"TL-93","field":"__created__","from":"","to":"Bramka weryfikacji w tasklog close","actor":"unknown","source":"external"}
+{"id":"01M1E69RE2SH1ZBE3YSX4PHNB6","ts":"2026-09-01T09:55:10.402Z","task":"TL-93","field":"title","from":"Bramka weryfikacji w tasklog close","to":"Bramka weryfikacji w worktrail close","actor":"unknown","source":"external"}
+{"id":"01M1ERGVRCXR9E35NHP0BAZS0N","ts":"2026-09-01T15:13:37.548Z","task":"TL-93","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1ERGVRCMT4NDZDAYWAN3TT5","ts":"2026-09-01T15:13:37.548Z","task":"TL-93","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1ERVQGJ5Q5BFNFVB5RQ1SEG","ts":"2026-09-01T15:19:33.650Z","task":"TL-93","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
+{"id":"01M1F5BNKGFTA8ZSS7X4Z4GSN6","ts":"2026-09-01T18:57:58.896Z","task":"TL-93","field":"blocks","from":["TL-1506","TL-1511"],"to":["TL-96","TL-101"],"actor":"unknown","source":"external","reason":"unknown"}

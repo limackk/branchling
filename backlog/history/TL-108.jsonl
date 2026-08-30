@@ -1,0 +1,8 @@
+{"id":"01M1DXJDP939CYRZ1NRVN6PSM9","ts":"2026-09-01T07:22:37.129Z","task":"TL-108","field":"__created__","from":"","to":"Komenda tasklog plan z --json: stan wykonania planu","actor":"unknown","source":"external"}
+{"id":"01M1DXMY65DCGZ8PPEQNECJD33","ts":"2026-09-01T07:23:59.557Z","task":"TL-108","field":"epic","from":"","to":"Plan wykonania","actor":"unknown","source":"external"}
+{"id":"01M1DXMY65KTNH8158CVTPQ0RB","ts":"2026-09-01T07:23:59.557Z","task":"TL-108","field":"blocked_by","from":[],"to":["TL-1517"],"actor":"unknown","source":"external"}
+{"id":"01M1E69RE2TMETTCAEZ0D456V6","ts":"2026-09-01T09:55:10.402Z","task":"TL-108","field":"title","from":"Komenda tasklog plan z --json: stan wykonania planu","to":"Komenda worktrail plan z --json: stan wykonania planu","actor":"unknown","source":"external"}
+{"id":"01M1F2K77RMZEHQAVC1WJNZBRE","ts":"2026-09-01T18:09:40.600Z","task":"TL-108","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1F2K77RY8ZMZGX3NMZBENKT","ts":"2026-09-01T18:09:40.600Z","task":"TL-108","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1F30S63PZQM2FTZNCZCXEEY","ts":"2026-09-01T18:17:04.963Z","task":"TL-108","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
+{"id":"01M1F5BNKGQ71XQ499FKS2ZH28","ts":"2026-09-01T18:57:58.896Z","task":"TL-108","field":"blocked_by","from":["TL-1517"],"to":["TL-107"],"actor":"unknown","source":"external","reason":"unknown"}

@@ -1,0 +1,3 @@
+{"id":"01M19YZJ42Q0WV650VVS5YMA5G","ts":"2026-08-30T18:30:18.498Z","task":"TL-37","field":"__created__","from":"","to":"Oczyść dokumenty z kontekstu the origin project przed publikacją","actor":"unknown","source":"external"}
+{"id":"01M19ZB682KBGM3ASEKSZF1SP0","ts":"2026-08-30T18:36:39.554Z","task":"TL-37","field":"title","from":"Oczyść dokumenty z kontekstu the origin project przed publikacją","to":"Rozdziel dokumenty — mechanizm jedzie, pomiary zostają","actor":"unknown","source":"external"}
+{"id":"01M1E69RE21V2XREVK92X04N57","ts":"2026-09-01T09:55:10.402Z","task":"TL-37","field":"related_docs","from":["origin#docs/architecture/tasklog-extraction.md"],"to":["origin#docs/architecture/worktrail-extraction.md"],"actor":"unknown","source":"external"}

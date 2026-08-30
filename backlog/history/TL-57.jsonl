@@ -1,0 +1,2 @@
+{"id":"01M1DX1VJ53ERBRVJ2PHMEBN66","ts":"2026-09-01T07:13:34.277Z","task":"TL-57","field":"__created__","from":"","to":"Flaga --json na komendach czytających: check, next-id, board","actor":"unknown","source":"boot"}
+{"id":"01M1E69RE2BPPWC0M83XWHR5BZ","ts":"2026-09-01T09:55:10.402Z","task":"TL-57","field":"related_docs","from":["docs/tasklog-global-tool.md",".claude/skills/tasklog-cli/SKILL.md"],"to":["docs/worktrail-global-tool.md",".claude/skills/worktrail-cli/SKILL.md"],"actor":"unknown","source":"external"}

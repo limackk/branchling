@@ -1,0 +1,2 @@
+{"id":"01M19PNBM1R5XB4VGEXXDQAJTJ","ts":"2026-08-30T16:04:55.553Z","task":"TL-30","field":"__created__","from":"","to":"Adapter tokenów i kosztu sesji","actor":"unknown","source":"external"}
+{"id":"01M1F5BNKGMC6F6B6TYD4SCN66","ts":"2026-09-01T18:57:58.896Z","task":"TL-30","field":"blocked_by","from":["TL-1425"],"to":["TL-28"],"actor":"unknown","source":"external","reason":"unknown"}

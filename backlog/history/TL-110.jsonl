@@ -1,0 +1,5 @@
+{"id":"01M1DXJDP96RBSCF282GC94MBA","ts":"2026-09-01T07:22:37.129Z","task":"TL-110","field":"__created__","from":"","to":"Sciezka krytyczna i animacje widoku Execution","actor":"unknown","source":"external"}
+{"id":"01M1DXQ0MVH3TK0HG3HRA7MMSR","ts":"2026-09-01T07:25:07.611Z","task":"TL-110","field":"title","from":"Sciezka krytyczna i animacje widoku Execution","to":"Ścieżka krytyczna i animacje widoku Execution","actor":"unknown","source":"external"}
+{"id":"01M1DXQ0MV00J4E1TQKG4K5T6V","ts":"2026-09-01T07:25:07.611Z","task":"TL-110","field":"epic","from":"","to":"Plan wykonania","actor":"unknown","source":"external"}
+{"id":"01M1DXQ0MVDGQE3H6EKMBBG9WT","ts":"2026-09-01T07:25:07.611Z","task":"TL-110","field":"blocked_by","from":[],"to":["TL-1519"],"actor":"unknown","source":"external"}
+{"id":"01M1F5BNKG8EEWVTXTC10AW1G4","ts":"2026-09-01T18:57:58.896Z","task":"TL-110","field":"blocked_by","from":["TL-1519"],"to":["TL-109"],"actor":"unknown","source":"external","reason":"unknown"}

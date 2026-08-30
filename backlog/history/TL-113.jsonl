@@ -1,0 +1,7 @@
+{"id":"01M1E4TJRWWR05814RQ0H1571Q","ts":"2026-09-01T09:29:24.508Z","task":"TL-113","field":"__created__","from":"","to":"Pole executor: wymog czlowieka egzekwowany w dyspozytorze","actor":"unknown","source":"external"}
+{"id":"01M1E4W6RGDGDYCHY3YQQ0BETF","ts":"2026-09-01T09:30:17.744Z","task":"TL-113","field":"status","from":"pending","to":"blocked","actor":"unknown","source":"external"}
+{"id":"01M1E4W6RGRS059BK1E4YQMD1S","ts":"2026-09-01T09:30:17.744Z","task":"TL-113","field":"blocked_by","from":[],"to":["TL-1508"],"actor":"unknown","source":"external"}
+{"id":"01M1E4W6RG6YVE0Z9HX0X1Z89M","ts":"2026-09-01T09:30:17.744Z","task":"TL-113","field":"blocks","from":[],"to":["TL-1525"],"actor":"unknown","source":"external"}
+{"id":"01M1E4W6RG8P2H29YQPBAG76G5","ts":"2026-09-01T09:30:17.744Z","task":"TL-113","field":"related_docs","from":[],"to":["docs/backlog-human-agent-decisions.md"],"actor":"unknown","source":"external"}
+{"id":"01M1F5BNKG7SHW74YNTYG1TS2A","ts":"2026-09-01T18:57:58.896Z","task":"TL-113","field":"blocked_by","from":["TL-1508"],"to":["TL-98"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1F5BNKGCZBBGR9NF40JX2R3","ts":"2026-09-01T18:57:58.896Z","task":"TL-113","field":"blocks","from":["TL-1525"],"to":["TL-115"],"actor":"unknown","source":"external","reason":"unknown"}

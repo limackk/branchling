@@ -1,0 +1,4 @@
+{"id":"01M1DX1VJ5HTHCHF0TKBSV216C","ts":"2026-09-01T07:13:34.277Z","task":"TL-53","field":"__created__","from":"","to":"CI, CONTRIBUTING i szablony zgłoszeń przed publikacją","actor":"unknown","source":"boot"}
+{"id":"01M1E3P8P9WN5AV01QYQSE8JNM","ts":"2026-09-01T09:09:34.537Z","task":"TL-53","field":"blocked_by","from":[],"to":["TL-1522"],"actor":"unknown","source":"external"}
+{"id":"01M1E69RE273PXK95W66VRBFEK","ts":"2026-09-01T09:55:10.402Z","task":"TL-53","field":"related_docs","from":[".claude/skills/tasklog-release/SKILL.md"],"to":[".claude/skills/worktrail-release/SKILL.md"],"actor":"unknown","source":"external"}
+{"id":"01M1F5BNKGPMM449MRRG5VYYWB","ts":"2026-09-01T18:57:58.896Z","task":"TL-53","field":"blocked_by","from":["TL-1522"],"to":["TL-112"],"actor":"unknown","source":"external","reason":"unknown"}
