@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Plan wykonania"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:session
 estimate: 1d
 created: 2026-09-01
 updated: 2026-09-01

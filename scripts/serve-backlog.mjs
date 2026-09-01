@@ -28,7 +28,7 @@
 import { createServer, get } from "node:http";
 import { spawn } from "node:child_process";
 import { readFileSync, realpathSync, writeFileSync, watch } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { readTasks, computeStats, buildHtml } from "./build-viewer.mjs";
@@ -40,7 +40,8 @@ import {
   splitFrontmatter,
 } from "./task-fields.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { PLAN_FILENAME, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { loadPlan } from "./plan.mjs";
 import { ANY_TASK_ID } from "./task-id.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import {
@@ -73,6 +74,7 @@ if (cliArgs.argv.some((a) => a === "--help" || a === "-h")) {
 }
 const BACKLOG_DIR = resolveBacklogDir({ dir: cliArgs.dir, moduleDir: __dirname }).root;
 const TASKS_DIR = join(BACKLOG_DIR, "tasks");
+const PLAN_PATH = join(BACKLOG_DIR, PLAN_FILENAME);
 const CONFIG = loadConfigOrExit(BACKLOG_DIR);
 const FIELDS = buildFieldSpecs(CONFIG);
 
@@ -269,6 +271,15 @@ try {
     if (filename && !/\.md$/.test(filename)) return;
     notifyClients();
   });
+  // plan.yaml sits BESIDE tasks/, not inside it, so the watch above never sees
+  // it — and the Execution view (TL-109) is drawn from it. The same
+  // `tasks-changed` signal on purpose: the page answers it by re-reading
+  // /api/tasks, which carries the plan, so a second event would be a second name
+  // for one refresh.
+  watch(BACKLOG_DIR, { persistent: false }, (_event, filename) => {
+    if (filename && filename !== PLAN_FILENAME) return;
+    notifyClients();
+  });
 } catch (e) {
   console.warn(`${N} serve: fs.watch unavailable — live push disabled:`, e.message);
 }
@@ -370,6 +381,18 @@ async function handleFieldEdit(res, payload) {
   });
 }
 
+/** The plan file in the shape the page embeds it in — one definition, so a
+ *  refresh cannot deliver a different structure than the first paint did. */
+function planPayload() {
+  const loaded = loadPlan(PLAN_PATH);
+  return {
+    exists: loaded.exists,
+    path: `${basename(BACKLOG_DIR)}/${PLAN_FILENAME}`,
+    plan: loaded.plan,
+    problems: loaded.problems,
+  };
+}
+
 async function handle(req, res) {
   const url = new URL(req.url, "http://127.0.0.1");
   const path = url.pathname;
@@ -401,7 +424,7 @@ async function handle(req, res) {
 
   if (path === "/api/tasks") {
     const tasks = readTasks(BACKLOG_DIR);
-    sendJson(res, 200, { tasks, stats: computeStats(tasks) });
+    sendJson(res, 200, { tasks, stats: computeStats(tasks), plan: planPayload() });
     return;
   }
 

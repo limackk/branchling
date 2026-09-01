@@ -15,7 +15,7 @@
  */
 
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { extractMeta, splitFrontmatter } from "./task-fields.mjs";
@@ -24,6 +24,7 @@ import { readAllHistory } from "./history.mjs";
 import { loadConfig, loadConfigOrExit } from "./config.mjs";
 import { taskIdPatterns } from "./task-id.mjs";
 import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { loadPlan } from "./plan.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -46,9 +47,17 @@ function defaultRoot() {
  * `export ` disappears, because the page is not a module; `</script` is split,
  * because such a sequence inside a script's body would close the tag earlier than
  * intended (there is none here, but it is one line less to remember next time).
+ *
+ * `import` lines disappear too, and that is a CONSTRAINT ON THE ORDER OF THE
+ * PASTES, not a free lunch: a module inlined here may only reach for names that
+ * an earlier paste has already defined. `plan.mjs` reads two helpers from
+ * `task-fields.mjs`, which is pasted before it. What it imports from `node:fs`
+ * is used only as the default argument of `loadPlan()` — a function the page
+ * never calls, and a default is evaluated at the call, not at the paste.
  */
 function readModuleSource(name) {
   return readFileSync(join(__dirname, name), "utf8")
+    .replace(/^import [^;]*;\n/gm, "")
     .replace(/^export /gm, "")
     .replace(/^#!.*\n/, "")
     .replace(/<\/script/gi, "<\\/script");
@@ -251,7 +260,19 @@ export function computeStats(tasks) {
 // HTML template
 // ──────────────────────────────────────────────────────────────────────────
 
-export function buildHtml(tasks, stats, config = loadConfig(defaultRoot()), history = readAllHistory(config.root)) {
+/**
+ * @param {object} plan  the result of `loadPlan()`. A default rather than a
+ *   required argument for the same reason `history` is one: both call sites
+ *   (the `viewer` command and the server) hand in tasks and a config, and neither
+ *   should have to learn where the plan file lives to keep working.
+ */
+export function buildHtml(
+  tasks,
+  stats,
+  config = loadConfig(defaultRoot()),
+  history = readAllHistory(config.root),
+  plan = loadPlan(backlogPaths(config.root).planPath)
+) {
   const tasksJson = JSON.stringify(tasks).replace(/</g, "\\u003c");
   const statsJson = JSON.stringify(stats);
   const boardsJson = JSON.stringify(config.boards.map((b) => ({ slug: b.slug, name: b.name }))).replace(/</g, "\\u003c");
@@ -307,6 +328,20 @@ export function buildHtml(tasks, stats, config = loadConfig(defaultRoot()), hist
     }).join("\n"),
   ].filter(Boolean).join("\n");
 
+  // The PLAN FILE goes into the page, not the state computed from it: the page
+  // recomputes the state itself with `planState()` after every refresh, so a
+  // status changed in the browser moves the card without a round trip to a
+  // number somebody baked in at build time. A plan that does not parse travels
+  // as its problems, and the view says so instead of drawing half an order.
+  // The path travels as `<backlog dir>/plan.yaml`, never absolute: the page is
+  // mailed around and read over file://, and somebody else's home directory in
+  // an empty state is noise at best.
+  const planPathLabel = basename(config.root) + "/plan.yaml";
+  const planJson = JSON.stringify(
+    plan && plan.exists
+      ? { exists: true, path: planPathLabel, plan: plan.plan, problems: plan.problems }
+      : { exists: false, path: planPathLabel, plan: null, problems: (plan && plan.problems) || [] }
+  ).replace(/</g, "\\u003c");
   const configJson = JSON.stringify(config, (k, v) => (k === "paths" || k === "problems" || k === "taskId" ? undefined : v)).replace(/</g, "\\u003c");
   const buildTime = new Date().toISOString();
   const urlModuleSrc = readModuleSource("viewer-url.mjs");
@@ -316,6 +351,10 @@ export function buildHtml(tasks, stats, config = loadConfig(defaultRoot()), hist
   // browser could give two different numbers for the same question.
   const estimateModuleSrc = readModuleSource("estimate.mjs");
   const elsewhereModuleSrc = readModuleSource("elsewhere.mjs");
+  // The plan's arithmetic and the Execution view. `plan.mjs` comes first:
+  // `viewer-plan.mjs` renders what `planState()` returns.
+  const planModuleSrc = readModuleSource("plan.mjs");
+  const viewerPlanModuleSrc = readModuleSource("viewer-plan.mjs");
   const historyJson = JSON.stringify(history).replace(/</g, "\\u003c");
 
   return `<!DOCTYPE html>
@@ -1300,6 +1339,169 @@ ${paletteBadgeCss}
   }
   .copy-link-btn:hover { border-color: var(--accent); color: var(--fg); }
 
+  /* ─── Execution (the plan as waves, TL-109) ─────────────────────── */
+  /* A flow, not a table: the whole point of the view is that it does not look
+     like the rest of the page. Every colour is a token, so the dark block below
+     needs no rule of its own. */
+  .execution-view { display: none; }
+  body.view-execution main.app-main { display: none; }
+  body.view-execution .filters-bar,
+  body.view-execution .stats { display: none; }
+  body.view-execution .execution-view {
+    display: block;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 20px 24px 64px;
+  }
+  .exec-head h2 { margin: 0 0 2px; font-size: 16px; }
+  .exec-updated { font-size: 11px; color: var(--fg-muted); font-variant-numeric: tabular-nums; }
+  .exec-rationale { margin: 6px 0 18px; color: var(--fg-muted); font-size: 13px; max-width: 70ch; }
+  .exec-flow { position: relative; }
+  /* The edges are drawn UNDER the cards and never take a click. */
+  .exec-edges {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+    overflow: visible;
+  }
+  .exec-edges path {
+    fill: none;
+    stroke: var(--fg-muted);
+    stroke-width: 1.5;
+    opacity: .45;
+  }
+  .exec-wave {
+    position: relative;
+    z-index: 1;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg-card);
+    padding: 10px 14px 14px;
+    margin-bottom: 18px;
+  }
+  .exec-wave.is-active { border-color: var(--accent); box-shadow: var(--shadow); }
+  .exec-wave.is-past { opacity: .55; }
+  .exec-wave-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+  .exec-wave-name { font-weight: 600; font-size: 13px; }
+  .exec-wave-count { font-size: 11px; color: var(--fg-muted); font-variant-numeric: tabular-nums; }
+  .exec-wave-tag {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    padding: 1px 8px;
+  }
+  /* The "now" line: the boundary between what is finished and the rest. A word,
+     not only a colour — the rule the status badges follow (TL-52). */
+  .exec-now {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 4px 0 10px;
+    color: var(--accent);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+  }
+  .exec-now::after {
+    content: "";
+    flex: 1;
+    border-top: 2px dashed var(--accent);
+  }
+  .exec-cards { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start; }
+  .exec-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 20px 10px 10px;
+    position: relative;
+    border: 1px dashed var(--accent);
+    border-radius: 10px;
+  }
+  .exec-group-label {
+    position: absolute;
+    top: 4px;
+    left: 10px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--accent);
+  }
+  .exec-card {
+    width: 230px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    padding: 8px 10px 9px;
+  }
+  .exec-card.is-closed { opacity: .6; }
+  .exec-card.is-running { border-color: var(--accent); }
+  .exec-card.is-unknown { border-style: dashed; }
+  .exec-card-head { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  .exec-id { font-size: 11px; font-weight: 600; color: var(--accent); text-decoration: none; }
+  .exec-id:hover { text-decoration: underline; }
+  .exec-title { font-size: 12px; line-height: 1.35; }
+  .exec-meta { margin-top: 5px; font-size: 11px; color: var(--fg-muted); }
+  .exec-waiting { white-space: nowrap; }
+  .exec-missing { background: var(--bg-card); color: var(--fg-muted); }
+  .exec-bar {
+    position: relative;
+    margin-top: 7px;
+    height: 14px;
+    border-radius: 999px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .exec-bar-fill { height: 100%; background: var(--accent-soft); }
+  .exec-bar-label {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: var(--fg-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .exec-unplanned { margin-top: 10px; }
+  .exec-unplanned h3 { font-size: 13px; margin: 0 0 4px; }
+  .exec-unplanned p { color: var(--fg-muted); font-size: 12px; margin: 0 0 8px; max-width: 70ch; }
+  .exec-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .exec-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 340px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+    color: var(--fg);
+    text-decoration: none;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 3px 10px 3px 4px;
+  }
+  .exec-chip:hover { border-color: var(--accent); }
+  .exec-empty { max-width: 70ch; }
+  .exec-empty h2 { font-size: 16px; margin: 0 0 8px; }
+  .exec-empty p { color: var(--fg-muted); font-size: 13px; }
+  .exec-empty pre {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 12px;
+    overflow-x: auto;
+  }
+
   /* ─── Dashboard ─────────────────────────────────────────────────── */
   .dashboard-view { display: none; }
   body.view-dashboard main.app-main { display: none; }
@@ -1652,6 +1854,7 @@ ${paletteBadgeCss}
     <nav class="view-tabs" id="viewTabs">
       <button type="button" class="view-tab is-active" data-view="tasks">Tasks</button>
       <button type="button" class="view-tab" data-view="dashboard">Dashboard</button>
+      <button type="button" class="view-tab" data-view="execution">Execution</button>
       <button type="button" class="copy-link-btn" id="btnCopyLink"
               title="Copies the address of this view — filters, search, sort, board and the selected task">⧉ Copy link</button>
     </nav>
@@ -1691,6 +1894,7 @@ ${paletteBadgeCss}
 </main>
 
 <section class="dashboard-view" id="dashboardView"></section>
+<section class="execution-view" id="executionView"></section>
 <div class="chart-tip" id="chartTip" hidden></div>
 
 <script>
@@ -1716,6 +1920,19 @@ ${estimateModuleSrc}
 ${elsewhereModuleSrc}
 // ─── end of the pasted module ─────────────────────────────────────────
 
+// ─── Pasted source of scripts/plan.mjs (TL-107) ──────────────────────
+// \`planState()\` — the five definitions of "active wave", "next up", "in
+// progress", "unplanned" and "stale". The \`plan\` command imports THIS file, so the
+// terminal and the page cannot disagree about which task comes next.
+${planModuleSrc}
+// ─── end of the pasted module ─────────────────────────────────────────
+
+// ─── Pasted source of scripts/viewer-plan.mjs (TL-109) ───────────────
+// The Execution view: the model and the HTML, tested by
+// node --test scripts/tests/viewer-plan.test.mjs.
+${viewerPlanModuleSrc}
+// ─── end of the pasted module ─────────────────────────────────────────
+
 // TASKS / STATS are mutable — live mode replaces them after reading from disk.
 // ALL_TASKS is the full set; TASKS is its narrowing to the selected board.
 // The split is here rather than at every place that reads TASKS, because a board
@@ -1735,6 +1952,9 @@ const BOARDS = ${boardsJson};
 // This project's vocabularies (config.yaml + boards.yaml) — the page's code knows
 // no particular value, it receives them from here (BL-1400).
 const CONFIG = ${configJson};
+// The plan file as it was read from disk. Mutable: the server hands a fresh copy
+// back on /api/tasks, so an edit to plan.yaml reaches an open tab.
+let PLAN = ${planJson};
 
 // The id prefix is a PROJECT value (BL-1452), and the client had it hardcoded in
 // three places (TL-44): the file filter when reading from disk and two sorts by
@@ -1755,7 +1975,7 @@ const state = {
   filterEnv: new Set(),   // the values of the label_axis_env axis plus "n/a"
   filterEpic: new Set(),  // values: epic name | NO_EPIC constant
   sortBy: "priority",     // "priority" | "id_asc" | "id_desc"
-  view: "tasks",          // "tasks" | "dashboard"
+  view: "tasks",          // "tasks" | "dashboard" | "execution"
   // Dashboard date range — flow metrics only, see computeDashboard().
   dashRange: { preset: "all", from: null, to: null },
   // Day pinned by clicking a chart point: { day, source } — source names which
@@ -2073,6 +2293,9 @@ async function refreshFromServer(quiet) {
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     ALL_TASKS = data.tasks;
+    // plan.yaml is watched too (TL-109): an order edited in an editor reaches an
+    // open tab by the same signal a task edit does.
+    if (data.plan) PLAN = data.plan;
     applyScope();
     renderBoardScope();
     render();
@@ -4699,13 +4922,81 @@ function dashSyncHash() {
   }
 }
 
+// ─── Execution view (TL-109) ──────────────────────────────────────────
+// The state is recomputed on every render from ALL_TASKS — deliberately not from
+// TASKS: a board is a scope over the LIST, while a plan spans the whole backlog,
+// and a scoped Execution tab would quietly drop half an order and look complete.
+function renderExecution_() {
+  const host = document.getElementById("executionView");
+  if (!PLAN || !PLAN.exists) {
+    host.innerHTML = renderPlanMissing({ planPath: PLAN && PLAN.path });
+    return;
+  }
+  if (PLAN.problems && PLAN.problems.length) {
+    // Half an order drawn from a file that does not parse is worse than none:
+    // it looks like the plan, and it is not.
+    host.innerHTML = '<div class="exec-empty"><h2>The plan file cannot be read</h2><p>' +
+      escapeHtmlStr(PLAN.problems[0]) + "</p></div>";
+    return;
+  }
+  const state_ = planState(PLAN.plan, ALL_TASKS, {
+    archivedStatuses: CONFIG.archivedStatuses,
+    inProgressStatus: CONFIG.inProgressStatus,
+  });
+  const vm = planViewModel(state_, ALL_TASKS, {
+    history: HISTORY,
+    now: Date.now(),
+    estimateHours,
+    archivedStatuses: CONFIG.archivedStatuses,
+  });
+  host.innerHTML = renderExecution(vm);
+  drawPlanEdges();
+}
+
+/**
+ * The geometry of the dependency edges, measured after layout.
+ *
+ * The model says which pairs are joined (\`data-edge-from\` / \`data-edge-to\`); the
+ * positions only exist once the browser has laid the cards out, so they are
+ * filled in here. A cubic curve rather than a straight line: two cards in the
+ * same row would otherwise be joined by a line running through the cards between
+ * them.
+ */
+function drawPlanEdges() {
+  const svg = document.getElementById("execEdges");
+  if (!svg) return;
+  const flow = svg.parentElement;
+  const base = flow.getBoundingClientRect();
+  svg.setAttribute("viewBox", "0 0 " + Math.round(base.width) + " " + Math.round(base.height));
+  for (const path of svg.querySelectorAll("path")) {
+    const a = flow.querySelector('[data-plan-card="' + CSS.escape(path.dataset.edgeFrom) + '"]');
+    const b = flow.querySelector('[data-plan-card="' + CSS.escape(path.dataset.edgeTo) + '"]');
+    if (!a || !b) { path.removeAttribute("d"); continue; }
+    const ra = a.getBoundingClientRect();
+    const rb = b.getBoundingClientRect();
+    const x1 = ra.left + ra.width / 2 - base.left;
+    const y1 = ra.bottom - base.top;
+    const x2 = rb.left + rb.width / 2 - base.left;
+    const y2 = rb.top - base.top;
+    const dy = Math.max((y2 - y1) / 2, 18);
+    path.setAttribute("d", "M" + x1 + "," + y1 + " C" + x1 + "," + (y1 + dy) + " " + x2 + "," + (y2 - dy) + " " + x2 + "," + y2);
+  }
+}
+
+// The cards move when the window does; the edges are pixels and have to follow.
+window.addEventListener("resize", () => {
+  if (state.view === "execution") drawPlanEdges();
+});
+
 function setView(view) {
   state.view = view;
   document.body.classList.toggle("view-dashboard", view === "dashboard");
+  document.body.classList.toggle("view-execution", view === "execution");
   for (const btn of document.querySelectorAll(".view-tab")) {
     btn.classList.toggle("is-active", btn.dataset.view === view);
   }
   if (view === "dashboard") renderDashboard();
+  if (view === "execution") renderExecution_();
 }
 
 function dashFilterTo(key, value) {
@@ -4788,6 +5079,10 @@ function render() {
   // Live mode replaces TASKS wholesale — the dashboard has to follow, or it
   // silently shows the numbers from before the refresh.
   if (state.view === "dashboard") renderDashboard();
+  // Same reason as the dashboard: the plan's state is computed from the tasks,
+  // so a refresh that did not redraw it would leave a card in a status the rest
+  // of the page no longer shows.
+  else if (state.view === "execution") renderExecution_();
   // The one place where the list rewrites the URL: every change of a filter, a
   // chip, the sorting and the scope ends up here anyway, so there is no route by
   // which the state changes without a link (except the search — that renders cards only).
@@ -4810,6 +5105,11 @@ function handleHash() {
     dashApplyHash(qi < 0 ? "" : raw.slice(qi + 1));
     if (state.view !== "dashboard") setView("dashboard");
     else renderDashboard();
+    return;
+  }
+  if (id === "execution") {
+    if (state.view !== "execution") setView("execution");
+    else renderExecution_();
     return;
   }
   if (isTasksHash(id)) {
@@ -4904,6 +5204,7 @@ for (const btn of document.querySelectorAll(".view-tab")) {
     const v = btn.dataset.view;
     setView(v);
     if (v === "dashboard") window.location.hash = dashEncodeHash();
+    else if (v === "execution") window.location.hash = "execution";
     else tasksSyncHash();
   });
 }
