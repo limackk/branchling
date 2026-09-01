@@ -1,0 +1,4 @@
+{"id":"01M1F90QZ9DAH2J2GBS81Y7V5T","ts":"2026-09-01T20:01:55.177Z","task":"TL-139","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M1F90QZ93X98P5FF008M0GMQ","ts":"2026-09-01T20:01:55.177Z","task":"TL-139","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M1F93QET08HQY6DQCDBZSD9Y","ts":"2026-09-01T20:03:32.954Z","task":"TL-139","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
+{"id":"01M1F93QEV51MC75YF92H2CGV8","ts":"2026-09-01T20:03:32.955Z","task":"TL-139","field":"__verified__","from":"","to":"TL-101's `verification:` can be satisfied without writing a procedure back into .claude/skills/backlog-workflow/SKILL.md — read both files and say which of the two the contract now measures","actor":"agent:claude","source":"done","reason":"proven"}

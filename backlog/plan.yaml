@@ -27,10 +27,14 @@ waves:
 
   - name: "The execution loop"
     tasks: [TL-96, TL-101]
-    # One surface, two consumers: the `next → agent → close` loop and the skill
-    # that should stop editing files by hand. A divergence between them shows
-    # only when both are written against a single shape of the command.
-    together: [[TL-96, TL-101]]
+    # The `together` group [TL-96, TL-101] was DISSOLVED by TL-139, not lost. It
+    # existed because both were consumers of ONE command surface — the loop
+    # calling the gate, and the skill telling an agent to call it — so a
+    # divergence would only show if both were written at once. TL-101 is no
+    # longer that second consumer: the skill carries no procedure, and TL-101 is
+    # now a guard over what `instructions` PRINTS. Two tasks that no longer share
+    # a surface cannot prove each other, and a group that claims they do would
+    # make the plan say something false.
 
   - name: "Roles in the dispatcher"
     tasks: [TL-98]

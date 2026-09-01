@@ -16,19 +16,18 @@ blocked_by: [TL-87, TL-93]
 blocks: []
 related_docs: []
 verification:
-  - bash: "grep -q 'worktrail take' .claude/skills/backlog-workflow/SKILL.md"
-  - bash: "grep -q 'worktrail done' .claude/skills/backlog-workflow/SKILL.md"
+  - id: guides-say-primitives
+    bash: "node --test scripts/tests/instructions.test.mjs"
+  - id: skill-points-at-the-guide
+    bash: "grep -q 'worktrail instructions overview' .claude/skills/backlog-workflow/SKILL.md"
 ---
 
 ## Cel
 
-Skill `backlog-workflow` (instrukcja dla agentów pracujących z backlogiem)
-przechodzi z ręcznej edycji frontmattera na nowe prymitywy:
-
-- „Take it" = `worktrail take <ID> --actor agent:<nazwa>` zamiast trzech
-  ręcznych zmian pól + `build`;
-- „Close a task" = `worktrail done <ID>` zamiast ręcznego uruchamiania
-  wpisów `verification:` i ustawiania `done`.
+Przewodniki, które agent czyta przed pracą i przed zamknięciem taska, KAŻĄ mu
+używać prymitywów (`take`, `done`) i opisują ręczną edycję pól jako drogę
+zapasową — i jest to pilnowane testem, a nie tylko prawdą w dniu, w którym
+ktoś to napisał.
 
 Tryb bezpośredni („zrób TL-1234" powiedziane głównemu agentowi w Claude Code
 / Codex) dostaje w ten sposób lock, atrybucję i fokus sesji za darmo — mniej
@@ -36,39 +35,59 @@ kroków dla agenta, lepsze ślady dla człowieka.
 
 ## Kontekst
 
-Powstało z decyzji 2026-08-31 o zachowaniu dzisiejszego trybu pracy przy
-wprowadzaniu ról: rola bramkuje dyspozytor (TL-98), a tryb bezpośredni
-używa `take` (TL-87) i `done` (TL-93) bez sprawdzania ról.
+Task przepisany 2026-09-01 przy rozstrzygnięciu TL-139; poprzedni zakres
+(przepisanie sekcji „Work a task" i „Close a task" w
+`.claude/skills/backlog-workflow/SKILL.md`) jest NIEAKTUALNY, bo tych sekcji
+już nie ma. Skill świadomie nie niesie żadnej procedury ani słownictwa i
+odsyła do `worktrail instructions overview`; powód stoi w jego własnym ciele —
+kopia procedury w pliku skilla zamarza w dniu, w którym powstała, i myli się
+wtedy najgorszym możliwym sposobem: nadal konkretnie i pewnie.
 
-Skill jest instrukcją, nie kodem — ale jest częścią produktu (jedzie do
-konsumentów) i rozjazd między nim a CLI to klasa „ta sama decyzja w dwóch
-miejscach". Stąd task, a nie poprawka przy okazji: zmiana ma przejść razem
-z dowiezieniem obu komend, nie przed nimi.
+Treść, której chciał pierwotny TL-101, JEST już dowieziona — tylko gdzie
+indziej. `instructions task-execution` mówi wprost „Do not edit the status by
+hand to claim it" i podaje `next`/`take`; `instructions task-finalization`
+mówi „ONE COMMAND CLOSES A TASK" i zakazuje robienia tych kroków ręcznie;
+oba wskazują `worktrail history --source manual` jako drogę dla zmian zrobionych
+ręcznie. Nie ma więc pracy do wykonania w prozie — brakuje DOWODU, że tak
+zostanie.
 
-Zakres:
-- sekcje „Work a task" i „Close a task" w skillu: prymityw zamiast listy
-  ręcznych kroków; ręczna edycja pól zostaje opisana jako droga zapasowa
-  (działa zawsze — to sens architektury), z notą, że traci lock i fokus;
-- wzmianka o `handoff` (TL-99), jeśli jest już dowieziony — jednym
-  akapitem, bez wykładu o rolach;
-- bez zmian w sekcjach query/new/check.
+Bo nic tego nie pilnuje. `scripts/tests/instructions.test.mjs` sprawdza
+routing z `overview`, podstawienie słownictwa i to, że nieznany placeholder
+wywala się zamiast trafić do terminala — ale ani jednej asercji, że przewodniki
+w ogóle każą używać `take`/`done` zamiast edycji pól. Zdanie, na którym stoi
+cały tryb bezpośredni, można dziś usunąć jednym commitem i suita zostanie
+zielona.
+
+Granica: to jest strażnik nad TEZĄ przewodnika, nie nad jego brzmieniem.
+Asercja na całe zdanie zmusiłaby do poprawiania testu przy każdej redakcji
+stylu, więc byłaby pierwszą rzeczą, którą ktoś rozluźni.
+
+## Pre-flight reading
+
+- `scripts/instructions.mjs` — tematy `task-execution` i `task-finalization`;
+  tam stoją zdania, które ten task obejmuje strażnikiem.
+- `scripts/tests/instructions.test.mjs` — czego suita już dowodzi i w jakiej
+  konwencji (kontrola pozytywna przy każdym twierdzeniu).
+- `.claude/skills/backlog-workflow/SKILL.md` — dlaczego skill NIE niesie
+  procedury; kontrakt na ten plik mierzy wyłącznie wskaźnik.
 
 ## Kroki
 
-1. Zaktualizować `.claude/skills/backlog-workflow/SKILL.md` po dowiezieniu
-   TL-87 i TL-93: kroki take/done, ręczna edycja jako fallback.
-2. Przejrzeć przykłady komend w skillu pod kątem spójności z faktycznym
-   `--help` obu komend (nazwy flag, kody wyjścia).
-3. Jeśli repo konsumenta ma własną kopię skilla — odnotować w tasku
-   konsumenta, nie kopiować ręcznie stamtąd.
+1. W `instructions.test.mjs`: asercja, że `task-execution` niesie zakaz ręcznej
+   zmiany statusu i podaje `take`/`next`, a `task-finalization` — że zamyka
+   jedna komenda uruchamiająca kontrakt. Nazwy komend brać z `PRODUCT_NAME`
+   i z tabeli komend, nie z literałów.
+2. Kontrola pozytywna: asercja ma OBLEWAĆ, gdy zdanie zniknie z szablonu —
+   test, który przechodzi na pustym tekście, jest zielony bez mocy dowodowej.
+3. Sprawdzić, czy przewodniki opisują ręczną edycję jako drogę zapasową
+   (`history --source manual`); jeśli nie — dopisać jedno zdanie, nie wykład.
 
 ## Acceptance criteria
 
-- [ ] Skill nie instruuje ręcznej edycji statusu jako drogi pierwszej;
-      `take`/`done` są krokami głównymi, edycja fallbackiem.
-- [ ] Każda komenda cytowana w skillu istnieje i ma dokładnie te flagi
-      (sprawdzone ręcznie wobec `--help`).
-- [ ] Weryfikacje grep z frontmattera przechodzą.
+- [ ] `task-execution` każe wziąć task komendą i zabrania ręcznej zmiany statusu; strażnik oblewa, gdy to zdanie zniknie. [proof: guides-say-primitives]
+- [ ] `task-finalization` mówi, że zamyka jedna komenda uruchamiająca `verification:`. [proof: guides-say-primitives]
+- [ ] Skill nie niesie procedury — jego kontrakt sprawdza wyłącznie, że odsyła do przewodnika. [proof: skill-points-at-the-guide]
+- [ ] Żaden wpis `verification:` nie wymaga wpisania procedury z powrotem do `.claude/skills/`. [proof: skill-points-at-the-guide]
 
 ## Log
 

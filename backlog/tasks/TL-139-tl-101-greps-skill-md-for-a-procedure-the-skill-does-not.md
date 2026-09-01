@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""
 priority: P2                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 estimate: 30m                      # 30m | 2h | 1d | 1w | 1mo
 created: 2026-09-01
 updated: 2026-09-01
@@ -69,4 +69,4 @@ The decision is between three, and it is a decision, not a repair:
 
 ## Acceptance criteria
 
-- [ ] TL-101 can be closed without writing a procedure back into `SKILL.md`, or it is cancelled with a stated reason. [proof: contract-holds]
+- [x] TL-101 can be closed without writing a procedure back into `SKILL.md`, or it is cancelled with a stated reason. [proof: contract-holds]
