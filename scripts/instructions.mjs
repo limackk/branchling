@@ -360,6 +360,21 @@ prompt on stdin. What you pipe in is the task file \`next\` just printed, and it
 is enough: it was written for a reader with none of your conversation. Nothing
 in this loop is ours except the two commands at its ends.
 
+THAT LOOP, WITH THE ACCOUNTING, IS \`{{tool}} run\`. Write your own when you want
+it in your own shape; use the command when you want the bookkeeping the three
+lines above do not do — attempts, per-task agent logs outside the repository, and
+a report of what closed, what did not and where the run stopped.
+
+  {{tool}} run --agent "claude -p @{task_file}" --max-attempts 2
+  {{tool}} run --dry-run     # the order it would work in, claiming nothing
+
+It changes nothing about the two commands at the ends: it calls \`{{tool}} next\`
+and \`{{tool}} done\` exactly as your shell would, and the agent is a template of
+yours
+run through your shell. A task whose contract keeps failing is never closed —
+after the last attempt it is parked in the status your \`reason_required_statuses\`
+protects, with the reason, and the dispatcher stops offering it.
+
 THE TWO ENDS OF A SESSION.
 
   starting   \`{{tool}} next --actor <ns:name>\` — one task, already claimed and

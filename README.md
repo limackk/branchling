@@ -288,6 +288,24 @@ done   # exits 3 — nothing left to take
 closed, not yours) · `2` a bad invocation. An empty queue is not an error, and
 it does not look like one.
 
+**That loop, with the accounting, is `worktrail run`.** It takes a task, hands it
+to a command of yours, and closes it through the same gate you would — until the
+queue is empty. The tool is still not an agent and will not become one: the
+command is a template, `{task_file}` and `{id}` are substituted, and the task —
+plus, from the second attempt, what `done` refused — arrives on stdin.
+
+```bash
+worktrail run --agent "claude -p @{task_file}" --max-attempts 2
+worktrail run --dry-run          # the order it would work in; claims nothing
+```
+
+A task whose contract keeps failing is not retried forever and is never closed:
+after `--max-attempts` it is moved to the open status your
+`reason_required_statuses` protects, **with the reason** — so the board after a
+run says where it stopped and why. Agent output goes to one log file per task
+outside the repository, and the report names the path. The process ends with the
+queue; nothing is scheduled and there is no daemon.
+
 **Where the guarantee ends, said plainly.** Two mechanisms, and they stop in
 different places. The reservation is a lockfile in your user state directory,
 keyed by the repository, so it excludes sessions running *at the same moment* in

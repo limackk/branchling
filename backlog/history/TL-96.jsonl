@@ -8,3 +8,6 @@
 {"id":"01M1F70MHFFP8A32WA0KNKKYCD","ts":"2026-09-01T19:26:54.511Z","task":"TL-96","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
 {"id":"01M1F71X22A6CDDKSMREE12T8W","ts":"2026-09-01T19:27:36.002Z","task":"TL-96","field":"status","from":"in_progress","to":"pending","actor":"agent:claude","source":"manual","reason":"claim released: the plan puts wave 3 (TL-133, TL-125) ahead of this task"}
 {"id":"01M1F71X22Y8NQWJ7VJMT5YGB0","ts":"2026-09-01T19:27:36.002Z","task":"TL-96","field":"owner","from":"agent:claude","to":"unassigned","actor":"agent:claude","source":"manual","reason":"claim released: the plan puts wave 3 (TL-133, TL-125) ahead of this task"}
+{"id":"01M1F96GT7HMKX2VNA8VAEZ920","ts":"2026-09-01T20:05:04.455Z","task":"TL-96","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M1F96GT7PX686B1W9K9E9A1B","ts":"2026-09-01T20:05:04.455Z","task":"TL-96","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M1FA27AF3T3VK87TJ2PSPZMA","ts":"2026-09-01T20:20:12.239Z","task":"TL-96","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

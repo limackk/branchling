@@ -6,19 +6,20 @@ labels: []
 board: main
 epic: "Wyróżniki agentowe"
 priority: P1
-status: pending
-owner: unassigned
+status: done
+owner: agent:claude
 estimate: 1d
 confidence: medium
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 blocked_by: [TL-87, TL-93]
 blocks: [TL-98]
 related_docs:
   - docs/worktrail-global-tool.md
   - docs/worktrail-state-and-sync.md
 verification:
-  - bash: "node --test scripts/tests/run.test.mjs"
+  - id: loop
+    bash: "node --test scripts/tests/run.test.mjs"
 ---
 
 ## Cel
@@ -91,14 +92,11 @@ w ryzach czterech praw:
 
 ## Acceptance criteria
 
-- [ ] Pętla nie zawiera żadnej wiedzy o konkretnym hoście agenta; testy
-      przechodzą z atrapą będącą zwykłym skryptem.
-- [ ] Task po `run_max_attempts` oblanych weryfikacjach jest `blocked`
-      z powodem, nigdy `done`.
-- [ ] Wynik oblanej weryfikacji trafia do wejścia kolejnej próby agenta.
-- [ ] Przebieg kończy się także wtedy, gdy zostały wyłącznie taski
-      zablokowane — bez wirowania na pustej selekcji.
-- [ ] Raport w `--json` niesie per task: wynik, liczbę prób, ścieżkę logu.
+- [x] Pętla nie zna żadnego konkretnego hosta agenta; testy przechodzą z atrapą będącą zwykłym skryptem. [proof: loop]
+- [x] Task po wyczerpaniu prób jest `blocked` z powodem, nigdy `done`. [proof: loop]
+- [x] Wynik oblanej weryfikacji trafia do wejścia kolejnej próby agenta. [proof: loop]
+- [x] Przebieg kończy się także wtedy, gdy zostały wyłącznie taski zablokowane — bez wirowania na pustej selekcji. [proof: loop]
+- [x] Raport w `--json` niesie per task: wynik, liczbę prób, ścieżkę logu. [proof: loop]
 
 ## Log
 
