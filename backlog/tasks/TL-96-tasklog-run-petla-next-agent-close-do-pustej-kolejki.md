@@ -25,7 +25,7 @@ verification:
 
 `worktrail run` prowadzi backlog do pustej kolejki: w pętli bierze task
 (`next`, TL-87), uruchamia komendę agenta z konfiguracji, po jej wyjściu
-próbuje zamknąć task bramką weryfikacji (`close`, TL-93); task oblewający
+próbuje zamknąć task bramką weryfikacji (`done`, TL-93); task oblewający
 weryfikację `run_max_attempts` razy idzie na `blocked` z powodem w logu
 i pętla bierze następny. Na końcu raport przebiegu: zamknięte / zablokowane /
 nietknięte, czas, a gdy adapter kosztu działa — tokeny per model.
@@ -77,7 +77,7 @@ w ryzach czterech praw:
    pliku taska i ID), `run_max_attempts`, timeout pojedynczego uruchomienia
    agenta. Warstwa: komenda agenta to fakt o maszynie użytkownika —
    warstwa użytkownika.
-2. Pętla: `next` → agent (wyjście do logu per task) → `close`; porażka
+2. Pętla: `next` → agent (wyjście do logu per task) → `done`; porażka
    weryfikacji dokleja jej wynik do kolejnej próby agenta (agent ma wiedzieć,
    CO oblało); wyczerpanie prób → `blocked` + wpis do `## Log` taska.
 3. Warunki stopu: pusta kolejka, same zablokowane, `--max-tasks N`,

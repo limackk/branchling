@@ -5,3 +5,6 @@
 {"id":"01M1ERX7CF14G6E08C0YP6VRRP","ts":"2026-09-01T15:20:22.671Z","task":"TL-125","field":"blocks","from":[],"to":["TL-1506","TL-1511"],"actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1F5BNKGR2GRY1ZT67G34JQV","ts":"2026-09-01T18:57:58.896Z","task":"TL-125","field":"title","from":"TL-1506 i TL-1511 wolaja worktrail close — komendy o tej nazwie nie ma","to":"TL-96 i TL-101 wolaja worktrail close — komendy o tej nazwie nie ma","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1F5BNKGQTV2455H7MBQEB8S","ts":"2026-09-01T18:57:58.896Z","task":"TL-125","field":"blocks","from":["TL-1506","TL-1511"],"to":["TL-96","TL-101"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1F7HSHB8PDQM1D52CKFK2BK","ts":"2026-09-01T19:36:16.683Z","task":"TL-125","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M1F7HSHB87SZ4TNFQCA3RMRJ","ts":"2026-09-01T19:36:16.683Z","task":"TL-125","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M1F7PYVQTWNDQ4J7JCHC5BG2","ts":"2026-09-01T19:39:05.975Z","task":"TL-125","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

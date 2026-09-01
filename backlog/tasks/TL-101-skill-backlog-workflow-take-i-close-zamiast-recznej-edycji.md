@@ -17,7 +17,7 @@ blocks: []
 related_docs: []
 verification:
   - bash: "grep -q 'worktrail take' .claude/skills/backlog-workflow/SKILL.md"
-  - bash: "grep -q 'worktrail close' .claude/skills/backlog-workflow/SKILL.md"
+  - bash: "grep -q 'worktrail done' .claude/skills/backlog-workflow/SKILL.md"
 ---
 
 ## Cel
@@ -27,7 +27,7 @@ przechodzi z ręcznej edycji frontmattera na nowe prymitywy:
 
 - „Take it" = `worktrail take <ID> --actor agent:<nazwa>` zamiast trzech
   ręcznych zmian pól + `build`;
-- „Close a task" = `worktrail close <ID>` zamiast ręcznego uruchamiania
+- „Close a task" = `worktrail done <ID>` zamiast ręcznego uruchamiania
   wpisów `verification:` i ustawiania `done`.
 
 Tryb bezpośredni („zrób TL-1234" powiedziane głównemu agentowi w Claude Code
@@ -38,7 +38,7 @@ kroków dla agenta, lepsze ślady dla człowieka.
 
 Powstało z decyzji 2026-08-31 o zachowaniu dzisiejszego trybu pracy przy
 wprowadzaniu ról: rola bramkuje dyspozytor (TL-98), a tryb bezpośredni
-używa `take` (TL-87) i `close` (TL-93) bez sprawdzania ról.
+używa `take` (TL-87) i `done` (TL-93) bez sprawdzania ról.
 
 Skill jest instrukcją, nie kodem — ale jest częścią produktu (jedzie do
 konsumentów) i rozjazd między nim a CLI to klasa „ta sama decyzja w dwóch
@@ -56,7 +56,7 @@ Zakres:
 ## Kroki
 
 1. Zaktualizować `.claude/skills/backlog-workflow/SKILL.md` po dowiezieniu
-   TL-87 i TL-93: kroki take/close, ręczna edycja jako fallback.
+   TL-87 i TL-93: kroki take/done, ręczna edycja jako fallback.
 2. Przejrzeć przykłady komend w skillu pod kątem spójności z faktycznym
    `--help` obu komend (nazwy flag, kody wyjścia).
 3. Jeśli repo konsumenta ma własną kopię skilla — odnotować w tasku
@@ -65,7 +65,7 @@ Zakres:
 ## Acceptance criteria
 
 - [ ] Skill nie instruuje ręcznej edycji statusu jako drogi pierwszej;
-      `take`/`close` są krokami głównymi, edycja fallbackiem.
+      `take`/`done` są krokami głównymi, edycja fallbackiem.
 - [ ] Każda komenda cytowana w skillu istnieje i ma dokładnie te flagi
       (sprawdzone ręcznie wobec `--help`).
 - [ ] Weryfikacje grep z frontmattera przechodzą.

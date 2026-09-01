@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Wyróżniki agentowe"
 priority: P2                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 estimate: 30m                      # 30m | 2h | 1d | 1w | 1mo
 created: 2026-09-01
 updated: 2026-09-01
@@ -63,7 +63,7 @@ tutaj chodzi wyłącznie o dwa znane wystąpienia.
 
 ## Acceptance criteria
 
-- [ ] Żaden OTWARTY task nie woła `worktrail close`. [proof: no-close-cmd]
-- [ ] Kontrakt TL-101 da się spełnić bez wpisania nieistniejącej komendy do `.claude/skills/`. [proof: no-close-cmd]
-- [ ] `## Cel` TL-96 nazywa bramkę tak, jak nazywa się komenda. [proof: run-names-done]
-- [ ] Bramka dalej zielona po zmianie. [proof: gate-still-green]
+- [x] Żaden OTWARTY task nie woła `worktrail close`. [proof: no-close-cmd]
+- [x] Kontrakt TL-101 da się spełnić bez wpisania nieistniejącej komendy do `.claude/skills/`. [proof: no-close-cmd]
+- [x] `## Cel` TL-96 nazywa bramkę tak, jak nazywa się komenda. [proof: run-names-done]
+- [x] Bramka dalej zielona po zmianie. [proof: gate-still-green]
