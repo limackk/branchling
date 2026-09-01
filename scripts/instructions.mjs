@@ -377,15 +377,27 @@ changes nothing — so re-reading the task is one command, not a recovery
 procedure. Wire it to whatever your vendor calls a pre-compaction hook, and wire
 \`{{tool}} instructions overview\` to whatever it calls a session-start hook.
 
-WHAT THE CLAIM GUARANTEES, AND WHERE IT STOPS. Selection and reservation are one
-act, so two sessions asking at the same moment get two different tasks. The
-reservation is a lockfile OUTSIDE the repository, keyed by the shared git
-directory: it therefore covers every worktree of one clone on one machine, which
-is the fleet this is built for. It does NOT reach another machine, and it does
-not reach a branch — data travels with the branch (that is the point), so a task
-taken on \`feature/x\` is still {{queue_statuses}} on \`main\` until the branch is
-merged. Two clones will hand out the same task. Merge finished work promptly and
-the window closes; expect no more from a lockfile than a lockfile can give.
+WHAT THE CLAIM GUARANTEES, AND WHERE IT STOPS. Two mechanisms answer two
+different questions, and the boundary is where the SECOND one stops.
+
+  the lock       Selection and reservation are one act, so two sessions asking
+                 at the same moment get two different tasks. It is a file
+                 OUTSIDE the repository, keyed by the shared git directory, so
+                 it covers every worktree of one clone on one machine — and it
+                 knows nothing about a decision already written to a file.
+  the scan       Data travels with the branch (that is the point), so a task
+                 taken on \`feature/x\` is still {{queue_statuses}} in \`main\`'s copy
+                 of the file until the branch is merged. \`next\` therefore reads
+                 every branch and worktree of this CLONE — local refs only, never
+                 a \`git fetch\` — and passes over a task they report in a status
+                 it does not hand out, naming the branch or tree it deferred to.
+                 \`cross_branch_state: false\` switches that off and it reads this
+                 checkout alone.
+
+So the boundary is the clone, not the machine and not the branch. Two clones
+will still hand out the same task and will find out when they merge. Merge
+finished work promptly and the window closes; expect no more from a lockfile and
+a set of local refs than they can give.
 
 WHEN A SESSION DIES MID-TASK. Its lock expires after \`lock_ttl_minutes\` — that
 only frees the reservation. The CLAIM in the tree (\`status: {{progress}}\` and

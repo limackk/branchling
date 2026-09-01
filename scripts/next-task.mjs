@@ -23,6 +23,15 @@
  * quietly undo somebody's decision. `--status` overrides it, because a person
  * asking for exactly that is not unattended.
  *
+ * WHAT IT REFUSES TO HAND OUT, BEYOND THIS TREE. The tasks in one checkout are
+ * one opinion about the backlog, and the command that WRITES may not have a
+ * narrower view than the ones that only read: `query`, `stats` and the viewer
+ * have consulted the branch and worktree scan since TL-73, while the dispatcher
+ * did not, so a fleet was handed tasks another branch had already started
+ * (TL-133). The scan may only ever REMOVE a candidate here, never add one — see
+ * `selectCandidates`. It costs one pass over the local refs per call and is
+ * switched off, explicitly, by `cross_branch_state: false`.
+ *
  * EXIT CODES. 0 took a task · 3 nothing to take · 1 a refusal about a task that
  * exists · 2 a usage error. "Nothing to take" must be distinguishable from "the
  * call was wrong", or a loop cannot tell an empty queue from its own typo.
@@ -33,6 +42,7 @@
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { crossBranchState, describeDivergence, divergences, scanNote } from "./branch-scan.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { ACTOR_NAMESPACES, isValidActor, isValidReason } from "./history.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
@@ -144,6 +154,25 @@ export function isAbandoned(task, config, now) {
 }
 
 /**
+ * The observations that say somebody else's tree has already moved this task on.
+ * PURE.
+ *
+ * The rule is DERIVED, not a list of statuses written here: an observation
+ * disqualifies the task exactly when its status is one this call would not have
+ * handed out in the first place (third law — the vocabulary is the project's).
+ * By default that is every status outside `queueStatuses()`, so a task another
+ * branch reports as in progress, closed or blocked is not offered a second time.
+ *
+ * @param {object} task a record carrying `elsewhere` from `branch-scan.mjs`
+ * @param {Set<string>} handedOut the statuses of this call, lowercased
+ */
+export function heldElsewhere(task, handedOut) {
+  return (task.elsewhere || []).filter(
+    (o) => !handedOut.has(String(o.status || "").toLowerCase())
+  );
+}
+
+/**
  * The candidates, best first. PURE with respect to the disk — it is handed the
  * records.
  *
@@ -157,27 +186,59 @@ export function isAbandoned(task, config, now) {
  * naming statuses is asking a question, and answering it with tasks in a status
  * they did not name would be the tool choosing for them.
  *
- * @returns {{candidates: object[], reclaimable: Set<string>, skippedBlocked: number}}
+ * THE SCAN MAY ONLY NARROW THIS, NEVER WIDEN IT (TL-133). Two rules, and the
+ * asymmetry between them is the decision:
+ *
+ *   removes  a task another branch or worktree reports in a status this call
+ *            does not hand out is EXCLUDED, not pushed to the end. Pushing back
+ *            is right for an abandoned claim, where the evidence is a stale date
+ *            and taking it over may be a rescue; here the evidence is another
+ *            tree's live state, and a candidate at the end of the queue is still
+ *            handed out the moment nothing else is left — which is exactly the
+ *            13:41/13:43 collision in CLAUDE.md, delayed rather than removed.
+ *   adds     nothing. `filterTasks` matches a task on the statuses seen ANYWHERE
+ *            (that is what `query --status in_progress` from `main` is for), but
+ *            `next` WRITES: a task whose only evidence of being startable comes
+ *            from somebody else's branch is not startable in this tree, and
+ *            claiming it here would manufacture the divergence. So the local
+ *            status has to be one of this call's own.
+ *
+ * @returns {{candidates: object[], reclaimable: Set<string>, skippedBlocked: number,
+ *            skippedElsewhere: Array<{id: string, elsewhere: object[]}>}}
  */
 export function selectCandidates(records, config, filters, now) {
   const archived = new Set(config.archivedStatuses);
   const byId = new Map(records.map((t) => [String(t.id).toUpperCase(), t]));
   const wanted = filters.status || queueStatuses(config);
-  const matching = filterTasks(records, { ...filters, status: wanted }, archived);
+  const handedOut = new Set(wanted.map((s) => String(s).toLowerCase()));
+  const matching = filterTasks(records, { ...filters, status: wanted }, archived)
+    .filter((t) => handedOut.has(String(t.status || "").toLowerCase()));
   const fresh = matching.filter((t) => isExecutable(t, byId, archived));
   sortTasks(fresh, "priority", config);
-  const candidates = fresh.slice();
+
+  const skippedElsewhere = [];
+  const free = (task, held) => {
+    if (!held.length) return true;
+    skippedElsewhere.push({ id: task.id, elsewhere: held });
+    return false;
+  };
+  const candidates = fresh.filter((t) => free(t, heldElsewhere(t, handedOut)));
 
   const reclaimable = new Set();
   if (!filters.status) {
     const stale = filterTasks(records, { ...filters, status: [inProgressStatus(config)].filter(Boolean) }, archived)
       .filter((t) => isAbandoned(t, config, now || Date.now()))
-      .filter((t) => isExecutable(t, byId, archived));
+      .filter((t) => isExecutable(t, byId, archived))
+      // ANY disagreement stops a reclaim, whatever it says. Taking over a claim
+      // is already a guess made from a date; a tree that reports something else
+      // about the same task is the one piece of evidence that the guess is
+      // wrong, and it costs nothing to believe it.
+      .filter((t) => free(t, (t.elsewhere || []).slice()));
     sortTasks(stale, "priority", config);
     for (const t of stale) reclaimable.add(String(t.id).toUpperCase());
     candidates.push(...stale);
   }
-  return { candidates, reclaimable, skippedBlocked: matching.length - fresh.length };
+  return { candidates, reclaimable, skippedBlocked: matching.length - fresh.length, skippedElsewhere };
 }
 
 export function run(argv) {
@@ -218,7 +279,19 @@ export function run(argv) {
   };
   const now = Date.now();
   const records = readTaskRecords(backlogPaths(root).tasksDir, config.taskId.file);
-  const { candidates, reclaimable, skippedBlocked } = selectCandidates(records, config, filters, now);
+  // What the REST of this clone says (TL-133). Attached exactly as `query`
+  // attaches it, from the same module, so the dispatcher and the listing cannot
+  // disagree about the tree they are both looking at.
+  const scan = crossBranchState(root, config);
+  for (const t of records) t.elsewhere = divergences(t.status, scan.byId.get(t.id));
+  const { candidates, reclaimable, skippedBlocked, skippedElsewhere } =
+    selectCandidates(records, config, filters, now);
+  // Named, never silent: a candidate that disappears without a word is
+  // indistinguishable from an empty queue, and the reader has no second place
+  // to look.
+  const elsewhereLines = skippedElsewhere.map(
+    (s) => s.id + " skipped — " + s.elsewhere.map(describeDivergence).join(", ")
+  );
 
   // Candidates are tried IN ORDER, and a taken one is skipped rather than
   // waited for: that is what makes two parallel calls come back with two
@@ -239,8 +312,12 @@ export function run(argv) {
         console.error(warn("the views were not rebuilt — run `" + N + " build` yourself"));
       }
       if (plan.json) {
-        console.log(JSON.stringify({ ...takeJson(result), passedOver, considered: candidates.length }, null, 2));
+        console.log(JSON.stringify({
+          ...takeJson(result), passedOver, considered: candidates.length,
+          skippedElsewhere, scan: { scanned: scan.scanned, reason: scan.reason },
+        }, null, 2));
       } else {
+        for (const line of elsewhereLines) console.log(color.dim(MARK.bullet + " " + line));
         for (const p of passedOver) {
           console.log(color.dim(MARK.bullet + " " + p.id + " passed over: " + p.why));
         }
@@ -265,6 +342,12 @@ export function run(argv) {
     "searched statuses: " + (searched.join(", ") || "(none — check `statuses` in config.yaml)"),
   ];
   if (skippedBlocked) details.push(skippedBlocked + " matching task(s) still have open blockers");
+  if (elsewhereLines.length) {
+    details.push(elsewhereLines.length + " candidate(s) are in another state on another branch or worktree");
+    for (const line of elsewhereLines) details.push("  " + MARK.bullet + " " + line);
+  }
+  const note = scanNote(scan.reason);
+  if (note) details.push(note);
   if (!(config.abandonedAfterDays > 0)) {
     details.push(
       "claims already held are never handed out again — `abandoned_after_days` is 0 (off)"
@@ -276,7 +359,8 @@ export function run(argv) {
   if (plan.json) {
     console.log(JSON.stringify({
       ok: false, kind: "nothing-to-take", taken: null,
-      searchedStatuses: searched, skippedBlocked, passedOver,
+      searchedStatuses: searched, skippedBlocked, passedOver, skippedElsewhere,
+      scan: { scanned: scan.scanned, reason: scan.reason },
     }, null, 2));
   } else {
     // NOT an error, and it says so: silence here would read as a crash, and an

@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Wyróżniki agentowe"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 estimate: 2h                       # 30m | 2h | 1d | 1w | 1mo
 created: 2026-09-01
 updated: 2026-09-01
@@ -79,8 +79,8 @@ Rozstrzygnięcia do podjęcia w tasku, nie z góry:
 
 ## Acceptance criteria
 
-- [ ] `next` nie wydaje taska, który na innej AKTYWNEJ gałęzi lub w innym worktree jest w toku. [proof: two-trees]
-- [ ] Powód pominięcia nazywa gałąź i status, nie jest cichy. [proof: two-trees]
-- [ ] `cross_branch_state: false` zostawia dzisiejsze, jednodrzewowe zachowanie. [proof: two-trees]
-- [ ] Granica gwarancji w `README.md` i w `instructions autonomous-loop` mówi „klon", nie „maszyna". [proof: docs-say-clone]
-- [ ] Test na dwóch worktree z kontrolą pozytywną przy wyłączonym skanie. [proof: two-trees]
+- [x] `next` nie wydaje taska, który na innej AKTYWNEJ gałęzi lub w innym worktree jest w toku. [proof: two-trees]
+- [x] Powód pominięcia nazywa gałąź i status, nie jest cichy. [proof: two-trees]
+- [x] `cross_branch_state: false` zostawia dzisiejsze, jednodrzewowe zachowanie. [proof: two-trees]
+- [x] Granica gwarancji w `README.md` i w `instructions autonomous-loop` mówi „klon", nie „maszyna". [proof: docs-say-clone]
+- [x] Test na dwóch worktree z kontrolą pozytywną przy wyłączonym skanie. [proof: two-trees]

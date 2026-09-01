@@ -288,13 +288,24 @@ done   # exits 3 — nothing left to take
 closed, not yours) · `2` a bad invocation. An empty queue is not an error, and
 it does not look like one.
 
-**Where the guarantee ends, said plainly.** The reservation is a lockfile in
-your user state directory, keyed by the repository, so it is shared by every
-worktree of it *on this machine* — which is the case it exists for. Two machines
-connected only by git can still both take one task and will find out when they
-merge; that is a property of git, not something this hides. A session that dies
-leaves its lock behind, and the next caller takes it over after
-`lock_ttl_minutes` and says whose it was.
+**Where the guarantee ends, said plainly.** Two mechanisms, and they stop in
+different places. The reservation is a lockfile in your user state directory,
+keyed by the repository, so it excludes sessions running *at the same moment* in
+every worktree of it on this machine. It cannot see a decision that was already
+written down and committed, because data travels with the branch: a task started
+on `feature/x` is still untouched in `main`'s copy of the file. That second case
+is what the branch and worktree scan answers, so `next` will not hand out a task
+that **every branch and worktree of one clone** — local refs only, never a
+`git fetch` — reports in a status it does not hand out, and it names the branch
+or the tree it is deferring to instead of skipping it silently. Set
+`cross_branch_state: false` and the dispatcher goes back to reading this checkout
+alone.
+
+The boundary is therefore the *clone*: two clones connected only by git can
+still both take one task and will find out when they merge; that is a property
+of git, not something this hides. Merge finished work promptly and the window
+closes. A session that dies leaves its lock behind, and the next caller takes it
+over after `lock_ttl_minutes` and says whose it was.
 
 Two statuses are never handed out unattended: the one that means *in progress*
 (somebody has it) and any status your `reason_required_statuses` protects —
