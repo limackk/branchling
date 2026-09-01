@@ -187,6 +187,67 @@ test("the fixture's OWN words reach the output — the substitution really ran",
   assert.ok(closing.includes("`" + OWN.archived[1] + "`"), "the other archived statuses are not named");
 });
 
+/**
+ * What the phase guides may not stop saying (TL-101).
+ *
+ * The needles are the THESIS, not the wording. An assertion on a whole sentence
+ * would have to be edited every time somebody improves the prose, and a test
+ * that is edited to stay green is the first one loosened until it guards
+ * nothing. What is pinned here is: the primitives are NAMED, doing it by hand is
+ * REFUSED, and the by-hand route that does exist is the one that records itself.
+ *
+ * PURE, and it takes the texts rather than reading them, so the control below
+ * can feed it a guide with the sentence removed.
+ *
+ * @returns {string[]} problems; empty means the guides still say it
+ */
+function primitivesPromised(guides) {
+  const problems = [];
+  // Flattened first: the guides are wrapped at 72 columns, so a sentence is
+  // regularly cut in the middle by a newline. A needle that cannot survive the
+  // line break would be measuring the typesetting.
+  const flat = (name) => String(guides[name] || "").replace(/\s+/g, " ");
+  const need = (name, re, what) => {
+    if (!re.test(flat(name))) problems.push(name + ": " + what);
+  };
+  need("task-execution", new RegExp(PRODUCT_NAME + " take"), "does not name the command that claims a task");
+  need("task-execution", new RegExp(PRODUCT_NAME + " next"), "does not name the dispatcher");
+  need("task-execution", /(do not|don't|never)[^.]{0,60}by hand/i, "no longer refuses hand-editing to claim a task");
+  need("task-execution", /history[^.]*--source manual/, "does not say how a hand edit is recorded");
+  need("task-finalization", new RegExp(PRODUCT_NAME + " done"), "does not name the command that closes a task");
+  need("task-finalization", /(do not|don't|never)[^.]{0,60}by hand/i, "no longer refuses closing a task by hand");
+  return problems;
+}
+
+test("the guides tell an agent to use the primitives, not to edit fields", () => {
+  // The sentence the whole direct mode rests on. It was true when TL-101 was
+  // written and nothing measured it, so one commit could have removed it in
+  // silence — which is what this test exists to stop, not to introduce.
+  const fx = fixture();
+  const config = loadConfig(fx.dir);
+  const guides = {};
+  for (const name of TOPIC_NAMES) guides[name] = topicText(name, config);
+  assert.deepEqual(primitivesPromised(guides), []);
+});
+
+test("POSITIVE CONTROL: remove the sentence and the guard says which one went", () => {
+  // Without this pair, the assertion above passes just as well against a check
+  // that cannot fail — the failure mode of every "the text contains X" test.
+  const fx = fixture();
+  const config = loadConfig(fx.dir);
+  const guides = {};
+  for (const name of TOPIC_NAMES) guides[name] = topicText(name, config);
+
+  const stripped = { ...guides, "task-execution": guides["task-execution"].replace(/by\s+hand/gi, "somehow") };
+  const problems = primitivesPromised(stripped);
+  assert.equal(problems.length, 1, "removing the prohibition was not noticed");
+  assert.match(problems[0], /task-execution: no longer refuses hand-editing/);
+
+  // And the other half: a guide that says nothing at all fails on every needle
+  // it owns, rather than on none of them.
+  assert.equal(primitivesPromised({ ...guides, "task-finalization": "" }).length, 2);
+});
+
 test("a placeholder nobody defined THROWS instead of being printed", () => {
   const fx = fixture();
   const config = loadConfig(fx.dir);

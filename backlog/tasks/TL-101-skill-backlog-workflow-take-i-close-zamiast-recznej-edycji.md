@@ -6,12 +6,12 @@ labels: []
 board: main
 epic: "Wyróżniki agentowe"
 priority: P2
-status: pending
-owner: unassigned
+status: done
+owner: agent:claude
 estimate: 2h
 confidence: high
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 blocked_by: [TL-87, TL-93]
 blocks: []
 related_docs: []
@@ -84,10 +84,10 @@ stylu, więc byłaby pierwszą rzeczą, którą ktoś rozluźni.
 
 ## Acceptance criteria
 
-- [ ] `task-execution` każe wziąć task komendą i zabrania ręcznej zmiany statusu; strażnik oblewa, gdy to zdanie zniknie. [proof: guides-say-primitives]
-- [ ] `task-finalization` mówi, że zamyka jedna komenda uruchamiająca `verification:`. [proof: guides-say-primitives]
-- [ ] Skill nie niesie procedury — jego kontrakt sprawdza wyłącznie, że odsyła do przewodnika. [proof: skill-points-at-the-guide]
-- [ ] Żaden wpis `verification:` nie wymaga wpisania procedury z powrotem do `.claude/skills/`. [proof: skill-points-at-the-guide]
+- [x] `task-execution` każe wziąć task komendą i zabrania ręcznej zmiany statusu; strażnik oblewa, gdy to zdanie zniknie. [proof: guides-say-primitives]
+- [x] `task-finalization` mówi, że zamyka jedna komenda uruchamiająca `verification:`. [proof: guides-say-primitives]
+- [x] Skill nie niesie procedury — jego kontrakt sprawdza wyłącznie, że odsyła do przewodnika. [proof: skill-points-at-the-guide]
+- [x] Żaden wpis `verification:` nie wymaga wpisania procedury z powrotem do `.claude/skills/`. [proof: skill-points-at-the-guide]
 
 ## Log
 

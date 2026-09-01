@@ -1,3 +1,6 @@
 {"id":"01M1E066RD14N5WDMVD0M2G30K","ts":"2026-09-01T08:08:22.541Z","task":"TL-101","field":"__created__","from":"","to":"Skill backlog-workflow: take i close zamiast recznej edycji","actor":"unknown","source":"external"}
 {"id":"01M1F3N6ZFF1KHCVY5F17KS17N","ts":"2026-09-01T18:28:14.447Z","task":"TL-101","field":"status","from":"blocked","to":"pending","actor":"agent:claude","source":"cli","reason":"blocked_by w całości zamknięte — status blocked był zwietrzały i wykluczał task z next"}
 {"id":"01M1F5BNKGW3R8NWD6V0BM3S1J","ts":"2026-09-01T18:57:58.896Z","task":"TL-101","field":"blocked_by","from":["TL-1497","TL-1503"],"to":["TL-87","TL-93"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1FA3J89QHXN26BCZFG5B876","ts":"2026-09-01T20:20:56.201Z","task":"TL-101","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M1FA3J89G23NJV3EDMYED3DR","ts":"2026-09-01T20:20:56.201Z","task":"TL-101","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M1FA6CAV35PGDX786B4CVZWX","ts":"2026-09-01T20:22:28.443Z","task":"TL-101","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
