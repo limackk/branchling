@@ -1,3 +1,6 @@
 {"id":"01M1EKR2J2JTZQYDQ7PQW17EVT","ts":"2026-09-01T13:50:11.010Z","task":"TL-121","field":"__created__","from":"","to":"Szablon tego repo zgubił pola, które ma szablon wysyłkowy","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK5ESV9GEC2M3Z9VX74","ts":"2026-09-02T07:16:31.461Z","task":"TL-121","field":"title","from":"Szablon tego repo zgubił pola, które ma szablon wysyłkowy","to":"This repo's template lost fields that the shipping template has","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK5AFNP9GRHAQGVWMT0","ts":"2026-09-02T07:16:31.461Z","task":"TL-121","field":"epic","from":"Historia i atrybucja","to":"History and attribution","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1HASS58D1H4RMKRDKTWEDM3","ts":"2026-09-02T15:11:33.032Z","task":"TL-121","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1HASS5864FGYPAVCDXGYV4D","ts":"2026-09-02T15:11:33.032Z","task":"TL-121","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1HB2VG9QGS97186A9SHMTWC","ts":"2026-09-02T15:16:30.345Z","task":"TL-121","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
