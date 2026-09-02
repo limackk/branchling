@@ -79,6 +79,11 @@ export function parseTaskRecord(raw, file) {
     // has to tell a claim that is being worked from one nobody came back to
     // (TL-104) — and because it is the only evidence of that in the tree.
     updated: str(meta.updated),
+    // What a task says has to be read before it is started. Read here because
+    // `docs-drift` asks the inverse question — which tasks name THIS document
+    // (TL-100) — and that answer has to come from the same parse as every other
+    // field, not from a second walk over the tree.
+    related_docs: meta.related_docs,
     file: `tasks/${file}`,
     // What OTHER branches and worktrees say this task's status is, when they
     // disagree with the line above (TL-73). Filled in by the caller from

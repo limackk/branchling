@@ -54,6 +54,12 @@ export function taskIdPatterns(prefix) {
     fileId: new RegExp("^(" + p + "-\\d+)"),
     /** Capture just the number out of a filename. */
     fileNumber: new RegExp("^" + p + "-(\\d+)"),
+    /** An id ANYWHERE in prose: the form `docs-drift` looks for when it asks
+     *  which tasks a document names (TL-100). Word-bounded on the left so
+     *  `XBL-12` is not read as `BL-12`, and on the right by the digits
+     *  themselves. Callers that scan repeatedly must build their own `g` copy —
+     *  a shared stateful regex is a bug waiting for a second caller. */
+    anywhere: new RegExp("\\b" + p + "-\\d+\\b"),
     /** A history log filename: `BL-123.jsonl`. */
     historyFile: new RegExp("^(" + p + "-\\d+)\\.jsonl$"),
   };

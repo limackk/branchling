@@ -264,7 +264,10 @@ export function createTask({ root, config, board, slug, fields, body }) {
     .replace(/^board: .*$/m, "board: " + board)
     .replace(/^created: .*$/m, "created: " + day)
     .replace(/^updated: .*$/m, "updated: " + day);
-  for (const key of ["priority", "status", "type", "estimate", "owner"]) {
+  // `role` joins the scalar fields rather than getting a branch of its own: it
+  // is one more enum from the configuration, and `docs-drift --seed-tasks`
+  // (TL-100) is the first caller that has to set it programmatically.
+  for (const key of ["priority", "status", "type", "estimate", "owner", "role"]) {
     if (opts[key]) text = text.replace(new RegExp("^" + key + ": .*$", "m"), key + ": " + opts[key]);
   }
   if (opts.epic) text = text.replace(/^epic: .*$/m, "epic: " + quoted(opts.epic));
@@ -273,6 +276,15 @@ export function createTask({ root, config, board, slug, fields, body }) {
   // already the right answer.
   if (Array.isArray(opts.labels) && opts.labels.length) {
     text = text.replace(/^labels: .*$/m, "labels: [" + opts.labels.join(", ") + "]");
+  }
+  // A BLOCK list, like `verification` below and unlike `labels`: the template
+  // carries `related_docs: []` on one line, and the tree's convention — the one
+  // `check --docs` resolves against — is one indented entry per line.
+  if (Array.isArray(opts.related_docs) && opts.related_docs.length) {
+    text = text.replace(
+      /^related_docs:.*\n(?:[ \t]+[^\n]*\n)*/m,
+      "related_docs:\n" + opts.related_docs.map((d) => "  - " + d + "\n").join("")
+    );
   }
   if (Array.isArray(opts.verification)) {
     // A block, not a line — `verification` is a list, and the template carries a

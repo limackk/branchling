@@ -137,6 +137,37 @@ export const DEFAULTS = Object.freeze({
   // a week off without accusing anybody. A project that works in shorter cycles
   // lowers it; the code knows the shape, this line knows the value.
   audit_stale_days: 7,
+  // ── Documentation drift (TL-100) ────────────────────────────────────────
+  // `docs-drift` detects that a document is going stale; it never writes one.
+  // Every value below is a PROJECT's, because every one of them encodes a
+  // convention: how many closed tasks around a document mean it has moved on,
+  // how much evidence is enough to say so out loud, and what this project's
+  // documents write when they claim work is still ahead of them.
+  //
+  // How many tasks that name a document in `related_docs:` may close AFTER the
+  // document last changed before that counts as a signal. Three rather than
+  // one: a single task closing beside a document is the normal case, and a
+  // detector that fires on it reports the whole `docs/` directory forever.
+  docs_drift_task_threshold: 3,
+  // How many signals a document needs before it is REPORTED. Below it the
+  // document is named in the "too little signal" section instead — the same
+  // rule the time reports follow with `min_report_n`, and for the same reason:
+  // one dead link is a typo, and a report that calls it drift is noise nobody
+  // reads twice.
+  docs_drift_min_signals: 2,
+  // Regular expressions matching a line where a document CLAIMS the work it
+  // describes is still ahead of it. The lie this catches is such a line naming
+  // only tasks this backlog has since closed. Empty means the project has no
+  // such convention, and the detector says so rather than guessing at one —
+  // `**Status:** PROJECT` is this repository's habit, not a fact about
+  // markdown.
+  docs_status_pending_patterns: [],
+  // Which role a task created by `--seed-tasks` asks for — a value from
+  // `roles:`. Empty means this project has not said who maintains its
+  // documentation, and then `--seed-tasks` REFUSES: a task with no role goes
+  // into the general queue, which is the one place the split this command
+  // exists for stops working.
+  docs_role: "",
   // How long a task reservation is honoured, in minutes (TL-87). A killed
   // session leaves its lockfile behind, and a reservation nobody can release is
   // a task that leaves the queue for good; after this long the lock is stale and
@@ -183,12 +214,13 @@ const LIST_KEYS = new Set([
   "statuses", "archived_statuses", "priorities", "types", "confidence",
   "labels", "label_axis_timing", "label_axis_env", "owners", "estimates", "actors", "roles",
   "dashboard_open_statuses", "status_strikethrough", "reason_required_statuses",
+  "docs_status_pending_patterns",
 ]);
 const MAP_KEYS = new Set(["epic_aliases", "status_colors", "priority_colors", "label_colors"]);
 const NUMBER_KEYS = new Set([
   "title_max_length", "lock_ttl_minutes", "active_branch_days", "abandoned_after_days",
   "idle_gap_minutes", "heartbeat_throttle_seconds", "min_report_n", "activity_retention_days",
-  "audit_stale_days",
+  "audit_stale_days", "docs_drift_task_threshold", "docs_drift_min_signals",
 ]);
 const BOOL_KEYS = new Set(["labels_closed", "cross_branch_state"]);
 
@@ -556,6 +588,15 @@ export function loadConfig(root, opts = {}) {
     heartbeatThrottleSeconds: values.heartbeat_throttle_seconds,
     minReportN: values.min_report_n,
     auditStaleDays: values.audit_stale_days,
+    // Documentation drift (TL-100). Grouped, because the four keys are one
+    // policy: what counts as a signal, how much of it is enough to speak, and
+    // who gets handed the result.
+    docsDrift: {
+      taskThreshold: values.docs_drift_task_threshold,
+      minSignals: values.docs_drift_min_signals,
+      pendingPatterns: values.docs_status_pending_patterns,
+      role: values.docs_role,
+    },
     activityRetentionDays: values.activity_retention_days,
     labelAxes: { timing: values.label_axis_timing, env: values.label_axis_env },
     owners: values.owners,
@@ -713,6 +754,32 @@ export function validateConfig(config) {
     }
     if (seenRoles.has(r)) problems.push("duplicate role `" + r + "` in `roles`");
     seenRoles.add(r);
+  }
+
+  // Documentation drift (TL-100). `docs_role` names a role a DISPATCHER has to
+  // be able to serve, so a value outside `roles:` is a queue nobody reads —
+  // caught here rather than at the moment a seeded task lands in it.
+  const drift = config.docsDrift || {};
+  if (drift.role && !seenRoles.has(drift.role)) {
+    problems.push(
+      (config.roles || []).length
+        ? "`docs_role: " + drift.role + "` is not in `roles` (" + (config.roles || []).join(", ") + ")"
+        : "`docs_role: " + drift.role + "` is set, but this project declares no `roles`"
+    );
+  }
+  for (const key of [["docs_drift_task_threshold", drift.taskThreshold], ["docs_drift_min_signals", drift.minSignals]]) {
+    // A threshold below one would fire on nothing at all and report every
+    // document in the tree — the noise this whole command is shaped to avoid.
+    if (!Number.isFinite(key[1]) || key[1] < 1) {
+      problems.push("`" + key[0] + "` = `" + key[1] + "` — expecting a whole number of 1 or more");
+    }
+  }
+  for (const p of drift.pendingPatterns || []) {
+    try {
+      new RegExp(p);
+    } catch (e) {
+      problems.push("`docs_status_pending_patterns` contains `" + p + "`, which is not a regular expression: " + e.message);
+    }
   }
 
   const seen = new Set();

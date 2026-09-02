@@ -122,6 +122,13 @@ export const KINDS = {
     activeWave: null, nextUp: [], inProgress: [], unplanned: [], stale: [],
     inProgressStatus: null,
   },
+  // `docs-drift --json` (TL-100). `flagged` and `tooLittle` are both LISTS of
+  // documents carrying their SIGNALS, never counts: the whole rule this command
+  // is built on is that a verdict with no evidence is not acted on, and a
+  // consumer handed a number would be handed exactly that verdict. `seeded` is
+  // absent unless `--seed-tasks` ran — an empty object would say a write
+  // happened and found nothing to do.
+  "docs-drift": { documents: null, minSignals: null, flagged: [], tooLittle: [], seeded: null },
   // `unstamped` is a LIST and not a count, for the reason `unplanned` is: the
   // tasks outside a measurement are the thing a reader has to be able to go and
   // look at, and a number cannot be acted on (TL-27).

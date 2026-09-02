@@ -540,6 +540,7 @@ implementation detail. Every reading command answers in the same envelope:
 | `<command> --help` | `command-help` | `command`, `summary`, `usage`, `configured`, `flags` |
 | `pr-summary` | `pr-summary` | `base`, `scanned`, `reason`, `tasks`, `engaged`, `cost` |
 | `audit` | `audit` | `since`, `dayZero`, `tasks`, `findings`, `closedWithoutTrace`, `skippedBeforeSince`, `reopened`, `rework`, `parked`, `withoutPremise` |
+| `docs-drift` | `docs-drift` | `documents`, `minSignals`, `flagged`, `tooLittle`, `seeded` (absent unless `--seed-tasks` ran) |
 | `sessions` | `sessions` | `correlation`, `total`, `sessions` |
 | `session` | `session` | `correlation`, `session` |
 

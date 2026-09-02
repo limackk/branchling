@@ -99,6 +99,11 @@ const READING = {
   // find, and the envelope still has to carry every key rather than dropping
   // the sections that came back empty.
   audit: ["audit", "--json"],
+  // A repository with no `docs/` at all (TL-100): zero documents still has to be
+  // a complete envelope. `flagged` and `tooLittle` come back as empty LISTS, and
+  // `seeded` as null — the command wrote nothing, which is a different answer
+  // from having written nothing useful.
+  "docs-drift": ["docs-drift", "--json"],
   // A backlog with no heartbeats (TL-92): zero sessions still has to be a
   // complete envelope, `correlation` included — that key states a limit of the
   // ANSWER, so dropping it when the list is empty would drop the caveat with it.

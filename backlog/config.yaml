@@ -71,3 +71,23 @@ estimates: [30m, 2h, 1d, 1w]
 actors: [local:me, agent:claude]
 
 title_max_length: 60
+
+# Who MAY take a task, as opposed to who holds it now (TL-97). This project
+# declares one role, because it has one specialised queue: documentation.
+# `docs-drift --seed-tasks` (TL-100) writes into it, and a dispatcher pointed at
+# `--role docs` is what empties it.
+roles: [docs]
+
+# ── Documentation drift (TL-100) ──────────────────────────────────────────
+# Which role a seeded documentation task asks for. Empty would make
+# `--seed-tasks` refuse rather than drop the task into the general queue.
+docs_role: docs
+
+# How this repository's documents write "the work described here is still ahead
+# of us". The convention is `**Status:** PROJECT` / `PLANNED` on the third line,
+# usually with the tasks it waits on in brackets; such a line naming only tasks
+# that have since closed is the document lying about itself. IMPLEMENTED and
+# FOUNDATION IMPLEMENTED are deliberately absent — those lines are supposed to
+# name closed tasks.
+docs_status_pending_patterns:
+  - "^\\*\\*Status:\\*\\*\\s+(PROJECT|PLANNED)"

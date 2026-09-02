@@ -6,12 +6,12 @@ labels: []
 board: main
 epic: "Agentic differentiators"
 priority: P2
-status: pending
-owner: unassigned
+status: done
+owner: agent:claude
 estimate: 1d
 confidence: low
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-02
 blocked_by: [TL-97]
 blocks: []
 related_docs:
