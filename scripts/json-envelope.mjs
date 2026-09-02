@@ -64,6 +64,14 @@ export const KINDS = {
   // at all: outside git, or with a base this clone does not have, `tasks: []` is
   // "nobody looked" rather than "nothing changed", and `reason` says which.
   "pr-summary": { base: null, scanned: null, reason: null, tasks: [], engaged: null, cost: null },
+  // `audit --json` (TL-90). `since` and `dayZero` are what makes an empty
+  // `closedWithoutTrace` readable: the log has a first day, and everything
+  // before it left no trace for a reason that is nobody's fault.
+  audit: {
+    since: null, dayZero: null, tasks: null, findings: null,
+    closedWithoutTrace: [], skippedBeforeSince: null, reopened: [], rework: [],
+    parked: [], withoutPremise: [],
+  },
   // `stats --json`. The tallies stay nested under `stats` instead of being
   // spread across the root: a future tally called `kind` would otherwise
   // overwrite the envelope's own key and nobody would notice until a consumer

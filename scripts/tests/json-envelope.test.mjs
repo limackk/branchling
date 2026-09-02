@@ -95,6 +95,10 @@ const READING = {
   // command with no range to read gives (TL-89) — which has to stay a complete
   // envelope saying `scanned: false`, not an error and not an empty list.
   "pr-summary": ["pr-summary", "--json"],
+  // A backlog with no history at all (TL-90): every detector has nothing to
+  // find, and the envelope still has to carry every key rather than dropping
+  // the sections that came back empty.
+  audit: ["audit", "--json"],
 };
 
 /**

@@ -129,6 +129,14 @@ export const DEFAULTS = Object.freeze({
   min_report_n: 8,
   // How long raw heartbeats are kept, in days. The aggregate outlives them.
   activity_retention_days: 90,
+  // After how many days without a recorded change `audit` calls a task in
+  // progress PARKED (TL-90). A REPORT's threshold, not a rule: nothing acts on
+  // it, unlike `abandoned_after_days`, which hands the task to somebody else.
+  //
+  // Seven days rather than two, because the number has to survive a weekend and
+  // a week off without accusing anybody. A project that works in shorter cycles
+  // lowers it; the code knows the shape, this line knows the value.
+  audit_stale_days: 7,
   // How long a task reservation is honoured, in minutes (TL-87). A killed
   // session leaves its lockfile behind, and a reservation nobody can release is
   // a task that leaves the queue for good; after this long the lock is stale and
@@ -180,6 +188,7 @@ const MAP_KEYS = new Set(["epic_aliases", "status_colors", "priority_colors", "l
 const NUMBER_KEYS = new Set([
   "title_max_length", "lock_ttl_minutes", "active_branch_days", "abandoned_after_days",
   "idle_gap_minutes", "heartbeat_throttle_seconds", "min_report_n", "activity_retention_days",
+  "audit_stale_days",
 ]);
 const BOOL_KEYS = new Set(["labels_closed", "cross_branch_state"]);
 
@@ -546,6 +555,7 @@ export function loadConfig(root, opts = {}) {
     idleGapMinutes: values.idle_gap_minutes,
     heartbeatThrottleSeconds: values.heartbeat_throttle_seconds,
     minReportN: values.min_report_n,
+    auditStaleDays: values.audit_stale_days,
     activityRetentionDays: values.activity_retention_days,
     labelAxes: { timing: values.label_axis_timing, env: values.label_axis_env },
     owners: values.owners,

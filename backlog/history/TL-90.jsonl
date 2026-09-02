@@ -2,3 +2,6 @@
 {"id":"01M1E69RE2MQNFYRSY8WYXAR47","ts":"2026-09-01T09:55:10.402Z","task":"TL-90","field":"title","from":"tasklog audit — deklaracje kontra ślady aktywności","to":"worktrail audit — deklaracje kontra ślady aktywności","actor":"unknown","source":"external"}
 {"id":"01M1GFKZK5JB9STJV47FF801VS","ts":"2026-09-02T07:16:31.461Z","task":"TL-90","field":"title","from":"worktrail audit — deklaracje kontra ślady aktywności","to":"worktrail audit — declarations versus traces of activity","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK5SM2F6MHKGZGF6V1C","ts":"2026-09-02T07:16:31.461Z","task":"TL-90","field":"epic","from":"Wyróżniki agentowe","to":"Agentic distinguishers","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1H3MZ7MBRRH325YPVNJE7DD","ts":"2026-09-02T13:06:35.380Z","task":"TL-90","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1H3MZ7MB2PDPTHVH2XYBYSG","ts":"2026-09-02T13:06:35.380Z","task":"TL-90","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1H41JTNW5G5DFZS0EAVST3N","ts":"2026-09-02T13:13:28.661Z","task":"TL-90","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

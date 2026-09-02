@@ -6,19 +6,28 @@ labels: []
 board: main
 epic: "Agentic distinguishers"
 priority: P2
-status: pending
-owner: unassigned
+status: done
+owner: agent:claude
 estimate: 1d
 confidence: medium
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-02
 blocked_by: []
 blocks: []
 related_docs:
   - docs/backlog-field-editing-history.md
   - docs/backlog-time-tracking.md
 verification:
-  - bash: "node --test scripts/tests/audit.test.mjs"
+  - id: suite
+    bash: "node --test scripts/tests/audit.test.mjs"
+  - id: thresholds
+    bash: "node -e \"import('./scripts/config.mjs').then(m=>{const c=m.loadConfig('backlog');if(!Number.isInteger(c.auditStaleDays)||!Number.isInteger(c.minReportN))process.exit(1);console.log('the thresholds come from config.yaml — OK')})\" && d=$(mktemp -d) && node scripts/cli.mjs init --dir \"$d\" --no-example >/dev/null && printf '\\naudit_nonsense: 3\\n' >> \"$d/config.yaml\" && ! node scripts/cli.mjs audit --dir \"$d\" >/dev/null 2>&1 && echo 'an unknown key still fails — OK'"
+  - id: day-zero
+    bash: "node scripts/cli.mjs audit --json | node -e \"let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const r=JSON.parse(s);if(!r.dayZero||r.since!==r.dayZero)process.exit(1);if(!(r.skippedBeforeSince>0))process.exit(1);console.log('tasks closed before day zero are dropped, and counted — OK')})\""
+  - id: sample
+    bash: "node scripts/cli.mjs audit --json | node -e \"let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const r=JSON.parse(s);const thin=r.rework.filter(x=>!x.enough);if(!thin.length)process.exit(1);if(thin.some(x=>x.rate!==null))process.exit(1);console.log('a thin bucket reports no rate at all — OK')})\""
+  - id: not-a-gate
+    bash: "node scripts/cli.mjs audit >/dev/null 2>&1; a=$?; node scripts/cli.mjs check >/dev/null 2>&1; c=$?; test \"$c\" -eq 0 && echo \"audit exits $a while check exits $c — two questions, two exit codes — OK\""
 ---
 
 ## Goal
@@ -92,17 +101,28 @@ Do not merge them — different moment of use, different exit code.
 
 ## Acceptance criteria
 
-- [ ] Each detector has a test where it finds SOMETHING, and a test where it
-      rightly stays silent.
-- [ ] Tasks predating the start of history are not reported as "done with no
-      trace".
-- [ ] Thresholds come from `config.yaml`; an unknown key fails as before.
-- [ ] The per-actor report applies the threshold `n` and does not evaluate
-      below it.
+- [x] Each detector has a test where it finds SOMETHING, and a test where it rightly stays silent. [proof: suite]
+- [x] Tasks predating the start of history are not reported as "done with no trace". [proof: day-zero]
+- [x] Thresholds come from `config.yaml`; an unknown key fails as before. [proof: thresholds]
+- [x] The per-actor report applies the threshold `n` and does not evaluate below it. [proof: sample]
 
 ## Log
 
 Append-only. Format: `YYYY-MM-DD status — who — note`.
 
+- 2026-09-02 in_progress — agent:claude — three decisions worth keeping. (1) DAY
+  ZERO is the day the log first recorded a STATUS TRANSITION, not the first entry
+  of any kind. Measured here: the log begins 2026-08-29 and the first transition
+  lands 2026-08-30, so the loose definition accused every task closed in between
+  of leaving no trace when the mechanism that leaves one was not running yet.
+  With the sharp definition, 23 tasks are dropped and counted, and 19 real
+  findings remain. (2) NO NEW KEY FOR "blocked": the set is derived as the ACTIVE
+  members of `reason_required_statuses`, which is already the project's own
+  declaration that a status carries a premise. A `blocked_status:` key would have
+  been a second way of saying what the configuration says, and two ways of saying
+  one thing is one of them being wrong later. (3) The sample threshold REUSES
+  `min_report_n`, which the time reports already apply for the same reason; only
+  `audit_stale_days` is new, and it is a REPORT's threshold — unlike
+  `abandoned_after_days`, nothing acts on it.
 - 2026-08-31 pending — agent:claude — task created from a review of agentic
   distinguishers; motivation: 27776f0 and §3.1 of the time-tracking document.
