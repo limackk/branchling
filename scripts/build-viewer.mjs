@@ -3244,7 +3244,7 @@ const ACTOR_STORAGE_KEY = "origin-backlog-actor";
 const ACTORS = CONFIG.actors || [];
 
 const HISTORY_FIELD_LABELS = {
-  __created__: "task utworzony",
+  __created__: "task created",
   __deleted__: "task deleted",
   __body__: "task body",
   __comment__: "comment",
@@ -3255,7 +3255,7 @@ const HISTORY_FIELD_LABELS = {
   __attributed__: "claimed as their own change",
   __role_override__: "taken outside its role",
   updated: "Updated",
-  created: "Utworzony",
+  created: "Created",
 };
 
 /**
@@ -3759,7 +3759,7 @@ function renderDetail() {
     : "";
 
   const readOnlyRows =
-    '<div class="meta-row"><div class="meta-label">Utworzony</div><div class="meta-value">' + escape(t.created || "—") + "</div></div>" +
+    '<div class="meta-row"><div class="meta-label">Created</div><div class="meta-value">' + escape(t.created || "—") + "</div></div>" +
     '<div class="meta-row"><div class="meta-label">Updated</div><div class="meta-value">' + escape(t.updated || "—") + "</div></div>" +
     // COMPUTED from commit messages, so there is no pen: it is not a field
     // anybody may edit, and offering one would invite a value that contradicts

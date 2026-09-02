@@ -14,12 +14,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { ALLOW_MARKER, PUBLIC_PATHS, auditText, auditTree, polishShapeHits } from "../check-public-language.mjs";
+import { ALLOW_MARKER, PUBLIC_PATHS, auditText, auditTree, labelHits, polishShapeHits } from "../check-public-language.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, "..", "..");
@@ -267,4 +267,73 @@ test("the ✓ line does NOT claim the text is English", () => {
   assert.ok(!/read as English/.test(r.stdout),
     "the guard still claims more than three heuristics can support");
   assert.match(r.stdout, /none matching/, "and it has to say what it DID check instead");
+});
+
+// ── A quoted label needs only ONE Polish-shaped word (TL-131) ─────────────
+//
+// THE MEASURED FAILURE. `HISTORY_FIELD_LABELS` in the generated viewer shipped
+// `"task utworzony"` and `"Utworzony"` into other people's repositories while
+// this guard reported thirty thousand lines as English. Two hits per line is the
+// right threshold for a SENTENCE; a label is one or two words and can never
+// reach it. It is the same blindness the strong-word list was added for: the
+// text a stranger reads FIRST has the least around it for a guard to hold on to.
+
+test("FINDS: a one-word Polish label inside quotes", () => {
+  // language-guard: allow — the shipped label IS the sample
+  assert.equal(auditText('  created: "Utworzony",')[0].reason, "label");
+  // language-guard: allow — the shipped label IS the sample
+  assert.equal(auditText('  __created__: "task utworzony",')[0].reason, "label");
+});
+
+test("FINDS: a label between HTML tags, which is how the viewer writes them", () => {
+  // A quoted string here is as often a fragment of HTML as a bare label, and the
+  // label a stranger reads is the text between the tags.
+  // language-guard: allow — the shipped label IS the sample
+  const line = `'<div class="meta-row"><div class="meta-label">Utworzony</div>' +`;
+  assert.equal(auditText(line)[0].reason, "label");
+});
+
+test("SILENT: English labels, including the few English words with a Polish digraph", () => {
+  for (const line of [
+    '  created: "Created",',
+    '  __created__: "task created",',
+    '<div class="meta-label">Created</div>',
+    '  title: "the Czech translation",',
+    '  name: "czar of the build",',
+    '  path: "backlog/tasks/TL-99-przekazanie-taska.md",',
+  ]) {
+    assert.deepEqual(auditText(line), [], "false positive on: " + line);
+  }
+});
+
+test("a quoted blob that is NOT prose is not judged as a label", () => {
+  // A JSON payload, a regular expression, a command line: not something a
+  // stranger reads as text, and not something this rule may guess about.
+  // language-guard: allow — the pattern in the sample is the sample
+  assert.equal(labelHits('const re = "^[a-z]+(cz|sz)$";'), 0);
+  assert.equal(labelHits('run("git rev-parse --show-toplevel")'), 0);
+});
+
+test("POSITIVE CONTROL: putting a Polish label back FAILS the guard", () => {
+  // The assertion TL-131 asks for by name. Without it, fixing the two labels
+  // would leave a guard that is green because nobody has written another one
+  // yet, rather than because it would catch one.
+  const dir = mkdtempSync(join(tmpdir(), "worktrail-lang-label-"));
+  mkdirSync(join(dir, "scripts"), { recursive: true });
+  writeFileSync(join(dir, "scripts", "build-viewer.mjs"),
+    // language-guard: allow — the regression this control exists to catch
+    'const LABELS = { __created__: "task utworzony" };\n', "utf8");
+  const { findings } = auditTree(dir);
+  assert.equal(findings.length, 1, "a Polish label written back in has to be caught");
+  assert.equal(findings[0].reason, "label");
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("the labels that actually ship are English", () => {
+  // Read from the source the viewer is generated from, so this cannot pass
+  // against a stale build.
+  const source = readFileSync(join(ROOT, "scripts", "build-viewer.mjs"), "utf8");
+  const map = source.match(/const HISTORY_FIELD_LABELS = \{[^}]*\}/);
+  assert.ok(map, "the label map is not where this test looks — the check would be vacuous");
+  assert.deepEqual(auditText(map[0]), [], map[0]);
 });

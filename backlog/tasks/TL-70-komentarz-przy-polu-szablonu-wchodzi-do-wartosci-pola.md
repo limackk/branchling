@@ -29,7 +29,7 @@ the value.
 
 Measured on 2026-08-31 on a clean tree from `worktrail init`:
 
-```console
+```console language-guard: allow — a verbatim CLI transcript; translating it would falsify what was run
 $ worktrail new --title "Napisz README"
 $ worktrail query
 <!-- language-guard: allow — verbatim buggy CLI output being diagnosed, not prose -->

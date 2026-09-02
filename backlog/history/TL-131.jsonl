@@ -3,3 +3,6 @@
 {"id":"01M1EYH29V363Z85NM5A1MXE57","ts":"2026-09-01T16:58:35.707Z","task":"TL-131","field":"confidence","from":"","to":"medium","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1EYH29VFCN8XD7HJ0CHNKBP","ts":"2026-09-01T16:58:35.707Z","task":"TL-131","field":"epic","from":"","to":"Backlog viewer","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK5ENP1VZTDDW6VE58X","ts":"2026-09-02T07:16:31.461Z","task":"TL-131","field":"title","from":"Guard --language nie widzi polskich etykiet w viewerze","to":"The --language guard does not see Polish labels in the viewer","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1HC36V5N553PPZQCN1ZJ5FD","ts":"2026-09-02T15:34:10.533Z","task":"TL-131","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1HC36V5V3R7GETBC3TQH2CF","ts":"2026-09-02T15:34:10.533Z","task":"TL-131","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1HCCY6EKYGVYKW0FC9B5WMF","ts":"2026-09-02T15:39:29.358Z","task":"TL-131","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

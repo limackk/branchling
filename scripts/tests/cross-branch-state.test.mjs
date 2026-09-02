@@ -12,7 +12,7 @@
  * (`active_branch_days`), and that run MUST come out differently. Without the
  * pair, "the query found the task" is indistinguishable from "the query lists
  * everything anyway" — a green result with no evidentiary power, which is what
- * the fourth rule under "Zanim zmienisz kod" is about.
+ * the fourth rule under "Before you change the code" is about.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";

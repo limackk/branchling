@@ -280,9 +280,9 @@ test("the order inside a list is a change, null and an empty string are not", ()
 
 test("every editable field has a label and a known kind", () => {
   for (const f of EDITABLE_FIELDS) {
-    assert.ok(f.label, f.key + " bez etykiety");
-    assert.ok(["text", "enum", "list"].indexOf(f.kind) >= 0, f.key + " ma dziwny kind");
-    if (f.kind === "list") assert.ok(["inline", "block"].indexOf(f.style) >= 0, f.key + " bez stylu listy");
+    assert.ok(f.label, f.key + " has no label");
+    assert.ok(["text", "enum", "list"].indexOf(f.kind) >= 0, f.key + " has an odd kind");
+    if (f.kind === "list") assert.ok(["inline", "block"].indexOf(f.style) >= 0, f.key + " has no list style");
     // An enum with no vocabulary and no dynamic set could not be set to
     // anything — buildFieldSpecs turns that shape into text. The one exception
     // is a field that REQUIRES its dictionary (TL-97): there an undeclared

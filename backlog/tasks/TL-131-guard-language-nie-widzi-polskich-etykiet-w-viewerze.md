@@ -6,12 +6,12 @@ labels: []
 board: main
 epic: "Backlog viewer"
 priority: P2
-status: pending
-owner: unassigned
+status: done
+owner: agent:claude
 estimate: 2h
 confidence: medium
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-02
 blocked_by: []
 blocks: []
 related_docs: []
@@ -58,7 +58,7 @@ with no evidentiary force (the rule from CLAUDE.md).
 
 ## Acceptance criteria
 
-- [ ] No value in `HISTORY_FIELD_LABELS` is in Polish. [proof: labels-english]
-- [ ] Positive control: substituting a Polish label FAILS. [proof:
+- [x] No value in `HISTORY_FIELD_LABELS` is in Polish. [proof: labels-english]
+- [x] Positive control: substituting a Polish label FAILS. [proof:
       labels-english]
-- [ ] `check --language` still green after the change. [proof: guard-green]
+- [x] `check --language` still green after the change. [proof: guard-green]

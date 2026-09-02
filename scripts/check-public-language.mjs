@@ -159,6 +159,69 @@ export function polishShapeHits(searched) {
   return hits.size;
 }
 
+/**
+ * A QUOTED LABEL needs only ONE Polish-shaped word (TL-131).
+ *
+ * WHY THE LINE THRESHOLD IS WRONG HERE. Two hits per line is the right rule for
+ * a sentence, which carries several. A user-facing LABEL is one or two words
+ * inside quotes and can never reach two — which is why `HISTORY_FIELD_LABELS` in
+ * the generated viewer shipped `"task utworzony"` and `"Utworzony"` past a guard
+ * that had just reported thirty thousand lines as English. It is the same
+ * blindness `STRONG_WORDS` was added for: the text a stranger reads FIRST is the
+ * text with the least around it for a guard to hold on to.
+ *
+ * WHY ONLY THE DIGRAPHS COUNT HERE, and not the inflectional endings. `-ach` is
+ * the ending of `reach`, `each`, `search`, `coach`; one hit on it inside a short
+ * English label would fire constantly. The digraphs `cz sz rz dz` have no such
+ * English neighbours, so a single one inside a quoted phrase is evidence on its
+ * own. The endings keep their two-hit rule at line level, where they are safe.
+ *
+ * WHAT COUNTS AS A LABEL: a quoted run of at most four words made only of
+ * letters, spaces and light punctuation. A quoted path, a regular expression or
+ * a command line is not prose and is not judged.
+ */
+const QUOTED = /"([^"\n]{1,400})"|'([^'\n]{1,400})'/g;   // language-guard: allow — the pattern itself
+const LABEL_SHAPE = /^[\p{L} .,:;!?—–-]+$/u;
+
+/**
+ * The English words that carry a Polish digraph, and there are very few.
+ *
+ * Kept as a list rather than pretended away: `Czech` and `czar` are English, the
+ * pattern cannot tell, and an exception the code states is better than one every
+ * reader has to silence by hand. At line level the two-hit threshold already
+ * absorbs them; only the single-hit label rule needs this.
+ */
+// language-guard: allow — the exception list itself
+const ENGLISH_WITH_DIGRAPH = new Set(["czech", "czechs", "czar", "czars", "adze", "adzes", "kudzu"]);
+
+/** Polish-shaped words inside quoted labels on this line. PURE. */
+export function labelHits(searched) {
+  const hits = new Set();
+  QUOTED.lastIndex = 0;
+  let m;
+  while ((m = QUOTED.exec(searched)) !== null) {
+    const inner = (m[1] === undefined ? m[2] : m[1]).trim();
+    if (!inner) continue;
+    // A quoted string in this codebase is as often a FRAGMENT OF HTML as a bare
+    // label — the viewer is built by concatenating them — and the label a
+    // stranger reads is the text between the tags. `<div class="meta-label">
+    // Utworzony</div>` is exactly that shape, and a rule that only looked at
+    // whole quoted strings walked past it (TL-131).
+    for (const run of inner.replace(/<[^>]*>/g, "\u0000").split("\u0000")) {
+      const text = run.trim();
+      if (!text || !LABEL_SHAPE.test(text)) continue;
+      if (text.split(/\s+/).length > 4) continue;
+      POLISH_DIGRAPH.lastIndex = 0;
+      let w;
+      while ((w = POLISH_DIGRAPH.exec(text)) !== null) {
+        const word = w[0].toLowerCase();
+        if (!ENGLISH_WITH_DIGRAPH.has(word)) hits.add(word);
+      }
+    }
+  }
+  return hits.size;
+}
+
 /** The files whose text reaches a user of the tool, or a stranger reading it. */
 // `skills` joined the list in TL-54, when the agent instructions started
 // travelling in the tarball: a file installed into somebody else's editor is as
@@ -195,7 +258,7 @@ function stripDataSpans(line) {
  * PURE — audits already-read text, so a test can exercise it without a tree.
  *
  * @param {string} text
- * @returns {Array<{line: number, text: string, reason: "diacritics"|"word"|"words"|"shape"}>}
+ * @returns {Array<{line: number, text: string, reason: "diacritics"|"word"|"words"|"shape"|"label"}>}
  */
 export function auditText(text) {
   const lines = String(text || "").split(/\r?\n/);
@@ -223,6 +286,10 @@ export function auditText(text) {
     }
     if (polishShapeHits(searched) >= 2) {
       problems.push({ line: i + 1, text: line.trim(), reason: "shape" });
+      continue;
+    }
+    if (labelHits(searched) >= 1) {
+      problems.push({ line: i + 1, text: line.trim(), reason: "label" });
     }
   }
   return problems;
