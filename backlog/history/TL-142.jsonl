@@ -1,0 +1,3 @@
+{"id":"01M1GEZMJWMP2WZ20JV22ZHH3E","ts":"2026-09-02T07:05:24.828Z","task":"TL-142","field":"__created__","from":"","to":"A task created in hosted mode is visible before its file exists","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GF0JBERF2X31VF25SQS5C1","ts":"2026-09-02T07:05:55.310Z","task":"TL-142","field":"priority","from":"P1","to":"P3","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GF0JBEPWJXY3YZ093VG59T","ts":"2026-09-02T07:05:55.310Z","task":"TL-142","field":"estimate","from":"2h","to":"1d","actor":"unknown","source":"external","reason":"unknown"}
