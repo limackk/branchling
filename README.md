@@ -331,6 +331,14 @@ Two statuses are never handed out unattended: the one that means *in progress*
 `--status` overrides that, because a person asking for exactly that is not
 unattended.
 
+**With one exception, and it is the reason the protection can stay strict.** A
+task in a protected status that NAMED its condition — a non-empty `blocked_by`
+— is handed out once every task it named is closed. The decision has not been
+overruled, it has been discharged, by the very tasks it pointed at; the history
+entry says which ones. A protected task with an *empty* `blocked_by` is waiting
+on something outside the tree that nothing here can observe arriving, and stays
+where it is.
+
 **A dead session's claim, and why it is not reclaimed by default.** The lock
 frees itself; the claim in the tree — `status: in_progress` and `owner:` — does
 not, and that is deliberate: the evidence for "abandoned" is `updated:`, which

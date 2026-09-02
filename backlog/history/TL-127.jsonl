@@ -1,1 +1,4 @@
 {"id":"01M1EVJSJ02RWTC9D2ZDBQ1M0R","ts":"2026-09-01T16:07:06.560Z","task":"TL-127","field":"__created__","from":"","to":"Task z zamknietymi blokerami zostaje blocked i nigdy nie wychodzi z next","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1G82PRBPHM185BDY430DX4S","ts":"2026-09-02T05:04:45.323Z","task":"TL-127","field":"status","from":"pending","to":"in_progress","actor":"agent:session","source":"next","reason":"unknown"}
+{"id":"01M1G82PRB8E04AQ6F646PDVNM","ts":"2026-09-02T05:04:45.323Z","task":"TL-127","field":"owner","from":"unassigned","to":"agent:session","actor":"agent:session","source":"next","reason":"unknown"}
+{"id":"01M1G8AJ096GXBPQWQ5QXWT1XC","ts":"2026-09-02T05:09:02.601Z","task":"TL-127","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

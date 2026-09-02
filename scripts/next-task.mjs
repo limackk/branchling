@@ -121,6 +121,34 @@ export function isExecutable(task, byId, archived) {
 }
 
 /**
+ * Is this task in a protected status whose stated blockers are all closed? PURE.
+ *
+ * THE ASYMMETRY THIS RESTS ON (TL-127). `blocked_by` is a FACT computable from
+ * the tree — the blocker is closed or it is not. `status: blocked` is a person's
+ * DECLARATION, and `reason_required_statuses` protects it precisely so that an
+ * unattended agent cannot undo somebody's decision quietly. But when the
+ * declaration NAMED its condition and every named task is closed, the decision
+ * has not been undone — it has been discharged, by the very tasks it pointed at.
+ * Handing that work out is reading the declaration, not overruling it.
+ *
+ * AN EMPTY `blocked_by` IS THE OPPOSITE CASE and is deliberately excluded. A
+ * task blocked with nothing named is waiting on something outside the tree — a
+ * decision, another team, a delivery — and nothing here can observe that it
+ * arrived. Dispatching it would hand out work that cannot be done, which is a
+ * worse failure than the one this fixes.
+ *
+ * The status comes from the project's own `reason_required_statuses`; no value
+ * is written into this code.
+ */
+export function isUnblocked(task, byId, archived, config) {
+  const protectedOnes = new Set(config.reasonRequiredStatuses || []);
+  if (!protectedOnes.has(task.status)) return false;
+  if (archived.has(task.status)) return false;
+  if (!(task.blocked_by || []).length) return false;
+  return isExecutable(task, byId, archived);
+}
+
+/**
  * Has this claim been abandoned? PURE.
  *
  * The evidence is `updated:` — the last day a command wrote to the file — and
@@ -214,6 +242,21 @@ export function selectCandidates(records, config, filters, now) {
   const matching = filterTasks(records, { ...filters, status: wanted }, archived)
     .filter((t) => handedOut.has(String(t.status || "").toLowerCase()));
   const fresh = matching.filter((t) => isExecutable(t, byId, archived));
+
+  // Work whose stated blockers have all closed (TL-127). Only when the caller
+  // did NOT name statuses: `--status` is somebody choosing what they want, and
+  // widening their answer would be answering a different question. They are
+  // merged BEFORE the sort rather than appended after it — a discharged P1 is
+  // ready work, and burying it under every `pending` P3 would leave the queue
+  // stuck in a slower way.
+  const unblocked = new Set();
+  if (!filters.status) {
+    for (const t of filterTasks(records, { ...filters, status: null }, archived)) {
+      if (!isUnblocked(t, byId, archived, config)) continue;
+      unblocked.add(String(t.id).toUpperCase());
+      fresh.push(t);
+    }
+  }
   sortTasks(fresh, "priority", config);
 
   const skippedElsewhere = [];
@@ -238,7 +281,13 @@ export function selectCandidates(records, config, filters, now) {
     for (const t of stale) reclaimable.add(String(t.id).toUpperCase());
     candidates.push(...stale);
   }
-  return { candidates, reclaimable, skippedBlocked: matching.length - fresh.length, skippedElsewhere };
+  return {
+    candidates, reclaimable, unblocked, skippedElsewhere,
+    // The count is of tasks that MATCHED and were held back by an open blocker;
+    // the unblocked ones were never in `matching`, so they must not be
+    // subtracted from it.
+    skippedBlocked: matching.length - (fresh.length - unblocked.size),
+  };
 }
 
 export function run(argv) {
@@ -284,7 +333,7 @@ export function run(argv) {
   // disagree about the tree they are both looking at.
   const scan = crossBranchState(root, config);
   for (const t of records) t.elsewhere = divergences(t.status, scan.byId.get(t.id));
-  const { candidates, reclaimable, skippedBlocked, skippedElsewhere } =
+  const { candidates, reclaimable, unblocked, skippedBlocked, skippedElsewhere } =
     selectCandidates(records, config, filters, now);
   // Named, never silent: a candidate that disappears without a word is
   // indistinguishable from an empty queue, and the reader has no second place
@@ -303,9 +352,14 @@ export function run(argv) {
     const reclaim = reclaimable.has(String(candidate.id).toUpperCase())
       ? { afterDays: config.abandonedAfterDays }
       : null;
+    const key = String(candidate.id).toUpperCase();
+    // The blockers travel with the take, because the REASON written into the
+    // history has to name the tasks that discharged the status — a change whose
+    // why is "the tool decided" is the `unknown` this project refuses.
+    const cleared = unblocked.has(key) ? { blockers: (candidate.blocked_by || []).slice() } : null;
     const result = takeTask({
       root, config, id: candidate.id, actor, reason: plan.reason,
-      source: reclaim ? "reclaim" : "next", reclaim, now,
+      source: reclaim ? "reclaim" : "next", reclaim, unblocked: cleared, now,
     });
     if (result.ok) {
       if (!rebuildViews(root)) {

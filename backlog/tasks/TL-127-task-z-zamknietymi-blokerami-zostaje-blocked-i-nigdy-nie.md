@@ -6,11 +6,11 @@ labels: []
 board: main
 epic: ""
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:session
 estimate: 4h
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-02
 blocked_by: []
 blocks: []
 related_docs: []
@@ -80,6 +80,6 @@ teza do sprawdzenia w tym tasku, nie rozstrzygnięcie.
 
 ## Acceptance criteria
 
-- [ ] `next` wydaje task `blocked`, którego wszystkie blokery są zamknięte. [proof: unblocked-is-issuable]
-- [ ] `next` NADAL pomija `blocked` z otwartym blokerem i `blocked` z pustym `blocked_by`. [proof: unblocked-is-issuable]
-- [ ] Zdjęcie statusu zostawia wpis w `history/` z aktorem i powodem innym niż `unknown`. [proof: unblocked-is-issuable]
+- [x] `next` wydaje task `blocked`, którego wszystkie blokery są zamknięte. [proof: unblocked-is-issuable]
+- [x] `next` NADAL pomija `blocked` z otwartym blokerem i `blocked` z pustym `blocked_by`. [proof: unblocked-is-issuable]
+- [x] Zdjęcie statusu zostawia wpis w `history/` z aktorem i powodem innym niż `unknown`. [proof: unblocked-is-issuable]

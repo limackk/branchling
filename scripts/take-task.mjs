@@ -235,11 +235,17 @@ export function takeTask(opts) {
         (record.updated || "?") + ", past `abandoned_after_days: " + reclaim.afterDays + "`"
     );
   }
+  const cleared = opts.unblocked && record.status !== inProgress ? opts.unblocked : null;
   if (record.status !== inProgress && config.reasonRequiredStatuses.indexOf(record.status) >= 0) {
-    // `blocked` (or whatever this project calls it) was entered deliberately and
-    // with a stated reason. Taking it is allowed — a person naming a task
-    // outranks the dispatcher's caution — but it is not something to do silently.
-    warnings.push("was `" + record.status + "` — a status this project does not let you enter without a reason");
+    // A status this project does not let anybody ENTER without a reason. Leaving
+    // it is worth a line either way, and the two lines say different things: a
+    // person naming the task outranks the dispatcher's caution, while a
+    // dispatched one has had its own stated condition discharged (TL-127) and
+    // names the tasks that discharged it.
+    warnings.push(cleared
+      ? "left `" + record.status + "` — every task in `blocked_by` is closed (" +
+        (cleared.blockers || []).join(", ") + ")"
+      : "was `" + record.status + "` — a status this project does not let you enter without a reason");
   }
 
   const specs = buildFieldSpecs(config);
@@ -266,7 +272,10 @@ export function takeTask(opts) {
   recordEdit(root, {
     taskId: id, before, after, actor, ts,
     source: opts.source || "take",
-    reason: opts.reason || (reclaim ? reclaimReason(before.owner, before.updated, reclaim.afterDays) : ""),
+    reason:
+      opts.reason ||
+      (reclaim ? reclaimReason(before.owner, before.updated, reclaim.afterDays) : "") ||
+      (cleared ? unblockedReason(before.status, cleared.blockers) : ""),
   });
 
   // Taken by somebody other than the role the task asks for. NOT a refusal: a
@@ -292,6 +301,15 @@ export function takeTask(opts) {
   }
 
   return { ok: true, id, file, text, before, after, lock: lock.lock, reclaimed: reclaim ? before.owner : null, warnings };
+}
+
+/** The sentence a dispatched-after-unblocking take writes into the history when
+ *  the caller gave none (TL-127). It states the EVIDENCE — which tasks closed —
+ *  and not a verdict, for the same reason `reclaimReason` does: a reader a year
+ *  from now can check the evidence and cannot check an opinion. */
+export function unblockedReason(status, blockers) {
+  return "left `" + status + "`: every task it named is closed (" +
+    ((blockers || []).join(", ") || "none named") + ")";
 }
 
 /** The sentence a takeover writes into the history when the caller gave none.
