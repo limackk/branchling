@@ -1,0 +1,4 @@
+{"id":"01M1GWECYEWQDAAG94C8VSTX9B","ts":"2026-09-02T11:00:40.014Z","task":"TL-157","field":"__created__","from":"","to":"The actor chain has one home, and it reads the user layer","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GWG5NKM6ANS5EX3QRAH0JS","ts":"2026-09-02T11:01:38.099Z","task":"TL-157","field":"priority","from":"P1","to":"P2","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GWG5NKDRDN8GTRMDQ13S2Q","ts":"2026-09-02T11:01:38.099Z","task":"TL-157","field":"type","from":"task","to":"code","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GWG5NKHG8JAFT76R1Y0CKC","ts":"2026-09-02T11:01:38.099Z","task":"TL-157","field":"blocked_by","from":[],"to":["TL-34"],"actor":"unknown","source":"external","reason":"unknown"}

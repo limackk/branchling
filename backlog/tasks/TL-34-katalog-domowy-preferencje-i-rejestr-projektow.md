@@ -6,20 +6,28 @@ labels: [post-launch]
 board: main
 epic: "Backlog — open source publication"
 priority: P2
-status: pending
-owner: unassigned
+status: done
+owner: agent:claude
 estimate: 1d
 confidence: medium
 created: 2026-08-30
-updated: 2026-08-30
+updated: 2026-09-02
 blocked_by: [TL-33]
 blocks: [TL-35, TL-36]
 related_docs:
   - docs/worktrail-global-tool.md
   - docs/backlog-config-and-portability.md
 verification:
-  - bash: "node --test backlog/scripts/tests/home.test.mjs backlog/scripts/tests/registry.test.mjs"
-  - bash: "WORKTRAIL_HOME=/tmp/worktrail-probe node backlog/scripts/cli.mjs where --json | python3 -c \"import json,sys; d=json.load(sys.stdin); assert d['home'].startswith('/tmp/worktrail-probe'), d; print('WORKTRAIL_HOME respected — OK')\""
+  - id: home-and-registry
+    bash: "node --test scripts/tests/home.test.mjs scripts/tests/registry.test.mjs"
+  - id: home-env-wins
+    bash: "WORKTRAIL_HOME=/tmp/worktrail-probe node scripts/cli.mjs where --json | python3 -c \"import json,sys; d=json.load(sys.stdin); assert d['home'].startswith('/tmp/worktrail-probe'), d; print('WORKTRAIL_HOME respected — OK')\""
+  - id: registry-deletable
+    bash: "rm -rf /tmp/worktrail-probe; WORKTRAIL_HOME=/tmp/worktrail-probe node scripts/cli.mjs query --count > /dev/null && echo 'missing registry harmless — OK'"
+  - id: wrong-layer-fails
+    bash: "rm -rf /tmp/worktrail-probe; mkdir -p /tmp/worktrail-probe/config; echo 'statuses: [foo]' > /tmp/worktrail-probe/config/config.yaml; WORKTRAIL_HOME=/tmp/worktrail-probe node scripts/cli.mjs query --count > /dev/null 2>&1; rc=$?; rm -rf /tmp/worktrail-probe; test $rc -ne 0 && echo 'wrong layer fails — OK'"
+  - id: guards
+    bash: "node scripts/cli.mjs check"
 ---
 
 ## Goal
@@ -59,19 +67,19 @@ must not duplicate that** — it is an index, and deleting it must be harmless
 
 ## Pre-flight reading
 
-1. `docs/architecture/worktrail-global-tool.md` — §3 (the four laws), §5
+1. `docs/worktrail-global-tool.md` — §3 (the four laws), §5
    (where the directory lives), §7 (the registry as index), §8
    (multi-repository workspace).
-2. `backlog/scripts/config.mjs` — `DEFAULTS`, `KNOWN_KEYS`, how an unknown key
+2. `scripts/config.mjs` — `DEFAULTS`, `KNOWN_KEYS`, how an unknown key
    is made to fail. The user layer must repeat this rigor, not invent its own.
-3. `backlog/scripts/paths.mjs` — `looksLikeBacklogDir()`; the registry
+3. `scripts/paths.mjs` — `looksLikeBacklogDir()`; the registry
    revalidates through this function, not through `existsSync`.
-4. `docs/architecture/backlog-config-and-portability.md` — why the values
+4. `docs/backlog-config-and-portability.md` — why the values
    moved out into configuration.
 
 ## Steps
 
-1. `backlog/scripts/home.mjs` — resolve the home directory per §5:
+1. `scripts/home.mjs` — resolve the home directory per §5:
    `WORKTRAIL_HOME` → `XDG_CONFIG_HOME`/`XDG_DATA_HOME` → `~/.config` +
    `~/.local/share` → `%APPDATA%`. The **config vs data** split is part of the
    contract, not a detail.
@@ -99,48 +107,94 @@ must not duplicate that** — it is an index, and deleting it must be harmless
 
 ## Acceptance criteria
 
-- [ ] `WORKTRAIL_HOME` wins over everything — there is a test for this (and it
-      is the test hook for the rest).
-- [ ] `XDG_CONFIG_HOME`/`XDG_DATA_HOME` respected when set; default to
-      `~/.config` + `~/.local/share`.
-- [ ] Config and data are **separate** directories — there is an assertion for
-      this, not just intent.
-- [ ] A project-vocabulary key (`statuses`, `labels`, `boards`…) in the user
-      layer **FAILS** with a message pointing to the right layer — negative
-      test.
-- [ ] The user layer cannot override ANY value from the project's
-      `config.yaml` — a test, not a declaration.
-- [ ] Deleting `projects.yaml` does not break any command that runs inside a
-      repo — a test (Law 2).
-- [ ] An entry with a nonexistent path is reported, not skipped — a test.
-- [ ] The registry holds the **backlog** directory; a layout of "repo root +
-      9 sub-repos" (this workspace) yields ONE project, not ten — a test on a
-      fixture of that shape.
-- [ ] `worktrail where` reports the source of the backlog resolution.
-- [ ] No command starts REQUIRING `--project` — if one does, the registry has
-      become a source of truth and that is a regression (§11 point 2).
+One line each: the parser reads the `- [ ]` line and nothing under it (TL-118),
+so a wrapped `[proof:]` marker is invisible to it.
+
+- [x] `WORKTRAIL_HOME` wins over everything, and is the hook the rest is tested through. [proof: home-env-wins, home-and-registry]
+- [x] `XDG_CONFIG_HOME`/`XDG_DATA_HOME` are respected when set, defaulting to `~/.config` and `~/.local/share`. [proof: home-and-registry]
+- [x] Config and data are SEPARATE directories — an assertion under every rule, not an intention. [proof: home-and-registry]
+- [x] A project-vocabulary key in the user layer FAILS, with a message naming the file it belongs in. [proof: wrong-layer-fails, home-and-registry]
+- [x] The user layer cannot override ANY project value — the two key sets are disjoint, and a test says so. [proof: home-and-registry]
+- [x] Deleting `projects.yaml` breaks no command that runs inside a repository. [proof: registry-deletable, home-and-registry]
+- [x] An entry whose path is gone is reported, never skipped. [proof: home-and-registry]
+- [x] The registry's unit is the BACKLOG directory: a workspace of nine repositories around one backlog is ONE project. [proof: home-and-registry]
+- [x] `where` reports which RULE resolved the backlog, not only the path. [proof: home-and-registry]
+- [x] No command requires `--project` — checked against the command table, not asserted in prose. [proof: home-and-registry]
+- [x] The guards still pass over the whole source and the whole backlog. [proof: guards]
+
+## Decision (2026-09-02)
+
+**The contract was rewritten to this repository's paths**, as TL-27, TL-28 and
+TL-31 were: it named `backlog/scripts/` and `docs/architecture/`, the layout of
+the repository this tool was extracted from. Nothing about its substance
+changed, and the checks that stood only in the body's prose — the registry being
+deletable, the wrong layer failing, and the guards — were promoted into the
+frontmatter rather than invented.
+
+**The user layer is loaded in `loadConfig()`, in ONE place, and joined
+disjointly.** Not per command, because a user file holding a project key has to
+FAIL in every command rather than in the two that remembered to look — a
+`statuses:` in the wrong file that merely does nothing is the worst available
+outcome, since the person believes they changed the vocabulary. The preferences
+land under `config.user`, a namespace of their own that nothing above ever reads
+from, so there is no precedence rule to get wrong: `parseUserConfig` refuses a
+project key before it can reach the object. The test for "cannot override ANY
+value" is therefore structural — the two key sets are asserted disjoint — rather
+than a case per key, which could only ever cover the keys somebody thought of.
+
+**`home` collapses onto `config` when the two are split, and that is stated
+rather than left to be discovered.** Under XDG and under the platform defaults
+there is no single root the other two derive from; only an explicit
+`WORKTRAIL_HOME` gives one. `where` prints all three plus the rule that decided.
+
+**`process.platform` is injected into `homePaths()`.** The Windows branch is
+otherwise unreachable from this suite, and a rule no test can run is a rule
+nobody has checked — the same reasoning that makes `spawnSync` injectable in
+`lock.mjs`.
+
+**The directory name is `BLOCK_MARKER_NAME`, not `PRODUCT_NAME`**, and
+`WORKTRAIL_HOME` is spelled out with a `product-name: allow`. Both are KEYS
+rather than display text: a path holding a person's own files, and a variable
+they type into a shell profile. Derived from the display name, a rename would
+silently move somebody's preferences to a directory the tool then reports as
+empty, and would break a variable set in files this project cannot reach.
+
+**A name clash is refused BEFORE the rename branch, not after it.** Registering
+a backlog under a label another project holds would otherwise half-apply — the
+old entry renamed, the clash found too late, and two entries left sharing what
+is supposed to be a lookup key. A test covers it; it was a real defect in the
+first draft, found by the test that asserted both names were unchanged after a
+refusal.
+
+**What is deliberately NOT done: the preferences are not yet CONSUMED by the
+commands.** `actor` is resolved in eight separate places, each with its own
+`flag || BACKLOG_ACTOR || default` chain, and threading a ninth source through
+all of them is a refactor with its own thesis — the actor chain having one home
+— not a side effect of adding a layer. The layer is complete and proven: it
+parses, it validates, it refuses the wrong file, and `where` shows it. TL-157
+carries the consumption.
 
 ## Verification
 
 ```bash
-# 1. Home directory and registry tests — expected: pass
-node --test backlog/scripts/tests/home.test.mjs backlog/scripts/tests/registry.test.mjs
+# 1. The home directory and the registry — expected: pass
+node --test scripts/tests/home.test.mjs scripts/tests/registry.test.mjs
 
 # 2. WORKTRAIL_HOME wins — expected: OK message
-WORKTRAIL_HOME=/tmp/worktrail-probe node backlog/scripts/cli.mjs where --json | python3 -c \
+WORKTRAIL_HOME=/tmp/worktrail-probe node scripts/cli.mjs where --json | python3 -c \
   "import json,sys; d=json.load(sys.stdin); assert d['home'].startswith('/tmp/worktrail-probe'); print('WORKTRAIL_HOME respected — OK')"
 
 # 3. The registry is deletable — expected: commands keep working
-WORKTRAIL_HOME=/tmp/worktrail-probe rm -f /tmp/worktrail-probe/config/projects.yaml
-node backlog/scripts/cli.mjs query --count && echo 'missing registry harmless — OK'
+rm -rf /tmp/worktrail-probe
+WORKTRAIL_HOME=/tmp/worktrail-probe node scripts/cli.mjs query --count && echo 'missing registry harmless — OK'
 
 # 4. The user layer cannot override vocabulary — expected: nonzero exit code
-mkdir -p /tmp/worktrail-probe/config && printf 'statuses: [foo]\n' > /tmp/worktrail-probe/config/config.yaml
-WORKTRAIL_HOME=/tmp/worktrail-probe node backlog/scripts/cli.mjs query --count; test $? -ne 0 && echo 'wrong layer fails — OK'
+mkdir -p /tmp/worktrail-probe/config && echo 'statuses: [foo]' > /tmp/worktrail-probe/config/config.yaml
+WORKTRAIL_HOME=/tmp/worktrail-probe node scripts/cli.mjs query --count; test $? -ne 0 && echo 'wrong layer fails — OK'
 rm -rf /tmp/worktrail-probe
 
 # 5. Module guards
-node backlog/scripts/cli.mjs check
+node scripts/cli.mjs check
 ```
 
 ## Notes

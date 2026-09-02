@@ -33,6 +33,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 import { DEFAULT_TASK_ID_PREFIX } from "./task-id.mjs";
 import { loadConfig } from "./config.mjs";
 import { TEMPLATE_FILENAME, backlogPaths } from "./paths.mjs";
+import { registerQuietly } from "./registry.mjs";
 import { PRODUCT_NAME as N, BLOCK_MARKER_NAME as BLOCK_LABEL } from "./product.mjs";
 import { failure } from "./ui.mjs";
 import { createTask, slugify } from "./new-task.mjs";
@@ -497,6 +498,18 @@ export function main(argv) {
   // with a step the tool can perform by itself.
   const built = spawnSync(process.execPath, [join(HERE, "build-backlog.mjs"), "--dir", root], { stdio: "ignore" });
   if (built.status !== 0) console.log(`  WARNING: could not build the views — run \`${N} build\``);
+
+  // The new backlog joins this machine's index (TL-34) — BEST EFFORT, and the
+  // distinction matters. Creating a backlog is what the user asked for; putting
+  // it in an index is the tool's own convenience, so a home directory that
+  // cannot be written must not turn the first into a failure. Registration is
+  // never a precondition for anything, which is exactly why it can be silent
+  // when it does not happen.
+  const registered = registerQuietly(root);
+  if (registered && !registered.already) {
+    console.log("  registered as `" + registered.project.name + "` — `" + N +
+      " project list`. Deleting that index is harmless.");
+  }
 
   if (!created.length) console.log("  nothing to do — the backlog is already here");
   else console.log(`  next: ${N}        # the viewer, in your browser`);

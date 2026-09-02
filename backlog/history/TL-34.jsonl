@@ -4,3 +4,6 @@
 {"id":"01M1F5BNKGY6PCKTV8R22MT51M","ts":"2026-09-01T18:57:58.896Z","task":"TL-34","field":"blocks","from":["TL-1441","TL-1442"],"to":["TL-35","TL-36"],"actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK5CSXPRDR70QPQX70R","ts":"2026-09-02T07:16:31.461Z","task":"TL-34","field":"title","from":"Katalog domowy — preferencje i rejestr projektów","to":"Home directory — preferences and project registry","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK5E02BQ48ZA14RXD74","ts":"2026-09-02T07:16:31.461Z","task":"TL-34","field":"epic","from":"Backlog — publikacja open source","to":"Backlog — open source publication","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GVVKRFN7300GG9MJ23MQ4M","ts":"2026-09-02T10:50:24.399Z","task":"TL-34","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1GVVKRFW8VB6M7ZG07C0JWP","ts":"2026-09-02T10:50:24.399Z","task":"TL-34","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1GWHAF5CKAR6F7K65DZTW6J","ts":"2026-09-02T11:02:15.781Z","task":"TL-34","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

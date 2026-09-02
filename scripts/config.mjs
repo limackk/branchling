@@ -40,6 +40,7 @@ import { DEFAULT_TASK_ID_PREFIX, PREFIX_SHAPE, inferPrefix, taskIdPatterns } fro
 import { ACTOR_NAMESPACES, ROLE_SHAPE, isValidActor } from "./task-fields.mjs";
 import { LINK_POLICIES } from "./criteria.mjs";
 import { DEFAULT_LOCK_TTL_MINUTES } from "./lock.mjs";
+import { USER_KEYS, loadUserConfig } from "./home.mjs";
 
 // ──────────────────────────────────────────────────────────────────────────
 // Default values — generic, for a fresh repository
@@ -402,8 +403,19 @@ export class ConfigError extends Error {
     this.configPath = info.configPath;
     this.problems = info.problems;
     this.headline = info.headline;
+    // The way out belongs to the FILE, not to this class. Since TL-34 two
+    // different files reach here — the project's vocabulary and a person's
+    // preferences — and telling somebody editing their own preferences that
+    // "the vocabularies are this project's values" sends them to the wrong
+    // file to fix the right problem.
+    this.remedy = info.remedy || null;
   }
 }
+
+const VOCABULARY_REMEDY = [
+  "  → fix the file; the vocabularies are this project's VALUES, so an unknown",
+  "    key is a typo, not a new capability.",
+];
 
 /** The message for a human: headline, file, the list of problems, a way out. */
 export function formatConfigError(err, product = PRODUCT_NAME) {
@@ -412,8 +424,7 @@ export function formatConfigError(err, product = PRODUCT_NAME) {
     "  " + err.configPath,
     ...err.problems.map((p) => "    " + p),
     "",
-    "  → fix the file; the vocabularies are this project's VALUES, so an unknown",
-    "    key is a typo, not a new capability.",
+    ...(err.remedy || VOCABULARY_REMEDY),
   ].join("\n");
 }
 
@@ -462,6 +473,37 @@ export function loadConfig(root, opts = {}) {
     }
     parsedValues = parsed.values;
     Object.assign(values, parsed.values);
+  }
+
+  // THE USER LAYER IS LOADED HERE, IN ONE PLACE, and joined DISJOINTLY (Law 3).
+  //
+  // Here rather than per command, because a user file holding a project key has
+  // to FAIL — every command, not the two that happened to remember to look. A
+  // preference silently ignored is indistinguishable from one that had no
+  // effect, and a `statuses:` in the wrong file that merely does nothing is the
+  // worst possible outcome: the person believes they changed the vocabulary.
+  //
+  // DISJOINT MEANS THE MERGE CANNOT EXPRESS AN OVERRIDE. The preferences land
+  // under `config.user`, a namespace of their own, and nothing above ever reads
+  // from it. There is no precedence rule to get wrong, because there is no
+  // shared key for one to apply to — `parseUserConfig` refuses a project key
+  // before it ever reaches this object.
+  const user = loadUserConfig(opts.env || process.env, KNOWN_KEYS);
+  if (user.problems.length && strict) {
+    throw new ConfigError(
+      user.path + ":\n  " + user.problems.join("\n  "),
+      {
+        configPath: user.path,
+        problems: user.problems,
+        headline: "cannot read the user preferences",
+        remedy: [
+          "  → this file holds facts about YOU and your machine: " + USER_KEYS.join(", ") + ".",
+          "    A project's vocabulary lives in the backlog's config.yaml and may not be",
+          "    overridden from here — two people would then see different values for one",
+          "    repository, which is the single truth that file exists to be.",
+        ],
+      }
+    );
   }
 
   const boardsPath = opts.boardsPath || paths.boardsPath;
@@ -537,6 +579,10 @@ export function loadConfig(root, opts = {}) {
     boards: registry.boards,
     defaultBoard: registry.default,
     boardIgnorePaths: registry.ignorePaths,
+    // Facts about the PERSON, in a namespace of their own (TL-34). Nothing
+    // above this line may read from here and nothing here may shadow a key
+    // above it: that is what makes the two layers disjoint rather than ranked.
+    user: Object.freeze({ ...user.values, path: user.path, exists: user.exists }),
   };
 
   const problems = validateConfig(config);

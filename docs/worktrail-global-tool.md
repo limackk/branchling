@@ -299,3 +299,50 @@ Everyone has this problem, not just us. Recorded as TL-46.
    `~/.worktrail/` for everything is easier to explain; XDG is more correct.
    If the first reports are about "where is this even stored", the answer is
    `worktrail where`, not abandoning XDG.
+
+---
+
+## 12. What is implemented (2026-09-02, TL-34)
+
+The home directory and the registry. Until this, there was not one `homedir()`
+in the module.
+
+- `scripts/home.mjs` — the four rules of §5, PURE, with `process.platform`
+  injected so the Windows branch is reachable from a test. **`config` and `data`
+  are separate under every one of them**, and there is an assertion per rule
+  rather than an intention: preferences are a file a human edits and backs up,
+  the activity log is machine data, and the two want opposite answers to
+  "should this sync between machines". `home` collapses onto `config` where the
+  two are split — only an explicit `WORKTRAIL_HOME` gives a real root — and that
+  is stated rather than left to be discovered.
+- **The user layer is loaded in `loadConfig()`, in ONE place, and joined
+  DISJOINTLY.** Not per command: a user file holding a project key has to FAIL
+  everywhere, because a `statuses:` in the wrong file that merely does nothing
+  is the worst available outcome — the person believes they changed the
+  vocabulary. The preferences land under `config.user`, a namespace nothing
+  above ever reads from, so there is no precedence rule to get wrong. The test
+  for Law 3 is structural: the two key sets are asserted DISJOINT, because a
+  case-per-key test could only ever cover the keys somebody thought of.
+- `scripts/registry.mjs` and `worktrail project add|list|remove` — §7. The unit
+  is the BACKLOG directory, and §8's layout has a test: nine repositories around
+  one backlog are ONE project, and a command run inside one of the nine still
+  finds the workspace's backlog by walking upwards. A missing path is REPORTED,
+  never skipped. `init` registers, best effort — creating a backlog is what the
+  user asked for, and an index entry is the tool's convenience.
+- **Law 2 has a test rather than a paragraph.** With `projects.yaml` deleted,
+  `query`, `stats`, `build`, `next-id`, `where` and `check` all still pass — and
+  nothing recreates the file behind the user's back, because a read that writes
+  turns "I deleted that" into "it came back".
+- `worktrail where` — the backlog this run would use, the RULE that found it,
+  and this machine's own directories. The source is the half of the answer
+  nobody can reconstruct afterwards. It creates nothing.
+- **`no command takes `--project`` is a test**, checked against the command
+  table (§11 point 2). The first command that needs it is the moment the index
+  stopped being an index, and that drift would otherwise only be visible to
+  somebody who remembered this paragraph.
+
+**Deliberately NOT done: the preferences are not yet consumed by the commands.**
+`actor` is resolved in eight separate places, each with its own chain, and two of
+them already disagree about the fallback. Threading a ninth source through eight
+copies is a refactor with its own thesis — the actor chain having one home — and
+it is TL-157.
