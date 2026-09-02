@@ -5,3 +5,6 @@
 {"id":"01M1F5BNKGV013DX2RZ3X0VY2Q","ts":"2026-09-01T18:57:58.896Z","task":"TL-116","field":"blocked_by","from":["TL-1524"],"to":["TL-114"],"actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK59T292JX63PFHG22D","ts":"2026-09-02T07:16:31.461Z","task":"TL-116","field":"title","from":"Graf zmian taska w viewerze z osi historii","to":"Task change graph in the viewer, built from the history axis","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK5H58CF9QBGSGZMRM5","ts":"2026-09-02T07:16:31.461Z","task":"TL-116","field":"epic","from":"Wyróżniki agentowe","to":"Agent-facing distinctives","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1H9P72G6D4QQCENEGW7BDY6","ts":"2026-09-02T14:52:07.632Z","task":"TL-116","field":"status","from":"blocked","to":"in_progress","actor":"agent:claude","source":"next","reason":"left `blocked`: every task it named is closed (TL-114)"}
+{"id":"01M1H9P72G51GK20GPH86NTNAJ","ts":"2026-09-02T14:52:07.632Z","task":"TL-116","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"left `blocked`: every task it named is closed (TL-114)"}
+{"id":"01M1HA4VVPQV4B77DHZ6BGY03T","ts":"2026-09-02T15:00:07.670Z","task":"TL-116","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

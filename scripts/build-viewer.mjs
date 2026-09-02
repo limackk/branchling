@@ -368,6 +368,7 @@ export function buildHtml(
   const viewerPlanModuleSrc = readModuleSource("viewer-plan.mjs");
   // The decision panel reads `openQuestions` from task-fields.mjs, pasted above.
   const decisionPanelModuleSrc = readModuleSource("decision-panel.mjs");
+  const taskGraphModuleSrc = readModuleSource("task-graph.mjs");
   const historyJson = JSON.stringify(history).replace(/</g, "\\u003c");
 
   return `<!DOCTYPE html>
@@ -1160,6 +1161,53 @@ ${paletteBadgeCss}
   .field-stamp:hover { border-color: var(--accent); color: var(--accent); }
 
   .history-block { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 10px; }
+  /* ── The change graph (TL-116) ───────────────────────────────────────────
+     Every distinction here is carried by a MARK as well as a hue: a glyph per
+     class of actor, a dashed ring for an open question, and the words under
+     every node. The colours are emphasis. */
+  .tgraph-block { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 10px; }
+  .tgraph { margin-top: 8px; }
+  .tgraph.is-empty p, .tgraph-since, .tgraph-trailing {
+    margin: 0 0 6px;
+    font-size: 11px;
+    color: var(--fg-muted);
+  }
+  /* The graph scrolls INSIDE its frame. A long history must not stretch the
+     page — the detail panel is where somebody is reading and editing. */
+  .tgraph-scroll { overflow-x: auto; overflow-y: hidden; padding-bottom: 4px; }
+  .tgraph-svg { display: block; }
+  .tgraph-axis { stroke: var(--border); stroke-width: 2; }
+  .tgraph-link { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 3 2; }
+  .tgraph-collapsed circle { fill: var(--fg-muted); opacity: .5; }
+  .tgraph-collapsed text { fill: var(--fg-muted); font-size: 9px; text-anchor: middle; }
+  .tgraph-node { cursor: pointer; }
+  .tgraph-node circle { fill: var(--bg-card); stroke: var(--fg-muted); stroke-width: 2; }
+  .tgraph-node:hover circle, .tgraph-node:focus circle { stroke-width: 3; }
+  .tgraph-node:focus { outline: none; }
+  .tgraph-glyph { font-size: 9px; text-anchor: middle; fill: var(--fg-muted); }
+  .tgraph-when { font-size: 9px; text-anchor: middle; fill: var(--fg-muted); }
+  .tgraph-label { font-size: 10px; text-anchor: middle; fill: var(--fg); }
+  .tgraph-actor { font-size: 9px; text-anchor: middle; fill: var(--fg-muted); }
+  /* The three classes of identity. "legacy" and "unknown" share an appearance
+     on purpose: both mean "the log does not say who", and two shades of
+     not-knowing would suggest the tool can tell them apart. */
+  .tgraph-node.actor-agent circle { stroke: var(--accent); }
+  .tgraph-node.actor-agent .tgraph-glyph { fill: var(--accent); }
+  .tgraph-node.actor-local circle, .tgraph-node.actor-user circle { stroke: var(--ok, #4c9a6a); }
+  .tgraph-node.actor-local .tgraph-glyph, .tgraph-node.actor-user .tgraph-glyph { fill: var(--ok, #4c9a6a); }
+  .tgraph-node.actor-unknown circle, .tgraph-node.actor-legacy circle { stroke-dasharray: 2 2; }
+  /* An open question: a dashed ring, so it reads as unfinished without colour. */
+  .tgraph-node.is-open circle { stroke-dasharray: 4 3; stroke-width: 3; }
+  .tgraph-node.is-deleted circle { fill: var(--border); }
+  .tgraph-legend {
+    margin: 4px 0 0;
+    font-size: 10px;
+    color: var(--fg-muted);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .tgraph-legend .actor-agent { color: var(--accent); }
   .history-toggle {
     font: inherit; font-size: 12px; font-weight: 600; color: var(--fg-muted);
     background: none; border: none; padding: 0; cursor: pointer;
@@ -2117,6 +2165,13 @@ ${viewerPlanModuleSrc}
 ${decisionPanelModuleSrc}
 // ─── end of the pasted module ─────────────────────────────────────────
 
+// ─── Pasted source of scripts/task-graph.mjs (TL-116) ────────────────
+// One task's history folded into a graph, and the SVG for it. Nothing is
+// stored — delete it and a rebuild brings it back. Tested by
+// node --test scripts/tests/task-graph.test.mjs.
+${taskGraphModuleSrc}
+// ─── end of the pasted module ─────────────────────────────────────────
+
 // TASKS / STATS are mutable — live mode replaces them after reading from disk.
 // ALL_TASKS is the full set; TASKS is its narrowing to the selected board.
 // The split is here rather than at every place that reads TASKS, because a board
@@ -2182,6 +2237,9 @@ const state = {
   // value has to be the one that IS true in typical use of the viewer.
   actor: "founder",
   historyOpen: false,
+  // The change graph (TL-116) is closed by default: a reader who opened a task
+  // to change a field must not have to scroll past a picture to reach it.
+  graphOpen: false,
   historyField: null,     // narrows the history list to one field
   // The scope, not a filter: BOARD_ALL or a board slug. Kept apart from
   // the filter* fields, because clearing the filters must not clear it — this is
@@ -3638,6 +3696,47 @@ function historyHtml(t) {
   return '<section class="history-block is-open" id="historyBlock">' + head + body + "</section>";
 }
 
+/**
+ * The change graph, over the same events the list below it shows (TL-116).
+ *
+ * A SECOND READING, not a second mechanism: the list is denser, the graph
+ * answers "where did this task go" at a glance. Both are folds of
+ * \`history/<ID>.jsonl\`, so neither can be more current than the other.
+ *
+ * Collapsed behind a toggle, defaulting to closed: a reader who opened a task to
+ * change a field should not have to scroll past a picture to reach it.
+ */
+function taskGraphHtml(t) {
+  const entries = historyFor(t.id);
+  const head = '<button type="button" class="history-toggle" onclick="toggleTaskGraph()">' +
+    (state.graphOpen ? "▾" : "▸") + " Change graph (" + entries.length + ")</button>";
+  if (!state.graphOpen) return '<section class="tgraph-block">' + head + "</section>";
+  return '<section class="tgraph-block is-open">' + head +
+    renderTaskGraph(taskGraph(entries), { day: histDay }) + "</section>";
+}
+
+function toggleTaskGraph() {
+  state.graphOpen = !state.graphOpen;
+  renderDetail();
+}
+
+// ONE listener rather than one per node: the detail panel is re-rendered
+// wholesale on every edit and every SSE refresh, so per-node handlers would be
+// re-bound each time. A click narrows the history list to that node's field —
+// the filter mechanism the list already has, rather than a second one.
+document.addEventListener("click", function (e) {
+  const node = e.target.closest && e.target.closest("[data-graph-node]");
+  if (!node || !state.selectedId) return;
+  openHistory(state.selectedId, node.dataset.graphField);
+});
+document.addEventListener("keydown", function (e) {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  const node = e.target.closest && e.target.closest("[data-graph-node]");
+  if (!node || !state.selectedId) return;
+  e.preventDefault();
+  openHistory(state.selectedId, node.dataset.graphField);
+});
+
 function renderDetail() {
   const el = document.getElementById("taskDetail");
   const t = TASKS.find(function (x) { return x.id === state.selectedId; });
@@ -3691,6 +3790,7 @@ function renderDetail() {
       '<div class="detail-meta-grid">' + rows + readOnlyRows + "</div>" +
       editHint +
       reasonAskHtml(t) +
+      taskGraphHtml(t) +
       historyHtml(t) +
     "</div>" +
     '<div class="markdown-content">' + t.bodyHtml + "</div>";
@@ -5626,6 +5726,7 @@ window.saveLines = saveLines;
 window.onEditorKey = onEditorKey;
 window.openHistory = openHistory;
 window.toggleHistory = toggleHistory;
+window.toggleTaskGraph = toggleTaskGraph;
 window.clearHistoryFilter = clearHistoryFilter;
 
 // ─── Connection bar event wiring ─────────────────────────────────────

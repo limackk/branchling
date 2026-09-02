@@ -6,11 +6,11 @@ labels: []
 board: main
 epic: "Agent-facing distinctives"
 priority: P2
-status: blocked
-owner: unassigned
+status: done
+owner: agent:claude
 estimate: 1d
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-02
 blocked_by: [TL-114]
 blocks: []
 related_docs:
