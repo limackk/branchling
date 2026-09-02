@@ -689,4 +689,24 @@ const COEXISTS_WITH = probe.state === "other"
 // ports: we build ONCE.
 const VIEWS_BUILT = await regenerateViews();
 
+// RETENTION RUNS HERE FOR THE REASON THE BUILD DOES (TL-31). Raw heartbeats are
+// a record of what hour a particular person worked, and a retention window
+// somebody has to remember to apply is not a retention window — it is a
+// paragraph in a document. So it runs where the tool is already doing periodic
+// housekeeping, on the same two triggers as the views.
+//
+// SILENT AND BEST EFFORT. The aggregates are recomputed from the full log before
+// anything is deleted, so a failure here loses nothing; and a viewer that
+// refused to start because a directory was read-only would be trading the
+// user's whole session for a tidy-up.
+try {
+  const { prune } = await import("./activity-retention.mjs");
+  const { loadConfig } = await import("./config.mjs");
+  prune(BACKLOG_DIR, loadConfig(BACKLOG_DIR));
+} catch {
+  // Nothing measured yet, an unreadable state directory, a configuration the
+  // server has already complained about elsewhere — none of them is this
+  // process's problem to report twice.
+}
+
 listen(COEXISTS_WITH ? DEFAULT_PORT + 1 : DEFAULT_PORT, 10);

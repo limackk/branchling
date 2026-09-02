@@ -27,7 +27,7 @@
  * Tests: `node --test scripts/tests/activity.test.mjs`
  */
 
-import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { backlogPaths } from "./paths.mjs";
@@ -42,6 +42,27 @@ import { eventId, isValidActor } from "./history.mjs";
  * would produce rows nothing knows how to read.
  */
 export const ACTIVITY_KINDS = ["tool", "prompt", "commit", "edit", "reassign"];
+
+/**
+ * Which of those kinds are evidence that somebody was AT THE KEYBOARD.
+ *
+ * DEFINED ONCE, HERE, because three readers need it — `time --engaged`, the
+ * versioned rollup, and any future one — and two of them disagreeing would mean
+ * the terminal and the committed aggregate reporting different numbers for the
+ * same task, with nothing to say which was right.
+ *
+ * `commit` is excluded and the reason is specific: almost every `commit` row in
+ * existence was BACKFILLED out of git, which reconstructs an instant after the
+ * fact. A reconstructed stamp is evidence about a file, not about a person's
+ * presence, and admitting it would give every closed task a run of one —
+ * inflating the count of runs too short to measure, which is the number the
+ * throttling window is meant to be settled with.
+ *
+ * `reassign` is excluded because it is a CORRECTION to attribution, not
+ * activity: counting it would make fixing a mistake look like doing more work,
+ * and would leave a one-row cluster on the task somebody corrected AWAY from.
+ */
+export const HEARTBEAT_KINDS = ["tool", "prompt", "edit"];
 
 /**
  * How the task on a row was decided (§8) — metadata about how much the row is
@@ -102,7 +123,7 @@ export function activityEntry(row) {
   }
   const ts = row.ts || new Date().toISOString();
   if (Number.isNaN(Date.parse(ts))) throw new Error("`ts` is not a date: " + ts);
-  return {
+  const entry = {
     id: row.id || eventId(ts),
     ts,
     task,
@@ -112,6 +133,31 @@ export function activityEntry(row) {
     session: String((row && row.session) || "").trim(),
     attribution,
   };
+
+  // A CORRECTION CARRIES TWO EXTRA FIELDS AND NOTHING ELSE DOES (TL-31). The
+  // log is append-only, so a misattributed row cannot be edited — the fix is a
+  // NEW event saying where those rows should have gone, applied by the reader.
+  // `to` and `since` are therefore meaningful only on a `reassign`, and putting
+  // them on every row would both bloat a file that grows in the thousands and
+  // invite a reader to look for a destination on rows that have none.
+  const to = String((row && row.to) || "").trim();
+  const since = String((row && row.since) || "").trim();
+  if (kind === "reassign") {
+    if (!to) throw new Error("a `reassign` with no `to` corrects nothing");
+    if (to === task) throw new Error("a `reassign` from " + task + " to itself is not a correction");
+    if (!entry.session) {
+      throw new Error(
+        "a `reassign` with no session would move every row of " + task + " ever recorded\n" +
+          "The session is the scope of the mistake; without it this is not a correction but a merge."
+      );
+    }
+    if (since && Number.isNaN(Date.parse(since))) throw new Error("`since` is not a date: " + since);
+    entry.to = to;
+    if (since) entry.since = since;
+  } else if (to || since) {
+    throw new Error("`to`/`since` belong to a `reassign` row, not to a `" + kind + "`");
+  }
+  return entry;
 }
 
 /** Append rows for ONE task. Returns what was written. */
@@ -150,6 +196,31 @@ export function readActivity(root, taskId) {
   return out;
 }
 
+/**
+ * Replace one task's rows with `rows`, or remove the file when none are left.
+ *
+ * THE ONE LEGITIMATE REWRITE OF AN APPEND-ONLY LOG, and it is narrow on
+ * purpose: DELETION. Retention and erasure are the two operations that cannot
+ * be expressed as an append — an event saying "forget the rows above" leaves
+ * the rows above on disk, which is the whole thing a person asking to be
+ * forgotten is asking not to happen (§9). Everything else — a correction, a
+ * takeover, a mistake — is a new row and goes through `appendActivity`.
+ *
+ * IT NEVER EDITS A ROW. The rows handed in are rows that were already written;
+ * this function only decides which of them survive. A caller passing a modified
+ * row would be rewriting history through a door meant for removing it.
+ */
+export function rewriteActivity(root, taskId, rows) {
+  const file = activityPath(root, taskId);
+  if (!rows || !rows.length) {
+    if (existsSync(file)) rmSync(file, { force: true });
+    return 0;
+  }
+  ensureDir(backlogPaths(root).activityDir);
+  writeFileSync(file, rows.map((e) => JSON.stringify(e)).join("\n") + "\n", "utf8");
+  return rows.length;
+}
+
 /** Every task this backlog holds activity for. */
 export function listActivityTasks(root) {
   const dir = backlogPaths(root).activityDir;
@@ -158,6 +229,73 @@ export function listActivityTasks(root) {
     .filter((f) => f.endsWith(".jsonl"))
     .map((f) => f.slice(0, -".jsonl".length))
     .sort();
+}
+
+/**
+ * Every task's rows, with the corrections applied. PURE.
+ *
+ * WHY A CORRECTION IS APPLIED AT READ TIME AND NOT WRITTEN INTO THE FILE. The
+ * log is append-only, and the reason is the same one `history/` has: a file
+ * somebody may rewrite is a file whose past cannot be relied on. So the fix for
+ * a row attributed to the wrong task is a NEW row saying where those rows
+ * belong, and every reader applies it — the same shape as the dedup by `id`
+ * that `readActivity` already does.
+ *
+ * DETERMINISTIC BY `id`, WHICH IS A ULID. Corrections compose: a session moved
+ * from A to B and then from B to C has to end in C for every reader, on every
+ * machine, whatever order the files happen to be read in. Lexicographic order
+ * on a ULID is time order, so sorting by `id` is sorting by when the correction
+ * was made, and applying them in that order is the only rule that composes.
+ *
+ * A `reassign` ROW IS NEVER ITSELF MOVED. It is a statement about activity, not
+ * activity, and moving it would make a correction disappear into the task it
+ * corrected — after which nothing could be corrected twice.
+ *
+ * @param {Record<string, object[]>} rowsByTask
+ * @returns {Record<string, object[]>} a NEW map; the input is not mutated
+ */
+export function applyReassignments(rowsByTask) {
+  const out = {};
+  const corrections = [];
+  for (const [task, rows] of Object.entries(rowsByTask || {})) {
+    out[task] = [];
+    for (const row of rows || []) {
+      if (row && row.kind === "reassign" && row.to) corrections.push(row);
+      out[task].push(row);
+    }
+  }
+  corrections.sort((a, b) => String(a.id).localeCompare(String(b.id)));
+
+  for (const fix of corrections) {
+    const from = out[fix.task];
+    if (!from) continue;
+    const since = fix.since ? Date.parse(fix.since) : null;
+    const moved = [];
+    out[fix.task] = from.filter((row) => {
+      if (!row || row.kind === "reassign") return true;
+      if (String(row.session || "") !== String(fix.session)) return true;
+      if (since !== null && Date.parse(row.ts || "") < since) return true;
+      moved.push(row);
+      return false;
+    });
+    if (!moved.length) continue;
+    out[fix.to] = (out[fix.to] || []).concat(moved);
+  }
+
+  for (const task of Object.keys(out)) {
+    out[task].sort((a, b) => String(a.id).localeCompare(String(b.id)));
+  }
+  return out;
+}
+
+/** Every task's rows in one call, corrections applied. The read path every
+ *  report uses — a report reading `readActivity` directly would see the
+ *  uncorrected log and would be wrong in exactly the way `reassign` exists to
+ *  fix. */
+export function readAllActivity(root) {
+  const rowsByTask = {};
+  for (const id of listActivityTasks(root)) rowsByTask[id] = readActivity(root, id);
+  return applyReassignments(rowsByTask);
 }
 
 /**

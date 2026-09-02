@@ -2,3 +2,6 @@
 {"id":"01M1F5BNKGSC2BG6A5CJDCR1FS","ts":"2026-09-01T18:57:58.896Z","task":"TL-31","field":"blocked_by","from":["TL-1425"],"to":["TL-28"],"actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK5JYEFHY8WG5T2WNE2","ts":"2026-09-02T07:16:31.461Z","task":"TL-31","field":"title","from":"Retencja, korekta atrybucji i prawo do usunięcia","to":"Retention, attribution correction, and the right to deletion","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK5T6BA6WN7TVQ7569A","ts":"2026-09-02T07:16:31.461Z","task":"TL-31","field":"epic","from":"Backlog — pomiar czasu pracy","to":"Backlog — time tracking","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GV6MDBYWPEKCYY19213RDQ","ts":"2026-09-02T10:38:56.939Z","task":"TL-31","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1GV6MDB0M7JENKSCDMW6199","ts":"2026-09-02T10:38:56.939Z","task":"TL-31","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1GVTXXJWBVKT24KK61RCG2D","ts":"2026-09-02T10:50:02.034Z","task":"TL-31","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

@@ -31,7 +31,7 @@ import { fileURLToPath } from "node:url";
 import { ATTRIBUTIONS } from "../activity.mjs";
 import { ATTRIBUTION_CHAIN, attribute, taskFromBranch, taskFromPath } from "../attribution.mjs";
 import { readFocus, sessionId, writeFocus } from "../focus.mjs";
-import { parseRecordArgs, signalsFromPayload } from "../activity-record.mjs";
+import { parseRecordArgs, signalsFromPayload } from "../activity-command.mjs";
 import { parseFocusArgs } from "../focus-command.mjs";
 import { taskIdPatterns } from "../task-id.mjs";
 import { REPO_ROOT } from "./_repo.mjs";

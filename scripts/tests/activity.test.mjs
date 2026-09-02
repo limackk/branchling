@@ -114,10 +114,20 @@ test("an unknown `kind` is refused and nothing is written", () => {
       /unknown activity kind/);
     assert.deepEqual(readActivity(dir, ids[0]), []);
     // POSITIVE CONTROL: every declared kind IS accepted, so the guard is not
-    // simply refusing everything.
+    // simply refusing everything. `reassign` carries two fields of its own
+    // (TL-31) — a correction with no destination and no session corrects
+    // nothing — so the control supplies them rather than skipping the kind,
+    // which would leave one sixth of the set unproven.
     for (const kind of ACTIVITY_KINDS) {
-      assert.equal(activityEntry({ task: ids[0], kind, actor: "agent:a" }).kind, kind);
+      const extra = kind === "reassign" ? { to: ids[0] + "0", session: "s1" } : {};
+      assert.equal(activityEntry({ task: ids[0], kind, actor: "agent:a", ...extra }).kind, kind);
     }
+    assert.throws(() => activityEntry({ task: ids[0], kind: "reassign", actor: "agent:a", session: "s1" }),
+      /no `to`/, "a correction with no destination is not a correction");
+    assert.throws(() => activityEntry({ task: ids[0], kind: "reassign", actor: "agent:a", to: "FX-9" }),
+      /no session/, "a correction with no session is a merge, not a correction");
+    assert.throws(() => activityEntry({ task: ids[0], kind: "tool", actor: "agent:a", to: "FX-9" }),
+      /belong to a `reassign`/, "only a correction may name a destination");
   } finally {
     cleanup(dir);
   }

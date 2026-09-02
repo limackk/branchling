@@ -28,7 +28,7 @@
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { listActivityTasks, readActivity } from "./activity.mjs";
+import { HEARTBEAT_KINDS, listActivityTasks, readActivity, readAllActivity } from "./activity.mjs";
 import { engagedReport } from "./cluster.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { printJson } from "./json-envelope.mjs";
@@ -41,21 +41,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const KNOWN_FLAGS = ["--json", "--engaged", "--dir"];
 
-/**
- * Which rows are evidence that somebody was AT THE KEYBOARD (TL-28).
- *
- * `commit` is excluded, and the reason is specific rather than tidy: almost
- * every `commit` row in existence was BACKFILLED out of git by
- * `backfill-completions`, which reconstructs an instant after the fact. A
- * reconstructed stamp is evidence about a file, not about a person's presence,
- * and admitting it would give every closed task a cluster of one — inflating
- * the count of single-heartbeat clusters, which is the number §14 point 4 wants
- * to settle the throttling threshold with.
- *
- * `reassign` is excluded because it is a CORRECTION to attribution (TL-31), not
- * activity: counting it would make fixing a mistake look like doing more work.
- */
-export const HEARTBEAT_KINDS = ["tool", "prompt", "edit"];
 
 /** The nearest-rank percentile, on a sorted array. PURE.
  *  Nearest-rank rather than interpolation: with a handful of tasks an
@@ -244,9 +229,16 @@ export function main(argv) {
   // (law 4), and a key that appears only when a flag was passed is a contract a
   // consumer has to read the help to discover — the envelope's rule is that a
   // declared key is always there.
+  //
+  // IT READS THROUGH `readAllActivity`, NOT `readActivity` PER TASK (TL-31).
+  // The raw files still hold rows a `reassign` says belong elsewhere, and a
+  // report built from them would credit the minutes to the task somebody
+  // explicitly corrected them away from — which is the entire failure the
+  // correction exists to undo, reappearing at read time.
+  const corrected = readAllActivity(root);
   const rowsByTask = {};
-  for (const id of listActivityTasks(root)) {
-    rowsByTask[id] = readActivity(root, id).filter((r) => r && HEARTBEAT_KINDS.indexOf(r.kind) >= 0);
+  for (const [id, rows] of Object.entries(corrected)) {
+    rowsByTask[id] = rows.filter((r) => r && HEARTBEAT_KINDS.indexOf(r.kind) >= 0);
   }
   const engaged = engagedReport(rowsByTask, { idleGapMinutes: config.idleGapMinutes });
 

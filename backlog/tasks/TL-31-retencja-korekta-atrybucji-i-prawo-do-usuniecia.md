@@ -6,20 +6,26 @@ labels: [post-launch]
 board: main
 epic: "Backlog — time tracking"
 priority: P2
-status: pending
-owner: unassigned
+status: done
+owner: agent:claude
 estimate: 4h
 confidence: medium
 created: 2026-08-30
-updated: 2026-08-30
+updated: 2026-09-02
 blocked_by: [TL-28]
 blocks: []
 related_docs:
   - docs/backlog-time-tracking.md
   - origin#docs/architecture/legal-and-compliance.md
 verification:
-  - bash: "node --test backlog/scripts/tests/retention.test.mjs backlog/scripts/tests/reassign.test.mjs"
-  - bash: "node backlog/scripts/cli.mjs activity forget --actor local:test --dry-run"
+  - id: retention-and-correction
+    bash: "node --test scripts/tests/retention.test.mjs scripts/tests/reassign.test.mjs"
+  - id: dry-run-is-dry
+    bash: "find backlog/activity -name '*.jsonl' | sort | xargs shasum > /tmp/wt-before.txt; node scripts/cli.mjs activity forget --actor local:test --dry-run >/dev/null; find backlog/activity -name '*.jsonl' | sort | xargs shasum > /tmp/wt-after.txt; diff /tmp/wt-before.txt /tmp/wt-after.txt && echo 'dry-run clean — OK'"
+  - id: privacy-report
+    bash: "node scripts/cli.mjs activity report --privacy | grep -q 'activity_retention_days' && echo 'the window is on the report — OK'"
+  - id: guards
+    bash: "node scripts/cli.mjs check"
 ---
 
 ## Goal
@@ -59,13 +65,14 @@ machine before this task is closed.
 
 ## Pre-flight reading
 
-1. `docs/architecture/backlog-time-tracking.md` — §9 (privacy, retention,
+1. `docs/backlog-time-tracking.md` — §9 (privacy, retention,
    correction), §5 (row shape, `kind: reassign`), §13 (what this mechanism is
    NOT).
-2. `docs/architecture/legal-and-compliance.md` — the workspace's conventions
-   for personal data and retention windows.
-3. `backlog/scripts/activity.mjs` (TL-27) and `attribution.mjs` (TL-28).
-4. `backlog/scripts/config.mjs` — `activity_retention_days` and
+2. `docs/license-and-contributions.md` §3 — the open/hosted line. There is no
+   `legal-and-compliance.md` in this repository; it stayed in the workspace this
+   tool was extracted from.
+3. `scripts/activity.mjs` (TL-27) and `scripts/attribution.mjs` (TL-28).
+4. `scripts/config.mjs` — `activity_retention_days` and
    `activity_privacy` are already in the schema (TL-27 step 7); this task only
    adds their USE.
 
@@ -98,44 +105,88 @@ machine before this task is closed.
 
 ## Acceptance criteria
 
-- [ ] `prune` deletes only rows older than the window and does NOT touch the
-      aggregates — there is a test for this.
-- [ ] The aggregate is recomputed BEFORE deletion; a test checks that minutes
-      from before the window do not disappear from the calibration.
-- [ ] `forget --actor` deletes raw rows and recomputes aggregates; after it,
-      the report does not reconstruct the actor's data.
-- [ ] `forget --dry-run` touches nothing — a test compares file checksums
-      before and after.
-- [ ] `reassign` is an appended event, not an edit of existing rows — a test
-      reads the file and checks that old rows are untouched.
-- [ ] Two `reassign` events on the same session compose in deterministic
-      order (by ULID).
-- [ ] Minutes carry over completely after `reassign`: the per-task sum
-      matches, nothing is lost and nothing is duplicated.
-- [ ] `report --privacy` prints the retention window, the mode, and the list
-      of versioned paths.
-- [ ] The README (EN) describes the data collected, retention, and the
-      deletion path.
-- [ ] `qa/backlog-time-tracking.yaml` extended with retention, `forget`, and
-      `reassign` cases.
+One line each, because the parser reads the `- [ ]` line and nothing under it
+(TL-118), so a wrapped `[proof:]` marker is invisible to it.
+
+- [x] `prune` deletes only rows older than the window and does NOT touch the aggregates. [proof: retention-and-correction]
+- [x] The aggregate is recomputed BEFORE deletion; minutes from before the window do not disappear from the calibration. [proof: retention-and-correction]
+- [x] `forget --actor` deletes raw rows and recomputes aggregates; afterwards the report does not reconstruct the actor's data. [proof: retention-and-correction]
+- [x] `forget --dry-run` touches nothing — the activity files' bytes are identical before and after. [proof: dry-run-is-dry, retention-and-correction]
+- [x] `reassign` is an appended event, not an edit — the old rows are untouched on disk. [proof: retention-and-correction]
+- [x] Two `reassign` events on the same session compose in deterministic order, by ULID. [proof: retention-and-correction]
+- [x] Minutes carry over completely after `reassign`: nothing is lost and nothing is duplicated. [proof: retention-and-correction]
+- [x] `report --privacy` prints the retention window, the mode, and the list of versioned paths. [proof: privacy-report, retention-and-correction]
+- [x] The README describes the data collected, the retention, and the deletion path. [proof: retention-and-correction]
+- [x] The guards still pass over the whole backlog and the whole source. [proof: guards]
+- [ ] `qa/backlog-time-tracking.yaml` extended with retention, `forget`, and `reassign` cases.
+
+## Decision (2026-09-02)
+
+**The contract was rewritten to this repository's paths.** It named
+`backlog/scripts/` and `docs/architecture/`, the layout of the repository this
+tool was extracted from, so not one command in it addressed a file that exists.
+Nothing about the SUBSTANCE changed: the four checks it asks for are the ones it
+always asked for, and two that stood only in the body's prose — the privacy
+report actually printing the window, and the guards still passing — were
+promoted into the frontmatter rather than invented. Same correction TL-27 and
+TL-28 recorded; TL-138 is what stops it happening one task at a time.
+
+**`qa/backlog-time-tracking.yaml` is left unticked, again.** The scenario
+directory did not come across at extraction; this repository keeps its evidence
+in `scripts/tests/`, and inventing a file to tick a line is the opposite of what
+the criterion is for.
+
+**`prune` and `forget` differ by ONE line, and that line is the whole
+semantics.** `prune` recomputes the aggregates BEFORE deleting, `forget`
+recomputes them AFTER. Expiry keeps the summary, because time passing does not
+revoke anything and the summary is the entire input to estimate calibration;
+erasure does not, because an aggregate left standing over deleted rows is the
+data coming back at the next report. Both directions have a test, and the
+`prune` one asserts the surviving MINUTES rather than the surviving files —
+recomputing after the delete would have halved the history while every file
+count stayed right.
+
+**A `reassign` row written by the erased actor survives `forget`.** It is a
+statement about somebody else's rows; dropping it would silently un-correct an
+attribution that person fixed, restoring a claim about them in the very act of
+erasing them.
+
+**`--session` is REQUIRED on `reassign`, and that is a refusal rather than a
+default.** Without it the correction would move every row ever recorded on the
+task, which is a merge and not a correction. The command fails instead of
+guessing the scope of somebody's mistake.
+
+**`--since` deliberately does not conserve minutes, and the test says so.**
+Splitting one run in two loses the gap that spanned the split, because after the
+split no cluster contains both sides of it. Asserting equality there would be
+asserting a lie; what the test holds to is that nothing is DUPLICATED.
+
+**Two things the task listed that are not commands.** `prune` at viewer startup
+is wired into `serve-backlog.mjs` beside the view rebuild, silently and best
+effort — a retention window somebody has to remember to apply is a paragraph in
+a document, not a mechanism. And `HEARTBEAT_KINDS` moved into `activity.mjs`:
+three readers need it, and two of them disagreeing would mean the terminal and
+the committed aggregate reporting different numbers for the same task.
 
 ## Verification
 
 ```bash
 # 1. Retention and correction — expected: pass, including reassign on reassign
-node --test backlog/scripts/tests/retention.test.mjs backlog/scripts/tests/reassign.test.mjs
+node --test scripts/tests/retention.test.mjs scripts/tests/reassign.test.mjs
 
 # 2. forget --dry-run touches nothing — expected: identical checksums
-find backlog/activity -name '*.jsonl' -exec shasum {} \; | sort > /tmp/before.txt
-node backlog/scripts/cli.mjs activity forget --actor local:test --dry-run
-find backlog/activity -name '*.jsonl' -exec shasum {} \; | sort > /tmp/after.txt
-diff /tmp/before.txt /tmp/after.txt && echo 'dry-run clean — OK'
+# (no `-exec … \;` — a backslash in a YAML double-quoted scalar reaches the
+# shell verbatim here, so the contract in the frontmatter uses xargs instead.)
+find backlog/activity -name '*.jsonl' | sort | xargs shasum > /tmp/wt-before.txt
+node scripts/cli.mjs activity forget --actor local:test --dry-run
+find backlog/activity -name '*.jsonl' | sort | xargs shasum > /tmp/wt-after.txt
+diff /tmp/wt-before.txt /tmp/wt-after.txt && echo 'dry-run clean — OK'
 
 # 3. The user sees what the tool holds about them — expected: window, mode, paths
-node backlog/scripts/cli.mjs activity report --privacy
+node scripts/cli.mjs activity report --privacy
 
 # 4. Module guards still green
-node backlog/scripts/cli.mjs check
+node scripts/cli.mjs check
 ```
 
 ## Notes

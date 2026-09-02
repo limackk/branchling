@@ -357,6 +357,60 @@ writes one short pointer to that command into `CLAUDE.md` or `AGENTS.md`.
 
 ---
 
+## What it records about you
+
+If you wire up the activity hook, the tool measures **how long work took** — and
+that measurement is a record of what hour a particular person worked, day after
+day. It is worth being exact about it rather than reassuring.
+
+**What is collected.** One row per tool invocation, at most one a minute per
+task (`heartbeat_throttle_seconds`): a timestamp, the task, the kind of
+evidence, the actor, the session, and which rule decided the task. No file
+contents, no commands, no diffs, no keystrokes.
+
+**Where it lives.** `backlog/activity/<ID>.jsonl`, and it is **gitignored by
+default** — `activity_privacy: local`. Only the per-task aggregate in
+`backlog/activity/rollup/` is committed: minutes, sessions, first, last, and the
+share of minutes nothing could attribute. At that resolution it is a fact about
+a task rather than about a person, and it is the whole input to estimate
+calibration.
+
+**For how long.** `activity_retention_days`, 90 by default. `worktrail activity
+prune` deletes raw rows past the window and keeps the aggregate — recomputing it
+from the full log *before* deleting anything, so the window does not eat the
+history it exists to make safe to keep. It also runs when the viewer starts: a
+retention window somebody has to remember to apply is not a retention window.
+
+**How to get rid of it.**
+
+```bash
+worktrail activity report --privacy              # what is kept, whose, for how long
+worktrail activity forget --actor you --dry-run  # what would go. There is no undo
+worktrail activity forget --actor you
+```
+
+`forget` deletes the raw rows **and recomputes the aggregates without them**,
+because an aggregate left standing over deleted rows is the data coming back at
+the next report.
+
+**How to correct it.** An attribution can be wrong, and the log is append-only,
+so the fix is a new row rather than an edit:
+
+```bash
+worktrail activity reassign --from TASK-1 --to TASK-2 --session <s> [--since <ts>]
+```
+
+**What this is not.** It is a set of mechanisms — minimisation, retention,
+erasure, correction — and **not a compliance claim**. The legal basis, informing
+the people being measured, and any assessment stay with whoever deploys it.
+`forget --actor` also acts on a *claim*: nothing here authenticates an actor,
+which is the same single-machine boundary the reservation has.
+
+**If you want none of it**, wire no hook. Nothing is recorded unless something
+calls `worktrail activity record`, and the tool never installs that for you.
+
+---
+
 ## Documentation
 
 **[The manual](docs/manual.md)** is the reference: statuses, configuration,

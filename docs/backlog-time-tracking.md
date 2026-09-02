@@ -493,11 +493,53 @@ heartbeat that CLOSES each interval, so a cluster whose rows the chain settled
 differently is split exactly rather than rounded to one answer — the parts sum
 to the whole, and a test asserts it.
 
-**What is still deliberately NOT implemented:** tokens (TL-30), calibration
-(TL-29), and retention, correction and the right to erasure (TL-31). The last of
-those is the one that matters: **this is the commit where personal data starts
-being produced**, and §9 makes TL-31 a condition of the module rather than a
-follow-up. It must not fall more than one iteration behind.
+**What is still deliberately NOT implemented:** tokens (TL-30) and calibration
+(TL-29). Retention, correction and the right to erasure — §9's condition — are
+§17, one iteration behind as required.
+
+## 17. What is implemented (2026-09-02, TL-31)
+
+What the log gives BACK. §9 makes these a condition of the module rather than a
+follow-up, and they land one iteration after the collection they answer for.
+
+- `worktrail activity prune` — raw rows past `activity_retention_days` go, the
+  per-task aggregate stays. **The aggregates are recomputed from the FULL log
+  BEFORE anything is deleted**, and the order is not an implementation detail:
+  deleting first would silently rewrite every historical figure to "the last N
+  days", the calibration input would shrink every night, and the report would
+  look exactly as healthy as before. The test asserts the surviving MINUTES, not
+  the surviving files, because that is the only assertion that can tell the two
+  orders apart.
+- **`prune` runs when the viewer starts**, beside the view rebuild, silently and
+  best effort. A retention window somebody has to remember to apply is a
+  paragraph in a document, not a mechanism.
+- `worktrail activity forget --actor` — one person's raw rows go **and the
+  aggregates are recomputed WITHOUT them**. That inversion is the whole
+  difference from `prune`: expiry keeps the summary because time passing revokes
+  nothing, erasure does not because an aggregate left standing over deleted rows
+  is the data coming back at the next report. `--dry-run` is required rather
+  than offered — there is no undo — and the test compares the files' BYTES.
+- `worktrail activity reassign --from --to --session [--since]` — the log is
+  append-only, so a correction is a new row and `applyReassignments()` applies
+  it at read time, deterministically by ULID, so corrections compose. Nothing on
+  disk is edited, which matters because the person disputing an attribution is
+  being asked to trust the tool a second time. `--session` is REQUIRED: without
+  it the correction would move every row ever recorded on the task, which is a
+  merge.
+- `worktrail activity report --privacy` — the window, the mode, how many raw
+  rows exist, whose they are, and which paths are versioned. One place a person
+  can see what the tool holds about them, and it says in as many words that it
+  is a set of mechanisms and not a compliance claim.
+- **The README has a section, `What it records about you`** — what is collected,
+  where it lives, for how long, how to erase it, how to correct it, and how to
+  have none of it. A mechanism nobody can find is not a mechanism, and the
+  README is where somebody who has not read this document looks.
+
+**What is still NOT true, and must not be implied.** None of this makes a
+deployment compliant with anything. `forget --actor` acts on a CLAIM and not on
+proof — there is no actor authentication, the same single-machine boundary the
+reservation has. The legal basis, informing the people measured, and any
+assessment stay with whoever deploys it.
 
 **A limit that belongs to THIS repository, not to the tool.** The git history was
 flattened to a single commit at extraction ([`LINEAGE.md`](../LINEAGE.md)), so
