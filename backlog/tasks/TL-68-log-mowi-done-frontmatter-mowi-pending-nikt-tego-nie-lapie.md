@@ -22,7 +22,7 @@ verification:
   - id: wired
     bash: "node scripts/cli.mjs check"
   - id: recorded
-    bash: "grep -q 'step 5 settled' backlog/tasks/TL-68-*.md && echo 'the error/warning choice is recorded with its reason — OK'"
+    bash: "grep -q 'step 5 settled' backlog/tasks/TL-68-log-mowi-done-frontmatter-mowi-pending-nikt-tego-nie-lapie.md && echo 'the error/warning choice is recorded with its reason — OK'"
   - id: doctor
     bash: "node scripts/cli.mjs doctor --json | node -e \"let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const r=JSON.parse(s);const row=r.checks.find(c=>c.id==='log-status');if(!row){console.error('no log-status row in doctor');process.exit(1)}console.log('doctor knows about this drift — OK')})\""
 ---

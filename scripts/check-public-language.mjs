@@ -244,14 +244,51 @@ function walk(abs, out) {
 }
 
 /**
+ * The extensions a bare path may end in. A CLOSED list on purpose: the test for
+ * "is this token a path" has to be narrow enough that a Polish word cannot walk
+ * through it, and an open rule — anything after a dot — would let
+ * `wiadomo/nie.tak` past. Every extension here is one this repository actually
+ * writes into a task file or a command.
+ */
+const PATH_EXTENSIONS = "md|mjs|cjs|js|json|jsonl|ya?ml|html|css|txt|sh|svg|png|patch";
+
+/**
+ * A bare file path — the THIRD carrier of a filename, after the markdown link
+ * target and the inline code span (TL-160).
+ *
+ * WHY IT NEEDED ADDING. TL-137 stripped the two carriers that existed when it
+ * was written, and a path written plainly inside a YAML scalar — a
+ * `verification:` command that greps the very task it belongs to — is a third
+ * one nobody had produced yet. CLAUDE.md already settles the principle: a
+ * task's filename is data, not prose, and 145 files in this repository will
+ * carry a Polish word in their names forever because TL-137 deliberately did
+ * not rename them. Without this the only ways past the guard were an allow
+ * marker on a line that is not an exception, or a glob that silently narrows
+ * what the command asserts.
+ *
+ * WHAT COUNTS, narrowly: no whitespace, no quote of any kind, at least one `/`,
+ * and one of the extensions above at the end. The slash is what makes this
+ * safe — Polish prose has spaces in it, so a sentence can never be one token,
+ * and a token that is one word cannot reach the two hits every word rule here
+ * requires. A bare filename with no directory is deliberately NOT a path by
+ * this definition: nothing in the tree writes one, and admitting it would widen
+ * the hole for no gain.
+ */
+const BARE_PATH = new RegExp(
+  "[^\\s\"'`]*\\/[^\\s\"'`]*\\.(?:" + PATH_EXTENSIONS + ")(?![A-Za-z0-9])",
+  "g"
+);
+
+/**
  * Remove spans that are DATA, not prose, from a line before it is SEARCHED —
  * see "WHY INLINE CODE SPANS AND LINK TARGETS ARE STRIPPED" above. Only the
  * search text changes; a finding still reports the original line untouched.
  */
-function stripDataSpans(line) {
+export function stripDataSpans(line) {
   return line
     .replace(/`[^`]*`/g, "``")
-    .replace(/\]\([^)]*\)/g, "]()");
+    .replace(/\]\([^)]*\)/g, "]()")
+    .replace(BARE_PATH, "/");
 }
 
 /**

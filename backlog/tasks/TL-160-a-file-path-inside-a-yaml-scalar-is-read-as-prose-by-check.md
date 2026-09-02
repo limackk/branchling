@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Data integrity"
 priority: P2                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 estimate: 2h                       # 30m | 2h | 1d | 1w | 1mo
 created: 2026-09-02
 updated: 2026-09-02
@@ -16,7 +16,7 @@ blocks: []
 related_docs: []
 verification:
   - id: suite
-    bash: "node --test scripts/tests/language-guard.test.mjs"
+    bash: "node --test scripts/tests/public-language.test.mjs"
   - id: tree
     bash: "node scripts/cli.mjs check --language"
 ---
@@ -80,9 +80,36 @@ live in quotes.
 
 ## Acceptance criteria
 
-- [ ] A file path with a Polish filename inside a YAML scalar does not fail the guard. [proof: suite]
-- [ ] A Polish sentence in the same scalar still fails. [proof: suite]
-- [ ] The whole tree still passes `check --language`. [proof: tree]
+- [x] A file path with a Polish filename inside a YAML scalar does not fail the guard. [proof: suite]
+- [x] A Polish sentence in the same scalar still fails. [proof: suite]
+- [x] The whole tree still passes `check --language`. [proof: tree]
+
+## Decisions
+
+**A path is a token with no whitespace and no quotes, containing at least one
+`/`, ending in one of a closed list of extensions.** Three narrowings, each
+carrying its own weight. The SLASH is what makes the rule safe: Polish prose has
+spaces in it, so a sentence can never be one token, and a single word cannot
+reach the two hits every word rule in this guard requires. The CLOSED extension
+list is what stops `wiadomo/nie.tak` walking through a rule that accepted
+anything after a dot. And a BARE filename with no directory is deliberately not
+a path: nothing in the tree writes one, so admitting it would widen the hole for
+no gain. `stripDataSpans()` is now exported, because the boundary of the rule is
+worth asserting directly rather than only through its effects.
+
+**The contract named a test file that has never existed.** `verification:` said
+`scripts/tests/language-guard.test.mjs`; the language guard's tests live in
+`scripts/tests/public-language.test.mjs` and always have. The entry was
+corrected to name the real file rather than a new file being created to match
+the mistaken name — splitting one guard's tests across two files to satisfy a
+typo would cost every future reader of either. This is the "the task was never
+finished being written" case from `worktrail instructions task-finalization`,
+not an edit to get past a failing run: the four cases the contract asks for were
+written first, and they are in that file.
+
+**TL-68's exact path is restored**, replacing the glob workaround. That is the
+positive control: if the strip stopped working, the tree-wide `check --language`
+would fail on a real line rather than on a fixture.
 
 ## Notes
 

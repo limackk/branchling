@@ -2,3 +2,6 @@
 {"id":"01M1H0HV7R721YBMQNHBPMF0AK","ts":"2026-09-02T12:12:27.256Z","task":"TL-160","field":"priority","from":"P1","to":"P2","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1H0HV7RE5K8FBPMQWEP13QR","ts":"2026-09-02T12:12:27.256Z","task":"TL-160","field":"type","from":"task","to":"bug","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1H0HV7RKF41DZWJYYZ678Y0","ts":"2026-09-02T12:12:27.256Z","task":"TL-160","field":"epic","from":"","to":"Data integrity","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1HN7S0YQKSGREJPYNTKTJ47","ts":"2026-09-02T18:13:57.406Z","task":"TL-160","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1HN7S0YZT1STRCGJTZAQH9J","ts":"2026-09-02T18:13:57.406Z","task":"TL-160","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1HNDY3P4DMYVMR8N3YR8HAV","ts":"2026-09-02T18:17:19.222Z","task":"TL-160","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

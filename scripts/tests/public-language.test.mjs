@@ -19,7 +19,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { ALLOW_MARKER, PUBLIC_PATHS, auditText, auditTree, labelHits, polishShapeHits } from "../check-public-language.mjs";
+import { ALLOW_MARKER, PUBLIC_PATHS, auditText, auditTree, labelHits, polishShapeHits, stripDataSpans } from "../check-public-language.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, "..", "..");
@@ -336,4 +336,61 @@ test("the labels that actually ship are English", () => {
   const map = source.match(/const HISTORY_FIELD_LABELS = \{[^}]*\}/);
   assert.ok(map, "the label map is not where this test looks — the check would be vacuous");
   assert.deepEqual(auditText(map[0]), [], map[0]);
+});
+
+// ── a bare file path is the third carrier of a filename (TL-160) ──────────
+//
+// The two carriers TL-137 stripped were a markdown link's target and an inline
+// code span. A path written plainly inside a YAML scalar — a `verification:`
+// command that greps the very task file it belongs to — is a third, and until
+// TL-160 the only ways past the guard were an allow marker on a line that is
+// not an exception, or a glob that silently narrows what the command asserts.
+
+test("SILENT: a path with a Polish filename inside a YAML scalar", () => {
+  // The reported case, verbatim: TL-68's own closing contract.
+  // language-guard: allow — the path IS the sample
+  const line = '    bash: "grep -q \'step 5 settled\' backlog/tasks/TL-68-log-mowi-done-frontmatter-mowi-pending-nikt-tego-nie-lapie.md"';
+  assert.deepEqual(auditText(line), [], "a filename is data, not prose");
+});
+
+test("FINDS: a Polish SENTENCE in the same scalar, beside a path", () => {
+  // Without this the change would be indistinguishable from switching the
+  // guard off for `verification:` — which is the whole risk of stripping.
+  // language-guard: allow — the sentence is the sample
+  const line = '    bash: "grep -q \'nie ma tego w drzewie\' scripts/serve-backlog.mjs"';
+  const found = auditText(line);
+  assert.equal(found.length, 1, "the prose beside the path still has to be caught");
+  assert.equal(found[0].reason, "words");
+});
+
+test("a path is a token with a slash and a known extension, and nothing wider", () => {
+  // The narrowness IS the safety. A rule admitting anything after a dot would
+  // let a two-word Polish phrase through as a `.tak` file, and a rule not
+  // requiring a slash would admit a bare word.
+  assert.equal(stripDataSpans("scripts/take-task.mjs").includes("take-task"), false);
+  // language-guard: allow — every string below is a sample of what must NOT pass
+  const unknownExtension = "wiadomo/nie.tak";
+  // language-guard: allow — the sample
+  const noDirectory = "nie-lapie.md";
+  // language-guard: allow — the sample
+  const sentence = "nie ma/tego.md";
+  assert.equal(stripDataSpans(unknownExtension), unknownExtension,
+    "an unknown extension is not a path");
+  assert.equal(stripDataSpans(noDirectory), noDirectory,
+    "a bare filename with no directory is not a path by this definition");
+  assert.equal(stripDataSpans(sentence), "nie /",
+    "whitespace ends a token: only the token itself goes, never the word before it");
+});
+
+test("POSITIVE CONTROL: a Polish path-shaped line that is prose still FAILS in a tree", () => {
+  // The tree-level counterpart: stripping happens inside auditText, so the
+  // control has to run through the whole walk to prove the walk still catches.
+  const dir = mkdtempSync(join(tmpdir(), "worktrail-lang-path-"));
+  mkdirSync(join(dir, "scripts"), { recursive: true });
+  writeFileSync(join(dir, "scripts", "x.mjs"),
+    // language-guard: allow — the regression this control exists to catch
+    '// nie ma tego w drzewie, backlog/tasks/TL-68-nie-lapie.md\n', "utf8");
+  const { findings } = auditTree(dir);
+  assert.equal(findings.length, 1, "prose sitting next to a path is still prose");
+  rmSync(dir, { recursive: true, force: true });
 });
