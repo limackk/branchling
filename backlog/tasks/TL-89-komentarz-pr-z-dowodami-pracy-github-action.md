@@ -6,19 +6,30 @@ labels: []
 board: main
 epic: "Agentic differentiators"
 priority: P2
-status: pending
-owner: unassigned
+status: in_progress
+owner: agent:claude
 estimate: 1d
 confidence: medium
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-02
 blocked_by: []
 blocks: []
 related_docs:
   - docs/worktrail-state-and-sync.md
   - docs/backlog-time-tracking.md
 verification:
-  - bash: "node --test scripts/tests/pr-summary.test.mjs"
+  - id: suite
+    bash: "node --test scripts/tests/pr-summary.test.mjs"
+  - id: from-git
+    bash: "node scripts/cli.mjs pr-summary --base HEAD~1 --json | node -e \"let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const r=JSON.parse(s);if(r.kind!=='pr-summary'||r.scanned!==true)process.exit(1);console.log('the range is read from git — OK')})\""
+  - id: no-zeros
+    bash: "node scripts/cli.mjs pr-summary --base HEAD~1 | grep -qi 'token\\|\\$\\|model' && { echo 'cost information leaked into a comment that did not ask for it'; exit 1; }; echo 'no tokens, amounts or model names without --cost — OK'"
+  - id: no-tasks
+    bash: "node scripts/cli.mjs pr-summary --base HEAD | grep -q 'No task changed' && echo 'a range with no tasks says so rather than going quiet — OK'"
+  - id: standalone
+    bash: "node scripts/cli.mjs pr-summary --base HEAD~1 | head -1 | grep -q 'the backlog on this branch' && echo 'the command works with no GitHub anywhere near it — OK'"
+  - id: rendered
+    manual: "The markdown from `worktrail pr-summary` was pasted into a real pull-request comment and renders correctly there — the table has its columns, the transitions read as a list, and nothing shows as raw markup"
 ---
 
 ## Goal
@@ -91,19 +102,35 @@ dollar figures where none exist.
 
 ## Acceptance criteria
 
-- [ ] Task detection via git diff, not via any computed view.
-- [ ] The time/token sections disappear entirely when there is no data — no
-      zeros.
-- [ ] Without `--cost`, the output contains no tokens, amounts or model
-      names.
-- [ ] The markdown output renders correctly as a GitHub comment (checked on a
-      real PR before closing).
-- [ ] The command works without GitHub (stdout) — the Action is only the
-      transport.
+- [ ] Task detection via git diff, not via any computed view. [proof: from-git]
+- [ ] The time/token sections disappear entirely when there is no data — no zeros. [proof: suite]
+- [ ] Without `--cost`, the output contains no tokens, amounts or model names. [proof: no-zeros]
+- [ ] The markdown output renders correctly as a GitHub comment (checked on a real PR before closing). [proof: rendered]
+- [ ] The command works without GitHub (stdout) — the Action is only the transport. [proof: standalone]
 
 ## Log
 
 Append-only. Format: `YYYY-MM-DD status — who — note`.
+
+- 2026-09-02 in_progress — agent:claude — two decisions worth keeping. (1) Both
+  sources are GIT, never a view: `git diff --name-status` over the task files
+  says which tasks, and the lines ADDED to `history/*.jsonl` in the same range
+  say what happened. The second works because the log is append-only, so "added
+  in this range" and "happened on this branch" are the same set — comparing
+  timestamps would need a clock everybody agrees on, which a distributed history
+  does not have. (2) Whether a task was OPENED here comes from git's `A`, not
+  from a `__created__` entry: `new` writes no history entry at all, so a summary
+  waiting for one would silently miss every task somebody opened while working.
+  That was found by the test rather than by reading the code.
+- 2026-09-02 in_progress — agent:claude — `unknown` is rendered two different
+  ways, decided by the entry's `source`. After a reconcile it means "nobody was
+  there to ask"; after a command it means "nobody typed a reason". Rendered
+  identically — which is what the first draft did — one of them libels the tool
+  in a public comment. An unrecognised source takes the milder reading.
+- 2026-09-02 in_progress — agent:claude — `--cost` has nothing to report today,
+  because no measurement in this repository records tokens (TL-30 is not built).
+  It says so in a sentence rather than printing a zero: a silent omission is
+  indistinguishable from a cost of nothing.
 
 - 2026-08-31 pending — agent:claude — task opened from a review of agentic
   differentiators; the measurement section is deliberately conditional

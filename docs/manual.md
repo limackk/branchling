@@ -538,6 +538,7 @@ implementation detail. Every reading command answers in the same envelope:
 | `seed` | `seed` | `ok`, `root`, `dryRun`, `created`, `errors` |
 | `import` | `import` | `ok`, `root`, `dryRun`, `created`, `skipped`, `droppedLabels`, `withoutVerification`, `errors` |
 | `<command> --help` | `command-help` | `command`, `summary`, `usage`, `configured`, `flags` |
+| `pr-summary` | `pr-summary` | `base`, `scanned`, `reason`, `tasks`, `engaged`, `cost` |
 
 **`--help --json` describes how to CALL a command** (TL-83), which is the other
 half of Law 4: the reading commands answer in JSON, and so does the description

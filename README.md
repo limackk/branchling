@@ -339,6 +339,35 @@ worktrail doctor --json | jq -e '.ok'          # a gate in CI
 worktrail done TASK-42 --json | jq '.entries[] | select(.ok | not)'
 ```
 
+### The backlog diff, in the pull request
+
+A pull request shows the code diff. It does not show which tasks the branch
+touched or which statuses moved — the half of the change a reviewer cannot
+reconstruct from the diff:
+
+```bash
+worktrail pr-summary --base main        # markdown on stdout
+```
+
+Copy [`examples/pr-summary.yml`](examples/pr-summary.yml) into
+`.github/workflows/` and that markdown becomes one pull-request comment,
+updated in place. The job is checkout, run, comment: every decision is in the
+command, so the same invocation works unchanged in GitLab CI, in a git hook, or
+typed into a terminal.
+
+Both sources are git — `git diff --name-status` over the task files says *which*
+tasks, and the lines added to `history/*.jsonl` in the same range say *what
+happened*. Never a computed view: on CI nothing has been rebuilt, so a view
+would answer for a state that does not exist there.
+
+A section with no data does not appear as zeros, a branch that touched no task
+says so rather than posting an empty comment, and cost information is opt-in —
+`--cost` only, because the comment lands somewhere public and token counts,
+model names and amounts are facts about your spend and your stack rather than
+about the change.
+
+---
+
 ### Calling it from an agent
 
 **`<command> --help --json` describes the input surface** — every flag, whether

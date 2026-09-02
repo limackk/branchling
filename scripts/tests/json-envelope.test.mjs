@@ -91,6 +91,10 @@ const READING = {
   // (TL-83). `new` is the one whose flags draw on the most vocabularies, so a
   // fixture answering it exercises the part that varies per project.
   "command-help": ["new", "--help", "--json"],
+  // The fixtures are not git repositories, so this exercises the answer a
+  // command with no range to read gives (TL-89) — which has to stay a complete
+  // envelope saying `scanned: false`, not an error and not an empty list.
+  "pr-summary": ["pr-summary", "--json"],
 };
 
 /**
