@@ -1,3 +1,6 @@
 {"id":"01M1DX1VJ5G800H643D0P740N9","ts":"2026-09-01T07:13:34.277Z","task":"TL-43","field":"__created__","from":"","to":"Log historii bywa nieśledzony w gicie — bramka na zapisie traci przesłankę","actor":"unknown","source":"boot"}
 {"id":"01M1GFKZK5MG6EA1NRJJ23SHGJ","ts":"2026-09-02T07:16:31.461Z","task":"TL-43","field":"title","from":"Log historii bywa nieśledzony w gicie — bramka na zapisie traci przesłankę","to":"The history log sometimes goes untracked in git — the write-time gate loses its premise","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK5865RTPZ49JN5DRAJ","ts":"2026-09-02T07:16:31.461Z","task":"TL-43","field":"epic","from":"Historia i atrybucja","to":"History and attribution","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GWYN528VR6Z1S2JZ5CXFH3","ts":"2026-09-02T11:09:32.706Z","task":"TL-43","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1GWYN52WCFEY6WDYRQ16710","ts":"2026-09-02T11:09:32.706Z","task":"TL-43","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1GX7Z7SF91JTM675D91H1FP","ts":"2026-09-02T11:14:37.945Z","task":"TL-43","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

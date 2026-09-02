@@ -6,18 +6,23 @@ labels: []
 board: main
 epic: "History and attribution"
 priority: P2
-status: pending
-owner: unassigned
+status: done
+owner: agent:claude
 estimate: 2h
 confidence: medium
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-02
 blocked_by: []
 blocks: []
 related_docs:
   - docs/backlog-field-editing-history.md
 verification:
-  - bash: "node scripts/cli.mjs check --history"
+  - id: guard-behaviour
+    bash: "node --test scripts/tests/history-tracked.test.mjs"
+  - id: this-tree
+    bash: "node scripts/cli.mjs check --history"
+  - id: in-the-default-run
+    bash: "node scripts/cli.mjs check --help | grep -q -- '--history' && echo 'the selector is documented — OK'"
 ---
 
 ## Goal
@@ -71,15 +76,70 @@ incomplete data.
 
 ## Acceptance criteria
 
-- [ ] An untracked history log is reported with its file name and a nonzero
-      exit.
-- [ ] Outside a git repository the command does **not pretend** it checked —
-      it says there is nothing to check, and that is visible in the output.
-- [ ] Positive control: a repository with one untracked log fails, the same
-      repository after `git add` passes.
-- [ ] An orphaned log (without a task) is recognized separately from an
-      untracked one — these are two different defects, and conflating them
-      obscures both.
+One line each: the parser reads the `- [ ]` line and nothing under it (TL-118).
+
+- [x] An untracked history log is reported with its file name and a nonzero exit. [proof: guard-behaviour]
+- [x] Outside a git repository the command says there is nothing to check, and does NOT print a tick it did not earn. [proof: guard-behaviour]
+- [x] Positive control: a repository with one untracked log fails, and the same repository passes after `git add`. [proof: guard-behaviour]
+- [x] An orphaned log — one with no task — is counted apart from an untracked one. [proof: guard-behaviour]
+- [x] The guard runs in a bare `check`, and `--history` selects it alone. [proof: guard-behaviour, in-the-default-run]
+- [x] This repository passes its own guard. [proof: this-tree, guard-behaviour]
+
+## Decision (2026-09-02)
+
+**Yes, it is the tool's job — as a guard that is honest about git rather than
+one that assumes it.** Step 1 asks the question and the answer turns on the
+second half of it: `--dir` may point outside any repository, so the guard says
+"not a git repository — nothing to check about tracking" and exits 0. It does
+NOT print a tick, because a tick is a claim that the logs are safely versioned,
+and a run that never looked at a repository has not earned one.
+
+**The failure condition is the ASYMMETRY, not the absence, and that settles step
+4.** "This log is untracked" is not by itself a defect: a backlog nobody has
+committed yet has no tracked anything, and a guard failing there would make
+`check` red on a fresh `init` — the worst possible first minute with the tool.
+What IS a defect is a log untracked while its OWN task file is tracked, because
+that pair can only mean the log was left behind. Stated that way the guard is
+safe in the default run, which is where it has to be: a guard wired to nothing
+passes every test of its own, and this repository has a test with that exact
+name.
+
+**An orphan reports and does not fail, and this tree contains the reason.**
+`backlog/history/TL-1546.jsonl` has no task, and its single row is a
+`__deleted__` tombstone from the renumbering — a legitimate record of a task
+that no longer exists. Failing on it would demand deleting an append-only log to
+make a guard green. The other common orphan is a task living on another branch,
+which is the whole point of data travelling with branches. Both are counted
+apart from the untracked ones: one is somebody's other branch, the other is
+somebody's missing commit, and a single number would hide both.
+
+**A defect the first test run caught in the guard itself.** `git rev-parse
+--show-toplevel` answers with the REAL path, and on macOS `/var` is a symlink to
+`/private/var` — so in a temporary directory the repository root and the backlog
+root shared no prefix, every path computed as `../../..`, nothing matched `git
+ls-files`, and the guard read that as "nothing is tracked" and passed. It was
+green for the same reason an empty sample is green: an empty set has no
+asymmetry in it. Both roots now go through `realpathSync`.
+
+**Step 5 is out of reach and is not silently dropped.** The 28 untracked logs
+were measured in `origin`, a repository this one was extracted from and
+cannot touch. What this task can deliver is the guard that finds them, and it
+does; running it there is somebody's command in that tree, not a change to this
+one. This repository's own 157 logs are all tracked, which is what the
+`this-tree` verification asserts.
+
+## Verification
+
+```bash
+# 1. The guard's behaviour, against real repositories — expected: pass
+node --test scripts/tests/history-tracked.test.mjs
+
+# 2. This tree passes — expected: every log tracked
+node scripts/cli.mjs check --history
+
+# 3. The selector is documented — expected: OK message
+node scripts/cli.mjs check --help | grep -q -- '--history' && echo 'the selector is documented — OK'
+```
 
 ## Notes
 

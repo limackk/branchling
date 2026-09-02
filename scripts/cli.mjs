@@ -52,6 +52,12 @@ const CHECK_USAGE = [
   "  --criteria           only whether every acceptance criterion names the `verification:`",
   "                       entry that proves it; how hard it judges a MISSING link comes from",
   "                       `criteria_links` in config.yaml (off / warn / require)",
+  "  --history            only whether the history logs reach git. It FAILS on a log",
+  "                       left untracked while its own task file is tracked — that pair",
+  "                       can only mean the log was left behind, and another tree then",
+  "                       sees a task with no history. A backlog nobody has committed",
+  "                       yet passes, and outside git the command says so rather than",
+  "                       printing a tick it did not earn",
   "  --reasons            only which recorded transitions into a status named by",
   "                       `reason_required_statuses` carry no reason. It REPORTS and never",
   "                       fails: the gaps it finds are in the past, and the rule is enforced",
@@ -751,7 +757,7 @@ function runScript(script, args, colorForce = null) {
  * evidential force. The dispatcher supplies the mode so that nobody has to
  * remember it.
  */
-const CHECK_FLAGS = ["--dir", "--id-collisions", "--boards", "--refs", "--criteria", "--reasons", "--vocabulary", "--plan", "--language", "--product-name"];
+const CHECK_FLAGS = ["--dir", "--id-collisions", "--boards", "--refs", "--criteria", "--reasons", "--history", "--vocabulary", "--plan", "--language", "--product-name"];
 
 /** PURE — resolves `check`'s arguments. Throws on a usage error. */
 export function parseCheckArgs(args) {
@@ -761,6 +767,7 @@ export function parseCheckArgs(args) {
   let wantRefs = false;
   let wantCriteria = false;
   let wantReasons = false;
+  let wantHistory = false;
   let wantVocabulary = false;
   let wantPlan = false;
   let wantLanguage = false;
@@ -779,6 +786,7 @@ export function parseCheckArgs(args) {
     if (a === "--refs") { wantRefs = true; continue; }
     if (a === "--criteria") { wantCriteria = true; continue; }
     if (a === "--reasons") { wantReasons = true; continue; }
+    if (a === "--history") { wantHistory = true; continue; }
     if (a === "--vocabulary") { wantVocabulary = true; continue; }
     if (a === "--plan") { wantPlan = true; continue; }
     if (a === "--language") { wantLanguage = true; continue; }
@@ -804,11 +812,13 @@ export function parseCheckArgs(args) {
   // No selector means all of them. A new guard joins the default run on purpose
   // (BL-1451): a dangling reference passed `check`, because `check` checked only
   // what somebody had once written into it.
-  if (!wantIds && !wantBoards && !wantRefs && !wantCriteria && !wantReasons && !wantVocabulary && !wantPlan && !wantLanguage && !wantProductName) {
+  if (!wantIds && !wantBoards && !wantRefs && !wantCriteria && !wantReasons && !wantHistory &&
+      !wantVocabulary && !wantPlan && !wantLanguage && !wantProductName) {
     wantIds = true; wantBoards = true; wantRefs = true; wantCriteria = true; wantReasons = true;
+    wantHistory = true;
     wantVocabulary = true; wantPlan = true; wantLanguage = true; wantProductName = true;
   }
-  return { dir, wantIds, wantBoards, wantRefs, wantCriteria, wantReasons, wantVocabulary, wantPlan, wantLanguage, wantProductName, files };
+  return { dir, wantIds, wantBoards, wantRefs, wantCriteria, wantReasons, wantHistory, wantVocabulary, wantPlan, wantLanguage, wantProductName, files };
 }
 
 function runCheck(args) {
@@ -867,6 +877,13 @@ function runCheck(args) {
     // whole history and needs the configuration to know which statuses require a
     // reason at all.
     worst = Math.max(worst, runScript("check-backlog-reasons.mjs", ["--dir", join(tasksDir, "..")]));
+  }
+  if (plan.wantHistory) {
+    // The backlog directory, like the two guards above. This one also asks git,
+    // which is why it is the only guard whose answer depends on something
+    // outside the backlog directory at all — and why it says so when there is no
+    // git to ask.
+    worst = Math.max(worst, runScript("check-backlog-history-tracked.mjs", ["--dir", join(tasksDir, "..")]));
   }
   if (plan.wantVocabulary) {
     // The backlog directory through --dir, like the reference guard: it judges the
