@@ -1,0 +1,5 @@
+{"id":"01M1H46EK4N31D5QD47T2Y64YY","ts":"2026-09-02T13:16:08.164Z","task":"TL-164","field":"__created__","from":"","to":"A history entry carries no session id, so a change can only be guessed at","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1H477S1YRWD1X6HSFE6PJM8","ts":"2026-09-02T13:16:33.953Z","task":"TL-164","field":"priority","from":"P1","to":"P2","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1H477S16GT7N7SFK76GC277","ts":"2026-09-02T13:16:33.953Z","task":"TL-164","field":"type","from":"task","to":"bug","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1H477S1C7X6QZRH7AH44GA5","ts":"2026-09-02T13:16:33.953Z","task":"TL-164","field":"estimate","from":"2h","to":"4h","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1H477S1QZYA2JG3Y7CWXZTP","ts":"2026-09-02T13:16:33.953Z","task":"TL-164","field":"epic","from":"","to":"History and attribution","actor":"unknown","source":"external","reason":"unknown"}

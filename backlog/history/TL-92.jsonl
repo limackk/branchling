@@ -3,3 +3,6 @@
 {"id":"01M1F5BNKGP9G6JHBPMXZ7WA1T","ts":"2026-09-01T18:57:58.896Z","task":"TL-92","field":"blocked_by","from":["TL-1425"],"to":["TL-28"],"actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK5RRH4AAANT8JFX2DN","ts":"2026-09-02T07:16:31.461Z","task":"TL-92","field":"title","from":"worktrail session — raport z sesji agenta","to":"worktrail session — report from an agent's session","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK5VYRTM1XSGKKVV86F","ts":"2026-09-02T07:16:31.461Z","task":"TL-92","field":"epic","from":"Wyróżniki agentowe","to":"Agentic differentiators","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1H41RD11KBA2JKMVVSHKADT","ts":"2026-09-02T13:13:34.369Z","task":"TL-92","field":"status","from":"blocked","to":"in_progress","actor":"agent:claude","source":"next","reason":"left `blocked`: every task it named is closed (TL-28)"}
+{"id":"01M1H41RD18FH119CK2M5JW2X0","ts":"2026-09-02T13:13:34.369Z","task":"TL-92","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"left `blocked`: every task it named is closed (TL-28)"}
+{"id":"01M1H4G9A2J3E00VR8SDS6F2CB","ts":"2026-09-02T13:21:30.434Z","task":"TL-92","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

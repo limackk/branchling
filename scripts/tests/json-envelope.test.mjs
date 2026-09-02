@@ -99,6 +99,14 @@ const READING = {
   // find, and the envelope still has to carry every key rather than dropping
   // the sections that came back empty.
   audit: ["audit", "--json"],
+  // A backlog with no heartbeats (TL-92): zero sessions still has to be a
+  // complete envelope, `correlation` included — that key states a limit of the
+  // ANSWER, so dropping it when the list is empty would drop the caveat with it.
+  sessions: ["sessions", "--json"],
+  // Asking about a session the fixture does not have: "not found" is an ANSWER
+  // and still an envelope, with `session: null` and a non-zero exit. A consumer
+  // must not have to parse stderr to learn that.
+  session: ["session", "no-such-session", "--json"],
 };
 
 /**

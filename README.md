@@ -339,6 +339,30 @@ worktrail doctor --json | jq -e '.ok'          # a gate in CI
 worktrail done TASK-42 --json | jq '.entries[] | select(.ok | not)'
 ```
 
+### The morning after a fleet of agents worked
+
+```bash
+worktrail sessions --since 2026-09-02     # who worked, on what, for how long
+worktrail session <id>                    # one session's narrative
+```
+
+**A session that moved nothing is listed, marked `nothing moved`.** That is the
+finding — it worked and closed nothing — and a report that quietly dropped those
+would be one you could not trust to be complete.
+
+Both commands only read: the heartbeats and the field changes are already
+recorded, and the minutes come from the same clustering every other report uses.
+Field changes are matched to a session by task and **time window**, because the
+history log carries no session id yet; every answer says so rather than implying
+a certainty it does not have.
+
+Tokens, when something records them, are reported **per model** and never as one
+total: `280k tokens` means three different things for a frontier model over an
+API, an agent on a subscription, and a local model on a laptop. Nothing here
+records them yet — and an absent section is not a zero.
+
+---
+
 ### Is the "done" actually done
 
 `worktrail check` judges structure and fails a commit. `worktrail audit` judges

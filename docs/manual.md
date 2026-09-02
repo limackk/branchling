@@ -540,6 +540,8 @@ implementation detail. Every reading command answers in the same envelope:
 | `<command> --help` | `command-help` | `command`, `summary`, `usage`, `configured`, `flags` |
 | `pr-summary` | `pr-summary` | `base`, `scanned`, `reason`, `tasks`, `engaged`, `cost` |
 | `audit` | `audit` | `since`, `dayZero`, `tasks`, `findings`, `closedWithoutTrace`, `skippedBeforeSince`, `reopened`, `rework`, `parked`, `withoutPremise` |
+| `sessions` | `sessions` | `correlation`, `total`, `sessions` |
+| `session` | `session` | `correlation`, `session` |
 
 **`--help --json` describes how to CALL a command** (TL-83), which is the other
 half of Law 4: the reading commands answer in JSON, and so does the description

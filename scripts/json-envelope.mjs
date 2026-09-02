@@ -67,6 +67,12 @@ export const KINDS = {
   // `audit --json` (TL-90). `since` and `dayZero` are what makes an empty
   // `closedWithoutTrace` readable: the log has a first day, and everything
   // before it left no trace for a reason that is nobody's fault.
+  // `sessions --json` and `session <id> --json` (TL-92). `correlation` is on
+  // both because it is a limit of the ANSWER, not a detail of one field: field
+  // changes are matched to a session by task and time window, since the history
+  // log carries no session id.
+  sessions: { correlation: null, total: null, sessions: [] },
+  session: { correlation: null, session: null },
   audit: {
     since: null, dayZero: null, tasks: null, findings: null,
     closedWithoutTrace: [], skippedBeforeSince: null, reopened: [], rework: [],
