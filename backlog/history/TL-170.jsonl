@@ -1,0 +1,4 @@
+{"id":"01M1HSMRP659HH71WF6DCC5BMM","ts":"2026-09-02T19:30:57.350Z","task":"TL-170","field":"__created__","from":"","to":"A done refused on a manual entry leaves nothing behind","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1HSNRS2PYW5NP1YAKTR6SEH","ts":"2026-09-02T19:31:30.210Z","task":"TL-170","field":"estimate","from":"2h","to":"4h","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1HSNRS2MF8F3H0Z5V8K62Z8","ts":"2026-09-02T19:31:30.210Z","task":"TL-170","field":"epic","from":"","to":"Agentic differentiators","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1HSNRS285F97RD8S8Z5E2DY","ts":"2026-09-02T19:31:30.210Z","task":"TL-170","field":"related_docs","from":[],"to":["docs/worktrail-state-and-sync.md"],"actor":"unknown","source":"external","reason":"unknown"}
