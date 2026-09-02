@@ -1,3 +1,6 @@
 {"id":"01M1EED0N34H1XNBVDE0RT7VD0","ts":"2026-09-01T12:16:45.731Z","task":"TL-118","field":"__created__","from":"","to":"Kryterium zawinięte do drugiej linii gubi tekst i [proof:]","actor":"agent:claude","source":"manual","reason":"task zalozony z defektu zmierzonego przy TL-1497"}
 {"id":"01M1GFKZK590BMX0F9QFDD94VN","ts":"2026-09-02T07:16:31.461Z","task":"TL-118","field":"title","from":"Kryterium zawinięte do drugiej linii gubi tekst i [proof:]","to":"A criterion wrapped onto a second line loses text and [proof:]","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK50VCYGES1BEMMX46C","ts":"2026-09-02T07:16:31.461Z","task":"TL-118","field":"epic","from":"Integralność danych","to":"Data integrity","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1HA5Z9BKB2XWT8NXYXXY7VT","ts":"2026-09-02T15:00:43.947Z","task":"TL-118","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1HA5Z9BBYRDJ1QDD2FDGEB4","ts":"2026-09-02T15:00:43.947Z","task":"TL-118","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1HAB8Q1YR3352DRMYZWA68D","ts":"2026-09-02T15:03:37.441Z","task":"TL-118","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

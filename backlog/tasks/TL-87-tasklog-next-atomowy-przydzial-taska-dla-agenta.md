@@ -113,14 +113,22 @@ do not pretend to provide it here.
 
 ## Acceptance criteria
 
-- [x] Two parallel `next` calls never return the same task — a test with real concurrency, not sequential. [proof: suite]
-- [x] `take` on a task locked by another session refuses with a message and error code; it does not overwrite someone else's lock. [proof: suite]
-- [x] `next` is implemented as selection + `take` — there is no second reservation path (import test). [proof: suite]
-- [x] A task blocked by an unresolved `blocked_by` is not handed out. [proof: suite]
-- [x] `--actor` without a namespace fails (consistent with TL-21). [proof: suite]
-- [x] An empty backlog / no candidate gives an unambiguous message, not silence. [proof: suite]
-- [x] The event for taking a task is in `history/` with the correct actor. [proof: suite]
-- [x] The rest of the tool does not regress under concurrent writes. [proof: no-regression]
+- [x] Two parallel `next` calls never return the same task — a test with real
+      concurrency, not sequential. [proof: suite]
+- [x] `take` on a task locked by another session refuses with a message and
+      error code; it does not overwrite someone else's lock. [proof: suite]
+- [x] `next` is implemented as selection + `take` — there is no second
+      reservation path (import test). [proof: suite]
+- [x] A task blocked by an unresolved `blocked_by` is not handed out.
+      [proof: suite]
+- [x] `--actor` without a namespace fails (consistent with TL-21).
+      [proof: suite]
+- [x] An empty backlog / no candidate gives an unambiguous message, not silence.
+      [proof: suite]
+- [x] The event for taking a task is in `history/` with the correct actor.
+      [proof: suite]
+- [x] The rest of the tool does not regress under concurrent writes.
+      [proof: no-regression]
 
 The criterion "taking outside the role is recorded in the event, never
 blocked" was MOVED to [TL-97](TL-97-pole-role-taska-wymog-roli-ze-slownika-konfiguracji.md),

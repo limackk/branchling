@@ -6,11 +6,11 @@ labels: []
 board: main
 epic: "Data integrity"
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 estimate: 2h
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-02
 blocked_by: []
 blocks: []
 related_docs: []
@@ -86,9 +86,9 @@ Decisions still to be made in this task, not settled in advance:
 
 ## Acceptance criteria
 
-- [ ] A criterion wrapped onto two lines with `[proof: x]` at the end is checked off by `done`. [proof: wrapped]
-- [ ] The criterion's text in the `check --criteria` report covers all its lines, not just the first. [proof: wrapped]
-- [ ] Positive control: a wrapped criterion WITHOUT `[proof:]` is still reported as unlinked. [proof: wrapped]
-- [ ] The checkoff lands on the line with `- [ ]`, and the file is otherwise unchanged byte-for-byte except that mark. [proof: wrapped]
-- [ ] `check --criteria` passes on this repository. [proof: tree]
+- [x] A criterion wrapped onto two lines with `[proof: x]` at the end is checked off by `done`. [proof: wrapped]
+- [x] The criterion's text in the `check --criteria` report covers all its lines, not just the first. [proof: wrapped]
+- [x] Positive control: a wrapped criterion WITHOUT `[proof:]` is still reported as unlinked. [proof: wrapped]
+- [x] The checkoff lands on the line with `- [ ]`, and the file is otherwise unchanged byte-for-byte except that mark. [proof: wrapped]
+- [x] `check --criteria` passes on this repository. [proof: tree]
 </content>

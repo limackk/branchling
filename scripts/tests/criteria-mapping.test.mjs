@@ -339,3 +339,124 @@ test("this repository's own template demonstrates a link, not just describes it"
     for (const p of item.proofs) assert.ok(ids.has(p), `the template names a proof \`${p}\` it does not define`);
   }
 });
+
+// ── A criterion that wraps onto a second line (TL-118) ────────────────────
+//
+// Wrapping at eighty columns is the NORM in this format, and the one-line
+// reader that used to stand in `parseCriteria` saw only the first line: the
+// rest of the sentence vanished from every report and the `[proof:]` at the end
+// of the last line vanished with it. Measured on this repository the moment the
+// fix landed: 15 links appeared that had been written all along, and four tasks
+// stopped being reported as unlinked. `check --criteria` was stating an untruth
+// about correctly written tasks — under `criteria_links: require` it would have
+// FAILED them, and a guard that fails on correct data is a guard people
+// switch off.
+
+const wrapped = [
+  "## Acceptance criteria",
+  "",
+  "- [ ] The first half of a sentence and",
+  "      the second half of it. [proof: suite]",
+  "- [ ] A criterion on three lines that goes",
+  "      on, and on,",
+  "      and finally ends. [proof: suite]",
+  "- [ ] One that wraps and names",
+  "      no proof at all.",
+  "",
+].join("\n");
+
+test("a wrapped criterion is read WHOLE, proof and all", () => {
+  const { items } = parseCriteria(wrapped);
+  assert.equal(items.length, 3);
+  assert.equal(items[0].text, "The first half of a sentence and the second half of it.");
+  assert.deepEqual(items[0].proofs, ["suite"]);
+  assert.equal(items[1].text, "A criterion on three lines that goes on, and on, and finally ends.");
+  assert.deepEqual(items[1].proofs, ["suite"]);
+});
+
+test("POSITIVE CONTROL: a wrapped criterion with no proof is still reported", () => {
+  // Without this the fix could be "treat everything as linked", which passes
+  // every other assertion here and destroys the guard.
+  const { items } = parseCriteria(wrapped);
+  assert.deepEqual(items[2].proofs, []);
+  assert.equal(items[2].text, "One that wraps and names no proof at all.");
+  const audit = auditTask({
+    frontmatter: 'verification:\n  - id: suite\n    bash: "true"\n',
+    body: wrapped,
+  });
+  assert.equal(audit.warnings.length, 1, JSON.stringify(audit.warnings));
+  assert.match(audit.warnings[0], /One that wraps and names no proof at all\./);
+});
+
+test("the report quotes the WHOLE criterion, not its first line", () => {
+  const audit = auditTask({
+    frontmatter: 'verification:\n  - id: suite\n    bash: "true"\n',
+    body: "## Acceptance criteria\n\n- [ ] A sentence broken\n      across two lines.\n",
+  });
+  assert.match(audit.warnings.join("\n"), /A sentence broken across two lines\./);
+});
+
+test("what ENDS a criterion: a blank line, a new item, a heading, an unindented line", () => {
+  const { items } = parseCriteria([
+    "## Acceptance criteria",
+    "",
+    "- [ ] First one,",
+    "      continued. [proof: a]",
+    "",
+    "      This paragraph follows a blank line and is NOT part of it.",
+    "- [ ] Second one. [proof: b]",
+    "unindented prose, which is not a continuation either",
+    "",
+    "## Log",
+    "",
+    "- [ ] not a criterion, it is past the heading",
+  ].join("\n"));
+  assert.equal(items.length, 2);
+  assert.equal(items[0].text, "First one, continued.");
+  assert.equal(items[1].text, "Second one.");
+});
+
+test("`[proof:]` counts at the end of the LAST line and nowhere else", () => {
+  const { items } = parseCriteria([
+    "## Acceptance criteria",
+    "",
+    "- [ ] It names its proof [proof: middle] and then keeps",
+    "      talking.",
+  ].join("\n"));
+  assert.deepEqual(items[0].proofs, [], "one position, not two — see the comment in parseCriteria");
+});
+
+test("the tick lands on the `- [ ]` line, and the file is otherwise byte-identical", () => {
+  const raw = [
+    "---",
+    "id: MAP-1",
+    'verification:',
+    "  - id: suite",
+    '    bash: "true"',
+    "---",
+    "",
+    "## Acceptance criteria",
+    "",
+    "- [ ] A sentence broken",
+    "      across two lines. [proof: suite]",
+    "",
+  ].join("\n");
+  const { text, ticked } = applyProofs(raw, ["suite"]);
+  assert.deepEqual(ticked, ["A sentence broken across two lines."]);
+  const before = raw.split("\n");
+  const after = text.split("\n");
+  assert.equal(before.length, after.length);
+  for (let i = 0; i < before.length; i++) {
+    if (i === 9) {
+      assert.equal(after[i], "- [x] A sentence broken", "the tick must land on the item line");
+    } else {
+      assert.equal(after[i], before[i], "line " + i + " changed and must not have");
+    }
+  }
+});
+
+test("a criterion knows both its first line and its last", () => {
+  const { items } = parseCriteria("## Acceptance criteria\n\n- [ ] One\n      two\n      three. [proof: a]\n");
+  assert.equal(items[0].line, 2);
+  assert.equal(items[0].endLine, 4);
+});

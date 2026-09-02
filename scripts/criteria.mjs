@@ -140,9 +140,12 @@ export function parseVerification(frontmatter) {
  * The items of the `## Acceptance criteria` list.
  *
  * @param {string} body everything after the frontmatter
- * @returns {{present: boolean, items: Array<{text: string, checked: boolean, proofs: string[], line: number}>}}
+ * @returns {{present: boolean, items: Array<{text: string, checked: boolean, proofs: string[], line: number, endLine: number}>}}
  *          `present` distinguishes "the section is missing" from "the section is
  *          empty" — both are defects, but not the same one.
+ *          `line` is the `- [ ]` line and `endLine` the last line of the
+ *          criterion; they differ when the sentence wraps, and only `line` may
+ *          ever be written to.
  */
 export function parseCriteria(body) {
   const lines = String(body || "").split(/\r?\n/);
@@ -154,23 +157,56 @@ export function parseCriteria(body) {
   }
   if (start < 0) return { present: false, items };
 
-  for (let i = start; i < lines.length; i++) {
-    const raw = lines[i];
-    if (/^#{2,}\s+\S/.test(raw)) break;                // the next section
-    const m = raw.match(/^\s*-\s*\[([ xX])\]\s*(.*)$/);
-    if (!m) continue;
-    const rest = m[2];
-    const marker = rest.match(/\[proof:\s*([^\]]*)\]\s*$/);
-    const proofs = marker
+  // A CRITERION MAY WRAP (TL-118). Wrapping at eighty columns is the norm in
+  // this format, not an exception, and the one-line reader that stood here saw
+  // only the first line: the rest of the sentence vanished from every report,
+  // and a `[proof:]` at the end of the last line vanished with it — so
+  // `check --criteria` said "criterion with no proof" about a criterion that
+  // named one. A guard that fails on correct data is a guard people switch off.
+  //
+  // WHAT ENDS A CRITERION: a blank line, a new list item, a heading, or an
+  // unindented line. That is the markdown rule for a list item's continuation,
+  // and it is deliberately the same shape `parseVerification` above uses for a
+  // multi-line entry. Lazy continuation — an UNindented following line — is not
+  // accepted, because at that point a criterion and the prose after the list
+  // become indistinguishable.
+  //
+  // WHERE `[proof:]` MAY STAND: at the end of the LAST line, which is where a
+  // person writes it. One place rather than two: a second permitted position
+  // buys nothing and makes the rule harder to state than to follow.
+  let current = null;
+  const close = () => {
+    if (!current) return;
+    const joined = current.parts.join(" ").replace(/\s+/g, " ").trim();
+    const marker = joined.match(/\[proof:\s*([^\]]*)\]\s*$/);
+    current.item.proofs = marker
       ? marker[1].split(",").map((s) => s.trim()).filter(Boolean)
       : [];
-    items.push({
-      text: (marker ? rest.slice(0, marker.index) : rest).trim(),
-      checked: m[1] !== " ",
-      proofs,
-      line: i,
-    });
+    current.item.text = (marker ? joined.slice(0, marker.index) : joined).trim();
+    items.push(current.item);
+    current = null;
+  };
+
+  for (let i = start; i < lines.length; i++) {
+    const raw = lines[i];
+    if (/^#{2,}\s+\S/.test(raw)) { close(); break; }   // the next section
+    const m = raw.match(/^\s*-\s*\[([ xX])\]\s*(.*)$/);
+    if (m) {
+      close();
+      // `line` stays the index of the `- [ ]` line and of no other: it is what
+      // `applyProofs` writes the tick onto, and a tick landing on a
+      // continuation would corrupt the sentence instead of marking it.
+      current = { item: { text: "", checked: m[1] !== " ", proofs: [], line: i, endLine: i }, parts: [m[2]] };
+      continue;
+    }
+    if (!current) continue;
+    // A list item that is not a criterion, or an unindented line, or a blank
+    // one: the criterion ended at the line before.
+    if (!raw.trim() || !/^\s/.test(raw) || /^\s*-\s/.test(raw)) { close(); continue; }
+    current.parts.push(raw.trim());
+    current.item.endLine = i;
   }
+  close();
   return { present: true, items };
 }
 
