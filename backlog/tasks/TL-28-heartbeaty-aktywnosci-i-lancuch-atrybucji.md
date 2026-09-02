@@ -6,20 +6,25 @@ labels: [post-launch]
 board: main
 epic: "Backlog — work time measurement"
 priority: P2
-status: pending
-owner: unassigned
+status: done
+owner: agent:claude
 estimate: 1d
 confidence: low
 created: 2026-08-30
-updated: 2026-08-30
+updated: 2026-09-02
 blocked_by: [TL-27]
 blocks: [TL-29, TL-30, TL-31, TL-92]
 related_docs:
   - docs/backlog-time-tracking.md
 verification:
-  - bash: "node --test backlog/scripts/tests/cluster.test.mjs backlog/scripts/tests/attribution.test.mjs"
-  - bash: "node backlog/scripts/cli.mjs time --engaged --json | python3 -c \"import json,sys; d=json.load(sys.stdin); assert 'unknown_ratio' in d, 'report missing the unknown share'; print('unknown:', d['unknown_ratio'])\""
-  - bash: "python3 -c \"import json,sys; h=json.load(open('.claude/settings.json'))['hooks']['PostToolUse']; ms=[e.get('matcher','') for e in h]; assert any(m in ('','*') or 'Bash' in m for m in ms), f'activity adapter does not see Bash: {ms}'; print('matcher covers Bash — OK')\""
+  - id: cluster-and-attribution
+    bash: "node --test scripts/tests/cluster.test.mjs scripts/tests/attribution.test.mjs"
+  - id: unknown-share
+    bash: "node scripts/cli.mjs time --engaged --json | python3 -c \"import json,sys; d=json.load(sys.stdin); assert 'unknown_ratio' in d, 'report missing the unknown share'; print('unknown:', d['unknown_ratio'])\""
+  - id: matcher-covers-bash
+    bash: "python3 -c \"import json,sys; h=json.load(open('.claude/settings.json'))['hooks']['PostToolUse']; ms=[e.get('matcher','') for e in h]; assert any(m in ('','*') or 'Bash' in m for m in ms), f'activity adapter does not see Bash: {ms}'; print('matcher covers Bash — OK')\""
+  - id: unknown-flag-fails
+    bash: "node scripts/cli.mjs activity record --frobnicate 2>/dev/null; test $? -eq 2 && echo 'unknown flag fails — OK'"
 ---
 
 ## Goal
@@ -121,55 +126,85 @@ takes one task.
 
 ## Acceptance criteria
 
-- [ ] The hook matcher covers `Bash` (and the rest of the tools), not only
-      `Edit|Write|MultiEdit` — there is a gate for this in Verification.
-- [ ] Throttling works: N tool calls within one interval produce one row,
-      not N.
-- [ ] A single-element cluster counts as 0 minutes and appears in the report
-      as a separate figure.
-- [ ] A gap exactly equal to `idle_gap_minutes` has a decided and tested
-      behavior.
-- [ ] Heartbeats out of chronological order give the same result as sorted
-      ones.
-- [ ] A session without "closure" (no final heartbeat) does not produce
-      infinite time.
-- [ ] Two parallel sessions on one task give a sum of effort ≠ calendar
-      span; both figures are in the report.
-- [ ] Writing `status: in_progress` sets the session focus — there is a test
-      for this.
-- [ ] Attribution does NOT read global `in_progress` state (45 tasks) —
-      there is a negative test for this: two tasks `in_progress` in two
-      sessions do not mix.
-- [ ] The attribution chain has a test for EACH of the five legs.
-- [ ] `unknown_ratio` is always in the report, even when it is 0.
-- [ ] `worktrail activity record` works without Claude Code (a test calling
-      the CLI alone).
-- [ ] The hook does not trigger a loop and stays silent when there is no
-      match.
-- [ ] `qa/backlog-time-tracking.yaml` extended with clustering and
-      attribution cases.
+Each criterion is on ONE line, and that is not formatting: the parser reads the
+`- [ ]` line and nothing under it, so a `[proof:]` marker wrapped onto a second
+line is invisible to it (TL-118). Wrapping them and linking them are mutually
+exclusive until that is fixed, and a linked criterion is worth more than a
+tidy one.
+
+- [x] The hook matcher covers `Bash` and the rest of the tools, not only `Edit|Write|MultiEdit`. [proof: matcher-covers-bash, cluster-and-attribution]
+- [x] Throttling works: N tool calls within one interval produce one row, not N. [proof: cluster-and-attribution]
+- [x] A single-element cluster counts as 0 minutes and appears in the report as a separate figure. [proof: cluster-and-attribution]
+- [x] A gap exactly equal to `idle_gap_minutes` has a decided and tested behavior. [proof: cluster-and-attribution]
+- [x] Heartbeats out of chronological order give the same result as sorted ones. [proof: cluster-and-attribution]
+- [x] A session without "closure" (no final heartbeat) does not produce infinite time. [proof: cluster-and-attribution]
+- [x] Two parallel sessions on one task give a sum of effort ≠ calendar span; both figures are in the report. [proof: cluster-and-attribution]
+- [x] Writing `status: in_progress` sets the session focus — there is a test for this. [proof: cluster-and-attribution]
+- [x] Attribution does NOT read global `in_progress` state — there is a negative test: two tasks `in_progress` in two sessions do not mix. [proof: cluster-and-attribution]
+- [x] The attribution chain has a test for EACH of the five legs. [proof: cluster-and-attribution]
+- [x] `unknown_ratio` is always in the report, even when it is 0. [proof: unknown-share, cluster-and-attribution]
+- [x] The `activity record` command works without Claude Code — a test calling the CLI alone. [proof: cluster-and-attribution]
+- [x] An unknown flag fails instead of being silently ignored. [proof: unknown-flag-fails, cluster-and-attribution]
+- [x] The hook does not trigger a loop and stays silent when there is no match. [proof: cluster-and-attribution]
+- [ ] `qa/backlog-time-tracking.yaml` extended with clustering and attribution cases.
+
+## Decision (2026-09-02)
+
+**The contract was rewritten to this repository's paths, and the reason is
+recorded here rather than done quietly.** The task was written in the repository
+this tool was extracted from, and it names `backlog/scripts/` — the layout where
+the code sat above the data. Here the code is in `scripts/` and the data in
+`backlog/`, so every command in `verification:` addressed a file that does not
+exist, and the contract could not be run at all. Nothing about its SUBSTANCE
+changed: the four questions it asks are the ones it always asked, and the fifth
+one (an unknown flag fails) was in the body's `## Verification` block and not in
+the frontmatter, so it was promoted rather than invented. This is the same
+correction TL-27 recorded for the same reason, and it is what TL-138 exists to
+stop happening one task at a time.
+
+**One criterion is left unticked on purpose.** `qa/backlog-time-tracking.yaml`
+has no counterpart in this repository — the scenario directory did not come
+across at extraction, and this repository keeps its evidence in `scripts/tests/`.
+Inventing a file to tick a line would be the opposite of what the criterion is
+for. TL-27 left the same criterion standing for the same reason.
+
+**The session pointer lives OUTSIDE the repository, not in a gitignored file as
+step 4 asks.** Two reasons, and both are the ones `lock.mjs` was moved for under
+TL-87. Every worktree has its own checkout, so a pointer written into the
+backlog would be a DIFFERENT file in each of them — "which task is this session
+on" would then be answered per tree instead of per session, which is precisely
+the global-state failure §8.1 disqualifies. And a raw activity log is somebody's
+working calendar: keeping its pointer out of every repository this tool is
+dropped into is a structural guarantee, where a `.gitignore` entry is a
+procedure every future user has to maintain (§9).
+
+**The branch leg now ignores case.** §8.1 records leg 4 as "does not fire at all
+in this repository" because branches are named `tl-<number>-<slug>` while the
+prefix is `TL`. That was written as an observation about naming; it is a defect
+in the leg. An id is an id whichever case a branch spells it in, and the id
+returned is always the canonical one from the configuration.
 
 ## Verification
 
 ```bash
 # 1. Cluster math and attribution — expected: pass, including edge cases
-node --test backlog/scripts/tests/cluster.test.mjs backlog/scripts/tests/attribution.test.mjs
+node --test scripts/tests/cluster.test.mjs scripts/tests/attribution.test.mjs
 
-# 2. Adapter sees Bash — expected: "matcher covers Bash — OK"
+# 2. The report ALWAYS gives the unknown share — expected: key present
+node scripts/cli.mjs time --engaged --json | python3 -c \
+  "import json,sys; d=json.load(sys.stdin); assert 'unknown_ratio' in d; print('unknown:', d['unknown_ratio'])"
+
+# 3. Adapter sees Bash — expected: "matcher covers Bash — OK"
 python3 -c "import json; h=json.load(open('.claude/settings.json'))['hooks']['PostToolUse']; \
   ms=[e.get('matcher','') for e in h]; \
   assert any(m in ('','*') or 'Bash' in m for m in ms), f'does not see Bash: {ms}'; print('matcher covers Bash — OK')"
 
-# 3. Core without a host — expected: row appended, exit code 0
-node backlog/scripts/cli.mjs activity record --task TL-28 --kind tool --actor local:founder
+# 4. An unknown flag fails instead of silently passing — expected: exit=2
+node scripts/cli.mjs activity record --frobnicate 2>/dev/null; test $? -eq 2 && echo 'unknown flag fails — OK'
+
+# 5. Core without a host — expected: row appended, exit code 0
+node scripts/cli.mjs activity record --task TL-28 --kind tool --actor local:founder
 tail -1 backlog/activity/TL-28.jsonl
-
-# 4. The report ALWAYS gives the unknown share — expected: key present
-node backlog/scripts/cli.mjs time --engaged --json | python3 -c \
-  "import json,sys; d=json.load(sys.stdin); assert 'unknown_ratio' in d; print('unknown:', d['unknown_ratio'])"
-
-# 5. An unknown flag fails instead of silently passing — expected: exit=2
-node backlog/scripts/cli.mjs activity record --frobnicate 2>/dev/null; test $? -eq 2 && echo 'unknown flag fails — OK'
 ```
 
 ## Notes

@@ -28,7 +28,8 @@
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { readActivity } from "./activity.mjs";
+import { listActivityTasks, readActivity } from "./activity.mjs";
+import { engagedReport } from "./cluster.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
@@ -38,7 +39,23 @@ import { MARK, color, failure, heading, table } from "./ui.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const KNOWN_FLAGS = ["--json", "--dir"];
+const KNOWN_FLAGS = ["--json", "--engaged", "--dir"];
+
+/**
+ * Which rows are evidence that somebody was AT THE KEYBOARD (TL-28).
+ *
+ * `commit` is excluded, and the reason is specific rather than tidy: almost
+ * every `commit` row in existence was BACKFILLED out of git by
+ * `backfill-completions`, which reconstructs an instant after the fact. A
+ * reconstructed stamp is evidence about a file, not about a person's presence,
+ * and admitting it would give every closed task a cluster of one — inflating
+ * the count of single-heartbeat clusters, which is the number §14 point 4 wants
+ * to settle the throttling threshold with.
+ *
+ * `reassign` is excluded because it is a CORRECTION to attribution (TL-31), not
+ * activity: counting it would make fixing a mistake look like doing more work.
+ */
+export const HEARTBEAT_KINDS = ["tool", "prompt", "edit"];
 
 /** The nearest-rank percentile, on a sorted array. PURE.
  *  Nearest-rank rather than interpolation: with a handful of tasks an
@@ -140,8 +157,58 @@ export function renderTime(stats, config, opts = {}) {
       " closed task(s) have no stamp and are outside every number above");
   }
   out.push("");
-  out.push("  " + paint.dim("This is calendar time, not time worked. Nothing here records how long"));
-  out.push("  " + paint.dim("anybody was at the keyboard; that measurement starts at the first heartbeat."));
+  out.push("  " + paint.dim("This is calendar time, not time worked. `--engaged` reports the measured"));
+  out.push("  " + paint.dim("time at the keyboard, from the heartbeats in `activity/`."));
+  return out.join("\n");
+}
+
+const mins = (v) => (v >= 60 ? (Math.round((v / 60) * 10) / 10) + "h" : Math.round(v) + "m");
+
+/**
+ * The engaged-time section. PURE, so a test reads it without a terminal.
+ *
+ * THE UNATTRIBUTED SHARE IS PRINTED BEFORE THE TASK TABLE, not after it. §8.2
+ * makes it a first-class number for a reason: a reader who sees the per-task
+ * minutes first has already believed them by the time a footnote says 60% of
+ * the time could not be placed. The order is the argument.
+ *
+ * SO IS THE COUNT OF SINGLE-HEARTBEAT CLUSTERS. Those are runs that measured
+ * zero minutes by rule 1 of §6 — real work that fell below the resolution the
+ * throttle allows. It is printed because §14 point 4 says the throttling window
+ * has to be settled from this number rather than from an opinion, and a number
+ * nobody prints is a number nobody will settle anything with.
+ */
+export function renderEngaged(engaged, opts = {}) {
+  const paint = opts.color || color;
+  const out = [];
+  out.push("");
+  out.push("  engaged time, measured from heartbeats:");
+  if (!engaged.tasks.length) {
+    out.push("  " + paint.dim("no heartbeats recorded yet — nothing has been measured."));
+    out.push("  " + paint.dim("Rows arrive from `" + N + " activity record`, wired to whatever host you use."));
+    return out.join("\n");
+  }
+  out.push(table([
+    ["    effort (sessions summed)", mins(engaged.minutes)],
+    ["    calendar (sessions merged)", mins(engaged.calendarMinutes)],
+    ["    unattributed share", (engaged.unknownRatio * 100).toFixed(1) + "% (" + mins(engaged.unknownMinutes) + ")"],
+    ["    runs too short to measure", String(engaged.singles)],
+  ]));
+  out.push("");
+  out.push(table(engaged.tasks.slice(0, 12).map((t) => [
+    "    " + t.task,
+    mins(t.minutes) + "  " + t.sessions + " session(s)" +
+      (t.unknownRatio > 0 ? "  " + (t.unknownRatio * 100).toFixed(0) + "% unattributed" : ""),
+  ])));
+  if (engaged.tasks.length > 12) {
+    out.push("  " + paint.dim("… and " + (engaged.tasks.length - 12) + " more — `--json` for all of them"));
+  }
+  if (engaged.unknownRatio > 0.3) {
+    out.push("");
+    out.push("  " + paint.warn(MARK.warn) + " more than 30% of the measured time is unattributed —");
+    out.push("    the attribution chain is at fault, not the data (§14 point 2). Check that");
+    out.push("    `" + N + " take` is what claims tasks here, or set `" + N + " focus <ID>`.");
+  }
   return out.join("\n");
 }
 
@@ -149,6 +216,7 @@ export function main(argv) {
   const cli = takeDirFlag(argv);
   const rest = cli.argv;
   const asJson = rest.includes("--json");
+  const wantEngaged = rest.includes("--engaged");
   const unknown = rest.filter((a) => !KNOWN_FLAGS.includes(a));
   if (unknown.length) {
     console.error(failure(N + " time", "unexpected argument: " + unknown.join(" "), [],
@@ -171,11 +239,23 @@ export function main(argv) {
   };
   const stats = timeStats(tasks, stampFor, config);
 
+  // The engaged report is computed WHETHER OR NOT `--engaged` was passed, and
+  // only the TEXT view is gated by the flag. `--json` is the extension surface
+  // (law 4), and a key that appears only when a flag was passed is a contract a
+  // consumer has to read the help to discover — the envelope's rule is that a
+  // declared key is always there.
+  const rowsByTask = {};
+  for (const id of listActivityTasks(root)) {
+    rowsByTask[id] = readActivity(root, id).filter((r) => r && HEARTBEAT_KINDS.indexOf(r.kind) >= 0);
+  }
+  const engaged = engagedReport(rowsByTask, { idleGapMinutes: config.idleGapMinutes });
+
   if (asJson) {
-    printJson("time", { root, ...stats });
+    printJson("time", { root, ...stats, engaged, unknown_ratio: engaged.unknownRatio });
     return 0;
   }
   console.log(renderTime(stats, config));
+  if (wantEngaged) console.log(renderEngaged(engaged));
   return 0;
 }
 

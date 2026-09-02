@@ -93,9 +93,22 @@ export const KINDS = {
   // `unstamped` is a LIST and not a count, for the reason `unplanned` is: the
   // tasks outside a measurement are the thing a reader has to be able to go and
   // look at, and a number cannot be acted on (TL-27).
+  // `engaged` and `unknown_ratio` are TL-28's: measured time at the keyboard,
+  // beside the calendar time the stamps give. `unknown_ratio` sits at the ROOT
+  // rather than inside `engaged` because §8.2 of docs/backlog-time-tracking.md
+  // makes it a first-class number of every report — a consumer must not have to
+  // walk into a nested object to find out whether the sum beside it can be
+  // trusted, and one that forgot to look would be reading a pretty sum.
+  //
+  // IT IS THE ONE SNAKE_CASE KEY IN THIS FILE, deliberately. It is the name the
+  // design document and the task's own contract give the statistic, the way
+  // `p80` is a name rather than a field; renaming it for house style would put
+  // the tool's only honesty signal under a word nothing else in the project
+  // uses.
   time: {
     root: null, closed: null, completed: null, unstamped: [],
     leadTimeDays: null, throughput: [], perWeekMean: null,
+    engaged: null, unknown_ratio: null,
   },
 };
 

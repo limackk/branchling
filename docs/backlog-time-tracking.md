@@ -426,7 +426,7 @@ before it closes.
    high or rule 1 is too strict — settled by the count of single-heartbeat
    clusters, which the report should surface for exactly this reason.
 
-## 12. What is implemented (2026-09-02, TL-27)
+## 15. What is implemented (2026-09-02, TL-27)
 
 This section is in English because it is new text; the rest of the document is
 translated by TL-137. What exists now:
@@ -450,10 +450,54 @@ translated by TL-137. What exists now:
   whole set at once, because an unknown key fails: adding them one task at a time
   would be four schema changes, each rejecting a config written for the next.
 
-**What is deliberately NOT implemented:** engaged time. Nothing here records how
-long anybody was at the keyboard. The stamps give calendar time only, and
-`worktrail time` says so on every report rather than leaving it to be worked out.
-That measurement starts at the first heartbeat and is TL-28's.
+## 16. What is implemented (2026-09-02, TL-28)
+
+Engaged time. The hole §15 named is closed; what fills it:
+
+- `scripts/cluster.mjs` — §6, as a PURE function with no disk access and no
+  imports, so it can be pasted into the viewer by source the way `estimate.mjs`
+  is. All three rules are tested as PAIRS — the case that must hold and the
+  smallest change that must flip it — because a clusterer with no window at all
+  passes every one-sided test of a window.
+- `scripts/attribution.mjs` — the five legs of §8, pure, with the leg that
+  settled each row written onto the row. **Leg 4 now ignores case**: §8.1
+  recorded it as "does not fire at all in this repository" because branches are
+  named `tl-<number>-<slug>` while the prefix is `TL`, and that is a defect in
+  the leg rather than a fact about branch naming.
+- `scripts/focus.mjs` and `worktrail focus` — legs 1 and 2, and the throttle
+  window. **The pointer lives outside the repository**, keyed like the locks by
+  the shared git directory plus the session, not in a gitignored file: every
+  worktree has its own checkout, so a pointer in the backlog would be a
+  different file in each of them and would answer per TREE rather than per
+  session — the global-state failure §8.1 disqualifies. It also keeps a person's
+  working calendar out of every repository this tool is dropped into by
+  construction rather than by a `.gitignore` somebody has to maintain (§9).
+- **Auto-focus in `take`** — §8.1's condition. Writing `status: in_progress`
+  sets THIS session's focus, best effort: a state directory that cannot be
+  written loses a leg of the chain, never a claim.
+- `scripts/activity-record.mjs` and `worktrail activity record` — the callable
+  input of §7. Flags are an instruction, a host payload on stdin is a hint. A
+  throttled call SUCCEEDS and writes nothing: the adapter fires after every tool
+  call, so an error there would be a banner over most of an editing session.
+- `scripts/activity-hook.sh` and `.claude/settings.json` — the adapter, wired to
+  **every** tool. The throttle is what makes the wide matcher affordable, and it
+  lives in the command rather than in the script because the window's value is
+  in `config.yaml` and because §7 expects more adapters than this one.
+- `worktrail time --engaged` — effort (sessions summed) beside calendar time
+  (sessions merged), the count of runs too short to measure, and
+  `unknown_ratio`, which `--json` carries whether or not `--engaged` was passed.
+
+**What §8.2 promised, and what it costs.** The unattributed share is printed
+first and is never omitted. Minutes are credited interval by interval to the
+heartbeat that CLOSES each interval, so a cluster whose rows the chain settled
+differently is split exactly rather than rounded to one answer — the parts sum
+to the whole, and a test asserts it.
+
+**What is still deliberately NOT implemented:** tokens (TL-30), calibration
+(TL-29), and retention, correction and the right to erasure (TL-31). The last of
+those is the one that matters: **this is the commit where personal data starts
+being produced**, and §9 makes TL-31 a condition of the module rather than a
+follow-up. It must not fall more than one iteration behind.
 
 **A limit that belongs to THIS repository, not to the tool.** The git history was
 flattened to a single commit at extraction ([`LINEAGE.md`](../LINEAGE.md)), so

@@ -43,9 +43,22 @@ import { eventId, isValidActor } from "./history.mjs";
  */
 export const ACTIVITY_KINDS = ["tool", "prompt", "commit", "edit", "reassign"];
 
-/** How the task on a row was decided (§8) — metadata about how much the row is
- *  worth, exactly as `source` is for the author of a field change. */
-export const ATTRIBUTIONS = ["focus", "branch", "path", "declared", "unknown"];
+/**
+ * How the task on a row was decided (§8) — metadata about how much the row is
+ * worth, exactly as `source` is for the author of a field change.
+ *
+ * THE FIVE LEGS OF THE CHAIN LIVE IN `attribution.mjs` (`ATTRIBUTION_CHAIN`) and
+ * are repeated here rather than imported, so that the storage layer keeps no
+ * dependency on the module that decides. The two are pinned against each other
+ * by a test — a repetition nothing checks is how a closed set silently opens.
+ *
+ * `declared` is the sixth value and belongs to no leg: it marks a row whose task
+ * the CALLER stated outright (`activity record --task <ID>`), which is a
+ * statement rather than an inference. It stays in the set regardless of what the
+ * chain does, because rows carrying it are already written and the file is
+ * append-only.
+ */
+export const ATTRIBUTIONS = ["focus", "session-state", "path", "branch", "declared", "unknown"];
 
 export function activityPath(root, taskId) {
   return join(backlogPaths(root).activityDir, taskId + ".jsonl");
