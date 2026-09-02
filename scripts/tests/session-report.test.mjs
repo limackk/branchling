@@ -15,14 +15,18 @@
  *   4. MISSING COST IS NOT ZERO, and a token count never appears without a
  *      model — a session using two models gets two rows, never one sum.
  *
- * The fifth is this report's own honesty: the join to the history log is by
- * time window, because no session id is recorded there (TL-164), and every
- * answer has to say so.
+ * The fifth is this report's own honesty. It used to be that the join to the
+ * history log was by time window, because no session id was recorded there, and
+ * every answer had to say so. Since TL-164 the entries carry the session they
+ * were written in and the join is exact — so what has to be proved now is the
+ * case a window join could never get right (two sessions, one task, overlapping
+ * times) and the case the exact join must not paper over (an entry with no
+ * session belongs to nobody, and is counted rather than claimed).
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { appendFileSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -129,25 +133,55 @@ test("a session with heartbeats and no status change is marked, not dropped", ()
   assert.equal(movedNothing(sessions[0]), true);
 });
 
-test("a status change inside the window makes it not empty", () => {
-  const history = { "T-1": [{ field: "status", from: "a", to: "b", actor: "agent:one", ts: at(3) }] };
+test("a status change stamped with this session makes it not empty", () => {
+  const history = { "T-1": [{ field: "status", from: "a", to: "b", actor: "agent:one", ts: at(3), session: "s-a" }] };
   const s = collectSessions({ "T-1": [beat("s-a", 0), beat("s-a", 5)] }, history)[0];
   assert.equal(movedNothing(s), false);
   assert.equal(s.changes.length, 1);
 });
 
-test("a change to the same task OUTSIDE the window belongs to no session here", () => {
-  const history = { "T-1": [{ field: "status", from: "a", to: "b", actor: "agent:one", ts: at(90) }] };
-  const s = collectSessions({ "T-1": [beat("s-a", 0), beat("s-a", 5)] }, history)[0];
-  assert.deepEqual(s.changes, []);
+test("a change to the same task stamped with ANOTHER session is not this one's", () => {
+  // The case a window join could never get right, and the reason the field
+  // exists: two agents on one task at overlapping times. Nothing about the
+  // timestamps separates these; only the id does.
+  const history = { "T-1": [
+    { field: "status", from: "a", to: "b", actor: "agent:one", ts: at(3), session: "s-a" },
+    { field: "owner", from: "", to: "agent:two", actor: "agent:two", ts: at(4), session: "s-b" },
+  ] };
+  const both = collectSessions({ "T-1": [beat("s-a", 0), beat("s-a", 5), beat("s-b", 1), beat("s-b", 4)] }, history);
+  const a = both.find((s) => s.session === "s-a");
+  const b = both.find((s) => s.session === "s-b");
+  assert.deepEqual(a.changes.map((c) => c.field), ["status"]);
+  assert.deepEqual(b.changes.map((c) => c.field), ["owner"]);
+  assert.equal(a.unattributedChanges, 0);
 });
 
-test("a change by ANOTHER actor inside the window is shown, with that actor", () => {
-  // The known cost of a window join (TL-164): this row is not necessarily this
-  // session's work, so the actor travels with it rather than being dropped.
+test("an entry with NO session belongs to nobody, and is counted rather than claimed", () => {
+  // Every line written before the field existed, and every change reconciled
+  // from a hand edit. Listing them under whichever session was running is the
+  // guess this replaced; dropping them without a word would make an empty list
+  // read as "nothing happened".
   const history = { "T-1": [{ field: "status", from: "a", to: "b", actor: "local:someone-else", ts: at(3) }] };
   const s = collectSessions({ "T-1": [beat("s-a", 0), beat("s-a", 5)] }, history)[0];
-  assert.equal(s.changes[0].actor, "local:someone-else");
+  assert.deepEqual(s.changes, []);
+  assert.equal(s.unattributedChanges, 1);
+  assert.equal(movedNothing(s), true, "a change nobody claimed must not count as this session's work");
+});
+
+test("a stamped change OUTSIDE this session's window is still this session's", () => {
+  // The id outranks the clock, which is the whole point: a session's own write
+  // made after its last heartbeat was invisible to the window join.
+  const history = { "T-1": [{ field: "status", from: "a", to: "b", actor: "agent:one", ts: at(90), session: "s-a" }] };
+  const s = collectSessions({ "T-1": [beat("s-a", 0), beat("s-a", 5)] }, history)[0];
+  assert.equal(s.changes.length, 1);
+});
+
+test("an unattributed change outside the window is not even counted", () => {
+  // The count is about what a reader might otherwise expect to see beside this
+  // session, not a tally of the whole log.
+  const history = { "T-1": [{ field: "status", from: "a", to: "b", actor: "local:x", ts: at(900) }] };
+  const s = collectSessions({ "T-1": [beat("s-a", 0), beat("s-a", 5)] }, history)[0];
+  assert.equal(s.unattributedChanges, 0);
 });
 
 // ── Tokens ────────────────────────────────────────────────────────────────
@@ -251,20 +285,41 @@ test("`session <id>` tells one story, and an unknown id is an error with a way o
   assert.equal(JSON.parse(asJson.stdout).session, null);
 });
 
-test("both commands say their answer is a window join, in text and in JSON", () => {
+test("both commands say the join is on the session id, in text and in JSON", () => {
   const dir = backlog({ "TASK-1": [beat("s-a", 0), beat("s-a", 5)] });
-  assert.match(run(["sessions", "--dir", dir]).stdout, /carries no session id/);
-  assert.match(run(["session", "s-a", "--dir", dir]).stdout, /carries no session id/);
+  // The caveat is GONE, not reworded: there is no window guess left to warn
+  // about. `correlation` stays in the envelope so a consumer reading an older
+  // log through a newer tool can still see which join it got.
+  assert.doesNotMatch(run(["sessions", "--dir", dir]).stdout, /carries no session id/);
+  assert.doesNotMatch(run(["session", "s-a", "--dir", dir]).stdout, /time window/);
 
   const list = JSON.parse(run(["sessions", "--dir", dir, "--json"]).stdout);
   assert.equal(list.kind, "sessions");
-  assert.equal(list.correlation, "window");
+  assert.equal(list.correlation, "session");
   assert.equal(list.sessions[0].movedNothing, true);
 
   const one = JSON.parse(run(["session", "s-a", "--dir", dir, "--json"]).stdout);
   assert.equal(one.kind, "session");
-  assert.equal(one.correlation, "window");
+  assert.equal(one.correlation, "session");
   assert.equal(one.session.tokens, null, "missing cost is null, never 0");
+});
+
+test("a command stamps the session it ran in, and the report finds it", () => {
+  // End to end, through the real commands: nothing above proves the WRITE side.
+  const dir = mkdtempSync(join(tmpdir(), "worktrail-session-e2e-"));
+  const env = { ...process.env, NO_COLOR: "1", BACKLOG_SESSION: "s-real",
+    BACKLOG_STATE_DIR: join(dir, ".state") };
+  const cli = (args) => spawnSync(process.execPath, [CLI].concat(args),
+    { cwd: dir, encoding: "utf8", timeout: 60_000, env });
+
+  assert.equal(cli(["init", "--dir", ".", "--no-example"]).status, 0);
+  assert.equal(cli(["new", "--dir", ".", "--title", "Something to claim"]).status, 0);
+  assert.equal(cli(["take", "TASK-1", "--dir", ".", "--actor", "agent:one"]).status, 0);
+
+  const lines = readFileSync(join(dir, "history", "TASK-1.jsonl"), "utf8")
+    .split("\n").filter(Boolean).map((l) => JSON.parse(l));
+  assert.ok(lines.length, "the claim recorded nothing at all");
+  for (const e of lines) assert.equal(e.session, "s-real", JSON.stringify(e));
 });
 
 test("tokens reach the report per model, once an adapter writes them", () => {

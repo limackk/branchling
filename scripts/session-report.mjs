@@ -16,13 +16,19 @@
  * `clusterHeartbeats()`, the one implementation, because the same decision made
  * in two places is the same decision made differently within a month.
  *
- * THE ONE HONEST GAP, and it is named rather than papered over. History entries
- * carry an actor and a timestamp but NO session id, so a field change cannot be
- * attributed to a session with certainty. This report therefore correlates by
- * TASK AND TIME WINDOW and says so — every answer carries
- * `correlation: "window"`, and `--json` consumers can see it. The gap is not
- * worked around silently; it is TL-164, against the log that would have to
- * carry the field.
+ * A FIELD CHANGE IS JOINED ON THE SESSION ID (TL-164), not guessed at. Until
+ * that field existed this report correlated by TASK AND TIME WINDOW and said so
+ * on every answer — an approximation with a named failure case: two agents
+ * working the same task at overlapping times could not be told apart at all,
+ * which is precisely what a fleet of parallel worktrees produces. `correlation`
+ * now reads `session` and the caveat is gone.
+ *
+ * WHAT IS STILL HONEST ABOUT IT. Every line written before the field existed has
+ * no session, and so does every change reconciled from a hand edit — the tool
+ * saw those, it did not make them. They are counted as `unattributedChanges`
+ * and never listed under a session: attributing them by time is the guess this
+ * removed, and a list mixing exact rows with guessed ones would be harder to
+ * read than the honest one.
  *
  * WHY A TOKEN COUNT IS NEVER PRINTED WITHOUT A MODEL. "280k tokens" means three
  * different things for a frontier model over an API, an agent on a
@@ -202,6 +208,7 @@ export function collectSessions(rowsByTask, history, opts = {}) {
     for (const t of tasks) for (const r of rowsByTask[t.task] || []) {
       if ((String(r.session || "") || UNSESSIONED) === s.session) rows.push(r);
     }
+    const correlated = correlateChanges(s, tasks, history);
     out.push({
       session: s.session,
       actors: [...s.actors].sort(),
@@ -216,7 +223,10 @@ export function collectSessions(rowsByTask, history, opts = {}) {
       // so a session made of them measures zero and is not idle.
       singles: s.singles,
       tasks,
-      changes: correlateChanges(s, tasks, history),
+      changes: correlated.changes,
+      // Named apart from `changes`, never folded into it: these belong to no
+      // session, and a count is the only true thing that can be said about them.
+      unattributedChanges: correlated.unattributed,
       tokens: tokensByModel(rows),
     });
   }
@@ -226,28 +236,51 @@ export function collectSessions(rowsByTask, history, opts = {}) {
 const round = (n) => Math.round(n * 10) / 10;
 
 /**
- * The field changes recorded against this session's tasks while it was running.
+ * The field changes this session recorded, joined on the SESSION ID (TL-164).
  *
- * BY WINDOW, NOT BY SESSION ID, because the history log has no session field
- * (TL-164). The consequence is stated on every answer rather than assumed away:
- * a change another actor made to the same task inside the same window appears
- * here, with its actor, and `correlation: "window"` says why.
+ * WHAT THIS REPLACED, and why the replacement is not a refinement of it. The
+ * join used to be by TASK AND TIME WINDOW, because the history log had no
+ * session field. That is an approximation with a named failure case: two agents
+ * working the same task at overlapping times cannot be told apart at all — and
+ * a fleet of parallel worktrees produces exactly that case. Every answer had to
+ * carry `correlation: "window"` to say so.
+ *
+ * THE WINDOW FALLBACK IS NOT KEPT. An entry with no session id is not attributed
+ * to a session at all, because attributing it by time is the very guess this
+ * task exists to remove, and a report that mixed exact rows with guessed ones
+ * would be harder to read than the honest one — a reader would have to check
+ * each row's provenance to know what it means.
+ *
+ * NOR IS IT DROPPED IN SILENCE. `unattributed` counts the changes on this
+ * session's tasks that fall inside its window and carry no session — every line
+ * written before this field existed, plus every hand edit reconciled afterwards.
+ * They are real changes; they simply belong to nobody's session, and saying how
+ * many there are is what stops an empty list reading as "nothing happened".
  */
 export function correlateChanges(session, tasks, history) {
   const from = Date.parse(session.from);
   const to = Date.parse(session.to);
   const out = [];
+  let unattributed = 0;
   for (const t of tasks) {
     for (const e of (history && history[t.task]) || []) {
-      const at = Date.parse(e.ts);
-      if (!Number.isFinite(at) || at < from || at > to) continue;
+      if (e.session) {
+        if (e.session !== session.session) continue;
+      } else {
+        // No session id: countable, never claimed. The window still decides
+        // whether it is worth mentioning beside this session at all.
+        const at = Date.parse(e.ts);
+        if (Number.isFinite(at) && at >= from && at <= to) unattributed++;
+        continue;
+      }
       out.push({
         task: t.task, field: e.field, from: e.from || "", to: e.to || "",
         actor: e.actor || "", ts: e.ts, reason: e.reason || "",
       });
     }
   }
-  return out.sort((a, b) => String(a.ts).localeCompare(String(b.ts)));
+  out.sort((a, b) => String(a.ts).localeCompare(String(b.ts)));
+  return { changes: out, unattributed };
 }
 
 /** A session that moved no STATUS is the one the morning report exists to
@@ -290,7 +323,7 @@ export function renderList(sessions, opts = {}) {
   ])));
   out.push("");
   out.push("  " + color.dim("`nothing moved` means heartbeats but no status transition — it worked and closed nothing."));
-  out.push("  " + color.dim("Changes are correlated by task and time window; the history log carries no session id."));
+  out.push("  " + color.dim("Changes are joined on the session id each entry carries; entries written before it are counted apart."));
   return out.join("\n");
 }
 
@@ -321,8 +354,12 @@ export function renderOne(s) {
       (c.from || "—") + " → " + (c.to || "—"), c.actor,
     ])));
   }
-  out.push("  " + color.dim("correlated by task and time window — the history log carries no session id,"));
-  out.push("  " + color.dim("so a change another actor made to the same task in the same window appears here."));
+  if (s.unattributedChanges) {
+    // Counted, never listed. These are changes on this session's tasks that
+    // belong to no session — written before the field existed, or reconciled
+    // from a hand edit nobody claimed.
+    out.push("  " + color.dim(s.unattributedChanges + " further change(s) on these tasks carry no session id and are nobody's."));
+  }
 
   if (s.tokens) {
     out.push("");
@@ -362,7 +399,7 @@ export function mainList(argv) {
 
   if (opts.json) {
     printJson("sessions", {
-      correlation: "window",
+      correlation: "session",
       total: sessions.length,
       sessions: shown.map((s) => ({ ...s, movedNothing: movedNothing(s) })),
     });
@@ -390,7 +427,7 @@ export function mainOne(argv) {
     // about does not exist. The exit code carries the verdict, as everywhere
     // else — the document describes the result, it does not replace it.
     if (opts.json) {
-      printJson("session", { correlation: "window", session: null });
+      printJson("session", { correlation: "session", session: null });
       return 1;
     }
     console.error(failure(N + " session", "no session `" + opts.id + "` in this backlog's activity log",
@@ -399,7 +436,7 @@ export function mainOne(argv) {
     return 1;
   }
   if (opts.json) {
-    printJson("session", { correlation: "window", session: { ...found, movedNothing: movedNothing(found) } });
+    printJson("session", { correlation: "session", session: { ...found, movedNothing: movedNothing(found) } });
     return 0;
   }
   console.log(renderOne(found));

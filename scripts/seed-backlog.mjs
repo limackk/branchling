@@ -51,10 +51,7 @@ import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { PROOF_ID } from "./criteria.mjs";
 import { TEMPLATE_PLACEHOLDER } from "./done-task.mjs";
-import {
-  ACTOR_NAMESPACES, FIELD_CREATED, appendEntries, eventId, isValidActor, isValidReason,
-  normalizeActor, normalizeReason, reconcile,
-} from "./history.mjs";
+import { ACTOR_NAMESPACES, appendEntries, currentSession, eventId, FIELD_CREATED, isValidActor, isValidReason, normalizeActor, normalizeReason, reconcile } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { createTask, driftMessage, slugify } from "./new-task.mjs";
 import { backlogPaths, looksLikeBacklogDir, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
@@ -794,6 +791,7 @@ function recordCreations(root, written, opts) {
     appendEntries(root, w.id, [{
       id: eventId(ts), ts, task: w.id, field: FIELD_CREATED, from: "", to: w.title,
       actor: normalizeActor(actor), source: "seed", reason: normalizeReason(opts.reason || ""),
+      session: currentSession(root),
     }]);
   }
   reconcile(root, { actor, source: "seed", reason: opts.reason || undefined });

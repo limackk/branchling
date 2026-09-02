@@ -37,7 +37,8 @@ One row = one change to one field:
 
 ```json
 {"ts":"2026-08-29T13:17:10.970Z","task":"TASK-9999","field":"status",
- "from":"pending","to":"in_progress","actor":"local:founder","source":"viewer"}
+ "from":"pending","to":"in_progress","actor":"local:founder","source":"viewer",
+ "session":"s-2026-08-29-a"}
 ```
 
 - `from` / `to` — a string or an array (list fields: `labels`,
@@ -86,6 +87,24 @@ and have their own dedup rule on read:
 - `source` — which route the change arrived by: `viewer` | `hook` |
   `external` | `boot` | `cli`. This is metadata about how much `actor` is
   worth, not decoration (§4).
+- `session` — which session wrote it (TL-164). **The same identifier the
+  activity log records**, from `sessionId()` in `focus.mjs`, because
+  `worktrail session <id>` joins the two logs and a second derivation of
+  "which session is this" would break the join in exactly the cases it exists
+  for. Before this field the report correlated by task and time window and
+  said so on every answer; two agents working one task at overlapping times
+  could not be told apart at all.
+
+  **Only a write that MADE the change may carry it.** Reconciliation records
+  changes it merely SAW — an editor, git, another session — so stamping the
+  observing process there would attribute somebody else's work to whoever ran
+  the reconcile, which is TL-130's defect with a new field. `reconcile()`
+  therefore writes no session, and neither does any line predating this field.
+
+  **Absent, never empty.** An empty string would be a third state beside
+  "absent" and "present" meaning the same as the first. An entry with no
+  session belongs to no session; `worktrail session` counts such changes
+  apart instead of listing them under whichever session was running.
 
 ### Why JSONL per task, not one file / SQLite / git
 

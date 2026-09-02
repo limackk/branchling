@@ -48,7 +48,7 @@ import { fileURLToPath } from "node:url";
 
 import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { ACTOR_NAMESPACES, FIELD_COMMENT, appendEntries, eventId, isValidActor, isValidReason, normalizeReason, readHistory, recordEdit } from "./history.mjs";
+import { ACTOR_NAMESPACES, appendEntries, currentSession, eventId, FIELD_COMMENT, isValidActor, isValidReason, normalizeReason, readHistory, recordEdit } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { isExpired, lockDir, readLock, releaseLock } from "./lock.mjs";
 import { queueStatuses } from "./next-task.mjs";
@@ -271,6 +271,7 @@ export function handoffTask(opts) {
     id: eventId(ts), ts, task: id, field: FIELD_COMMENT,
     from: "", to: opts.reason,
     actor, source: "handoff", reason: normalizeReason(opts.reason),
+    session: currentSession(root, opts.env),
   };
   appendEntries(root, id, [comment]);
 

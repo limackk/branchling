@@ -42,7 +42,7 @@ import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { applyProofs, auditTask, parseCriteria, parseVerification } from "./criteria.mjs";
 import { buildFieldSpecs, extractMeta, fieldSpec, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
-import { ACTOR_NAMESPACES, FIELD_VERIFIED, REASON_PROVEN, appendEntries, eventId, isValidActor, isValidReason, recordEdit, requiresReason } from "./history.mjs";
+import { ACTOR_NAMESPACES, appendEntries, currentSession, eventId, FIELD_VERIFIED, isValidActor, isValidReason, REASON_PROVEN, recordEdit, requiresReason } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { releaseLock } from "./lock.mjs";
 import { MARK, color, errColor, failure } from "./ui.mjs";
@@ -638,6 +638,7 @@ function run(argv) {
       id: eventId(ts), ts, task: before.id, field: FIELD_VERIFIED,
       from: "", to: v.command, actor, source: "done",
       reason: statedReason || REASON_PROVEN,
+      session: currentSession(root),
     })));
   }
 

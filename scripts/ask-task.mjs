@@ -37,10 +37,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 
 import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import {
-  ACTOR_NAMESPACES, FIELD_COMMENT, appendEntries, eventId, isValidActor, isValidReason,
-  questionBlockReason, recordEdit,
-} from "./history.mjs";
+import { ACTOR_NAMESPACES, appendEntries, currentSession, eventId, FIELD_COMMENT, isValidActor, isValidReason, questionBlockReason, recordEdit } from "./history.mjs";
 import { releaseLock } from "./lock.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
 import { printJson } from "./json-envelope.mjs";
@@ -181,6 +178,7 @@ export function askTask(opts) {
     id: eventId(ts), ts, task: id, field: FIELD_COMMENT,
     from: "", to: opts.question,
     actor, source: "ask", reason: opts.question,
+    session: currentSession(root, opts.env),
   };
   appendEntries(root, id, [question]);
 

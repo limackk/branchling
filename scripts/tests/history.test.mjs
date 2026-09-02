@@ -15,29 +15,8 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
-import {
-  FIELD_CREATED,
-  FIELD_DELETED,
-  appendEntries,
-  hasSnapshot,
-  historyPath,
-  isValidActor,
-  lastChangeByField,
-  normalizeActor,
-  readAllHistory,
-  readHistory,
-  recordEdit,
-  reconcile,
-  metaFromText,
-  actorParts,
-  FIELD_BODY,
-  FIELD_COMMENT,
-  FIELD_ATTRIBUTED,
-  PSEUDO_FIELDS,
-  attributeChanges,
-  isUnattributed,
-  unattributedChanges,
-} from "../history.mjs";
+import { sessionId } from "../focus.mjs";
+import { actorParts, appendEntries, attributeChanges, currentSession, FIELD_ATTRIBUTED, FIELD_BODY, FIELD_COMMENT, FIELD_CREATED, FIELD_DELETED, hasSnapshot, historyPath, isUnattributed, isValidActor, lastChangeByField, metaFromText, normalizeActor, PSEUDO_FIELDS, readAllHistory, readHistory, reconcile, recordEdit, unattributedChanges } from "../history.mjs";
 import { diffMeta } from "../task-fields.mjs";
 import { isolateHome } from "./_repo.mjs";
 
@@ -298,7 +277,16 @@ test("the history lives in backlog/history/<ID>.jsonl — one task, one file", (
   assert.equal(raw.length, 1);
   // `reason` joined the record in TL-105 and is on EVERY entry: a field present
   // on some rows only would make "no reason given" and "none needed" one shape.
-  assert.deepEqual(Object.keys(JSON.parse(raw[0])).sort(), ["actor", "field", "from", "id", "reason", "source", "task", "to", "ts"]);
+  //
+  // `session` (TL-164) is the deliberate opposite, and the asymmetry is the
+  // point. A reason is something a writer either gave or did not, and both
+  // states belong on every row. A session is something a write either HAS or
+  // genuinely has not — every line predating the field, and every change the
+  // tool merely observed — so an empty string would be a third state meaning
+  // the same as absence. `recordEdit` is a command writing its own change, so
+  // it is present here.
+  assert.deepEqual(Object.keys(JSON.parse(raw[0])).sort(),
+    ["actor", "field", "from", "id", "reason", "session", "source", "task", "to", "ts"]);
   rmSync(dir, { recursive: true, force: true });
 });
 
@@ -665,4 +653,46 @@ test("CLI: --attribute without a reason is REFUSED", () => {
   assert.equal(r.status, 2);
   assert.match(r.stderr, /needs `--reason/);
   rmSync(dir, { recursive: true, force: true });
+});
+
+// ── the session a change was written in (TL-164) ──────────────────────────
+
+test("a reconciled change carries NO session — the tool saw it, it did not make it", () => {
+  // The rule the whole field turns on. Stamping the reconciling process here
+  // would attribute somebody else's edit to whoever ran the reconcile, which is
+  // TL-130's defect arriving through a new field.
+  const dir = sandbox();
+  writeFileSync(join(dir, "tasks", "BL-900-x.md"), taskFile(), "utf8");
+  reconcile(dir, { actor: "agent:one" });                       // seeds only
+  writeFileSync(join(dir, "tasks", "BL-900-x.md"), taskFile({ status: "done" }), "utf8");
+  const { entries } = reconcile(dir, { actor: "agent:one" });
+
+  assert.ok(entries.length, "the fixture recorded nothing — the case is not being tested");
+  for (const e of entries) {
+    assert.equal("session" in e, false, "a reconciled entry claimed a session: " + JSON.stringify(e));
+  }
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("a caller may state that there is no session, and nothing is written", () => {
+  // The escape hatch for a route that acts for somebody else. `""` says so; it
+  // does not land on disk as a third state.
+  const dir = sandbox();
+  const [entry] = recordEdit(dir, {
+    taskId: "BL-901",
+    before: metaFromText(taskFile()),
+    after: metaFromText(taskFile({ status: "done" })),
+    actor: "local:founder",
+    session: "",
+  });
+  assert.equal("session" in entry, false);
+  assert.equal(readFileSync(join(dir, "history", "BL-901.jsonl"), "utf8").includes("session"), false);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("the session id is the activity log's own, not a second derivation of it", () => {
+  // The join in `session <id>` reads both logs. Two derivations of "which
+  // session is this" would disagree in exactly the cases the report exists for.
+  const env = { BACKLOG_SESSION: "s-from-the-host" };
+  assert.equal(currentSession("/anywhere", env), sessionId({ env, root: "/anywhere" }));
 });

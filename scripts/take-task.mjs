@@ -35,7 +35,7 @@ import { fileURLToPath } from "node:url";
 
 import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { ACTOR_NAMESPACES, FIELD_ROLE_OVERRIDE, appendEntries, changesRequiringReason, eventId, isValidActor, isValidReason, normalizeReason, readHistory, recordEdit } from "./history.mjs";
+import { ACTOR_NAMESPACES, appendEntries, changesRequiringReason, currentSession, eventId, FIELD_ROLE_OVERRIDE, isValidActor, isValidReason, normalizeReason, readHistory, recordEdit } from "./history.mjs";
 import { withDecisions } from "./decisions.mjs";
 import { focusQuietly } from "./focus.mjs";
 import { printJson } from "./json-envelope.mjs";
@@ -308,6 +308,7 @@ export function takeTask(opts) {
       from: wantedRole, to: declaredRole,
       actor, source: opts.source || "take",
       reason: normalizeReason(opts.reason || ""),
+      session: currentSession(root, opts.env),
     }]);
     warnings.push(
       "taken outside its role — the task asks for `" + wantedRole + "`, you declared `" +

@@ -32,6 +32,7 @@ import { randomBytes } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { sessionId } from "./focus.mjs";
 import { ACTOR_UNKNOWN, FIELD_ATTRIBUTED, FIELD_COMMENT, FIELD_CREATED, FIELD_DECISION, FIELD_DELETED, REASON_UNKNOWN, TRACKED_FIELDS, diffMeta, extractMeta, formatValue, hasStatedReason, normalizeActor as normalizeActorFn, normalizeReason, splitFrontmatter } from "./task-fields.mjs";
 import { ANY_HISTORY_FILE, ANY_TASK_FILE, ANY_TASK_FILE_ID, ANY_TASK_ID, taskIdPatterns } from "./task-id.mjs";
 
@@ -137,6 +138,11 @@ function ensureDir(dir) {
 export function appendEntries(backlogDir, taskId, entries) {
   if (!entries || !entries.length) return [];
   ensureDir(historyDir(backlogDir));
+  // An EMPTY `session` is never written (TL-164). Every line recorded before the
+  // field existed has no session at all, so an empty string would be a third
+  // state beside "absent" and "present" that means the same as the first — and a
+  // reader would have to know that to count correctly.
+  for (const e of entries) if (e && !e.session) delete e.session;
   const lines = entries.map((e) => JSON.stringify(e)).join("\n") + "\n";
   appendFileSync(historyPath(backlogDir, taskId), lines, "utf8");
   return entries;
@@ -527,13 +533,52 @@ function migratedId(m, id) {
  * months on cannot tell them apart. Every entry carries the field; what varies
  * is whether it holds a sentence or a sentinel.
  */
-function entry(taskId, field, from, to, actor, source, ts, reason) {
-  return {
+function entry(taskId, field, from, to, actor, source, ts, reason, session) {
+  const e = {
     id: eventId(ts), ts, task: taskId, field, from, to,
     actor: normalizeActorFn(actor),
     source: source || "unknown",
     reason: normalizeReason(reason),
   };
+  // OMITTED WHEN THERE IS NONE, never written as "" (TL-164). The log is
+  // append-only and every line written before this field existed has no session;
+  // an empty string would be a THIRD state beside "absent" and "present", and a
+  // reader would have to know that two of the three mean the same thing. An
+  // absent key is what "nobody recorded which session" already looks like.
+  const id = normalizeSession(session);
+  if (id) e.session = id;
+  return e;
+}
+
+/**
+ * The session this process belongs to, for stamping an entry it is about to
+ * write (TL-164).
+ *
+ * THE SAME VALUE THE ACTIVITY LOG USES, from the same function — that is the
+ * whole point. The `session <id>` report joins the two logs, and a second
+ * derivation of "which session is this" would make the join fail in exactly the
+ * cases it exists for. `focus.mjs` documents why the fallback is the worktree
+ * and why a per-process id would be worse.
+ *
+ * WHICH WRITES MAY STAMP IT, and this is the decision the field turns on: only
+ * a command that MADE the change. Reconciliation records changes it merely
+ * SAW — made by an editor, by git, by another session — and stamping the
+ * observing process there would attribute somebody else's work to whoever
+ * happened to run the reconcile. That is TL-130's defect with a new field, and
+ * it is why `reconcile()` passes no session at all.
+ */
+export function currentSession(backlogDir, env = process.env) {
+  try {
+    return sessionId({ env, root: backlogDir });
+  } catch {
+    return "";
+  }
+}
+
+/** The same shape the activity log accepts, so the two sides of the join cannot
+ *  disagree about what counts as an identifier. */
+export function normalizeSession(value) {
+  return String(value || "").trim().replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 64);
 }
 
 /**
@@ -573,12 +618,16 @@ export function changesRequiringReason(config, changes) {
 export function recordEdit(backlogDir, opts) {
   const { taskId, before, after, actor, source, reason } = opts;
   const ts = opts.ts || new Date().toISOString();
+  // This route is a command WRITING a change it is making, so the session is
+  // known and is the process's own. A caller may state one (a server acting for
+  // a request that carries its own) and pass "" to state that there is none.
+  const session = opts.session === undefined ? currentSession(backlogDir) : opts.session;
   const changes = diffMeta(before, after);
   // The reason belongs to the ACT, and one act can move several fields — the
   // viewer writes one field at a time, `done` writes status and updated
   // together. Copying it onto every entry of the act is what makes the answer
   // survive reading any one of them alone.
-  const entries = changes.map((c) => entry(taskId, c.field, c.from, c.to, actor, source, ts, reason));
+  const entries = changes.map((c) => entry(taskId, c.field, c.from, c.to, actor, source, ts, reason, session));
   appendEntries(backlogDir, taskId, entries);
   const snap = loadSnapshot(backlogDir) || { version: 1, tasks: {} };
   snap.tasks[taskId] = pickTracked(after);

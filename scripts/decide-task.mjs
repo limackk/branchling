@@ -44,11 +44,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 
 import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import {
-  ACTOR_NAMESPACES, EVENT_ID_RE, FIELD_DECISION,
-  appendEntries, eventId, isValidActor, isValidReason, normalizeReason, openQuestions, questionIdFromReason,
-  readHistory, recordEdit,
-} from "./history.mjs";
+import { ACTOR_NAMESPACES, appendEntries, currentSession, EVENT_ID_RE, eventId, FIELD_DECISION, isValidActor, isValidReason, normalizeReason, openQuestions, questionIdFromReason, readHistory, recordEdit } from "./history.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { todayStamp } from "./take-task.mjs";
@@ -156,6 +152,7 @@ export function decideTask(opts) {
     from: "", to: opts.reason,
     actor, source: "decide",
     reason: normalizeReason(opts.reason),
+    session: currentSession(root, opts.env),
   };
   // `resolves` is written only when it holds something: an empty key in every
   // row would make "answers nothing" and "answers a thing named nowhere" the

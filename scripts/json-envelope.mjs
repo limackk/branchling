@@ -68,9 +68,11 @@ export const KINDS = {
   // `closedWithoutTrace` readable: the log has a first day, and everything
   // before it left no trace for a reason that is nobody's fault.
   // `sessions --json` and `session <id> --json` (TL-92). `correlation` is on
-  // both because it is a limit of the ANSWER, not a detail of one field: field
-  // changes are matched to a session by task and time window, since the history
-  // log carries no session id.
+  // both because it says HOW the answer was reached, not what one field holds:
+  // since TL-164 it reads `session`, because history entries carry the session
+  // they were written in and the join is exact. It stays in the envelope rather
+  // than being dropped as a now-constant field — a consumer reading an older
+  // log through a newer tool needs to be able to see which join it got.
   sessions: { correlation: null, total: null, sessions: [] },
   session: { correlation: null, session: null },
   audit: {
