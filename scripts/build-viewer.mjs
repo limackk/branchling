@@ -355,6 +355,8 @@ export function buildHtml(
   // `viewer-plan.mjs` renders what `planState()` returns.
   const planModuleSrc = readModuleSource("plan.mjs");
   const viewerPlanModuleSrc = readModuleSource("viewer-plan.mjs");
+  // The decision panel reads `openQuestions` from task-fields.mjs, pasted above.
+  const decisionPanelModuleSrc = readModuleSource("decision-panel.mjs");
   const historyJson = JSON.stringify(history).replace(/</g, "\\u003c");
 
   return `<!DOCTYPE html>
@@ -1510,6 +1512,89 @@ ${paletteBadgeCss}
     overflow-x: auto;
   }
 
+  /* ─── Waiting on you (TL-115) ────────────────────────────────────── */
+  .decisions-view { display: none; }
+  body.view-decisions main.app-main { display: none; }
+  body.view-decisions .filters-bar,
+  body.view-decisions .stats { display: none; }
+  body.view-decisions .decisions-view {
+    display: block;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 20px 24px 64px;
+  }
+  .dec-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+  .dec-head h2 { margin: 0; font-size: 16px; }
+  .dec-lede { color: var(--fg-muted); font-size: 13px; max-width: 74ch; margin: 0 0 16px; }
+  .dec-filter {
+    font: inherit;
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--fg-muted);
+    cursor: pointer;
+  }
+  .dec-filter.is-on { background: var(--accent-soft); border-color: var(--accent); color: var(--fg); }
+  .dec-item {
+    border: 1px solid var(--border);
+    border-left-width: 3px;
+    border-radius: 10px;
+    background: var(--bg-card);
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+  .dec-item.is-question { border-left-color: var(--accent); }
+  .dec-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .dec-id { font-weight: 600; font-size: 12px; color: var(--accent); text-decoration: none; }
+  .dec-id:hover { text-decoration: underline; }
+  .dec-title { font-size: 13px; }
+  .dec-kind {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--fg-muted);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0 7px;
+  }
+  .dec-unblocks { margin-left: auto; font-size: 11px; color: var(--fg-muted); font-variant-numeric: tabular-nums; }
+  .dec-question {
+    margin-top: 8px;
+    padding: 8px 10px;
+    background: var(--bg);
+    border-radius: 8px;
+    font-size: 12px;
+  }
+  .dec-meta { margin-top: 6px; font-size: 11px; color: var(--fg-muted); }
+  .dec-actions { margin-top: 10px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .dec-actions input {
+    font: inherit;
+    font-size: 12px;
+    flex: 1;
+    min-width: 220px;
+    padding: 5px 9px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--fg);
+  }
+  .dec-hint { font-size: 11px; color: var(--fg-muted); }
+  .dec-empty { color: var(--fg-muted); font-size: 13px; max-width: 74ch; }
+  .tab-count {
+    display: inline-block;
+    margin-left: 6px;
+    min-width: 17px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: var(--accent);
+    color: white;
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+  }
+
   /* ─── Dashboard ─────────────────────────────────────────────────── */
   .dashboard-view { display: none; }
   body.view-dashboard main.app-main { display: none; }
@@ -1863,6 +1948,7 @@ ${paletteBadgeCss}
       <button type="button" class="view-tab is-active" data-view="tasks">Tasks</button>
       <button type="button" class="view-tab" data-view="dashboard">Dashboard</button>
       <button type="button" class="view-tab" data-view="execution">Execution</button>
+      <button type="button" class="view-tab" data-view="decisions" id="tabDecisions">Waiting on you</button>
       <button type="button" class="copy-link-btn" id="btnCopyLink"
               title="Copies the address of this view — filters, search, sort, board and the selected task">⧉ Copy link</button>
     </nav>
@@ -1903,6 +1989,7 @@ ${paletteBadgeCss}
 
 <section class="dashboard-view" id="dashboardView"></section>
 <section class="execution-view" id="executionView"></section>
+<section class="decisions-view" id="decisionsView"></section>
 <div class="chart-tip" id="chartTip" hidden></div>
 
 <script>
@@ -1939,6 +2026,13 @@ ${planModuleSrc}
 // The Execution view: the model and the HTML, tested by
 // node --test scripts/tests/viewer-plan.test.mjs.
 ${viewerPlanModuleSrc}
+// ─── end of the pasted module ─────────────────────────────────────────
+
+// ─── Pasted source of scripts/decision-panel.mjs (TL-115) ────────────
+// What hangs on a person's decision — computed from the tasks and the history,
+// with no stored state of its own. Tested by
+// node --test scripts/tests/decision-panel.test.mjs.
+${decisionPanelModuleSrc}
 // ─── end of the pasted module ─────────────────────────────────────────
 
 // TASKS / STATS are mutable — live mode replaces them after reading from disk.
@@ -1983,7 +2077,9 @@ const state = {
   filterEnv: new Set(),   // the values of the label_axis_env axis plus "n/a"
   filterEpic: new Set(),  // values: epic name | NO_EPIC constant
   sortBy: "priority",     // "priority" | "id_asc" | "id_desc"
-  view: "tasks",          // "tasks" | "dashboard" | "execution"
+  view: "tasks",          // "tasks" | "dashboard" | "execution" | "decisions"
+  // The panel's own filter: "" = everything, "mine" = rows naming this actor.
+  decisionsMine: false,
   // Dashboard date range — flow metrics only, see computeDashboard().
   dashRange: { preset: "all", from: null, to: null },
   // Day pinned by clicking a chart point: { day, source } — source names which
@@ -5007,15 +5103,168 @@ window.addEventListener("resize", () => {
   if (state.view === "execution") drawPlanEdges();
 });
 
+// ─── Waiting on you (TL-115) ──────────────────────────────────────────
+// Computed from ALL_TASKS and HISTORY on every render — never from the
+// generated views, which are a snapshot of the last build and would describe a
+// backlog that moved an hour ago (the rule TL-108 states). ALL_TASKS and not
+// TASKS: a person's decision queue is not a property of the board they happen
+// to be looking at.
+function decisionRows() {
+  const items = decisionPanel(ALL_TASKS, HISTORY, {
+    archivedStatuses: CONFIG.archivedStatuses,
+    now: Date.now(),
+    // \`servedRoles\` is deliberately NOT passed: the map of roles to agent
+    // commands lives in somebody's \`run\` invocation and the page has never seen
+    // it. Guessing an empty one would put every task with any role into a
+    // person's queue.
+  });
+  return state.decisionsMine ? minePanel(items, state.actor) : items;
+}
+
+function renderDecisions() {
+  const host = document.getElementById("decisionsView");
+  const rows = decisionRows();
+  const head =
+    '<div class="dec-head"><h2>Waiting on you</h2>' +
+    '<button type="button" class="dec-filter' + (state.decisionsMine ? " is-on" : "") +
+    '" onclick="toggleDecisionsMine()">' +
+    (state.decisionsMine ? "only mine: " + escapeHtmlStr(state.actor || "(nobody declared)") : "everything") +
+    "</button></div>" +
+    '<p class="dec-lede">Work that cannot move until a person decides: tasks marked for a human, ' +
+    "and questions somebody asked that nothing has answered. Ordered by how many tasks the " +
+    "decision would release, counted through the chain — not by age.</p>";
+
+  if (!rows.length) {
+    host.innerHTML = head + '<p class="dec-empty">Nothing is waiting on a person. A task gets here by ' +
+      'carrying <code>executor: human</code>, or when a handoff leaves a question nobody has answered yet.</p>';
+    updateDecisionsCount();
+    return;
+  }
+
+  host.innerHTML = head + rows.map(function (r) {
+    const unblocks = r.unblocks
+      ? '<span class="dec-unblocks">releases ' + r.unblocks + " task" + (r.unblocks === 1 ? "" : "s") + "</span>"
+      : '<span class="dec-unblocks">releases nothing else</span>';
+    const top =
+      '<div class="dec-row">' +
+      '<a class="dec-id" href="#' + escapeHtmlStr(r.id) + '">' + escapeHtmlStr(r.id) + "</a>" +
+      '<span class="dec-title">' + escapeHtmlStr(r.title) + "</span>" +
+      '<span class="dec-kind">' + (r.kind === "question" ? "question" : "for a person") + "</span>" +
+      unblocks + "</div>";
+
+    if (r.kind === "question") {
+      const age = r.ageDays === null ? "" :
+        " · asked " + (r.ageDays === 0 ? "today" : r.ageDays + " day" + (r.ageDays === 1 ? "" : "s") + " ago");
+      return '<article class="dec-item is-question">' + top +
+        '<div class="dec-question">' + escapeHtmlStr(r.question) + "</div>" +
+        '<div class="dec-meta">' + escapeHtmlStr(r.asker || "somebody") + age + "</div>" +
+        decisionForm(r.id, r.eventId) +
+        "</article>";
+    }
+    const why = r.why.indexOf("executor") >= 0
+      ? "marked <code>executor: human</code>"
+      : "asks for the role <code>" + escapeHtmlStr(r.role) + "</code>, which no agent here serves";
+    return '<article class="dec-item">' + top +
+      '<div class="dec-meta">' + why + (r.owner ? " · " + escapeHtmlStr(r.owner) : "") + "</div>" +
+      decisionForm(r.id, "") +
+      "</article>";
+  }).join("");
+  updateDecisionsCount();
+}
+
+/** The one action the panel offers, and it writes through \`/api/decision\`,
+ *  which calls the same function the \`decide\` command calls. A second write
+ *  path would be a second set of rules about what a decision may say.
+ *
+ *  The handlers are DELEGATED rather than inline: a decision is free text and
+ *  would break out of an onclick="…('…')" attribute the first time one carried
+ *  an apostrophe — the reason the dashboard binds its own buttons that way. */
+function decisionForm(id, eventId) {
+  if (!CAN_EDIT) {
+    return '<div class="dec-actions"><span class="dec-hint">Read-only: connect to the folder ' +
+      "(or run the server) to record a decision from here.</span></div>";
+  }
+  return '<div class="dec-actions">' +
+    '<input type="text" placeholder="What was decided, and why" ' +
+    'data-decision-for="' + escapeHtmlStr(id) + '" data-resolves="' + escapeHtmlStr(eventId) + '">' +
+    '<button type="button" class="btn-action primary" data-decision-submit="1">Record</button>' +
+    "</div>";
+}
+
+async function submitDecision(input) {
+  const text = String(input.value || "").trim();
+  if (!text) { toast("A decision with no content records that something was settled and leaves out what", "error"); return; }
+  if (!state.actor) { toast("Say who you are first — the actor picker is in the header", "error"); return; }
+  try {
+    const res = await fetch("api/decision", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: input.dataset.decisionFor,
+        reason: text,
+        resolves: input.dataset.resolves || null,
+        actor: state.actor,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
+    toast(input.dataset.decisionFor + ": decision recorded", "success");
+    // The history is what the panel counts from, so it is re-read before the
+    // redraw — otherwise the answered question would still be sitting there.
+    await refreshHistory(input.dataset.decisionFor, true);
+    renderDecisions();
+  } catch (e) {
+    toast("The decision was not recorded: " + e.message, "error");
+  }
+}
+
+function toggleDecisionsMine() {
+  state.decisionsMine = !state.decisionsMine;
+  renderDecisions();
+  decisionsSyncHash();
+}
+
+/** The count on the tab, so the panel is visible from wherever you are. */
+function updateDecisionsCount() {
+  const tab = document.getElementById("tabDecisions");
+  if (!tab) return;
+  const n = decisionPanel(ALL_TASKS, HISTORY, { archivedStatuses: CONFIG.archivedStatuses }).length;
+  tab.innerHTML = "Waiting on you" + (n ? '<span class="tab-count">' + n + "</span>" : "");
+}
+
+function decisionsSyncHash() {
+  if (state.view !== "decisions") return;
+  const next = "#decisions" + (state.decisionsMine ? "?mine=1" : "");
+  if (window.location.hash !== next) {
+    history.replaceState(null, "", window.location.pathname + window.location.search + next);
+  }
+}
+
+document.getElementById("decisionsView").addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-decision-submit]");
+  if (btn) submitDecision(btn.previousElementSibling);
+});
+document.getElementById("decisionsView").addEventListener("keydown", (e) => {
+  if (e.key !== "Enter") return;
+  const input = e.target.closest("[data-decision-for]");
+  if (!input) return;
+  e.preventDefault();
+  submitDecision(input);
+});
+
+window.toggleDecisionsMine = toggleDecisionsMine;
+
 function setView(view) {
   state.view = view;
   document.body.classList.toggle("view-dashboard", view === "dashboard");
   document.body.classList.toggle("view-execution", view === "execution");
+  document.body.classList.toggle("view-decisions", view === "decisions");
   for (const btn of document.querySelectorAll(".view-tab")) {
     btn.classList.toggle("is-active", btn.dataset.view === view);
   }
   if (view === "dashboard") renderDashboard();
   if (view === "execution") renderExecution_();
+  if (view === "decisions") renderDecisions();
 }
 
 function dashFilterTo(key, value) {
@@ -5091,6 +5340,9 @@ document.getElementById("dashboardView").addEventListener("change", (e) => {
 // ─── Render all ───────────────────────────────────────────────────────
 function render() {
   renderBoardScope();
+  // The tab's count is refreshed on EVERY render, not only inside the panel:
+  // its whole job is to be seen from the view you are already on.
+  updateDecisionsCount();
   renderStats();
   renderFilters();
   renderCards();
@@ -5102,6 +5354,7 @@ function render() {
   // so a refresh that did not redraw it would leave a card in a status the rest
   // of the page no longer shows.
   else if (state.view === "execution") renderExecution_();
+  else if (state.view === "decisions") renderDecisions();
   // The one place where the list rewrites the URL: every change of a filter, a
   // chip, the sorting and the scope ends up here anyway, so there is no route by
   // which the state changes without a link (except the search — that renders cards only).
@@ -5124,6 +5377,12 @@ function handleHash() {
     dashApplyHash(qi < 0 ? "" : raw.slice(qi + 1));
     if (state.view !== "dashboard") setView("dashboard");
     else renderDashboard();
+    return;
+  }
+  if (id === "decisions") {
+    state.decisionsMine = qi >= 0 && new URLSearchParams(raw.slice(qi + 1)).get("mine") === "1";
+    if (state.view !== "decisions") setView("decisions");
+    else renderDecisions();
     return;
   }
   if (id === "execution") {
@@ -5224,6 +5483,7 @@ for (const btn of document.querySelectorAll(".view-tab")) {
     setView(v);
     if (v === "dashboard") window.location.hash = dashEncodeHash();
     else if (v === "execution") window.location.hash = "execution";
+    else if (v === "decisions") window.location.hash = "decisions" + (state.decisionsMine ? "?mine=1" : "");
     else tasksSyncHash();
   });
 }

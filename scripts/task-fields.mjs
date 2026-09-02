@@ -236,6 +236,46 @@ export function isPseudoField(key) {
 }
 
 /**
+ * The questions in this task's history that nothing has answered (TL-114).
+ *
+ * THE DEFINITION, and it is the whole of the state "waiting for a decision":
+ * a question event that no `__decision__.resolves` points at. Computed from the
+ * log, so there is no second file to keep in step with it (law 2) — the panel
+ * (TL-115) and the graph (TL-116) both read this function rather than each
+ * writing the rule out again.
+ *
+ * WHAT COUNTS AS A QUESTION: a `__comment__`. The tool cannot tell a question
+ * from a remark — both are somebody's sentence — and the honest reading of that
+ * is the generous one: every comment is answerable, and one nobody answered is
+ * open. Guessing at question marks would quietly drop the handoff that ends
+ * "decide which of the two we do", which is the case this exists for.
+ *
+ * PURE, and it takes entries rather than a directory: the callers that matter
+ * (the panel, the graph) already hold the history and must not re-read it per
+ * task.
+ *
+ * IT LIVES HERE, NOT IN history.mjs, for one reason: this file is pasted into
+ * the viewer by source, and the decision panel (TL-115) has to ask the same
+ * question in the browser. A second implementation there would be a second
+ * definition of "waiting for a decision", and the two would part company.
+ * `history.mjs` re-exports it, so every existing caller is unchanged.
+ *
+ * @param {object[]} entries one task's history
+ * @returns {object[]} the unanswered comment entries, in the order they arrived
+ */
+export function openQuestions(entries) {
+  const answered = new Set();
+  for (const e of entries || []) {
+    if (e && e.field === FIELD_DECISION && typeof e.resolves === "string" && e.resolves) {
+      answered.add(e.resolves);
+    }
+  }
+  return (entries || []).filter(
+    (e) => e && e.field === FIELD_COMMENT && !(typeof e.id === "string" && answered.has(e.id))
+  );
+}
+
+/**
  * How ONE history entry reads. PURE, and here rather than inside the viewer's
  * template because a decision written into that template cannot be run from a
  * test — an assertion on the page's HTML passes just as happily for a branch

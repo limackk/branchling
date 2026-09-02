@@ -42,11 +42,14 @@ import {
 import { loadConfigOrExit } from "./config.mjs";
 import { PLAN_FILENAME, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { loadPlan } from "./plan.mjs";
+import { decideTask } from "./decide-task.mjs";
 import { ANY_TASK_ID } from "./task-id.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import {
+  ACTOR_UNKNOWN,
   isValidActor,
   isValidReason,
+  normalizeActor,
   listTaskFiles,
   readAllHistory,
   readHistory,
@@ -484,6 +487,52 @@ async function handle(req, res) {
     }
     const { id, status, actor } = payload || {};
     await handleFieldEdit(res, { id, field: "status", value: status, actor });
+    return;
+  }
+
+  // A decision from the panel (TL-115). It calls the SAME function the `decide`
+  // command calls, so the validation of `--resolves`, the event's shape and the
+  // reserved reasons cannot differ between the terminal and the page — the
+  // lesson §5 of docs/backlog-field-editing-history.md draws from the field
+  // edits (a real path — product-name: allow).
+  if (path === "/api/decision" && req.method === "POST") {
+    let payload;
+    try {
+      payload = JSON.parse(await readBody(req));
+    } catch (e) {
+      sendJson(res, 400, { error: "Malformed JSON: " + e.message });
+      return;
+    }
+    const { id, reason, resolves, actor } = payload || {};
+    const who = normalizeActor(actor || ACTOR_UNKNOWN);
+    if (!isValidActor(who)) {
+      sendJson(res, 400, { error: "The actor `" + who + "` has no valid namespace" });
+      return;
+    }
+    if (!isValidReason(reason || "")) {
+      sendJson(res, 400, {
+        error: "A decision needs its content — and `unknown` and `proven` are the tool's own words",
+      });
+      return;
+    }
+    const result = decideTask({
+      root: BACKLOG_DIR, config: CONFIG, id, actor: who,
+      reason, resolves: resolves || null,
+    });
+    if (!result.ok) {
+      sendJson(res, result.kind === "not-found" ? 404 : 409, { error: result.message, kind: result.kind });
+      return;
+    }
+    // The history moved and nothing else did — the same signal the reconciler
+    // sends, so an open tab refreshes the axis it is showing.
+    for (const client of sseClients) {
+      try { client.write("event: history-changed\ndata: {}\n\n"); } catch { sseClients.delete(client); }
+    }
+    sendJson(res, 200, {
+      ok: true,
+      decision: { id: result.decision.id, ts: result.decision.ts, text: result.decision.to, actor: who },
+      openQuestions: result.open.map((e) => ({ id: e.id, ts: e.ts, text: e.to, actor: e.actor })),
+    });
     return;
   }
 
