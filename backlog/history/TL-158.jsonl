@@ -1,0 +1,6 @@
+{"id":"01M1GXYA2SR8BAGWYB9WA57ETV","ts":"2026-09-02T11:26:49.945Z","task":"TL-158","field":"__created__","from":"","to":"The CI badge and the first publicly visible green run","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GXZ2SN32ZNSKD4D9XJ891N","ts":"2026-09-02T11:27:15.253Z","task":"TL-158","field":"priority","from":"P1","to":"P2","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GXZ2SNC1SY5QC7GZ1SWZKP","ts":"2026-09-02T11:27:15.253Z","task":"TL-158","field":"estimate","from":"2h","to":"30m","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GXZ2SN39B2KJRFG9JK6D4S","ts":"2026-09-02T11:27:15.253Z","task":"TL-158","field":"epic","from":"","to":"Backlog — open source publication","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GXZ2SNY3CNYZ1H4ED397M6","ts":"2026-09-02T11:27:15.253Z","task":"TL-158","field":"labels","from":[],"to":["pre-launch"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GXZ2SNV177BF7DC67VXTAA","ts":"2026-09-02T11:27:15.253Z","task":"TL-158","field":"blocked_by","from":[],"to":["TL-53"],"actor":"unknown","source":"external","reason":"unknown"}

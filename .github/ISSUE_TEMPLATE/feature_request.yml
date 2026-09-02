@@ -1,0 +1,37 @@
+name: Feature request
+description: Something the tool should be able to do
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before writing: this CLI is deliberately a **single-machine** tool.
+        Everything that serves one person in one clone is open and stays open;
+        coordination between people and between clones is out of its scope on
+        purpose — see §3 of `docs/license-and-contributions.md`. A good idea can
+        still fall on the wrong side of that line, and it is better to find out
+        here than at review.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: >
+        What you were trying to do, and what stopped you. Not the solution — the
+        situation. A request stated as a solution hides the constraint that
+        would have chosen a different one.
+    validations:
+      required: true
+  - type: textarea
+    id: today
+    attributes:
+      label: What you do about it today
+      description: The workaround, however ugly. It says how much the gap actually costs.
+    validations:
+      required: true
+  - type: textarea
+    id: shape
+    attributes:
+      label: What you think it should look like
+      description: Optional. A command line, a flag, a field — whatever you had in mind.
+    validations:
+      required: false

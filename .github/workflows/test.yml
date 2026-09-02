@@ -1,0 +1,90 @@
+# The test suite, on every push and every pull request.
+#
+# WHY THIS FILE EARNS ITS KEEP even though the tests already pass locally: a
+# green run here is the only version of "the tests pass" that somebody who does
+# not trust the author can read. The work behind it was already done; this makes
+# it visible.
+#
+# AND ONE THING IT CHECKS THAT A LOCAL RUN CANNOT. CI is the only place the
+# suite runs on a FRESH CLONE — no generated views, no state directory, no
+# `node_modules`, and the code NOT co-located with the data it is asked about.
+# That last difference is the one that produced the class of bug
+# `scripts/tests/non-colocated-layout.test.mjs` exists for: a path computed as
+# `join(__dirname, "..")` is correct for exactly as long as the two sit
+# together.
+name: test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    # THE MATRIX MATCHES `engines` IN package.json, and that is not decoration.
+    # `>=18` with CI on one version is an unverified declaration — either it is
+    # measured or it is narrowed, and this measures it. Two operating systems
+    # because the tool writes lockfiles and reads paths, and those are where the
+    # platforms differ.
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["18", "20", "22"]
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      # NO `npm install`, and its absence is the assertion. The package has zero
+      # dependencies; a workflow that installed anyway would keep passing on the
+      # day that stopped being true.
+      - name: refuse a dependency that crept in
+        shell: bash
+        run: |
+          node -e '
+            const m = JSON.parse(require("fs").readFileSync("package.json", "utf8"));
+            const deps = Object.keys(m.dependencies || {});
+            if (deps.length) { console.error("runtime dependencies appeared: " + deps.join(", ")); process.exit(1); }
+            console.log("zero runtime dependencies — OK");
+          '
+
+      - name: tests
+        run: node --test scripts/tests/*.test.mjs
+
+      # The guards judge the SET, and a change that passes its own test can
+      # still break one — a dangling reference, a board that no longer exists, a
+      # link into a void.
+      - name: guards
+        run: node scripts/cli.mjs check
+
+      # AN ALLOWLIST THAT IS NOT CHECKED HOLDS ONLY UNTIL THE FIRST MISTAKE.
+      # `files` in package.json is what stops this project's own backlog — its
+      # roadmap, its history, somebody's task list — from being published to npm
+      # inside the tarball. It is one line away from being wrong at any time.
+      - name: the tarball carries the tool and not the project's data
+        if: matrix.os == 'ubuntu-latest' && matrix.node == '22'
+        shell: bash
+        run: |
+          npm pack --dry-run --json > /tmp/pack.json
+          node -e '
+            const files = JSON.parse(require("fs").readFileSync("/tmp/pack.json", "utf8"))[0].files
+              .map((f) => f.path);
+            const forbidden = files.filter((f) =>
+              /^(backlog\/|tasks\/|history\/|archive\/|boards\/|docs\/)/.test(f) ||
+              /(^|\/)(config\.yaml|boards\.yaml|plan\.yaml|viewer\.html|INDEX\.yaml|NOW\.yaml)$/.test(f) ||
+              f.startsWith("scripts/tests/"));
+            if (forbidden.length) {
+              console.error("the tarball carries data that is not the tool:\n  " + forbidden.join("\n  "));
+              process.exit(1);
+            }
+            for (const required of ["package.json", "README.md", "LICENSE", "bin/worktrail.mjs",
+                                    "scripts/cli.mjs", "_template.md"]) {
+              if (!files.includes(required)) {
+                console.error("the tarball is missing " + required);
+                process.exit(1);
+              }
+            }
+            console.log(files.length + " file(s), none of them this project’s data — OK");
+          '

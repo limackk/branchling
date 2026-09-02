@@ -1,0 +1,55 @@
+name: Bug report
+description: Something the tool does that it should not, or does not do that it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Three fields below are marked required, and they are the three that
+        settle most reports before anybody has to guess. A report without them
+        usually costs a round trip.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: The command you ran and what it printed. Paste the output rather than describing it.
+      render: console
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: worktrail --version
+      description: If it prints nothing, say so — a missing version means a broken install and that is itself the answer.
+    validations:
+      required: true
+  - type: input
+    id: node
+    attributes:
+      label: node --version
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: macOS 15.1 / Ubuntu 24.04 / Windows 11
+    validations:
+      required: true
+  - type: textarea
+    id: layout
+    attributes:
+      label: Where the backlog is
+      description: >
+        The output of `worktrail where`, if the command runs. Most surprises about
+        "it is reading the wrong backlog" are answered by which RULE resolved the
+        directory, and that is the half nobody can reconstruct afterwards.
+      render: console
+    validations:
+      required: false
