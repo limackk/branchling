@@ -1,0 +1,4 @@
+{"id":"01M1GQ5QCK5NCNT2RBBSXCA3Y7","ts":"2026-09-02T09:28:32.915Z","task":"TL-153","field":"__created__","from":"","to":"The README is a manual that duplicates --help, and it has already drifted","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GRHRTW7CBNJYXXCJ2ZQKD8","ts":"2026-09-02T09:52:36.188Z","task":"TL-153","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M1GRHRTWJV2MG3X96445D9K3","ts":"2026-09-02T09:52:36.188Z","task":"TL-153","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M1GRTKEC7FF2SAN6G8CQHWHT","ts":"2026-09-02T09:57:25.580Z","task":"TL-153","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
