@@ -78,7 +78,7 @@ export const KINDS = {
   audit: {
     since: null, dayZero: null, tasks: null, findings: null,
     closedWithoutTrace: [], skippedBeforeSince: null, reopened: [], rework: [],
-    parked: [], withoutPremise: [], awaitingVouch: [],
+    parked: [], withoutPremise: [], awaitingVouch: [], vouches: [], vouchesByActor: [],
   },
   // `stats --json`. The tallies stay nested under `stats` instead of being
   // spread across the root: a future tally called `kind` would otherwise

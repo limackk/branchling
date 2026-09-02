@@ -44,7 +44,7 @@ export const MIGRATIONS_FILE = ".migrations.jsonl";
 // source, so the browser and node see the same list). Here only a re-export, so
 // that existing imports from history.mjs keep working.
 export { FIELD_CREATED, FIELD_DELETED, FIELD_BODY, FIELD_COMMENT, FIELD_VERIFIED, FIELD_UNVERIFIED,
-  FIELD_ROLE_OVERRIDE, FIELD_DECISION, FIELD_ATTRIBUTED, openQuestions, outstandingVouches, VOUCH_REFUSALS,
+  FIELD_ROLE_OVERRIDE, FIELD_DECISION, FIELD_ATTRIBUTED, openQuestions, outstandingVouches, VOUCH_REFUSALS, VOUCH_SOURCES,
   PSEUDO_FIELDS, isPseudoField,
   ACTOR_NAMESPACES, ACTOR_UNKNOWN, actorParts, isValidActor, normalizeActor,
   REASON_UNKNOWN, REASON_PROVEN, REASON_SENTINELS, REASON_MAX_LENGTH, hasStatedReason, isValidReason,

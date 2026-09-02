@@ -254,6 +254,7 @@ export function runContract(entries, cwd, opts = {}) {
       const decision = opts.manual ? opts.manual(e, i) : { ok: null };
       const row = { id: e.id, kind: "manual", command: e.manual, ok: decision.ok, exitCode: null, ms: 0 };
       if (decision.vouchedBy) row.vouchedBy = decision.vouchedBy;
+      if (decision.vouch) row.vouch = decision.vouch;
       results.push(row);
       if (decision.ok === false) return { results, failed: { entry: e, kind: "manual" } };
       continue;
@@ -540,7 +541,12 @@ function run(argv) {
       }
       log(plan.json, "  " + OKM + " vouched for by " + actor);
       log(plan.json, "");
-      return { ok: true, vouchedBy: actor };
+      // WHICH path vouched, not merely that one did (TL-171). `--confirm-manual`
+      // answers every manual entry in the contract at once and a typed word
+      // answers this one; both are legitimate, and a table that could not tell
+      // them apart would be reporting the guarantee and the ritual as one
+      // number.
+      return { ok: true, vouchedBy: actor, vouch: plan.confirmManual ? "flag" : "typed" };
     },
   });
 
@@ -679,7 +685,7 @@ function run(argv) {
     const ts = new Date().toISOString();
     appendEntries(root, before.id, vouched.map((v) => ({
       id: eventId(ts), ts, task: before.id, field: FIELD_VERIFIED,
-      from: "", to: v.command, actor, source: "done",
+      from: "", to: v.command, actor, source: "done", vouch: v.vouch,
       reason: statedReason || REASON_PROVEN,
       session: currentSession(root),
     })));

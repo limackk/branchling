@@ -47,7 +47,7 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadConfigOrExit } from "./config.mjs";
-import { outstandingVouches, readAllHistory } from "./history.mjs";
+import { FIELD_VERIFIED, outstandingVouches, readAllHistory } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
@@ -73,6 +73,11 @@ export const USAGE = [
   "                           carrying an empty `blocked_by`",
   "    awaiting a vouch       open, with a closing run stopped at a `manual:`",
   "                           entry nobody has vouched for",
+  "",
+  "  It also TABLES, without calling them findings, the `manual:` entries that WERE",
+  "  vouched for — per actor, and split by whether somebody typed the confirmation",
+  "  or passed `--confirm-manual`. Neither is wrong; a backlog where every human",
+  "  check is answered by the flag has manual entries in name only.",
   "",
   "  --since <date>  the earliest closing date to judge. Defaults to the day the",
   "                  log first recorded a status transition: a task closed before",
@@ -300,6 +305,57 @@ export function awaitingVouch(tasks, history, { archived }) {
   return { found, reason: null };
 }
 
+/**
+ * Who stood behind the `manual:` entries this backlog closed, and how (TL-171).
+ *
+ * WHY THIS IS A TABLE AND NOT A FINDING. One agent vouching for one manual
+ * entry is not a defect; it is what `--confirm-manual` is FOR, and an
+ * unattended queue has nothing else. What is worth seeing is the pattern across
+ * many — a backlog where every human check is answered by the flag has manual
+ * entries in name only. So this reports and never changes the exit code, the
+ * same way the rework table does.
+ *
+ * `typed` and `flag` are counted apart because that is the whole question. An
+ * entry from before the distinction was recorded counts as `unrecorded` and is
+ * never assigned to either: the log is append-only, and a guess about who
+ * pressed what a month ago would be exactly the invented attribution the rest
+ * of this file refuses.
+ *
+ * The rate is the share answered by the flag, and it obeys `min_report_n` for
+ * the reason the rework table does — a percentage over three vouches reads like
+ * one over three hundred.
+ */
+export function vouches(history, { minN }) {
+  const byActor = new Map();
+  const found = [];
+  for (const id of Object.keys(history || {}).sort()) {
+    for (const e of history[id] || []) {
+      if (e.field !== FIELD_VERIFIED) continue;
+      const actor = e.actor || "unknown";
+      const how = e.vouch === "typed" || e.vouch === "flag" ? e.vouch : "unrecorded";
+      found.push({ task: id, actor, how, when: day(e.ts), manual: e.to || "" });
+      if (!byActor.has(actor)) byActor.set(actor, { actor, vouches: 0, typed: 0, flag: 0, unrecorded: 0 });
+      const row = byActor.get(actor);
+      row.vouches++;
+      row[how]++;
+    }
+  }
+  const table = [...byActor.values()]
+    .sort((a, b) => b.vouches - a.vouches)
+    .map((row) => {
+      // Only the entries that SAY how they were given can carry a rate. A
+      // denominator that quietly included the unrecorded ones would report a
+      // backlog as more careful than anything here can know it to be.
+      const known = row.typed + row.flag;
+      return {
+        ...row,
+        rate: known >= minN ? Math.round((row.flag / known) * 1000) / 1000 : null,
+        enough: known >= minN,
+      };
+    });
+  return { found, table };
+}
+
 /** Every detector, over one read. PURE. */
 export function auditBacklog({ tasks, history, config, since, today }) {
   const archived = config.archivedStatuses || [];
@@ -313,6 +369,7 @@ export function auditBacklog({ tasks, history, config, since, today }) {
   });
   const premise = withoutPremise(tasks, { reasonRequired: config.reasonRequiredStatuses, archived });
   const vouch = awaitingVouch(tasks, history, { archived });
+  const given = vouches(history, { minN: config.minReportN });
 
   const findings = trace.found.length + reopen.found.length + stale.found.length +
     premise.found.length + vouch.found.length;
@@ -326,6 +383,9 @@ export function auditBacklog({ tasks, history, config, since, today }) {
     parked: stale,
     withoutPremise: premise,
     awaitingVouch: vouch,
+    // NOT added to `findings`: a vouch is a fact about how work was closed, not
+    // a disagreement between a declaration and its trace.
+    vouches: given,
   };
 }
 
@@ -383,6 +443,23 @@ export function render(report, config) {
     "a closing run stopped at a `manual:` entry; the automatic ones passed and nobody has vouched for this");
 
   out.push("");
+  out.push(heading("  vouched `manual:` entries  (" + report.vouches.found.length + ")"));
+  if (!report.vouches.found.length) {
+    // An empty section and a missing one must not look alike. "nobody has ever
+    // vouched here" is an answer; silence is the absence of one, and this whole
+    // file exists because the two were being confused.
+    out.push("  " + color.dim("no `manual:` entry in this backlog has been vouched for — nothing to report, not nothing to see"));
+  } else {
+    out.push("  " + color.dim("who stood behind a check no command could run, and how they said so:"));
+    out.push(table(report.vouches.table.map((r) => [
+      "   ", r.actor, r.vouches + " vouched", r.typed + " typed", r.flag + " by flag",
+      r.unrecorded ? r.unrecorded + " unrecorded" : "",
+      r.enough ? (r.rate * 100).toFixed(0) + "% by flag" : color.dim("not enough (needs " + config.minReportN + ")"),
+    ])));
+    out.push("  " + color.dim("`--confirm-manual` is legitimate and is what an unattended run has. This is a REPORT: a backlog where every human check is answered by the flag has manual entries in name only, and that is worth seeing, not punishing."));
+  }
+
+  out.push("");
   out.push(report.findings
     ? "  " + color.warn(MARK.warn) + " " + report.findings + " finding(s). This is a REPORT: nothing was changed, and nothing failed."
     : "  " + color.ok(MARK.ok) + " nothing to report — every declaration has the trace it should have.");
@@ -430,6 +507,8 @@ export function main(argv, today = new Date().toISOString().slice(0, 10)) {
       parked: report.parked.found,
       withoutPremise: report.withoutPremise.found,
       awaitingVouch: report.awaitingVouch.found,
+      vouches: report.vouches.found,
+      vouchesByActor: report.vouches.table,
     });
     return report.findings ? 1 : 0;
   }

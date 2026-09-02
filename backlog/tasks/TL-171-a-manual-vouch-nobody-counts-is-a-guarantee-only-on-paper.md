@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Agentic differentiators"
 priority: P1
-status: pending
-owner: unassigned
+status: done
+owner: agent:claude
 role: ""
 executor: ""
 estimate: 4h
@@ -95,10 +95,10 @@ task wants to make visible, not a fault of TL-89's author in particular.
 
 ## Acceptance criteria
 
-- [ ] `audit` reports vouched `manual:` entries with the actor that stood behind
+- [x] `audit` reports vouched `manual:` entries with the actor that stood behind
       each one. [proof: vouches]
-- [ ] `audit --json` carries the same finding for a program. [proof: vouches]
-- [ ] A backlog with no vouches reports that, rather than going quiet — an empty
+- [x] `audit --json` carries the same finding for a program. [proof: vouches]
+- [x] A backlog with no vouches reports that, rather than going quiet — an empty
       section and a missing one must not look alike. [proof: vouches]
-- [ ] The existing four findings and the per-actor table are unchanged.
-      [proof: suite]
+- [x] Every finding that existed before this task, and the rework table, are
+      unchanged. [proof: suite]

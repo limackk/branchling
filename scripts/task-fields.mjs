@@ -240,6 +240,25 @@ export const FIELD_UNVERIFIED = "__unverified__";
  */
 export const VOUCH_REFUSALS = ["no-terminal", "json", "declined"];
 
+/**
+ * HOW a `__verified__` vouch was given (TL-171). Both paths produce the same
+ * event and always have; the difference between them is the one thing worth
+ * counting, so it is recorded rather than inferred.
+ *
+ *   typed  somebody read the prompt and typed the confirmation word, for THIS
+ *          entry, in a terminal
+ *   flag   `--confirm-manual`, which vouches for every manual entry in the
+ *          contract at once. Legitimate — it is what an unattended run has —
+ *          and also the path of least resistance, which is why the two are not
+ *          one number
+ *
+ * ABSENT IS NOT A THIRD VALUE. Entries written before this distinction existed
+ * carry no `vouch` at all, and the log is append-only, so nothing may go back
+ * and decide which they were. They are counted as unrecorded and reported as
+ * such — the same discipline `unknown` gets for an actor nobody can name.
+ */
+export const VOUCH_SOURCES = ["typed", "flag"];
+
 // A task taken by somebody outside the role it asks for (TL-97). A
 // pseudo-field for the same reason as `__verified__`: nothing in the frontmatter
 // changes, so `diffMeta` cannot see it. `from` is the role the task asks for,
