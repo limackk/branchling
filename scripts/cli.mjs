@@ -39,6 +39,7 @@ import { ConfigError, formatConfigError, loadConfig } from "./config.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { failure } from "./ui.mjs";
 import { resolveBacklogDir } from "./paths.mjs";
+import { FIELD_SHAPES } from "./task-fields.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -380,7 +381,21 @@ export const COMMANDS = {
   new: {
     script: "new-task.mjs",
     summary: "create a task from the template — numbered across every branch, not max+1",
-    usage: `${N} new --title "…" [--board b] [--priority P1] [--epic e] [--estimate 2h]`,
+    usage: [
+      `${N} new --title "<text>" [--board <b>] [--priority <p>] [--status <s>] [--type <t>]`,
+      `          [--owner <o>] [--epic <e>] [--estimate <2h>] [--dir <path>]`,
+      "",
+      "  Every field marked below draws its values from THIS project's config.yaml,",
+      "  and a value outside the vocabulary FAILS rather than being written:",
+      "",
+      "  --priority <p>  from `priorities:`",
+      "  --status <s>    from `statuses:`",
+      "  --type <t>      from `types:`",
+      "  --owner <o>     from `owners:`",
+      "  --board <b>     from the board registry; the default is used when omitted",
+      "",
+      `  \`${N} new --help --json\` prints those lists, so nothing has to be guessed.`,
+    ].join("\n"),
   },
   seed: {
     script: "seed-backlog.mjs",
@@ -765,6 +780,152 @@ export function commandHelpText(name, spec) {
 }
 
 /**
+ * The flags a command accepts, READ OUT OF ITS OWN HELP (TL-83).
+ *
+ * WHY DERIVED AND NOT DECLARED IN A SECOND TABLE. The obvious design is a
+ * `flags:` array beside `usage:` in the command table — and it would be a
+ * SECOND place to be wrong, drifting from the prose the moment somebody
+ * documents a flag in one and not the other. Worse, the drift would be
+ * invisible: an agent reading `--help --json` and a person reading `--help`
+ * would be told different things about the same command, and neither would
+ * have a reason to compare. Derivation cannot drift, because there is one
+ * source.
+ *
+ * WHAT COUNTS AS A DECLARATION, precisely, so prose does not become surface:
+ *
+ *   - a SYNOPSIS line — one beginning with the product name — contributes every
+ *     flag on it;
+ *   - a FLAG line — one whose first non-space token is `--something` —
+ *     contributes that flag.
+ *
+ * A `--json` mentioned mid-sentence contributes nothing, which is the point: an
+ * explanation is not an interface. A flag that exists but is documented in
+ * neither place is invisible here, and that is the correct answer — an
+ * undocumented flag is not a promise the tool has made.
+ *
+ * `required` is read from the synopsis: a flag NOT wrapped in `[…]` there is
+ * one the command refuses to run without.
+ *
+ * PURE — a test asks about a usage string, not about a spawned command.
+ *
+ * @returns {Array<{flag: string, arg: string|null, required: boolean}>}
+ */
+export function describeFlags(usage) {
+  const found = new Map();
+  const add = (flag, arg, required) => {
+    const prev = found.get(flag);
+    if (!prev) return void found.set(flag, { flag, arg: arg || null, required: !!required });
+    if (arg && !prev.arg) prev.arg = arg;
+    if (required) prev.required = true;
+  };
+
+  // THE SYNOPSIS IS THE BLOCK BEFORE THE FIRST BLANK LINE, wrapped continuation
+  // lines included. Recognising it by "starts with the product name" would drop
+  // every second line of a two-line synopsis — and drop it SILENTLY, which is
+  // the failure this whole mechanism exists to prevent.
+  let inSynopsis = true;
+  for (const raw of String(usage || "").split("\n")) {
+    const line = raw.trim();
+    if (!line) { inSynopsis = false; continue; }
+
+    if (inSynopsis) {
+      // A flag is OPTIONAL when it stands inside brackets, and the test is the
+      // bracket DEPTH at its position rather than a `[` immediately before it:
+      // in `[--json|--files|--count]` only the first alternative has one, and a
+      // naive test would report the other two as required — the tool demanding
+      // flags it does not want. The optional quotes catch `--title "<text>"`,
+      // quoted in the synopsis because a caller has to quote it too.
+      let depth = 0;
+      const re = /\[|\]|(--[a-z][a-z0-9-]*)(?:[ =]"?(<[^>]+>)"?)?/g;
+      for (const m of line.matchAll(re)) {
+        if (m[0] === "[") { depth++; continue; }
+        if (m[0] === "]") { depth = Math.max(0, depth - 1); continue; }
+        add(m[1], m[2], depth === 0);
+      }
+      continue;
+    }
+
+    const m = line.match(/^(--[a-z][a-z0-9-]*)(?:[ =]"?(<[^>]+>)"?)?/);
+    if (m) add(m[1], m[2], false);
+  }
+  return [...found.values()].sort((a, b) => a.flag.localeCompare(b.flag));
+}
+
+/**
+ * Which configuration vocabulary a flag draws its values from.
+ *
+ * The mapping is from the FIELD, not from the flag's spelling, and the field's
+ * dictionary is `FIELD_SHAPES`' — the same one the viewer and every guard read.
+ * A list of values written here would be this file's opinion about somebody
+ * else's project (Law 3), and it would be wrong for every backlog that renamed
+ * a status.
+ *
+ * The two entries not in `FIELD_SHAPES` are the tool's OWN closed vocabularies:
+ * `--actor` takes a namespace this code defines, and `--to-role` is `role` under
+ * another name.
+ */
+const FLAG_DICTIONARY = {
+  "--to-role": "roles", "--from-role": "roles",
+  // Two fields whose values are OBSERVED in the tree rather than declared, and
+  // which the writing commands nevertheless refuse outside `config.yaml`.
+  "--owner": "owners", "--to-owner": "owners", "--board": "boards",
+  // The field is `labels`, the flag is singular on every command that filters by
+  // one — so the derivation from FIELD_SHAPES below cannot reach it.
+  "--label": "labels",
+};
+for (const shape of FIELD_SHAPES) {
+  if (shape.dictionary) FLAG_DICTIONARY["--" + shape.key.replace(/_/g, "-")] = shape.dictionary;
+}
+
+/**
+ * A vocabulary's values, and whether it is CLOSED — that is, whether a value
+ * outside it is refused.
+ *
+ * The distinction is the whole usefulness of this for an agent. `labels:` is
+ * open unless the project says otherwise, so an empty list there means "invent
+ * your own", while an empty `statuses:` would mean the opposite. Reported as one
+ * array, the two would be indistinguishable and an agent would be wrong about
+ * one of them every time.
+ */
+function vocabulary(dictionary, config) {
+  if (!config) return { values: null, closed: null };
+  if (dictionary === "boards") return { values: (config.boards || []).map((b) => b.slug), closed: true };
+  if (dictionary === "labels") return { values: config.labels || [], closed: !!config.labelsClosed };
+  return { values: config[dictionary] || [], closed: true };
+}
+
+/**
+ * One command's input surface, for a program (TL-83).
+ *
+ * WHY THE VALUES COME FROM THE BACKLOG BEING READ. An agent that has to guess a
+ * status will guess, fail and retry, and that loop is the only reason a strict
+ * vocabulary is ever experienced as a nuisance. The strictness is not the
+ * problem — the list being unavailable at the moment it is needed is. So this
+ * narrows the input space rather than validating after the fact, and it narrows
+ * it to THIS project's words: `config.yaml`, never a literal here.
+ *
+ * A backlog that cannot be resolved is not an error: `--help` is exactly what
+ * somebody types before they have one. The flags are then described without
+ * their values, and `dictionary` still names where the values would come from.
+ */
+export function commandHelpJson(name, spec, config) {
+  const flags = describeFlags(spec.usage).map((f) => {
+    const dictionary = FLAG_DICTIONARY[f.flag] || null;
+    const { values, closed } = dictionary ? vocabulary(dictionary, config) : { values: null, closed: null };
+    return { ...f, dictionary, values, closed };
+  });
+  return {
+    command: name,
+    summary: spec.summary,
+    usage: String(spec.usage || ""),
+    // `null` and not `[]` when there is no backlog: an empty vocabulary is a
+    // decision a project can make, and it must not read as "we did not look".
+    configured: !!config,
+    flags,
+  };
+}
+
+/**
  * Whether a command's arguments are asking for help (TL-51).
  *
  * WHY THIS SITS HERE AND NOT IN EVERY COMMAND. The main help promises
@@ -788,6 +949,89 @@ export function wantsHelp(args) {
     if (COMMAND_HELP_FLAGS.includes(a)) return true;
   }
   return false;
+}
+
+/**
+ * The fields `--append-<field>` may build up, one call argument at a time.
+ *
+ * ONE ENTRY TODAY, and that is not an oversight: `--reason` is the only input
+ * anybody writes a paragraph into. TL-80 and TL-82 add commands that write
+ * prose, and they join this list rather than inventing their own mechanism.
+ * A general "append to any text flag" would make `--append-title` look like an
+ * interface the tool offers, which it does not.
+ */
+export const APPENDABLE_FIELDS = ["reason"];
+
+/**
+ * `--append-<field> "line"` folded into one `--<field>` before the spawn (TL-83).
+ *
+ * WHY THIS EXISTS AT ALL. Agent sandboxes built on tree-sitter reject the
+ * `$'a\nb'` shell syntax, so an agent inside one has no way to put a second line
+ * into a flag value in a single call. It is not a nuisance but a hard wall: the
+ * only inputs it can express are single-line ones. Repeatable `--append-` flags
+ * are the way round it, which is why they are the form recommended to agents.
+ *
+ * THE ORDER IS DEFINED, because an undefined one makes the same set of flags
+ * mean different things on different days: `--<field>` REPLACES and is applied
+ * first, then every `--append-<field>` in COMMAND-LINE order, each on its own
+ * line. So `--reason A --append-reason B` is "A\nB" and never "B\nA", whichever
+ * side of the line the flags were typed on.
+ *
+ * WHY IN THE DISPATCHER and not in each command, the same argument
+ * `takeColorFlags` makes: the alternative is adding the flag to the allowed list
+ * in every writing command — that is, one chance per command to forget it, and
+ * one place per command to change for the next such flag. The commands keep
+ * their own validation and never learn this flag exists.
+ *
+ * A command that does not accept `--<field>` is REFUSED here rather than handed
+ * a flag it will reject as unknown: the second message would name a flag the
+ * user did not type.
+ *
+ * @returns {{argv: string[], error: string|null}}
+ */
+export function foldAppendFlags(argv, accepts = () => true) {
+  const appends = new Map();
+  const base = new Map();
+  const rest = [];
+  let passthrough = false;
+
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (passthrough) { rest.push(a); continue; }
+    if (a === "--") { passthrough = true; rest.push(a); continue; }
+
+    const m = a.match(/^--append-([a-z][a-z0-9-]*)$/);
+    if (!m) {
+      // Remember where the base value was given, so the fold rewrites it in
+      // place rather than moving the flag to the end of the line.
+      const field = APPENDABLE_FIELDS.find((f) => a === "--" + f);
+      if (field && argv[i + 1] !== undefined) {
+        base.set(field, rest.length + 1);
+        rest.push(a, argv[++i]);
+        continue;
+      }
+      rest.push(a);
+      continue;
+    }
+    const field = m[1];
+    if (APPENDABLE_FIELDS.indexOf(field) < 0) {
+      return { argv, error: "unknown flag: " + a + "\n`--append-` builds up: " + APPENDABLE_FIELDS.map((f) => "--append-" + f).join(" ") };
+    }
+    if (!accepts("--" + field)) {
+      return { argv, error: a + " has nothing to append to — this command takes no `--" + field + "`" };
+    }
+    const value = argv[++i];
+    if (value === undefined) return { argv, error: a + " requires a value" };
+    if (!appends.has(field)) appends.set(field, []);
+    appends.get(field).push(value);
+  }
+
+  for (const [field, lines] of appends) {
+    const at = base.get(field);
+    if (at === undefined) rest.push("--" + field, lines.join("\n"));
+    else rest[at] = [rest[at], ...lines].join("\n");
+  }
+  return { argv: rest, error: null };
 }
 
 /**
@@ -1102,12 +1346,39 @@ export function main(argv) {
 
   if (wantsHelp(resolved.args)) {
     // Help goes to stdout and exits zero: this is not a usage error.
+    if (resolved.args.includes("--json")) {
+      // Law 4's other half (TL-83): the reading commands answer in JSON, and so
+      // does the description of how to CALL the writing ones. Without a
+      // configuration the flags are still described — `--help` is what somebody
+      // types before they have a backlog.
+      let config = null;
+      try {
+        const dirFlag = resolved.args.indexOf("--dir");
+        config = loadConfig(resolveBacklogDir({
+          dir: dirFlag >= 0 ? resolved.args[dirFlag + 1] : undefined, moduleDir: HERE,
+        }).root);
+      } catch {
+        // No backlog here, or one that will not load. Neither stops the answer.
+      }
+      printJson("command-help", commandHelpJson(resolved.name, resolved.spec, config));
+      return 0;
+    }
     console.log(commandHelpText(resolved.name, resolved.spec));
     return 0;
   }
 
-  if (resolved.name === "check") return runCheck(resolved.args);
-  return runScript(resolved.spec.script, resolved.args, tinted.force);
+  // BEFORE the command sees its arguments (TL-83), and after help: `--help
+  // --append-reason x` is a question about the interface, not a use of it.
+  const declared = new Set(describeFlags(resolved.spec.usage).map((f) => f.flag));
+  const folded = foldAppendFlags(resolved.args, (flag) => declared.has(flag));
+  if (folded.error) {
+    const [head, ...detail] = folded.error.split("\n");
+    console.error(failure(N + " " + resolved.name, head, detail, [N + " " + resolved.name + " --help"]));
+    return 2;
+  }
+
+  if (resolved.name === "check") return runCheck(folded.argv);
+  return runScript(resolved.spec.script, folded.argv, tinted.force);
 }
 
 if (process.argv[1] && process.argv[1].endsWith("cli.mjs")) {

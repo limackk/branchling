@@ -2,3 +2,6 @@
 {"id":"01M1E69RE2YJQZDS5CM0E54T84","ts":"2026-09-01T09:55:10.402Z","task":"TL-83","field":"related_docs","from":["docs/tasklog-global-tool.md"],"to":["docs/worktrail-global-tool.md"],"actor":"unknown","source":"external"}
 {"id":"01M1GFKZK5XCZ90X3TE5YX9VDK","ts":"2026-09-02T07:16:31.461Z","task":"TL-83","field":"title","from":"Wejście komend piszących: enumy ze słowników i --append- zamiast wieloliniowych stringów","to":"Input surface of writing commands: enums from dictionaries and --append instead of multiline strings","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK538FS40Y8JAFX9BYM","ts":"2026-09-02T07:16:31.461Z","task":"TL-83","field":"epic","from":"Powierzchnia CLI","to":"CLI surface","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1H1MCMET10PFXZY1J7EEA2Y","ts":"2026-09-02T12:31:19.182Z","task":"TL-83","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1H1MCMER99VN0BYD4ZYFBF1","ts":"2026-09-02T12:31:19.182Z","task":"TL-83","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1H2515QNCQWEGX8VR7JNTDF","ts":"2026-09-02T12:40:24.503Z","task":"TL-83","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

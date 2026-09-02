@@ -54,6 +54,12 @@ export const KINDS = {
   // says whether the git index could be computed at all (TL-75): zero matches
   // and an unscanned repository are otherwise the same empty `tasks`.
   "task-list": { tasks: [], total: null, limit: null, scan: null, modifiedFile: null },
+  // `<command> --help --json` (TL-83). `flags` describes the input surface, and
+  // a flag drawing on a vocabulary carries THIS project's values in `values` —
+  // so an agent narrows its input instead of guessing and retrying. `configured`
+  // says whether a backlog was found at all: `values: null` under
+  // `configured: false` is "nobody looked", not "the vocabulary is empty".
+  "command-help": { command: null, summary: null, usage: null, configured: null, flags: [] },
   // `stats --json`. The tallies stay nested under `stats` instead of being
   // spread across the root: a future tally called `kind` would otherwise
   // overwrite the envelope's own key and nobody would notice until a consumer

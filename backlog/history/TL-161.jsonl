@@ -1,0 +1,4 @@
+{"id":"01M1H23EMHENJ88SDXHBEKS7MH","ts":"2026-09-02T12:39:32.753Z","task":"TL-161","field":"__created__","from":"","to":"query accepts a status outside the vocabulary and answers zero","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1H246NSAPVYSCANGGGVTFXN","ts":"2026-09-02T12:39:57.369Z","task":"TL-161","field":"priority","from":"P1","to":"P2","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1H246NSQM7JWQ094VKSFAKK","ts":"2026-09-02T12:39:57.369Z","task":"TL-161","field":"type","from":"task","to":"bug","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1H246NSYCPYKQR427X186HK","ts":"2026-09-02T12:39:57.369Z","task":"TL-161","field":"epic","from":"","to":"CLI surface","actor":"unknown","source":"external","reason":"unknown"}

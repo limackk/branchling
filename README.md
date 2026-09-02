@@ -307,6 +307,55 @@ worktrail doctor --json | jq -e '.ok'          # a gate in CI
 worktrail done TASK-42 --json | jq '.entries[] | select(.ok | not)'
 ```
 
+### Calling it from an agent
+
+**`<command> --help --json` describes the input surface** — every flag, whether
+it takes a value, whether it is required, and for a flag drawing on a vocabulary
+the values *this* project allows:
+
+```bash
+worktrail new --help --json | jq '.flags[] | select(.dictionary) | {flag, values}'
+```
+
+The lists come from your `config.yaml`, so nothing has to be guessed. An unknown
+value still fails — this adds the list, not leniency. The point is that failing
+on a value you could not have known was wrong is what makes strictness feel like
+an obstacle; the strictness itself is what keeps a vocabulary a vocabulary.
+
+`closed: false` on a flag means a value outside the list is accepted (open
+labels); `values: null` with `configured: false` means no backlog was found, not
+that the vocabulary is empty.
+
+**Multiline values have three forms, and only two of them work everywhere:**
+
+```bash
+worktrail handoff TASK-42 --to-role reviewer --reason "First line.
+Second line."                                    # a real newline: fine in a shell
+
+worktrail handoff TASK-42 --to-role reviewer --reason $'First line.\nSecond line.'
+                                                 # rejected by some agent sandboxes
+
+worktrail handoff TASK-42 --to-role reviewer \
+  --reason "First line." --append-reason "Second line."   # works everywhere
+```
+
+**`--append-<field>` is the form to use from an agent.** Sandboxes built on
+tree-sitter reject `$'a\nb'` outright, which leaves an agent inside one unable to
+express any value with a newline in it. Repeating `--append-reason` builds the
+value up one argument at a time instead.
+
+The order is defined so the same flags always mean the same thing: `--<field>`
+replaces and is applied first, then every `--append-<field>` in command-line
+order, each on its own line. A command that has no `--<field>` refuses
+`--append-<field>` rather than passing on a flag you never typed.
+
+One honest note: `--reason` is stored in the history as a single line, so its
+newlines are collapsed there. `--append-reason` still preserves your order, and
+the field is the first of several — the commands that write longer prose join
+the same mechanism rather than inventing their own.
+
+---
+
 ### Why does this file look like this
 
 `git log <file>` says who changed a file and when. It does not say **as part of

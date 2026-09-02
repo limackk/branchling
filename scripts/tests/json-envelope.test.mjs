@@ -87,6 +87,10 @@ const READING = {
   // A backlog with no `activity/` at all: the answer has to stay a complete
   // envelope, with zero counted rather than a section missing (TL-27).
   time: ["time", "--json"],
+  // The input surface of ONE command, for a program to read before it calls it
+  // (TL-83). `new` is the one whose flags draw on the most vocabularies, so a
+  // fixture answering it exercises the part that varies per project.
+  "command-help": ["new", "--help", "--json"],
 };
 
 /**

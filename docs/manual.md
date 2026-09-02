@@ -536,6 +536,22 @@ implementation detail. Every reading command answers in the same envelope:
 | `plan` | `plan` | `root`, `exists`, `updated`, `rationale`, `waves`, `activeWave`, `nextUp`, `inProgress`, `unplanned`, `stale`, `inProgressStatus` |
 | `time` | `time` | `root`, `closed`, `completed`, `unstamped` (ids, not a count), `leadTimeDays`, `throughput`, `perWeekMean`, `engaged`, `unknown_ratio` |
 | `seed` | `seed` | `ok`, `root`, `dryRun`, `created`, `errors` |
+| `import` | `import` | `ok`, `root`, `dryRun`, `created`, `skipped`, `droppedLabels`, `withoutVerification`, `errors` |
+| `<command> --help` | `command-help` | `command`, `summary`, `usage`, `configured`, `flags` |
+
+**`--help --json` describes how to CALL a command** (TL-83), which is the other
+half of Law 4: the reading commands answer in JSON, and so does the description
+of the writing ones' input. Each entry in `flags` carries `flag`, `arg` (the
+value placeholder, or `null` for a switch), `required`, and — for a flag drawing
+on a vocabulary — `dictionary` (the `config.yaml` key), `values` (*your*
+project's values) and `closed` (whether a value outside them is refused).
+
+`configured: false` means no backlog was found, and then `values` is `null`
+rather than `[]`: an empty vocabulary is a decision a project can make, and it
+must not read as "nobody looked". The flags are derived from the command's own
+`usage`, so `--help` and `--help --json` cannot come to describe different
+commands; a flag mentioned only in passing in the prose is not part of the
+surface.
 
 **What is promised.**
 
