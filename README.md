@@ -1,9 +1,37 @@
 # worktrail
 
-A backlog that lives in markdown files and is driven from the terminal. One task
-is one file with YAML frontmatter; everything that aggregates them — the index,
-the "what now" view, the archive, the browser page — is **computed** from those
-files and is not committed.
+**A queue your agents draw from, and a tool that does not take their word for
+it.** Tasks are markdown files in your repository. What makes this different
+from every other file-based backlog is what sits on top of them:
+
+- **A queue.** `worktrail next` chooses a task and reserves it in the same
+  act, so two sessions asking at the same moment get two different tasks. It
+  answers with that one task, so asking "what now" costs your agent the same
+  whether the backlog holds forty tasks or four hundred — listing them does
+  not.
+- **A contract.** `worktrail done` RUNS the task's `verification:` commands
+  and refuses to close it if they fail. There is no `--force`. A checkbox
+  ticked by whoever did the work carries no information when that whoever is
+  an agent.
+- **A ledger.** Every change records who made it, through what, and why —
+  and the statuses you list in `reason_required_statuses` cannot be entered
+  without a stated reason at all.
+
+```bash
+worktrail run --agent "claude -p @{task_file}" --max-attempts 2
+```
+
+That is the loop: `next` → your agent → `done`, until the queue is empty.
+worktrail never starts an agent and never will — `--agent` is *your* command
+template, run through *your* shell. A task that fails its contract twice is
+parked with the reason, never closed: a run that could not verify a task may
+not say it is done. Add `--agent-for <role>=<command>` and one queue feeds
+several different hands, with the roles nobody has a command for left waiting
+rather than handed out.
+
+Everything that aggregates tasks — the index, the "what now" view, the
+archive, the browser page — is **computed** from the files and is not
+committed.
 
 Requirements: Node 18+. Zero npm dependencies.
 
@@ -13,11 +41,6 @@ worktrail new --title "…"          # a new task
 worktrail query --status blocked   # ask a question instead of reading everything
 worktrail                          # the viewer, in your browser
 ```
-
-> **This file is written in English on purpose.** The repository's own
-> documentation and its task files are Polish; `worktrail` is a tool meant to be
-> installed into other people's repositories, so everything a user of the tool
-> reads is English. The boundary is the directory, not the topic.
 
 ---
 

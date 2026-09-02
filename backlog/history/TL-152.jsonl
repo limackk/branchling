@@ -1,0 +1,3 @@
+{"id":"01M1GPRWW7AN0S9YRMEWS804SS","ts":"2026-09-02T09:21:32.551Z","task":"TL-152","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M1GPRWW7SECSG7SM66SYMB40","ts":"2026-09-02T09:21:32.551Z","task":"TL-152","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M1GPTJNVA8C0349JPXHCWZ42","ts":"2026-09-02T09:22:27.643Z","task":"TL-152","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
