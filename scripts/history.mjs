@@ -599,10 +599,12 @@ export function recordEdit(backlogDir, opts) {
  * batch of their own edits) passes `reason` and speaks for themselves.
  *
  * @param {string} backlogDir
- * @param {{actor?: string, source?: string, ts?: string, only?: string[], reason?: string}} opts
+ * @param {{actor?: string, source?: string, ts?: string, only?: string[], reason?: string,
+ *          dryRun?: boolean}} opts
  *        `only` narrows to selected ids (the hook knows one file — there is no
- *        reason for it to read the whole tree).
- * @returns {{entries: object[], seeded: boolean}}
+ *        reason for it to read the whole tree). `dryRun` computes the entries
+ *        and writes NOTHING — neither the log nor the snapshot.
+ * @returns {{entries: object[], seeded: boolean, dryRun?: boolean}}
  */
 export function reconcile(backlogDir, opts = {}) {
   const tasksDir = join(backlogDir, "tasks");
@@ -694,6 +696,14 @@ export function reconcile(backlogDir, opts = {}) {
       delete snap.tasks[id];
     }
   }
+
+  // `dryRun` ASKS the question without answering it in the log (TL-162).
+  // `doctor` needs exactly this diff and fixes nothing by design; a diagnosis
+  // that wrote would also sign somebody else's edit with whoever happened to run
+  // it, which is the defect TL-130 describes on the server's side. The snapshot
+  // is left alone too — moving it forward is what makes a change invisible to
+  // the person who is about to claim it.
+  if (opts.dryRun) return { entries, seeded: seeding, dryRun: true };
 
   for (const e of entries) appendEntries(backlogDir, e.task, [e]);
   saveSnapshot(backlogDir, snap);

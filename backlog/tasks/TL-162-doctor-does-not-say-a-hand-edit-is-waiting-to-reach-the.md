@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "History and attribution"
 priority: P2                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 estimate: 2h                       # 30m | 2h | 1d | 1w | 1mo
 created: 2026-09-02
 updated: 2026-09-02
@@ -81,13 +81,39 @@ run in a dry mode, and if it cannot, that is the first step.
 
 ## Acceptance criteria
 
-- [ ] `doctor` carries a row saying how many changes the history has not seen. [proof: row]
-- [ ] The row is computed WITHOUT writing to the log. [proof: suite]
-- [ ] It warns and does not fail. [proof: suite]
-- [ ] The test has a positive control: an untouched tree and an edited one differ. [proof: suite]
+- [x] `doctor` carries a row saying how many changes the history has not seen. [proof: row]
+- [x] The row is computed WITHOUT writing to the log. [proof: suite]
+- [x] It warns and does not fail. [proof: suite]
+- [x] The test has a positive control: an untouched tree and an edited one differ. [proof: suite]
 
 ## Notes
 
 Out of scope: changing who a reconciled entry is attributed to — that is
 TL-130. Out of scope too: making `build` reconcile, which would put a write
 inside a command whose whole point is that its output is disposable.
+
+## Decisions
+
+**`reconcile` grew a `dryRun` rather than `doctor` growing a second diff.**
+The question the row asks is exactly the one `history --source manual` answers;
+a private copy of it in `doctor` would be a second implementation of the
+comparison, and the one that drifted would be the diagnostic — the place a
+reader trusts precisely because they are not checking it. `dryRun` skips both
+writes: the log AND the snapshot. Skipping only the log would be worse than
+useless, because moving the reference point forward is what makes a change
+invisible to the person who is about to claim it.
+
+**The row is a WARNING, and there is no state in which it is an error.** An
+unrecorded change is the normal condition between an edit and the command that
+records it. A row that went red while somebody was working would be red most of
+the time, and a red that means nothing is trained out of a reader — which would
+cost more than this row is worth.
+
+**A tree with no reference point reports `info`, not zero.** "No changes the
+history has not seen" and "nothing has ever been compared" are different facts,
+and a fresh backlog is in the second state. Reporting the first would be the
+same class of answer this task exists to remove.
+
+**The fix string keeps `<ns:name>` as a placeholder.** The actor is the one part
+the tool must not fill in: the whole reason `doctor` does not reconcile is that
+it would sign somebody else's edit with whoever ran it (TL-130).

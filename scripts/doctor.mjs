@@ -36,7 +36,7 @@ import { auditLogStatus, readTaskTexts } from "./check-backlog-log-status.mjs";
 import { ConfigError, formatConfigError, loadConfig } from "./config.mjs";
 import { commandRunner, contextBudget } from "./context-budget.mjs";
 import { ATTRIBUTE_RULES, IGNORE_RULES, hasUnionMerge, insideGitRepo, trackedViews, unignoredViews } from "./git-rules.mjs";
-import { SNAPSHOT_FILE, loadSnapshot, readMigrations } from "./history.mjs";
+import { SNAPSHOT_FILE, loadSnapshot, readMigrations, reconcile } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { MARK as UI_MARK, color, errColor, heading } from "./ui.mjs";
@@ -230,6 +230,54 @@ function checkSnapshot(root, config) {
     "rm " + join("history", SNAPSHOT_FILE) + "   # drop the stale reference point instead of recording tombstones");
 }
 
+/**
+ * Is there a change on disk that the history has never seen? (TL-162)
+ *
+ * THE LOOSE END THIS CLOSES. TL-84 made editing a task file by hand a SUPPORTED
+ * path. Measured afterwards: `build` does not reconcile, and neither do `query`,
+ * `stats` or `check` — only `history --actor <ns:name> --source manual` does. So
+ * between a hand edit and somebody remembering that command, the change is
+ * invisible on the history axis, and nothing anywhere said so. `doctor` already
+ * carries the rows that need no remembering; this is the one that was missing.
+ *
+ * A WARNING, NEVER AN ERROR. An unrecorded change is the NORMAL state between an
+ * edit and the command that records it. A row that went red while somebody was
+ * working would be read as noise inside a day, which is how a real signal gets
+ * trained out of a reader.
+ *
+ * AND IT DOES NOT RECORD ANYTHING. `doctor` fixes nothing by design, and a
+ * diagnosis that wrote to the log would sign somebody else's edit with whoever
+ * happened to run it — the defect TL-130 describes on the server's side. The
+ * row reports; the person decides who signs it. That is why `reconcile` grew a
+ * `dryRun` rather than this row growing a second copy of the diff.
+ */
+function checkUnrecorded(root) {
+  let result;
+  try {
+    result = reconcile(root, { dryRun: true });
+  } catch (e) {
+    // A history directory that cannot be read is the `history` guard's finding,
+    // not this row's. Saying "not checked" is more honest than a count of zero.
+    return check("unrecorded", "changes not in the log", INFO,
+      "not checked — the history could not be read: " + e.message);
+  }
+  if (result.seeded) {
+    return check("unrecorded", "changes not in the log", INFO,
+      "no reference point yet — the first `history` run writes one and records nothing",
+      N + " history --actor <ns:name> --source manual");
+  }
+  if (!result.entries.length) {
+    return check("unrecorded", "changes not in the log", OK,
+      "every change on disk is in the history");
+  }
+  const tasks = [...new Set(result.entries.map((e) => e.task))];
+  return check("unrecorded", "changes not in the log", WARN,
+    result.entries.length + " change(s) across " + tasks.length + " task(s) the history has not seen (" +
+      tasks.slice(0, 3).join(", ") + (tasks.length > 3 ? ", …" : "") + ")" +
+      " — normal between an edit and the command that records it",
+    N + " history --actor <ns:name> --source manual");
+}
+
 function checkGitIgnore(root) {
   if (!insideGitRepo(root)) {
     return [check("git-repo", "git", INFO, "this is not a repository — the rules have nothing to apply to")];
@@ -310,7 +358,7 @@ export function diagnose(root) {
     // Without a configuration that could be read, the remaining questions make no
     // sense: they would be counting under a vocabulary we do not know. "Not
     // checked" is more honest than a result.
-    for (const [id, title] of [["vocabulary", "vocabulary vs tree"], ["unused-vocabulary", "declared but unused"], ["prefix", "id prefix"], ["snapshot", "history reference point"], ["log-status", "log vs status field"], ["guards", "backlog guards"], ["volume", "tasks"], ["context", "cost of asking"]]) {
+    for (const [id, title] of [["vocabulary", "vocabulary vs tree"], ["unused-vocabulary", "declared but unused"], ["prefix", "id prefix"], ["snapshot", "history reference point"], ["unrecorded", "changes not in the log"], ["log-status", "log vs status field"], ["guards", "backlog guards"], ["volume", "tasks"], ["context", "cost of asking"]]) {
       rows.push(check(id, title, INFO, "not checked — the configuration comes first"));
     }
     rows.push(...checkGitIgnore(root));
@@ -321,6 +369,7 @@ export function diagnose(root) {
   rows.push(vocabRow, ...(vocabExtra || []));
   rows.push(checkPrefix(root, config));
   rows.push(checkSnapshot(root, config));
+  rows.push(checkUnrecorded(root));
   rows.push(checkLogStatus(root, config));
   rows.push(...checkGitIgnore(root));
   rows.push(checkGuards(root));
