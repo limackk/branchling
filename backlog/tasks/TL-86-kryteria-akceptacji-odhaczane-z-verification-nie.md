@@ -25,7 +25,7 @@ verification:
   - id: closed-untouched
     bash: 'grep -lE "^status: (done|cancelled)" backlog/tasks/*.md | xargs grep -l "\[proof:" && { echo "the mechanism was applied to a closed task"; exit 1; }; echo "no closed task carries a proof link"'
   - id: doc-distinction
-    bash: "grep -q 'Wyliczone to nie to samo co odtwarzalne' docs/worktrail-global-tool.md"
+    bash: "grep -q 'Computed is not the same as reconstructible' docs/worktrail-global-tool.md"
 ---
 
 ## Goal

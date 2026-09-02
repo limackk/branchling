@@ -6,12 +6,12 @@ labels: []
 board: main
 epic: "worktrail — the tool"
 priority: P2
-status: pending
-owner: unassigned
+status: done
+owner: agent:claude
 estimate: 2h
 confidence: medium
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-02
 blocked_by: []
 blocks: []
 related_docs: []
@@ -31,7 +31,7 @@ sample, not only on samples that happened to land on its word list.
 
 Found while working on TL-97. `scripts/serve-backlog.mjs:241` carries:
 
-```
+```text language-guard: allow — the defect QUOTED; translating it would erase the evidence
 // (`history-record.mjs --actor claude`) — dlatego czekamy RECONCILE_DELAY_MS,
 ```
 
@@ -72,8 +72,8 @@ remain the only way out.
 
 ## Acceptance criteria
 
-- [ ] Positive control: a sample with `dlatego czekamy` in a public file
+- [x] Positive control: a sample with `dlatego czekamy` in a public file
       fails the guard. [proof: guard-catches-it]
-- [ ] `scripts/serve-backlog.mjs` has no Polish sentence. [proof: guard-catches-it]
-- [ ] `worktrail check --language` is green across the whole tree, and every
+- [x] `scripts/serve-backlog.mjs` has no Polish sentence. [proof: guard-catches-it]
+- [x] `worktrail check --language` is green across the whole tree, and every
       exception has a `language-guard: allow` comment on that one line. [proof: guard-catches-it]

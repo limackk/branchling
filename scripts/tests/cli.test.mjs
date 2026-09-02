@@ -94,7 +94,7 @@ test("every command in the table has a description and an EXISTING script", () =
   }
 });
 
-// ── Prawdziwe uruchomienia ────────────────────────────────────────────────
+// ── Real runs ─────────────────────────────────────────────────────────────
 
 test("`query` really asks about tasks rather than starting the server", () => {
   const dir = sandbox();

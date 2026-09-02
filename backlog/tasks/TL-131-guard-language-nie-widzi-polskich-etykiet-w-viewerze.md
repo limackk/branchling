@@ -16,7 +16,7 @@ blocked_by: []
 blocks: []
 related_docs: []
 verification:
-  - id: labels-english
+  - id: labels-english             # language-guard: allow — the Polish labels ARE this check's input
     bash: "node -e \"const s=require('fs').readFileSync('scripts/build-viewer.mjs','utf8');const m=s.match(/const HISTORY_FIELD_LABELS = \\{[^}]*\\}/);if(!m)process.exit(1);if(/utworzony|komentarz|zmieniony/i.test(m[0])){console.error(m[0]);process.exit(1)}console.log('labels are English')\""
   - id: guard-green
     bash: "node scripts/cli.mjs check --language"

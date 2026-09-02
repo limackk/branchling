@@ -19,7 +19,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { ALLOW_MARKER, PUBLIC_PATHS, auditText, auditTree } from "../check-public-language.mjs";
+import { ALLOW_MARKER, PUBLIC_PATHS, auditText, auditTree, polishShapeHits } from "../check-public-language.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, "..", "..");
@@ -207,4 +207,64 @@ test("backlog/history/*.jsonl stays invisible to the guard even once backlog/ is
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// ── The third signal: the SHAPE of a word (TL-129) ────────────────────────
+//
+// THE MEASURED FAILURE THIS CLOSES. `scripts/serve-backlog.mjs` carried a
+// Polish sentence for weeks while this guard read the file and reported it as
+// English — neither of its words was on either closed list, and neither carried
+// an accent. A guard that says "N files read as English" gets cited as proof,
+// and that citation was false the whole time. Two closed lists can only ever
+// catch what somebody thought to write down; the shape of a word does not
+// depend on that.
+
+test("FINDS: the exact sentence the guard used to let through", () => {
+  // language-guard: allow — the sample IS the input; translating it would test nothing
+  const found = auditText("// (`history-record.mjs --actor claude`) — dlatego czekamy RECONCILE_DELAY_MS,");
+  assert.equal(found.length, 1, "this is the sample TL-129 was opened for");
+  assert.equal(found[0].reason, "shape");
+});
+
+test("FINDS: a Polish comment whose words are on no list and carry no accent", () => {
+  // language-guard: allow — the sample IS the input
+  assert.equal(auditText("// Pojedyncze sprawdzenia")[0].reason, "shape");
+});
+
+test("SILENT: English prose does not trip the shape signal", () => {
+  // The lines below are real ones from this repository, chosen because they are
+  // the shape most likely to collide: technical prose, identifiers, and paths.
+  for (const line of [
+    "// The individual checks",
+    " * Tests: `node --test scripts/tests/public-language.test.mjs`",
+    "const DIACRITICS = /[a-z]/;",
+    "  // A negative window would make every claim abandoned the moment it is made:",
+    "export function polishShapeHits(searched) {",
+    "  size: 12, resize: true, downsized: false,",
+  ]) {
+    assert.deepEqual(auditText(line), [], "false positive on: " + line);
+  }
+});
+
+test("ONE Polish-shaped word is not enough — the threshold is two, like the stop words", () => {
+  // A surname, a transliteration or a fragment of a URL reaches one hit by
+  // accident; a real sentence carries several. Without this the guard would
+  // start crying wolf, and a guard people mute is worth nothing.
+  assert.equal(polishShapeHits("the Czech translation"), 1);
+  assert.deepEqual(auditText("// see the Czech translation"), []);
+  // language-guard: allow — the sample IS the input
+  assert.ok(polishShapeHits("dlatego czekamy") >= 2);
+});
+
+test("the ✓ line does NOT claim the text is English", () => {
+  // The narrower claim is the point of TL-129: three heuristics can say that
+  // nothing matched, and they cannot say a file is English. The old wording said
+  // the second thing, and it was false while the defect above stood.
+  const r = spawnSync(process.execPath, [join(ROOT, "scripts", "check-public-language.mjs")], {
+    encoding: "utf8", timeout: 60_000, env: { ...process.env, NO_COLOR: "1" },
+  });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.ok(!/read as English/.test(r.stdout),
+    "the guard still claims more than three heuristics can support");
+  assert.match(r.stdout, /none matching/, "and it has to say what it DID check instead");
 });

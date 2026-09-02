@@ -118,4 +118,4 @@ in this repo is not dead, it is unused. The report should say what it measured
 
 ## Log
 
-- 2026-09-02 created — agent:claude — from closing the "Ochrona danych lokalnych" epic in origin; measured in both repos before filing, and the two opposite verdicts are what turned it from a guard into a report
+- 2026-09-02 created — agent:claude — from closing the "Ochrona danych lokalnych" epic <!-- language-guard: allow — another repository's epic name, a fact rather than prose --> in origin; measured in both repos before filing, and the two opposite verdicts are what turned it from a guard into a report

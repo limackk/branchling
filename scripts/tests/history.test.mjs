@@ -386,7 +386,7 @@ test("actor: a namespace is required for new records", () => {
 
 test("actor: a name WITHOUT a namespace is not promoted — guessing is inventing", () => {
   // `claude` to agent, `founder` to czlowiek. Hurtowe dopisanie `local:`
-  // przekwalifikowaloby agenta na czlowieka - ladna nieprawda.
+  // would reclassify an agent as a person — a tidy untruth.
   assert.equal(normalizeActor("kamil"), "unknown");
   assert.equal(normalizeActor("claude"), "unknown");
 });

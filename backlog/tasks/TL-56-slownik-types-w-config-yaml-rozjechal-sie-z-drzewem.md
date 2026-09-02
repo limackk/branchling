@@ -19,7 +19,7 @@ related_docs:
 verification:
   - bash: "node --test scripts/tests/config-vocabulary.test.mjs"
   - bash: "node scripts/cli.mjs check"
-  - bash: "d=$(mktemp -d) && node scripts/cli.mjs init --dir \"$d\" >/dev/null 2>&1 && T=$(node -e \"import('./scripts/config.mjs').then(m=>console.log(m.loadConfig(process.argv[1]).types[0]))\" \"$d\") && node scripts/cli.mjs new --dir \"$d\" --title Sonda --type \"$T\" >/dev/null 2>&1 || { echo 'typ z konfiguracji ODRZUCONY przy zapisie'; exit 1; }; node scripts/cli.mjs new --dir \"$d\" --title Sonda2 --type nie-ma-takiego >/dev/null 2>&1 && { echo 'wartosc spoza slownika PRZESZLA'; exit 1; }; echo \"OK: typ z konfiguracji ($T) przechodzi, wartosc spoza slownika odrzucona\""
+  - bash: "d=$(mktemp -d) && node scripts/cli.mjs init --dir \"$d\" >/dev/null 2>&1 && T=$(node -e \"import('./scripts/config.mjs').then(m=>console.log(m.loadConfig(process.argv[1]).types[0]))\" \"$d\") && node scripts/cli.mjs new --dir \"$d\" --title Sonda --type \"$T\" >/dev/null 2>&1 || { echo 'a type from the configuration was REFUSED on write'; exit 1; }; node scripts/cli.mjs new --dir \"$d\" --title Sonda2 --type nie-ma-takiego >/dev/null 2>&1 && { echo 'a value outside the vocabulary PASSED'; exit 1; }; echo \"OK: a type from the configuration ($T) passes, a value outside the vocabulary is refused\""
 ---
 
 ## Goal

@@ -114,6 +114,51 @@ const STRONG_WORDS =
 const STOP_WORDS =
   /\b(nie|jest|się|sie|przez|który|ktory|która|które|żeby|zeby|czyli|więc|wiec|jeśli|jesli|może|moze|musi|trzeba|zamiast|katalog|katalogu|widok|widoki|widoków|plik|pliku|plików|taska|tasku|tego|jak|bez|oraz|albo|wtedy|nigdy|zawsze|gdy|kiedy|liczy|daje|robi|zapis|odczyt|słownik|slownik|prefiks|numer|drzewo|drzewa|kolejka|kolejki|zakres|zakresu|pole|pola|polu|dzień|dni|godzin)\b/gi;   // language-guard: allow — the word list itself
 
+/**
+ * THE THIRD SIGNAL: the SHAPE of a word, rather than the word itself (TL-129).
+ *
+ * WHY IT EXISTS. The two signals above are both closed lists, and a closed list
+ * only catches what somebody thought to write down. Measured: this guard read
+ * `scripts/serve-backlog.mjs` for weeks and reported it as English while it
+ * carried a Polish sentence — because neither of its words was on either list
+ * and neither carried an accent. That is worse than no guard: a green line
+ * saying "N files read as English" gets cited as proof, and the citation was
+ * false the whole time.
+ *
+ * WHAT IT LOOKS AT. Two properties of Polish orthography that do not depend on
+ * anybody having listed the word:
+ *
+ *   the digraphs `cz sz rz dz`, which are how Polish spells four consonants and
+ *     which essentially do not occur inside English words;
+ *   the inflectional endings below, each chosen so that no English word of five
+ *     letters or more ends that way.
+ *
+ * TWO HITS ON ONE LINE, the same threshold `STOP_WORDS` uses and for the same
+ * reason: a single hit is reachable by accident — a surname, a fragment of a
+ * URL, a transliteration — and demanding two costs almost nothing on a real
+ * sentence, which carries several.
+ *
+ * WHAT IT STILL DOES NOT CATCH, said here because a guard that overstates its
+ * reach is the defect this whole file is about: a SHORT phrase whose words carry
+ * no accent, no digraph and no inflected ending passes — `prywatne okno` did,
+ * and it was closed by adding the words above, which is the last resort rather
+ * than the mechanism. The ✓ line therefore says what was actually checked and
+ * does not claim the text is English.
+ */
+const POLISH_DIGRAPH = /\b[a-z]*(?:cz|sz|rz|dz)[a-z]*\b/gi;   // language-guard: allow — the pattern itself
+const POLISH_ENDING = /\b[a-z]{2,}(?:ego|emu|ych|ymi|ach|ami|ości|ość|enia|ania|eniu|aniu|amy|emy|imy|ów)\b/gi;   // language-guard: allow — the pattern itself
+
+/** How many DISTINCT words on this line are Polish-shaped. PURE. */
+export function polishShapeHits(searched) {
+  const hits = new Set();
+  for (const re of [POLISH_DIGRAPH, POLISH_ENDING]) {
+    re.lastIndex = 0;
+    let m;
+    while ((m = re.exec(searched)) !== null) hits.add(m[0].toLowerCase());
+  }
+  return hits.size;
+}
+
 /** The files whose text reaches a user of the tool, or a stranger reading it. */
 // `skills` joined the list in TL-54, when the agent instructions started
 // travelling in the tarball: a file installed into somebody else's editor is as
@@ -150,7 +195,7 @@ function stripDataSpans(line) {
  * PURE — audits already-read text, so a test can exercise it without a tree.
  *
  * @param {string} text
- * @returns {Array<{line: number, text: string, reason: "diacritics"|"word"|"words"}>}
+ * @returns {Array<{line: number, text: string, reason: "diacritics"|"word"|"words"|"shape"}>}
  */
 export function auditText(text) {
   const lines = String(text || "").split(/\r?\n/);
@@ -174,6 +219,10 @@ export function auditText(text) {
     const hits = searched.match(STOP_WORDS);
     if (hits && hits.length >= 2) {
       problems.push({ line: i + 1, text: line.trim(), reason: "words" });
+      continue;
+    }
+    if (polishShapeHits(searched) >= 2) {
+      problems.push({ line: i + 1, text: line.trim(), reason: "shape" });
     }
   }
   return problems;
@@ -205,8 +254,16 @@ function main() {
   if (!findings.length) {
     // The counts are the positive control: a ✓ over zero files would mean the
     // walk read the wrong tree, not that the surface is clean.
+    //
+    // AND IT SAYS WHAT IT ACTUALLY CHECKED (TL-129). The old wording — "read as
+    // English" — is a claim three heuristics cannot support, and it was FALSE
+    // for weeks while a Polish sentence sat in `serve-backlog.mjs` that none of
+    // the signals happened to match. A green line gets quoted as proof, so it
+    // has to state its own reach: nothing here matched, which is not the same
+    // as "this is English".
     console.log(
-      `${OKM} language: ${linesChecked} lines across ${filesChecked} public files read as English`
+      `${OKM} language: ${linesChecked} lines across ${filesChecked} public files, ` +
+        "none matching the accents, word lists or Polish word shapes this guard looks for"
     );
     return 0;
   }

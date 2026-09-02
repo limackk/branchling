@@ -243,7 +243,7 @@ function notifyClients() {
 //
 // The author: `unknown`, and that is deliberate. The server sees a changed byte,
 // not the hand that changed it. Who really edited it is known to the agent's hook
-// (`history-record.mjs --actor claude`) — dlatego czekamy RECONCILE_DELAY_MS,
+// (`history-record.mjs --actor claude`) — which is why we wait RECONCILE_DELAY_MS,
 // so that it gets to write its entry first; after that this pass no longer sees a
 // difference and stays quiet. Guessing "if not the viewer then the agent" would
 // produce entries signed by somebody who did not do it.

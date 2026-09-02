@@ -1,7 +1,7 @@
 /**
  * The generated views are not versioned (BL-1404 step 3).
  *
- * Zmierzona przyczyna: INDEX.yaml i archive/done.yaml to posortowane agregaty
+ * The measured cause: INDEX.yaml and archive/done.yaml are sorted aggregates
  * of EVERY task, so each branch rewrites the same file. `git merge-tree` on two
  * branches that shared no task at all produced a conflict in INDEX.yaml, and most
  * commits touching tasks/ touched the views as well.

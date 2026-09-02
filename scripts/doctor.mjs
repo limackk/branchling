@@ -78,7 +78,7 @@ function check(id, title, status, detail, fix) {
 }
 
 // ──────────────────────────────────────────────────────────────────────────
-// Pojedyncze sprawdzenia
+// The individual checks
 // ──────────────────────────────────────────────────────────────────────────
 
 function checkConfig(root) {
