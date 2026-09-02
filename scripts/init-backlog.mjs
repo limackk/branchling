@@ -70,6 +70,18 @@ statuses: [pending, in_progress, blocked, done, cancelled]
 archived_statuses: [done, cancelled]
 dashboard_open_statuses: [pending, in_progress, blocked]
 
+# [tree] Statuses nobody may ENTER without saying why — writing commands refuse
+# rather than ask. It is also what an unattended dispatcher will not hand out:
+# entering one of these was somebody's decision, and an agent must not undo it
+# silently. Declared here rather than left out, because with the key absent it
+# resolves to \`archived_statuses\` and \`blocked\` would then be dispatched to
+# agents by default, which is not what the documentation says and not what
+# \`${N} run\` can work with — it parks a task it could not finish in this
+# very status. Two values are reserved and are never typed by hand:
+# \`unknown\` (a change the tool observed rather than made) and \`proven\`
+# (a verification run).
+reason_required_statuses: [blocked, cancelled]
+
 priorities: [P0, P1, P2, P3]       # [tree]
 
 # [tree] How hard \`${N} check\` judges a task whose acceptance criteria do not

@@ -64,11 +64,14 @@ function fixture(count = 1, opts = {}) {
   const env = { BACKLOG_STATE_DIR: join(dir, "state") };
   assert.equal(cli(["init", "--dir", backlog, "--no-example"], env).status, 0);
   // A task parked by the run has to leave the queue, and in this tool that is
-  // said by `reason_required_statuses`. `init` does not declare it, so a default
-  // backlog dispatches `blocked` — the refusal that produces is asserted below.
-  if (!opts.plainConfig) {
+  // said by `reason_required_statuses`. Since TL-140 `init` declares it, so this
+  // line is now belt and braces rather than a repair — kept because the fixture
+  // must state what it depends on rather than inherit it silently. `plainConfig`
+  // strips the key back out, which is the shape a backlog created before TL-140
+  // still has.
+  if (opts.plainConfig) {
     const cfg = join(backlog, "config.yaml");
-    writeFileSync(cfg, readFileSync(cfg, "utf8") + "\nreason_required_statuses: [blocked, cancelled]\n", "utf8");
+    writeFileSync(cfg, readFileSync(cfg, "utf8").replace(/^reason_required_statuses:.*$/m, ""), "utf8");
   }
 
   const ids = [];
@@ -323,10 +326,11 @@ test("the environment supplies the agent when the flag does not", () => {
 });
 
 test("a backlog that still dispatches `blocked` is REFUSED, not parked in a loop", () => {
-  // The default `init` config leaves `reason_required_statuses` unset, so it
-  // resolves to the archived statuses and `next` hands out `blocked`. Parking a
-  // task there would hand it straight back: the run refuses BEFORE it takes
-  // anything, and says which key settles it.
+  // A backlog written before TL-140 leaves `reason_required_statuses` unset, so
+  // it resolves to the archived statuses and `next` hands out `blocked`. Parking
+  // a task there would hand it straight back: the run refuses BEFORE it takes
+  // anything, and says which key settles it. `init` now writes the key, which is
+  // what TL-140 changed — the refusal stays, for the backlogs that predate it.
   const { dir, repo, backlog, env, ids } = fixture(1, { plainConfig: true });
   try {
     const agent = agentScript(dir, "idle.sh", "cat > /dev/null");
@@ -590,4 +594,31 @@ test("waitingForExecutor counts only OPEN work this species may not be handed", 
   ];
   assert.deepEqual(waitingForExecutor(records, config, "agent"), { human: ["FX-1"] });
   assert.deepEqual(waitingForExecutor(records, config, "human"), { agent: ["FX-5"] });
+});
+
+test("a backlog straight out of `init` needs no repair before a run (TL-140)", () => {
+  // The point of TL-140: this fixture adds nothing to the generated config, and
+  // the flagship loop starts. Before it, the first `run` on a fresh backlog was
+  // an error message.
+  const dir = tmp("fresh");
+  const repo = join(dir, "repo");
+  mkdirSync(repo, { recursive: true });
+  const backlog = join(repo, "backlog");
+  const env = { BACKLOG_STATE_DIR: join(dir, "state") };
+  try {
+    assert.equal(cli(["init", "--dir", backlog, "--no-example"], env).status, 0);
+    const r = cli(["new", "--dir", backlog, "--title", "Fresh", "--priority", "P1"], env);
+    const id = (r.stdout.match(/([A-Z]+-\d+)/) || [])[1];
+    const file = join(backlog, "tasks", readdirSync(join(backlog, "tasks")).find((f) => f.startsWith(id + "-")));
+    writeFileSync(file, readFileSync(file, "utf8")
+      .replace(/verification:[\s\S]*?\n---/, 'verification:\n  - id: it-is-done\n    bash: "test -f ' + id + '.done"\n---')
+      .replace(/\[proof:[^\]]*\]/g, "[proof: it-is-done]"), "utf8");
+
+    const agent = agentScript(dir, "a.sh", 'id=$(grep -m1 "^id: " | sed "s/^id: //"); touch "$id.done"');
+    const run_ = cli(["run", "--dir", backlog, "--actor", "agent:worker", "--agent", agent], env, { cwd: repo });
+    assert.equal(run_.status, 0, run_.stdout + run_.stderr);
+    assert.equal(statusOf(backlog, id), "done");
+  } finally {
+    cleanup(dir);
+  }
 });

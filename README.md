@@ -358,7 +358,11 @@ Two statuses are never handed out unattended: the one that means *in progress*
 (somebody has it) and any status your `reason_required_statuses` protects —
 `blocked` was entered by a decision, and an agent must not undo it silently.
 `--status` overrides that, because a person asking for exactly that is not
-unattended.
+unattended. `init` writes `reason_required_statuses: [blocked, cancelled]` into
+the config it generates rather than leaving the key out: absent, it resolves to
+`archived_statuses`, and then a brand-new backlog would dispatch `blocked` — the
+very status `run` parks a task it could not finish in, which is a queue that
+never empties.
 
 **With one exception, and it is the reason the protection can stay strict.** A
 task in a protected status that NAMED its condition — a non-empty `blocked_by`

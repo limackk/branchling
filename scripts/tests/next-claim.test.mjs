@@ -352,6 +352,9 @@ test("the mechanism reads the project's words, not ours", () => {
     .replace(/^statuses: .*$/m, "statuses: [queued, mine, parked, shipped, dropped]")
     .replace(/^archived_statuses: .*$/m, "archived_statuses: [shipped, dropped]")
     .replace(/^dashboard_open_statuses: .*$/m, "dashboard_open_statuses: [queued, mine, parked]")
+    // Written by `init` since TL-140, so a fixture renaming the statuses has to
+    // rename it too or the configuration names words its own `statuses` lack.
+    .replace(/^reason_required_statuses: .*$/m, "reason_required_statuses: [parked, dropped]")
     .replace(/^priorities: .*$/m, "priorities: [high, low]")
     .replace(/^# in_progress_status: .*$/m, "in_progress_status: mine")
     .replace(/^abandoned_after_days: .*$/m, "abandoned_after_days: 2"), "utf8");

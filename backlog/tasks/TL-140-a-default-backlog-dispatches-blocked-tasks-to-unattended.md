@@ -6,11 +6,11 @@ labels: []
 board: main
 epic: ""
 priority: P1                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:session
 estimate: 2h                       # 30m | 2h | 1d | 1w | 1mo
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-02
 blocked_by: []
 blocks: []
 related_docs: []
@@ -66,6 +66,31 @@ The first is the least surprising and the third is the cheapest; the second
 changes behaviour for backlogs whose owners never asked for it, and TL-105 chose
 the current fallback deliberately, so overturning it needs its own argument.
 
+## Decision (2026-09-02)
+
+**`init` writes the key.** The generated `config.yaml` now carries
+`reason_required_statuses: [blocked, cancelled]`, with a comment beside it
+saying why, so every new backlog agrees with the documentation and
+`worktrail run` starts on it without repair.
+
+The other two were rejected, and not because they were harder:
+
+- **Changing what an ABSENT key resolves to** would move every backlog whose
+  owner never declared it, silently, on an upgrade. TL-105 chose that fallback
+  deliberately — leaving the queue is the decision whose why is irrecoverable
+  later — so overturning it needs its own argument, and "a default is
+  inconvenient" is not one.
+- **Declaring the dispatch correct and repairing the README** would leave the
+  flagship loop refusing to start on a fresh backlog, because `run` parks a task
+  it could not finish in exactly the status the dispatcher would then hand out.
+  A first run that is an error message is not a documentation problem.
+
+Recorded in three places a reader actually meets: the comment in every
+generated `config.yaml`, the paragraph in `README.md` about statuses never
+handed out unattended, and this section. Backlogs created before this change are
+untouched — the fallback still applies to them, and `run` still refuses with the
+key named.
+
 ## Pre-flight reading
 
 - `scripts/config.mjs` — `reason_required_statuses`, and the comment explaining
@@ -84,6 +109,6 @@ the current fallback deliberately, so overturning it needs its own argument.
 
 ## Acceptance criteria
 
-- [ ] A backlog straight out of `init` and the README say the same thing about which statuses are handed out unattended. [proof: fresh-backlog-protects-it]
-- [ ] `worktrail run` either starts on a fresh backlog, or its refusal is a deliberate, documented consequence. [proof: fresh-backlog-protects-it]
-- [ ] The decision is recorded where a reader will find it, not only in a commit body. [proof: decided-in-writing]
+- [x] A backlog straight out of `init` and the README say the same thing about which statuses are handed out unattended. [proof: fresh-backlog-protects-it]
+- [x] `worktrail run` either starts on a fresh backlog, or its refusal is a deliberate, documented consequence. [proof: fresh-backlog-protects-it]
+- [x] The decision is recorded where a reader will find it, not only in a commit body. [proof: decided-in-writing]

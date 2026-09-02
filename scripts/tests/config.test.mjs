@@ -25,7 +25,10 @@ import {
   validateConfig,
 } from "../config.mjs";
 
-import { BACKLOG_DIR as REAL_BACKLOG } from "./_repo.mjs";
+import { spawnSync } from "node:child_process";
+
+import { BACKLOG_DIR as REAL_BACKLOG, SCRIPTS_DIR } from "./_repo.mjs";
+import { queueStatuses } from "../next-task.mjs";
 
 function sandbox(files = {}) {
   const dir = mkdtempSync(join(tmpdir(), "backlog-config-"));
@@ -272,3 +275,35 @@ test("config: an unknown actor namespace FAILS", () => {
   assert.match(problems[0], /robot:r2d2/);
 });
 
+
+// ── What a FRESH backlog protects (TL-140) ────────────────────────────────
+
+test("`init` DECLARES reason_required_statuses, so a fresh backlog matches the documentation", () => {
+  const dir = mkdtempSync(join(tmpdir(), "worktrail-fresh-"));
+  try {
+    const r = spawnSync(process.execPath, [join(SCRIPTS_DIR, "cli.mjs"), "init", "--dir", dir, "--no-example"], {
+      encoding: "utf8", env: { ...process.env, NO_COLOR: "1" },
+    });
+    assert.equal(r.status, 0, r.stderr);
+    const config = loadConfig(dir);
+    // The key is WRITTEN, not left to the fallback. With it absent it resolves
+    // to `archived_statuses`, and then the stuck status is one the dispatcher
+    // hands out — a queue that never empties, and a README that describes
+    // nothing.
+    assert.ok(config.reasonRequiredStatuses.length > 0, "a fresh backlog protects no status at all");
+    assert.deepEqual(
+      config.reasonRequiredStatuses,
+      config.reasonRequiredStatuses.filter((s2) => config.statuses.includes(s2)),
+      "a protected status that is not in `statuses`"
+    );
+    // POSITIVE CONTROL for the property that matters: at least one protected
+    // status is OPEN, so `run` has somewhere to park a task it could not close
+    // that the dispatcher will not immediately hand out again.
+    const open = config.reasonRequiredStatuses.filter((s2) => !config.archivedStatuses.includes(s2));
+    assert.ok(open.length > 0, "no OPEN protected status: `run` would have nowhere to park a task");
+    assert.deepEqual(queueStatuses(config).filter((s2) => open.includes(s2)), [],
+      "the dispatcher hands out the very status a failed run parks a task in");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

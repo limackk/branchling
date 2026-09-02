@@ -414,7 +414,10 @@ test("a backlog with renamed statuses is asked which one means `in progress`", (
   const renamed = readFileSync(configPath, "utf8")
     .replace(/^statuses: .*$/m, "statuses: [todo, doing, parked, shipped, dropped]")
     .replace(/^archived_statuses: .*$/m, "archived_statuses: [shipped, dropped]")
-    .replace(/^dashboard_open_statuses: .*$/m, "dashboard_open_statuses: [todo, doing, parked]");
+    .replace(/^dashboard_open_statuses: .*$/m, "dashboard_open_statuses: [todo, doing, parked]")
+    // `init` declares this since TL-140, so a fixture renaming the statuses has
+    // to rename it too rather than leave the configuration naming missing words.
+    .replace(/^reason_required_statuses: .*$/m, "reason_required_statuses: [parked, dropped]");
   writeFileSync(configPath, renamed, "utf8");
   const file = join(backlog, "tasks", readdirSync(join(backlog, "tasks")).find((f) => f.startsWith(ids[0] + "-")));
   writeFileSync(file, readFileSync(file, "utf8").replace(/^status: .*$/m, "status: todo"), "utf8");
@@ -434,7 +437,8 @@ test("a status the project protects cannot be entered without a reason", () => {
   const { backlog, env, ids } = fixture(["P1"]);
   const configPath = join(backlog, "config.yaml");
   writeFileSync(configPath,
-    readFileSync(configPath, "utf8") + "\nreason_required_statuses: [in_progress, done, cancelled]\n", "utf8");
+    readFileSync(configPath, "utf8").replace(/^reason_required_statuses: .*$/m, "") +
+      "\nreason_required_statuses: [in_progress, done, cancelled]\n", "utf8");
 
   const refused = run(["take", ids[0], "--dir", backlog, "--actor", "agent:a1"], env);
   assert.equal(refused.status, 1, "the rule was written down and not enforced");
