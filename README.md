@@ -299,6 +299,23 @@ worktrail run --agent "claude -p @{task_file}" --max-attempts 2
 worktrail run --dry-run          # the order it would work in; claims nothing
 ```
 
+**One queue, several hands.** A task may ask for a competence in `role:`, and a
+run can serve more than one of them: `--agent-for <role>=<command>`, repeatable,
+with `--agent` serving the tasks that ask for nobody in particular. A role you
+gave no command for is *not* handed out and *not* failed over to the general
+one — it waits for a hand this deployment does not have, which is usually a
+person, and the report counts those tasks by role and names them. That is the
+whole escalation mechanism: an absent entry, not a workflow engine. A role your
+`config.yaml` does not declare fails before the loop starts. `next --role r`
+asks the same question by hand and hands out that role *or* the tasks with none;
+`--role-strict` narrows it to exactly that role.
+
+```bash
+worktrail run --agent "codex exec" \
+  --agent-for docs="claude -p @{task_file}" \
+  --agent-for analyst="…"      # omit it, and analyst tasks wait for you
+```
+
 A task whose contract keeps failing is not retried forever and is never closed:
 after `--max-attempts` it is moved to the open status your
 `reason_required_statuses` protects, **with the reason** — so the board after a

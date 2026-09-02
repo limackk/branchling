@@ -32,7 +32,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { agentInput, blockedReason, parseRunArgs, renderAgentCommand, stuckStatus } from "../run-loop.mjs";
+import { agentFor, agentInput, blockedReason, parseRunArgs, renderAgentCommand, servedRoles, stuckStatus, waitingForRole } from "../run-loop.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPTS = join(HERE, "..");
@@ -88,6 +88,18 @@ function fixture(count = 1, opts = {}) {
   }
   cli(["build", "--dir", backlog], env);
   return { dir, repo, backlog, env, ids };
+}
+
+/** Give a task a role, and declare the vocabulary it comes from. The roles are
+ *  the FIXTURE's own: `roles:` is a project's vocabulary, and asserting one
+ *  project's job titles would make the test a copy of somebody's config.yaml. */
+function withRoles(backlog, roles, assignments) {
+  const cfg = join(backlog, "config.yaml");
+  writeFileSync(cfg, readFileSync(cfg, "utf8") + "\nroles: [" + roles.join(", ") + "]\n", "utf8");
+  for (const [id, role] of Object.entries(assignments || {})) {
+    const file = join(backlog, "tasks", readdirSync(join(backlog, "tasks")).find((f) => f.startsWith(id + "-")));
+    writeFileSync(file, readFileSync(file, "utf8").replace(/^role:.*$/m, "role: " + role), "utf8");
+  }
 }
 
 /** An agent that is a shell script, and nothing more. */
@@ -395,4 +407,140 @@ test("a positive whole number, or a usage error", () => {
   assert.throws(() => parseRunArgs(["--max-attempts", "0"]), /positive whole number/);
   assert.throws(() => parseRunArgs(["--timeout", "1.5"]), /positive whole number/);
   assert.throws(() => parseRunArgs(["--agent"]), /with no value/);
+});
+
+// ── One queue, several hands (TL-98) ──────────────────────────────────────
+
+test("each role is worked by ITS OWN command, and the role-less task by --agent", () => {
+  const { dir, repo, backlog, env, ids } = fixture(3);
+  try {
+    withRoles(backlog, ["archivist", "stonemason"], { [ids[0]]: "archivist", [ids[1]]: "stonemason" });
+    // Every agent appends its own name to one file, so the assertion is WHICH
+    // hand did the work and not merely that the work got done. The path is
+    // absolute: the contract runs in the repository root, which is not this
+    // fixture's directory.
+    const ledger = join(dir, "who.log");
+    const mk = (name) => agentScript(dir, name + ".sh",
+      'id=$(grep -m1 "^id: " | sed "s/^id: //"); touch "$id.done"; echo "$id ' + name + '" >> ' + ledger);
+    const r = cli([
+      "run", "--dir", backlog, "--actor", "agent:worker",
+      "--agent", mk("general"),
+      "--agent-for", "archivist=" + mk("arch"),
+      "--agent-for", "stonemason=" + mk("stone"),
+    ], env, { cwd: repo });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    const who = Object.fromEntries(
+      readFileSync(ledger, "utf8").trim().split("\n").map((l) => l.split(" "))
+    );
+    assert.equal(who[ids[0]], "arch");
+    assert.equal(who[ids[1]], "stone");
+    assert.equal(who[ids[2]], "general");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("POSITIVE CONTROL: a role with no command is never handed to another hand", () => {
+  const { dir, repo, backlog, env, ids } = fixture(2);
+  try {
+    withRoles(backlog, ["archivist", "stonemason"], { [ids[0]]: "stonemason" });
+    const agent = agentScript(dir, "arch.sh",
+      'id=$(grep -m1 "^id: " | sed "s/^id: //"); touch "$id.done"');
+    const r = cli([
+      "run", "--dir", backlog, "--actor", "agent:worker",
+      "--agent", agent, "--agent-for", "archivist=" + agent, "--json",
+    ], env, { cwd: repo });
+    assert.equal(r.status, 0, r.stderr);
+    // The stonemason's task is untouched — not taken, not attempted, not blocked.
+    assert.equal(statusOf(backlog, ids[0]), "pending");
+    assert.equal(statusOf(backlog, ids[1]), "done");
+    const out = JSON.parse(r.stdout);
+    assert.deepEqual(out.waitingForRole, [{ role: "stonemason", count: 1, ids: [ids[0]] }]);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("a skip is never silent: the report names the role and counts the tasks", () => {
+  const { dir, repo, backlog, env, ids } = fixture(2);
+  try {
+    withRoles(backlog, ["archivist", "stonemason"], { [ids[0]]: "stonemason", [ids[1]]: "stonemason" });
+    const agent = agentScript(dir, "arch.sh", "cat > /dev/null");
+    const r = cli([
+      "run", "--dir", backlog, "--actor", "agent:worker",
+      "--agent", agent, "--agent-for", "archivist=" + agent,
+    ], env, { cwd: repo });
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /2 task\(s\) ask for `stonemason`/);
+    assert.match(r.stdout, new RegExp(ids[0]));
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("a role the project does not declare fails BEFORE the loop starts", () => {
+  const { dir, repo, backlog, env, ids } = fixture(1);
+  try {
+    withRoles(backlog, ["archivist"], {});
+    const agent = agentScript(dir, "a.sh", 'id=$(grep -m1 "^id: " | sed "s/^id: //"); touch "$id.done"');
+    const r = cli([
+      "run", "--dir", backlog, "--actor", "agent:worker",
+      "--agent", agent, "--agent-for", "stonemason=" + agent,
+    ], env, { cwd: repo });
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /does not declare/);
+    // Nothing ran: the first task is exactly where it was.
+    assert.equal(statusOf(backlog, ids[0]), "pending");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("with no --agent-for at all, one command still serves every task", () => {
+  const { dir, repo, backlog, env, ids } = fixture(2);
+  try {
+    withRoles(backlog, ["archivist"], { [ids[0]]: "archivist" });
+    const agent = agentScript(dir, "a.sh", 'id=$(grep -m1 "^id: " | sed "s/^id: //"); touch "$id.done"');
+    const r = cli(["run", "--dir", backlog, "--actor", "agent:worker", "--agent", agent], env, { cwd: repo });
+    assert.equal(r.status, 0, r.stderr);
+    for (const id of ids) assert.equal(statusOf(backlog, id), "done");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("the map, without a loop around it", () => {
+  const plan = parseRunArgs(["--agent", "general", "--agent-for", "archivist=arch --flag", "--agent-for", "stonemason=stone"]);
+  assert.deepEqual(plan.agentFor, { archivist: "arch --flag", stonemason: "stone" });
+  assert.deepEqual(servedRoles(plan), ["archivist", "stonemason"]);
+  assert.equal(agentFor(plan, "archivist"), "arch --flag");
+  assert.equal(agentFor(plan, ""), "general");
+  // The escalation: no entry is NOT the general command.
+  assert.equal(agentFor(plan, "carpenter"), null);
+  // …and with no map at all the scalar serves everybody, as it did before.
+  const plain = parseRunArgs(["--agent", "general"]);
+  assert.equal(agentFor(plain, "archivist"), "general");
+});
+
+test("`--agent-for` refuses a shape that is not `<role>=<command>`, and a repeat", () => {
+  assert.throws(() => parseRunArgs(["--agent-for", "archivist"]), /<role>=<command>/);
+  assert.throws(() => parseRunArgs(["--agent-for", "=cmd"]), /<role>=<command>/);
+  assert.throws(() => parseRunArgs(["--agent-for", "archivist="]), /with no command/);
+  assert.throws(
+    () => parseRunArgs(["--agent-for", "archivist=a", "--agent-for", "archivist=b"]),
+    /given twice/
+  );
+});
+
+test("waitingForRole counts only OPEN work in roles nobody here serves", () => {
+  const config = { archivedStatuses: ["done"], inProgressStatus: "in_progress" };
+  const records = [
+    { id: "FX-1", role: "archivist", status: "pending" },
+    { id: "FX-2", role: "stonemason", status: "pending" },
+    { id: "FX-3", role: "stonemason", status: "done" },        // closed, not waiting
+    { id: "FX-4", role: "stonemason", status: "in_progress" },  // somebody has it
+    { id: "FX-5", role: "", status: "pending" },                // nobody in particular
+  ];
+  assert.deepEqual(waitingForRole(records, config, ["archivist"]), { stonemason: ["FX-2"] });
+  assert.deepEqual(waitingForRole(records, config, ["archivist", "stonemason"]), {});
 });

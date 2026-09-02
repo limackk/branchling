@@ -55,7 +55,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export const NEXT_FLAGS = [
   "--dir", "--actor", "--reason", "--json",
-  "--board", "--label", "--priority", "--epic", "--status",
+  "--board", "--label", "--priority", "--epic", "--status", "--role",
 ];
 
 /** No candidate is not an error — see the header. */
@@ -64,10 +64,12 @@ export const EXIT_NOTHING_TO_TAKE = 3;
 /** PURE — resolves `next`'s arguments. Throws on a usage error. */
 export function parseNextArgs(args) {
   const plan = { dir: null, actor: null, reason: null, json: false,
-    board: null, label: null, priority: null, epic: null, status: null };
+    board: null, label: null, priority: null, epic: null, status: null,
+    role: null, roleStrict: false };
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === "--json") { plan.json = true; continue; }
+    if (a === "--role-strict") { plan.roleStrict = true; continue; }
     if (NEXT_FLAGS.indexOf(a) >= 0) {
       const value = args[++i] || null;
       if (!value) throw new Error("`" + a + "` with no value");
@@ -75,11 +77,21 @@ export function parseNextArgs(args) {
       continue;
     }
     if (a.startsWith("-")) {
-      throw new Error("unknown flag: " + a + "\nknown flags: " + NEXT_FLAGS.join(" "));
+      throw new Error("unknown flag: " + a + "\nknown flags: " + NEXT_FLAGS.concat(["--role-strict"]).join(" "));
     }
     throw new Error(
       "unexpected argument: " + a + "\n" +
         "`next` chooses the task — to name one yourself use `" + N + " take " + a + "`."
+    );
+  }
+  // `--role-strict` alone narrows nothing — there is no role to be strict about,
+  // and silently ignoring a flag is how a caller gets a queue they did not ask
+  // for and no word about it.
+  if (plan.roleStrict && plan.role === null) {
+    throw new Error(
+      "`--role-strict` with no `--role`\n" +
+        "It narrows `--role r` from `r or no role` to `exactly r`; on its own there is\n" +
+        "nothing for it to narrow."
     );
   }
   if (plan.reason !== null && !isValidReason(plan.reason)) {
@@ -319,12 +331,38 @@ export function run(argv) {
   }
   const config = loadConfigOrExit(root);
 
+  // A role outside the project's vocabulary is a typo, and a typo that silently
+  // matches nothing looks exactly like an empty queue (TL-97's rule, applied to
+  // the dispatcher's side).
+  const wantedRoles = splitList(plan.role);
+  if (wantedRoles) {
+    const unknown = wantedRoles.filter((r) => (config.roles || []).indexOf(r) < 0);
+    if (unknown.length) {
+      console.error(failure(N + " next", "unknown role(s): " + unknown.join(", "),
+        (config.roles || []).length
+          ? ["`roles` in config.yaml holds: " + config.roles.join(", ")]
+          : [
+              "This backlog declares no `roles:` in config.yaml, so no task can carry one.",
+              "Declare the vocabulary there first — filtering by a role nobody serves",
+              "would answer `nothing to take` about a queue that is not empty.",
+            ],
+        [N + " next --help"]));
+      return 2;
+    }
+  }
+
   const filters = {
     status: splitList(plan.status),
     priority: splitList(plan.priority),
     board: splitList(plan.board),
     label: splitList(plan.label),
     epic: splitList(plan.epic),
+    // `--role r` means `r OR no role`, because a task that asks for nobody in
+    // particular can be done by anybody. The reverse default would starve every
+    // role-less task the moment all the callers passed the flag — which, in a
+    // fleet of specialised agents, is all of them. `--role-strict` is the
+    // narrower question, asked explicitly.
+    role: wantedRoles ? (plan.roleStrict ? wantedRoles : wantedRoles.concat([""])) : null,
   };
   const now = Date.now();
   const records = readTaskRecords(backlogPaths(root).tasksDir, config.taskId.file);
@@ -395,6 +433,12 @@ export function run(argv) {
   const details = [
     "searched statuses: " + (searched.join(", ") || "(none — check `statuses` in config.yaml)"),
   ];
+  if (wantedRoles) {
+    details.push(
+      "searched roles: " + wantedRoles.join(", ") +
+        (plan.roleStrict ? " (exactly — `--role-strict`)" : " (or no role at all)")
+    );
+  }
   if (skippedBlocked) details.push(skippedBlocked + " matching task(s) still have open blockers");
   if (elsewhereLines.length) {
     details.push(elsewhereLines.length + " candidate(s) are in another state on another branch or worktree");

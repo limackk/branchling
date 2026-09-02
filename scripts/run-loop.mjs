@@ -73,7 +73,7 @@ const CLI = join(__dirname, "cli.mjs");
 export const AGENT_ENV = "BACKLOG_AGENT_COMMAND";
 
 export const RUN_FLAGS = [
-  "--dir", "--actor", "--agent", "--max-attempts", "--max-tasks", "--timeout",
+  "--dir", "--actor", "--agent", "--agent-for", "--max-attempts", "--max-tasks", "--timeout",
   "--log-dir", "--stuck-status", "--json", "--dry-run",
   "--board", "--label", "--priority", "--epic",
 ];
@@ -84,7 +84,7 @@ const DEFAULT_TIMEOUT_SECONDS = 900;
 /** PURE — resolves `run`'s arguments. Throws on a usage error. */
 export function parseRunArgs(args) {
   const plan = {
-    dir: null, actor: null, agent: null, json: false, dryRun: false,
+    dir: null, actor: null, agent: null, agentFor: {}, json: false, dryRun: false,
     maxAttempts: DEFAULT_MAX_ATTEMPTS, maxTasks: 0, timeout: DEFAULT_TIMEOUT_SECONDS,
     logDir: null, stuckStatus: null, board: null, label: null, priority: null, epic: null,
   };
@@ -102,6 +102,26 @@ export function parseRunArgs(args) {
           throw new Error("`" + a + " " + value + "` is not a positive whole number");
         }
         plan[numbers[a]] = n;
+        continue;
+      }
+      if (a === "--agent-for") {
+        const at = value.indexOf("=");
+        if (at <= 0) {
+          throw new Error(
+            "`--agent-for " + value + "` is not `<role>=<command>`\n" +
+              "One role, one command, one flag — repeat it for each role you serve."
+          );
+        }
+        const role = value.slice(0, at).trim();
+        const command = value.slice(at + 1).trim();
+        if (!command) throw new Error("`--agent-for " + role + "=` with no command");
+        if (plan.agentFor[role]) {
+          throw new Error(
+            "`--agent-for " + role + "` given twice\n" +
+              "Two commands for one role is two answers to one question; say which."
+          );
+        }
+        plan.agentFor[role] = command;
         continue;
       }
       const key = { "--log-dir": "logDir", "--stuck-status": "stuckStatus" }[a] || a.slice(2);
@@ -128,6 +148,58 @@ export function parseRunArgs(args) {
  * placeholder is left alone rather than blanked — silently deleting part of
  * somebody's command line is how a run does the wrong thing and reports success.
  */
+/**
+ * Which command serves this task. PURE.
+ *
+ * ONE QUEUE, SEVERAL HANDS (TL-98). `--agent` is the command for a task that
+ * asks for nobody in particular; `--agent-for <role>=<cmd>` names one hand per
+ * role. With no `--agent-for` at all the scalar serves EVERY task, which is the
+ * behaviour before this existed, byte for byte.
+ *
+ * A ROLE WITH NO ENTRY IS NOT AN ERROR AND NOT A FALLBACK. It is the escalation:
+ * "I have no analyst" is a fact about this deployment, and the task waits for
+ * one — possibly a person. Falling back to the general command would hand a
+ * specialist's task to whoever was left, which is the outcome `role:` exists to
+ * prevent; failing would stop a queue that has other work it can do.
+ *
+ * @returns {string|null} the command, or null when nothing here serves that role
+ */
+export function agentFor(plan, role) {
+  const wanted = String(role || "").trim();
+  if (!wanted) return plan.agent || null;
+  if (!Object.keys(plan.agentFor || {}).length) return plan.agent || null;
+  return plan.agentFor[wanted] || null;
+}
+
+/** The roles this invocation serves, for `next --role`. Empty when the caller
+ *  named none — and then no role filter is passed at all, so the queue behaves
+ *  exactly as it did. PURE. */
+export function servedRoles(plan) {
+  return Object.keys(plan.agentFor || {}).sort();
+}
+
+/**
+ * Open work this invocation cannot serve, counted per role. PURE.
+ *
+ * A SKIP IS NEVER SILENT. A task quietly left out is indistinguishable from an
+ * empty queue, and the reader has no second place to look — the same class of
+ * defect as a silent no-op. So the run reports "3 task(s) waiting for `analyst`
+ * — no command was given for that role" and names the ids.
+ */
+export function waitingForRole(records, config, served) {
+  const archived = new Set(config.archivedStatuses || []);
+  const inProgress = config.inProgressStatus || null;
+  const serving = new Set(served);
+  const out = {};
+  for (const t of records || []) {
+    const role = String(t.role || "").trim();
+    if (!role || serving.has(role)) continue;
+    if (archived.has(t.status) || t.status === inProgress) continue;
+    (out[role] = out[role] || []).push(t.id);
+  }
+  return out;
+}
+
 export function renderAgentCommand(template, task) {
   return String(template)
     .split("{task_file}").join(task.file)
@@ -340,7 +412,7 @@ function workOne(ctx, task) {
 
   for (let attempt = 1; attempt <= ctx.plan.maxAttempts; attempt++) {
     attempts = attempt;
-    const command = renderAgentCommand(ctx.plan.agent, task);
+    const command = renderAgentCommand(task.command, task);
     appendFileSync(logPath, "=== attempt " + attempt + ": " + command + "\n", "utf8");
     const agent = spawnSync(command, {
       shell: true,
@@ -402,6 +474,17 @@ function renderReport(report, plan) {
     if (r.detail) lines.push("      " + color.dim(String(r.detail).split("\n")[0]));
   }
   if (!report.taken.length) lines.push("  " + color.dim(MARK.bullet + " nothing was taken"));
+  const waitingRoles = Object.keys(report.waiting || {}).sort();
+  if (waitingRoles.length) {
+    lines.push("");
+    lines.push("  waiting for a role this run does not serve:");
+    for (const role of waitingRoles) {
+      const ids = report.waiting[role];
+      lines.push("    " + MARK.warn + " " + ids.length + " task(s) ask for `" + role +
+        "` — no `--agent-for " + role + "=…` was given");
+      lines.push("      " + color.dim(ids.join(", ")));
+    }
+  }
   lines.push("");
   lines.push("  " + color.dim("stopped: " + report.stopped));
   if (plan.dryRun) lines.push("  " + color.dim("`--dry-run`: no agent was run and nothing was claimed"));
@@ -435,6 +518,20 @@ export function run(argv) {
   }
   const config = loadConfigOrExit(root);
 
+  // A role in the map that the project does not declare is a typo, and it fails
+  // BEFORE the loop starts: found in the middle of a run it would have wasted
+  // every task up to it (third law — the map is the user's layer, the vocabulary
+  // is the project's, and the consistency between them is checked at the seam).
+  const unknownRoles = servedRoles(plan).filter((r) => (config.roles || []).indexOf(r) < 0);
+  if (unknownRoles.length) {
+    console.error(failure(N + " run", "`--agent-for` names role(s) this backlog does not declare: " + unknownRoles.join(", "),
+      (config.roles || []).length
+        ? ["`roles` in config.yaml holds: " + config.roles.join(", ")]
+        : ["This backlog declares no `roles:` in config.yaml, so no task can ask for one."],
+      [N + " run --help"]));
+    return 2;
+  }
+
   plan.agent = plan.agent || process.env[AGENT_ENV] || null;
   if (!plan.agent && !plan.dryRun) {
     console.error(failure(N + " run", "no agent command — this tool does not have one of its own", [
@@ -460,6 +557,15 @@ export function run(argv) {
   const passthrough = [];
   for (const key of ["board", "label", "priority", "epic"]) {
     if (plan[key]) passthrough.push("--" + key, plan[key]);
+  }
+  // The roles are pushed into the SELECTION rather than filtered after it. A
+  // task claimed and then skipped would be left `in_progress` under this run's
+  // actor with nobody working on it — the dispatcher must not hand out what this
+  // invocation cannot serve.
+  const served = servedRoles(plan);
+  if (served.length) {
+    passthrough.push("--role", served.join(","));
+    filters.role = served.concat([""]);
   }
 
   // `--dry-run` asks WHICH tasks, in what order, and must not claim any of them.
@@ -529,7 +635,18 @@ export function run(argv) {
     }
     seen.add(task.id);
 
-    const result = workOne(ctx, { id: task.id, file: task.file, text: task.text || "" });
+    const role = String((task.task && task.task.role) || "").trim();
+    const command = agentFor(plan, role);
+    if (!command) {
+      // Belt and braces: the selection above already excludes these, so arriving
+      // here means the dispatcher and this loop disagree — and a task claimed
+      // with nobody to work it must not be left claimed.
+      releaseLock({ root, taskId: task.id, actor });
+      stopped = task.id + " asks for role `" + role + "`, which no `--agent-for` serves";
+      break;
+    }
+    const result = workOne(ctx, { id: task.id, file: task.file, text: task.text || "", command });
+    result.role = role;
     if (result.outcome === "closed") {
       tally.closed++;
     } else {
@@ -553,15 +670,23 @@ export function run(argv) {
     console.error(warn("the views were not rebuilt — run `" + N + " build` yourself"));
   }
 
-  const report = { taken, tally, ms: Date.now() - started, stopped };
+  // Counted from the tree AFTER the run: what is left that this invocation had
+  // no hand for. It is not an error and not a failure — it is the escalation,
+  // and naming it is the whole point (a silent skip looks like an empty queue).
+  const waiting = served.length
+    ? waitingForRole(readTaskRecords(backlogPaths(root).tasksDir, config.taskId.file), config, served)
+    : {};
+
+  const report = { taken, tally, ms: Date.now() - started, stopped, waiting };
   if (plan.json) {
     console.log(JSON.stringify({
-      ok: true, dryRun: false, agent: plan.agent, stopped,
+      ok: true, dryRun: false, agent: plan.agent, agentFor: plan.agentFor, stopped,
+      waitingForRole: Object.keys(waiting).sort().map((r) => ({ role: r, count: waiting[r].length, ids: waiting[r] })),
       tally: { ...tally, taken: taken.length },
       ms: report.ms,
       tasks: taken.map((r) => ({
         id: r.id, outcome: r.outcome, attempts: r.attempts, ms: r.ms, log: r.log,
-        status: r.status || null, detail: r.detail || null,
+        role: r.role || "", status: r.status || null, detail: r.detail || null,
       })),
     }, null, 2));
   } else {

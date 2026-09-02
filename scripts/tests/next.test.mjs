@@ -502,3 +502,77 @@ test("selectCandidates is pure: no disk, and it says what it skipped", () => {
   assert.deepEqual(candidates.map((t) => t.id), ["T-2", "T-3"]);
   assert.equal(skippedBlocked, 1);
 });
+
+// ── Roles in the dispatcher (TL-98) ───────────────────────────────────────
+//
+// The roles are the FIXTURE's own. `roles:` is a project's vocabulary, and a
+// test asserting one project's job titles would be a copy of somebody's
+// config.yaml rather than a statement about the code.
+
+/** Declare a vocabulary of roles and give some tasks one. */
+function withRoles(backlog, roles, assignments) {
+  const cfg = join(backlog, "config.yaml");
+  writeFileSync(cfg, readFileSync(cfg, "utf8") + "\nroles: [" + roles.join(", ") + "]\n", "utf8");
+  for (const [id, role] of Object.entries(assignments)) {
+    const name = readdirSync(join(backlog, "tasks")).find((f) => f.startsWith(id + "-"));
+    const file = join(backlog, "tasks", name);
+    writeFileSync(file, readFileSync(file, "utf8").replace(/^role:.*$/m, "role: " + role), "utf8");
+  }
+}
+
+test("--role hands out that role AND the tasks that ask for nobody", () => {
+  const { backlog, env, ids } = fixture(["P1", "P1"]);
+  withRoles(backlog, ["archivist", "stonemason"], { [ids[0]]: "stonemason" });
+
+  // ids[0] asks for a stonemason, ids[1] for nobody. An archivist gets the
+  // second one — never the first.
+  const first = run(["next", "--dir", backlog, "--actor", "agent:a", "--role", "archivist", "--json"], env);
+  assert.equal(first.status, 0, first.stderr);
+  assert.equal(JSON.parse(first.stdout).id, ids[1]);
+
+  const second = run(["next", "--dir", backlog, "--actor", "agent:a", "--role", "archivist"], env);
+  assert.equal(second.status, 3, "the stonemason's task was handed to an archivist: " + second.stdout);
+  assert.match(second.stdout, /searched roles: archivist \(or no role at all\)/);
+});
+
+test("--role-strict leaves the role-less tasks for somebody else", () => {
+  const { backlog, env, ids } = fixture(["P1", "P1"]);
+  withRoles(backlog, ["archivist", "stonemason"], { [ids[0]]: "stonemason" });
+
+  const r = run(["next", "--dir", backlog, "--actor", "agent:a", "--role", "archivist", "--role-strict"], env);
+  assert.equal(r.status, 3, "a role-less task was handed out under --role-strict: " + r.stdout);
+  // POSITIVE CONTROL: the same call for the role that IS on a task does hand it out.
+  const s = run(["next", "--dir", backlog, "--actor", "agent:a", "--role", "stonemason", "--role-strict", "--json"], env);
+  assert.equal(s.status, 0, s.stderr);
+  assert.equal(JSON.parse(s.stdout).id, ids[0]);
+});
+
+test("several roles at once, and a role outside the vocabulary fails", () => {
+  const { backlog, env, ids } = fixture(["P1", "P1", "P2"]);
+  withRoles(backlog, ["archivist", "stonemason"], { [ids[0]]: "stonemason", [ids[1]]: "archivist" });
+
+  const r = run(["next", "--dir", backlog, "--actor", "agent:a", "--role", "archivist,stonemason", "--json"], env);
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok([ids[0], ids[1]].includes(JSON.parse(r.stdout).id));
+
+  const bad = run(["next", "--dir", backlog, "--actor", "agent:b", "--role", "carpenter"], env);
+  assert.equal(bad.status, 2);
+  assert.match(bad.stderr, /unknown role/);
+});
+
+test("--role-strict on its own is a usage error, not a silently ignored flag", () => {
+  const { backlog, env } = fixture(["P1"]);
+  const r = run(["next", "--dir", backlog, "--actor", "agent:a", "--role-strict"], env);
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /with no `--role`/);
+});
+
+test("`take <ID>` is untouched by roles — the gate belongs to the dispatcher", () => {
+  const { backlog, env, ids } = fixture(["P1", "P1"]);
+  withRoles(backlog, ["archivist", "stonemason"], { [ids[0]]: "stonemason" });
+  // No role declared by the caller, no flag: the direct mode works exactly as it
+  // did, and TL-97 says why — a person naming a task outranks the field.
+  const r = run(["take", ids[0], "--dir", backlog, "--actor", "agent:a"], env);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(field(taskText(backlog, ids[0]), "status"), "in_progress");
+});
