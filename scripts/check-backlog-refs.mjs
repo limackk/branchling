@@ -114,7 +114,57 @@ export function auditRefs(tasksDir, prefix, read = readFileSync, list = readdirS
       }
     }
   }
-  return { checked, dangling, unresolvable, taskCount: parsed.length };
+  return {
+    checked, dangling, unresolvable, taskCount: parsed.length,
+    // The parsed set travels out so a second rule can judge it without reading
+    // every file again (TL-134). One pass over the tree, two questions asked of
+    // it.
+    tasks: parsed.map((t) => ({
+      id: t.id,
+      file: t.file,
+      status: unquote(stripComment((t.fm.match(/^status:\s*(.+?)\s*$/m) || [])[1] || "")),
+      blocked_by: inlineList(t.fm, "blocked_by"),
+    })),
+  };
+}
+
+/**
+ * Tasks standing in a blocking status whose every stated blocker is closed.
+ * PURE (TL-134).
+ *
+ * WHY IT IS A DIFFERENT DEFECT FROM A DANGLING REFERENCE. There the reference
+ * points at nothing; here every reference is correct and closed. The guard above
+ * cannot see this — checked, on this tree, before the rule was written.
+ *
+ * WHICH STATUSES BLOCK is DERIVED, never the literal `blocked`: the statuses a
+ * project protects with `reason_required_statuses`, minus the archived ones.
+ * Those are exactly the statuses somebody had to state a reason to enter, and
+ * the reason a `blocked_by` list states is discharged when every task in it
+ * closes.
+ *
+ * AN EMPTY `blocked_by` IS NOT STALE. Such a task waits on something outside the
+ * tree — a decision, another team — and nothing here can observe that arriving.
+ * Reporting it would ask people to justify a state the tool cannot judge, which
+ * is how a guard teaches people to work around it.
+ *
+ * @param {Array<{id: string, status: string, blocked_by: string[]}>} tasks
+ * @param {{archivedStatuses?: string[], reasonRequiredStatuses?: string[]}} config
+ */
+export function staleBlocked(tasks, config = {}) {
+  const archived = new Set(config.archivedStatuses || []);
+  const blocking = (config.reasonRequiredStatuses || []).filter((s) => !archived.has(s));
+  const byId = new Map((tasks || []).map((t) => [t.id, t]));
+  const out = [];
+  for (const t of tasks || []) {
+    if (blocking.indexOf(t.status) < 0) continue;
+    const refs = t.blocked_by || [];
+    if (!refs.length) continue;
+    // An unknown id is not a closed one — that is the dangling-reference defect,
+    // and reporting the same task under both rules would say one problem twice.
+    if (!refs.every((r) => byId.has(r) && archived.has(byId.get(r).status))) continue;
+    out.push({ id: t.id, file: t.file, status: t.status, blockers: refs.slice() });
+  }
+  return out;
 }
 
 function main(argv) {
@@ -127,13 +177,39 @@ function main(argv) {
 
   const root = resolveBacklogDir({ dir: dir || undefined, moduleDir: __dirname }).root;
   // STRICT (TL-60): guard.
-  const prefix = loadConfigOrExit(root).taskIdPrefix;
-  const { checked, dangling, unresolvable, taskCount } = auditRefs(backlogPaths(root).tasksDir, prefix);
+  const config = loadConfigOrExit(root);
+  const prefix = config.taskIdPrefix;
+  const { checked, dangling, unresolvable, taskCount, tasks } = auditRefs(backlogPaths(root).tasksDir, prefix);
+  const stale = staleBlocked(tasks, config);
+
+  // REPORTED, NEVER FAILED, and the level is the decision this task asked for.
+  // Closing a blocker and lifting the status are two writes by nature, so a
+  // tree caught between them is mid-work rather than broken. Since TL-127 the
+  // dispatcher hands such a task out and clears the status itself, which makes
+  // this a state that corrects itself — failing a build over it would stop a
+  // queue that was already fixing the problem. And the guard changes nothing:
+  // leaving a blocking status is a state change and goes through a write with a
+  // stated reason, like every other.
+  const staleLines = [];
+  if (stale.length) {
+    staleLines.push(
+      color.warn(MARK.warn) + " backlog: " + stale.length + " task(s) stand in a blocking status " +
+        "whose every stated blocker is closed"
+    );
+    for (const t of stale) {
+      staleLines.push(`  - ${t.file}: \`${t.status}\`, waiting on ${t.blockers.join(", ")} — all closed`);
+    }
+    staleLines.push(
+      "  Nothing was changed. `" + N + " next` will hand these out and record leaving the status;"
+    );
+    staleLines.push("  to lift it by hand, write the change with its reason rather than editing the field.");
+  }
 
   if (!dangling.length && !unresolvable.length) {
     console.log(
       `${OKM} backlog: ${checked} blocked_by/blocks references across ${taskCount} tasks all point at tasks that exist`
     );
+    for (const line of staleLines) console.log(line);
     return 0;
   }
 
@@ -146,6 +222,7 @@ function main(argv) {
       `  - ${u.file}: \`${u.field}\` contains ${u.ref} — that is not a number from THIS backlog`
     );
   }
+  for (const line of staleLines) console.error(line);
   console.error("");
   if (dangling.length) {
     console.error("A reference usually dangles after a task was DELETED or moved, not after a typo.");

@@ -6,11 +6,11 @@ labels: []
 board: main
 epic: "Integralność danych"
 priority: P1                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:session
 estimate: 2h                       # 30m | 2h | 1d | 1w | 1mo
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-02
 blocked_by: []
 blocks: []
 related_docs: []
@@ -66,8 +66,8 @@ piszącej.
 
 ## Acceptance criteria
 
-- [ ] Task ze statusem blokady i wszystkimi `blocked_by` zamkniętymi jest zgłaszany przez `worktrail check`. [proof: guard-fails-on-stale]
-- [ ] Nazwa statusu pochodzi z `config.yaml`, nie z literału w kodzie. [proof: guard-fails-on-stale]
-- [ ] Test ma kontrolę pozytywną — fixture, na którym guard MUSI zgłosić. [proof: guard-fails-on-stale]
-- [ ] Guard jest zielony na obecnym drzewie tego repozytorium. [proof: guard-green-on-tree]
-- [ ] Guard niczego nie przestawia — zgłasza i kończy. [proof: guard-fails-on-stale]
+- [x] Task ze statusem blokady i wszystkimi `blocked_by` zamkniętymi jest zgłaszany przez `worktrail check`. [proof: guard-fails-on-stale]
+- [x] Nazwa statusu pochodzi z `config.yaml`, nie z literału w kodzie. [proof: guard-fails-on-stale]
+- [x] Test ma kontrolę pozytywną — fixture, na którym guard MUSI zgłosić. [proof: guard-fails-on-stale]
+- [x] Guard jest zielony na obecnym drzewie tego repozytorium. [proof: guard-green-on-tree]
+- [x] Guard niczego nie przestawia — zgłasza i kończy. [proof: guard-fails-on-stale]

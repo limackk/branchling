@@ -14,11 +14,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { SCRIPTS_DIR, TASKS_DIR } from "./_repo.mjs";
+import { staleBlocked } from "../check-backlog-refs.mjs";
 
 const GUARD = join(SCRIPTS_DIR, "check-backlog-refs.mjs");
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
@@ -190,4 +191,158 @@ test("the real tree of THIS repository is clean — and on a non-zero sample", (
   assert.equal(r.code, 0, r.out);
   const m = r.out.match(/(\d+) blocked_by\/blocks references/);
   assert.ok(m && Number(m[1]) > 0, "zero references checked — green with no evidential force: " + r.out);
+});
+
+// ── A blocking status whose blockers have all closed (TL-134) ─────────────
+//
+// A DIFFERENT DEFECT from a dangling reference: every reference here is correct
+// and closed. The rule above cannot see it, and this file asserts both — the
+// same tree passes the reference check and is reported by this one.
+
+/** A config declaring the fixture's OWN vocabulary. The status called "blocked"
+ *  is this repository's word; the guard must work off `config.yaml`, so the
+ *  fixture uses names no project of ours uses. */
+function config(dir, lines) {
+  writeFileSync(join(dir, "config.yaml"), [
+    "task_id_prefix: BL",
+    "statuses: [queued, running, parked, shipped]",
+    "archived_statuses: [shipped]",
+    "dashboard_open_statuses: [queued, running, parked]",
+    "in_progress_status: running",
+    "reason_required_statuses: [parked]",
+    ...(lines || []),
+  ].join("\n") + "\n", "utf8");
+}
+
+test("a task PARKED behind blockers that have all closed is reported", () => {
+  withSandbox(
+    (d) => {
+      config(d);
+      task(d, "BL-100", { status: "parked", blocked_by: ["BL-101"] });
+      task(d, "BL-101", { status: "shipped" });
+    },
+    (dir) => {
+      const r = run(["--dir", dir]);
+      // Reported, not failed: closing a blocker and lifting the status are two
+      // writes, so a tree caught between them is mid-work rather than broken.
+      assert.equal(r.code, 0, "a self-correcting state failed the build: " + r.out);
+      assert.match(r.out, /BL-100/, "the report does not say WHICH task");
+      assert.match(r.out, /BL-101/, "the report does not say which blockers closed");
+      assert.match(r.out, /parked/, "the report does not name the status from config.yaml");
+    },
+  );
+});
+
+test("POSITIVE CONTROL: the same shape with one blocker still open is NOT reported", () => {
+  withSandbox(
+    (d) => {
+      config(d);
+      task(d, "BL-100", { status: "parked", blocked_by: ["BL-101", "BL-102"] });
+      task(d, "BL-101", { status: "shipped" });
+      task(d, "BL-102", { status: "queued" });
+    },
+    (dir) => {
+      const r = run(["--dir", dir]);
+      assert.equal(r.code, 0, r.out);
+      assert.doesNotMatch(r.out, /blocking status/, "a task with an open blocker was reported: " + r.out);
+    },
+  );
+});
+
+test("a parked task with an EMPTY blocked_by is not reported — nothing here can judge it", () => {
+  withSandbox(
+    (d) => {
+      config(d);
+      task(d, "BL-100", { status: "parked" });
+    },
+    (dir) => {
+      const r = run(["--dir", dir]);
+      assert.equal(r.code, 0, r.out);
+      assert.doesNotMatch(r.out, /blocking status/, r.out);
+    },
+  );
+});
+
+test("the status comes from config.yaml: rename it and the rule follows", () => {
+  withSandbox(
+    (d) => {
+      writeFileSync(join(d, "config.yaml"), [
+        "task_id_prefix: BL",
+        "statuses: [queued, running, waiting, shipped]",
+        "archived_statuses: [shipped]",
+        "dashboard_open_statuses: [queued, running, waiting]",
+        "in_progress_status: running",
+        "reason_required_statuses: [waiting]",
+      ].join("\n") + "\n", "utf8");
+      task(d, "BL-100", { status: "waiting", blocked_by: ["BL-101"] });
+      task(d, "BL-101", { status: "shipped" });
+    },
+    (dir) => {
+      const r = run(["--dir", dir]);
+      assert.match(r.out, /waiting/, "the rule did not follow the project's own word: " + r.out);
+    },
+  );
+});
+
+test("a status NOT protected by reason_required_statuses is nobody's decision to have made", () => {
+  withSandbox(
+    (d) => {
+      config(d);
+      // `queued` is an ordinary status: a task sitting in it behind closed
+      // blockers is just a task waiting to be picked up.
+      task(d, "BL-100", { status: "queued", blocked_by: ["BL-101"] });
+      task(d, "BL-101", { status: "shipped" });
+    },
+    (dir) => {
+      const r = run(["--dir", dir]);
+      assert.doesNotMatch(r.out, /blocking status/, r.out);
+    },
+  );
+});
+
+test("the guard changes nothing: the file is byte for byte what it was", () => {
+  withSandbox(
+    (d) => {
+      config(d);
+      task(d, "BL-100", { status: "parked", blocked_by: ["BL-101"] });
+      task(d, "BL-101", { status: "shipped" });
+    },
+    (dir) => {
+      const file = join(dir, "tasks", "BL-100-x.md");
+      const before = readFileSync(file, "utf8");
+      run(["--dir", dir]);
+      assert.equal(readFileSync(file, "utf8"), before);
+    },
+  );
+});
+
+test("a stale reference and a stale status are reported as TWO defects, not one", () => {
+  withSandbox(
+    (d) => {
+      config(d);
+      task(d, "BL-100", { status: "parked", blocked_by: ["BL-101"] });
+      task(d, "BL-101", { status: "shipped" });
+      task(d, "BL-102", { blocked_by: ["BL-999"] });
+    },
+    (dir) => {
+      const r = run(["--dir", dir]);
+      assert.notEqual(r.code, 0, "the dangling reference stopped failing: " + r.out);
+      assert.match(r.out, /BL-999/);
+      assert.match(r.out, /blocking status/);
+    },
+  );
+});
+
+test("staleBlocked, without a tree", () => {
+  const config_ = { archivedStatuses: ["shipped"], reasonRequiredStatuses: ["parked", "shipped"] };
+  const tasks = [
+    { id: "BL-1", file: "a", status: "parked", blocked_by: ["BL-2"] },
+    { id: "BL-2", file: "b", status: "shipped", blocked_by: [] },
+    // A blocker that is not in the tree at all: that is the dangling-reference
+    // defect, and saying it twice would report one problem as two.
+    { id: "BL-3", file: "c", status: "parked", blocked_by: ["BL-404"] },
+    // A protected status that is ALSO archived is not a blocking one.
+    { id: "BL-4", file: "d", status: "shipped", blocked_by: ["BL-2"] },
+  ];
+  assert.deepEqual(staleBlocked(tasks, config_).map((t) => t.id), ["BL-1"]);
 });
