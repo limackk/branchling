@@ -144,6 +144,24 @@ One row = one piece of evidence of activity:
 - `session` — the host's session identifier. Without it, two agents working
   in parallel on one task blur into one session and time is counted once
   instead of twice. It is also the **attribution scope key** (§8).
+- `derived` — **the other name this session answers to**, written only when it
+  differs from `session` (TL-168). The host's id arrives inside the hook
+  payload and reaches nothing else: a plain `worktrail done` is not run by the
+  hook and has only the environment, so the field-change log stamps the key
+  every process DERIVES from the checkout (`sessionId()` in `focus.mjs`).
+  Without this pair the two logs name one session twice and never meet —
+  measured on 2026-09-02, with activity rows keyed
+  `3d71196b-2eae-4664-833f-be84f1e1da16`, history entries keyed
+  `tree-cb84986431a6`, and `worktrail session <id>` reporting no changes for a
+  session that had closed seven tasks. This writer is the only place that sees
+  both at the same moment, which is why it is the one that says they are the
+  same session.
+
+  A host that exports `BACKLOG_SESSION` makes the two ids IDENTICAL, and then
+  there is nothing for this field to say and it is absent. That is the better
+  arrangement where a host can be configured; it is deliberately not what the
+  join relies on, because relying on configuration fails silently on every
+  machine where nobody did it.
 - `attribution` — **which leg of the chain (§8) settled the task.** This is
   metadata about the row's reliability, exactly like `source` next to the
   author in the field change log.

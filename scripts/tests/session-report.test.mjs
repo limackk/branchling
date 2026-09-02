@@ -332,3 +332,59 @@ test("tokens reach the report per model, once an adapter writes them", () => {
   assert.match(r.stdout, /small\s+100/);
   assert.doesNotMatch(r.stdout, /1000/, "a single total is exactly what must not be printed");
 });
+
+// ── one session, two names (TL-168) ───────────────────────────────────────
+//
+// The activity row is keyed by the HOST's session id, which reaches its writer
+// inside a hook payload and reaches nothing else: a plain `worktrail done` has
+// only the environment, so the history log stamps the key every process DERIVES
+// from the checkout. Measured after TL-164 landed: activity rows keyed
+// `3d71196b-…`, history entries keyed `tree-cb84986431a6`, and the report
+// showing `what moved (0)` for a session that had closed seven tasks. The row's
+// writer is the one place that sees both, so it says so, and this is where that
+// is read back.
+
+test("a change stamped with the DERIVED key belongs to the session the host named", () => {
+  const rows = [beat("host-1", 0, { derived: "tree-abc" }), beat("host-1", 5, { derived: "tree-abc" })];
+  const history = { "T-1": [{ field: "status", from: "a", to: "b", actor: "agent:one", ts: at(3), session: "tree-abc" }] };
+  const s = collectSessions({ "T-1": rows }, history)[0];
+  assert.equal(s.session, "host-1", "the row's own key still names the session");
+  assert.equal(s.changes.length, 1, "the alias did not resolve — the join is exact and empty again");
+  assert.equal(s.unknownSessionChanges, 0);
+});
+
+test("POSITIVE CONTROL: without the alias the same change does not join", () => {
+  // Without this the assertion above could be passing because the join ignores
+  // the id altogether.
+  const rows = [beat("host-1", 0), beat("host-1", 5)];
+  const history = { "T-1": [{ field: "status", from: "a", to: "b", actor: "agent:one", ts: at(3), session: "tree-abc" }] };
+  const s = collectSessions({ "T-1": rows }, history)[0];
+  assert.deepEqual(s.changes, []);
+  assert.equal(s.unknownSessionChanges, 1, "a name nothing knows has to be counted, not skipped");
+});
+
+test("a change belonging to ANOTHER listed session is not counted as unknown", () => {
+  // It is not missing: it is over there, in that session's own row. Only a name
+  // nothing in the activity log has ever seen is a finding.
+  const rows = { "T-1": [beat("host-1", 0), beat("host-1", 5), beat("host-2", 1), beat("host-2", 4)] };
+  const history = { "T-1": [{ field: "owner", from: "", to: "x", actor: "agent:two", ts: at(2), session: "host-2" }] };
+  const a = collectSessions(rows, history).find((s) => s.session === "host-1");
+  assert.equal(a.unknownSessionChanges, 0);
+  assert.deepEqual(a.changes, []);
+});
+
+test("`session <id>` says out loud that a change named a session it has never seen", () => {
+  const dir = backlog({ "TASK-1": [beat("s-a", 0), beat("s-a", 5)] });
+  mkdirSync(join(dir, "history"), { recursive: true });
+  writeFileSync(join(dir, "history", "TASK-1.jsonl"), JSON.stringify({
+    id: "01AAA", ts: at(3), task: "TASK-1", field: "status", from: "a", to: "b",
+    actor: "agent:one", source: "done", reason: "proven", session: "a-session-nobody-saw",
+  }) + "\n", "utf8");
+
+  const r = run(["session", "s-a", "--dir", dir]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /never seen/);
+
+  const one = JSON.parse(run(["session", "s-a", "--dir", dir, "--json"]).stdout);
+  assert.equal(one.session.unknownSessionChanges, 1);
+});

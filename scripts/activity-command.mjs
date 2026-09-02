@@ -225,7 +225,12 @@ export function record(opts) {
     ts: new Date(now).toISOString(),
     task, kind: plan.kind, actor,
     source: plan.source || (hints.tool ? "hook" : "cli"),
-    session, attribution,
+    session,
+    // The key every OTHER process of this tool derives for the session, so the
+    // history log and this one can be joined even when the host's id reaches
+    // only the hook (TL-168). Dropped by `activityEntry` when it is the same.
+    derived: focusSession,
+    attribution,
   }]);
   throttleMark(root, key, seconds, { env: scopedEnv, now });
   return { ok: true, wrote: true, task, session, actor, attribution, entry };

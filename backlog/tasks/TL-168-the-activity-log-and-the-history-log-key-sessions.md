@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P2                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 4h                       # 30m | 2h | 1d | 1w
@@ -104,9 +104,9 @@ session is a session.
 
 ## Acceptance criteria
 
-- [ ] In this repository, `worktrail session <the newest session>` lists the changes that session made. [proof: joined-in-this-tree]
-- [ ] A history entry carrying a session the report does not know is counted, not silently skipped. [proof: suite]
-- [ ] The decision about a history-only session — whether `sessions` lists it — is recorded in this file. [proof: suite]
+- [x] In this repository, `worktrail session <the newest session>` lists the changes that session made. [proof: joined-in-this-tree]
+- [x] A history entry carrying a session the report does not know is counted, not silently skipped. [proof: suite]
+- [x] The decision about a history-only session — whether `sessions` lists it — is recorded in this file. [proof: suite]
 
 ## Notes
 
@@ -116,3 +116,47 @@ session is a session.
   this task.
 - Out of scope: what a session IS. The clustering, the idle gap and the minutes
   are settled and nothing here revisits them.
+
+## Decisions
+
+**Reproduced first, exactly as step 1 asks.** After TL-164 landed, the running
+session's activity rows were keyed
+`3d71196b-2eae-4664-833f-be84f1e1da16` and the history entry `done` had just
+written was keyed `tree-cb84986431a6`; `session 3d71196b-…` printed
+`what moved (0)` for a session that had closed seven tasks. After this change
+the same call lists them.
+
+**Design 2, and not design 1.** The activity row carries `derived` — the key
+every other process of this tool computes from the checkout — written only when
+it differs from `session`. Its writer is the one place that sees both names at
+the same moment, so it is the only place that can say they are the same session,
+and it says so without anybody configuring anything.
+
+Design 1 — `BACKLOG_SESSION` exported by whatever reports activity — is the
+better arrangement where a host can be configured, and it is now documented in
+`docs/backlog-time-tracking.md` §5. It is deliberately not what the join relies
+on: relying on configuration fails silently on every machine where nobody did
+it, and a report that is exact and empty is the worst of the three possible
+answers. The two are not exclusive; where a host exports the variable the ids
+are identical, `derived` says nothing and is absent.
+
+**The field earns its place the way `to` and `since` do.** The log's own header
+argues that extra fields must, and this one is written only when it carries
+information the row does not already have. A second name on every row would
+bloat a file that grows in the thousands and invite a reader to look for an
+alias on rows that have none.
+
+**A history-only session is NOT a session, and `sessions` does not list one.**
+A session here is a span of measured work: the minutes come from clustering
+heartbeats, and a row built from history alone would have no minutes, no
+clusters and no span — a row of nulls pretending to be a measurement. But it may
+not be invisible either, so `unknownSessionChanges` counts the changes on a
+session's tasks that name a session the activity log has never seen, and the
+text output says so with a warning marker.
+
+**Three states, three names, and that is the point.** `changes` are this
+session's, joined on any name it answers to. `unattributedChanges` name no
+session at all — every line written before TL-164, and every change reconciled
+from a hand edit. `unknownSessionChanges` name a session nothing has ever heard
+of. A change belonging to ANOTHER listed session is none of these: it is not
+missing, it is in that session's own row.

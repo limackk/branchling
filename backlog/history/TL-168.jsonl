@@ -1,1 +1,4 @@
 {"id":"01M1HQMNKHJ46R8TEXG341A00E","ts":"2026-09-02T18:55:57.041Z","task":"TL-168","field":"__created__","from":"","to":"The activity log and the history log key sessions differently","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1HRFYB151H91A7HSERHH7PX","ts":"2026-09-02T19:10:50.721Z","task":"TL-168","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown","session":"tree-cb84986431a6"}
+{"id":"01M1HRFYB1TZ3V08E7A5FSTYGB","ts":"2026-09-02T19:10:50.721Z","task":"TL-168","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown","session":"tree-cb84986431a6"}
+{"id":"01M1HRVKFKRB0AQW4DYBJH1YJY","ts":"2026-09-02T19:17:12.819Z","task":"TL-168","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven","session":"tree-cb84986431a6"}

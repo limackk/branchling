@@ -368,3 +368,32 @@ test("the new configuration keys are accepted, and a typo among them still fails
     cleanup(dir);
   }
 });
+
+// ── the other name a session answers to (TL-168) ──────────────────────────
+
+test("`derived` is written only when it says something the row does not already", () => {
+  // It earns its place the way `to` and `since` do: a field on every row would
+  // bloat a log that grows in the thousands and invite a reader to look for a
+  // second name on rows that have none.
+  const base = { task: "T-1", kind: "tool", actor: "agent:one", attribution: "focus" };
+
+  const differing = activityEntry({ ...base, session: "host-1", derived: "tree-abc" });
+  assert.equal(differing.derived, "tree-abc");
+
+  const same = activityEntry({ ...base, session: "tree-abc", derived: "tree-abc" });
+  assert.equal("derived" in same, false, "a name identical to the key says nothing");
+
+  const none = activityEntry({ ...base, session: "host-1" });
+  assert.equal("derived" in none, false);
+});
+
+test("the pair is what lets the two logs be joined at all", () => {
+  // The row's writer is the ONE place that sees the host's id and the key every
+  // other process derives at the same moment. If this field went, the history
+  // log and this one would name one session twice and never meet.
+  const e = activityEntry({
+    task: "T-1", kind: "tool", actor: "agent:one", attribution: "focus",
+    session: "3d71196b", derived: "tree-cb84986431a6",
+  });
+  assert.deepEqual([e.session, e.derived], ["3d71196b", "tree-cb84986431a6"]);
+});

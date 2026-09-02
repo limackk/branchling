@@ -163,7 +163,8 @@ function ensureDir(dir) {
  * append-only: a row written wrong cannot be edited out later, only explained.
  *
  * @param {{ts?: string, task: string, kind: string, actor: string,
- *          source?: string, session?: string, attribution?: string}} row
+ *          source?: string, session?: string, derived?: string,
+ *          attribution?: string}} row
  */
 export function activityEntry(row) {
   const task = String((row && row.task) || "").trim();
@@ -195,6 +196,25 @@ export function activityEntry(row) {
     session: String((row && row.session) || "").trim(),
     attribution,
   };
+
+  // THE OTHER NAME THIS SESSION ANSWERS TO (TL-168), and it earns its place the
+  // way `to`/`since` earn theirs below: it is written ONLY where it says
+  // something, never on every row.
+  //
+  // `session` is the HOST's id, which reaches this writer inside a hook payload.
+  // No other process can see it: a plain `done` is not run by the hook
+  // and has only the environment. So the history log stamps the key every
+  // process DERIVES from the checkout instead, and the two logs end up naming
+  // one session twice. Measured: activity rows keyed
+  // `3d71196b-2eae-4664-833f-be84f1e1da16`, history entries keyed
+  // `tree-cb84986431a6`, and `session <id>` reporting no changes for a session
+  // that closed seven tasks.
+  //
+  // This writer is the ONE place that knows both at the same moment, so it is
+  // the only place that can say they are the same session. When they are equal
+  // there is nothing to say and the field is absent.
+  const derived = String((row && row.derived) || "").trim();
+  if (derived && derived !== entry.session) entry.derived = derived;
 
   // A CORRECTION CARRIES TWO EXTRA FIELDS AND NOTHING ELSE DOES (TL-31). The
   // log is append-only, so a misattributed row cannot be edited — the fix is a

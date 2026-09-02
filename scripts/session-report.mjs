@@ -179,7 +179,11 @@ export function collectSessions(rowsByTask, history, opts = {}) {
       const key = cluster.session || UNSESSIONED;
       if (!sessions.has(key)) {
         sessions.set(key, {
-          session: key, actors: new Set(), tasks: new Map(),
+          // EVERY NAME THIS SESSION ANSWERS TO (TL-168). The host's id is the
+          // one the row is keyed by; `derived` is what a process that never saw
+          // the hook payload calls the same session, and it is what the history
+          // log stamps. Without the set, the join is exact and empty.
+          session: key, names: new Set([key]), actors: new Set(), tasks: new Map(),
           from: cluster.from, to: cluster.to, minutes: 0, singles: 0, clusters: 0, spans: [],
         });
       }
@@ -197,9 +201,23 @@ export function collectSessions(rowsByTask, history, opts = {}) {
     }
     for (const r of rows || []) {
       const key = String(r.session || "") || UNSESSIONED;
-      if (sessions.has(key) && r.actor) sessions.get(key).actors.add(r.actor);
+      if (!sessions.has(key)) continue;
+      if (r.actor) sessions.get(key).actors.add(r.actor);
+      // Read from the ROWS, not from the clusters: a cluster is a span of time
+      // and carries only what the clustering needs, which is deliberately the
+      // session key and nothing else.
+      if (r.derived) sessions.get(key).names.add(String(r.derived));
     }
   }
+
+  // EVERY NAME THE WHOLE REPORT KNOWS, gathered before the changes are
+  // correlated (TL-168). It is what separates "this change belongs to another
+  // session, which is listed over there" from "this change names a session
+  // nothing in the activity log has ever heard of" — and only the second is a
+  // finding. Without the distinction the second one vanishes in silence, which
+  // is a third invisible state beside "mine" and "nobody's".
+  const known = new Set();
+  for (const s of sessions.values()) for (const n of s.names) known.add(n);
 
   const out = [];
   for (const s of sessions.values()) {
@@ -208,7 +226,7 @@ export function collectSessions(rowsByTask, history, opts = {}) {
     for (const t of tasks) for (const r of rowsByTask[t.task] || []) {
       if ((String(r.session || "") || UNSESSIONED) === s.session) rows.push(r);
     }
-    const correlated = correlateChanges(s, tasks, history);
+    const correlated = correlateChanges(s, tasks, history, known);
     out.push({
       session: s.session,
       actors: [...s.actors].sort(),
@@ -227,6 +245,9 @@ export function collectSessions(rowsByTask, history, opts = {}) {
       // Named apart from `changes`, never folded into it: these belong to no
       // session, and a count is the only true thing that can be said about them.
       unattributedChanges: correlated.unattributed,
+      // And apart from THOSE: a change naming a session the activity log has
+      // never heard of is a different fact from a change naming none.
+      unknownSessionChanges: correlated.unknownSession,
       tokens: tokensByModel(rows),
     });
   }
@@ -257,15 +278,28 @@ const round = (n) => Math.round(n * 10) / 10;
  * They are real changes; they simply belong to nobody's session, and saying how
  * many there are is what stops an empty list reading as "nothing happened".
  */
-export function correlateChanges(session, tasks, history) {
+export function correlateChanges(session, tasks, history, known = null) {
   const from = Date.parse(session.from);
   const to = Date.parse(session.to);
+  // Every name this session answers to, not only the one the rows are keyed by
+  // (TL-168). `names` always holds at least the key itself.
+  const names = session.names || new Set([session.session]);
   const out = [];
   let unattributed = 0;
+  let unknownSession = 0;
   for (const t of tasks) {
     for (const e of (history && history[t.task]) || []) {
       if (e.session) {
-        if (e.session !== session.session) continue;
+        if (!names.has(e.session)) {
+          // Another session's work is that session's row, and it is listed.
+          // A name NOTHING in the activity log knows is the finding: work that
+          // left a trace in one log and none in the other.
+          if (known && !known.has(e.session)) {
+            const at = Date.parse(e.ts);
+            if (Number.isFinite(at) && at >= from && at <= to) unknownSession++;
+          }
+          continue;
+        }
       } else {
         // No session id: countable, never claimed. The window still decides
         // whether it is worth mentioning beside this session at all.
@@ -280,7 +314,7 @@ export function correlateChanges(session, tasks, history) {
     }
   }
   out.sort((a, b) => String(a.ts).localeCompare(String(b.ts)));
-  return { changes: out, unattributed };
+  return { changes: out, unattributed, unknownSession };
 }
 
 /** A session that moved no STATUS is the one the morning report exists to
@@ -353,6 +387,12 @@ export function renderOne(s) {
       "   ", stamp(c.ts).slice(-5), c.task, c.field,
       (c.from || "—") + " → " + (c.to || "—"), c.actor,
     ])));
+  }
+  if (s.unknownSessionChanges) {
+    // The louder of the two, because it is a gap rather than a limitation: a
+    // change that named a session no heartbeat ever mentioned.
+    out.push("  " + color.warn(MARK.warn) + " " + s.unknownSessionChanges +
+      " change(s) name a session this activity log has never seen.");
   }
   if (s.unattributedChanges) {
     // Counted, never listed. These are changes on this session's tasks that
