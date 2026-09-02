@@ -237,7 +237,10 @@ test("--json returns the result of every entry, and a refusal is JSON too", () =
 
       const bad = done(dir, ["TASK-404", "--json"]);
       assert.notEqual(bad.code, 0);
-      assert.equal(JSON.parse(bad.stdout).reason, "no-such-task");
+      const refused = JSON.parse(bad.stdout);
+      assert.equal(refused.kind, "verification-run", "a refusal is an envelope too (TL-119)");
+      assert.equal(refused.ok, false);
+      assert.equal(refused.refusalKind, "no-such-task");
     }
   );
 });

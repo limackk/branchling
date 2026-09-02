@@ -540,6 +540,9 @@ implementation detail. Every reading command answers in the same envelope:
 | `<command> --help` | `command-help` | `command`, `summary`, `usage`, `configured`, `flags` |
 | `pr-summary` | `pr-summary` | `base`, `scanned`, `reason`, `tasks`, `engaged`, `cost` |
 | `audit` | `audit` | `since`, `dayZero`, `tasks`, `findings`, `closedWithoutTrace`, `skippedBeforeSince`, `reopened`, `rework`, `parked`, `withoutPremise` |
+| `take`, `next` | `task-take` | `ok`, `taken`, `id`, `file`, `task`, `text`, `warnings`, `reclaimed`, `lock`, `refusalKind`, `refusal`, `details`, and — filled in by `next` — `passedOver`, `considered`, `searchedStatuses`, `skippedBlocked`, `skippedElsewhere`, `skippedExecutor`, `scan` |
+| `handoff` | `task-handoff` | `ok`, `id`, `file`, `task`, `role`, `owner`, `status` (each a `from`/`to` pair), `comment`, `released`, `warnings`, `refusalKind`, `refusal`, `details` |
+| `done` | `verification-run` | `ok`, `task`, `dryRun`, `closed`, `entries` (one per `verification:` entry, with its exit code), `status`, `wouldBe`, `ticked`, `refusalKind`, `refusal`, `details` |
 | `docs-drift` | `docs-drift` | `documents`, `minSignals`, `flagged`, `tooLittle`, `seeded` (absent unless `--seed-tasks` ran) |
 | `sessions` | `sessions` | `correlation`, `total`, `sessions` |
 | `session` | `session` | `correlation`, `session` |
@@ -572,7 +575,11 @@ surface.
 written for a person — `reason`, `next`, a check's `detail` — may be reworded;
 read `kind`, `ok` and `id` instead of matching on prose.
 
-`take`, `next`, `handoff` and `done` still answer with a bare object; the first
-three predate the envelope and `handoff` joins them so the four writing commands
-agree today — they move together in a separate change. `seed` was written after
-the envelope and uses it.
+**A refusal is the same kind with `ok: false`** (TL-119), never a kind of its
+own. `kind` answers "which question was asked" and is what a consumer switches
+on to know the payload's shape; a separate `refusal` kind would force two
+branches per command and would stop `kind` identifying the command at all. The
+refusal's own word for what went wrong is `refusalKind`, because `kind` belongs
+to the envelope. `take` and `next` share one kind for the same reason: they
+answer the same question and hand back the same task, and the keys that say how
+`next` CHOSE come back empty for `take`.

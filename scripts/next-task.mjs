@@ -47,7 +47,8 @@ import { loadConfigOrExit } from "./config.mjs";
 import { ACTOR_NAMESPACES, isValidActor, isValidReason } from "./history.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
-import { inProgressStatus, rebuildViews, refusalCode, renderTake, resolveActor, takeJson, takeTask } from "./take-task.mjs";
+import { printJson } from "./json-envelope.mjs";
+import { inProgressStatus, rebuildViews, refusalCode, refusalPayload, renderTake, resolveActor, takeJson, takeTask } from "./take-task.mjs";
 import { filterTasks, readTaskRecords, sortTasks, splitList } from "./task-select.mjs";
 import { MARK, color, failure, warn } from "./ui.mjs";
 
@@ -451,10 +452,10 @@ export function run(argv) {
         console.error(warn("the views were not rebuilt — run `" + N + " build` yourself"));
       }
       if (plan.json) {
-        console.log(JSON.stringify({
+        printJson("task-take", {
           ...takeJson(result), passedOver, considered: candidates.length,
           skippedElsewhere, skippedExecutor, scan: { scanned: scan.scanned, reason: scan.reason },
-        }, null, 2));
+        });
       } else {
         for (const line of elsewhereLines) console.log(color.dim(MARK.bullet + " " + line));
         for (const p of passedOver) {
@@ -469,7 +470,7 @@ export function run(argv) {
       continue;
     }
     if (plan.json) {
-      console.log(JSON.stringify({ ok: false, kind: result.kind, id: result.id, message: result.message, details: result.details || [] }, null, 2));
+      printJson("task-take", { ...refusalPayload(result), considered: candidates.length, passedOver });
     } else {
       console.error(failure(N + " next", result.message, result.details || []));
     }
@@ -514,11 +515,16 @@ export function run(argv) {
   for (const p of passedOver) details.push("  " + MARK.bullet + " " + p.why);
 
   if (plan.json) {
-    console.log(JSON.stringify({
-      ok: false, kind: "nothing-to-take", taken: null,
+    // AN EMPTY QUEUE IS AN ANSWER, not an error — and it is still an envelope,
+    // with every key of the kind present. A loop reading this has to tell "there
+    // is nothing" from "there is something I was not allowed to take", and the
+    // `skipped*` lists are the only place that distinction lives.
+    printJson("task-take", {
+      ok: false, taken: false, refusalKind: "nothing-to-take", refusal: "nothing to take",
+      details,
       searchedStatuses: searched, skippedBlocked, passedOver, skippedElsewhere, skippedExecutor,
       scan: { scanned: scan.scanned, reason: scan.reason },
-    }, null, 2));
+    });
   } else {
     // NOT an error, and it says so: silence here would read as a crash, and an
     // error would make an empty queue indistinguishable from a broken call.

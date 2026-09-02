@@ -326,17 +326,18 @@ no longer true.
 the tool working, which makes it worse than an error — especially when it has a
 side effect.
 
-**You extend this by composition, not through a plugin API.** Every reading
-command takes `--json` and answers in a versioned envelope; every writing
-command can be called from a script. `next-id` and `board` also keep printing
-their one value alone on the first line, so they drop straight into
-substitution.
+**You extend this by composition, not through a plugin API.** Every command that
+takes `--json` answers in the same versioned envelope — the writing ones
+included, refusals included — and every writing command can be called from a
+script. `next-id` and `board` also keep printing their one value alone on the
+first line, so they drop straight into substitution.
 
 ```bash
 worktrail query --status blocked --files | xargs $EDITOR
 worktrail stats --json | jq '.stats.byStatus.blocked'
 worktrail doctor --json | jq -e '.ok'          # a gate in CI
 worktrail done TASK-42 --json | jq '.entries[] | select(.ok | not)'
+worktrail next --actor agent:worker --json | jq -r '.refusalKind // .id'
 ```
 
 ### One description, a whole backlog

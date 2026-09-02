@@ -2,3 +2,6 @@
 {"id":"01M1EYJ35BE6M535RW347VGRCJ","ts":"2026-09-01T16:59:09.355Z","task":"TL-119","field":"title","from":"Koperta JSON w komendach piszących: take, next, done","to":"Koperta JSON w komendach piszących: take, next, handoff, done","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK52WBV60CTZPHG2TB6","ts":"2026-09-02T07:16:31.461Z","task":"TL-119","field":"title","from":"Koperta JSON w komendach piszących: take, next, handoff, done","to":"JSON envelope in the writing commands: take, next, handoff, done","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK53BSJYGWRAYNEGYF4","ts":"2026-09-02T07:16:31.461Z","task":"TL-119","field":"epic","from":"Powierzchnia CLI","to":"CLI surface","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1HAC33VC295A03D6J1NVDWH","ts":"2026-09-02T15:04:04.475Z","task":"TL-119","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1HAC33VSW10E11776HWZ578","ts":"2026-09-02T15:04:04.475Z","task":"TL-119","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1HASENPP0WNBXH8XTR7SFET","ts":"2026-09-02T15:11:22.294Z","task":"TL-119","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

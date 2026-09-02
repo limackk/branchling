@@ -36,6 +36,7 @@ import { fileURLToPath } from "node:url";
 import { loadConfigOrExit } from "./config.mjs";
 import { ACTOR_NAMESPACES, FIELD_ROLE_OVERRIDE, appendEntries, changesRequiringReason, eventId, isValidActor, isValidReason, normalizeReason, recordEdit } from "./history.mjs";
 import { focusQuietly } from "./focus.mjs";
+import { printJson } from "./json-envelope.mjs";
 import { acquireLock, releaseLock } from "./lock.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
@@ -411,6 +412,23 @@ export function takeJson(result) {
   };
 }
 
+/**
+ * A refusal, as the SAME kind with `ok: false` (TL-119).
+ *
+ * Shared with `next`, which refuses for the same reasons and must not answer in
+ * a second shape. `refusalKind` and not `kind`: the envelope owns that word.
+ */
+export function refusalPayload(result, fallbackId) {
+  return {
+    ok: false,
+    taken: false,
+    id: result.id || fallbackId || null,
+    refusalKind: result.kind,
+    refusal: result.message,
+    details: result.details || [],
+  };
+}
+
 /** The exit code for a refusal. A usage error (you named a task that is not
  *  there) is 2, like every other bad invocation; a refusal about a task that
  *  exists is 1. `next` adds 3 for "nothing to do", which is neither. */
@@ -467,7 +485,7 @@ export function run(argv) {
   const result = takeTask({ root, config, id: plan.id, actor, role: plan.role, reason: plan.reason });
   if (!result.ok) {
     if (plan.json) {
-      console.log(JSON.stringify({ ok: false, kind: result.kind, id: result.id || plan.id, message: result.message, details: result.details || [] }, null, 2));
+      printJson("task-take", refusalPayload(result, plan.id));
     } else {
       console.error(failure(N + " take", result.message, result.details || []));
     }
@@ -477,7 +495,7 @@ export function run(argv) {
   if (!result.alreadyOwned && !rebuildViews(root)) {
     console.error(warn("the views were not rebuilt — run `" + N + " build` yourself"));
   }
-  if (plan.json) console.log(JSON.stringify(takeJson(result), null, 2));
+  if (plan.json) printJson("task-take", takeJson(result));
   else console.log(renderTake(result, root));
   return 0;
 }

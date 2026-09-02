@@ -6,11 +6,11 @@ labels: []
 board: main
 epic: "CLI surface"
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 estimate: 2h                       # 30m | 2h | 1d | 1w | 1mo
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-02
 blocked_by: []
 blocks: []
 related_docs:

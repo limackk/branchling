@@ -221,7 +221,11 @@ test("nothing to take says so in `--json` as well, with the reason", () => {
     const r = cli(["next", "--dir", backlog, "--actor", "agent:b", "--json"], { cwd: repoRoot, env });
     assert.equal(r.status, 3);
     const out = JSON.parse(r.stdout);
-    assert.equal(out.kind, "nothing-to-take");
+    // The ENVELOPE's kind says which question was asked; `refusalKind` says how
+    // the answer came out (TL-119). An empty queue is still a `task-take`.
+    assert.equal(out.kind, "task-take");
+    assert.equal(out.ok, false);
+    assert.equal(out.refusalKind, "nothing-to-take");
     assert.equal(out.skippedElsewhere[0].id, ids[0]);
     assert.equal(out.skippedElsewhere[0].elsewhere[0].source, "feature");
   } finally {

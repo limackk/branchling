@@ -48,6 +48,7 @@ import { fileURLToPath } from "node:url";
 
 import { loadConfigOrExit } from "./config.mjs";
 import { ACTOR_NAMESPACES, FIELD_COMMENT, appendEntries, eventId, isValidActor, isValidReason, normalizeReason, readHistory, recordEdit } from "./history.mjs";
+import { printJson } from "./json-envelope.mjs";
 import { isExpired, lockDir, readLock, releaseLock } from "./lock.mjs";
 import { queueStatuses } from "./next-task.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
@@ -414,7 +415,10 @@ export function run(argv) {
   });
   if (!result.ok) {
     if (plan.json) {
-      console.log(JSON.stringify({ ok: false, kind: result.kind, id: result.id || plan.id, message: result.message, details: result.details || [] }, null, 2));
+      printJson("task-handoff", {
+        ok: false, id: result.id || plan.id, refusalKind: result.kind,
+        refusal: result.message, details: result.details || [],
+      });
     } else {
       console.error(failure(N + " handoff", result.message, result.details || []));
     }
@@ -424,7 +428,7 @@ export function run(argv) {
   if (!rebuildViews(root)) {
     console.error(failure(N + " handoff", "the views were not rebuilt — run `" + N + " build` yourself", []));
   }
-  if (plan.json) console.log(JSON.stringify(handoffJson(result), null, 2));
+  if (plan.json) printJson("task-handoff", handoffJson(result));
   else console.log(renderHandoff(result));
   return 0;
 }

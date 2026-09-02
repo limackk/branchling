@@ -42,6 +42,7 @@ import { loadConfigOrExit } from "./config.mjs";
 import { applyProofs, auditTask, parseCriteria, parseVerification } from "./criteria.mjs";
 import { buildFieldSpecs, extractMeta, fieldSpec, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
 import { ACTOR_NAMESPACES, FIELD_VERIFIED, REASON_PROVEN, appendEntries, eventId, isValidActor, isValidReason, recordEdit, requiresReason } from "./history.mjs";
+import { printJson } from "./json-envelope.mjs";
 import { releaseLock } from "./lock.mjs";
 import { MARK, color, errColor, failure } from "./ui.mjs";
 
@@ -308,11 +309,11 @@ function log(json, text) {
 function refuse(plan, headline, details, results, reason) {
   console.error(failure(N + " done", headline, details));
   if (plan.json) {
-    console.log(JSON.stringify({
+    printJson("verification-run", {
       task: plan.id, ok: false, closed: false, dryRun: plan.dryRun,
-      reason, refusal: [headline].concat(details || []).join("\n"),
+      refusalKind: reason, refusal: headline, details: details || [],
       entries: results || [],
-    }, null, 2));
+    });
   }
   return 1;
 }
@@ -533,7 +534,7 @@ function run(argv) {
     log(plan.json, "    would set: status " + before.status + " → " + status);
     log(plan.json, "    would tick: " + (proofed.ticked.length || "no") + " criteri" +
       (proofed.ticked.length === 1 ? "on" : "a"));
-    if (plan.json) printJson(plan, results, { status: before.status, wouldBe: status, ticked: proofed.ticked, closed: false });
+    if (plan.json) answer(plan, results, { status: before.status, wouldBe: status, ticked: proofed.ticked, closed: false });
     return 0;
   }
 
@@ -600,7 +601,7 @@ function run(argv) {
     console.error(WARNM + " the views were not rebuilt — run `" + N + " build` yourself");
   }
 
-  if (plan.json) printJson(plan, results, { status, ticked: proofed.ticked, closed: true });
+  if (plan.json) answer(plan, results, { status, ticked: proofed.ticked, closed: true });
   return 0;
 }
 
@@ -615,18 +616,21 @@ function run(argv) {
 // sentences nobody can reconstruct, and deleting a person's writing to tidy up a
 // convention would cost more than the tidiness is worth.
 
-function printJson(plan, results, extra) {
-  console.log(JSON.stringify({
+/** The answer, in the envelope every other command uses (TL-119). The kind is
+ *  `verification-run` and not `task-done`, because what a consumer reads here is
+ *  the EVIDENCE — `--dry-run` produces the same payload with `closed: false`. */
+function answer(plan, results, extra) {
+  printJson("verification-run", {
     task: plan.id,
     ok: results.every((r) => r.ok),
     dryRun: plan.dryRun,
     entries: results,
     ...extra,
-  }, null, 2));
+  });
 }
 
 function finishFailed(plan, results, code) {
-  if (plan.json) printJson(plan, results, { closed: false });
+  if (plan.json) answer(plan, results, { closed: false });
   return code;
 }
 

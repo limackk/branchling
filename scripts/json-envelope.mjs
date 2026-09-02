@@ -122,6 +122,51 @@ export const KINDS = {
     activeWave: null, nextUp: [], inProgress: [], unplanned: [], stale: [],
     inProgressStatus: null,
   },
+  // ── The WRITING commands (TL-119) ──────────────────────────────────────
+  //
+  // A REFUSAL IS THE SAME KIND WITH `ok: false`, NOT A KIND OF ITS OWN. The
+  // decision matters because `kind` is what a consumer switches on to know the
+  // payload's shape, and it answers "which question was asked", never "did the
+  // answer come out yes". A `refusal` kind would force every consumer into two
+  // branches per command and would make `kind` stop identifying the command at
+  // all — and the discriminator it would duplicate, `ok`, is already here.
+  //
+  // The refusal's own word for what went wrong is `refusalKind` and not `kind`:
+  // `kind` belongs to the envelope, and a payload may not carry it.
+  //
+  // `take` and `next` share ONE kind, because they answer the same question and
+  // return the same task. `next` fills in the keys that say how it CHOSE — what
+  // it passed over and why, what it never considered — and for `take` those come
+  // back empty, which is the emptiness rule doing its job rather than two kinds
+  // doing it by hand.
+  "task-take": {
+    ok: null, taken: null, id: null, file: null, task: null, text: null,
+    warnings: [], reclaimed: null, lock: null,
+    refusalKind: null, refusal: null, details: [],
+    // `next` only, and the reason each is here rather than in prose on stderr:
+    // a loop must be able to tell an empty queue from a queue it was not allowed
+    // to draw from, and it cannot parse a sentence to do it.
+    passedOver: [], considered: null, searchedStatuses: [], skippedBlocked: null,
+    skippedElsewhere: [], skippedExecutor: [], scan: null,
+  },
+  // `handoff --json` (TL-99). Three from/to pairs and the comment that carries
+  // the reason: a handoff is not a task being performed, it is a task changing
+  // hands, and a consumer wants both ends of every field that moved.
+  "task-handoff": {
+    ok: null, id: null, file: null, task: null,
+    role: null, owner: null, status: null, comment: null, released: null,
+    warnings: [],
+    refusalKind: null, refusal: null, details: [],
+  },
+  // `done --json`. `entries` carries one row per `verification:` entry with its
+  // exit code — the evidence, which is the whole point of the command. `ticked`
+  // is the criteria the run granted; `closed` says whether the file actually
+  // moved, which `--dry-run` makes a different answer from `ok`.
+  "verification-run": {
+    ok: null, task: null, dryRun: null, closed: null, entries: [],
+    status: null, wouldBe: null, ticked: [],
+    refusalKind: null, refusal: null, details: [],
+  },
   // `docs-drift --json` (TL-100). `flagged` and `tooLittle` are both LISTS of
   // documents carrying their SIGNALS, never counts: the whole rule this command
   // is built on is that a verdict with no evidence is not acted on, and a

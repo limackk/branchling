@@ -120,6 +120,20 @@ const READING = {
  * answer with a bare object and move separately, so they have no kind to check.
  */
 const WRITING = {
+  // The writing commands (TL-119). `take` and `next` share ONE kind, so the
+  // table names it once and the completeness check below is satisfied by either
+  // — here it is exercised by `next`, and the refusal test after this one
+  // covers `take`.
+  "task-take": { args: ["next", "--actor", "agent:test", "--json"] },
+  // A handoff of a task nobody holds: a REFUSAL, and refusals are the path most
+  // easily left without an envelope. `--reason` is required before the refusal
+  // is even reached, so it is given.
+  "task-handoff": {
+    args: ["handoff", "TASK-404", "--to-owner", "unassigned", "--reason", "a fixture", "--actor", "agent:test", "--json"],
+    refuses: true,
+  },
+  // A task that is not there: same reason as above — the refusal path.
+  "verification-run": { args: ["done", "TASK-404", "--json"], refuses: true },
   seed: {
     args: ["seed", "--json"],
     input: JSON.stringify({
@@ -134,7 +148,10 @@ const WRITING = {
 function ask(kind, dir) {
   const spec = READING[kind] ? { args: READING[kind] } : WRITING[kind];
   const r = run(spec.args.concat(["--dir", dir]), undefined, spec.input);
-  assert.notEqual(r.status, 2, kind + ": a usage error — " + r.stderr);
+  // A REFUSAL still has to be an envelope, so a non-zero exit is not a failure
+  // here — only a usage error is, and only for the kinds that are not testing a
+  // refusal on purpose.
+  if (!spec.refuses) assert.notEqual(r.status, 2, kind + ": a usage error — " + r.stderr);
   let parsed;
   assert.doesNotThrow(() => { parsed = JSON.parse(r.stdout); },
     kind + ": the output does not parse as JSON: " + r.stdout.slice(0, 200));
@@ -322,4 +339,48 @@ test("the text output of the single-value commands is unchanged", () => {
   const { dir } = backlog({ tasks: 2 });
   assert.equal(run(["next-id", "--dir", dir]).stdout.trim(), "3");
   assert.equal(run(["board", "--dir", dir, "--paths", "src/app.js"]).stdout.split("\n")[0], "main");
+});
+
+// ── The refusal path (TL-119) ─────────────────────────────────────────────
+//
+// The path most easily left without an envelope, because it is the one nobody
+// tries by hand. A consumer that has to parse stderr to learn WHY it was refused
+// has no contract at all — which is the state `take`, `next`, `handoff` and
+// `done` were in until this task.
+
+test("a refusal is an envelope too, with the reason in `refusalKind`", () => {
+  const { dir } = backlog({ tasks: 0, rule: true });
+
+  const take = run(["take", "NOPE-1", "--actor", "agent:test", "--json", "--dir", dir]);
+  const takeOut = JSON.parse(take.stdout);
+  assert.equal(takeOut.schemaVersion, 1);
+  assert.equal(takeOut.kind, "task-take", "a refusal keeps the kind of the question it answers");
+  assert.equal(takeOut.ok, false);
+  assert.equal(takeOut.refusalKind, "not-found");
+  assert.ok(takeOut.refusal, "the refusal has to carry its own sentence, not only an exit code");
+  // The emptiness rule holds on a refusal as well: every key of the kind is
+  // present, so a consumer never has to tell "no value" from "old tool".
+  for (const key of Object.keys(KINDS["task-take"])) {
+    assert.ok(key in takeOut, "missing key on a refusal: " + key);
+  }
+
+  const done_ = run(["done", "NOPE-1", "--json", "--dir", dir]);
+  const doneOut = JSON.parse(done_.stdout);
+  assert.equal(doneOut.kind, "verification-run");
+  assert.equal(doneOut.ok, false);
+  assert.equal(doneOut.refusalKind, "no-such-task");
+  assert.deepEqual(doneOut.entries, [], "nothing ran, and the key is still there");
+});
+
+test("an empty queue is an ANSWER in the envelope, not an error and not a bare object", () => {
+  const { dir } = backlog({ tasks: 0, rule: true });
+  const r = run(["next", "--actor", "agent:test", "--json", "--dir", dir]);
+  assert.equal(r.status, 3, "3 is `nothing to take` — neither a refusal nor a usage error");
+  const out = JSON.parse(r.stdout);
+  assert.equal(out.kind, "task-take");
+  assert.equal(out.refusalKind, "nothing-to-take");
+  // The distinction a loop cannot make from prose: nothing there, versus
+  // something there it was not allowed to take.
+  assert.deepEqual(out.passedOver, []);
+  assert.ok(Array.isArray(out.searchedStatuses) && out.searchedStatuses.length);
 });
