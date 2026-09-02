@@ -1,1 +1,2 @@
 {"id":"01M1B42152FFBA9W3Z7EENETXB","ts":"2026-08-31T05:18:16.738Z","task":"TL-11","field":"__created__","from":"","to":"Guard pre-commit na pole board — partycja nie może się rozjechać po cichu","actor":"unknown","source":"boot"}
+{"id":"01M1GFKZK5F4A1AA70VKZ47GKZ","ts":"2026-09-02T07:16:31.461Z","task":"TL-11","field":"title","from":"Guard pre-commit na pole board — partycja nie może się rozjechać po cichu","to":"Pre-commit guard on the board field — a partition must not drift silently","actor":"unknown","source":"external","reason":"unknown"}

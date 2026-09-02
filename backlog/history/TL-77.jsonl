@@ -1,1 +1,3 @@
 {"id":"01M1DSM4P71HT1P87SA441DVXQ","ts":"2026-09-01T06:13:39.143Z","task":"TL-77","field":"priority","from":"P2","to":"P3","actor":"agent:claude","source":"manual"}
+{"id":"01M1GFKZK5FK9YAWE95QAE9PNM","ts":"2026-09-02T07:16:31.461Z","task":"TL-77","field":"title","from":"Completions do shella z wartościami ze słowników config.yaml","to":"Shell completions with values from config.yaml vocabularies","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK554HE7MXVGAF5R7MM","ts":"2026-09-02T07:16:31.461Z","task":"TL-77","field":"epic","from":"Powierzchnia CLI","to":"CLI surface","actor":"unknown","source":"external","reason":"unknown"}

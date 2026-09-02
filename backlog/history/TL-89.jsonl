@@ -1,2 +1,4 @@
 {"id":"01M1E066RD9HTDWJA2SMZ73NK1","ts":"2026-09-01T08:08:22.541Z","task":"TL-89","field":"__created__","from":"","to":"Komentarz PR z dowodami pracy: GitHub Action","actor":"unknown","source":"external"}
 {"id":"01M1E69RE2NFNNCMC5D6MPBQRE","ts":"2026-09-01T09:55:10.402Z","task":"TL-89","field":"related_docs","from":["docs/tasklog-state-and-sync.md","docs/backlog-time-tracking.md"],"to":["docs/worktrail-state-and-sync.md","docs/backlog-time-tracking.md"],"actor":"unknown","source":"external"}
+{"id":"01M1GFKZK59DHECESDRJR9F55Y","ts":"2026-09-02T07:16:31.461Z","task":"TL-89","field":"title","from":"Komentarz PR z dowodami pracy: GitHub Action","to":"PR comment with proof of work: GitHub Action","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5A9GZAR8X5ZCVYFBM","ts":"2026-09-02T07:16:31.461Z","task":"TL-89","field":"epic","from":"Wyróżniki agentowe","to":"Agentic differentiators","actor":"unknown","source":"external","reason":"unknown"}

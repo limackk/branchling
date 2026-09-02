@@ -3,3 +3,5 @@
 {"id":"01M1E4Z0NBP880C71QB8VBESZ7","ts":"2026-09-01T09:31:49.803Z","task":"TL-116","field":"blocked_by","from":[],"to":["TL-1524"],"actor":"unknown","source":"external"}
 {"id":"01M1E4Z0NB9KDAYXKW7JFCJ2KM","ts":"2026-09-01T09:31:49.803Z","task":"TL-116","field":"related_docs","from":[],"to":["docs/backlog-human-agent-decisions.md","docs/backlog-field-editing-history.md"],"actor":"unknown","source":"external"}
 {"id":"01M1F5BNKGV013DX2RZ3X0VY2Q","ts":"2026-09-01T18:57:58.896Z","task":"TL-116","field":"blocked_by","from":["TL-1524"],"to":["TL-114"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK59T292JX63PFHG22D","ts":"2026-09-02T07:16:31.461Z","task":"TL-116","field":"title","from":"Graf zmian taska w viewerze z osi historii","to":"Task change graph in the viewer, built from the history axis","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5H58CF9QBGSGZMRM5","ts":"2026-09-02T07:16:31.461Z","task":"TL-116","field":"epic","from":"Wyróżniki agentowe","to":"Agent-facing distinctives","actor":"unknown","source":"external","reason":"unknown"}

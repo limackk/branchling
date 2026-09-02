@@ -11,3 +11,5 @@
 {"id":"01M1F96GT7HMKX2VNA8VAEZ920","ts":"2026-09-01T20:05:04.455Z","task":"TL-96","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown"}
 {"id":"01M1F96GT7PX686B1W9K9E9A1B","ts":"2026-09-01T20:05:04.455Z","task":"TL-96","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown"}
 {"id":"01M1FA27AF3T3VK87TJ2PSPZMA","ts":"2026-09-01T20:20:12.239Z","task":"TL-96","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
+{"id":"01M1GFKZK5B6Y1MJ0T2PVZNQMV","ts":"2026-09-02T07:16:31.461Z","task":"TL-96","field":"title","from":"worktrail run — petla next, agent, close do pustej kolejki","to":"worktrail run — a next, agent, close loop to an empty queue","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5J0MY0VZ1W0QGCG5M","ts":"2026-09-02T07:16:31.461Z","task":"TL-96","field":"epic","from":"Wyróżniki agentowe","to":"Agentic differentiators","actor":"unknown","source":"external","reason":"unknown"}

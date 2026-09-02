@@ -4,3 +4,5 @@
 {"id":"01M1ERGVRCMT4NDZDAYWAN3TT5","ts":"2026-09-01T15:13:37.548Z","task":"TL-93","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
 {"id":"01M1ERVQGJ5Q5BFNFVB5RQ1SEG","ts":"2026-09-01T15:19:33.650Z","task":"TL-93","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
 {"id":"01M1F5BNKGFTA8ZSS7X4Z4GSN6","ts":"2026-09-01T18:57:58.896Z","task":"TL-93","field":"blocks","from":["TL-1506","TL-1511"],"to":["TL-96","TL-101"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5HR6A0CJ78X362GVV","ts":"2026-09-02T07:16:31.461Z","task":"TL-93","field":"title","from":"Bramka weryfikacji w worktrail close","to":"The verification gate in worktrail close","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5R4B8KKQ8FGH57N9J","ts":"2026-09-02T07:16:31.461Z","task":"TL-93","field":"epic","from":"Wyróżniki agentowe","to":"Agent differentiators","actor":"unknown","source":"external","reason":"unknown"}

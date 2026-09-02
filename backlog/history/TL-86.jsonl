@@ -3,3 +3,5 @@
 {"id":"01M1E5YXWM60ZE0RPF3R114Q8W","ts":"2026-09-01T09:49:15.540Z","task":"TL-86","field":"owner","from":"unassigned","to":"agent:claude","actor":"unknown","source":"external"}
 {"id":"01M1E6JH6ET2TD3M9D1Q3518ZX","ts":"2026-09-01T09:59:57.902Z","task":"TL-86","field":"status","from":"in_progress","to":"done","actor":"unknown","source":"external"}
 {"id":"01M1F5BNKG75TH3SBFQFH7N61W","ts":"2026-09-01T18:57:58.896Z","task":"TL-86","field":"blocks","from":["TL-1492"],"to":["TL-82"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5Z74SR8KXNH5VVXV0","ts":"2026-09-02T07:16:31.461Z","task":"TL-86","field":"title","from":"Kryteria akceptacji odhaczane z verification, nie deklarowane ręcznie","to":"Acceptance criteria checked off from verification, not declared by hand","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5KYB2SVQG4V8Z6ZGY","ts":"2026-09-02T07:16:31.461Z","task":"TL-86","field":"epic","from":"Integralność danych","to":"Data integrity","actor":"unknown","source":"external","reason":"unknown"}

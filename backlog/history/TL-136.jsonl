@@ -1,3 +1,5 @@
 {"id":"01M1F5NSNDBEDE0J4SNR9ZGXHF","ts":"2026-09-01T19:03:30.733Z","task":"TL-136","field":"__created__","from":"","to":"renumber nie odroznia odwolania od przykladu w komentarzu","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1F5PSZ714ZBPF3H77V76PV3","ts":"2026-09-01T19:04:03.815Z","task":"TL-136","field":"priority","from":"P1","to":"P2","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1F5PSZ7PVAQCNZFNVPN1B41","ts":"2026-09-01T19:04:03.815Z","task":"TL-136","field":"epic","from":"","to":"Integralność danych","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5FAPVWRDF29B85MJ7","ts":"2026-09-02T07:16:31.461Z","task":"TL-136","field":"title","from":"renumber nie odroznia odwolania od przykladu w komentarzu","to":"renumber does not distinguish a reference from an example in a comment","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK50922GBP5PF8EMW78","ts":"2026-09-02T07:16:31.461Z","task":"TL-136","field":"epic","from":"Integralność danych","to":"Data integrity","actor":"unknown","source":"external","reason":"unknown"}

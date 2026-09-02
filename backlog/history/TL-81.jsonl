@@ -4,3 +4,5 @@
 {"id":"01M1E8KXFJJRDVRTHYM5YWXJG4","ts":"2026-09-01T10:35:40.402Z","task":"TL-81","field":"status","from":"pending","to":"in_progress","actor":"unknown","source":"external"}
 {"id":"01M1E8KXFJ3YF67BPD8DJ2H8N2","ts":"2026-09-01T10:35:40.402Z","task":"TL-81","field":"owner","from":"unassigned","to":"agent:claude","actor":"unknown","source":"external"}
 {"id":"01M1E8SJAFACPMED5Z51W178YP","ts":"2026-09-01T10:38:45.583Z","task":"TL-81","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done"}
+{"id":"01M1GFKZK5DMT01WMFMVDBDM8P","ts":"2026-09-02T07:16:31.461Z","task":"TL-81","field":"title","from":"Kanały dystrybucji i kolizja nazwy worktrail w npx","to":"Distribution channels and the worktrail name collision in npx","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5QHM6X02B8PAP2J64","ts":"2026-09-02T07:16:31.461Z","task":"TL-81","field":"epic","from":"Backlog — publikacja open source","to":"Backlog — open source publication","actor":"unknown","source":"external","reason":"unknown"}

@@ -1,1 +1,3 @@
 {"id":"01M1EN9P503N0WD1A2B473E8YW","ts":"2026-09-01T14:17:16.704Z","task":"TL-123","field":"__created__","from":"","to":"Rozstrzygnij synonimię type: code i type: task","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5N7TJE34NYP8MDMGB","ts":"2026-09-02T07:16:31.461Z","task":"TL-123","field":"title","from":"Rozstrzygnij synonimię type: code i type: task","to":"Resolve the synonymy between type: code and type: task","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK558K3A40WC7ZVX683","ts":"2026-09-02T07:16:31.461Z","task":"TL-123","field":"epic","from":"Integralność danych","to":"Data integrity","actor":"unknown","source":"external","reason":"unknown"}

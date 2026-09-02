@@ -1,3 +1,5 @@
 {"id":"01M1DX1VJ5NKSQ6R87HRF598H8","ts":"2026-09-01T07:13:34.277Z","task":"TL-66","field":"__created__","from":"","to":"Ostrzeżenie next-id kłamie o gicie na pustym backlogu","actor":"unknown","source":"boot"}
 {"id":"01M1E69RE23CTGZJC348Q911F8","ts":"2026-09-01T09:55:10.402Z","task":"TL-66","field":"related_docs","from":[".claude/skills/tasklog-cli/references/output-style.md"],"to":[".claude/skills/worktrail-cli/references/output-style.md"],"actor":"unknown","source":"external"}
 {"id":"01M1F5BNKGA5H93K4PHP32SQ2B","ts":"2026-09-01T18:57:58.896Z","task":"TL-66","field":"blocks","from":["TL-1474"],"to":["TL-64"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5YMKY2B3Z022BP10Y","ts":"2026-09-02T07:16:31.461Z","task":"TL-66","field":"title","from":"Ostrzeżenie next-id kłamie o gicie na pustym backlogu","to":"next-id warning lies about git on an empty backlog","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK541RQBZZBF789M9D0","ts":"2026-09-02T07:16:31.461Z","task":"TL-66","field":"epic","from":"Powierzchnia CLI","to":"CLI surface","actor":"unknown","source":"external","reason":"unknown"}

@@ -1,1 +1,3 @@
 {"id":"01M1B4215236Y8KRXCFSV3GMG3","ts":"2026-08-31T05:18:16.738Z","task":"TL-42","field":"__created__","from":"","to":"Prefiks ID taska to konfiguracja, nie kod","actor":"unknown","source":"boot"}
+{"id":"01M1GFKZK58D5KBK4G7XVR8NBV","ts":"2026-09-02T07:16:31.461Z","task":"TL-42","field":"title","from":"Prefiks ID taska to konfiguracja, nie kod","to":"Task ID prefix is configuration, not code","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5R484SN73NP67VYYS","ts":"2026-09-02T07:16:31.461Z","task":"TL-42","field":"epic","from":"Konfigurowalność","to":"Configurability","actor":"unknown","source":"external","reason":"unknown"}

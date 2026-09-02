@@ -1,1 +1,2 @@
 {"id":"01M1CEPQY6FAS9SPYF1MRHW638","ts":"2026-08-31T17:43:35.622Z","task":"TL-85","field":"__created__","from":"","to":"Rozstrzygnąć politykę zakresu dla agenta: zakładać task czy pytać","actor":"agent:claude","source":"manual"}
+{"id":"01M1GFKZK5T74NJ1DKZNKEZ032","ts":"2026-09-02T07:16:31.461Z","task":"TL-85","field":"title","from":"Rozstrzygnąć politykę zakresu dla agenta: zakładać task czy pytać","to":"Settle the scope policy for the agent: open a task or ask","actor":"unknown","source":"external","reason":"unknown"}

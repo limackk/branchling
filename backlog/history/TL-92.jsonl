@@ -1,3 +1,5 @@
 {"id":"01M1E066RDT1AP2BXE414QV8V8","ts":"2026-09-01T08:08:22.541Z","task":"TL-92","field":"__created__","from":"","to":"tasklog session — raport z sesji agenta","actor":"unknown","source":"external"}
 {"id":"01M1E69RE2B1MYTHY1EBHYTAG5","ts":"2026-09-01T09:55:10.402Z","task":"TL-92","field":"title","from":"tasklog session — raport z sesji agenta","to":"worktrail session — raport z sesji agenta","actor":"unknown","source":"external"}
 {"id":"01M1F5BNKGP9G6JHBPMXZ7WA1T","ts":"2026-09-01T18:57:58.896Z","task":"TL-92","field":"blocked_by","from":["TL-1425"],"to":["TL-28"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5RRH4AAANT8JFX2DN","ts":"2026-09-02T07:16:31.461Z","task":"TL-92","field":"title","from":"worktrail session — raport z sesji agenta","to":"worktrail session — report from an agent's session","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5VYRTM1XSGKKVV86F","ts":"2026-09-02T07:16:31.461Z","task":"TL-92","field":"epic","from":"Wyróżniki agentowe","to":"Agentic differentiators","actor":"unknown","source":"external","reason":"unknown"}

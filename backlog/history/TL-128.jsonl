@@ -5,3 +5,5 @@
 {"id":"01M1EWPS1SPAJTRHVKPBQRZG2Y","ts":"2026-09-01T16:26:45.689Z","task":"TL-128","field":"epic","from":"","to":"Higiena repozytorium","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1EWPS1SKEKXGB89X5MXARWH","ts":"2026-09-01T16:26:45.689Z","task":"TL-128","field":"related_docs","from":[],"to":["CLAUDE.md"],"actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1EWQ4HRY4BXWFDY0TC1176G","ts":"2026-09-01T16:26:57.464Z","task":"TL-128","field":"epic","from":"Higiena repozytorium","to":"worktrail — narzędzie","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5ETXM0NCX8C8F99JD","ts":"2026-09-02T07:16:31.461Z","task":"TL-128","field":"title","from":"Polskie komunikaty asercji w scripts/tests/ wbrew konwencji \"cały kod po angielsku\"","to":"Polish assertion messages in scripts/tests/ against the \"all code in English\" convention","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5DZZPB6GKB83WTXTF","ts":"2026-09-02T07:16:31.461Z","task":"TL-128","field":"epic","from":"worktrail — narzędzie","to":"worktrail — the tool","actor":"unknown","source":"external","reason":"unknown"}

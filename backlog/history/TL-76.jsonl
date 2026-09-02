@@ -1,1 +1,3 @@
 {"id":"01M1DSM4P7C6XG9D5DV2ZQM61N","ts":"2026-09-01T06:13:39.143Z","task":"TL-76","field":"priority","from":"P2","to":"P3","actor":"agent:claude","source":"manual"}
+{"id":"01M1GFKZK5Q8AAYD8GZGK0YBE8","ts":"2026-09-02T07:16:31.461Z","task":"TL-76","field":"title","from":"Przechodni graf zależności wyliczany przy odczycie","to":"Transitive dependency graph computed at read time","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK589Q6K8JZRA6A5NBT","ts":"2026-09-02T07:16:31.461Z","task":"TL-76","field":"epic","from":"Integralność danych","to":"Data integrity","actor":"unknown","source":"external","reason":"unknown"}

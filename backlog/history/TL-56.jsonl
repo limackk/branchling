@@ -1,2 +1,4 @@
 {"id":"01M1DX1VJ5WCZN6Q1HZYYVB8PA","ts":"2026-09-01T07:13:34.277Z","task":"TL-56","field":"__created__","from":"","to":"Słownik types w config.yaml rozjechał się z drzewem","actor":"unknown","source":"boot"}
 {"id":"01M1EN70CGMX1NV69YVV3BZ00C","ts":"2026-09-01T14:15:48.880Z","task":"TL-56","field":"status","from":"pending","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
+{"id":"01M1GFKZK5EZ4C4TEW04E7ZXPC","ts":"2026-09-02T07:16:31.461Z","task":"TL-56","field":"title","from":"Słownik types w config.yaml rozjechał się z drzewem","to":"The types vocabulary in config.yaml has drifted from the tree","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5MQDS1R50MVZ5E09V","ts":"2026-09-02T07:16:31.461Z","task":"TL-56","field":"epic","from":"Integralność danych","to":"Data integrity","actor":"unknown","source":"external","reason":"unknown"}

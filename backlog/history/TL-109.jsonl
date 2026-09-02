@@ -7,3 +7,5 @@
 {"id":"01M1FACRKDHBGBESB6XP8157BF","ts":"2026-09-01T20:25:57.613Z","task":"TL-109","field":"status","from":"pending","to":"in_progress","actor":"agent:session","source":"next","reason":"unknown"}
 {"id":"01M1FACRKDEMT5MN6KQR4S6PKR","ts":"2026-09-01T20:25:57.613Z","task":"TL-109","field":"owner","from":"unassigned","to":"agent:session","actor":"agent:session","source":"next","reason":"unknown"}
 {"id":"01M1FB2WJMK7NT1XDP6DMFJ0YB","ts":"2026-09-01T20:38:02.580Z","task":"TL-109","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
+{"id":"01M1GFKZK5F49C5HZV08SF0HXR","ts":"2026-09-02T07:16:31.461Z","task":"TL-109","field":"title","from":"Widok Execution w viewerze: fale, graf, linia teraz","to":"Execution view in the viewer: waves, graph, now-line","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5KXTZ4Z7EZHZJ6ZKT","ts":"2026-09-02T07:16:31.461Z","task":"TL-109","field":"epic","from":"Plan wykonania","to":"Execution plan","actor":"unknown","source":"external","reason":"unknown"}

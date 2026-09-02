@@ -8,3 +8,5 @@
 {"id":"01M1G8VKH49YK72NWRYAVGNHA2","ts":"2026-09-02T05:18:21.220Z","task":"TL-113","field":"status","from":"blocked","to":"in_progress","actor":"agent:session","source":"next","reason":"left `blocked`: every task it named is closed (TL-98)"}
 {"id":"01M1G8VKH4DX1SHZ7NG22D86F3","ts":"2026-09-02T05:18:21.220Z","task":"TL-113","field":"owner","from":"unassigned","to":"agent:session","actor":"agent:session","source":"next","reason":"left `blocked`: every task it named is closed (TL-98)"}
 {"id":"01M1G9B3HHBF52BMYVWX0ADYZ8","ts":"2026-09-02T05:26:49.137Z","task":"TL-113","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
+{"id":"01M1GFKZK50TXXD1KRCAZYXN9B","ts":"2026-09-02T07:16:31.461Z","task":"TL-113","field":"title","from":"Pole executor: wymog czlowieka egzekwowany w dyspozytorze","to":"Executor field: human requirement enforced in the dispatcher","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5Z2YSMC712FJMH6CR","ts":"2026-09-02T07:16:31.461Z","task":"TL-113","field":"epic","from":"Wyróżniki agentowe","to":"Agent markers","actor":"unknown","source":"external","reason":"unknown"}

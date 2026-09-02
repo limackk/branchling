@@ -3,3 +3,5 @@
 {"id":"01M1A0KG6QVG0Y6VEB0KX741R9","ts":"2026-08-30T18:58:40.471Z","task":"TL-33","field":"owner","from":"unassigned","to":"claude","actor":"agent:claude","source":"hook"}
 {"id":"01M1E69RE2EY3ZQE4ETNW1S6EH","ts":"2026-09-01T09:55:10.402Z","task":"TL-33","field":"related_docs","from":["docs/tasklog-global-tool.md"],"to":["docs/worktrail-global-tool.md"],"actor":"unknown","source":"external"}
 {"id":"01M1F5BNKGN55C2JB301RGDBGP","ts":"2026-09-01T18:57:58.896Z","task":"TL-33","field":"blocks","from":["TL-1440"],"to":["TL-34"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5KTQTV8W70BVG58CB","ts":"2026-09-02T07:16:31.461Z","task":"TL-33","field":"title","from":"Packaging — instalacja globalna i npx","to":"Packaging — global install and npx","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK583DZS1W358MEFF5P","ts":"2026-09-02T07:16:31.461Z","task":"TL-33","field":"epic","from":"Backlog — publikacja open source","to":"Backlog — open source release","actor":"unknown","source":"external","reason":"unknown"}

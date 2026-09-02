@@ -3,3 +3,4 @@
 {"id":"01M1EJCJEEX0ZX63AXQZKE5CGC","ts":"2026-09-01T13:26:25.486Z","task":"TL-74","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
 {"id":"01M1EJCJEE9T52JQEG6TCNXPVD","ts":"2026-09-01T13:26:25.486Z","task":"TL-74","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
 {"id":"01M1EK8EC5QTWAZYSDW9MYB52C","ts":"2026-09-01T13:41:38.821Z","task":"TL-74","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
+{"id":"01M1GFKZK5VSJWBWRXJ288ZYQ1","ts":"2026-09-02T07:16:31.461Z","task":"TL-74","field":"title","from":"worktrail instructions — instrukcje workflow wydaje CLI, nie plik w cudzym repo","to":"worktrail instructions — the CLI issues workflow instructions, not a file in someone else's repo","actor":"unknown","source":"external","reason":"unknown"}

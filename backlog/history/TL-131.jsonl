@@ -2,3 +2,4 @@
 {"id":"01M1EYH29VE4BWTS5S62PD0Z3S","ts":"2026-09-01T16:58:35.707Z","task":"TL-131","field":"priority","from":"P1","to":"P2","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1EYH29V363Z85NM5A1MXE57","ts":"2026-09-01T16:58:35.707Z","task":"TL-131","field":"confidence","from":"","to":"medium","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1EYH29VFCN8XD7HJ0CHNKBP","ts":"2026-09-01T16:58:35.707Z","task":"TL-131","field":"epic","from":"","to":"Backlog viewer","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5ENP1VZTDDW6VE58X","ts":"2026-09-02T07:16:31.461Z","task":"TL-131","field":"title","from":"Guard --language nie widzi polskich etykiet w viewerze","to":"The --language guard does not see Polish labels in the viewer","actor":"unknown","source":"external","reason":"unknown"}

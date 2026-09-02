@@ -1,1 +1,3 @@
 {"id":"01M1DX1VJ5KRCM17NWDA1R0HKA","ts":"2026-09-01T07:13:34.277Z","task":"TL-45","field":"__created__","from":"","to":"Bramka na martwe linki i related_docs w dokumentach narzędzia","actor":"unknown","source":"boot"}
+{"id":"01M1GFKZK5GD20KCG2GWKNNGNT","ts":"2026-09-02T07:16:31.461Z","task":"TL-45","field":"title","from":"Bramka na martwe linki i related_docs w dokumentach narzędzia","to":"Gate on dead links and related_docs in the tool's documents","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5HAAW8JJ5XAGWPE64","ts":"2026-09-02T07:16:31.461Z","task":"TL-45","field":"epic","from":"Backlog — publikacja open source","to":"Backlog — open source publication","actor":"unknown","source":"external","reason":"unknown"}

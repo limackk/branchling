@@ -3,3 +3,5 @@
 {"id":"01M1G9RQGS7FW8GH6JA707GN6E","ts":"2026-09-02T05:34:15.577Z","task":"TL-134","field":"status","from":"pending","to":"in_progress","actor":"agent:session","source":"next","reason":"unknown"}
 {"id":"01M1G9RQGS1APDYNAWEECNMRZT","ts":"2026-09-02T05:34:15.577Z","task":"TL-134","field":"owner","from":"unassigned","to":"agent:session","actor":"agent:session","source":"next","reason":"unknown"}
 {"id":"01M1G9WM5XT4RWX9X50E8BKNHW","ts":"2026-09-02T05:36:23.229Z","task":"TL-134","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
+{"id":"01M1GFKZK5Y5J65MPE7A71ZC8C","ts":"2026-09-02T07:16:31.461Z","task":"TL-134","field":"title","from":"Guard: status blocked, choc wszystkie blocked_by sa zamkniete","to":"Guard: status blocked even though all blocked_by are closed","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5K9K983EN2ZD6RCFY","ts":"2026-09-02T07:16:31.461Z","task":"TL-134","field":"epic","from":"Integralność danych","to":"Data integrity","actor":"unknown","source":"external","reason":"unknown"}

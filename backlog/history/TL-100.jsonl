@@ -1,3 +1,5 @@
 {"id":"01M1E066RDWAZRYES0P2SQWP7B","ts":"2026-09-01T08:08:22.541Z","task":"TL-100","field":"__created__","from":"","to":"Detektor driftu dokumentacji zakladajacy taski docs","actor":"unknown","source":"external"}
 {"id":"01M1EWSX42RWXVYXNJ71FB27M8","ts":"2026-09-01T16:28:28.162Z","task":"TL-100","field":"status","from":"blocked","to":"pending","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1F5BNKG34AQM48SHNXZPK9D","ts":"2026-09-01T18:57:58.896Z","task":"TL-100","field":"blocked_by","from":["TL-1507"],"to":["TL-97"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5NYDEFRS9AWF3W6RF","ts":"2026-09-02T07:16:31.461Z","task":"TL-100","field":"title","from":"Detektor driftu dokumentacji zakladajacy taski docs","to":"Documentation drift detector that creates docs tasks","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5HZV812H446AYVRYZ","ts":"2026-09-02T07:16:31.461Z","task":"TL-100","field":"epic","from":"Wyróżniki agentowe","to":"Agentic differentiators","actor":"unknown","source":"external","reason":"unknown"}

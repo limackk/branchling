@@ -6,3 +6,5 @@
 {"id":"01M1F4T6PCEE0T48QE7EKNC8NE","ts":"2026-09-01T18:48:26.572Z","task":"TL-135","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown"}
 {"id":"01M1F5M6Q4T6J9S8AX6YJFGMZM","ts":"2026-09-01T19:02:38.564Z","task":"TL-135","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
 {"id":"01M1F5M6Q8YVT62Y888SQP39R0","ts":"2026-09-01T19:02:38.568Z","task":"TL-135","field":"__verified__","from":"","to":"W tym pliku stoi rozstrzygnięcie WARIANTU (A/B/C) z uzasadnieniem, albo task jest cancelled z powodem.","actor":"agent:claude","source":"done","reason":"proven"}
+{"id":"01M1GFKZK5K3EQT8VF5Z2QF9DD","ts":"2026-09-02T07:16:31.461Z","task":"TL-135","field":"title","from":"Renumeracja backlogu od 1: mapa, migracja i przekierowania","to":"Renumbering the backlog from 1: map, migration and redirects","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5JKWPM1FTK4CE0AS9","ts":"2026-09-02T07:16:31.461Z","task":"TL-135","field":"epic","from":"Integralność danych","to":"Data integrity","actor":"unknown","source":"external","reason":"unknown"}

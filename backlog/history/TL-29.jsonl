@@ -2,3 +2,5 @@
 {"id":"01M1E066RDGEE02J0VP0TQFZDD","ts":"2026-09-01T08:08:22.541Z","task":"TL-29","field":"blocks","from":[],"to":["TL-1498"],"actor":"unknown","source":"external"}
 {"id":"01M1F5BNKGZRRE01RJZTG76GZD","ts":"2026-09-01T18:57:58.896Z","task":"TL-29","field":"blocked_by","from":["TL-1425"],"to":["TL-28"],"actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1F5BNKGQ54N1VWH7G11M4DM","ts":"2026-09-01T18:57:58.896Z","task":"TL-29","field":"blocks","from":["TL-1498"],"to":["TL-88"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5M6JWBMYWBQC0JFEQ","ts":"2026-09-02T07:16:31.461Z","task":"TL-29","field":"title","from":"Kalibracja estymat z danych rzeczywistych","to":"Estimate calibration from real data","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5ND1JKDCH2EGY7C9N","ts":"2026-09-02T07:16:31.461Z","task":"TL-29","field":"epic","from":"Backlog — pomiar czasu pracy","to":"Backlog — work time measurement","actor":"unknown","source":"external","reason":"unknown"}

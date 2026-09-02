@@ -1,2 +1,3 @@
 {"id":"01M1B421521EKGGNF9MMRTA197","ts":"2026-08-31T05:18:16.738Z","task":"TL-38","field":"__created__","from":"","to":"Suita testów odpięta od repozytorium źródłowego","actor":"unknown","source":"boot"}
 {"id":"01M1E69RE2R4PGV5QJKFZF5C3J","ts":"2026-09-01T09:55:10.402Z","task":"TL-38","field":"related_docs","from":["docs/tasklog-global-tool.md"],"to":["docs/worktrail-global-tool.md"],"actor":"unknown","source":"external"}
+{"id":"01M1GFKZK5R3GMC11TEE3Y999Q","ts":"2026-09-02T07:16:31.461Z","task":"TL-38","field":"title","from":"Suita testów odpięta od repozytorium źródłowego","to":"Test suite detached from its source repository","actor":"unknown","source":"external","reason":"unknown"}

@@ -34,3 +34,5 @@
 {"id":"01M1EYPSSXDGKA003JE3Y6AF0K","ts":"2026-09-01T17:01:43.613Z","task":"TL-99","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
 {"id":"01M1F5BNKGPBDW0S7B6GTB56YG","ts":"2026-09-01T18:57:58.896Z","task":"TL-99","field":"blocked_by","from":["TL-1497","TL-1507"],"to":["TL-87","TL-97"],"actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1F5BNKG7M9CPD4Z20C1W1W0","ts":"2026-09-01T18:57:58.896Z","task":"TL-99","field":"blocks","from":["TL-1524"],"to":["TL-114"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5ZJ9SQY6QJ4JF89HZ","ts":"2026-09-02T07:16:31.461Z","task":"TL-99","field":"title","from":"worktrail handoff — przekazanie taska z powodem i sladem","to":"worktrail handoff — handing off a task with a reason and a trail","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5NF2A778H5S8VANT6","ts":"2026-09-02T07:16:31.461Z","task":"TL-99","field":"epic","from":"Wyróżniki agentowe","to":"Agentic differentiators","actor":"unknown","source":"external","reason":"unknown"}

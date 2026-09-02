@@ -4,3 +4,5 @@
 {"id":"01M1EYH29VE7DT4463FYR9SW0A","ts":"2026-09-01T16:58:35.707Z","task":"TL-132","field":"epic","from":"","to":"Wyróżniki agentowe","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1EYH29VRV25790G9KKMPY66","ts":"2026-09-01T16:58:35.707Z","task":"TL-132","field":"blocked_by","from":[],"to":["TL-1509"],"actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1F5BNKGZV7FCXBJFVZ310C9","ts":"2026-09-01T18:57:58.896Z","task":"TL-132","field":"blocked_by","from":["TL-1509"],"to":["TL-99"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5KJ481BQ03ZFAR3DK","ts":"2026-09-02T07:16:31.461Z","task":"TL-132","field":"title","from":"Przewodnik task-execution nie mówi o handoffie","to":"The task-execution guide does not mention handoff","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5XBD18S3D5GCX1VSY","ts":"2026-09-02T07:16:31.461Z","task":"TL-132","field":"epic","from":"Wyróżniki agentowe","to":"Agent-facing differentiators","actor":"unknown","source":"external","reason":"unknown"}

@@ -8,3 +8,5 @@
 {"id":"01M1FB5H19WEKJNJN0DCG06B0R","ts":"2026-09-01T20:39:29.065Z","task":"TL-112","field":"status","from":"pending","to":"in_progress","actor":"agent:session","source":"next","reason":"unknown"}
 {"id":"01M1FB5H19X220GRQB70K7A9F3","ts":"2026-09-01T20:39:29.065Z","task":"TL-112","field":"owner","from":"unassigned","to":"agent:session","actor":"agent:session","source":"next","reason":"unknown"}
 {"id":"01M1G7JB0T8MYERB1C9SEGBWGC","ts":"2026-09-02T04:55:49.018Z","task":"TL-112","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
+{"id":"01M1GFKZK5EWD3ESCES4XHGP8F","ts":"2026-09-02T07:16:31.461Z","task":"TL-112","field":"title","from":"Model kontrybucji i granica open/chmura — decyzja z terminem ważności","to":"Contribution model and the open/cloud boundary — a decision with an expiry date","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5B1JBAER4NC57YGW0","ts":"2026-09-02T07:16:31.461Z","task":"TL-112","field":"epic","from":"Backlog — publikacja open source","to":"Backlog — open source publication","actor":"unknown","source":"external","reason":"unknown"}

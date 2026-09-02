@@ -3,3 +3,5 @@
 {"id":"01M1E066RDVH3QVSX0STWZRE28","ts":"2026-09-01T08:08:22.541Z","task":"TL-28","field":"blocks","from":["TL-1426","TL-1427","TL-1429"],"to":["TL-1426","TL-1427","TL-1429","TL-1502"],"actor":"unknown","source":"external"}
 {"id":"01M1F5BNKGY2BPZ639A9CRK4DA","ts":"2026-09-01T18:57:58.896Z","task":"TL-28","field":"blocked_by","from":["TL-1424"],"to":["TL-27"],"actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1F5BNKG1RF2Z69WYJ49D7G1","ts":"2026-09-01T18:57:58.896Z","task":"TL-28","field":"blocks","from":["TL-1426","TL-1427","TL-1429","TL-1502"],"to":["TL-29","TL-30","TL-31","TL-92"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5ETGQ3WSKGYWVK5EP","ts":"2026-09-02T07:16:31.461Z","task":"TL-28","field":"title","from":"Heartbeaty aktywności i łańcuch atrybucji","to":"Activity heartbeats and the attribution chain","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5GTT0CHQ1KABP7YCM","ts":"2026-09-02T07:16:31.461Z","task":"TL-28","field":"epic","from":"Backlog — pomiar czasu pracy","to":"Backlog — work time measurement","actor":"unknown","source":"external","reason":"unknown"}

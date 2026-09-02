@@ -1,1 +1,3 @@
 {"id":"01M1DX1VJ5B8PGE73CTT6JWQBH","ts":"2026-09-01T07:13:34.277Z","task":"TL-60","field":"__created__","from":"","to":"Literówka w config.yaml przelatuje przez build i check","actor":"unknown","source":"boot"}
+{"id":"01M1GFKZK56JSNFR279B96P7XD","ts":"2026-09-02T07:16:31.461Z","task":"TL-60","field":"title","from":"Literówka w config.yaml przelatuje przez build i check","to":"A typo in config.yaml sails through build and check","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5R7W3KEQ7DJE0W2KK","ts":"2026-09-02T07:16:31.461Z","task":"TL-60","field":"epic","from":"Konfigurowalność","to":"Configurability","actor":"unknown","source":"external","reason":"unknown"}

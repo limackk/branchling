@@ -1,2 +1,4 @@
 {"id":"01M1EGVDNZWSXY0B07PTDCKGWE","ts":"2026-09-01T12:59:34.975Z","task":"TL-120","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown"}
 {"id":"01M1EGW163WWRY4FQRH13MPZGM","ts":"2026-09-01T12:59:54.947Z","task":"TL-120","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
+{"id":"01M1GFKZK50TDMF1B7AQ8SYSXP","ts":"2026-09-02T07:16:31.461Z","task":"TL-120","field":"title","from":"Własny szablon repo nadal uczy ## Log — usuń sekcję","to":"This repo's own template still teaches ## Log — remove the section","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK56QMZN8GTX2QGXRAM","ts":"2026-09-02T07:16:31.461Z","task":"TL-120","field":"epic","from":"Historia i atrybucja","to":"History and attribution","actor":"unknown","source":"external","reason":"unknown"}

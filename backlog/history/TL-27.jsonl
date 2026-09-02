@@ -4,3 +4,5 @@
 {"id":"01M1GBFW2MHSGD3A56Z6SGBF9A","ts":"2026-09-02T06:04:22.484Z","task":"TL-27","field":"status","from":"pending","to":"in_progress","actor":"agent:session","source":"take","reason":"unknown"}
 {"id":"01M1GBFW2M5NT5F7HMVSN5FY0Z","ts":"2026-09-02T06:04:22.484Z","task":"TL-27","field":"owner","from":"unassigned","to":"agent:session","actor":"agent:session","source":"take","reason":"unknown"}
 {"id":"01M1GC3KHQN14ZM6VBVRP6N0D7","ts":"2026-09-02T06:15:09.111Z","task":"TL-27","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
+{"id":"01M1GFKZK5X0ZN9KTH1N62WJZW","ts":"2026-09-02T07:16:31.461Z","task":"TL-27","field":"title","from":"Pomiar czasu pracy — fundament i uczciwy punkt zero","to":"Work time measurement — foundation and an honest point zero","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK52DDX9AAR7SA4AGT7","ts":"2026-09-02T07:16:31.461Z","task":"TL-27","field":"epic","from":"Backlog — pomiar czasu pracy","to":"Backlog — work time measurement","actor":"unknown","source":"external","reason":"unknown"}

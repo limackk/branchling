@@ -5,3 +5,5 @@
 {"id":"01M1ETDZAR30HF8DX163TBXZSP","ts":"2026-09-01T15:47:00.056Z","task":"TL-94","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
 {"id":"01M1EVGTMYE6F6A6DR5EF7FBE8","ts":"2026-09-01T16:06:02.142Z","task":"TL-94","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
 {"id":"01M1F5BNKGB316F5VARZTTB8TH","ts":"2026-09-01T18:57:58.896Z","task":"TL-94","field":"blocks","from":["TL-1505"],"to":["TL-95"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5WF6DR4P3ENWW1BX3","ts":"2026-09-02T07:16:31.461Z","task":"TL-94","field":"title","from":"worktrail seed — plan projektu jako wejście do backlogu","to":"worktrail seed — project plan as input to the backlog","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5QS56B3PP99KCCKB5","ts":"2026-09-02T07:16:31.461Z","task":"TL-94","field":"epic","from":"Wyróżniki agentowe","to":"Agentic differentiators","actor":"unknown","source":"external","reason":"unknown"}

@@ -1,2 +1,3 @@
 {"ts":"2026-08-29T14:48:38.581Z","task":"TL-18","field":"__created__","from":"","to":"Odklej katalog danych backlogu od położenia kodu","actor":"unknown","source":"external"}
 {"id":"01M1F5BNKG7V04WW2ZFQGB0586","ts":"2026-09-01T18:57:58.896Z","task":"TL-18","field":"blocks","from":["TL-1400"],"to":["TL-19"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5581EP6ZHG4HJG3B2","ts":"2026-09-02T07:16:31.461Z","task":"TL-18","field":"title","from":"Odklej katalog danych backlogu od położenia kodu","to":"Detach the backlog data directory from the code's location","actor":"unknown","source":"external","reason":"unknown"}

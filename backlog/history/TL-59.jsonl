@@ -1,1 +1,3 @@
 {"id":"01M1DX1VJ5WCNW243SS3N56J74","ts":"2026-09-01T07:13:34.277Z","task":"TL-59","field":"__created__","from":"","to":"Ko-lokacja: widoki nie są ignorowane w istniejącym repo","actor":"unknown","source":"boot"}
+{"id":"01M1GFKZK5GK7Z1FNZPJDRFY5W","ts":"2026-09-02T07:16:31.461Z","task":"TL-59","field":"title","from":"Ko-lokacja: widoki nie są ignorowane w istniejącym repo","to":"Co-location: views are not ignored in an existing repo","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK51K14JBZ826R52ZXV","ts":"2026-09-02T07:16:31.461Z","task":"TL-59","field":"epic","from":"Integralność danych","to":"Data integrity","actor":"unknown","source":"external","reason":"unknown"}

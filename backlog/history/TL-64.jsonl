@@ -1,2 +1,3 @@
 {"id":"01M1DX1VJ5YA4AK7W2KD6ATYA6","ts":"2026-09-01T07:13:34.277Z","task":"TL-64","field":"__created__","from":"","to":"init zakłada przykładowy task zamiast pustego backlogu","actor":"unknown","source":"boot"}
 {"id":"01M1F5BNKG1240B79BRMASE9RG","ts":"2026-09-01T18:57:58.896Z","task":"TL-64","field":"blocked_by","from":["TL-1476"],"to":["TL-66"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5AJ8MG8GHCGWH7NDC","ts":"2026-09-02T07:16:31.461Z","task":"TL-64","field":"title","from":"init zakłada przykładowy task zamiast pustego backlogu","to":"init creates a sample task instead of an empty backlog","actor":"unknown","source":"external","reason":"unknown"}

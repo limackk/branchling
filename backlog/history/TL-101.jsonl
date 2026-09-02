@@ -4,3 +4,5 @@
 {"id":"01M1FA3J89QHXN26BCZFG5B876","ts":"2026-09-01T20:20:56.201Z","task":"TL-101","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown"}
 {"id":"01M1FA3J89G23NJV3EDMYED3DR","ts":"2026-09-01T20:20:56.201Z","task":"TL-101","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown"}
 {"id":"01M1FA6CAV35PGDX786B4CVZWX","ts":"2026-09-01T20:22:28.443Z","task":"TL-101","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
+{"id":"01M1GFKZK5BDJYRPTMPJAMB22A","ts":"2026-09-02T07:16:31.461Z","task":"TL-101","field":"title","from":"Skill backlog-workflow: take i close zamiast recznej edycji","to":"Skill backlog-workflow: take and close instead of manual editing","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5ZZFK1G1PWDBF1SHP","ts":"2026-09-02T07:16:31.461Z","task":"TL-101","field":"epic","from":"Wyróżniki agentowe","to":"Agentic hallmarks","actor":"unknown","source":"external","reason":"unknown"}

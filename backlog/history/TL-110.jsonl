@@ -3,3 +3,5 @@
 {"id":"01M1DXQ0MV00J4E1TQKG4K5T6V","ts":"2026-09-01T07:25:07.611Z","task":"TL-110","field":"epic","from":"","to":"Plan wykonania","actor":"unknown","source":"external"}
 {"id":"01M1DXQ0MVDGQE3H6EKMBBG9WT","ts":"2026-09-01T07:25:07.611Z","task":"TL-110","field":"blocked_by","from":[],"to":["TL-1519"],"actor":"unknown","source":"external"}
 {"id":"01M1F5BNKG8EEWVTXTC10AW1G4","ts":"2026-09-01T18:57:58.896Z","task":"TL-110","field":"blocked_by","from":["TL-1519"],"to":["TL-109"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5E8EMJKA24QGZYXR0","ts":"2026-09-02T07:16:31.461Z","task":"TL-110","field":"title","from":"Ścieżka krytyczna i animacje widoku Execution","to":"Critical path and animations for the Execution view","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5VZ3KR67KAMFAE6YS","ts":"2026-09-02T07:16:31.461Z","task":"TL-110","field":"epic","from":"Plan wykonania","to":"Execution plan","actor":"unknown","source":"external","reason":"unknown"}

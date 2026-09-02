@@ -1,2 +1,4 @@
 {"id":"01M1E066RDN8W5ETMYH47RWJCY","ts":"2026-09-01T08:08:22.541Z","task":"TL-90","field":"__created__","from":"","to":"tasklog audit — deklaracje kontra ślady aktywności","actor":"unknown","source":"external"}
 {"id":"01M1E69RE2MQNFYRSY8WYXAR47","ts":"2026-09-01T09:55:10.402Z","task":"TL-90","field":"title","from":"tasklog audit — deklaracje kontra ślady aktywności","to":"worktrail audit — deklaracje kontra ślady aktywności","actor":"unknown","source":"external"}
+{"id":"01M1GFKZK5JB9STJV47FF801VS","ts":"2026-09-02T07:16:31.461Z","task":"TL-90","field":"title","from":"worktrail audit — deklaracje kontra ślady aktywności","to":"worktrail audit — declarations versus traces of activity","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5SM2F6MHKGZGF6V1C","ts":"2026-09-02T07:16:31.461Z","task":"TL-90","field":"epic","from":"Wyróżniki agentowe","to":"Agentic distinguishers","actor":"unknown","source":"external","reason":"unknown"}

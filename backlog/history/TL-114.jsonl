@@ -10,3 +10,5 @@
 {"id":"01M1G7K0B08XJ66ZS7X9AY05TF","ts":"2026-09-02T04:56:10.848Z","task":"TL-114","field":"status","from":"pending","to":"in_progress","actor":"agent:session","source":"next","reason":"unknown"}
 {"id":"01M1G7K0B0P7CXZCZBEXT9T1G4","ts":"2026-09-02T04:56:10.848Z","task":"TL-114","field":"owner","from":"unassigned","to":"agent:session","actor":"agent:session","source":"next","reason":"unknown"}
 {"id":"01M1G81ZM85JM4YQHTRFDCS25X","ts":"2026-09-02T05:04:21.640Z","task":"TL-114","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
+{"id":"01M1GFKZK5VGTR32D31ZR1TP6G","ts":"2026-09-02T07:16:31.461Z","task":"TL-114","field":"title","from":"Zdarzenie __decision__ i komenda worktrail decide","to":"The __decision__ event and the worktrail decide command","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK54W1T0EZB1AV3QND3","ts":"2026-09-02T07:16:31.461Z","task":"TL-114","field":"epic","from":"Wyróżniki agentowe","to":"Agentic hallmarks","actor":"unknown","source":"external","reason":"unknown"}

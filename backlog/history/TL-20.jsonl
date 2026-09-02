@@ -2,3 +2,5 @@
 {"id":"01M19RJ36QE41P588KXK66BNZ5","ts":"2026-08-30T16:38:05.783Z","task":"TL-20","field":"epic","from":"Backlog viewer","to":"Backlog — publikacja open source","actor":"unknown","source":"external"}
 {"id":"01M19YZJ42TRK8646YNVB4S75P","ts":"2026-08-30T18:30:18.498Z","task":"TL-20","field":"status","from":"pending","to":"done","actor":"unknown","source":"external"}
 {"id":"01M1EN9P500JV9STJJD29AFWT9","ts":"2026-09-01T14:17:16.704Z","task":"TL-20","field":"type","from":"manual","to":"code","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5ZPYR3FERS9DNKTY2","ts":"2026-09-02T07:16:31.461Z","task":"TL-20","field":"title","from":"Domknij nazwę narzędzia przed publikacją open source","to":"Close the tool's name before open source publication","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5148FEX93121TF3SK","ts":"2026-09-02T07:16:31.461Z","task":"TL-20","field":"epic","from":"Backlog — publikacja open source","to":"Backlog — open source publication","actor":"unknown","source":"external","reason":"unknown"}

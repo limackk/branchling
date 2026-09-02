@@ -3,3 +3,4 @@
 {"id":"01M1ECEEQV0KX43NA8X8BBRPZ9","ts":"2026-09-01T11:42:35.771Z","task":"TL-111","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"manual","reason":"unknown"}
 {"id":"01M1ECEEQVM0DRX3B7NJNZ36A7","ts":"2026-09-01T11:42:35.771Z","task":"TL-111","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"manual","reason":"unknown"}
 {"id":"01M1ECSBPRK4BJB1KQNWSD7YTS","ts":"2026-09-01T11:48:33.112Z","task":"TL-111","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
+{"id":"01M1GFKZK5VHDXZHQCCJ1EFFVX","ts":"2026-09-02T07:16:31.461Z","task":"TL-111","field":"title","from":"migrate-prefix zostawia historię pod starym ID","to":"migrate-prefix leaves history under the old ID","actor":"unknown","source":"external","reason":"unknown"}

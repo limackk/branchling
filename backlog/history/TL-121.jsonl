@@ -1,1 +1,3 @@
 {"id":"01M1EKR2J2JTZQYDQ7PQW17EVT","ts":"2026-09-01T13:50:11.010Z","task":"TL-121","field":"__created__","from":"","to":"Szablon tego repo zgubił pola, które ma szablon wysyłkowy","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5ESV9GEC2M3Z9VX74","ts":"2026-09-02T07:16:31.461Z","task":"TL-121","field":"title","from":"Szablon tego repo zgubił pola, które ma szablon wysyłkowy","to":"This repo's template lost fields that the shipping template has","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5AFNP9GRHAQGVWMT0","ts":"2026-09-02T07:16:31.461Z","task":"TL-121","field":"epic","from":"Historia i atrybucja","to":"History and attribution","actor":"unknown","source":"external","reason":"unknown"}

@@ -9,3 +9,5 @@
 {"id":"01M1EA1E0JRXZNWZV3DRZ6XGRT","ts":"2026-09-01T11:00:31.890Z","task":"TL-117","field":"status","from":"pending","to":"in_progress","actor":"unknown","source":"external"}
 {"id":"01M1EA1E0J188F57SK4VDSJ6DQ","ts":"2026-09-01T11:00:31.890Z","task":"TL-117","field":"owner","from":"unassigned","to":"agent:claude","actor":"unknown","source":"external"}
 {"id":"01M1EAP7CXNWQ39JEWQ6M9JCX7","ts":"2026-09-01T11:11:53.245Z","task":"TL-117","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done"}
+{"id":"01M1GFKZK5EVM87N9MCBJWZAZ3","ts":"2026-09-02T07:16:31.461Z","task":"TL-117","field":"title","from":"Nazwa produktu z jednej stałej, a nie z literału","to":"Product name from a single constant, not from a literal","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5NXHQB8YW6AZ3B9PW","ts":"2026-09-02T07:16:31.461Z","task":"TL-117","field":"epic","from":"Backlog — publikacja open source","to":"Backlog — open source publication","actor":"unknown","source":"external","reason":"unknown"}

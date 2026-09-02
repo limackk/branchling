@@ -2,3 +2,5 @@
 {"id":"01M1EWXQ30DBCS1HP6EQ8FKA3Q","ts":"2026-09-01T16:30:33.056Z","task":"TL-129","field":"priority","from":"P1","to":"P2","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1EWXQ30WY8HXW3MW125YA7G","ts":"2026-09-01T16:30:33.056Z","task":"TL-129","field":"confidence","from":"","to":"medium","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1EWXQ30D4JDV9NBKQ5GKCGS","ts":"2026-09-01T16:30:33.056Z","task":"TL-129","field":"epic","from":"","to":"worktrail — narzędzie","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK55YX0V0JPNKVZREPD","ts":"2026-09-02T07:16:31.461Z","task":"TL-129","field":"title","from":"check --language przepuszcza polski w scripts/serve-backlog.mjs","to":"check --language lets Polish through in scripts/serve-backlog.mjs","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK5MHTTFMC4R40QE2ZT","ts":"2026-09-02T07:16:31.461Z","task":"TL-129","field":"epic","from":"worktrail — narzędzie","to":"worktrail — the tool","actor":"unknown","source":"external","reason":"unknown"}

@@ -1,1 +1,3 @@
 {"id":"01M1B421522NV0R4K7AGK2GY2X","ts":"2026-08-31T05:18:16.738Z","task":"TL-41","field":"__created__","from":"","to":"Wiszące blocked_by nie oblewa żadnej bramki","actor":"unknown","source":"boot"}
+{"id":"01M1GFKZK59DCAGYYX3YBSM275","ts":"2026-09-02T07:16:31.461Z","task":"TL-41","field":"title","from":"Wiszące blocked_by nie oblewa żadnej bramki","to":"A dangling blocked_by fails no gate","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GFKZK50XZJFQRK5FZQZ2AE","ts":"2026-09-02T07:16:31.461Z","task":"TL-41","field":"epic","from":"Integralność danych","to":"Data integrity","actor":"unknown","source":"external","reason":"unknown"}

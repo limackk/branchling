@@ -1,1 +1,2 @@
 {"id":"01M1B42152NP1T16JQ72H2QAP0","ts":"2026-08-31T05:18:16.738Z","task":"TL-13","field":"__created__","from":"","to":"NOW.yaml wyliczany zamiast pola focus — „co teraz” bez bitu do utrzymywania","actor":"unknown","source":"boot"}
+{"id":"01M1GFKZK52TWYDZJYRMC5EAWQ","ts":"2026-09-02T07:16:31.461Z","task":"TL-13","field":"title","from":"NOW.yaml wyliczany zamiast pola focus — „co teraz” bez bitu do utrzymywania","to":"NOW.yaml computed instead of a focus field — \"what now\" without a bit to maintain","actor":"unknown","source":"external","reason":"unknown"}
