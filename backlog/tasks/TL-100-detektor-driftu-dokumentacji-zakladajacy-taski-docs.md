@@ -75,7 +75,7 @@ work, not the detector's), watching files live, any writes beyond
 
 - `backlog/tasks/TL-97-pole-role-taska-wymog-roli-ze-slownika-konfiguracji.md`
   — the docs role in the dictionary.
-- `backlog/tasks/TL-90-worktrail-audit-deklaracje-kontra-slady-aktywnosci.md`
+- `backlog/tasks/TL-90-tasklog-audit-deklaracje-kontra-slady-aktywnosci.md`
   — a sibling command (declarations vs. traces of activity); shared report
   style and exit codes, consider sharing the task+history read path.
 - this repo's `docs/` — **Status:** headings, relative link format; the

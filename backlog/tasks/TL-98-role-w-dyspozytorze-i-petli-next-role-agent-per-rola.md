@@ -67,8 +67,8 @@ Decisions:
 
 ## Pre-flight reading
 
-- `backlog/tasks/TL-87-worktrail-next-atomowy-przydzial-taska-dla-agenta.md`
-  and `backlog/tasks/TL-96-worktrail-run-petla-next-agent-close-do-pustej-kolejki.md`
+- `backlog/tasks/TL-87-tasklog-next-atomowy-przydzial-taska-dla-agenta.md`
+  and `backlog/tasks/TL-96-tasklog-run-petla-next-agent-close-do-pustej-kolejki.md`
   — the contracts this task extends.
 - `backlog/tasks/TL-97-pole-role-taska-wymog-roli-ze-slownika-konfiguracji.md`
   — the semantics of the field and the dictionary.

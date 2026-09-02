@@ -193,6 +193,81 @@ test("the real tree of THIS repository is clean — and on a non-zero sample", (
   assert.ok(m && Number(m[1]) > 0, "zero references checked — green with no evidential force: " + r.out);
 });
 
+// ── A task file PATH written in prose (TL-138) ────────────────────────────
+//
+// A THIRD question of the same tree, and a different defect again: the fields
+// are correct, and a path in the body points at a filename that no longer
+// exists. It happened here — a product rename rewrote `worktrail` in PROSE
+// while the slugs on disk kept the old word — and nothing saw it, because the
+// reference check reads ids and not paths.
+
+/** Append prose to a task the `task()` helper already wrote. */
+function body(dir, id, text) {
+  const file = join(dir, "tasks", `${id}-x.md`);
+  writeFileSync(file, readFileSync(file, "utf8") + text + "\n", "utf8");
+}
+
+test("a path to a task file that does not exist fails, and says what it meant", () => {
+  withSandbox(
+    (dir) => {
+      config(dir, []);
+      task(dir, "BL-1");
+      task(dir, "BL-2");
+      // The exact accident: right id, stale slug.
+      body(dir, "BL-2", "Pre-flight: `backlog/tasks/BL-1-renamed.md` explains why.");
+    },
+    (dir) => {
+      const r = run(["--dir", dir]);
+      assert.equal(r.code, 1, "a path leading nowhere passed: " + r.out);
+      assert.match(r.out, /BL-1-renamed\.md/);
+      assert.match(r.out, /BL-1 is `BL-1-x\.md`/, "the guard did not resolve the id to the real file");
+    },
+  );
+});
+
+test("POSITIVE CONTROL: the same path, spelled right, passes and is COUNTED", () => {
+  // Without this the test above passes just as well against a guard that
+  // rejects every path it sees.
+  withSandbox(
+    (dir) => {
+      config(dir, []);
+      task(dir, "BL-1");
+      task(dir, "BL-2");
+      body(dir, "BL-2", "Pre-flight: `backlog/tasks/BL-1-x.md` explains why.");
+    },
+    (dir) => {
+      const r = run(["--dir", dir]);
+      assert.equal(r.code, 0, r.out);
+      const m = r.out.match(/(\d+) task file path\(s\) written in prose/);
+      assert.ok(m && Number(m[1]) === 1, "the path was not checked at all: " + r.out);
+    },
+  );
+});
+
+test("a filename NOT written as a path is data about a name, not a pointer", () => {
+  // A task reporting broken paths has to quote them, and the quotation must not
+  // be the very thing that fails the guard. What promises to resolve is a path;
+  // a bare name in a list does not.
+  withSandbox(
+    (dir) => {
+      config(dir, []);
+      task(dir, "BL-1");
+      body(dir, "BL-1", "Broken, measured on 2026-09-01:\n\n    BL-1-gone-forever.md\n");
+    },
+    (dir) => {
+      const r = run(["--dir", dir]);
+      assert.equal(r.code, 0, "a quoted filename was read as a path: " + r.out);
+    },
+  );
+});
+
+test("the real tree of THIS repository has no path leading nowhere, on a non-zero sample", () => {
+  const r = run(["--dir", join(TASKS_DIR, "..")]);
+  assert.equal(r.code, 0, r.out);
+  const m = r.out.match(/(\d+) task file path\(s\) written in prose/);
+  assert.ok(m && Number(m[1]) > 0, "zero paths checked — green with no evidential force: " + r.out);
+});
+
 // ── A blocking status whose blockers have all closed (TL-134) ─────────────
 //
 // A DIFFERENT DEFECT from a dangling reference: every reference here is correct

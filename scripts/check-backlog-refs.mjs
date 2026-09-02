@@ -23,6 +23,21 @@
  * true dependency history to get green, which is how a guard teaches people to
  * lie to it.
  *
+ * A THIRD QUESTION OF THE SAME TREE: the task-file PATHS written in prose
+ * (TL-138). `blocked_by` is an id, and an id is stable; a path carries the SLUG
+ * as well, and the slug moves — a product rename rewrote `tasklog` in prose
+ * while the filenames on disk kept it, and six of this repository's twelve
+ * pre-flight paths pointed at nothing with every guard green. It is checked
+ * here rather than in a command of its own for the reason `staleBlocked` is:
+ * one pass over the tree, three questions asked of it.
+ *
+ * WHY THE PATHS WERE REPAIRED AND NOT REPLACED BY IDS. An id the reader
+ * resolves with a query removes the class outright, and it charges the cost at
+ * the worst moment — pre-flight reading is what a session does BEFORE it
+ * understands anything, and a path is one click there. With this guard the
+ * class is caught by the run that comes after every rename anyway, so keeping
+ * the link costs a check rather than a search.
+ *
  * KNOWN LIMIT, stated rather than discovered later: this resolves against the
  * files in `tasks/`, and archived tasks live there today. If closed tasks ever
  * move to their own directory, this guard starts failing on correct data and
@@ -83,6 +98,23 @@ function inlineList(fm, key) {
   return m[1].split(",").map((s) => unquote(s.trim())).filter(Boolean);
 }
 
+/**
+ * A path to a task FILE written in prose: `backlog/tasks/PROJ-93-slug.md`
+ * (TL-138). Built from the configured prefix, like every other pattern here.
+ *
+ * ANCHORED ON `tasks/` ON PURPOSE. A bare filename in a list — which is how a
+ * task that reports broken paths has to quote them — is data about a name, not
+ * a pointer to a file; only something written as a PATH promises to resolve.
+ * The directory segment before it is not checked, because `backlog/tasks/` and
+ * `tasks/` are the same reference in the two layouts this tool supports. A dot
+ * inside the name is not accepted either: `tasks/PROJ-68-log-...-catches.md` is
+ * a name ELIDED in prose, and demanding that a shortened quotation resolve
+ * would report the writing rather than a broken pointer.
+ */
+function taskPathScanner(prefix) {
+  return new RegExp("tasks/((?:" + prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")-\\d+[A-Za-z0-9_-]*\\.md)", "g");
+}
+
 export function auditRefs(tasksDir, prefix, read = readFileSync, list = readdirSync) {
   // Patterns built from the configured prefix (BL-1452) — the guard and the
   // generator have no right to disagree about what counts as a task.
@@ -92,11 +124,38 @@ export function auditRefs(tasksDir, prefix, read = readFileSync, list = readdirS
   const known = new Set();
   const parsed = [];
   for (const file of files) {
-    const fm = frontmatter(read(join(tasksDir, file), "utf8"));
+    const raw = read(join(tasksDir, file), "utf8");
+    const fm = frontmatter(raw);
     const idMatch = fm.match(/^id:\s*(.+?)\s*$/m);
     const id = idMatch ? unquote(stripComment(idMatch[1])) : file.match(pat.fileId)[1];
     known.add(id);
-    parsed.push({ id, file, fm });
+    parsed.push({ id, file, fm, raw });
+  }
+
+  // The paths written in prose, resolved by NAME against this same directory.
+  // Nothing here reads the filesystem a second time: the set of files was
+  // listed above, and a reference is right or wrong relative to that set.
+  const onDisk = new Set(files);
+  const byId = new Map(parsed.map((t) => [t.id, t.file]));
+  let pathsChecked = 0;
+  const danglingPaths = [];
+  for (const t of parsed) {
+    const seen = new Set();
+    for (const m of t.raw.matchAll(taskPathScanner(prefix))) {
+      const name = m[1];
+      if (seen.has(name)) continue;
+      seen.add(name);
+      pathsChecked++;
+      if (onDisk.has(name)) continue;
+      const idMatch = name.match(pat.fileId);
+      danglingPaths.push({
+        from: t.id, file: t.file, path: name,
+        // The id is the stable half of the name and the slug is not, so the
+        // guard can usually say what the path was MEANT to be — which is the
+        // whole repair, and the reason this is not just a red line.
+        suggestion: idMatch ? byId.get(idMatch[1]) || null : null,
+      });
+    }
   }
 
   let checked = 0;
@@ -115,7 +174,7 @@ export function auditRefs(tasksDir, prefix, read = readFileSync, list = readdirS
     }
   }
   return {
-    checked, dangling, unresolvable, taskCount: parsed.length,
+    checked, dangling, unresolvable, taskCount: parsed.length, pathsChecked, danglingPaths,
     // The parsed set travels out so a second rule can judge it without reading
     // every file again (TL-134). One pass over the tree, two questions asked of
     // it.
@@ -179,7 +238,9 @@ function main(argv) {
   // STRICT (TL-60): guard.
   const config = loadConfigOrExit(root);
   const prefix = config.taskIdPrefix;
-  const { checked, dangling, unresolvable, taskCount, tasks } = auditRefs(backlogPaths(root).tasksDir, prefix);
+  const pat = taskIdPatterns(prefix);
+  const { checked, dangling, unresolvable, taskCount, tasks, pathsChecked, danglingPaths } =
+    auditRefs(backlogPaths(root).tasksDir, prefix);
   const stale = staleBlocked(tasks, config);
 
   // REPORTED, NEVER FAILED, and the level is the decision this task asked for.
@@ -205,9 +266,12 @@ function main(argv) {
     staleLines.push("  to lift it by hand, write the change with its reason rather than editing the field.");
   }
 
-  if (!dangling.length && !unresolvable.length) {
+  if (!dangling.length && !unresolvable.length && !danglingPaths.length) {
     console.log(
       `${OKM} backlog: ${checked} blocked_by/blocks references across ${taskCount} tasks all point at tasks that exist`
+    );
+    console.log(
+      `${OKM} backlog: ${pathsChecked} task file path(s) written in prose, each one leading to a file that exists`
     );
     for (const line of staleLines) console.log(line);
     return 0;
@@ -222,8 +286,20 @@ function main(argv) {
       `  - ${u.file}: \`${u.field}\` contains ${u.ref} — that is not a number from THIS backlog`
     );
   }
+  for (const d of danglingPaths) {
+    console.error(
+      `  - ${d.file}: the path \`tasks/${d.path}\` leads to no file` +
+        (d.suggestion ? ` — ${d.path.match(pat.fileId)[1]} is \`${d.suggestion}\`` : "")
+    );
+  }
   for (const line of staleLines) console.error(line);
   console.error("");
+  if (danglingPaths.length) {
+    console.error("A path in a task body is the first instruction a fresh session follows, before it");
+    console.error("understands anything else, so one that resolves to nothing costs that session a");
+    console.error("search — or gets skipped. The id in the name is stable and the slug is not: a");
+    console.error("rename or a `" + N + " renumber` moves filenames while the prose keeps the old name.");
+  }
   if (dangling.length) {
     console.error("A reference usually dangles after a task was DELETED or moved, not after a typo.");
     console.error("Use the git history to find where it went, and fix the MEANING, not just the number:");

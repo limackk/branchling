@@ -73,7 +73,7 @@ Decisions:
   §5.1–§5.2 — comments as an append-only, conflict-free class.
 - `scripts/task-fields.mjs` — `PSEUDO_FIELDS`; `scripts/history.mjs` —
   writing and reading events.
-- `backlog/tasks/TL-87-worktrail-next-atomowy-przydzial-taska-dla-agenta.md`
+- `backlog/tasks/TL-87-tasklog-next-atomowy-przydzial-taska-dla-agenta.md`
   — the lock contract that handoff releases.
 
 ## Steps

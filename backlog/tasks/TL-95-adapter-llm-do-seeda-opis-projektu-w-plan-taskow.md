@@ -76,7 +76,7 @@ Decisions and constraints:
 
 ## Pre-flight reading
 
-- `backlog/tasks/TL-94-worktrail-seed-plan-projektu-jako-wejscie-do-backlogu.md`
+- `backlog/tasks/TL-94-tasklog-seed-plan-projektu-jako-wejscie-do-backlogu.md`
   — the plan format and validation behavior; the adapter is its client.
 - [docs/worktrail-global-tool.md](../../docs/worktrail-global-tool.md) §3 —
   Law 3 (user layer) and Law 4 (composition).

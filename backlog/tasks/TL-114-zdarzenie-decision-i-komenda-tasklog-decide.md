@@ -71,7 +71,7 @@ Decisions:
   §3 — the event's format and the definition of an open question.
 - [docs/backlog-field-editing-history.md](../../docs/backlog-field-editing-history.md)
   §2 — pseudo-fields, ULID, dedup rules.
-- `backlog/tasks/TL-99-worktrail-handoff-przekazanie-taska-z-powodem-i-sladem.md`
+- `backlog/tasks/TL-99-tasklog-handoff-przekazanie-taska-z-powodem-i-sladem.md`
   — the `__comment__` implementation this task extends with a
   question→decision pair.
 - `scripts/task-fields.mjs` (`PSEUDO_FIELDS`), `scripts/history.mjs` — event

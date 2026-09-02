@@ -6,11 +6,11 @@ labels: []
 board: main
 epic: ""
 priority: P2                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 estimate: 2h                       # 30m | 2h | 1d | 1w | 1mo
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-02
 blocked_by: []
 blocks: []
 related_docs: []
@@ -73,5 +73,5 @@ clickable link.
 
 ## Acceptance criteria
 
-- [ ] No task file carries a `backlog/tasks/...md` path that does not exist. [proof: tree-resolves]
-- [ ] The guard reports a broken path, with a positive control: a deliberately broken path in a fixture is caught. [proof: guard-catches]
+- [x] No task file carries a `backlog/tasks/...md` path that does not exist. [proof: tree-resolves]
+- [x] The guard reports a broken path, with a positive control: a deliberately broken path in a fixture is caught. [proof: guard-catches]

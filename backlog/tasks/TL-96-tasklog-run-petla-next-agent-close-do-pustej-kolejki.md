@@ -69,9 +69,9 @@ within the four laws:
 
 ## Pre-flight reading
 
-- `backlog/tasks/TL-87-worktrail-next-atomowy-przydzial-taska-dla-agenta.md`
+- `backlog/tasks/TL-87-tasklog-next-atomowy-przydzial-taska-dla-agenta.md`
   — the `next` contract: selection, lock, exit codes.
-- `backlog/tasks/TL-93-bramka-weryfikacji-w-worktrail-close.md` — the
+- `backlog/tasks/TL-93-bramka-weryfikacji-w-tasklog-close.md` — the
   `close` contract: when the status stays untouched, the verification event.
 - [docs/worktrail-global-tool.md](../../docs/worktrail-global-tool.md) §3, §10 —
   Law 4 and the "no daemon" decision.
