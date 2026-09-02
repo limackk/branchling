@@ -1,0 +1,26 @@
+[
+  {
+    "number": 12,
+    "title": "Crash on startup when the config file is missing",
+    "body": "Running the binary in a fresh checkout ends in a stack trace instead of a\nmessage naming the file it wanted.\n\nSteps:\n\n1. Clone the repository\n2. Run the binary\n3. Read the trace",
+    "state": "OPEN",
+    "labels": [{ "name": "bug" }],
+    "url": "https://github.com/acme/app/issues/12"
+  },
+  {
+    "number": 31,
+    "title": "Document the retry policy",
+    "body": "",
+    "state": "CLOSED",
+    "labels": [],
+    "url": "https://github.com/acme/app/issues/31"
+  },
+  {
+    "number": 44,
+    "title": "Batch the outbound writes",
+    "body": "One request per row is fine at ten rows and is not fine at ten thousand.",
+    "state": "OPEN",
+    "labels": [{ "name": "performance" }, { "name": "needs-triage" }],
+    "url": "https://github.com/acme/app/issues/44"
+  }
+]

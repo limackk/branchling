@@ -6,12 +6,12 @@ labels: [post-launch]
 board: main
 epic: "Onboarding"
 priority: P2
-status: pending
-owner: unassigned
+status: done
+owner: agent:claude
 estimate: 1w
 confidence: medium
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-02
 blocked_by: []
 blocks: []
 related_docs:
@@ -19,10 +19,16 @@ related_docs:
   - docs/worktrail-global-tool.md
   - .claude/skills/worktrail-cli/SKILL.md
 verification:
-  - bash: "node --test scripts/tests/import-github.test.mjs"
-  - bash: "cat scripts/tests/fixtures/gh-issues.json | node scripts/cli.mjs import --from github --dir $(mktemp -d) --dry-run | grep -q 'nothing was written' && echo 'dry-run does not write — OK'"
-  - bash: "d=$(mktemp -d); node scripts/cli.mjs init --dir \"$d\" --no-example >/dev/null; cat scripts/tests/fixtures/gh-issues.json | node scripts/cli.mjs import --from github --dir \"$d\" >/dev/null; cat scripts/tests/fixtures/gh-issues.json | node scripts/cli.mjs import --from github --dir \"$d\" >/dev/null; test $(ls \"$d/tasks\" | wc -l | tr -d ' ') -eq 3 && echo 'the second import does not duplicate — OK'"
-  - bash: "node scripts/cli.mjs check --dir <directory-after-import>"
+  - id: suite
+    bash: "node --test scripts/tests/import-github.test.mjs"
+  - id: dry-run
+    bash: "d=$(mktemp -d); node scripts/cli.mjs init --dir \"$d\" --no-example >/dev/null; cat scripts/tests/fixtures/gh-issues.json | node scripts/cli.mjs import --from github --dir \"$d\" --dry-run | grep -q 'nothing was written' && test $(ls \"$d/tasks\" | wc -l | tr -d ' ') -eq 0 && echo 'dry-run does not write — OK'"
+  - id: idempotent
+    bash: "d=$(mktemp -d); node scripts/cli.mjs init --dir \"$d\" --no-example >/dev/null; cat scripts/tests/fixtures/gh-issues.json | node scripts/cli.mjs import --from github --dir \"$d\" >/dev/null; cat scripts/tests/fixtures/gh-issues.json | node scripts/cli.mjs import --from github --dir \"$d\" >/dev/null; test $(ls \"$d/tasks\" | wc -l | tr -d ' ') -eq 3 && echo 'the second import does not duplicate — OK'"
+  - id: no-network
+    bash: "grep -Eq 'node:(http|https|net|tls)' scripts/import-github.mjs && exit 1; echo 'the importer imports no network module — OK'"
+  - id: checked
+    bash: "d=$(mktemp -d); node scripts/cli.mjs init --dir \"$d\" --no-example >/dev/null; cat scripts/tests/fixtures/gh-issues.json | node scripts/cli.mjs import --from github --dir \"$d\" >/dev/null; node scripts/cli.mjs check --dir \"$d\""
 ---
 
 ## Goal
@@ -149,16 +155,16 @@ meant to close.
 
 ## Acceptance criteria
 
-- [ ] `worktrail import --from github` reads JSON from stdin and makes not a single network request.
-- [ ] `--dry-run` writes nothing and says so outright.
-- [ ] Statuses and labels mapped from CONFIGURATION and flags, never from literals in the code.
-- [ ] A value outside a closed vocabulary fails BEFORE anything is written.
-- [ ] `verification` stays empty, and the count of such tasks is in the report.
-- [ ] Numbers are local, from `createTask()`; no rewriting of GitHub's numbers.
-- [ ] A repeated import of the same input does not duplicate a single task.
-- [ ] `worktrail check` passes on the directory after the import.
-- [ ] The test runs with no network, on a fixture.
-- [ ] The decision about the pointer to the source is recorded in `## Log` with a reason.
+- [x] `worktrail import --from github` reads JSON from stdin and makes not a single network request. [proof: no-network]
+- [x] `--dry-run` writes nothing and says so outright. [proof: dry-run]
+- [x] Statuses and labels mapped from CONFIGURATION and flags, never from literals in the code. [proof: suite]
+- [x] A value outside a closed vocabulary fails BEFORE anything is written. [proof: suite]
+- [x] `verification` stays empty, and the count of such tasks is in the report. [proof: suite]
+- [x] Numbers are local, from `createTask()`; no rewriting of GitHub's numbers. [proof: suite]
+- [x] A repeated import of the same input does not duplicate a single task. [proof: idempotent]
+- [x] `worktrail check` passes on the directory after the import. [proof: checked]
+- [x] The test runs with no network, on a fixture. [proof: no-network]
+- [x] The decision about the pointer to the source is recorded with a reason. [proof: suite]
 
 ## Notes
 
@@ -173,4 +179,5 @@ Append-only. Format: `YYYY-MM-DD status — who — note`.
 
 - 2026-08-31 created — agent:claude — from the decision in TL-65: the importer is to be built, solidly, not now. The task carries the six decisions so that "solidly" does not mean "work it out again from scratch".
 2026-09-01 pending — agent:claude — raised P3→P2 from a competitive analysis — importing from Issues is a way to try the tool with no cost of migration; nobody abandons their existing tracker on day one.
+- 2026-09-02 in_progress — agent:claude — decision 5 settled: the pointer to the source is a LINE IN THE BODY (`Imported from GitHub: <url>` under `## Notes`), not a `source:` frontmatter field. Reason: a field is a schema change across `FIELD_SHAPES`, the viewer and the history axis, and this task's own context says such a change would have to be a separate task taken BEFORE this one — so choosing the field would have blocked the import rather than improved it. The field remains addable later and nothing written today would need migrating, because the line stays true either way. The cost is stated rather than hidden: deduplication scans task bodies instead of asking `query` for a field, and it reads THIS CHECKOUT only, so an issue imported on another branch is imported again here and the copies meet at the merge — the same boundary `next` has, for the same reason.
 </content>

@@ -162,7 +162,9 @@ function fail(msg, hint) {
  * (`wx`).
  *
  * @param {{body: string|null}} opts `body` replaces the template's content below
- *        the frontmatter; `null` leaves the template untouched.
+ *        the frontmatter; `null` leaves the template untouched. `fields.labels`
+ *        is a list; `fields.verification` is a list whose EMPTY value means an
+ *        empty contract, not an absent instruction.
  * @returns {{path: string, taskId: string, source: "repo"|"local"}}
  * @throws {Error & {code: "EEXIST", file: string, taskId: string}}
  */
@@ -200,7 +202,13 @@ export function createTask({ root, config, board, slug, fields, body }) {
     if (opts[key]) text = text.replace(new RegExp("^" + key + ": .*$", "m"), key + ": " + opts[key]);
   }
   if (opts.epic) text = text.replace(/^epic: .*$/m, "epic: " + quoted(opts.epic));
-  if (Array.isArray(opts.verification) && opts.verification.length) {
+  // A LIST, so it is set as a block rather than by the scalar loop above. An
+  // empty list leaves the template's `labels: []` exactly as it is, which is
+  // already the right answer.
+  if (Array.isArray(opts.labels) && opts.labels.length) {
+    text = text.replace(/^labels: .*$/m, "labels: [" + opts.labels.join(", ") + "]");
+  }
+  if (Array.isArray(opts.verification)) {
     // A block, not a line — `verification` is a list, and the template carries a
     // placeholder in it. A task shipped with the placeholder would teach that the
     // field is decorative, when it is the only line of defence against a "done"
@@ -210,7 +218,12 @@ export function createTask({ root, config, board, slug, fields, body }) {
       // span two lines (`- id:` then `bash:`), and a pattern that stops at the
       // first continuation line would leave it orphaned under the new block.
       /^verification:.*\n(?:[ \t]+[^\n]*\n)*/m,
-      "verification:\n" + opts.verification.map(verificationEntry).join("")
+      // An EMPTY list is a deliberate answer, not a missing one (TL-67): `import`
+      // has no contract to write and must not leave the template's placeholder,
+      // because a field filled in by the template was filled in by nobody.
+      opts.verification.length
+        ? "verification:\n" + opts.verification.map(verificationEntry).join("")
+        : "verification: []\n"
     );
   }
 

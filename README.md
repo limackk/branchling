@@ -313,6 +313,39 @@ what requires a new `schemaVersion` — are in
 
 ---
 
+## Bringing your team over
+
+If your tasks are already in GitHub Issues, you do not have to retype them.
+
+```bash
+gh issue list --state all --limit 500 --json number,title,body,state,labels,url \
+  | worktrail import --from github --dry-run
+```
+
+`--dry-run` prints what it would create and writes nothing; drop the flag to
+write. Nothing here touches the network — the issues arrive as JSON on standard
+input, so authentication stays inside `gh` where it already works, and you can
+pipe in a file instead if you prefer to look at it first.
+
+**It is a one-off copy, not a synchronisation.** Two-way sync would put your
+task state back outside the branch, which is the thing files were chosen over a
+tracker to avoid.
+
+**What it does not bring over**, so that nobody discovers it later: comments,
+attachments, status history and assignees. Those are the conversation *around* a
+task rather than the task, and every imported file carries a link back to the
+issue, so none of it is lost. Issue numbers are not carried either — `#412`
+becomes whatever number is free here, because a number that is free in your
+repository is not free on somebody else's branch.
+
+**And `verification:` arrives empty**, because no tracker has that field. The
+import says how many tasks it left in that state rather than filling it with a
+placeholder: those tasks are readable and searchable straight away, and
+`worktrail done` will refuse them until somebody writes down how to check the
+outcome.
+
+---
+
 ## What does not belong in a backlog
 
 - **Fixes shorter than half an hour** — just do them and commit.
