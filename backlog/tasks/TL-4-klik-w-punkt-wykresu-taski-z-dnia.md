@@ -14,8 +14,7 @@ created: 2026-08-26
 updated: 2026-08-26
 blocked_by: []
 blocks: []
-related_docs:
-  - backlog/README.md
+related_docs: []
 verification:
   - bash: "node backlog/scripts/build-viewer.mjs"
   - manual: "Dashboard → click on a point of each of the three charts: a panel below the chart with tasks created and closed that day; clicking a title opens the task"

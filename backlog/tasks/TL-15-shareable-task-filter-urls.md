@@ -14,8 +14,7 @@ created: 2026-08-29
 updated: 2026-08-29
 blocked_by: []
 blocks: []
-related_docs:
-  - backlog/README.md
+related_docs: []
 verification:
   - bash: "node --test backlog/scripts/tests/viewer-url.test.mjs"
   - manual: "In the viewer select Status=blocked + Epic, paste the URL from the bar into a new window — same list, same count"

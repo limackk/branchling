@@ -14,8 +14,7 @@ created: 2026-08-29
 updated: 2026-08-29
 blocked_by: []
 blocks: []
-related_docs:
-  - backlog/README.md
+related_docs: []
 verification:
   - bash: "./scripts/worktrail new --title \"Test\" --priority P3  # number matches `worktrail next-id`"
   - bash: "node --test backlog/scripts/tests/new-task.test.mjs"
@@ -24,7 +23,7 @@ verification:
 ## Goal
 
 Close the last command from the list deferred in
-[TL-23](TL-23-worktrail-init-i-stats.md): creating a task from the template,
+[TL-23](TL-23-tasklog-init-i-stats.md): creating a task from the template,
 with a number, a slug, and filled-in frontmatter.
 
 ## Context

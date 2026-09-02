@@ -128,7 +128,7 @@ boards:
 vocabulary is indistinguishable from "that is how this project does it". So does
 an inconsistency: an archived status that is not in `statuses`, a board
 `default:` that is not in the list, a duplicated slug. The full list of keys:
-[`docs/backlog-config-and-portability.md`](docs/backlog-config-and-portability.md).
+[`docs/backlog-config-and-portability.md`](backlog-config-and-portability.md).
 
 ### The task id prefix
 

@@ -108,7 +108,7 @@ Decisions:
 - [x] The field is editable in the viewer, and a change writes a history entry — with no viewer code changes beyond the schema. [proof: field-schema]
 - [x] `query --role` filters; a task without a role does not disappear from general views. [proof: role-end-to-end]
 - [x] No role name appears in the code (a test in the spirit of the DEFAULTS genericity guard). [proof: field-schema]
-- [x] `worktrail take TL-NNNN` on a task whose role differs from the caller's declared role PASSES, and the event in `history/` records that the take was outside the role. This criterion came from [TL-87](TL-87-worktrail-next-atomowy-przydzial-taska-dla-agenta.md), where `take` was created: there was nothing to prove there yet, because the `role:` field did not exist yet. `take` deliberately does not have and will not get a role gate — the dispatcher gates it (TL-98), and an explicit human instruction outranks it. [proof: role-end-to-end]
+- [x] `worktrail take TL-NNNN` on a task whose role differs from the caller's declared role PASSES, and the event in `history/` records that the take was outside the role. This criterion came from [TL-87](TL-87-tasklog-next-atomowy-przydzial-taska-dla-agenta.md), where `take` was created: there was nothing to prove there yet, because the `role:` field did not exist yet. `take` deliberately does not have and will not get a role gate — the dispatcher gates it (TL-98), and an explicit human instruction outranks it. [proof: role-end-to-end]
 
 ## Log
 

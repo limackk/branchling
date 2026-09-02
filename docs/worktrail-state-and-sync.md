@@ -1,6 +1,6 @@
 # worktrail — state, synchronization and the boundary between modes
 
-**Status:** FOUNDATION IMPLEMENTED 2026-08-29 ([TL-21](../backlog/tasks/TL-21-fundament-logu-zdarzen-worktrail.md)) — **all 5 steps from §7 done; from §6, locks (TL-87, §6.1) and reading state across multiple branches (TL-73, §6.2) are done; §5 and the rest of §6 (reversing the direction, SQLite, the server) are still a project**
+**Status:** FOUNDATION IMPLEMENTED 2026-08-29 ([TL-21](../backlog/tasks/TL-21-fundament-logu-zdarzen-tasklog.md)) — **all 5 steps from §7 done; from §6, locks (TL-87, §6.1) and reading state across multiple branches (TL-73, §6.2) are done; §5 and the rest of §6 (reversing the direction, SQLite, the server) are still a project**
 **Concerns:** `backlog/` as the future `worktrail` tool (working name — [TL-20](../backlog/tasks/TL-20-domknij-nazwe-narzedzia-przed-publikacja.md))
 **Predecessors:** [backlog-field-editing-history.md](backlog-field-editing-history.md) (the field change log), [backlog-config-and-portability.md](backlog-config-and-portability.md) (separating code from data)
 
@@ -343,7 +343,7 @@ with agents, i.e. for the open-source core.
 
 ## 7. Schema decisions — cheap today, irreversible after the first outside user
 
-These points are in [TL-21](../backlog/tasks/TL-21-fundament-logu-zdarzen-worktrail.md).
+These points are in [TL-21](../backlog/tasks/TL-21-fundament-logu-zdarzen-tasklog.md).
 Why they are TOGETHER despite differing in weight: 1–3 pay off even if the
 server never gets built (they solve pain measured today), and 4–5 cost one
 line today, and after release — a migration of other people's data.

@@ -1,3 +1,6 @@
 {"id":"01M1DX1VJ5KRCM17NWDA1R0HKA","ts":"2026-09-01T07:13:34.277Z","task":"TL-45","field":"__created__","from":"","to":"Bramka na martwe linki i related_docs w dokumentach narzędzia","actor":"unknown","source":"boot"}
 {"id":"01M1GFKZK5GD20KCG2GWKNNGNT","ts":"2026-09-02T07:16:31.461Z","task":"TL-45","field":"title","from":"Bramka na martwe linki i related_docs w dokumentach narzędzia","to":"Gate on dead links and related_docs in the tool's documents","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK5HAAW8JJ5XAGWPE64","ts":"2026-09-02T07:16:31.461Z","task":"TL-45","field":"epic","from":"Backlog — publikacja open source","to":"Backlog — open source publication","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GXAEPMJ4T0SW0D40ZTVN8T","ts":"2026-09-02T11:15:59.316Z","task":"TL-45","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1GXAEPM8F8G7RX28CEMD6E2","ts":"2026-09-02T11:15:59.316Z","task":"TL-45","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1GXRD70Z40EAF46P50819MZ","ts":"2026-09-02T11:23:36.544Z","task":"TL-45","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

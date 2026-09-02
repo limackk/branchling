@@ -14,8 +14,7 @@ created: 2026-08-26
 updated: 2026-08-26
 blocked_by: []
 blocks: []
-related_docs:
-  - backlog/README.md
+related_docs: []
 verification:
   - bash: "node backlog/scripts/build-viewer.mjs"
   - manual: "Dashboard → \"Date range\" bar: presets 30/60/90/whole history + custom dates; charts, pace, balance, and lead time follow the range, while open/epics/distributions do not"

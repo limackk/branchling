@@ -58,6 +58,12 @@ const CHECK_USAGE = [
   "                       sees a task with no history. A backlog nobody has committed",
   "                       yet passes, and outside git the command says so rather than",
   "                       printing a tick it did not earn",
+  "  --docs               only whether a markdown link or a `related_docs` entry leads",
+  "                       to a file that exists. Judges the REPOSITORY holding the backlog",
+  "                       — top-level *.md, docs/ and the task files — because that is the",
+  "                       tree those paths resolve against. External URLs are not fetched,",
+  "                       an anchor does not break a path, and a `<repo>#<path>` reference",
+  "                       to another repository is skipped by a rule, not by accident",
   "  --reasons            only which recorded transitions into a status named by",
   "                       `reason_required_statuses` carry no reason. It REPORTS and never",
   "                       fails: the gaps it finds are in the past, and the rule is enforced",
@@ -757,7 +763,7 @@ function runScript(script, args, colorForce = null) {
  * evidential force. The dispatcher supplies the mode so that nobody has to
  * remember it.
  */
-const CHECK_FLAGS = ["--dir", "--id-collisions", "--boards", "--refs", "--criteria", "--reasons", "--history", "--vocabulary", "--plan", "--language", "--product-name"];
+const CHECK_FLAGS = ["--dir", "--id-collisions", "--boards", "--refs", "--criteria", "--reasons", "--history", "--docs", "--vocabulary", "--plan", "--language", "--product-name"];
 
 /** PURE — resolves `check`'s arguments. Throws on a usage error. */
 export function parseCheckArgs(args) {
@@ -768,6 +774,7 @@ export function parseCheckArgs(args) {
   let wantCriteria = false;
   let wantReasons = false;
   let wantHistory = false;
+  let wantDocs = false;
   let wantVocabulary = false;
   let wantPlan = false;
   let wantLanguage = false;
@@ -787,6 +794,7 @@ export function parseCheckArgs(args) {
     if (a === "--criteria") { wantCriteria = true; continue; }
     if (a === "--reasons") { wantReasons = true; continue; }
     if (a === "--history") { wantHistory = true; continue; }
+    if (a === "--docs") { wantDocs = true; continue; }
     if (a === "--vocabulary") { wantVocabulary = true; continue; }
     if (a === "--plan") { wantPlan = true; continue; }
     if (a === "--language") { wantLanguage = true; continue; }
@@ -813,12 +821,12 @@ export function parseCheckArgs(args) {
   // (BL-1451): a dangling reference passed `check`, because `check` checked only
   // what somebody had once written into it.
   if (!wantIds && !wantBoards && !wantRefs && !wantCriteria && !wantReasons && !wantHistory &&
-      !wantVocabulary && !wantPlan && !wantLanguage && !wantProductName) {
+      !wantDocs && !wantVocabulary && !wantPlan && !wantLanguage && !wantProductName) {
     wantIds = true; wantBoards = true; wantRefs = true; wantCriteria = true; wantReasons = true;
-    wantHistory = true;
+    wantHistory = true; wantDocs = true;
     wantVocabulary = true; wantPlan = true; wantLanguage = true; wantProductName = true;
   }
-  return { dir, wantIds, wantBoards, wantRefs, wantCriteria, wantReasons, wantHistory, wantVocabulary, wantPlan, wantLanguage, wantProductName, files };
+  return { dir, wantIds, wantBoards, wantRefs, wantCriteria, wantReasons, wantHistory, wantDocs, wantVocabulary, wantPlan, wantLanguage, wantProductName, files };
 }
 
 function runCheck(args) {
@@ -884,6 +892,13 @@ function runCheck(args) {
     // outside the backlog directory at all — and why it says so when there is no
     // git to ask.
     worst = Math.max(worst, runScript("check-backlog-history-tracked.mjs", ["--dir", join(tasksDir, "..")]));
+  }
+  if (plan.wantDocs) {
+    // The backlog directory, like the guards above — but this one judges the
+    // REPOSITORY that contains it, not this installation: a `related_docs` entry
+    // resolves against the consumer's tree, and their README is part of the same
+    // navigation an agent moves through.
+    worst = Math.max(worst, runScript("check-docs-links.mjs", ["--dir", join(tasksDir, "..")]));
   }
   if (plan.wantVocabulary) {
     // The backlog directory through --dir, like the reference guard: it judges the

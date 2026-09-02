@@ -32,7 +32,7 @@ publication**, because after the first merged PR this decision stops being
 possible to make unilaterally.
 
 This is a DECISION task, like
-[TL-81](TL-81-kanaly-dystrybucji-i-kolizja-nazwy-worktrail-w-npx.md). The
+[TL-81](TL-81-kanaly-dystrybucji-i-kolizja-nazwy-tasklog-w-npx.md). The
 deliverable is a recorded choice with a rationale, not code.
 
 ## Context
@@ -70,7 +70,7 @@ paid side.
 1. `backlog/tasks/TL-48-*.md`, `## Log` section — the full license analysis
    from 2026-09-01, including the arguments that were REJECTED and why. Do
    not repeat that work.
-2. [TL-81](TL-81-kanaly-dystrybucji-i-kolizja-nazwy-worktrail-w-npx.md) — the
+2. [TL-81](TL-81-kanaly-dystrybucji-i-kolizja-nazwy-tasklog-w-npx.md) — the
    name as an asset; with a cloud service, the trademark is the only thing
    protecting against a fork standing next to it.
 3. [TL-53](TL-53-ci-contributing-i-szablony-zgloszen-przed-publikacja.md) —

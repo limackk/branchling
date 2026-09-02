@@ -90,7 +90,7 @@ applies here just the same.
 5. The label, board and epic vocabulary: show that it is the project's
    `config.yaml`, and give an example NOT tied to any existing repository.
 6. Paste CLI output examples in only at the end — after
-   [TL-51](TL-51-worktrail-komenda-help-oblewa-w-8-z-12-komend.md) and
+   [TL-51](TL-51-tasklog-komenda-help-oblewa-w-8-z-12-komend.md) and
    [TL-52](TL-52-kolor-i-spojne-komunikaty-cli-w-jednym-module-ui-mjs.md),
    otherwise they will need rewriting a second time.
 7. Move internal material (the protocol for an agent, the protocol for the

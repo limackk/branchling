@@ -55,7 +55,7 @@ being written next to the field.
 This task is cheap and highly scored precisely because it adds no mechanism.
 It changes text in a single template — and here, text is the interface.
 
-A dependency worth knowing about: `worktrail doctor` ([TL-62](TL-62-worktrail-doctor-jedna-odpowiedz-czy-backlog-jest-ustawiony.md))
+A dependency worth knowing about: `worktrail doctor` ([TL-62](TL-62-tasklog-doctor-jedna-odpowiedz-czy-backlog-jest-ustawiony.md))
 answers the same question after the fact. This task answers it **before** —
 and that is why both make sense, and neither replaces the other.
 

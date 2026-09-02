@@ -55,7 +55,7 @@ Two sentences, both in files a user reads, are false today:
   indistinguishable from 'this project just works that way', and costs the
   same as a typo in a CLI flag."
 
-This is the same class the project closed for CLI flags ([TL-25](TL-25-domknij-walidacje-flag-w-5-komendach-worktrail.md)):
+This is the same class the project closed for CLI flags ([TL-25](TL-25-domknij-walidacje-flag-w-5-komendach-tasklog.md)):
 a silent no-op looks like it worked. Here it hurts more, because editing
 `config.yaml` is the **main act of onboarding** — it is where the user fits
 the tool to their project, and where they most need feedback.
@@ -74,7 +74,7 @@ Both tasks touch the same read path, so it is worth doing them back to back.
 
 1. `scripts/config.mjs` — `loadConfig()` (lines ~248–322), `parseConfigYaml()`, `validateConfig()`.
 2. Every call to `loadConfig(` outside `config.mjs` — there are twelve, each with its own reason.
-3. [TL-25](TL-25-domknij-walidacje-flag-w-5-komendach-worktrail.md) — the same rule for CLI flags.
+3. [TL-25](TL-25-domknij-walidacje-flag-w-5-komendach-tasklog.md) — the same rule for CLI flags.
 4. [TL-47](TL-47-brak-backlogu-wychodzi-jako-nieobsluzony-wyjatek-ze-stack.md) — the other half of the problem: an anticipated state should not exit with a stack trace.
 
 ## Steps

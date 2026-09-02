@@ -16,7 +16,6 @@ blocked_by: []
 blocks: [TL-17]
 related_docs:
   - docs/backlog-field-editing-history.md
-  - backlog/README.md
 verification:
   - bash: "node --test backlog/scripts/tests/task-fields.test.mjs"
   - manual: "In the viewer (backlog) click Owner in the task detail, type a value, Tab — field saved to .md, INDEX.yaml regenerated"

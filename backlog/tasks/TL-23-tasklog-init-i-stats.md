@@ -15,7 +15,6 @@ updated: 2026-08-29
 blocked_by: []
 blocks: []
 related_docs:
-  - backlog/README.md
   - docs/worktrail-state-and-sync.md
 verification:
   - bash: "./scripts/worktrail init --dir /tmp/x && ./scripts/worktrail build --dir /tmp/x && ./scripts/worktrail stats --dir /tmp/x"
@@ -25,7 +24,7 @@ verification:
 
 ## Goal
 
-Close out the two commands deferred in [TL-22](TL-22-worktrail-dispatcher-komend.md)
+Close out the two commands deferred in [TL-22](TL-22-tasklog-dispatcher-komend.md)
 as "require extracting the dashboard core": `init` (creating a new backlog)
 and `stats` (its state in the terminal).
 

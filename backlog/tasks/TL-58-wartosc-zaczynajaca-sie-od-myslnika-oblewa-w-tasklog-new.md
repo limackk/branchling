@@ -63,7 +63,7 @@ instead of a day.
 
 1. `scripts/new-task.mjs` — `FLAGS`, `parseArgs()`.
 2. `scripts/query.mjs` — a second flag parser, the same condition to check.
-3. [TL-25](TL-25-domknij-walidacje-flag-w-5-komendach-worktrail.md) — why an unknown flag fails; this rule stays untouched.
+3. [TL-25](TL-25-domknij-walidacje-flag-w-5-komendach-tasklog.md) — why an unknown flag fails; this rule stays untouched.
 
 ## Steps
 

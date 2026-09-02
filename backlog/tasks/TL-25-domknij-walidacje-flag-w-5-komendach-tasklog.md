@@ -14,8 +14,7 @@ created: 2026-08-30
 updated: 2026-08-30
 blocked_by: []
 blocks: []
-related_docs:
-  - backlog/README.md
+related_docs: []
 verification:
   - bash: "worktrail history --frobnicate  # should FAIL, today it does a full reconciliation"
   - bash: "worktrail build --frobnicate     # should FAIL, today it ignores it and builds"

@@ -56,11 +56,11 @@ measured pitfall:
 | `config.yaml` parses, keys are known | [TL-60](TL-60-literowka-w-config-yaml-przelatuje-przez-build-i-check.md) |
 | vocabularies are consistent (`archived_statuses` ⊆ `statuses`, etc.) | works today, collect it |
 | values in tasks fit within the vocabularies | [TL-56](TL-56-slownik-types-w-config-yaml-rozjechal-sie-z-drzewem.md) |
-| the prefix from the configuration matches the tree | [TL-61](TL-61-rozjazd-prefiksu-nie-zatrzymuje-worktrail-new.md) |
+| the prefix from the configuration matches the tree | [TL-61](TL-61-rozjazd-prefiksu-nie-zatrzymuje-tasklog-new.md) |
 | views are ignored by git | [TL-59](TL-59-ko-lokacja-widoki-nie-sa-ignorowane-w-istniejacym-repo.md) |
 | `history/*.jsonl` has `merge=union` | TL-59 |
 | backlog guards (`check`) | exists |
-| hooks installed or not | [TL-46](TL-46-worktrail-init-hooks-bramka-ktora-sama-sie-instaluje-u.md) |
+| hooks installed or not | [TL-46](TL-46-tasklog-init-hooks-bramka-ktora-sama-sie-instaluje-u.md) |
 | how many tasks, in which statuses, what's next | exists in `stats` |
 
 **A boundary that must not be crossed: `doctor` fixes nothing.** A command

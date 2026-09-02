@@ -66,7 +66,7 @@ colors, symbols, the anatomy of an error, the layout of help — lives in
 implements it rather than inventing it anew.
 
 **Order relative to
-[TL-51](TL-51-worktrail-komenda-help-oblewa-w-8-z-12-komend.md):** help has
+[TL-51](TL-51-tasklog-komenda-help-oblewa-w-8-z-12-komend.md):** help has
 to exist first, then it gets to look good. The reverse order would mean
 designing the layout of text that does not exist in eight commands.
 

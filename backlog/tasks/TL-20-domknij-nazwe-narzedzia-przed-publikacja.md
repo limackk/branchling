@@ -16,7 +16,6 @@ blocked_by: []
 blocks: []
 related_docs:
   - docs/backlog-config-and-portability.md
-  - backlog/README.md
 verification:
   - bash: "curl -s -o /dev/null -w '%{http_code}' https://registry.npmjs.org/tasklog   # 404 = name still free"
   - manual: "The name confirmed OR changed everywhere: scripts/tasklog, package.json, README §2.1, the alias in ~/.zshrc"

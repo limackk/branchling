@@ -16,7 +16,6 @@ blocked_by: []
 blocks: [TL-19]
 related_docs:
   - docs/backlog-config-and-portability.md
-  - backlog/README.md
   - origin#qa/backlog-config-portability.yaml
 verification:
   - bash: "node --test backlog/scripts/tests/paths.test.mjs"

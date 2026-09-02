@@ -4,3 +4,4 @@
 {"id":"01M1E69RE2QBDNTWEGC77P372D","ts":"2026-09-01T09:55:10.402Z","task":"TL-26","field":"epic","from":"tasklog — narzędzie","to":"worktrail — narzędzie","actor":"unknown","source":"external"}
 {"id":"01M1GFKZK5NMMQD06TBRJYFGSC","ts":"2026-09-02T07:16:31.461Z","task":"TL-26","field":"title","from":"next-backlog-id.mjs nie znajduje niczego, gdy backlog jest korzeniem repozytorium git","to":"next-backlog-id.mjs finds nothing when the backlog is the git repository root","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK5HX17QG9TY8EBNG38","ts":"2026-09-02T07:16:31.461Z","task":"TL-26","field":"epic","from":"worktrail — narzędzie","to":"worktrail — the tool","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GXGYZEZV0ZAXBJAG385AGN","ts":"2026-09-02T11:19:32.590Z","task":"TL-26","field":"related_docs","from":["backlog/README.md"],"to":[],"actor":"unknown","source":"external","reason":"unknown"}

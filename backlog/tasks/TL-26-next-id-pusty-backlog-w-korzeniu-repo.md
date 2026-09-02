@@ -14,8 +14,7 @@ created: 2026-08-30
 updated: 2026-08-30
 blocked_by: []
 blocks: []
-related_docs:
-  - backlog/README.md
+related_docs: []
 verification:
   - bash: "mkdir /tmp/x && cd /tmp/x && git init -q && node <path>/init-backlog.mjs --dir . && echo 'id: BL-1' > tasks/BL-1-x.md && git add -A && git commit -qm x && node <path>/next-backlog-id.mjs --dir . --explain  # should show BL-1, today: “no BL-* found AT ALL”"
 ---
@@ -28,7 +27,7 @@ nothing and exits with an error — even though tasks exist and are committed.
 
 ## Context
 
-Found while writing tests for [TL-25](TL-25-domknij-walidacje-flag-w-5-komendach-worktrail.md)
+Found while writing tests for [TL-25](TL-25-domknij-walidacje-flag-w-5-komendach-tasklog.md)
 (flag validation) — a separate, unrelated defect in the same file.
 
 Cause — `BACKLOG_REL`:
@@ -49,7 +48,7 @@ which does not exist (the tasks are directly in `<root>/tasks`). Zero numbers
 in the union → `exit 2`, "found NO BL-* at all."
 
 **Why this is not theoretical:** this is exactly the layout that
-[TL-23](TL-23-worktrail-init-i-stats.md) leads to — `worktrail init --dir .`
+[TL-23](TL-23-tasklog-init-i-stats.md) leads to — `worktrail init --dir .`
 in a freshly created open-source repository, where the backlog IS the whole
 repo, not a subdirectory of a workspace (as in the origin project). The first `worktrail
 new` in such a repo would get `BL-1` from the fallback local path instead of

@@ -16,7 +16,6 @@ blocked_by: [TL-16]
 blocks: []
 related_docs:
   - docs/backlog-field-editing-history.md
-  - backlog/README.md
   - origin#qa/backlog-field-editing-history.yaml
 verification:
   - bash: "node --test backlog/scripts/tests/history.test.mjs"

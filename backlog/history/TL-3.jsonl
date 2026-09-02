@@ -1,2 +1,3 @@
 {"id":"01M1B42152590PCRDFY1MVZVRE","ts":"2026-08-31T05:18:16.738Z","task":"TL-3","field":"__created__","from":"","to":"Interaktywne wykresy dashboardu — dymek z danymi pod kursorem","actor":"unknown","source":"boot"}
 {"id":"01M1GFKZK5WA0DWNS8M03M39T4","ts":"2026-09-02T07:16:31.461Z","task":"TL-3","field":"title","from":"Interaktywne wykresy dashboardu — dymek z danymi pod kursorem","to":"Interactive dashboard charts — a tooltip with data under the cursor","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GXGYZE19YEZMSX1JYX3WR2","ts":"2026-09-02T11:19:32.590Z","task":"TL-3","field":"related_docs","from":["backlog/README.md"],"to":[],"actor":"unknown","source":"external","reason":"unknown"}

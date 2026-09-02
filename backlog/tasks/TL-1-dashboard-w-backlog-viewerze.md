@@ -14,8 +14,7 @@ created: 2026-08-26
 updated: 2026-08-26
 blocked_by: []
 blocks: []
-related_docs:
-  - backlog/README.md
+related_docs: []
 verification:
   - bash: "node backlog/scripts/build-viewer.mjs"
   - manual: "backlog → \"Dashboard\" tab (or viewer.html#dashboard): KPIs, cumulative chart, day-by-day, epic table, distributions, attention lists, forecast"

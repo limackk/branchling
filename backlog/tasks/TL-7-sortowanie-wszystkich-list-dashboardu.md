@@ -14,8 +14,7 @@ created: 2026-08-26
 updated: 2026-08-26
 blocked_by: []
 blocks: []
-related_docs:
-  - backlog/README.md
+related_docs: []
 verification:
   - bash: "node backlog/scripts/build-viewer.mjs"
   - manual: "Dashboard → 13 sort controls: tables (epics, age) via headers, lists and bars via the „sort:" bar; the „order" option reverts to the natural order"

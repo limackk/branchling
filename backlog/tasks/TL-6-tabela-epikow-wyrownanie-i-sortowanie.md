@@ -14,8 +14,7 @@ created: 2026-08-26
 updated: 2026-08-26
 blocked_by: []
 blocks: []
-related_docs:
-  - backlog/README.md
+related_docs: []
 verification:
   - bash: "node backlog/scripts/build-viewer.mjs"
   - manual: "Dashboard → Epics table: numbers sit under their headers; clicking a header sorts, clicking again reverses it; \"(no epic)\" stays at the bottom"

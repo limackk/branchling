@@ -2,13 +2,13 @@
 
 **Status:** PLANNED 2026-09-01
 ([TL-113](../backlog/tasks/TL-113-pole-executor-wymog-czlowieka-egzekwowany-w-dyspozytorze.md),
-[TL-114](../backlog/tasks/TL-114-zdarzenie-decision-i-komenda-worktrail-decide.md),
+[TL-114](../backlog/tasks/TL-114-zdarzenie-decision-i-komenda-tasklog-decide.md),
 [TL-115](../backlog/tasks/TL-115-panel-decyzyjny-w-viewerze-co-czeka-na-czlowieka.md),
 [TL-116](../backlog/tasks/TL-116-graf-zmian-taska-w-viewerze-z-osi-historii.md))
 **Builds on:** roles and handoff
 ([TL-97](../backlog/tasks/TL-97-pole-role-taska-wymog-roli-ze-slownika-konfiguracji.md),
 [TL-98](../backlog/tasks/TL-98-role-w-dyspozytorze-i-petli-next-role-agent-per-rola.md),
-[TL-99](../backlog/tasks/TL-99-worktrail-handoff-przekazanie-taska-z-powodem-i-sladem.md))
+[TL-99](../backlog/tasks/TL-99-tasklog-handoff-przekazanie-taska-z-powodem-i-sladem.md))
 and the history mechanism ([backlog-field-editing-history.md](backlog-field-editing-history.md)).
 
 ---

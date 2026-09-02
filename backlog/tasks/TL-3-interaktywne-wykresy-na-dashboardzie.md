@@ -14,8 +14,7 @@ created: 2026-08-26
 updated: 2026-08-26
 blocked_by: []
 blocks: []
-related_docs:
-  - backlog/README.md
+related_docs: []
 verification:
   - bash: "node backlog/scripts/build-viewer.mjs"
   - manual: "Dashboard → hover over the cumulative, daily and focus burndown charts: crosshair/bar highlight + a tooltip with the date, all series and the context row"

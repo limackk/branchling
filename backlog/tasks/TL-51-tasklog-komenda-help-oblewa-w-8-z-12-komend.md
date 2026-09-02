@@ -40,7 +40,7 @@ twelve commands in the `COMMANDS` table:
 | works, but prints the module's source comment — including the `#!/usr/bin/env node` line | `query` |
 | not checked (would start a server) | `serve` |
 
-**Where this came from.** [TL-25](TL-25-domknij-walidacje-flag-w-5-komendach-worktrail.md)
+**Where this came from.** [TL-25](TL-25-domknij-walidacje-flag-w-5-komendach-tasklog.md)
 closed off flag validation in five commands — rightly, because a silent
 no-op looks like it worked. But the list of allowed flags did not include
 `--help`, so a good change turned the help flag into a usage error. This is a
@@ -67,7 +67,7 @@ loop.
 
 1. `scripts/cli.mjs` — `COMMANDS` (the `usage` field is already in the table), `HELP_FLAGS`, `runScript`.
 2. `scripts/query.mjs` — the flag validation pattern and today's `--help` handling.
-3. [TL-25](TL-25-domknij-walidacje-flag-w-5-komendach-worktrail.md) — why an unknown flag fails; this rule stays.
+3. [TL-25](TL-25-domknij-walidacje-flag-w-5-komendach-tasklog.md) — why an unknown flag fails; this rule stays.
 4. `.claude/skills/worktrail-cli/references/output-style.md` §7 — the help layout.
 
 ## Steps

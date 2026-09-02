@@ -5,3 +5,4 @@
 {"id":"01M1E69RE2AVT992V89E4XH86A","ts":"2026-09-01T09:55:10.402Z","task":"TL-25","field":"epic","from":"tasklog — narzędzie","to":"worktrail — narzędzie","actor":"unknown","source":"external"}
 {"id":"01M1GFKZK5B0HQ7X96RRCEEMVJ","ts":"2026-09-02T07:16:31.461Z","task":"TL-25","field":"title","from":"Domknij walidację flag w 5 komendach worktrail (build/viewer/next-id/board/history)","to":"Closing the flag validation gap in 5 worktrail commands (build/viewer/next-id/board/history)","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK58RNFS1K0CCW025V4","ts":"2026-09-02T07:16:31.461Z","task":"TL-25","field":"epic","from":"worktrail — narzędzie","to":"worktrail — the tool","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GXGYZECTM49Z8WV5C8PBAS","ts":"2026-09-02T11:19:32.590Z","task":"TL-25","field":"related_docs","from":["backlog/README.md"],"to":[],"actor":"unknown","source":"external","reason":"unknown"}
