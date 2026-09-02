@@ -33,7 +33,14 @@ import { auditLogStatus, lastLoggedStatus } from "../check-backlog-log-status.mj
 import { diagnose } from "../doctor.mjs";
 import { loadConfig } from "../config.mjs";
 import { parseCheckArgs } from "../cli.mjs";
-import { BACKLOG_DIR, TASKS_DIR } from "./_repo.mjs";
+import { BACKLOG_DIR, isolateHome, TASKS_DIR } from "./_repo.mjs";
+
+// THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
+// file in its own process, so one call covers every case in it. Without this a
+// test reads the DEVELOPER's `<config>/config.yaml` — their actor, their model
+// endpoint — and the suite answers differently on different machines.
+isolateHome("log-status-agreement");
+
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CLI = join(HERE, "..", "cli.mjs");

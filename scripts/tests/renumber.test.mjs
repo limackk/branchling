@@ -33,7 +33,14 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, exist
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { SCRIPTS_DIR } from "./_repo.mjs";
+import { isolateHome, SCRIPTS_DIR } from "./_repo.mjs";
+
+// THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
+// file in its own process, so one call covers every case in it. Without this a
+// test reads the DEVELOPER's `<config>/config.yaml` — their actor, their model
+// endpoint — and the suite answers differently on different machines.
+isolateHome("renumber");
+
 import { FIELD_CREATED, FIELD_DELETED, MIGRATIONS_FILE, applyIdMigrations, readMigrations, reconcile } from "../history.mjs";
 import { EXAMPLE_MARKER, planRenumber, rewriteIds, rewriteHistoryFile } from "../renumber.mjs";
 

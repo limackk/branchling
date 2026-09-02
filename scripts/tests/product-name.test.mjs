@@ -28,6 +28,14 @@ import {
 } from "../check-product-name.mjs";
 import { BLOCK_MARKER_NAME, PRODUCT_NAME } from "../product.mjs";
 
+import { isolateHome } from "./_repo.mjs";
+
+// THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
+// file in its own process, so one call covers every case in it. Without this a
+// test reads the DEVELOPER's `<config>/config.yaml` — their actor, their model
+// endpoint — and the suite answers differently on different machines.
+isolateHome("product-name");
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, "..", "..");
 const GUARD = join(ROOT, "scripts", "check-product-name.mjs");

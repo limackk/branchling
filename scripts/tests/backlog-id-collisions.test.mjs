@@ -22,7 +22,14 @@ import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { TASKS_DIR } from "./_repo.mjs";
+import { isolateHome, TASKS_DIR } from "./_repo.mjs";
+
+// THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
+// file in its own process, so one call covers every case in it. Without this a
+// test reads the DEVELOPER's `<config>/config.yaml` — their actor, their model
+// endpoint — and the suite answers differently on different machines.
+isolateHome("backlog-id-collisions");
+
 
 const SCRIPT = join(
   dirname(fileURLToPath(import.meta.url)),

@@ -13,8 +13,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P2                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
@@ -28,7 +28,7 @@ verification:                      # HOW to check the task is really done
   - id: every-file-isolates
     bash: "node --test scripts/tests/test-hygiene.test.mjs"
   - id: suite-under-a-hostile-home
-    bash: "d=$(mktemp -d) && mkdir -p \"$d/config\" && printf 'actor: local:hostile\\n' > \"$d/config/config.yaml\" && WORKTRAIL_HOME=\"$d\" node --test scripts/tests/*.test.mjs > /dev/null"
+    bash: "d=$(mktemp -d) && mkdir -p \"$d/config\" && printf 'actor: local:hostile\\neditor: /bin/false\\ntheme: dark\\nport: 9999\\ndate_format: local\\nllm_endpoint: http://127.0.0.1:1\\nllm_model: nonexistent\\nllm_retries: 0\\nllm_timeout_seconds: 1\\n' > \"$d/config/config.yaml\" && WORKTRAIL_HOME=\"$d\" node --test scripts/tests/*.test.mjs > /dev/null"
   - id: suite
     bash: "node --test scripts/tests/*.test.mjs > /dev/null"
 ---
@@ -95,9 +95,9 @@ which is why it is a verification entry and not a note.
 
 ## Acceptance criteria
 
-- [ ] The whole suite is green with `WORKTRAIL_HOME` pointing at a config file that sets `actor:`. [proof: suite-under-a-hostile-home]
-- [ ] A new test file that spawns the CLI without isolating the home FAILS the guard, and the guard has a positive control proving it can fail. [proof: every-file-isolates]
-- [ ] The suite stays green on a machine with no preferences at all. [proof: suite]
+- [x] The whole suite is green with `WORKTRAIL_HOME` pointing at a config file that sets EVERY user preference, not only `actor:`. [proof: suite-under-a-hostile-home]
+- [x] A new test file that spawns the CLI without isolating the home FAILS the guard, and the guard has a positive control proving it can fail. [proof: every-file-isolates]
+- [x] The suite stays green on a machine with no preferences at all. [proof: suite]
 - [ ] The choice between a guard and isolation-by-default is written in this file, with the reason.
 
 ## Notes
@@ -107,3 +107,40 @@ which is why it is a verification entry and not a note.
   verification.
 - `home.test.mjs` and `registry.test.mjs` read a home on purpose. They are the
   reason a blanket rule needs an opt-out rather than an exception list.
+
+## Decisions
+
+**A guard, with the rule made UNIFORM — every test file isolates.** Neither of
+the two candidates was taken as written. The narrow rule ("only the files that
+spawn the CLI or touch the activity log") needs the guard to detect "spawns the
+CLI" by reading source text, and it misses a file that merely imports a module
+which reads the home in-process; a rule with a hole is worse than a broad rule,
+because the hole is where the next file lands. Isolation as an import side
+effect of `_repo.mjs` was rejected outright: 39 of 88 files import it, so it is
+not a complete answer, and a module that changes global state on import
+surprises exactly when it is least affordable. 74 files gained one call; `node
+--test` runs each file in its own process, so one call per file covers every
+case in it and no case can be forgotten individually.
+
+**No exceptions were needed.** `home.test.mjs` and `registry.test.mjs` were
+expected to want a real home; they do not — every case in both injects `env`
+explicitly, so isolating the process is harmless and strictly safer. The
+allow-marker exists anyway, because a rule with no way out gets weakened rather
+than exempted, and it is spelled the way the language and product-name guards
+spell theirs.
+
+**The contract was STRENGTHENED, not satisfied.** As written, the hostile home
+set only `actor:` — and the suite was already green under it before a line was
+changed, because most tests pass `--actor` explicitly. A proof that passes
+before the work is a proof with no evidentiary force. The entry now sets every
+key in `USER_DEFAULTS`, and under that home one test really did fail:
+`seed-adapter.test.mjs` asserts the message you get when NO model is configured,
+and its own comment said "no `llm_endpoint` is configured in this test
+environment" — an assumption about the developer's machine written down as if it
+were a fact about the suite. On anyone running a local model it would have
+failed, and nothing would have said why. That is the measurement step 1 asked
+for: one file, found by making the hazard real.
+
+**The guard checks for the CALL, not the import.** Importing the helper and
+never calling it is the shape a careless edit leaves behind, and it satisfies
+any rule written about imports. The positive control includes that case.

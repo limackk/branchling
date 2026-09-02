@@ -23,6 +23,14 @@ import assert from "node:assert/strict";
 import { decisionPanel, minePanel, unblocksCount } from "../decision-panel.mjs";
 import { FIELD_COMMENT, FIELD_DECISION } from "../task-fields.mjs";
 
+import { isolateHome } from "./_repo.mjs";
+
+// THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
+// file in its own process, so one call covers every case in it. Without this a
+// test reads the DEVELOPER's `<config>/config.yaml` — their actor, their model
+// endpoint — and the suite answers differently on different machines.
+isolateHome("decision-panel");
+
 const ARCHIVED = ["shipped"];
 const task = (over) => ({
   id: "FX-0", title: "", status: "queued", priority: "P2", owner: "", role: "",

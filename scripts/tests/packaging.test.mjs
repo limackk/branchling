@@ -26,7 +26,14 @@ import { looksLikeBacklogDir, resolveBacklogDir } from "../paths.mjs";
 import { PRODUCT_NAME, PRODUCT_VERSION, MANIFEST_PATH, readManifest } from "../product.mjs";
 import { versionText, helpText } from "../cli.mjs";
 
-import { REPO_ROOT as PKG_ROOT } from "./_repo.mjs";
+import { isolateHome, REPO_ROOT as PKG_ROOT } from "./_repo.mjs";
+
+// THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
+// file in its own process, so one call covers every case in it. Without this a
+// test reads the DEVELOPER's `<config>/config.yaml` — their actor, their model
+// endpoint — and the suite answers differently on different machines.
+isolateHome("packaging");
+
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BIN = join(PKG_ROOT, "bin", "worktrail.mjs");

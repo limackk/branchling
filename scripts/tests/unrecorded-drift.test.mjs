@@ -28,7 +28,14 @@ import { join } from "node:path";
 
 import { SNAPSHOT_FILE, reconcile } from "../history.mjs";
 import { diagnose } from "../doctor.mjs";
-import { SCRIPTS_DIR } from "./_repo.mjs";
+import { isolateHome, SCRIPTS_DIR } from "./_repo.mjs";
+
+// THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
+// file in its own process, so one call covers every case in it. Without this a
+// test reads the DEVELOPER's `<config>/config.yaml` — their actor, their model
+// endpoint — and the suite answers differently on different machines.
+isolateHome("unrecorded-drift");
+
 
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
 

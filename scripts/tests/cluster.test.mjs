@@ -26,6 +26,14 @@ import assert from "node:assert/strict";
 
 import { clusterHeartbeats, engagedReport, engagedTime, unionMinutes } from "../cluster.mjs";
 
+import { isolateHome } from "./_repo.mjs";
+
+// THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
+// file in its own process, so one call covers every case in it. Without this a
+// test reads the DEVELOPER's `<config>/config.yaml` — their actor, their model
+// endpoint — and the suite answers differently on different machines.
+isolateHome("cluster");
+
 const T0 = Date.parse("2026-09-02T09:00:00.000Z");
 
 /** One heartbeat, `m` minutes after the reference instant. */

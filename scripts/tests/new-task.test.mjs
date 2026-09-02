@@ -24,6 +24,14 @@ import { fileURLToPath } from "node:url";
 import { slugify } from "../new-task.mjs";
 import { DEFAULT_TASK_ID_PREFIX as P, taskIdPatterns } from "../task-id.mjs";
 
+import { isolateHome } from "./_repo.mjs";
+
+// THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
+// file in its own process, so one call covers every case in it. Without this a
+// test reads the DEVELOPER's `<config>/config.yaml` — their actor, their model
+// endpoint — and the suite answers differently on different machines.
+isolateHome("new-task");
+
 // The patterns come from the tool's own FUNCTIONS, not retyped in the test — a
 // bywa cichym „prawie tym samym" (BL-1452).
 const PAT = taskIdPatterns(P);

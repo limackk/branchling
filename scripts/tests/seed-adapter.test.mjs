@@ -35,6 +35,14 @@ import {
   planSchema, producePlan, renderPrompt, seedValidator,
 } from "../seed-adapter.mjs";
 
+import { isolateHome } from "./_repo.mjs";
+
+// THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
+// file in its own process, so one call covers every case in it. Without this a
+// test reads the DEVELOPER's `<config>/config.yaml` — their actor, their model
+// endpoint — and the suite answers differently on different machines.
+isolateHome("seed-adapter");
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CLI = join(HERE, "..", "cli.mjs");
 
@@ -296,8 +304,11 @@ test("a plan on a PIPE seeds the backlog — the surface other people's adapters
 test("`seed --from` needs a model, and says so instead of failing obscurely", () => {
   const dir = backlog();
   writeFileSync(join(dir, "spec.md"), "A project that does a thing.\n", "utf8");
-  // No `llm_endpoint` is configured in this test environment, so this exercises
-  // the message somebody hits on their first try.
+  // The isolated home has no `llm_endpoint`, so this exercises the message
+  // somebody hits on their first try. It used to say "no endpoint is configured
+  // in this test environment", which was an assumption about the DEVELOPER's
+  // machine written down as if it were a fact about the suite — and it was the
+  // one case a hostile home actually broke (TL-166).
   const r = run(["seed", "--dir", dir, "--from", join(dir, "spec.md")]);
   assert.notEqual(r.status, 0);
   assert.match(r.stderr, /no model is configured|llm_endpoint/);

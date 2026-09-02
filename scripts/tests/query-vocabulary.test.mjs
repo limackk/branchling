@@ -26,7 +26,14 @@ import { join } from "node:path";
 
 import { unknownFilterValues } from "../task-select.mjs";
 import { loadConfig } from "../config.mjs";
-import { SCRIPTS_DIR, alignTemplate } from "./_repo.mjs";
+import { alignTemplate, isolateHome, SCRIPTS_DIR } from "./_repo.mjs";
+
+// THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
+// file in its own process, so one call covers every case in it. Without this a
+// test reads the DEVELOPER's `<config>/config.yaml` — their actor, their model
+// endpoint — and the suite answers differently on different machines.
+isolateHome("query-vocabulary");
+
 
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
 

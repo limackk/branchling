@@ -21,7 +21,14 @@ import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { SCRIPTS_DIR as SCRIPTS, BACKLOG_DIR, TASKS_DIR } from "./_repo.mjs";
+import { BACKLOG_DIR, isolateHome, SCRIPTS_DIR as SCRIPTS, TASKS_DIR } from "./_repo.mjs";
+
+// THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
+// file in its own process, so one call covers every case in it. Without this a
+// test reads the DEVELOPER's `<config>/config.yaml` — their actor, their model
+// endpoint — and the suite answers differently on different machines.
+isolateHome("boards");
+
 import { loadConfig } from "../config.mjs";
 import { taskIdPatterns } from "../task-id.mjs";
 
