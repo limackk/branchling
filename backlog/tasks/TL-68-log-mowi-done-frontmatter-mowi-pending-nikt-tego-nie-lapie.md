@@ -6,20 +6,25 @@ labels: [pre-launch]
 board: main
 epic: "Data integrity"
 priority: P2
-status: pending
-owner: unassigned
+status: done
+owner: agent:claude
 estimate: 2h
 confidence: high
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-02
 blocked_by: []
 blocks: []
 related_docs:
   - docs/backlog-field-editing-history.md
 verification:
-  - bash: "node --test scripts/tests/log-status-agreement.test.mjs"
-  - bash: "node scripts/cli.mjs check"
-  - bash: "node scripts/cli.mjs doctor --json | node -e \"let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const r=JSON.parse(s);const row=r.checks.find(c=>c.id==='log-status');if(!row){console.error('no log-status row in doctor');process.exit(1)}console.log('doctor knows about this drift — OK')})\""
+  - id: suite
+    bash: "node --test scripts/tests/log-status-agreement.test.mjs"
+  - id: wired
+    bash: "node scripts/cli.mjs check"
+  - id: recorded
+    bash: "grep -q 'step 5 settled' backlog/tasks/TL-68-*.md && echo 'the error/warning choice is recorded with its reason — OK'"
+  - id: doctor
+    bash: "node scripts/cli.mjs doctor --json | node -e \"let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const r=JSON.parse(s);const row=r.checks.find(c=>c.id==='log-status');if(!row){console.error('no log-status row in doctor');process.exit(1)}console.log('doctor knows about this drift — OK')})\""
 ---
 
 ## Goal
@@ -93,13 +98,13 @@ decision.
 
 ## Acceptance criteria
 
-- [ ] Drift between the last log entry and the `status:` field is detected.
-- [ ] The message states the file, both values, and the entry date.
-- [ ] The guard fixes NOTHING.
-- [ ] A task with no log entries is not a violation.
-- [ ] Wired into `check` and visible in `doctor`.
-- [ ] The test has a positive control: a fixture with drift MUST fail.
-- [ ] The error/warning choice is recorded in `## Log` with a reason.
+- [x] Drift between the last log entry and the `status:` field is detected. [proof: suite]
+- [x] The message states the file, both values, and the entry date. [proof: suite]
+- [x] The guard fixes NOTHING. [proof: suite]
+- [x] A task with no log entries is not a violation. [proof: suite]
+- [x] Wired into `check` and visible in `doctor`. [proof: doctor]
+- [x] The test has a positive control: a fixture with drift MUST fail. [proof: suite]
+- [x] The error/warning choice is recorded in `## Log` with a reason. [proof: recorded]
 
 ## Log
 
@@ -108,3 +113,16 @@ Append-only. Format: `YYYY-MM-DD status — who — note`.
 - 2026-08-31 created — agent:claude — encountered during our own work: TL-52
   had five `done` entries in its log and `status: pending` in its field, sat
   in the INDEX as open, and no gate saw it
+- 2026-09-02 in_progress — agent:claude — step 5 settled: NEITHER a plain error
+  nor a plain warning, because the two directions of drift are not the same
+  defect. A log naming an ARCHIVED status while the field is open is TL-52
+  exactly — finished work counted as open, the index misreporting the project
+  while looking normal — so it FAILS. A log merely BEHIND its field is stale
+  prose, and since TL-105 it is the normal end state of every legacy task:
+  nothing writes `## Log` any more, so `done` moves the field and no closing
+  line will ever be appended. Measured before deciding: 27 of this repository's
+  88 status-bearing logs are behind their field, and ZERO are ahead. An error in
+  both directions would have left `check` permanently red with two ways out —
+  inventing entries in somebody else's append-only notes, or switching the guard
+  off — and a warning in both would report the one defect it exists for in the
+  same voice as the noise around it

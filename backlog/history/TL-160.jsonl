@@ -1,0 +1,4 @@
+{"id":"01M1H0H465ZEP1GHAQ3T69T7JS","ts":"2026-09-02T12:12:03.653Z","task":"TL-160","field":"__created__","from":"","to":"A file path inside a YAML scalar is read as prose by check --language","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1H0HV7R721YBMQNHBPMF0AK","ts":"2026-09-02T12:12:27.256Z","task":"TL-160","field":"priority","from":"P1","to":"P2","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1H0HV7RE5K8FBPMQWEP13QR","ts":"2026-09-02T12:12:27.256Z","task":"TL-160","field":"type","from":"task","to":"bug","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1H0HV7RKF41DZWJYYZ678Y0","ts":"2026-09-02T12:12:27.256Z","task":"TL-160","field":"epic","from":"","to":"Data integrity","actor":"unknown","source":"external","reason":"unknown"}

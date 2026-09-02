@@ -43,7 +43,7 @@ import { resolveBacklogDir } from "./paths.mjs";
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 const CHECK_USAGE = [
-  `${N} check [--dir <path>] [--id-collisions] [--boards] [--refs] [--criteria] [--reasons] [--vocabulary] [--plan] [--language] [--product-name] [task-file.md …]`,
+  `${N} check [--dir <path>] [--id-collisions] [--boards] [--refs] [--criteria] [--reasons] [--log-status] [--vocabulary] [--plan] [--language] [--product-name] [task-file.md …]`,
   "",
   "  no selector          every guard; exit code = the WORST of them",
   "  --json               the whole run as one document: which guards ran, which failed,",
@@ -74,6 +74,13 @@ const CHECK_USAGE = [
   "                       `reason_required_statuses` carry no reason. It REPORTS and never",
   "                       fails: the gaps it finds are in the past, and the rule is enforced",
   "                       when the change is written, not here",
+  "  --log-status         only whether a task's legacy `## Log` still agrees with its",
+  "                       `status:` field. The two directions are not the same defect: a log",
+  "                       naming a CLOSED status while the field is open FAILS — that is work",
+  "                       finished and counted as open, and the views misreport it without",
+  "                       looking wrong. A log merely BEHIND its field warns, because since",
+  "                       TL-105 nothing writes `## Log` any more, so a legacy section going",
+  "                       stale is the normal end state rather than anybody's mistake",
   "  --plan               only whether plan.yaml can be executed — that no wave stands before",
   "                       a task it is blocked by. A backlog with no plan.yaml passes: the",
   "                       execution order is an optional decision, not a required file",
@@ -857,7 +864,7 @@ function captureScript(script, args) {
  * evidential force. The dispatcher supplies the mode so that nobody has to
  * remember it.
  */
-const CHECK_FLAGS = ["--dir", "--json", "--id-collisions", "--boards", "--refs", "--criteria", "--reasons", "--history", "--docs", "--vocabulary", "--plan", "--language", "--product-name"];
+const CHECK_FLAGS = ["--dir", "--json", "--id-collisions", "--boards", "--refs", "--criteria", "--reasons", "--log-status", "--history", "--docs", "--vocabulary", "--plan", "--language", "--product-name"];
 
 /** PURE — resolves `check`'s arguments. Throws on a usage error. */
 export function parseCheckArgs(args) {
@@ -867,6 +874,7 @@ export function parseCheckArgs(args) {
   let wantRefs = false;
   let wantCriteria = false;
   let wantReasons = false;
+  let wantLogStatus = false;
   let wantHistory = false;
   let wantDocs = false;
   let wantVocabulary = false;
@@ -889,6 +897,7 @@ export function parseCheckArgs(args) {
     if (a === "--refs") { wantRefs = true; continue; }
     if (a === "--criteria") { wantCriteria = true; continue; }
     if (a === "--reasons") { wantReasons = true; continue; }
+    if (a === "--log-status") { wantLogStatus = true; continue; }
     if (a === "--history") { wantHistory = true; continue; }
     if (a === "--docs") { wantDocs = true; continue; }
     if (a === "--vocabulary") { wantVocabulary = true; continue; }
@@ -916,13 +925,13 @@ export function parseCheckArgs(args) {
   // No selector means all of them. A new guard joins the default run on purpose
   // (BL-1451): a dangling reference passed `check`, because `check` checked only
   // what somebody had once written into it.
-  if (!wantIds && !wantBoards && !wantRefs && !wantCriteria && !wantReasons && !wantHistory &&
-      !wantDocs && !wantVocabulary && !wantPlan && !wantLanguage && !wantProductName) {
+  if (!wantIds && !wantBoards && !wantRefs && !wantCriteria && !wantReasons && !wantLogStatus &&
+      !wantHistory && !wantDocs && !wantVocabulary && !wantPlan && !wantLanguage && !wantProductName) {
     wantIds = true; wantBoards = true; wantRefs = true; wantCriteria = true; wantReasons = true;
-    wantHistory = true; wantDocs = true;
+    wantLogStatus = true; wantHistory = true; wantDocs = true;
     wantVocabulary = true; wantPlan = true; wantLanguage = true; wantProductName = true;
   }
-  return { dir, json, wantIds, wantBoards, wantRefs, wantCriteria, wantReasons, wantHistory, wantDocs, wantVocabulary, wantPlan, wantLanguage, wantProductName, files };
+  return { dir, json, wantIds, wantBoards, wantRefs, wantCriteria, wantReasons, wantLogStatus, wantHistory, wantDocs, wantVocabulary, wantPlan, wantLanguage, wantProductName, files };
 }
 
 /**
@@ -955,6 +964,12 @@ export const CHECK_GUARDS = [
     args: (root) => ["--dir", root] },
   // Reads the whole history; the configuration says which statuses require a reason.
   { key: "reasons", want: "wantReasons", name: "reasons", script: "check-backlog-reasons.mjs",
+    args: (root) => ["--dir", root] },
+  // Compares each task against ITSELF — the only guard whose question is entirely
+  // inside one file. It needs the configuration twice over: for the statuses that
+  // make a log line a status claim at all, and for the archived ones that decide
+  // which direction of drift is a defect rather than stale prose.
+  { key: "log-status", want: "wantLogStatus", name: "log-status", script: "check-backlog-log-status.mjs",
     args: (root) => ["--dir", root] },
   // The only guard whose answer depends on something outside the backlog
   // directory — it asks git — which is why it says so when there is no git.

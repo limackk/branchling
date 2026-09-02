@@ -32,6 +32,7 @@ import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { auditLogStatus, readTaskTexts } from "./check-backlog-log-status.mjs";
 import { ConfigError, formatConfigError, loadConfig } from "./config.mjs";
 import { ATTRIBUTE_RULES, IGNORE_RULES, hasUnionMerge, insideGitRepo, trackedViews, unignoredViews } from "./git-rules.mjs";
 import { SNAPSHOT_FILE, loadSnapshot, readMigrations } from "./history.mjs";
@@ -108,6 +109,40 @@ function checkVocabulary(root, config) {
     row: check("vocabulary", "vocabulary vs tree", ERR, detail,
       "add the missing values to `" + first.dictionary + ":` in config.yaml, or correct the tasks"),
   };
+}
+
+/**
+ * Does any task's legacy `## Log` still claim a status its field contradicts?
+ * (TL-68)
+ *
+ * WHY IT IS HERE and not only in `check`. The defect that produced this row was
+ * found by a person noticing that a finished task sat in the index as open —
+ * that is, by nobody's tool. `doctor` is the command somebody runs when the
+ * backlog "feels wrong", and a row is the only place this question gets asked
+ * without knowing to ask it.
+ *
+ * The audit is IMPORTED from the guard rather than repeated: a second reader
+ * would drift, and then `doctor` and `check` would disagree about one file,
+ * which is worse than neither of them looking.
+ */
+function checkLogStatus(root, config) {
+  const { ahead, behind, logged } = auditLogStatus(readTaskTexts(backlogPaths(root).tasksDir), config);
+  if (ahead.length) {
+    return check("log-status", "log vs status field", ERR,
+      ahead.length + " task(s) log a closed status while the field is still open — " +
+        ahead.slice(0, 3).map((r) => r.file.replace(/-.*$/, "")).join(", "),
+      N + " check --log-status");
+  }
+  if (behind.length) {
+    // A WARNING and not an error, for the reason the guard gives: since TL-105
+    // nothing writes `## Log`, so a legacy section falling behind is the normal
+    // end state of a task, not a mistake anybody made.
+    return check("log-status", "log vs status field", WARN,
+      behind.length + " of " + logged + " legacy `## Log` section(s) are behind their field — prose, not state",
+      null);
+  }
+  return check("log-status", "log vs status field", OK,
+    logged + " task(s) with a status-bearing `## Log`, each agreeing with its field");
 }
 
 function checkPrefix(root, config) {
@@ -220,7 +255,7 @@ export function diagnose(root) {
     // Without a configuration that could be read, the remaining questions make no
     // sense: they would be counting under a vocabulary we do not know. "Not
     // checked" is more honest than a result.
-    for (const [id, title] of [["vocabulary", "vocabulary vs tree"], ["prefix", "id prefix"], ["snapshot", "history reference point"], ["guards", "backlog guards"], ["volume", "tasks"]]) {
+    for (const [id, title] of [["vocabulary", "vocabulary vs tree"], ["prefix", "id prefix"], ["snapshot", "history reference point"], ["log-status", "log vs status field"], ["guards", "backlog guards"], ["volume", "tasks"]]) {
       rows.push(check(id, title, INFO, "not checked — the configuration comes first"));
     }
     rows.push(...checkGitIgnore(root));
@@ -231,6 +266,7 @@ export function diagnose(root) {
   rows.push(vocabRow);
   rows.push(checkPrefix(root, config));
   rows.push(checkSnapshot(root, config));
+  rows.push(checkLogStatus(root, config));
   rows.push(...checkGitIgnore(root));
   rows.push(checkGuards(root));
   rows.push(checkVolume(metas, config));
