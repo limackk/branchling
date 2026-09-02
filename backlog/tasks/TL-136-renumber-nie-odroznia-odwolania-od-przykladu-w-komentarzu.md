@@ -6,11 +6,11 @@ labels: []
 board: main
 epic: "Data integrity"
 priority: P2                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 estimate: 2h                       # 30m | 2h | 1d | 1w | 1mo
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-02
 blocked_by: []
 blocks: []
 related_docs: []
@@ -74,6 +74,6 @@ an ID in this project looks like.
 
 ## Acceptance criteria
 
-- [ ] An ID used as an example survives a `renumber` run untouched, or is printed before writing. [proof: przyklad-nietkniety]
-- [ ] The test has a positive control: a fixture with an example that, without the fix, gets damaged. [proof: przyklad-nietkniety]
-- [ ] The convention (marker or sample prefix) is recorded where the comment's author will see it, not only in this task. [proof: przyklad-nietkniety]
+- [x] An ID used as an example survives a `renumber` run untouched, or is printed before writing. [proof: przyklad-nietkniety]
+- [x] The test has a positive control: a fixture with an example that, without the fix, gets damaged. [proof: przyklad-nietkniety]
+- [x] The convention (marker or sample prefix) is recorded where the comment's author will see it, not only in this task. [proof: przyklad-nietkniety]

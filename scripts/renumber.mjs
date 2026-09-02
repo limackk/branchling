@@ -30,6 +30,11 @@
  *     not a reference the tool owns. Mentions inside it are REPORTED.
  *   - `history/.migrations.jsonl`. It is the one file that must keep speaking in
  *     old ids — rewriting it would erase the map that explains the rewrite.
+ *   - ANY LINE MARKED `renumber: allow`. A known id in documentation is either a
+ *     reference, which must follow its task, or an EXAMPLE of the renumbering
+ *     itself, which the rewrite would turn into nonsense while every guard stays
+ *     green. Nothing can tell the two apart mechanically, so the author says
+ *     which it is — see `rewriteIds()`.
  *   - Anything outside the backlog unless `--also` names it. A tool that went
  *     hunting through a repository it was merely installed into would be
  *     rewriting files nobody asked it to open.
@@ -81,6 +86,10 @@ const USAGE = [
   "  the log is append-only — and never `history/" + MIGRATIONS_FILE + "`.",
   "",
   "  Ids found in text that this renumber does not know are LEFT ALONE and listed.",
+  "",
+  "  An id that ILLUSTRATES the renumbering rather than pointing at a task is an",
+  "  example, and rewriting it destroys the sentence around it. Mark that ONE line",
+  "  `renumber: allow` in a comment beside it and every id on it is left alone.",
   "",
   "  exit: 0 renumbered (or nothing to do) · 1 refused · 2 usage error",
 ].join("\n");
@@ -158,23 +167,56 @@ export function planRenumber(root, prefix, opts = {}) {
 // ──────────────────────────────────────────────────────────────────────────
 
 /**
+ * The marker that says an id on this line is an EXAMPLE, not a reference
+ * (TL-136). Same shape as the repository's other in-line guard exceptions, and
+ * for the same reason: the exception stands beside the ONE line it covers, so
+ * a reviewer reads it in the diff instead of having to know a convention.
+ */
+export const EXAMPLE_MARKER = "renumber: allow";
+
+/**
  * Replace every id the map knows; leave every other id alone and name it.
  *
- * @returns {{text: string, changed: number, unknown: string[]}}
+ * A LINE CARRYING `renumber: allow` IS PASSED THROUGH WHOLE. In documentation an
+ * id plays two roles the scanner cannot tell apart: a REFERENCE, which must
+ * follow the task, and an EXAMPLE, which illustrates the renumbering itself.
+ * Rewriting the second is not a stale pointer but a sentence that destroys its
+ * own meaning — `PROJ-1303 becomes PROJ-1` collapsing into `PROJ-1 becomes
+ * PROJ-1` — and it does so SILENTLY: every id was real, so no guard fires and
+ * the tests stay green. Measured on this repository's own renumbering run.
+ *
+ * The marker is the author's declaration, because nothing else can be: an id
+ * next to the word "becomes" is a heuristic, and a heuristic that is wrong here
+ * is wrong in the direction of not rewriting a real reference.
+ *
+ * @returns {{text: string, changed: number, unknown: string[], exempt: number}}
  */
 export function rewriteIds(raw, idMap, prefix) {
   const unknown = new Set();
   let changed = 0;
-  const text = raw.replace(taskIdScanner(prefix), (whole, id) => {
-    const next = idMap.get(id);
-    if (!next) {
-      unknown.add(id);
-      return whole;
-    }
-    changed++;
-    return next;
-  });
-  return { text, changed, unknown: [...unknown].sort() };
+  let exempt = 0;
+  const scan = taskIdScanner(prefix);
+  const text = raw
+    .split("\n")
+    .map((line) => {
+      if (line.includes(EXAMPLE_MARKER)) {
+        // Counted, not silently skipped: an exemption nobody is told about is
+        // indistinguishable from the tool having missed the line.
+        exempt += [...line.matchAll(scan)].filter((m) => idMap.has(m[1])).length;
+        return line;
+      }
+      return line.replace(scan, (whole, id) => {
+        const next = idMap.get(id);
+        if (!next) {
+          unknown.add(id);
+          return whole;
+        }
+        changed++;
+        return next;
+      });
+    })
+    .join("\n");
+  return { text, changed, unknown: [...unknown].sort(), exempt };
 }
 
 /**
@@ -249,7 +291,12 @@ export function applyRenumber(root, plan, opts = {}) {
     actor: opts.actor,
   });
 
-  const report = { files: 0, replacements: 0, unknown: new Map(), historyProse: 0 };
+  const report = { files: 0, replacements: 0, unknown: new Map(), historyProse: 0, exempt: 0, exemptFiles: new Set() };
+  const noteExempt = (file, count) => {
+    if (!count) return;
+    report.exempt += count;
+    report.exemptFiles.add(file);
+  };
   const note = (file, unknown) => {
     for (const id of unknown) {
       if (!report.unknown.has(id)) report.unknown.set(id, new Set());
@@ -272,6 +319,7 @@ export function applyRenumber(root, plan, opts = {}) {
       const res = rewriteIds(raw, idMap, prefix);
       next = res.text;
       report.replacements += res.changed;
+      noteExempt(relative(root, abs), res.exempt);
       note(relative(root, abs), res.unknown);
     }
     if (next !== raw) {
@@ -298,6 +346,7 @@ export function applyRenumber(root, plan, opts = {}) {
     if (!existsSync(file)) continue;
     const raw = readFileSync(file, "utf8");
     const res = rewriteIds(raw, idMap, prefix);
+    noteExempt(relative(root, file), res.exempt);
     note(relative(root, file), res.unknown);
     if (res.text !== raw) {
       writeFileSync(file, res.text, "utf8");
@@ -422,6 +471,9 @@ export function main(argv) {
   console.log(`${OKM} renumbered. ${report.replacements} reference(s) rewritten across ${report.files} file(s)`);
   if (report.historyProse) {
     console.log(`  ${report.historyProse} mention(s) inside history records left as written — the log is append-only`);
+  }
+  if (report.exempt) {
+    console.log(`  ${report.exempt} id(s) across ${report.exemptFiles.size} file(s) left as EXAMPLES — the line says \`${EXAMPLE_MARKER}\``);
   }
   if (report.unknown.size) {
     console.log(`  ${report.unknown.size} id(s) left alone because this renumber does not know them:`);

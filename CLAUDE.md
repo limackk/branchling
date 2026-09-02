@@ -63,6 +63,15 @@ drift apart; a test fails if this copy falls behind it.
 - **The code knows the SHAPE of a field, `backlog/config.yaml` knows the
   VALUES.** An unknown key fails. Do not write the project's vocabulary into the
   code.
+- **An id in a comment that is an EXAMPLE, not a reference, is marked
+  `renumber: allow` on that ONE line** (TL-136). `worktrail renumber` rewrites
+  prose deliberately — after a renumbering an id left behind still exists and
+  names a DIFFERENT task — and it cannot tell the two roles apart, so the
+  sentence on the next line collapses into "one becomes one" with every guard
+  still green — which is why that line carries the marker:
+  "`TL-1303` becomes `TL-1`". <!-- renumber: allow -->
+  The marker is the author's declaration; a foreign prefix (`PROJ-1303`) is the
+  other way out, because no map of this repository will ever cover it.
 - **The reason for a change travels with the WRITE, not as prose in the file**
   (TL-105). `## Log` exists neither in the template nor in what `worktrail done`
   writes; the "why" is the `reason` field of a record in `backlog/history/`.

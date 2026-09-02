@@ -35,7 +35,7 @@ import { join } from "node:path";
 
 import { SCRIPTS_DIR } from "./_repo.mjs";
 import { FIELD_CREATED, FIELD_DELETED, MIGRATIONS_FILE, applyIdMigrations, readMigrations, reconcile } from "../history.mjs";
-import { planRenumber, rewriteIds, rewriteHistoryFile } from "../renumber.mjs";
+import { EXAMPLE_MARKER, planRenumber, rewriteIds, rewriteHistoryFile } from "../renumber.mjs";
 
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
 
@@ -165,6 +165,52 @@ test("--also rewrites a file outside the backlog", () => {
       rmSync(doc, { force: true });
     }
   });
+});
+
+// ── An example is not a reference (TL-136) ────────────────────────────────
+
+/** The sentence the real run destroyed: an id in the role of an EXAMPLE. */
+const EXAMPLE_LINE = "TL-9305 becomes TL-9100 only because of where it sat in one ordering.";
+
+test("an id marked as an example survives the rewrite that surrounds it", () => {
+  withBacklog({
+    numbers: [9301, 9305],
+    bodies: { "TL-9301": `${EXAMPLE_LINE} // ${EXAMPLE_MARKER}\nBut the real reference in TL-9305 moves.` },
+  }, (dir) => {
+    const r = cli(["renumber", "--dir", dir, "--start", "9100"]);
+    assert.equal(r.code, 0, r.out);
+    const body = read(dir, "tasks", "TL-9100-slug.md");
+    assert.match(body, new RegExp(EXAMPLE_LINE.replace(/[.]/g, "\\.")), "the marked example was rewritten anyway");
+    // The other half of the same file: the marker covers ONE line, not the file.
+    assert.match(body, /the real reference in TL-9101 moves/, "the marker leaked onto the next line");
+    assert.match(r.out, new RegExp(EXAMPLE_MARKER), "the exemption was honoured silently");
+  });
+});
+
+test("POSITIVE CONTROL: without the marker that same sentence is destroyed", () => {
+  // Without this the test above passes just as well against a rewrite that
+  // never touched the body at all — which is the failure mode of every
+  // "the text is still there" assertion.
+  withBacklog({ numbers: [9301, 9305], bodies: { "TL-9301": EXAMPLE_LINE } }, (dir) => {
+    const r = cli(["renumber", "--dir", dir, "--start", "9100"]);
+    assert.equal(r.code, 0, r.out);
+    const body = read(dir, "tasks", "TL-9100-slug.md");
+    assert.match(body, /TL-9101 becomes TL-9100/, "the fixture no longer demonstrates the defect");
+    assert.doesNotMatch(body, new RegExp(EXAMPLE_LINE.replace(/[.]/g, "\\.")));
+  });
+});
+
+test("the convention is printed by the command, not only agreed in a task", () => {
+  // Criterion of TL-136: the next author of such a comment has to be able to
+  // find this without reading the task that introduced it. `--help` is where
+  // they look, and the module header is what a reader of the code sees.
+  const help = cli(["renumber", "--help"]);
+  assert.equal(help.code, 0, help.out);
+  assert.match(help.out, new RegExp(EXAMPLE_MARKER), "`--help` does not name the marker");
+  assert.match(help.out, /example/i);
+
+  const header = readFileSync(join(SCRIPTS_DIR, "renumber.mjs"), "utf8").split("*/")[0];
+  assert.match(header, new RegExp(EXAMPLE_MARKER), "the module header still promises a rewrite with no exception");
 });
 
 test("POSITIVE CONTROL: an id the map does not know is left alone and reported", () => {
