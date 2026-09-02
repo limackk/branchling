@@ -5,3 +5,6 @@
 {"id":"01M1F5BNKG8EEWVTXTC10AW1G4","ts":"2026-09-01T18:57:58.896Z","task":"TL-110","field":"blocked_by","from":["TL-1519"],"to":["TL-109"],"actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK5E8EMJKA24QGZYXR0","ts":"2026-09-02T07:16:31.461Z","task":"TL-110","field":"title","from":"Ścieżka krytyczna i animacje widoku Execution","to":"Critical path and animations for the Execution view","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK5VZ3KR67KAMFAE6YS","ts":"2026-09-02T07:16:31.461Z","task":"TL-110","field":"epic","from":"Plan wykonania","to":"Execution plan","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1H6FFW0VMDGW2BGBZZ8PV72","ts":"2026-09-02T13:56:01.536Z","task":"TL-110","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1H6FFW0MRMD55FWB9SV947X","ts":"2026-09-02T13:56:01.536Z","task":"TL-110","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1H6YHE2CSTSRVNGASSHRQBP","ts":"2026-09-02T14:04:14.658Z","task":"TL-110","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

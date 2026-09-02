@@ -1464,6 +1464,77 @@ ${paletteBadgeCss}
   .exec-card.is-closed { opacity: .6; }
   .exec-card.is-running { border-color: var(--accent); }
   .exec-card.is-unknown { border-style: dashed; }
+  /* ── The critical path, the selected chain, and motion (TL-110) ──────────
+     Every state below is carried by MORE than a hue: the critical path adds a
+     thicker border, a left rule and the words "critical path" on the card; the
+     selection dims what is not in the chain rather than tinting what is. A
+     reader who cannot separate two colours still sees which cards are meant. */
+  .exec-card { transition: opacity .18s ease, transform .18s ease, border-color .18s ease; }
+  .exec-card.is-critical {
+    border-width: 2px;
+    border-color: var(--accent);
+    box-shadow: inset 3px 0 0 0 var(--accent);
+  }
+  .exec-critical-tag {
+    font-weight: 600;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+  .exec-critical-sum {
+    margin-left: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .exec-critical-head { margin: 4px 0 0; }
+  .exec-critical-head .exec-critical-sum { margin-left: 0; }
+  /* Thicker AND solid against the dashed rest — the same rule as the cards. */
+  .exec-edges path.is-critical { stroke: var(--accent); stroke-width: 3; opacity: .9; }
+  .exec-edges path:not(.is-critical) { stroke-dasharray: 4 3; }
+
+  /* Selection: the chain a task unblocks. Everything else recedes, which is why
+     nothing has to be tinted to say "this one". */
+  .exec-flow.is-focused .exec-card { opacity: .22; }
+  .exec-flow.is-focused .exec-card.is-lit { opacity: 1; }
+  .exec-flow.is-focused .exec-card.is-selected {
+    opacity: 1;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+  .exec-flow.is-focused .exec-edges path { opacity: .08; }
+  .exec-flow.is-focused .exec-edges path.is-lit { opacity: .9; stroke: var(--accent); stroke-width: 2.5; }
+  .exec-selection-hint {
+    margin: 6px 0 0;
+    font-size: 11px;
+    color: var(--fg-muted);
+  }
+
+  /* A card that has just moved, and a wave that has just closed in full. Both
+     announce a change that ACTUALLY happened — the first paint animates
+     nothing, because there is nothing yet for a card to have moved from. */
+  @keyframes execPulse {
+    0%   { transform: translateY(-4px); box-shadow: 0 0 0 0 var(--accent); }
+    35%  { transform: translateY(0);    box-shadow: 0 0 0 4px var(--accent-soft); }
+    100% { transform: translateY(0);    box-shadow: 0 0 0 0 transparent; }
+  }
+  @keyframes execWaveDone {
+    0%   { background: var(--accent-soft); }
+    100% { background: transparent; }
+  }
+  .exec-card.just-changed { animation: execPulse .9s ease-out; }
+  .exec-wave.just-closed { animation: execWaveDone 1.4s ease-out; }
+
+  /* MOTION IS OPT-OUT, and the opt-out is the reader's system setting rather
+     than a control in this page: somebody who has asked their machine for less
+     motion has already answered, and asking again is a worse answer. The
+     information survives — only the movement stops. */
+  @media (prefers-reduced-motion: reduce) {
+    .exec-card { transition: none; }
+    .exec-card.just-changed,
+    .exec-wave.just-closed { animation: none; }
+  }
   .exec-card-head { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
   .exec-id { font-size: 11px; font-weight: 600; color: var(--accent); text-decoration: none; }
   .exec-id:hover { text-decoration: underline; }
@@ -5086,9 +5157,112 @@ function renderExecution_() {
     estimateHours,
     archivedStatuses: CONFIG.archivedStatuses,
   });
+  // WHAT MOVED SINCE THE LAST RENDER, computed BEFORE the HTML is replaced —
+  // afterwards the old statuses are gone. \`null\` on the first paint, so the
+  // load does not announce changes that did not happen.
+  const moved = statusChanges(EXEC_SEEN, vm);
+  EXEC_SEEN = { statuses: moved.statuses, closure: moved.closure };
+
   host.innerHTML = renderExecution(vm);
+  execAnnounce(host, moved);
+  execApplySelection();
   drawPlanEdges();
 }
+
+// ─── The chain a card unblocks, and the motion (TL-110) ───────────────────
+// Presentation only: nothing here changes a task, a status or the plan. The
+// arithmetic — which chain is critical, what has moved — lives in
+// viewer-plan.mjs, where a test can reach it.
+
+// The statuses the previous render drew, so a change can be told from a first
+// paint. Reset to null when the tab is left, because a card cannot have "moved"
+// relative to a render nobody saw.
+let EXEC_SEEN = null;
+// The card whose chain is lit, or null. Kept OUTSIDE the DOM so it survives the
+// innerHTML replacement an SSE refresh performs.
+let EXEC_SELECTED = null;
+
+/** Mark what has just moved, and take the mark off again once it has been seen.
+ *  The class is removed on \`animationend\` so a reader with reduced motion — for
+ *  whom no animation ever fires — is not left with a permanent highlight. */
+function execAnnounce(host, moved) {
+  for (const id of moved.cards) {
+    const el = host.querySelector('[data-plan-card="' + CSS.escape(id) + '"]');
+    if (!el) continue;
+    el.classList.add("just-changed");
+    el.addEventListener("animationend", () => el.classList.remove("just-changed"), { once: true });
+  }
+  for (const index of moved.waves) {
+    const el = host.querySelector('[data-plan-wave="' + index + '"]');
+    if (!el) continue;
+    el.classList.add("just-closed");
+    el.addEventListener("animationend", () => el.classList.remove("just-closed"), { once: true });
+  }
+  // With motion switched off nothing fires \`animationend\`, so the marks are
+  // cleared on a timer as well. Belt and braces on purpose: a highlight that
+  // never goes away stops meaning "this just changed".
+  setTimeout(() => {
+    for (const el of host.querySelectorAll(".just-changed, .just-closed")) {
+      el.classList.remove("just-changed", "just-closed");
+    }
+  }, 2000);
+}
+
+/** Draw the current selection, whatever it is. Called after every render, so a
+ *  refresh mid-selection does not silently drop it. */
+function execApplySelection() {
+  const flow = document.querySelector("#executionView .exec-flow");
+  if (!flow) return;
+  for (const el of flow.querySelectorAll(".is-lit, .is-selected")) {
+    el.classList.remove("is-lit", "is-selected");
+  }
+  const hint = document.getElementById("execSelectionHint");
+  if (hint) hint.remove();
+  if (!EXEC_SELECTED) { flow.classList.remove("is-focused"); return; }
+
+  const edges = [...flow.querySelectorAll("#execEdges path")]
+    .map((p) => ({ from: p.dataset.edgeFrom, to: p.dataset.edgeTo }));
+  const lit = descendants(edges, EXEC_SELECTED);
+  const selected = flow.querySelector('[data-plan-card="' + CSS.escape(EXEC_SELECTED) + '"]');
+  if (!selected) { EXEC_SELECTED = null; flow.classList.remove("is-focused"); return; }
+
+  flow.classList.add("is-focused");
+  selected.classList.add("is-selected");
+  for (const id of lit) {
+    const el = flow.querySelector('[data-plan-card="' + CSS.escape(id) + '"]');
+    if (el) el.classList.add("is-lit");
+  }
+  for (const p of flow.querySelectorAll("#execEdges path")) {
+    const chain = new Set([EXEC_SELECTED, ...lit]);
+    if (chain.has(p.dataset.edgeFrom) && chain.has(p.dataset.edgeTo)) p.classList.add("is-lit");
+  }
+  // A word, again: the dimming says WHICH cards, this says what the dimming
+  // means and how to undo it.
+  const note = document.createElement("p");
+  note.className = "exec-selection-hint";
+  note.id = "execSelectionHint";
+  note.textContent = EXEC_SELECTED + " unblocks " + lit.size + " task(s) — click again or press Escape to clear";
+  flow.parentElement.insertBefore(note, flow);
+}
+
+/** One listener on the view, not one per card: the cards are replaced on every
+ *  refresh, and per-card listeners would be re-bound (or leak) each time. */
+document.addEventListener("click", (e) => {
+  const card = e.target.closest && e.target.closest("#executionView [data-plan-card]");
+  if (!card) return;
+  // The id in the head is a link to the task; selecting the chain must not
+  // steal that click.
+  if (e.target.closest(".exec-id")) return;
+  const id = card.dataset.planCard;
+  EXEC_SELECTED = EXEC_SELECTED === id ? null : id;
+  execApplySelection();
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape" || !EXEC_SELECTED) return;
+  EXEC_SELECTED = null;
+  execApplySelection();
+});
 
 /**
  * The geometry of the dependency edges, measured after layout.

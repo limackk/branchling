@@ -84,6 +84,157 @@ export function durationLabel(ms) {
 }
 
 /**
+ * Everything a task transitively unblocks, following the plan's edges forward.
+ *
+ * PURE, and exported for the page: clicking a card lights up the chain that
+ * waits on it, and "the chain" has to mean the same thing in the test and in the
+ * browser. A cycle would be a defect in somebody's `blocked_by`, not in this
+ * function, so the walk simply refuses to visit a node twice rather than
+ * hanging.
+ *
+ * @param {Array<{from: string, to: string}>} edges  blocker → dependent
+ * @returns {Set<string>} the ids downstream of `id`, NOT including `id` itself
+ */
+export function descendants(edges, id) {
+  const next = new Map();
+  for (const e of edges || []) {
+    if (!next.has(e.from)) next.set(e.from, []);
+    next.get(e.from).push(e.to);
+  }
+  const seen = new Set();
+  const stack = [...(next.get(id) || [])];
+  while (stack.length) {
+    const n = stack.pop();
+    if (seen.has(n)) continue;
+    seen.add(n);
+    for (const m of next.get(n) || []) stack.push(m);
+  }
+  seen.delete(id);
+  return seen;
+}
+
+/**
+ * The longest chain of OPEN work in the plan, weighted by the estimates.
+ *
+ * WHY WEIGHTED AND NOT COUNTED. A chain of five half-hour tasks is not the thing
+ * that decides when the plan finishes; one week-long task with two short ones
+ * behind it is. Counting cards would highlight the wrong chain and do it
+ * confidently.
+ *
+ * WHY CLOSED TASKS ARE OUT. The critical path is a statement about what is still
+ * ahead. A closed blocker holds nothing up, so a path drawn through it would be
+ * reporting history as though it were work.
+ *
+ * THE TIE-BREAK IS TOTAL AND STATED, never "any of them". Two chains of equal
+ * weight get compared by length, then by their ids; without that the highlight
+ * would move from render to render for no reason a reader could see, which is
+ * indistinguishable from the plan having changed.
+ *
+ * THE SUM SAYS HOW MUCH OF IT IT COULD NOT COUNT. `unknown` is the number of
+ * tasks on the path with no parseable estimate — the same rule `sumHours()`
+ * follows, and for the same reason: a total that hides them pretends to be
+ * complete.
+ *
+ * @param {Array<object>} cards  every planned card, closed ones included
+ * @param {Array<{from: string, to: string}>} edges
+ * @param {{estimateHours: (e: string) => number|null}} opts
+ * @returns {{ids: string[], hours: number, unknown: number}}
+ */
+export function criticalPath(cards, edges, opts = {}) {
+  const estimateHours = opts.estimateHours || (() => null);
+  const open = new Map();
+  for (const c of cards || []) if (c && c.open && c.known) open.set(c.id, c);
+  if (!open.size) return { ids: [], hours: 0, unknown: 0 };
+
+  const next = new Map();
+  for (const e of edges || []) {
+    if (!open.has(e.from) || !open.has(e.to)) continue;
+    if (!next.has(e.from)) next.set(e.from, []);
+    next.get(e.from).push(e.to);
+  }
+  const weight = (id) => {
+    const h = estimateHours(open.get(id).estimate);
+    return h == null ? 0 : h;
+  };
+  const unknownAt = (id) => (estimateHours(open.get(id).estimate) == null ? 1 : 0);
+
+  // hours desc, then length desc, then ids ascending — total, so the answer
+  // cannot depend on the order the map happened to be built in.
+  const better = (a, b) => {
+    if (!b) return true;
+    if (a.hours !== b.hours) return a.hours > b.hours;
+    if (a.ids.length !== b.ids.length) return a.ids.length > b.ids.length;
+    return a.ids.join(",") < b.ids.join(",");
+  };
+
+  const memo = new Map();
+  const inStack = new Set();
+  const from = (id) => {
+    if (memo.has(id)) return memo.get(id);
+    // A cycle is a defect in somebody's `blocked_by`; the walk stops rather than
+    // hanging, and the node still contributes its own weight.
+    if (inStack.has(id)) return { ids: [id], hours: weight(id), unknown: unknownAt(id) };
+    inStack.add(id);
+    let best = null;
+    for (const n of (next.get(id) || []).slice().sort()) {
+      const tail = from(n);
+      const candidate = {
+        ids: [id, ...tail.ids],
+        hours: weight(id) + tail.hours,
+        unknown: unknownAt(id) + tail.unknown,
+      };
+      if (better(candidate, best)) best = candidate;
+    }
+    if (!best) best = { ids: [id], hours: weight(id), unknown: unknownAt(id) };
+    inStack.delete(id);
+    memo.set(id, best);
+    return best;
+  };
+
+  let best = null;
+  for (const id of [...open.keys()].sort()) {
+    const candidate = from(id);
+    if (better(candidate, best)) best = candidate;
+  }
+  return { ids: best.ids, hours: Math.round(best.hours * 10) / 10, unknown: best.unknown };
+}
+
+/**
+ * Which cards and which waves have MOVED since the last render.
+ *
+ * PURE, so the animation has something testable behind it. `previous` is what a
+ * previous call returned; `null` means FIRST PAINT and produces no changes at
+ * all — animating every card on load would announce a change that did not
+ * happen, which is the one thing a change animation must never do.
+ *
+ * A card the previous render did not have is not a change either: it is a task
+ * that has just been added to the plan, and it arrives rather than moves.
+ *
+ * @param {{statuses: Map<string,string>, closure: Map<number,boolean>}|null} previous
+ * @param {object} vm  a view model from `planViewModel()`
+ * @returns {{cards: string[], waves: number[], statuses: Map, closure: Map}}
+ */
+export function statusChanges(previous, vm) {
+  const statuses = new Map();
+  const closure = new Map();
+  for (const w of (vm && vm.waves) || []) {
+    closure.set(w.index, w.total > 0 && w.closed === w.total);
+    for (const c of w.cards) statuses.set(c.id, c.status || "");
+  }
+  if (!previous) return { cards: [], waves: [], statuses, closure };
+
+  const cards = [];
+  for (const [id, status] of statuses) {
+    if (previous.statuses.has(id) && previous.statuses.get(id) !== status) cards.push(id);
+  }
+  const waves = [];
+  for (const [index, isClosed] of closure) {
+    if (isClosed && previous.closure.get(index) === false) waves.push(index);
+  }
+  return { cards: cards.sort(), waves: waves.sort((a, b) => a - b), statuses, closure };
+}
+
+/**
  * The plan, the tree and the history folded into what the view draws.
  *
  * @param {object|null} state   the result of `planState()` (null = no plan file)
@@ -99,7 +250,9 @@ export function planViewModel(state, tasks, opts = {}) {
   const history = opts.history || {};
   const now = opts.now || Date.now();
   const estimateHours = opts.estimateHours || (() => null);
-  if (!state) return { exists: false, waves: [], edges: [], unplanned: [], unknown: [] };
+  if (!state) {
+    return { exists: false, waves: [], edges: [], unplanned: [], unknown: [], critical: { ids: [], hours: 0, unknown: 0 } };
+  }
 
   const byId = new Map((tasks || []).map((t) => [t.id, t]));
   const archived = opts.archivedStatuses || [];
@@ -183,8 +336,21 @@ export function planViewModel(state, tasks, opts = {}) {
     }
   }
 
+  // THE CRITICAL PATH IS COMPUTED HERE, over the cards and edges just built, so
+  // the view and any test see the same chain. Marking the cards and edges rather
+  // than handing the page a list keeps the render dumb.
+  const allCards = waves.flatMap((w) => w.cards);
+  const critical = criticalPath(allCards, edges, { estimateHours });
+  const onPath = new Set(critical.ids);
+  for (const c of allCards) c.critical = onPath.has(c.id);
+  for (let i = 0; i < critical.ids.length - 1; i++) {
+    const edge = edges.find((e) => e.from === critical.ids[i] && e.to === critical.ids[i + 1]);
+    if (edge) edge.critical = true;
+  }
+
   return {
     exists: true,
+    critical,
     updated: state.updated || "",
     rationale: state.rationale || "",
     activeWave: state.activeWave,
@@ -203,6 +369,7 @@ function renderCard(card) {
   if (!card.known) cls.push("is-unknown");
   if (!card.open && card.known) cls.push("is-closed");
   if (card.inProgress) cls.push("is-running");
+  if (card.critical) cls.push("is-critical");
   const bits = [];
   bits.push('<a class="exec-id" href="#' + planEsc(card.id) + '">' + planEsc(card.id) + "</a>");
   // The status is a colour AND a word (TL-52): colour is emphasis, never the
@@ -215,6 +382,10 @@ function renderCard(card) {
     bits.push('<span class="badge exec-missing">not in this backlog</span>');
   }
   const meta = [];
+  // A WORD, not only a colour and a thicker border (TL-52). The critical path is
+  // the one claim on this view a reader might act on, and a claim carried by
+  // hue alone is invisible to a good share of the people reading it.
+  if (card.critical) meta.push('<span class="exec-critical-tag">critical path</span>');
   if (card.owner && card.owner !== "unassigned") meta.push(planEsc(card.owner));
   if (card.estimate) meta.push(planEsc(card.estimate));
   for (const id of card.waitingOn) {
@@ -293,9 +464,37 @@ export function renderPlanMissing(opts = {}) {
   );
 }
 
+/**
+ * The critical path, in words.
+ *
+ * `~` because the sum is built from estimates, and `+N unestimated` because a
+ * total that quietly drops the tasks it could not count is a total nobody should
+ * plan against.
+ */
+export function criticalLabel(critical) {
+  if (!critical || !critical.ids.length) return "";
+  // "1 tasks" is a programmer's note seen by a user — the same rule `plural()`
+  // follows in the terminal reports.
+  const n = critical.ids.length;
+  const parts = ["critical path: ~" + critical.hours + "h", n + (n === 1 ? " task" : " tasks")];
+  if (critical.unknown) parts.push(critical.unknown + " unestimated");
+  return parts.join(" · ");
+}
+
 /** The whole Execution view. */
 export function renderExecution(vm, opts = {}) {
   if (!vm || !vm.exists) return renderPlanMissing(opts);
+
+  const critical = criticalLabel(vm.critical);
+  const criticalTag = critical
+    ? '<span class="exec-critical-sum" data-plan-critical="' + planEsc(String((vm.critical.ids || []).length)) +
+      '">' + planEsc(critical) + "</span>"
+    : "";
+  // BESIDE THE NOW-LINE where there is one, and in the header where there is
+  // not. The number is about what is still ahead, so it belongs next to the
+  // marker for "here"; a plan with every wave closed has no such marker, and
+  // dropping the label there would hide the answer instead of stating it.
+  let sumPlaced = false;
 
   const waves = vm.waves
     .map((w) => {
@@ -303,9 +502,11 @@ export function renderExecution(vm, opts = {}) {
       if (w.active) cls.push("is-active");
       if (w.past) cls.push("is-past");
       if (w.future) cls.push("is-future");
-      const nowLine = w.active
-        ? '<div class="exec-now" data-plan-now="1"><span>now</span></div>'
-        : "";
+      let nowLine = "";
+      if (w.active) {
+        nowLine = '<div class="exec-now" data-plan-now="1"><span>now</span>' + criticalTag + "</div>";
+        sumPlaced = true;
+      }
       return (
         nowLine +
         '<section class="' + cls.join(" ") + '" data-plan-wave="' + w.index + '">' +
@@ -322,7 +523,8 @@ export function renderExecution(vm, opts = {}) {
 
   // Empty `<path>`s: the pairs are decided here, the geometry after layout.
   const edges = vm.edges
-    .map((e) => '<path data-edge-from="' + planEsc(e.from) + '" data-edge-to="' + planEsc(e.to) + '"></path>')
+    .map((e) => '<path data-edge-from="' + planEsc(e.from) + '" data-edge-to="' + planEsc(e.to) + '"' +
+      (e.critical ? ' data-edge-critical="1" class="is-critical"' : "") + "></path>")
     .join("");
 
   const unplanned =
@@ -349,6 +551,7 @@ export function renderExecution(vm, opts = {}) {
     "<h2>Execution</h2>" +
     (vm.updated ? '<span class="exec-updated">plan updated ' + planEsc(vm.updated) + "</span>" : "") +
     (vm.rationale ? '<p class="exec-rationale">' + planEsc(vm.rationale) + "</p>" : "") +
+    (criticalTag && !sumPlaced ? '<p class="exec-critical-head">' + criticalTag + "</p>" : "") +
     "</div>" +
     '<div class="exec-flow">' +
     '<svg class="exec-edges" id="execEdges" aria-hidden="true">' + edges + "</svg>" +

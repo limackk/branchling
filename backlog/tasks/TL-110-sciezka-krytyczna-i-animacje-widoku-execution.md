@@ -6,11 +6,11 @@ labels: []
 board: main
 epic: "Execution plan"
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 estimate: 2h
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-02
 blocked_by: [TL-109]
 blocks: []
 related_docs: []
