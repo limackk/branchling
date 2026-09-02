@@ -1,0 +1,3 @@
+{"id":"01M1HTR8CMTBEFEAZDGF0P48CH","ts":"2026-09-02T19:50:20.308Z","task":"TL-172","field":"__created__","from":"","to":"CLAUDE.md claims a test count that rots on every commit","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1HTRRP2GF3GHG0FPM00DEPG","ts":"2026-09-02T19:50:36.994Z","task":"TL-172","field":"priority","from":"P1","to":"P3","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1HTRRP27N5NSPXGMXCWFP21","ts":"2026-09-02T19:50:36.994Z","task":"TL-172","field":"estimate","from":"2h","to":"30m","actor":"unknown","source":"external","reason":"unknown"}
