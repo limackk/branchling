@@ -5,3 +5,6 @@
 {"id":"01M1E3NG506T1VBRYRN0PD0D96","ts":"2026-09-01T09:09:09.408Z","task":"TL-112","field":"related_docs","from":[],"to":[".claude/skills/tasklog-release/SKILL.md"],"actor":"unknown","source":"external"}
 {"id":"01M1E69RE2H7NE7R0GHPC5FVYY","ts":"2026-09-01T09:55:10.402Z","task":"TL-112","field":"related_docs","from":[".claude/skills/tasklog-release/SKILL.md"],"to":[".claude/skills/worktrail-release/SKILL.md"],"actor":"unknown","source":"external"}
 {"id":"01M1F5BNKGPZN6GBV742Z2DA9G","ts":"2026-09-01T18:57:58.896Z","task":"TL-112","field":"blocks","from":["TL-1463"],"to":["TL-53"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1FB5H19WEKJNJN0DCG06B0R","ts":"2026-09-01T20:39:29.065Z","task":"TL-112","field":"status","from":"pending","to":"in_progress","actor":"agent:session","source":"next","reason":"unknown"}
+{"id":"01M1FB5H19X220GRQB70K7A9F3","ts":"2026-09-01T20:39:29.065Z","task":"TL-112","field":"owner","from":"unassigned","to":"agent:session","actor":"agent:session","source":"next","reason":"unknown"}
+{"id":"01M1G7JB0T8MYERB1C9SEGBWGC","ts":"2026-09-02T04:55:49.018Z","task":"TL-112","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

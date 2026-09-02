@@ -6,20 +6,22 @@ labels: [pre-launch]
 board: main
 epic: "Backlog — publikacja open source"
 priority: P1
-status: pending
-owner: unassigned
+status: done
+owner: agent:session
 estimate: 2h
 confidence: high
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-02
 blocked_by: []
 blocks: [TL-53]
 related_docs:
   - .claude/skills/worktrail-release/SKILL.md
-verification:
-  - bash: "test -f docs/licencja-i-kontrybucje.md && echo 'dokument decyzji jest — OK' || { echo 'brak docs/licencja-i-kontrybucje.md'; exit 1; }"
-  - bash: "for q in 'DCO' 'CLA' 'chmur' 'dual'; do grep -qi \"$q\" docs/licencja-i-kontrybucje.md || { echo \"decyzja nie odpowiada na: $q\"; exit 1; }; done; echo 'cztery pytania rozstrzygnięte — OK'"
-  - bash: "grep -q 'licencja-i-kontrybucje' README.md CONTRIBUTING.md 2>/dev/null && echo 'decyzja jest widoczna dla kontrybutora — OK' || { echo 'decyzja nigdzie nie jest widoczna z zewnątrz'; exit 1; }"
+verification:                      # English filename and probes: CLAUDE.md admits no
+                                   # directory-shaped exception, and the original contract
+                                   # grepped for a Polish stem that English text cannot carry
+  - bash: "test -f docs/license-and-contributions.md && echo 'the decision document exists — OK' || { echo 'docs/license-and-contributions.md is missing'; exit 1; }"
+  - bash: "for q in 'DCO' 'CLA' 'cloud' 'dual licensing'; do grep -qi \"$q\" docs/license-and-contributions.md || { echo \"the decision does not answer: $q\"; exit 1; }; done; echo 'four questions settled — OK'"
+  - bash: "grep -q 'license-and-contributions' README.md CONTRIBUTING.md 2>/dev/null && echo 'the decision is visible to a contributor — OK' || { echo 'the decision is nowhere visible from outside'; exit 1; }"
 ---
 
 ## Cel

@@ -909,7 +909,7 @@ leaving everything else in the file untouched. `--no-nudge` opts out.
 ## Documentation
 
 These documents are the reasoning behind the design. They are part of this
-repository rather than the published package, and they are written in Polish.
+repository rather than the published package.
 
 - [`docs/worktrail-global-tool.md`](docs/worktrail-global-tool.md) — the tool
   outside a single repository; §3 is the four rules everything else follows from.
@@ -921,6 +921,9 @@ repository rather than the published package, and they are written in Polish.
   and time.
 - [`docs/worktrail-state-and-sync.md`](docs/worktrail-state-and-sync.md) — the
   target model: the log as the source of truth about state.
+- [`docs/license-and-contributions.md`](docs/license-and-contributions.md) — the
+  licence, the DCO, and where the line between the open tool and a hosted
+  service runs. Read this before opening a pull request.
 - [`LINEAGE.md`](LINEAGE.md) — where this came from, and why the git history
   starts at a single commit.
 
@@ -929,3 +932,16 @@ The tool tracks itself with itself: its own backlog is in `backlog/`.
 ```bash
 node --test scripts/tests/*.test.mjs
 ```
+
+## Contributing
+
+The code is MIT, and a contribution goes out under MIT. Sign your commits off —
+`git commit -s`, a [DCO](https://developercertificate.org/) line, no CLA and no
+paperwork.
+
+Before writing anything large, read
+[`docs/license-and-contributions.md`](docs/license-and-contributions.md) §3. The
+tool is deliberately a single-machine one: everything that serves one person in
+one clone is open and stays open, and coordination between people and clones is
+out of its scope. A patch can be good and still fall on the wrong side of that
+line, which is why the line is written down instead of discovered at review.
