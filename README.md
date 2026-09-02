@@ -191,15 +191,25 @@ verification:               # HOW to check the task is actually done
 ---
 ```
 
-The body sections: the goal (what will be true once it is done), the context
-(what the next person has to know before starting — they were not in the
-conversation this task came out of), pre-flight reading (files to read first,
-each with a reason), the steps, acceptance criteria (verifiable, not
-subjective), and an append-only log of the form
-`YYYY-MM-DD status — who — note`.
+The body sections are `## Goal` (what will be true once it is done),
+`## Context` (what the next person has to know before starting — they were not
+in the conversation this task came out of), `## Pre-flight reading` (files to
+read first, each with a reason), `## Steps`, and `## Acceptance criteria`, each
+one naming the `verification:` entry that proves it:
 
-The template ships with those headings; the tool does not require any particular
-set of them.
+```markdown
+- [ ] Verifiable, not subjective. [proof: the-name]
+```
+
+The tool ticks those boxes after a green run, so a box you tick by hand is a
+claim rather than evidence.
+
+**The reason for a change is not one of these sections.** It travels with the
+write, as the `reason` field of the record in `history/` — which is why
+`worktrail done` asks for nothing and the statuses in
+`reason_required_statuses` refuse to be entered without one. The template
+ships with the headings above; the tool does not require any particular set of
+them.
 
 **`board` versus `epic`** — two different questions, and therefore two different
 rules:

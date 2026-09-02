@@ -6,11 +6,11 @@ labels: []
 board: main
 epic: ""
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 estimate: 30m
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-02
 blocked_by: []
 blocks: []
 related_docs: []
@@ -66,7 +66,5 @@ and deliberately does not write `## Log`.
 
 ## Acceptance criteria
 
-- [ ] README does not describe `## Log` as part of the task file. [proof:
-      no-log-section]
-- [ ] Every body section the README lists is a heading in `_template.md`.
-      [proof: sections-match-template]
+- [x] README does not describe `## Log` as part of the task file. [proof: no-log-section]
+- [x] Every body section the README lists is a heading in `_template.md`. [proof: sections-match-template]
