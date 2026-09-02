@@ -36,6 +36,7 @@ import { join, resolve } from "node:path";
 
 import { loadConfig } from "../config.mjs";
 import { PROOF_ID, parseCriteria, parseVerification } from "../criteria.mjs";
+import { stripTemplateBanner } from "../new-task.mjs";
 import { BACKLOG_DIR, REPO_ROOT } from "./_repo.mjs";
 
 const SHIPPED = join(REPO_ROOT, "_template.md");
@@ -136,4 +137,43 @@ test("POSITIVE CONTROL: a verification entry without `id:` is caught", () => {
   const damaged = frontmatterOf(read(SHIPPED)).replace(/^\s+- id: .*$/m, "  - ");
   const { entries } = parseVerification(damaged);
   assert.equal(entries[0].id, null, "the check for an `id:` would pass on a template that has none");
+});
+
+// ── the banner belongs to the template, and to nothing made from it (TL-165) ──
+
+test("both templates open with a banner, and the strip takes exactly it", () => {
+  // The positive control for everything below: if a template had no banner, the
+  // assertions about removing one would be about nothing.
+  for (const [name, path] of [["shipping", SHIPPED], ["this backlog's", OWN]]) {
+    if (SAME_FILE && name === "this backlog's") continue;
+    const text = read(path);
+    assert.match(text.split("\n")[1] || "", /^#/, "the " + name + " template has no banner to strip");
+
+    const stripped = stripTemplateBanner(text);
+    assert.equal(stripped.split("\n")[0], "---");
+    assert.match(stripped.split("\n")[1], /^id:/, "the strip did not stop at the first field");
+    // Nothing but the leading block goes: the frontmatter keys are untouched.
+    assert.deepEqual(keysOf(frontmatterOf(stripped)), keysOf(frontmatterOf(text)));
+  }
+});
+
+test("a comment BESIDE a field survives — the annotations are not comments to delete", () => {
+  // Without this the fix could be "strip every comment", which satisfies the
+  // assertion above and destroys the part of the template that teaches.
+  const stripped = stripTemplateBanner(read(OWN));
+  assert.match(stripped, /^blocked_by: \[\][^\n]*#/m,
+    "the note beside `blocked_by` did not survive the strip");
+});
+
+test("a template with no banner is returned unchanged, character for character", () => {
+  const plain = "---\nid: X-1\ntitle: \"\"\n---\n\n## Goal\n";
+  assert.equal(stripTemplateBanner(plain), plain);
+});
+
+test("a frontmatter that is ONLY comments is left alone rather than emptied", () => {
+  // The degenerate case. Emptying it would turn a broken template into a
+  // silently different broken template.
+  const odd = "---\n# nothing but a note\n---\n\nbody\n";
+  assert.equal(stripTemplateBanner(odd), odd);
+  assert.equal(stripTemplateBanner("no frontmatter at all\n"), "no frontmatter at all\n");
 });

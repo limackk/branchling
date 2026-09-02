@@ -269,3 +269,51 @@ test("new: the created task PASSES the guards and enters the views", () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// ── the template's banner does not travel into a task (TL-165) ────────────
+
+test("new: the created task does not carry the template's own banner", () => {
+  // Reproduced in a fresh backlog, exactly as TL-165 reports it: `init` writes a
+  // template whose first lines describe what a template IS, and every task made
+  // from it opened by calling itself the file tasks are copied from.
+  const dir = freshBacklog();
+  try {
+    const template = readFileSync(join(dir, "_template.md"), "utf8");
+    assert.match(template.split("\n")[1] || "", /^#/,
+      "the template `init` wrote has no banner — this case is not being tested");
+
+    assert.equal(run(["new", "--dir", dir, "--title", "Banner probe"]).status, 0);
+    const file = join(dir, "tasks", readdirSync(join(dir, "tasks")).find((f) => f.endsWith(".md")));
+    const text = readFileSync(file, "utf8");
+
+    assert.equal(text.split("\n")[1], "id: TASK-1", "the banner is still the task's first line");
+    assert.equal(text.includes("TASK TEMPLATE"), false);
+
+    // THE POSITIVE CONTROL, and the half that matters: a note beside a FIELD is
+    // about that field and belongs in every task. A fix that stripped every
+    // comment would pass the assertions above and destroy the annotations.
+    assert.match(text, /^blocked_by: \[\][^\n]*#/m,
+      "the note beside `blocked_by` was deleted with the banner");
+
+    // And the file is still a task the rest of the tool accepts.
+    assert.equal(run(["check", "--dir", dir]).status, 0);
+    assert.equal(run(["build", "--dir", dir]).status, 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("new: a template whose values drift from the vocabulary is still REFUSED", () => {
+  // `templateDrift()` reads the template before the write, and it reads the file
+  // on disk — banner and all. Stripping happens on the copy, so the guard must
+  // be untouched by it (TL-69 is what makes this refusal exist at all).
+  const dir = freshBacklog();
+  try {
+    const path = join(dir, "_template.md");
+    writeFileSync(path, readFileSync(path, "utf8").replace(/^status: .*$/m, "status: nonsense"), "utf8");
+    const r = run(["new", "--dir", dir, "--title", "Drifting"]);
+    assert.notEqual(r.status, 0, "a template offering a value outside the vocabulary was accepted");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

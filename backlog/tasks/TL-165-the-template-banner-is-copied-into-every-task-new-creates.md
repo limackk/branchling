@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h
@@ -101,7 +101,41 @@ BEFORE the write, and it parses the same file.
 
 ## Acceptance criteria
 
-- [ ] A task created by `new` from a template with a banner does not contain the banner. [proof: banner]
-- [ ] A comment beside a FIELD survives into the created task. [proof: banner]
-- [ ] `templateDrift()` still refuses a template whose values are outside the vocabulary. [proof: banner]
-- [ ] The full suite is green. [proof: banner]
+- [x] A task created by `new` from a template with a banner does not contain the banner. [proof: banner]
+- [x] A comment beside a FIELD survives into the created task. [proof: banner]
+- [x] `templateDrift()` still refuses a template whose values are outside the vocabulary. [proof: banner]
+- [x] The full suite is green. [proof: banner]
+
+## Decisions
+
+**Candidate 1 — strip the comment block above the first field — and not the
+sentinel.** The positional rule is not a heuristic that happens to fit: a
+comment standing before the FIRST field has no field to annotate. There is
+nothing above it but the opening `---`, so whatever it is about, it is not about
+a value in this file. That is exactly the banner's position in both templates,
+and it is the only position with that property. A `# note` beside a field is
+about that field and survives untouched — which is the half of the test that
+matters, because a fix reading "strip every comment" passes the other half and
+destroys everything the template teaches.
+
+**The cost, stated rather than discovered later.** A comment somebody
+deliberately writes above `id:`, meaning it to annotate `id:`, is deleted with
+the banner. The sentinel would have covered that case and would have cost every
+template author, forever, one more thing to know — to fix a case nobody has yet
+written. A comment meant to reach a task goes BELOW the first field, where it
+annotates something.
+
+**Blank lines in the leading block go with it.** A task beginning with the blank
+lines the banner was separated by would be a different kind of wrong, not a
+smaller one.
+
+**Two degenerate inputs are left ALONE rather than made tidy**: a file with no
+frontmatter, and a frontmatter that is nothing but comments. Emptying the second
+would turn a broken template into a silently different broken template.
+
+**The strip runs BEFORE the field rewrites, not after.** Every `^key:` pattern in
+`createTask()` is anchored per line, so a comment line beginning with one of
+those words would otherwise be a rewrite target.
+
+**`templateDrift()` is untouched**, and there is a test saying so. It reads the
+file on disk, banner and all; the strip happens on the copy being written.

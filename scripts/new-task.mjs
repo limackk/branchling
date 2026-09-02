@@ -247,6 +247,52 @@ function verificationEntry(v) {
   return "  - id: " + v.id + "\n    " + kind + ': "' + command + '"\n';
 }
 
+/**
+ * Remove the template's own banner — the comment block ABOVE the first field
+ * (TL-165).
+ *
+ * WHY A TASK MUST NOT CARRY IT. The block says "TASK TEMPLATE. `new` copies this
+ * file", which is true of the template and false of every file made from it. A
+ * task that opens by describing itself as the thing tasks are copied from is a
+ * file lying about what it is, and it has been that way in every consumer
+ * repository since `init` first shipped a template with a comment block.
+ *
+ * WHERE THE LINE RUNS, and it is a decision rather than a lookup, because two
+ * kinds of comment live in these files:
+ *
+ *   the banner       about the template AS A FILE — meaningless once copied
+ *   a `# note`       about the FIELD it sits beside — useful in every task,
+ *                    which is why `stripComment()` exists in the parsers
+ *
+ * THE DISCRIMINATOR IS POSITION, and it is not arbitrary: a comment standing
+ * before the FIRST field has no field to annotate. There is nothing above it
+ * but the opening `---`, so whatever it is about, it is not about a value in
+ * this file. That is exactly the banner's position in both templates, and it is
+ * the only position with that property.
+ *
+ * THE COST, stated rather than discovered later: a comment somebody deliberately
+ * writes above `id:` — meaning it to annotate `id:` — is deleted with the
+ * banner. The alternative was a sentinel line the template carries and this
+ * function consumes, which is explicit and costs every template author one more
+ * thing to know, forever, to fix a case nobody has yet written. A comment meant
+ * to reach a task goes BELOW the first field, where it annotates something.
+ *
+ * A TEMPLATE WITH NO BANNER IS UNCHANGED, and so is anything after the
+ * frontmatter: this reads only the block between the first two `---`.
+ */
+export function stripTemplateBanner(text) {
+  const lines = String(text).split("\n");
+  if (lines[0] !== "---") return text;
+  let i = 1;
+  // Blank lines go with it. A file that began with the blanks the banner was
+  // separated by would be a different kind of wrong, not a smaller one.
+  while (i < lines.length && (lines[i].trim() === "" || lines[i].trimStart().startsWith("#"))) i++;
+  // The closing `---` reached with no field in between is not a frontmatter this
+  // function understands, and it leaves it alone rather than emptying it.
+  if (i === 1 || i >= lines.length || lines[i].trim() === "---") return text;
+  return [lines[0]].concat(lines.slice(i)).join("\n");
+}
+
 export function createTask({ root, config, board, slug, fields, body }) {
   const paths = backlogPaths(root);
   const pat = taskIdPatterns(config.taskIdPrefix);
@@ -257,7 +303,10 @@ export function createTask({ root, config, board, slug, fields, body }) {
   const day = today();
   const opts = fields || {};
 
-  const template = readFileSync(join(root, "_template.md"), "utf8");
+  // The banner is dropped BEFORE the rewrites, not after: every `^key:` pattern
+  // below is anchored per line, and a comment line that happened to start with
+  // one of those words would otherwise be a rewrite target.
+  const template = stripTemplateBanner(readFileSync(join(root, "_template.md"), "utf8"));
   let text = template
     .replace(/^id: .*$/m, "id: " + taskId)
     .replace(/^title: .*$/m, "title: " + quoted(opts.title))
