@@ -1,6 +1,6 @@
 ---
 id: TL-12
-title: "INDEX.yaml jako indeks, nie kopia frontmattera — 149 KB → 70 KB"
+title: "INDEX.yaml as an index, not a copy of the frontmatter — 149 KB → 70 KB"
 type: code
 labels: [post-launch, ops-hardening]
 board: main
@@ -21,34 +21,52 @@ verification:
   - bash: "node backlog/scripts/build-backlog.mjs && wc -c backlog/INDEX.yaml"
 ---
 
-## Cel
+## Goal
 
-`INDEX.yaml` powielał cały frontmatter — 337 tasków × ~15 linii = 149 KB, czyli ~37k tokenów przy każdym odczycie. Indeks ma pozwolić **wybrać** task, a nie go opisać; opis stoi w pliku taska, który jest SSOT.
+`INDEX.yaml` duplicated the whole frontmatter — 337 tasks × ~15 lines = 149
+KB, i.e. ~37k tokens on every read. The index should let you **select** a
+task, not describe it; the description lives in the task file, which is the
+SSOT.
 
-## Kontekst
+## Context
 
-Zmierzone przed zmianą: `FOCUS.yaml` 14 KB (~3,5k tok), `INDEX.yaml` 149 KB (~37k tok). Rozmowa zaczęła się od pytania, czy usunąć pole `focus` „dla oszczędności tokenów" — pomiar pokazał, że cały focus to 3,5k, a dziesięciokrotność tego leży w indeksie, który przepisuje dane obecne w taskach.
+Measured before the change: `FOCUS.yaml` 14 KB (~3.5k tok), `INDEX.yaml` 149
+KB (~37k tok). The conversation started from the question of whether to
+remove the `focus` field "to save tokens" — the measurement showed that all
+of focus is 3.5k, and ten times that sits in the index, which copies data
+already present in the tasks.
 
-Co wypadło z wiersza i dlaczego akurat to:
-- `type`, `owner`, `estimate`, `confidence`, `created`, `updated` — opis taska, nie kryterium wyboru pracy;
-- `file` — nazwa pliku to `tasks/<id>-*.md`, a glob po samym ID jest jednoznaczny, bo pilnuje tego guard tożsamości (BL-900..903);
-- `epic` — stoi w nagłówku grupy, w wierszu był płacony 337 razy;
-- `board` w widokach **per board** — z tego samego powodu co epic (nagłówek pliku już go podaje);
-- `blocks` — odwrotność `blocked_by`, wyprowadzalna z pozostałych wierszy tego samego pliku.
+What was dropped from the row and why exactly this:
 
-Zostało to, po czym realnie wybiera się pracę: `id`, `priority`, `status`, `board`, `labels`, `blocked_by`, `title` (+ `focus`, dopóki pole istnieje).
+- `type`, `owner`, `estimate`, `confidence`, `created`, `updated` — a description of the task, not a criterion for choosing work;
+- `file` — the filename is `tasks/<id>-*.md`, and a glob on the ID alone is unambiguous, because the identity guard (BL-900..903) enforces it;
+- `epic` — it stands in the group heading, in the row it was being paid for 337 times;
+- `board` in **per-board** views — for the same reason as epic (the file header already states it);
+- `blocks` — the inverse of `blocked_by`, derivable from the other rows of the same file.
 
-Wiersz jest flow-mappingiem YAML, nie tekstem — indeks ma zostać maszynowy. Wymusiło to osobne cytowanie: w `{...}` wartość kończy nie tylko koniec linii, ale też `,` i `}`, więc tytuł „Rozdziel produkcję IG na posts i stories, bo…" bez cudzysłowów rozpadłby się na dwa pola (`yFlowStr`, obok istniejącego `yStr` dla formy blokowej).
+What is left is what work is actually chosen by: `id`, `priority`, `status`,
+`board`, `labels`, `blocked_by`, `title` (+ `focus`, as long as the field
+exists).
 
-Nikt nie parsuje `INDEX.yaml` maszynowo poza generatorem — sprawdzone gerpem po repo przed zmianą (viewer i guardy czytają `tasks/*.md`), więc zmiana formatu nie miała konsumenta do zepsucia. Konsumentem jest człowiek i agent.
+The row is a YAML flow mapping, not text — the index should stay
+machine-readable. This forced separate quoting: inside `{...}` a value ends
+not only at the end of the line but also at `,` and `}`, so a title like
+"Split IG production into posts and stories, because…" without quotes would
+fall apart into two fields (`yFlowStr`, alongside the existing `yStr` for the
+block form).
+
+Nobody parses `INDEX.yaml` programmatically besides the generator — checked
+with grep across the repo before the change (the viewer and the guards read
+`tasks/*.md`), so the format change had no consumer to break. The consumer
+is a human and an agent.
 
 ## Acceptance criteria
 
-- [x] Jedna linia na task, poprawny YAML (zweryfikowany prawdziwym parserem: 337 + 337 + 55 + 1006 wpisów w czterech widokach).
-- [x] `INDEX.yaml` < 75 KB — jest 69,6 KB (~17k tok, było ~37k).
-- [x] Widoki per board bez kolumny `board`.
-- [x] README: §2, §3.3, §5.1 i quick-reference zgodne z nowym kształtem.
-- [x] Testy: 28/28 zielonych (4 nowe przypadki kontraktu INDEX-u).
+- [x] One line per task, valid YAML (verified with a real parser: 337 + 337 + 55 + 1006 entries across four views).
+- [x] `INDEX.yaml` < 75 KB — it is 69.6 KB (~17k tok, was ~37k).
+- [x] Per-board views without a `board` column.
+- [x] README: §2, §3.3, §5.1 and the quick reference match the new shape.
+- [x] Tests: 28/28 green (4 new cases for the INDEX contract).
 
 ## Verification
 
@@ -60,15 +78,25 @@ node --test backlog/scripts/tests/boards.test.mjs
 
 ## Notes
 
-Próg 75 KB w teście jest ratchetem: gdy backlog urośnie, ma paść po to, żeby ktoś **świadomie** zdecydował, co dalej (paginacja? indeks per board jako domyślny odczyt?), a nie po to, żeby indeks po cichu wrócił do roli kopii.
+The 75 KB threshold in the test is a ratchet: when the backlog grows, it
+should fail so that someone **deliberately** decides what comes next
+(pagination? a per-board index as the default read?), not so that the index
+silently reverts to being a copy.
 
-Dwa protokoły w README wskazywały pola, których już nie ma — poprawione w tym samym commicie: §5.1 krok 3 mówił „sprawdź `blocks:` w INDEX-ie" (teraz: `grep 'blocked_by:.*BL-NNN'`), a quick-reference pokazywał `yq` z polem `owner`.
+Two protocols in the README pointed to fields that no longer exist — fixed
+in the same commit: §5.1 step 3 said "check `blocks:` in the INDEX" (now:
+`grep 'blocked_by:.*BL-NNN'`), and the quick reference showed `yq` with the
+`owner` field.
 
-Zaobserwowane przy okazji, NIE naprawiane (dane, nie format): kilka tasków ma w tytule literalne `\"` zamiast cudzysłowu zamykającego (np. BL-1157, BL-1055). Stary indeks niósł dokładnie to samo — to defekt źródła, nie regresja.
+Observed along the way, NOT fixed (data, not format): a few tasks have a
+literal `\"` in the title instead of a closing quote (e.g. BL-1157,
+BL-1055). The old index carried exactly the same thing — this is a defect
+in the source, not a regression.
 
-Następny krok w tej samej rozmowie: `NOW.yaml` wyliczany zamiast pola `focus` (osobny task, gdy founder zdecyduje).
+Next step in the same conversation: a computed `NOW.yaml` instead of the
+`focus` field (a separate task, once the founder decides).
 
 ## Log
 
-- 2026-08-29 done — claude — wiersz jednolinijkowy, próg rozmiaru w teście, README zsynchronizowane
-- 2026-08-29 renumbered — claude — kolizja BL-1384 z taskiem dashboardu (9 odwołań w kodzie mobilnym vs 1 tutaj); numer 1385 z `next-backlog-id.mjs`, kryterium „mniej odwołań" z backlog/README.md §3.4
+- 2026-08-29 done — claude — single-line row, size threshold in the test, README synchronized
+- 2026-08-29 renumbered — claude — collision of BL-1384 with the dashboard task (9 references in mobile code vs 1 here); number 1385 from `next-backlog-id.mjs`, the "fewer references" criterion from backlog/README.md §3.4

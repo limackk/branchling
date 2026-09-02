@@ -2,12 +2,26 @@
 /**
  * Guard: the public surface is written in English (TL-32).
  *
- * WHAT COUNTS AS THE PUBLIC SURFACE. Everything a user of the tool reads:
- * `scripts/` (CLI messages, `--help`, the viewer chrome the generator emits),
- * `bin/`, `README.md` and `_template.md`. The repository's own `docs/`,
- * `backlog/tasks/` and `backlog/config.yaml` are NOT public surface — they are
- * this project's own documents and data, and they stay in whatever language
- * their authors use. The boundary is the directory, not the topic.
+ * WHAT COUNTS AS THE PUBLIC SURFACE. Originally everything a user of the tool
+ * READS: `scripts/` (CLI messages, `--help`, the viewer chrome the generator
+ * emits), `bin/`, `README.md` and `_template.md`. `backlog/` and `docs/` were
+ * excluded — this project's own documents and data, free to stay in whatever
+ * language their authors used.
+ *
+ * TL-137 moved that boundary. It was drawn around what ships in the npm
+ * tarball; it is now drawn around what a STRANGER reads when they open the
+ * repository, and `backlog/tasks/` clears that bar more strongly than the
+ * code does — `LINEAGE.md` names it this tool's real development history.
+ * `backlog` and `docs` were added to `PUBLIC_PATHS` once every file under
+ * them was translated (TL-137), which is also why `backlog/config.yaml`,
+ * `backlog/plan.yaml` and `backlog/boards.yaml` are covered now too, as a
+ * side effect of adding the directory rather than only `backlog/tasks/` —
+ * they were translated by hand earlier and had never been brought under a
+ * guard that would keep them that way. `backlog/history/*.jsonl` stays
+ * invisible to this guard independent of that: `walk()` below only collects
+ * `.mjs`, `.js` and `.md` files, so the append-only log — whose `reason`
+ * fields are a person's own sentences, never corrected after the fact — is
+ * excluded by file extension, not by a special case in the path list.
  *
  * WHY A GUARD AND NOT A ONE-OFF CLEAN-UP. The translation in TL-32 was one
  * pass over 2,600 lines. Without something that fails, the next message written
@@ -20,12 +34,30 @@
  * cheap, so both run — the diacritics catch one half and a small stop-word list
  * catches the other.
  *
- * WHY THERE IS AN ALLOW LIST. Two things legitimately carry non-English
- * characters and must not be flagged: a transliteration table (its keys ARE the
- * accented letters the feature exists for) and a test whose input is deliberately
- * accented. Both are marked in the source with `language-guard: allow` on the
- * line or on the line above, so an exception is a decision written down rather
- * than a hole in the pattern.
+ * WHY INLINE CODE SPANS AND LINK TARGETS ARE STRIPPED BEFORE THE CHECK.
+ * TL-137 deliberately did NOT rename any file — a task's filename stays in
+ * whatever language it was created in, only its CONTENT changes (see that
+ * task's Decisions). That means every cross-reference between tasks — a
+ * markdown link, or a bare path in an inline code span — legitimately
+ * contains a Polish word as part of a filename, forever, for every task
+ * written from here on that links to one written before this migration. A
+ * guard that flagged those would either have to be silenced with an
+ * `language-guard: allow` marker on every single cross-reference (hundreds of
+ * them, and one more on every future task that links an old one) or be
+ * switched off — both are worse than the gap. `stripDataSpans()` removes an
+ * inline code span's content and a markdown link's `(...)` target from the
+ * text that gets SEARCHED, before either signal runs; the line reported in a
+ * finding is still the original, so a real mistake is still visible.
+ *
+ * WHY THERE IS ALSO AN ALLOW LIST. Some non-English text is not a path and
+ * cannot be stripped by shape alone — a transliteration table (its keys ARE
+ * the accented letters the feature exists for), a test whose input is
+ * deliberately accented, and (since TL-137) a handful of task files that
+ * quote real, historical Polish CLI output or Polish words as evidence of a
+ * bug, where translating the quote would falsify what was actually observed.
+ * Each is marked in the source with `language-guard: allow` on the line or on
+ * the line above, so an exception is a decision written down rather than a
+ * hole in the pattern.
  *
  * Usage:
  *   node scripts/check-public-language.mjs
@@ -82,8 +114,8 @@ const STRONG_WORDS =
 const STOP_WORDS =
   /\b(nie|jest|się|sie|przez|który|ktory|która|które|żeby|zeby|czyli|więc|wiec|jeśli|jesli|może|moze|musi|trzeba|zamiast|katalog|katalogu|widok|widoki|widoków|plik|pliku|plików|taska|tasku|tego|jak|bez|oraz|albo|wtedy|nigdy|zawsze|gdy|kiedy|liczy|daje|robi|zapis|odczyt|słownik|slownik|prefiks|numer|drzewo|drzewa|kolejka|kolejki|zakres|zakresu|pole|pola|polu|dzień|dni|godzin)\b/gi;   // language-guard: allow — the word list itself
 
-/** The files whose text reaches a user of the tool. */
-export const PUBLIC_PATHS = ["scripts", "bin", "README.md", "_template.md"];
+/** The files whose text reaches a user of the tool, or a stranger reading it. */
+export const PUBLIC_PATHS = ["scripts", "bin", "README.md", "_template.md", "backlog", "docs"];
 
 const SKIP_DIRS = new Set(["node_modules", ".git"]);
 
@@ -97,6 +129,17 @@ function walk(abs, out) {
   }
   if (/\.(mjs|js|md)$/.test(abs)) out.push(abs);
   return out;
+}
+
+/**
+ * Remove spans that are DATA, not prose, from a line before it is SEARCHED —
+ * see "WHY INLINE CODE SPANS AND LINK TARGETS ARE STRIPPED" above. Only the
+ * search text changes; a finding still reports the original line untouched.
+ */
+function stripDataSpans(line) {
+  return line
+    .replace(/`[^`]*`/g, "``")
+    .replace(/\]\([^)]*\)/g, "]()");
 }
 
 /**
@@ -115,15 +158,16 @@ export function auditText(text) {
     // reader would look for the reason anyway.
     const allowed = line.includes(ALLOW_MARKER) || (i > 0 && lines[i - 1].includes(ALLOW_MARKER));
     if (allowed) continue;
-    if (DIACRITICS.test(line)) {
+    const searched = stripDataSpans(line);
+    if (DIACRITICS.test(searched)) {
       problems.push({ line: i + 1, text: line.trim(), reason: "diacritics" });
       continue;
     }
-    if (STRONG_WORDS.test(line)) {
+    if (STRONG_WORDS.test(searched)) {
       problems.push({ line: i + 1, text: line.trim(), reason: "word" });
       continue;
     }
-    const hits = line.match(STOP_WORDS);
+    const hits = searched.match(STOP_WORDS);
     if (hits && hits.length >= 2) {
       problems.push({ line: i + 1, text: line.trim(), reason: "words" });
     }
@@ -169,9 +213,10 @@ function main() {
   }
   if (findings.length > 20) console.error(`  … and ${findings.length - 20} more`);
   console.error("");
-  console.error("  Everything a user of the tool reads is English: CLI messages, --help,");
-  console.error("  comments, the viewer chrome, README.md and _template.md. The repository's");
-  console.error("  own docs/ and backlog/ are not public surface and are not checked.");
+  console.error("  Everything in this repository is English (CLAUDE.md): CLI messages,");
+  console.error("  --help, comments, the viewer chrome, README.md, _template.md, the backlog");
+  console.error("  and docs/. A markdown link's target and an inline `code span` are not");
+  console.error("  searched — a task's filename is not part of this rule (TL-137).");
   console.error(`  A deliberate exception: put \`${ALLOW_MARKER}\` on the line or above it.`);
   return 1;
 }

@@ -1,10 +1,10 @@
 ---
 id: TL-40
-title: "check z wyborem guardu i regen-hook w CLI"
+title: "check with guard selection and regen-hook in the CLI"
 type: code
 labels: []
 board: main
-epic: "Powierzchnia CLI"
+epic: "CLI surface"
 priority: P1
 status: done
 owner: claude
@@ -19,69 +19,74 @@ verification:
   - bash: "node --test scripts/tests/cli.test.mjs"
 ---
 
-## Cel
+## Goal
 
-Projekt, który konsumuje `worktrail` z instalacji, ma mieć **komendę** na każdą
-rzecz, którą dziś robi wywołaniem pliku po ścieżce. Dziś dwie potrzeby nie mają
-komendy, więc jedynym wyjściem jest sięgnięcie do `node_modules/worktrail/scripts/…`
-— czyli dokładnie ta zależność od układu plików, którą instalacja miała usunąć.
+A project that consumes `worktrail` from an installation should have a
+**command** for everything it does today by calling a file by path. Today two
+needs have no command, so the only option is reaching into
+`node_modules/worktrail/scripts/…` — exactly the file-layout dependency the
+installation was meant to remove.
 
-## Kontekst
+## Context
 
-Zmierzone 2026-08-30 na realnym hooku `pre-commit` projektu, który wydzielił to
-narzędzie. Trzy braki:
+Measured 2026-08-30 on a real `pre-commit` hook in a project that split this
+tool out. Three gaps:
 
-**1. `check` nie umie wybrać guardu.** Robi zawsze oba. Hook potrzebuje ich
-osobno, bo mają **różny zakres z rozmysłem**: kolizja numerów jest właściwością
-ZBIORU (czyta całe drzewo), a board jest właściwością JEDNEGO pliku (czyta pliki
-ze stage'a — inaczej mój commit oblewałby przez cudzą pracę w toku). Zlanie ich w
-jedno wywołanie kasuje tę różnicę.
+**1. `check` cannot select a guard.** It always runs both. The hook needs them
+separately, because they have a **deliberately different scope**: an id
+collision is a property of the SET (it reads the whole tree), while a board is
+a property of a SINGLE file (it reads staged files — otherwise my commit would
+fail over someone else's work in progress). Merging them into one call erases
+that distinction.
 
-**2. `check` nie przyjmuje listy plików.** Guard boardów w trybie plikowym
-dostaje ścieżki jako argumenty pozycyjne. Bez tego hook musi wołać
-`check-backlog-boards.mjs` po ścieżce.
+**2. `check` does not accept a list of files.** The board guard in file mode
+receives paths as positional arguments. Without this the hook has to call
+`check-backlog-boards.mjs` by path.
 
-**3. Nie ma komendy na hook PostToolUse.** `regen-on-task-edit.sh` liczy sąsiadów
-przez `BASH_SOURCE`, więc *technicznie* zadziała też z `node_modules` — i to jest
-pułapka, nie zaleta: wygląda na przenośne, a wymaga, żeby konsument znał ścieżkę
-do wnętrza pakietu. Layout pakietu przestaje być wtedy szczegółem implementacji.
+**3. There is no command for the PostToolUse hook.** `regen-on-task-edit.sh`
+computes its siblings via `BASH_SOURCE`, so it *technically* also works from
+`node_modules` — and that is a trap, not a feature: it looks portable, and
+requires the consumer to know the path into the package's internals. The
+package layout then stops being an implementation detail.
 
-**Czwarta rzecz, znaleziona przy okazji:** `check` IGNORUJE nieznane flagi.
-`worktrail check --help` uruchamia guardy zamiast pokazać pomoc. To ten sam cichy
-no-op, dla którego powstało TL-25 — tyle że `check` powstał później i wypadł
-poza tamtą siatkę.
+**A fourth thing, found along the way:** `check` IGNORES unknown flags.
+`worktrail check --help` runs the guards instead of showing help. This is the
+same silent no-op that TL-25 was created for — except `check` was created
+later and fell outside that net.
 
 ## Pre-flight reading
 
-1. `scripts/cli.mjs` — `runCheck()`; dziś czyta wyłącznie `--dir` i milczy o
-   reszcie.
-2. `scripts/check-backlog-boards.mjs` — `--all` kontra argumenty pozycyjne.
-3. `scripts/check-backlog-id-collisions.mjs` — katalog jako `argv[2]`.
-4. `scripts/regen-on-task-edit.sh` — kształt wejścia (JSON hooka na stdin).
+1. `scripts/cli.mjs` — `runCheck()`; today it reads only `--dir` and is silent
+   about the rest.
+2. `scripts/check-backlog-boards.mjs` — `--all` versus positional arguments.
+3. `scripts/check-backlog-id-collisions.mjs` — the directory as `argv[2]`.
+4. `scripts/regen-on-task-edit.sh` — the input shape (the hook's JSON on stdin).
 
-## Kroki
+## Steps
 
-1. `check` przyjmuje `--id-collisions` i `--boards` jako selektory. Brak
-   selektora = oba, jak dziś (zgodność wstecz).
-2. `check --boards <plik…>` przekazuje ścieżki do guardu; bez plików i bez
-   `--all` — tryb `--all`.
-3. Walidacja flag: nieznana flaga **oblewa** exit 2, `--help` drukuje użycie.
-4. `regen-hook` — nowa komenda, czyta JSON hooka na stdin, robi to samo co
-   `regen-on-task-edit.sh`. ~~Skrypt zostaje jako implementacja~~ — **zmienione w
-   trakcie: skrypt USUNIĘTY**, powód w `## Log`.
-5. Kod wyjścia: przy dwóch guardach wygrywa **gorszy**, nie ostatni.
+1. `check` accepts `--id-collisions` and `--boards` as selectors. No selector =
+   both, as today (backward compatibility).
+2. `check --boards <file…>` passes the paths to the guard; with no files and no
+   `--all` — `--all` mode.
+3. Flag validation: an unknown flag **fails** with exit 2, `--help` prints
+   usage.
+4. `regen-hook` — a new command, reads the hook's JSON on stdin, does the same
+   thing as `regen-on-task-edit.sh`. ~~The script stays as the implementation~~
+   — **changed along the way: the script REMOVED**, reason in `## Log`.
+5. Exit code: with two guards, the **worse** one wins, not the last one.
 
 ## Acceptance criteria
 
-- [x] `check --id-collisions` uruchamia TYLKO guard kolizji — dowodem jest
-      wyjście, nie założenie.
-- [x] `check --boards <plik>` sprawdza wskazany plik, nie całe drzewo.
-- [x] `check --frobnicate` oblewa exit 2; `check --help` drukuje użycie i nie
-      uruchamia guardów.
-- [x] `regen-hook` regeneruje widoki i dopisuje historię z JSON-a na stdin.
-- [x] `regen-hook` przy pliku spoza `tasks/BL-*.md` jest cichy i kończy 0.
-- [x] Bez selektora `check` robi oba guardy i zwraca gorszy kod — test na parze
-      (zielony, czerwony), nie na samej ścieżce szczęśliwej.
+- [x] `check --id-collisions` runs ONLY the collision guard — proven by the
+      output, not by assumption.
+- [x] `check --boards <file>` checks the given file, not the whole tree.
+- [x] `check --frobnicate` fails with exit 2; `check --help` prints usage and
+      does not run the guards.
+- [x] `regen-hook` regenerates the views and appends to the history from the
+      JSON on stdin.
+- [x] `regen-hook` is silent and exits 0 for a file outside `tasks/BL-*.md`.
+- [x] Without a selector `check` runs both guards and returns the worse code —
+      tested on a pair (green, red), not just the happy path.
 
 ## Verification
 
@@ -89,22 +94,23 @@ poza tamtą siatkę.
 # expected: pass
 node --test scripts/tests/cli.test.mjs
 
-# Nieznana flaga oblewa — expected: exit 2
+# An unknown flag fails — expected: exit 2
 node scripts/cli.mjs check --frobnicate; echo "exit=$?"
 
-# Selektor zawęża — expected: jedna linia o kolizjach, ZERO o boardach
+# A selector narrows the scope — expected: one line about collisions, ZERO about boards
 node scripts/cli.mjs check --id-collisions
 ```
 
 ## Notes
 
-- Krok 3 jest tu, bo bez niego kroki 1–2 są niemierzalne: gdy nieznana flaga
-  przelatuje, `check --id-collisions` na starym kodzie też „przechodzi" — robiąc
-  oba guardy. Zielone przejście opisywałoby wtedy brak walidacji, nie selektor.
+- Step 3 is here because without it steps 1–2 are unmeasurable: when an
+  unknown flag slips through, `check --id-collisions` on the old code also
+  "passes" — while running both guards. A green pass would then be describing
+  the absence of validation, not the selector.
 
 ## Log
 
-- 2026-08-30 done — claude — 8 testów w `cli.test.mjs`, 7 red-first (ósmy — „gorszy kod wyjścia" — był już poprawny i dostał siatkę). Pełna suita: 220/234, te same 14 znanych oblanych z TL-38, zero nowych.
-- 2026-08-30 zmiana decyzji — claude — `regen-on-task-edit.sh` USUNIĘTY zamiast zostawiony. Powód: `regen-hook.mjs` nie jest jego opakowaniem, tylko drugą implementacją tej samej reguły („co jest taskiem" + „co po edycji"). Dwa miejsca znające jedną decyzję to gwarantowany rozjazd, a skrypt nie miał już żadnego wywołania w tym repo. Konsument (origin) woła własną kopię i przepina się w BL-1446.
-- 2026-08-30 pomyłka w teście — claude — pierwsza wersja szukała śladu guardu wzorcem `/numer|board/`, który pada też w TEKŚCIE POMOCY `check`; test raportował uruchomiony guard tam, gdzie wypisała się sama pomoc. Wzorce zawężone do zdań, które drukuje wyłącznie guard.
-- 2026-08-30 created — claude — brak zmierzony na hooku pre-commit projektu konsumującego (BL-1446); bez tych komend konsument musi wołać pliki z node_modules po ścieżce
+- 2026-08-30 done — claude — 8 tests in `cli.test.mjs`, 7 red-first (the eighth — "worse exit code wins" — was already correct and got a net). Full suite: 220/234, the same 14 known failures from TL-38, zero new ones.
+- 2026-08-30 change of decision — claude — `regen-on-task-edit.sh` REMOVED instead of kept. Reason: `regen-hook.mjs` is not a wrapper around it, but a second implementation of the same rule ("what counts as a task" + "what happens after an edit"). Two places knowing one decision is a guaranteed drift, and the script no longer had any caller in this repo. The consumer (origin) calls its own copy and switches over in BL-1446.
+- 2026-08-30 mistake in the test — claude — the first version looked for a trace of the guard with the pattern `/numer|board/`, which also matches the HELP TEXT of `check`; the test reported a guard as run where only the help text had been printed. Patterns narrowed to sentences that only the guard prints.
+- 2026-08-30 created — claude — gap measured on the pre-commit hook of a consuming project (BL-1446); without these commands the consumer has to call files from node_modules by path

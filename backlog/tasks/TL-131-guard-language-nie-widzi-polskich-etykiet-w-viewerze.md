@@ -1,6 +1,6 @@
 ---
 id: TL-131
-title: "Guard --language nie widzi polskich etykiet w viewerze"
+title: "The --language guard does not see Polish labels in the viewer"
 type: task
 labels: []
 board: main
@@ -22,41 +22,43 @@ verification:
     bash: "node scripts/cli.mjs check --language"
 ---
 
-## Cel
+## Goal
 
-`worktrail check --language` przechodzi na zielono, a mimo to viewer pokazuje
-polskie etykiety. W `scripts/build-viewer.mjs`, w mapie `HISTORY_FIELD_LABELS`,
-stoją `__created__: "task utworzony"`, `created: "Utworzony"` — obok wpisów
-angielskich (`__deleted__: "task deleted"`). Ta mapa jedzie do cudzych
-repozytoriów w wygenerowanej stronie, więc jest POWIERZCHNIĄ PUBLICZNĄ
-(TL-32), a guard jej nie łapie.
+`worktrail check --language` passes green, and yet the viewer shows Polish
+labels. In `scripts/build-viewer.mjs`, in the `HISTORY_FIELD_LABELS` map,
+there are `__created__: "task utworzony"`, `created: "Utworzony"` — sitting
+next to English entries (`__deleted__: "task deleted"`). This map ships into
+other people's repositories in the generated page, so it is a PUBLIC SURFACE
+(TL-32), and the guard does not catch it.
 
-Po zrobieniu: etykiety są angielskie ORAZ guard ma kontrolę pozytywną, która
-oblewa, gdy ktoś znów wpisze polskie słowo w tej mapie.
+Once done: the labels are English AND the guard has a positive control that
+fails when a Polish word is written into this map again.
 
-## Kontekst
+## Context
 
-Znalezione przy TL-99, kiedy `__comment__: "komentarz"` zamieniono na
-`"comment"` przy okazji implementacji komentarzy. Dwa pozostałe wpisy zostały,
-bo nie należały do tezy tamtego taska.
+Found during TL-99, when `__comment__: "komentarz"` was switched to
+`"comment"` while implementing comments. The two remaining entries were left
+because they were not part of that task's thesis.
 
-Ważniejsze od samej poprawki jest PYTANIE O GUARD: `check --language` czyta
-30 tys. linii i orzeka „reads as English", a te dwie linie przepuścił. Trzeba
-ustalić, dlaczego — heurystyka może pomijać krótkie stringi, wnętrza obiektów
-albo linie bez czasownika. Poprawienie samych etykiet bez zamknięcia dziury
-zostawia guard zielonym bez mocy dowodowej (reguła z CLAUDE.md).
+More important than the fix itself is the QUESTION ABOUT THE GUARD:
+`check --language` reads 30 thousand lines and rules "reads as English", and
+it let these two lines through. It needs to be established why — the
+heuristic may be skipping short strings, object interiors, or lines without a
+verb. Fixing the labels alone without closing the gap leaves the guard green
+with no evidentiary force (the rule from CLAUDE.md).
 
-## Kroki
+## Steps
 
-1. Ustalić, na czym `scripts/check-public-language.mjs` gubi te dwie linie —
-   zacząć od podania mu ich w izolacji jako kontroli pozytywnej.
-2. Poprawić etykiety na angielskie w `scripts/build-viewer.mjs`.
-3. Domknąć guard albo — jeśli okaże się to niewykonalne bez fałszywych
-   alarmów — dołożyć węższy test na samą mapę i opisać w tasku, dlaczego
-   ogólna reguła nie da rady.
+1. Establish where `scripts/check-public-language.mjs` loses these two
+   lines — start by feeding it them in isolation as a positive control.
+2. Fix the labels to English in `scripts/build-viewer.mjs`.
+3. Close the gap in the guard, or — if that turns out to be infeasible
+   without false positives — add a narrower test on the map itself and
+   describe in this task why the general rule cannot handle it.
 
 ## Acceptance criteria
 
-- [ ] Żadna wartość w `HISTORY_FIELD_LABELS` nie jest po polsku. [proof: labels-english]
-- [ ] Kontrola pozytywna: podstawienie polskiej etykiety OBLEWA. [proof: labels-english]
-- [ ] `check --language` nadal zielony po zmianie. [proof: guard-green]
+- [ ] No value in `HISTORY_FIELD_LABELS` is in Polish. [proof: labels-english]
+- [ ] Positive control: substituting a Polish label FAILS. [proof:
+      labels-english]
+- [ ] `check --language` still green after the change. [proof: guard-green]

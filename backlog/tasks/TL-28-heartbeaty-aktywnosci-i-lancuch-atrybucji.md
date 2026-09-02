@@ -1,10 +1,10 @@
 ---
 id: TL-28
-title: "Heartbeaty aktywności i łańcuch atrybucji"
+title: "Activity heartbeats and the attribution chain"
 type: code
 labels: [post-launch]
 board: main
-epic: "Backlog — pomiar czasu pracy"
+epic: "Backlog — work time measurement"
 priority: P2
 status: pending
 owner: unassigned
@@ -18,100 +18,180 @@ related_docs:
   - docs/backlog-time-tracking.md
 verification:
   - bash: "node --test backlog/scripts/tests/cluster.test.mjs backlog/scripts/tests/attribution.test.mjs"
-  - bash: "node backlog/scripts/cli.mjs time --engaged --json | python3 -c \"import json,sys; d=json.load(sys.stdin); assert 'unknown_ratio' in d, 'raport bez udziału unknown'; print('unknown:', d['unknown_ratio'])\""
-  - bash: "python3 -c \"import json,sys; h=json.load(open('.claude/settings.json'))['hooks']['PostToolUse']; ms=[e.get('matcher','') for e in h]; assert any(m in ('','*') or 'Bash' in m for m in ms), f'adapter aktywności nie widzi Bash: {ms}'; print('matcher pokrywa Bash — OK')\""
+  - bash: "node backlog/scripts/cli.mjs time --engaged --json | python3 -c \"import json,sys; d=json.load(sys.stdin); assert 'unknown_ratio' in d, 'report missing the unknown share'; print('unknown:', d['unknown_ratio'])\""
+  - bash: "python3 -c \"import json,sys; h=json.load(open('.claude/settings.json'))['hooks']['PostToolUse']; ms=[e.get('matcher','') for e in h]; assert any(m in ('','*') or 'Bash' in m for m in ms), f'activity adapter does not see Bash: {ms}'; print('matcher covers Bash — OK')\""
 ---
 
-## Cel
+## Goal
 
-Zacząć mierzyć **engaged time** — realny czas pracy nad taskiem, z wyciętymi przerwami, przypisany do właściwego taska. Bez tego kalibracja estymat (TL-29) nie ma wejścia, a to ona jest celem całego epiku.
+Start measuring **engaged time** — the real time spent working on a task,
+with breaks cut out, attributed to the right task. Without this, estimate
+calibration (TL-29) has no input, and that is the goal of the whole epic.
 
-## Kontekst
+## Context
 
-Po TL-27 istnieje warstwa danych i stemple ukończenia, ale nadal **zero** informacji o tym, jak długo praca trwała. Pomiar z §2 dokumentu pokazał, że tej liczby nie da się odzyskać z przeszłości — trzeba ją zacząć zbierać.
+After TL-27 a data layer and completion timestamps exist, but there is still
+**zero** information about how long the work took. The measurement in §2 of
+the document showed that this number cannot be recovered from the past — it
+has to start being collected.
 
-Trzy decyzje, które trzeba utrzymać, bo wszystkie są kontrintuicyjne, a dwie ostatnie wyszły dopiero z adwersarialnego przeglądu projektu:
+Three decisions that have to be upheld, because all of them are
+counterintuitive, and the last two only emerged from an adversarial review of
+the design:
 
-**Heartbeaty, nie pary start/stop.** Para gubi awarię: sesja zabita, laptop uśpiony, `Ctrl-C` — interwał nigdy się nie domyka i task raportuje nieskończony czas. Heartbeat jest kompletny w chwili zapisu; brak następnego jest informacją, nie uszkodzeniem.
+**Heartbeats, not start/stop pairs.** A pair loses a crash: a killed session,
+a laptop put to sleep, `Ctrl-C` — the interval never closes and the task
+reports infinite time. A heartbeat is complete the moment it is written; the
+absence of the next one is information, not corruption.
 
-**Heartbeat z KAŻDEGO narzędzia, nie z podzbioru.** Istniejący hook backlogu ma matcher `Edit|Write|MultiEdit` (`.claude/settings.json`). Gdyby adapter aktywności poszedł tą samą drogą, nie zobaczyłby ani jednego uruchomienia testów, builda, gita, czytania ani szukania. Skutkiem nie byłoby równomierne zaniżenie, tylko zaniżenie **skorelowane z rodzajem pracy**: task spędzony na uruchamianiu testów wyszedłby prawie darmowy, a task spędzony na pisaniu plików — drogi. Zaniżenie skorelowane jest gorsze od równomiernego, bo wygląda jak sygnał i wprost przekrzywia kalibrację.
+**A heartbeat from EVERY tool, not a subset.** The existing backlog hook has
+the matcher `Edit|Write|MultiEdit` (`.claude/settings.json`). If the activity
+adapter took the same path, it would not see a single test run, build, git
+command, read, or search. The result would not be a uniform underestimate,
+but an underestimate **correlated with the kind of work**: a task spent
+running tests would come out almost free, and a task spent writing files —
+expensive. A correlated underestimate is worse than a uniform one, because it
+looks like a signal and directly skews the calibration.
 
-**Atrybucja jest trudniejsza niż pomiar** i musi być automatyczna. Przypisanie czasu do złego taska wygląda identycznie jak przypisanie do dobrego. Zmierzone ograniczenia łańcucha w tym repozytorium:
+**Attribution is harder than measurement** and has to be automatic.
+Attributing time to the wrong task looks identical to attributing it to the
+right one. Measured limitations of the chain in this repository:
 
-- noga „ścieżka pliku" strzela **dwa razy na task** (wzięcie, zamknięcie) — cała praca dzieje się w plikach sub-repo;
-- noga „regex gałęzi" **nie strzela wcale** — gałęzie nazywają się `claude/task-<opis>`, bez numeru BL;
-- zostaje `focus`, a ręczne `worktrail focus` na starcie sesji to ten sam błąd, który dyskwalifikuje `timetrace`: mechanizm zależny od tego, czy ktoś pamiętał.
+- the "file path" leg fires **twice per task** (take, close) — all the work
+  happens in sub-repo files;
+- the "branch regex" leg **does not fire at all** — branches are named
+  `claude/task-<description>`, without a BL number;
+- that leaves `focus`, and a manual `worktrail focus` at the start of a
+  session is the same flaw that disqualifies `timetrace`: a mechanism
+  dependent on someone remembering.
 
-Dlatego fokus ustawia się **sam** w chwili, gdy agent zapisuje `status: in_progress` — hook już wtedy działa i już to zapisuje do `history/`. **Zakresem musi być SESJA, nie stan globalny:** globalnie `in_progress` jest 45 tasków, 32 z `owner: claude`, więc globalnie to pytanie nie ma jednej odpowiedzi. W obrębie sesji ma, bo jedna sesja bierze jeden task.
+That is why the focus sets **itself** the moment the agent writes `status:
+in_progress` — the hook already runs at that point and already writes it to
+`history/`. **The scope has to be the SESSION, not global state:** globally
+there are 45 tasks `in_progress`, 32 with `owner: claude`, so globally that
+question has no single answer. Within a session it does, because one session
+takes one task.
 
 ## Pre-flight reading
 
-1. `docs/architecture/backlog-time-tracking.md` — §5.3 (dlaczego heartbeaty), §6 (klastrowanie, trzy reguły), §7 (dlaczego wszystkie narzędzia + throttling), §8 (łańcuch atrybucji), §13 (czego to nie mierzy).
-2. `backlog/scripts/activity.mjs` — zapis/odczyt z TL-27.
-3. `backlog/scripts/regen-on-task-edit.sh` + `.claude/settings.json` — istniejący hook i jego matcher. Nowy adapter idzie obok, tą samą konwencją (cichy przy braku dopasowania, bez pętli), ale z **szerszym** matcherem.
-4. `backlog/scripts/estimate.mjs` — `sumHours()` zwracające `{hours, unknown}`. Raport engaged time trzyma ten sam kontrakt.
+1. `docs/architecture/backlog-time-tracking.md` — §5.3 (why heartbeats), §6
+   (clustering, three rules), §7 (why all tools + throttling), §8
+   (attribution chain), §13 (what this does not measure).
+2. `backlog/scripts/activity.mjs` — read/write from TL-27.
+3. `backlog/scripts/regen-on-task-edit.sh` + `.claude/settings.json` — the
+   existing hook and its matcher. The new adapter goes alongside it,
+   following the same convention (silent when there is no match, no loop),
+   but with a **wider** matcher.
+4. `backlog/scripts/estimate.mjs` — `sumHours()` returning `{hours,
+   unknown}`. The engaged-time report holds to the same contract.
 
-## Kroki
+## Steps
 
-1. `backlog/scripts/cluster.mjs` — funkcja PURE nad listą heartbeatów → klastry i minuty. Bez dysku i bez importów spoza modułu (ten sam rygor co `estimate.mjs`, żeby dała się wkleić do viewera).
-2. Trzy reguły z §6, każda z osobnym testem: klaster jednoelementowy = 0 minut i osobna liczba w raporcie; gap dokładnie na progu należy do poprzedniego klastra; sesje równoległe sumują się (wysiłek) i osobno dają rozpiętość kalendarzową.
-3. `backlog/scripts/attribution.mjs` — łańcuch pięcionożny z §8, zwracający `{task, attribution}`:
-   `focus` → `session-state` → `path` → `branch` → `unknown`. Nigdy nie zwraca taska bez powiedzenia, którą nogą go ustalił.
-4. `worktrail focus BL-NNNN` / `--clear` — wskaźnik sesji w pliku lokalnym (gitignored) + odczyt `BACKLOG_TASK` ze środowiska.
-5. **Auto-fokus:** zapis `status: in_progress` przez hook ustawia fokus TEJ sesji. Rozstrzygnąć i przetestować, co się dzieje, gdy jedna sesja weźmie drugi task — wygrywa ostatni, a poprzedni zostaje w logu z własnymi wierszami (nie przepisujemy wstecz).
-6. Adapter `backlog/scripts/activity-hook.sh` (PostToolUse) — emituje `kind: tool`. **Matcher obejmuje wszystkie narzędzia**, nie `Edit|Write|MultiEdit`.
-7. **Throttling obowiązkowy** — najwyżej jeden heartbeat na `heartbeat_throttle_seconds` (domyślnie 60) per sesja. Bez tego log rośnie liniowo z gadatliwością agenta, a rozdzielczość i tak ogranicza próg klastrowania.
-8. `worktrail activity record` — CLI przyjmujące flagi/stdin, żeby dowolny inny host (git hook, Cursor, WakaTime, prompt powłoki) mógł zasilać ten sam log. Rdzeń nie może zależeć od Claude Code'a.
-9. `worktrail time --engaged` — minuty per task, per okres, plus **udział `unknown` jako pole pierwszoklasowe** i liczba klastrów jednoelementowych (to ona rozstrzygnie założenie §14 pkt 4).
+1. `backlog/scripts/cluster.mjs` — a PURE function over the heartbeat list →
+   clusters and minutes. No disk access and no imports from outside the
+   module (the same rigor as `estimate.mjs`, so it can be pasted into the
+   viewer).
+2. Three rules from §6, each with its own test: a single-element cluster = 0
+   minutes and a separate figure in the report; a gap exactly at the
+   threshold belongs to the previous cluster; parallel sessions sum up
+   (effort) and separately give a calendar span.
+3. `backlog/scripts/attribution.mjs` — the five-leg chain from §8, returning
+   `{task, attribution}`: `focus` → `session-state` → `path` → `branch` →
+   `unknown`. It never returns a task without saying which leg established
+   it.
+4. `worktrail focus BL-NNNN` / `--clear` — a session pointer in a local file
+   (gitignored) + reading `BACKLOG_TASK` from the environment.
+5. **Auto-focus:** writing `status: in_progress` through the hook sets the
+   focus of THAT session. Decide and test what happens when one session
+   takes a second task — the latest one wins, and the previous one stays in
+   the log with its own rows (we do not rewrite backward).
+6. Adapter `backlog/scripts/activity-hook.sh` (PostToolUse) — emits `kind:
+   tool`. **The matcher covers all tools**, not `Edit|Write|MultiEdit`.
+7. **Throttling is mandatory** — at most one heartbeat per
+   `heartbeat_throttle_seconds` (default 60) per session. Without it the log
+   grows linearly with the agent's chattiness, and the clustering threshold
+   limits the resolution anyway.
+8. `worktrail activity record` — a CLI accepting flags/stdin, so that any
+   other host (a git hook, Cursor, WakaTime, a shell prompt) can feed the
+   same log. The core must not depend on Claude Code.
+9. `worktrail time --engaged` — minutes per task, per period, plus the
+   **`unknown` share as a first-class field** and the count of
+   single-element clusters (this is what will settle the assumption in §14
+   point 4).
 
 ## Acceptance criteria
 
-- [ ] Matcher hooka pokrywa `Bash` (i resztę narzędzi), nie tylko `Edit|Write|MultiEdit` — jest na to bramka w Verification.
-- [ ] Throttling działa: N wywołań narzędzi w ciągu jednego interwału daje jeden wiersz, nie N.
-- [ ] Klaster jednoelementowy liczy się jako 0 minut i pojawia się w raporcie jako osobna liczba.
-- [ ] Gap dokładnie równy `idle_gap_minutes` ma rozstrzygnięte i przetestowane zachowanie.
-- [ ] Heartbeaty poza kolejnością czasową dają ten sam wynik co posortowane.
-- [ ] Sesja bez „domknięcia" (brak ostatniego heartbeatu) nie produkuje nieskończonego czasu.
-- [ ] Dwie równoległe sesje nad jednym taskiem dają sumę wysiłku ≠ rozpiętość kalendarzową; obie liczby są w raporcie.
-- [ ] Zapis `status: in_progress` ustawia fokus sesji — jest na to test.
-- [ ] Atrybucja NIE czyta globalnego stanu `in_progress` (45 tasków) — jest na to test negatywny: dwa taski `in_progress` w dwóch sesjach nie mieszają się.
-- [ ] Łańcuch atrybucji ma test na KAŻDĄ z pięciu nóg.
-- [ ] `unknown_ratio` jest w raporcie zawsze, także gdy wynosi 0.
-- [ ] `worktrail activity record` działa bez Claude Code'a (test wołający samo CLI).
-- [ ] Hook nie wywołuje pętli i milczy przy braku dopasowania.
-- [ ] `qa/backlog-time-tracking.yaml` rozszerzone o przypadki klastrowania i atrybucji.
+- [ ] The hook matcher covers `Bash` (and the rest of the tools), not only
+      `Edit|Write|MultiEdit` — there is a gate for this in Verification.
+- [ ] Throttling works: N tool calls within one interval produce one row,
+      not N.
+- [ ] A single-element cluster counts as 0 minutes and appears in the report
+      as a separate figure.
+- [ ] A gap exactly equal to `idle_gap_minutes` has a decided and tested
+      behavior.
+- [ ] Heartbeats out of chronological order give the same result as sorted
+      ones.
+- [ ] A session without "closure" (no final heartbeat) does not produce
+      infinite time.
+- [ ] Two parallel sessions on one task give a sum of effort ≠ calendar
+      span; both figures are in the report.
+- [ ] Writing `status: in_progress` sets the session focus — there is a test
+      for this.
+- [ ] Attribution does NOT read global `in_progress` state (45 tasks) —
+      there is a negative test for this: two tasks `in_progress` in two
+      sessions do not mix.
+- [ ] The attribution chain has a test for EACH of the five legs.
+- [ ] `unknown_ratio` is always in the report, even when it is 0.
+- [ ] `worktrail activity record` works without Claude Code (a test calling
+      the CLI alone).
+- [ ] The hook does not trigger a loop and stays silent when there is no
+      match.
+- [ ] `qa/backlog-time-tracking.yaml` extended with clustering and
+      attribution cases.
 
 ## Verification
 
 ```bash
-# 1. Matematyka klastrów i atrybucja — expected: pass, w tym przypadki brzegowe
+# 1. Cluster math and attribution — expected: pass, including edge cases
 node --test backlog/scripts/tests/cluster.test.mjs backlog/scripts/tests/attribution.test.mjs
 
-# 2. Adapter widzi Bash — expected: "matcher pokrywa Bash — OK"
+# 2. Adapter sees Bash — expected: "matcher covers Bash — OK"
 python3 -c "import json; h=json.load(open('.claude/settings.json'))['hooks']['PostToolUse']; \
   ms=[e.get('matcher','') for e in h]; \
-  assert any(m in ('','*') or 'Bash' in m for m in ms), f'nie widzi Bash: {ms}'; print('matcher pokrywa Bash — OK')"
+  assert any(m in ('','*') or 'Bash' in m for m in ms), f'does not see Bash: {ms}'; print('matcher covers Bash — OK')"
 
-# 3. Rdzeń bez hosta — expected: wiersz dopisany, kod wyjścia 0
+# 3. Core without a host — expected: row appended, exit code 0
 node backlog/scripts/cli.mjs activity record --task TL-28 --kind tool --actor local:founder
 tail -1 backlog/activity/TL-28.jsonl
 
-# 4. Raport ZAWSZE podaje udział unknown — expected: klucz obecny
+# 4. The report ALWAYS gives the unknown share — expected: key present
 node backlog/scripts/cli.mjs time --engaged --json | python3 -c \
   "import json,sys; d=json.load(sys.stdin); assert 'unknown_ratio' in d; print('unknown:', d['unknown_ratio'])"
 
-# 5. Nieznana flaga oblewa zamiast po cichu przejść — expected: exit=2
-node backlog/scripts/cli.mjs activity record --frobnicate 2>/dev/null; test $? -eq 2 && echo 'nieznana flaga oblewa — OK'
+# 5. An unknown flag fails instead of silently passing — expected: exit=2
+node backlog/scripts/cli.mjs activity record --frobnicate 2>/dev/null; test $? -eq 2 && echo 'unknown flag fails — OK'
 ```
 
 ## Notes
 
-- Próg 10 minut pochodzi z praktyki WakaTime, nie z pomiaru na tych danych — to najsłabiej uzasadniona liczba w projekcie (§14 pkt 3). Po kilku tygodniach zbierania trzeba go dobrać z rozkładu odstępów i zapisać wynik w dokumencie.
-- Jeśli po pierwszym miesiącu `unknown_ratio` przekracza ~30%, zły jest łańcuch atrybucji, a nie dane (§14 pkt 2).
-- Throttling 60 s może gubić bardzo krótkie sesje (klaster jednoelementowy = 0 minut). Liczba takich klastrów jest raportowana właśnie po to, żeby dało się to rozstrzygnąć danymi, a nie opinią (§14 pkt 4).
-- Świadomie poza zakresem: tokeny (TL-30), kalibracja (TL-29), retencja i `reassign` (TL-31). **TL-31 nie może zostać w tyle o więcej niż jedną iterację** — od tego taska zaczynają powstawać dane osobowe.
+- The 10-minute threshold comes from WakaTime practice, not from a
+  measurement on this data — it is the least justified number in the design
+  (§14 point 3). After a few weeks of collecting data it has to be tuned from
+  the distribution of gaps, and the result recorded in the document.
+- If after the first month `unknown_ratio` exceeds ~30%, the attribution
+  chain is at fault, not the data (§14 point 2).
+- 60-second throttling can lose very short sessions (single-element cluster
+  = 0 minutes). The count of such clusters is reported precisely so that
+  this can be settled with data, not opinion (§14 point 4).
+- Deliberately out of scope: tokens (TL-30), calibration (TL-29), retention
+  and `reassign` (TL-31). **TL-31 must not fall behind by more than one
+  iteration** — this task is where personal data starts being produced.
 
 ## Log
 
-- 2026-08-30 created — claude — rozpisane z analizy pomiaru czasu (docs/architecture/backlog-time-tracking.md)
-- 2026-08-30 revised — claude — po adwersarialnym przeglądzie: matcher na wszystkie narzędzia (zaniżenie skorelowane z rodzajem pracy), auto-fokus przy `in_progress` scope'owany do sesji (45 globalnych `in_progress` czyni stan globalny bezużytecznym), throttling z opcji na wymóg
+- 2026-08-30 created — claude — written up from the time-tracking analysis
+  (docs/architecture/backlog-time-tracking.md)
+- 2026-08-30 revised — claude — after adversarial review: matcher on all
+  tools (underestimate correlated with the kind of work), auto-focus on
+  `in_progress` scoped to the session (45 global `in_progress` tasks make
+  global state useless), throttling changed from optional to required

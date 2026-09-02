@@ -108,15 +108,20 @@ titles and bodies, branch names, worktree names.
 
 Three things are enforced by a guard; the rest is this rule:
 
-- `worktrail check --language` reads the source that ships (`scripts/`, `bin/`,
-  `README.md`, `_template.md`). An exception there — a transliteration table,
-  test data — is marked with a `language-guard: allow` comment beside that ONE
-  line.
+- `worktrail check --language` reads `scripts/`, `bin/`, `README.md`,
+  `_template.md`, the whole `backlog/` directory, and `docs/` (TL-137). A
+  markdown link's target and an inline `` `code span` `` are not searched — a
+  task's filename is data, not prose (TL-137's Decisions: filenames are never
+  part of a translation, only file CONTENT is).
+  `backlog/history/*.jsonl` stays outside the guard's reach independent of
+  that: the walk only reads `.mjs`, `.js` and `.md` files, so the append-only
+  log is excluded by extension, not by a carve-out in the path list. Any other
+  exception — a transliteration table, test data, a quoted historical CLI
+  transcript that would be falsified by translating it — is marked with a
+  `language-guard: allow` comment beside that ONE line.
 - Nothing checks the git surface, deliberately: history cannot be inspected
   before it is written or corrected afterwards, so a guard would either run too
   late to help or demand a rewrite that costs more than it returns.
-- Nothing checks `docs/` or `backlog/` yet. Extending the guard is part of the
-  migration below, and it cannot be switched on until the last file is done.
 
 The commit history no longer carries a Polish exception. It was squashed to a
 single English commit on 2026-09-01, while the repository had no remote and
@@ -125,16 +130,19 @@ window has now closed: **from here on the history is immutable again**, and a
 commit written in the wrong language is fixed by writing the next one correctly,
 never by rewriting the old one.
 
-**What was written in Polish before this rule STAYS until a deliberate
-migration:**
+**What was written in Polish before this rule STAYS, and always will:**
 
 - **`backlog/history/*.jsonl`.** The log is append-only. A `reason` written by a
   person is their sentence, not a field a later pass may correct.
-- **`backlog/tasks/` and `docs/`.** Translating a task title changes its slug,
-  which changes the filename — a MIGRATION, not a fix in passing. **Do not
-  translate them opportunistically while doing other work:** half a backlog in
-  each language is worse than all of it in one, because a reader cannot tell a
-  missed file from an old one. There is a task for this.
+
+`backlog/tasks/` and `docs/` were the last two directories carrying this
+exception; TL-137 translated both (145 files) and is why the guard above now
+covers them. That migration deliberately did **not** rename any file —
+translating a task's title would change its slug, hence its filename, and a
+rename is a narrowly scoped, separate concern from a content migration (see
+TL-137's Decisions for the full reasoning). A task's filename may therefore
+still carry a Polish word forever; that is not an exception to this rule,
+because a filename is not something the rule about *content* governs.
 
 Other conventions:
 

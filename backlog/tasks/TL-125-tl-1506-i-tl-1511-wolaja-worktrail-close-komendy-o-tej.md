@@ -1,10 +1,10 @@
 ---
 id: TL-125
-title: "TL-96 i TL-101 wolaja worktrail close — komendy o tej nazwie nie ma"
+title: "TL-96 and TL-101 call worktrail close — no command by that name exists"
 type: task
 labels: []
 board: main
-epic: "Wyróżniki agentowe"
+epic: "Agent-facing differentiators"
 priority: P2                       # P0 blocker | P1 critical | P2 nice | P3 backlog
 status: done  # pending | in_progress | blocked | done | cancelled
 owner: agent:claude
@@ -14,7 +14,7 @@ updated: 2026-09-01
 blocked_by: []
 blocks: [TL-96, TL-101]
 related_docs: []
-verification:                      # JAK sprawdzić, że task naprawdę jest zrobiony
+verification:                      # HOW to check the task is really done
   - id: no-close-cmd
     bash: "! grep -rn 'worktrail close' backlog/tasks/ --exclude='TL-125-*' --exclude='TL-93-*'"
   - id: run-names-done
@@ -23,47 +23,52 @@ verification:                      # JAK sprawdzić, że task naprawdę jest zro
     bash: "node --test scripts/tests/verification-gate.test.mjs"
 ---
 
-## Cel
+## Goal
 
-Żaden task w `backlog/tasks/` nie każe wołać `worktrail close`. Komenda nazywa
-się `done` i nigdy nie nazywała się inaczej — `close` to nazwa robocza z tasków
-pisanych, zanim TL-82 ją zaimplementował.
+No task in `backlog/tasks/` tells the reader to call `worktrail close`. The
+command is named `done` and has never been named anything else — `close`
+was a working name from tasks written before TL-82 implemented it.
 
-## Kontekst
+## Context
 
-Wyszło przy zamykaniu TL-93 (2026-09-01). Dwa taski, które ten task właśnie
-odblokował, niosą tę nazwę:
+Surfaced while closing TL-93 (2026-09-01). Two tasks this task just
+unblocked carry that name:
 
-- **TL-101** — w bloku `verification:` ma wpis
+- **TL-101** — its `verification:` block has the entry
   `grep -q 'worktrail close' .claude/skills/backlog-workflow/SKILL.md`.
-  To nie jest literówka w prozie, tylko kontrakt zamknięcia: żeby go spełnić,
-  wykonawca musiałby WPISAĆ do skilla nieistniejącą komendę. Bramka
-  weryfikacji wymusiłaby wtedy wprowadzenie błędu do pliku, który jedzie do
-  cudzych repozytoriów.
-- **TL-96** — `## Cel` opisuje pętlę jako „próbuje zamknąć task bramką
-  weryfikacji (`close`, TL-93)".
+  This is not a typo in prose, it is the closing contract: to satisfy it,
+  whoever does the work would have to WRITE a nonexistent command into a
+  skill. The verification gate would then force a bug into a file that
+  ships into other people's repositories.
+- **TL-96** — its `## Goal` describes the loop as "tries to close the task
+  with the verification gate (`close`, TL-93)".
 
-Prozy zamkniętego **TL-93** ten task NIE rusza — jest zapisem decyzji, która
-zapadła, a nie długiem do posprzątania; dlatego jego plik jest wyłączony
-z grepa razem z tym taskiem, który tę frazę cytuje.
+This task does NOT touch the prose of closed **TL-93** — it is a record of
+a decision that was made, not debt to clean up; that is why its file is
+excluded from the grep together with this task, which quotes that phrase.
 
-Klasy błędu nie łapie żaden guard: `worktrail check` sprawdza id, boardy,
-referencje, słownictwo, język i nazwę produktu, ale nie sprawdza, czy komenda
-zawołana we `verification:` w ogóle istnieje. To osobne pytanie i osobny task —
-tutaj chodzi wyłącznie o dwa znane wystąpienia.
+No guard catches this class of bug: `worktrail check` checks ids, boards,
+references, vocabulary, language and product name, but does not check
+whether a command called in `verification:` even exists. That is a separate
+question and a separate task — this one is about only the two known
+occurrences.
 
-## Kroki
+## Steps
 
-1. W TL-101: wpis `verification:` i proza → `worktrail done`. Sprawdzić przy
-   okazji, czego naprawdę ma dowodzić — grep po SKILL.md jest kontraktem na
-   treść skilla, a skill od TL-87 odsyła do `worktrail instructions`.
-2. W TL-96: `## Cel` → `done` zamiast `close`; odniesienie do TL-93 zostaje,
-   bo to tam bramka została domknięta.
+1. In TL-101: the `verification:` entry and the prose → `worktrail done`.
+   Check along the way what it is actually meant to prove — a grep over
+   SKILL.md is a contract on the skill's content, and the skill has
+   deferred to `worktrail instructions` since TL-87.
+2. In TL-96: `## Goal` → `done` instead of `close`; the reference to TL-93
+   stays, because that is where the gate was closed.
 3. `worktrail build`.
 
 ## Acceptance criteria
 
-- [x] Żaden OTWARTY task nie woła `worktrail close`. [proof: no-close-cmd]
-- [x] Kontrakt TL-101 da się spełnić bez wpisania nieistniejącej komendy do `.claude/skills/`. [proof: no-close-cmd]
-- [x] `## Cel` TL-96 nazywa bramkę tak, jak nazywa się komenda. [proof: run-names-done]
-- [x] Bramka dalej zielona po zmianie. [proof: gate-still-green]
+- [x] No OPEN task calls `worktrail close`. [proof: no-close-cmd]
+- [x] The TL-101 contract can be satisfied without writing a nonexistent
+      command into `.claude/skills/`. [proof: no-close-cmd]
+- [x] TL-96's `## Goal` names the gate the same way the command is named.
+      [proof: run-names-done]
+- [x] The gate is still green after the change. [proof: gate-still-green]
+</content>

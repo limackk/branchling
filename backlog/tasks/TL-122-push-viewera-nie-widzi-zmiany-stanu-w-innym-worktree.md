@@ -1,6 +1,6 @@
 ---
 id: TL-122
-title: "Push viewera nie widzi zmiany stanu w innym worktree"
+title: "The viewer's push does not see a status change in another worktree"
 type: task
 labels: []
 board: main
@@ -21,66 +21,75 @@ verification:
   - id: no-regression
     bash: "node --test scripts/tests/*.test.mjs"
   - id: manual-two-trees
-    manual: "Przy otwartej stronie z `worktrail serve` w głównym checkoucie: `worktrail take <ID>` w DRUGIM worktree sprawia, że badge `<worktree>: in_progress` pojawia się na karcie bez przeładowania strony"
+    manual: "With a page open from `worktrail serve` in the main checkout: running `worktrail take <ID>` in a SECOND worktree makes the `<worktree>: in_progress` badge appear on the card without reloading the page"
 ---
 
-## Cel
+## Goal
 
-Otwarta strona viewera pokazuje wzięcie taska w innym worktree bez przeładowania.
-Dziś sygnał stanu z wielu gałęzi (TL-73) działa w ODCZYCIE, ale nie w pushu:
-strona zostaje stara, a czytelnik nie ma powodu nacisnąć F5.
+An open viewer page shows a task being taken in another worktree without a
+reload. Today the cross-branch status signal (TL-73) works on READ, but not
+on push: the page goes stale, and the reader has no reason to press F5.
 
-## Kontekst
+## Context
 
-`GET /` renderuje HTML per request (`scripts/serve-backlog.mjs:377-386`), więc po
-przeładowaniu badge `elsewhere` jest aktualny — dane są dobre, problem jest
-wyłącznie w powiadamianiu.
+`GET /` renders HTML per request (`scripts/serve-backlog.mjs:377-386`), so
+after a reload the `elsewhere` badge is up to date — the data is fine, the
+problem is entirely in notification.
 
-Push do przeglądarki wisi na jednym `fs.watch` nad WŁASNYM `backlog/tasks`
-(`scripts/serve-backlog.mjs:267-273`). `worktrail take <ID>` wykonany w innym
-worktree zapisuje plik w KATALOGU TAMTEGO DRZEWA — lokalnie nie zmienia się nic,
-więc watcher nie strzela i SSE milczy. To samo dotyczy commita na cudzej gałęzi.
+The push to the browser hangs on a single `fs.watch` over its OWN
+`backlog/tasks` (`scripts/serve-backlog.mjs:267-273`). `worktrail take <ID>`
+run in another worktree writes a file in THAT TREE'S directory — locally
+nothing changes, so the watcher does not fire and SSE stays silent. The same
+applies to a commit on someone else's branch.
 
-Dlaczego to jest wada, a nie kosmetyka: `crossBranchState()` istnieje po to, żeby
-widok z jednego checkoutu nie KŁAMAŁ o reszcie repozytorium. Strona, która trzyma
-nieaktualny skan i wygląda na żywą (bo dostaje pushe przy lokalnych edycjach),
-jest tym samym trybem awarii, tylko trudniejszym do zauważenia niż statyczny plik.
+Why this is a defect and not cosmetic: `crossBranchState()` exists so that the
+view from one checkout does not LIE about the rest of the repository. A page
+that holds a stale scan and looks alive (because it gets pushes on local
+edits) is the same failure mode, just harder to notice than a static file.
 
-Pułapki, które trzeba rozstrzygnąć w trakcie:
+Traps to resolve along the way:
 
-1. **Nie zakładaj watchera na cudze worktree.** Ich lista zmienia się w czasie
-   życia serwera (worktree powstają i są usuwane), a każdy nowy watcher to
-   deskryptor, którego nikt nie zamyka. Odpytywanie `crossBranchState()` w
-   interwale jest tańsze i nie zależy od tego, czy plik był brudny czy
-   zacommitowany.
-2. **Push tylko przy RÓŻNICY.** SSE ma lecieć, gdy zmieni się wynik skanu, a nie
-   co tick — inaczej strona przerysowuje się w kółko i pushe przestają cokolwiek
-   znaczyć.
-3. **Interwał jest wartością konfiguracji, nie literałem** (III prawo). Skan
-   uruchamia `git`, więc częstotliwość to koszt, o którym decyduje projekt.
-   Wyłącznik skanu (`crossBranchState: false`) MUSI wyłączać także tę pętlę.
-4. **Serwer bywa poza repozytorium git** — wtedy skan nie rusza (`reason`) i
-   pętla nie ma czego pilnować; nie wolno logować ostrzeżenia co tick.
+1. **Do not set up a watcher on other worktrees.** Their list changes over
+   the server's lifetime (worktrees are created and removed), and every new
+   watcher is a descriptor nobody closes. Polling `crossBranchState()` at an
+   interval is cheaper and does not depend on whether the file was dirty or
+   committed.
+2. **Push only on a DIFFERENCE.** SSE should fire when the scan result
+   changes, not every tick — otherwise the page keeps redrawing and pushes
+   stop meaning anything.
+3. **The interval is a configuration value, not a literal** (law III). The
+   scan runs `git`, so the frequency is a cost the project decides on. The
+   scan switch (`crossBranchState: false`) MUST also disable this loop.
+4. **The server is sometimes outside a git repository** — then the scan does
+   not run (`reason`) and the loop has nothing to watch; a warning must not
+   be logged every tick.
 
 ## Pre-flight reading
 
-1. `scripts/serve-backlog.mjs:245-273` — reconcile + `fs.watch` + `notifyClients()`.
-2. `scripts/branch-scan.mjs:400-430` — `crossBranchState()` i jego `reason`.
-3. `scripts/build-viewer.mjs:200-222` — gdzie `elsewhere` wchodzi do taska.
+1. `scripts/serve-backlog.mjs:245-273` — reconcile + `fs.watch` +
+   `notifyClients()`.
+2. `scripts/branch-scan.mjs:400-430` — `crossBranchState()` and its `reason`.
+3. `scripts/build-viewer.mjs:200-222` — where `elsewhere` enters the task.
 
-## Kroki
+## Steps
 
-1. Wyliczaj skrót wyniku `crossBranchState()` (para `id → obserwacje`) w interwale
-   z konfiguracji; przy zmianie skrótu wyślij zdarzenie SSE.
-2. Klucz konfiguracji na interwał w warstwie projektu; nieznany klucz oblewa.
-   Wyłączony skan = brak pętli.
-3. Test: fixture z dwoma worktree, take w drugim, oczekiwane zdarzenie na SSE
-   BEZ przeładowania. Kontrola pozytywna: przy braku zmiany nie leci nic.
+1. Compute a hash of the `crossBranchState()` result (a pair `id →
+   observations`) at a configured interval; send an SSE event when the hash
+   changes.
+2. A configuration key for the interval in the project layer; an unknown key
+   fails. A disabled scan means no loop.
+3. Test: a fixture with two worktrees, a take in the second one, an expected
+   SSE event WITHOUT a reload. Positive control: nothing fires when there is
+   no change.
 
 ## Acceptance criteria
 
-- [ ] Zmiana stanu taska w innym worktree wywołuje pushe do otwartej strony. [proof: suite]
-- [ ] Brak zmiany nie wywołuje pusha — test ma kontrolę negatywną i pozytywną. [proof: suite]
-- [ ] Interwał jest kluczem konfiguracji projektu, a wyłączony skan wyłącza pętlę. [proof: suite]
-- [ ] Serwer poza repozytorium git działa jak dziś i nie loguje ostrzeżenia w pętli. [proof: suite]
-- [ ] Pozostałe testy zielone. [proof: no-regression]
+- [ ] A task's status change in another worktree triggers pushes to the open
+      page. [proof: suite]
+- [ ] No change triggers no push — the test has a negative and a positive
+      control. [proof: suite]
+- [ ] The interval is a project configuration key, and a disabled scan
+      disables the loop. [proof: suite]
+- [ ] A server outside a git repository behaves as today and does not log a
+      warning in the loop. [proof: suite]
+- [ ] The rest of the tests stay green. [proof: no-regression]

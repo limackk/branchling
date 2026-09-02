@@ -1,10 +1,10 @@
 ---
 id: TL-98
-title: "Role w dyspozytorze i petli: next --role, agent per rola"
+title: "Roles in the dispatcher and the loop: next --role, agent per role"
 type: task
 labels: []
 board: main
-epic: "Wyróżniki agentowe"
+epic: "Agentic distinguishers"
 priority: P1
 status: done
 owner: agent:session
@@ -20,93 +20,99 @@ verification:
   - bash: "node --test scripts/tests/next.test.mjs scripts/tests/run.test.mjs"
 ---
 
-## Cel
+## Goal
 
-Dyspozytor i pętla rozumieją role:
+The dispatcher and the loop understand roles:
 
-- `worktrail next --role developer` wydaje wyłącznie taski z tą rolą lub bez
-  roli (`--role-strict` ogranicza do dokładnie tej roli);
-- w `worktrail run` komenda agenta staje się mapą per rola
-  (`run_agent_commands: {developer: "…", docs: "…"}`); task z rolą, dla
-  której mapa nie ma wpisu, jest POMIJANY z jawnym zliczeniem w raporcie —
-  czeka na wykonawcę tej roli, np. człowieka.
+- `worktrail next --role developer` hands out only tasks with that role or
+  with no role (`--role-strict` restricts it to exactly that role);
+- in `worktrail run` the agent command becomes a map per role
+  (`run_agent_commands: {developer: "…", docs: "…"}`); a task with a role
+  for which the map has no entry is SKIPPED with an explicit count in the
+  report — it waits for an executor of that role, e.g. a human.
 
-Efekt: jedna kolejka obsługuje wyspecjalizowanych agentów i ludzi naraz,
-a eskalacja do człowieka nie wymaga żadnego mechanizmu — jest brakiem wpisu
-w mapie.
+Effect: a single queue serves specialized agents and humans at once, and
+escalation to a human needs no mechanism at all — it is simply a missing
+entry in the map.
 
-## Kontekst
+## Context
 
-Powstało z decyzji o rolach subagentów (2026-08-31). To rozszerzenie dwóch
-istniejących kontraktów, nie nowy mechanizm: selekcja w `next` (TL-87)
-dostaje jeden filtr więcej, konfiguracja `run` (TL-96) zamienia skalar na
-mapę. Trzymać się granic tamtych tasków — lock, atrybucja i bramka weryfikacji
-nie zmieniają się ani o linię.
+Grew out of the decision on subagent roles (2026-08-31). This is an
+extension of two existing contracts, not a new mechanism: selection in
+`next` (TL-87) gets one more filter, `run`'s configuration (TL-96) turns a
+scalar into a map. Stay within the boundaries of those tasks — the lock,
+attribution and verification gate do not change by a single line.
 
-Decyzje:
-- **Zakres egzekwowania ról to WYŁĄCZNIE ten task**: selekcja `next` i mapa
-  komend `run`. `take <ID>` (TL-87) i bezpośrednia praca agenta na plikach
-  ról nie sprawdzają — wzięcie poza rolą jest odnotowywane w zdarzeniu, nie
-  blokowane (zasada w TL-97). Test regresji: `take` taska z dowolną rolą
-  przechodzi bez flag i bez konfiguracji ról.
-- **Domyślna semantyka `--role r` = „r albo bez roli"**, bo task bez roli
-  z definicji może wziąć każdy; wersja ścisła flagą. Odwrotny domyślny
-  (tylko dokładna rola) głodziłby taski bez roli, gdy wszyscy wykonawcy
-  wołają z flagą.
-- **Zgodność wstecz:** skalarny `run_agent_command` (z TL-96) nadal działa
-  jako wpis dla tasków bez roli; oba klucze naraz oblewają walidację
-  konfiguracji (dwie odpowiedzi na jedno pytanie — klasa rozjazdu z Prawa 3).
-- **Pominięcie nie jest ciszą.** Raport `run` zlicza taski pominięte per
-  brakująca rola („3 taski czekają na rolę analyst — brak komendy w mapie").
-  Cichy skip wyglądałby jak pusta kolejka — ta sama klasa błędu co cichy
-  no-op.
-- Nazwy ról w mapie muszą istnieć w słowniku `roles` projektu — literówka
-  w warstwie użytkownika oblewa, zanim pętla wystartuje.
+Decisions:
+- **The scope of role enforcement is EXCLUSIVELY this task**: `next`
+  selection and `run`'s command map. `take <ID>` (TL-87) and an agent
+  working directly on files of a given role do not check — taking outside
+  the role is recorded in the event, not blocked (the rule from TL-97).
+  Regression test: `take` on a task with any role passes without flags and
+  without role configuration.
+- **The default semantics of `--role r` is "r or no role"**, because a task
+  with no role can by definition be taken by anyone; the strict version is
+  a flag. The opposite default (exact role only) would starve tasks with no
+  role whenever every executor calls with the flag.
+- **Backward compatibility:** the scalar `run_agent_command` (from TL-96)
+  still works as the entry for tasks with no role; both keys at once fail
+  configuration validation (two answers to one question — the class of
+  divergence from Law 3).
+- **Skipping is not silence.** The `run` report counts skipped tasks per
+  missing role ("3 tasks waiting for role analyst — no command in the map").
+  A silent skip would look like an empty queue — the same class of bug as a
+  silent no-op.
+- Role names in the map must exist in the project's `roles` dictionary; a
+  typo in the user layer fails before the loop starts.
 
 ## Pre-flight reading
 
 - `backlog/tasks/TL-87-worktrail-next-atomowy-przydzial-taska-dla-agenta.md`
-  i `backlog/tasks/TL-96-worktrail-run-petla-next-agent-close-do-pustej-kolejki.md`
-  — kontrakty, które ten task rozszerza.
+  and `backlog/tasks/TL-96-worktrail-run-petla-next-agent-close-do-pustej-kolejki.md`
+  — the contracts this task extends.
 - `backlog/tasks/TL-97-pole-role-taska-wymog-roli-ze-slownika-konfiguracji.md`
-  — semantyka pola i słownika.
+  — the semantics of the field and the dictionary.
 - [docs/worktrail-global-tool.md](../../docs/worktrail-global-tool.md) §3 —
-  Prawo 3: mapa komend to warstwa użytkownika, słownik ról to warstwa
-  projektu; walidacja spójności między nimi.
+  Law 3: the command map is the user layer, the role dictionary is the
+  project layer; validation of consistency between them.
 
-## Kroki
+## Steps
 
-1. `next`: filtr roli w selekcji (domyślnie „rola albo brak", `--role-strict`
-   dokładnie); bez `--role` zachowanie bez zmian.
-2. Walidacja konfiguracji `run`: mapa vs skalar, klucze mapy wobec słownika
-   `roles`, konflikt obu form.
-3. Pętla: wybór komendy z mapy po roli taska; brak wpisu = pomiń task,
-   zlicz per rola, nie próbuj ponownie w tym przebiegu.
-4. Raport `run`: sekcja „czeka na rolę" z liczbami; `--json` analogicznie.
-5. Testy: filtr ról w next (z i bez strict), przebieg z mapą dwóch ról
-   i atrapami agentów, task z rolą bez wpisu pominięty i zliczony (kontrola
-   pozytywna: NIE trafia do agenta innej roli), konflikt skalar+mapa oblewa.
+1. `next`: role filter in selection (default "role or no role",
+   `--role-strict` exact); without `--role`, behavior unchanged.
+2. `run` configuration validation: map vs scalar, map keys against the
+   `roles` dictionary, conflict between both forms.
+3. Loop: pick the command from the map by the task's role; no entry = skip
+   the task, count per role, do not retry within this run.
+4. `run` report: a "waiting for role" section with counts; `--json`
+   likewise.
+5. Tests: role filter in next (with and without strict), a run with a map of
+   two roles and stub agents, a task with a role and no entry skipped and
+   counted (positive control: it does NOT go to an agent of another role),
+   scalar+map conflict fails.
 
 ## Acceptance criteria
 
-- [ ] `next --role r` nigdy nie wydaje taska z inną niepustą rolą.
-- [ ] Task z rolą bez wpisu w mapie nie jest wykonywany i jest zliczony
-      w raporcie per rola.
-- [ ] Skalarny `run_agent_command` działa jak dotąd; skalar + mapa naraz
-      oblewa walidację.
-- [ ] Klucz mapy spoza słownika `roles` oblewa przed startem pętli.
-- [ ] Zachowanie `next` i `run` bez ról jest bajtowo niezmienione
-      (regresja na istniejących testach).
-- [ ] `take <ID>` działa identycznie z rolami i bez nich — role nie dotykają
-      trybu bezpośredniego (test).
+- [ ] `next --role r` never hands out a task with a different, non-empty
+      role.
+- [ ] A task with a role and no entry in the map is not executed and is
+      counted in the per-role report.
+- [ ] The scalar `run_agent_command` works as before; scalar + map at once
+      fails validation.
+- [ ] A map key outside the `roles` dictionary fails before the loop starts.
+- [ ] The behavior of `next` and `run` without roles is byte-for-byte
+      unchanged (regression on existing tests).
+- [ ] `take <ID>` behaves identically with and without roles — roles do not
+      touch direct mode (test).
 
 ## Log
 
-Append-only. Format: `YYYY-MM-DD status — kto — notatka`.
+Append-only. Format: `YYYY-MM-DD status — who — note`.
 
-- 2026-08-31 blocked — agent:claude — task założony z decyzji o rolach;
-  czeka na pole role (TL-97) oraz kontrakty next (TL-87) i run (TL-96).
-- 2026-08-31 revised — agent:claude — zakres egzekwowania ról zawężony
-  jawnie do next/run; take i tryb bezpośredni poza nim.
-- 2026-09-01 blocked — agent:claude — dopisany dependent TL-113 (pole
-  executor rozszerza mechanikę pomijania i raportu z tego taska).
+- 2026-08-31 blocked — agent:claude — task created from the roles decision;
+  waiting on the role field (TL-97) and the next (TL-87) and run (TL-96)
+  contracts.
+- 2026-08-31 revised — agent:claude — scope of role enforcement explicitly
+  narrowed to next/run; take and direct mode are outside it.
+- 2026-09-01 blocked — agent:claude — added dependent TL-113 (the executor
+  field extends the skipping and reporting mechanics from this task).

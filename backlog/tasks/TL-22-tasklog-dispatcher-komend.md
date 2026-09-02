@@ -1,10 +1,10 @@
 ---
 id: TL-22
-title: "worktrail jako jedno wejście: dispatcher komend zamiast ośmiu ścieżek"
+title: "worktrail as one entry point: a command dispatcher instead of eight paths"
 type: code
 labels: [pre-launch]
 board: main
-epic: "worktrail — narzędzie"
+epic: "worktrail — the tool"
 priority: P1
 status: done
 owner: claude
@@ -18,59 +18,100 @@ related_docs:
   - docs/worktrail-state-and-sync.md
   - backlog/README.md
 verification:
-  - bash: "./scripts/worktrail query --status blocked --priority P0,P1  # lista tasków, NIE otwarta przeglądarka"
-  - bash: "./scripts/worktrail querry  # exit 2 z listą komend"
-  - bash: "./scripts/worktrail serve --frobnicate  # exit 2, serwer NIE startuje"
+  - bash: "./scripts/worktrail query --status blocked --priority P0,P1  # a list of tasks, NOT an open browser"
+  - bash: "./scripts/worktrail querry  # exit 2 with a list of commands"
+  - bash: "./scripts/worktrail serve --frobnicate  # exit 2, the server does NOT start"
   - bash: "node --test backlog/scripts/tests/cli.test.mjs"
 ---
 
-## Cel
+## Goal
 
-Zdjąć defekt zgłoszony przez foundera: **każda „komenda" inna niż serwer po cichu otwierała stronę** zamiast cokolwiek zrobić.
+Remove the defect reported by the founder: **every "command" other than the
+server silently opened a page** instead of doing anything.
 
-## Kontekst
+## Context
 
-`scripts/worktrail` miał 15 linii i kończył się `exec node serve-backlog.mjs "$@"` — był na sztywno przypięty do JEDNEGO skryptu. Serwer czytał tylko znane sobie flagi (`--port`, `--no-open`, `--dir`) i **ignorował resztę**, po czym `probeExisting()` widział działającą instancję i robił jedyną rzecz, jaką umiał: otwierał kartę.
+`scripts/worktrail` was 15 lines and ended in `exec node serve-backlog.mjs
+"$@"` — it was hard-wired to ONE script. The server only read the flags it
+knew about (`--port`, `--no-open`, `--dir`) and **ignored the rest**, after
+which `probeExisting()` saw a running instance and did the only thing it
+knew how to do: open a tab.
 
-Efekt: `worktrail query --status blocked` kończyło się na `http://127.0.0.1:4321/#tasks?board=__all__`. **Cichy no-op z efektem ubocznym jest gorszy od błędu, bo wygląda jak działanie.**
+Effect: `worktrail query --status blocked` ended up at
+`http://127.0.0.1:4321/#tasks?board=__all__`. **A silent no-op with a side
+effect is worse than an error, because it looks like it worked.**
 
-To nie była decyzja projektowa, tylko zaszłość: wrapper powstał, gdy jedyną rzeczą do odpalenia był serwer, a osiem kolejnych zdolności dorosło obok jako osobne `node backlog/scripts/<coś>.mjs`, każda z własną konwencją flag.
+This was not a design decision, just a leftover: the wrapper was created when
+the only thing to launch was the server, and eight further capabilities grew
+up alongside it as separate `node backlog/scripts/<something>.mjs` calls,
+each with its own flag convention.
 
-Druga pułapka tej samej klasy, znaleziona przy okazji: `check-backlog-boards.mjs` bez `--all <katalog>` kończył **zielono na „0 tasków sprawdzonych"** — zielony wynik przy zerowej mocy dowodowej.
+A second trap of the same class, found along the way:
+`check-backlog-boards.mjs` without `--all <dir>` ended **green on "0 tasks
+checked"** — a green result with zero evidentiary force.
 
-**Odrzucona alternatywa — flagi bez podkomend** (`worktrail --status blocked`, o co founder pytał wprost). `worktrail --port 4400` już znaczyło „uruchom serwer". Gdyby komendę wybierała flaga, `--status` znaczyłoby „pytaj", `--port` „serwuj", a `--dir` — przyjmowane przez OBIE — nie znaczyłoby nic rozstrzygającego. Rozstrzyganie komendy po tym, którą flagę ktoś akurat wpisał, to gwarantowany rozjazd. Podkomenda usuwa niejednoznaczność i **zachowuje nawyk**: `worktrail` bez argumentów to nadal serwer.
+**Rejected alternative — flags without subcommands**
+(`worktrail --status blocked`, which is what the founder literally asked
+about). `worktrail --port 4400` already meant "run the server". If the flag
+chose the command, `--status` would mean "query", `--port` would mean
+"serve", and `--dir` — accepted by BOTH — would not settle anything. Deciding
+the command by whichever flag someone happened to type is a guaranteed source
+of drift. A subcommand removes the ambiguity and **preserves the habit**:
+`worktrail` with no arguments is still the server.
 
-**Odrzucona alternatywa — import zamiast spawn.** Skrypty są samodzielnymi programami z własną walidacją flag i kodami wyjścia. Przepisanie ich na biblioteki + cienkie `main` to osobna robota; dispatcher, który je woła i PROPAGUJE kod wyjścia, daje jedno wejście bez ruszania pięciu działających programów.
+**Rejected alternative — import instead of spawn.** The scripts are
+standalone programs with their own flag validation and exit codes. Rewriting
+them as libraries with a thin `main` is separate work; a dispatcher that
+calls them and PROPAGATES the exit code gives a single entry point without
+touching five working programs.
 
-## Kroki
+## Steps
 
-1. `backlog/scripts/cli.mjs` — tabela komend, `helpText()`, PURE `resolveCommand()`, `main()` propagujący kod wyjścia.
-2. `serve-backlog.mjs` — nieznana flaga i nieoczekiwany argument OBLEWAJĄ (exit 2) zamiast być ignorowane.
-3. `check` jako komenda złożona: dokłada `--all <tasksDir>` i pozycyjny katalog, bo dwa guardy mają dwie różne konwencje wejścia.
-4. `scripts/worktrail` → mostek do `cli.mjs`; `package.json` → `node backlog/scripts/cli.mjs`.
+1. `backlog/scripts/cli.mjs` — command table, `helpText()`, a PURE
+   `resolveCommand()`, a `main()` that propagates the exit code.
+2. `serve-backlog.mjs` — an unknown flag or unexpected argument FAILS (exit
+   2) instead of being ignored.
+3. `check` as a composite command: adds `--all <tasksDir>` and a positional
+   directory, because the two guards have two different input conventions.
+4. `scripts/worktrail` → a bridge to `cli.mjs`; `package.json` → `node
+   backlog/scripts/cli.mjs`.
 
 ## Acceptance criteria
 
-- [x] `worktrail query --status blocked` zwraca taski — sprawdzone na realnym drzewie, zwróciło 5 blokerów.
-- [x] Nieznana komenda: exit 2 + lista dostępnych, ZERO odwołań do `127.0.0.1`.
-- [x] `worktrail serve --frobnicate` kończy 2 i nie startuje serwera (test z timeoutem, żeby regresja nie wieszała suity na 127 s).
-- [x] Kod wyjścia podkomendy propagowany (literówka we fladze `query` dalej oblewa).
-- [x] `worktrail --help` wymienia KAŻDĄ komendę z tabeli — generowane z niej, nie ręczna lista.
-- [x] `worktrail check` sprawdza realne taski (1368), nie zero.
-- [x] `worktrail` bez argumentów dalej uruchamia serwer (HTTP 200 na `/api/ping`).
-- [x] 13 testów `cli.test.mjs`; pełna suita backlogu zielona.
+- [x] `worktrail query --status blocked` returns tasks — checked on the real
+      tree, returned 5 blockers.
+- [x] Unknown command: exit 2 + list of available ones, ZERO references to
+      `127.0.0.1`.
+- [x] `worktrail serve --frobnicate` exits 2 and does not start the server
+      (test with a timeout, so a regression does not hang the suite for 127
+      s).
+- [x] Subcommand exit code propagated (a typo in a `query` flag still fails).
+- [x] `worktrail --help` lists EVERY command from the table — generated from
+      it, not a manual list.
+- [x] `worktrail check` checks real tasks (1368), not zero.
+- [x] `worktrail` with no arguments still starts the server (HTTP 200 on
+      `/api/ping`).
+- [x] 13 tests in `cli.test.mjs`; full backlog suite green.
 
 ## Notes
 
-**Świadomie POZA zakresem:**
+**Deliberately OUT of scope:**
 
-- `worktrail init` (założenie świeżego backlogu) i `worktrail stats` — wymagają wydzielenia rdzenia dashboardu; osobny task, gdy dojdzie do wydzielenia repo.
-- Per-komendowe `--help` z `usage` z tabeli — dziś `--help` leci do skryptu, który ma własną pomoc (albo jej nie ma).
-- Przepisanie skryptów na biblioteki + cienkie `main` — patrz „odrzucone alternatywy".
+- `worktrail init` (setting up a fresh backlog) and `worktrail stats` —
+  require extracting the dashboard core; a separate task, once the repo
+  extraction happens.
+- Per-command `--help` built from the table's `usage` — today `--help` goes
+  to the script, which has its own help (or none).
+- Rewriting the scripts as libraries with a thin `main` — see "rejected
+  alternatives".
 
-**Klasa buga do zapamiętania:** parser, który ignoruje nieznane wejście, zamienia literówkę w ciche wykonanie czegoś innego. Walidacja wejścia jest tańsza niż tłumaczenie, dlaczego narzędzie „nic nie robi".
+**Bug class worth remembering:** a parser that ignores unknown input turns a
+typo into silently running something else. Input validation is cheaper than
+explaining why the tool "does nothing".
 
 ## Log
 
-- 2026-08-29 created — claude — zgłoszenie foundera: „wszystkie komendy odpalają stronę"
-- 2026-08-29 done — claude — dispatcher + walidacja flag serwera + `check` bez fałszywej zieleni
+- 2026-08-29 created — claude — founder's report: "every command opens the
+  page"
+- 2026-08-29 done — claude — dispatcher + server flag validation + `check`
+  without false green

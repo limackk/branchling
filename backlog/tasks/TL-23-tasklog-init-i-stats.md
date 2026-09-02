@@ -1,10 +1,10 @@
 ---
 id: TL-23
-title: "worktrail init i stats — założenie backlogu i jego stan w terminalu"
+title: "worktrail init and stats — creating a backlog and showing its state in the terminal"
 type: code
 labels: [pre-launch]
 board: main
-epic: "worktrail — narzędzie"
+epic: "worktrail — the tool"
 priority: P2
 status: done
 owner: claude
@@ -23,50 +23,86 @@ verification:
   - bash: "node --test backlog/scripts/tests/init-stats.test.mjs"
 ---
 
-## Cel
+## Goal
 
-Domknąć dwie komendy odłożone w [TL-22](TL-22-worktrail-dispatcher-komend.md) jako „wymagają wydzielenia rdzenia dashboardu": `init` (założenie nowego backlogu) i `stats` (jego stan w terminalu).
+Close out the two commands deferred in [TL-22](TL-22-worktrail-dispatcher-komend.md)
+as "require extracting the dashboard core": `init` (creating a new backlog)
+and `stats` (its state in the terminal).
 
-## Kontekst
+## Context
 
-`stats` był odłożony, bo arytmetyka dashboardu żyje w `build-viewer.mjs` WEWNĄTRZ template literala viewera. Sprawdzenie przed pisaniem zmieniło zakres: **`computeStats` już istniał i był eksportowany**, a z całej reszty `stats` potrzebował wyłącznie przeliczania estymat na godziny (`DASH_UNIT_HOURS`, `dashHours`, `dashSumHours`, `dashHoursLabel`) — kilkanaście linii, nie 270-liniowy `computeDashboard`.
+`stats` was deferred because the dashboard's arithmetic lived inside
+`build-viewer.mjs`, INSIDE the viewer's template literal. Checking before
+writing changed the scope: **`computeStats` already existed and was
+exported**, and out of everything else `stats` needed only the estimate-to-
+hours conversion (`DASH_UNIT_HOURS`, `dashHours`, `dashSumHours`,
+`dashHoursLabel`) — a dozen or so lines, not the 270-line `computeDashboard`.
 
-Napisanie tego drugi raz w CLI znaczyłoby, że **dashboard i terminal mogą kiedyś podać dwie różne liczby na to samo pytanie**. Zamiast tego matematyka wyjechała do `estimate.mjs`, wklejanego ŹRÓDŁEM do viewera — ten sam wzorzec, co `task-fields.mjs` i `viewer-url.mjs`. Viewer stracił swoją kopię; jedna implementacja obsługuje obie powierzchnie.
+Writing that a second time in the CLI would have meant that **the dashboard
+and the terminal could someday give two different numbers for the same
+question.** Instead, the math moved to `estimate.mjs`, pasted as SOURCE into
+the viewer — the same pattern as `task-fields.mjs` and `viewer-url.mjs`. The
+viewer lost its own copy; one implementation now serves both surfaces.
 
-**Poza zakresem świadomie:** ekstrakcja `computeDashboard` (dni, wykresy, burndown, lead time). To ~270 linii sterujących wykresami; wyciąganie ich przy okazji `stats` byłoby refactorem o realnym ryzyku regresji bez potrzeby po stronie CLI.
+**Deliberately out of scope:** extracting `computeDashboard` (days, charts,
+burndown, lead time). That is ~270 lines driving charts; pulling them out
+alongside `stats` would be a refactor with real regression risk and no need
+on the CLI side.
 
-`init` ma odwrotne ryzyko niż `stats`: **pisze do cudzego katalogu, a zapis nie ma cofnięcia.** Stąd dwie decyzje, które wyglądają na przesadę:
+`init` carries the opposite risk from `stats`: **it writes into someone
+else's directory, and the write cannot be undone.** Hence two decisions
+that look like overkill:
 
-1. **`--dir` OBOWIĄZKOWE.** Wszystkie inne komendy wykrywają backlog w górę od cwd; tutaj wykrywanie byłoby zgadywaniem, GDZIE założyć pliki.
-2. **Istniejący plik jest POMIJANY i pominięcie jest wypisane.** Milczenie o pominiętym pliku czyta się jak zapis.
+1. **`--dir` is MANDATORY.** Every other command detects the backlog upward
+   from cwd; here, detection would mean guessing WHERE to create the files.
+2. **An existing file is SKIPPED and the skip is printed.** Silence about a
+   skipped file reads like a write.
 
-## Kroki
+## Steps
 
-1. `estimate.mjs` — estymata → godziny, bez importów, wklejany do viewera; usunięcie kopii z `build-viewer.mjs`.
-2. `stats.mjs` — czysta `summarize(tasks, config)`; aktywne vs zarchiwizowane WEDŁUG konfiguracji, nie po nazwie statusu.
-3. `stats-report.mjs` — odczyt `tasks/*.md` (nie widoków — te są gitignored) i formatowanie; `--json`.
-4. `init-backlog.mjs` — generyczne szablony (`config.yaml`, `boards.yaml`, `_template.md`, `.gitignore`, `.gitattributes`) + katalogi.
-5. Rejestracja obu w tabeli komend `cli.mjs`.
+1. `estimate.mjs` — estimate → hours, no imports, pasted into the viewer;
+   remove the copy from `build-viewer.mjs`.
+2. `stats.mjs` — a pure `summarize(tasks, config)`; active vs. archived
+   according to configuration, not by status name.
+3. `stats-report.mjs` — reads `tasks/*.md` (not the views — those are
+   gitignored) and formats it; `--json`.
+4. `init-backlog.mjs` — generic templates (`config.yaml`, `boards.yaml`,
+   `_template.md`, `.gitignore`, `.gitattributes`) plus directories.
+5. Register both in the `cli.mjs` command table.
 
 ## Acceptance criteria
 
-- [x] `worktrail init --dir <pusty>` daje backlog, na którym `build`, `check` i `stats` przechodzą — sprawdzone jako test i ręcznie.
-- [x] `init` nie nadpisuje istniejącego pliku, nie rusza istniejących tasków, dwa razy pod rząd to no-op.
-- [x] `init` bez `--dir` OBLEWA zamiast zgadywać katalog.
-- [x] Szablony generyczne — test przechodzi po słownictwie the origin project (`pre-launch`, `founder`, `data-gated`, `backlog-project`).
-- [x] `stats` liczy z konfiguracji: status nieużyty pokazuje ZERO zamiast zniknąć (brak wiersza czyta się jak „nie sprawdzałem").
-- [x] Estymata nieparsowalna daje `null`, nigdy zera, a raport pokazuje ILU tasków nie policzył.
-- [x] Liczby skonfrontowane z niezależnym źródłem: `stats` 342/1013 i `query --count` 342/1013; `blocked` 12 w obu.
-- [x] Viewer NIE ma już własnej kopii przeliczania estymat; regex sprawdzony w postaci, w jakiej trafia do przeglądarki (wykonany, nie tylko zgrepowany).
-- [x] 19 testów `init-stats.test.mjs`; pełna suita 169 zielona.
+- [x] `worktrail init --dir <empty>` produces a backlog on which `build`,
+      `check`, and `stats` pass — checked both as a test and manually.
+- [x] `init` does not overwrite an existing file, does not touch existing
+      tasks, and running it twice in a row is a no-op.
+- [x] `init` without `--dir` FAILS instead of guessing the directory.
+- [x] Generic templates — the test passes on the origin project's vocabulary
+      (`pre-launch`, `founder`, `data-gated`, `backlog-project`).
+- [x] `stats` computes from configuration: an unused status shows ZERO
+      instead of vanishing (a missing row reads as "I didn't check").
+- [x] An unparsable estimate gives `null`, never zero, and the report shows
+      HOW MANY tasks it could not count.
+- [x] Numbers cross-checked against an independent source: `stats` 342/1013
+      and `query --count` 342/1013; `blocked` 12 in both.
+- [x] The viewer no longer has its own copy of estimate conversion; the
+      regex was checked in the exact form it reaches the browser (run, not
+      just grepped).
+- [x] 19 tests in `init-stats.test.mjs`; full suite 169 green.
 
 ## Notes
 
-**Poprawka nazwy po sprawdzeniu wyniku:** pierwsza wersja raportu miała wiersz „zablokowanych: 79" tuż pod statusem `blocked: 12`. Dwie różne rzeczy pod jedną nazwą zmuszają czytelnika do zgadywania, którą właśnie widzi — wiersz nazywa się teraz „czeka na inne taski (niepuste `blocked_by`)".
+**A naming fix after checking the result:** the first version of the report
+had a row "blocked: 79" right under the `blocked: 12` status. Two different
+things under one name force the reader to guess which one they're looking
+at — the row is now named "waiting on other tasks (non-empty `blocked_by`)."
 
-**Nadal poza zakresem:** ekstrakcja `computeDashboard`, per-komendowe `--help` z `usage` z tabeli, `worktrail new` (założenie taska z szablonu + numer z `next-id`).
+**Still out of scope:** extracting `computeDashboard`, per-command `--help`
+built from the table's `usage`, `worktrail new` (creating a task from the
+template plus a number from `next-id`).
 
 ## Log
 
-- 2026-08-29 created — claude — domknięcie komend odłożonych w TL-22
-- 2026-08-29 done — claude — init + stats; przy okazji usunięta kopia przeliczania estymat z viewera
+- 2026-08-29 created — claude — closing out the commands deferred in TL-22
+- 2026-08-29 done — claude — init + stats; the copy of estimate conversion
+  removed from the viewer along the way

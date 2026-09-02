@@ -1,10 +1,10 @@
 ---
 id: TL-107
-title: "Plan wykonania: plan.yaml, parser i guard spójności"
+title: "Execution plan: plan.yaml, parser and consistency guard"
 type: task
 labels: []
 board: main
-epic: "Plan wykonania"
+epic: "Execution plan"
 priority: P1
 status: done  # pending | in_progress | blocked | done | cancelled
 owner: agent:claude
@@ -14,122 +14,131 @@ updated: 2026-09-01
 blocked_by: []
 blocks: [TL-108, TL-109]
 related_docs: []
-verification:                      # JAK sprawdzić, że task naprawdę jest zrobiony
+verification:                      # HOW to check that the task is really done
   - bash: "node --test scripts/tests/plan.test.mjs"
   - bash: "node scripts/cli.mjs check --plan"
 ---
 
-## Cel
+## Goal
 
-Kolejność implementacji backlogu ma być DANYMI w repozytorium: jeden plik
-`backlog/plan.yaml` opisujący fale (waves) wykonania, grupy „zrób razem"
-i uzasadnienie kolejności. Po tym tasku istnieje parser tego pliku oraz guard
-`worktrail check --plan`, który oblewa, gdy plan kłamie wobec grafu `blocked_by`.
+The implementation order of the backlog is to be DATA in the repository: one
+file, `backlog/plan.yaml`, describing execution waves, "do together" groups
+and the reasoning behind the order. After this task there is a parser for this
+file and a guard, `worktrail check --plan`, that fails when the plan lies
+against the `blocked_by` graph.
 
-Gdy task jest zrobiony, prawdą jest:
-- format `plan.yaml` jest zdefiniowany i sparsowany jednym modułem
-  (`scripts/plan.mjs`), z którego korzystają wszyscy konsumenci — bez drugiego
-  parsera w viewerze czy guardzie (ta sama zasada co `parseBoardsYaml`
-  w `scripts/config.mjs`),
-- niespójny plan oblewa build, zamiast cicho pokazywać złą kolejność.
+When the task is done, it is true that:
+- the `plan.yaml` format is defined and parsed by a single module
+  (`scripts/plan.mjs`), used by every consumer — with no second parser in the
+  viewer or the guard (the same principle as `parseBoardsYaml` in
+  `scripts/config.mjs`),
+- an inconsistent plan fails the build, instead of quietly showing the wrong
+  order.
 
-## Kontekst
+## Context
 
-Backlog ma ~70 tasków. Chcemy, by agent ustalał kolejność implementacji
-(które taski robić najpierw, które razem), a viewer pokazywał wykonanie planu
-na żywo. Analiza z 2026-09-01 (sesja Claude) rozstrzygnęła kluczowe decyzje:
+The backlog has ~70 tasks. We want an agent to settle the implementation
+order (which tasks to do first, which together), with the viewer showing plan
+execution live. The 2026-09-01 analysis (Claude session) settled the key
+decisions:
 
-- **Kolejność NIE jest boardem.** Board to partycja „kto/kontekst" (zamknięty
-  słownik w `boards.yaml`); kolejność wykonania to inna oś. Odrzucone.
-- **Kolejność NIE jest polem frontmattera** (`sequence:`). Przetasowanie planu
-  zmieniałoby 70 plików naraz — nieczytelny diff, konflikt z każdą gałęzią.
-  Odrzucone.
-- **Kolejność jest osobnym plikiem `backlog/plan.yaml`.** Decyzje agenta
-  (kolejność wśród tasków wolnych, grupy „razem", uzasadnienie) NIE są
-  wyliczalne z drzewa — to dane w rozumieniu prawa 1 z CLAUDE.md, więc jadą
-  w repo i przez review. Wyliczalna jest tylko ich WALIDACJA.
-- **Plan jest doradczy, status jest prawdą.** Plan niczego nie blokuje twardo;
-  jedyny twardy warunek to zgodność z `blocked_by` (task nie może stać w fali
-  wcześniejszej niż jego blokada). Inaczej plan stałby się drugim źródłem
-  prawdy o stanie.
-- Sam plan UKŁADA agent (ręcznie/w sesji) — narzędzie go tylko waliduje.
-  Automatyczne układanie planu to świadomie NIE jest zakres tego taska.
+- **Order is NOT a board.** A board is a "who/context" partition (a closed
+  vocabulary in `boards.yaml`); execution order is a different axis. Rejected.
+- **Order is NOT a frontmatter field** (`sequence:`). Reshuffling the plan
+  would change 70 files at once — an unreadable diff, conflicting with every
+  branch. Rejected.
+- **Order is a separate file, `backlog/plan.yaml`.** The agent's decisions
+  (the order among free tasks, "together" groups, the reasoning) are NOT
+  computable from the tree — this is data in the sense of law 1 in
+  CLAUDE.md, so it travels in the repo and through review. Only its
+  VALIDATION is computable.
+- **The plan is advisory, status is the truth.** The plan does not hard-block
+  anything; the only hard condition is agreement with `blocked_by` (a task
+  cannot sit in a wave earlier than its blocker). Otherwise the plan would
+  become a second source of truth about state.
+- The plan itself is LAID OUT by the agent (by hand / in a session) — the tool
+  only validates it. Automatically laying out the plan is deliberately NOT
+  the scope of this task.
 
-Proponowany format (do doprecyzowania w implementacji, klucze po angielsku —
-to powierzchnia narzędzia, wartości to dane projektu):
+Proposed format (to be refined during implementation, keys in English — this
+is the tool's surface, values are project data):
 
 ```yaml
 updated: 2026-09-01
-rationale: "jedno zdanie: dlaczego taka kolejność"
+rationale: "one sentence: why this order"
 waves:
-  - name: "Fundament"
+  - name: "Foundation"
     tasks: [TL-27, TL-28]
-  - name: "Konsumenci"
+  - name: "Consumers"
     tasks: [TL-29, TL-30]
-    together: [[TL-29, TL-30]]   # wspólny branch / wspólne pliki
+    together: [[TL-29, TL-30]]   # shared branch / shared files
 ```
 
-Reguły guarda (`worktrail check --plan`, dołączony też do zbiorczego
+Guard rules (`worktrail check --plan`, also included in the aggregate
 `worktrail check`):
 
-1. Każde ID w planie istnieje w drzewie (jak `check-backlog-refs`).
-2. Task w fali N nie ma w `blocked_by` taska z fali > N ani taska spoza planu,
-   który jest otwarty. Blokada w tej samej fali = ostrzeżenie (może być
-   sekwencją wewnątrz fali), w późniejszej = błąd.
-3. ID w `together` należą do tej samej fali.
-4. Duplikat ID w planie = błąd.
-5. Task zamknięty (`done`/`cancelled`) w planie NIE jest błędem — plan
-   historyczny ma prawo istnieć; to widok liczy „falę aktywną".
-6. BRAK `plan.yaml` nie jest błędem — funkcja jest opcjonalna; guard mówi
-   wtedy „no plan file" i przechodzi. Ale guard MUSI mieć kontrolę pozytywną
-   w testach (fixture ze złym planem, który oblewa) — guard zielony na zerowej
-   próbce nie dowodzi niczego (reguła z CLAUDE.md).
+1. Every ID in the plan exists in the tree (like `check-backlog-refs`).
+2. A task in wave N does not have, in `blocked_by`, a task from a wave > N
+   nor a task outside the plan that is open. A blocker in the same wave =
+   warning (it may be a sequence within the wave), in a later wave = error.
+3. IDs in `together` belong to the same wave.
+4. A duplicate ID in the plan = error.
+5. A closed task (`done`/`cancelled`) in the plan is NOT an error — a
+   historical plan has a right to exist; the view is what computes the
+   "active wave".
+6. A MISSING `plan.yaml` is not an error — the feature is optional; the guard
+   then says "no plan file" and passes. But the guard MUST have a positive
+   control in the tests (a fixture with a broken plan that fails) — a guard
+   that is green on a zero sample proves nothing (rule from CLAUDE.md).
 
-Czy `plan.yaml` jest wersjonowany: TAK (to dane, nie widok) — nie dopisywać go
-do gitignore generowanych widoków.
+Whether `plan.yaml` is versioned: YES (it is data, not a view) — do not add it
+to the gitignore of generated views.
 
 ## Pre-flight reading
 
-1. `CLAUDE.md` — cztery prawa; szczególnie 1 (dane w repo) i 2 (wyliczone
-   wolno skasować) — plan jest po stronie DANYCH.
-2. `scripts/config.mjs` — `parseBoardsYaml` jako wzorzec: jeden parser
-   ograniczonego kształtu YAML, zero zależności npm.
-3. `scripts/check-backlog-refs.mjs` — wzorzec guarda na wiszące ID i sposób
-   raportowania błędów.
-4. `scripts/cli.mjs` — jak `check` agreguje guardy i jak dodaje się flagę.
-5. `scripts/tests/dangling-refs.test.mjs` i `scripts/tests/_repo.mjs` —
-   wzorzec testu guarda na fixture (katalog backlogu ZAWSZE z `_repo.mjs`).
+1. `CLAUDE.md` — the four laws; especially 1 (data in the repo) and 2
+   (computed things may be deleted) — the plan is on the DATA side.
+2. `scripts/config.mjs` — `parseBoardsYaml` as the pattern: one parser for a
+   limited YAML shape, zero npm dependencies.
+3. `scripts/check-backlog-refs.mjs` — the pattern for a guard on dangling IDs
+   and how it reports errors.
+4. `scripts/cli.mjs` — how `check` aggregates guards and how a flag is added.
+5. `scripts/tests/dangling-refs.test.mjs` and `scripts/tests/_repo.mjs` — the
+   pattern for a guard test on a fixture (the backlog directory ALWAYS from
+   `_repo.mjs`).
 
-## Kroki
+## Steps
 
-1. Zdefiniuj i zaimplementuj parser `plan.yaml` w `scripts/plan.mjs`
-   (kształt jak wyżej; nieznany klucz oblewa — spójnie z resztą configów).
-2. Zaimplementuj walidację (reguły 1–6 z Kontekstu) w tym samym module,
-   zwracającą listę problemów z poziomami error/warning.
-3. Podepnij `worktrail check --plan` w `scripts/cli.mjs` i dołącz do zbiorczego
-   `worktrail check`; komunikaty po angielsku, styl jak pozostałe guardy.
-4. Testy: poprawny plan przechodzi; każdy typ błędu oblewa z czytelnym
-   komunikatem; brak pliku = pass z adnotacją; kontrola pozytywna obecna.
-5. Utwórz startowy `backlog/plan.yaml` dla tego epika (fale: TL-107 →
-   TL-108/TL-109 → TL-110) — plan śledzi własną implementację.
-6. Zaktualizuj `README.md` (sekcja o plikach backlogu) o `plan.yaml`.
+1. Define and implement the `plan.yaml` parser in `scripts/plan.mjs` (shape as
+   above; an unknown key fails — consistent with the rest of the configs).
+2. Implement validation (rules 1–6 from Context) in the same module, returning
+   a list of issues with error/warning levels.
+3. Wire `worktrail check --plan` into `scripts/cli.mjs` and include it in the
+   aggregate `worktrail check`; messages in English, in the style of the other
+   guards.
+4. Tests: a valid plan passes; every error type fails with a readable message;
+   a missing file = pass with an annotation; a positive control is present.
+5. Create a starter `backlog/plan.yaml` for this epic (waves: TL-107 →
+   TL-108/TL-109 → TL-110) — the plan tracks its own implementation.
+6. Update `README.md` (the section on backlog files) with `plan.yaml`.
 
 ## Acceptance criteria
 
-- [ ] `node --test scripts/tests/plan.test.mjs` zielone, z kontrolą pozytywną
-      (zły plan oblewa).
-- [ ] `worktrail check --plan` istnieje, jest w `--help` i w zbiorczym `check`.
-- [ ] Plan z taskiem ustawionym przed jego `blocked_by` oblewa build z
-      komunikatem wskazującym oba ID i obie fale.
-- [ ] Brak `plan.yaml` nie oblewa niczego.
-- [ ] Istnieje `backlog/plan.yaml` opisujący fale tego epika i przechodzi
-      własny guard.
-- [ ] Cała nowa powierzchnia (kod, komunikaty, testy) po angielsku;
-      `worktrail check --language` zielone.
+- [ ] `node --test scripts/tests/plan.test.mjs` green, with a positive control
+      (a broken plan fails).
+- [ ] `worktrail check --plan` exists, is in `--help` and in the aggregate
+      `check`.
+- [ ] A plan with a task placed before its `blocked_by` fails the build with
+      a message naming both IDs and both waves.
+- [ ] A missing `plan.yaml` fails nothing.
+- [ ] `backlog/plan.yaml` exists, describing this epic's waves, and passes its
+      own guard.
+- [ ] The entire new surface (code, messages, tests) is in English;
+      `worktrail check --language` is green.
 
 ## Log
 
-Append-only. Format: `YYYY-MM-DD status — kto — notatka`.
+Append-only. Format: `YYYY-MM-DD status — who — note`.
 
-2026-09-01 pending — agent:claude — task założony z analizy „plan wykonania
-z monitoringiem w viewerze"; rozstrzygnięcia projektowe w Kontekście.
+2026-09-01 pending — agent:claude — task created from the "execution plan with
+viewer monitoring" analysis; design decisions in Context.

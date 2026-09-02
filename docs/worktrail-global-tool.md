@@ -1,119 +1,190 @@
-# worktrail jako narzędzie globalne — katalog domowy, rejestr projektów, rozszerzalność
+# worktrail as a global tool — home directory, project registry, extensibility
 
-**Status:** PROJEKT (2026-08-30) — nic z tego nie jest wdrożone
-**Dotyczy:** `backlog/` jako narzędzie `worktrail` ([TL-20](../backlog/tasks/TL-20-domknij-nazwe-narzedzia-przed-publikacja.md) — nazwa wstępna)
-**Poprzednicy:** [backlog-config-and-portability.md](backlog-config-and-portability.md) (katalog danych jest argumentem), [worktrail-state-and-sync.md](worktrail-state-and-sync.md) (gdzie mieszka prawda), [backlog-time-tracking.md](backlog-time-tracking.md) (pomiar czasu — zmienia mu się lokalizacja logu)
-**Taski:** [TL-33](../backlog/tasks/TL-33-packaging-instalacja-globalna-i-npx.md) · [TL-34](../backlog/tasks/TL-34-katalog-domowy-preferencje-i-rejestr-projektow.md) · [TL-35](../backlog/tasks/TL-35-surowy-log-aktywnosci-do-katalogu-domowego.md) · [TL-36](../backlog/tasks/TL-36-widok-przekrojowy-nad-wieloma-projektami.md)
+**Status:** PROJECT (2026-08-30) — none of this is implemented
+**Concerns:** `backlog/` as the `worktrail` tool ([TL-20](../backlog/tasks/TL-20-domknij-nazwe-narzedzia-przed-publikacja.md) — working name)
+**Predecessors:** [backlog-config-and-portability.md](backlog-config-and-portability.md) (the data directory as an argument), [worktrail-state-and-sync.md](worktrail-state-and-sync.md) (where the truth lives), [backlog-time-tracking.md](backlog-time-tracking.md) (time tracking — its log's location is about to change)
+**Tasks:** [TL-33](../backlog/tasks/TL-33-packaging-instalacja-globalna-i-npx.md) · [TL-34](../backlog/tasks/TL-34-katalog-domowy-preferencje-i-rejestr-projektow.md) · [TL-35](../backlog/tasks/TL-35-surowy-log-aktywnosci-do-katalogu-domowego.md) · [TL-36](../backlog/tasks/TL-36-widok-przekrojowy-nad-wieloma-projektami.md)
 
 ---
 
-## 1. Pytanie
+## 1. The question
 
-Czy `worktrail` ma być narzędziem **globalnym** — zainstalowanym raz dla użytkownika, z własnym katalogiem domowym i rejestrem projektów — czy dalej modułem żyjącym wewnątrz jednego repozytorium?
+Should `worktrail` be a **global** tool — installed once for the user, with
+its own home directory and project registry — or remain a module living
+inside a single repository?
 
-Odpowiedź: **globalnym, ale wyłącznie jako program i wskaźniki. Dane tasków zostają w repozytoriach.** Ten dokument zapisuje granicę między jednym a drugim, prawa, które jej pilnują, i punkty rozszerzeń, przez które narzędzie ma rosnąć bez łamania zgodności.
+Answer: **global, but only as a program and pointers. Task data stays in the
+repositories.** This document records the boundary between the two, the laws
+that guard it, and the extension points through which the tool is meant to
+grow without breaking compatibility.
 
-## 2. Stan zastany — większość tej pracy jest zrobiona
+## 2. Existing state — most of this work is already done
 
-| Zdolność | Stan | Gdzie |
+| Capability | State | Where |
 |---|---|---|
-| Katalog danych jest **argumentem**, nie właściwością położenia kodu | ✅ zrobione (TL-18) | `paths.mjs`: `--dir` → `BACKLOG_DIR` → wykrywanie w górę od cwd → ko-lokacja |
-| Wykrywanie wymaga **znacznika**, nie samego `tasks/` | ✅ zrobione | `looksLikeBacklogDir()` — cudze repo z katalogiem `tasks/` jest częstsze, niż się wydaje |
-| Kod zna KSZTAŁT, konfiguracja zna WARTOŚCI | ✅ zrobione (TL-19) | `config.yaml`, nieznany klucz OBLEWA |
-| `init` do cudzego katalogu, bez zgadywania i bez nadpisywania | ✅ zrobione (TL-23) | `init --dir` obowiązkowe, istniejący plik pomijany i raportowany |
-| **Instalacja** — `package.json`, `bin/`, `npx worktrail` | ❌ **BRAK** | dokumentacja obiecuje `npx worktrail`, a moduł nie jest instalowalny |
-| Katalog domowy użytkownika, rejestr projektów | ❌ brak | żadnego `homedir()` ani `XDG_` w całym module |
+| The data directory is an **argument**, not a property of where the code sits | ✅ done (TL-18) | `paths.mjs`: `--dir` → `BACKLOG_DIR` → detection upwards from cwd → co-location |
+| Detection requires a **marker**, not `tasks/` alone | ✅ done | `looksLikeBacklogDir()` — a foreign repo with a `tasks/` directory is more common than it seems |
+| Code knows the SHAPE, configuration knows the VALUES | ✅ done (TL-19) | `config.yaml`, an unknown key FAILS |
+| `init` into a foreign directory, with no guessing and no overwriting | ✅ done (TL-23) | `init --dir` mandatory, an existing file skipped and reported |
+| **Installation** — `package.json`, `bin/`, `npx worktrail` | ❌ **MISSING** | the documentation promises `npx worktrail`, but the module is not installable |
+| A user home directory, a project registry | ❌ missing | not a single `homedir()` or `XDG_` anywhere in the module |
 
-> Wniosek: „zrobienie z tego narzędzia globalnego" to w 80% **spakowanie tego, co już działa**, a nie przebudowa. Jedyny twardy brak na tej drodze to packaging.
+> Conclusion: "making this a global tool" is 80% **packaging what already
+> works**, not a rebuild. The one hard gap on this path is packaging.
 
-## 3. Cztery prawa
+## 3. Four laws
 
-Rozszerzalność bierze się z niewielkiej liczby reguł, które trzymają się przy każdej nowej funkcji — nie z API wtyczek. Te cztery są kontraktem tego modułu i każda przyszła zmiana ma się o nie opierać.
+Extensibility comes from a small number of rules that hold across every new
+feature — not from a plugin API. These four are this module's contract, and
+every future change should rest on them.
 
-### Prawo 1 — dane w repozytorium, wskaźniki globalnie
+### Law 1 — data in the repository, pointers globally
 
-Taski, historia pól i konfiguracja projektu mieszkają w repo, przy kodzie. Katalog domowy trzyma **wyłącznie**: preferencje użytkownika, rejestr ścieżek do projektów i dane prywatne dla maszyny (§6).
+Tasks, field history and project configuration live in the repo, next to the
+code. The home directory holds **only**: user preferences, a registry of
+paths to projects, and data private to the machine (§6).
 
-Dlaczego nie odwrotnie: task w gicie jedzie z gałęzią, przechodzi przez review w PR, klonuje się razem z repozytorium, a `git log` na jego pliku jest jego historią. Przeniesienie tasków do `~/.worktrail/projects/foo/` daje dokładnie tę wadę, dla której [worktrail-state-and-sync.md §4.3](worktrail-state-and-sync.md) odrzucił Jirę i Lineara: **stan rozwiedziony z gałęzią**. To, że pliki byłyby lokalne zamiast w cudzej chmurze, zmienia tylko właściciela rozjazdu, nie sam rozjazd.
+Why not the other way round: a task in git travels with its branch, goes
+through review in a PR, clones with the repository, and `git log` on its file
+is its history. Moving tasks to `~/.worktrail/projects/foo/` reproduces
+exactly the defect that [worktrail-state-and-sync.md §4.3](worktrail-state-and-sync.md)
+rejected Jira and Linear for: **state divorced from the branch.** Files being
+local instead of in someone else's cloud only changes who owns the
+divergence, not the divergence itself.
 
-### Prawo 2 — co wyliczone, wolno skasować
+### Law 2 — what is computed may be deleted
 
-Widoki (`INDEX.yaml`, `NOW.yaml`, `boards/`), przyszły indeks SQLite, rejestr projektów, agregaty aktywności — **każde z nich musi dać się skasować bez utraty czegokolwiek**. Odtworzenie jest komendą, nie odzyskiwaniem.
+Views (`INDEX.yaml`, `NOW.yaml`, `boards/`), a future SQLite index, the
+project registry, activity aggregates — **every one of them must be
+deletable with nothing lost.** Rebuilding is a command, not a recovery.
 
-To jest test poprawności, nie deklaracja: jeśli skasowanie rejestru boli, znaczy że rejestr zdążył zostać prawdą, i wtedy błąd jest w projekcie, a nie w użytkowniku, który go skasował.
+This is a correctness test, not a declaration: if deleting the registry
+hurts, it means the registry has become a truth, and then the defect is in
+the design, not in the user who deleted it.
 
-**Wyliczone to nie to samo co odtwarzalne** (TL-86). Odhaczony checkbox w `## Acceptance criteria` jest WYLICZONY — stawia go narzędzie po zielonym przebiegu `verification`, nie człowiek — a mimo to jedzie do wersjonowanego pliku i nie wolno go skasować. To nie jest wyłom w tym prawie, tylko granica, po której ono biegnie: widok da się **odtworzyć z tasków jedną komendą**, a wynik przebiegu, który już się odbył, da się odtworzyć wyłącznie przez ponowne uruchomienie — przeciw drzewu, które w międzyczasie się ruszyło. To nie jest to samo pytanie i nie ma tej samej odpowiedzi.
+**Computed is not the same as reconstructible** (TL-86). A checked checkbox
+in `## Acceptance criteria` is COMPUTED — the tool sets it after a green
+`verification` run, not a human — and yet it travels in a versioned file and
+must not be deleted. This is not a breach of this law, but the boundary it
+runs along: a view can be **rebuilt from the task files alone in one
+command**, while the result of a run that already happened can only be
+recreated by running it again — against a tree that has since moved on. That
+is not the same question and does not have the same answer.
 
-Kryterium rozstrzygające brzmi więc: *czy do odtworzenia tego wystarczą pliki tasków?* Jeśli tak — to widok, kasuj do woli. Jeśli potrzeba jeszcze CZASU, w którym coś zaszło — to zapis zdarzenia, tej samej klasy co linia w `## Log` albo wpis w historii pól, i podlega prawu 1, nie prawu 2.
+The deciding criterion, then: *is it enough to reconstruct this from the task
+files?* If yes — it is a view, delete it freely. If it also needs the TIME at
+which something happened — it is an event record, the same class as a line in
+`## Log` or an entry in the field history, and falls under law 1, not law 2.
 
-### Prawo 3 — warstwa dokłada tylko to, czego druga nie może wiedzieć
+### Law 3 — a layer adds only what the other cannot know
 
-Dwie warstwy konfiguracji to gwarantowany rozjazd, o ile obie mogą mówić o tym samym. Granica jest więc **rozłączna, nie priorytetowa**:
+Two configuration layers are a guaranteed drift, as long as both can speak
+about the same thing. The boundary is therefore **disjoint, not
+prioritised**:
 
-| Warstwa | Trzyma | Przykłady |
+| Layer | Holds | Examples |
 |---|---|---|
-| **użytkownik** (`~/.worktrail/config.yaml`) | to, co jest faktem o CZŁOWIEKU i jego maszynie | tożsamość aktora, edytor, motyw, domyślny port, format daty |
-| **projekt** (`<repo>/backlog/config.yaml`) | to, co jest faktem o PROJEKCIE | statusy, priorytety, typy, labels, boardy, kolory, `title_max_length` |
+| **user** (`~/.worktrail/config.yaml`) | what is a fact about the HUMAN and their machine | actor identity, editor, theme, default port, date format |
+| **project** (`<repo>/backlog/config.yaml`) | what is a fact about the PROJECT | statuses, priorities, types, labels, boards, colors, `title_max_length` |
 
-**Warstwa użytkownika nie ma prawa nadpisać słownictwa projektu.** Gdyby mogła, dwie osoby zobaczyłyby różne boardy dla tego samego repozytorium, a moduł właśnie skończył wyprowadzać te wartości do `config.yaml` po to, żeby były jedną prawdą. Klucz zadeklarowany w złej warstwie **OBLEWA**, tak jak dziś oblewa nieznany klucz — literówka w warstwie jest nieodróżnialna od „ten projekt tak ma".
+**The user layer has no right to override the project's vocabulary.** If it
+could, two people would see different boards for the same repository, and
+the module just finished moving these values into `config.yaml` precisely so
+they would be one truth. A key declared in the wrong layer **FAILS**, exactly
+like an unknown key fails today — a typo in the layer is indistinguishable
+from "this project just works that way".
 
-### Prawo 4 — rozszerzalność przez kompozycję, nie przez API wtyczek
+### Law 4 — extensibility through composition, not a plugin API
 
-API wtyczek to kontrakt zgodności, którego nie da się złamać po pierwszym zewnętrznym użytkowniku, a utrzymuje go jedna osoba. Zamiast tego:
+A plugin API is a compatibility contract that cannot be broken once the first
+external user exists, and one person maintains it. Instead:
 
-- **każda komenda czytająca ma `--json`** — to jest powierzchnia rozszerzeń. Od TL-72 odpowiedź jest KOPERTĄ (`schemaVersion`, `kind`, ładunek), a nie gołą tablicą: goła tablica nie ma gdzie pomieścić metadanych, więc każde dołożenie pola byłoby zerwaniem kontraktu. Kształt kopert deklaruje `scripts/json-envelope.mjs`, kontrakt spisuje README;
-- **każda komenda pisząca ma postać wywoływalną z zewnątrz** (`activity record`, `new`, `set`), więc cudzy skrypt, hook czy inny host zasila `worktrail` bez wiedzy o jego wnętrzu;
-- słownik podkomend (`COMMANDS` w `cli.mjs`) pozostaje **zamknięty**, bo nieznana komenda ma oblewać, a nie milczeć.
+- **every reading command has `--json`** — this is the extension surface.
+  Since TL-72 the response is an ENVELOPE (`schemaVersion`, `kind`, payload),
+  not a bare array: a bare array has nowhere to hold metadata, so every added
+  field would be a breaking change. The envelope shape is declared by
+  `scripts/json-envelope.mjs`, the contract is written up in the README;
+- **every writing command has a form callable from outside**
+  (`activity record`, `new`, `set`), so an outside script, hook or other
+  host feeds `worktrail` without knowing its internals;
+- the subcommand vocabulary (`COMMANDS` in `cli.mjs`) stays **closed**,
+  because an unknown command should fail, not stay silent.
 
-Efekt: integracja z WakaTime, cudzym CI czy dowolnym edytorem jest skryptem nad stabilnym wejściem/wyjściem, a nie wtyczką w cudzym procesie. Wersja płatna/hostowana z [worktrail-state-and-sync.md §6](worktrail-state-and-sync.md) wchodzi tą samą drogą.
+Effect: integrating with WakaTime, someone else's CI, or any editor is a
+script over a stable input/output, not a plugin inside someone else's
+process. The paid/hosted version from
+[worktrail-state-and-sync.md §6](worktrail-state-and-sync.md) enters the same way.
 
-## 4. Rozbicie pomysłu — dwie rzeczy dobre, jedna zła
+## 4. Breaking the idea down — two good parts, one bad one
 
-| Składnik | Werdykt | Powód |
+| Component | Verdict | Reason |
 |---|---|---|
-| Globalny binarny (`npm i -g`, `npx`) | ✅ TAK | brakujący element; wymagany i tak do publikacji |
-| `~/.worktrail/` — preferencje + rejestr **wskaźników** | ✅ TAK | odblokowuje widok przekrojowy i atrybucję pomiaru czasu |
-| Taski przeniesione do katalogu domowego | ❌ NIE | łamie Prawo 1 |
+| A global binary (`npm i -g`, `npx`) | ✅ YES | the missing piece; needed for publication regardless |
+| `~/.worktrail/` — preferences + a registry of **pointers** | ✅ YES | unlocks the cross-project view and time-tracking attribution |
+| Tasks moved into the home directory | ❌ NO | breaks Law 1 |
 
-### 4.1. Czego rejestr NIE kupuje
+### 4.1. What the registry does NOT buy
 
-**Nie kupuje „znajdowania backlogu".** Wykrywanie w górę od cwd już to robi i robi dobrze. Rejestr zbudowany po to byłby drugą odpowiedzią na pytanie, które ma już jedną — czyli dokładnie tym rozjazdem, przed którym ostrzega Prawo 3.
+**It does not buy "finding the backlog".** Detection upwards from cwd already
+does that, and does it well. A registry built for that would be a second
+answer to a question that already has one — exactly the divergence Law 3
+warns against.
 
-### 4.2. Co rejestr kupuje naprawdę
+### 4.2. What the registry genuinely buys
 
-1. **Widok przekrojowy** — „nad czym pracuję we wszystkich projektach". Dziś niemożliwy, bo żadne miejsce nie wie, że projektów jest więcej niż jeden.
-2. **Atrybucję pomiaru czasu poza repo.** Heartbeat z [TL-28](../backlog/tasks/TL-28-heartbeaty-aktywnosci-i-lancuch-atrybucji.md) musi wiedzieć nie tylko *który task*, ale *który projekt*. Bez rejestru `activity record` wymaga `--dir` przy każdym wywołaniu; z rejestrem mapuje cwd → projekt.
-3. **Prywatność surowego logu aktywności** — §6. To jest najmocniejszy pojedynczy argument za katalogiem domowym.
+1. **A cross-project view** — "what am I working on across all projects".
+   Impossible today, because no single place knows there is more than one
+   project.
+2. **Attributing time tracking outside the repo.** The heartbeat from
+   [TL-28](../backlog/tasks/TL-28-heartbeaty-aktywnosci-i-lancuch-atrybucji.md)
+   has to know not only *which task*, but *which project*. Without a
+   registry, `activity record` needs `--dir` on every call; with one, it maps
+   cwd → project.
+3. **Privacy for the raw activity log** — §6. This is the single strongest
+   argument for a home directory.
 
-## 5. Gdzie ten katalog leży
+## 5. Where this directory lives
 
-Nie `~/.worktrail` na sztywno. Kolejność, spójna z tym, czego użytkownicy Linuksa oczekują, a reszty nie boli:
+Not a hardcoded `~/.worktrail`. An order consistent with what Linux users
+expect, and that doesn't hurt anyone else:
 
 ```
-1. WORKTRAIL_HOME                                  → jawnie, wygrywa wszystko (i to jest hak testowy)
-2. $XDG_CONFIG_HOME/worktrail  + $XDG_DATA_HOME/worktrail   → gdy zmienne ustawione
-3. ~/.config/worktrail + ~/.local/share/worktrail    → Linux/macOS domyślnie
+1. WORKTRAIL_HOME                                  → explicit, wins over everything (and this is the test hook)
+2. $XDG_CONFIG_HOME/worktrail  + $XDG_DATA_HOME/worktrail   → when the variables are set
+3. ~/.config/worktrail + ~/.local/share/worktrail    → Linux/macOS default
 4. %APPDATA%\worktrail                             → Windows
 ```
 
-Rozdział **config vs data** jest tu istotny, nie kosmetyczny: preferencje to plik, który człowiek edytuje i backupuje, a log aktywności to dane maszyny, których nie chce mieć w dotfile'ach.
+The **config vs. data** split matters here, and isn't cosmetic: preferences
+are a file a human edits and backs up, while the activity log is machine
+data nobody wants sitting among their dotfiles.
 
-Nazwa katalogu pochodzi z **jednej stałej**, bo `worktrail` jest nazwą wstępną ([TL-20](../backlog/tasks/TL-20-domknij-nazwe-narzedzia-przed-publikacja.md)) — zmiana nazwy narzędzia nie może wymagać przeszukiwania kodu.
+The directory name comes from **one constant**, because `worktrail` is a
+working name ([TL-20](../backlog/tasks/TL-20-domknij-nazwe-narzedzia-przed-publikacja.md))
+— renaming the tool must not require searching through the code.
 
-## 6. Surowy log aktywności przenosi się do katalogu domowego
+## 6. The raw activity log moves into the home directory
 
-[backlog-time-tracking.md §5](backlog-time-tracking.md) umieszcza go dziś w `backlog/activity/` i broni gitignorem. To działa, dopóki nikt nie zrobi `git add -A` w cudzym repozytorium — a wtedy prywatne stemple czasu jednej osoby trafiają do publicznej historii i **nie da się ich stamtąd usunąć**.
+[backlog-time-tracking.md §5](backlog-time-tracking.md) currently places it
+in `backlog/activity/` and protects it with gitignore. That works until
+someone runs `git add -A` in a foreign repository — at which point one
+person's private time stamps land in public history and **cannot be removed
+from there**.
 
-W katalogu domowym ten wypadek jest **niemożliwy**, a nie tylko odradzany:
+In the home directory this accident is **impossible**, not merely
+discouraged:
 
 ```
-<data>/activity/<projekt>/BL-NNNN.jsonl   ← surowe heartbeaty, poza jakimkolwiek repo
-<repo>/backlog/activity/rollup/BL-NNNN.json ← agregat per task, wersjonowany (bez zmian)
+<data>/activity/<project>/BL-NNNN.jsonl   ← raw heartbeats, outside any repo
+<repo>/backlog/activity/rollup/BL-NNNN.json ← per-task aggregate, versioned (unchanged)
 ```
 
-Podział ról zostaje ten sam co w projekcie pomiaru: surowe zostaje przy człowieku, agregat jedzie z projektem. Zmienia się tylko to, że „zostaje przy człowieku" przestaje zależeć od poprawnego `.gitignore`. Zakres: [TL-35](../backlog/tasks/TL-35-surowy-log-aktywnosci-do-katalogu-domowego.md).
+The split of roles stays the same as in the time-tracking project: raw data
+stays with the human, the aggregate travels with the project. The only
+change is that "stays with the human" stops depending on a correct
+`.gitignore`. Scope: [TL-35](../backlog/tasks/TL-35-surowy-log-aktywnosci-do-katalogu-domowego.md).
 
-## 7. Rejestr projektów — indeks, nie prawda
+## 7. Project registry — an index, not the truth
 
 ```yaml
 # <config>/projects.yaml
@@ -124,57 +195,107 @@ projects:
     path: /Users/x/code/acme/backlog
 ```
 
-Reguły, wszystkie wynikające z Prawa 2:
+Rules, all following from Law 2:
 
-- **Wpis jest rewalidowany przy użyciu** (`looksLikeBacklogDir()`), nigdy przyjmowany na wiarę.
-- **Brakująca ścieżka jest RAPORTOWANA, nie pomijana po cichu.** Cichy skip zamienia „przeniosłeś repo" w „ten projekt nie ma tasków", a to jest ten sam kształt błędu co cichy no-op w CLI.
-- **Skasowanie `projects.yaml` jest nieszkodliwe** — komendy w repo działają dalej przez wykrywanie; ginie tylko widok przekrojowy. To jest test Prawa 2.
-- **`init` rejestruje projekt**, ale rejestracja nie jest warunkiem działania.
-- Nazwa projektu jest **lokalna dla użytkownika** (jego etykieta na jego maszynie), nie tożsamością projektu. Tożsamością jest ścieżka repo; dwie osoby mogą nazwać ten sam projekt inaczej i nic z tego nie wynika.
+- **An entry is revalidated on use** (`looksLikeBacklogDir()`), never taken
+  on faith.
+- **A missing path is REPORTED, not silently skipped.** A silent skip turns
+  "you moved the repo" into "this project has no tasks", which is the same
+  shape of defect as a silent no-op in the CLI.
+- **Deleting `projects.yaml` is harmless** — commands within a repo keep
+  working through detection; only the cross-project view is lost. This is
+  Law 2's test.
+- **`init` registers the project**, but registration is not a condition for
+  the tool to work.
+- A project's name is **local to the user** (their own label on their own
+  machine), not the project's identity. The repo path is the identity; two
+  people can name the same project differently and nothing follows from
+  that.
 
-## 8. Przypadek brzegowy, który trzeba przetestować: workspace wielorepozytoryjny
+## 8. An edge case that must be tested: a multi-repository workspace
 
-Ten workspace jest nim: root to repozytorium **bez remote'a** trzymające `backlog/`, a w środku dziewięć osobnych repozytoriów z własnym `.git`. Uruchomienie `worktrail` z sub-repo wchodzi w górę i trafia w backlog workspace'u — i **tak ma być**.
+This workspace is one: the root is a repository **with no remote** holding
+`backlog/`, and inside it are nine separate repositories with their own
+`.git`. Running `worktrail` from a sub-repo walks upwards and lands on the
+workspace's backlog — and **that is correct**.
 
-Naiwny rejestr z założeniem „jedno repo = jeden projekt" rozjechałby się z tym układem, dając dziewięć projektów bez backlogu i jeden z nim. Stąd wymóg: jednostką rejestru jest **katalog backlogu**, nie repozytorium git. Test na tym układzie jest obowiązkowy, bo to nie jest egzotyka — monorepo i workspace'y wielorepozytoryjne są częstsze niż pojedyncze repo z jednym `.git` na wierzchu.
+A naive registry assuming "one repo = one project" would clash with this
+layout, yielding nine projects with no backlog and one that has one. Hence
+the requirement: the registry's unit is the **backlog directory**, not the
+git repository. A test on this layout is mandatory, because it is not an
+exotic case — monorepos and multi-repository workspaces are more common than
+a single repo with one `.git` at the top.
 
-## 9. Kolejność
+## 9. Order
 
-| Krok | Task | Co dowozi | Ryzyko |
+| Step | Task | What it delivers | Risk |
 |---|---|---|---|
-| 1 | [TL-33](../backlog/tasks/TL-33-packaging-instalacja-globalna-i-npx.md) | `package.json` + `bin/` + `npx worktrail` | niskie, niczego nie przesądza |
-| 2 | [TL-34](../backlog/tasks/TL-34-katalog-domowy-preferencje-i-rejestr-projektow.md) | katalog domowy, preferencje, rejestr | średnie — Prawo 3 jest tu do złamania |
-| 3 | [TL-35](../backlog/tasks/TL-35-surowy-log-aktywnosci-do-katalogu-domowego.md) | surowe stemple poza repo | zależy od TL-28 |
-| 4 | [TL-36](../backlog/tasks/TL-36-widok-przekrojowy-nad-wieloma-projektami.md) | widok nad wieloma projektami | jedyny krok zmieniający produkt |
+| 1 | [TL-33](../backlog/tasks/TL-33-packaging-instalacja-globalna-i-npx.md) | `package.json` + `bin/` + `npx worktrail` | low, decides nothing |
+| 2 | [TL-34](../backlog/tasks/TL-34-katalog-domowy-preferencje-i-rejestr-projektow.md) | home directory, preferences, registry | medium — Law 3 is at risk of being broken here |
+| 3 | [TL-35](../backlog/tasks/TL-35-surowy-log-aktywnosci-do-katalogu-domowego.md) | raw stamps outside the repo | depends on TL-28 |
+| 4 | [TL-36](../backlog/tasks/TL-36-widok-przekrojowy-nad-wieloma-projektami.md) | cross-project view | the only step that changes the product |
 
-Kroki 1–3 zdejmują z drogi rzeczy, które i tak blokują publikację. Krok 4 jest jedynym, który daje użytkownikowi coś nowego — i dlatego jest ostatni, a nie pierwszy.
+Steps 1–3 clear away things that block publication regardless. Step 4 is the
+only one that gives the user something new — and that is why it comes last,
+not first.
 
-## 10. Czego świadomie NIE robimy
+## 10. What we deliberately do NOT do
 
-- **Demona w tle.** Rejestr i heartbeaty nie wymagają procesu rezydentnego; wprowadzenie go dokłada cykl życia, logi, restart i awarie, żeby oszczędzić odczyt pliku YAML.
-- **Synchronizacji katalogu domowego między maszynami.** To jest ten sam problem, który [worktrail-state-and-sync.md §6](worktrail-state-and-sync.md) przypisuje wersji hostowanej. Lokalnie: katalog domowy jest lokalny i tyle.
-- **API wtyczek** — Prawo 4.
-- **Migracji istniejących instalacji.** Nie ma zewnętrznych użytkowników; jedyną instalacją jest ta. Kiedy będą, migracja stanie się osobnym taskiem z prawdziwym kontraktem.
-- **Hooka pre-commit w TYM repozytorium** (decyzja 2026-08-31). Kuszące przez symetrię z konsumentem, ale symetria to zły powód. Sprawdzian, który tę propozycję obalił: z czterech błędów popełnionych w sesji, w której ją zgłoszono, **żadnego** nie złapałaby żadna z trzech bramek `check` — bo psuły się proza, regex, linki i nieśledzone pliki, a nie kolizje ID, boardy czy odwołania. U konsumenta te bramki zarabiają na siebie skalą (1363 taski, siedem równoległych worktree'ów, cztery kolizje ID, które przeżyły w `main` miesiące); tutaj jest 45 tasków i jeden piszący.
+- **A background daemon.** The registry and heartbeats do not need a
+  resident process; introducing one adds a lifecycle, logs, restarts and
+  crashes to save reading a YAML file.
+- **Syncing the home directory between machines.** This is the same problem
+  [worktrail-state-and-sync.md §6](worktrail-state-and-sync.md) assigns to
+  the hosted version. Locally: the home directory is local, full stop.
+- **A plugin API** — Law 4.
+- **Migrating existing installs.** There are no external users; the only
+  install is this one. When there are, migration becomes a separate task
+  with a real contract.
+- **A pre-commit hook in THIS repository** (decision 2026-08-31). Tempting by
+  symmetry with the consumer, but symmetry is a bad reason. The test that
+  disproved this proposal: of four mistakes made in the session that raised
+  it, **none** would have been caught by any of the three `check` gates —
+  because what broke was prose, a regex, links and untracked files, not id
+  collisions, boards or references. For the consumer, these gates earn their
+  keep through scale (1363 tasks, seven parallel worktrees, four id
+  collisions that survived on `main` for months); here there are 45 tasks
+  and one writer.
 
-  **Warunek, przy którym ta decyzja się odwraca — jeden i konkretny:** gdy w tym drzewie zacznie pisać więcej niż jedna sesja naraz. Kolizja ID powstaje wyłącznie tak: dwie sesje pytają o numer, obie dostają ten sam. Do tego czasu `worktrail check` jest jedną komendą i człowiek widzi jej wynik.
+  **The one specific condition that reverses this decision:** when more than
+  one session starts writing in this tree at once. An id collision arises
+  only that way: two sessions ask for a number, both get the same one. Until
+  then, `worktrail check` is one command and a human sees its result.
 
-  To **nie jest** decyzja o bramkach w produkcie — one już są w paczce (§10.1).
+  This is **not** a decision about gates in the product — they already ship
+  in the package (§10.1).
 
-### 10.1. Trzy różne rzeczy, które łatwo pomylić z jedną
+### 10.1. Three different things easily mistaken for one
 
-Rozróżnienie zapisane, bo w rozmowie 2026-08-31 zlało się w jedno słowo „bramki":
+Distinction recorded because in the 2026-08-31 conversation they collapsed
+into one word, "gates":
 
-| | Gdzie żyje | Kto to dostaje |
+| | Where it lives | Who gets it |
 |---|---|---|
-| **Kod bramek** — `check-backlog-{id-collisions,boards,refs}.mjs` | `scripts/`, objęte `files` w `package.json` | **każda instalacja**, jako `worktrail check` |
-| **`.githooks/pre-commit` konsumenta** | repozytorium konsumenta | nikt poza nim; z ~25 kroków dwa wołają `worktrail check` |
-| **Hook dogfoodingowy tutaj** | byłby w tym repo, POZA paczką | tylko ten, kto klonuje źródło — świadomie nie robimy (§10) |
+| **Gate code** — `check-backlog-{id-collisions,boards,refs}.mjs` | `scripts/`, covered by `files` in `package.json` | **every install**, as `worktrail check` |
+| **The consumer's `.githooks/pre-commit`** | the consumer's repository | nobody but them; of ~25 steps, two call `worktrail check` |
+| **A dogfooding hook here** | would live in this repo, OUTSIDE the package | only someone cloning the source — deliberately not done (§10) |
 
-Wniosek, który z tego wynika i jest osobną decyzją produktową: skoro bramki jadą do każdej instalacji, a hook — do żadnej, to brakującym elementem nie jest hook u nas, tylko **umiejętność narzędzia, żeby zainstalować hooka SWOJEMU użytkownikowi**. Ten problem ma każdy, nie my. Zapisane jako TL-46.
+The conclusion that follows, and is a separate product decision: since the
+gates ship to every install and the hook to none, the missing piece is not a
+hook for us, but the **tool's ability to install a hook for its own user**.
+Everyone has this problem, not just us. Recorded as TL-46.
 
-## 11. Założenia do obalenia
+## 11. Assumptions to be falsified
 
-1. **Że rejestr będzie miał więcej niż jeden wpis.** Dziś projekt jest jeden. Jeśli po kwartale nadal jest jeden, krok 4 nie miał odbiorcy i lepiej go nie budować — a kroki 1–3 bronią się same.
-2. **Że wykrywanie w górę od cwd wystarcza w praktyce**, więc rejestr nigdy nie stanie się drogą główną. Falsyfikacja: jeśli komendy zaczną wymagać `--project`, znaczy że rejestr po cichu został prawdą i Prawo 2 zostało złamane.
-3. **Że rozdział config/data (§5) nikogo nie zdziwi.** Prostsze `~/.worktrail/` dla wszystkiego jest łatwiejsze do wytłumaczenia; XDG jest poprawniejsze. Jeśli pierwsze zgłoszenia będą o „gdzie to w ogóle jest", odpowiedzią jest `worktrail where`, a nie porzucenie XDG.
+1. **That the registry will ever hold more than one entry.** Today there is
+   one project. If after a quarter there is still one, step 4 had no
+   audience and is better left unbuilt — and steps 1–3 justify themselves
+   regardless.
+2. **That detection upwards from cwd is enough in practice**, so the registry
+   never becomes the main path. Falsification: if commands start requiring
+   `--project`, it means the registry has quietly become the truth and
+   Law 2 has been broken.
+3. **That the config/data split (§5) will not surprise anyone.** A simpler
+   `~/.worktrail/` for everything is easier to explain; XDG is more correct.
+   If the first reports are about "where is this even stored", the answer is
+   `worktrail where`, not abandoning XDG.

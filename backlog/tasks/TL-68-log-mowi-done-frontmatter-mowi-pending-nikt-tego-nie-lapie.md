@@ -1,10 +1,10 @@
 ---
 id: TL-68
-title: "Log mówi done, frontmatter mówi pending — nikt tego nie łapie"
+title: "The log says done, the frontmatter says pending — nothing catches it"
 type: bug
 labels: [pre-launch]
 board: main
-epic: "Integralność danych"
+epic: "Data integrity"
 priority: P2
 status: pending
 owner: unassigned
@@ -19,71 +19,92 @@ related_docs:
 verification:
   - bash: "node --test scripts/tests/log-status-agreement.test.mjs"
   - bash: "node scripts/cli.mjs check"
-  - bash: "node scripts/cli.mjs doctor --json | node -e \"let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const r=JSON.parse(s);const row=r.checks.find(c=>c.id==='log-status');if(!row){console.error('brak wiersza log-status w doctorze');process.exit(1)}console.log('doctor zna ten rozjazd — OK')})\""
+  - bash: "node scripts/cli.mjs doctor --json | node -e \"let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const r=JSON.parse(s);const row=r.checks.find(c=>c.id==='log-status');if(!row){console.error('no log-status row in doctor');process.exit(1)}console.log('doctor knows about this drift — OK')})\""
 ---
 
-## Cel
+## Goal
 
-Złapać task, którego `## Log` mówi jedno, a pole `status:` drugie — bo dziś ten
-rozjazd nie jest widziany przez żadną bramkę.
+Catch a task whose `## Log` says one thing and whose `status:` field says
+another — because today this drift is not seen by any gate.
 
-## Kontekst
+## Context
 
-Trafione 2026-08-31 na własnej pracy. [TL-52](TL-52-kolor-i-spojne-komunikaty-cli-w-jednym-module-ui-mjs.md)
-miał w logu pięć wpisów `done`, zacommitowany kod i zielone testy — a w polu
-`status: pending`. Przez to siedział w `INDEX.yaml` jako otwarty i wypadł z
-archiwum, czyli **widoki kłamały o stanie projektu**.
+Encountered 2026-08-31 during our own work.
+[TL-52](TL-52-kolor-i-spojne-komunikaty-cli-w-jednym-module-ui-mjs.md) had
+five `done` entries in its log, committed code, and green tests — while its
+field read `status: pending`. Because of this it sat in `INDEX.yaml` as
+open and fell out of the archive, meaning **the views lied about the state
+of the project**.
 
-Mechanizm pomyłki jest banalny i powtarzalny: wpis do logu i zmiana pola to dwie
-osobne edycje tego samego pliku. Kiedy jedna się nie wykona — bo wywołanie
-padło, bo podmiana nie znalazła wzorca, bo ktoś dopisał notatkę i zapomniał
-przestawić status — plik zostaje w stanie wewnętrznie sprzecznym i **nic tego
-nie zgłasza**. `check` sądzi kolizje numerów, boardy i odwołania; żaden z tych
-trzech nie zagląda do środka pliku po to, żeby porównać go z nim samym.
+The mechanism behind the mistake is trivial and repeatable: appending to the
+log and changing the field are two separate edits to the same file. When one
+of them fails — because a call errored, because a substitution didn't match
+the pattern, because someone added a note and forgot to flip the status —
+the file is left internally inconsistent and **nothing reports it**. `check`
+looks for number collisions, boards, and references; none of those three
+looks inside a file to compare it against itself.
 
-**Dlaczego to jest warte guardu, a nie uważności.** Ten backlog jest po to, żeby
-odpowiadać na pytanie „co jest zrobione". Task ze statusem sprzecznym z własnym
-logiem odpowiada na nie źle, wygląda przy tym normalnie i nie ma powodu, żeby
-ktokolwiek go otworzył. To jest dokładnie ta klasa, dla której powstały
-pozostałe bramki tego projektu — cichy stan, który wygląda jak działanie.
+**Why this deserves a guard rather than just care.** This backlog exists to
+answer the question "what is done". A task whose status contradicts its own
+log answers that wrong, looks normal while doing so, and gives no one a
+reason to open it. This is exactly the class this project's other gates were
+built for — a silent state that looks like it's working.
 
-Format logu jest zadeklarowany w szablonie: `YYYY-MM-DD status — kto — notatka`.
-Ostatni wpis pasujący do tego kształtu niesie stan, do którego task doszedł.
+The log format is declared in the template: `YYYY-MM-DD status — who —
+note`. The last entry matching that shape carries the state the task has
+reached.
 
-**Czego ten guard NIE MOŻE robić.** Nie wolno mu poprawiać pliku. Sprzeczność
-rozstrzyga człowiek, bo obie strony bywają prawdziwe: log może wyprzedzać pole
-(praca skończona, status niezmieniony) albo pole może wyprzedzać log (status
-przestawiony w viewerze, notatka niedopisana). Automat wybierający jedną ze stron
-zamieniłby wykrytą sprzeczność w cichą decyzję.
+**What this guard MUST NOT do.** It must not fix the file. A human resolves
+the contradiction, because either side can be the true one: the log may be
+ahead of the field (work finished, status not yet updated), or the field may
+be ahead of the log (status flipped in the viewer, note not yet added). An
+automaton picking one side would turn a detected contradiction into a silent
+decision.
 
 ## Pre-flight reading
 
-1. `backlog/_template.md` — deklarowany format wpisu logu.
-2. `scripts/check-backlog-refs.mjs` — najbliższy kształtem guard (czyta drzewo, wypisuje listę naruszeń, oblewa).
-3. `scripts/doctor.mjs` — jak dokłada się wiersz do diagnozy; `doctor` woła guardy, nie przepisuje ich.
+1. `backlog/_template.md` — the declared log-entry format.
+2. `scripts/check-backlog-refs.mjs` — the closest guard in shape (reads the
+   tree, lists violations, fails).
+3. `scripts/doctor.mjs` — how a row is added to the diagnosis; `doctor` calls
+   guards, it does not reimplement them.
 4. `scripts/task-fields.mjs` — `splitFrontmatter`, `extractMeta`.
 
-## Kroki
+## Steps
 
-1. Funkcja czytająca OSTATNI wpis logu pasujący do zadeklarowanego kształtu i zwracająca jego status; brak wpisów to nie naruszenie, tylko brak danych.
-2. Guard porównujący ten status z polem `status:`. Naruszeniem jest różnica, nie brak.
-3. Komunikat nazywa plik, obie wartości i datę ostatniego wpisu — żeby dało się rozstrzygnąć bez otwierania pliku.
-4. Wpięcie w `worktrail check` jako czwarty guard oraz wiersz `log-status` w `doctor`.
-5. Rozstrzygnij, czy to ma być błąd czy ostrzeżenie. Argument za ostrzeżeniem: wpis logu bywa dopisywany po zmianie statusu i przez chwilę stan jest sprzeczny w normalnej pracy. Argument za błędem: `check` biegnie przed commitem, a nie w trakcie edycji. Zapisz wybór i powód.
-6. Test z kontrolą pozytywną w obie strony: plik zgodny przechodzi, plik z logiem `done` i polem `pending` OBLEWA. Bez tej drugiej połowy guard byłby zielony na całym dzisiejszym drzewie i nic by nie dowodził.
+1. A function that reads the LAST log entry matching the declared shape and
+   returns its status; no entries is not a violation, only an absence of
+   data.
+2. A guard comparing that status against the `status:` field. A violation is
+   a difference, not an absence.
+3. The message names the file, both values, and the date of the last entry —
+   so it can be resolved without opening the file.
+4. Wire it into `worktrail check` as a fourth guard, and add a `log-status`
+   row to `doctor`.
+5. Decide whether this should be an error or a warning. Argument for a
+   warning: a log entry is sometimes appended after the status change, and
+   the state is briefly contradictory during normal work. Argument for an
+   error: `check` runs before a commit, not mid-edit. Record the choice and
+   the reason.
+6. Test with a positive control in both directions: a consistent file
+   passes, a file with a `done` log entry and a `pending` field FAILS.
+   Without this second half the guard would be green across today's entire
+   tree and would prove nothing.
 
 ## Acceptance criteria
 
-- [ ] Rozjazd ostatniego wpisu logu z polem `status:` jest wykrywany.
-- [ ] Komunikat podaje plik, obie wartości i datę wpisu.
-- [ ] Guard NICZEGO nie poprawia.
-- [ ] Task bez wpisów w logu nie jest naruszeniem.
-- [ ] Wpięte w `check` i widoczne w `doctor`.
-- [ ] Test ma kontrolę pozytywną: fixture z rozjazdem MUSI oblać.
-- [ ] Wybór błąd/ostrzeżenie zapisany w `## Log` z powodem.
+- [ ] Drift between the last log entry and the `status:` field is detected.
+- [ ] The message states the file, both values, and the entry date.
+- [ ] The guard fixes NOTHING.
+- [ ] A task with no log entries is not a violation.
+- [ ] Wired into `check` and visible in `doctor`.
+- [ ] The test has a positive control: a fixture with drift MUST fail.
+- [ ] The error/warning choice is recorded in `## Log` with a reason.
 
 ## Log
 
-Append-only. Format: `YYYY-MM-DD status — kto — notatka`.
+Append-only. Format: `YYYY-MM-DD status — who — note`.
 
-- 2026-08-31 created — agent:claude — trafione na własnej pracy: TL-52 miał pięć wpisów `done` w logu i `status: pending` w polu, siedział w INDEX-ie jako otwarty i żadna bramka tego nie widziała
+- 2026-08-31 created — agent:claude — encountered during our own work: TL-52
+  had five `done` entries in its log and `status: pending` in its field, sat
+  in the INDEX as open, and no gate saw it

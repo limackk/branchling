@@ -1,6 +1,6 @@
 ---
 id: TL-63
-title: "Komentarze config.yaml mają mówić, co zmiana kosztuje"
+title: "config.yaml comments should say what a change costs"
 type: task
 labels: [pre-launch]
 board: main
@@ -17,75 +17,108 @@ blocks: []
 related_docs:
   - docs/backlog-config-and-portability.md
 verification:
-  - bash: "d=$(mktemp -d); node /Users/limack/workspace/tasklog/bin/worktrail.mjs init --dir \"$d\" >/dev/null; for k in statuses priorities labels task_id_prefix owners estimates; do grep -q \"^$k:\" \"$d/config.yaml\" || { echo \"brak klucza $k w szablonie\"; exit 1; }; done; echo 'wszystkie klucze obecne — OK'"
+  - bash: "d=$(mktemp -d); node /Users/limack/workspace/tasklog/bin/worktrail.mjs init --dir \"$d\" >/dev/null; for k in statuses priorities labels task_id_prefix owners estimates; do grep -q \"^$k:\" \"$d/config.yaml\" || { echo \"missing key $k in template\"; exit 1; }; done; echo 'all keys present — OK'"
   - bash: "node --test scripts/tests/init-config-comments.test.mjs"
-  - manual: "Ktoś, kto nie zna narzędzia, po samym przeczytaniu wygenerowanego config.yaml potrafi powiedzieć, które zmiany są darmowe, a która wymaga migracji."
+  - manual: "Someone who does not know the tool can, after reading only the generated config.yaml, say which changes are free and which requires a migration."
 ---
 
-## Cel
+## Goal
 
-Dopisać do generowanego `config.yaml` informację, której dziś nie ma nigdzie:
-**ile kosztuje zmiana każdego klucza** i co trzeba zrobić, gdy backlog nie jest
-już pusty.
+Add to the generated `config.yaml` a piece of information that is nowhere
+today: **how much it costs to change each key** and what needs to happen when
+the backlog is no longer empty.
 
-## Kontekst
+## Context
 
-Wygenerowany `config.yaml` jest głównym — realnie jedynym — dokumentem, który
-otwiera osoba dostosowująca narzędzie do swojego projektu. Komentarze już tam są
-i są dobre, ale odpowiadają na pytanie „co to jest", a nie na to, które użytkownik
-zadaje faktycznie: **„czy mogę to teraz zmienić".**
+The generated `config.yaml` is the main — realistically the only — document
+opened by someone adapting the tool to their project. The comments already
+there are good, but they answer "what is this", not the question the user
+actually asks: **"can I change this now".**
 
-Odpowiedź nie jest jednakowa i to jest sedno. Zmierzone 2026-08-31:
+The answer is not uniform, and that is the whole point. Measured on
+2026-08-31:
 
-| Klucz | Koszt zmiany |
+| Key | Cost of change |
 |---|---|
-| `priorities`, `owners`, `estimates`, `labels`, kolory, `title_max_length` | darmowa |
-| `statuses`, `types`, `labels_closed`, boardy | wymaga przejrzenia drzewa — istniejące taski mogą mieć wartości spoza nowego słownika |
-| `task_id_prefix` | **wymaga migracji**: `worktrail migrate-prefix --to <NOWY>`, najpierw `--dry-run` |
+| `priorities`, `owners`, `estimates`, `labels`, colors, `title_max_length` | free |
+| `statuses`, `types`, `labels_closed`, boards | requires reviewing the tree — existing tasks may hold values outside the new vocabulary |
+| `task_id_prefix` | **requires migration**: `worktrail migrate-prefix --to <NEW>`, `--dry-run` first |
 
-Przy `task_id_prefix` ostrzeżenie już jest i jest dobre. Przy `statuses` nie ma
-nic — a zmiana `statuses` na własne (`todo`/`doing`/`shipped`) jest jedną z
-pierwszych rzeczy, które robi zespół, i pociąga za sobą `archived_statuses` oraz
-`dashboard_open_statuses`. Zmierzone: taka zmiana bez poprawienia tych dwóch
-kluczy daje pięciolinijkowy komunikat o niespójności — poprawny i czytelny, tylko
-że wychodzi PO fakcie, zamiast być napisany obok pola.
+For `task_id_prefix` the warning already exists and is good. For `statuses`
+there is nothing — and changing `statuses` to a project's own
+(`todo`/`doing`/`shipped`) is one of the first things a team does, and it
+drags along `archived_statuses` and `dashboard_open_statuses`. Measured: such
+a change without fixing these two keys produces a five-line inconsistency
+message — correct and readable, only it comes out AFTER the fact, instead of
+being written next to the field.
 
-Ten task jest tani i wysoko punktowany właśnie dlatego, że nie dokłada mechanizmu.
-Zmienia tekst w jednym szablonie — a tekst jest tu interfejsem.
+This task is cheap and highly scored precisely because it adds no mechanism.
+It changes text in a single template — and here, text is the interface.
 
-Zależność, którą warto znać: `worktrail doctor` ([TL-62](TL-62-worktrail-doctor-jedna-odpowiedz-czy-backlog-jest-ustawiony.md))
-odpowie na to samo pytanie po fakcie. Ten task odpowiada na nie **przed** — i
-dlatego oba mają sens, a żaden nie zastępuje drugiego.
+A dependency worth knowing about: `worktrail doctor` ([TL-62](TL-62-worktrail-doctor-jedna-odpowiedz-czy-backlog-jest-ustawiony.md))
+answers the same question after the fact. This task answers it **before** —
+and that is why both make sense, and neither replaces the other.
 
 ## Pre-flight reading
 
-1. `scripts/init-backlog.mjs` — `CONFIG_YAML`; to jest cały zakres edycji.
-2. `scripts/config.mjs` — `DEFAULTS` i `validateConfig()`; klasyfikacja musi się zgadzać z tym, co kod naprawdę egzekwuje.
-3. `backlog/config.yaml` tego repozytorium — przykład konfiguracji, która odjechała od domyślnej.
+1. `scripts/init-backlog.mjs` — `CONFIG_YAML`; this is the entire scope of the
+   edit.
+2. `scripts/config.mjs` — `DEFAULTS` and `validateConfig()`; the
+   classification must agree with what the code actually enforces.
+3. `backlog/config.yaml` of this repository — an example of configuration
+   that has drifted from the default.
 
-## Kroki
+## Steps
 
-1. Dopisz do nagłówka `CONFIG_YAML` krótką legendę trzech klas zmiany. Trzy linie, nie akapit.
-2. Przy każdym kluczu oznacz klasę i — gdy klasa jest inna niż „darmowa" — jedno zdanie o tym, co zrobić, gdy backlog nie jest pusty.
-3. Przy `statuses` wymień wprost dwa klucze, które trzeba poprawić razem (`archived_statuses`, `dashboard_open_statuses`). Ten związek jest niewidoczny, dopóki się nie oberwie komunikatem.
-4. Przy `labels_closed` powiedz, co się zmienia po przestawieniu na `true` i że dotyczy to również tasków już istniejących.
-5. Nie duplikuj dokumentacji — to ma być pięć–dziesięć linii razem, nie druga instrukcja obsługi. Komentarz, który rośnie, przestaje być czytany.
-6. Test `scripts/tests/init-config-comments.test.mjs`: wygenerowany `config.yaml` po `init` nadal parsuje się bez problemów (komentarz nie może zepsuć wąskiego parsera) i zawiera legendę klas.
+1. Add a short legend of the three change classes to the `CONFIG_YAML` header.
+   Three lines, not a paragraph.
+2. Mark each key with its class and — when the class is other than "free" —
+   one sentence about what to do when the backlog is not empty.
+3. For `statuses`, explicitly name the two keys that must be fixed together
+   (`archived_statuses`, `dashboard_open_statuses`). This relationship is
+   invisible until it hits you with an error message.
+4. For `labels_closed`, say what changes when it is flipped to `true` and that
+   it also applies to tasks that already exist.
+5. Do not duplicate the documentation — this should be five to ten lines
+   total, not a second manual. A comment that keeps growing stops being read.
+6. Test `scripts/tests/init-config-comments.test.mjs`: the generated
+   `config.yaml` after `init` still parses without issue (the comment must
+   not break the narrow parser) and contains the class legend.
 
 ## Acceptance criteria
 
-- [ ] Generowany `config.yaml` ma legendę trzech klas zmiany.
-- [ ] Każdy klucz ma przypisaną klasę.
-- [ ] `statuses` wskazuje dwa klucze zależne.
-- [ ] Klasyfikacja zgadza się z tym, co egzekwuje `validateConfig()`.
-- [ ] Wygenerowany plik nadal parsuje się bez problemów.
+- [ ] The generated `config.yaml` has a legend of the three change classes.
+- [ ] Every key has an assigned class.
+- [ ] `statuses` names the two dependent keys.
+- [ ] The classification agrees with what `validateConfig()` enforces.
+- [ ] The generated file still parses without issue.
 
 ## Log
 
-Append-only. Format: `YYYY-MM-DD status — kto — notatka`.
+Append-only. Format: `YYYY-MM-DD status — who — note`.
 
-- 2026-08-31 created — agent:claude — z audytu onboardingu
-- 2026-08-31 in_progress — agent:claude — start implementacji
-- 2026-08-31 done — agent:claude — legenda trzech klas w nagłówku generowanego `config.yaml`, klasa przy każdym kluczu. Przy `statuses` wymienione WPROST oba klucze do poprawienia razem z nim (`archived_statuses`, `dashboard_open_statuses`) — a przy okazji `dashboard_open_statuses` w ogóle wjechał do szablonu, bo dotąd go tam nie było, mimo że jego niespójność oblewa build. Przy `task_id_prefix` dopisane zdanie, że na PUSTYM backlogu zmiana jest darmowa: to jest najczęstszy przypadek zaraz po `init`, a samo odesłanie do `migrate-prefix` wyglądało na armatę na wróbla.
-- 2026-08-31 done — agent:claude — klasyfikacja musiała zostać SKORYGOWANA w trakcie, i to jest wynik warty zapisania. `owners` chciałem oznaczyć „[wolna] podpowiedzi, nie słownik zamknięty" — nieprawda: `new-task.mjs` sprawdza `--owner` przeciw tej liście, choć drzewo może trzymać dowolnego ownera (pole jest `dynamic`, więc `auditVocabulary` je pomija). To ta sama asymetria zapis/odczyt co w TL-56, tylko w drugą stronę. Komentarz mówi teraz obie połowy.
-- 2026-08-31 done — agent:claude — test `init-config-comments.test.mjs`, 7 asercji. Dwie pilnują, że komentarz nie wywraca wąskiego parsera; trzy są kontrolami POZYTYWNYMI dla samej klasyfikacji — sprawdzają, że klucz oznaczony [migracja] naprawdę oblewa build po zmianie, a oznaczony [wolna] naprawdę nie. Komentarz mówiący „wolna" przy kluczu wymagającym migracji jest gorszy od braku komentarza, więc asercja na obecność tekstu bez asercji na jego prawdziwość niczego by nie broniła. 309/309.
+- 2026-08-31 created — agent:claude — from the onboarding audit
+- 2026-08-31 in_progress — agent:claude — implementation started
+- 2026-08-31 done — agent:claude — a legend of the three classes in the header
+  of the generated `config.yaml`, a class next to each key. For `statuses`,
+  both keys to fix alongside it are named EXPLICITLY
+  (`archived_statuses`, `dashboard_open_statuses`) — and along the way
+  `dashboard_open_statuses` entered the template at all, since it was not
+  there before, despite its inconsistency failing the build. For
+  `task_id_prefix` a sentence was added saying that on an EMPTY backlog the
+  change is free: this is the most common case right after `init`, and the
+  bare pointer to `migrate-prefix` looked like overkill.
+- 2026-08-31 done — agent:claude — the classification had to be CORRECTED
+  along the way, and that result is worth recording. I wanted to mark
+  `owners` as "[free] a hint, not a closed vocabulary" — not true:
+  `new-task.mjs` checks `--owner` against this list, even though the tree can
+  hold any owner (the field is `dynamic`, so `auditVocabulary` skips it).
+  This is the same write/read asymmetry as in TL-56, only in the opposite
+  direction. The comment now states both halves.
+- 2026-08-31 done — agent:claude — test `init-config-comments.test.mjs`, 7
+  assertions. Two guard against the comment breaking the narrow parser; three
+  are POSITIVE controls for the classification itself — checking that a key
+  marked [migration] really fails the build after the change, and one marked
+  [free] really does not. A comment saying "free" next to a key that requires
+  migration is worse than no comment, so an assertion on the presence of the
+  text without an assertion on its truth would defend nothing. 309/309.

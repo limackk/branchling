@@ -1,10 +1,10 @@
 ---
 id: TL-108
-title: "Komenda worktrail plan z --json: stan wykonania planu"
+title: "worktrail plan command with --json: plan execution state"
 type: task
 labels: []
 board: main
-epic: "Plan wykonania"
+epic: "Execution plan"
 priority: P1
 status: done  # pending | in_progress | blocked | done | cancelled
 owner: agent:claude
@@ -14,83 +14,87 @@ updated: 2026-09-01
 blocked_by: [TL-107]
 blocks: []
 related_docs: []
-verification:                      # JAK sprawdzić, że task naprawdę jest zrobiony
+verification:                      # HOW to check the task is actually done
   - bash: "node --test scripts/tests/plan-command.test.mjs"
   - bash: "node scripts/cli.mjs plan --json"
 ---
 
-## Cel
+## Goal
 
-`worktrail plan` pokazuje stan wykonania planu z `backlog/plan.yaml`: która fala
-jest aktywna, co jest „next up", co jest w toku, co poza planem. Z `--json`
-staje się wejściem dla agenta implementującego — agent pyta o następny task
-jedną komendą, zamiast samemu składać graf z 70 plików.
+`worktrail plan` shows the execution state of the plan from
+`backlog/plan.yaml`: which wave is active, what is "next up," what is in
+progress, what is outside the plan. With `--json` it becomes input for an
+implementing agent — the agent asks for the next task with a single command,
+instead of assembling the graph from 70 files itself.
 
-## Kontekst
+## Context
 
-Część epika „Plan wykonania" (analiza 2026-09-01, pełne rozstrzygnięcia
-w Kontekście TL-107). Ten task to warstwa ODCZYTU nad danymi z TL-107:
-format pliku, parser (`scripts/plan.mjs`) i guard już istnieją — tutaj tylko
-liczenie stanu i prezentacja. Nie dubluj walidacji: komenda ma używać parsera
-z TL-107, a na niespójnym planie oblewać z tym samym komunikatem co guard.
+Part of the "Execution plan" epic (analysis 2026-09-01, full decisions in
+TL-107's Context). This task is the READ layer over the data from TL-107: the
+file format, the parser (`scripts/plan.mjs`) and the guard already exist —
+here it is only about computing the state and presenting it. Do not
+duplicate validation: the command has to use the parser from TL-107, and on
+an inconsistent plan it fails with the same message as the guard.
 
-Definicje (liczone z żywych `tasks/*.md`, NIGDY z wygenerowanych widoków —
-te są snapshotem ostatniego builda):
+Definitions (computed from the live `tasks/*.md`, NEVER from generated views
+— those are a snapshot of the last build):
 
-- **fala aktywna** — pierwsza fala zawierająca task otwarty
-  (status spoza `archived_statuses` z config.yaml),
-- **next up** — otwarte taski fali aktywnej, których wszystkie `blocked_by`
-  są zamknięte; grupy `together` raportowane razem,
-- **in progress** — taski planu ze statusem `in_progress`, niezależnie od fali,
-- **unplanned** — otwarte taski spoza planu (jawna liczba + ID; plan gnije
-  po cichu, jeśli tego nie pokazujemy),
-- **stale** — taski planu już zamknięte w falach PO fali aktywnej (sygnał,
-  że plan wymaga przetasowania).
+- **active wave** — the first wave containing an open task
+  (a status outside `archived_statuses` from config.yaml),
+- **next up** — open tasks of the active wave whose `blocked_by` entries are
+  all closed; `together` groups reported together,
+- **in progress** — plan tasks with status `in_progress`, regardless of wave,
+- **unplanned** — open tasks outside the plan (an explicit count + IDs; the
+  plan rots silently if we do not show this),
+- **stale** — plan tasks already closed in waves AFTER the active wave (a
+  signal that the plan needs reshuffling).
 
-Wyjście tekstowe w stylu reszty CLI (przez `scripts/ui.mjs` — TL-52: kolor
-to emfaza, wszystko musi być powiedziane słowami). `--json` zwraca pełną
-strukturę (fale ze statusami tasków, next_up, unplanned, stale). Prawo 4
-z CLAUDE.md: `--json` na każdej komendzie czytającej.
+Text output in the style of the rest of the CLI (through `scripts/ui.mjs` —
+TL-52: color is emphasis, everything must also be said in words). `--json`
+returns the full structure (waves with task statuses, next_up, unplanned,
+stale). Law 4 from CLAUDE.md: `--json` on every reading command.
 
-Brak `plan.yaml` = exit 0 z komunikatem „no plan file" i pustym JSON-em
-(`{"waves": []}` + pola puste) — spójnie z guardem z TL-107.
+No `plan.yaml` = exit 0 with a "no plan file" message and empty JSON
+(`{"waves": []}` + empty fields) — consistent with the guard from TL-107.
 
 ## Pre-flight reading
 
-1. Kontekst TL-107 — format planu i rozstrzygnięcia projektowe.
-2. `scripts/plan.mjs` (powstanie w TL-107) — parser i walidacja do reużycia.
-3. `scripts/query.mjs` — wzorzec komendy czytającej: ładowanie tasków,
-   `--json`, kody wyjścia.
-4. `scripts/ui.mjs` — styl wyjścia terminalowego, obsługa NO_COLOR/TTY.
-5. `scripts/cli.mjs` — tablica komend, walidacja flag, wpis do `--help`.
-6. `.claude/skills/worktrail-cli/SKILL.md` — konwencje powierzchni CLI.
+1. TL-107's Context — the plan format and the design decisions.
+2. `scripts/plan.mjs` (created in TL-107) — parser and validation to reuse.
+3. `scripts/query.mjs` — the pattern for a reading command: loading tasks,
+   `--json`, exit codes.
+4. `scripts/ui.mjs` — terminal output style, NO_COLOR/TTY handling.
+5. `scripts/cli.mjs` — the command table, flag validation, the `--help` entry.
+6. `.claude/skills/worktrail-cli/SKILL.md` — CLI surface conventions.
 
-## Kroki
+## Steps
 
-1. Zaimplementuj liczenie stanu (fala aktywna, next up, unplanned, stale)
-   w `scripts/plan.mjs` obok parsera — viewer (TL-109) ma reużyć TĘ SAMĄ
-   funkcję, żeby CLI i widok nie mogły się rozjechać w definicjach.
-2. Dodaj komendę `plan` w `scripts/cli.mjs`: wyjście tekstowe + `--json`;
-   nieznana flaga oblewa; wpis w `--help` i `help plan`.
-3. Testy na fixture z `_repo.mjs`: plan wielofalowy z taskami w różnych
-   statusach; przypadki: brak pliku, fala domknięta, task unplanned,
-   task stale, grupa `together` w next up.
+1. Implement the state computation (active wave, next up, unplanned, stale)
+   in `scripts/plan.mjs` alongside the parser — the viewer (TL-109) has to
+   reuse THIS SAME function, so the CLI and the view cannot drift apart in
+   their definitions.
+2. Add the `plan` command in `scripts/cli.mjs`: text output + `--json`; an
+   unknown flag fails; an entry in `--help` and `help plan`.
+3. Tests on a fixture from `_repo.mjs`: a multi-wave plan with tasks in
+   various statuses; cases: no file, a closed wave, an unplanned task, a
+   stale task, a `together` group in next up.
 
 ## Acceptance criteria
 
-- [ ] `node --test scripts/tests/plan-command.test.mjs` zielone.
-- [ ] `worktrail plan` pokazuje falę aktywną, next up (z grupami `together`),
-      in progress, liczbę i ID unplanned oraz stale.
-- [ ] `worktrail plan --json` zwraca tę samą informację strukturalnie;
-      `--json` i tekst liczone jedną funkcją.
-- [ ] Brak `plan.yaml`: exit 0, czytelny komunikat, pusty JSON.
-- [ ] Niespójny plan: exit niezerowy, komunikat guarda z TL-107.
-- [ ] Komenda jest w `--help`; nieznana flaga oblewa (exit 2).
-- [ ] `worktrail check --language` zielone.
+- [ ] `node --test scripts/tests/plan-command.test.mjs` green.
+- [ ] `worktrail plan` shows the active wave, next up (with `together`
+      groups), in progress, the count and IDs of unplanned and stale.
+- [ ] `worktrail plan --json` returns the same information structurally;
+      `--json` and text are computed by one function.
+- [ ] No `plan.yaml`: exit 0, a readable message, empty JSON.
+- [ ] Inconsistent plan: nonzero exit, the guard's message from TL-107.
+- [ ] The command is in `--help`; an unknown flag fails (exit 2).
+- [ ] `worktrail check --language` green.
 
 ## Log
 
-Append-only. Format: `YYYY-MM-DD status — kto — notatka`.
+Append-only. Format: `YYYY-MM-DD status — who — note`.
 
-2026-09-01 pending — agent:claude — task założony z analizy „plan wykonania";
-czeka na format i parser z TL-107.
+2026-09-01 pending — agent:claude — task created from the "execution plan"
+analysis; waiting on the format and parser from TL-107.
+</content>

@@ -1,253 +1,430 @@
-# Backlog — pomiar czasu pracy nad taskiem
+# Backlog — measuring time spent on a task
 
-**Status:** PROJEKT (2026-08-30, zrewidowany 2026-08-30 po adwersarialnym przeglądzie) — nic z tego nie jest wdrożone
-**Dotyczy:** `backlog/` jako przyszłe narzędzie `worktrail` ([TL-20](../backlog/tasks/TL-20-domknij-nazwe-narzedzia-przed-publikacja.md))
-**Poprzednicy:** [backlog-field-editing-history.md](backlog-field-editing-history.md) (log zmian pól), [worktrail-state-and-sync.md](worktrail-state-and-sync.md) (log zdarzeń jako SSOT), [backlog-config-and-portability.md](backlog-config-and-portability.md) (kod zna kształt, konfiguracja wartości)
-**Taski:** [TL-27](../backlog/tasks/TL-27-pomiar-czasu-fundament-i-uczciwy-punkt-zero.md) · [TL-28](../backlog/tasks/TL-28-heartbeaty-aktywnosci-i-lancuch-atrybucji.md) · [TL-29](../backlog/tasks/TL-29-kalibracja-estymat-z-danych-rzeczywistych.md) · [TL-30](../backlog/tasks/TL-30-adapter-tokenow-i-kosztu-sesji.md) · [TL-31](../backlog/tasks/TL-31-retencja-korekta-atrybucji-i-prawo-do-usuniecia.md)
+**Status:** PROJECT (2026-08-30, revised 2026-08-30 after adversarial review) — none of this is implemented
+**Concerns:** `backlog/` as the future `worktrail` tool ([TL-20](../backlog/tasks/TL-20-domknij-nazwe-narzedzia-przed-publikacja.md))
+**Predecessors:** [backlog-field-editing-history.md](backlog-field-editing-history.md) (the field change log), [worktrail-state-and-sync.md](worktrail-state-and-sync.md) (the event log as SSOT), [backlog-config-and-portability.md](backlog-config-and-portability.md) (code knows the shape, configuration knows the values)
+**Tasks:** [TL-27](../backlog/tasks/TL-27-pomiar-czasu-fundament-i-uczciwy-punkt-zero.md) · [TL-28](../backlog/tasks/TL-28-heartbeaty-aktywnosci-i-lancuch-atrybucji.md) · [TL-29](../backlog/tasks/TL-29-kalibracja-estymat-z-danych-rzeczywistych.md) · [TL-30](../backlog/tasks/TL-30-adapter-tokenow-i-kosztu-sesji.md) · [TL-31](../backlog/tasks/TL-31-retencja-korekta-atrybucji-i-prawo-do-usuniecia.md)
 
 ---
 
-## 1. Pytanie
+## 1. The question
 
-Backlog ma 1387 tasków, z czego 1026 `done`, a **1019 z nich ma wpisaną estymatę**. Nie ma ani jednej liczby mówiącej, ile ta praca faktycznie zajęła. Estymaty są więc dziś nieweryfikowalne: `confidence: medium` znaczy „tak mi się wydawało" i po roku znaczy dokładnie tyle samo.
+The backlog has 1387 tasks, of which 1026 are `done`, and **1019 of those carry
+an estimate**. There is not a single number saying how long that work actually
+took. Estimates are therefore unverifiable today: `confidence: medium` means
+"that's what I thought" and, a year later, means exactly the same thing.
 
-Cel: **zbierać czas pracy agenta AI nad taskiem tak, żeby dało się skalibrować estymaty** — i zrobić to w module, który idzie open source, więc nad cudzymi repozytoriami i cudzymi ludźmi.
+Goal: **collect the AI agent's working time on a task well enough to calibrate
+estimates against it** — and do it in a module that goes open source, so over
+other people's repositories and other people's people.
 
-## 2. Pomiar — dlaczego nie ma tu drogi na skróty
+## 2. Measurement — why there is no shortcut here
 
-Wszystkie liczby zmierzone na tym repozytorium 2026-08-30, przed napisaniem jednej linijki projektu. Ta sekcja istnieje, bo trzy „oczywiste" źródła danych historycznych wyglądają na wystarczające, dopóki się ich nie policzy.
+All numbers measured on this repository on 2026-08-30, before a single line of
+the module was written. This section exists because three "obvious" sources of
+historical data look sufficient until they are actually counted.
 
-| Hipoteza źródła | Wynik pomiaru | Werdykt |
+| Source hypothesis | Measured result | Verdict |
 |---|---|---|
-| Log zmian pól (`history/*.jsonl`) już to ma | **9 tasków, 13 wpisów, 1** z parą `in_progress` + `done` | Log ruszył 2026-08-30. Pokrycie ≈ 0,1% |
-| Frontmatter `created` → `updated` | 1016 tasków parsowalnych, mediana **0 dni**, **71% ukończonych tego samego dnia** | Rozdzielczość dobowa. Zero dla 7 na 10 tasków |
-| Git — rozpiętość commitów na pliku taska | mediana **722 h** przy 71% „tego samego dnia" we frontmatterze | Zanieczyszczone masowymi backfillami pól (`board:` dotknęło 1390 plików jednego dnia) |
-| Git — pickaxe `-S"status: done"` | **20/20** trafień, dokładnie 1 commit, rozdzielczość sekundowa, ~60 s dla 1023 tasków | ✅ Moment UKOŃCZENIA da się odtworzyć |
-| Git — pickaxe `-S"status: in_progress"` | **3/20** (15%); wartości 0,2 h / 142 h / 554 h | Moment STARTU nie istnieje w danych |
+| The field change log (`history/*.jsonl`) already has this | **9 tasks, 13 entries, 1** with an `in_progress` + `done` pair | The log started on 2026-08-30. Coverage ≈ 0.1% |
+| Frontmatter `created` → `updated` | 1016 tasks parseable, median **0 days**, **71% completed the same day** | Day-level resolution. Zero for 7 out of 10 tasks |
+| Git — the commit span on a task file | median **722 h**, against 71% "same day" in the frontmatter | Contaminated by mass field backfills (`board:` touched 1390 files in one day) |
+| Git pickaxe on `-S"status: done"` | **20/20** hits, exactly 1 commit, second-level resolution, ~60 s for 1023 tasks | ✅ The moment of COMPLETION is recoverable |
+| Git pickaxe on `-S"status: in_progress"` | **3/20** (15%); values 0.2 h / 142 h / 554 h | The moment of START does not exist in the data |
 
-Ostatnie dwa wiersze rozstrzygają projekt. Agent zwykle zapisuje `pending → done` jednym commitem, więc **stan pośredni nigdy nie powstał** — nie „zgubił się", tylko go nie było. A tam, gdzie był, rozrzut 0,2 h ÷ 554 h pokazuje, że to i tak czas kalendarzowy, nie wysiłek.
+The last two rows settle the project. An agent usually writes `pending → done`
+in a single commit, so **the intermediate state was never produced** — it was
+not "lost", it simply never existed. And where it did exist, a spread of
+0.2 h to 554 h shows it was calendar time regardless, not effort.
 
-> **Wniosek, który zmienia plan: historia sprzed dnia zero nie istnieje i nie da się jej wywnioskować.** Można odtworzyć *kiedy* task się skończył (git, dokładnie), nie można *ile trwał*. Każdy backfill „czasu pracy" byłby ładną nieprawdą — dokładnie tą klasą, dla której [backlog-field-editing-history.md §6](backlog-field-editing-history.md) odrzucił backfill autorstwa z gita.
+> **A conclusion that changes the plan: history from before day zero does not
+> exist and cannot be inferred.** *When* a task finished can be recovered (git,
+> exactly); *how long* it took cannot. Any backfill of "time worked" would be a
+> pretty untruth — exactly the class that [backlog-field-editing-history.md §6](backlog-field-editing-history.md)
+> rejected backfilling authorship from git for.
 >
-> Rozróżnienie, którego trzymamy się dalej: **stempel ukończenia backfillujemy** (git jest dowodem), **czasu pracy nie** (git nie jest dowodem).
+> The distinction kept from here on: **the completion stamp is backfilled**
+> (git is evidence), **time worked is not** (git is not evidence).
 
-## 3. Co właściwie mierzymy
+## 3. What we are actually measuring
 
-„Czas implementacji" to cztery różne wielkości. Mieszanie ich w jedną liczbę jest najczęstszym błędem tej klasy narzędzi.
+"Implementation time" is four different quantities. Mixing them into one
+number is the most common mistake in this class of tool.
 
-| Wielkość | Definicja | Skąd | Do czego dobra |
+| Quantity | Definition | Source | Good for |
 |---|---|---|---|
-| **lead time** | `created` → `done` | git (backfill) + log | przepustowość kolejki |
-| **cycle time** | `in_progress` → `done` | log zdarzeń, od dnia zero | ⚠️ w tym repozytorium **bezwartościowa**, patrz §3.1 |
-| **engaged time** | suma realnych sesji pracy, przerwy wycięte | heartbeaty (§6–§7) | **estymacja** |
-| **koszt** | tokeny, wywołania narzędzi, model | adapter hosta (§10) | budżet, odporne na prędkość modelu |
+| **lead time** | `created` → `done` | git (backfill) + log | queue throughput |
+| **cycle time** | `in_progress` → `done` | the event log, from day zero | ⚠️ **worthless** in this repository, see §3.1 |
+| **engaged time** | sum of real work sessions, gaps cut out | heartbeats (§6–§7) | **estimation** |
+| **cost** | tokens, tool calls, model | host adapter (§10) | budget, immune to model speed |
 
-### 3.1. Cycle time jest tu miarą-pułapką
+### 3.1. Cycle time is a trap metric here
 
-W chwili pisania **45 tasków ma jednocześnie `status: in_progress`, z czego 32 z `owner: claude`.** To nie znaczy, że 32 agenty pracują naraz — `in_progress` jest w tym repozytorium stanem **parkingowym**: task w nim zostaje, gdy sesja się skończy, gdy praca czeka na decyzję, gdy coś odłożono.
+At the time of writing **45 tasks are simultaneously `status: in_progress`, 32
+of them with `owner: claude`.** That does not mean 32 agents are working at
+once — `in_progress` in this repository is a **parking** state: a task stays
+in it when a session ends, when work is waiting on a decision, when something
+was set aside.
 
-Cycle time liczony z takiego stanu zmierzy więc parkowanie, nie pracę, i będzie tym większy, im gorszą ma się higienę backlogu. **Raportujemy go wyłącznie jako miarę higieny kolejki (jak długo task stoi w robocie), nigdy jako miarę wysiłku.** To jest ta sama pułapka, co „liczba otwartych ticketów" udająca obciążenie zespołu.
+Cycle time computed from such a state therefore measures parking, not work,
+and grows worse the poorer the backlog's hygiene is. **We report it only as a
+measure of queue hygiene (how long a task sits in progress), never as a
+measure of effort.** This is the same trap as "number of open tickets"
+posing as team workload.
 
-### 3.2. Dlaczego mimo wszystko engaged time, a nie same tokeny
+### 3.2. Why engaged time anyway, and not tokens alone
 
-Zegar agenta AI zależy od modelu, od tego, ile razy człowiek przerwał sesję, i od tego, czy dwa agenty pracowały równolegle. Tokeny są stabilniejsze, tylko nie przeliczają się na godziny człowieka — a `estimate:` we frontmatterze **jest w godzinach człowieka** i kalibracja musi być w tej samej jednostce.
+An AI agent's clock depends on the model, on how many times a human
+interrupted the session, and on whether two agents worked in parallel.
+Tokens are more stable, but they don't convert to human-hours — and
+`estimate:` in the frontmatter **is in human-hours**, so calibration has to
+be in the same unit.
 
-Zbieramy więc oba, domyślnie raportujemy engaged time, a to, czy ta jednostka w ogóle się broni, jest jawnie założeniem do obalenia (§14 pkt 1).
+We therefore collect both, report engaged time by default, and treat whether
+this unit holds up at all as an explicit assumption to be falsified (§14
+point 1).
 
-## 4. Dlaczego nie gotowe narzędzie
+## 4. Why not an off-the-shelf tool
 
-Pytanie, które zada pierwszy zewnętrzny użytkownik. Odpowiedź nie brzmi „bo chcemy swoje".
+The question the first external user will ask. The answer is not "because we
+want our own".
 
-| Narzędzie | Co robi dobrze | Czemu nie wystarcza |
+| Tool | What it does well | Why it isn't enough |
 |---|---|---|
-| **WakaTime / Wakapi** | dojrzały model heartbeatów, wtyczki do edytorów, self-hosted (Wakapi) | mierzy **plik i język**, nie **task**. Nie ma pojęcia „TL-27", więc nie da się z tego zrobić kalibracji estymat — a to jest cały cel |
-| **ActivityWatch** | pomiar całego pulpitu, prywatność lokalna | granulacja aplikacji/okna; wymaga demona na maszynie użytkownika; nadmiarowy wobec pytania „ile trwał ten task" |
-| **timetrace / watson / timewarrior** | proste CLI, tagi, zero infrastruktury | **ręczny start/stop**. Człowiek pamięta albo nie; agentowi AI nie ma kto przypomnieć, a nieodpalony timer daje ciszę nieodróżnialną od zera |
-| **git-time-metric** | zero konfiguracji, czyta commity | wnioskuje czas z odstępów między commitami. Nasz pomiar (§2) pokazuje, że tutaj odstępy commitów są zanieczyszczone masowymi backfillami — mediana 722 h przy 71% pracy „tego samego dnia" |
-| **Jira / Linear cycle time** | gotowe raporty przepływu | mierzy przejścia statusów, czyli dokładnie tę wielkość, którą §3.1 właśnie zdyskwalifikował; poza tym wymaga porzucenia plików w gicie jako SSOT |
+| **WakaTime / Wakapi** | mature heartbeat model, editor plugins, self-hosted (Wakapi) | measures **file and language**, not **task**. Has no notion of "TL-27", so it cannot calibrate estimates — which is the whole point |
+| **ActivityWatch** | whole-desktop measurement, local privacy | application/window granularity; needs a daemon on the user's machine; overkill for "how long did this task take" |
+| **timetrace / watson / timewarrior** | simple CLI, tags, zero infrastructure | **manual start/stop**. A human remembers or doesn't; nobody reminds an AI agent, and an unstarted timer gives silence indistinguishable from zero |
+| **git-time-metric** | zero configuration, reads commits | infers time from gaps between commits. Our measurement (§2) shows commit gaps here are contaminated by mass backfills — median 722 h against 71% "same day" work |
+| **Jira / Linear cycle time** | ready-made flow reports | measures status transitions, i.e. exactly the quantity §3.1 just disqualified; also requires giving up files in git as SSOT |
 
-Wspólny mianownik: **istniejące narzędzia mierzą albo aktywność bez taska, albo task bez aktywności.** Brakujący element to atrybucja aktywności do taska (§8) — i to jest jedyna rzecz, którą ten moduł ma zrobić sam. Reszta (klastrowanie heartbeatów, próg bezczynności) to świadomie zapożyczony model WakaTime, nie wynalazek.
+Common denominator: **existing tools measure either activity without a task,
+or a task without activity.** The missing piece is attributing activity to a
+task (§8) — and that is the only thing this module has to build itself. The
+rest (heartbeat clustering, an idle threshold) is a deliberately borrowed
+model from WakaTime, not an invention.
 
-Konsekwencja praktyczna: `worktrail activity record` jest **otwartym wejściem** (§7). Kto ma już WakaTime, może z niego zasilać ten log, zamiast pisać drugi zbieracz.
+Practical consequence: `worktrail activity record` is an **open input** (§7).
+Whoever already has WakaTime can feed this log from it, instead of writing a
+second collector.
 
-## 5. Model danych
+## 5. Data model
 
 ```
-backlog/activity/BL-NNNN.jsonl        ← heartbeaty, append-only, DOMYŚLNIE gitignored (§9)
-backlog/activity/rollup/BL-NNNN.json  ← agregat PER TASK, wersjonowany (§9)
-backlog/history/BL-NNNN.jsonl         ← bez zmian: zmiany pól, wersjonowane
+backlog/activity/BL-NNNN.jsonl        ← heartbeats, append-only, gitignored by DEFAULT (§9)
+backlog/activity/rollup/BL-NNNN.json  ← aggregate PER TASK, versioned (§9)
+backlog/history/BL-NNNN.jsonl         ← unchanged: field changes, versioned
 ```
 
-> **Lokalizacja surowego logu ZMIENIA SIĘ w [TL-35](../backlog/tasks/TL-35-surowy-log-aktywnosci-do-katalogu-domowego.md).** Heartbeaty przenoszą się do katalogu domowego użytkownika (`<data>/activity/<projekt>/BL-NNNN.jsonl`), bo w repo ich ochrona zależy od poprawnego `.gitignore` w każdym repozytorium, do którego narzędzie kiedykolwiek trafi — a jeden `git add -A` w cudzym drzewie wpisuje czyjś kalendarz pracy do publicznej historii nieodwracalnie. **Agregat `rollup/` zostaje w repo bez zmian.** Uzasadnienie: [worktrail-global-tool.md §6](worktrail-global-tool.md).
+> **The raw log's location CHANGES in [TL-35](../backlog/tasks/TL-35-surowy-log-aktywnosci-do-katalogu-domowego.md).**
+> Heartbeats move to the user's home directory (`<data>/activity/<project>/BL-NNNN.jsonl`),
+> because in the repo their protection depends on a correct `.gitignore` in
+> every repository this tool ever reaches — and a single `git add -A` in
+> someone else's tree writes their work calendar into public history
+> irreversibly. **The `rollup/` aggregate stays in the repo unchanged.**
+> Reasoning: [worktrail-global-tool.md §6](worktrail-global-tool.md).
 
-Jeden wiersz = jeden dowód aktywności:
+One row = one piece of evidence of activity:
 
 ```json
 {"id":"01M18TSCBMECG6E6D42E6AE0J6","ts":"2026-08-30T09:14:42.326Z","task":"TL-27",
  "kind":"tool","actor":"agent:claude","source":"hook","session":"85bcc80f","attribution":"focus"}
 ```
 
-- `id` — ULID, ta sama funkcja co w `history.mjs`: sortowanie leksykograficzne = porządek czasowy, więc jest gotowym kursorem synchronizacji.
-- `kind` — `tool` | `prompt` | `commit` | `edit` | `reassign`. Klasa dowodu, nie waga.
-- `session` — identyfikator sesji hosta. Bez niego dwa agenty pracujące równolegle nad jednym taskiem zlewają się w jedną sesję i czas jest liczony raz zamiast dwa razy. Jest też **kluczem zakresu atrybucji** (§8).
-- `attribution` — **którą nogą łańcucha (§8) task został ustalony.** To jest metadana o wiarygodności wiersza, dokładnie jak `source` przy autorze w logu zmian pól.
+- `id` — a ULID, the same function as in `history.mjs`: lexicographic
+  ordering equals time ordering, so it is a ready-made sync cursor.
+- `kind` — `tool` | `prompt` | `commit` | `edit` | `reassign`. The class of
+  evidence, not a weight.
+- `session` — the host's session identifier. Without it, two agents working
+  in parallel on one task blur into one session and time is counted once
+  instead of twice. It is also the **attribution scope key** (§8).
+- `attribution` — **which leg of the chain (§8) settled the task.** This is
+  metadata about the row's reliability, exactly like `source` next to the
+  author in the field change log.
 
-### 5.1. Dlaczego osobny plik, a nie `history/`
+### 5.1. Why a separate file, not `history/`
 
-`history/` jest semantycznym logiem „kto co zmienił" i viewer go renderuje przy polach. Heartbeaty idą w tysiącach na task. Wrzucenie ich tam zalałoby UI i spowolniło `readHistory()`. Ta sama dyscyplina (ULID, przestrzenie nazw aktora, append-only, dedup po `id`), inny plik.
+`history/` is the semantic "who changed what" log and the viewer renders it
+next to fields. Heartbeats run into the thousands per task. Dropping them in
+there would flood the UI and slow down `readHistory()`. Same discipline
+(ULID, actor namespaces, append-only, dedup by `id`), a different file.
 
-### 5.2. Dlaczego agregat PER TASK, a nie jeden `rollup.json`
+### 5.2. Why an aggregate PER TASK, not one `rollup.json`
 
-Bo jeden zbiorczy plik byłby drugim `INDEX.yaml` — a ten moduł już raz za to zapłacił. `backlog/.gitignore` trzyma zmierzone uzasadnienie: agregat wszystkich tasków sprawia, że **każda gałąź przepisuje ten sam plik**, `git merge-tree` dwóch gałęzi **bez ani jednego wspólnego taska** dawał konflikt, a 78% commitów dotykających `tasks/` dotykało też widoków.
+Because a single collective file would be a second `INDEX.yaml` — and this
+module already paid for that once. `backlog/.gitignore` carries the measured
+reasoning: an aggregate of all tasks means **every branch rewrites the same
+file**, `git merge-tree` on two branches **with not a single task in common**
+produced a conflict, and 78% of commits touching `tasks/` also touched views.
 
-Agregat czasu ma dokładnie tę samą charakterystykę: rośnie z każdym taskiem, zmienia się przy każdej sesji, a scala się źle. `activity/rollup/BL-NNNN.json` sprawia, że gałąź dotyka wyłącznie plików własnych tasków — konflikt jest wtedy realnym konfliktem, a nie skutkiem ubocznym agregacji.
+The time aggregate has exactly the same profile: it grows with every task,
+changes with every session, and merges badly. `activity/rollup/BL-NNNN.json`
+means a branch touches only the files of its own tasks — a conflict is then a
+real conflict, not a side effect of aggregation.
 
-### 5.3. Dlaczego heartbeaty, a nie pary start/stop
+### 5.3. Why heartbeats, not start/stop pairs
 
-Para gubi przypadek awarii: sesja zabita, laptop uśpiony, `Ctrl-C` — interwał nigdy się nie domyka i task raportuje nieskończony czas. Heartbeat jest **kompletny w momencie zapisu**; brak następnego jest informacją, nie uszkodzeniem.
+A pair loses the failure case: a session killed, a laptop put to sleep,
+`Ctrl-C` — the interval never closes and the task reports infinite time. A
+heartbeat is **complete at the moment it is written**; the absence of the
+next one is information, not damage.
 
-### 5.4. Współbieżny zapis
+### 5.4. Concurrent writes
 
-`history.mjs` używa `appendFileSync`. Dla wierszy tej wielkości (~200 B) POSIX gwarantuje atomowość dopisania poniżej `PIPE_BUF`, więc równoległe sesje nie przeplotą sobie linii — ale **to jest gwarancja ograniczona i trzeba ją nazwać**, bo na Windowsie nie obowiązuje w tej postaci. Stąd wymóg, żeby czytnik przeżywał uszkodzony wiersz (pomija go i liczy dalej), zamiast zakładać, że uszkodzenie nie wystąpi.
+`history.mjs` uses `appendFileSync`. For rows of this size (~200 B), POSIX
+guarantees the atomicity of an append below `PIPE_BUF`, so parallel sessions
+won't interleave their lines — but **this guarantee is limited and has to be
+named**, because it does not hold in this form on Windows. Hence the
+requirement that the reader survive a corrupt row (skip it and keep counting)
+instead of assuming corruption never happens.
 
-## 6. Od heartbeatów do minut
+## 6. From heartbeats to minutes
 
-Czasu **nie zapisujemy** — wyprowadzamy go, tak jak `INDEX.yaml` wyprowadza się z tasków, a `estimateHours()` z tekstu estymaty.
+We **do not record** time — we derive it, the same way `INDEX.yaml` is
+derived from tasks, and `estimateHours()` from the estimate text.
 
 ```
-klaster  := maksymalny ciąg heartbeatów tej samej sesji,
-            w którym sąsiedzi dzieli mniej niż idle_gap (domyślnie 10 min)
-minuty   := Σ (last(klaster) − first(klaster))
+cluster  := the longest run of heartbeats in the same session,
+            where neighbours are less than idle_gap apart (10 min default)
+minutes  := Σ (last(cluster) − first(cluster))
 ```
 
-Trzy reguły, które muszą mieć testy, bo każda z nich to miejsce, w którym takie liczydła po cichu kłamią:
+Three rules that must have tests, because each of them is a place where a
+counter of this kind quietly lies:
 
-1. **Klaster jednoelementowy liczy się jako 0** i raportuje osobno jako liczbę. Nie doklejamy „nominalnych 5 minut" — to byłoby zmyślanie proporcjonalne do rozdrobnienia pracy.
-2. **Gap dokładnie na progu** należy do poprzedniego klastra (`<` vs `≤` rozstrzygnięte jawnie, nie przypadkiem).
-3. **Sesje równoległe sumują się.** Dwa agenty × 30 min to 60 minut wysiłku i 30 minut kalendarza. Raport pokazuje obie liczby, bo odpowiadają na dwa różne pytania.
+1. **A single-heartbeat cluster counts as 0** and is reported separately as a
+   count. We do not tack on a "nominal 5 minutes" — that would be invention
+   proportional to how fine-grained the work was.
+2. **A gap exactly at the threshold** belongs to the previous cluster (`<`
+   vs `≤` settled explicitly, not by accident).
+3. **Parallel sessions sum.** Two agents × 30 min is 60 minutes of effort and
+   30 minutes of calendar time. The report shows both numbers, because they
+   answer two different questions.
 
-Progi (`idle_gap_minutes`, `min_session_minutes`) idą do `config.yaml` — kod zna kształt, konfiguracja wartości.
+The thresholds (`idle_gap_minutes`, `min_session_minutes`) go into
+`config.yaml` — code knows the shape, configuration knows the values.
 
-## 7. Skąd biorą się heartbeaty — i dlaczego z KAŻDEGO narzędzia
+## 7. Where heartbeats come from — and why from EVERY tool
 
-Rdzeń to `worktrail activity record --task BL-N --kind tool` — zwykłe CLI czytające flagi i stdin. Adaptery to cienkie wtyczki nad nim: hook Claude Code'a, git hook, WakaTime, prompt powłoki. **Rdzeń nie może wymagać żadnego z nich**, bo moduł ma działać nad cudzym procesem.
+The core is `worktrail activity record --task BL-N --kind tool` — an ordinary
+CLI reading flags and stdin. Adapters are thin plugins on top of it: a Claude
+Code hook, a git hook, WakaTime, a shell prompt. **The core must not require
+any of them**, because the module has to work over someone else's process.
 
-Jedna decyzja, która wygląda na szczegół, a jest warunkiem sensowności danych:
+One decision that looks like a detail but is a condition for the data making
+sense at all:
 
-> **Heartbeat musi lecieć z każdego wywołania narzędzia, nie z podzbioru.**
+> **A heartbeat must fire on every tool invocation, not on a subset.**
 
-Istniejący hook backlogu ma matcher `Edit|Write|MultiEdit` (`.claude/settings.json`). Gdyby adapter aktywności poszedł tą samą drogą, **nie zobaczyłby ani jednego uruchomienia testów, builda, gita, czytania ani szukania**. Skutkiem nie jest równomierne zaniżenie — jest zaniżenie **skorelowane z rodzajem pracy**: task spędzony na uruchamianiu testów wyszedłby prawie darmowy, a task spędzony na pisaniu plików drogi. Zaniżenie skorelowane jest gorsze od równomiernego, bo wygląda jak sygnał i wprost przekłada się na przekrzywioną kalibrację (§11).
+The existing backlog hook has an `Edit|Write|MultiEdit` matcher
+(`.claude/settings.json`). If the activity adapter followed the same path,
+**it would see not a single test run, build, git command, read or search.**
+The result would not be a uniform undercount — it would be an undercount
+**correlated with the kind of work**: a task spent running tests would come
+out nearly free, and a task spent writing files expensive. A correlated
+undercount is worse than a uniform one, because it looks like signal and
+directly skews calibration (§11).
 
-Stąd: matcher obejmujący wszystkie narzędzia + **throttling** (nie więcej niż jeden heartbeat na `heartbeat_throttle_seconds`, domyślnie 60, per sesja). Throttling jest tu obowiązkowy, nie optymalizacyjny — bez niego log rośnie liniowo z gadatliwością agenta, a rozdzielczość i tak jest ograniczona progiem klastrowania z §6.
+Hence: a matcher covering all tools + **throttling** (no more than one
+heartbeat per `heartbeat_throttle_seconds`, 60 by default, per session).
+Throttling is mandatory here, not an optimisation — without it the log grows
+linearly with the agent's chattiness, and resolution is bounded anyway by the
+clustering threshold from §6.
 
-## 8. Atrybucja — łańcuch pierwszeństwa i uczciwe `unknown`
+## 8. Attribution — the priority chain and an honest `unknown`
 
-Najtrudniejsze pytanie nie brzmi „ile", tylko **„nad czym"**. Tu takie systemy kłamią najczęściej, bo przypisanie do złego taska wygląda identycznie jak przypisanie do dobrego.
+The hardest question is not "how much" but **"on what"**. This is where such
+systems lie most often, because attribution to the wrong task looks identical
+to attribution to the right one.
 
-Kolejność, pierwsze trafienie wygrywa:
+Order, first match wins:
 
-| # | Noga | `attribution` | Uwaga |
+| # | Leg | `attribution` | Note |
 |---|---|---|---|
-| 1 | `worktrail focus BL-NNNN` — jawny wskaźnik sesji, albo `BACKLOG_TASK` w środowisku | `focus` | ustawiany też AUTOMATYCZNIE — §8.1 |
-| 2 | ostatnie w tej **sesji** przejście taska na `status: in_progress` przez tego aktora | `session-state` | §8.1 |
-| 3 | ścieżka edytowanego pliku, gdy to `backlog/tasks/BL-NNNN-*.md` | `path` | |
-| 4 | regex z nazwy gałęzi/worktree (`task_id_pattern` z konfiguracji) | `branch` | |
-| 5 | **`unknown`** | `unknown` | zapisane, nie zgadnięte |
+| 1 | `worktrail focus BL-NNNN` — an explicit session marker, or `BACKLOG_TASK` in the environment | `focus` | also set AUTOMATICALLY — §8.1 |
+| 2 | the most recent transition to `status: in_progress` in this **session** by this actor | `session-state` | §8.1 |
+| 3 | the edited file's path, when it is `backlog/tasks/BL-NNNN-*.md` | `path` | |
+| 4 | a regex on the branch/worktree name (`task_id_pattern` from configuration) | `branch` | |
+| 5 | **`unknown`** | `unknown` | recorded, not guessed |
 
-### 8.1. Dlaczego nogi 1 i 2 muszą być automatyczne
+### 8.1. Why legs 1 and 2 must be automatic
 
-Bez tego łańcuch nie działa — i to jest zmierzone, nie przewidywane:
+Without this the chain does not work — and this is measured, not predicted:
 
-- **Noga 3 strzela dwa razy na task.** Odpala się tylko przy edycji `backlog/tasks/BL-*.md`, czyli przy wzięciu i zamknięciu. Cała realna praca dzieje się w plikach sub-repo, których ta noga nie widzi.
-- **Noga 4 w tym repozytorium nie strzela wcale.** Gałęzie nazywają się `claude/task-<opis>`, bez numeru BL. Zostaje dla cudzych repozytoriów, gdzie konwencja bywa inna.
+- **Leg 3 fires twice per task.** It only triggers on editing
+  `backlog/tasks/BL-*.md`, i.e. on taking and on closing. All the real work
+  happens in sub-repo files this leg cannot see.
+- **Leg 4 does not fire at all in this repository.** Branches are named
+  `claude/task-<description>`, without a BL number. It remains useful for
+  other repositories, where the convention may differ.
 
-Zostaje więc noga 1 — a ręczne `worktrail focus` na starcie każdej sesji to dokładnie ten sam błąd, który dyskwalifikuje `timetrace` (§4): mechanizm zależny od tego, czy ktoś pamiętał.
+That leaves leg 1 — and a manual `worktrail focus` at the start of every
+session is exactly the same failure that disqualifies `timetrace` (§4): a
+mechanism that depends on someone remembering.
 
-Rozwiązanie: **agent i tak deklaruje, nad czym pracuje.** Protokół każe mu przy wzięciu taska ustawić `status: in_progress` + `owner:`, a hook już to przechwytuje i zapisuje do `history/`. To jest darmowy, istniejący sygnał `focus` — wystarczy, żeby zapis `in_progress` ustawiał również fokus sesji.
+Solution: **the agent already declares what it is working on.** The protocol
+requires it, on taking a task, to set `status: in_progress` + `owner:`, and
+the hook already captures this and writes it to `history/`. This is a free,
+existing `focus` signal — it only needs the `in_progress` write to also set
+the session's focus.
 
-**Krytyczny warunek: zakresem jest SESJA, nigdy stan globalny.** Globalnie w tej chwili `in_progress` jest 45 tasków, 32 z `owner: claude` — pytanie „który task jest w toku" nie ma globalnie jednej odpowiedzi i nigdy nie będzie miało. Ma jednoznaczną odpowiedź w obrębie jednej sesji, bo jedna sesja bierze jeden task (jedna sesja = jeden worktree). Ta sama liczba, która psuje cycle time (§3.1), psułaby atrybucję — o ile liczyć ją globalnie.
+**Critical condition: the scope is the SESSION, never global state.**
+Globally, right now, `in_progress` covers 45 tasks, 32 with `owner: claude` —
+the question "which task is in progress" has no single answer globally and
+never will. It has an unambiguous answer within one session, because one
+session takes one task (one session = one worktree). The same number that
+breaks cycle time (§3.1) would break attribution — if counted globally.
 
-### 8.2. `unknown` jest liczbą, nie awarią
+### 8.2. `unknown` is a number, not a failure
 
-**Udział `unknown` jest pierwszoklasową liczbą w każdym raporcie.** Jeśli 60% zmierzonego czasu jest nieprzypisane, metryka nie jest wiarygodna i raport ma to napisać, zamiast pokazać ładną sumę. Ta sama zasada, co `estimateHours()` zwracające `null` zamiast zera i `sumHours()` zwracające `{hours, unknown}`.
+**The `unknown` share is a first-class number in every report.** If 60% of
+measured time is unattributed, the metric is not trustworthy and the report
+has to say so, instead of showing a pretty sum. The same principle as
+`estimateHours()` returning `null` instead of zero, and `sumHours()`
+returning `{hours, unknown}`.
 
-## 9. Prywatność, retencja i korekta — warunek, bez którego to nie idzie open source
+## 9. Privacy, retention and correction — the condition without which this cannot go open source
 
-Log aktywności to zapis **o której godzinie konkretny człowiek pracował**, dzień po dniu. W publicznym repozytorium to metadane nadzoru, a nie telemetria projektu. W repo firmowym to dane pracownicze, a w UE — dane osobowe z wszystkim, co z tego wynika.
+An activity log is a record of **what hour a specific person worked**, day
+after day. In a public repository that is surveillance metadata, not project
+telemetry. In a company repo it is employee data, and in the EU — personal
+data with everything that entails.
 
-Trzy mechanizmy, wszystkie w [TL-31](../backlog/tasks/TL-31-retencja-korekta-atrybucji-i-prawo-do-usuniecia.md):
+Three mechanisms, all in [TL-31](../backlog/tasks/TL-31-retencja-korekta-atrybucji-i-prawo-do-usuniecia.md):
 
-**Minimalizacja.** Surowe stemple zostają na maszynie, która je wyprodukowała: dziś przez gitignore (`backlog/activity/*.jsonl`, jak `history/.snapshot.json`), docelowo przez położenie **poza jakimkolwiek repozytorium** ([TL-35](../backlog/tasks/TL-35-surowy-log-aktywnosci-do-katalogu-domowego.md)) — bo procedura utrzymywana przez każdego przyszłego użytkownika jest słabsza niż konstrukcja. Wersjonowany jest tylko agregat per task (§5.2): `minutes`, `sessions`, `first`, `last`, `unknown_ratio`. Tyle wystarcza do kalibracji, a nie odtwarza kalendarza nikogo. `activity_privacy: local | aggregate | full` — `full` istnieje dla zespołów, które świadomie tego chcą, i nigdy nie jest domyślne.
+**Minimisation.** Raw stamps stay on the machine that produced them: today
+via gitignore (`backlog/activity/*.jsonl`, like `history/.snapshot.json`),
+eventually by living **outside any repository**
+([TL-35](../backlog/tasks/TL-35-surowy-log-aktywnosci-do-katalogu-domowego.md))
+— because a procedure every future user has to maintain is weaker than a
+structural guarantee. Only the per-task aggregate (§5.2) is versioned:
+`minutes`, `sessions`, `first`, `last`, `unknown_ratio`. That is enough for
+calibration and does not reconstruct anyone's calendar.
+`activity_privacy: local | aggregate | full` — `full` exists for teams that
+deliberately want it, and is never the default.
 
-**Retencja.** `activity_retention_days` (domyślnie 90, wzorem retencji snapshotów diagnostycznych w tym workspace). Surowe heartbeaty starsze niż okno są kasowane; **agregat przeżywa**, bo nie jest już danymi o osobie w tej rozdzielczości. Bez tego log rośnie w nieskończoność i nie ma odpowiedzi na pytanie „jak długo to trzymacie".
+**Retention.** `activity_retention_days` (90 by default, following the
+retention of diagnostic snapshots in this workspace). Raw heartbeats older
+than the window are deleted; **the aggregate survives**, because it is no
+longer personal data at that resolution. Without this the log grows forever
+and there is no answer to "how long do you keep this".
 
-**Prawo do usunięcia i do sprostowania.** `worktrail activity forget --actor <a>` kasuje surowe wiersze aktora i przelicza agregaty. Osobno `worktrail activity reassign --from BL-A --to BL-B --session S` dopisuje zdarzenie `kind: "reassign"` — log jest append-only, więc korekta jest **nowym zdarzeniem, nie edycją historii**. Bez tej ścieżki pierwsza pomyłka atrybucji zostaje na zawsze, a to gwarantowany pierwszy zgłoszony błąd.
+**The right to deletion and to correction.** `worktrail activity forget
+--actor <a>` deletes an actor's raw rows and recomputes the aggregates.
+Separately, `worktrail activity reassign --from BL-A --to BL-B --session S`
+appends a `kind: "reassign"` event — the log is append-only, so a correction
+is a **new event, not an edit to history**. Without this path the first
+attribution mistake stays forever, and that is a guaranteed first bug report.
 
-> **Powierzchnia publiczna po angielsku.** Ten dokument i taski są po polsku zgodnie z konwencją workspace'u, ale publiczne README, opis formatu zdarzenia i teksty CLI muszą być EN, zanim moduł wyjdzie na zewnątrz — łącznie z sekcją o retencji z tego paragrafu. Osobny task: [TL-32](../backlog/tasks/TL-32-angielska-powierzchnia-publiczna-modulu.md) (zmierzone: 667 linii komentarzy + 350 stringów + 415 linii README; słownik `DEFAULTS` jest już angielski, więc nie ma migracji danych).
+> **The public surface in English.** This document and the tasks are in
+> Polish per the workspace convention, but the public README, the event
+> format description and the CLI text must be EN before the module ships —
+> including the retention section from this paragraph. Separate task:
+> [TL-32](../backlog/tasks/TL-32-angielska-powierzchnia-publiczna-modulu.md)
+> (measured: 667 lines of comments + 350 strings + 415 lines of README; the
+> `DEFAULTS` vocabulary is already English, so there is no data migration).
 
-## 10. Koszt jako druga oś (opcjonalna)
+## 10. Cost as a second axis (optional)
 
-Adapter, który potrafi, dokłada do wiersza `tokens_in`, `tokens_out`, `model`. Kalibracja kosztowa jest wtedy pochodną, a nie osobnym mechanizmem. Brak adaptera = **brak kolumny, nie zero** — zero znaczyłoby „zmierzone i wyszło darmo".
+An adapter that can, adds `tokens_in`, `tokens_out`, `model` to the row.
+Cost calibration is then a derivative, not a separate mechanism. No adapter =
+**no column, not zero** — zero would mean "measured and it came out free".
 
-## 11. Kalibracja — po co to wszystko
+## 11. Calibration — the whole point of this
 
-Wartość nie jest w zdaniu „TL-27 zajął 3 h". Jest w rozkładzie per kubełek estymaty:
+The value is not in the sentence "TL-27 took 3 h". It is in the distribution
+per estimate bucket:
 
 ```
-estymata   n    mediana   p80    bias
+estimate   n    median    p80    bias
 30m        41   0h48m     1h30m  ×1.6
 2h         23   2h36m     4h06m  ×1.3
-1d          6   —         —      za mało danych
+1d          6   —         —      too little data
 ```
 
-Trzy reguły raportu:
+Three rules for the report:
 
-1. Poniżej progu `n` (domyślnie 8) raport pisze **„za mało danych"**, nie liczbę. Mediana z trzech obserwacji jest liczbą, nie wiedzą.
-2. Zawsze przedział, nigdy punkt. „2h taski lądują 1,4–4,1 h" jest użyteczne; „2h taski trwają 2,6 h" jest fałszywie precyzyjne.
-3. Rozbicia (board, `type`, `owner`) tylko tam, gdzie każda komórka spełnia próg `n`.
+1. Below the `n` threshold (8 by default) the report writes **"too little
+   data"**, not a number. A median of three observations is a number, not
+   knowledge.
+2. Always a range, never a point. "2h tasks land at 1.4–4.1 h" is useful;
+   "2h tasks take 2.6 h" is falsely precise.
+3. Breakdowns (board, `type`, `owner`) only where every cell meets the `n`
+   threshold.
 
-**Nic z tego nie ląduje we frontmatterze.** Żadnego pola `actual: 3h`, które za miesiąc rozjedzie się ze źródłem. Frontmatter trzyma to, co zdecydował człowiek (`estimate`, `confidence`); actuals są wyliczane, jak widoki.
+**None of this lands in the frontmatter.** No `actual: 3h` field that drifts
+from its source a month later. The frontmatter holds what a human decided
+(`estimate`, `confidence`); actuals are computed, like views.
 
-### 11.1. Kiedy kubełki się zapełnią (zmierzone)
+### 11.1. When the buckets will fill up (measured)
 
-Rozkład estymat wśród 1026 zamkniętych tasków i tempo zamykania z ostatnich 8 tygodni:
+The estimate distribution among 1026 closed tasks and the closing pace over
+the last 8 weeks:
 
-| estymata | n (done) | | tydzień | zamkniętych |
+| estimate | n (done) | | week | closed |
 |---|---|---|---|---|
 | `1d` | 259 | | 2026-08-03 | 134 |
 | `2h` | 238 | | 2026-08-10 | 74 |
 | `4h` | 201 | | 2026-08-17 | 95 |
 | `3h` | 105 | | 2026-08-24 | 142 |
-| `1h` | 62 | | **średnia** | **~95/tydz.** |
+| `1h` | 62 | | **average** | **~95/week** |
 
-Pięć górnych kubełków to ~84% zamkniętych tasków, a tempo wynosi ~95 zamknięć tygodniowo. Próg `n = 8` **dla tych kubełków jest osiągalny w kilka dni od uruchomienia fazy 1**, nie w kilka tygodni. Ogon (`1w`, `2d`, `15m`) nie zapełni się nigdy i ma na stałe raportować „za mało danych" — to jest cecha, nie brak.
+The top five buckets are ~84% of closed tasks, and the pace is ~95 closures a
+week. The `n = 8` threshold **for these buckets is reachable within days of
+launching phase 1**, not weeks. The tail (`1w`, `2d`, `15m`) will never fill
+and should permanently report "too little data" — that is a feature, not a
+gap.
 
-## 12. Kolejność wdrożenia
+## 12. Rollout order
 
-| Faza | Task | Co dowozi | Wartość samodzielna |
+| Phase | Task | What it delivers | Standalone value |
 |---|---|---|---|
-| 0 | [TL-27](../backlog/tasks/TL-27-pomiar-czasu-fundament-i-uczciwy-punkt-zero.md) | `activity/` + `worktrail time` + backfill **samych stempli ukończenia** z gita | velocity i throughput z 1026 tasków |
-| 1 | [TL-28](../backlog/tasks/TL-28-heartbeaty-aktywnosci-i-lancuch-atrybucji.md) | heartbeaty ze WSZYSTKICH narzędzi, klastrowanie, atrybucja z auto-fokusem | engaged time zaczyna istnieć |
-| 1b | [TL-31](../backlog/tasks/TL-31-retencja-korekta-atrybucji-i-prawo-do-usuniecia.md) | retencja, `forget`, `reassign` | **warunek wypuszczenia poza tę maszynę** |
-| 2 | [TL-29](../backlog/tasks/TL-29-kalibracja-estymat-z-danych-rzeczywistych.md) | kalibracja w `worktrail stats` + kolumna w viewerze | estymaty przestają być nieweryfikowalne |
-| 3 | [TL-30](../backlog/tasks/TL-30-adapter-tokenow-i-kosztu-sesji.md) | adapter tokenów/kosztu | druga oś, odporna na prędkość modelu |
+| 0 | [TL-27](../backlog/tasks/TL-27-pomiar-czasu-fundament-i-uczciwy-punkt-zero.md) | `activity/` + `worktrail time` + backfill of **completion stamps only** from git | velocity and throughput from 1026 tasks |
+| 1 | [TL-28](../backlog/tasks/TL-28-heartbeaty-aktywnosci-i-lancuch-atrybucji.md) | heartbeats from ALL tools, clustering, attribution with auto-focus | engaged time starts to exist |
+| 1b | [TL-31](../backlog/tasks/TL-31-retencja-korekta-atrybucji-i-prawo-do-usuniecia.md) | retention, `forget`, `reassign` | **condition for releasing this beyond this machine** |
+| 2 | [TL-29](../backlog/tasks/TL-29-kalibracja-estymat-z-danych-rzeczywistych.md) | calibration in `worktrail stats` + a viewer column | estimates stop being unverifiable |
+| 3 | [TL-30](../backlog/tasks/TL-30-adapter-tokenow-i-kosztu-sesji.md) | a token/cost adapter | a second axis, immune to model speed |
 
-TL-31 jest **1b, nie 4**: dane osobowe zaczynają powstawać w chwili uruchomienia fazy 1, więc mechanizm ich kasowania nie może przyjść „później". Może zostać za fazą 1 w kolejności prac, o ile do jego domknięcia nic nie opuszcza jednej maszyny.
+TL-31 is **1b, not 4**: personal data starts being produced the moment phase 1
+launches, so the mechanism for deleting it cannot arrive "later". It can stay
+behind phase 1 in work order, as long as nothing leaves the one machine
+before it closes.
 
-## 13. Czego ten mechanizm NIE gwarantuje
+## 13. What this mechanism does NOT guarantee
 
-- **Nie mierzy myślenia.** Czas, w którym founder rozważa problem bez dotykania narzędzi, nie produkuje heartbeatów. Engaged time jest dolnym oszacowaniem i tak ma być raportowany.
-- **Nie odróżnia pracy od czekania w sesji.** Agent czekający na `flutter test` produkuje heartbeaty jak agent piszący kod.
-- **Nie widzi pracy poza hostem z adapterem.** Task zrobiony ręcznie w edytorze bez hooka jest `unknown`, nie zerem.
-- **Nie mierzy wysiłku przez cycle time** — §3.1.
-- **Nie jest ewidencją czasu pracy.** Ani do rozliczeń, ani do oceny ludzi. Rozdzielczość i luki z punktów wyżej czynią z niego narzędzie kalibracji estymat i nic więcej. Gdyby miał kiedyś służyć do czegokolwiek innego, wymaga gwarancji, których dziś nie ma — a §9 jest po to, żeby nie dało się w to wejść przypadkiem.
+- **It does not measure thinking.** Time spent by the founder considering a
+  problem without touching tools produces no heartbeats. Engaged time is a
+  lower bound and should be reported as such.
+- **It does not distinguish work from waiting within a session.** An agent
+  waiting on `flutter test` produces heartbeats like an agent writing code.
+- **It does not see work outside a host with an adapter.** A task done by
+  hand in an editor without a hook is `unknown`, not zero.
+- **It does not measure effort through cycle time** — §3.1.
+- **It is not a timesheet.** Not for billing, not for evaluating people. The
+  resolution and gaps described above make it a tool for calibrating
+  estimates and nothing more. Were it ever to serve any other purpose, it
+  would need guarantees it does not have today — and §9 exists precisely so
+  that it cannot be walked into by accident.
 
-## 14. Założenia do obalenia
+## 14. Assumptions to be falsified
 
-1. **Że engaged time koreluje z estymatą w godzinach człowieka.** Estymaty pisano w ramie „ile zajęłoby to człowiekowi", a mierzymy zegar agenta — możliwe, że korelacji nie ma wcale i jedyną użyteczną osią okażą się tokeny. Falsyfikacja jest tania i **idzie PIERWSZA w TL-29**: jeśli rozrzut wewnątrz kubełka jest większy niż różnica między kubełkami, kalibracja po czasie jest bezwartościowa i nie warto budować dla niej raportu.
-2. **Że `unknown` da się utrzymać nisko.** Jeśli po fazie 1 przekracza ~30%, zły jest łańcuch atrybucji (§8), a nie dane.
-3. **Że próg 10 minut jest właściwy.** Wzięty z praktyki WakaTime, nie z pomiaru na tych danych. Po fazie 1 da się go dobrać z rozkładu odstępów między heartbeatami — i wtedy trzeba, bo dziś to najsłabiej uzasadniona liczba w tym dokumencie.
-4. **Że throttling 60 s nie gubi krótkich sesji.** Praca krótsza niż jeden interwał daje klaster jednoelementowy, czyli zero minut (§6 reguła 1). Jeśli takich klastrów okaże się dużo, próg throttlingu jest za wysoki albo reguła 1 za surowa — rozstrzyga liczba klastrów jednoelementowych, którą raport ma podawać właśnie po to.
+1. **That engaged time correlates with the estimate in human-hours.**
+   Estimates were written in the frame of "how long would this take a
+   human", and we measure an agent's clock — it is possible there is no
+   correlation at all and the only useful axis turns out to be tokens.
+   Falsification is cheap and **comes FIRST in TL-29**: if the spread within
+   a bucket is larger than the difference between buckets, calibrating on
+   time is worthless and a report for it is not worth building.
+2. **That `unknown` can be kept low.** If after phase 1 it exceeds ~30%, the
+   attribution chain (§8) is broken, not the data.
+3. **That the 10-minute threshold is right.** Taken from WakaTime's practice,
+   not from measurement on this data. After phase 1 it can be tuned from the
+   distribution of gaps between heartbeats — and it must be, since today it
+   is the least justified number in this document.
+4. **That 60 s throttling does not lose short sessions.** Work shorter than
+   one interval yields a single-heartbeat cluster, i.e. zero minutes (§6
+   rule 1). If many such clusters turn up, the throttling threshold is too
+   high or rule 1 is too strict — settled by the count of single-heartbeat
+   clusters, which the report should surface for exactly this reason.
 
 ## 12. What is implemented (2026-09-02, TL-27)
 

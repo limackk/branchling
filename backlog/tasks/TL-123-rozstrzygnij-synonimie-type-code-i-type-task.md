@@ -1,10 +1,10 @@
 ---
 id: TL-123
-title: "Rozstrzygnij synonimię type: code i type: task"
+title: "Resolve the synonymy between type: code and type: task"
 type: task
 labels: [pre-launch]
 board: main
-epic: "Integralność danych"
+epic: "Data integrity"
 priority: P3
 status: pending
 owner: unassigned
@@ -17,68 +17,75 @@ blocks: []
 related_docs:
   - docs/backlog-config-and-portability.md
 verification:
-  - bash: "test $(grep -c '^type: code' backlog/tasks/*.md 2>/dev/null | grep -vc ':0') -eq 0 || grep -q 'code' backlog/config.yaml   # albo migracja, albo zapisana decyzja o zostawieniu"
+  - bash: "test $(grep -c '^type: code' backlog/tasks/*.md 2>/dev/null | grep -vc ':0') -eq 0 || grep -q 'code' backlog/config.yaml   # either a migration, or a recorded decision to keep it"
   - bash: "node scripts/cli.mjs check --vocabulary"
-  - manual: "Decyzja zapisana w config.yaml przy `types:` — którym słowem opisuje się zwykłą pracę i dlaczego drugie zostaje albo znika"
+  - manual: "Decision recorded in config.yaml next to `types:` — which word describes ordinary work and why the other one stays or disappears"
 ---
 
-## Cel
+## Goal
 
-Sprawić, żeby na zwykłą pracę było JEDNO słowo — albo żeby dwa słowa miały
-zapisaną, sprawdzalną różnicę.
+Make it so ordinary work has ONE word — or so the two words have a recorded,
+checkable difference.
 
-## Kontekst
+## Context
 
-Wypadek uboczny TL-56, świadomie z niego wyłączony. Uzgadniając `types:`
-z drzewem zmierzono rozkład:
+A side effect of TL-56, deliberately excluded from it. While reconciling
+`types:` with the tree, the distribution was measured:
 
-| wartość | plików | pierwszy | ostatni |
+| value | files | first | last |
 |---|---|---|---|
 | `code` | 59 | 2026-08-26 | 2026-09-01 |
 | `task` | 48 | 2026-08-31 | 2026-09-01 |
 | `bug`  | 13 | 2026-08-30 | 2026-08-31 |
 
-`code` i `task` nie dzielą backlogu na dwie klasy pracy — oba są aktywnie pisane
-TEGO SAMEGO DNIA i oba stoją na taskach nie do odróżnienia po treści. Próbka
-z 2026-09-01: pod `code` leżą „Koperta JSON w komendach piszących" i „Pętla
-autonomiczna", pod `task` — „Komenda worktrail plan z --json" i „Nazwa produktu
-z jednej stałej". To ta sama robota opisana dwoma słowami.
+`code` and `task` do not split the backlog into two classes of work — both are
+actively written on THE SAME DAY and both sit on tasks indistinguishable by
+content. A sample from 2026-09-01: under `code` sit "JSON envelope in writing
+commands" and "Autonomous loop"; under `task` — "worktrail plan command with
+--json" and "Product name from a single constant". This is the same work
+described with two words.
 
-Skąd się wzięły oba: `code` to wartość z pierwszego commita, `task` weszło
-2026-08-31 razem z `_template.md`, który niesie `type: task` na sztywno. Od tej
-pory `worktrail new` pisze `task`, a `code` dopisuje się ręczną edycją pliku —
-bo `--type code` był do TL-56 ODRZUCANY przez ścieżkę piszącą.
+Where both came from: `code` is the value from the first commit, `task` came
+in on 2026-08-31 together with `_template.md`, which carries `type: task`
+hardcoded. Since then `worktrail new` writes `task`, and `code` gets added by
+manually editing the file — because `--type code` was REJECTED by the writing
+path until TL-56.
 
-**Dlaczego to nie pojechało w TL-56.** Tamten task zamykał rozjazd słownika
-z drzewem i jego naprawa to jedna linia w `config.yaml`. Zwinięcie synonimii to
-migracja 59 plików i decyzja o SŁOWNICTWIE projektu, a nie skutek uboczny
-naprawy guarda. Właściciel wybrał 2026-09-01 wariant „drzewo jest prawdą, bez
-masowego przepisywania" — z tego wyboru ten task został jako reszta.
+**Why this did not go into TL-56.** That task closed the drift between the
+vocabulary and the tree, and its fix is one line in `config.yaml`. Collapsing
+a synonymy is a migration of 59 files and a decision about the project's
+VOCABULARY, not a side effect of fixing a guard. The owner chose on
+2026-09-01 the variant "the tree is the truth, no mass rewrite" — this task
+was left as the remainder of that choice.
 
-**Do rozstrzygnięcia jest, czy różnica ma powstać, czy zniknąć.** Trzecia droga
-jest realna i tańsza od obu: `type` może w ogóle nie być osią, którą ten projekt
-mierzy — wtedy odpowiedzią jest `types: [task, bug]` i migracja, a nie
-wymyślanie znaczenia dla `code`.
+**What must be decided is whether the difference should be created or made to
+disappear.** A third path is real and cheaper than either: `type` may not be
+an axis this project measures at all — in which case the answer is
+`types: [task, bug]` and a migration, rather than inventing a meaning for
+`code`.
 
 ## Pre-flight reading
 
-1. `backlog/config.yaml` — komentarz przy `types:` opisuje stan i tę odłożoną decyzję.
-2. `scripts/check-backlog-vocabulary.mjs` — guard, który od TL-56 pilnuje, że drzewo i słownik się zgadzają.
-3. `backlog/_template.md` — źródło `type: task` przy każdym `worktrail new`.
+1. `backlog/config.yaml` — the comment next to `types:` describes the state and this deferred decision.
+2. `scripts/check-backlog-vocabulary.mjs` — the guard that, since TL-56, checks that the tree and the vocabulary agree.
+3. `backlog/_template.md` — the source of `type: task` on every `worktrail new`.
 
-## Kroki
+## Steps
 
-1. Rozstrzygnij z właścicielem: jedno słowo czy dwa z zapisaną różnicą.
-2. Jeśli jedno — przepisz drzewo i ZWĘŹ `types:` w tym samym commicie; słownik
-   szerszy niż drzewo to ten sam rozjazd, tylko z drugiej strony.
-3. Jeśli dwa — zapisz różnicę przy `types:` w `config.yaml` tak, żeby dała się
-   zastosować bez pytania autora, i sprawdź ją na dziesięciu istniejących taskach.
-4. Uzgodnij `_template.md` z wynikiem — dziś przemyca `task` niezależnie od
-   decyzji (to jest osobno TL-69).
+1. Decide with the owner: one word, or two with a recorded difference.
+2. If one — rewrite the tree and NARROW `types:` in the same commit; a
+   vocabulary wider than the tree is the same drift, just from the other
+   side.
+3. If two — record the difference next to `types:` in `config.yaml` so it can
+   be applied without asking the author, and check it against ten existing
+   tasks.
+4. Reconcile `_template.md` with the outcome — today it smuggles in `task`
+   regardless of the decision (that is separately TL-69).
 
 ## Acceptance criteria
 
-- [ ] `types:` w `config.yaml` zawiera tylko wartości, które ktoś umie rozróżnić.
-- [ ] Jeśli została jedna wartość na zwykłą pracę — żaden task nie niesie drugiej.
-- [ ] Jeśli zostały dwie — kryterium rozróżnienia stoi w `config.yaml`, nie w cudzej głowie.
-- [ ] `worktrail check --vocabulary` zielony po zmianie.
+- [ ] `types:` in `config.yaml` contains only values someone can actually tell apart.
+- [ ] If one value remains for ordinary work — no task carries the other.
+- [ ] If two remain — the distinguishing criterion sits in `config.yaml`, not in someone's head.
+- [ ] `worktrail check --vocabulary` green after the change.
+</content>

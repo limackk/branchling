@@ -1,6 +1,6 @@
 ---
 id: TL-71
-title: "Serwer nie wie, czyj backlog trzyma — ping bez katalogu"
+title: "The server does not know whose backlog it holds — a ping without a directory"
 type: task
 labels: []
 board: main
@@ -16,9 +16,9 @@ blocks: []
 related_docs:
   - docs/worktrail-global-tool.md
 verification:
-  # Jeden wpis na CAŁY plik, nie po jednym na kryterium: wzorzec `--test-name-pattern`
-  # nietrafiający w żaden test kończy się zielono i zerem testów, więc taki dowód
-  # byłby zielony bez mocy dowodowej. Każdy test tu ma swoją kontrolę pozytywną.
+  # One entry for the WHOLE file, not one per criterion: a `--test-name-pattern`
+  # that matches no test ends green with zero tests run, so such a proof would
+  # be green with no evidentiary force. Every test here has its own positive control.
   - id: identity
     bash: "node --test scripts/tests/serve-identity.test.mjs"
   - id: no-stale-name
@@ -27,24 +27,25 @@ verification:
     bash: "node --test scripts/tests/*.test.mjs"
 ---
 
-## Cel
+## Goal
 
-`worktrail serve` uruchomiony w projekcie A, gdy na porcie 4321 stoi już serwer
-projektu B, ma **wystartować własny serwer** i powiedzieć, dlaczego wziął inny
-port — zamiast po cichu otworzyć kartę z backlogiem projektu B.
+`worktrail serve` started in project A, when a server for project B is already
+sitting on port 4321, is to **start its own server** and say why it took a
+different port — instead of silently opening a tab with project B's backlog.
 
-Po tym tasku odpowiedź na pytanie „czyj backlog widzę w przeglądarce" jest
-dostępna maszynowo (`/api/ping`), a nie tylko przez `ps aux | grep`.
+After this task the answer to "whose backlog am I looking at in the browser"
+is available programmatically (`/api/ping`), not only via `ps aux | grep`.
 
-## Kontekst
+## Context
 
-Zgłoszenie: „dlaczego w przeglądarce nie widzę tasków TL". Na 4321 działał
-proces uruchomiony ze skryptu worktrail, ale z `cwd` w innym repozytorium, więc
-`resolveBacklogDir()` wykrył w górę backlog tamtego projektu i serwował 1378
-cudzych tasków.
+Report: "why don't I see the TL tasks in the browser". A process was running
+on 4321, started from the worktrail script but with `cwd` in a different
+repository, so `resolveBacklogDir()` detected that project's backlog upwards
+and served 1378 tasks that were not ours.
 
-Samo `cwd` nie jest tu całą przyczyną. Drugie uruchomienie — już z właściwego
-katalogu — **też** pokazałoby cudze taski, bo start jest poprzedzony sondą:
+`cwd` alone is not the whole cause here. A second launch — this time from the
+correct directory — would **also** show someone else's tasks, because the
+start is preceded by a probe:
 
 ```js
 // serve-backlog.mjs:437-443
@@ -52,100 +53,107 @@ katalogu — **też** pokazałoby cudze taski, bo start jest poprzedzony sondą:
 resolve(JSON.parse(body).app === PING_ID);
 ```
 
-`/api/ping` (`serve-backlog.mjs:342`) oddaje `{ app, pid }` — **bez katalogu
-backlogu**. Sonda rozpoznaje więc „dowolny worktrail", nie „worktrail nad TYM
-backlogiem", a `serve-backlog.mjs:506` na tej podstawie kończy się `exit 0`
-z komunikatem „już działa — otwieram kartę". To cichy no-op z efektem
-ubocznym: użytkownik dostaje otwartą kartę, czyli sygnał sukcesu, i cudze dane.
-Ta sama klasa błędu, którą TL-22 zdjął z walidacji flag.
+`/api/ping` (`serve-backlog.mjs:342`) returns `{ app, pid }` — **without the
+backlog directory**. The probe therefore recognizes "some worktrail", not
+"worktrail over THIS backlog", and `serve-backlog.mjs:506` on that basis exits
+with `exit 0` and the message "already running — opening the tab". This is a
+silent no-op with a side effect: the user gets an open tab, i.e. a success
+signal, and someone else's data. Same class of bug that TL-22 removed from
+flag validation.
 
-**Wielu serwerów naraz ten task nie wprowadza — one już działają** (`--port`,
-plus zejście na `port + 1` przy EADDRINUSE w `listen()`). Brakuje wyłącznie
-tożsamości: dopóki serwer nie publikuje swojego katalogu, ani sonda, ani viewer,
-ani przyszły przełącznik projektów nie mają na czym się oprzeć.
+**This task does not introduce multiple servers at once — those already
+work** (`--port`, plus falling back to `port + 1` on `EADDRINUSE` in
+`listen()`). Only identity is missing: until the server publishes its own
+directory, neither the probe, nor the viewer, nor a future project switcher
+has anything to rely on.
 
-Dlatego to jest **przesłanka dla kroku 6 w TL-36** („widok w viewerze —
-przełącznik projekt / wszystkie"). Rozstrzygnięcie kształtu tamtego przełącznika
-zostaje w TL-36 i tu go nie przesądzamy: jeden serwer obsługuje jeden backlog,
-bo serwer PISZE (zapis `.md`, dopis do historii, regeneracja widoków), a jeden
-proces piszący do N repozytoriów rozwodzi stan z gałęzią (Prawo 1).
+That is why this is **a prerequisite for step 6 in TL-36** ("view in the
+viewer — project / all switcher"). The shape of that switcher is settled in
+TL-36 and is not prejudged here: one server serves one backlog, because the
+server WRITES (`.md` writes, history appends, view regeneration), and one
+process writing to N repositories divorces state from the branch (Law 1).
 
-Poza zakresem: stały port per projekt z rejestru (to TL-34) i klucze
-`origin-backlog-*` w `localStorage`/IndexedDB viewera — te są utrwalone
-u użytkownika i ich zmiana wymaga migracji, więc idą osobnym taskiem.
-`PING_ID` jest tu jedynym wyjątkiem, bo to token handshake'u liczony w runtime,
-nieutrwalony nigdzie — jego zmiana nic nie kosztuje, a zostawiony literał
-z nazwą cudzego projektu łamie regułę „nazwa produktu pochodzi z
-`scripts/product.mjs`".
+Out of scope: a fixed port per project from a registry (that's TL-34) and the
+`origin-backlog-*` keys in the viewer's `localStorage`/IndexedDB — those persist
+on the user's machine and changing them requires a migration, so they go in a
+separate task. `PING_ID` is the one exception here, because it is a handshake
+token computed at runtime, not persisted anywhere — changing it costs nothing,
+while leaving a literal naming another project breaks the rule "the product
+name comes from `scripts/product.mjs`".
 
 ## Pre-flight reading
 
-1. `scripts/serve-backlog.mjs` — `PING_ID` (:76), handler `/api/ping` (:342),
-   `probeExisting()` (:435), `listen()` z zejściem na kolejny port (:455),
-   sonda przed startem (:506).
-2. `scripts/paths.mjs` — `resolveBacklogDir()`: cztery źródła katalogu i to,
-   dlaczego `cwd` jest jednym z nich.
-3. `scripts/product.mjs` — skąd bierze się nazwa produktu.
-4. `scripts/tests/_repo.mjs` — jak testy ustalają katalog backlogu w OBU
-   układach; nowy test ma z tego korzystać, a nie liczyć ścieżek w górę.
-5. `scripts/tests/flag-validation.test.mjs` — wzorzec testu, który startuje
-   komendę i asertuje na jej wyjściu.
+1. `scripts/serve-backlog.mjs` — `PING_ID` (:76), the `/api/ping` handler
+   (:342), `probeExisting()` (:435), `listen()` with fallback to the next port
+   (:455), the probe before start (:506).
+2. `scripts/paths.mjs` — `resolveBacklogDir()`: the four sources of the
+   directory and why `cwd` is one of them.
+3. `scripts/product.mjs` — where the product name comes from.
+4. `scripts/tests/_repo.mjs` — how the tests establish the backlog directory
+   in BOTH layouts; the new test should use this rather than counting paths
+   upward itself.
+5. `scripts/tests/flag-validation.test.mjs` — the pattern for a test that
+   starts a command and asserts on its output.
 
-## Kroki
+## Steps
 
-1. `/api/ping` oddaje `{ app, pid, backlogDir, projectName }`. `backlogDir`
-   jako ścieżka **absolutna i zrezolwowana** (`realpath`) — inaczej worktree
-   przez symlink porówna się nierówno z tym samym katalogiem.
-2. `probeExisting()` przyjmuje oczekiwany katalog i zwraca trzy stany, nie dwa:
-   `same` (ten sam backlog), `other` (worktrail, ale cudzy backlog), `none`.
-   Zwracanie boolean-a jest tym, co dziś skleja dwa pierwsze przypadki.
-3. `same` → zachowanie jak dziś: komunikat i otwarcie karty, `exit 0`.
-4. `other` → **nie przejmuj portu**: `listen()` od `port + 1`, a komunikat mówi
-   oba projekty po nazwie i oba porty. Bez nazw użytkownik nie wie, co na tym
-   porcie siedzi, i wraca do `ps aux`.
-5. `PING_ID` liczony z `product.mjs`, nie literał `"origin-backlog-viewer"`.
-6. Test `scripts/tests/serve-identity.test.mjs` na dwóch fixture'ach backlogu
-   startuje dwa serwery na tym samym porcie startowym i asertuje, że drugi
-   serwuje SWÓJ backlog pod innym portem. Kontrola pozytywna obowiązkowa: test
-   ma też pokryć przypadek `same` (drugie uruchomienie nad tym samym katalogiem
-   NIE podnosi drugiego serwera) — bez niej przechodzi implementacja, która
-   nigdy nie rozpoznaje serwera jako swojego.
-7. Sprzątanie w teście: oba procesy ubite w `finally`, także gdy asercja padła.
-   Wiszący serwer na 4321 psuje kolejne uruchomienie suity.
+1. `/api/ping` returns `{ app, pid, backlogDir, projectName }`. `backlogDir`
+   as an **absolute, resolved** path (`realpath`) — otherwise a worktree
+   reached through a symlink would compare unequal to the same directory.
+2. `probeExisting()` takes the expected directory and returns three states,
+   not two: `same` (same backlog), `other` (worktrail, but someone else's
+   backlog), `none`. Returning a boolean is what today conflates the first two
+   cases.
+3. `same` → behaves as today: message and open the tab, `exit 0`.
+4. `other` → **do not take over the port**: `listen()` starting from
+   `port + 1`, and the message names both projects and both ports. Without
+   names the user does not know what is sitting on that port and goes back to
+   `ps aux`.
+5. `PING_ID` computed from `product.mjs`, not the literal `"origin-backlog-viewer"`.
+6. Test `scripts/tests/serve-identity.test.mjs` starts two servers on the same
+   starting port over two backlog fixtures and asserts that the second one
+   serves ITS OWN backlog on a different port. A positive control is
+   mandatory: the test must also cover the `same` case (a second launch over
+   the same directory does NOT bring up a second server) — without it, an
+   implementation that never recognizes a server as its own would still pass.
+7. Cleanup in the test: both processes killed in `finally`, even when the
+   assertion fails. A hanging server on 4321 breaks the next run of the suite.
 
 ## Acceptance criteria
 
-- [x] `GET /api/ping` zwraca `backlogDir` (absolutny, po `realpath`) i `projectName`. [proof: identity]
-- [x] Drugi `worktrail serve` nad INNYM backlogiem podnosi własny serwer na kolejnym wolnym porcie; jego strona ma `project_name` swojego projektu. [proof: identity]
-- [x] Komunikat tego przypadku wymienia oba projekty i oba porty. [proof: identity]
-- [x] Drugi `worktrail serve` nad TYM SAMYM backlogiem nadal tylko otwiera kartę i kończy `exit 0` — bez drugiego procesu. [proof: identity]
-- [x] `grep origin scripts/serve-backlog.mjs` nie zwraca nic. [proof: no-stale-name]
-- [x] `node --test scripts/tests/*.test.mjs` zielone w całości. [proof: no-regression]
-- [x] Test nie zostawia działającego procesu, także po nieudanej asercji. [proof: identity]
+- [x] `GET /api/ping` returns `backlogDir` (absolute, after `realpath`) and `projectName`. [proof: identity]
+- [x] A second `worktrail serve` over a DIFFERENT backlog brings up its own server on the next free port; its page has its own project's `project_name`. [proof: identity]
+- [x] The message for this case names both projects and both ports. [proof: identity]
+- [x] A second `worktrail serve` over the SAME backlog still only opens a tab and exits with `exit 0` — no second process. [proof: identity]
+- [x] `grep origin scripts/serve-backlog.mjs` returns nothing. [proof: no-stale-name]
+- [x] `node --test scripts/tests/*.test.mjs` fully green. [proof: no-regression]
+- [x] The test does not leave a running process behind, even after a failed assertion. [proof: identity]
 
 ## Verification
 
 ```bash
-# 1. Tożsamość serwera — expected: pass, w tym kontrola pozytywna `same`
+# 1. Server identity — expected: pass, including the `same` positive control
 node --test scripts/tests/serve-identity.test.mjs
 
-# 2. Nazwa cudzego projektu nie została w kodzie — expected: exit 0 (brak trafień)
+# 2. The other project's name was not left in the code — expected: exit 0 (no matches)
 ! grep -n 'origin' scripts/serve-backlog.mjs
 
-# 3. Cała suita — expected: pass, bez regresji
+# 3. The whole suite — expected: pass, no regressions
 node --test scripts/tests/*.test.mjs
 ```
 
 ## Notes
 
-- Zmiana `PING_ID` sprawia, że nowy klient nie rozpozna **starego** działającego
-  serwera i wejdzie na kolejny port. To jest poprawne: stary proces ma stary kod
-  i tak czy inaczej nie umie powiedzieć, czyj backlog trzyma.
-- Przesłanka dla kroku 6 w TL-36; nie wpisano tego w `blocked_by` TL-36,
-  bo tamten task blokuje przede wszystkim rejestr z TL-34.
+- Changing `PING_ID` means a new client will not recognize an **old** running
+  server and will move on to the next port. This is correct: the old process
+  runs old code and cannot say whose backlog it holds either way.
+- Prerequisite for step 6 in TL-36; this was not entered in TL-36's
+  `blocked_by`, because that task is primarily blocked by the registry from
+  TL-34.
 
 ## Log
 
-- 2026-08-31 pending — claude — z diagnozy „nie widzę tasków TL w przeglądarce":
-  na 4321 stał serwer innego projektu, a sonda `/api/ping` nie odróżnia cudzego
-  backlogu od własnego, więc drugie uruchomienie i tak trafiłoby w cudze dane
+- 2026-08-31 pending — claude — from the diagnosis "I don't see the TL tasks
+  in the browser": a server for another project was sitting on 4321, and the
+  `/api/ping` probe does not distinguish someone else's backlog from its own,
+  so a second launch would have hit the wrong data either way

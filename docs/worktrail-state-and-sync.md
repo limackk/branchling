@@ -1,217 +1,409 @@
-# worktrail — stan, synchronizacja i granica trybów
+# worktrail — state, synchronization and the boundary between modes
 
-**Status:** FUNDAMENT WDROŻONY 2026-08-29 ([TL-21](../backlog/tasks/TL-21-fundament-logu-zdarzen-worktrail.md)) — **wszystkie 5 kroków z §7 zrobione; z §6 zrobione locki (TL-87, §6.1) i odczyt stanu z wielu gałęzi (TL-73, §6.2); §5 i reszta §6 (odwrócenie kierunku, SQLite, serwer) nadal projekt**
-**Dotyczy:** `backlog/` jako przyszłe narzędzie `worktrail` (nazwa wstępna — [TL-20](../backlog/tasks/TL-20-domknij-nazwe-narzedzia-przed-publikacja.md))
-**Poprzednicy:** [backlog-field-editing-history.md](backlog-field-editing-history.md) (log zmian pól), [backlog-config-and-portability.md](backlog-config-and-portability.md) (rozdział kodu od danych)
+**Status:** FOUNDATION IMPLEMENTED 2026-08-29 ([TL-21](../backlog/tasks/TL-21-fundament-logu-zdarzen-worktrail.md)) — **all 5 steps from §7 done; from §6, locks (TL-87, §6.1) and reading state across multiple branches (TL-73, §6.2) are done; §5 and the rest of §6 (reversing the direction, SQLite, the server) are still a project**
+**Concerns:** `backlog/` as the future `worktrail` tool (working name — [TL-20](../backlog/tasks/TL-20-domknij-nazwe-narzedzia-przed-publikacja.md))
+**Predecessors:** [backlog-field-editing-history.md](backlog-field-editing-history.md) (the field change log), [backlog-config-and-portability.md](backlog-config-and-portability.md) (separating code from data)
 
 ---
 
-## 1. Po co ten dokument
+## 1. Why this document
 
-Narzędzie ma docelowo działać w trzech trybach naraz:
+The tool is eventually meant to work in three modes at once:
 
-1. **Lokalnie, open source** — `git clone && npx worktrail`, bez konta i bez serwera.
-2. **Zespołowo, hostowane** — konto i plan płatny, jak Supabase czy the sync layer.
-3. **Dla osób nietechnicznych** — analityk, support: bez klona repozytorium, przez przeglądarkę.
+1. **Locally, open source** — `git clone && npx worktrail`, no account and no
+   server.
+2. **As a team, hosted** — an account and a paid plan, like Supabase or
+   the sync layer.
+3. **For non-technical people** — an analyst, support: no repository clone,
+   through the browser.
 
-Te trzy tryby nakładają sprzeczne wymagania na jedno pytanie: **gdzie mieszka prawda o tasku.** Dokument zapisuje odpowiedź, pomiar, który do niej doprowadził, i te decyzje schematu, które są tanie dziś, a nieodwracalne po tym, jak dane powstaną u obcych ludzi.
+These three modes place conflicting requirements on one question: **where
+does the truth about a task live.** This document records the answer, the
+measurement that led to it, and the schema decisions that are cheap today and
+irreversible once data exists in other people's hands.
 
-Dokument NIE jest opisem stanu wdrożonego. Wdrożone są dziś §2 i §3 — reszta to projekt.
+The document is NOT a description of implemented state. §2 and §3 are
+implemented today — the rest is a project.
 
-## 2. Pomiar — konflikt nie bierze się z tasków
+## 2. Measurement — the conflict does not come from tasks
 
-Wszystkie liczby zmierzone na tym repozytorium 2026-08-29.
+All numbers measured on this repository on 2026-08-29.
 
-| Co | Wynik | Jak zmierzone |
+| What | Result | How measured |
 |---|---|---|
-| Żywe worktree'y | **7** równoległych gałęzi | `git worktree list` |
-| Taski dotknięte przez więcej niż jedną gałąź | **0** | `git diff --name-only main...<branch> -- backlog/tasks/`, zliczone |
-| Gałęzie dotykające widoków generowanych | **3 z 7** | jw. dla `INDEX.yaml`, `NOW.yaml`, `archive/done.yaml`, `boards/` |
-| Próbny merge dwóch gałęzi **bez wspólnego taska** | **KONFLIKT w `INDEX.yaml`** | `git merge-tree --write-tree` |
-| Commity 60 dni dotykające `tasks/` | 1142 | `git log --since` |
-| …z tego dotykające widoków generowanych | **896 (78%)** | jw. |
+| Live worktrees | **7** parallel branches | `git worktree list` |
+| Tasks touched by more than one branch | **0** | `git diff --name-only main...<branch> -- backlog/tasks/`, counted |
+| Branches touching generated views | **3 of 7** | same, for `INDEX.yaml`, `NOW.yaml`, `archive/done.yaml`, `boards/` |
+| Trial merge of two branches **with no task in common** | **CONFLICT in `INDEX.yaml`** | `git merge-tree --write-tree` |
+| Commits in 60 days touching `tasks/` | 1142 | `git log --since` |
+| …of those, touching generated views | **896 (78%)** | same |
 
-Ostatnie dwa wiersze są sednem. `INDEX.yaml` i `archive/done.yaml` to **posortowane agregaty wszystkich 1362 tasków**, więc każda gałąź przepisuje ten sam plik — nawet gdy pracuje na zupełnie innym tasku. Konflikt jest strukturalny, nie przypadkowy.
+The last two rows are the crux. `INDEX.yaml` and `archive/done.yaml` are
+**sorted aggregates of all 1362 tasks**, so every branch rewrites the same
+file — even when working on a completely different task. The conflict is
+structural, not incidental.
 
-> **Ból nie bierze się z tego, że taski są wersjonowane. Bierze się z tego, że wersjonujemy stan wyliczony z tasków.**
+> **The pain does not come from tasks being versioned. It comes from
+> versioning state computed from tasks.**
 
-### 2.1. Co w taskach faktycznie się zmienia
+### 2.1. What actually changes in tasks
 
-Modyfikacje **istniejących** plików (`--diff-filter=M`, więc bez tworzenia nowych; z pominięciem jednorazowego backfillu `board:` = 1339):
+Modifications to **existing** files (`--diff-filter=M`, so no file creation;
+excluding the one-off `board:` backfill = 1339):
 
 ```
 status   639  ┐
-owner    498  ├─  ~91% wszystkich mutacji
+owner    498  ├─  ~91% of all mutations
 updated  272  ┘
 blocked_by 85 ┐
-title      43 ├─  treść: ~9%
-reszta    <35 ┘
+title      43 ├─  content: ~9%
+rest      <35 ┘
 ```
 
-Ten rozkład jest fundamentem wszystkich decyzji niżej: **treść taska prawie się nie zmienia, stan taska zmienia się bez przerwy.** Dziś jedno i drugie leży w tym samym pliku, na tej samej gałęzi, pod tym samym mechanizmem scalania — architektura nie odwzorowuje granicy, która realnie istnieje.
+This distribution is the foundation for every decision below: **a task's
+content barely changes, a task's state changes constantly.** Today both live
+in the same file, on the same branch, under the same merge mechanism — the
+architecture does not reflect a boundary that genuinely exists.
 
-## 3. Co już mamy (i czego nie wiedzieliśmy, że mamy)
+## 3. What we already have (and did not know we had)
 
-[TL-17](../backlog/tasks/TL-17-historia-zmian-pol-taska-z-autorem.md) wprowadził wpis historii o kształcie:
+[TL-17](../backlog/tasks/TL-17-historia-zmian-pol-taska-z-autorem.md)
+introduced a history entry shaped like this:
 
 ```json
 {"ts":"…","task":"BL-1401","field":"status","from":"pending","to":"done","actor":"unknown","source":"boot"}
 ```
 
-To jest **LWW-Register per pole** — dokładnie prymityw, na którym buduje się synchronizację bez CRDT. Powstał jako mechanizm audytu, ale nadaje się na fundament stanu rozproszonego. Nie trzeba go wymyślać; trzeba go **odwrócić** (§5.1) i uzupełnić o `id` (§7.1).
+This is an **LWW-Register per field** — exactly the primitive synchronization
+without CRDTs is built on. It was created as an audit mechanism, but it is fit
+to be the foundation of distributed state. It does not need to be invented;
+it needs to be **reversed** (§5.1) and given an `id` (§7.1).
 
-Dziś jednak:
+Today, however:
 
-- **Kierunek jest odwrotny do potrzebnego** — źródłem prawdy o stanie jest plik `.md`, a log jest jego POCHODNĄ (rekoncyliacja diffuje plik względem snapshotu). Pochodnej nie da się synchronizować.
-- **Wpisy nie mają identyfikatora** — bez niego scalanie i sync produkują duplikaty nieodróżnialne od prawdziwych powtórzeń.
-- **`actor` to goły pseudonim** (`^[a-z0-9][a-z0-9._-]{0,31}$`), bez przestrzeni nazw — nie da się odróżnić zadeklarowanej „anny" od uwierzytelnionej Anny.
-- **Ciało taska nie jest śledzone w ogóle** — `TRACKED_FIELDS` obejmuje wyłącznie pola frontmattera.
-- **Brak `.gitattributes`** — dwie gałęzie dopisujące do tego samego pliku append-only będą konfliktować co znak. Dziś nie boli, bo historia ma 9 plików i jeden dzień życia.
+- **The direction is the opposite of what's needed** — the source of truth
+  for state is the `.md` file, and the log is its DERIVATIVE (reconciliation
+  diffs the file against a snapshot). A derivative cannot be synchronized.
+- **Entries have no identifier** — without one, merging and syncing produce
+  duplicates indistinguishable from genuine repeats.
+- **`actor` is a bare nickname** (`^[a-z0-9][a-z0-9._-]{0,31}$`), with no
+  namespace — a declared "anna" cannot be told apart from an authenticated
+  Anna.
+- **A task's body is not tracked at all** — `TRACKED_FIELDS` covers only
+  frontmatter fields.
+- **No `.gitattributes`** — two branches appending to the same append-only
+  file will conflict on every character. It doesn't hurt today because the
+  history is 9 files and one day old.
 
-## 4. Decyzja
+## 4. The decision
 
-> **Treść w git. Stan w append-only logu zdarzeń, który JEST źródłem prawdy o stanie. SQLite jako lokalny, odtwarzalny indeks — nigdy jako SSOT. Hosting = ten sam log + auth + role.**
+> **Content in git. State in an append-only event log, which IS the source
+> of truth for state. SQLite as a local, rebuildable index — never as SSOT.
+> Hosting = the same log + auth + roles.**
 
-### 4.1. Dlaczego nie „po prostu SQLite"
+### 4.1. Why not "just SQLite"
 
-Baza z mutowalnymi wierszami działa lokalnie i **rozpada się w momencie dołożenia hostingu**. Dwa klienty zmieniają `status` tego samego taska offline — przy wierszach są dwie prawdy i żadnej reguły scalania. Wtedy dopisuje się `updated_at`, potem wektory wersji, potem CRDT — i po roku istnieje własny, gorszy the sync layer.
+A database with mutable rows works locally and **falls apart the moment
+hosting is added.** Two clients change the `status` of the same task offline
+— now the rows hold two truths and no merge rule. Then `updated_at` gets
+added, then version vectors, then CRDTs — and a year later you have your own,
+worse the sync layer.
 
-Log zdarzeń nie ma tego problemu, bo **konfliktu nie ma z definicji**: dwa zdarzenia to dwa zdarzenia. Stan to `fold(log)`, a regułą scalania jest LWW per pole (wygrywa najwyższy `ts` dla pary `(task, field)`).
+An event log does not have this problem, because **there is no conflict by
+definition**: two events are two events. State is `fold(log)`, and the merge
+rule is LWW per field (the highest `ts` for the pair `(task, field)` wins).
 
-### 4.2. Dlaczego nie „wszystko do bazy"
+### 4.2. Why not "everything into the database"
 
-Przeniesienie całego taska do bazy kosztuje: przegląd treści w PR, tryb offline, wędrowanie taska z gałęzią i prostotę klonowania dla open source — a rozwiązuje problem, który wg §2.1 stanowi **9% ruchu**. Zła wymiana.
+Moving the whole task into the database costs: content review in a PR, an
+offline mode, a task travelling with its branch, and simplicity of cloning
+for open source — and it solves a problem that, per §2.1, accounts for **9%
+of the traffic**. A bad trade.
 
-### 4.3. Dlaczego nie zewnętrzny serwis (Linear / Jira / Notion API)
+### 4.3. Why not an external service (Linear / Jira / Notion API)
 
-Narzędzie open source musi działać po `git clone`, bez konta i bez tokenu. Zewnętrzny serwis łamie tryb 1, który jest rdzeniem projektu.
+The open-source tool has to work after `git clone`, without an account and
+without a token. An external service breaks mode 1, which is the core of the
+project.
 
-## 5. Model danych
+## 5. Data model
 
-### 5.1. Kto wygrywa przy rozjeździe — per klasa pola
+### 5.1. Who wins on divergence — per field class
 
-To jest odpowiedź na pytanie z zestawu B („czy rekonsyliacja jest jednokierunkowa i która strona wygrywa"). Odpowiedź jest **różna dla różnych klas**, i to celowo — bo §2.1 mierzy dwie różne populacje zmian.
+This is the answer to the question from set B ("is reconciliation
+one-directional and which side wins"). The answer is **different for
+different classes**, and deliberately so — because §2.1 measures two
+different populations of changes.
 
-| Klasa | Pola | Kto pisze najczęściej | Kto wygrywa |
+| Class | Fields | Who writes most | Who wins |
 |---|---|---|---|
-| **Koordynacja** (~91%) | `status`, `owner`, `updated`, etykiety, locki | wszyscy, w tym analityk i support | **Log**, LWW per pole |
-| **Treść** (~9%) | `title`, ciało, kryteria akceptacji, `related_docs`, `epic` | developer, agent | **Serwer** (tryb hostowany) / **plik** (tryb lokalny), z kontrolą wersji bazowej |
-| **Komentarze** | — | analityk, support | **Nikt** — append-only, nie konfliktują |
-| **Załączniki / linki** | — | support | jw. |
+| **Coordination** (~91%) | `status`, `owner`, `updated`, labels, locks | everyone, including the analyst and support | **The log**, LWW per field |
+| **Content** (~9%) | `title`, body, acceptance criteria, `related_docs`, `epic` | developer, agent | **The server** (hosted mode) / **the file** (local mode), with base-version control |
+| **Comments** | — | analyst, support | **Nobody** — append-only, never conflict |
+| **Attachments / links** | — | support | same |
 
-Konsekwencja dla frontmattera: pola koordynacyjne stają się **projekcją logu**, nie oryginałem. Edycja `status:` w pliku przez agenta (Edit/Write) nie jest zapisem stanu — jest **propozycją zdarzenia**, wciąganą z `actor` i `ts`. Jeśli w logu istnieje nowsze zdarzenie dla tej pary `(task, field)`, frontmatter zostaje przepisany z powrotem.
+Consequence for the frontmatter: coordination fields become a **projection of
+the log**, not the original. An agent editing `status:` in the file
+(Edit/Write) is not writing state — it is **proposing an event**, tagged with
+`actor` and `ts`. If a newer event exists in the log for that
+`(task, field)` pair, the frontmatter is written back over it.
 
-Agenci muszą dalej edytować `.md` bezpośrednio — to jest cały sens narzędzia. Ingestia (dzisiejsza rekoncyliacja) zostaje; zmienia się to, która strona jest autorytatywna po ingestii.
+Agents still have to edit `.md` directly — that is the whole point of the
+tool. Ingestion (today's reconciliation) stays; what changes is which side is
+authoritative after ingestion.
 
-### 5.2. Komentarze jako kanał zapisu dla osób nietechnicznych
+### 5.2. Comments as the write channel for non-technical people
 
-Analityk i support nie przepisują kryteriów akceptacji taska inżynierskiego. Oni czytają, zakładają nowe taski, komentują, zmieniają status i przypisania — czyli piszą **w klasie koordynacyjnej i w komentarzach**, a obie są strukturalnie bezkonfliktowe.
+An analyst or support does not rewrite an engineering task's acceptance
+criteria. They read, found new tasks, comment, change status and
+assignments — that is, they write **in the coordination class and in
+comments**, and both are structurally conflict-free.
 
-To nie jest ograniczenie nałożone na te role. To opis tego, jak one pracują. Podział person **pokrywa się** ze zmierzonym podziałem pól — i dlatego jedna architektura obsługuje obie populacje bez kompromisu.
+This is not a restriction imposed on these roles. It is a description of how
+they work. The split of personas **matches** the measured split of fields —
+and that is why one architecture serves both populations without compromise.
 
-### 5.3. Edycja ciała — konflikt trafia do tego, kto umie go rozwiązać
+### 5.3. Editing the body — the conflict lands with whoever can resolve it
 
-- **Web UI (analityk, support):** zapis niesie hash wersji bazowej. Nie zgadza się z głową → **409 i „ktoś to zmienił, odśwież"**. Osoba nietechniczna **nigdy** nie widzi markera konfliktu, bo nigdy nie dostaje scalania do rozstrzygnięcia.
-- **Git (developer, agent):** rozjazd materializuje się jako **zwykły konflikt w pliku**, rozwiązywany w edytorze — narzędziem, które ta osoba już zna.
+- **Web UI (analyst, support):** the write carries a base-version hash.
+  Mismatch with the head → **409 and "someone changed this, refresh"**. A
+  non-technical person **never** sees a conflict marker, because they are
+  never handed a merge to resolve.
+- **Git (developer, agent):** divergence materialises as an **ordinary
+  conflict in the file**, resolved in the editor — a tool this person already
+  knows.
 
-Bez CRDT i bez zależności. CRDT rozwiązuje **jednoczesne pisanie w tym samym akapicie**, a nie „dwie osoby edytowały ten sam task w ciągu dnia". Log zdarzeń jest właściwym fundamentem, gdyby kiedyś trzeba było to dołożyć.
+No CRDTs and no dependency. CRDTs solve **simultaneous writing to the same
+paragraph**, not "two people edited the same task during the day". The event
+log is the right foundation, should this ever need to be added.
 
-### 5.4. SQLite jako indeks, nie jako prawda
+### 5.4. SQLite as an index, not as truth
 
-`node:sqlite` jest wbudowane w Node (≥22; zweryfikowane na v24.18.0 — `new DatabaseSync(':memory:')` działa bez żadnej zależności), więc nie łamie zasady zero-dependencies modułu.
+`node:sqlite` is built into Node (≥22; verified on v24.18.0 —
+`new DatabaseSync(':memory:')` works with zero dependencies), so it does not
+break the module's zero-dependency rule.
 
-Baza jest **w 100% odtwarzalna z logu** i leży **poza gitem** (`.worktrail/` albo `backlog/.state/`, gitignored). **Skasowanie pliku bazy ma być nieszkodliwe — i to jest test poprawności tej architektury.** Jeśli kiedykolwiek przestanie być nieszkodliwe, znaczy to, że baza po cichu stała się SSOT-em i decyzja z §4 została złamana.
+The database is **100% rebuildable from the log** and lives **outside git**
+(`.worktrail/` or `backlog/.state/`, gitignored). **Deleting the database
+file must be harmless — and that is this architecture's correctness test.**
+If it is ever no longer harmless, it means the database has quietly become
+the SSOT and the decision in §4 has been broken.
 
-## 6. Granica trybów
+## 6. The boundary between modes
 
-| | Lokalnie (open source) | Hostowane (plan płatny) |
+| | Local (open source) | Hosted (paid plan) |
 |---|---|---|
-| SSOT treści | pliki w repo | serwer (repo = replika) |
-| SSOT stanu | log w repo | log na serwerze |
-| Transport synchronizacji | **git** | serwer |
-| Atrybucja | deklarowana | **uwierzytelniona** |
-| Locki | w obrębie jednej maszyny (lockfile, TL-87) | **gwarantowane** |
-| Dostęp bez repo | brak | **jest** (analityk, support) |
-| Konto | niepotrzebne | wymagane |
+| SSOT for content | files in the repo | server (repo = replica) |
+| SSOT for state | log in the repo | log on the server |
+| Sync transport | **git** | server |
+| Attribution | declared | **authenticated** |
+| Locks | within one machine (lockfile, TL-87) | **guaranteed** |
+| Access without a repo | none | **available** (analyst, support) |
+| Account | not needed | required |
 
-### 6.1. Czego wersja lokalna nie da — i dlaczego to uczciwa granica płatna
+### 6.1. What the local version cannot give — and why that is a fair paid boundary
 
-**Prawdziwej wzajemnej wykluczalności bez pojedynczego pisarza.** Lock jest też zdarzeniem, a LWW rozstrzyga je dopiero po fakcie. Dwie maszyny połączone wyłącznie gitem mogą wziąć ten sam task i dowiedzą się o tym przy synchronizacji — nie wcześniej. Atomowy lock istnieje tylko tam, gdzie jest jeden pisarz: lokalnie system plików (co pokrywa dzisiejszy przypadek siedmiu worktree'ów na jednym dysku), w zespole dopiero serwer.
+**True mutual exclusion without a single writer.** A lock is also an event,
+and LWW only resolves it after the fact. Two machines connected only by git
+can take the same task and find out only when they sync — not before. An
+atomic lock exists only where there is one writer: locally, the filesystem
+(which covers today's case of seven worktrees on one disk); in a team, only
+the server does.
 
-**Zrobione w TL-87** — `worktrail take` / `worktrail next`, `scripts/lock.mjs`. Pojedynczym pisarzem jest system plików, nie SQLite: `link()` z pliku tymczasowego pod docelową nazwę albo się udaje, albo oblewa na EEXIST, a baza byłaby zależnością i drugim źródłem prawdy dla jednego bitu. Dwie rzeczy zmierzone przy okazji, obie realne:
+**Done in TL-87** — `worktrail take` / `worktrail next`, `scripts/lock.mjs`.
+The single writer is the filesystem, not SQLite: `link()` from a temporary
+file into the target name either succeeds or fails on EEXIST, whereas the
+database would be a dependency and a second source of truth for one bit. Two
+things measured along the way, both real:
 
-1. **`open(wx)` + zapis to NIE jest jeden krok.** Plik istnieje pusty przez czas zapisu, a proces, który trafi w to okno, czyta „lock bez treści", uznaje go za uszkodzony i przejmuje. Sześć równoległych `next` wydało ten sam task dwóm sesjom. `link()` zamyka okno: nazwa pojawia się dopiero z kompletną treścią.
-2. **Locki muszą leżeć POZA repozytorium.** Każdy worktree ma własny `backlog/`, więc lock w katalogu backlogu byłby w każdym z nich innym plikiem i nie wykluczałby nikogo. Kluczem jest `git rev-parse --git-common-dir` — ta sama ścieżka ze wszystkich worktree'ów jednego repozytorium.
+1. **`open(wx)` + a write is NOT one step.** The file exists empty for the
+   duration of the write, and a process hitting that window reads "a lock
+   with no content", judges it corrupt, and takes over. Six parallel `next`
+   calls handed the same task to two sessions. `link()` closes the window:
+   the name appears only with complete content already in place.
+2. **Locks must live OUTSIDE the repository.** Every worktree has its own
+   `backlog/`, so a lock in the backlog directory would be a different file
+   in each of them and would exclude nobody. The key is
+   `git rev-parse --git-common-dir` — the same path from every worktree of
+   one repository.
 
-Granica jest w `take --help` i w README, a nie tylko tutaj: gwarancja obejmuje jedną maszynę i jedno konto użytkownika.
+The boundary is stated in `take --help` and in the README, not only here: the
+guarantee covers one machine and one user account.
 
-### 6.2. Odczyt stanu z wielu gałęzi — zrobione w TL-73
+### 6.2. Reading state across multiple branches — done in TL-73
 
-Lock rozstrzyga, kto BIERZE task. Osobnym problemem jest to, co widzi ten, kto **czyta** backlog: widok policzony z jednego checkoutu kłamie o reszcie repozytorium. Task ruszony na `feature/x` jest w kopii z `main` wciąż `pending`, więc `query --status pending` podawał go jako wolny — ten sam rozjazd stanu z gałęzią, dla którego odrzucono zewnętrzne trackery, tylko odwrócony.
+A lock settles who TAKES a task. A separate problem is what someone
+**reading** the backlog sees: a view computed from one checkout lies about
+the rest of the repository. A task started on `feature/x` is still `pending`
+in the copy from `main`, so `query --status pending` reported it as free —
+the same state-divorced-from-branch defect that external trackers were
+rejected for, only inverted.
 
-`scripts/branch-scan.mjs` uogólnia skan, który od BL-1452 robił `next-backlog-id.mjs` dla NUMERÓW, na STAN. Jeden moduł, dwóch odbiorców — dwie kopie rozjechałyby się w pytaniu „które gałęzie istnieją", a to jest dokładnie ta różnica, przez którą jeden task trafia do dwóch sesji.
+`scripts/branch-scan.mjs` generalises the scan that `next-backlog-id.mjs`
+already did for NUMBERS, since BL-1452, to STATE. One module, two consumers —
+two copies would have drifted on the question "which branches exist", and
+that is exactly the kind of difference that hands one task to two sessions.
 
-Cztery rozstrzygnięcia, których nie da się cofnąć po cichu:
+Four settled decisions that cannot be walked back quietly:
 
-1. **Rozbieżność jest POKAZANA, nie rozstrzygnięta.** `query`, `stats` i viewer podają oba statusy i nazywają gałąź (`elsewhere: [feature/x: in_progress]`). Wybór zwycięzcy byłby znowu jedną wartością udającą prawdę — czyli tą samą wadą co widok z jednego checkoutu, tylko trudniejszą do zauważenia.
-2. **Tylko refy lokalne.** Żadnego `git fetch`. Pilnuje tego test podstawiający własny `git` na PATH i sprawdzający ZAREJESTROWANE wywołania — asercja na źródle przegapiłaby fetch przez alias albo helper.
-3. **Okno aktywności** (`active_branch_days: 30`) ogranicza koszt, ale gałąź WYCIĄGNIĘTA w worktree czytana jest zawsze — stoi w niej ktoś, kto najpewniej trzyma task. Wyłącznik to `cross_branch_state`.
-4. **Własna gałąź nie jest drugą opinią.** Niezacommitowany `take` na `main` nie ma raportować „main: pending" sam sobie; ostrzeżenie, które pada po każdym `take`, przestaje być czytane, a wtedy ginie to prawdziwe.
+1. **The discrepancy is SHOWN, not resolved.** `query`, `stats` and the
+   viewer report both statuses and name the branch
+   (`elsewhere: [feature/x: in_progress]`). Picking a winner would again be
+   one value posing as the truth — the same defect as a view from a single
+   checkout, only harder to notice.
+2. **Local refs only.** No `git fetch`. Enforced by a test that substitutes
+   its own `git` on PATH and checks the REGISTERED calls — an assertion on
+   the source would miss a fetch hidden behind an alias or a helper.
+3. **The activity window** (`active_branch_days: 30`) bounds the cost, but a
+   branch CHECKED OUT in a worktree is always read — someone is standing in
+   it and most likely holding the task. The switch is
+   `cross_branch_state`.
+4. **A branch's own state is not a second opinion.** An uncommitted `take` on
+   `main` must not report "main: pending" to itself; the warning shown after
+   every `take` stops being read, and the real one gets lost with it.
 
-Czego to NIE robi: task istniejący wyłącznie na innej gałęzi nadal nie pojawia się na liście. To pytanie „jakie taski istnieją gdziekolwiek", a nie „co inni mówią o taskach w tym drzewie" — i jedyny jego kosztowny przypadek (zajęty numer) pokrywa `next-id`.
+What this does NOT do: a task existing only on another branch still does not
+show up in the list. That is the question "what tasks exist anywhere", not
+"what do others say about tasks in this tree" — and its one costly case
+(a taken number) is covered by `next-id`.
 
-To jest **odczyt** przez gita jako transport, czyli §6 wiersz „Transport synchronizacji". Nie zastępuje logu z §4: stanem prawdziwym pozostaje plik na swojej gałęzi, a skan mówi tylko, że gałęzie się nie zgadzają.
+This is a **read** using git as transport, i.e. §6's "Sync transport" row. It
+does not replace the log from §4: the true state remains the file on its own
+branch, and the scan only says that branches disagree.
 
-Trzy rzeczy, których tryb lokalny **z definicji** nie umie — żadnej nie trzeba celowo okaleczać: zweryfikowana atrybucja, prawdziwe locki, dostęp bez repozytorium. Darmowa wersja zostaje w pełni użyteczna dla dewelopera z agentami, czyli dla rdzenia open source.
+Three things the local mode **by definition** cannot do — none of them needs
+to be deliberately crippled: verified attribution, true locks, access without
+a repository. The free version stays fully useful for a developer working
+with agents, i.e. for the open-source core.
 
-## 7. Decyzje schematu — tanie dziś, nieodwracalne po pierwszym obcym użytkowniku
+## 7. Schema decisions — cheap today, irreversible after the first outside user
 
-Te punkty są w [TL-21](../backlog/tasks/TL-21-fundament-logu-zdarzen-worktrail.md). Powód, dla którego są RAZEM mimo różnej wagi: 1–3 opłacają się nawet gdyby serwer nigdy nie powstał (rozwiązują zmierzony dziś ból), a 4–5 kosztują dziś linijkę, a po wydaniu — migrację cudzych danych.
+These points are in [TL-21](../backlog/tasks/TL-21-fundament-logu-zdarzen-worktrail.md).
+Why they are TOGETHER despite differing in weight: 1–3 pay off even if the
+server never gets built (they solve pain measured today), and 4–5 cost one
+line today, and after release — a migration of other people's data.
 
-1. ✅ **`id` w każdym zdarzeniu** — **ULID** (48 bitów czasu + 80 losowości, Crockford base32, 26 znaków), `eventId()` w `history.mjs`. Hash treści odpadł: dwie repliki stemplują to samo zdarzenie własnym zegarem, więc i tak by się rozjechał, a ULID daje coś, czego hash nie ma — **porządek**, czyli gotowy kursor synchronizacji („daj zdarzenia po X"). Licznik odpadł, bo wymaga jednego pisarza, a dróg zapisu są trzy w osobnych procesach. Dedup po `id` siedzi w `readHistory()`; wpisy sprzed TL-21 (bez `id`) czytają się dalej i **nie są** deduplikowane — nie ma czym ich porównać, a zgadywanie po treści zlałoby dwie prawdziwe zmiany na tę samą wartość.
-2. ✅ **`backlog/.gitattributes`: `history/*.jsonl merge=union`.** Plik leży **w katalogu backlogu**, nie w korzeniu repozytorium — gitattributes obowiązuje per katalog, więc reguła jedzie z backlogiem do cudzego repo. Reguła i punkt 1 działają **wyłącznie razem**: bez `id` union sklejałby log, którego nikt nie umie rozplątać.
-3. ✅ **Widoki generowane do `.gitignore`** (`INDEX.yaml`, `NOW.yaml`, `archive/done.yaml`, `boards/*/`) + `git rm --cached`. Warunek konieczny dowieziony razem z nimi: `serve-backlog.mjs` regeneruje widoki **przed nasłuchem** (raz, poza `listen()`, które rekurencyjnie próbuje kolejnych portów), a hook robi to po każdej edycji taska.
-4. ✅ **`actor` z przestrzenią nazw** — `local:<nick>` (zadeklarowany, niezweryfikowany), `agent:<nazwa>` (zapis automatyczny), `user:<id>` (konto uwierzytelnione), plus `unknown` jako jedyna wartość bez przestrzeni. Bez tego po wprowadzeniu kont nie da się odróżnić deklaracji od uwierzytelnienia, a to jest **dokładnie ta różnica, za którą płaci firma**.
+1. ✅ **`id` on every event** — **a ULID** (48 bits of time + 80 bits of
+   randomness, Crockford base32, 26 characters), `eventId()` in
+   `history.mjs`. A content hash was dropped: two replicas stamp the same
+   event with their own clock, so it would drift anyway, and a ULID gives
+   something a hash does not — **ordering**, i.e. a ready-made sync cursor
+   ("give me events after X"). A counter was dropped because it requires one
+   writer, and there are three write paths in separate processes. Dedup by
+   `id` lives in `readHistory()`; entries from before TL-21 (with no `id`)
+   still read fine and are **not** deduplicated — there is nothing to
+   compare them by, and guessing from content would merge two genuine
+   changes into the same value.
+2. ✅ **`backlog/.gitattributes`: `history/*.jsonl merge=union`.** The file
+   lives **in the backlog directory**, not the repository root —
+   gitattributes applies per directory, so the rule travels with the backlog
+   into someone else's repo. The rule and point 1 work **only together**:
+   without `id`, union merge would glue together a log nobody could untangle.
+3. ✅ **Generated views into `.gitignore`** (`INDEX.yaml`, `NOW.yaml`,
+   `archive/done.yaml`, `boards/*/`) + `git rm --cached`. A necessary
+   condition delivered alongside them: `serve-backlog.mjs` regenerates views
+   **before it listens** (once, outside `listen()`, which recursively tries
+   further ports), and the hook does the same after every task edit.
+4. ✅ **A namespaced `actor`** — `local:<nick>` (declared, unverified),
+   `agent:<name>` (automated write), `user:<id>` (authenticated account),
+   plus `unknown` as the only value with no namespace. Without this, once
+   accounts arrive, there is no way to tell a declaration from an
+   authentication apart — and that is **exactly the difference a company
+   pays for**.
 
-   **Kod nie zgaduje przestrzeni.** Goła nazwa w NOWYM zapisie to brak deklaracji, więc ląduje jako `unknown` — hurtowe dopisanie `local:` przekwalifikowałoby agenta `claude` na człowieka, czyli byłoby ładną nieprawdą tej samej klasy co odrzucony backfill z gita (§6 [backlog-field-editing-history.md](backlog-field-editing-history.md)). Wpisy sprzed TL-21 zostają w logu bajt w bajt i przy ODCZYCIE dostają przestrzeń `legacy` — to prawda o nich, w przeciwieństwie do wciśnięcia ich w dzisiejszą kategorię.
+   **The code does not guess a namespace.** A bare name in a NEW write is a
+   missing declaration, so it lands as `unknown` — bulk-prepending `local:`
+   would reclassify the `claude` agent as a human, i.e. it would be a pretty
+   untruth of the same class as the rejected git backfill (§6 in
+   [backlog-field-editing-history.md](backlog-field-editing-history.md)).
+   Entries from before TL-21 stay in the log byte for byte and are given the
+   `legacy` namespace at READ time — that is the truth about them, unlike
+   forcing them into today's category.
 
-   Degradacja musiała stać się GŁOŚNA w obu miejscach, gdzie mogła być cicha: `validateConfig` odrzuca gołego aktora w `config.yaml` z komunikatem podającym trzy dozwolone formy, a `history-record.mjs` kończy kodem 2 zamiast raportować „zapisano zmiany (kamil)" i zapisywać `unknown` — wyjście kłamałoby o autorze, czyli o jedynej rzeczy, dla której ta historia istnieje.
-5. ✅ **Typ zdarzenia dopuszczający ciało i komentarze** — `__body__` i `__comment__` zarezerwowane obok `__created__` / `__deleted__` w `PSEUDO_FIELDS`. Lista mieszka w `task-fields.mjs`, bo ten plik jest wklejany źródłem do viewera; viewer miał do tej pory własną, ręcznie przepisaną kopię warunku `field === "__created__" || field === "__deleted__"` — klasa „ta sama decyzja w dwóch miejscach" zniknęła przy okazji.
+   Degradation had to become LOUD in both places it could have stayed
+   quiet: `validateConfig` rejects a bare actor in `config.yaml` with a
+   message naming the three allowed forms, and `history-record.mjs` exits
+   with code 2 instead of reporting "changes saved (kamil)" and writing
+   `unknown` — the output would lie about the author, i.e. about the one
+   thing this history exists for.
+5. ✅ **An event type admitting body and comments** — `__body__` and
+   `__comment__` reserved alongside `__created__` / `__deleted__` in
+   `PSEUDO_FIELDS`. The list lives in `task-fields.mjs`, because this file is
+   pasted as source into the viewer; the viewer used to have its own,
+   hand-copied version of the condition
+   `field === "__created__" || field === "__deleted__"` — the "same decision
+   in two places" class disappeared along the way.
 
-   **`__comment__` jest ZAIMPLEMENTOWANY od TL-99**, `__body__` nadal nie. Pierwszym pisarzem jest `worktrail handoff`, ale kształt jest ogólny i nie wie nic o przekazywaniu: całą treścią jest `to`, `from` zostaje puste (komentarz niczego nie zastępuje), a dedup działa **wyłącznie po `id`** — reguła zdarzeniowa z `__created__` go NIE dotyczy, bo dwa identyczne zdania powiedziane w różnym czasie to dwie wypowiedzi, a nie jedno zdarzenie widziane dwa razy. Rezerwacja opłaciła się dokładnie tak, jak zakładano: doszedł zapis, nie migracja cudzych danych.
+   **`__comment__` is IMPLEMENTED since TL-99**, `__body__` still is not. The
+   first writer is `worktrail handoff`, but the shape is generic and knows
+   nothing about handoff: the whole content is `to`, `from` stays empty
+   (a comment replaces nothing), and dedup works **by `id` alone** — the
+   event rule from `__created__` does NOT apply to it, because the same
+   sentence said twice at different times is two utterances, not one event
+   seen twice. The reservation paid off exactly as intended: a write was
+   added, not a migration of other people's data.
 
-   Odczyt jest jedną regułą dla wszystkich zdarzeń — `historyEntryKind()` w `task-fields.mjs` rozstrzyga, czy wiersz czyta się jako `message` (cała treść w `to`), `event` (sama etykieta) czy `transition` (`from → to`). Powód jest ten sam, dla którego lista pseudo-pól tu mieszka: viewer wkleja ten plik źródłem, więc reguła nie może się rozjechać ze stroną, a test może ją wywołać zamiast asertować HTML.
+   Reading is a single rule for every event — `historyEntryKind()` in
+   `task-fields.mjs` decides whether a row reads as `message` (all content in
+   `to`), `event` (just the label), or `transition` (`from → to`). This is
+   the same reason the pseudo-field list lives here: the viewer pastes this
+   file as source, so the rule cannot drift from the page, and a test can
+   call it instead of asserting on HTML.
 
-### 7.1. Jednorazowy koszt przejścia (zmierzony)
+### 7.1. The one-time transition cost (measured)
 
-Gałęzie utworzone **przed** krokiem 3 nadal mają widoki w indeksie, więc scalenie, które wnosi tę zmianę, **jeszcze raz zgłosi konflikt** — zmierzone na żywej gałęzi: `KONFLIKT (zawartość)` w `backlog/INDEX.yaml` i `backlog/archive/done.yaml`. Rozwiązanie jest jednorazowe i mechaniczne: przyjąć usunięcie (`git rm`) i zregenerować widoki. Od następnego scalenia problem nie wraca, bo pliku nie ma po żadnej stronie.
+Branches created **before** step 3 still have views in the index, so the
+merge that introduces this change **will report a conflict once more** —
+measured on a live branch: `CONFLICT (content)` in `backlog/INDEX.yaml` and
+`backlog/archive/done.yaml`. The fix is one-off and mechanical: accept the
+deletion (`git rm`) and regenerate the views. From the next merge onward the
+problem does not return, because the file is absent on both sides.
 
-W dniu zmiany żyło **7 worktree'ów**, więc ta jedna operacja czeka każdy z nich przy najbliższym scaleniu z `main`.
+On the day of the change **7 worktrees** were alive, so this one operation
+awaits each of them at its next merge with `main`.
 
-### 7.2. Jak to jest udowodnione
+### 7.2. How this is proven
 
-Każdy z trzech kroków ma test z **kontrolą pozytywną** — bez niej zielony wynik jest nieodróżnialny od „ten mechanizm i tak nigdy nie failował":
+Each of the three steps has a test with a **positive control** — without one
+a green result is indistinguishable from "this mechanism never failed
+anyway":
 
-| Krok | Dowód | Kontrola pozytywna |
+| Step | Evidence | Positive control |
 |---|---|---|
-| 1 | `history.test.mjs` — id, unikalność w tej samej milisekundzie, porządek leksykograficzny, dedup | „dedup NIE łączy dwóch różnych zdarzeń o tej samej treści" + „wpisy bez id nigdy nie są deduplikowane" |
-| 2 | `history-merge.test.mjs` — **prawdziwe** scalenie dwóch gałęzi w repozytorium tymczasowym, z NASZYM plikiem atrybutów | to samo scalenie **bez** `.gitattributes` MUSI konfliktować |
-| 3 | `views-not-versioned.test.mjs` — rozłączne gałęzie scalają się czysto; w tym repo widoki ignorowane **i nieśledzone** | wersjonowany agregat konfliktuje mimo rozłącznych tasków |
-| 4 | `history.test.mjs` — walidacja, rozbiór, cała droga zapisu; `config.test.mjs` — konfiguracja z gołym aktorem oblewa | goła nazwa NIE jest promowana do `local:`; log sprzed TL-21 czyta się bajt w bajt; CLI kończy błędem zamiast cicho zapisać `unknown` |
-| 5 | `history.test.mjs` — pseudo-pola przechodzą zapis i odczyt | `diffMeta` NIGDY ich nie produkuje (inaczej rekoncyliacja zmyślałaby zmiany ciała, którego nie czyta) |
+| 1 | `history.test.mjs` — id, uniqueness within the same millisecond, lexicographic ordering, dedup | "dedup does NOT merge two distinct events with the same content" + "entries without an id are never deduplicated" |
+| 2 | `history-merge.test.mjs` — a **real** merge of two branches in a temporary repository, with OUR attributes file | the same merge **without** `.gitattributes` MUST conflict |
+| 3 | `views-not-versioned.test.mjs` — disjoint branches merge cleanly; in this repo views are ignored **and** untracked | a versioned aggregate conflicts despite disjoint tasks |
+| 4 | `history.test.mjs` — validation, parsing, the whole write path; `config.test.mjs` — configuration with a bare actor fails | a bare name is NOT promoted to `local:`; the log from before TL-21 reads byte for byte; the CLI exits with an error instead of silently writing `unknown` |
+| 5 | `history.test.mjs` — pseudo-fields pass write and read | `diffMeta` NEVER produces them (otherwise reconciliation would invent body changes it does not read) |
 
-Asercja „plik zawiera `merge=union`" byłaby bezwartościowa — sprawdzałaby, że regułę napisano, a nie że git ją stosuje.
+An assertion of "the file contains `merge=union`" would be worthless — it
+would check that the rule was written, not that git applies it.
 
-## 8. Kolejność i ryzyko
+## 8. Order and risk
 
-Serwer buduje się **dopiero wtedy, gdy ktoś poza founderem używa wersji lokalnej.** Wcześniej optymalizuje się pod użytkownika, którego jeszcze nie ma, kosztem produktu, który już istnieje (the origin project).
+The server gets built **only once someone besides the founder uses the local
+version.** Before that, optimising for a user who does not yet exist comes at
+the expense of the product that already does (the origin project).
 
-To, co opisuje §6, to produkt SaaS z kontami, rolami, billingiem, synchronizacją i webowym UI — prowadzony przez jednoosobowy zespół obok the origin project. Dokument tego nie odradza; zapisuje, że **kolejność ma tu znaczenie większe niż wybór technologii**, a kroki 1–5 są właśnie tą częścią, która jest wartościowa niezależnie od tego, czy hosting powstanie.
+What §6 describes is a SaaS product with accounts, roles, billing,
+synchronization and a web UI — run by a one-person team alongside the origin project. The
+document does not advise against it; it records that **order matters here
+more than the choice of technology**, and steps 1–5 are exactly the part that
+is valuable regardless of whether hosting ever gets built.
 
-## 9. Założenia do obalenia
+## 9. Assumptions to be falsified
 
-Rzeczy, których NIE zmierzyłem, a które odwróciłyby część powyższego:
+Things I did NOT measure, which would overturn part of the above:
 
-1. **Czy realny ból to konflikty, czy kolizje na tasku.** §2 mierzy tylko to, co doszło do commita. Agent, który wszedł w zajęty task i się wycofał, w gicie nie zostawia śladu. Gdyby dominowały kolizje, priorytetem byłyby locki (§6.1), a nie kroki 1–3.
-2. **Czy osoby nietechniczne będą jednak edytować ciało.** §5.2 opiera się na obserwacji ról, nie na pomiarze. Gdyby analityk realnie przepisywał treść tasków, §5.3 przestaje wystarczać i wraca temat CRDT.
-3. **Czy git wystarczy jako transport dla małego zespołu.** Zakłada, że wszyscy członkowie mają repo i regularnie synchronizują. Zespół z jedną osobą nietechniczną łamie to założenie od pierwszego dnia — i wtedy serwer jest potrzebny wcześniej, niż mówi §8.
+1. **Whether the real pain is conflicts or task collisions.** §2 only
+   measures what reached a commit. An agent that walked into a taken task and
+   backed off leaves no trace in git. If collisions dominated, the priority
+   would be locks (§6.1), not steps 1–3.
+2. **Whether non-technical people will edit the body after all.** §5.2 rests
+   on an observation of roles, not a measurement. If an analyst genuinely
+   rewrote task content, §5.3 stops being enough and the CRDT question comes
+   back.
+3. **Whether git is enough as transport for a small team.** This assumes
+   everyone on the team has the repo and syncs regularly. A team with one
+   non-technical member breaks this assumption from day one — and then the
+   server is needed earlier than §8 says.

@@ -1,6 +1,6 @@
 ---
 id: TL-111
-title: "migrate-prefix zostawia historię pod starym ID"
+title: "migrate-prefix leaves history under the old ID"
 type: task
 labels: []
 board: main
@@ -14,130 +14,133 @@ updated: 2026-09-01
 blocked_by: []
 blocks: []
 related_docs: []
-verification:                      # JAK sprawdzić, że task naprawdę jest zrobiony
+verification:                      # HOW to verify that the task is truly done
   - bash: "node --test scripts/tests/migrate-prefix-history.test.mjs"
   - bash: "node --test scripts/tests/history.test.mjs"
 ---
 
-## Cel
+## Goal
 
-Po `worktrail migrate-prefix` żaden task nie ma w historii rekordu mówiącego, że
-został skasowany. Dziś ma je KAŻDY: migracja `BL-` → `TL-` w tym repozytorium
-wyprodukowała 42 pliki `history/BL-*.jsonl`, każdy z jednym rekordem
-`__deleted__`, oraz komplet rekordów `__created__` na nowych ID. Historia
-mówiła, że cały backlog skasowano i założono od nowa tego samego dnia.
+After `worktrail migrate-prefix`, no task has a history record saying it was
+deleted. Today EVERY one does: the `BL-` → `TL-` migration in this repository
+produced 42 `history/BL-*.jsonl` files, each with one `__deleted__` record,
+plus a full set of `__created__` records under the new IDs. The history said
+the whole backlog had been deleted and recreated on the same day.
 
-Gdy task jest zrobiony, migracja prefiksu jest dla historii RENAME, nie parą
-skasowanie+utworzenie.
+When this task is done, the prefix migration is a RENAME as far as history is
+concerned, not a delete+create pair.
 
-## Kontekst
+## Context
 
-Znalezione 2026-09-01 przy porządkowaniu working tree: 42 nieśledzone pliki
-`backlog/history/BL-*.jsonl`, wszystkie z jednym rekordem, wszystkie
-`{"field":"__deleted__","actor":"unknown","source":"boot"}`, wszystkie ze
-znacznikiem czasu `2026-09-01T07:13:34.277Z` — jeden przebieg reconcile.
-Pliki zostały skasowane (nie niosły żadnej historii poza nagrobkiem; prawdziwa
-historia każdego taska jest w bliźniaku `TL-*`, który jest w repo). Ten task
-usuwa PRZYCZYNĘ, żeby następna migracja ich nie odtworzyła.
+Found 2026-09-01 while cleaning up the working tree: 42 untracked
+`backlog/history/BL-*.jsonl` files, all with one record, all
+`{"field":"__deleted__","actor":"unknown","source":"boot"}`, all with
+timestamp `2026-09-01T07:13:34.277Z` — one reconcile run. The files were
+deleted (they carried no history beyond the tombstone; each task's real
+history is in its `TL-*` twin, which is in the repo). This task removes the
+CAUSE, so the next migration does not recreate them.
 
-**Przyczyna.** `scripts/migrate-prefix.mjs` przemianowuje starannie cztery
-rzeczy (patrz komentarz na górze pliku): plik taska, `id:` we frontmatterze,
-`blocked_by`/`blocks`, plik `history/<ID>.jsonl` wraz z polem `task` w środku
-oraz `task_id_prefix` w config.yaml. Nie dotyka **piątej**:
-`history/.snapshot.json` — `grep snapshot scripts/migrate-prefix.mjs` nie ma
-ani jednego trafienia. Snapshot to „ostatnio widziany frontmatter każdego
-taska", klucz = ID taska. Po migracji snapshot trzyma 74 klucze `BL-*`, a
-drzewo ma 74 taski `TL-*`. Najbliższy reconcile (`source: "boot"`) porównuje
-jedno z drugim i uczciwie melduje 74 zniknięcia i 74 nowe taski — robi dokładnie
-to, do czego został napisany. Wada jest w migracji, która zostawiła mu
-nieaktualny punkt odniesienia.
+**Cause.** `scripts/migrate-prefix.mjs` carefully renames four things (see
+the comment at the top of the file): the task file, `id:` in the
+frontmatter, `blocked_by`/`blocks`, the `history/<ID>.jsonl` file along with
+the `task` field inside it, and `task_id_prefix` in config.yaml. It does not
+touch the **fifth**: `history/.snapshot.json` — `grep snapshot
+scripts/migrate-prefix.mjs` has zero matches. The snapshot is "the last seen
+frontmatter of every task", keyed by task ID. After migration the snapshot
+holds 74 `BL-*` keys, while the tree has 74 `TL-*` tasks. The next reconcile
+(`source: "boot"`) compares one against the other and honestly reports 74
+disappearances and 74 new tasks — it does exactly what it was written to do.
+The defect is in the migration, which left it a stale reference point.
 
-**Dlaczego to nie jest kosmetyka.** Historia pól jest wersjonowana i ma regułę
-`merge=union` (`scripts/git-rules.mjs`); nagrobki wjeżdżają do repo i zostają.
-TL-28–TL-31 budują na tej historii łańcuch atrybucji i kalibrację estymat
-z danych rzeczywistych — dane, w których każdy task „powstał" w dniu migracji,
-zafałszują każdy wyliczony z nich wiek i tempo.
+**Why this is not cosmetic.** Field history is versioned and has the
+`merge=union` rule (`scripts/git-rules.mjs`); tombstones go into the repo and
+stay there. TL-28–TL-31 build an attribution chain and estimate calibration
+from real data on top of this history — data in which every task "was
+created" on migration day would corrupt any age and pace computed from it.
 
-**Druga wada, przy okazji.** Jeden z nagrobków miał ID
-`BL-1417-domknij-walidacje-flag-w-5` — czyli klucz w snapshocie powstał
-z NAZWY PLIKU (numer + slug ucięty na `-5`), a nie z pola `id:` we
-frontmatterze. Task `TL-25` istnieje i ma własną, poprawną historię.
-Sprawdzić, gdzie klucz snapshotu jest liczony z nazwy pliku, i czy nie jest to
-osobna klasa błędu wymagająca własnego taska.
+**A second defect, found along the way.** One of the tombstones had ID
+`BL-1417-domknij-walidacje-flag-w-5` — meaning the snapshot key was computed
+from the FILE NAME (number + slug truncated at `-5`), not from the `id:`
+field in the frontmatter. Task `TL-25` exists and has its own, correct
+history. Check where the snapshot key is computed from the file name, and
+whether that is a separate bug class requiring its own task.
 
-**Rozstrzygnięcie do podjęcia w trakcie.** Snapshot jest gitignorowany
-(`IGNORE_RULES` w `git-rules.mjs`), więc przepisanie go w klonie, który
-wykonuje migrację, nie pomaga KLONOWI OBOK: on pociągnie drzewo `TL-*`,
-porówna z własnym snapshotem `BL-*` i wyprodukuje te same 74 nagrobki.
-Do wyboru:
+**A decision to make along the way.** The snapshot is gitignored
+(`IGNORE_RULES` in `git-rules.mjs`), so rewriting it in the clone that
+performs the migration does not help a CLONE SITTING ALONGSIDE IT: it will
+pull the `TL-*` tree, compare it against its own `BL-*` snapshot, and produce
+the same 74 tombstones. Options:
 
-- **(a)** `migrate-prefix` przepisuje klucze lokalnego snapshotu — konieczne
-  minimum, nie wystarcza dla innych klonów;
-- **(b)** reconcile rozpoznaje HURTOWY rename (znikło ID `X-N`, pojawiło się
-  `Y-N` o tym samym numerze i tej samej treści) i zapisuje rename zamiast
-  pary skasowanie+utworzenie — działa w każdym klonie, ale to zgadywanie,
-  a `history.mjs` deklaruje „uczciwość zamiast zgadywania";
-- **(c)** migracja zostawia w repo jawny, wersjonowany zapis „prefiks zmienił
-  się z X na Y w tym momencie", a reconcile go czyta — jawne, działa w każdym
-  klonie, ale dokłada plik do formatu danych.
+- **(a)** `migrate-prefix` rewrites the local snapshot's keys — the necessary
+  minimum, not sufficient for other clones;
+- **(b)** reconcile recognizes a BULK rename (ID `X-N` disappeared, `Y-N`
+  appeared with the same number and the same content) and records a rename
+  instead of a delete+create pair — works in every clone, but it is a guess,
+  and `history.mjs` declares "honesty instead of guessing";
+- **(c)** the migration leaves an explicit, versioned record in the repo
+  saying "the prefix changed from X to Y at this moment", and reconcile reads
+  it — explicit, works in every clone, but adds a file to the data format.
 
-Rekomendacja: **(a) + (c)** — (a) naprawia klon migrujący natychmiast,
-(c) daje pozostałym FAKT do odczytania zamiast heurystyki. Decyzję zapisać
-w komentarzu przy implementacji, bo to wybór, nie oczywistość.
+Recommendation: **(a) + (c)** — (a) fixes the migrating clone immediately,
+(c) gives the rest a FACT to read instead of a heuristic. Record the decision
+in a comment at implementation time, because it is a choice, not something
+obvious.
 
 ## Pre-flight reading
 
-1. `scripts/migrate-prefix.mjs` — komentarz na górze wylicza, co migracja
-   przemianowuje; to lista, do której dochodzi snapshot.
+1. `scripts/migrate-prefix.mjs` — the comment at the top lists what the
+   migration renames; that is the list the snapshot joins.
 2. `scripts/history.mjs` — `snapshotPath`, `loadSnapshot`, `saveSnapshot`
-   i `reconcile()`; szczególnie komentarze przy `__created__`/`__deleted__`
-   (linie ~144 i ~390) — one tłumaczą, dlaczego reconcile zachował się
-   poprawnie.
-3. `scripts/git-rules.mjs` — `IGNORE_RULES` (snapshot ignorowany) i
-   `ATTRIBUTE_RULES` (`history/*.jsonl merge=union`); to one przesądzają,
-   że nagrobki są trwałe, a snapshot lokalny.
-4. `scripts/tests/history.test.mjs` i `scripts/tests/id-prefix.test.mjs` —
-   wzorce testów obu obszarów.
-5. `scripts/tests/_repo.mjs` — katalog backlogu ZAWSZE stąd.
+   and `reconcile()`; especially the comments near `__created__`/`__deleted__`
+   (lines ~144 and ~390) — they explain why reconcile behaved correctly.
+3. `scripts/git-rules.mjs` — `IGNORE_RULES` (snapshot ignored) and
+   `ATTRIBUTE_RULES` (`history/*.jsonl merge=union`); these are what decide
+   that tombstones are permanent while the snapshot is local.
+4. `scripts/tests/history.test.mjs` and `scripts/tests/id-prefix.test.mjs` —
+   test patterns for both areas.
+5. `scripts/tests/_repo.mjs` — the backlog directory ALWAYS comes from here.
 
-## Kroki
+## Steps
 
-1. Odtwórz wadę w teście: fixture z taskami `BL-*`, historią i snapshotem →
-   `migrate-prefix --to TL` → reconcile → asercja, że NIE powstał żaden
-   rekord `__deleted__` ani `__created__`. Ten test ma dziś OBLEWAĆ.
-2. Zaimplementuj (a): `migrate-prefix` przepisuje klucze `.snapshot.json`
-   razem z resztą planu renames — w tej samej transakcji, żeby przerwana
-   migracja nie zostawiła snapshotu rozjechanego z drzewem (plik już dba
-   o kolejność: najpierw walidacja, potem zapisy).
-3. Rozstrzygnij i zaimplementuj (c) albo świadomie odrzuć — decyzję zapisz
-   w komentarzu w kodzie wraz z powodem.
-4. Sprawdź, czy `--dry-run` mówi o snapshocie tak samo jak o pozostałych
-   plikach (migracja ma być przewidywalna przed uruchomieniem).
-5. Zbadaj drugą wadę: skąd klucz snapshotu
-   `BL-1417-domknij-walidacje-flag-w-5`. Jeśli to osobna klasa błędu —
-   załóż osobny task i zlinkuj tutaj w `blocks`.
-6. Uzupełnij `doctor` albo `check` o wykrycie rozjazdu snapshot↔drzewo, jeśli
-   okaże się tani — nagrobki powinny być zauważone przez narzędzie, nie przez
-   człowieka czytającego `git status`.
+1. Reproduce the defect in a test: fixture with `BL-*` tasks, history and
+   snapshot → `migrate-prefix --to TL` → reconcile → assert that NOT A SINGLE
+   `__deleted__` or `__created__` record was produced. This test must FAIL
+   today.
+2. Implement (a): `migrate-prefix` rewrites the `.snapshot.json` keys
+   together with the rest of the rename plan — in the same transaction, so an
+   interrupted migration does not leave the snapshot out of sync with the
+   tree (the file already takes care of ordering: validation first, then
+   writes).
+3. Decide on and implement (c), or deliberately reject it — record the
+   decision in a code comment along with the reason.
+4. Check whether `--dry-run` reports the snapshot the same way it reports the
+   other files (the migration is meant to be predictable before it runs).
+5. Investigate the second defect: where does the snapshot key
+   `BL-1417-domknij-walidacje-flag-w-5` come from. If it is a separate bug
+   class — open a separate task and link it here under `blocks`.
+6. Add detection of a snapshot↔tree mismatch to `doctor` or `check`, if it
+   turns out to be cheap — tombstones should be caught by the tool, not by a
+   human reading `git status`.
 
 ## Acceptance criteria
 
-- [x] `node --test scripts/tests/migrate-prefix-history.test.mjs` zielone,
-      z kontrolą pozytywną (test oblewa na kodzie sprzed poprawki).
-- [x] Po migracji na fixture reconcile nie produkuje ANI JEDNEGO rekordu
-      `__deleted__` / `__created__`.
-- [x] Po migracji w `history/` nie zostaje żaden plik pod starym prefiksem.
-- [x] `.snapshot.json` po migracji ma klucze wyłącznie pod nowym prefiksem.
-- [x] `--dry-run` wymienia snapshot wśród plików, które zostaną zmienione.
-- [x] Wybór między (b) a (c) rozstrzygnięty i uzasadniony w komentarzu w kodzie.
-- [x] `node --test scripts/tests/*.test.mjs` bez regresji;
-      `worktrail check` zielone.
+- [x] `node --test scripts/tests/migrate-prefix-history.test.mjs` green,
+      with a positive control (the test fails against the pre-fix code).
+- [x] After migration on the fixture, reconcile produces NOT A SINGLE
+      `__deleted__` / `__created__` record.
+- [x] After migration, no file remains in `history/` under the old prefix.
+- [x] `.snapshot.json` after migration has keys only under the new prefix.
+- [x] `--dry-run` lists the snapshot among the files that will change.
+- [x] The choice between (b) and (c) is decided and justified in a code
+      comment.
+- [x] `node --test scripts/tests/*.test.mjs` with no regressions;
+      `worktrail check` green.
 
 ## Log
 
-Append-only. Format: `YYYY-MM-DD status — kto — notatka`.
+Append-only. Format: `YYYY-MM-DD status — who — note`.
 
-2026-09-01 pending — agent:claude — założony po znalezieniu 42 nagrobków
-`history/BL-*.jsonl` z migracji BL→TL. Pliki skasowane (same nagrobki, zero
-historii); ten task usuwa przyczynę. Przyczyna ustalona: migracja nie
-przepisuje `history/.snapshot.json`.
+2026-09-01 pending — agent:claude — opened after finding 42 tombstones in
+`history/BL-*.jsonl` from the BL→TL migration. Files deleted (pure
+tombstones, no history); this task removes the cause. Cause established: the
+migration does not rewrite `history/.snapshot.json`.

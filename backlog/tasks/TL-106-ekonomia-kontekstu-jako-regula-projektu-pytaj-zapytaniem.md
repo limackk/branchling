@@ -1,6 +1,6 @@
 ---
 id: TL-106
-title: "Ekonomia kontekstu jako reguła projektu — pytaj zapytaniem, nie czytaj drzewa"
+title: "Context economy as a project rule — ask with a query, do not read the tree"
 type: code
 labels: [post-launch]
 board: main
@@ -20,100 +20,117 @@ related_docs:
 verification:
   - bash: "node --test scripts/tests/context-budget.test.mjs"
   - bash: "node scripts/cli.mjs query --status pending --count"
-  - manual: "`CLAUDE.md` w korzeniu i temat `context-budget` w `worktrail instructions` niosą tę samą regułę, z tabelą kosztów policzoną z bieżącego drzewa, a nie wpisaną na sztywno"
+  - manual: "`CLAUDE.md` at the root and the `context-budget` topic in `worktrail instructions` carry the same rule, with a cost table computed from the current tree rather than hardcoded"
 ---
 
-## Cel
+## Goal
 
-Agent wie — z reguły projektu, nie z domysłu — że o backlog się PYTA komendą,
-a nie czyta się go plikami. Koszt sesji zostaje funkcją jednego taska także
-wtedy, gdy backlog urośnie do kilkuset pozycji.
+The agent knows — from a project rule, not a guess — that the backlog is
+QUERIED with a command, not read file by file. Session cost stays a function
+of a single task even once the backlog grows to several hundred entries.
 
-## Kontekst
+## Context
 
-Architektura jest dziś właściwa: na starcie sesji ładuje się wyłącznie
-`CLAUDE.md`, backlog nie wchodzi do kontekstu, dopóki agent po niego nie sięgnie.
-Pomiar na tym drzewie (88 tasków, 44 aktywne, 2026-09-01):
+The architecture is already correct today: at session start only
+`CLAUDE.md` is loaded, the backlog does not enter the context until the
+agent reaches for it. Measurement on this tree (88 tasks, 44 active,
+2026-09-01):
 
 ```
-CLAUDE.md (automatycznie)                      ~940 tok
-SKILL.md (gdy skill się odpali)              ~1 810 tok
+CLAUDE.md (automatic)                          ~940 tok
+SKILL.md (when a skill fires)                ~1 810 tok
 worktrail stats                                  ~200 tok
-query --status pending (44 taski)            ~2 130 tok
-jeden plik taska (mediana)                   ~1 130 tok
+query --status pending (44 tasks)            ~2 130 tok
+one task file (median)                       ~1 130 tok
 ─────────────────────────────────────────────────────────
-typowa sesja na jeden task                   ~6 000 tok   ≈ 3% okna 200k
+typical single-task session                  ~6 000 tok   ≈ 3% of the 200k window
 
-ścieżka naiwna: cat tasks/*.md            ~115 500 tok   ≈ 58% okna
-backlog/INDEX.yaml                           ~2 400 tok   (i NIEŚWIEŻY)
+naive path: cat tasks/*.md                 ~115 500 tok   ≈ 58% of the window
+backlog/INDEX.yaml                           ~2 400 tok   (and STALE)
 ```
 
-Trzy rzeczy tę architekturę psują i żadna nie jest dziś nigdzie zapisana:
+Three things break this architecture and none of them is recorded anywhere
+today:
 
-1. **Szukanie pracy skaluje się liniowo, praca nie.** `query --status pending`
-   kosztuje ~48 tokenów na task. Przy 44 taskach ~2 100; przy 400 — **~19 400
-   tokenów tylko po to, żeby zapytać „co teraz"**, czyli trzykrotnie więcej niż
-   cała reszta sesji. Docelowe rozwiązanie to `worktrail next` (TL-104, koszt
-   stały); do tego czasu regułą jest `--count` i `stats` zamiast pełnej listy,
-   a pełna lista tylko z filtrem.
-2. **Nic nie broni przed ścieżką naiwną.** `Read` na katalogu tasków albo szeroki
-   grep wciąga 115k tokenów i sesja jest ugotowana, zanim zacznie pracę.
-   `CLAUDE.md` nie mówi o tym ani słowa; skill mówi dopiero, gdy się odpali,
-   a odpala się nie zawsze.
-3. **`INDEX.yaml` jest pułapką podwójną**: kosztuje ~12× więcej niż `stats`
-   i jest snapshotem ostatniego `build`, więc odpowiada nieświeżo. Leży przy tym
-   w oczywistym miejscu i wygląda jak indeks, po który się sięga.
+1. **Looking for work scales linearly, work does not.** `query --status
+   pending` costs ~48 tokens per task. At 44 tasks that is ~2,100; at 400 —
+   **~19,400 tokens just to ask "what now"**, three times the rest of the
+   session. The intended fix is `worktrail next` (TL-104, constant cost);
+   until then the rule is `--count` and `stats` instead of the full list, and
+   the full list only with a filter.
+2. **Nothing guards against the naive path.** A `Read` on the tasks
+   directory, or a broad grep, pulls in 115k tokens and the session is
+   cooked before it starts work. `CLAUDE.md` says not a word about it; the
+   skill only says so once it fires, and it does not always fire.
+3. **`INDEX.yaml` is a double trap**: it costs ~12x more than `stats` and is
+   a snapshot of the last `build`, so it answers stale. On top of that it
+   sits in an obvious place and looks like the index to reach for.
 
-Przy 88 taskach to nie boli. Przy 400 zdecyduje, czy tryb autonomiczny w ogóle
-działa — a backlog rośnie właśnie dlatego, że narzędzie działa.
+At 88 tasks this does not hurt. At 400 it will decide whether autonomous
+mode works at all — and the backlog is growing precisely because the tool
+works.
 
-**Rozstrzygnięte: reguła ma jedno źródło.** Trafia do `CLAUDE.md` (bo to jedyna
-rzecz ładowana automatycznie) ORAZ jako temat `context-budget` w `worktrail
-instructions` (TL-74) — ale jako jeden tekst z jednego miejsca, nie dwie kopie,
-które się rozjadą. Jeśli TL-74 jeszcze nie wszedł, zacznij od `CLAUDE.md`
-i zostaw punkt zaczepienia.
+**Settled: the rule has one source.** It goes into `CLAUDE.md` (because that
+is the only thing loaded automatically) AND as the `context-budget` topic in
+`worktrail instructions` (TL-74) — but as one text from one place, not two
+copies that drift apart. If TL-74 has not landed yet, start with `CLAUDE.md`
+and leave a hook.
 
-**Rozstrzygnięte: tabela kosztów jest LICZONA, nie wpisana.** Liczby wpisane na
-sztywno zestarzeją się przy pierwszym urośnięciu backlogu i zaczną uczyć
-nieprawdy — a to jest ta sama klasa błędu co README opisujący cudzy projekt.
-Stąd `worktrail stats --context` albo równoważne: koszt odpowiedzi każdej drogi
-policzony z bieżącego drzewa.
+**Settled: the cost table is COMPUTED, not hardcoded.** Hardcoded numbers
+would go stale the first time the backlog grows, and start teaching a
+falsehood — the same class of bug as a README describing someone else's
+project. Hence `worktrail stats --context` or equivalent: the cost of each
+path's answer computed from the current tree.
 
 ## Pre-flight reading
 
-1. `CLAUDE.md` — sekcja „Zanim zmienisz kod"; reguła ma tam pasować tonem
-   i zwięzłością. To plik ładowany do KAŻDEJ sesji, więc każde zdanie kosztuje.
-2. `.claude/skills/backlog-workflow/SKILL.md` — sekcja „Find work"; dziś mówi
-   o `--count`, ale nie mówi DLACZEGO ani czego nie robić.
-3. `scripts/stats.mjs` i `scripts/query.mjs` — skąd wziąć liczby do wyliczenia.
-4. `backlog/tasks/TL-104-*.md` — `worktrail next`, docelowe rozwiązanie punktu 1.
+1. `CLAUDE.md` — section "Before you change the code"; the rule needs to
+   match its tone and brevity there. This is a file loaded into EVERY
+   session, so every sentence costs.
+2. `.claude/skills/backlog-workflow/SKILL.md` — section "Find work"; today
+   it says to use `--count`, but not WHY or what not to do.
+3. `scripts/stats.mjs` and `scripts/query.mjs` — where to get the numbers
+   for the computation from.
+4. `backlog/tasks/TL-104-*.md` — `worktrail next`, the intended fix for
+   point 1.
 
-## Kroki
+## Steps
 
-1. Napisz regułę: **pytaj `query`/`stats`/`next`, nie czytaj `tasks/*.md`
-   hurtem i nie czytaj widoków generowanych.** Krótko — to jedzie w każdej sesji.
-2. Wpisz ją do `CLAUDE.md` z jednym zdaniem uzasadnienia (58% okna za jeden
-   nieostrożny odczyt) i z powodem, dla którego widoki generowane odpadają
-   podwójnie: koszt i nieświeżość.
-3. `worktrail stats --context` (albo równoważne): koszt odpowiedzi każdej drogi
-   policzony z bieżącego drzewa — ile kosztuje `--count`, `stats`, pełna lista,
-   jeden task, całe drzewo.
-4. Temat `context-budget` w `instructions` (TL-74) z tego samego źródła.
-5. Rozważ ostrzeżenie w `doctor`, gdy pełna lista przekracza próg — i rozstrzygnij
-   próg wartością, nie przeczuciem (np. udział w typowym oknie).
-6. `scripts/tests/context-budget.test.mjs`: `--count` jest o rząd wielkości
-   tańszy niż pełna lista na fixture; liczby w tabeli pochodzą z drzewa
-   (test oblewa, gdy ktoś je wpisze na sztywno); reguła jest obecna w
-   `CLAUDE.md`. Kontrola pozytywna: fixture z inną liczbą tasków daje inne liczby.
+1. Write the rule: **ask with `query`/`stats`/`next`, do not read
+   `tasks/*.md` in bulk and do not read generated views.** Keep it short —
+   this rides along in every session.
+2. Add it to `CLAUDE.md` with one sentence of justification (58% of the
+   window for one careless read) and with the reason generated views are
+   doubly disqualified: cost and staleness.
+3. `worktrail stats --context` (or equivalent): the cost of each path's
+   answer computed from the current tree — what `--count`, `stats`, the
+   full list, one task, the whole tree each cost.
+4. The `context-budget` topic in `instructions` (TL-74) from the same
+   source.
+5. Consider a warning in `doctor` when the full list exceeds a threshold —
+   and settle the threshold with a value, not a hunch (e.g. a share of a
+   typical window).
+6. `scripts/tests/context-budget.test.mjs`: `--count` is an order of
+   magnitude cheaper than the full list on the fixture; the numbers in the
+   table come from the tree (the test fails if someone hardcodes them); the
+   rule is present in `CLAUDE.md`. Positive control: a fixture with a
+   different task count gives different numbers.
 
 ## Acceptance criteria
 
-- [ ] Reguła „pytaj, nie czytaj" jest w `CLAUDE.md`, krótko i z uzasadnieniem.
-- [ ] Istnieje jedno źródło reguły; `instructions` i skill z niego korzystają, nie kopiują.
-- [ ] Koszty są liczone z bieżącego drzewa, nie wpisane na sztywno.
-- [ ] Powód odrzucenia widoków generowanych obejmuje OBA argumenty: koszt i nieświeżość.
-- [ ] Test oblewa, gdy liczby zostaną zaszyte w kodzie albo gdy reguła zniknie z `CLAUDE.md`.
+- [ ] The "ask, do not read" rule is in `CLAUDE.md`, short and justified.
+- [ ] There is one source for the rule; `instructions` and the skill draw
+  from it, not copy it.
+- [ ] Costs are computed from the current tree, not hardcoded.
+- [ ] The reason for rejecting generated views covers BOTH arguments: cost
+  and staleness.
+- [ ] A test fails when numbers get baked into code or the rule disappears
+  from `CLAUDE.md`.
 
 ## Log
 
-2026-09-01 pending — agent:claude — założony po pomiarze ładowania kontekstu: sesja na jeden task to ~6 000 tokenów (3% okna), ale `cat tasks/*.md` to ~115 500 (58%), a szukanie pracy rośnie liniowo — ~19 400 tokenów przy 400 taskach. Architektura jest dobra, nigdzie nie jest regułą.
+2026-09-01 pending — agent:claude — created after measuring context loading:
+a single-task session is ~6,000 tokens (3% of the window), but `cat
+tasks/*.md` is ~115,500 (58%), and looking for work scales linearly —
+~19,400 tokens at 400 tasks. The architecture is good, nowhere is it a rule.
+</content>

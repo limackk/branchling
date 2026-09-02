@@ -14,6 +14,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -102,10 +104,11 @@ test("the public surface of this repository is English", () => {
   assert.ok(linesChecked > 1000, "the walk read only " + linesChecked + " lines — wrong tree?");
 });
 
-test("the guard covers the files that actually ship", () => {
-  // The point is not the list itself but that the two things it has to cover —
-  // the code a user runs and the two markdown files in the tarball — are on it.
-  for (const entry of ["scripts", "bin", "README.md", "_template.md"]) {
+test("the guard covers the files that actually ship, plus the backlog and docs (TL-137)", () => {
+  // The point is not the list itself but that the code a user runs, the two
+  // markdown files in the tarball, and (since TL-137) this project's own
+  // backlog and architecture docs are all on it.
+  for (const entry of ["scripts", "bin", "README.md", "_template.md", "backlog", "docs"]) {
     assert.ok(PUBLIC_PATHS.includes(entry), entry + " dropped out of the guard's scope");
   }
 });
@@ -117,4 +120,91 @@ test("the command exits 0 on a clean tree and prints what it read", () => {
   });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /\d+ lines across \d+ public files/, "a clean run says nothing about its sample size");
+});
+
+// ── Data spans: a task's own filename is not prose (TL-137) ──────────────
+
+test("a Polish filename inside a markdown link's target is not flagged", () => {
+  // TL-137 deliberately did not rename any file, so every cross-reference
+  // between tasks carries a Polish slug in its link target forever. The link
+  // TEXT is still checked — only the `(...)` target is exempt.
+  const line =
+    "See [TL-97](../backlog/tasks/TL-97-pole-role-taska-wymog-roli-ze-slownika-konfiguracji.md) for the field.";
+  assert.deepEqual(auditText(line), []);
+});
+
+test("a Polish filename inside an inline code span is not flagged", () => {
+  const line = "Referenced as `backlog/tasks/TL-97-pole-role-taska-wymog-roli-ze-slownika-konfiguracji.md`.";
+  assert.deepEqual(auditText(line), []);
+});
+
+test("the link TEXT is still checked even though the target is exempt", () => {
+  // Stripping the `(...)` target must not accidentally swallow prose that
+  // sits outside it on the same line.
+  const found = auditText("Zobacz [ten task](TL-97-pole-role-taska.md) dla szczegółów.");   // language-guard: allow
+  assert.ok(found.length >= 1, "Polish prose next to an exempt link target should still be caught");
+});
+
+test("Polish prose is still caught even on a line that also has a code span", () => {
+  const found = auditText("// plik nie jest widokiem, patrz `config.yaml`");   // language-guard: allow
+  assert.equal(found.length, 1);
+});
+
+// ── Positive control: a planted Polish task file MUST be reported ────────
+
+test("a Polish task file under backlog/tasks/ in the real PUBLIC_PATHS shape is caught", () => {
+  // A guard that passes on an empty sample is green with no evidentiary
+  // force (CLAUDE.md). This plants a fixture in a throwaway root that has
+  // the same shape auditTree() walks — a `backlog/tasks/*.md` file — and
+  // asserts the walk actually finds and flags it.
+  const dir = mkdtempSync(join(tmpdir(), "worktrail-lang-guard-"));
+  try {
+    mkdirSync(join(dir, "backlog", "tasks"), { recursive: true });
+    writeFileSync(
+      join(dir, "backlog", "tasks", "TL-9999-fixture.md"),
+      // language-guard: allow — deliberately Polish, the fixture this positive control plants
+      "---\nid: TL-9999\ntitle: \"Fixture\"\n---\n\n## Context\n\nTen plik nie jest przetłumaczony na angielski.\n"
+    );
+    const { findings } = auditTree(dir);
+    assert.ok(
+      findings.some((f) => f.file.includes("TL-9999-fixture.md")),
+      "a planted Polish task file under backlog/tasks/ was not caught — the guard is not actually watching that directory"
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a Polish doc file under docs/ in the real PUBLIC_PATHS shape is caught", () => {
+  const dir = mkdtempSync(join(tmpdir(), "worktrail-lang-guard-"));
+  try {
+    mkdirSync(join(dir, "docs"), { recursive: true });
+    // language-guard: allow — deliberately Polish, the fixture this positive control plants
+    writeFileSync(join(dir, "docs", "fixture.md"), "# Fikstura\n\nTen plik nie jest przetłumaczony.\n");
+    const { findings } = auditTree(dir);
+    assert.ok(
+      findings.some((f) => f.file.includes("fixture.md")),
+      "a planted Polish doc file under docs/ was not caught — the guard is not actually watching that directory"
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("backlog/history/*.jsonl stays invisible to the guard even once backlog/ is covered", () => {
+  // The append-only log is protected by file EXTENSION (walk() only collects
+  // .mjs/.js/.md), not by a special case carved out of PUBLIC_PATHS — this
+  // proves that holds even with a Polish `reason` field in a real .jsonl.
+  const dir = mkdtempSync(join(tmpdir(), "worktrail-lang-guard-"));
+  try {
+    mkdirSync(join(dir, "backlog", "history"), { recursive: true });
+    writeFileSync(
+      join(dir, "backlog", "history", "TL-1.jsonl"),
+      '{"id":"1","task":"TL-1","field":"status","from":"pending","to":"blocked","reason":"czeka na inny task"}\n'
+    );
+    const { findings } = auditTree(dir);
+    assert.deepEqual(findings, [], "a .jsonl history entry should never be walked by this guard");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

@@ -1,10 +1,10 @@
 ---
 id: TL-32
-title: "Angielska powierzchnia publiczna modułu"
+title: "English public surface of the module"
 type: code
 labels: [post-launch]
 board: main
-epic: "Backlog — publikacja open source"
+epic: "Backlog — open source publication"
 priority: P3
 status: done
 owner: agent:claude
@@ -24,105 +24,234 @@ verification:
   - bash: "node --test scripts/tests/public-language.test.mjs"
 ---
 
-## Cel
+## Goal
 
-Doprowadzić **publiczną powierzchnię** modułu `backlog/` do angielskiego, zanim wyjdzie on jako open source: README, komunikaty CLI, komentarze w kodzie i chrome viewera. Dziś narzędzie, które ma trafić do cudzych repozytoriów, mówi do użytkownika po polsku.
+Bring the **public surface** of the `backlog/` module up to English before it
+ships as open source: README, CLI messages, code comments and the viewer
+chrome. Today the tool, which is meant to land in other people's
+repositories, speaks to the user in Polish.
 
-## Kontekst
+## Context
 
-Moduł jest projektowany na publikację ([TL-20](TL-20-domknij-nazwe-narzedzia-przed-publikacja.md) domyka nazwę, [backlog-config-and-portability.md](../../docs/backlog-config-and-portability.md) rozdzielił kod od danych the origin project), ale jego język pozostał wewnętrzny. Rozmiar roboty zmierzony 2026-08-30:
+The module is designed for publication ([TL-20](TL-20-domknij-nazwe-narzedzia-przed-publikacja.md)
+settles the name, [backlog-config-and-portability.md](../../docs/backlog-config-and-portability.md)
+separated the code from the origin project's data), but its language has stayed internal.
+Size of the work, measured 2026-08-30:
 
-| Powierzchnia | Polskich linii | Uwaga |
+| Surface | Polish lines | Note |
 |---|---|---|
-| `scripts/*.mjs` — komentarze | **667** | już dziś łamie regułę CLAUDE.md „kod, komentarze: ZAWSZE po angielsku" — to dług, nie nowa praca |
-| `scripts/*.mjs` — stringi i komunikaty | **350** | błędy walidacji, teksty CLI, opisy flag |
-| `README.md` | 415 / 851 | główny dokument, który zobaczy obcy użytkownik |
-| `build-viewer.mjs` | 352 | ŹRÓDŁO chrome'u viewera |
-| `config.yaml` / `boards.yaml` / `_template.md` / `.gitignore` | 36 / 20 / 28 / 9 | komentarze objaśniające, czytane przy adopcji |
+| `scripts/*.mjs` — comments | **667** | already breaks the CLAUDE.md rule "code, comments: ALWAYS in English" today — this is debt, not new work |
+| `scripts/*.mjs` — strings and messages | **350** | validation errors, CLI text, flag descriptions |
+| `README.md` | 415 / 851 | the main document a stranger will see |
+| `build-viewer.mjs` | 352 | SOURCE of the viewer chrome |
+| `config.yaml` / `boards.yaml` / `_template.md` / `.gitignore` | 36 / 20 / 28 / 9 | explanatory comments, read at adoption time |
 
-**Dobra wiadomość z pomiaru: słownik danych jest już angielski.** `DEFAULTS` w `config.mjs` trzyma `pending`, `in_progress`, `P0`, `unassigned`, `30m` — wartości, nie etykiety PL. Nie ma więc migracji danych ani przenumerowania statusów; polszczyzna siedzi wyłącznie w prozie wokół nich.
+**Good news from the measurement: the data vocabulary is already English.**
+`DEFAULTS` in `config.mjs` holds `pending`, `in_progress`, `P0`, `unassigned`,
+`30m` — values, not PL labels. So there is no data migration and no status
+renumbering; the Polish sits only in the prose around them.
 
-**Zła wiadomość: te komentarze są nietypowo wartościowe.** Bloki `PO CO` / `DLACZEGO` w `cli.mjs`, `config.mjs`, `.gitignore` czy `history.mjs` niosą zmierzone uzasadnienia decyzji (np. dlaczego widoki nie są wersjonowane, dlaczego nieznany klucz oblewa). Tłumaczenie hurtem prawie na pewno je skróci — i to jest główne ryzyko tego taska, większe niż sam wolumen. Utrata tych akapitów byłaby cichą stratą wiedzy, której nikt później nie odtworzy.
+**Bad news: those comments are unusually valuable.** The `PO CO` / `DLACZEGO`
+(WHY) blocks in `cli.mjs`, `config.mjs`, `.gitignore` and `history.mjs` carry
+measured justifications for decisions (e.g. why views are not versioned, why
+an unknown key fails). Translating in bulk would almost certainly shorten
+them — and that is the main risk of this task, bigger than the volume itself.
+Losing those paragraphs would be a silent loss of knowledge that nobody would
+later reconstruct.
 
 ## Pre-flight reading
 
-1. `backlog/README.md` — najpierw przeczytaj w całości; to on definiuje, co moduł obiecuje.
-2. `backlog/scripts/build-viewer.mjs` — **viewer.html jest GENEROWANY i gitignored** (`<html lang="pl">` pochodzi stąd). Tłumaczenie `viewer.html` wprost przepadnie przy najbliższym buildzie.
-3. `backlog/scripts/config.mjs` §DEFAULTS — potwierdzenie, że słownik jest już EN.
-4. `docs/architecture/backlog-config-and-portability.md` — granica „kod zna kształt, konfiguracja zna wartości". Ta sama granica dzieli język: **kod i DEFAULTS = EN zawsze; `config.yaml` tego repo może zostać PL**, bo to dane projektu the origin project, nie kod narzędzia.
+1. `backlog/README.md` — read it in full first; it defines what the module
+   promises.
+2. `backlog/scripts/build-viewer.mjs` — **viewer.html is GENERATED and
+   gitignored** (`<html lang="pl">` comes from here). Translating
+   `viewer.html` directly would be lost at the next build.
+3. `backlog/scripts/config.mjs` §DEFAULTS — confirmation that the vocabulary
+   is already EN.
+4. `docs/architecture/backlog-config-and-portability.md` — the boundary "code
+   knows the shape, configuration knows the values". The same boundary splits
+   the language: **code and DEFAULTS = EN always; this repo's
+   `config.yaml` may stay PL**, because that is the origin project's project data, not the
+   tool's code.
 
-## Decyzje do utrzymania
+## Decisions to uphold
 
-**1. Twarde przełączenie na EN, nie i18n.** Warstwa tłumaczeń podwaja utrzymanie dla jednoosobowego zespołu i wymaga infrastruktury (katalogi, fallbacki, testy per locale) przy zerowym dziś popycie. Jeśli kiedyś pojawi się zapotrzebowanie, wraca jako osobny task — z użytkownikiem, który go zamówił.
+**1. A hard switch to EN, not i18n.** A translation layer doubles maintenance
+for a one-person team and needs infrastructure (directories, fallbacks,
+per-locale tests) with zero demand today. If demand ever appears, it comes
+back as a separate task — with the user who requested it.
 
-**2. `backlog/README.md` staje się angielski i to jest ŚWIADOMY wyjątek od reguły workspace'u.** CLAUDE.md mówi „dokumentacja po polsku"; ten plik jest jednak powierzchnią publiczną narzędzia, nie dokumentacją the origin project. Wyjątek musi zostać zapisany **w CLAUDE.md i w samym README**, inaczej pierwszy agent, który zobaczy angielski README w polskim repo, „naprawi" go z powrotem.
+**2. `backlog/README.md` becomes English and this is a DELIBERATE exception
+to the workspace rule.** CLAUDE.md says "documentation in Polish"; this file,
+however, is the tool's public surface, not the origin project's documentation. The
+exception must be recorded **in CLAUDE.md and in the README itself**,
+otherwise the first agent to see an English README in a Polish repo will
+"fix" it back.
 
-**3. `docs/architecture/*` i `backlog/tasks/*` zostają po polsku.** To dokumentacja the origin project i nie wyjeżdża z modułem. Granica jest po katalogu, nie po temacie.
+**3. `docs/architecture/*` and `backlog/tasks/*` stay in Polish.** This is
+the origin project's documentation and does not leave with the module. The boundary runs
+along the directory, not the topic.
 
-**4. Tłumaczenie zachowuje rozumowanie, nie streszcza go.** Blok `PO CO` ma zostać blokiem `WHY`, nie jednym zdaniem. Akapit z liczbą (np. „78% commitów dotykało widoków") ma zachować liczbę.
+**4. Translation preserves the reasoning, it does not summarize it.** A `PO
+CO` (WHY) block is to become a `WHY` block, not a single sentence. A
+paragraph with a number (e.g. "78% of commits touched views") is to keep the
+number.
 
-## Kroki
+## Steps
 
-1. ~~`README.md` → EN~~ — **ZROBIONE w [TL-49](TL-49-readme-w-tarballu-to-dokument-cudzego-projektu.md) (2026-08-31).** README został przy okazji napisany od zera, więc tłumaczenia nie ma czego dotyczyć. Nota o granicy językowej stoi w nim i w CLAUDE.md § Konwencje. **Zostaje jedno zadanie na tej powierzchni:** wrócić do README z blokami DOSŁOWNEGO wyjścia CLI, gdy krok 3 przetłumaczy komunikaty — dziś ich tam nie ma, bo angielski dokument nie może cytować polskiego terminala.
-2. `scripts/*.mjs` — komentarze (667 linii), plik po pliku, nie hurtem. Kolejność od najczęściej czytanych: `cli.mjs`, `config.mjs`, `history.mjs`, `build-backlog.mjs`, `task-fields.mjs`, reszta.
-3. `scripts/*.mjs` — komunikaty i stringi (350). Komunikat błędu ma zostać **diagnozą, nie etykietą**: obecne teksty mówią, co się rozjedzie i co zrobić — ta własność ma przetrwać tłumaczenie.
-4. `build-viewer.mjs` — chrome viewera + `<html lang="en">`. **Nie dotykać `viewer.html`.**
-5. `_template.md` — nagłówki sekcji i podpowiedzi → EN (to szablon, który obcy użytkownik kopiuje przy każdym tasku).
-6. `boards.yaml` / `.gitignore` / `config.mjs` DEFAULTS-komentarze → EN.
-7. `config.yaml` **zostaje PL** — to dane tego repo. Dopisać w nim jedno zdanie mówiące, że wartości są konfiguracją projektu, a język kodu narzędzia jest EN.
-8. Zapisać wyjątek z decyzji 2 w `CLAUDE.md` (sekcja „Konwencje").
-9. Guard: `check-public-surface-language.mjs` — oblewa, gdy w `backlog/scripts/`, `backlog/README.md` lub `backlog/_template.md` pojawi się polski znak diakrytyczny. Wpiąć do `worktrail check`, żeby regresja językowa nie wróciła cicho przy następnej zmianie.
+1. ~~`README.md` → EN~~ — **DONE in [TL-49](TL-49-readme-w-tarballu-to-dokument-cudzego-projektu.md)
+   (2026-08-31).** The README was rewritten from scratch along the way, so
+   there is nothing left to translate. The note on the language boundary
+   stands in it and in CLAUDE.md § Conventions. **One task remains on this
+   surface:** come back to the README with blocks of LITERAL CLI output once
+   step 3 translates the messages — they are not there today, because an
+   English document cannot quote a Polish terminal.
+2. `scripts/*.mjs` — comments (667 lines), file by file, not in bulk. Order
+   by how often each is read: `cli.mjs`, `config.mjs`, `history.mjs`,
+   `build-backlog.mjs`, `task-fields.mjs`, the rest.
+3. `scripts/*.mjs` — messages and strings (350). An error message is to
+   become **a diagnosis, not a label**: the current texts say what will go
+   wrong and what to do about it — that property is to survive translation.
+4. `build-viewer.mjs` — viewer chrome + `<html lang="en">`. **Do not touch
+   `viewer.html`.**
+5. `_template.md` — section headings and hints → EN (this is the template a
+   stranger copies for every task).
+6. `boards.yaml` / `.gitignore` / `config.mjs` DEFAULTS comments → EN.
+7. `config.yaml` **stays PL** — this is this repo's data. Add one sentence in
+   it saying that the values are project configuration, while the tool's
+   code language is EN.
+8. Record the exception from decision 2 in `CLAUDE.md` (§ "Conventions").
+9. Guard: `check-public-surface-language.mjs` — fails when a Polish
+   diacritic appears in `backlog/scripts/`, `backlog/README.md` or
+   `backlog/_template.md`. Wire it into `worktrail check` so a language
+   regression cannot silently come back on the next change.
 
 ## Acceptance criteria
 
-- [x] Powierzchnia publiczna (`scripts/`, `bin/`, `README.md`, `_template.md`) przechodzi guard językowy.
-- [x] `viewer.html` po przebudowie ma `<html lang="en">` i angielskie etykiety — zmiana siedzi w `build-viewer.mjs:311`, nie w wygenerowanym pliku.
-- [x] Żaden plik nie stracił więcej niż 20% linii komentarza — liczby przed/po w `## Log`.
-- [x] Bloki `PO CO` / `DLACZEGO` mają odpowiedniki `WHY` i zachowały odwołania do numerów tasków. Liczby będące POMIARAMI cudzego repozytorium zostały świadomie zamienione na mechanizm plus komendę do zmierzenia własnego drzewa — reguła TL-37, ta sama, którą stosował TL-49 (szczegóły w ## Log).
-- [x] Komunikaty błędów nadal mówią, **co się rozjedzie i co zrobić** — sprawdzone realnymi uruchomieniami `check`, `doctor`, `new`, `query`, `migrate-prefix`, `init`.
-- [x] `backlog/config.yaml` pozostał PL i ma nagłówek mówiący, gdzie biegnie granica językowa.
-- [x] Wyjątek „README modułu po angielsku" zapisany w CLAUDE.md. (TL-49, 2026-08-31)
-- [x] Guard językowy wpięty w `worktrail check` (osobno `check --language`); kontrola negatywna wykonana na żywo — wstawiona polska linia w `scripts/estimate.mjs` dała exit 1.
-- [x] Wszystkie testy przechodzą: `node --test scripts/tests/*.test.mjs` — 351/351.
+- [x] The public surface (`scripts/`, `bin/`, `README.md`, `_template.md`)
+  passes the language guard.
+- [x] After a rebuild, `viewer.html` has `<html lang="en">` and English
+  labels — the change sits in `build-viewer.mjs:311`, not in the generated
+  file.
+- [x] No file lost more than 20% of its comment lines — before/after counts
+  in `## Log`.
+- [x] `PO CO` / `DLACZEGO` (WHY) blocks have `WHY` counterparts and kept
+  their references to task numbers. Numbers that were MEASUREMENTS of
+  someone else's repository were deliberately replaced with a mechanism plus
+  a command to measure one's own tree — the TL-37 rule, the same one TL-49
+  applied (details in `## Log`).
+- [x] Error messages still say **what will go wrong and what to do about
+  it** — checked with real runs of `check`, `doctor`, `new`, `query`,
+  `migrate-prefix`, `init`.
+- [x] `backlog/config.yaml` stayed PL and has a header stating where the
+  language boundary runs.
+- [x] The "module README in English" exception is recorded in CLAUDE.md.
+  (TL-49, 2026-08-31)
+- [x] The language guard is wired into `worktrail check` (separately as
+  `check --language`); a negative control was run live — inserting a Polish
+  line into `scripts/estimate.mjs` produced exit 1.
+- [x] All tests pass: `node --test scripts/tests/*.test.mjs` — 351/351.
 
 ## Verification
 
 ```bash
-# 1. Brak polszczyzny na powierzchni publicznej — expected: komunikat OK
+# 1. No Polish on the public surface — expected: OK message (language-guard: allow — its own alphabet)
 test -z "$(grep -rlE '[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]' backlog/scripts backlog/README.md backlog/_template.md)" \
-  && echo 'powierzchnia publiczna bez polszczyzny — OK'
+  && echo 'public surface without Polish — OK'
 
-# 2. Viewer generowany po angielsku — expected: "viewer lang=en — OK"
+# 2. Viewer generated in English — expected: "viewer lang=en — OK"
 node backlog/scripts/build-viewer.mjs && grep -q '<html lang="en"' backlog/viewer.html \
   && echo 'viewer lang=en — OK'
 
-# 3. Guard językowy faktycznie oblewa — expected: kod wyjścia != 0
-printf '\n// polski komentarz kontrolny\n' >> backlog/scripts/estimate.mjs
-node backlog/scripts/cli.mjs check; test $? -ne 0 && echo 'guard łapie regresję — OK'
+# 3. Language guard actually fails — expected: exit code != 0
+printf '\n// Polish control comment\n' >> backlog/scripts/estimate.mjs
+node backlog/scripts/cli.mjs check; test $? -ne 0 && echo 'guard catches the regression — OK'
 git checkout backlog/scripts/estimate.mjs
 
-# 4. Testy modułu — expected: wszystkie pass
+# 4. Module tests — expected: all pass
 node --test backlog/scripts/tests/*.test.mjs
 
-# 5. Guardy repo nadal zielone
+# 5. Repo guards still green
 node backlog/scripts/cli.mjs check
 ```
 
 ## Notes
 
-- **Kolejność wobec TL-20:** ten task nie zależy od nazwy — teksty można pisać z placeholderem nazwy i podmienić go jednym `sed`, gdy TL-20 się domknie. Oba są blokerami publikacji, żaden nie blokuje drugiego.
-- **Epic `Backlog — publikacja open source` jest nowy.** [TL-20](TL-20-domknij-nazwe-narzedzia-przed-publikacja.md) siedzi dziś w epiku „Backlog viewer", co jest reliktem — pasuje tutaj, ale jest własnością foundera, więc nie przepinam go bez decyzji.
-- **Czego świadomie NIE robimy:** i18n (decyzja 1), tłumaczenia `docs/architecture/*` i `backlog/tasks/*` (decyzja 3), tłumaczenia treści tasków the origin project — one jadą z produktem, nie z narzędziem.
-- Największe ryzyko to nie wolumen, tylko **ciche streszczenie 667 linii uzasadnień**. Stąd kryterium na 20% i wymóg pliku po pliku.
+- **Order relative to TL-20:** this task does not depend on the name — the
+  texts can be written with a name placeholder and swapped with one `sed`
+  once TL-20 closes. Both are publication blockers, neither blocks the
+  other.
+- **The `Backlog — open source publication` epic is new.** [TL-20](TL-20-domknij-nazwe-narzedzia-przed-publikacja.md)
+  currently sits in the "Backlog viewer" epic, which is a relic — it fits
+  here, but it is the founder's call, so I am not re-assigning it without a
+  decision.
+- **What we deliberately do NOT do:** i18n (decision 1), translating
+  `docs/architecture/*` and `backlog/tasks/*` (decision 3), translating the
+  content of the origin project's tasks — those ship with the product, not with the tool.
+- The biggest risk is not the volume, it is **silently summarizing 667 lines
+  of justifications.** Hence the 20% criterion and the file-by-file
+  requirement.
 
 ## Log
 
-- 2026-08-30 created — claude — wydzielone z §9 [backlog-time-tracking.md](../../docs/backlog-time-tracking.md); rozmiar zmierzony przed opisem (667 komentarzy + 350 stringów + 415 linii README), słownik `DEFAULTS` potwierdzony jako już angielski
-- 2026-08-31 pending — agent:claude — krok 1 (README → EN) zdjęty: wykonany w TL-49, gdzie README i tak był przepisywany od zera z powodu cudzego kontekstu — tłumaczenie starego tekstu byłoby pracą do wyrzucenia. Wyjątek językowy zapisany w CLAUDE.md § Konwencje (krok 8). Do przeliczenia przed startem: liczby w ## Kontekst pochodzą sprzed wydzielenia repo i mówią o `backlog/scripts/`, a kod leży dziś w `scripts/`; ścieżki w ## Verification wymagają tej samej poprawki. Zakres, który został: komentarze i stringi w `scripts/`, chrome viewera, `_template.md`, guard językowy.
-- 2026-08-31 done — agent:claude — cała powierzchnia publiczna przetłumaczona jednym przebiegiem, plik po pliku. ZAKRES: 27 modułów w `scripts/` (komunikaty, `--help`, komentarze), chrome viewera w `build-viewer.mjs` wraz z `<html lang="en">`, `_template.md`, szablony pisane przez `init` (config.yaml, boards.yaml, .gitignore, .gitattributes, przykładowy task) oraz 27 plików testów — te ostatnie musiały wejść, bo asercje sprawdzały treść komunikatów, a CLAUDE.md i tak wymaga angielskich opisów testów.
-- 2026-08-31 done — agent:claude — KRYTERIUM 20% NA KOMENTARZACH: 2372 linie komentarza przed, 2483 po (+4.7%); największy spadek w pojedynczym pliku to 0.0%. Angielski wymagał WIĘCEJ linii, nie mniej — ryzyko „cichego streszczenia", które ten task nazywał największym, nie zmaterializowało się. Pomiar z baseline'u zdjętego przed pierwszą edycją.
-- 2026-08-31 done — agent:claude — ODSTĘPSTWO OD KRYTERIUM „zachowaj liczby": liczby będące POMIARAMI cudzego repozytorium („337 tasków", „1339 tasków", „93 aktywne P0/P1", „78% commitów", „~17k tokenów") zostały zamienione na mechanizm plus komendę do zmierzenia własnego drzewa. Powód: to jest reguła TL-37 i §3 skilla worktrail-release — liczba z repozytorium, do którego czytelnik nie ma dostępu, nie jest dowodem, tylko prośbą o zaufanie, i przy okazji wynosi na zewnątrz informację o tamtym projekcie. Liczby będące własnością TEGO kodu (BL-1417, „8 z 12 komend", 149 KB jako opis defektu) zostały.
-- 2026-08-31 done — agent:claude — GUARD (krok 9): `scripts/check-public-language.mjs`, wpięty w `worktrail check` i osobno jako `check --language`. Dwa sygnały, nie jeden: diakrytyki ORAZ lista słów-stopów, bo `grep -rE '[ąćęłńóśźż]'` przepuszcza `nie`, `jest`, `przez`, `plik` — to jest połowa polszczyzny w tym drzewie i dokładnie ta połowa, którą znalazłem dopiero drugim przebiegiem. Wyjątek oznacza się per LINIA (`language-guard: allow`), nie per plik. Test: `scripts/tests/public-language.test.mjs`, 10 asercji, w tym kontrole negatywne i sprawdzenie, że guard NIE krzyczy na zwykłą angielszczyznę.
-- 2026-08-31 done — agent:claude — czego świadomie NIE ruszono: `docs/` (5 dokumentów), `backlog/tasks/` i `backlog/config.yaml`. To dokumentacja i DANE tego repozytorium, nie kod narzędzia; guard ich nie czyta. Granica biegnie po katalogu i jest zapisana w trzech miejscach: CLAUDE.md § Konwencje, nagłówek `backlog/config.yaml` i nagłówek samego guardu.
-- 2026-08-31 done — agent:claude — weryfikacja: `node scripts/check-public-language.mjs` (18177 linii w 62 plikach), `worktrail check` zielone, viewer `<html lang="en">` z generatora, 351/351 testów. Kontrola negatywna guardu wykonana na żywo.
-- 2026-09-01 done — agent:claude — z gałęzi `claude/backlog-md-analysis-63830a` przyszło podniesienie P3→P1 („angielska powierzchnia publiczna to warunek wejścia na rynek, nie kosmetyka jednego modułu") wraz z powrotem na `pending`. ODRZUCONE przy merge'u: ta gałąź odbiła się przed c302564 i nie wiedziała, że zakres jest już wykonany. Argument został — jest słuszny i zapisany tutaj — ale nie zmienia stanu taska, który jest zamknięty.
+- 2026-08-30 created — claude — split out of §9 [backlog-time-tracking.md](../../docs/backlog-time-tracking.md);
+  size measured before the description (667 comments + 350 strings + 415
+  README lines), the `DEFAULTS` vocabulary confirmed already English
+- 2026-08-31 pending — agent:claude — step 1 (README → EN) dropped: done in
+  TL-49, where the README was rewritten from scratch anyway because of a
+  stranger's context — translating the old text would have been throwaway
+  work. The language exception recorded in CLAUDE.md § Conventions (step 8).
+  To be recalculated before starting: the numbers in ## Context predate the
+  repo split and speak of `backlog/scripts/`, while the code now lives in
+  `scripts/`; the paths in ## Verification need the same fix. Remaining
+  scope: comments and strings in `scripts/`, the viewer chrome,
+  `_template.md`, the language guard.
+- 2026-08-31 done — agent:claude — the whole public surface translated in
+  one pass, file by file. SCOPE: 27 modules in `scripts/` (messages,
+  `--help`, comments), the viewer chrome in `build-viewer.mjs` including
+  `<html lang="en">`, `_template.md`, the templates written by `init`
+  (config.yaml, boards.yaml, .gitignore, .gitattributes, sample task), and
+  27 test files — the latter had to be included because the assertions
+  checked message content, and CLAUDE.md requires English test descriptions
+  anyway.
+- 2026-08-31 done — agent:claude — 20% CRITERION ON COMMENTS: 2372 comment
+  lines before, 2483 after (+4.7%); the largest drop in a single file is
+  0.0%. English required MORE lines, not fewer — the "silent summarizing"
+  risk this task named as the biggest did not materialize. Measurement from
+  a baseline taken before the first edit.
+- 2026-08-31 done — agent:claude — DEPARTURE FROM THE "preserve numbers"
+  CRITERION: numbers that were MEASUREMENTS of someone else's repository
+  ("337 tasks", "1339 tasks", "93 active P0/P1", "78% of commits", "~17k
+  tokens") were replaced with a mechanism plus a command to measure one's
+  own tree. Reason: this is the TL-37 rule and §3 of the worktrail-release
+  skill — a number from a repository the reader has no access to is not
+  evidence, it is a request for trust, and it also leaks information about
+  that other project on the way out. Numbers that are the property of THIS
+  code (BL-1417, "8 of 12 commands", 149 KB as a defect description) stayed.
+- 2026-08-31 done — agent:claude — GUARD (step 9): `scripts/check-public-language.mjs`,
+  wired into `worktrail check` and separately as `check --language`. Two
+  signals, not one: diacritics AND a stop-word list, because
+  `grep -rE '[ąćęłńóśźż]'` lets through `nie`, `jest`, `przez`, `plik` — that
+  is half the Polish in this tree, and exactly the half I only found on the
+  second pass. The exception is marked per LINE (`language-guard: allow`),
+  not per file. Test: `scripts/tests/public-language.test.mjs`, 10
+  assertions, including negative controls and a check that the guard does
+  NOT flag ordinary English.
+- 2026-08-31 done — agent:claude — what was deliberately NOT touched:
+  `docs/` (5 documents), `backlog/tasks/` and `backlog/config.yaml`. This is
+  this repository's documentation and DATA, not the tool's code; the guard
+  does not read them. The boundary runs along the directory and is recorded
+  in three places: CLAUDE.md § Conventions, the header of
+  `backlog/config.yaml`, and the header of the guard itself.
+- 2026-08-31 done — agent:claude — verification: `node scripts/check-public-language.mjs`
+  (18177 lines across 62 files), `worktrail check` green, viewer
+  `<html lang="en">` from the generator, 351/351 tests. The guard's negative
+  control was run live.
+- 2026-09-01 done — agent:claude — from the `claude/backlog-md-analysis-63830a`
+  branch came a bump from P3→P1 ("an English public surface is a market
+  entry requirement, not cosmetics on one module") together with a reset to
+  `pending`. REJECTED at merge time: that branch forked before c302564 and
+  did not know the scope was already done. The argument stands — it is
+  correct and recorded here — but it does not change the state of a task
+  that is closed.
+</content>

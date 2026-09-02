@@ -1,10 +1,10 @@
 ---
 id: TL-41
-title: "Wiszące blocked_by nie oblewa żadnej bramki"
+title: "A dangling blocked_by fails no gate"
 type: code
 labels: []
 board: main
-epic: "Integralność danych"
+epic: "Data integrity"
 priority: P1
 status: done
 owner: claude
@@ -19,74 +19,75 @@ verification:
   - bash: "node --test scripts/tests/dangling-refs.test.mjs"
 ---
 
-## Cel
+## Goal
 
-`blocked_by`/`blocks` wskazujące na task, którego nie ma, mają **oblewać**.
-Dziś przechodzą przez `build` i `check` bez słowa.
+`blocked_by`/`blocks` pointing at a task that does not exist must **fail**.
+Today it passes through `build` and `check` without a word.
 
-## Kontekst
+## Context
 
-Zmierzone 2026-08-30, na żywym przypadku. Po usunięciu z tego repozytorium
-tasków należących do konsumenta, `TL-37` został z `blocked_by: [BL-1445]`
-wskazującym na plik, który już nie istnieje. `worktrail build` i `worktrail check`
-były **zielone**:
+Measured on 2026-08-30, on a live case. After removing the consumer's tasks
+from this repository, `TL-37` was left with `blocked_by: [BL-1445]` pointing
+at a file that no longer exists. `worktrail build` and `worktrail check` were
+**green**:
 
 ```
-✓ backlog wygenerowany: 40 tasków → 11 aktywnych
-✓ backlog: 40 tasków, każdy BL-NNN użyty raz
-✓ backlog: 40 task(ów) sprawdzonych, każdy z boardem z rejestru
+✓ backlog generated: 40 tasks → 11 active
+✓ backlog: 40 tasks, each BL-NNN used once
+✓ backlog: 40 task(s) checked, each with a board from the registry
 ```
 
-**Dlaczego to boli bardziej niż literówka.** `blocked_by` steruje kolejnością
-pracy — to pole, po którym narzędzie odpowiada „czy mogę to wziąć". Wiszące
-odwołanie daje task, który **na zawsze wygląda na zablokowany przez nic**. Nie
-ma sygnału, że coś jest nie tak; jest sygnał, że trzeba czekać.
+**Why this hurts more than a typo.** `blocked_by` drives the order of work —
+it is the field the tool consults to answer "can I take this". A dangling
+reference produces a task that **forever looks blocked by nothing**. There is
+no signal that something is wrong; there is a signal to wait.
 
-**To ta sama klasa, którą zamykały guardy kolizji ID i boardów:** detektor,
-który nie ma jak oblać, jest ostrzeżeniem, nie zabezpieczeniem. Tyle że tutaj
-nie ma nawet ostrzeżenia.
+**This is the same class that the ID-collision and board guards closed:** a
+detector that has no way to fail is a warning, not a safeguard. Except here
+there is not even a warning.
 
-**Skąd wzięło się wiszące odwołanie** — nie z literówki, tylko z **usunięcia
-taska**. To będzie się powtarzać: każdy podział backlogu, archiwizacja z
-kasowaniem albo przeniesienie taska do innego repozytorium produkuje tę samą
-sytuację.
+**Where the dangling reference came from** — not a typo, but **deleting a
+task**. This will recur: every backlog split, archival with deletion, or
+moving a task to another repository produces the same situation.
 
 ## Pre-flight reading
 
-1. `scripts/build-backlog.mjs` — czyta całe drzewo, więc zna zbiór istniejących
-   ID; to jest naturalne miejsce na sprawdzenie.
-2. `scripts/check-backlog-id-collisions.mjs` — wzór guardu, który sądzi ZBIÓR, i
-   jego komunikat (mówi, co zrobić, nie tylko że źle).
-3. `scripts/cli.mjs` — `parseCheckArgs`; nowy selektor idzie tą samą konwencją
-   co `--id-collisions` i `--boards`.
+1. `scripts/build-backlog.mjs` — reads the whole tree, so it knows the set of
+   existing IDs; this is the natural place for the check.
+2. `scripts/check-backlog-id-collisions.mjs` — the pattern for a guard that
+   judges a SET, and its message (it says what to do, not just that something
+   is wrong).
+3. `scripts/cli.mjs` — `parseCheckArgs`; the new selector follows the same
+   convention as `--id-collisions` and `--boards`.
 
-## Kroki
+## Steps
 
-1. Red-first: fixture z taskiem, którego `blocked_by` wskazuje na nieistniejący
-   numer. Ma oblać.
-2. Rozstrzygnąć zakres: `blocked_by` i `blocks` — oba. Sprawdzić, czy istnieją
-   inne pola nawiązujące do ID (`related_docs` bywa ścieżką, nie ID).
-3. Rozstrzygnąć **taski zarchiwizowane**: odwołanie do taska `done` jest
-   POPRAWNE (blocker spełniony), odwołanie do NIEISTNIEJĄCEGO nie. Nie zlewać
-   tych dwóch przypadków — to różnica między „zrobione" a „zgubione".
-4. Rozstrzygnąć **odwołania cross-repo**: po podziale backlogu istnieje forma
-   `<repo>#BL-NNNN` (użyta w `LINEAGE.md`). Guard ma ją przepuszczać jako
-   świadomie zewnętrzną, a nie oblewać — inaczej wymusi kłamstwo w danych.
-5. Wystawić jako `check --refs`, dołożyć do domyślnego `check`.
+1. Red-first: a fixture with a task whose `blocked_by` points at a nonexistent
+   number. It must fail.
+2. Settle the scope: `blocked_by` and `blocks` — both. Check whether other
+   fields reference IDs (`related_docs` is sometimes a path, not an ID).
+3. Settle **archived tasks**: a reference to a `done` task is CORRECT (the
+   blocker was satisfied), a reference to a NONEXISTENT one is not. Do not
+   conflate the two cases — that is the difference between "done" and "lost".
+4. Settle **cross-repo references**: after a backlog split, the form
+   `<repo>#BL-NNNN` exists (used in `LINEAGE.md`). The guard should let it
+   through as deliberately external, not fail it — otherwise it would force a
+   lie into the data.
+5. Expose as `check --refs`, add to the default `check`.
 
 ## Acceptance criteria
 
-- [x] `blocked_by` na nieistniejący numer **oblewa** — test red-first.
-- [x] `blocks` sprawdzane tym samym przebiegiem.
-- [x] Odwołanie do taska `done`/`cancelled` **przechodzi** — test negatywny,
-      inaczej guard zmusza do kasowania prawdziwej historii zależności.
-- [x] ~~Odwołanie w formie `<repo>#BL-NNNN` przechodzi i jest rozpoznane jako
-      zewnętrzne~~ → **rozstrzygnięte ODWROTNIE: takie odwołanie OBLEWA**, z
-      komunikatem mówiącym, gdzie je zapisać. Powód w `## Log`.
-- [x] Komunikat mówi, KTÓRY task wskazuje na CO i co z tym zrobić.
-- [x] `check --refs` działa osobno i jest częścią domyślnego `check`.
-- [x] Realne drzewo tego repozytorium przechodzi — z kontrolą pozytywną, że
-      guard w ogóle coś sprawdził (liczba zweryfikowanych odwołań > 0).
+- [x] `blocked_by` pointing at a nonexistent number **fails** — red-first test.
+- [x] `blocks` checked in the same pass.
+- [x] A reference to a `done`/`cancelled` task **passes** — negative test,
+      otherwise the guard would force deleting real dependency history.
+- [x] ~~A reference in the form `<repo>#BL-NNNN` passes and is recognized as
+      external~~ → **resolved the OPPOSITE way: such a reference FAILS**, with
+      a message saying where to record it instead. Reason in `## Log`.
+- [x] The message says WHICH task points at WHAT and what to do about it.
+- [x] `check --refs` works standalone and is part of the default `check`.
+- [x] The real tree of this repository passes — with a positive control that
+      the guard actually checked something (number of references checked > 0).
 
 ## Verification
 
@@ -94,10 +95,10 @@ sytuację.
 # expected: pass
 node --test scripts/tests/dangling-refs.test.mjs
 
-# Realne drzewo — expected: ✓ i NIEZEROWA liczba sprawdzonych odwołań
+# Real tree — expected: ✓ and a NONZERO count of references checked
 node scripts/cli.mjs check --refs
 
-# Kontrola pozytywna na żywym drzewie — expected: exit != 0
+# Positive control on the live tree — expected: exit != 0
 cp backlog/tasks/TL-41-wiszace-blocked-by-nie-oblewa-zadnej-bramki.md /tmp/bl1451.bak
 sed -i '' 's/^blocked_by: \[\]/blocked_by: [BL-999999]/' backlog/tasks/TL-41-wiszace-blocked-by-nie-oblewa-zadnej-bramki.md
 node scripts/cli.mjs check --refs; echo "exit=$?"
@@ -106,19 +107,21 @@ cp /tmp/bl1451.bak backlog/tasks/TL-41-wiszace-blocked-by-nie-oblewa-zadnej-bram
 
 ## Notes
 
-- Znalezione ręcznie, nie przez test — czyli dziś nic tej klasy nie pilnuje.
-- Krok 3 jest tu najważniejszy merytorycznie: najprostsza implementacja („każdy
-  numer z `blocked_by` musi być plikiem w `tasks/`") jest POPRAWNA tylko dopóki
-  archiwum zostaje w `tasks/`. Gdyby taski `done` wyprowadziły się kiedyś do
-  osobnego katalogu, ten guard zacząłby oblewać na poprawnych danych.
+- Found by hand, not by a test — meaning nothing today guards this class of
+  bug.
+- Step 3 is the most substantively important one here: the simplest
+  implementation ("every number in `blocked_by` must be a file in `tasks/`")
+  is CORRECT only as long as the archive stays in `tasks/`. If `done` tasks
+  ever moved out to a separate directory, this guard would start failing on
+  correct data.
 
 ## Log
 
-- 2026-08-30 done — claude — `scripts/check-backlog-refs.mjs` + `check --refs`, dołożony do domyślnego `check`. 8 testów, wszystkie red-first. Pełna suita 240/240.
-- 2026-08-30 KROK 4 ROZSTRZYGNIĘTY ODWROTNIE NIŻ W PLANIE — claude — task zakładał, że guard ma PRZEPUSZCZAĆ `<repo>#BL-NNNN` jako „świadomie zewnętrzne". Pomiar to obalił dwa razy. **Po pierwsze, taka wartość nie ma jak dziś powstać:** `task-fields.mjs` ma `itemPattern: "^BL-[0-9]+$"` na obu polach, więc viewer ją odrzuca — pisałbym obsługę wejścia, którego nie da się wprowadzić. **Po drugie, i ważniejsze: przepuszczenie zepsułoby znaczenie pola.** Narzędzie nie wie, czy `inne-repo#BL-1` jest zrobione, więc `blocked_by` przestałoby być pełną odpowiedzią na „czy mogę to wziąć" — cicho, bo wpis wyglądałby na sprawdzony. Guard taki wpis ODRZUCA i mówi, gdzie zależność zapisać: prozą w `## Log`/`## Notes`. Dokładnie tak zrobiłem ręcznie w `origin#BL-1445`, zanim ten guard powstał.
-- 2026-08-30 zakres guardu — claude — sądzi ZBIÓR (jak guard kolizji), nie pojedynczy plik (jak guard boardów). Odwołanie jest złe wyłącznie WZGLĘDEM całego drzewa; żaden pojedynczy plik nie niesie dość informacji, żeby to stwierdzić.
-- 2026-08-30 `done` to nie „zgubione" — claude — odwołanie do zamkniętego blockera PRZECHODZI, z testem negatywnym pilnującym tej różnicy. Tańsza reguła („musi wskazywać na task aktywny") wyglądałaby na poprawną i zmuszała do kasowania prawdziwej historii zależności dla zielonego wyniku — czyli uczyła kłamać guardowi. Znany limit zapisany w nagłówku pliku: rozstrzyganie idzie po plikach w `tasks/`, więc gdyby archiwum kiedyś wyprowadziło się do osobnego katalogu, guard zacząłby oblewać na poprawnych danych i musi się o tym katalogu dowiedzieć W TEJ SAMEJ zmianie.
-- 2026-08-30 kontrola pozytywna w komunikacie — claude — czysty przebieg drukuje LICZBĘ sprawdzonych odwołań, bo „✓" nad zerem znaczy „nie było czego sprawdzać". Test na pustym drzewie pilnuje, że guard nie zmyśla niezerowej liczby.
-- 2026-08-30 sprawdzone na KONSUMENCIE przed wypuszczeniem — claude — guard wchodzi do domyślnego `check`, czyli od razu do hooka `pre-commit` origin. Zmierzone tam PRZED commitem: **562 odwołania, 0 wiszących** — hook nie zaświeci się founderowi na czerwono.
-- 2026-08-30 dwie pomyłki własne — claude — (1) polski cudzysłów zamykający `"` wewnątrz literału `"…"` urwał string i plik nie parsował się; (2) `takeDirFlag` zwraca `{dir, argv}`, nie `{dir, rest}`. Obie złapane pierwszym uruchomieniem, obie przez to, że guard był wołany, a nie tylko czytany.
-- 2026-08-30 created — claude — znalezione przy rozdzielaniu backlogu konsumenta: po usunięciu tasków `origin#BL-1445`/`#BL-1446` z tego repo `TL-37` został z wiszącym `blocked_by`, a `build` i `check` były zielone
+- 2026-08-30 done — claude — `scripts/check-backlog-refs.mjs` + `check --refs`, added to the default `check`. 8 tests, all red-first. Full suite 240/240.
+- 2026-08-30 STEP 4 RESOLVED THE OPPOSITE WAY FROM THE PLAN — claude — the task assumed the guard should LET `<repo>#BL-NNNN` THROUGH as "deliberately external". Measurement disproved this twice. **First, such a value has no way to arise today:** `task-fields.mjs` has `itemPattern: "^BL-[0-9]+$"` on both fields, so the viewer rejects it — I would be writing handling for input that cannot be entered. **Second, and more important: letting it through would break the field's meaning.** The tool does not know whether `another-repo#BL-1` is done, so `blocked_by` would stop being a complete answer to "can I take this" — silently, because the entry would look verified. The guard REJECTS such an entry and says where to record the dependency instead: as prose in `## Log`/`## Notes`. Exactly what I did by hand in `origin#BL-1445`, before this guard existed.
+- 2026-08-30 guard scope — claude — judges the SET (like the collision guard), not a single file (like the board guard). A reference is only wrong RELATIVE to the whole tree; no single file carries enough information to determine that on its own.
+- 2026-08-30 `done` is not "lost" — claude — a reference to a closed blocker PASSES, with a negative test guarding this distinction. The cheaper rule ("must point at an active task") would look correct and would force deleting real dependency history to get a green result — that is, it would teach the guard to lie. Known limit recorded at the top of the file: resolution walks files in `tasks/`, so if the archive ever moved to a separate directory, the guard would start failing on correct data and must learn about that directory in the SAME change.
+- 2026-08-30 positive control in the message — claude — a clean run prints the NUMBER of references checked, because a "✓" over zero means "there was nothing to check". A test on an empty tree guards against the guard fabricating a nonzero count.
+- 2026-08-30 checked against the CONSUMER before release — claude — the guard enters the default `check`, meaning it immediately reaches origin's `pre-commit` hook. Measured there BEFORE the commit: **562 references, 0 dangling** — the hook will not turn red on the founder.
+- 2026-08-30 two mistakes of my own — claude — (1) a Polish closing quote `"` inside a `"…"` literal broke the string and the file failed to parse; (2) `takeDirFlag` returns `{dir, argv}`, not `{dir, rest}`. Both caught on first run, both because the guard was invoked, not just read.
+- 2026-08-30 created — claude — found while splitting the consumer's backlog: after removing tasks `origin#BL-1445`/`#BL-1446` from this repo, `TL-37` was left with a dangling `blocked_by`, and `build` and `check` were green

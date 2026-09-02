@@ -1,10 +1,10 @@
 ---
 id: TL-102
-title: "Demo pierwszego kontaktu — odmowa worktrail done w 60 sekund"
+title: "First-contact demo — worktrail done's refusal in 60 seconds"
 type: task
 labels: [pre-launch]
 board: main
-epic: "Backlog — publikacja open source"
+epic: "Backlog — open source publication"
 priority: P1
 status: in_progress
 owner: agent:claude
@@ -18,75 +18,85 @@ related_docs:
   - docs/funkcjonalnosci.md
 verification:
   - bash: "test -f docs/demo/scenario.md && grep -q 'exit' docs/demo/scenario.md"
-  - manual: "Nagranie (asciinema lub GIF) jest podlinkowane w nagłówku README, trwa do 60 sekund i kończy się CZERWONĄ odmową `worktrail done`, po której następuje naprawa i zielone zamknięcie"
+  - manual: "A recording (asciinema or GIF) is linked in the README header, runs up to 60 seconds and ends with a RED refusal from `worktrail done`, followed by a fix and a green close"
 ---
 
-## Cel
+## Goal
 
-Nieznajomy w 60 sekund widzi jedyną rzecz, której nie ma nigdzie indziej:
-`worktrail done` ODMAWIA zamknięcia taska, bo weryfikacja oblała — pokazuje
-wyjście testu, task zostaje `pending`. Potem naprawa i zielone zamknięcie.
-Nagranie wisi w nagłówku README jako pierwszy kontakt z narzędziem.
+A stranger sees, in 60 seconds, the one thing that exists nowhere else:
+`worktrail done` REFUSES to close a task because verification failed — it
+shows the test's output, the task stays `pending`. Then a fix and a green
+close. The recording hangs in the README header as the first contact with
+the tool.
 
-## Kontekst
+## Context
 
-W kategorii „markdown backlog CLI" pierwszym kontaktem lidera jest kanban w
-terminalu — ładny, ale generyczny. Nasz wyróżnik jest fotogeniczny w inny
-sposób: **odmowa jest ciekawsza niż sukces**. Scena „agent mówi zrobione,
-narzędzie mówi nie" nazywa ból, który każdy pracujący z agentami zna z
-codzienności — i nie da się jej pokazać żadnym innym narzędziem z tej kategorii.
+In the "markdown backlog CLI" category, the leader's first contact is a
+kanban board in the terminal — nice, but generic. Our distinguisher is
+photogenic in a different way: **the refusal is more interesting than the
+success.** The scene "an agent says done, the tool says no" names the pain
+that everyone working with agents knows from everyday experience — and no
+other tool in this category can show it.
 
-Deweloperzy nie czytają dokumentów zakresu; patrzą na GIF w README i decydują
-w kilkanaście sekund. Bez tego taska cała praca nad mechanizmem (TL-86,
-TL-82) jest niewidzialna dla kogoś, kto nie przeczyta kodu.
+Developers do not read scope documents; they watch the GIF in the README
+and decide within a dozen seconds. Without this task, all the work on the
+mechanism (TL-86, TL-82) is invisible to anyone who does not read the code.
 
-Rozstrzygnięte z góry:
+Settled up front:
 
-1. **Scenariusz jest skryptem w repo, nie improwizacją.** `docs/demo/scenario.md`
-   z dokładnymi komendami — nagranie musi być odtwarzalne po każdej zmianie CLI,
-   inaczej zgnije jak każdy screenshot.
-2. **Dramaturgia: porażka najpierw.** init → task z `verification:` → praca
-   „prawie skończona" → `worktrail done` → CZERWONA odmowa z wyjściem testu →
-   naprawa → `worktrail done` → zielone. Nie pokazujemy tour po komendach.
-3. **60 sekund to limit twardy.** Wszystko, co nie służy scenie odmowy, wypada.
-4. Format: asciinema jako źródło (tekst, lekkie, kopiowowalne), GIF jako fallback
-   do README na GitHubie, który asciinema nie osadza.
+1. **The scenario is a script in the repo, not an improvisation.**
+   `docs/demo/scenario.md` with exact commands — the recording must be
+   reproducible after every CLI change, otherwise it rots like any
+   screenshot.
+2. **Dramaturgy: failure first.** init → a task with `verification:` → work
+   "almost finished" → `worktrail done` → RED refusal with the test's output
+   → fix → `worktrail done` → green. We are not showing a command tour.
+3. **60 seconds is a hard limit.** Anything that does not serve the refusal
+   scene is cut.
+4. Format: asciinema as the source (text, lightweight, copyable), GIF as a
+   fallback for the README on GitHub, which does not embed asciinema.
 
-Blokady są realne, nie porządkowe: bez TL-82 nie ma czego nagrać (komenda
-`done` nie istnieje), bez TL-49 nie ma README, w którym nagranie mogłoby wisieć.
+The blockers are real, not procedural: without TL-82 there is nothing to
+record (the `done` command does not exist), without TL-49 there is no
+README for the recording to hang in.
 
 ## Pre-flight reading
 
-1. `backlog/tasks/TL-82-*.md` — dokładne zachowanie `done` przy porażce;
-   scenariusz ma pokazywać prawdziwe komunikaty, nie wymyślone.
-2. `backlog/tasks/TL-49-*.md` — kształt nowego README; demo ma trafić w jego
-   nagłówek.
-3. README Backlog.md (github.com/MrLesk/Backlog.md) — jak wygląda ich GIF
-   pierwszego kontaktu; nasz ma być rozpoznawalnie INNY, nie ładniejszy ich.
+1. `backlog/tasks/TL-82-*.md` — the exact behavior of `done` on failure; the
+   scenario is to show real messages, not invented ones.
+2. `backlog/tasks/TL-49-*.md` — the shape of the new README; the demo has to
+   land in its header.
+3. Backlog.md's README (github.com/MrLesk/Backlog.md) — what their
+   first-contact GIF looks like; ours has to be recognizably DIFFERENT, not
+   just prettier than theirs.
 
-## Kroki
+## Steps
 
-1. Napisz `docs/demo/scenario.md`: komendy krok po kroku, z oczekiwanym wyjściem.
-2. Przejdź scenariusz ręcznie na świeżym katalogu; zmierz czas.
-3. Nagraj asciinema; wygeneruj GIF.
-4. Podlinkuj w nagłówku README; plik nagrania trzymaj poza npm-owym tarballem
-   (rozmiar pakietu to część pierwszego wrażenia).
-5. Dopisz do `worktrail-release` bramkę: scenariusz przechodzi na bieżącym CLI.
+1. Write `docs/demo/scenario.md`: commands step by step, with expected
+   output.
+2. Walk through the scenario by hand on a fresh directory; time it.
+3. Record with asciinema; generate a GIF.
+4. Link it in the README header; keep the recording file out of the npm
+   tarball (package size is part of the first impression).
+5. Add a gate to `worktrail-release`: the scenario passes on the current
+   CLI.
 
 ## Acceptance criteria
 
-- [x] Scenariusz w `docs/demo/scenario.md` jest odtwarzalny komenda po komendzie.
-- [ ] Nagranie trwa ≤60 s i zawiera scenę odmowy PRZED sceną sukcesu.
-- [ ] Nagranie jest widoczne z nagłówka README bez klikania.
-- [x] Tarball npm nie niesie plików nagrania.
-- [x] Bramka release'owa sprawdza aktualność scenariusza.
+- [x] The scenario in `docs/demo/scenario.md` is reproducible command by
+      command.
+- [ ] The recording runs ≤60s and contains the refusal scene BEFORE the
+      success scene.
+- [ ] The recording is visible from the README header with no clicking.
+- [x] The npm tarball does not carry the recording files.
+- [x] The release gate checks that the scenario is current.
 
 ## Log
 
-2026-09-01 pending — agent:claude — założony z analizy konkurencyjności: mechanizm bez demo jest niewidzialny; odmowa jest bardziej fotogeniczna niż sukces.
-- 2026-09-01 in_progress — agent:claude — podjety; TL-82 i TL-49 zamkniete, blokady odpadly.
-- 2026-09-01 in_progress — agent:claude — **NIE ZAMKNIETY: brakuje samego nagrania, i tylko jego.** Scenariusz PRZESZEDLEM NA ZYWO na swiezym katalogu (`git init` → `init` → `new` → kontrakt w frontmatterze → odmowa → poprawka → zielone zamkniecie); wszystkie bloki „oczekiwane wyjscie" w `docs/demo/scenario.md` sa przepisane z prawdziwego przebiegu, nie wymyslone. Krokow 3 (asciinema/GIF) nie da sie tu wykonac: na maszynie nie ma `asciinema`, `agg`, `vhs` ani `ttyrec`, a nagranie wymaga TTY. Zostaje dla czlowieka i dokladnie to opisuje wpis `manual:`.
-- 2026-09-01 in_progress — agent:claude — README **CELOWO NIETKNIETY**. Kryterium „nagranie widoczne z naglowka" wymaga pliku, ktorego nie ma; odnosnik-placeholder w naglowku README bylby martwym linkiem na pierwszym ekranie, czyli dokladnie odwrotnoscia celu tego taska. Zapisany warunek na pozniej: odnosnik musi byc URL-em ABSOLUTNYM — `files` w `package.json` jest lista dozwolen bez `docs/`, wiec README w tarballu nie ma czego pokazac pod sciezka wzgledna.
-- 2026-09-01 in_progress — agent:claude — bramka z kroku 5 zrobiona JAKO TEST, nie jako punkt na ludzkiej liscie: `scripts/tests/demo-scenario.test.mjs` odtwarza scenariusz przy kazdym przebiegu testow i asertuje trzy takty, na ktorych stoi nagranie — niezerowy kod wyjscia odmowy, PRAWDZIWE wyjscie testu w komunikacie (a nie streszczenie), oraz plik taska bajt w bajt nietkniety po odmowie. Scena 4 ma kontrole pozytywna: najpierw asertuje, ze pierwszy przebieg OBLEWA, wiec test nie moze przejsc na scenariuszu, ktory nigdy nie byl czerwony. Skill `worktrail-release` dostal §6b, ktore ten test wywoluje i dokłada trzy rzeczy do sprawdzenia okiem.
-- 2026-09-01 in_progress — agent:claude — ZNALEZIONA OSTRA KRAWEDZ, warta zapisania poza tym taskiem: zagniezdzony `node --test` DZIEDZICZY `NODE_TEST_CONTEXT` i raportuje wynik do zewnetrznego runnera, konczac sie kodem 0. Test bramki byl przez to ZIELONY mimo oblewajacej weryfikacji — czyli dokladnie ten rodzaj falszywej zieleni, przed ktorym stoi cale narzedzie. Naprawione czyszczeniem `NODE_TEST_CONTEXT` i `NODE_OPTIONS` w srodowisku procesu potomnego, z komentarzem w miejscu. Dotyczy KAZDEGO taska, ktorego `verification:` wola `node --test`, gdy `worktrail done` jest wywolywany z wnetrza testu; w zwyklej powloce uzytkownika problem nie wystepuje.
-- 2026-09-01 in_progress — agent:claude — 419/419 zielone, `check --language` zielony (20845 linii, 72 pliki publiczne). Odmowilem `--confirm-manual`: nagrania nie ma, wiec reczne poswiadczenie byloby dokladnie tym „sprawdzilem", ktore ten mechanizm wymienia jako NIE-dowod.
+2026-09-01 pending — agent:claude — created from a competitiveness analysis: the mechanism without a demo is invisible; the refusal is more photogenic than the success.
+- 2026-09-01 in_progress — agent:claude — taken up; TL-82 and TL-49 closed, blockers gone.
+- 2026-09-01 in_progress — agent:claude — **NOT CLOSED: only the recording itself is missing.** I walked the scenario LIVE on a fresh directory (`git init` → `init` → `new` → a contract in the frontmatter → refusal → fix → green close); every "expected output" block in `docs/demo/scenario.md` is transcribed from the real run, not invented. Step 3 (asciinema/GIF) cannot be done here: this machine has no `asciinema`, `agg`, `vhs`, or `ttyrec`, and recording needs a TTY. It is left for a human, and the `manual:` entry describes exactly that.
+- 2026-09-01 in_progress — agent:claude — README **DELIBERATELY UNTOUCHED**. The criterion "recording visible from the header" needs a file that does not exist; a placeholder link in the header would be a dead link on the very first screen — exactly the opposite of this task's goal. A condition recorded for later: the link must be an ABSOLUTE URL — `files` in `package.json` is an allowlist with no `docs/`, so the README in the tarball has nothing to show at a relative path.
+- 2026-09-01 in_progress — agent:claude — the gate from step 5 was made AS A TEST, not as an item on a human checklist: `scripts/tests/demo-scenario.test.mjs` replays the scenario on every test run and asserts the three beats the recording rests on — a non-zero exit code for the refusal, the REAL test output in the message (not a summary), and the task file byte-for-byte untouched after the refusal. Scene 4 has a positive control: it first asserts that the first run FAILS, so the test cannot pass on a scenario that was never red. The `worktrail-release` skill got a §6b, which invokes this test and adds three more things to check by eye.
+- 2026-09-01 in_progress — agent:claude — A SHARP EDGE FOUND, worth recording outside this task: a nested `node --test` INHERITS `NODE_TEST_CONTEXT` and reports its result to the outer runner, ending with exit code 0. The gate test was therefore GREEN despite failing verification — exactly the kind of false green this whole tool exists to prevent. Fixed by clearing `NODE_TEST_CONTEXT` and `NODE_OPTIONS` in the child process's environment, with a comment at the spot. This affects EVERY task whose `verification:` calls `node --test`, when `worktrail done` is invoked from inside a test; in a normal user shell the problem does not occur.
+- 2026-09-01 in_progress — agent:claude — 419/419 green, `check --language` green (20845 lines, 72 public files). I refused `--confirm-manual`: there is no recording, so manual attestation would be exactly the "I checked" that this mechanism exists to rule out as NOT proof.

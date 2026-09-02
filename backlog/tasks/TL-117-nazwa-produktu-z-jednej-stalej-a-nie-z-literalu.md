@@ -1,10 +1,10 @@
 ---
 id: TL-117
-title: "Nazwa produktu z jednej stałej, a nie z literału"
+title: "Product name from a single constant, not from a literal"
 type: task
 labels: [pre-launch]
 board: main
-epic: "Backlog — publikacja open source"
+epic: "Backlog — open source publication"
 priority: P1
 status: done
 owner: agent:claude
@@ -24,88 +24,155 @@ verification:
     bash: "node --test scripts/tests/*.test.mjs"
 ---
 
-## Cel
+## Goal
 
-Zmiana nazwy produktu kosztuje **jedną edycję `package.json`**, a nie sweep po
-drzewie. Dziś to twierdzenie jest w CLAUDE.md i w docstringu
-`scripts/product.mjs` zapisane jako fakt, a faktem nie jest.
+Changing the product name costs **a single edit to `package.json`**, not a
+sweep across the tree. Today this claim is written down as fact in CLAUDE.md
+and in the docstring of `scripts/product.mjs`, and it is not a fact.
 
-## Kontekst
+## Context
 
-`scripts/product.mjs` powstał w [TL-33](TL-33-packaging-instalacja-globalna-i-npx.md)
-właśnie po to, żeby nazwa miała jedno źródło — i eksportuje `PRODUCT_NAME`
-czytane z `package.json`. **Tyle że prawie nikt go nie używa.** Reszta
-`scripts/` nadal wpisuje nazwę jako literał w tekstach pomocy, komunikatach
-błędów, docstringach i szablonach zapisywanych do cudzych repozytoriów.
+`scripts/product.mjs` was created in [TL-33](TL-33-packaging-instalacja-globalna-i-npx.md)
+precisely so the name would have one source — and it exports `PRODUCT_NAME`
+read from `package.json`. **Except almost nothing uses it.** The rest of
+`scripts/` still writes the name as a literal in help text, error messages,
+docstrings, and templates written into other people's repositories.
 
-Dowód jest empiryczny, nie teoretyczny: **2026-09-01 zmiana `tasklog` →
-`worktrail` dotknęła 158 plików** (26 w `scripts/`, 21 w `scripts/tests/`, 89
-w `backlog/tasks/`, plus README, `_template.md`, CLAUDE.md, `.gitignore`,
-`package.json` i cztery skille). Deklarowana „jedna edycja" była w praktyce
-`sed`-em po całym drzewie — czyli dokładnie tym, czego `product.mjs` miał
-zabronić. To jest też odpowiedź na krok 2 z
-[TL-81](TL-81-kanaly-dystrybucji-i-kolizja-nazwy-tasklog-w-npx.md), który
-kazał to twierdzenie sprawdzić `grep`-em zamiast zakładać.
+The proof is empirical, not theoretical: **on 2026-09-01 the `tasklog` →
+`worktrail` rename touched 158 files** (26 in `scripts/`, 21 in
+`scripts/tests/`, 89 in `backlog/tasks/`, plus README, `_template.md`,
+CLAUDE.md, `.gitignore`, `package.json` and four skills). The declared "single
+edit" was in practice a `sed` across the whole tree — exactly what
+`product.mjs` was supposed to make unnecessary. This is also the answer to
+step 2 of [TL-81](TL-81-kanaly-dystrybucji-i-kolizja-nazwy-tasklog-w-npx.md),
+which called for checking this claim with `grep` instead of assuming it.
 
-**Dlaczego to jest P1, a nie kosmetyka.** Nazwa `worktrail` NIE jest
-zarezerwowana na npm (otwarte ryzyko z TL-20 i TL-33). Jeśli ktoś ją zajmie
-przed publikacją, trzeba będzie zmienić nazwę jeszcze raz — a wtedy koszt tej
-zmiany zapłacimy drugi raz w tej samej wysokości. Wartość tego taska jest
-najwyższa PRZED publikacją i spada do zera po niej.
+**Why this is P1, not cosmetic.** The name `worktrail` is NOT reserved on npm
+(an open risk from TL-20 and TL-33). If someone takes it before publication,
+the name will have to change again — and then the cost of this change gets
+paid a second time, at the same size. The value of this task is highest
+BEFORE publication and drops to zero after it.
 
-**Gdzie literał musi zostać** i nie jest to dług: klucz `bin` i pole `name`
-w `package.json` (to jest źródło), nazwa pliku `bin/worktrail.mjs`, oraz
-fallback w `product.mjs`.
+**Where the literal must stay** and this is not debt: the `bin` key and the
+`name` field in `package.json` (that is the source), the file name
+`bin/worktrail.mjs`, and the fallback in `product.mjs`.
 
-**Uwaga na `git-rules.mjs`.** `BLOCK_OPEN` / `BLOCK_CLOSE` (`# >>> worktrail`)
-są zapisywane do `.gitignore` i `.gitattributes` **cudzych** repozytoriów.
-Znacznik jest kluczem, po którym `init` odnajduje swój blok przy ponownym
-uruchomieniu — więc gdy nazwa zmieni się PO publikacji, użytkownik dostanie
-drugi blok zamiast aktualizacji pierwszego. Dopóki nic nie jest opublikowane,
-problem nie istnieje; po publikacji wymaga rozpoznawania obu znaczników.
+**Note on `git-rules.mjs`.** `BLOCK_OPEN` / `BLOCK_CLOSE` (`# >>> worktrail`)
+are written into **other people's** `.gitignore` and `.gitattributes`. The
+marker is the key by which `init` finds its own block on a subsequent run —
+so if the name changes AFTER publication, the user will get a second block
+instead of an update to the first one. As long as nothing is published, the
+problem does not exist; after publication it requires recognizing both
+markers.
 
-## Kroki
+## Steps
 
-1. `grep -rn` po literałach nazwy w `scripts/` i `bin/` — pełna lista miejsc.
-2. Przepiąć teksty na `PRODUCT_NAME` z `scripts/product.mjs`. Uwaga na miejsca,
-   gdzie nazwa jest wewnątrz template literala albo wewnątrz stringa
-   wstrzykiwanego do viewera (`build-viewer.mjs` — tam idzie do HTML).
-3. Rozstrzygnąć `git-rules.mjs`: czy znacznik bloku bierze nazwę z
-   `PRODUCT_NAME`, czy zostaje stałą literalną na zawsze. **To jest decyzja,
-   nie refaktor** — patrz „Uwaga" wyżej; oba wyjścia są obronne, ale trzeba
-   wybrać świadomie i zapisać powód.
-4. Dołożyć guard, który OBLEWA na literale nazwy poza `product.mjs`
-   i `package.json` — inaczej dług wróci przy pierwszym nowym pliku. Wpiąć
-   w `worktrail check` (tam gdzie już siedzi `--language`).
-5. Sprawdzić, czy guard ma moc dowodową: wstawić literał celowo i potwierdzić,
-   że oblewa (CLAUDE.md, „guard na zerowej próbce jest zielony bez mocy").
+1. `grep -rn` for name literals in `scripts/` and `bin/` — the full list of
+   places.
+2. Switch the text over to `PRODUCT_NAME` from `scripts/product.mjs`. Watch
+   for places where the name sits inside a template literal or inside a
+   string injected into the viewer (`build-viewer.mjs` — that one goes into
+   HTML).
+3. Decide on `git-rules.mjs`: does the block marker take its name from
+   `PRODUCT_NAME`, or does it stay a literal constant forever. **This is a
+   decision, not a refactor** — see the "Note" above; both outcomes are
+   defensible, but it must be chosen deliberately and the reason recorded.
+4. Add a guard that FAILS on a name literal outside `product.mjs` and
+   `package.json` — otherwise the debt returns with the first new file. Hook
+   it into `worktrail check` (where `--language` already lives).
+5. Check whether the guard has evidentiary force: insert a literal on
+   purpose and confirm it fails (CLAUDE.md, "a guard on a zero sample is
+   green with no evidentiary force").
 
 ## Acceptance criteria
 
-- [x] Literał nazwy w `scripts/` i `bin/` daje zero trafień poza `product.mjs`; wyjątkiem są dwie linie z prawdziwą ścieżką na dysku, oznaczone `product-name: allow`. [proof: no-name-literals]
-- [x] Zmiana `name` w `package.json` zmienia `--help` i komunikaty błędów — bez żadnej innej edycji w `scripts/`. [proof: guard-has-force]
-- [x] Guard wpięty w `worktrail check` (przebieg BEZ selektora), z kontrolą negatywną na celowo wstawionym literale. [proof: guard-has-force]
-- [x] Decyzja o znaczniku w `git-rules.mjs` jest zapisana w tym tasku wraz z powodem. [proof: guard-has-force]
-- [x] Pełna suita zielona. [proof: suite-green]
+- [x] A name literal in `scripts/` and `bin/` gives zero hits outside
+      `product.mjs`; the exception is two lines with a real path on disk,
+      marked `product-name: allow`. [proof: no-name-literals]
+- [x] Changing `name` in `package.json` changes `--help` and error messages —
+      with no other edit in `scripts/`. [proof: guard-has-force]
+- [x] Guard hooked into `worktrail check` (a run WITHOUT a selector), with a
+      negative control on a deliberately inserted literal. [proof:
+      guard-has-force]
+- [x] The decision about the marker in `git-rules.mjs` is recorded in this
+      task along with the reason. [proof: guard-has-force]
+- [x] Full suite green. [proof: suite-green]
 
 ## Notes
 
-Ten task NIE zmienia nazwy produktu — nazwa jest już rozstrzygnięta
-(`worktrail`, [TL-20](TL-20-domknij-nazwe-narzedzia-przed-publikacja.md)).
-Zmienia koszt NASTĘPNEJ zmiany.
+This task does NOT change the product name — the name is already decided
+(`worktrail`, [TL-20](TL-20-domknij-nazwe-narzedzia-przed-publikacja.md)). It
+changes the cost of the NEXT change.
 
 ## Log
 
-- 2026-09-01 pending — agent:claude — założony przy zmianie nazwy `tasklog` →
-  `worktrail`. Task nie jest hipotezą: powstał z pomiaru wykonanego tego dnia
-  (158 zmienionych plików) i unieważnia twierdzenie z CLAUDE.md, że zmiana
-  nazwy „ma zostać jedną edycją". Do czasu zrobienia tego taska twierdzenie
-  w CLAUDE.md jest INTENCJĄ, nie opisem stanu — i tak jest tam teraz oznaczone.
-- 2026-09-01 in_progress — agent:claude — podjęty; oba taski `in_progress` (TL-48, TL-102) stoją na wejściu od właściciela, ten nie stoi na niczym.
-- 2026-09-01 in_progress — agent:claude — **DECYZJA (krok 3): znacznik w `git-rules.mjs` ZOSTAJE ZAMROŻONY, nie jedzie z `PRODUCT_NAME`.** `# >>> worktrail` / `# <<< worktrail` to KLUCZ NA DYSKU w cudzym `.gitignore` i `.gitattributes`, po którym drugi `init` odnajduje własny blok — nie tekst do czytania. Wyprowadzony z nazwy: po zmianie nazwy każde już zainicjowane repozytorium dostaje DRUGI blok zamiast aktualizacji pierwszego, w repozytoriach, do których nie mamy dostępu, żeby to naprawić. Zamrożony: po zmianie nazwy znacznik niesie stare słowo — kosmetyczne zaskoczenie w komentarzu. Odrzucone trzecie wyjście (rozpoznawanie OBU znaczników) — to jest lek na sytuację po publikacji, a dziś dokłada gałąź, której nic nie może wywołać. Realizacja: `BLOCK_MARKER_NAME` w `product.mjs`, obok `PRODUCT_NAME` i celowo od niego oddzielone; guard sprawdza OBA pisania, bo oba są literałami, które ktoś mógłby przepisać.
-- 2026-09-01 in_progress — agent:claude — sweep zrobiony: 126 literałów w 27 plikach `scripts/` + `bin/` przepiętych na `PRODUCT_NAME`. Dwie różne robótki, nie jedna: komunikaty i szablony biorą nazwę przez `${N}` (w tym `EXAMPLE_VERIFICATION` z `init` — to wchodzi do CUDZEGO taska i jest URUCHAMIANE, więc literał tam byłby komendą, której po zmianie nazwy nie ma), a KOMENTARZE przepisane tak, żeby nazywały KOMENDĘ (`build`, `check`), nie binarkę — wewnątrz pliku, który jest tą binarką, jej nazwa i tak nic nie wnosi. Szablony `init` i nagłówek `GEN_HEADER` sprawdzone na wyjściu, nie tylko w źródle: `${N}` w template literalu zapisanym do cudzego repozytorium łatwo zostawić nierozwinięte.
-- 2026-09-01 in_progress — agent:claude — guard `scripts/check-product-name.mjs`, wpięty w `worktrail check` (przebieg bez selektora + `--product-name`). Moc dowodowa sprawdzona TRZEMA sposobami, bo guard tej klasy oblewa cicho na trzy sposoby: (1) literał wstawiony do PRAWDZIWEGO `scripts/ui.mjs` — oblewa z kodem 1, plik przywrócony; (2) kontrola pozytywna na rozmiarze próbki (36 plików, 12953 linie) — ✓ nad zerem plików znaczy „poszedłem do złego katalogu"; (3) test asertuje przebieg `check` BEZ selektora — guard poprawny i niewywoływany przechodzi każdy test o własnej logice. Dołożony test end-to-end: kopia narzędzia, zmiana `name` w `package.json` i pytanie CLI, jak się nazywa — guard dowodzi tylko, że nikt nazwy nie wpisał, a nie że instalacja niesie nową.
-- 2026-09-01 in_progress — agent:claude — `scripts/tests/` ŚWIADOMIE poza guardem, i to jest jedyna decyzja uznaniowa w tym tasku. Test biorący oczekiwaną nazwę z tej samej stałej co kod asertuje `N === N` i przechodzi przez zepsutą zmianę nazwy — część asercji MA trzymać bieżące pisanie, bo tam siedzi kontrola pozytywna. Cena zapisana, nie przemilczana: zmiana nazwy nadal rusza pliki testów (85 wystąpień w 24 plikach, zmierzone dziś), w większości prefiksy katalogów tymczasowych.
-- 2026-09-01 in_progress — agent:claude — weryfikacja `verification:` PRZEPISANA z surowego `grep` na wywołanie guardu, i to wymaga uzasadnienia, bo edycja kontraktu, żeby przejść, jest dokładnie tym, czego to narzędzie nie przyjmuje. Guard jest ŚCIŚLE SZERSZY od tamtego grepa (rekurencyjnie po `scripts/` i `bin/`, nie tylko `*.mjs` na jednym poziomie; sprawdza też zamrożony znacznik). Jedyna różnica na minus to furtka `product-name: allow`, której surowy grep nie umie wyrazić, użyta w DWÓCH miejscach — obu na PRAWDZIWĄ ścieżkę na dysku (`docs/worktrail-state-and-sync.md`, `.claude/skills/worktrail-release/SKILL.md`). To nie są wystąpienia nazwy produktu do przepięcia, tylko nazwy plików; ich zmiana jest osobną decyzją.
-- 2026-09-01 in_progress — agent:claude — CLAUDE.md przestaje kłamać: akapit o nazwie był oznaczony jako INTENCJA i teraz opisuje stan, wraz z regułą o dwóch tożsamościach (`PRODUCT_NAME` do czytania, `BLOCK_MARKER_NAME` zamrożony) i o wyłączeniu `scripts/tests/`. 431/431 zielone (było 419 — 12 nowych asercji).
+- 2026-09-01 pending — agent:claude — opened during the `tasklog` →
+  `worktrail` rename. The task is not a hypothesis: it comes from a
+  measurement taken that day (158 changed files) and invalidates the claim in
+  CLAUDE.md that a name change "is meant to be a single edit". Until this
+  task is done, the claim in CLAUDE.md is an INTENTION, not a description of
+  the current state — and it is now marked as such there.
+- 2026-09-01 in_progress — agent:claude — picked up; both `in_progress` tasks
+  (TL-48, TL-102) are blocked waiting on input from their owner, this one is
+  blocked on nothing.
+- 2026-09-01 in_progress — agent:claude — **DECISION (step 3): the marker in
+  `git-rules.mjs` is FROZEN, it does not travel with `PRODUCT_NAME`.**
+  `# >>> worktrail` / `# <<< worktrail` is a KEY ON DISK in someone else's
+  `.gitignore` and `.gitattributes`, by which a second `init` finds its own
+  block — not text meant to be read. Derived from the name: after a rename,
+  every already-initialized repository would get a SECOND block instead of an
+  update to the first, in repositories we have no access to fix. Frozen:
+  after a rename the marker carries the old word — a cosmetic surprise in a
+  comment. The third option (recognizing BOTH markers) was rejected — that is
+  a remedy for the situation after publication, and today it just adds a
+  branch that nothing can trigger. Implementation: `BLOCK_MARKER_NAME` in
+  `product.mjs`, next to `PRODUCT_NAME` and deliberately separate from it; the
+  guard checks BOTH spellings, because both are literals someone could
+  rewrite.
+- 2026-09-01 in_progress — agent:claude — sweep done: 126 literals in 27
+  `scripts/` + `bin/` files switched over to `PRODUCT_NAME`. Two different
+  jobs, not one: messages and templates take the name through `${N}`
+  (including `EXAMPLE_VERIFICATION` from `init` — that goes into SOMEONE
+  ELSE'S task and is RUN, so a literal there would be a command that no
+  longer exists after the rename), while COMMENTS were rewritten to name the
+  COMMAND (`build`, `check`), not the binary — inside a file that is that
+  binary, its name adds nothing anyway. The `init` templates and the
+  `GEN_HEADER` banner were checked at the output, not just in the source:
+  `${N}` inside a template literal written into someone else's repository is
+  easy to leave unexpanded.
+- 2026-09-01 in_progress — agent:claude — guard `scripts/check-product-name.mjs`,
+  hooked into `worktrail check` (a run without a selector plus
+  `--product-name`). Evidentiary force checked THREE ways, because a guard of
+  this class fails silently in three ways: (1) a literal inserted into the
+  REAL `scripts/ui.mjs` — fails with exit code 1, file restored; (2) positive
+  control on sample size (36 files, 12953 lines) — a checkmark over zero files
+  means "I went to the wrong directory"; (3) a test asserts a `check` run
+  WITHOUT a selector — a correct, uncalled guard passes every test about its
+  own logic. Added an end-to-end test: a copy of the tool, change `name` in
+  `package.json` and ask the CLI what it is called — the guard only proves
+  nobody typed the name in, not that the installation carries the new one.
+- 2026-09-01 in_progress — agent:claude — `scripts/tests/` DELIBERATELY left
+  outside the guard, and this is the only judgment call in this task. A test
+  that takes its expected name from the same constant as the code asserts
+  `N === N` and passes through a broken rename — part of the assertions ARE
+  meant to keep the current spelling, because that's where the positive
+  control lives. The cost is recorded, not hidden: a rename still touches test
+  files (85 occurrences in 24 files, measured today), mostly temporary
+  directory prefixes.
+- 2026-09-01 in_progress — agent:claude — the `verification:` entry REWRITTEN
+  from a raw `grep` to a call to the guard, and this needs justifying, because
+  editing the contract to make it pass is exactly what this tool does not
+  accept. The guard is STRICTLY WIDER than that grep (recursive over
+  `scripts/` and `bin/`, not just `*.mjs` at one level; it also checks the
+  frozen marker). The only difference on the minus side is the
+  `product-name: allow` escape hatch, which a raw grep cannot express, used
+  in TWO places — both for a REAL path on disk (`docs/worktrail-state-and-sync.md`,
+  `.claude/skills/worktrail-release/SKILL.md`). These are not occurrences of
+  the product name to switch over, just file names; changing them is a
+  separate decision.
+- 2026-09-01 in_progress — agent:claude — CLAUDE.md stops lying: the
+  paragraph about the name was marked as an INTENTION and now describes the
+  actual state, along with the rule about two identities (`PRODUCT_NAME` for
+  reading, `BLOCK_MARKER_NAME` frozen) and the exclusion of `scripts/tests/`.
+  431/431 green (was 419 — 12 new assertions).
 2026-09-01 done — agent:claude — closed by `worktrail done`: 3 command(s) green.

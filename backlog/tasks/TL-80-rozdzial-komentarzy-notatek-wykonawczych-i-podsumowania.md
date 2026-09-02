@@ -1,10 +1,10 @@
 ---
 id: TL-80
-title: "Rozdział komentarzy, notatek wykonawczych i podsumowania końcowego"
+title: "Separating comments, implementation notes, and the final summary"
 type: code
 labels: [post-launch]
 board: main
-epic: "Historia i atrybucja"
+epic: "History and attribution"
 priority: P3
 status: pending
 owner: unassigned
@@ -20,58 +20,66 @@ verification:
   - bash: "node --test scripts/tests/task-sections.test.mjs"
 ---
 
-## Cel
+## Goal
 
-Trzy różne rodzaje tekstu w tasku mają trzy różne miejsca, bo czyta je kto inny:
-dyskusja (komentarz z autorem), postęp wykonania (notatka) i podsumowanie do
-pull requesta.
+Three different kinds of text in a task get three different places, because
+each is read by someone different: discussion (a comment with an author),
+execution progress (a note), and a summary for the pull request.
 
-## Kontekst
+## Context
 
-Dziś wszystko ląduje w `## Log` (append-only, format `data status — kto —
-notatka`) plus historia pól w `history/*.jsonl`. `## Log` odpowiada na pytanie
-„co się z tym taskiem działo", ale przez to miesza trzy odbiorców: recenzenta
-(„czemu tak, a nie inaczej"), wykonawcę („gdzie skończyłem") i autora PR-a
-(„co tu wpisać w opis"). Backlog.md rozdziela to na `comments` z autorem,
-`implementation notes` i `final summary`.
+Today everything lands in `## Log` (append-only, format `date status — who —
+note`) plus field history in `history/*.jsonl`. `## Log` answers the question
+"what happened to this task", but in doing so mixes three audiences: the
+reviewer ("why this way and not another"), the executor ("where did I leave
+off"), and the PR author ("what do I put in the description"). Backlog.md
+splits this into `comments` with an author, `implementation notes`, and
+`final summary`.
 
-Uwaga, dlatego `confidence: low`: to jest zmiana MODELU danych taska, nie
-dodanie komendy. Zanim cokolwiek napiszesz, rozstrzygnij, czy rozdział zarabia
-na swój koszt na NASZYM materiale — przejrzyj `## Log` w kilkudziesięciu
-zamkniętych taskach i sprawdź, czy wpisy faktycznie rozpadają się na te trzy
-kategorie. Jeśli 90% to jedna linia „done — commit abc", zamknij ten task jako
-`cancelled` z uzasadnieniem. To jest legalne zakończenie tego taska.
+Note, hence `confidence: low`: this is a change to the task's data MODEL, not
+the addition of a command. Before writing anything, decide whether the split
+earns its cost on OUR material — review `## Log` in a few dozen closed tasks
+and check whether the entries actually fall into these three categories. If
+90% of them are one line "done — commit abc", close this task as `cancelled`
+with the justification. That is a legitimate way to end this task.
 
-Drugi warunek: cokolwiek powstanie, musi się zgadzać z tym, co już zapisuje
-historia w `history/*.jsonl`. Dwa niezależne rejestry tego samego zdarzenia
-rozjadą się.
+Second condition: whatever gets built has to agree with what history already
+records in `history/*.jsonl`. Two independent logs of the same event will
+drift apart.
 
 ## Pre-flight reading
 
-1. `_template.md` — sekcja `## Log` i jej deklarowany format.
-2. `scripts/history-record.mjs` i `scripts/history.mjs` — co już zapisujemy o
-   zmianach i z jaką atrybucją.
-3. `docs/backlog-field-editing-history.md` — rozstrzygnięcia o atrybucji;
-   przestrzeń nazw aktorów jest obowiązkowa i to zostaje.
+1. `_template.md` — the `## Log` section and its declared format.
+2. `scripts/history-record.mjs` and `scripts/history.mjs` — what we already
+   record about changes and with what attribution.
+3. `docs/backlog-field-editing-history.md` — attribution decisions; the actor
+   namespace is mandatory and that stays.
 
-## Kroki
+## Steps
 
-1. Przejrzyj `## Log` w zamkniętych taskach i rozstrzygnij, czy rozdział ma sens.
-   Jeśli nie — zamknij task jako `cancelled` z tym ustaleniem w logu.
-2. Jeśli tak: zdefiniuj sekcje i ich semantykę w `_template.md`.
-3. Wejście wywoływalne na każdą z nich (IV prawo), z aktorem w przestrzeni nazw.
-4. Wyprowadź je w `query --json` (koperta z TL-72) i w detalu w viewerze.
-5. Rozstrzygnij relację z `history/*.jsonl` — jedno źródło, nie dwa rejestry.
-6. `scripts/tests/task-sections.test.mjs` — dopisanie zachowuje poprzednie wpisy;
-   aktor bez przestrzeni nazw jest odrzucany.
+1. Review `## Log` in closed tasks and decide whether the split makes sense.
+   If not — close the task as `cancelled` with this finding in the log.
+2. If yes: define the sections and their semantics in `_template.md`.
+3. A callable entry point for each of them (Law 4), with the actor in its
+   namespace.
+4. Expose them in `query --json` (the envelope from TL-72) and in the detail
+   view in the viewer.
+5. Decide the relationship with `history/*.jsonl` — one source, not two logs.
+6. `scripts/tests/task-sections.test.mjs` — appending preserves earlier
+   entries; an actor without a namespace is rejected.
 
 ## Acceptance criteria
 
-- [ ] Rozstrzygnięcie „robimy / nie robimy" jest zapisane w logu tego taska wraz z danymi, na których zapadło.
-- [ ] Jeśli robimy: każda sekcja ma wejście wywoływalne i atrybucję w przestrzeni nazw.
-- [ ] Relacja z `history/*.jsonl` jest jednoznaczna — jedno źródło zdarzenia.
-- [ ] Dopisanie nigdy nie kasuje wcześniejszego wpisu.
+- [ ] The "do it / don't do it" decision is recorded in this task's log along
+      with the data it was based on.
+- [ ] If doing it: each section has a callable entry point and namespaced
+      attribution.
+- [ ] The relationship with `history/*.jsonl` is unambiguous — one source per
+      event.
+- [ ] Appending never deletes an earlier entry.
 
 ## Log
 
-2026-08-31 pending — agent:claude — założony z analizy Backlog.md (github.com/MrLesk/Backlog.md), punkt 9. Świadomie dopuszczone zamknięcie jako `cancelled` — patrz `## Kontekst`.
+2026-08-31 pending — agent:claude — opened from an analysis of Backlog.md
+(github.com/MrLesk/Backlog.md), point 9. Closing as `cancelled` is
+deliberately allowed — see `## Context`.

@@ -1,10 +1,10 @@
 ---
 id: TL-130
-title: "Reconcile serwera podpisuje cudze zmiany jako unknown/external, zanim sesja zdazy je przypisac"
+title: "The server's reconcile signs someone else's changes as unknown/external before a session can attribute them"
 type: task
 labels: []
 board: main
-epic: "Historia i atrybucja"
+epic: "History and attribution"
 priority: P2
 status: pending
 owner: unassigned
@@ -21,69 +21,78 @@ verification:
     bash: "node --test scripts/tests/history.test.mjs"
 ---
 
-## Cel
+## Goal
 
-Zmiana zrobiona ręcznie i przypisana sobie przez sesję (`worktrail history
---actor <ns:name> --source manual --reason "…"`) ma trafić do historii Z TYM
-autorem i tym powodem — także wtedy, gdy w tle chodzi `worktrail serve`.
-Dzisiaj przegrywa wyścig i ląduje jako `actor: unknown`, `source: external`,
-`reason: unknown`, a komenda przypisująca mówi „no changes to record".
+A change made by hand and attributed to itself by a session (`worktrail
+history --actor <ns:name> --source manual --reason "…"`) must land in the
+history WITH that author and that reason — even when `worktrail serve` is
+running in the background. Today it loses the race and lands as `actor:
+unknown`, `source: external`, `reason: unknown`, while the attributing command
+says "no changes to record".
 
-## Kontekst
+## Context
 
-Zmierzone przy TL-97 (2026-09-01). Sesja zmieniła `status: blocked` →
-`pending` w TL-99 i TL-100, po czym wykonała udokumentowaną drogę:
+Measured during TL-97 (2026-09-01). A session changed `status: blocked` →
+`pending` in TL-99 and TL-100, then followed the documented path:
 
 ```
 worktrail history --actor agent:claude-code --source manual --reason "…"
 → worktrail history: no changes to record
 ```
 
-W `backlog/history/TL-99.jsonl` stoi natomiast wpis o 16:28:28 z
-`"actor":"unknown","source":"external","reason":"unknown"`. Zapisał go
-`scripts/serve-backlog.mjs:252` — pętla `scheduleReconcile()` działającego
-serwera viewera. Reconcile aktualizuje snapshot, więc kolejne wywołanie
-`history` nie widzi już RÓŻNICY i milczy: atrybucja jest stracona bezpowrotnie,
-bo log jest append-only i nie przepisujemy go.
+Yet `backlog/history/TL-99.jsonl` holds an entry at 16:28:28 with
+`"actor":"unknown","source":"external","reason":"unknown"`. It was written by
+`scripts/serve-backlog.mjs:252` — the `scheduleReconcile()` loop of the
+running viewer server. Reconcile updates the snapshot, so the next `history`
+call no longer sees a DIFFERENCE and stays silent: the attribution is lost
+irrecoverably, because the log is append-only and is never rewritten.
 
-**Dlaczego to nie jest kosmetyka.** `worktrail instructions task-execution`
-podaje `worktrail history --actor … --source manual` jako drogę dla zmian
-zrobionych ręcznie. W repozytorium z uruchomionym serwerem ta droga NIE DZIAŁA
-i mówi, że nie miała nic do zrobienia — czyli wygląda na wykonaną. Efekt jest
-odwrotny do celu całego mechanizmu: `actor` miał mieć stuprocentową obecność
-dlatego, że jest wymuszany przy zapisie.
+**Why this is not cosmetic.** `worktrail instructions task-execution` gives
+`worktrail history --actor … --source manual` as the path for manually made
+changes. In a repository with a running server, this path DOES NOT WORK and
+reports that it had nothing to do — that is, it looks like it succeeded. The
+effect is the opposite of the whole mechanism's purpose: `actor` was supposed
+to have one-hundred-percent presence precisely because it is enforced on
+write.
 
-Komentarz w `serve-backlog.mjs:238-244` pokazuje, że problem był przewidziany:
-`RECONCILE_DELAY_MS = 2500` istnieje po to, żeby hook agenta zdążył zapisać swój
-wpis pierwszy. To działa dla HOOKA, który pisze w milisekundach, i nie działa dla
-człowieka ani dla sesji, która edytuje plik i przypisuje sobie zmianę minutę
-później. Opóźnienie jest zakładem o czas, nie regułą.
+The comment at `serve-backlog.mjs:238-244` shows the problem was anticipated:
+`RECONCILE_DELAY_MS = 2500` exists so an agent hook has time to write its
+entry first. That works for a HOOK, which writes within milliseconds, and does
+not work for a human, or for a session that edits the file and attributes the
+change to itself a minute later. The delay is a bet on timing, not a rule.
 
-Kierunki do rozważenia (żaden nie jest przesądzony — to jest ta decyzja
-projektowa, dla której powstał osobny task):
+Directions to consider (none is settled — this is exactly the design decision
+this separate task exists for):
 
-1. **Odroczenie zamiast zgadywania**: reconcile widzi różnicę, ale zapisuje ją
-   dopiero po oknie karencji dużo dłuższym niż 2,5 s, a viewer pokazuje ją jako
-   „nieprzypisana" do czasu zapisu.
-2. **Wpis do przypisania**: `external/unknown` zostaje, ale `worktrail history
-   --actor … --reason …` potrafi DOPISAĆ wpis atrybucji do już zapisanego
-   zdarzenia (nowy wpis wskazujący `id` poprzedniego), zamiast szukać różnicy
-   w drzewie. Log zostaje append-only.
-3. **Reconcile serwera tylko do odczytu**: serwer wykrywa różnicę i sygnalizuje
-   ją SSE, ale zapisuje ją TYLKO ten, kto zna autora.
+1. **Defer instead of guessing**: reconcile sees the difference but writes it
+   only after a grace window much longer than 2.5 s, and the viewer shows it
+   as "unattributed" until it is written.
+2. **An entry to attribute**: `external/unknown` stays, but `worktrail history
+   --actor … --reason …` can APPEND an attribution entry to an already
+   recorded event (a new entry pointing at the `id` of the previous one),
+   instead of looking for a difference in the tree. The log stays
+   append-only.
+3. **Server reconcile stays read-only**: the server detects the difference and
+   signals it over SSE, but it is written ONLY by whoever knows the author.
 
 ## Pre-flight reading
 
 1. `scripts/serve-backlog.mjs` — `scheduleReconcile()`, `RECONCILE_DELAY_MS`
-   i komentarz nad nimi (238-265).
-2. `scripts/history.mjs` — `reconcile()`, zwłaszcza aktualizacja snapshotu, bo
-   to ona zamyka drogę drugiemu pisarzowi.
-3. `scripts/history-record.mjs` — droga `--actor … --source manual`.
-4. `docs/backlog-field-editing-history.md` — po co `actor` i `source` w ogóle są.
+   and the comment above them (238-265).
+2. `scripts/history.mjs` — `reconcile()`, especially the snapshot update,
+   since that is what closes the path for a second writer.
+3. `scripts/history-record.mjs` — the `--actor … --source manual` path.
+4. `docs/backlog-field-editing-history.md` — why `actor` and `source` exist at
+   all.
 
 ## Acceptance criteria
 
-- [ ] Kontrola pozytywna: test odtwarza wyścig — zmiana w pliku, reconkiliacja „serwera", potem `history --actor … --reason …` — i dziś OBLEWA. [proof: attribution-race]
-- [ ] Po zmianie autor i powód podany przez sesję są w historii, a nie `unknown/unknown`. [proof: attribution-race]
-- [ ] Log pozostaje append-only: żaden istniejący wpis nie jest przepisany ani usunięty. [proof: attribution-race]
-- [ ] `worktrail history` nie mówi „no changes to record" w sytuacji, w której zmiana jest, a brakuje jej tylko atrybucji. [proof: attribution-race]
+- [ ] Positive control: a test reproduces the race — a change in the file,
+      "server" reconcile, then `history --actor … --reason …` — and today it
+      FAILS. [proof: attribution-race]
+- [ ] After the fix, the author and reason given by the session are in the
+      history, not `unknown/unknown`. [proof: attribution-race]
+- [ ] The log stays append-only: no existing entry is rewritten or removed.
+      [proof: attribution-race]
+- [ ] `worktrail history` does not say "no changes to record" in a situation
+      where a change exists but only lacks attribution. [proof: attribution-race]

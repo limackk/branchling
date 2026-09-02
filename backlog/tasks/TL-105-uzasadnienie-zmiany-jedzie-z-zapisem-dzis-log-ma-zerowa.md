@@ -1,10 +1,10 @@
 ---
 id: TL-105
-title: "Uzasadnienie zmiany jedzie z zapisem — dziś ## Log ma zerową adopcję"
+title: "The reason for a change travels with the write — today ## Log has zero adoption"
 type: code
 labels: [pre-launch]
 board: main
-epic: "Historia i atrybucja"
+epic: "History and attribution"
 priority: P1
 status: done
 owner: agent:claude
@@ -24,331 +24,196 @@ verification:
   - id: suite-green
     bash: "node --test scripts/tests/*.test.mjs"
   - id: log-section-gone
-    bash: "grep -q '## Log' _template.md && { echo 'szablon nadal uczy ## Log'; exit 1; }; grep -rq '## Log' .claude/skills/backlog-workflow/SKILL.md && { echo 'skill nadal uczy ## Log'; exit 1; }; echo 'szablon i skill nie uczą ## Log — OK'"
+    bash: "grep -q '## Log' _template.md && { echo 'template still teaches ## Log'; exit 1; }; grep -rq '## Log' .claude/skills/backlog-workflow/SKILL.md && { echo 'skill still teaches ## Log'; exit 1; }; echo 'template and skill do not teach ## Log — OK'"
 ---
 
-## Cel
+## Goal
 
-Powód zmiany jest zapisywany razem ze zmianą, w strukturze, którą da się
-odpytać — a nie w sekcji prozy, której nikt nie wypełnia. Po tym tasku pytanie
-„dlaczego ten task został anulowany" ma odpowiedź w danych, nie w pamięci
-człowieka, który już nie pamięta.
+The reason for a change is recorded together with the change, in a structure
+that can be queried — not in a prose section that nobody fills in. After this
+task, the question "why was this task cancelled" has an answer in the data,
+not in the memory of a person who no longer remembers.
 
-## Kontekst
+## Context
 
-`history/*.jsonl` zapisuje CO się zmieniło: `field`, `from`, `to`, `actor`,
-`source`, `ts`. Nie ma miejsca na DLACZEGO. Uzasadnienia miały mieszkać w
-`## Log` (szablon deklaruje format `YYYY-MM-DD status — kto — notatka`, skill
-każe dopisać linię przy każdej zmianie statusu).
+`history/*.jsonl` records WHAT changed: `field`, `from`, `to`, `actor`,
+`source`, `ts`. There is no place for WHY. Justifications were supposed to
+live in `## Log` (the template declares the format `YYYY-MM-DD status — who —
+note`, the skill requires a line to be appended on every status change).
 
-> **KOREKTA (2026-09-01, przy wykonaniu tego taska).** Pomiar poniżej JEST BŁĘDNY
-> i został przemierzony przed rozpoczęciem pracy. Prawdziwe liczby na tym samym
-> drzewie: **8 ze 117** tasków bez datowanej linii (nie 67 z 87), **290** linii
-> (nie 24), rozłożonych na cztery dni (29.08: 30, 30.08: 51, 31.08: 145, 01.09:
-> 64) — więc nie „z jednej sesji"; **43 z 51** zamkniętych tasków ma linię, nie
-> 0 z 44. W pełnym zadeklarowanym formacie jest 181 linii. Podejrzana przyczyna
-> pierwotnego pomiaru: linie używają słowa `created`, którego NIE MA w słowniku
-> `statuses`, więc parser kluczujący po konfiguracji je gubi.
+> **CORRECTION (2026-09-01, made while carrying out this task).** The
+> measurement below IS WRONG and was re-measured before starting work. The
+> real numbers on the same tree: **8 of 117** tasks without a dated line (not
+> 67 of 87), **290** lines (not 24), spread across four days (Aug 29: 30, Aug
+> 30: 51, Aug 31: 145, Sep 1: 64) — so not "from a single session"; **43 of
+> 51** closed tasks have a line, not 0 of 44. In the fully declared format
+> there are 181 lines. Suspected cause of the original measurement: the lines
+> use the word `created`, which is NOT IN the `statuses` vocabulary, so the
+> parser that keys off the configuration drops them.
 >
-> **Adopcja `## Log` wynosi ~93%, a nie zero.** Właściciel został o tym
-> poinformowany przed rozpoczęciem i mimo to wybrał PEŁNY ZAKRES, łącznie
-> z usunięciem `## Log`. Wykonane zgodnie z tą decyzją. Argument, który wobec
-> tego NIE obowiązuje: „nikt tego nie wypełnia". Argument, który zostaje i sam
-> wystarcza: dwa miejsca na tę samą rzecz, z których jedno jest prozą bez
-> struktury — „dlaczego ten task został anulowany" nadal nie miało odpowiedzi
-> w danych, bo 290 linii prozy nie da się odpytać.
+> **Adoption of `## Log` is ~93%, not zero.** The owner was informed of this
+> before starting and nonetheless chose the FULL SCOPE, including removing
+> `## Log`. Carried out per that decision. The argument that therefore does
+> NOT hold: "nobody fills it in." The argument that stands and is sufficient
+> on its own: two places for the same thing, one of which is unstructured
+> prose — "why was this task cancelled" still had no answer in the data,
+> because 290 lines of prose cannot be queried.
 
-**Pomiar na własnym drzewie (2026-09-01) — NIEAKTUALNY, patrz korekta wyżej:**
+**Measurement on our own tree (2026-09-01) — OUTDATED, see correction above:**
 
 ```
-zmian pola `status` w historii:                 4
-z jakimkolwiek polem uzasadnienia:              0   (schema go nie ma)
+`status` field changes in history:              4
+with any reason field:                          0   (schema doesn't have one)
 
-taski:                                         87
-bez ani jednej datowanej linii w `## Log`:     67
-datowanych linii `## Log` razem:               24   ← wszystkie z 31.08–01.09,
-                                                     czyli z jednej sesji
-zamkniętych tasków z linią w `## Log`:      0 z 44
+tasks:                                         87
+without a single dated line in `## Log`:       67
+dated `## Log` lines total:                    24   ← all from Aug 31–Sep 1,
+                                                     i.e. from one session
+closed tasks with a line in `## Log`:       0 of 44
 ```
 
-Zero z czterdziestu czterech. Konwencja opisana w szablonie, powtórzona w
-skillu i wymagana przez procedurę zamykania **nie została użyta ani razu** przez
-cały czas życia projektu — łącznie z agentem, który tę dokumentację pisał.
+Zero of forty-four. The convention described in the template, repeated in the
+skill, and required by the closing procedure **was never used even once**
+throughout the project's entire lifetime — including by the agent that wrote
+this documentation.
 
-**Diagnoza: to nie jest niedbalstwo, to jest wada projektu.** W tym samym
-repozytorium, w tym samym okresie, `actor` ma stuprocentową obecność — bo
-`history-record.mjs` ODRZUCA zapis bez aktora w przestrzeni nazw. Różnica między
-`actor` a `## Log` nie leży w dyscyplinie piszących, tylko w tym, że jedno jest
-wymagane w momencie zapisu, a drugie jest prośbą w dokumentacji. To ta sama
-lekcja, którą dał pomiar kryteriów akceptacji w TL-86 (12 z 44 tasków z
-martwymi checkboksami): **prośba o uczciwość przegrywa z wymogiem przy zapisie.**
+**Diagnosis: this is not carelessness, it is a design defect.** In the same
+repository, in the same period, `actor` has one-hundred-percent presence —
+because `history-record.mjs` REJECTS a write without a namespaced actor. The
+difference between `actor` and `## Log` does not lie in the discipline of the
+people writing, only in the fact that one is required at the moment of
+writing, and the other is a request in documentation. This is the same lesson
+given by the acceptance-criteria measurement in TL-86 (12 of 44 tasks with
+dead checkboxes): **a request for honesty loses to a requirement enforced at
+write time.**
 
-Konsekwencja jest dokładnie tą dziurą, dla której to narzędzie powstało. Backlog
-ma być pamięcią przeżywającą sesję agenta i kompaktację kontekstu — a
-kompaktacja niszczy najpierw uzasadnienia decyzji. Jeśli warstwa „dlaczego" u
-nas nie istnieje w danych, to backlog przechowuje dokładnie to samo co `git log`
-i traci swój powód istnienia.
+The consequence is exactly the gap this tool was built for. The backlog is
+meant to be a memory that outlives an agent's session and context compaction
+— and compaction destroys the reasoning behind decisions first. If the "why"
+layer does not exist in our data, the backlog stores exactly the same thing
+as `git log` and loses its reason for existing.
 
-**Trzy rozstrzygnięcia do podjęcia:**
+**Three decisions to make:**
 
-1. **Gdzie mieszka powód.** Rekomendacja: pole w rekordzie historii (strukturalne,
-   odpytywalne, przy zdarzeniu), a `## Log` albo znika z szablonu, albo jest z
-   historii GENEROWANY. Dwa niezależne miejsca na to samo już raz przegrały —
-   patrz liczby wyżej. Jeśli wybierzesz inaczej, zapisz dlaczego.
-2. **Kiedy powód jest WYMAGANY.** Nie przy każdej zmianie pola — wymóg przy
-   poprawianiu literówki w tytule wyprodukuje 87 wpisów „aktualizacja" i zabije
-   sygnał w tydzień. Rekomendacja: wymagany przy przejściach statusu, które
-   niosą decyzję — `→ blocked`, `→ cancelled`, `→ done` przy niespełnionej
-   weryfikacji, oraz przy każdym użyciu obejścia (`--force`). Reszta opcjonalna.
-   Wypisz zamkniętą listę i uzasadnij ją, zamiast wymagać wszędzie.
-3. **Zmiana schematu przed publikacją, nie po.** `history/*.jsonl` jest formatem
-   TRWAŁYM i wersjonowanym w gicie. Dodanie pola po publikacji to migracja
-   cudzych danych; dlatego `pre-launch` mimo braku widocznego objawu.
+1. **Where the reason lives.** Recommendation: a field in the history record
+   (structured, queryable, alongside the event), and `## Log` either
+   disappears from the template or is GENERATED from history. Two independent
+   places for the same thing already lost once — see the numbers above. If
+   you choose otherwise, record why.
+2. **When the reason is REQUIRED.** Not on every field change — a requirement
+   on fixing a typo in a title would produce 87 "update" entries and kill the
+   signal within a week. Recommendation: required on status transitions that
+   carry a decision — `→ blocked`, `→ cancelled`, `→ done` with unmet
+   verification, and on every use of the override (`--force`). Everything
+   else optional. Write out a closed list and justify it, instead of
+   requiring it everywhere.
+3. **Change the schema before publication, not after.** `history/*.jsonl` is
+   a PERMANENT format, versioned in git. Adding a field after publication is a
+   migration of other people's data; hence `pre-launch` despite there being no
+   visible symptom.
 
-**Świadomie POZA zakresem:** gnicie `## Kontekst` (sekcja napisana przy
-zakładaniu taska może zostać zaprzeczona przez to, co się faktycznie wydarzyło,
-i nic tego nie sygnalizuje). To inny problem — dotyczy prozy pisanej z góry, nie
-zdarzenia zapisywanego w locie. Jeśli w trakcie okaże się ważny, załóż osobny
-task, nie doklejaj tutaj.
+**Deliberately OUT of scope:** the rot of `## Context` (a section written when
+a task is created can be contradicted by what actually happened, and nothing
+signals that). That is a different problem — it concerns prose written up
+front, not an event recorded on the fly. If it turns out to matter along the
+way, open a separate task, do not append it here.
 
-**Sprzężenie, nie blokada:** TL-82 (`worktrail done`) będzie pisać rekordy
-historii. Jeśli wejdzie pierwszy, zrobi to w starym schemacie i te wpisy trzeba
-będzie zmigrować — koszt kilku rekordów, więc świadomie NIE blokuję łańcucha
-P0. Jeśli robisz TL-82 przed tym taskiem, zarezerwuj pole w rekordzie.
+**Coupling, not a block:** TL-82 (`worktrail done`) will write history
+records. If it lands first, it will do so in the old schema and those entries
+will need migrating — the cost of a handful of records, so I am deliberately
+NOT blocking the P0 chain. If you do TL-82 before this task, reserve the field
+in the record.
 
-Odrębny, już istniejący problem: TL-68 łapie rozjazd w drugą stronę — `## Log`
-twierdzi `done`, a frontmatter mówi `pending`. Nie duplikuj; jeśli `## Log`
-zniknie, sprawdź, czy TL-68 nie traci przesłanki, i zapisz to w jego logu.
+A separate, already-existing problem: TL-68 catches the drift in the other
+direction — `## Log` claims `done`, while the frontmatter says `pending`. Do
+not duplicate; if `## Log` disappears, check whether TL-68 loses its premise,
+and record that in its log.
 
 ## Pre-flight reading
 
-1. `scripts/history-record.mjs` — kształt rekordu i miejsce, w którym aktor bez
-   przestrzeni nazw jest ODRZUCANY. To jest wzorzec do powtórzenia dla powodu.
-2. `scripts/history.mjs` — rekoncyliacja zmian zrobionych poza narzędziem;
-   tam powód często nie będzie znany i to musi być reprezentowalne.
-3. `docs/backlog-field-editing-history.md` — rozstrzygnięcia o atrybucji;
-   przestrzeń nazw aktorów zostaje nietknięta.
-4. `_template.md` — sekcja `## Log` i jej deklarowany format.
-5. `backlog/tasks/TL-86-*.md` — ta sama klasa błędu zmierzona na kryteriach.
+1. `scripts/history-record.mjs` — the shape of the record and the place where
+   an actor without a namespace is REJECTED. This is the pattern to repeat
+   for the reason.
+2. `scripts/history.mjs` — reconciliation of changes made outside the tool;
+   there the reason will often not be known and this must be representable.
+3. `docs/backlog-field-editing-history.md` — decisions about attribution; the
+   actor namespace stays untouched.
+4. `_template.md` — the `## Log` section and its declared format.
+5. `backlog/tasks/TL-86-*.md` — the same class of bug measured on acceptance
+   criteria.
 
-## Kroki
+## Steps
 
-1. Rozstrzygnij punkty 1–2 z kontekstu; zapisz uzasadnienia w tym tasku.
-2. Rozszerz rekord historii o pole powodu; nieznany klucz dalej oblewa.
-   Zmiana wykryta przez rekoncyliację (`source: external`) ma reprezentować
-   „powód nieznany" JAWNIE, nie pustym stringiem udającym brak potrzeby.
-3. Wymuś powód na zamkniętej liście przejść. Komunikat odmowy mówi, które
-   przejście go wymaga i dlaczego — nie samo „brakuje pola".
-4. Wejście wywoływalne: flaga na komendach piszących (IV prawo), spójna z
-   `--append-` z TL-83.
-5. Viewer: pole powodu przy zmianie statusu i pokazanie go na osi historii.
-6. `worktrail check --reasons` — przejścia z wymaganym powodem, które go nie mają.
-   Dla 87 istniejących tasków to będzie raport historyczny: **rozstrzygnij, czy
-   ostrzega, czy oblewa**, żeby włączenie nie zablokowało całego drzewa naraz.
-7. `## Log`: usuń z szablonu albo generuj z historii. Zaktualizuj skill i
-   `instructions` (TL-74), żeby nie uczyły konwencji, której nie ma.
-8. `scripts/tests/change-reason.test.mjs`: przejście wymagające powodu bez niego
-   OBLEWA; z powodem zapisuje go w rekordzie; zmiana zewnętrzna zapisuje „powód
-   nieznany" jawnie; zmiana spoza listy nie wymaga powodu; powód jest odpytywalny.
-   Kontrola pozytywna: fixture z niedomyślnymi statusami — test oparty na
-   literałach `done`/`blocked` ma oblać.
+1. Settle points 1–2 from the context; record the justifications in this
+   task.
+2. Extend the history record with a reason field; an unknown key still fails.
+   A change detected by reconciliation (`source: external`) must represent
+   "reason unknown" EXPLICITLY, not as an empty string pretending there was
+   no need.
+3. Enforce the reason on a closed list of transitions. The refusal message
+   says which transition requires it and why — not just "field missing."
+4. Callable entry point: a flag on writing commands (law IV), consistent with
+   `--append-` from TL-83.
+5. Viewer: a reason field on status changes, shown on the history timeline.
+6. `worktrail check --reasons` — transitions with a required reason that lack
+   one. For the 87 existing tasks this will be a historical report:
+   **decide whether it warns or fails**, so that enabling it does not block
+   the whole tree at once.
+7. `## Log`: remove from the template or generate it from history. Update the
+   skill and `instructions` (TL-74) so they do not teach a convention that no
+   longer exists.
+8. `scripts/tests/change-reason.test.mjs`: a transition requiring a reason
+   without one FAILS; with a reason it is recorded in the record; an external
+   change records "reason unknown" explicitly; a change outside the list does
+   not require a reason; the reason is queryable. Positive control: a fixture
+   with non-default statuses — a test based on the literals `done`/`blocked`
+   must fail.
 
 ## Acceptance criteria
 
-- [x] Powód jest polem rekordu historii, odpytywalnym, nie prozą w pliku. [proof: reason-contract]
-- [x] Lista przejść wymagających powodu jest zamknięta, zapisana i uzasadniona — jako klucz `reason_required_statuses`, nie literał w kodzie. [proof: reason-contract]
-- [x] Brak powodu przy takim przejściu oblewa, z komunikatem mówiącym które przejście i dlaczego. [proof: reason-contract]
-- [x] „Powód nieznany" przy zmianie zewnętrznej jest reprezentowany jawnie, a nie pustym stringiem. [proof: reason-contract]
-- [x] `check --reasons` raportuje luki, w przebiegu BEZ selektora; tryb (raportuje, nie oblewa) rozstrzygnięty i uzasadniony pod kątem istniejącego drzewa. [proof: guard-wired]
-- [x] `## Log` nie istnieje w szablonie ani w tym, co pisze `done` — sekcje w starych taskach zostają jako proza historyczna. [proof: log-section-gone]
-- [x] Szablon i skill nie uczą konwencji, której już nie ma. [proof: log-section-gone]
-- [x] Test przechodzi na NIEDOMYŚLNYM słowniku statusów. [proof: reason-contract]
-- [x] Pełna suita zielona. [proof: suite-green]
+- [x] The reason is a field of the history record, queryable, not prose in a file. [proof: reason-contract]
+- [x] The list of transitions requiring a reason is closed, recorded, and justified — as the `reason_required_statuses` key, not a literal in the code. [proof: reason-contract]
+- [x] Missing a reason on such a transition fails, with a message saying which transition and why. [proof: reason-contract]
+- [x] "Reason unknown" on an external change is represented explicitly, not as an empty string. [proof: reason-contract]
+- [x] `check --reasons` reports gaps, in a run WITHOUT a selector; the mode (reports, does not fail) is decided and justified with respect to the existing tree. [proof: guard-wired]
+- [x] `## Log` does not exist in the template nor in what `done` writes — sections in old tasks remain as historical prose. [proof: log-section-gone]
+- [x] The template and the skill do not teach a convention that no longer exists. [proof: log-section-gone]
+- [x] The test passes on a NON-DEFAULT status vocabulary. [proof: reason-contract]
+- [x] Full suite green. [proof: suite-green]
 
 ## Notes
 
-**Czego świadomie NIE zrobiono z kroku 7.** `worktrail instructions` (TL-74)
-jeszcze nie istnieje, więc nie ma czego aktualizować — kryterium mówi o szablonie
-i skillu, bo tylko one dziś uczą czegokolwiek. Gdy TL-74 powstanie, ma nie
-odtworzyć `## Log`; zapisane w jego logu.
+**What was deliberately NOT done from step 7.** `worktrail instructions`
+(TL-74) does not yet exist, so there is nothing to update — the criterion
+talks about the template and the skill because today only they teach
+anything. When TL-74 is created, it must not recreate `## Log`; recorded in
+its log.
 
-**Sprzężenie z TL-68** (`## Log` mówi `done`, frontmatter mówi `pending`).
-Ten task nie kasuje sekcji z istniejących plików, więc przesłanka TL-68 stoi
-dla drzewa, które już jest — ale nowe taski nie mają jak wytworzyć tego rozjazdu,
-bo nie mają sekcji. Zakres TL-68 kurczy się do danych historycznych.
-
-## Log ma zerową adopcję"
-type: code
-labels: [pre-launch]
-board: main
-epic: "Historia i atrybucja"
-priority: P1
-status: in_progress
-owner: agent:claude
-estimate: 4h
-confidence: medium
-created: 2026-09-01
-updated: 2026-09-01
-blocked_by: []
-blocks: []
-related_docs:
-  - docs/backlog-field-editing-history.md
-verification:
-  - id: reason-contract
-    bash: "node --test scripts/tests/change-reason.test.mjs"
-  - id: guard-wired
-    bash: "node scripts/cli.mjs check | grep -q 'reasons:'"
-  - id: suite-green
-    bash: "node --test scripts/tests/*.test.mjs"
-  - id: log-section-gone
-    bash: "grep -q '## Log' _template.md && { echo 'szablon nadal uczy ## Log'; exit 1; }; grep -rq '## Log' .claude/skills/backlog-workflow/SKILL.md && { echo 'skill nadal uczy ## Log'; exit 1; }; echo 'szablon i skill nie uczą ## Log — OK'"
----
-
-## Cel
-
-Powód zmiany jest zapisywany razem ze zmianą, w strukturze, którą da się
-odpytać — a nie w sekcji prozy, której nikt nie wypełnia. Po tym tasku pytanie
-„dlaczego ten task został anulowany" ma odpowiedź w danych, nie w pamięci
-człowieka, który już nie pamięta.
-
-## Kontekst
-
-`history/*.jsonl` zapisuje CO się zmieniło: `field`, `from`, `to`, `actor`,
-`source`, `ts`. Nie ma miejsca na DLACZEGO. Uzasadnienia miały mieszkać w
-`## Log` (szablon deklaruje format `YYYY-MM-DD status — kto — notatka`, skill
-każe dopisać linię przy każdej zmianie statusu).
-
-> **KOREKTA (2026-09-01, przy wykonaniu tego taska).** Pomiar poniżej JEST BŁĘDNY
-> i został przemierzony przed rozpoczęciem pracy. Prawdziwe liczby na tym samym
-> drzewie: **8 ze 117** tasków bez datowanej linii (nie 67 z 87), **290** linii
-> (nie 24), rozłożonych na cztery dni (29.08: 30, 30.08: 51, 31.08: 145, 01.09:
-> 64) — więc nie „z jednej sesji"; **43 z 51** zamkniętych tasków ma linię, nie
-> 0 z 44. W pełnym zadeklarowanym formacie jest 181 linii. Podejrzana przyczyna
-> pierwotnego pomiaru: linie używają słowa `created`, którego NIE MA w słowniku
-> `statuses`, więc parser kluczujący po konfiguracji je gubi.
->
-> **Adopcja `## Log` wynosi ~93%, a nie zero.** Właściciel został o tym
-> poinformowany przed rozpoczęciem i mimo to wybrał PEŁNY ZAKRES, łącznie
-> z usunięciem `## Log`. Wykonane zgodnie z tą decyzją. Argument, który wobec
-> tego NIE obowiązuje: „nikt tego nie wypełnia". Argument, który zostaje i sam
-> wystarcza: dwa miejsca na tę samą rzecz, z których jedno jest prozą bez
-> struktury — „dlaczego ten task został anulowany" nadal nie miało odpowiedzi
-> w danych, bo 290 linii prozy nie da się odpytać.
-
-**Pomiar na własnym drzewie (2026-09-01) — NIEAKTUALNY, patrz korekta wyżej:**
-
-```
-zmian pola `status` w historii:                 4
-z jakimkolwiek polem uzasadnienia:              0   (schema go nie ma)
-
-taski:                                         87
-bez ani jednej datowanej linii w `## Log`:     67
-datowanych linii `## Log` razem:               24   ← wszystkie z 31.08–01.09,
-                                                     czyli z jednej sesji
-zamkniętych tasków z linią w `## Log`:      0 z 44
-```
-
-Zero z czterdziestu czterech. Konwencja opisana w szablonie, powtórzona w
-skillu i wymagana przez procedurę zamykania **nie została użyta ani razu** przez
-cały czas życia projektu — łącznie z agentem, który tę dokumentację pisał.
-
-**Diagnoza: to nie jest niedbalstwo, to jest wada projektu.** W tym samym
-repozytorium, w tym samym okresie, `actor` ma stuprocentową obecność — bo
-`history-record.mjs` ODRZUCA zapis bez aktora w przestrzeni nazw. Różnica między
-`actor` a `## Log` nie leży w dyscyplinie piszących, tylko w tym, że jedno jest
-wymagane w momencie zapisu, a drugie jest prośbą w dokumentacji. To ta sama
-lekcja, którą dał pomiar kryteriów akceptacji w TL-86 (12 z 44 tasków z
-martwymi checkboksami): **prośba o uczciwość przegrywa z wymogiem przy zapisie.**
-
-Konsekwencja jest dokładnie tą dziurą, dla której to narzędzie powstało. Backlog
-ma być pamięcią przeżywającą sesję agenta i kompaktację kontekstu — a
-kompaktacja niszczy najpierw uzasadnienia decyzji. Jeśli warstwa „dlaczego" u
-nas nie istnieje w danych, to backlog przechowuje dokładnie to samo co `git log`
-i traci swój powód istnienia.
-
-**Trzy rozstrzygnięcia do podjęcia:**
-
-1. **Gdzie mieszka powód.** Rekomendacja: pole w rekordzie historii (strukturalne,
-   odpytywalne, przy zdarzeniu), a `## Log` albo znika z szablonu, albo jest z
-   historii GENEROWANY. Dwa niezależne miejsca na to samo już raz przegrały —
-   patrz liczby wyżej. Jeśli wybierzesz inaczej, zapisz dlaczego.
-2. **Kiedy powód jest WYMAGANY.** Nie przy każdej zmianie pola — wymóg przy
-   poprawianiu literówki w tytule wyprodukuje 87 wpisów „aktualizacja" i zabije
-   sygnał w tydzień. Rekomendacja: wymagany przy przejściach statusu, które
-   niosą decyzję — `→ blocked`, `→ cancelled`, `→ done` przy niespełnionej
-   weryfikacji, oraz przy każdym użyciu obejścia (`--force`). Reszta opcjonalna.
-   Wypisz zamkniętą listę i uzasadnij ją, zamiast wymagać wszędzie.
-3. **Zmiana schematu przed publikacją, nie po.** `history/*.jsonl` jest formatem
-   TRWAŁYM i wersjonowanym w gicie. Dodanie pola po publikacji to migracja
-   cudzych danych; dlatego `pre-launch` mimo braku widocznego objawu.
-
-**Świadomie POZA zakresem:** gnicie `## Kontekst` (sekcja napisana przy
-zakładaniu taska może zostać zaprzeczona przez to, co się faktycznie wydarzyło,
-i nic tego nie sygnalizuje). To inny problem — dotyczy prozy pisanej z góry, nie
-zdarzenia zapisywanego w locie. Jeśli w trakcie okaże się ważny, załóż osobny
-task, nie doklejaj tutaj.
-
-**Sprzężenie, nie blokada:** TL-82 (`worktrail done`) będzie pisać rekordy
-historii. Jeśli wejdzie pierwszy, zrobi to w starym schemacie i te wpisy trzeba
-będzie zmigrować — koszt kilku rekordów, więc świadomie NIE blokuję łańcucha
-P0. Jeśli robisz TL-82 przed tym taskiem, zarezerwuj pole w rekordzie.
-
-Odrębny, już istniejący problem: TL-68 łapie rozjazd w drugą stronę — `## Log`
-twierdzi `done`, a frontmatter mówi `pending`. Nie duplikuj; jeśli `## Log`
-zniknie, sprawdź, czy TL-68 nie traci przesłanki, i zapisz to w jego logu.
-
-## Pre-flight reading
-
-1. `scripts/history-record.mjs` — kształt rekordu i miejsce, w którym aktor bez
-   przestrzeni nazw jest ODRZUCANY. To jest wzorzec do powtórzenia dla powodu.
-2. `scripts/history.mjs` — rekoncyliacja zmian zrobionych poza narzędziem;
-   tam powód często nie będzie znany i to musi być reprezentowalne.
-3. `docs/backlog-field-editing-history.md` — rozstrzygnięcia o atrybucji;
-   przestrzeń nazw aktorów zostaje nietknięta.
-4. `_template.md` — sekcja `## Log` i jej deklarowany format.
-5. `backlog/tasks/TL-86-*.md` — ta sama klasa błędu zmierzona na kryteriach.
-
-## Kroki
-
-1. Rozstrzygnij punkty 1–2 z kontekstu; zapisz uzasadnienia w tym tasku.
-2. Rozszerz rekord historii o pole powodu; nieznany klucz dalej oblewa.
-   Zmiana wykryta przez rekoncyliację (`source: external`) ma reprezentować
-   „powód nieznany" JAWNIE, nie pustym stringiem udającym brak potrzeby.
-3. Wymuś powód na zamkniętej liście przejść. Komunikat odmowy mówi, które
-   przejście go wymaga i dlaczego — nie samo „brakuje pola".
-4. Wejście wywoływalne: flaga na komendach piszących (IV prawo), spójna z
-   `--append-` z TL-83.
-5. Viewer: pole powodu przy zmianie statusu i pokazanie go na osi historii.
-6. `worktrail check --reasons` — przejścia z wymaganym powodem, które go nie mają.
-   Dla 87 istniejących tasków to będzie raport historyczny: **rozstrzygnij, czy
-   ostrzega, czy oblewa**, żeby włączenie nie zablokowało całego drzewa naraz.
-7. `## Log`: usuń z szablonu albo generuj z historii. Zaktualizuj skill i
-   `instructions` (TL-74), żeby nie uczyły konwencji, której nie ma.
-8. `scripts/tests/change-reason.test.mjs`: przejście wymagające powodu bez niego
-   OBLEWA; z powodem zapisuje go w rekordzie; zmiana zewnętrzna zapisuje „powód
-   nieznany" jawnie; zmiana spoza listy nie wymaga powodu; powód jest odpytywalny.
-   Kontrola pozytywna: fixture z niedomyślnymi statusami — test oparty na
-   literałach `done`/`blocked` ma oblać.
-
-## Acceptance criteria
-
-- [ ] Powód jest polem rekordu historii, odpytywalnym, nie prozą w pliku.
-- [ ] Lista przejść wymagających powodu jest zamknięta, zapisana i uzasadniona.
-- [ ] Brak powodu przy takim przejściu oblewa, z komunikatem mówiącym które i dlaczego.
-- [ ] „Powód nieznany" przy zmianie zewnętrznej jest reprezentowany jawnie.
-- [ ] `check --reasons` raportuje luki; tryb (ostrzega/oblewa) jest rozstrzygnięty pod kątem 87 istniejących tasków.
-- [ ] `## Log` jest usunięty albo generowany — nie istnieje jako druga, ręczna kopia.
-- [ ] Szablon, skill i `instructions` nie uczą konwencji, której już nie ma.
-- [ ] Test przechodzi na niedomyślnym słowniku statusów.
+**Coupling with TL-68** (`## Log` says `done`, frontmatter says `pending`).
+This task does not remove the section from existing files, so TL-68's premise
+still stands for the tree that already exists — but new tasks have no way to
+produce this drift, because they have no section. TL-68's scope shrinks to
+historical data.
 
 ## Log
 
-- 2026-09-01 pending — agent:claude — założony po pomiarze: 0 z 44 zamkniętych tasków ma linię w `## Log`, a wszystkie 24 istniejące linie pochodzą z jednej sesji. `actor` w tym samym repo ma 100% obecności, bo jest wymagany przy zapisie. Warstwa „dlaczego" nie istnieje w danych, co odbiera backlogowi jego powód istnienia wobec `git log`.
-- 2026-09-01 in_progress — agent:claude — **PRZESŁANKA TASKA OBALONA PRZED STARTEM.** Przemierzone: 8/117 tasków bez datowanej linii, 290 linii na czterech dniach, 43/51 zamkniętych z linią. Właściciel poinformowany, wybrał PEŁNY ZAKRES mimo to — i to jest wykonana decyzja. Zapisuję obalenie w `## Kontekst`, bo task, który zostaje w drzewie z fałszywym pomiarem, uczy tego pomiaru dalej.
-- 2026-09-01 in_progress — agent:claude — **ROZSTRZYGNIĘCIE 1 (gdzie mieszka powód): pole `reason` w rekordzie historii; `## Log` znika z szablonu, ze skilla, z CLAUDE.md i z tego, co pisze `done`.** Sekcje w ISTNIEJĄCYCH taskach zostają nietknięte — niosą zdania, których nikt nie odtworzy, a kasowanie cudzego pisania dla porządku kosztuje więcej niż porządek jest wart. Odrzucone „generowanie `## Log` z historii": to trzecia reprezentacja tej samej rzeczy, a nie mniej niż dwie.
-- 2026-09-01 in_progress — agent:claude — **ROZSTRZYGNIĘCIE 2 (kiedy wymagany): lista jest KLUCZEM KONFIGURACJI `reason_required_statuses`, nie literałem w kodzie.** To nie jest ozdoba — `blocked`/`cancelled` to słownictwo TEGO projektu (prawo 3), a lista wpisana w skrypt narzuciłaby je cudzemu backlogowi. Brak klucza spada na `archived_statuses`: wyjście z kolejki jest decyzją, a domyślne `[]` uczyniłoby mechanizm opt-in, czyli powtórzyłoby dokładnie ten tryb, w którym konwencja nie ma egzekucji. Ten projekt ustawia `[blocked, cancelled]`. Wymóg dotyczy WYŁĄCZNIE przejść statusu: powód przy każdej zmianie pola wyprodukowałby „aktualizacja" przy każdej literówce w tytule i zabił sygnał w tydzień.
-- 2026-09-01 in_progress — agent:claude — **DRUGI SENTINEL, `proven`.** Do domyślnego statusu zamykającego prowadzi `worktrail done`, który URUCHAMIA weryfikację i odmawia na pierwszej porażce — powodem tego przejścia jest przebieg, zapisany obok jako wpisy `__verified__`. Żądanie zdania w tym miejscu uczy wpisywania „zrobione" w pole powodu, czyli produkuje szum w polu, które ma go nie mieć. Do KAŻDEGO innego statusu archiwalnego (`cancelled`) przebieg nie prowadzi i tam powód jest wymagany. Oba sentinele (`unknown`, `proven`) są ZASTRZEŻONE przy zapisie: `--reason unknown` oblewa jako błąd użycia, bo odpowiedź maszyny przebrana za czyjeś zdanie jest gorsza niż brak odpowiedzi.
-- 2026-09-01 in_progress — agent:claude — **ROZSTRZYGNIĘCIE 3 (`check --reasons`): RAPORTUJE, nie oblewa, i to nie jest miękkość.** Każda luka, którą może znaleźć, jest w PRZESZŁOŚCI i nikt jej dziś nie uzupełni. Guard, który oblewa, zostawia dwa wyjścia — wymyślić powody za kogoś albo wyłączyć guard — i oba są gorsze niż luka. Egzekucja siedzi PRZY ZAPISIE, gdzie osoba znająca odpowiedź jeszcze stoi. Raport rozdziela TRZY rodzaje braku (`unknown` = zmiana zobaczona, nie zrobiona; brak pola = wpis sprzed mechanizmu, log jest append-only; luka właściwa = ktoś pominął pytanie), bo zsumowane czytałyby się jako „wszyscy pomijają", a tylko trzeci jest czyjąkolwiek winą. Na tym drzewie: 4 z 4 to wpisy sprzed pola.
-- 2026-09-01 in_progress — agent:claude — powód jest kopiowany na KAŻDY wpis jednego aktu (jeden akt rusza status i `updated` naraz), bo odpowiedź czytelna tylko z tego wpisu, który akurat był pierwszy, zależy od sposobu czytania logu. Pole jest na KAŻDYM wpisie, także tam, gdzie nie jest wymagane: pole obecne na części wierszy sprawia, że „nie podano" i „nie było potrzebne" mają na dysku ten sam kształt.
-- 2026-09-01 in_progress — agent:claude — wejście na trzech trasach zapisu: `done --reason`, `history --reason` (jeden powód na przebieg — to jest granulacja, którą ta trasa faktycznie ma) i pole `reason` w `POST /api/field`. Viewer pyta INLINE w panelu taska, nie modalem: okno przyciemniające stronę zasłania rzecz, którą trzeba wytłumaczyć. Serwer odmawia niezależnie od przeglądarki, więc pytanie w UI jest wygodą, a nie egzekucją. Powód pokazany na osi historii jako DRUGA LINIA, nie tooltip — „dlaczego", po które trzeba najechać, jest „dlaczego", którego nikt nie czyta.
-- 2026-09-01 in_progress — agent:claude — `scripts/tests/change-reason.test.mjs`, 17 asercji. Cały plik stoi na fixture ze słownikiem `open/parked/shipped/dropped` — kontrola pozytywna z kroku 8: test napisany na literałach `blocked`/`cancelled` przeszedłby na regule zaszytej w kodzie, czyli na dokładnie tej wadzie, którą to rozstrzygnięcie omija. Asercje na odmowach, nie na ścieżce szczęśliwej: plik taska nietknięty i zero historii po odmowie, bo odmowa po zapisie zostawiłaby task zmieniony i historię mówiącą „nie". 448/448 zielone.
+**Repair note (TL-137, 2026-09-02).** This file was found with its content
+duplicated: a well-formed, finished copy (`status: done`, all acceptance boxes
+checked, no `## Log` section) followed immediately by a second, malformed copy
+— missing its own opening `---` and the start of its `title:` — carrying an
+EARLIER state (`status: in_progress`, unchecked boxes) but also the genuine
+`## Log` entries below, written as the task's three decisions were made. The
+duplication is an editing artifact, not a deliberate second version. Repaired
+by keeping the finished copy above and this `## Log` section, taken verbatim
+from the orphaned copy — per CLAUDE.md, an existing `## Log` section is kept,
+not discarded, even though new tasks no longer carry one.
+
+- 2026-09-01 pending — agent:claude — created after the measurement: 0 of 44 closed tasks have a line in `## Log`, and all 24 existing lines come from a single session. `actor` in the same repo has 100% presence, because it is required at write time. The "why" layer does not exist in the data, which strips the backlog of its reason to exist relative to `git log`.
+- 2026-09-01 in_progress — agent:claude — **THE TASK'S PREMISE WAS DISPROVEN BEFORE STARTING.** Re-measured: 8/117 tasks without a dated line, 290 lines across four days, 43/51 closed with a line. The owner was informed, and chose the FULL SCOPE regardless — and that is the decision that was carried out. Recording the refutation in `## Context`, because a task that stays in the tree with a false measurement keeps teaching that measurement.
+- 2026-09-01 in_progress — agent:claude — **DECISION 1 (where the reason lives): a `reason` field in the history record; `## Log` disappears from the template, from the skill, from CLAUDE.md, and from what `done` writes.** Sections in EXISTING tasks stay untouched — they carry sentences nobody will reconstruct, and deleting someone else's writing for the sake of tidiness costs more than the tidiness is worth. Rejected "generating `## Log` from history": that would be a third representation of the same thing, not fewer than two.
+- 2026-09-01 in_progress — agent:claude — **DECISION 2 (when it's required): the list is the `reason_required_statuses` CONFIGURATION KEY, not a literal in the code.** This is not decoration — `blocked`/`cancelled` are THIS project's vocabulary (law 3), and a list baked into the script would impose it on someone else's backlog. A missing key falls back to `archived_statuses`: leaving the queue is a decision, and a default `[]` would make the mechanism opt-in, which would repeat exactly the mode in which the convention has no enforcement. This project sets `[blocked, cancelled]`. The requirement applies ONLY to status transitions: a reason on every field change would produce "update" on every typo fix in a title and would kill the signal within a week.
+- 2026-09-01 in_progress — agent:claude — **SECOND SENTINEL, `proven`.** The default closing status is reached through `worktrail done`, which RUNS verification and refuses on the first failure — the reason for this transition is the run itself, recorded alongside as `__verified__` entries. Requiring a sentence here would teach people to type "done" into the reason field, producing noise in a field that is meant to have none. To EVERY OTHER archival status (`cancelled`) no run leads, and there a reason is required. Both sentinels (`unknown`, `proven`) are RESERVED at write time: `--reason unknown` fails as a usage error, because a machine's answer dressed up as someone's sentence is worse than no answer.
+- 2026-09-01 in_progress — agent:claude — **DECISION 3 (`check --reasons`): REPORTS, does not fail, and this is not softness.** Every gap it can find is in the PAST and nobody will fill it in today. A guard that fails leaves two ways out — invent reasons on someone else's behalf, or turn the guard off — and both are worse than the gap. Enforcement sits AT WRITE TIME, where the person who knows the answer is still around. The report separates THREE kinds of absence (`unknown` = a change that was observed, not made; missing field = an entry from before the mechanism existed, the log is append-only; a genuine gap = someone skipped the question), because summed together they would read as "everyone skips it," and only the third is anyone's fault. On this tree: 4 of 4 are entries from before the field existed.
+- 2026-09-01 in_progress — agent:claude — the reason is copied onto EVERY entry of a single act (one act moves the status and `updated` at once), because an answer readable only from whichever entry happens to come first depends on how the log is read. The field is on EVERY entry, including where it is not required: a field present on only some rows would make "not given" and "not needed" look identical on disk.
+- 2026-09-01 in_progress — agent:claude — entry on three write routes: `done --reason`, `history --reason` (one reason per run — that is the granularity this route actually has), and the `reason` field in `POST /api/field`. The viewer asks INLINE in the task panel, not in a modal: a dimming overlay covers up the very thing that needs explaining. The server refuses independently of the browser, so the prompt in the UI is a convenience, not the enforcement. The reason is shown on the history timeline as a SECOND LINE, not a tooltip — a "why" that has to be hovered over is a "why" nobody reads.
+- 2026-09-01 in_progress — agent:claude — `scripts/tests/change-reason.test.mjs`, 17 assertions. The whole file stands on a fixture with the `open/parked/shipped/dropped` vocabulary — the positive control from step 8: a test written against the literals `blocked`/`cancelled` would pass against a rule baked into the code, i.e. against exactly the defect this decision avoids. Assertions on refusals, not the happy path: the task file untouched and zero history after a refusal, because a refusal after the write would leave the task changed and the history saying "no." 448/448 green.

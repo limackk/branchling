@@ -1,10 +1,10 @@
 ---
 id: TL-132
-title: "Przewodnik task-execution nie mówi o handoffie"
+title: "The task-execution guide does not mention handoff"
 type: task
 labels: []
 board: main
-epic: "Wyróżniki agentowe"
+epic: "Agent-facing differentiators"
 priority: P2
 status: pending
 owner: unassigned
@@ -20,48 +20,55 @@ verification:
     bash: "node --test scripts/tests/instructions.test.mjs"
 ---
 
-## Cel
+## Goal
 
-`worktrail instructions task-execution` wylicza w sekcji „WHILE YOU WORK", co
-zrobić, gdy zakres rośnie i gdy trafi się na blokadę — ale nie mówi, co zrobić,
-gdy decyzja jest POZA MANDATEM wykonawcy. Od TL-99 istnieje na to komenda
-(`worktrail handoff`), a przewodnik jej nie zna, więc żadna sesja jej nie użyje:
-przewodnik jest jedynym miejscem, z którego agent uczy się procedury.
+`worktrail instructions task-execution` lists, in the "WHILE YOU WORK"
+section, what to do when scope grows and when a blocker is hit — but does
+not say what to do when a decision is OUTSIDE the executor's mandate. A
+command for this has existed since TL-99 (`worktrail handoff`), and the
+guide does not know about it, so no session will use it: the guide is the
+only place an agent learns the procedure from.
 
-Po zrobieniu: przewodnik wymienia handoff jako trzecią odpowiedź obok „nowy
-task" i „blocked".
+Once done: the guide lists handoff as a third response alongside "new task"
+and "blocked".
 
-## Kontekst
+## Context
 
-Powstało przy TL-99, świadomie zostawione poza tamtym zakresem, bo wymaga
-osobnej decyzji projektowej: **role są opcjonalne**. W backlogu bez `roles:`
-w `config.yaml` (jak ten) `handoff --to-role` z definicji oblewa, więc wiersz
-wypisany bezwarunkowo uczyłby komendy, której w tym projekcie nie da się
-wywołać — dokładnie ta klasa, co obiecywanie flagi, której nie ma.
+Grew out of TL-99, deliberately left outside that scope because it needs a
+separate design decision: **roles are optional**. In a backlog without
+`roles:` in `config.yaml` (like this one), `handoff --to-role` fails by
+definition, so a line printed unconditionally would be teaching a command
+that cannot be called in this project — exactly the same class of bug as
+promising a flag that does not exist.
 
-Przewodniki są renderowane słownictwem PROJEKTU (`scripts/instructions.mjs`,
-`vocabulary()` + `render()`), a mechanizm podstawiania nie ma dziś warunków:
-`render()` zna tylko `{{klucz}}` i RZUCA na nieznanym. Trzeba więc rozstrzygnąć
-jedno:
+Guides are rendered with the PROJECT's vocabulary (`scripts/instructions.mjs`,
+`vocabulary()` + `render()`), and the substitution mechanism has no
+conditionals today: `render()` only knows `{{key}}` and THROWS on an
+unknown one. So one thing needs to be decided:
 
-- albo tekst jest bezwarunkowy i sformułowany tak, żeby był prawdziwy również
-  bez ról (np. mówi o `handoff --to-owner`, które działa zawsze),
-- albo `instructions.mjs` dostaje sekcje warunkowe — a to zmiana mechanizmu,
-  nie tekstu, i wtedy potrzebuje własnego testu obu gałęzi.
+- either the text is unconditional and phrased so it is true even without
+  roles (e.g. it talks about `handoff --to-owner`, which always works),
+- or `instructions.mjs` gets conditional sections — which is a change to
+  the mechanism, not the text, and would then need its own test of both
+  branches.
 
-Rekomendacja: zacząć od pierwszego wariantu. Sekcje warunkowe to nowa
-maszyneria dla jednego akapitu.
+Recommendation: start with the first variant. Conditional sections are new
+machinery for one paragraph.
 
-## Kroki
+## Steps
 
-1. Dopisać wiersz do „WHILE YOU WORK" w `TASK_EXECUTION` w
+1. Add a line to "WHILE YOU WORK" in `TASK_EXECUTION` in
    `scripts/instructions.mjs`.
-2. Jeśli tekst ma wymieniać role — dołożyć placeholder do `vocabulary()`
-   i test renderowania dla backlogu BEZ `roles:` i z nimi.
-3. Sprawdzić, czy `overview` nie wymaga zdania o tym samym.
+2. If the text is to mention roles — add a placeholder to `vocabulary()`
+   and a render test for a backlog WITHOUT `roles:` and with them.
+3. Check whether `overview` needs a sentence about the same thing.
 
 ## Acceptance criteria
 
-- [ ] `instructions task-execution` wymienia handoff jako odpowiedź na „decyzja poza mandatem". [proof: guides-render]
-- [ ] Tekst jest prawdziwy w backlogu BEZ `roles:` — nic nie obiecuje, czego tam nie ma. [proof: guides-render]
-- [ ] Każdy topic nadal renderuje się bez nieznanego placeholdera. [proof: guides-render]
+- [ ] `instructions task-execution` lists handoff as the response to "a
+      decision outside the mandate". [proof: guides-render]
+- [ ] The text is true in a backlog WITHOUT `roles:` — it promises nothing
+      that is not there. [proof: guides-render]
+- [ ] Every topic still renders without an unknown placeholder.
+      [proof: guides-render]
+</content>

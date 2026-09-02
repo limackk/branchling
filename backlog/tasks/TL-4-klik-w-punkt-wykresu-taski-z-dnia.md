@@ -1,6 +1,6 @@
 ---
 id: TL-4
-title: "Klik w punkt wykresu — panel z taskami z tego dnia"
+title: "Click on a chart point — panel with that day's tasks"
 type: code
 labels: [pre-launch]
 epic: ""
@@ -18,61 +18,65 @@ related_docs:
   - backlog/README.md
 verification:
   - bash: "node backlog/scripts/build-viewer.mjs"
-  - manual: "Dashboard → klik w punkt każdego z trzech wykresów: panel pod wykresem z taskami utworzonymi i zamkniętymi tego dnia; klik w tytuł otwiera task"
-  - manual: "Ponowny klik w ten sam punkt zamyka panel; ✕ zamyka; przypięty dzień poza zakresem dat znika i wraca po poszerzeniu zakresu"
+  - manual: "Dashboard → click on a point of each of the three charts: a panel below the chart with tasks created and closed that day; clicking a title opens the task"
+  - manual: "Clicking the same point again closes the panel; ✕ closes it; a pinned day outside the date range disappears and comes back once the range widens"
 ---
 
-## Cel
+## Goal
 
-Wykresy (TL-1, TL-2) i dymki (TL-3) mówiły ILE. Nie mówiły KTÓRE.
-„2026-08-09: 41 nowych" to sygnał, ale bez listy tasków nie da się z nim nic
-zrobić bez ręcznego grepowania po `created:`.
+The charts (TL-1, TL-2) and tooltips (TL-3) said HOW MANY. They did not say
+WHICH ONES. "2026-08-09: 41 new" is a signal, but without a list of tasks
+there is nothing to do with it short of manually grepping by `created:`.
 
-## Kontekst
+## Context
 
-Panel liczy taski dnia z tych samych dwóch definicji, z których rysowane są
-wykresy: dzień utworzenia to `created`, a „zamknięte tego dnia" to
-`status: done` + `updated` z tą datą. To nie jest kosmetyka — gdyby panel miał
-własną definicję zamknięcia, lista pod słupkiem pokazywałaby inną liczbę niż
-sam słupek, a użytkownik nie miałby jak rozstrzygnąć, która jest prawdziwa.
-Z tego samego powodu klik i hover przechodzą przez wspólne
-`dashChartPointAt()`: dwa niezależne wyliczenia indeksu mogłyby otworzyć inny
-dzień, niż nazywa dymek pod kursorem.
+The panel counts the day's tasks from the same two definitions the charts are
+drawn from: the creation day is `created`, and "closed that day" is
+`status: done` + `updated` matching that date. This is not cosmetic — if the
+panel had its own definition of "closed", the list under the bar would show a
+different number than the bar itself, and the user would have no way to
+decide which one is true. For the same reason, click and hover both go
+through the shared `dashChartPointAt()`: two independent index computations
+could open a different day than the one the tooltip under the cursor names.
 
-Panel jest zakotwiczony pod TYM wykresem, w który kliknięto (`source` w
-payloadzie), a nie w jednym stałym miejscu — dzięki temu nie gubi kontekstu i
-na burndownie może zawęzić listę do focusa dokładnie tak, jak robi to wykres.
+The panel is anchored under the SPECIFIC chart that was clicked (`source` in
+the payload), not in one fixed place — this way it does not lose context and,
+on the burndown, can narrow the list to the focus exactly the way the chart
+does.
 
-Odrzucone: filtrowanie listy zadań po dacie. Wymagałoby nowego facetu w
-`FILTER_SPECS` (data to nie enum, więc i nowego typu kontrolki), a odpowiedź
-i tak byłaby gorsza — jedna lista zamiast rozbicia na „utworzone" i
-„zamknięte", które na wykresie są dwiema różnymi seriami.
+Rejected: filtering the task list by date. It would require a new facet in
+`FILTER_SPECS` (a date is not an enum, so also a new control type), and the
+answer would be worse anyway — one list instead of the split into "created"
+and "closed", which are two different series on the chart.
 
-## Kroki
+## Steps
 
-1. `dashChartPointAt()` — wspólne wyliczenie punktu dla hovera i kliku.
-2. `source` w payloadzie każdego wykresu.
+1. `dashChartPointAt()` — shared point computation for hover and click.
+2. `source` in each chart's payload.
 3. `dashDayPanel()` / `dashDayPanelFor()` + `state.dashDay`.
-4. Klik i ✕ w delegowanym handlerze, toggle przy powtórnym kliknięciu.
-5. CSS panelu, `backlog/README.md` §2.2.
+4. Click and ✕ in the delegated handler, toggle on repeated click.
+5. Panel CSS, `backlog/README.md` §2.2.
 
 ## Acceptance criteria
 
-- [x] Klik w punkt każdego z trzech wykresów otwiera panel z listą tasków dnia.
-- [x] Rozbicie na utworzone / zamknięte, ze statusem i priorytetem.
-- [x] Klik w tytuł otwiera task w widoku listy.
-- [x] Toggle na tym samym punkcie i ✕ zamykają panel.
-- [x] Panel burndownu pokazuje tylko focus; panel poza zakresem dat znika.
+- [x] Clicking a point on each of the three charts opens a panel with that
+      day's task list.
+- [x] Split into created / closed, with status and priority.
+- [x] Clicking a title opens the task in the list view.
+- [x] Toggling the same point and ✕ close the panel.
+- [x] The burndown panel shows only the focus; a panel outside the date range
+      disappears.
 
 ## Verification
 
-- `node backlog/scripts/build-viewer.mjs` — build zielony.
-- W przeglądarce realnym kursorem: klik na wykresie dziennym (2026-08-13 → 4
-  utworzone / 4 zamknięte) zgadza się co do liczby z dymkiem tego samego dnia
-  (+4 nowych, 4 zamkniętych) — kontrola spójności panelu z wykresem. Klik w
-  BL-1030 otworzył task z `created`/`updated` 2026-08-13. Toggle, ✕, panel
-  focusowy i zachowanie przy zmianie zakresu sprawdzone osobno; dark + light.
+- `node backlog/scripts/build-viewer.mjs` — build green.
+- In the browser with a real cursor: click on a daily chart point
+  (2026-08-13 → 4 created / 4 closed) matches the tooltip's count for the
+  same day (+4 new, 4 closed) — a consistency check between panel and chart.
+  Clicking BL-1030 opened the task with `created`/`updated` 2026-08-13.
+  Toggle, ✕, the focus panel, and behavior on range changes checked
+  separately; dark + light.
 
 ## Log
 
-- 2026-08-26: zaimplementowane i zweryfikowane w przeglądarce — claude.
+- 2026-08-26: implemented and verified in the browser — claude.

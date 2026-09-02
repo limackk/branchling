@@ -1,10 +1,10 @@
 ---
 id: TL-43
-title: "Log historii bywa nieśledzony w gicie — bramka na zapisie traci przesłankę"
+title: "The history log sometimes goes untracked in git — the write-time gate loses its premise"
 type: bug
 labels: []
 board: main
-epic: "Historia i atrybucja"
+epic: "History and attribution"
 priority: P2
 status: pending
 owner: unassigned
@@ -20,62 +20,74 @@ verification:
   - bash: "node scripts/cli.mjs check --history"
 ---
 
-## Cel
+## Goal
 
-Plik `backlog/history/<ID>.jsonl` jest z założenia **wersjonowany** — to on niesie
-atrybucję między drzewami. Dziś nic nie pilnuje, żeby faktycznie trafił do gita,
-więc bywa nieśledzony i nie dojeżdża tam, gdzie jest potrzebny.
+The file `backlog/history/<ID>.jsonl` is meant to be **versioned** — it is
+what carries attribution between trees. Today nothing guards that it
+actually reaches git, so it sometimes goes untracked and fails to arrive
+where it is needed.
 
-## Kontekst
+## Context
 
-Zmierzone 2026-08-31 w repozytorium konsumenta (`origin`): **28 z 71**
-logów historii było nieśledzonych, przy jednocześnie zacommitowanych plikach
-tasków.
+Measured on 2026-08-31 in a consumer repository (`origin`): **28 of
+71** history logs were untracked, while the corresponding task files were
+committed.
 
-Przyczyna jest proceduralna, nie techniczna: reguła „`git add` wyliczonymi
-ścieżkami" (świadoma i słuszna — chroni przed zabraniem cudzej pracy) sprawia, że
-`.md` się dodaje, bo o nim myślisz, a `.jsonl` nie, bo powstał obok, bez udziału
-człowieka.
+The cause is procedural, not technical: the rule "`git add` with enumerated
+paths" (deliberate and sound — it protects against sweeping up someone
+else's work) means the `.md` gets added because you're thinking about it,
+while the `.jsonl` does not, because it was created alongside it, without a
+human's involvement.
 
-**Dlaczego to nie jest kosmetyka.** Bramka z TL-17 — rekoncyliacja pyta plik
-historii, zanim dopisze `__created__` — działa tylko wtedy, gdy ma co czytać.
-`.md` jedzie gitem, `.jsonl` tylko wtedy, gdy ktoś go dodał. Właśnie tak powstało
-trzecie wystąpienie duplikatu z TL-39, już PO tamtej naprawie: drugie drzewo
-zobaczyło task bez historii i uczciwie uznało go za nowy.
+**Why this is not cosmetic.** The gate from TL-17 — reconciliation checks the
+history file before appending `__created__` — only works when there is
+something to read. The `.md` travels with git, the `.jsonl` only when
+someone added it. This is exactly how the third occurrence of the duplicate
+from TL-39 happened, AFTER that fix: a second tree saw a task with no history
+and honestly took it for new.
 
-TL-39 dołożył drugą warstwę przy odczycie, więc **objaw jest zamknięty** — ale
-kosztem: dopóki log nie dojedzie, atrybucja jest odtwarzana dopiero po fakcie,
-a metryki liczone w drzewie bez logu są liczone z niepełnych danych.
+TL-39 added a second layer at read time, so **the symptom is closed** — but
+at a cost: until the log arrives, attribution is reconstructed only after the
+fact, and metrics computed in a tree without the log are computed from
+incomplete data.
 
-## Kroki
+## Steps
 
-1. Rozstrzygnąć, czy to zadanie narzędzia. `worktrail` z założenia nie zna gita
-   (`--dir` może wskazywać katalog poza repozytorium), więc bramka musi być
-   opcjonalna i **cicha, gdy gita nie ma** — a nie zielona, gdy jest.
-2. `worktrail check --history`: dla każdego taska w `tasks/` sprawdzić, czy jego log
-   (o ile istnieje) jest śledzony. Wyjście niezerowe przy nieśledzonych.
-3. Rozważyć drugą stronę: log BEZ taska (osierocony po zmianie prefiksu albo po
-   skasowaniu pliku) — to inny defekt, ale ta sama komenda go widzi.
-4. Zdecydować, czy `check --history` wchodzi do pełnego `check` (wtedy oblewa
-   drzewa, w których nikt jeszcze nie zacommitował logów) czy zostaje opt-in.
-5. W repozytorium konsumenta: dodać 28 nieśledzonych logów do gita — osobnym
-   commitem i po sprawdzeniu, że żaden nie jest cudzą pracą w locie.
+1. Decide whether this is the tool's job. `worktrail` by design does not know
+   about git (`--dir` may point at a directory outside a repository), so the
+   gate must be optional and **silent when there is no git** — not green
+   when there is.
+2. `worktrail check --history`: for every task in `tasks/`, check whether its
+   log (if it exists) is tracked. Nonzero exit when there are untracked
+   ones.
+3. Consider the other side: a log WITHOUT a task (orphaned after a prefix
+   change or after the file was deleted) — that is a different defect, but
+   the same command sees it.
+4. Decide whether `check --history` joins full `check` (in which case it
+   fails trees where nobody has committed logs yet) or stays opt-in.
+5. In the consumer repository: add the 28 untracked logs to git — as a
+   separate commit and after checking that none of them is someone else's
+   work in flight.
 
 ## Acceptance criteria
 
-- [ ] Nieśledzony log historii jest raportowany z nazwą pliku i wyjściem ≠ 0.
-- [ ] Poza repozytorium gita komenda **nie udaje**, że sprawdziła — mówi, że nie
-      ma czym sprawdzić, i to widać w wyjściu.
-- [ ] Kontrola pozytywna: repozytorium z jednym nieśledzonym logiem oblewa,
-      to samo repozytorium po `git add` przechodzi.
-- [ ] Osierocony log (bez taska) rozpoznany osobno od nieśledzonego — to dwa
-      różne defekty i mylenie ich zaciemnia oba.
+- [ ] An untracked history log is reported with its file name and a nonzero
+      exit.
+- [ ] Outside a git repository the command does **not pretend** it checked —
+      it says there is nothing to check, and that is visible in the output.
+- [ ] Positive control: a repository with one untracked log fails, the same
+      repository after `git add` passes.
+- [ ] An orphaned log (without a task) is recognized separately from an
+      untracked one — these are two different defects, and conflating them
+      obscures both.
 
 ## Notes
 
-- Klasa ogólniejsza: dane wytwarzane przez narzędzie obok pliku, który człowiek
-  dodaje ręcznie, są niewidoczne dla każdej siatki bezpieczeństwa gita.
+- A more general class: data produced by a tool alongside a file a human
+  adds by hand is invisible to any of git's safety nets.
 
 ## Log
 
-- 2026-08-31 created — claude — wydzielone z TL-39 po zmierzeniu 28/71 nieśledzonych logów; TL-39 zamknął objaw (dedup przy odczycie), ten task zamyka drogę dostarczenia
+- 2026-08-31 created — claude — split out from TL-39 after measuring 28/71
+  untracked history logs; TL-39 closed the symptom (dedup at read time), this
+  task closes the delivery path

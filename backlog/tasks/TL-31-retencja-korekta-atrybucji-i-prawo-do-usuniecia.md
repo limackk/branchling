@@ -1,10 +1,10 @@
 ---
 id: TL-31
-title: "Retencja, korekta atrybucji i prawo do usunięcia"
+title: "Retention, attribution correction, and the right to deletion"
 type: code
 labels: [post-launch]
 board: main
-epic: "Backlog — pomiar czasu pracy"
+epic: "Backlog — time tracking"
 priority: P2
 status: pending
 owner: unassigned
@@ -22,77 +22,136 @@ verification:
   - bash: "node backlog/scripts/cli.mjs activity forget --actor local:test --dry-run"
 ---
 
-## Cel
+## Goal
 
-Domknąć trzy rzeczy, bez których log aktywności nie może opuścić jednej maszyny: **ile go trzymamy**, **jak się go pozbyć** i **jak poprawić błędną atrybucję**. Bez nich moduł zbiera dane osobowe bez terminu ważności i bez ścieżki wyjścia.
+Close three things without which the activity log cannot leave a single
+machine: **how long we keep it**, **how to get rid of it**, and **how to
+correct a wrong attribution**. Without them the module collects personal data
+with no expiration and no way out.
 
-## Kontekst
+## Context
 
-Od TL-28 `backlog/activity/` zaczyna zawierać zapis tego, **o której godzinie konkretny człowiek pracował**, dzień po dniu. W publicznym repozytorium to metadane nadzoru, a nie telemetria projektu; w repo firmowym to dane pracownicze; w UE — dane osobowe.
+Since TL-28, `backlog/activity/` starts to contain a record of **at what hour
+a specific person worked**, day after day. In a public repository this is
+surveillance metadata, not project telemetry; in a company repo it is
+employee data; in the EU it is personal data.
 
-Trzy braki, wszystkie zidentyfikowane w adwersarialnym przeglądzie projektu, wszystkie o tej samej naturze („mechanizm zbiera, nic nie oddaje"):
+Three gaps, all identified in an adversarial review of the project, all of the
+same nature ("the mechanism collects, nothing gives back"):
 
-1. **Brak retencji.** Log rośnie w nieskończoność i nie ma odpowiedzi na pytanie „jak długo to trzymacie". To pierwsze pytanie zewnętrznego użytkownika z UE i pierwsze pytanie każdego zespołu, który to wdroży u siebie.
-2. **Brak usunięcia.** Nie ma polecenia, którym osoba wycofuje swoje dane. Kasowanie ręczne plików nie wystarcza, bo agregaty (`rollup/BL-NNNN.json`) są wyliczone z surowych wierszy i przeżyłyby usunięcie źródła — czyli dane wróciłyby przy pierwszym raporcie.
-3. **Brak korekty.** Log jest append-only, więc pierwsza pomyłka atrybucji (praca nad BL-A zapisana na BL-B) zostaje na zawsze i po cichu psuje kalibrację. To jest gwarantowany pierwszy zgłoszony błąd, a nie hipotetyczny.
+1. **No retention.** The log grows without bound and there is no answer to
+   "how long do you keep this". This is the first question from any external
+   EU user and the first question from any team that deploys this internally.
+2. **No deletion.** There is no command for a person to withdraw their data.
+   Manually deleting files is not enough, because the aggregates
+   (`rollup/BL-NNNN.json`) are computed from the raw rows and would survive
+   deleting the source — meaning the data would come back at the first
+   report.
+3. **No correction.** The log is append-only, so the first attribution mistake
+   (work on BL-A recorded under BL-B) stays forever and silently corrupts
+   calibration. This is a guaranteed first reported bug, not a hypothetical
+   one.
 
-**Dlaczego to faza 1b, a nie 4:** dane osobowe zaczynają powstawać w chwili uruchomienia TL-28. Mechanizm ich kasowania nie może przyjść „później" — może być za TL-28 w kolejności prac, ale nic nie ma prawa opuścić jednej maszyny, zanim ten task będzie zamknięty.
+**Why this is phase 1b, not phase 4:** personal data starts being generated
+the moment TL-28 ships. The mechanism to delete it cannot come "later" — it
+can come after TL-28 in the order of work, but nothing may leave a single
+machine before this task is closed.
 
 ## Pre-flight reading
 
-1. `docs/architecture/backlog-time-tracking.md` — §9 (prywatność, retencja, korekta), §5 (kształt wiersza, `kind: reassign`), §13 (czym ten mechanizm NIE jest).
-2. `docs/architecture/legal-and-compliance.md` — konwencje workspace'u dla danych osobowych i okien retencji.
-3. `backlog/scripts/activity.mjs` (TL-27) i `attribution.mjs` (TL-28).
-4. `backlog/scripts/config.mjs` — `activity_retention_days` i `activity_privacy` są już w schemie (TL-27 krok 7); tu dochodzi tylko ich UŻYCIE.
+1. `docs/architecture/backlog-time-tracking.md` — §9 (privacy, retention,
+   correction), §5 (row shape, `kind: reassign`), §13 (what this mechanism is
+   NOT).
+2. `docs/architecture/legal-and-compliance.md` — the workspace's conventions
+   for personal data and retention windows.
+3. `backlog/scripts/activity.mjs` (TL-27) and `attribution.mjs` (TL-28).
+4. `backlog/scripts/config.mjs` — `activity_retention_days` and
+   `activity_privacy` are already in the schema (TL-27 step 7); this task only
+   adds their USE.
 
-## Kroki
+## Steps
 
-1. `worktrail activity prune` — kasuje surowe heartbeaty starsze niż `activity_retention_days` (domyślnie 90) i **przelicza agregaty przed kasowaniem**, żeby okno retencji nie zjadało historycznej kalibracji. Agregat przeżywa, bo w tej rozdzielczości nie jest już danymi o osobie.
-2. Uruchamianie `prune`: przy starcie serwera viewera i z hooka, tą samą konwencją co `build-backlog.mjs` — mechanizm, o którym trzeba pamiętać, nie jest mechanizmem.
-3. `worktrail activity forget --actor <a>` — kasuje surowe wiersze aktora **i** przelicza agregaty, żeby dane nie wróciły przy najbliższym raporcie. `--dry-run` drukuje, co by zniknęło, i niczego nie dotyka.
-4. `worktrail activity reassign --from BL-A --to BL-B --session S [--since TS]` — dopisuje zdarzenie `kind: "reassign"`. Log jest append-only, więc korekta jest **nowym zdarzeniem, nie edycją historii**; czytnik stosuje ją przy odczycie, tak jak `readHistory()` stosuje dedup.
-5. Kolejność stosowania korekt musi być deterministyczna (po ULID), a `reassign` na `reassign` musi się składać — jest na to test.
-6. `worktrail activity report --privacy` — drukuje aktualne okno retencji, tryb `activity_privacy` i to, które pliki są wersjonowane. Jedno miejsce, w którym użytkownik sprawdza, co narzędzie o nim trzyma.
-7. Sekcja w publicznym README (EN): co jest zbierane, gdzie leży, jak długo, jak usunąć. Treść po angielsku — powierzchnia publiczna, patrz [TL-20](TL-20-domknij-nazwe-narzedzia-przed-publikacja.md).
+1. `worktrail activity prune` — deletes raw heartbeats older than
+   `activity_retention_days` (default 90) and **recomputes the aggregates
+   before deleting**, so the retention window does not eat historical
+   calibration. The aggregate survives, because at that resolution it is no
+   longer data about a person.
+2. Running `prune`: at viewer server startup and from a hook, following the
+   same convention as `build-backlog.mjs` — a mechanism that must be
+   remembered is not a mechanism.
+3. `worktrail activity forget --actor <a>` — deletes the actor's raw rows
+   **and** recomputes the aggregates, so the data does not come back at the
+   next report. `--dry-run` prints what would disappear and touches nothing.
+4. `worktrail activity reassign --from BL-A --to BL-B --session S [--since
+   TS]` — appends a `kind: "reassign"` event. The log is append-only, so the
+   correction is a **new event, not an edit of history**; the reader applies
+   it at read time, the same way `readHistory()` applies dedup.
+5. The order in which corrections are applied must be deterministic (by
+   ULID), and `reassign` on top of `reassign` must compose — there is a test
+   for this.
+6. `worktrail activity report --privacy` — prints the current retention
+   window, the `activity_privacy` mode, and which files are versioned. One
+   place where a user checks what the tool holds about them.
+7. A section in the public README (EN): what is collected, where it lives,
+   for how long, how to delete it. Content in English — public surface, see
+   [TL-20](TL-20-domknij-nazwe-narzedzia-przed-publikacja.md).
 
 ## Acceptance criteria
 
-- [ ] `prune` kasuje wyłącznie wiersze starsze niż okno i NIE rusza agregatów — jest na to test.
-- [ ] Agregat jest przeliczony PRZED kasowaniem; test sprawdza, że minuty sprzed okna nie znikają z kalibracji.
-- [ ] `forget --actor` kasuje surowe wiersze i przelicza agregaty; po nim raport nie odtwarza danych aktora.
-- [ ] `forget --dry-run` niczego nie dotyka — test porównuje sumy kontrolne plików przed i po.
-- [ ] `reassign` jest zdarzeniem dopisanym, nie edycją istniejących wierszy — test czyta plik i sprawdza, że stare wiersze są nietknięte.
-- [ ] Dwa `reassign` na tej samej sesji składają się w deterministycznej kolejności (po ULID).
-- [ ] Minuty po `reassign` przenoszą się w całości: suma per task się zgadza, nic nie ginie i nic się nie dubluje.
-- [ ] `report --privacy` drukuje okno retencji, tryb i listę wersjonowanych ścieżek.
-- [ ] README (EN) opisuje zbierane dane, retencję i ścieżkę usunięcia.
-- [ ] `qa/backlog-time-tracking.yaml` rozszerzone o przypadki retencji, `forget` i `reassign`.
+- [ ] `prune` deletes only rows older than the window and does NOT touch the
+      aggregates — there is a test for this.
+- [ ] The aggregate is recomputed BEFORE deletion; a test checks that minutes
+      from before the window do not disappear from the calibration.
+- [ ] `forget --actor` deletes raw rows and recomputes aggregates; after it,
+      the report does not reconstruct the actor's data.
+- [ ] `forget --dry-run` touches nothing — a test compares file checksums
+      before and after.
+- [ ] `reassign` is an appended event, not an edit of existing rows — a test
+      reads the file and checks that old rows are untouched.
+- [ ] Two `reassign` events on the same session compose in deterministic
+      order (by ULID).
+- [ ] Minutes carry over completely after `reassign`: the per-task sum
+      matches, nothing is lost and nothing is duplicated.
+- [ ] `report --privacy` prints the retention window, the mode, and the list
+      of versioned paths.
+- [ ] The README (EN) describes the data collected, retention, and the
+      deletion path.
+- [ ] `qa/backlog-time-tracking.yaml` extended with retention, `forget`, and
+      `reassign` cases.
 
 ## Verification
 
 ```bash
-# 1. Retencja i korekta — expected: pass, w tym reassign na reassign
+# 1. Retention and correction — expected: pass, including reassign on reassign
 node --test backlog/scripts/tests/retention.test.mjs backlog/scripts/tests/reassign.test.mjs
 
-# 2. forget --dry-run niczego nie dotyka — expected: sumy identyczne
-find backlog/activity -name '*.jsonl' -exec shasum {} \; | sort > /tmp/przed.txt
+# 2. forget --dry-run touches nothing — expected: identical checksums
+find backlog/activity -name '*.jsonl' -exec shasum {} \; | sort > /tmp/before.txt
 node backlog/scripts/cli.mjs activity forget --actor local:test --dry-run
-find backlog/activity -name '*.jsonl' -exec shasum {} \; | sort > /tmp/po.txt
-diff /tmp/przed.txt /tmp/po.txt && echo 'dry-run czysty — OK'
+find backlog/activity -name '*.jsonl' -exec shasum {} \; | sort > /tmp/after.txt
+diff /tmp/before.txt /tmp/after.txt && echo 'dry-run clean — OK'
 
-# 3. Użytkownik widzi, co narzędzie o nim trzyma — expected: okno, tryb, ścieżki
+# 3. The user sees what the tool holds about them — expected: window, mode, paths
 node backlog/scripts/cli.mjs activity report --privacy
 
-# 4. Guardy modułu nadal zielone
+# 4. Module guards still green
 node backlog/scripts/cli.mjs check
 ```
 
 ## Notes
 
-- **To nie czyni z modułu narzędzia zgodnego z RODO „z pudełka"** i README nie ma tego sugerować. Daje wdrażającemu mechanizmy (minimalizacja, retencja, usunięcie, sprostowanie); podstawa prawna, informowanie osób i ocena skutków zostają po stronie tego, kto to wdraża.
-- Świadomie poza zakresem: uwierzytelnianie aktora (bez niego `forget --actor` opiera się na deklaracji, nie dowodzie — to samo ograniczenie, które [worktrail-state-and-sync.md §6.1](../../docs/worktrail-state-and-sync.md) nazywa granicą wersji lokalnej), szyfrowanie logu, eksport danych osoby.
-- `--dry-run` w `forget` jest wymagany, nie opcjonalny: to polecenie kasuje dane bez kosza.
+- **This does not make the module GDPR-compliant "out of the box"**, and the
+  README must not suggest that. It gives the deployer mechanisms
+  (minimization, retention, deletion, correction); the legal basis, informing
+  data subjects, and impact assessment remain with whoever deploys it.
+- Deliberately out of scope: actor authentication (without it, `forget
+  --actor` relies on a claim, not proof — the same limitation that
+  [worktrail-state-and-sync.md §6.1](../../docs/worktrail-state-and-sync.md)
+  names as the local-version boundary), log encryption, exporting a person's
+  data.
+- `--dry-run` on `forget` is required, not optional: this command deletes data
+  with no trash bin.
 
 ## Log
 
-- 2026-08-30 created — claude — z adwersarialnego przeglądu projektu pomiaru czasu; trzy braki (retencja, usunięcie, korekta atrybucji) blokujące wypuszczenie modułu poza jedną maszynę
+- 2026-08-30 created — claude — from an adversarial review of the time-tracking project; three gaps (retention, deletion, attribution correction) blocking release of the module beyond a single machine

@@ -1,10 +1,10 @@
 ---
 id: TL-88
-title: "worktrail quote — prognoza czasu i kosztu taska"
+title: "worktrail quote — time and cost forecast for a task"
 type: task
 labels: []
 board: main
-epic: "Wyróżniki agentowe"
+epic: "Agent-facing differentiators"
 priority: P2
 status: blocked
 owner: unassigned
@@ -20,90 +20,96 @@ verification:
   - bash: "node --test scripts/tests/quote.test.mjs"
 ---
 
-## Cel
+## Goal
 
-`worktrail quote TL-NNNN` odpowiada PRZED oddaniem taska agentowi: „taski o tej
-estymacie i typie kończą się w 1,4–4,1 h i 250–400k tokenów (n=41)". Kalibracja
-z TL-29 liczy bias po fakcie; ta komenda odwraca ją w prognozę — odpowiedź na
-pytanie, którego nie zadaje żadne narzędzie backlogowe: **ile będzie kosztowało
-puszczenie agenta na ten task**.
+`worktrail quote TL-NNNN` answers BEFORE a task is handed to an agent: "tasks
+with this estimate and type finish in 1.4–4.1 h and 250–400k tokens (n=41)".
+The TL-29 calibration computes bias after the fact; this command inverts it
+into a forecast — an answer to a question no backlog tool asks: **how much
+will running an agent on this task cost**.
 
-## Kontekst
+## Context
 
-Powstało z przeglądu wyróżników wobec Backlog.md (2026-08-31). Cała mechanika
-jest pochodną kalibracji: te same kubełki (estymata × typ × board), te same
-progi wiarygodności. Komenda nie liczy niczego nowego — czyta rozkład, który
-TL-29 już policzył, i dobiera kubełek do wskazanego taska.
+Grew out of a differentiators review against Backlog.md (2026-08-31). All the
+mechanics are derived from the calibration: the same buckets (estimate ×
+type × board), the same confidence thresholds. The command computes nothing
+new — it reads the distribution TL-29 already computed and picks the bucket
+for the given task.
 
-Reguły przejęte wprost z
+Rules carried over verbatim from
 [docs/backlog-time-tracking.md](../../docs/backlog-time-tracking.md) §11,
-bo tu kłamie się najłatwiej:
-- poniżej progu `n` odpowiedź brzmi „za mało danych", nie liczba;
-- zawsze przedział (p20–p80), nigdy punkt;
-- koszt w tokenach tylko, gdy adapter kosztu (TL-30) dostarczył kolumnę —
-  brak adaptera = brak kolumny, nie zero;
-- **tokeny są osią główną prognozy, kwota jest pochodną warunkową.** Kwota
-  pojawia się wyłącznie, gdy KAŻDY wiersz źródłowy kubełka ma stawkę API
-  z cennika; dane z trybu `subscription` dają tokeny bez kwoty (z powodem),
-  z trybu `local` — zadeklarowane zero (tryby rozliczenia: TL-30 krok 4).
-  Użytkownik na abonamencie Claude Code / Codex albo na Ollamie ma dostać
-  prognozę tak samo użyteczną jak użytkownik API — tylko bez fikcyjnych
-  dolarów;
-- **kubełek nie miesza modeli.** Tokeny Sonneta przez API i lokalnej llamy to
-  nieporównywalne jednostki wysiłku; wiersz aktywności niesie pole `model`
-  (TL-30), więc przy danych z więcej niż jednego modelu kubełek tnie się
-  dodatkowo po modelu, a komórki poniżej progu `n` mówią „za mało danych"
-  zamiast uśredniać w poprzek;
-- udział `unknown` w danych źródłowych jest częścią odpowiedzi: prognoza z
-  danych, w których 60% czasu jest nieprzypisane, ma to napisać.
+because this is where lying is easiest:
+- below the `n` threshold the answer is "not enough data", not a number;
+- always a range (p20–p80), never a point;
+- cost in tokens only when the cost adapter (TL-30) has supplied the column
+  — no adapter means no column, not zero;
+- **tokens are the forecast's primary axis, the dollar amount is a
+  conditional derivative.** An amount appears only when EVERY source row of
+  the bucket has an API rate from the price list; data from `subscription`
+  mode gives tokens without an amount (with a reason), data from `local`
+  mode gives a declared zero (billing modes: TL-30 step 4). A user on a
+  Claude Code / Codex subscription, or on Ollama, is to get a forecast just
+  as useful as an API user — only without fictitious dollars;
+- **a bucket does not mix models.** Sonnet tokens through the API and a
+  local llama's tokens are incomparable units of effort; an activity row
+  carries a `model` field (TL-30), so with data from more than one model the
+  bucket is additionally sliced by model, and cells below the `n` threshold
+  say "not enough data" instead of averaging across models;
+- the share of `unknown` in the source data is part of the answer: a
+  forecast built from data where 60% of the time is unattributed has to say
+  so.
 
-Rozszerzenie opcjonalne (osobny task, gdy quote się przyjmie): pole `budget:`
-we frontmatterze i ostrzeżenie hooka przy przekroczeniu wielokrotności
-prognozy. Nie pakować tego tutaj.
+Optional extension (a separate task, once quote proves out): a `budget:`
+field in the frontmatter and a hook warning when a multiple of the forecast
+is exceeded. Do not fold this in here.
 
 ## Pre-flight reading
 
 - [docs/backlog-time-tracking.md](../../docs/backlog-time-tracking.md) §11
-  — format raportu kalibracji, progi `n`, reguła przedziałów.
-- `backlog/tasks/TL-29-kalibracja-estymat-z-danych-rzeczywistych.md` — gdzie
-  i w jakim kształcie kalibracja składa wyniki; quote MA je czytać, nie liczyć
-  ponownie.
-- `scripts/task-fields.mjs` — odczyt estymaty i typu wskazanego taska.
+  — calibration report format, `n` thresholds, the range rule.
+- `backlog/tasks/TL-29-kalibracja-estymat-z-danych-rzeczywistych.md` — where
+  and in what shape the calibration stores its results; quote IS to read
+  them, not recompute them.
+- `scripts/task-fields.mjs` — reading the estimate and type of the given
+  task.
 
-## Kroki
+## Steps
 
-1. Dobór kubełka: estymata + typ wskazanego taska; przy braku komórki
-   spełniającej próg `n` — degradacja do samej estymaty, jawnie opisana w
-   wyjściu.
-2. Wyjście tekstowe i `--json`: przedział czasu, przedział tokenów (jeśli
-   dane są), `n`, udział `unknown`, użyty kubełek.
-3. Task bez estymaty: komunikat wskazujący, że prognoza wymaga estymaty —
-   błąd wejścia, nie pusta odpowiedź.
-4. Testy na fixture'ach z syntetycznym rollupem: kubełek pełny, kubełek pod
-   progiem, dane bez kolumny tokenów, wysoki `unknown_ratio`, dane z dwóch
-   różnych modeli (cięcie po modelu, bez uśredniania w poprzek), źródła
-   w trybie `subscription` i `local` (kwota nie powstaje / powstaje zero
-   zadeklarowane).
+1. Bucket selection: estimate + type of the given task; when no cell meets
+   the `n` threshold — degrade to the estimate alone, explicitly stated in
+   the output.
+2. Text output and `--json`: time range, token range (if data exists), `n`,
+   `unknown` share, the bucket used.
+3. A task without an estimate: a message stating that the forecast requires
+   an estimate — an input error, not an empty answer.
+4. Tests on fixtures with a synthetic rollup: a full bucket, a bucket below
+   the threshold, data without a token column, a high `unknown_ratio`, data
+   from two different models (sliced by model, no averaging across), sources
+   in `subscription` and `local` mode (amount not produced / produced as a
+   declared zero).
 
 ## Acceptance criteria
 
-- [ ] Kubełek z `n` poniżej progu daje „za mało danych", nigdy liczbę.
-- [ ] Odpowiedź jest zawsze przedziałem; żadnej pojedynczej średniej.
-- [ ] Brak adaptera kosztu = brak kolumny tokenów w wyjściu.
-- [ ] Kwota w dolarach nie powstaje z danych `subscription`; dane `local` dają
-      zero zadeklarowane, odróżnialne od braku danych.
-- [ ] Kubełek z danymi więcej niż jednego modelu nie uśrednia tokenów
-      w poprzek modeli.
-- [ ] `--json` niesie te same pola co wyjście tekstowe.
-- [ ] Testy nie asertują wartości z danych tego projektu — fixture'y własne
-      (reguła z CLAUDE.md).
+- [ ] A bucket with `n` below the threshold gives "not enough data", never a
+      number.
+- [ ] The answer is always a range; never a single average.
+- [ ] No cost adapter = no token column in the output.
+- [ ] A dollar amount is not produced from `subscription` data; `local` data
+      gives a declared zero, distinguishable from missing data.
+- [ ] A bucket with data from more than one model does not average tokens
+      across models.
+- [ ] `--json` carries the same fields as the text output.
+- [ ] Tests do not assert values from this project's own data — dedicated
+      fixtures (rule from CLAUDE.md).
 
 ## Log
 
-Append-only. Format: `YYYY-MM-DD status — kto — notatka`.
+Append-only. Format: `YYYY-MM-DD status — who — note`.
 
-- 2026-08-31 blocked — agent:claude — task założony z przeglądu wyróżników
-  agentowych; czeka na kalibrację TL-29 (a pośrednio na dane z TL-27/25).
-- 2026-08-31 revised — agent:claude — uwzględnione tryby rozliczenia
-  (API / subskrypcja / model lokalny) i cięcie kubełków po modelu; tokeny
-  osią główną, kwota pochodną warunkową.
+- 2026-08-31 blocked — agent:claude — task created from the agent-facing
+  differentiators review; waiting on the TL-29 calibration (and indirectly
+  on data from TL-27/25).
+- 2026-08-31 revised — agent:claude — billing modes accounted for (API /
+  subscription / local model) and bucket slicing by model; tokens as the
+  primary axis, amount as a conditional derivative.
+</content>

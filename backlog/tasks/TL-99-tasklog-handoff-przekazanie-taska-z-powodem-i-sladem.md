@@ -1,10 +1,10 @@
 ---
 id: TL-99
-title: "worktrail handoff — przekazanie taska z powodem i sladem"
+title: "worktrail handoff — handing off a task with a reason and a trail"
 type: task
 labels: []
 board: main
-epic: "Wyróżniki agentowe"
+epic: "Agentic differentiators"
 priority: P1
 status: done
 owner: agent:claude
@@ -24,116 +24,122 @@ verification:
     bash: "node --test scripts/tests/*.test.mjs"
 ---
 
-## Cel
+## Goal
 
 `worktrail handoff TL-NNNN --to-role analyst --reason "…" --actor agent:claude`
-przekazuje task innej roli: zmienia `role:` (i zeruje `owner` na
-`unassigned`), zdejmuje lock bieżącej sesji, zapisuje powód jako zdarzenie
-komentarza oraz linię w `## Log` taska. Task wraca do kolejki i czeka na
-wykonawcę docelowej roli.
+hands off a task to another role: changes `role:` (and resets `owner` to
+`unassigned`), releases the current session's lock, records the reason as
+a comment event and a line in the task's `## Log`. The task returns to the
+queue and waits for the target role's executor.
 
-Scenariusz docelowy: agent-developer trafia na decyzję poza swoim mandatem,
-oddaje task analitykowi z pytaniem; analityk (agent albo człowiek) zapisuje
-decyzję i oddaje z powrotem. Cała wymiana — kto pytał, kto zdecydował, kiedy
-— jest w tasku i w historii, nie w scrollbacku sesji.
+Target scenario: agent-developer runs into a decision outside its mandate,
+hands the task off to an analyst with a question; the analyst (agent or
+human) records the decision and hands it back. The whole exchange — who
+asked, who decided, when — is in the task and in the history, not in session
+scrollback.
 
-## Kontekst
+## Context
 
-Powstało z decyzji o rolach subagentów (2026-08-31). Handoff jest komendą
-złożoną z istniejących prymitywów: zmiana pól przez `task-fields.mjs`,
-zdarzenia przez `history.mjs`, lock z TL-87. Nowe jest tylko jedno:
-**pierwsze użycie zarezerwowanego typu zdarzenia `__comment__`**
-([worktrail-state-and-sync.md](../../docs/worktrail-state-and-sync.md) §7 pkt 5,
-`PSEUDO_FIELDS` w `task-fields.mjs`) — powód przekazania jest komentarzem,
-nie zmianą pola, i jak komentarze jest append-only i bezkonfliktowy (§5.1
-tamtego dokumentu). Implementacja `__comment__` ma być na tyle ogólna, żeby
-przyszłe komentarze (viewer, osoby nietechniczne) użyły jej bez zmian —
-ale UI komentarzy jest POZA zakresem tego taska.
+Emerged from the decision about subagent roles (2026-08-31). Handoff is a
+command composed from existing primitives: field change through
+`task-fields.mjs`, events through `history.mjs`, lock from TL-87. Only one
+thing is new: **the first use of the reserved event type `__comment__`**
+([worktrail-state-and-sync.md](../../docs/worktrail-state-and-sync.md) §7 item 5,
+`PSEUDO_FIELDS` in `task-fields.mjs`) — the reason for the handoff is a
+comment, not a field change, and like comments it is append-only and
+conflict-free (§5.1 of that document). The `__comment__` implementation is
+meant to be general enough that future comments (the viewer, non-technical
+people) use it unchanged — but the comment UI is OUT of scope for this task.
 
-Decyzje:
-- **`--reason` jest obowiązkowy.** Przekazanie bez powodu to dla odbiorcy
-  task bez kontekstu — dokładnie ta klasa, co `blocked` z pustym
-  `blocked_by`.
-- **Handoff nie zmienia statusu.** Task wraca do `pending` tylko jeśli był
-  `in_progress` u przekazującego (bo przestaje być w toku); `blocked`
-  zostaje `blocked`. Żadnych nowych statusów — role nie są workflow.
-- **`--to-role` waliduje słownik** (TL-97); `--to-owner` jako wariant
-  przekazania konkretnej osobie w ramach tej samej roli.
-- Viewer pokazuje zdarzenia `__comment__` w osi historii taska (rendering
-  listy zdarzeń już istnieje; komentarz to nowy rodzaj wiersza, nie nowy
-  mechanizm).
+Decisions:
+- **`--reason` is mandatory.** A handoff without a reason is, for the
+  recipient, a task without context — exactly the same class as `blocked`
+  with an empty `blocked_by`.
+- **Handoff does not change status.** The task returns to `pending` only if
+  it was `in_progress` for the person handing it off (because it stops being
+  in progress); `blocked` stays `blocked`. No new statuses — roles are not a
+  workflow.
+- **`--to-role` validates against the dictionary** (TL-97); `--to-owner` as
+  a variant for handing off to a specific person within the same role.
+- The viewer shows `__comment__` events on the task's history timeline
+  (rendering of the event list already exists; a comment is a new kind of
+  row, not a new mechanism).
 
 ## Pre-flight reading
 
 - [docs/backlog-field-editing-history.md](../../docs/backlog-field-editing-history.md)
-  §2 — pseudo-pola, reguły dedupu; komentarz musi się w nie wpisać.
+  §2 — pseudo-fields, dedup rules; a comment has to fit into them.
 - [docs/worktrail-state-and-sync.md](../../docs/worktrail-state-and-sync.md)
-  §5.1–§5.2 — komentarze jako klasa append-only, bezkonfliktowa.
+  §5.1–§5.2 — comments as an append-only, conflict-free class.
 - `scripts/task-fields.mjs` — `PSEUDO_FIELDS`; `scripts/history.mjs` —
-  zapis i odczyt zdarzeń.
+  writing and reading events.
 - `backlog/tasks/TL-87-worktrail-next-atomowy-przydzial-taska-dla-agenta.md`
-  — kontrakt locka, który handoff zdejmuje.
+  — the lock contract that handoff releases.
 
-## Kroki
+## Steps
 
-1. Zdarzenie `__comment__`: zapis przez `history.mjs` (task, treść, aktor,
-   ULID), odczyt i render w viewerze przy osi historii; dedup po `id` jak
-   zwykłe zdarzenia (komentarz nie podlega regule dedupu `__created__`,
-   bo dwa identyczne komentarze w różnym czasie to dwa zdarzenia).
-2. Komenda `handoff`: walidacja roli/ownera, zmiana pól jedną istniejącą
-   drogą zapisu, zdjęcie locka sesji, komentarz z powodem, linia w `## Log`
-   pliku taska, `build`.
-3. Kody wyjścia i komunikaty: brak `--reason` = błąd wywołania; task
-   nieistniejący / rola spoza słownika = jak wszędzie.
-4. Testy: pełny handoff (pola + lock + komentarz + log), handoff taska bez
-   locka (działa — przekazać można też task wzięty ręcznie), brak reason
-   oblewa, `blocked` zostaje `blocked`.
+1. `__comment__` event: written through `history.mjs` (task, content, actor,
+   ULID), read and rendered in the viewer alongside the history timeline;
+   dedup by `id` like regular events (a comment is not subject to the
+   `__created__` dedup rule, because two identical comments at different
+   times are two events).
+2. `handoff` command: role/owner validation, field change through one
+   existing write path, session lock release, comment with the reason, line
+   in the task file's `## Log`, `build`.
+3. Exit codes and messages: missing `--reason` = invocation error;
+   nonexistent task / role outside the dictionary = as everywhere else.
+4. Tests: full handoff (fields + lock + comment + log), handoff of a task
+   without a lock (works — a task taken manually can also be handed off),
+   missing reason fails, `blocked` stays `blocked`.
 
 ## Acceptance criteria
 
-Każde kryterium w JEDNEJ linii: zawinięte do drugiej gubi tekst i `[proof:]`
-u dzisiejszego parsera (TL-118).
+Each criterion on ONE line: wrapping to a second loses text and `[proof:]`
+for today's parser (TL-118).
 
-- [x] Handoff zmienia `role`, czyści `owner`, zdejmuje lock. [proof: handoff]
-- [x] W historii zostaje `__comment__` z powodem, aktorem i własnym id. [proof: handoff]
-- [x] `handoff` bez `--reason` kończy się kodem 2 i NIC nie zapisuje. [proof: handoff]
-- [x] Rola spoza słownika oblewa przed jakimkolwiek zapisem. [proof: handoff]
-- [x] Backlog bez `roles:` mówi, gdzie je zadeklarować. [proof: handoff]
-- [x] Dwa identyczne komentarze w różnym czasie zostają dwoma zdarzeniami. [proof: handoff]
-- [x] Wiersz wstawiony dwa razy przez union-merge zostaje jednym. [proof: handoff]
-- [x] Viewer niesie treść komentarza i renderuje ją regułą `historyEntryKind()`. [proof: handoff]
-- [x] Przekazany task wraca do kolejki — `next` wydaje go ponownie. [proof: handoff]
-- [x] `blocked` zostaje `blocked`; status wraca tam, skąd task został wzięty. [proof: handoff]
-- [x] Suite zielona po zmianie kontraktu `owner`. [proof: suite-green]
+- [x] Handoff changes `role`, clears `owner`, releases the lock. [proof: handoff]
+- [x] History gains a `__comment__` with the reason, actor, and its own id. [proof: handoff]
+- [x] `handoff` without `--reason` exits with code 2 and writes NOTHING. [proof: handoff]
+- [x] A role outside the dictionary fails before any write. [proof: handoff]
+- [x] A backlog without `roles:` says where to declare them. [proof: handoff]
+- [x] Two identical comments at different times remain two events. [proof: handoff]
+- [x] A row inserted twice by union-merge remains one. [proof: handoff]
+- [x] The viewer carries the comment content and renders it through the `historyEntryKind()` rule. [proof: handoff]
+- [x] A handed-off task returns to the queue — `next` issues it again. [proof: handoff]
+- [x] `blocked` stays `blocked`; status returns to wherever the task was taken from. [proof: handoff]
+- [x] Suite green after the `owner` contract change. [proof: suite-green]
 
-Trzy rzeczy z pierwotnego brzmienia NIE są zrobione i to są decyzje, nie
-przeoczenia:
+Three things from the original wording are NOT done, and these are decisions,
+not oversights:
 
-- **Linia w sekcji `Log`.** Sekcja została zniesiona w TL-105 przy zerowej
-  adopcji, a powód jedzie odtąd z ZAPISEM (pole `reason` rekordu). Dopisanie
-  prozy byłoby drugą kopią tego, co historia już trzyma.
-- **`next --role <docelowa>`.** Selekcja po roli należy WYŁĄCZNIE do TL-98
-  („Zakres egzekwowania ról to wyłącznie ten task"), który czeka jeszcze na
-  TL-96. Zrobiona jest połowa dająca się dziś zweryfikować: task wraca do
-  kolejki i `next` wydaje go ponownie. Filtr po roli dojdzie tam.
-- **`owner: unassigned`.** `unassigned` jest wartością CUDZEGO projektu
-  (`owners:` w `config.yaml`), a nic w tym słowniku nie mówi, który wpis
-  znaczy „nikt". Zamiast wpisywać to słowo z kodu, `owner` dostał
-  `allowEmpty`: nieposiadany task to BRAK roszczenia — dashboard i tak już
-  grupował go przez `!t.owner`.
+- **A line in the `Log` section.** The section was abolished in TL-105 at
+  zero adoption, and the reason has since traveled with the RECORD (the
+  record's `reason` field). Appending prose would be a second copy of what
+  the history already holds.
+- **`next --role <target>`.** Selection by role belongs EXCLUSIVELY to
+  TL-98 ("The scope of role enforcement is this task alone"), which is still
+  waiting on TL-96. The half that can be verified today is done: the task
+  returns to the queue and `next` issues it again. The role filter will
+  arrive there.
+- **`owner: unassigned`.** `unassigned` is a value from SOMEONE ELSE'S
+  project (`owners:` in `config.yaml`), and nothing in this dictionary says
+  which entry means "nobody". Instead of hardcoding that word, `owner` got
+  `allowEmpty`: an unowned task is NO claim — the dashboard already grouped
+  it by `!t.owner` anyway.
 
-Do czego status wraca, nie rozstrzyga słownik, tylko HISTORIA tego taska:
-`take` zapisał przejście, którego handoff jest cofnięciem. Domyślna
-konfiguracja zostawia DWA statusy znaczące „czeka na kogoś" (`pending`
-i `blocked`), więc reguła czytająca sam `config.yaml` byłaby niejednoznaczna
-w przypadku zwyczajnym, a nie brzegowym.
+Where the status returns to is decided not by the dictionary, but by the
+HISTORY of that task: `take` recorded the transition that handoff undoes.
+The default configuration leaves TWO statuses meaning "waiting for someone"
+(`pending` and `blocked`), so a rule reading `config.yaml` alone would be
+ambiguous in the ordinary case, not just at the edge.
 
 ## Log
 
-Append-only. Format: `YYYY-MM-DD status — kto — notatka`.
+Append-only. Format: `YYYY-MM-DD status — who — note`.
 
-- 2026-08-31 blocked — agent:claude — task założony z decyzji o rolach;
-  czeka na pole role (TL-97) i lock z next (TL-87). Pierwsze użycie
-  zarezerwowanego `__comment__`.
-- 2026-09-01 blocked — agent:claude — dopisany dependent TL-114 (zdarzenie
-  `__decision__` buduje na implementacji `__comment__` z tego taska).
+- 2026-08-31 blocked — agent:claude — task created from the decision about
+  roles; waiting on the role field (TL-97) and the lock from next (TL-87).
+  First use of the reserved `__comment__`.
+- 2026-09-01 blocked — agent:claude — added dependent TL-114 (the
+  `__decision__` event builds on the `__comment__` implementation from this
+  task).

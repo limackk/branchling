@@ -1,10 +1,10 @@
 ---
 id: TL-121
-title: "Szablon tego repo zgubił pola, które ma szablon wysyłkowy"
+title: "This repo's template lost fields that the shipping template has"
 type: task
 labels: []
 board: main
-epic: "Historia i atrybucja"
+epic: "History and attribution"
 priority: P2
 status: pending
 owner: unassigned
@@ -22,105 +22,116 @@ verification:
     bash: "node --test scripts/tests/*.test.mjs"
 ---
 
-## Cel
+## Goal
 
-`backlog/_template.md` i korzeniowy `_template.md` mają ten sam KSZTAŁT: te same
-klucze frontmattera, wpis `verification:` z `id:` i sekcję kryteriów uczącą
-`[proof: <id>]`. Różnią się WYŁĄCZNIE językiem prozy. Pilnuje tego test, który
-listę pól WYLICZA z szablonu wysyłkowego, zamiast ją przepisywać.
+`backlog/_template.md` and the root `_template.md` share the same SHAPE: the
+same frontmatter keys, a `verification:` entry with `id:`, and an acceptance
+criteria section teaching `[proof: <id>]`. They differ ONLY in the language of
+the prose. A test guards this by DERIVING the field list from the shipping
+template instead of duplicating it.
 
-## Kontekst
+## Context
 
-Repozytorium trzyma dwa szablony i to jest w porządku: korzeniowy `_template.md`
-jedzie w tarballu do cudzych repozytoriów (angielski, pod strażą
-`check --language`), a `backlog/_template.md` jest szablonem TEGO backlogu
-i po polsku. Wada nie polega na tym, że są dwa — tylko na tym, że rozjechały
-się w wymiarze, w którym rozjechać się nie mogą.
+The repository keeps two templates, and that is fine: the root `_template.md`
+ships in the tarball into other people's repositories (English, guarded by
+`check --language`), while `backlog/_template.md` is THIS backlog's template
+and is in Polish. The defect is not that there are two of them — it is that
+they drifted apart along a dimension where they must not drift.
 
-Granica biegnie tam, gdzie CLAUDE.md ją stawia: **kod zna KSZTAŁT, dane znają
-WARTOŚCI.** Klucze frontmattera i struktura wpisu `verification:` to kształt —
-czyta je `task-fields.mjs` i `criteria.mjs`. Nagłówek `## Acceptance criteria`
-też jest kształtem: `criteria.mjs` ma go zaszytego po angielsku
-(`CRITERIA_HEADING`) właśnie dlatego, że to FORMAT, a nie słownictwo projektu.
-Prozą — i po polsku — są `## Cel`, `## Kontekst`, `## Kroki` i teksty adnotacji.
+The boundary runs where CLAUDE.md draws it: **the code knows the SHAPE, the
+data knows the VALUES.** The frontmatter keys and the structure of the
+`verification:` entry are shape — `task-fields.mjs` and `criteria.mjs` read
+them. The `## Acceptance criteria` heading is also shape: `criteria.mjs` has
+it hard-coded in English (`CRITERIA_HEADING`) precisely because it is a
+FORMAT, not project vocabulary. `## Cel`, `## Kontekst`, `## Kroki` and the
+annotation texts are prose — and in Polish.
 
-**Zmierzony rozjazd (2026-09-01):**
+**Measured drift (2026-09-01):**
 
-| czego brakuje w `backlog/_template.md` | koszt |
+| what `backlog/_template.md` is missing | cost |
 |---|---|
-| `confidence:` | 106 ze 120 tasków ma to pole — dopisywane RĘCZNIE, bo szablon go nie daje |
-| `id:` przy wpisie `verification:` | bez niego kryterium nie ma na co wskazać; `check --criteria` melduje 62 z 63 otwartych tasków bez linku |
-| akapit uczący `[proof: <id>]` | narzędzie odhacza kryterium po zielonym przebiegu, a szablon o tym nie mówi |
-| `## Pre-flight reading` | 89 ze 121 tasków ma tę sekcję, po angielsku — konwencja istnieje, tylko nie w szablonie |
-| ramka nagłówkowa z frontmattera | mówi, skąd biorą się słowniki (`config.yaml`), a nie z szablonu |
+| `confidence:` | 106 of 120 tasks have this field — added BY HAND, because the template does not provide it |
+| `id:` on the `verification:` entry | without it a criterion has nothing to point at; `check --criteria` reports 62 of 63 open tasks with no link |
+| the paragraph teaching `[proof: <id>]` | the tool checks off a criterion after a green run, and the template says nothing about it |
+| `## Pre-flight reading` | 89 of 121 tasks have this section, in English — the convention exists, just not in the template |
+| the header comment block from the frontmatter | states where the vocabularies come from (`config.yaml`), not from the template |
 
-Osobno: `id: BL-NNN` w `backlog/_template.md` niesie prefiks sprzed migracji
-TL-111, a `task_id_prefix` w `config.yaml` to `TL`. Nie psuje to `new`, bo
-`createTask` i tak podmienia całą linię `^id:`, ale placeholder KŁAMIE
-człowiekowi, który otworzy plik.
+Separately: `id: BL-NNN` in `backlog/_template.md` carries the prefix from
+before the TL-111 migration, while `task_id_prefix` in `config.yaml` is `TL`.
+This does not break `new`, since `createTask` replaces the whole `^id:` line
+regardless, but the placeholder LIES to a human who opens the file.
 
-**Dlaczego to zostało zauważone.** TL-120 usuwał `## Log` z tego samego pliku
-i przy okazji okazało się, że plik jest stary także pod innymi względami.
-TL-120 świadomie tego nie tknął — to inny defekt niż ten, który tam naprawiano.
+**Why this was noticed.** TL-120 was removing `## Log` from the same file, and
+in the process it turned out the file was stale in other respects too.
+TL-120 deliberately left this untouched — it is a different defect from the
+one being fixed there.
 
-**Czego ten task NIE robi.** `scripts/migrate-prefix.mjs` w ogóle nie dotyka
-`_template.md` — grep po `TEMPLATE`/`_template` w tym pliku nie daje trafień.
-Czyli KAŻDE repozytorium, które zmieni prefiks, zostanie z placeholderem na
-starym; tutaj poprawimy skutek, nie przyczynę. To defekt narzędzia, nie danych,
-i należy do osobnego taska.
+**What this task does NOT do.** `scripts/migrate-prefix.mjs` does not touch
+`_template.md` at all — grepping this file for `TEMPLATE`/`_template` gives no
+hits. That means EVERY repository that changes its prefix is left with the
+placeholder on the old one; here we fix the effect, not the cause. That is a
+tool defect, not a data one, and belongs to a separate task.
 
-**Sąsiedni task, który to NIE jest.** TL-69 dotyczy tego samego pliku
-z drugiej strony: tam chodzi o WARTOŚCI przemycane z szablonu po zmianie
-słowników w cudzym repozytorium, tu o KSZTAŁT szablonu w tym repozytorium.
-Nie blokują się wzajemnie i nie należy ich łączyć.
+**A neighboring task this is NOT.** TL-69 concerns the same file from the
+other side: there it is about VALUES smuggled in from the template after the
+vocabularies change in someone else's repository, here it is about the SHAPE
+of the template in this repository. They do not block each other and should
+not be merged.
 
-**Czego NIE wolno zrobić.** Nie tłumacz `backlog/_template.md` na angielski —
-CLAUDE.md mówi wprost, że `backlog/` jest po polsku i że guard go nie czyta.
-Nie ruszaj istniejących tasków: braki `confidence:` w czternastu z nich to nie
-jest sprzątanie do tego taska.
+**What must NOT be done.** Do not translate `backlog/_template.md` into
+English — CLAUDE.md states outright that `backlog/` is in Polish and that the
+guard does not read it. Do not touch existing tasks: the missing
+`confidence:` field in fourteen of them is not cleanup that belongs to this
+task.
 
 ## Pre-flight reading
 
-1. `_template.md` — wzorzec kształtu; stąd ma pochodzić lista pól w teście.
-2. `backlog/_template.md` — plik do wyrównania.
-3. `scripts/criteria.mjs:55-70` — `CRITERIA_HEADING` i `PROOF_ID`; dowód, że
-   nagłówek kryteriów jest formatem, a nie słownictwem.
-4. `scripts/task-fields.mjs:185-215` — lista pól i ich rodzaje, w tym
-   `confidence` (`allowEmpty: true`, dlatego brak nie oblewa builda i rozjazd
-   mógł żyć niezauważony).
-5. `scripts/tests/_repo.mjs` — stąd bierze się katalog backlogu.
-6. `scripts/tests/change-reason.test.mjs` (ogon, TL-120) — wzór strażnika
-   porównującego oba szablony i kontrola pozytywna.
-7. `CLAUDE.md`, „Zanim zmienisz kod" — reguła kształt/wartości i granica języka.
+1. `_template.md` — the shape reference; the field list in the test should be
+   derived from here.
+2. `backlog/_template.md` — the file to bring into alignment.
+3. `scripts/criteria.mjs:55-70` — `CRITERIA_HEADING` and `PROOF_ID`; proof
+   that the criteria heading is a format, not project vocabulary.
+4. `scripts/task-fields.mjs:185-215` — the list of fields and their kinds,
+   including `confidence` (`allowEmpty: true`, which is why its absence does
+   not fail the build and the drift could live unnoticed).
+5. `scripts/tests/_repo.mjs` — where the backlog directory comes from.
+6. `scripts/tests/change-reason.test.mjs` (tail, TL-120) — a model of a guard
+   comparing both templates, with a positive control.
+7. `CLAUDE.md`, "Before you change the code" — the shape/values rule and the
+   language boundary.
 
-## Kroki
+## Steps
 
-1. Dopisz do `backlog/_template.md` brakujące pole `confidence:` w tej samej
-   pozycji co w szablonie wysyłkowym (po `estimate:`).
-2. Rozbuduj wpis `verification:` o `id:`, tak jak w wysyłkowym, i dopisz do
-   sekcji kryteriów akapit o `[proof: <id>]` oraz przykładowe kryterium
-   z linkiem. Nagłówek `## Acceptance criteria` zostaje po angielsku.
-3. Dodaj sekcję `## Pre-flight reading` — po angielsku, bo taką nazwę noszą
-   89 istniejące taski, a zmiana nazwy rozjechałaby je z szablonem.
-4. Popraw `id: BL-NNN` na prefiks z `config.yaml`.
-5. Nowy plik `scripts/tests/template-shape.test.mjs`: klucze frontmattera
-   `backlog/_template.md` mają być równe kluczom wysyłkowego — listę WYLICZ
-   z pliku wysyłkowego, nie wpisuj. Ścieżki bierz z `_repo.mjs`; w układzie
-   ko-lokowanym oba wskazują ten sam plik i test ma wtedy przejść trywialnie,
-   a nie porównywać plik ze sobą i udawać dowód — powiedz to w kodzie.
-6. Dołóż w tym samym teście: wpis `verification:` niesie `id:`, sekcja kryteriów
-   zawiera `[proof: …]` pasujące do `PROOF_ID`, a prefiks w `id:` zgadza się
-   z `task_id_prefix` z `config.yaml`.
-7. Dołóż kontrolę pozytywną: usuń pole w kopii w piaskownicy i sprawdź, że ten
-   sam test to WIDZI. Bez tego zielony wynik nie ma mocy dowodowej.
-8. Sprawdź `node scripts/cli.mjs check` — liczba tasków bez linku
-   `criterion→verification` nie ma wzrosnąć.
+1. Add the missing `confidence:` field to `backlog/_template.md`, in the same
+   position as in the shipping template (after `estimate:`).
+2. Extend the `verification:` entry with `id:`, as in the shipping template,
+   and add a paragraph about `[proof: <id>]` to the criteria section along
+   with a sample criterion carrying a link. The `## Acceptance criteria`
+   heading stays in English.
+3. Add a `## Pre-flight reading` section — in English, because that is the
+   name 89 existing tasks already carry, and renaming it would drift them
+   away from the template.
+4. Fix `id: BL-NNN` to carry the prefix from `config.yaml`.
+5. New file `scripts/tests/template-shape.test.mjs`: the frontmatter keys of
+   `backlog/_template.md` must equal the keys of the shipping template —
+   DERIVE the list from the shipping file, do not hard-code it. Take the
+   paths from `_repo.mjs`; in the co-located layout both point to the same
+   file and the test then passes trivially — say so in the code, rather than
+   comparing the file to itself and pretending that is proof.
+6. Add to the same test: the `verification:` entry carries `id:`, the criteria
+   section contains `[proof: …]` matching `PROOF_ID`, and the prefix in `id:`
+   matches `task_id_prefix` from `config.yaml`.
+7. Add a positive control: remove the field from a sandbox copy and check
+   that the same test CATCHES it. Without this, a green result has no
+   evidentiary force.
+8. Check `node scripts/cli.mjs check` — the number of tasks without a
+   `criterion→verification` link must not increase.
 
 ## Acceptance criteria
 
-- [ ] Klucze frontmattera obu szablonów są identyczne, a lista jest wyliczona z wysyłkowego. [proof: shape-parity]
-- [ ] Wpis `verification:` w szablonie repo niesie `id:`, a kryteria uczą `[proof: <id>]`. [proof: shape-parity]
-- [ ] Placeholder `id:` niesie prefiks z `config.yaml`, nie sprzed migracji. [proof: shape-parity]
-- [ ] Strażnik OBLEWA po usunięciu pola z kopii — kontrola pozytywna. [proof: shape-parity]
-- [ ] Proza w `backlog/_template.md` pozostaje po polsku. [proof: suite-green]
-- [ ] Pełny pakiet testów jest zielony. [proof: suite-green]
+- [ ] The frontmatter keys of both templates are identical, and the list is derived from the shipping one. [proof: shape-parity]
+- [ ] The `verification:` entry in the repo template carries `id:`, and the criteria teach `[proof: <id>]`. [proof: shape-parity]
+- [ ] The `id:` placeholder carries the prefix from `config.yaml`, not the pre-migration one. [proof: shape-parity]
+- [ ] The guard FAILS after the field is removed from a copy — positive control. [proof: shape-parity]
+- [ ] The prose in `backlog/_template.md` stays in Polish. [proof: suite-green]
+- [ ] The full test suite is green. [proof: suite-green]

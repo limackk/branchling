@@ -1,6 +1,6 @@
 ---
 id: TL-126
-title: "README opisuje sekcję ## Log, której szablon nie ma od TL-105"
+title: "README describes a ## Log section the template hasn't had since TL-105"
 type: task
 labels: []
 board: main
@@ -14,55 +14,59 @@ updated: 2026-09-01
 blocked_by: []
 blocks: []
 related_docs: []
-verification:                      # JAK sprawdzić, że task naprawdę jest zrobiony
+verification:                      # HOW to check the task is really done
   - id: no-log-section
     bash: "! grep -n 'append-only log' README.md"
   - id: sections-match-template
     manual: "each body section README names is a heading present in _template.md"
 ---
 
-## Cel
+## Goal
 
-`README.md` przestaje opisywać sekcję `## Log` w pliku taska. Po zmianie opis
-ciała taska w README zgadza się z tym, co naprawdę jest w `_template.md` i co
-pisze `worktrail done`, a „dlaczego" wskazuje na pole `reason` rekordu
-w `backlog/history/`.
+`README.md` stops describing a `## Log` section in the task file. After the
+change, the description of a task's body in the README matches what is
+actually in `_template.md` and what `worktrail done` writes, and the "why"
+points to the `reason` field of a record in `backlog/history/`.
 
-## Kontekst
+## Context
 
-TL-105 usunął `## Log` z szablonu i z drogi zapisu: powód zmiany jedzie
-z ZAPISEM, nie z prozą w pliku. README tego nie zauważył. Linia 175
-(sekcja `## The task file`) nadal wymienia wśród sekcji ciała
-„an append-only log of the form `YYYY-MM-DD status — kto — notatka`".
+TL-105 removed `## Log` from the template and from the write path: the
+reason for a change travels with the WRITE, not as prose in the file. The
+README did not notice. Line 175 (the section `## The task file`) still
+lists among the body sections "an append-only log of the form `YYYY-MM-DD
+status — kto — notatka`".
 
-To nie jest kosmetyka. README jest PUBLICZNĄ powierzchnią i pierwszym, co czyta
-obcy użytkownik: opisuje sekcję, której `worktrail new` nigdy nie utworzy, więc
-uczy ręcznego prowadzenia dziennika obok mechanizmu, który powstał żeby go
-zastąpić. Stare taski z `## Log` zostają — to zdania, których nikt nie odtworzy
-— ale README nie ma tego zalecać nowym.
+This is not cosmetic. The README is a PUBLIC surface and the first thing a
+stranger reads: it describes a section that `worktrail new` will never
+create, so it teaches manual journal-keeping alongside the mechanism that
+was built to replace it. Old tasks with `## Log` stay — those are sentences
+nobody will reconstruct — but the README must not recommend it to new ones.
 
-Znalezione przy okazji TL-94 (`worktrail seed`), który generuje ciało taska
-i celowo nie pisze `## Log`.
+Found while working on TL-94 (`worktrail seed`), which generates a task body
+and deliberately does not write `## Log`.
 
 ## Pre-flight reading
 
-1. `README.md` — sekcja `## The task file`, akapit pod blokiem YAML (ok. linia
-   171-179): lista sekcji ciała.
-2. `_template.md` — co szablon NAPRAWDĘ zawiera; to jest źródło prawdy dla tego
-   akapitu.
-3. `CLAUDE.md` — akapit „Powód zmiany jedzie z ZAPISEM, nie z prozą w pliku
-   (TL-105)".
+1. `README.md` — the `## The task file` section, the paragraph under the
+   YAML block (around line 171-179): the list of body sections.
+2. `_template.md` — what the template ACTUALLY contains; this is the source
+   of truth for that paragraph.
+3. `CLAUDE.md` — the paragraph "The reason for a change travels with the
+   WRITE, not as prose in the file (TL-105)".
 
-## Kroki
+## Steps
 
-1. Popraw akapit w README tak, żeby wymieniał sekcje, które szablon ma,
-   i nie wymieniał `## Log`.
-2. Dopisz jedno zdanie mówiące, gdzie jest „dlaczego": pole `reason` rekordu
-   w `history/`, i że `reason_required_statuses` decyduje, kiedy jest wymagane.
-3. Sprawdź, czy ten sam nieistniejący dziennik nie jest opisany gdzie indziej
-   w README ani w `scripts/instructions.mjs`.
+1. Fix the paragraph in the README so it lists the sections the template
+   has, and does not list `## Log`.
+2. Add one sentence saying where the "why" is: the `reason` field of a
+   record in `history/`, and that `reason_required_statuses` decides when it
+   is required.
+3. Check whether the same nonexistent journal is described anywhere else in
+   the README or in `scripts/instructions.mjs`.
 
 ## Acceptance criteria
 
-- [ ] README nie opisuje `## Log` jako części pliku taska. [proof: no-log-section]
-- [ ] Każda sekcja ciała, którą README wymienia, jest nagłówkiem w `_template.md`. [proof: sections-match-template]
+- [ ] README does not describe `## Log` as part of the task file. [proof:
+      no-log-section]
+- [ ] Every body section the README lists is a heading in `_template.md`.
+      [proof: sections-match-template]

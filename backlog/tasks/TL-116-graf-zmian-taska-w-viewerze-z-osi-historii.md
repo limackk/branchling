@@ -1,10 +1,10 @@
 ---
 id: TL-116
-title: "Graf zmian taska w viewerze z osi historii"
+title: "Task change graph in the viewer, built from the history axis"
 type: task
 labels: []
 board: main
-epic: "Wyróżniki agentowe"
+epic: "Agent-facing distinctives"
 priority: P2
 status: blocked
 owner: unassigned
@@ -20,82 +20,86 @@ verification:
   - bash: "node --test scripts/tests/task-graph.test.mjs"
 ---
 
-## Cel
+## Goal
 
-Detal taska w viewerze dostaje graf zmian: oś czasu z węzłami — utworzenie,
-przejścia statusów, handoffy (zmiany `role`/`owner` z powodem), pytania
-i decyzje — z kolorem rozróżniającym aktora `agent:` od człowieka. Użytkownik
-otwiera task i widzi jednym spojrzeniem, którędy task szedł, kto go
-przekazywał, kto o co pytał i kto zdecydował.
+The task detail view in the viewer gets a change graph: a timeline with nodes
+— creation, status transitions, handoffs (`role`/`owner` changes with a
+reason), questions and decisions — colored to distinguish an `agent:` actor
+from a human. The user opens a task and sees, at a glance, where the task
+went, who handed it off, who asked what, and who decided.
 
-Graf jest czystą pochodną `history/TL-NNNN.jsonl` (Prawo 2): zero nowych
-danych, zero nowych zapisów. Działa też w trybie `file://` (historia jest
-wbudowana w build), więc graf da się wysłać komuś jednym plikiem.
+The graph is a pure derivative of `history/TL-NNNN.jsonl` (Law 2): no new
+data, no new writes. It also works in `file://` mode (history is embedded in
+the build), so the graph can be sent to someone as a single file.
 
-## Kontekst
+## Context
 
-Powstało z analizy human/agent (2026-09-01); rozstrzygnięcia w
+Came out of the human/agent analysis (2026-09-01); decisions in
 [docs/backlog-human-agent-decisions.md](../../docs/backlog-human-agent-decisions.md) §5.
 
-Detal taska ma już oś historii jako LISTĘ (docs/backlog-field-editing-history.md
-§5). Graf to drugi render tych samych zdarzeń, nie nowy mechanizm — lista
-zostaje (jest gęstsza informacyjnie), graf jest widokiem przebiegu.
+The task detail view already has a history axis as a LIST
+(docs/backlog-field-editing-history.md §5). The graph is a second rendering of
+the same events, not a new mechanism — the list stays (it is denser
+information-wise), the graph is a flow view.
 
-Decyzje:
-- **Współdzielony silnik z TL-91** — fold historii per task (`stateAt`)
-  planowany dla time-lapse'u boardu jest tym samym foldem; jeśli TL-91
-  powstanie pierwszy, reużyć jego moduł, jeśli ten — wystawić fold tak,
-  żeby TL-91 go reużył. Dwa foldy rozjadą się w definicjach.
-- **Kolor human/agent z przestrzeni nazw aktora** — ta sama konwencja co
-  TL-91; wpisy `unknown`/`legacy` mają własny, jawny kolor „nie wiadomo",
-  nie udają człowieka.
-- **Węzłem jest zdarzenie znaczące, nie każdy wpis** — przejścia `status`,
-  zmiany `role`/`owner`, `__created__`/`__deleted__`, `__comment__`,
-  `__decision__`. Pozostałe zmiany pól (priorytet, estymata…) zwinięte jako
-  kropki między węzłami, rozwijalne — inaczej graf taska o długiej historii
-  jest nieczytelny.
-- **Para pytanie→decyzja jest połączona krawędzią** (`resolves` z TL-114);
-  pytanie otwarte jest wizualnie oznaczone jako otwarte.
-- **Granice danych pokazane, nie ukryte** — historia zaczyna się 2026-08-30
-  (reguła z TL-91): początek osi opisany „historia od …", nie udaje
-  pełnego życiorysu taska.
+Decisions:
+- **Shared engine with TL-91** — the per-task history fold (`stateAt`) planned
+  for the board time-lapse is the same fold; if TL-91 lands first, reuse its
+  module, if this one does, expose the fold so TL-91 can reuse it. Two folds
+  would drift apart in their definitions.
+- **Human/agent color from the actor's namespace** — the same convention as
+  TL-91; `unknown`/`legacy` entries get their own, explicit "unknown" color,
+  not a stand-in for human.
+- **A node is a significant event, not every entry** — `status` transitions,
+  `role`/`owner` changes, `__created__`/`__deleted__`, `__comment__`,
+  `__decision__`. Other field changes (priority, estimate…) are collapsed into
+  dots between nodes, expandable — otherwise the graph of a task with a long
+  history is unreadable.
+- **A question→decision pair is connected by an edge** (`resolves` from
+  TL-114); an open question is visually marked as open.
+- **Data boundaries are shown, not hidden** — history starts on 2026-08-30
+  (rule from TL-91): the start of the axis is labeled "history since …", not
+  pretending to be the task's full life story.
 
 ## Pre-flight reading
 
 - [docs/backlog-human-agent-decisions.md](../../docs/backlog-human-agent-decisions.md)
-  §5 — zakres węzłów i relacja do TL-91.
+  §5 — node scope and relation to TL-91.
 - [docs/backlog-field-editing-history.md](../../docs/backlog-field-editing-history.md)
-  §2 i §5 — format wpisu, dedup, istniejący render osi.
+  §2 and §5 — entry format, dedup, existing axis rendering.
 - `backlog/tasks/TL-91-time-lapse-boardu-odtwarzany-z-logu-zdarzen.md`
-  — współdzielony fold i konwencja kolorów.
-- `scripts/build-viewer.mjs` — jak historia trafia do builda; pułapka
-  backslashy w template literalu.
+  — shared fold and color convention.
+- `scripts/build-viewer.mjs` — how history reaches the build; the backslash
+  trap in the template literal.
 
-## Kroki
+## Steps
 
-1. Fold zdarzeń taska do sekwencji węzłów grafu (klasyfikacja
-   znaczące/zwinięte, parowanie `resolves`) jako czysta funkcja —
-   uruchamialna w Node, wklejana źródłem do viewera.
-2. Render grafu w detalu taska (SVG, przewijalny poziomo w kontenerze,
-   nie rozpychający strony); kolor wg przestrzeni aktora; klik węzła
-   zawęża listę historii do tego zdarzenia (istniejący mechanizm filtra
-   per pole).
-3. Testy foldu na fixture: kolejność, task skasowany i założony ponownie,
-   para pytanie→decyzja, pytanie otwarte, wpisy `legacy` (kontrole
-   pozytywne dla każdego rodzaju węzła).
+1. Fold task events into a sequence of graph nodes (classify
+   significant/collapsed, pair up `resolves`) as a pure function — runnable in
+   Node, pasted as source into the viewer.
+2. Render the graph in the task detail view (SVG, scrollable horizontally
+   inside its container, not stretching the page); color by actor namespace;
+   clicking a node narrows the history list to that event (existing per-field
+   filter mechanism).
+3. Fold tests on a fixture: ordering, a task deleted and re-created, a
+   question→decision pair, an open question, `legacy` entries (positive
+   controls for each node kind).
 
 ## Acceptance criteria
 
-- [ ] Fold jest czystą funkcją z testami poza przeglądarką.
-- [ ] Graf nie wykonuje żadnych zapisów i działa w trybie `file://`.
-- [ ] Zmiany `agent:` są wizualnie odróżnialne od ludzkich, a `unknown`
-      od obu.
-- [ ] Pytanie otwarte i para pytanie→decyzja są rozróżnialne na grafie.
-- [ ] Początek historii jest opisany jawnie, nie wygląda jak początek taska.
+- [ ] The fold is a pure function with tests outside the browser.
+- [ ] The graph performs no writes and works in `file://` mode.
+- [ ] `agent:` changes are visually distinguishable from human ones, and
+      `unknown` from both.
+- [ ] An open question and a question→decision pair are distinguishable on the
+      graph.
+- [ ] The start of the history is explicitly labeled, not appearing as the
+      task's start.
 
 ## Log
 
-Append-only. Format: `YYYY-MM-DD status — kto — notatka`.
+Append-only. Format: `YYYY-MM-DD status — who — note`.
 
-- 2026-09-01 blocked — agent:claude — task założony z analizy human/agent;
-  czeka na zdarzenie decyzji (TL-114). Współdzieli fold z TL-91.
+- 2026-09-01 blocked — agent:claude — task created from the human/agent
+  analysis; waiting on the decision event (TL-114). Shares the fold with
+  TL-91.

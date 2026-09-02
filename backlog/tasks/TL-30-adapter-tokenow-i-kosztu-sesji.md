@@ -1,10 +1,10 @@
 ---
 id: TL-30
-title: "Adapter tokenów i kosztu sesji"
+title: "Token and session cost adapter"
 type: code
 labels: [post-launch]
 board: main
-epic: "Backlog — pomiar czasu pracy"
+epic: "Backlog — work time measurement"
 priority: P3
 status: pending
 owner: unassigned
@@ -18,65 +18,106 @@ related_docs:
   - docs/backlog-time-tracking.md
 verification:
   - bash: "node --test backlog/scripts/tests/cost-adapter.test.mjs"
-  - bash: "node backlog/scripts/cli.mjs time --cost --json | python3 -c \"import json,sys; d=json.load(sys.stdin); assert d['tokens'] is None or isinstance(d['tokens'], int), 'brak adaptera musi dawać null, nie zero'; print('tokeny:', d['tokens'])\""
+  - bash: "node backlog/scripts/cli.mjs time --cost --json | python3 -c \"import json,sys; d=json.load(sys.stdin); assert d['tokens'] is None or isinstance(d['tokens'], int), 'a missing adapter must give null, not zero'; print('tokens:', d['tokens'])\""
 ---
 
-## Cel
+## Goal
 
-Dołożyć drugą oś pomiaru wysiłku agenta: tokeny i wywołania narzędzi. Zegar agenta AI zależy od prędkości modelu i od tego, ile razy człowiek przerwał sesję; tokeny są od tego niezależne i przeliczają się wprost na koszt.
+Add a second axis for measuring agent effort: tokens and tool calls. An AI
+agent's clock depends on model speed and on how many times a human
+interrupted the session; tokens are independent of that and translate
+directly into cost.
 
-## Kontekst
+## Context
 
-Engaged time (TL-28) mierzy kalendarz pracy, nie jej rozmiar. Dwa taski po 40 minut mogą różnić się kilkukrotnie liczbą tokenów, a to ta druga liczba mówi, ile pracy naprawdę było — i ile kosztowała.
+Engaged time (TL-28) measures the calendar span of work, not its size. Two
+40-minute tasks can differ several times over in token count, and it is that
+second number that says how much work there really was — and what it cost.
 
-Ograniczenie, które definiuje kształt tego taska: **rdzeń modułu nie może zależeć od Claude Code'a.** Moduł idzie open source i ma działać nad cudzym procesem. Adapter jest więc opcjonalną wtyczką, a nie warunkiem działania — i jego brak musi dawać `null`, nie zero. Zero znaczyłoby „zmierzone i wyszło darmo", czyli nieprawdę; to ten sam kontrakt, który trzyma `estimateHours()`.
+The constraint that shapes this task: **the module's core must not depend on
+Claude Code.** The module is going open source and has to work over
+someone else's process. The adapter is therefore an optional plugin, not a
+condition for operation — and its absence must give `null`, not zero. Zero
+would mean "measured, and it came out free," which is untrue; this is the
+same contract that `estimateHours()` upholds.
 
 ## Pre-flight reading
 
-1. `docs/architecture/backlog-time-tracking.md` — §3 (koszt jako czwarta wielkość), §7 (adapter, nie zależność), §10 (koszt jako druga oś).
-2. `backlog/scripts/activity.mjs` — kształt wiersza z TL-27; pola kosztowe są OPCJONALNE i muszą takie zostać.
-3. `backlog/scripts/estimate.mjs` — kontrakt „`null`, nigdy zero".
+1. `docs/architecture/backlog-time-tracking.md` — §3 (cost as a fourth
+   quantity), §7 (adapter, not a dependency), §10 (cost as a second axis).
+2. `backlog/scripts/activity.mjs` — the shape of a row from TL-27; the cost
+   fields are OPTIONAL and must stay that way.
+3. `backlog/scripts/estimate.mjs` — the "`null`, never zero" contract.
 
-## Kroki
+## Steps
 
-1. Rozszerzyć kształt wiersza o opcjonalne `tokens_in`, `tokens_out`, `model` — obecność nieobowiązkowa, brak ≠ zero.
-2. Adapter Claude Code: odczyt zużycia z transkryptu sesji (`SessionEnd`) i dopisanie zbiorczego wiersza `kind: "session"` z atrybucją z TL-28.
-3. `worktrail time --cost` — tokeny i szacunkowy koszt per task/okres; `null` i jawny komunikat, gdy adapter nie działał.
-4. Cennik modeli w `config.yaml` (dane, nie kod) — bez niego raport podaje tokeny bez kwoty, zamiast zgadywać stawkę. Wpis cennika przyjmuje stawkę za token **albo** znacznik trybu rozliczenia: `subscription` (Claude Code / Codex w abonamencie — koszt krańcowy taska w dolarach jest fikcją, raport pokazuje tokeny bez kwoty z podaniem powodu) lub `local` (model lokalny, np. Ollama — stawka jest ZADEKLAROWANYM zerem, odróżnialnym od `null`). Trzy rozróżnialne wyjścia raportu: kwota / tokeny-bez-kwoty-bo-subskrypcja / zero-zadeklarowane; czwarte pozostaje `null` (brak adaptera lub brak wpisu w cenniku).
-5. Dokument: dopisać do §8, czy tokeny okazały się stabilniejszym predyktorem niż czas (§12 pkt 1).
+1. Extend the row shape with optional `tokens_in`, `tokens_out`, `model` —
+   presence is not mandatory, absence ≠ zero.
+2. Claude Code adapter: read usage from the session transcript (`SessionEnd`)
+   and append an aggregate `kind: "session"` row with the attribution from
+   TL-28.
+3. `worktrail time --cost` — tokens and estimated cost per task/period;
+   `null` and an explicit message when the adapter did not run.
+4. Model pricing in `config.yaml` (data, not code) — without it the report
+   gives tokens without an amount, instead of guessing a rate. A pricing
+   entry accepts either a per-token rate **or** a billing-mode marker:
+   `subscription` (Claude Code / Codex on a subscription — a task's marginal
+   dollar cost is fiction, the report shows tokens without an amount, stating
+   why) or `local` (a local model, e.g. Ollama — the rate is a DECLARED
+   zero, distinguishable from `null`). Three distinguishable report outputs:
+   amount / tokens-without-amount-because-subscription /
+   declared-zero; the fourth stays `null` (no adapter, or no pricing entry).
+5. Document: add to §8 whether tokens turned out to be a more stable
+   predictor than time (§12 item 1).
 
 ## Acceptance criteria
 
-- [ ] Rdzeń działa bez adaptera — jest na to test uruchamiający `worktrail time --cost` na logu bez pól kosztowych.
-- [ ] Brak danych kosztowych daje `null` i komunikat, nigdy `0`.
-- [ ] Cennik jest daną w `config.yaml`, nie liczbą w kodzie.
-- [ ] Nieznany model w logu nie wywraca raportu — jest liczony osobno jako „bez stawki".
-- [ ] Tryby `subscription` i `local` dają w raporcie wyjścia rozróżnialne od siebie i od `null` — jest na to test dla każdego z trzech przypadków.
-- [ ] Adapter nie jest wymagany przez żaden inny skrypt modułu (test importów).
+- [ ] The core works without an adapter — there is a test running
+      `worktrail time --cost` on a log with no cost fields.
+- [ ] Missing cost data gives `null` and a message, never `0`.
+- [ ] Pricing is data in `config.yaml`, not a number in the code.
+- [ ] An unknown model in the log does not break the report — it is counted
+      separately as "no rate."
+- [ ] The `subscription` and `local` modes produce report outputs
+      distinguishable from each other and from `null` — there is a test for
+      each of the three cases.
+- [ ] The adapter is not required by any other script in the module (import test).
 
 ## Verification
 
 ```bash
-# 1. Testy adaptera — expected: pass, w tym przebieg BEZ adaptera
+# 1. Adapter tests — expected: pass, including a run WITHOUT the adapter
 node --test backlog/scripts/tests/cost-adapter.test.mjs
 
-# 2. Brak adaptera daje null, nie zero — expected: "tokeny: None"
+# 2. No adapter gives null, not zero — expected: "tokens: None"
 node backlog/scripts/cli.mjs time --cost --json | python3 -c \
-  "import json,sys; d=json.load(sys.stdin); assert d['tokens'] is None or isinstance(d['tokens'], int); print('tokeny:', d['tokens'])"
+  "import json,sys; d=json.load(sys.stdin); assert d['tokens'] is None or isinstance(d['tokens'], int); print('tokens:', d['tokens'])"
 
-# 3. Niezależność rdzenia — expected: brak trafień
+# 3. Core independence — expected: no matches
 grep -rl "cost-adapter" backlog/scripts/ --include=*.mjs | grep -v tests | grep -v cost-adapter
 ```
 
 ## Notes
 
-- Świadomie poza zakresem: adaptery dla innych hostów (Cursor, Copilot). Kontrakt `worktrail activity record` z TL-28 już je umożliwia — pisanie ich bez użytkownika byłoby zgadywaniem.
-- Jeśli tokeny okażą się WYRAŹNIE lepszym predyktorem niż czas, to zmienia domyślną oś raportu z TL-29 i wymaga osobnego taska, nie cichej podmiany.
-- Ten task staje się osią GŁÓWNĄ, nie dodatkową, jeśli bramka korelacji z TL-29 (krok 0) wyjdzie negatywnie — wtedy priorytet idzie w górę.
-- Wiersz z tokenami opisuje sesję, więc podlega tej samej retencji i temu samemu `forget` co reszta logu ([TL-31](TL-31-retencja-korekta-atrybucji-i-prawo-do-usuniecia.md)).
+- Deliberately out of scope: adapters for other hosts (Cursor, Copilot). The
+  `worktrail activity record` contract from TL-28 already allows for them;
+  writing them without a user would be guesswork.
+- If tokens turn out to be a CLEARLY better predictor than time, that changes
+  the default report axis from TL-29 and needs a separate task, not a silent
+  swap.
+- This task becomes the PRIMARY axis, not a secondary one, if the
+  correlation gate from TL-29 (step 0) comes out negative — then its
+  priority moves up.
+- A row with tokens describes a session, so it is subject to the same
+  retention and the same `forget` as the rest of the log
+  ([TL-31](TL-31-retencja-korekta-atrybucji-i-prawo-do-usuniecia.md)).
 
 ## Log
 
-- 2026-08-30 created — claude — rozpisane z analizy pomiaru czasu (docs/architecture/backlog-time-tracking.md)
-- 2026-08-30 revised — claude — po adwersarialnym przeglądzie: wiązanie z bramką korelacji z TL-29 i z retencją z TL-31
-- 2026-08-31 revised — agent:claude — cennik rozszerzony o tryby rozliczenia (api / subscription / local): kwota, tokeny-bez-kwoty i zadeklarowane zero muszą być rozróżnialne od siebie i od null
+- 2026-08-30 created — claude — drafted from the time-tracking design
+  (docs/architecture/backlog-time-tracking.md)
+- 2026-08-30 revised — claude — after adversarial review: tied to the
+  correlation gate from TL-29 and to the retention from TL-31
+- 2026-08-31 revised — agent:claude — pricing extended with billing modes
+  (api / subscription / local): amount, tokens-without-amount, and declared
+  zero must be distinguishable from each other and from null

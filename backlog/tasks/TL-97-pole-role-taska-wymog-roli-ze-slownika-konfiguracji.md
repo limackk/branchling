@@ -1,10 +1,10 @@
 ---
 id: TL-97
-title: "Pole role taska: wymog roli ze slownika konfiguracji"
+title: "Task role field: role requirement from the configuration dictionary"
 type: task
 labels: []
 board: main
-epic: "Wyróżniki agentowe"
+epic: "Agentic differentiators"
 priority: P1
 status: done
 owner: agent:claude-code
@@ -25,90 +25,97 @@ verification:
     bash: "node --test scripts/tests/*.test.mjs"
 ---
 
-## Cel
+## Goal
 
-Task dostaje opcjonalne pole frontmattera `role:` — wymóg mówiący, KTO może
-go wziąć (developer, analityk, docs, reviewer…). Słownik ról mieszka
-w `config.yaml` (`roles:`), pole jest walidowane i edytowalne w viewerze jak
-każde inne, a jego zmiany trafiają do historii. Task bez roli może wziąć
-każdy.
+A task gets an optional frontmatter field `role:` — a requirement saying WHO
+can take it (developer, analyst, docs, reviewer…). The dictionary of roles
+lives in `config.yaml` (`roles:`), the field is validated and editable in the
+viewer like any other, and its changes are recorded in history. A task
+without a role can be taken by anyone.
 
-Fundament podziału pracy między wyspecjalizowanych agentów i ludzi: dyspozytor
-filtruje po roli (TL-98), przekazanie taska zmienia rolę ze śladem
-(TL-99), detektor driftu dokumentacji zakłada taski z rolą docs (TL-100).
+Foundation for dividing work between specialized agents and humans: the
+dispatcher filters by role (TL-98), handing off a task changes the role with
+a trace (TL-99), the documentation drift detector creates tasks with the docs
+role (TL-100).
 
-## Kontekst
+## Context
 
-Powstało z decyzji produktowej (2026-08-31): taski mają wskazywać
-wyspecjalizowanego wykonawcę, np. analityka podejmującego decyzje, których
-agent-developer podejmować nie powinien.
+Came from a product decision (2026-08-31): tasks should indicate a
+specialized executor, e.g. an analyst making decisions that a developer agent
+should not be making.
 
-Rozróżnienie, bez którego to pole się rozmyje — zapisać je też w opisie pola:
+A distinction without which this field would blur — record it in the field's
+description too:
 
-| Pojęcie | Pytanie | Gdzie |
+| Concept | Question | Where |
 |---|---|---|
-| `role` | kto MOŻE wziąć task | frontmatter (to pole) |
-| `owner` | kto trzyma go TERAZ | frontmatter (istnieje) |
-| `actor` | kto zapisał zmianę | historia (istnieje) |
+| `role` | who CAN take the task | frontmatter (this field) |
+| `owner` | who holds it NOW | frontmatter (exists) |
+| `actor` | who recorded the change | history (exists) |
 
-Decyzje:
-- **Słownik w konfiguracji projektu, nie w kodzie** (Prawo 3 — role to
-  wartości projektu; zespół bez analityka po prostu go nie deklaruje).
-  Wartość spoza słownika oblewa jak każdy nieznany element słownika;
-  brak klucza `roles` w konfiguracji = pole wolne tekstowo? NIE — brak
-  klucza znaczy, że projekt ról nie używa, i wtedy niepuste `role:` oblewa
-  z komunikatem wskazującym, gdzie słownik zadeklarować. Cicha akceptacja
-  literówki stworzyłaby rolę-widmo, której żaden dyspozytor nie obsłuży.
-- **Pole opcjonalne i JEDNO.** Nie lista ról, nie reguły przejść, nie stany
-  per rola — silnik workflow jest świadomie poza zakresem; procesy składa
-  się kompozycją (Prawo 4).
-- **Rola bramkuje DYSPOZYTOR, nie jawne wzięcie** (decyzja 2026-08-31).
-  `role:` istnieje po to, żeby kolejka bez człowieka nie oddała decyzji
-  analityka developerowi. Gdy człowiek każe agentowi zrobić wskazany task
-  („zrób TL-1234" w Claude Code / Codex), jawne polecenie bije podpowiedź
-  pola: `take` (TL-87) i bezpośrednia edycja plików działają bez zmian,
-  a wzięcie poza rolą jest ODNOTOWANE w historii, nigdy blokowane.
-  Egzekwowanie ról żyje wyłącznie w selekcji `next` i mapie komend `run`
-  (TL-98). Dzisiejszy tryb pracy jednego głównego agenta pozostaje więc
-  nietknięty — role nie wchodzą mu w drogę.
-- Nowe pole = jedna zmiana w `task-fields.mjs` (kształt) + słownik
-  w `config.mjs` — viewer i walidacja serwera mają wyjść z tej samej schemy
-  bez osobnych zmian (tak działa `buildFieldSpecs`).
+Decisions:
+- **Dictionary in the project's configuration, not in the code** (Law 3 —
+  roles are project values; a team without an analyst simply does not declare
+  one). A value outside the dictionary fails like any unknown dictionary
+  element; does a missing `roles` key in the configuration mean the field is
+  free text? NO — a missing key means the project does not use roles, and
+  then a non-empty `role:` fails with a message pointing to where the
+  dictionary should be declared. Silently accepting a typo would create a
+  phantom role that no dispatcher could handle.
+- **The field is optional and SINGLE.** Not a list of roles, not transition
+  rules, not per-role states — a workflow engine is deliberately out of
+  scope; processes are composed (Law 4).
+- **The role gates the DISPATCHER, not an explicit take** (decision
+  2026-08-31). `role:` exists so that an unattended queue does not hand an
+  analyst's decision to a developer. When a human tells an agent to do a
+  specific task ("do TL-1234" in Claude Code / Codex), the explicit
+  instruction beats the field's hint: `take` (TL-87) and direct file editing
+  work unchanged, and taking a task outside its role is RECORDED in history,
+  never blocked. Enforcing roles lives exclusively in `next` selection and
+  the `run` command map (TL-98). Today's single-main-agent way of working
+  therefore stays untouched — roles do not get in its way.
+- A new field = one change in `task-fields.mjs` (shape) + a dictionary in
+  `config.mjs` — the viewer and server-side validation should derive from the
+  same schema without separate changes (that is how `buildFieldSpecs` works).
 
 ## Pre-flight reading
 
 - [docs/backlog-config-and-portability.md](../../docs/backlog-config-and-portability.md)
-  §3 — linia kod-kształt / konfiguracja-wartości i jak dochodzi nowy klucz.
-- `scripts/task-fields.mjs` — `FIELD_SHAPES`, `EDITABLE_FIELDS`; wzorzec
-  istniejącego pola słownikowego (np. `priority`).
-- `scripts/config.mjs` — walidacja słowników i spójności między nimi.
+  §3 — the code-shape / configuration-values line, and how a new key is
+  added.
+- `scripts/task-fields.mjs` — `FIELD_SHAPES`, `EDITABLE_FIELDS`; the pattern
+  of an existing dictionary-backed field (e.g. `priority`).
+- `scripts/config.mjs` — dictionary validation and consistency between them.
 
-## Kroki
+## Steps
 
-1. Klucz `roles:` w konfiguracji + walidacja (duplikaty, kształt sluga).
-2. Pole `role` w `FIELD_SHAPES` jako opcjonalny enum ze słownika; edycja
-   w viewerze i zapis historii przychodzą z istniejącej mechaniki pól.
-3. Filtr `worktrail query --role <r>` (w tym `--role ""` dla tasków bez roli).
-4. `_template.md`: pole z komentarzem objaśniającym różnicę role/owner.
-5. Testy: wartość ze słownika przechodzi, spoza słownika oblewa, niepuste
-   `role:` bez zadeklarowanego słownika oblewa z pomocnym komunikatem,
-   task bez roli przechodzi wszędzie.
+1. `roles:` key in the configuration + validation (duplicates, slug shape).
+2. `role` field in `FIELD_SHAPES` as an optional enum from the dictionary;
+   editing in the viewer and history recording come from the existing field
+   machinery.
+3. `worktrail query --role <r>` filter (including `--role ""` for tasks
+   without a role).
+4. `_template.md`: the field with a comment explaining the role/owner
+   difference.
+5. Tests: a value from the dictionary passes, one outside the dictionary
+   fails, a non-empty `role:` without a declared dictionary fails with a
+   helpful message, a task without a role passes everywhere.
 
 ## Acceptance criteria
 
-- [x] Rola spoza słownika oblewa build z komunikatem nazywającym plik i wartość. [proof: role-end-to-end]
-- [x] Niepuste `role:` przy braku klucza `roles` w konfiguracji oblewa, nie przechodzi po cichu. [proof: role-end-to-end]
-- [x] Pole jest edytowalne w viewerze, a zmiana zapisuje wpis historii — bez zmian w kodzie viewera poza schemą. [proof: field-schema]
-- [x] `query --role` filtruje; task bez roli nie znika z widoków ogólnych. [proof: role-end-to-end]
-- [x] Żadna nazwa roli nie występuje w kodzie (test w duchu bramki generyczności DEFAULTS). [proof: field-schema]
-- [x] `worktrail take TL-NNNN` na tasku z rolą inną niż deklarowana przez wołającego PRZECHODZI, a zdarzenie w `history/` odnotowuje, że wzięcie było poza rolą. Kryterium przyszło z [TL-87](TL-87-worktrail-next-atomowy-przydzial-taska-dla-agenta.md), gdzie `take` powstał: tam nie było czego udowodnić, bo pola `role:` jeszcze nie ma. `take` świadomie nie ma i nie dostanie bramki roli — bramkuje dyspozytor (TL-98), a jawne polecenie człowieka jest ponad nim. [proof: role-end-to-end]
+- [x] A role outside the dictionary fails the build with a message naming the file and the value. [proof: role-end-to-end]
+- [x] A non-empty `role:` with no `roles` key in the configuration fails, it does not pass silently. [proof: role-end-to-end]
+- [x] The field is editable in the viewer, and a change writes a history entry — with no viewer code changes beyond the schema. [proof: field-schema]
+- [x] `query --role` filters; a task without a role does not disappear from general views. [proof: role-end-to-end]
+- [x] No role name appears in the code (a test in the spirit of the DEFAULTS genericity guard). [proof: field-schema]
+- [x] `worktrail take TL-NNNN` on a task whose role differs from the caller's declared role PASSES, and the event in `history/` records that the take was outside the role. This criterion came from [TL-87](TL-87-worktrail-next-atomowy-przydzial-taska-dla-agenta.md), where `take` was created: there was nothing to prove there yet, because the `role:` field did not exist yet. `take` deliberately does not have and will not get a role gate — the dispatcher gates it (TL-98), and an explicit human instruction outranks it. [proof: role-end-to-end]
 
 ## Log
 
-Append-only. Format: `YYYY-MM-DD status — kto — notatka`.
+Append-only. Format: `YYYY-MM-DD status — who — note`.
 
-- 2026-08-31 pending — agent:claude — task założony z decyzji o rolach
-  subagentów; fundament dla TL-98/1509/1510.
-- 2026-08-31 revised — agent:claude — zapisana zasada „rola bramkuje
-  dyspozytor, nie jawne wzięcie": tryb bezpośredni głównego agenta pozostaje
-  bez zmian, wzięcie poza rolą jest odnotowywane.
+- 2026-08-31 pending — agent:claude — task created from the decision on
+  subagent roles; foundation for TL-98/1509/1510.
+- 2026-08-31 revised — agent:claude — recorded the rule "the role gates the
+  dispatcher, not an explicit take": the main agent's direct mode stays
+  unchanged, taking outside the role is recorded.

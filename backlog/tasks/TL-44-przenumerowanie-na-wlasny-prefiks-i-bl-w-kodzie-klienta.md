@@ -1,10 +1,10 @@
 ---
 id: TL-44
-title: "Przenumerowanie na własny prefiks — i BL, które przetrwało w kodzie"
+title: "Renumbering to our own prefix — and the BL that survived in the code"
 type: code
 labels: []
 board: main
-epic: "Backlog — publikacja open source"
+epic: "Backlog — open source publication"
 priority: P2
 status: done
 owner: claude
@@ -21,57 +21,59 @@ verification:
   - bash: "node scripts/cli.mjs check && node scripts/cli.mjs build"
 ---
 
-## Cel
+## Goal
 
-Ten backlog numeruje się własnym prefiksem (`TL-`), a nie prefiksem projektu, z
-którego narzędzie wyszło. Kolizja `BL-1448` — jeden numer, dwa różne taski w
-dwóch repozytoriach — przestaje istnieć, bo przestaje istnieć wspólna przestrzeń
-numerów.
+This backlog numbers itself with its own prefix (`TL-`), not the prefix of the
+project the tool came out of. The `BL-1448` collision — one number, two
+different tasks in two different repositories — stops existing, because the
+shared number space stops existing.
 
-## Kontekst
+## Context
 
-TL-42 zrobił prefiks konfiguracją i dostarczył `migrate-prefix`, ale **krok
-przenumerowania świadomie odłożył**: dry-run pokazywał 215 wzmianek w PROZIE,
-których migracja nie tyka, bo `BL-1445` w treści może wskazywać na task drugiego
-repozytorium. Ten task wykonuje przenumerowanie razem z przeglądem prozy.
+TL-42 turned the prefix into configuration and delivered `migrate-prefix`, but
+**deliberately deferred the renumbering step**: the dry run showed 215
+mentions in PROSE that the migration does not touch, because `BL-1445` in the
+body text might point to a task in the other repository. This task carries
+out the renumbering together with a review of the prose.
 
-**Numery zostają, zmienia się tylko prefiks** (`BL-1449` → `TL-39`). To nie
-jest estetyka: komunikaty commitów są niezmienne i zawierają stare numery, więc
-zachowanie numeru sprawia, że stara historia dalej daje się mechanicznie
-rozwiązać. Przenumerowanie od 1 zerwałoby ten związek bez żadnego zysku.
+**The numbers stay, only the prefix changes** (`BL-1449` → `TL-39`). This is
+not aesthetics: commit messages are immutable and contain the old numbers, so
+keeping the number means the old history can still be resolved mechanically.
+Renumbering from 1 would sever that link for no gain at all.
 
-## Kroki
+## Steps
 
-1. `migrate-prefix --to TL` — nazwy plików, `id:`, `blocked_by`/`blocks`, logi
-   historii i `task_id_prefix` w konfiguracji.
-2. Proza: podzielić wzmianki na te, które JEDNOZNACZNIE wskazują ten backlog,
-   te, które wskazują konsumenta, i te, które trzeba przeczytać.
-3. Naprawić to, co przenumerowanie ODSŁONIŁO w kodzie.
-4. Konsument: odwołania `worktrail#BL-NNNN` przepiąć na `worktrail#TL-NNNN`.
+1. `migrate-prefix --to TL` — file names, `id:`, `blocked_by`/`blocks`, history
+   logs and `task_id_prefix` in the configuration.
+2. Prose: split mentions into those that UNAMBIGUOUSLY point at this backlog,
+   those that point at the consumer, and those that need to be read.
+3. Fix what the renumbering EXPOSED in the code.
+4. Consumer: rewire `worktrail#BL-NNNN` references to `worktrail#TL-NNNN`.
 
 ## Acceptance criteria
 
-- [x] `check` i `build` zielone, pełna suita 263/263.
-- [x] Wzmianki w prozie rozstrzygnięte co do jednej; wzmianki o taskach
-      konsumenta ZOSTAJĄ jako `BL-`, i to sam prefiks je teraz odróżnia.
-- [x] Odsłonięte defekty kodu naprawione, nie obejściem w teście.
-- [x] Guardy sądzą backlog, KTÓRY DOSTAŁY, a nie ten z cwd.
+- [x] `check` and `build` green, full suite 263/263.
+- [x] Prose mentions resolved down to the last one; mentions of consumer tasks
+      STAY as `BL-`, and the prefix alone now tells them apart.
+- [x] Exposed code defects fixed, not worked around in the test.
+- [x] Guards judge the backlog THEY WERE GIVEN, not the one from cwd.
 
 ## Notes
 
-- Klasa, którą to potwierdza: **zmiana wartości jest jedynym sprawdzianem, czy
-  wartość naprawdę wyszła z kodu.** TL-42 przeszedł zielono z czterema żywymi
-  hardkodami `BL`, bo jedyny backlog, na którym cokolwiek biegało, miał prefiks
-  `BL`. Test na konfiguracji ≠ test na innej wartości.
+- The class of thing this confirms: **changing the value is the only proof
+  that the value truly came out of the code.** TL-42 passed green with four
+  live hardcoded `BL`s, because the only backlog anything ran against had the
+  `BL` prefix. A test on the configuration ≠ a test on a different value.
 
 ## Log
 
-- 2026-08-31 done — claude — przenumerowane 43 taski / 85 plików; 287 wzmianek w prozie przepisanych automatycznie po podziale na kubełki (42 numery jednoznacznie własne), 5 zostawionych świadomie (wszystkie w TL-42, gdzie zdanie OPISUJE kolizję `BL-1448` i przepisanie uczyniłoby je fałszywym), 2 poprawione ręcznie. Wzmianki o taskach konsumenta (BL-1445, BL-1446, BL-1170…) zostają — po zmianie prefiksu sam zapis mówi, że są obce.
+- 2026-08-31 done — claude — renumbered 43 tasks / 85 files; 287 prose mentions rewritten automatically after sorting into buckets (42 numbers unambiguously our own), 5 left deliberately (all in TL-42, where the sentence DESCRIBES the `BL-1448` collision and rewriting it would have made it false), 2 fixed by hand. Mentions of consumer tasks (BL-1445, BL-1446, BL-1170…) stay — after the prefix change the notation itself now says they are foreign.
 
-- 2026-08-31 PRZENUMEROWANIE ODSŁONIŁO CZTERY ŻYWE DEFEKTY — claude — których TL-42 nie mógł zobaczyć, bo do wczoraj każdy backlog pod ręką miał prefiks `BL`: (1) `query.mjs` sortował po `Number(id.replace(/^BL-/,""))`, więc `--sort id` dawał 0 dla każdego taska i układał listę porządkiem, o który nikt nie prosił; (2) viewer czytający katalog przez File System Access filtrował `^BL-\d+.*\.md$` — pod innym prefiksem wczytywał ZERO tasków; (3) i (4) dwa sortowania po numerze w viewerze i na dashboardzie, ta sama pomyłka. Wszystkie ciche: żadna nie rzuca błędu, każda zwraca „nic" albo „zero".
+- 2026-08-31 THE RENUMBERING EXPOSED FOUR LIVE DEFECTS — claude — which TL-42 could not have seen, because until yesterday every backlog at hand had the `BL` prefix: (1) `query.mjs` sorted by `Number(id.replace(/^BL-/,""))`, so `--sort id` gave 0 for every task and arranged the list in an order nobody asked for; (2) the viewer, reading the directory through the File System Access API, filtered on `^BL-\d+.*\.md$` — under a different prefix it loaded ZERO tasks; (3) and (4) two number-based sorts in the viewer and on the dashboard, the same mistake. All silent: none of them throws an error, each just returns "nothing" or "zero".
 
-- 2026-08-31 druga klasa, poważniejsza — claude — guardy `check-backlog-id-collisions` i `check-backlog-boards` brały KATALOG z argumentu, a PREFIKS z konfiguracji znalezionej od cwd. Wskazane drzewo było więc sądzone słownikiem cudzego backlogu: zero dopasowanych plików i `✓ 0 tasków, każdy użyty raz`, exit 0. **Zielone przy zerowej mocy dowodowej.** W jednym repozytorium niewidoczne, bo cwd i cel to zawsze to samo drzewo. Korzeń idzie teraz z tego, co guard dostał (`backlogForTaskPath` przeniesione do `paths.mjs`), a gdy konfiguracja milczy — prefiks wnioskowany z OGLĄDANYCH nazw plików, nie z domyślnej wartości.
+- 2026-08-31 second class, more serious — claude — the guards `check-backlog-id-collisions` and `check-backlog-boards` took the DIRECTORY from an argument, but the PREFIX from configuration found by walking up from cwd. The tree pointed at was therefore judged by another backlog's vocabulary: zero matched files and "✓ 0 tasks, each used once", exit 0. **Green with zero evidentiary force.** Invisible in a single repository, because cwd and the target are always the same tree there. The root now comes from what the guard was given (`backlogForTaskPath` moved to `paths.mjs`), and when the configuration is silent, the prefix is inferred from the OBSERVED file names, not from a default value.
 
-- 2026-08-31 ŚWIADOMIE NIETKNIĘTE — claude — 75 wzmianek GENERYCZNYCH (`BL-NNN` jako symbol zastępczy, „numer BL", „kolizje numerów BL") w README, `docs/` i treściach tasków. To nie są odwołania do żadnego taska, tylko słownictwo dokumentów — a czyszczenie dokumentów z kontekstu the origin project jest treścią TL-37. Rozdzielone celowo: ten task miał zmienić IDENTYFIKATORY, a nie przepisać prozę przy okazji. Liczba jest tu po to, żeby TL-37 zaczynał od miary, a nie od zera.
+- 2026-08-31 DELIBERATELY UNTOUCHED — claude — 75 GENERIC mentions (`BL-NNN` as a placeholder, "BL number", "BL number collisions") in the README, `docs/`, and task content. These are not references to any task, just document vocabulary — and cleaning documents of the origin project's context is the content of TL-37. Separated deliberately: this task was to change IDENTIFIERS, not rewrite prose along the way. The count is here so TL-37 starts from a measurement, not from zero.
 
-- 2026-08-31 in_progress — claude — 15 testów oblało zaraz po migracji. Cztery były testami pinującymi literał `BL` tam, gdzie chodziło o kontrakt (naprawione przez wzięcie prefiksu z konfiguracji), reszta była SYGNAŁEM z produkcyjnego kodu. Odróżnienie jednych od drugich, plik po pliku, było właściwą treścią tego taska.
+- 2026-08-31 in_progress — claude — 15 tests failed right after the migration. Four were tests pinning the `BL` literal where a contract was meant (fixed by taking the prefix from configuration), the rest were a SIGNAL from production code. Telling one from the other, file by file, was the real content of this task.
+</content>

@@ -1,6 +1,6 @@
 ---
 id: TL-11
-title: "Guard pre-commit na pole board — partycja nie może się rozjechać po cichu"
+title: "Pre-commit guard on the board field — a partition must not drift silently"
 type: code
 labels: [post-launch, ops-hardening]
 board: main
@@ -21,43 +21,77 @@ verification:
   - bash: "node backlog/scripts/check-backlog-boards.mjs --all"
 ---
 
-## Cel
+## Goal
 
-Zamknąć lukę zostawioną świadomie w TL-9: pola `board:` pilnował tylko test modułu, a nie hook. Commit z brakującym albo literówkowym slugiem przechodził, jeśli nikt po drodze nie odpalił generatora.
+Close a gap deliberately left open in TL-9: the `board:` field was guarded
+only by a module test, not by a hook. A commit with a missing or misspelled
+slug went through, unless someone happened to run the generator along the
+way.
 
-## Kontekst
+## Context
 
-`build-backlog.mjs` oblewa na nieznanym slugu od TL-9 — ale generator ocenia tylko to, o co się go zapyta. Task z `board: backlog_project` (podkreślnik zamiast myślnika) wchodził do repo bez sprzeciwu i psuł widoki dopiero u następnej osoby, która zawołała build. To ten sam kształt, który guard tożsamości ID zamknął w BL-900..903: detektor, na którym nic nie potrafi oblać, jest ostrzeżeniem, a nie zabezpieczeniem.
+`build-backlog.mjs` has failed on an unknown slug since TL-9 — but the
+generator only evaluates what it is asked about. A task with `board:
+backlog_project` (an underscore instead of a hyphen) entered the repo without
+objection and broke the views only when the next person happened to call the
+build. This is the same shape the ID identity guard closed in BL-900..903:
+a detector that nothing can fail against is a warning, not a safeguard.
 
-**Zakres jest inny niż w guardzie ID i to jest decyzja, nie niedopatrzenie.** Kolizja ID jest własnością ZBIORU — nie da się jej ocenić z jednego pliku, więc tamten guard czyta całe drzewo. Board jest własnością POJEDYNCZEGO pliku, a w tym drzewie pracują równolegle dwie sesje (podczas TL-9 obok leżał niezacommitowany task innej sesji, podczas tej sesji — BL-1381). Guard czytający całe drzewo oblewałby MÓJ commit z powodu CUDZEJ pracy w toku, czyli uczyłby `--no-verify`. Dlatego hook podaje guardowi pliki ze stage'a.
+**The scope here differs from the ID guard, and that is a decision, not an
+oversight.** ID collision is a property of the SET — it cannot be evaluated
+from a single file, so that guard reads the whole tree. Board is a property of
+a SINGLE file, and two sessions work in parallel in this tree (during TL-9
+there was an uncommitted task from another session sitting alongside; during
+this session — BL-1381). A guard reading the whole tree would fail MY commit
+because of SOMEONE ELSE's work in progress, which would teach people to use
+`--no-verify`. That is why the hook gives the guard the staged files.
 
-**Jeden wyjątek:** gdy w commicie jest sam `boards.yaml`, sprawdzane jest całe drzewo. Usunięcie albo przemianowanie boarda osierociłoby wszystkie taski wskazujące na ten slug — a żadnego z nich nie ma w commicie. Kontrola po samych staged plikach przepuściłaby więc dokładnie tę zmianę, która psuje najwięcej plików.
+**One exception:** when the commit contains `boards.yaml` itself, the whole
+tree is checked. Removing or renaming a board would orphan every task
+pointing at that slug — and none of them is in the commit. Checking only the
+staged files would therefore let through exactly the change that breaks the
+most files.
 
-Guard waliduje też sam rejestr (zduplikowany slug, `default` wskazujący na nieistniejący board) — zepsuty rejestr wywraca generator, a jest jednym plikiem, więc sprawdzenie jest darmowe.
+The guard also validates the registry itself (a duplicate slug, `default`
+pointing at a non-existent board) — a broken registry crashes the generator,
+and it is a single file, so the check is free.
 
 ## Acceptance criteria
 
-- [x] `backlog/scripts/check-backlog-boards.mjs` — brak pola, nieznany slug, zepsuty rejestr → exit 1 z nazwą pliku.
-- [x] Wpięty w `.githooks/pre-commit` + zadeklarowany w `GUARD_MANIFEST` (brak skryptu = głośno, nie cichy skip).
-- [x] Staged-only, z wyjątkiem commita ruszającego `boards.yaml` → `--all`.
-- [x] Kontrola pozytywna: realna próba commita z taskiem bez `board:` została zablokowana z właściwym komunikatem.
-- [x] Testy: 17/17 zielonych (8 nowych przypadków guardu).
+- [x] `backlog/scripts/check-backlog-boards.mjs` — missing field, unknown
+      slug, broken registry → exit 1 with the filename.
+- [x] Wired into `.githooks/pre-commit` + declared in `GUARD_MANIFEST` (a
+      missing script fails loudly, not a silent skip).
+- [x] Staged-only, with an exception for a commit touching `boards.yaml` →
+      `--all`.
+- [x] Positive control: a real attempt to commit a task without `board:` was
+      blocked with the right message.
+- [x] Tests: 17/17 green (8 new guard cases).
 
 ## Verification
 
 ```bash
 node --test backlog/scripts/tests/boards.test.mjs
-node backlog/scripts/check-backlog-boards.mjs --all       # ✓ realne drzewo
+node backlog/scripts/check-backlog-boards.mjs --all       # ✓ real tree
 ```
 
-Kontrola pozytywna (wykonana 2026-08-29, nie tylko opisana): task `BL-9999` bez `board:` → `git commit` odrzucony komunikatem „task bez poprawnego `board:`". Plik sondy usunięty.
+Positive control (performed 2026-08-29, not only described): task `BL-9999`
+without `board:` → `git commit` rejected with the message "task without a
+valid `board:`". The probe file was removed.
 
 ## Notes
 
-Testy guardu asertują też, że w wyjściu nie ma `MODULE_NOT_FOUND` — bo brakujący skrypt kończy się kodem 1 tak samo jak wykryte naruszenie. Bez tego przypadek „zduplikowany slug" był zielony, ZANIM guard w ogóle powstał (zaobserwowane w tej sesji).
+The guard's tests also assert that the output contains no `MODULE_NOT_FOUND`
+— because a missing script exits with code 1 the same way a detected
+violation does. Without this, the "duplicate slug" case was green BEFORE the
+guard even existed (observed in this session).
 
-Nie wpięte w `pre-merge-commit`: ten hook jest celowo wąski i pilnuje niezmiennika, który powstaje DOPIERO przy zetknięciu gałęzi (kolizja ID). Board jest własnością pliku i został sprawdzony przy commicie, który go wniósł — merge nie tworzy nowych naruszeń tego typu.
+Not wired into `pre-merge-commit`: that hook is deliberately narrow and
+guards an invariant that arises ONLY when branches meet (ID collision). Board
+is a property of a file and was checked at the commit that introduced it —
+a merge creates no new violations of this kind.
 
 ## Log
 
-- 2026-08-29 done — claude — guard staged-only + `--all` przy zmianie rejestru; kontrola pozytywna na realnym commicie
+- 2026-08-29 done — claude — staged-only guard + `--all` on registry
+  changes; positive control on a real commit

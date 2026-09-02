@@ -1,6 +1,6 @@
 ---
 id: TL-6
-title: "Tabela epików: wyrównanie nagłówków, sortowanie, scrollbary w motywie"
+title: "Epics table: header alignment, sorting, themed scrollbars"
 type: code
 labels: [pre-launch]
 epic: ""
@@ -18,51 +18,52 @@ related_docs:
   - backlog/README.md
 verification:
   - bash: "node backlog/scripts/build-viewer.mjs"
-  - manual: "Dashboard → tabela Epiki: liczby stoją pod swoimi nagłówkami; klik w nagłówek sortuje, ponowny odwraca; „(bez epica)" zostaje na dole"
-  - manual: "Scrollbary (tabela epików, panel dnia, listy higieny, cała strona) w kolorach motywu, nie systemowa jasna belka"
+  - manual: "Dashboard → Epics table: numbers sit under their headers; clicking a header sorts, clicking again reverses it; \"(no epic)\" stays at the bottom"
+  - manual: "Scrollbars (epics table, day panel, hygiene lists, whole page) in theme colors, not the light system bar"
 ---
 
-## Cel
+## Goal
 
-Zgłoszone przez foundera na zrzucie: w tabeli epików liczby nie stały pod
-swoimi nagłówkami, scrollbar odcinał się od strony, a tabeli nie dało się
-posortować.
+Reported by the founder from a screenshot: in the epics table numbers did not
+line up under their headers, the scrollbar clashed with the page, and the
+table could not be sorted.
 
-## Kontekst
+## Context
 
-Rozjazd nie był błędem danych ani szerokości kolumn: `th` miało domyślne
-`text-align: left`, a `td.num` — `right`. Przy szerokiej kolumnie każdy
-nagłówek wisiał nad lewą krawędzią komórki, więc wartość czytało się jako
-należącą do kolumny obok. Widać to było najmocniej na P0/P1, gdzie czerwona
-jedynka wyglądała, jakby stała pod P1. Poprawka to jedna reguła
-`.dash-table th.num { text-align: right }` — i ta sama reguła prostuje tabelę
-wieku tasków, która miała ten sam defekt.
+The misalignment was not a data error or a column-width issue: `th` had the
+default `text-align: left`, and `td.num` had `right`. On a wide column, every
+header hung over the cell's left edge, so the value read as belonging to the
+next column. This was most visible on P0/P1, where a red "1" looked like it
+sat under P1. The fix is one rule, `.dash-table th.num { text-align: right }`
+— and the same rule straightens the task-age table, which had the same
+defect.
 
-Sortowanie: kolumny są zadeklarowane w `EPIC_COLUMNS` razem z akcesorem
-wartości, więc nagłówek, sortowanie i komórka nie mogą się rozjechać co do
-tego, czym jest „Blok.". Kierunek startowy zależy od kolumny (liczby malejąco,
-nazwa A→Z), a remisy rozstrzyga nazwa — bez tego dwa epiki o tej samej liczbie
-zamieniałyby się miejscami między renderami bez widocznego powodu. Wiersz
-„(bez epica)" jest dopisywany po sortowaniu i zostaje na dole, bo nie jest
-epikiem, tylko resztą.
+Sorting: columns are declared in `EPIC_COLUMNS` together with a value
+accessor, so the header, the sort, and the cell can never disagree about what
+"Blocked" means. The starting direction depends on the column (numbers
+descending, name A→Z), and ties are broken by name — without this, two epics
+with the same count would swap places between renders for no visible reason.
+The "(no epic)" row is appended after sorting and stays at the bottom, because
+it is not an epic, only the remainder.
 
-Scrollbary: `scrollbar-width: thin` + `scrollbar-color` z tokenów motywu i
-odpowiedniki `::-webkit-scrollbar`. Domyślna belka ignoruje motyw i w dark
-mode była najjaśniejszym elementem strony.
+Scrollbars: `scrollbar-width: thin` + `scrollbar-color` from theme tokens, and
+`::-webkit-scrollbar` equivalents. The default bar ignores the theme and in
+dark mode was the brightest element on the page.
 
 ## Acceptance criteria
 
-- [x] Nagłówki kolumn liczbowych wyrównane do prawej, jak ich wartości.
-- [x] Klik w nagłówek sortuje, ponowny odwraca kierunek, aktywna kolumna ma ▲/▼.
-- [x] „(bez epica)" zawsze na dole.
-- [x] Scrollbary w kolorach motywu w obu trybach.
+- [x] Numeric column headers aligned right, like their values.
+- [x] Clicking a header sorts, clicking again reverses direction, the active
+      column shows ▲/▼.
+- [x] "(no epic)" is always at the bottom.
+- [x] Scrollbars are themed in both modes.
 
 ## Verification
 
-- W przeglądarce (dark + light): sortowanie po P0 (malejąco 4,4,3,2…), toggle na
-  rosnąco, sortowanie alfabetyczne w obie strony, sortowanie po dacie ostatniego
-  ruchu, „(bez epica)" na dole w każdym z tych układów.
+- In the browser (dark + light): sorting by P0 (descending 4,4,3,2…), toggle
+  to ascending, alphabetical sorting both directions, sorting by last-moved
+  date, "(no epic)" at the bottom in each of these arrangements.
 
 ## Log
 
-- 2026-08-26: zaimplementowane i zweryfikowane w przeglądarce — claude.
+- 2026-08-26: implemented and verified in the browser — claude.

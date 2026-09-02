@@ -1,10 +1,10 @@
 ---
 id: TL-81
-title: "Kanały dystrybucji i kolizja nazwy worktrail w npx"
+title: "Distribution channels and the worktrail name collision in npx"
 type: task
 labels: [pre-launch]
 board: main
-epic: "Backlog — publikacja open source"
+epic: "Backlog — open source publication"
 priority: P0
 status: done
 owner: agent:claude
@@ -21,74 +21,72 @@ verification:
   - bash: "node --test scripts/tests/packaging.test.mjs"
 ---
 
-## Cel
+## Goal
 
-Wiemy, czy nazwa `worktrail` jest wolna w npm, i mamy rozstrzygnięte, którymi
-kanałami narzędzie jedzie do użytkownika. Ustalone ZANIM nazwa się utrwali w
-dokumentacji, adresach i cudzych skryptach.
+We know whether the name `worktrail` is free on npm, and we have settled
+which channels the tool reaches users through. Settled BEFORE the name
+becomes fixed in documentation, addresses, and other people's scripts.
 
-## Kontekst
+## Context
 
-`package.json` ma dziś `"name": "worktrail"`, `"private": true` i
-`"license": "UNLICENSED"` — nic jeszcze nie zostało opublikowane, więc nazwa
-jest jeszcze bezpłatnie wymienialna. Po publikacji przestaje być.
+`package.json` today has `"name": "worktrail"`, `"private": true`, and
+`"license": "UNLICENSED"` — nothing has been published yet, so the name is
+still freely exchangeable. After publication it stops being so.
 
-Konkretne ostrzeżenie z Backlog.md: ich pakiet nazywa się `backlog.md`, ale
-`npx backlog` (bez instalacji) rozwiązuje się do NIEPOWIĄZANEGO pakietu innego
-autora. Musieli to opisać w README jako pułapkę. To jest koszt, który ponosi się
-raz i na zawsze, a wykrywa się jedną komendą przed publikacją.
+A concrete warning from Backlog.md: their package is called `backlog.md`,
+but `npx backlog` (without installing) resolves to an UNRELATED package by a
+different author. They had to describe this in the README as a trap. This is
+a cost paid once and forever, and it is detected with one command before
+publication.
 
-Do rozstrzygnięcia w tym tasku (nie do wykonania — to jest task decyzyjny):
+To be settled in this task (not to be executed — this is a decision task):
 
-1. Czy `worktrail` jest wolne w npm; jeśli nie, jaka jest nazwa pakietu i czy
-   `npx <nazwa>` nie trafia w cudzy kod.
-2. Czy nazwa binarki (`bin.worktrail`) i nazwa pakietu mogą się różnić i co wtedy
-   pokazujemy w README.
-3. Które kanały poza npm: Homebrew i Nix (Backlog.md ma oba) — rozstrzygnij
-   TERAZ, czy w ogóle, bo to wpływa na to, co README obiecuje na starcie.
-4. Czy `scripts/product.mjs` naprawdę przykrywa wszystkie miejsca, w których
-   nazwa występuje — CLAUDE.md mówi, że zmiana nazwy ma być JEDNĄ edycją. To
-   jest twierdzenie do sprawdzenia, nie do założenia.
+1. Whether `worktrail` is free on npm; if not, what the package name is and
+   whether `npx <name>` does not land on someone else's code.
+2. Whether the binary name (`bin.worktrail`) and the package name can differ,
+   and what the README shows in that case.
+3. Which channels besides npm: Homebrew and Nix (Backlog.md has both) —
+   decide NOW, whether at all, because it affects what the README promises
+   from the start.
+4. Whether `scripts/product.mjs` really covers every place the name occurs —
+   CLAUDE.md says a name change should be ONE edit. This is a claim to
+   check, not to assume.
 
 ## Pre-flight reading
 
 1. `package.json` — `name`, `bin`, `files`, `private`, `license`.
-2. `scripts/product.mjs` — skąd bierze się nazwa produktu w wyjściu narzędzia.
-3. `scripts/tests/packaging.test.mjs` — co dziś pilnujemy o zawartości tarballa.
-4. `.claude/skills/worktrail-release/SKILL.md` — istniejąca bramka przedpublikacyjna;
-   ustalenia z tego taska mają do niej wrócić.
+2. `scripts/product.mjs` — where the product name in the tool's output comes from.
+3. `scripts/tests/packaging.test.mjs` — what is guarded today about the tarball's contents.
+4. `.claude/skills/worktrail-release/SKILL.md` — the existing pre-publication gate; the findings from this task should feed back into it.
 
-## Kroki
+## Steps
 
-1. Sprawdź dostępność nazwy w npm (`npm view worktrail`) i osobno, do czego
-   rozwiązuje się `npx worktrail` dzisiaj.
-2. Zweryfikuj twierdzenie „zmiana nazwy to jedna edycja": `grep` po literałach
-   nazwy poza `product.mjs`. Znalezione literały to albo poprawka, albo nowy task.
-3. Rozstrzygnij kanały dystrybucji i zapisz decyzję z uzasadnieniem.
-4. Wnioski dopisz do bramki `worktrail-release`, żeby następna publikacja ich nie
-   powtarzała od zera.
+1. Check the name's availability on npm (`npm view worktrail`) and separately, what `npx worktrail` resolves to today.
+2. Verify the claim "a name change is one edit": `grep` for name literals outside `product.mjs`. Any literals found are either a fix or a new task.
+3. Decide the distribution channels and record the decision with its reasoning.
+4. Append the findings to the `worktrail-release` gate, so the next publication does not repeat them from scratch.
 
 ## Acceptance criteria
 
-- [x] Wiadomo, czy nazwa pakietu jest wolna, i decyzja jest zapisana w tasku.
-- [x] Sprawdzone i zapisane, do czego rozwiązuje się `npx <nazwa>` bez instalacji.
-- [x] Twierdzenie o jednej edycji przy zmianie nazwy jest sprawdzone `grep`-em, nie założone.
-- [x] Decyzja o kanałach (npm / brew / nix) jest zapisana wraz z uzasadnieniem.
-- [x] Ustalenia trafiły do bramki przedpublikacyjnej.
+- [x] It is known whether the package name is free, and the decision is recorded in the task.
+- [x] Checked and recorded what `npx <name>` resolves to without installing.
+- [x] The claim about one edit for a name change is checked with `grep`, not assumed.
+- [x] The decision about channels (npm / brew / nix) is recorded along with its reasoning.
+- [x] The findings made it into the pre-publication gate.
 
 ## Log
 
-2026-08-31 pending — agent:claude — założony z analizy Backlog.md (github.com/MrLesk/Backlog.md), punkt 10.
-- 2026-09-01 pending — agent:claude — PODNIESIONE P1→P0 (dołącza do TL-82 i TL-86, które przyszły z merge'a gałęzi analitycznej). Powód jest nowy, nie kosmetyczny: właściciel rozważa usługę worktrail w chmurze (ustalone przy TL-48). Przy MIT — i tak samo przy Apache-2.0 — licencja NIE powstrzymuje konkurenta przed postawieniem usługi na tym kodzie; jedyne, co go powstrzymuje przed postawieniem jej POD TĄ NAZWĄ, to znak towarowy. Nazwa przestaje być kosmetyką i staje się aktywem biznesowym, a jest wciąż bezpłatnie wymienialna wyłącznie do pierwszej publikacji. Kolizja w npx (opisana w ## Kontekst jako cudzy przypadek) przy usłudze komercyjnej przestaje być niezręcznością w README, a staje się kierowaniem ruchu do cudzego pakietu.
-- 2026-09-01 pending — agent:claude — **nazwa zmieniona `tasklog` → `worktrail`** (decyzja i uzasadnienie w logu [TL-20](TL-20-domknij-nazwe-narzedzia-przed-publikacja.md)). Co to zmienia w TYM tasku:
-  **Krok 2 wykonany i dał wynik NEGATYWNY.** Twierdzenie „zmiana nazwy to jedna edycja" jest FAŁSZYWE — zmierzone, nie oszacowane: 158 plików, w tym 26 w `scripts/`. `scripts/product.mjs` eksportuje `PRODUCT_NAME`, ale reszta kodu go nie używa. Wynik wyjęty do [TL-117](TL-117-nazwa-produktu-z-jednej-stalej-a-nie-z-literalu.md), bo to robota, a nie decyzja — ten task pozostaje decyzyjny.
-  **Punkt 1 częściowo rozstrzygnięty:** `registry.npmjs.org/worktrail` → 404 (2026-09-01), nazwa wolna. **NIEROZSTRZYGNIĘTE zostaje pytanie ostrzejsze**, to samo, które ubodło Backlog.md: do czego rozwiązuje się `npx worktrail` BEZ instalacji. Wolna nazwa w rejestrze tego nie gwarantuje i trzeba to sprawdzić osobno.
-  **Podniesione ryzyko:** nazwa jest świeżo wybrana i wciąż niezarezerwowana, więc okno między wyborem a publikacją jest teraz jedynym zabezpieczeniem — i jest otwarte.
-  `## Kontekst` powyżej mówi o `"private": true` i `"license": "UNLICENSED"` — **oba są nieaktualne** niezależnie od nazwy (licencja rozstrzygnięta w [TL-48](TL-48-license-i-metadane-pakietu-dzis-nikt-nie-moze-tego-uzyc.md), `private` usunięte).
-- 2026-09-01 in_progress — agent:claude — **PUNKT 1 i 2 ROZSTRZYGNIĘTE POMIAREM** (2026-09-01, sieć). Rejestr: `registry.npmjs.org/worktrail` → 404, `npm view worktrail` → E404, wyszukiwarka npm dla `worktrail` → **0 wyników** (nie tylko brak dokładnej nazwy — brak czegokolwiek podobnego). Sąsiedztwo literówek wolne: `work-trail`, `worktrails`, `worktrail-cli` → 404. `which worktrail` → brak, więc żadna zainstalowana binarka nie przykrywa naszej. Brak formuły w Homebrew (`formulae.brew.sh/api/formula/worktrail.json` → 404).
-  **Pytanie ostrzejsze — do czego rozwiązuje się `npx worktrail` — ma odpowiedź STRUKTURALNĄ, nie tylko empiryczną.** Empirycznie: `cd /tmp && npx --yes worktrail --version` → E404, nie ma czego przejąć. Strukturalnie, i to jest właściwe zabezpieczenie: **`npx` rozwiązuje NAZWĘ PAKIETU, nigdy nazwę binarki.** Pułapka Backlog.md nie bierze się z pecha, tylko z rozjazdu tych dwóch nazw — zweryfikowane u źródła: `npm view backlog.md bin` → `{ backlog: 'cli.js' }`, a `npm view backlog` → `backlog@1.4.56`, „Orchestrator for AI coding agents", INNEGO autora. Ich `npx backlog` musi trafiać w cudzy kod, bo pakiet nazywa się inaczej niż binarka. U nas `name` == jedyny klucz `bin` == `worktrail`, więc ta klasa błędu jest ZAMKNIĘTA KONSTRUKCYJNIE, a nie tylko „dziś wolna". Warunek do utrzymania: nazwa pakietu i nazwa binarki nie mogą się rozjechać — gdyby kiedyś pakiet musiał nazywać się np. `worktrail.md`, pułapka otwiera się natychmiast.
-- 2026-09-01 in_progress — agent:claude — **PUNKT 4 (twierdzenie o jednej edycji) — potwierdzony NEGATYWNY wynik z poprzedniego wpisu.** `scripts/product.mjs` eksportuje `PRODUCT_NAME` czytany z `package.json` (jedno źródło dla nazwy pakietu i nazwy w `--help`), ale reszta `scripts/` nadal wpisuje nazwę literałem — 158 plików przy zmianie `tasklog` → `worktrail`. Twierdzenie z CLAUDE.md jest INTENCJĄ, nie opisem stanu; robota jest w [TL-117](TL-117-nazwa-produktu-z-jednej-stalej-a-nie-z-literalu.md) i tam zostaje. Ten task nic tu nie wykonuje.
-- 2026-09-01 in_progress — agent:claude — **PUNKT 3 — DECYZJA WŁAŚCICIELA: kanał tylko npm.** README obiecuje `npm i -g worktrail` i `npx worktrail`, nic więcej. Uzasadnienie: Homebrew i Nix to dwa osobne rytuały wydawnicze i dwa miejsca, w których wersja może się zestarzeć; tap opóźniony względem npm jest GORSZY niż brak tapa, bo obiecuje kanał, którego nie dowozi. Backlog.md ma oba, ale ma też użytkowników, którzy o nie poprosili — my mamy zero. Wracają jako osobne taski, kiedy ktoś poprosi, nie wcześniej. Konsekwencja dla README: nie wolno w nim wspominać brew/nix nawet jako „wkrótce".
-- 2026-09-01 in_progress — agent:claude — **REZERWACJA NAZWY — DECYZJA WŁAŚCICIELA: okno zostaje otwarte.** Przedstawiona alternatywa (opublikować działające `0.1.0` jako rezerwację, gdy tylko TL-48 dostanie adres repozytorium) ODRZUCONA; publikacja dopiero, gdy całość jest gotowa. **Ryzyko przyjęte świadomie i zapisane, żeby nie wróciło jako zaskoczenie:** dopóki nie ma publikacji, nazwa jest wolna dla każdego, a przy rozważanej usłudze w chmurze to nazwa — nie licencja — jest jedynym, co powstrzymuje konkurenta przed postawieniem usługi POD TĄ NAZWĄ (analiza w [TL-48](TL-48-license-i-metadane-pakietu-dzis-nikt-nie-moze-tego-uzyc.md)). Wariant scope'owany (`@…/worktrail`) rozważony i odrzucony jako pozorny: nie rezerwuje nazwy bezscope'owej, więc `npx worktrail` zostaje wolne mimo publikacji. Rezerwacja jest wciąż dostępna w każdej chwili — koszt rośnie tylko z czasem, nie z niczym innym.
-- 2026-09-01 in_progress — agent:claude — ustalenia dopisane do bramki przedpublikacyjnej `.claude/skills/worktrail-release/SKILL.md` §7: trzy komendy sprawdzające (`npm view` / `npx` / `which`) z wyjaśnieniem, DLACZEGO pierwsza nie zastępuje drugiej, precedens `backlog.md` jako dowód, oraz decyzja o kanałach. Zapisane jako reguła do powtórzenia przy każdej przyszłej zmianie nazwy, nie jako protokół z tego jednego sprawdzenia.
+2026-08-31 pending — agent:claude — created from the Backlog.md analysis (github.com/MrLesk/Backlog.md), point 10.
+- 2026-09-01 pending — agent:claude — RAISED P1→P0 (joins TL-82 and TL-86, which came from merging the analytical branch). The reason is new, not cosmetic: the owner is considering a worktrail cloud service (settled in TL-48). Under MIT — and the same under Apache-2.0 — the license does NOT stop a competitor from standing up a service on this code; the only thing stopping them from standing it up UNDER THIS NAME is the trademark. The name stops being cosmetic and becomes a business asset, and it is still freely exchangeable only until the first publication. The npx collision (described in ## Context as someone else's case) stops being an awkwardness in the README under a commercial service, and becomes routing traffic to someone else's package.
+- 2026-09-01 pending — agent:claude — **name changed `tasklog` → `worktrail`** (decision and reasoning in the log of [TL-20](TL-20-domknij-nazwe-narzedzia-przed-publikacja.md)). What this changes in THIS task:
+  **Step 2 done and produced a NEGATIVE result.** The claim "a name change is one edit" is FALSE — measured, not estimated: 158 files, including 26 in `scripts/`. `scripts/product.mjs` exports `PRODUCT_NAME`, but the rest of the code does not use it. The finding was moved out to [TL-117](TL-117-nazwa-produktu-z-jednej-stalej-a-nie-z-literalu.md), because it is work, not a decision — this task stays a decision task.
+  **Point 1 partially settled:** `registry.npmjs.org/worktrail` → 404 (2026-09-01), the name is free. **The sharper question stays UNSETTLED**, the same one that stung Backlog.md: what `npx worktrail` resolves to WITHOUT installing. A free name in the registry does not guarantee that, and it has to be checked separately.
+  **Raised risk:** the name is freshly chosen and still unreserved, so the window between choosing it and publishing is now the only safeguard — and it is open.
+  The `## Context` above mentions `"private": true` and `"license": "UNLICENSED"` — **both are stale** regardless of the name (the license was settled in [TL-48](TL-48-license-i-metadane-pakietu-dzis-nikt-nie-moze-tego-uzyc.md), `private` removed).
+- 2026-09-01 in_progress — agent:claude — **POINTS 1 AND 2 SETTLED BY MEASUREMENT** (2026-09-01, network). Registry: `registry.npmjs.org/worktrail` → 404, `npm view worktrail` → E404, npm search for `worktrail` → **0 results** (not just no exact name — nothing similar either). The typo neighborhood is free: `work-trail`, `worktrails`, `worktrail-cli` → 404. `which worktrail` → nothing, so no installed binary shadows ours. No Homebrew formula (`formulae.brew.sh/api/formula/worktrail.json` → 404).
+  **The sharper question — what `npx worktrail` resolves to — has a STRUCTURAL answer, not just an empirical one.** Empirically: `cd /tmp && npx --yes worktrail --version` → E404, there is nothing to hijack. Structurally, and this is the real safeguard: **`npx` resolves the PACKAGE NAME, never the binary name.** Backlog.md's trap does not come from bad luck, but from a mismatch between these two names — verified at the source: `npm view backlog.md bin` → `{ backlog: 'cli.js' }`, and `npm view backlog` → `backlog@1.4.56`, "Orchestrator for AI coding agents", by a DIFFERENT author. Their `npx backlog` has to land on someone else's code, because the package is named differently than the binary. For us `name` == the only `bin` key == `worktrail`, so this class of bug is CLOSED BY CONSTRUCTION, not just "free today". Condition to maintain: the package name and the binary name must never diverge — if the package ever had to be named e.g. `worktrail.md`, the trap opens immediately.
+- 2026-09-01 in_progress — agent:claude — **POINT 4 (the one-edit claim) — the NEGATIVE result from the previous entry confirmed.** `scripts/product.mjs` exports `PRODUCT_NAME` read from `package.json` (a single source for the package name and the name in `--help`), but the rest of `scripts/` still writes the name as a literal — 158 files for the `tasklog` → `worktrail` change. The claim from CLAUDE.md is an INTENTION, not a description of the current state; the work is in [TL-117](TL-117-nazwa-produktu-z-jednej-stalej-a-nie-z-literalu.md) and stays there. This task performs no work here.
+- 2026-09-01 in_progress — agent:claude — **POINT 3 — OWNER'S DECISION: npm-only channel.** The README promises `npm i -g worktrail` and `npx worktrail`, nothing more. Reasoning: Homebrew and Nix are two separate release rituals and two places where the version can go stale; a tap lagging behind npm is WORSE than no tap, because it promises a channel it does not deliver on. Backlog.md has both, but it also has users who asked for them — we have zero. They come back as separate tasks when someone asks, not before. Consequence for the README: it must not mention brew/nix even as "coming soon".
+- 2026-09-01 in_progress — agent:claude — **NAME RESERVATION — OWNER'S DECISION: the window stays open.** The alternative presented (publish a working `0.1.0` as a reservation, as soon as TL-48 has a repository address) was REJECTED; publication only once everything is ready. **Risk accepted deliberately and recorded so it does not come back as a surprise:** until there is a publication, the name is free for anyone, and given the cloud service under consideration, it is the name — not the license — that is the only thing stopping a competitor from standing up a service UNDER THIS NAME (analysis in [TL-48](TL-48-license-i-metadane-pakietu-dzis-nikt-nie-moze-tego-uzyc.md)). The scoped variant (`@…/worktrail`) was considered and rejected as illusory: it does not reserve the unscoped name, so `npx worktrail` stays free despite the publication. The reservation is still available at any moment — the cost only grows with time, nothing else.
+- 2026-09-01 in_progress — agent:claude — findings appended to the pre-publication gate `.claude/skills/worktrail-release/SKILL.md` §7: three checking commands (`npm view` / `npx` / `which`) with an explanation of WHY the first does not replace the second, the `backlog.md` precedent as evidence, and the decision about channels. Recorded as a rule to repeat on every future name change, not as a log of this one check.
 2026-09-01 done — agent:claude — closed by `worktrail done`: 2 command(s) green.

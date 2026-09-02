@@ -1,10 +1,10 @@
 ---
 id: TL-120
-title: "Własny szablon repo nadal uczy ## Log — usuń sekcję"
+title: "This repo's own template still teaches ## Log — remove the section"
 type: task
 labels: []
 board: main
-epic: "Historia i atrybucja"
+epic: "History and attribution"
 priority: P2
 status: done
 owner: agent:claude
@@ -22,78 +22,89 @@ verification:
     bash: "node --test scripts/tests/*.test.mjs"
 ---
 
-## Cel
+## Goal
 
-Task utworzony przez `worktrail new` w TYM repozytorium nie zawiera sekcji
-`## Log`, a strażnik tego faktu ocenia KAŻDY szablon leżący na dysku, nie jeden
-wskazany ścieżką.
+A task created by `worktrail new` in THIS repository does not contain a
+`## Log` section, and the guard for this fact evaluates EVERY template on
+disk, not one named by a path.
 
-## Kontekst
+## Context
 
-TL-105 przeniósł „dlaczego" ze zdania w pliku taska do pola `reason` rekordu
-w `backlog/history/`. Usunął `## Log` z szablonu — ale z JEDNEGO. Weryfikacja
-tamtego taska brzmiała:
+TL-105 moved "why" from a sentence in the task file to the `reason` field of
+a record in `backlog/history/`. It removed `## Log` from the template — but
+from ONE of them. That task's verification read:
 
 ```
-grep -q '## Log' _template.md && { echo 'szablon nadal uczy ## Log'; exit 1; }
+grep -q '## Log' _template.md && { echo 'template still teaches ## Log'; exit 1; }
 ```
 
-To jest ścieżka do szablonu, który JEDZIE W TARBALLU i który `worktrail init`
-kopiuje do cudzych repozytoriów. Tymczasem `new-task.mjs:181` czyta
-`join(root, "_template.md")`, gdzie `root` to rozwiązany katalog backlogu —
-czyli tutaj `backlog/_template.md`. To DRUGI plik, o innej treści (polski,
-932 B wobec 2,5 kB) i on sekcję zachował.
+That is the path to the template that SHIPS IN THE TARBALL and that
+`worktrail init` copies into other people's repositories. Meanwhile
+`new-task.mjs:181` reads `join(root, "_template.md")`, where `root` is the
+resolved backlog directory — here that is `backlog/_template.md`. That is a
+SECOND file, with different content (Polish, 932 B versus 2.5 kB), and it
+kept the section.
 
-Skutek: strażnik był zielony, a narzędzie przez cały ten czas wpisywało
-„Append-only. Format: `YYYY-MM-DD status — kto — notatka`." do każdego taska
-zakładanego w tym repozytorium. Dowodem jest sam ten plik — powstał z wadliwego
-szablonu i przyszedł na świat z sekcją `## Log`.
+Result: the guard was green, and the tool spent this whole time writing
+"Append-only. Format: `YYYY-MM-DD status — who — note`." into every task
+created in this repository. This very file is the proof — it came from the
+faulty template and was born with a `## Log` section.
 
-**Czego NIE trzeba ruszać.** `scripts/init-backlog.mjs` nie trzyma własnej kopii
-szablonu: `TEMPLATE_PATH = join(HERE, "..", TEMPLATE_FILENAME)` i `readTemplate()`
-czytają korzeniowy `_template.md` — decyzja z TL-50, żeby druga kopia nie
-rozjechała się z pierwszą. Cudze repozytoria dostają więc szablon już czysty
-i zmiana ich nie dotyczy. Usunięcie należy WYŁĄCZNIE do `backlog/_template.md`.
+**What does NOT need to change.** `scripts/init-backlog.mjs` does not hold
+its own copy of the template: `TEMPLATE_PATH = join(HERE, "..", TEMPLATE_FILENAME)`
+and `readTemplate()` read the root `_template.md` — a decision from TL-50, so
+the second copy would not drift from the first. Other people's repositories
+therefore already get the clean template, and the change does not concern
+them. The removal applies ONLY to `backlog/_template.md`.
 
-**Czego NIE wolno ruszać.** Istniejące taski z sekcją `## Log` zostają
-(CLAUDE.md): to zdania, których nikt nie odtworzy. Ten task usuwa szablon,
-nie historię.
+**What must NOT be touched.** Existing tasks with a `## Log` section stay
+(CLAUDE.md): those are sentences nobody will reconstruct. This task removes
+the template, not the history.
 
-**Klasa błędu, nie literówka.** Strażnik nazywający jedną ścieżkę jest tym
-samym, przed czym ostrzega CLAUDE.md: zielony bez mocy dowodowej, bo przechodzi
-na próbce, która pomija plik faktycznie używany. Dlatego lista szablonów ma być
-WYLICZONA — korzeń repozytorium i katalog backlogu, zdjęte w jedno w układzie
-ko-lokowanym — a nie wpisana.
+**A bug class, not a typo.** A guard naming a single path is exactly what
+CLAUDE.md warns about: green with no evidentiary force, because it passes on
+a sample that skips the file actually in use. That is why the list of
+templates has to be ENUMERATED — repository root and backlog directory,
+collapsed into one in the co-located layout — rather than written by hand.
 
 ## Pre-flight reading
 
-1. `backlog/_template.md` — plik do zmiany; sekcja na końcu.
-2. `_template.md` — szablon wysyłkowy, JUŻ czysty; punkt odniesienia dla treści.
-3. `scripts/new-task.mjs:181` — dowód, że `new` czyta szablon z katalogu backlogu.
-4. `scripts/init-backlog.mjs:132-150` — dowód, że `init` nie trzyma drugiej kopii.
-5. `scripts/tests/change-reason.test.mjs` — nagłówek pliku nazywa zastępowaną
-   konwencję; strażnik należy tutaj, a nie do nowego pliku.
-6. `scripts/tests/_repo.mjs` — stąd bierze się katalog backlogu; nie licz go sam.
+1. `backlog/_template.md` — the file to change; the section at the end.
+2. `_template.md` — the shipped template, ALREADY clean; the reference point
+   for content.
+3. `scripts/new-task.mjs:181` — proof that `new` reads the template from the
+   backlog directory.
+4. `scripts/init-backlog.mjs:132-150` — proof that `init` does not hold a
+   second copy.
+5. `scripts/tests/change-reason.test.mjs` — the header of the file names the
+   convention being replaced; the guard belongs here, not in a new file.
+6. `scripts/tests/_repo.mjs` — the backlog directory comes from here; do not
+   compute it yourself.
 
-## Kroki
+## Steps
 
-1. Usuń `## Log` wraz z linią „Append-only…" z `backlog/_template.md`.
-2. W `scripts/tests/change-reason.test.mjs` dołóż strażnika: lista szablonów
-   wyliczona z `REPO_ROOT` i `BACKLOG_DIR` (`_repo.mjs`), zdjęta przez `Set`,
-   wzorzec dopasowuje NAGŁÓWEK (`/^##[ \t]+Log[ \t]*$/m`), nie słowo.
-3. Dołóż test end-to-end: dla każdego szablonu załóż tymczasowy backlog przez
-   `init --no-example`, nadpisz w nim `_template.md` badanym plikiem, uruchom
-   `new` i sprawdź UTWORZONY task. Czytanie szablonu nie dowodzi, co zapisuje
-   `new`.
-4. Dołóż kontrolę pozytywną: dopisz sekcję z powrotem do szablonu w piaskownicy
-   i sprawdź, że ten sam wzorzec ją WIDZI.
-5. Popraw nieaktualny komentarz w `scripts/tests/new-task.test.mjs` (mówi
-   o `YYYY-MM-DD` „w sekcji ## Log", której już nie ma).
-6. Istniejących tasków nie dotykaj.
+1. Remove `## Log` along with the "Append-only…" line from
+   `backlog/_template.md`.
+2. In `scripts/tests/change-reason.test.mjs`, add a guard: the list of
+   templates enumerated from `REPO_ROOT` and `BACKLOG_DIR` (`_repo.mjs`),
+   deduplicated with a `Set`, the pattern matching the HEADING
+   (`/^##[ \t]+Log[ \t]*$/m`), not the word.
+3. Add an end-to-end test: for each template, set up a temporary backlog via
+   `init --no-example`, overwrite its `_template.md` with the file under
+   test, run `new` and check the CREATED task. Reading the template does not
+   prove what `new` writes.
+4. Add a positive control: put the section back in a sandbox template and
+   check that the same pattern DOES SEE it.
+5. Fix a stale comment in `scripts/tests/new-task.test.mjs` (it mentions
+   `YYYY-MM-DD` "in the ## Log section", which no longer exists).
+6. Do not touch existing tasks.
 
 ## Acceptance criteria
 
-- [x] `backlog/_template.md` nie zawiera nagłówka `## Log`. [proof: no-log-in-templates]
-- [x] Task z `worktrail new` nie ma `## Log` — dla każdego szablonu na dysku. [proof: no-log-in-templates]
-- [x] Strażnik OBLEWA, gdy sekcja wróci do szablonu (kontrola pozytywna). [proof: no-log-in-templates]
-- [x] Pełny pakiet testów jest zielony. [proof: suite-green]
+- [x] `backlog/_template.md` does not contain a `## Log` heading. [proof:
+      no-log-in-templates]
+- [x] A task from `worktrail new` has no `## Log` — for every template on
+      disk. [proof: no-log-in-templates]
+- [x] The guard FAILS when the section returns to a template (positive
+      control). [proof: no-log-in-templates]
+- [x] The full test suite is green. [proof: suite-green]

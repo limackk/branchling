@@ -1,10 +1,10 @@
 ---
 id: TL-136
-title: "renumber nie odroznia odwolania od przykladu w komentarzu"
+title: "renumber does not distinguish a reference from an example in a comment"
 type: task
 labels: []
 board: main
-epic: "Integralność danych"
+epic: "Data integrity"
 priority: P2                       # P0 blocker | P1 critical | P2 nice | P3 backlog
 status: pending                    # pending | in_progress | blocked | done | cancelled
 owner: unassigned
@@ -14,62 +14,66 @@ updated: 2026-09-01
 blocked_by: []
 blocks: []
 related_docs: []
-verification:                      # JAK sprawdzić, że task naprawdę jest zrobiony
+verification:                      # HOW to check the task is really done
   - id: przyklad-nietkniety
     bash: "node --test scripts/tests/renumber.test.mjs"
 ---
 
-## Cel
+## Goal
 
-`worktrail renumber` ma **nie przepisywać ID, które jest przykładem, a nie
-odwołaniem** — albo, jeśli nie da się ich odróżnić maszynowo, ma je wypisać
-przed zapisem, żeby człowiek zdążył zareagować.
+`worktrail renumber` must **not rewrite an ID that is an example, not a
+reference** — or, if there is no way to tell them apart mechanically, it must
+print them before writing, so a human has a chance to react.
 
-## Kontekst
+## Context
 
-Zmierzone 2026-09-01, na prawdziwym przebiegu renumeracji tego repozytorium
-([[TL-135]]). Komentarze w kodzie ilustrowały działanie migracji przykładem:
+Measured 2026-09-01, on a real renumbering run of this repository
+([[TL-135]]). Comments in the code illustrated the migration's behavior with
+an example:
 
 ```
  * function: `TL-1303` becomes `TL-1` only because of where it sat in one
  *           ordering of one tree at one moment.
 ```
 
-`TL-1303` był w mapie jako prawdziwy task, więc został przepisany na `TL-1`
-i zdanie zwinęło się w bezsensowne „`TL-1` becomes `TL-1`". To samo w trzech
-plikach: `scripts/renumber.mjs` (3 miejsca), `scripts/history.mjs`,
-`scripts/task-id.mjs` (3 miejsca).
+`TL-1303` was in the map as a real task, so it was rewritten to `TL-1`, and
+the sentence collapsed into the nonsensical "`TL-1` becomes `TL-1`". The same
+in three files: `scripts/renumber.mjs` (3 places), `scripts/history.mjs`,
+`scripts/task-id.mjs` (3 places).
 
-**Dlaczego to nie jest literówka.** Przepisywarka zachowała się dokładnie
-zgodnie ze specyfikacją — te ID BYŁY prawdziwymi ID i migracja miała je ruszyć.
-Wada leży w tym, że w tekście dokumentacyjnym ID pełni dwie różne funkcje,
-a narzędzie widzi tylko jedną. Uszkodzenie jest przy tym CICHE: żaden guard nie
-oblewa, testy przechodzą, a zdanie tłumaczące najtrudniejszą decyzję w module
-przestaje cokolwiek tłumaczyć. To najgorszy rodzaj uszkodzenia dokumentacji —
-takie, które wygląda na poprawne.
+**Why this is not a typo.** The rewriter behaved exactly according to spec —
+these IDs WERE real IDs and the migration was meant to move them. The defect
+is that in documentation text an ID plays two different roles, and the tool
+sees only one. The damage is also SILENT: no guard fails, the tests pass, and
+the sentence explaining the hardest decision in the module stops explaining
+anything. This is the worst kind of documentation damage — the kind that
+looks correct.
 
-**Jak naprawiono ręcznie** (i dlaczego to nie zamyka tematu): przykłady
-przepięto na obcy prefiks `PROJ-`, którego żadna mapa tego repozytorium nie
-obejmie. Działa, ale jest umową, o której nikt się nie dowie — następny autor
-komentarza napisze `TL-1303`, bo tak wygląda ID w tym projekcie.
+**How it was fixed by hand** (and why that does not close the topic): the
+examples were repointed to the foreign prefix `PROJ-`, which no map of this
+repository will ever cover. It works, but it is an agreement nobody knows
+about — the next comment's author will write `TL-1303`, because that is what
+an ID in this project looks like.
 
-## Kroki
+## Steps
 
-1. Rozstrzygnij, czy w ogóle da się to odróżnić maszynowo. Kandydaci:
-   - ID w komentarzu/prozie stojące obok słowa „becomes", „→", „e.g." — kruche;
-   - jawny znacznik przy linii, jak `product-name: allow` w [[TL-117]] —
-     spójne z tym, co repozytorium już robi z wyjątkami dla guardów;
-   - konwencja prefiksu przykładowego (`PROJ-`) UDOKUMENTOWANA i pilnowana
-     guardem, zamiast ustnej umowy.
-2. Jeśli odróżnienie jest niemożliwe: `renumber` ma przed zapisem wypisać
-   ID trafione w plikach ŹRÓDŁOWYCH (`scripts/`, `bin/`) osobno od tych
-   w backlogu i w `docs/`, bo to tam żyją przykłady.
-3. Cokolwiek wyjdzie — nagłówek `scripts/renumber.mjs` ma o tym mówić.
-   Dziś obiecuje, że nieznane ID zostaje nietknięte, i milczy o tym, że ZNANE
-   ID w roli przykładu zostaje przepisane.
+1. Decide whether this can be told apart mechanically at all. Candidates:
+   - an ID in a comment/prose standing next to the word "becomes", "→",
+     "e.g." — fragile;
+   - an explicit marker on the line, like `product-name: allow` in
+     [[TL-117]] — consistent with what the repository already does for guard
+     exceptions;
+   - a sample-prefix convention (`PROJ-`), DOCUMENTED and guarded, instead of
+     a verbal agreement.
+2. If telling them apart is impossible: `renumber` must print, before writing,
+   the IDs hit in SOURCE files (`scripts/`, `bin/`) separately from those in
+   the backlog and in `docs/`, since that is where examples live.
+3. Whatever comes out of this — the header of `scripts/renumber.mjs` must say
+   so. Today it promises that an unknown ID stays untouched, and stays silent
+   about a KNOWN ID in the role of an example being rewritten.
 
 ## Acceptance criteria
 
-- [ ] ID użyte jako przykład przeżywa przebieg `renumber` nietknięte albo jest wypisane przed zapisem. [proof: przyklad-nietkniety]
-- [ ] Test ma kontrolę pozytywną: fixture z przykładem, który BEZ poprawki zostaje uszkodzony. [proof: przyklad-nietkniety]
-- [ ] Konwencja (znacznik albo prefiks przykładowy) jest zapisana tam, gdzie autor komentarza ją zobaczy, a nie tylko w tym tasku. [proof: przyklad-nietkniety]
+- [ ] An ID used as an example survives a `renumber` run untouched, or is printed before writing. [proof: przyklad-nietkniety]
+- [ ] The test has a positive control: a fixture with an example that, without the fix, gets damaged. [proof: przyklad-nietkniety]
+- [ ] The convention (marker or sample prefix) is recorded where the comment's author will see it, not only in this task. [proof: przyklad-nietkniety]

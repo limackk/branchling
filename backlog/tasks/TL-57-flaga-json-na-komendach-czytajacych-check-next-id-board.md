@@ -1,10 +1,10 @@
 ---
 id: TL-57
-title: "Flaga --json na komendach czytających: check, next-id, board"
+title: "The --json flag on reading commands: check, next-id, board"
 type: task
 labels: [pre-launch]
 board: main
-epic: "Powierzchnia CLI"
+epic: "CLI surface"
 priority: P2
 status: pending
 owner: unassigned
@@ -19,74 +19,90 @@ related_docs:
   - .claude/skills/worktrail-cli/SKILL.md
 verification:
   - bash: "node --test scripts/tests/json-output.test.mjs"
-  - bash: "node scripts/cli.mjs check --json | node -e \"let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const r=JSON.parse(s);console.log('check --json parsuje, guardów:',Array.isArray(r)?r.length:Object.keys(r).length)})\""
-  - bash: "node scripts/cli.mjs next-id --json | node -e \"let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{JSON.parse(s);console.log('next-id --json parsuje — OK')})\""
+  - bash: "node scripts/cli.mjs check --json | node -e \"let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const r=JSON.parse(s);console.log('check --json parses, guards:',Array.isArray(r)?r.length:Object.keys(r).length)})\""
+  - bash: "node scripts/cli.mjs next-id --json | node -e \"let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{JSON.parse(s);console.log('next-id --json parses — OK')})\""
 ---
 
-## Cel
+## Goal
 
-Domknąć Prawo 4 — „`--json` na każdej komendzie czytającej" — bo dziś jest to
-opis dwóch komend, a nie reguła.
+Close out Law 4 — "`--json` on every reading command" — because today it is
+a description of two commands, not a rule.
 
-## Kontekst
+## Context
 
-Zmierzone 2026-08-31, `grep '--json' scripts/*.mjs`:
+Measured 2026-08-31, `grep '--json' scripts/*.mjs`:
 
-| Komenda | czyta? | `--json` |
+| Command | reads? | `--json` |
 |---|---|---|
-| `query` | tak | jest |
-| `stats` | tak | jest |
-| `check` | tak | **brak** |
-| `next-id` | tak | **brak** |
-| `board` | tak | **brak** |
+| `query` | yes | present |
+| `stats` | yes | present |
+| `check` | yes | **missing** |
+| `next-id` | yes | **missing** |
+| `board` | yes | **missing** |
 
-`docs/worktrail-global-tool.md` §3 stawia to jako jedno z czterech praw i wyprowadza
-z niego całą rozszerzalność: „bez API wtyczek, bo `--json` na każdej komendzie
-czytającej i wywoływalne wejście na każdej piszącej". Prawo, które obowiązuje w
-dwóch komendach na pięć, nie jest podstawą rozszerzalności — jest opisem stanu.
+`docs/worktrail-global-tool.md` §3 states this as one of the four laws and
+derives all extensibility from it: "no plugin API, because `--json` on every
+reading command and a callable input on every writing one." A law that holds
+in two commands out of five is not a basis for extensibility — it is a
+description of the current state.
 
-Praktyczna cena jest dziś widoczna w `new-task.mjs`: numer z `next-backlog-id.mjs`
-czytany jest **ze stdout, jako ostatnia linia**, po czym walidowany regeksem, żeby
-awaria skanera nie dała pliku `BL-NaN-*.md`. To jest obejście po dokładnie tę
-brakującą flagę. `--json` zamienia „ostatnia linia stdout, oby była liczbą" w pole.
+The practical cost is visible today in `new-task.mjs`: the number from
+`next-backlog-id.mjs` is read **from stdout, as the last line**, then
+validated with a regex, so that a scanner failure does not produce a
+`BL-NaN-*.md` file. This is a workaround for exactly this missing flag.
+`--json` turns "the last line of stdout, hopefully a number" into a field.
 
-Największą wartość ma tu `check --json`: to jest komenda, którą ktoś podepnie do
-CI albo do hooka i będzie chciał wiedzieć, KTÓRY guard oblał i na czym — a nie
-tylko, że kod wyjścia jest różny od zera.
+The greatest value here is `check --json`: this is the command someone will
+wire into CI or into a hook, and they will want to know WHICH guard failed
+and on what — not just that the exit code is nonzero.
 
-**Ograniczenie, które łatwo złamać:** przy `--json` na stdout nie ma prawa pojawić
-się nic poza JSON-em. Nagłówek, `✓` albo ostrzeżenie dopisane „tylko na chwilę"
-psują parsowanie u każdego konsumenta naraz. Diagnostyka idzie na stderr.
+**A constraint that is easy to break:** with `--json`, stdout may contain
+nothing but JSON. A heading, a `✓`, or a warning added "just for a moment"
+break parsing for every consumer at once. Diagnostics go to stderr.
 
-Kod wyjścia zostaje bez zmian: `check --json`, który znalazł naruszenie, nadal
-oblewa. JSON opisuje wynik, nie zastępuje kodu wyjścia.
+The exit code stays unchanged: `check --json` that found a violation still
+fails. JSON describes the result, it does not replace the exit code.
 
 ## Pre-flight reading
 
-1. `docs/worktrail-global-tool.md` §3, Prawo 4.
-2. `scripts/query.mjs` i `scripts/stats-report.mjs` — dwa istniejące wzorce `--json`.
-3. `scripts/new-task.mjs` — funkcja `nextId()`, czyli obejście, które ten task usuwa.
-4. `scripts/cli.mjs` — `check` jest komendą złożoną (trzy guardy, kod wyjścia = najgorszy z nich); JSON musi to zachować.
+1. `docs/worktrail-global-tool.md` §3, Law 4.
+2. `scripts/query.mjs` and `scripts/stats-report.mjs` — the two existing
+   `--json` patterns.
+3. `scripts/new-task.mjs` — the `nextId()` function, the workaround this
+   task removes.
+4. `scripts/cli.mjs` — `check` is a composite command (three guards, exit
+   code = the worst of them); the JSON must preserve that.
 
-## Kroki
+## Steps
 
-1. `check --json`: jeden dokument dla całego uruchomienia — lista guardów, dla każdego nazwa, wynik, liczba sprawdzonych rzeczy i lista naruszeń. Kod wyjścia nadal najgorszy z guardów.
-2. `next-id --json`: numer, pełne ID i **źródło** (`repo` / `local`) — dziś ostrzeżenie o węższym źródle idzie tylko na stderr prozą, a to jest informacja, na którą program powinien móc zareagować.
-3. `board --json`: sugerowany board plus reguła, z której wyszedł.
-4. Uporządkuj `new-task.mjs`, żeby czytał `next-id --json` zamiast ostatniej linii stdout.
-5. `scripts/tests/json-output.test.mjs`: dla każdej komendy czytającej wyjście `--json` parsuje się, także przy zerowej liczbie wyników, i stdout nie zawiera nic poza JSON-em.
-6. Dopisz `--json` do listy dozwolonych flag każdej z tych komend (dziś nieznana flaga oblewa).
+1. `check --json`: one document for the whole run — a list of guards, for
+   each a name, result, count of things checked, and a list of violations.
+   Exit code still the worst of the guards.
+2. `next-id --json`: the number, the full ID and the **source**
+   (`repo` / `local`) — today a warning about a narrower source only goes to
+   stderr as prose, and this is information the program should be able to
+   react to.
+3. `board --json`: the suggested board plus the rule it came from.
+4. Clean up `new-task.mjs` so it reads `next-id --json` instead of the last
+   line of stdout.
+5. `scripts/tests/json-output.test.mjs`: for every reading command, the
+   `--json` output parses, including with zero results, and stdout contains
+   nothing but JSON.
+6. Add `--json` to the allow-list of flags for each of these commands
+   (today an unknown flag fails).
 
 ## Acceptance criteria
 
-- [ ] `check`, `next-id`, `board` przyjmują `--json`.
-- [ ] Przy `--json` stdout zawiera wyłącznie JSON — sprawdzone testem, także dla pustego wyniku.
-- [ ] `check --json` nazywa guard, który oblał, i zachowuje kod wyjścia.
-- [ ] `next-id --json` niesie źródło numeru (`repo` / `local`).
-- [ ] `new-task.mjs` nie parsuje już stdout linia-po-linii.
+- [ ] `check`, `next-id`, `board` accept `--json`.
+- [ ] With `--json`, stdout contains only JSON — verified by a test,
+      including for an empty result.
+- [ ] `check --json` names the guard that failed and preserves the exit
+      code.
+- [ ] `next-id --json` carries the number's source (`repo` / `local`).
+- [ ] `new-task.mjs` no longer parses stdout line by line.
 
 ## Log
 
-Append-only. Format: `YYYY-MM-DD status — kto — notatka`.
+Append-only. Format: `YYYY-MM-DD status — who — note`.
 
-- 2026-08-31 created — agent:claude — z audytu powierzchni CLI
+- 2026-08-31 created — agent:claude — from an audit of the CLI surface

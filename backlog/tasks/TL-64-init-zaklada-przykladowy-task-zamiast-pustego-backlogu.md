@@ -1,6 +1,6 @@
 ---
 id: TL-64
-title: "init zakłada przykładowy task zamiast pustego backlogu"
+title: "init creates a sample task instead of an empty backlog"
 type: task
 labels: [post-launch]
 board: main
@@ -17,83 +17,129 @@ blocks: []
 related_docs:
   - .claude/skills/backlog-workflow/SKILL.md
 verification:
-  - bash: "d=$(mktemp -d); T=/Users/limack/workspace/tasklog/bin/worktrail.mjs; node $T init --dir \"$d\" >/dev/null && test \"$(ls \"$d/tasks\" | wc -l | tr -d ' ')\" = 1 && echo 'init zakłada jeden task — OK'"
+  - bash: "d=$(mktemp -d); T=/Users/limack/workspace/tasklog/bin/worktrail.mjs; node $T init --dir \"$d\" >/dev/null && test \"$(ls \"$d/tasks\" | wc -l | tr -d ' ')\" = 1 && echo 'init creates one task — OK'"
   - bash: "d=$(mktemp -d); T=/Users/limack/workspace/tasklog/bin/worktrail.mjs; node $T init --dir \"$d\" >/dev/null && node $T check --dir \"$d\" && node $T stats --dir \"$d\" | head -3"
-  - bash: "d=$(mktemp -d); T=/Users/limack/workspace/tasklog/bin/worktrail.mjs; node $T init --dir \"$d\" --no-example >/dev/null && test \"$(ls \"$d/tasks\" | wc -l | tr -d ' ')\" = 0 && echo 'da się wyłączyć — OK'"
+  - bash: "d=$(mktemp -d); T=/Users/limack/workspace/tasklog/bin/worktrail.mjs; node $T init --dir \"$d\" --no-example >/dev/null && test \"$(ls \"$d/tasks\" | wc -l | tr -d ' ')\" = 0 && echo 'can be disabled — OK'"
 ---
 
-## Cel
+## Goal
 
-Skrócić drogę od instalacji do pierwszej widocznej wartości: po `init` ma być co
-oglądać, a przykład ma pokazywać kształt dobrze napisanego taska.
+Shorten the path from installation to the first visible value: after `init`
+there should be something to look at, and the sample should show the shape of
+a well-written task.
 
-## Kontekst
+## Context
 
-Dziś po `worktrail init` backlog jest pusty: `stats` pokazuje same zera, viewer
-otwiera się bez ani jednej karty, a jedynym śladem po kształcie pliku jest
-`_template.md`, którego nikt nie musi otworzyć. Użytkownik ocenia narzędzie na
-pustym ekranie.
+Today, after `worktrail init` the backlog is empty: `stats` shows nothing but
+zeros, the viewer opens with not a single card, and the only trace of the file
+shape is `_template.md`, which nobody is required to open. The user judges the
+tool on an empty screen.
 
-Pusty stan jest też straconą okazją dydaktyczną. Najtrudniejsza do przekazania
-konwencja tego narzędzia to **`verification:` — task nie jest zrobiony, dopóki nie
-ma komendy, która to udowadnia.** Nie da się tego wyjaśnić akapitem tak dobrze,
-jak jednym plikiem, w którym to widać.
+The empty state is also a lost teaching opportunity. The hardest convention of
+this tool to convey is **`verification:` — a task is not done until there is a
+command that proves it.** No paragraph explains this as well as a single file
+where it is visible.
 
-**Ograniczenia, których nie wolno złamać:**
+**Constraints that must not be broken:**
 
-- Przykład musi być **generyczny**. Zero słownictwa jakiegokolwiek istniejącego
-  projektu — ten sam wymóg, który obowiązuje szablony i którego pilnuje test.
-- Musi być **kasowalny bez konsekwencji** i musi to mówić o sobie wprost.
-- Musi **przechodzić `worktrail check`** i mieć `verification`, które naprawdę da
-  się uruchomić. Przykład z atrapą komendy uczyłby dokładnie odwrotnie, niż trzeba.
-- Musi dać się **wyłączyć** — `init` bywa wołany przez skrypt i przez agenta, a
-  wtedy nieoczekiwany plik w `tasks/` jest zaskoczeniem.
+- The sample must be **generic**. No vocabulary from any existing project
+  whatsoever — the same requirement that applies to templates and that a test
+  guards.
+- It must be **deletable with no consequences**, and it must say so about
+  itself, outright.
+- It must **pass `worktrail check`** and have a `verification` that can
+  actually be run. A sample with a fake command would teach exactly the
+  opposite of what is needed.
+- It must be possible to **turn off** — `init` is sometimes called by a
+  script or by an agent, and then an unexpected file in `tasks/` is a
+  surprise.
 
-Do rozstrzygnięcia w tasku: czy przykładem ma być task „o narzędziu" (np.
-„Dostosuj słowniki w config.yaml do swojego projektu" — realne pierwsze zadanie,
-z `verification` wołającym `worktrail check`), czy neutralna atrapa. Pierwsze jest
-mocniejsze, bo przykład jest jednocześnie prawdziwym pierwszym krokiem i po
-wykonaniu zamyka się naturalnie. Drugie jest bezpieczniejsze, bo nie zakłada, co
-użytkownik chce zrobić.
+To be settled in the task: should the sample be a task "about the tool"
+(e.g. "Adapt the vocabularies in config.yaml to your project" — a real first
+task, with `verification` calling `worktrail check`), or a neutral dummy? The
+first is stronger, because the sample is simultaneously a real first step and
+closes itself naturally once done. The second is safer, because it does not
+assume what the user wants to do.
 
-Wariant do rozważenia zamiast flagi: `init` buduje widoki od razu, więc po jednej
-komendzie działa i `stats`, i viewer. Dziś `init` kończy podpowiedzią
-`dalej: worktrail build` — dobrą, ale wciąż to jest drugi krok do zrobienia ręcznie.
+A variant to consider instead of a flag: `init` builds the views right away,
+so after one command both `stats` and the viewer work. Today `init` ends with
+the hint `next: worktrail build` — a good one, but it is still a second step
+to do by hand.
 
 ## Pre-flight reading
 
-1. `scripts/init-backlog.mjs` — `FILES`, `TEMPLATE_MD`, zasada „istniejący plik pomijam".
-2. `scripts/new-task.mjs` — jak powstaje task; przykład powinien powstawać tą samą drogą, nie drugim generatorem.
-3. `.claude/skills/backlog-workflow/SKILL.md` §„Write a task" — standard, który przykład ma ilustrować.
-4. `scripts/tests/init-stats.test.mjs` — dzisiejsze asercje o świeżym backlogu; zmienią się.
+1. `scripts/init-backlog.mjs` — `FILES`, `TEMPLATE_MD`, the rule "skip a file
+   that already exists".
+2. `scripts/new-task.mjs` — how a task comes into being; the sample should be
+   created through the same path, not a second generator.
+3. `.claude/skills/backlog-workflow/SKILL.md` §"Write a task" — the standard
+   the sample is meant to illustrate.
+4. `scripts/tests/init-stats.test.mjs` — today's assertions about a fresh
+   backlog; they will change.
 
-## Kroki
+## Steps
 
-1. Rozstrzygnij treść przykładu (task o dostosowaniu konfiguracji kontra neutralna atrapa) i zapisz powód w `## Log`.
-2. Przykład powstaje przez tę samą ścieżkę co `worktrail new` — jeden generator, nie dwa.
-3. `--no-example` (albo `--bare`) wyłącza; dopisz flagę do walidacji flag `init`.
-4. Rozważ zbudowanie widoków na koniec `init`, żeby `stats` i viewer działały po jednej komendzie.
-5. Zaktualizuj podpowiedź „dalej:" tak, żeby odpowiadała temu, co faktycznie zostało zrobione.
-6. Popraw `scripts/tests/init-stats.test.mjs` i dopisz asercje: przykład przechodzi `check`, jego `verification` jest wykonywalne, `--no-example` daje pusty katalog.
+1. Decide the content of the sample (a task about adapting the configuration
+   versus a neutral dummy) and record the reason in `## Log`.
+2. The sample is created through the same path as `worktrail new` — one
+   generator, not two.
+3. `--no-example` (or `--bare`) turns it off; add the flag to `init`'s flag
+   validation.
+4. Consider building the views at the end of `init`, so `stats` and the
+   viewer work after one command.
+5. Update the "next:" hint so it matches what was actually done.
+6. Fix `scripts/tests/init-stats.test.mjs` and add assertions: the sample
+   passes `check`, its `verification` is runnable, `--no-example` gives an
+   empty directory.
 
 ## Acceptance criteria
 
-- [ ] `worktrail init` zakłada dokładnie jeden przykładowy task.
-- [ ] Przykład przechodzi `worktrail check` i ma uruchamialne `verification`.
-- [ ] Przykład mówi o sobie, że można go skasować.
-- [ ] Zero słownictwa jakiegokolwiek istniejącego projektu.
-- [ ] `--no-example` daje dzisiejsze, puste zachowanie.
-- [ ] Po `init` `worktrail stats` pokazuje niezerową liczbę bez dodatkowych komend.
+- [ ] `worktrail init` creates exactly one sample task.
+- [ ] The sample passes `worktrail check` and has runnable `verification`.
+- [ ] The sample says about itself that it can be deleted.
+- [ ] No vocabulary from any existing project whatsoever.
+- [ ] `--no-example` gives today's empty behavior.
+- [ ] After `init`, `worktrail stats` shows a nonzero count with no extra
+      commands.
 
 ## Log
 
-Append-only. Format: `YYYY-MM-DD status — kto — notatka`.
+Append-only. Format: `YYYY-MM-DD status — who — note`.
 
-- 2026-08-31 created — agent:claude — z audytu onboardingu
-- 2026-08-31 in_progress — agent:claude — start implementacji
-- 2026-08-31 pending — agent:claude — odblokowane: TL-66 zdjął fałszywe ostrzeżenie `next-id`, które padało przy pierwszym tasku i psuło ścieżkę, którą ten task ma skrócić.
-- 2026-08-31 done — agent:claude — wybrany wariant: task O KONFIGURACJI, nie neutralna atrapa (krok 1). Powód: przykład, który JEST prawdziwym pierwszym krokiem, uczy dwóch rzeczy naraz — kształtu pliku i tego, że `verification:` ma być uruchamialne — a po wykonaniu zamyka się sam. Jego `verification` to `worktrail doctor`, czyli komenda, która naprawdę odpowie na pytanie z tego taska. Atrapa uczyłaby, że to pole jest ozdobne.
-- 2026-08-31 done — agent:claude — „jeden generator" zrealizowany przez wydzielenie `createTask()` z `main()` w `new-task.mjs` (bez drukowania; `main` drukuje). `init` woła tę samą funkcję, więc numer nadal bierze skan wszystkich gałęzi, a zapis jest wyłączny (`wx`). `createTask` przyjmuje `body` (treść poniżej frontmattera) i `fields.verification` (blok, nie linia — szablon niesie tam atrapę). Przykład wchodzi TYLKO do pustego drzewa: backlog z taskami nie jest nowy, a dokładanie mu pliku byłoby tym samym zaskoczeniem, co nadpisanie.
-- 2026-08-31 done — agent:claude — `init` buduje na koniec widoki, więc `stats` i viewer działają po JEDNEJ komendzie; podpowiedź zmieniona z `dalej: worktrail build` na `dalej: worktrail`. `--no-example` przywraca dzisiejsze zachowanie i wszedł do walidacji flag.
-- 2026-08-31 done — agent:claude — siedem fixture'ów testowych dostało `--no-example`, każdy z uzasadnieniem w komentarzu. To nie jest obejście: te testy mówią o numeracji, o „nic nie zapisał" albo o PUSTYM drzewie, więc przykład zmieniałby ich przedmiot, a nie ich wynik. Pięć nowych asercji na sam przykład, z dowodem mocy przez wyłączenie zachowania. 318/318.
-- 2026-08-31 done — agent:claude — znane, świadomie zostawione: `init` do katalogu POZA repozytorium gita wypisuje przy przykładzie ostrzeżenie `next-id` o węższym źródle numeru. Jest prawdziwe (backlog naprawdę nie leży w repo), choć w świeżym katalogu ryzyko kolizji jest zerowe. Wyciszanie prawdziwego ostrzeżenia dla ładniejszego wyjścia byłoby odwrotnością reguły, którą właśnie naprawił TL-66.
+- 2026-08-31 created — agent:claude — from an onboarding audit
+- 2026-08-31 in_progress — agent:claude — implementation started
+- 2026-08-31 pending — agent:claude — unblocked: TL-66 removed the false
+  `next-id` warning that fired on the first task and broke the path this task
+  is meant to shorten.
+- 2026-08-31 done — agent:claude — chosen variant: a task ABOUT
+  CONFIGURATION, not a neutral dummy (step 1). Reason: a sample that IS a real
+  first step teaches two things at once — the shape of the file, and that
+  `verification:` is meant to be runnable — and it closes itself once done.
+  Its `verification` is `worktrail doctor`, a command that genuinely answers
+  the question posed by this task. A dummy would have taught that this field
+  is decorative.
+- 2026-08-31 done — agent:claude — "one generator" achieved by extracting
+  `createTask()` out of `main()` in `new-task.mjs` (with no printing; `main`
+  does the printing). `init` calls the same function, so the number still
+  comes from a scan of every branch, and the write is exclusive (`wx`).
+  `createTask` accepts `body` (the content below the frontmatter) and
+  `fields.verification` (a block, not a line — the template carries a dummy
+  there). The sample goes ONLY into an empty tree; a backlog with tasks
+  already in it is not new, and adding it a file would be the same kind of
+  surprise as overwriting one.
+- 2026-08-31 done — agent:claude — `init` builds the views at the end, so
+  `stats` and the viewer work after ONE command; the hint changed from
+  `next: worktrail build` to `next: worktrail`. `--no-example` restores
+  today's behavior and was added to flag validation.
+- 2026-08-31 done — agent:claude — seven test fixtures got `--no-example`,
+  each with a justification in a comment. This is not a workaround: these
+  tests are about numbering, about "wrote nothing", or about an EMPTY tree, so
+  the sample would have changed their subject, not their result. Five new
+  assertions on the sample itself, with proof of strength through disabling
+  the behavior. 318/318.
+- 2026-08-31 done — agent:claude — known, deliberately left as is: `init`
+  into a directory OUTSIDE a git repository prints a `next-id` warning about a
+  narrower source of the number, together with the sample. It is true (the
+  backlog really does not sit inside a repo), even though in a fresh directory
+  the collision risk is zero. Silencing a true warning for prettier output
+  would be the opposite of the rule TL-66 just fixed.

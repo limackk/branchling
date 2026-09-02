@@ -1,117 +1,195 @@
-# Backlog — rozdział kodu od danych i konfiguracja
+# Backlog — separating code from data, and configuration
 
 **Status:** IMPLEMENTED 2026-08-29 ([TL-18](../backlog/tasks/TL-18-katalog-danych-backlogu-jako-argument.md), [TL-19](../backlog/tasks/TL-19-slowniki-backlogu-do-konfiguracji.md))
-**SSOT kodu:** `backlog/scripts/paths.mjs`, `backlog/scripts/config.mjs`, `backlog/config.yaml`
-**Testy:** `node --test backlog/scripts/tests/paths.test.mjs backlog/scripts/tests/config.test.mjs`
+**Code SSOT:** `backlog/scripts/paths.mjs`, `backlog/scripts/config.mjs`, `backlog/config.yaml`
+**Tests:** `node --test backlog/scripts/tests/paths.test.mjs backlog/scripts/tests/config.test.mjs`
 
 ---
 
-## 1. Po co
+## 1. Why
 
-Moduł `backlog/` powstał jako część workspace'u the origin project i miał to wpisane w konstrukcję na dwa sposoby:
+The `backlog/` module was born as part of the origin project's workspace and had this baked
+into its construction in two ways:
 
-1. **Katalog danych wynikał z położenia kodu** — każdy skrypt liczył go jako `join(__dirname, "..")`. Kod i dane były jednym katalogiem, więc nie dało się ani wskazać innego backlogu, ani zainstalować narzędzia obok cudzego repozytorium.
-2. **Słowniki były kodem** — `pre-launch`, `test_env`, `data-gated`, `owner: founder|claude`, siedem statusów, cztery priorytety i dwa typy stały wpisane w `task-fields.mjs`, `build-backlog.mjs` i CSS viewera.
+1. **The data directory followed from where the code sat** — every script
+   computed it as `join(__dirname, "..")`. Code and data were one directory,
+   so it was impossible either to point at a different backlog, or to
+   install the tool alongside someone else's repository.
+2. **The vocabularies were code** — `pre-launch`, `test_env`, `data-gated`,
+   `owner: founder|claude`, seven statuses, four priorities and two types
+   were hardcoded into `task-fields.mjs`, `build-backlog.mjs` and the
+   viewer's CSS.
 
-Oba są w porządku dla narzędzia jednej firmy i oba są blokerem, gdy to ma być narzędzie. Dwa taski usunęły te założenia **bez** przenoszenia plików i bez wydzielania repozytorium — tak, żeby wydzielenie było później jednym `git subtree split`, a nie archeologią.
+Both are fine for one company's tool and both are a blocker once this is
+meant to be a tool. Two tasks removed these assumptions **without** moving
+files and without splitting off a repository — so that extraction would later
+be one `git subtree split`, not archaeology.
 
-## 2. Gdzie są dane (TL-18)
+## 2. Where the data lives (TL-18)
 
-`resolveBacklogDir()` w `paths.mjs`. Kolejność źródeł, od najbardziej jawnego:
+`resolveBacklogDir()` in `paths.mjs`. Order of sources, from most explicit:
 
-| # | Źródło | `source` | Uwagi |
+| # | Source | `source` | Notes |
 |---|---|---|---|
-| 1 | `--dir <ścieżka>` | `explicit` | wskazanie, które nie jest backlogiem, jest **błędem**, nie przejściem dalej |
-| 2 | `BACKLOG_DIR` | `env` | jak wyżej |
-| 3 | wykrywanie w górę od `cwd` (`.` albo `./backlog`) | `discovery` | wymaga ZNACZNIKA |
-| 4 | katalog nad plikiem skryptu | `colocated` | trzyma dzisiejszy układ i alias `backlog` |
+| 1 | `--dir <path>` | `explicit` | pointing at something that isn't a backlog is an **error**, not a fallthrough |
+| 2 | `BACKLOG_DIR` | `env` | same |
+| 3 | detection upwards from `cwd` (`.` or `./backlog`) | `discovery` | requires a MARKER |
+| 4 | the directory above the script file | `colocated` | keeps today's layout and the `backlog` alias |
 
-**Wykrywanie wymaga znacznika** (`tasks/` **plus** `boards.yaml` / `config.yaml` / `_template.md`), a nie samego `tasks/`. Cudze repo z katalogiem o tej nazwie jest częstsze, niż się wydaje, a ciche wskazanie nie tego drzewa kończy się zapisem nie tam — to gorsze niż błąd.
+**Detection requires a marker** (`tasks/` **plus** `boards.yaml` /
+`config.yaml` / `_template.md`), not `tasks/` alone. A foreign repo with a
+directory of that name is more common than it seems, and silently pointing
+at the wrong tree ends in a write landing somewhere it shouldn't — worse than
+an error.
 
-Punkt 4 jest tym, co utrzymuje dzisiejsze zachowanie: alias `backlog` startuje serwer z dowolnego katalogu, także spoza workspace'u.
+Point 4 is what keeps today's behaviour: the `backlog` alias starts the
+server from any directory, including outside the workspace.
 
-`backlogPaths(root)` jest jedynym miejscem, które zna nazwy plików w środku (`tasks/`, `history/`, `INDEX.yaml`, `viewer.html`…).
+`backlogPaths(root)` is the only place that knows the internal file names
+(`tasks/`, `history/`, `INDEX.yaml`, `viewer.html`…).
 
-## 3. Co jest konfiguracją (TL-19)
+## 3. What is configuration (TL-19)
 
-Linia podziału, której trzeba się trzymać:
+The dividing line to hold to:
 
-- **Kod zna KSZTAŁT** — jakie pola ma task, jakiego są typu, jak się je zapisuje do frontmattera, jak się je porównuje. To `FIELD_SHAPES` w `task-fields.mjs`.
-- **Konfiguracja zna WARTOŚCI** — jakie statusy, labels, priorytety, typy i boardy istnieją w TYM projekcie.
+- **Code knows the SHAPE** — what fields a task has, of what type, how they
+  are written to the frontmatter, how they are compared. That's
+  `FIELD_SHAPES` in `task-fields.mjs`.
+- **Configuration knows the VALUES** — which statuses, labels, priorities,
+  types and boards exist in THIS project.
 
-`buildFieldSpecs(config)` skleja jedno z drugim w specy, z których serwer waliduje, a viewer rysuje edytory.
+`buildFieldSpecs(config)` glues the two together into specs the server
+validates against and the viewer draws editors from.
 
-### Pliki
+### Files
 
 ```
-backlog/config.yaml   ← słowniki projektu (ten plik jest nowy)
-backlog/boards.yaml   ← rejestr boardów (bez zmian; ma własny guard)
+backlog/config.yaml   ← project vocabularies (this file is new)
+backlog/boards.yaml   ← board registry (unchanged; has its own guard)
 ```
 
-`config.mjs` czyta oba i zwraca **jeden** obiekt — reszta kodu nie wie, że to dwa pliki. Brak `config.yaml` = generyczne `DEFAULTS` (żadnego „pre-launch"), więc świeże repozytorium działa bez konfiguracji.
+`config.mjs` reads both and returns **one** object — the rest of the code
+does not know it is two files. No `config.yaml` = generic `DEFAULTS` (no
+"pre-launch" anywhere), so a fresh repository works with no configuration.
 
-### Klucze
+### Keys
 
-| Klucz | Znaczenie |
+| Key | Meaning |
 |---|---|
-| `project_name` | nagłówki generowanych widoków i tytuł viewera |
-| `statuses`, `archived_statuses` | workflow; `archived_statuses` decyduje, co wypada z `INDEX.yaml` do `archive/done.yaml` |
-| `priorities` | **kolejność = kolejność sortowania widoków** |
-| `types`, `confidence` | słowniki pól |
-| `labels`, `labels_closed` | słownik labeli i to, czy jest zamknięty |
-| `label_axis_timing`, `label_axis_env` | osie, z których viewer buduje facety „Faza" i „Środowisko"; **pusta oś = facet znika** |
-| `roles` | KTO MOŻE wziąć task (`role:`), w odróżnieniu od `owner:` — kto go trzyma TERAZ. **Pusty słownik to ODPOWIEDŹ**, nie brak konfiguracji: projekt nie używa ról, więc niepuste `role:` w drzewie oblewa build zamiast tworzyć rolę-widmo, której żaden dyspozytor nie obsłuży |
-| `owners`, `estimates` | podpowiedzi pól tekstowych (nie słownik zamknięty) |
-| `actors` | podpowiedzi przełącznika „Edytuję jako" w historii zmian |
-| `title_max_length` | walidacja tytułu |
-| `epic_aliases` | scalanie wariantów zapisu epiku |
-| `status_colors`, `priority_colors`, `label_colors`, `status_strikethrough` | prezentacja; brak wpisu = kolor z palety cyklicznej |
-| `dashboard_open_statuses`, `dashboard_burndown_kind/value` | co znaczy „otwarte" i co wypala burndown |
+| `project_name` | headers of generated views and the viewer's title |
+| `statuses`, `archived_statuses` | workflow; `archived_statuses` decides what drops out of `INDEX.yaml` into `archive/done.yaml` |
+| `priorities` | **order = sort order in the views** |
+| `types`, `confidence` | field vocabularies |
+| `labels`, `labels_closed` | the label vocabulary and whether it is closed |
+| `label_axis_timing`, `label_axis_env` | the axes the viewer builds the "Phase" and "Environment" facets from; **an empty axis makes the facet disappear** |
+| `roles` | WHO MAY take a task (`role:`), as distinct from `owner:` — who holds it NOW. **An empty vocabulary is an ANSWER**, not missing configuration: the project doesn't use roles, so a non-empty `role:` anywhere in the tree fails the build instead of creating a phantom role no dispatcher serves |
+| `owners`, `estimates` | text-field suggestions (not a closed vocabulary) |
+| `actors` | suggestions for the "Editing as" switch in the change history |
+| `title_max_length` | title validation |
+| `epic_aliases` | merging spelling variants of an epic |
+| `status_colors`, `priority_colors`, `label_colors`, `status_strikethrough` | presentation; no entry = a color from the cyclic palette |
+| `dashboard_open_statuses`, `dashboard_burndown_kind/value` | what "open" means and what the burndown burns down |
 
-`roles` jest jedynym słownikiem, którego PUSTA wartość coś znaczy. Każdy inny enum bez słownika `buildFieldSpecs` degraduje do wolnego tekstu — pole, którego nie da się na nic ustawić, nie jest enumem. Przy `role` wolny tekst to dokładnie ta dziura, którą pole ma zamknąć, więc zostaje enumem, w którym jedyną legalną wartością jest pusta (`dictionaryRequired` w `FIELD_SHAPES`).
+`roles` is the only vocabulary whose EMPTY value means something. Every other
+enum with no vocabulary degrades, in `buildFieldSpecs`, to free text — a
+field that cannot be set to anything is not an enum. For `role`, free text is
+exactly the hole the field is meant to close, so it stays an enum whose only
+legal value is empty (`dictionaryRequired` in `FIELD_SHAPES`).
 
-**Nieznany klucz OBLEWA.** Literówka w słowniku jest nieodróżnialna od „ten projekt tak ma" — ta sama zasada, co przy nieznanej fladze w `query.mjs`.
+**An unknown key FAILS.** A typo in a vocabulary is indistinguishable from
+"this project just works that way" — the same rule as an unknown flag in
+`query.mjs`.
 
-**Niespójność między słownikami oblewa**: status archiwalny spoza `statuses`, `dashboard_open_statuses` spoza `statuses`, `default:` boarda spoza listy, duplikat sluga, label osi spoza zamkniętego słownika.
+**Inconsistency between vocabularies fails**: an archived status outside
+`statuses`, `dashboard_open_statuses` outside `statuses`, a board's `default:`
+outside the list, a duplicate slug, an axis label outside the closed
+vocabulary.
 
 ### Parser
 
-Wąski i celowo taki: skalar, lista inline, lista blokowa, mapa blokowa. Moduł nie ma zależności, a „prawie YAML" psuje się gorzej niż parser, który po prostu nie znajdzie pola. Struktury zagnieżdżone głębiej niż jeden poziom **nie są obsługiwane** — dlatego klucze są płaskie (`dashboard_burndown_kind`, nie `dashboard: { burndown: {...} }`).
+Narrow, and deliberately so: a scalar, an inline list, a block list, a block
+map. The module has no dependencies, and "almost YAML" fails worse than a
+parser that simply fails to find a field. Structures nested deeper than one
+level **are not supported** — that's why keys are flat
+(`dashboard_burndown_kind`, not `dashboard: { burndown: {...} }`).
 
-Przy okazji zniknął **trzeci** parser `boards.yaml`: ten sam kształt czytały niezależnie `build-backlog`, `build-viewer` i `check-backlog-boards`.
+Along the way, a **third** `boards.yaml` parser disappeared: the same shape
+used to be read independently by `build-backlog`, `build-viewer` and
+`check-backlog-boards`.
 
-## 4. Jak to jest udowodnione
+## 4. How this is proven
 
-Trzy rodzaje dowodu, bo każdy łapie co innego:
+Three kinds of evidence, because each catches something different:
 
-1. **Parytet z kodem sprzed zmiany** — test sprawdza, że `config.yaml` the origin project odtwarza co do wartości słowniki, które były zaszyte. Dodatkowo: widoki wygenerowane po zmianie są **bajtowo identyczne** poza nagłówkiem, który teraz mówi nazwą projektu.
-2. **Generyczność domyślnych** — test przechodzi po `DEFAULTS` i oblewa, gdy pojawi się w nich którekolwiek słowo the origin project.
-3. **Bramka na wyniku** — `buildHtml()` z cudzą konfiguracją jest przeszukiwane pod kątem `pre-launch`, `test_env`, `on_queue`, `the origin project`… Ta jedna asercja łapie **każdy** nowy hardcode w viewerze, także taki, którego dziś nie ma.
+1. **Parity with the code before the change** — a test checks that the origin project's
+   `config.yaml` reproduces, value for value, the vocabularies that used to
+   be hardcoded. In addition: views generated after the change are
+   **byte-identical** apart from the header, which now names the project.
+2. **Genericness of the defaults** — a test walks `DEFAULTS` and fails if
+   any word of the origin project's turns up in them.
+3. **A gate on the output** — `buildHtml()` with a foreign configuration is
+   searched for `pre-launch`, `test_env`, `on_queue`, `the origin project`… This one
+   assertion catches **every** new hardcode in the viewer, including ones
+   that don't exist yet.
 
-Dowód end-to-end (zrobiony ręcznie 2026-08-29): katalog z `statuses: [todo, doing, review, shipped]`, `priorities: [now, next, later]`, `types: [feature, bug, chore]`, `labels: [ui, api]` uruchomiony przez `backlog --dir` — viewer pokazał tamte statusy w filtrach, na kartach i w edytorze pola, chipy statystyk mówiły `now / next / feature / bug / chore`, a facety „Faza" i „Środowisko" zniknęły, bo tamten projekt nie ma tych osi.
+End-to-end proof (done by hand on 2026-08-29): a directory with
+`statuses: [todo, doing, review, shipped]`, `priorities: [now, next, later]`,
+`types: [feature, bug, chore]`, `labels: [ui, api]` run through
+`backlog --dir` — the viewer showed those statuses in filters, on cards and
+in the field editor, the stats chips said `now / next / feature / bug /
+chore`, and the "Phase" and "Environment" facets disappeared, because that
+project has no such axes.
 
-## 5. Czego to NIE robi
+## 5. What this does NOT do
 
-- **Nie przenosi plików.** Kod dalej mieszka w `backlog/scripts/`, dane w `backlog/`. Podział `bin/` + `lib/` przyjdzie razem z CLI.
-- **Nie ma `init`** — katalog backlogu w cudzym repo trzeba dziś złożyć ręcznie (`tasks/`, `config.yaml`, `boards.yaml`).
-- **Nie wydziela repozytorium** i nie tłumaczy dokumentacji.
-- **Nie rusza rdzenia dashboardu** — `computeDashboard` dalej siedzi w template literalu viewera, więc jest nieuruchamialny poza przeglądarką. Jego rozbicia (godziny per faza, per typ) czytają już konfigurację, ale sama funkcja czeka na ekstrakcję; to warunek komendy `stats` w przyszłym CLI.
-- **Nie zmienia `suggest-board.mjs`** poza ścieżką rejestru — reguły routingu `paths:` i tak mieszkają w `boards.yaml`, czyli w danych.
+- **Does not move files.** Code still lives in `backlog/scripts/`, data in
+  `backlog/`. The `bin/` + `lib/` split arrives together with the CLI.
+- **No `init`** — assembling a backlog directory in a foreign repo today
+  still has to be done by hand (`tasks/`, `config.yaml`, `boards.yaml`).
+- **Does not split off a repository** and does not translate the
+  documentation.
+- **Does not touch the dashboard's core** — `computeDashboard` still lives in
+  the viewer's template literal, so it cannot be run outside the browser.
+  Its breakdowns (hours per phase, per type) already read the configuration,
+  but the function itself awaits extraction; that is a condition for a
+  future `stats` command.
+- **Does not change `suggest-board.mjs`** beyond the registry path — the
+  `paths:` routing rules still live in `boards.yaml`, i.e. in data.
 
-## 6. Nazwa narzędzia — wstępnie `worktrail`
+## 6. The tool's name — tentatively `worktrail`
 
-Moduł ma kiedyś żyć poza tym repozytorium, a wtedy nazwa przestaje być kosmetyką: **binarka musi być wolna u każdego użytkownika**. Zmierzone 2026-08-29 na `registry.npmjs.org`:
+The module is meant to eventually live outside this repository, at which
+point the name stops being cosmetic: **the binary has to be free for every
+user.** Measured on 2026-08-29 against `registry.npmjs.org`:
 
-| Pakiet | Stan | Binarka |
+| Package | State | Binary |
 |---|---|---|
-| `backlog` | zajęty (v1.4.56, 2026-05-10) | `backlog` |
-| `backlog.md` | zajęty (v1.50.1, 2026-08-10) | `backlog` |
-| `backlog-cli` | zajęty (2014, martwy) | `backlog` |
+| `backlog` | taken (v1.4.56, 2026-05-10) | `backlog` |
+| `backlog.md` | taken (v1.50.1, 2026-08-10) | `backlog` |
+| `backlog-cli` | taken (2014, dead) | `backlog` |
 
-Czyli komenda `backlog` na maszynie z zainstalowanym [Backlog.md](https://github.com/MrLesk/Backlog.md) znaczy już coś innego. Stąd **`worktrail`** (npm wolne, brak kolizji w `PATH`) jako nazwa robocza: tyle samo znaków co dotychczasowa komenda, a nazywa wyróżnik — dopisywalną historię zmian pól z autorem, której nie ma żadne z sąsiednich narzędzi (`backlog.md`, `mdtask`, `taskmd`).
+So the `backlog` command on a machine with [Backlog.md](https://github.com/MrLesk/Backlog.md)
+already installed means something else entirely. Hence **`worktrail`** (free
+on npm, no PATH collision) as a working name: the same number of characters
+as the previous command, and it names the distinguishing feature — an
+append-only field change history with an author, which none of the
+neighbouring tools have (`backlog.md`, `mdtask`, `taskmd`).
 
-Stan wdrożenia: `scripts/worktrail` jest jedynym wrapperem. Alias zgodności `scripts/backlog`, skrypt `npm run backlog` i alias powłoki `backlog` zostały usunięte 2026-08-29 na decyzję foundera — dwie nazwy na jedno narzędzie utrwalałyby starą w dokumentach i pamięci mięśniowej. Nazwa **nie jest domknięta** — decyzja i ewentualna rezerwacja na npm: [TL-20](../backlog/tasks/TL-20-domknij-nazwe-narzedzia-przed-publikacja.md). Katalog `backlog/`, nazwy plików i `project_name` w konfiguracji zostały nietknięte; `project_name` opisuje BACKLOG the origin project, nie narzędzie.
+Implementation state: `scripts/worktrail` is the only wrapper. The
+compatibility alias `scripts/backlog`, the `npm run backlog` script and the
+`backlog` shell alias were removed on 2026-08-29 by the founder's decision —
+two names for one tool would have kept the old one alive in documents and
+muscle memory. The name is **not settled** — the decision and a possible npm
+reservation: [TL-20](../backlog/tasks/TL-20-domknij-nazwe-narzedzia-przed-publikacja.md).
+The `backlog/` directory, file names and `project_name` in the configuration
+were left untouched; `project_name` describes the origin project's BACKLOG, not the tool.
 
-## 7. Klasa buga, którą to zamyka
+## 7. The class of bug this closes
 
-„Ten sam słownik w dwóch miejscach" — najczęstsza cicha usterka tego modułu. Przed zmianą lista statusów żyła w `serve-backlog.mjs`, w kliencie viewera i w README; rejestr boardów miał trzy parsery; labels the origin project były w `task-fields.mjs` **i** w CSS **i** w predykatach filtrów. Każde takie miejsce rozjeżdża się przy pierwszej zmianie słownika i nie zgłasza tego — po prostu jedna powierzchnia przestaje pokazywać wartość, którą druga akceptuje.
+"The same vocabulary in two places" — this module's most common silent
+defect. Before the change, the status list lived in `serve-backlog.mjs`, in
+the viewer's client, and in the README; the board registry had three
+parsers; the origin project's labels were in `task-fields.mjs` **and** in the CSS **and**
+in filter predicates. Every such place drifts on the first vocabulary change
+and doesn't report it — one surface simply stops showing a value the other
+still accepts.

@@ -1,10 +1,10 @@
 ---
 id: TL-50
-title: "Korzeniowy _template.md wiezie słownik cudzego projektu"
+title: "The root _template.md carries someone else's project vocabulary"
 type: bug
 labels: [pre-launch]
 board: main
-epic: "Backlog — publikacja open source"
+epic: "Backlog — open source publication"
 priority: P1
 status: done
 owner: claude
@@ -18,74 +18,107 @@ related_docs:
   - docs/backlog-config-and-portability.md
   - .claude/skills/worktrail-release/SKILL.md
 verification:
-  - bash: "printf 'wyslij DPA\\nboard: backlog-project\\n' > /tmp/tl1460-probe && grep -qwiE 'origin|DPA|backlog-project|pre-launch|Legal compliance|Mobile redesign' /tmp/tl1460-probe || { echo 'kontrola pozytywna: wzorzec nie łapie nawet jawnego trafienia'; exit 1; }; grep -qwiE 'origin|DPA|backlog-project|pre-launch|Legal compliance|Mobile redesign' _template.md && { echo 'szablon nadal niesie cudzy słownik'; exit 1; }; echo 'szablon generyczny — OK'"
-  - bash: "grep -q 'node backlog/scripts/' _template.md && { echo 'ścieżki sprzed pakietu'; exit 1; }; echo 'bez ścieżek do skryptów — OK'"
-  - bash: "npm pack --dry-run 2>&1 | grep -q '_template.md' && echo 'szablon nadal w tarballu (znacznik ko-lokacji) — OK'"
+  - bash: "printf 'send DPA\\nboard: backlog-project\\n' > /tmp/tl1460-probe && grep -qwiE 'origin|DPA|backlog-project|pre-launch|Legal compliance|Mobile redesign' /tmp/tl1460-probe || { echo 'positive control: pattern does not catch even an obvious match'; exit 1; }; grep -qwiE 'origin|DPA|backlog-project|pre-launch|Legal compliance|Mobile redesign' _template.md && { echo 'template still carries a foreign vocabulary'; exit 1; }; echo 'template is generic — OK'"
+  - bash: "grep -q 'node backlog/scripts/' _template.md && { echo 'paths from before packaging'; exit 1; }; echo 'no script paths — OK'"
+  - bash: "npm pack --dry-run 2>&1 | grep -q '_template.md' && echo 'template still in the tarball (co-location marker) — OK'"
 ---
 
-## Cel
+## Goal
 
-Szablon, który jedzie w pakiecie, ma pokazywać **kształt pliku taska**, a nie
-wartości cudzego projektu.
+The template that ships in the package should show the **shape of a task
+file**, not another project's values.
 
-## Kontekst
+## Context
 
-W repozytorium są dwa `_template.md` i różnią się treścią:
+There are two `_template.md` files in the repository, and their content
+differs:
 
-| Plik | Rola | Stan |
+| File | Role | State |
 |---|---|---|
-| `backlog/_template.md` | czyta go `worktrail new` (`join(root, "_template.md")`) | generyczny, krótki, w porządku |
-| `_template.md` (korzeń) | **jedzie w tarballu** (`files` w `package.json`) | stary szablon cudzego projektu |
+| `backlog/_template.md` | read by `worktrail new` (`join(root, "_template.md")`) | generic, short, fine |
+| `_template.md` (root) | **ships in the tarball** (`files` in `package.json`) | old template from someone else's project |
 
-Korzeniowy szablon zawiera (zmierzone 2026-08-31): `id: BL-NNN`, przykład tytułu
-„Wyślij DPA do Anthropic", `board: main | backlog-project`, `labels: [pre-launch]`
-z komentarzem o cudzych środowiskach, `related_docs: docs/architecture/<feature>.md`
-oraz `node backlog/scripts/suggest-board.mjs` jako sposób wyboru boardu.
+The root template contains (measured 2026-08-31): `id: BL-NNN`, an example
+title "Send DPA to Anthropic", `board: main | backlog-project`, `labels:
+[pre-launch]` with a comment about other environments, `related_docs:
+docs/architecture/<feature>.md`, and `node backlog/scripts/suggest-board.mjs`
+as a way to choose a board.
 
-**Zastrzeżenie, żeby task nie został zrobiony w złym miejscu:** ten plik nie jest
-dziś czytany jako treść. `init-backlog.mjs` trzyma własny `TEMPLATE_MD` w kodzie,
-a korzeniowy `_template.md` pełni rolę **znacznika ko-lokacji** — po nim
-`looksLikeBacklogDir()` poznaje katalog backlogu, co jest sprawdzane w
-`scripts/tests/packaging.test.mjs`. Nie kasuj go, podmień treść.
+**A caveat so the task is not fixed in the wrong place:** this file is not
+read as content today. `init-backlog.mjs` keeps its own `TEMPLATE_MD` in
+code, and the root `_template.md` plays the role of a **co-location marker**
+— `looksLikeBacklogDir()` recognizes a backlog directory by it, which is
+checked in `scripts/tests/packaging.test.mjs`. Do not delete it, replace its
+content.
 
-Mimo że nikt go nie czyta, **jest publikowany**, a opublikowana treść jest
-publiczna niezależnie od tego, czy program po nią sięga. Do tego mówi `BL-NNN`,
-podczas gdy `config.yaml` tego repozytorium mówi `task_id_prefix: TL` — więc jako
-dokumentacja jest w dodatku nieprawdziwy.
+Even though nobody reads it, **it is published**, and published content is
+public regardless of whether the program ever reaches for it. On top of
+that, it says `BL-NNN`, while this repository's `config.yaml` says
+`task_id_prefix: TL` — so as documentation it is also false.
 
-Przy okazji: prefiks w szablonie ma być **neutralny**, a nie zamieniony z `BL` na
-`TL`. Prefiks jest konfiguracją ([TL-42](TL-42-prefiks-id-taska-to-konfiguracja-nie-kod.md)),
-więc szablon, który wpisuje konkretny, uczy złego nawyku w pierwszym pliku,
-jaki widzi nowy użytkownik.
+Along the way: the prefix in the template should be **neutral**, not swapped
+from `BL` to `TL`. The prefix is configuration
+([TL-42](TL-42-prefiks-id-taska-to-konfiguracja-nie-kod.md)), so a template
+that hardcodes a specific one teaches a bad habit in the very first file a
+new user sees.
 
 ## Pre-flight reading
 
-1. `_template.md` i `backlog/_template.md` — porównaj oba (`diff`).
-2. `scripts/tests/packaging.test.mjs` — dlaczego korzeniowy plik musi istnieć.
-3. `scripts/init-backlog.mjs` — `TEMPLATE_MD`, czyli szablon, który dostaje nowy backlog.
+1. `_template.md` and `backlog/_template.md` — compare both (`diff`).
+2. `scripts/tests/packaging.test.mjs` — why the root file has to exist.
+3. `scripts/init-backlog.mjs` — `TEMPLATE_MD`, i.e. the template a new
+   backlog receives.
 
-## Kroki
+## Steps
 
-1. Zastąp treść korzeniowego `_template.md` wersją generyczną (bazą jest `backlog/_template.md`).
-2. Prefiks ID w szablonie zapisz neutralnie (np. `<PREFIX>-NNN`) z komentarzem, że wartość bierze się z `config.yaml`.
-3. Sprawdź, czy `TEMPLATE_MD` w `init-backlog.mjs` nie ma tego samego problemu — to on trafia do backlogu obcego użytkownika.
-4. Rozstrzygnij, czy dwie kopie szablonu mają sens: jeśli nie, jedna z nich powinna powstawać z drugiej, a nie żyć równolegle.
-5. `npm pack --dry-run` — szablon nadal w tarballu.
+1. Replace the root `_template.md` content with a generic version (based on
+   `backlog/_template.md`).
+2. Write the ID prefix in the template neutrally (e.g. `<PREFIX>-NNN`) with
+   a comment that the value comes from `config.yaml`.
+3. Check whether `TEMPLATE_MD` in `init-backlog.mjs` has the same problem —
+   it is what lands in another user's backlog.
+4. Decide whether two copies of the template make sense: if not, one of them
+   should be derived from the other, not live in parallel.
+5. `npm pack --dry-run` — the template is still in the tarball.
 
 ## Acceptance criteria
 
-- [ ] Korzeniowy `_template.md` nie zawiera nazw, boardów ani etykiet cudzego projektu.
-- [ ] Prefiks ID w szablonie jest neutralny, nie `BL` i nie `TL`.
-- [ ] `scripts/tests/packaging.test.mjs` przechodzi (znacznik ko-lokacji zachowany).
-- [ ] `TEMPLATE_MD` w `init-backlog.mjs` sprawdzony pod tym samym kątem.
+- [ ] The root `_template.md` contains no names, boards, or labels from
+      another project.
+- [ ] The ID prefix in the template is neutral, neither `BL` nor `TL`.
+- [ ] `scripts/tests/packaging.test.mjs` passes (co-location marker kept).
+- [ ] `TEMPLATE_MD` in `init-backlog.mjs` checked for the same issue.
 
 ## Log
 
-Append-only. Format: `YYYY-MM-DD status — kto — notatka`.
+Append-only. Format: `YYYY-MM-DD status — who — note`.
 
-- 2026-08-31 created — agent:claude — z audytu gotowości do publikacji
-- 2026-08-31 in_progress — agent:claude — start implementacji
-- 2026-08-31 done — agent:claude — korzeniowy `_template.md` przepisany: zero słownictwa cudzego projektu, prefiks NEUTRALNY (`<PREFIX>-NNN` z odesłaniem do `task_id_prefix`), nagłówek mówiący, że wartości to tylko domyślne z `init`, a słowniki pochodzą z `config.yaml` TWOJEGO backlogu. Rozmiar w tarballu spadł z 4.2 kB do 2.3 kB.
-- 2026-08-31 done — agent:claude — krok 4 rozstrzygnięty: dwie kopie NIE mają sensu. `TEMPLATE_MD` wpisany w `init-backlog.mjs` zniknął — `init` CZYTA teraz `_template.md` z pakietu. Ten plik i tak tam jedzie, bo jest znacznikiem ko-lokacji, więc druga kopia tej samej treści w kodzie mogła się z nim rozjechać, a rozjazd byłby niewidoczny: jedna wersja trafiałaby do nowych backlogów, druga do czytania przez człowieka, który otworzy plik w `node_modules`. Brak pliku znaczy uszkodzoną instalację i mówi to wprost — cichy szablon awaryjny dawałby backlogi różniące się od tych z normalnej instalacji.
-- 2026-08-31 done — agent:claude — WERYFIKACJA TEGO TASKA BYŁA WADLIWA i poprawiłem POMIAR, nie tekst. Wzorzec `DPA` bez granicy słowa trafiał w „odpadły" w prozie szablonu, więc guard oblewał na poprawnym pliku. Teraz `grep -w` plus kontrola pozytywna na sondzie z jawnym trafieniem — bez niej wzorzec, który nie łapie niczego, byłby zielony i bezużyteczny naraz.
-- 2026-08-31 done — agent:claude — dwa defekty trafione po drodze, oba starsze niż ta zmiana: podpowiedź `doctor` doklejała „s" do nazwy pola i odsyłała do `statuss:` zamiast `statuses:` (naprawione tutaj — klucz słownika idzie teraz z `FIELD_SHAPES`, nie ze zgadywania); oraz `worktrail new` po zmianie słowników zapisuje wartość z szablonu bez sprawdzenia, choć tę samą wartość podaną flagą by odrzucił — [TL-69](TL-69-szablon-po-zmianie-slownikow-przemyca-wartosc-spoza-nich.md).
+- 2026-08-31 created — agent:claude — from the release-readiness audit
+- 2026-08-31 in_progress — agent:claude — implementation started
+- 2026-08-31 done — agent:claude — the root `_template.md` rewritten: zero
+  vocabulary from another project, a NEUTRAL prefix (`<PREFIX>-NNN` pointing
+  to `task_id_prefix`), a heading saying the values are just `init`'s
+  defaults, and the dictionaries come from YOUR backlog's `config.yaml`.
+  Size in the tarball dropped from 4.2 kB to 2.3 kB.
+- 2026-08-31 done — agent:claude — step 4 resolved: two copies do NOT make
+  sense. The `TEMPLATE_MD` hardcoded in `init-backlog.mjs` is gone — `init`
+  now READS `_template.md` from the package. This file ships there anyway,
+  because it is the co-location marker, so a second copy of the same content
+  in code could have drifted from it, and the drift would have been
+  invisible: one version would reach new backlogs, the other would reach a
+  human opening the file in `node_modules`. A missing file means a broken
+  install and says so plainly — a silent fallback template would produce
+  backlogs different from those made by a normal install.
+- 2026-08-31 done — agent:claude — THIS TASK'S OWN VERIFICATION WAS FLAWED,
+  and I fixed the MEASUREMENT, not the text. The `DPA` pattern without a word
+  boundary matched inside "odpadły" [Polish: "fell off"] in the template's <!-- language-guard: allow — the Polish word being discussed is the evidence -->
+  prose, so the guard failed on a correct file. Now `grep -w` plus a positive
+  control on a probe with an explicit hit — without it, a pattern that
+  catches nothing would be green and useless at the same time.
+- 2026-08-31 done — agent:claude — two defects found along the way, both
+  older than this change: the `doctor` hint appended an "s" to the field name
+  and pointed to `statuss:` instead of `statuses:` (fixed here — the
+  dictionary key now comes from `FIELD_SHAPES`, not from guessing); and
+  `worktrail new` writes a template value unchecked after a dictionary
+  change, even though the same value passed via a flag would be rejected —
+  [TL-69](TL-69-szablon-po-zmianie-slownikow-przemyca-wartosc-spoza-nich.md).

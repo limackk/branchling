@@ -1,10 +1,10 @@
 ---
 id: TL-93
-title: "Bramka weryfikacji w worktrail close"
+title: "The verification gate in worktrail close"
 type: task
 labels: []
 board: main
-epic: "Wyróżniki agentowe"
+epic: "Agent differentiators"
 priority: P1
 status: done
 owner: agent:claude
@@ -25,98 +25,103 @@ verification:
     bash: "grep -q 'there is no .--force. flag' README.md"
 ---
 
-## Cel
+## Goal
 
-`worktrail close TL-NNNN` uruchamia komendy z bloku `verification:` taska
-i przechodzi na `status: done` TYLKO gdy wszystkie skończą się kodem 0.
-Wynik (które komendy, kody wyjścia, kiedy) trafia do `history/` jako zdarzenie
-— „done" przestaje być deklaracją i staje się dowodem, którego agent nie może
-ominąć przez wpisanie statusu do pliku.
+`worktrail close TL-NNNN` runs the commands from a task's `verification:`
+block and moves it to `status: done` ONLY when all of them exit with code 0.
+The result (which commands, which exit codes, when) goes into `history/` as an
+event — "done" stops being a declaration and becomes proof that an agent
+cannot bypass by simply writing the status into the file.
 
-To bezpośrednia odpowiedź na główny lęk użytkowników puszczających agentów bez
-nadzoru i spójna z filozofią głośnego oblewania (cichy no-op wygląda jak
-działanie).
+This is a direct answer to the main fear of users running agents unsupervised,
+and it is consistent with the philosophy of failing loudly (a silent no-op
+looks like it worked).
 
-## Kontekst
+## Context
 
-Powstało z przeglądu wyróżników wobec Backlog.md (2026-08-31). Protokół „close
-= uruchom verification" istnieje już jako konwencja (skill backlog-workflow);
-ten task zamienia konwencję w komendę. Klasa błędu jest realna: commit 27776f0
-(„TL-52 was done and said pending") i TL-68 jako guard, który by to złapał.
+Grew out of a review of differentiators against Backlog.md (2026-08-31). The
+protocol "close = run verification" already exists as a convention (the
+backlog-workflow skill); this task turns the convention into a command. The
+class of bug is real: commit 27776f0 ("TL-52 was done and said pending") and
+TL-68 as the guard that would have caught it.
 
-Decyzje zakresu:
-- **Edycja pliku wprost pozostaje możliwa** — agent może dalej wpisać
-  `status: done` Editem; architektura (state-and-sync §5.1) świadomie na to
-  pozwala. Bramka jest drogą preferowaną, a rozjazd „done bez zdarzenia
-  weryfikacji" wykrywa `worktrail audit` (TL-90). Nie budować policji zapisu.
-- **Wykonywanie cudzych komend jest jawne**: `close` pokazuje, co uruchomi,
-  i wykonuje z katalogu głównego repo; `--dry-run` tylko wypisuje. Blok
-  `verification` przychodzi z repozytorium, któremu użytkownik i tak ufa
-  (to jego własny kod), ale wyjście ma nazywać każdą uruchamianą komendę.
-- **Brak bloku albo placeholder** („komenda do uruchomienia" z szablonu) =
-  odmowa zamknięcia z komunikatem, nie ciche done. Flaga `--no-verify`
-  istnieje, jest głośna w wyjściu i zapisuje w zdarzeniu, że weryfikację
-  pominięto.
-- Po przejściu: `status: done`, `updated:`, zdarzenie w `history/`
-  (aktor z `--actor`), `build` — jedną istniejącą drogą zapisu
-  (`task-fields.mjs`), bez nowego kodu piszącego frontmatter.
+Scope decisions:
+- **Editing the file directly stays possible** — an agent can still write
+  `status: done` with an Edit; the architecture (state-and-sync §5.1)
+  deliberately allows this. The gate is the preferred path, and the drift
+  "done with no verification event" is caught by `worktrail audit` (TL-90).
+  Do not build a write police.
+- **Running someone else's commands is explicit**: `close` shows what it will
+  run and executes from the repository root; `--dry-run` only prints. The
+  `verification` block comes from a repository the user already trusts (it is
+  their own code), but the output must name every command being run.
+- **A missing block or a placeholder** (the "command to run" from the
+  template) means refusal to close with a message, not a silent done. A
+  `--no-verify` flag exists, is loud in the output, and records in the event
+  that verification was skipped.
+- After passing: `status: done`, `updated:`, an event in `history/` (actor
+  from `--actor`), `build` — through the one existing write path
+  (`task-fields.mjs`), with no new code writing frontmatter.
 
-## Rozstrzygnięcie (2026-09-01)
+## Resolution (2026-09-01)
 
-Bramkę dostarczył **TL-82** — pod nazwą `worktrail done`, nie `close`; ten task
-opisywał ją drugi raz i został założony tego samego dnia z tego samego przeglądu.
-Kryteria 1–3 były spełnione i pokryte testami, zanim ktokolwiek wziął TL-93.
+The gate was delivered by **TL-82** — under the name `worktrail done`, not
+`close`; this task described it a second time and was created the same day
+from the same review. Criteria 1–3 were satisfied and covered by tests before
+anyone picked up TL-93.
 
-Zostało kryterium 5 i nie było kosmetyczne. `done` pisał frontmatter regexem po
-CAŁYM pliku (`text.replace(/^status: .*$/m, …)`), podczas gdy `take` pisał to samo
-pole przez `setFrontmatterField`. Dwa mierzalne skutki:
+Criterion 5 remained, and it was not cosmetic. `done` wrote frontmatter with a
+regex over the WHOLE file (`text.replace(/^status: .*$/m, …)`), while `take`
+wrote the same field through `setFrontmatterField`. Two measurable effects:
 
-- komentarz obok wartości (`status: pending  # …`) był kasowany przy zamknięciu,
-  a przy `take` przeżywał — dwie komendy nie zgadzały się, czym jest plik taska
-  (TL-70: komentarz jest komentarzem w KAŻDYM czytniku);
-- na tasku bez pola `updated:` regex nie trafiał w nic i nie pisał nic **po
-  cichu**: task zamykał się z kodem 0 i bez pola mówiącego kiedy.
+- a comment next to the value (`status: pending  # …`) was erased on close,
+  while it survived `take` — the two commands disagreed about what a task
+  file even is (TL-70: a comment is a comment in EVERY reader);
+- on a task with no `updated:` field, the regex matched nothing and wrote
+  nothing, **silently**: the task closed with exit code 0 and no field saying
+  when.
 
-Drugi punkt to dokładnie ta klasa błędu, dla której to narzędzie istnieje —
-no-op, który melduje sukces.
+The second point is exactly the class of bug this tool exists for — a no-op
+that reports success.
 
 ## Pre-flight reading
 
-- `_template.md` — kształt bloku `verification:` (lista wpisów `bash:`).
-- `scripts/task-fields.mjs` — jedyna droga zapisu frontmattera.
-- `scripts/history.mjs` — zapis zdarzenia; ustalić reprezentację wyniku
-  weryfikacji (pseudo-pole vs zwykłe zdarzenie) spójną z `PSEUDO_FIELDS`
-  w `task-fields.mjs`.
+- `_template.md` — the shape of the `verification:` block (a list of `bash:`
+  entries).
+- `scripts/task-fields.mjs` — the only write path for frontmatter.
+- `scripts/history.mjs` — event writing; settle the representation of a
+  verification result (pseudo-field vs. plain event) consistent with
+  `PSEUDO_FIELDS` in `task-fields.mjs`.
 - [docs/backlog-field-editing-history.md](../../docs/backlog-field-editing-history.md)
-  §2–§3 — trzy drogi zapisu i format wpisu.
+  §2–§3 — the three write paths and the entry format.
 
-## Kroki
+## Steps
 
-1. Parser bloku `verification:` z frontmattera (wpisy `bash:`); placeholder
-   z szablonu rozpoznawany i odrzucany.
-2. Wykonanie sekwencyjne z wypisaniem komendy i jej wyjścia; pierwszy błąd
-   zatrzymuje bramkę, task zostaje w dotychczasowym statusie.
-3. Zapis sukcesu: zmiana statusu przez `task-fields.mjs`, zdarzenie
-   weryfikacji do `history/`, regeneracja widoków.
-4. `--dry-run`, `--no-verify` (głośne, odnotowane w zdarzeniu), `--json`.
-5. Testy: verification przechodzące, oblewające, brakujące, placeholder;
-   kontrola pozytywna — oblewająca komenda MUSI zostawić status nietknięty.
+1. A parser for the `verification:` block in frontmatter (`bash:` entries);
+   recognize and reject the placeholder from the template.
+2. Sequential execution, printing each command and its output; the first
+   failure stops the gate and the task stays at its current status.
+3. Write the success path: change status through `task-fields.mjs`, a
+   verification event to `history/`, regenerate the views.
+4. `--dry-run`, `--no-verify` (loud, recorded in the event), `--json`.
+5. Tests: passing verification, failing, missing, placeholder; a positive
+   control — a failing command MUST leave the status untouched.
 
 ## Acceptance criteria
 
-- [x] Oblana weryfikacja nie zmienia żadnego pola taska. [proof: gate]
-- [x] Brak bloku `verification:` lub placeholder = odmowa z komunikatem. [proof: gate]
-- [x] Zdarzenie w `history/` niesie wynik weryfikacji i aktora. [proof: gate]
-- [x] ~~`--no-verify` jest widoczny i w wyjściu, i w zapisanym zdarzeniu.~~
-  ODRZUCONE w TL-82, nie niezrobione. Obejście bramki jest ręczną edycją
-  pliku, którą widać w diffie; flaga zostawiłaby jedno słowo w jobie CI,
-  którego nikt nie czyta. README stwierdza to wprost. [proof: no-force]
-- [x] Zapis frontmattera idzie wyłącznie przez `task-fields.mjs`. [proof: one-door]
+- [x] A failed verification changes no field on the task. [proof: gate]
+- [x] A missing `verification:` block or a placeholder = refusal with a message. [proof: gate]
+- [x] The event in `history/` carries the verification result and the actor. [proof: gate]
+- [x] ~~`--no-verify` is visible both in the output and in the recorded event.~~
+  REJECTED in TL-82, not left undone. Bypassing the gate is a manual file
+  edit, which is visible in the diff; the flag would have left one word in a
+  CI job nobody reads. The README states this outright. [proof: no-force]
+- [x] Frontmatter writing goes exclusively through `task-fields.mjs`. [proof: one-door]
 
 ## Log
 
-Append-only. Format: `YYYY-MM-DD status — kto — notatka`.
+Append-only. Format: `YYYY-MM-DD status — who — note`.
 
-- 2026-08-31 pending — agent:claude — task założony z przeglądu wyróżników
-  agentowych; zamienia konwencję ze skilla backlog-workflow w egzekwowaną
-  komendę.
+- 2026-08-31 pending — agent:claude — task created from a review of agent
+  differentiators; turns a convention from the backlog-workflow skill into an
+  enforced command.

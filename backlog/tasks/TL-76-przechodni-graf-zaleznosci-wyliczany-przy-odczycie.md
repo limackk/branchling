@@ -1,10 +1,10 @@
 ---
 id: TL-76
-title: "Przechodni graf zależności wyliczany przy odczycie"
+title: "Transitive dependency graph computed at read time"
 type: code
 labels: [post-launch]
 board: main
-epic: "Integralność danych"
+epic: "Data integrity"
 priority: P3
 status: pending
 owner: unassigned
@@ -20,63 +20,70 @@ verification:
   - bash: "node scripts/cli.mjs query --graph TL-74"
 ---
 
-## Cel
+## Goal
 
-Detal taska pokazuje pełny, przechodni kontekst zależności: na co ten task czeka
-(bezpośrednio i dalej) i co odblokuje. Graf jest wyliczany przy odczycie i nie
-ląduje w żadnym pliku.
+A task's detail view shows the full, transitive dependency context: what this
+task is waiting on (directly and further out) and what it unblocks. The graph
+is computed at read time and does not land in any file.
 
-## Kontekst
+## Context
 
-Mamy `blocked_by` i `blocks` jako płaskie listy ID oraz guard
-`check-backlog-refs.mjs`, który pilnuje, że wskazują na istniejące taski.
-Brakuje przechodniości: „TL-80 czeka na TL-72, a TL-72 na TL-68" trzeba
-dziś składać ręcznie, otwierając plik po pliku.
+We have `blocked_by` and `blocks` as flat lists of IDs, and the
+`check-backlog-refs.mjs` guard, which ensures they point at existing tasks.
+Transitivity is missing: "TL-80 waits on TL-72, and TL-72 waits on TL-68" has
+to be assembled by hand today, opening one file after another.
 
-Graf jest wyliczany, nigdy zapisywany — II prawo. Zapisany zdążyłby stać się
-prawdą i rozjechać się z listami, z których powstaje.
+The graph is computed, never written — law II. A written graph would sooner
+or later become a source of truth and drift from the lists it is built from.
 
-Cztery przypadki brzegowe, które muszą być obsłużone jawnie (wzięte z modelu
-Backlog.md, bo są to dokładnie te miejsca, gdzie naiwna implementacja kłamie):
+Four edge cases that must be handled explicitly (taken from Backlog.md's
+model, because these are exactly the places where a naive implementation
+lies):
 
-1. **Kierunek krawędzi.** Krawędź idzie od taska, który deklaruje zależność, do
-   taska, od którego zależy. Wskazany blokuje wskazującego.
-2. **Cykl** — oznaczony `(cykl)`, nie rozwijany w nieskończoność.
-3. **Powtórzenie** — task pokazany raz; kolejne wystąpienie to `(wyżej)`.
-4. **Nierozstrzygnięta tożsamość** — `nieznane ID` (nikt się nie zgłasza) i
-   `niejednoznaczne ID` (zgłasza się więcej niż jeden). ŻADNE z nich nie liczy
-   się jako spełnione i graf się za nie NIE przechodzi. Zły graf, który
-   raportuje „odblokowane", jest gorszy niż brak grafu.
+1. **Edge direction.** The edge goes from the task declaring the dependency to
+   the task it depends on. The pointed-at task blocks the pointing one.
+2. **Cycle** — marked `(cycle)`, not expanded infinitely.
+3. **Repetition** — a task is shown once; a later occurrence is marked
+   `(above)`.
+4. **Unresolved identity** — `unknown ID` (nobody claims it) and `ambiguous
+   ID` (more than one claims it). NEITHER counts as satisfied and the graph
+   does NOT traverse through them. A wrong graph that reports "unblocked" is
+   worse than no graph.
 
 ## Pre-flight reading
 
-1. `scripts/check-backlog-refs.mjs:66-114` — `REF_FIELDS`, `auditRefs()`. Tu już
-   jest połowa logiki: czytanie pól i rozstrzyganie, czy ID istnieje.
-2. `scripts/query.mjs` — gdzie wpiąć wyjście tekstowe i JSON-owe.
-3. `_template.md` — semantyka `blocked_by` i `blocks` w szablonie.
+1. `scripts/check-backlog-refs.mjs:66-114` — `REF_FIELDS`, `auditRefs()`. Half
+   the logic already lives here: reading the fields and resolving whether an
+   ID exists.
+2. `scripts/query.mjs` — where to hook in the text and JSON output.
+3. `_template.md` — the semantics of `blocked_by` and `blocks` in the
+   template.
 
-## Kroki
+## Steps
 
-1. Wydziel z `check-backlog-refs.mjs` rozstrzyganie ID (istnieje / nieznane /
-   niejednoznaczne) do modułu używanego przez guard i przez graf.
-2. `scripts/dependency-graph.mjs` — budowa grafu z korzenia w obie strony,
-   z obsługą cyklu, powtórzenia i nierozstrzygniętego ID.
-3. Wyjście tekstowe: drzewko z nagłówkiem `N bezpośrednich, M łącznie`.
-4. Wyjście JSON: `root`, `nodes`, `edges`; węzeł niesie głębokość w obu
-   kierunkach (`null`, gdy nieosiągalny w danym kierunku).
-5. Ten sam graf w detalu taska w viewerze.
-6. `scripts/tests/dependency-graph.test.mjs` — po fixturze na każdy z czterech
-   przypadków brzegowych. Zwłaszcza: niejednoznaczne ID NIE jest spełnione.
+1. Extract ID resolution (exists / unknown / ambiguous) from
+   `check-backlog-refs.mjs` into a module used by both the guard and the
+   graph.
+2. `scripts/dependency-graph.mjs` — build the graph from the root in both
+   directions, handling cycles, repetition, and unresolved IDs.
+3. Text output: a tree with a header `N direct, M total`.
+4. JSON output: `root`, `nodes`, `edges`; each node carries its depth in both
+   directions (`null` when unreachable in a given direction).
+5. The same graph in the task detail view in the viewer.
+6. `scripts/tests/dependency-graph.test.mjs` — a fixture for each of the four
+   edge cases. Especially: an ambiguous ID is NOT satisfied.
 
 ## Acceptance criteria
 
-- [ ] Graf pokazuje zależności przechodnie w obu kierunkach, z rozróżnieniem bezpośrednich.
-- [ ] Cykl i powtórzenie są oznaczone, nie rozwijane.
-- [ ] Nieznane i niejednoznaczne ID nigdy nie liczy się jako spełnione ani nie jest przechodzone.
-- [ ] Graf nie jest zapisywany do żadnego pliku taska.
-- [ ] Test ma osobny fixture na każdy z czterech przypadków brzegowych.
+- [ ] The graph shows transitive dependencies in both directions, with direct
+      ones distinguished.
+- [ ] Cycles and repetitions are marked, not expanded.
+- [ ] Unknown and ambiguous IDs never count as satisfied and are never
+      traversed.
+- [ ] The graph is never written to any task file.
+- [ ] The test has a separate fixture for each of the four edge cases.
 
 ## Log
 
-2026-08-31 pending — agent:claude — założony z analizy Backlog.md (github.com/MrLesk/Backlog.md), punkt 4.
-2026-09-01 pending — agent:claude — obniżony P2→P3 z analizy konkurencyjności — feature parity z liderem nie jest powodem migracji; graf może czekać za mechanizmem weryfikacji i launchem.
+2026-08-31 pending — agent:claude — created from the Backlog.md analysis (github.com/MrLesk/Backlog.md), point 4.
+2026-09-01 pending — agent:claude — lowered P2→P3 from the competitive analysis — feature parity with the leader is not a reason to migrate; the graph can wait behind the verification mechanism and launch.

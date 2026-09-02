@@ -1,6 +1,6 @@
 ---
 id: TL-14
-title: "query.mjs — pytanie do backlogu zamiast czytania całego widoku"
+title: "query.mjs — a question to the backlog instead of reading a whole view"
 type: code
 labels: [post-launch, ops-hardening]
 board: main
@@ -21,46 +21,74 @@ verification:
   - bash: "node backlog/scripts/query.mjs --status blocked --epic Legal"
 ---
 
-## Cel
+## Goal
 
-Trzeci krok serii po TL-12 (odchudzenie INDEX-u) i TL-13 (NOW.yaml): zamienić **stały** koszt odczytu na koszt dopasowany do pytania.
+Third step in the series after TL-12 (INDEX slimming) and TL-13 (NOW.yaml):
+replace a **fixed** read cost with a cost matched to the question.
 
-## Kontekst
+## Context
 
-`INDEX.yaml` to dziś ~17k tokenów, `NOW.yaml` ~3k — i płaci się je w całości niezależnie od tego, o co się pyta. „Co jest zablokowane w Legal compliance" to jeden wiersz; zmierzone: **193 B odpowiedzi (~48 tokenów) w 58 ms** zamiast 17k tokenów.
+`INDEX.yaml` is today ~17k tokens, `NOW.yaml` ~3k — and the full cost is
+paid regardless of what is being asked. "What is blocked in Legal
+compliance" is one line; measured: **193 B of response (~48 tokens) in
+58 ms** instead of 17k tokens.
 
-Dwie decyzje, które wyszły przy pisaniu:
+Two decisions came up while writing this:
 
-**Czyta `tasks/*.md`, nie widoki.** Widoki są generowane; gdyby to one były źródłem odpowiedzi, świeżo zmieniony status byłby niewidoczny aż do regeneracji i zapytanie mylnie potwierdzałoby, że zmiana „nie zadziałała". Cena to ~1350 odczytów plików — 58 ms, mniej niż trwa spojrzenie w wynik. Test pilnuje tej własności wprost (zmiana pliku bez regeneracji musi być widoczna).
+**It reads `tasks/*.md`, not the views.** The views are generated; if they
+were the source of the answer, a freshly changed status would be invisible
+until regeneration, and the query would falsely confirm that the change
+"didn't work". The cost is about 1350 file reads — 58 ms, less than it takes
+to look at the result. A test guards this property directly (a file change
+without regeneration must be visible).
 
-**Literówka we fladze oblewa (exit 2).** `--prioryty P0` zwracające zero wyników jest nieodróżnialne od „nic takiego nie ma" — i czyta się jak odpowiedź. To ta sama klasa co pomiar bez kontroli pozytywnej. Z tego samego powodu `--limit` **mówi**, ile odciął (`# pokazano 5 z 12 pasujących`), zamiast po cichu podać wycinek jako komplet.
+**A typo in a flag fails (exit 2).** `--prioryty P0` returning zero results
+is indistinguishable from "there is nothing like that" — and reads like an
+answer. This is the same class as a measurement without a positive control.
+For the same reason `--limit` **states** how much it cut (`# showing 5 of
+12 matching`), instead of silently handing back a slice as if it were the
+whole set.
 
-Bez jawnego `--status` pytanie dotyczy tylko aktywnych: 1009 z 1346 tasków jest zamkniętych i zalałyby każdą odpowiedź. `--status done` wchodzi w archiwum świadomie.
+Without an explicit `--status`, the question applies only to active tasks:
+1009 of 1346 tasks are closed and would flood every answer. `--status done`
+enters the archive deliberately.
 
 ## Acceptance criteria
 
-- [x] Filtry `--status --priority --board --label --epic --owner --type --blocked-by --text`; AND między osiami, OR po przecinku wewnątrz osi.
-- [x] Wyjścia: linia na task (jak w INDEX-ie), `--json`, `--files` (pod `xargs`), `--count`; `--sort priority|id|id-desc`.
-- [x] Nieznana flaga → exit 2 z jej nazwą; `--limit` raportuje obcięcie.
-- [x] Czyta taski, nie widoki — świeża zmiana widoczna bez regeneracji.
-- [x] README §2/§3.3/§7 + workspace `CLAUDE.md`; testy 33/33 zielone (7 nowych przypadków).
+- [x] Filters `--status --priority --board --label --epic --owner --type
+      --blocked-by --text`; AND across axes, OR via commas within an axis.
+- [x] Outputs: one line per task (as in INDEX), `--json`, `--files` (for
+      `xargs`), `--count`; `--sort priority|id|id-desc`.
+- [x] Unknown flag → exit 2 with its name; `--limit` reports the truncation.
+- [x] Reads tasks, not views — a fresh change is visible without
+      regeneration.
+- [x] README §2/§3.3/§7 + workspace `CLAUDE.md`; tests 33/33 green (7 new
+      cases).
 
 ## Verification
 
 ```bash
 node --test backlog/scripts/tests/boards.test.mjs
 node backlog/scripts/query.mjs --status pending --priority P0 --limit 5
-node backlog/scripts/query.mjs --blocked-by BL-002        # kontrola pozytywna: BL-003
+node backlog/scripts/query.mjs --blocked-by BL-002        # positive control: BL-003
 ```
 
-Kontrola pozytywna wykonana 2026-08-29: `--blocked-by BL-003` zwróciło 0 — sprawdzone niezależnym grepem, że to prawdziwe zero, a nie cichy błąd filtra (`--blocked-by BL-002` zwraca BL-003, zgodnie z `grep -l "blocked_by:.*BL-002"`).
+Positive control run 2026-08-29: `--blocked-by BL-003` returned 0 —
+verified with an independent grep that this was a genuine zero, not a
+silent filter bug (`--blocked-by BL-002` returns BL-003, matching
+`grep -l "blocked_by:.*BL-002"`).
 
 ## Notes
 
-Bilans serii TL-12 → TL-14: domyślny odczyt spadł z 14 KB deklarowanego focusa do 12 KB wyliczanego NOW, indeks ze 149 KB do 69 KB, a pytania punktowe kosztują dziesiątki tokenów zamiast tysięcy.
+Balance sheet for the TL-12 → TL-14 series: the default read dropped from
+14 KB of declared focus to 12 KB of computed NOW, the index from 149 KB to
+69 KB, and point queries cost tens of tokens instead of thousands.
 
-Świadomie poza zakresem: `query.mjs` nie umie sortować po `updated`/`created` ani filtrować po zakresie dat — do „co się nie ruszało od 90 dni" służy dashboard viewera (sekcja Wiek / Higiena).
+Deliberately out of scope: `query.mjs` cannot sort by `updated`/`created` or
+filter by date range — "what hasn't moved in 90 days" is served by the
+viewer's dashboard (Age / Hygiene section) instead.
 
 ## Log
 
-- 2026-08-29 done — claude — filtry + trzy formaty wyjścia; twarde oblewanie na literówce we fladze i jawne raportowanie obcięcia
+- 2026-08-29 done — claude — filters + three output formats; hard failure on
+  a flag typo and explicit reporting of truncation

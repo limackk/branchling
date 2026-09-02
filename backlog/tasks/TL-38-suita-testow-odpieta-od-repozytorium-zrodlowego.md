@@ -1,6 +1,6 @@
 ---
 id: TL-38
-title: "Suita testów odpięta od repozytorium źródłowego"
+title: "Test suite detached from its source repository"
 type: code
 labels: []
 board: main
@@ -20,17 +20,18 @@ verification:
   - bash: "node --test scripts/tests/*.test.mjs"
 ---
 
-## Cel
+## Goal
 
-Suita ma przechodzić **w tym repozytorium**, a nie tylko w tym, z którego moduł
-został wydzielony. Dziś 14 testów z 226 oblewa, bo opisują cudze drzewo.
+The suite has to pass **in this repository**, not only in the one the module
+was extracted from. Today 14 of 226 tests fail, because they describe someone
+else's tree.
 
-## Kontekst
+## Context
 
-Znalezione przy pierwszym uruchomieniu suity po wydzieleniu (BL-1445). Rozkład
-oblanych, zmierzony 2026-08-30:
+Found on the first run of the suite after extraction (BL-1445). Distribution
+of failures, measured 2026-08-30:
 
-| Plik | Oblanych |
+| File | Failed |
 |---|---|
 | `boards.test.mjs` | 7 |
 | `history-merge.test.mjs` | 2 |
@@ -39,53 +40,58 @@ oblanych, zmierzony 2026-08-30:
 | `task-fields.test.mjs` | 1 |
 | `backlog-id-collisions.test.mjs` | 1 |
 
-To NIE są dwie różne sprawy, tylko dwie klasy jednej:
+This is NOT two separate issues, but two classes of one:
 
-**Klasa A — ko-lokacja w testach.** Pięć plików liczy katalog backlogu jako
-`join(HERE, "..", "..")`. To jest dokładnie ten błąd, który BL-1445 naprawił w
-`build-backlog.mjs` i `cli.mjs`: skrót, który działa wyłącznie wtedy, gdy kod
-leży NAD danymi, i milczy o tym, że jest założeniem. W tym repozytorium
-`scripts/tests/../..` to korzeń repo, nie backlog — więc `git check-ignore
-INDEX.yaml` pyta o nieistniejący plik w niewłaściwym katalogu.
+**Class A — co-location in tests.** Five files compute the backlog directory
+as `join(HERE, "..", "..")`. This is exactly the bug BL-1445 fixed in
+`build-backlog.mjs` and `cli.mjs`: a shortcut that only works when the code
+sits ABOVE the data, and stays silent about being an assumption. In this
+repository `scripts/tests/../..` is the repo root, not the backlog — so `git
+check-ignore INDEX.yaml` asks about a non-existent file in the wrong
+directory.
 
-**Klasa B — asercje o cudzym projekcie.** Część testów sprawdza WARTOŚCI, które
-były faktem o tamtym repozytorium: jego słowniki w `config.yaml`, jego manifest
-`pre-commit`, jego etykiety. Te testy nie mają czego pilnować tutaj i nie da się
-ich „przenieść" — trzeba je przepisać na fixture albo usunąć wraz z uzasadnieniem.
+**Class B — assertions about someone else's project.** Some tests check
+VALUES that were a fact about that repository: its vocabularies in
+`config.yaml`, its `pre-commit` manifest, its labels. These tests have
+nothing to guard here and cannot be "moved" — they have to be rewritten
+against a fixture or removed with a justification.
 
-**Czego NIE robić:** rozluźniać asercji, żeby przeszły. Kilka z nich (na przykład
-ratchet rozmiaru `INDEX.yaml` i kontrola pozytywna konfliktu widoków) ma realną
-moc dowodową i przechodzenie na pustym drzewie byłoby zielenią bez wartości.
+**What NOT to do:** loosen assertions so they pass. Several of them (for
+example the `INDEX.yaml` size ratchet and the positive control for a views
+conflict) carry real evidentiary force, and passing on an empty tree would be
+green with no value.
 
 ## Pre-flight reading
 
-1. `CLAUDE.md` §„Zanim zmienisz kod" — reguła o `resolveBacklogDir()`.
-2. `scripts/tests/non-colocated-layout.test.mjs` — regresja z BL-1445; pokazuje,
-   jak zbudować drzewo w kształcie tego repozytorium.
-3. `scripts/paths.mjs` — cztery źródła katalogu danych.
+1. `CLAUDE.md` §"Before you change the code" — the rule about
+   `resolveBacklogDir()`.
+2. `scripts/tests/non-colocated-layout.test.mjs` — the regression test from
+   BL-1445; shows how to build a tree shaped like this repository.
+3. `scripts/paths.mjs` — the four sources of the data directory.
 
-## Kroki
+## Steps
 
-1. **Klasa A:** zastąpić `join(HERE, "..", "..")` wywołaniem `resolveBacklogDir()`
-   albo — lepiej — fixture'em zakładanym przez test. Test, który pyta o REALNE
-   drzewo, jest zależny od tego, w jakim repo go uruchomiono; test na własnym
-   fixture nie jest.
-2. **Klasa B:** dla każdego testu rozstrzygnąć, czy pilnuje właściwości
-   NARZĘDZIA (→ fixture) czy właściwości tamtego projektu (→ usunąć, z powodem
-   w commicie).
-3. Testy, które muszą widzieć realne drzewo (ratchety, kontrole pozytywne),
-   zostawić — ale mają czytać drzewo TEGO repozytorium.
-4. Nie zostawić żadnego testu, który przechodzi na zerowej próbce.
+1. **Class A:** replace `join(HERE, "..", "..")` with a call to
+   `resolveBacklogDir()` or — better — a fixture set up by the test. A test
+   that asks about the REAL tree depends on which repo it is run in; a test
+   against its own fixture does not.
+2. **Class B:** for each test, decide whether it guards a property of the
+   TOOL (→ fixture) or a property of that project (→ remove, with a reason
+   in the commit).
+3. Tests that must see the real tree (ratchets, positive controls) stay —
+   but they must read the tree of THIS repository.
+4. Leave no test that passes on a zero sample.
 
 ## Acceptance criteria
 
-- [x] `node --test scripts/tests/*.test.mjs` — 0 oblanych w tym repozytorium.
-- [x] Żaden test nie liczy katalogu backlogu jako `join(HERE, "..", "..")`.
-- [x] Każdy usunięty test ma powód w commicie — nie znika po cichu.
-- [x] Żadna asercja nie została rozluźniona po to, żeby przeszła; testy z mocą
-      dowodową (ratchety, kontrole pozytywne) nadal ją mają.
-- [x] Test przechodzący na pustym drzewie nie istnieje — każdy ma kontrolę
-      pozytywną albo własny fixture.
+- [x] `node --test scripts/tests/*.test.mjs` — 0 failures in this repository.
+- [x] No test computes the backlog directory as `join(HERE, "..", "..")`.
+- [x] Every removed test has a reason in the commit — it does not disappear
+      silently.
+- [x] No assertion was loosened just to pass; tests with evidentiary force
+      (ratchets, positive controls) still have it.
+- [x] No test that passes on an empty tree exists — each one has a positive
+      control or its own fixture.
 
 ## Verification
 
@@ -93,38 +99,82 @@ moc dowodową i przechodzenie na pustym drzewie byłoby zielenią bez wartości.
 # expected: 0 fail
 node --test scripts/tests/*.test.mjs
 
-# Żaden test nie zgaduje katalogu przez ko-lokację — expected: brak trafień
-grep -rn '"\.\.", "\.\."' scripts/tests/ && echo "UWAGA: ko-lokacja w testach" || echo "czysto"
+# No test guesses the directory via co-location — expected: no matches
+grep -rn '"\.\.", "\.\."' scripts/tests/ && echo "WARNING: co-location in tests" || echo "clean"
 ```
 
 ## Notes
 
-- To jest dług przywieziony z wydzielenia, nie nowa wada — narzędzie działa
-  (`build`, `check`, 212 testów zielonych). Ale suita jest tym, co przekonuje
-  obcego użytkownika, że działa, więc czerwień w niej kosztuje wiarygodność.
+- This is debt brought over from the extraction, not a new defect — the tool
+  works (`build`, `check`, 212 tests green). But the suite is what convinces
+  a stranger that it works, so red in it costs credibility.
 
 ## Log
 
-- 2026-08-30 test mutacyjny po commicie — claude — `_repo.mjs` wskazany na `scripts/` zamiast `backlog/`: suita **CZERWONA** (7 oblanych) i licznik testów spada z 232 do 138, bo rzucenie przy imporcie zabija całe pliki. Zły resolver nie ma jak dać zielonego przebiegu — o to chodziło. Uwaga na przyszłość: przy tej mutacji trzeba czytać LICZNIK, nie samo „fail 7"; 94 testy w ogóle nie ruszyły.
-- 2026-08-30 done — claude — 232/232. Rozwiązanie: JEDEN moduł `scripts/tests/_repo.mjs` odpowiada na pytanie „gdzie jest backlog TEGO repozytorium", wszystkie testy pytają jego. Rozstrzyga OBA układy (`<repo>/backlog` i ko-lokowany `<repo>`), bo narzędzie wspiera oba — więc jego własne testy nie mogą wpisywać na sztywno żadnego.
-- 2026-08-30 dlaczego nie `resolveBacklogDir()` — claude — jego trzecim źródłem jest wykrywanie w górę od **cwd**, więc suita odpalona z innego katalogu sądziłaby cudzy backlog i nadal świeciła na zielono. Szukanie startuje od położenia pliku testu, nie od cwd.
-- 2026-08-30 dwa testy USUNIĘTE z powodem w kodzie — claude — (1) „guard jest zadeklarowany w manifeście pre-commit": trwale nieaktualny, nie tylko nieprzenośny — konsument świadomie usunął oba guardy z `GUARD_MANIFEST` (BL-1446), bo kontrakt manifestu to „guard jest ŚLEDZONYM plikiem w tym repo". (2) „config.yaml the origin project odtwarza słowniki": jednorazowy dowód parytetu przy TL-19, dostarczony tam, gdzie miał sens. Oba zostawiły komentarz mówiący, czego przez to NIE mamy.
-- 2026-08-30 ratchet PRZEBAZOWANY, nie usunięty — claude — próg `INDEX.yaml < 75 000 B` był policzony z 337 tasków tamtego projektu; przy 42 taskach przechodziłby, choćby każdy wiersz był pełnym mirrorem frontmattera — czyli był ZIELONY PRZY ZEROWEJ MOCY DOWODOWEJ, dokładnie to, czego ten task zabrania. Zastąpiony kosztem NA WIERSZ (próg 250 B), bo to jest niezmiennik, o który chodziło. Zmierzone: 155 B/wiersz tutaj, 168 B/wiersz u konsumenta (nagłówek liczony osobno — rozłożony na 14 wierszy podnosi średnią o ~90 B, na 353 o ~4 B). Defekt, dla którego ratchet powstał, to 442 B/task; kontrola pozytywna na syntetycznym „grubym" indeksie daje 451 B i ratchet ją ŁAPIE.
-- 2026-08-30 świadome rozluźnienie, jedno — claude — „boards.yaml zna co najmniej 2 boardy" → „co najmniej 1". To była właściwość rejestru tamtego projektu; projekt z jednym boardem jest poprawny. W zamian test dostał kontrolę pozytywną, której wcześniej NIE miał: „przeczytałem co najmniej jeden task" — bez niej pusty katalog dawał zielone „zero złych boardów".
-- 2026-08-30 dodane kontrole pozytywne — claude — cztery, w miejscach gdzie zielone przejście nie odróżniało „sprawdziłem i było dobrze" od „nie było czego sprawdzać": realne drzewo boardów, guard kolizji na realnym drzewie, `project_name` (brak pliku → default), `labels_closed` (druga strona przełącznika).
-- 2026-08-30 bramka poprawiona, nie obchodzona — claude — `grep '"..", ".."'` zapalał się też na `packaging.test.mjs`, gdzie ta ścieżka była POPRAWNA (korzeń repo, nie backlog). Zamiast obchodzić regex, `packaging` też idzie przez `_repo.mjs` — korzeń repozytorium liczy się teraz w jednym miejscu, tak samo jak katalog backlogu.
+- 2026-08-30 mutation test after commit — claude — `_repo.mjs` pointed at
+  `scripts/` instead of `backlog/`: the suite went **RED** (7 failures) and
+  the test count dropped from 232 to 138, because throwing at import time
+  kills whole files. A broken resolver has no way to produce a green run —
+  that was the point. A note for the future: this mutation has to be judged
+  by the COUNT, not just "fail 7"; 94 tests did not run at all.
+- 2026-08-30 done — claude — 232/232. Solution: ONE module,
+  `scripts/tests/_repo.mjs`, answers the question "where is the backlog of
+  THIS repository", and every test asks it. It settles BOTH layouts
+  (`<repo>/backlog` and the co-located `<repo>`), because the tool supports
+  both — so its own tests cannot hardcode either.
+- 2026-08-30 why not `resolveBacklogDir()` — claude — its third source is
+  detection upwards from **cwd**, so a suite run from a different directory
+  would judge someone else's backlog and still show green. The search has to
+  start from the test file's location, not from cwd.
+- 2026-08-30 two tests REMOVED with a reason in the code — claude — (1) "the
+  guard is declared in the pre-commit manifest": permanently outdated, not
+  merely non-portable — the consumer deliberately removed both guards from
+  `GUARD_MANIFEST` (BL-1446), because the manifest's contract is "the guard
+  is a TRACKED file in this repo". (2) "the origin project's config.yaml mirrors the
+  vocabularies": a one-off parity proof for TL-19, delivered where it made
+  sense. Both left a comment saying what we NO LONGER have because of this.
+- 2026-08-30 ratchet REBASED, not removed — claude — the threshold
+  `INDEX.yaml < 75,000 B` was computed from 337 tasks of that project; at 42
+  tasks it would pass even if every row were a full mirror of the
+  frontmatter — that is, it was GREEN WITH ZERO EVIDENTIARY FORCE, exactly
+  what this task forbids. Replaced with a cost PER ROW (threshold 250 B),
+  because that is the invariant that mattered. Measured: 155 B/row here,
+  168 B/row at the consumer (the header counted separately — spread over 14
+  rows it raises the average by ~90 B, over 353 by ~4 B). The defect the
+  ratchet was built for is 442 B/task; a positive control on a synthetic
+  "fat" index gives 451 B and the ratchet CATCHES it.
+- 2026-08-30 one deliberate loosening — claude — "boards.yaml knows at least
+  2 boards" → "at least 1". That was a property of that project's registry;
+  a project with one board is valid. In exchange, the test gained a positive
+  control it did NOT have before: "read at least one task" — without it, an
+  empty directory gave a green "zero bad boards".
+- 2026-08-30 positive controls added — claude — four, in places where a
+  green pass did not distinguish "I checked and it was fine" from "there was
+  nothing to check": the real board tree, the collision guard on the real
+  tree, `project_name` (missing file → default), `labels_closed` (the other
+  side of the switch).
+- 2026-08-30 gate fixed, not bypassed — claude — `grep '"..", ".."'` also
+  fired on `packaging.test.mjs`, where that path was CORRECT (repo root, not
+  backlog). Instead of working around the regex, `packaging` now also goes
+  through `_repo.mjs` — the repository root is now computed in one place,
+  the same as the backlog directory.
 - 2026-08-30 taken — claude
-- 2026-08-30 dopisane — claude — dwa uzupełnienia po BL-1446 w repo konsumenta:
-  1. Test „guard: jest zadeklarowany w manifeście pre-commit" jest teraz
-     **trwale nieaktualny**, nie tylko nieprzenośny. Konsument świadomie usunął
-     oba guardy z `GUARD_MANIFEST`, bo kontrakt manifestu brzmi „guard jest
-     ŚLEDZONYM plikiem w tym repo", a zainstalowana zależność tego nie spełnia.
-     Ten test nie ma czego pilnować NIGDZIE — należy do klasy B (usunąć z
-     powodem), a nie do klasy A.
-  2. Ta sama klasa siedzi w ~20 liniach KOMENTARZY (`node backlog/scripts/…` w
-     nagłówkach `scripts/*.mjs`). Nie oblewa niczego, więc nie blokuje tego
-     taska, ale jest tą samą zaszytą wiedzą o cudzym drzewie. Jedno wystąpienie
-     było **user-facing** — komunikat guardu boardów kazał uruchomić ścieżkę,
-     która u konsumenta nie istnieje; poprawione od ręki, reszta zostaje.
+- 2026-08-30 appended — claude — two additions after BL-1446 in the
+  consumer repo:
+  1. The test "guard: is declared in the pre-commit manifest" is now
+     **permanently outdated**, not merely non-portable. The consumer
+     deliberately removed both guards from `GUARD_MANIFEST`, because the
+     manifest's contract reads "the guard is a TRACKED file in this repo",
+     and the installed dependency does not satisfy that. This test has
+     nothing to guard ANYWHERE — it belongs to class B (remove with a
+     reason), not to class A.
+  2. The same class sits in ~20 lines of COMMENTS (`node backlog/scripts/…`
+     in the headers of `scripts/*.mjs`). It fails nothing, so it does not
+     block this task, but it is the same baked-in knowledge of someone
+     else's tree. One occurrence was **user-facing** — the boards guard's
+     message told the user to run a path that does not exist at the
+     consumer; fixed by hand, the rest stays.
 
-- 2026-08-30 created — claude — znalezione przy pierwszym uruchomieniu suity po wydzieleniu repo (BL-1445); 14/226 oblanych, dwie klasy: ko-lokacja w testach i asercje o cudzym projekcie
+- 2026-08-30 created — claude — found on the first run of the suite after
+  the repo extraction (BL-1445); 14/226 failed, two classes: co-location in
+  tests and assertions about someone else's project

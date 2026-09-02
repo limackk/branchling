@@ -1,10 +1,10 @@
 ---
 id: TL-42
-title: "Prefiks ID taska to konfiguracja, nie kod"
+title: "Task ID prefix is configuration, not code"
 type: code
 labels: []
 board: main
-epic: "Konfigurowalność"
+epic: "Configurability"
 priority: P2
 status: done
 owner: claude
@@ -20,82 +20,93 @@ verification:
   - bash: "node --test scripts/tests/id-prefix.test.mjs"
 ---
 
-## Cel
+## Goal
 
-Projekt zakładający backlog tym narzędziem ma móc powiedzieć, jak nazywają się
-jego taski. Dziś nie może — `BL-` jest wpisane w kod w 13 plikach.
+A project that adopts this tool's backlog should be able to say what its
+tasks are called. Today it cannot — `BL-` is hardcoded in 13 files.
 
-## Kontekst
+## Context
 
-Zmierzone 2026-08-30: wzorzec `BL-\d`, `BL-[0`, `BL-N` albo literał `"BL-"`
-występuje **31 razy w 13 plikach** (poza komentarzami odsyłającymi do tasków):
+Measured 2026-08-30: the pattern `BL-\d`, `BL-[0`, or the literal `"BL-"`
+occurs **31 times across 13 files** (excluding comments that reference
+tasks):
 
-| Plik | Wystąpień |
+| File | Occurrences |
 |---|---|
 | `build-backlog.mjs` | 8 |
 | `history.mjs` | 5 |
 | `check-backlog-id-collisions.mjs` | 4 |
 | `build-viewer.mjs` | 3 |
-| `new-task.mjs`, `task-fields.mjs` | po 2 |
-| 7 pozostałych | po 1 |
+| `new-task.mjs`, `task-fields.mjs` | 2 each |
+| 7 remaining files | 1 each |
 
-**Dlaczego to jest ta sama sprawa, co TL-19.** Wtedy słownictwo projektu
-(statusy, etykiety, boardy) wyprowadziło się z kodu do `config.yaml` pod hasłem
-„kod zna KSZTAŁT, konfiguracja zna WARTOŚCI". Prefiks ID to ostatnia wartość
-jednego projektu, jaka została w kodzie. Kształtem jest „prefiks + numer"; „BL"
-jest wartością — i to cudzą.
+**Why this is the same issue as TL-19.** Back then, the project's vocabulary
+(statuses, labels, boards) moved out of the code into `config.yaml` under the
+principle "the code knows the SHAPE, the configuration knows the VALUES". The
+ID prefix is the last value of one particular project left in the code. The
+shape is "prefix + number"; "BL" is a value — and someone else's at that.
 
-**Skutek uboczny, który to wywołał.** Po podziale backlogu (`origin`
-i to repo) oba drzewa wydają numery niezależnie z tej samej przestrzeni.
-`next-id` zwrócił `1448` w OBU, i `BL-1448` znaczy dziś dwie różne rzeczy: tutaj
-„Suita testów odpięta od repozytorium źródłowego", u konsumenta „Wygaś board
-backlog-project". **Ta kolizja jest realna, nie hipotetyczna** — istnieje w
-chwili pisania tego taska i jest świadomie zostawiona do rozstrzygnięcia tutaj,
-bo przenumerowanie po tej zmianie robi się raz, a nie dwa razy.
+**The side effect that triggered this.** After the backlog was split
+(`origin` and this repository), both trees issue numbers
+independently from the same space. `next-id` returned `1448` in BOTH, and
+`BL-1448` today means two different things: here, "Test suite decoupled from
+the source repository"; for the consumer, "Expire the backlog-project
+board". **This collision is real, not hypothetical** — it exists at the time
+of writing this task and is deliberately left unresolved here, because
+renumbering after this change happens once, not twice.
 
-Osobno, mniej pilne, ale prawdziwe: projekt open source zaczynający swój backlog
-od `TL-1` wygląda jak fragment cudzego repozytorium. Bo nim jest.
+Separately, less urgent but still true: an open-source project starting its
+backlog at `TL-1` looks like a fragment of someone else's repository.
+Because it is one.
 
 ## Pre-flight reading
 
-1. `scripts/config.mjs` — jak wygląda dokładanie klucza; nieznany klucz OBLEWA,
-   więc default musi istnieć zanim ktokolwiek go użyje.
-2. `scripts/paths.mjs` — `looksLikeBacklogDir`; rozpoznanie katalogu nie może
-   zależeć od prefiksu, inaczej zmiana prefiksu psuje wykrywanie backlogu.
-3. `scripts/next-backlog-id.mjs` — skan po WSZYSTKICH gałęziach; wzorzec siedzi
-   też w argumentach do gita.
-4. `LINEAGE.md` — tam odwołania cross-repo mają już formę `<repo>#BL-NNNN`.
+1. `scripts/config.mjs` — how a key is added to config; an unknown key FAILS,
+   so the default must exist before anyone uses it.
+2. `scripts/paths.mjs` — `looksLikeBacklogDir`; directory detection must not
+   depend on the prefix, otherwise changing the prefix breaks backlog
+   detection.
+3. `scripts/next-backlog-id.mjs` — scans across ALL branches; the pattern
+   also lives in the arguments passed to git.
+4. `LINEAGE.md` — cross-repo references there already use the form
+   `<repo>#BL-NNNN`.
 
-## Kroki
+## Steps
 
-1. Dodać `task_id_prefix` do konfiguracji z generycznym defaultem. **Default nie
-   może brzmieć `BL`** — to jest wartość projektu, od którego się odklejamy;
-   `TASK` albo `T` są neutralne. Zmiana defaultu jest zmianą łamiącą dla
-   każdego, kto już ma backlog, więc migracja idzie w kroku 4.
-2. Zastąpić 31 wystąpień odwołaniem do konfiguracji. Wzorce budować z prefiksu,
-   nie sklejać stringów w miejscu użycia — jedna funkcja `taskIdPattern(cfg)`.
-3. Nazwa pliku taska też niesie prefiks (`BL-NNN-slug.md`) — objąć tym samym.
-4. Napisać migrację: przenumerowanie istniejącego backlogu na nowy prefiks,
-   razem z `history/<ID>.jsonl`, `blocked_by`, `blocks` i odwołaniami w treści.
-   **Bez tego krok 1 jest pułapką**, nie zmianą.
-5. Rozstrzygnąć, czy TEN backlog przechodzi na własny prefiks. Rekomendacja:
-   tak — kolizja `BL-1448` znika sama, a numeracja przestaje zaczynać się od
-   1303. Decyzję i powód zapisać w `LINEAGE.md`.
+1. Add `task_id_prefix` to the configuration with a generic default. **The
+   default must NOT be `BL`** — that is the value of the project we are
+   detaching from; `TASK` or `T` are neutral. Changing the default is a
+   breaking change for anyone who already has a backlog, so the migration
+   goes in step 4.
+2. Replace the 31 occurrences with a reference to the configuration. Build
+   patterns from the prefix, don't concatenate strings at the point of use —
+   one function `taskIdPattern(cfg)`.
+3. The task filename also carries the prefix (`BL-NNN-slug.md`) — cover that
+   the same way.
+4. Write a migration: renumber the existing backlog to the new prefix,
+   including `history/<ID>.jsonl`, `blocked_by`, `blocks`, and references in
+   the body text. **Without this, step 1 is a trap**, not a change.
+5. Decide whether THIS backlog moves to its own prefix. Recommendation: yes
+   — the `BL-1448` collision disappears on its own, and numbering stops
+   starting at 1303. Record the decision and the reason in `LINEAGE.md`.
 
 ## Acceptance criteria
 
-- [x] `task_id_prefix` w konfiguracji, z generycznym (NIE `BL`) defaultem.
-- [x] `grep -rE '"BL-|BL-\\d' scripts/*.mjs` nie zwraca nic poza komentarzami
-      odsyłającymi do tasków — bramka w Verification.
-- [x] Backlog z prefiksem innym niż `BL` przechodzi pełny cykl: `init`, `new`,
-      `build`, `check`, `next-id`, `query`, viewer. Test end-to-end na fixture.
-- [x] `next-id` liczy z właściwego wzorca — test na drzewie z DWOMA prefiksami
-      pilnujący, że obcy nie jest liczony.
-- [x] Migracja przenosi też `history/<ID>.jsonl` i przepina `blocked_by`/`blocks`
-      — test na taskach, które się wzajemnie blokują.
-- [x] Odwołania `<repo>#PREFIX-NNNN` nadal działają (patrz TL-41).
-- [x] Kolizja `BL-1448` **rozstrzygnięta świadomie: ZOSTAJE na razie**, powód
-      niżej. Mechanizm, który ją rozpuszcza, jest dowieziony i sprawdzony.
+- [x] `task_id_prefix` in the configuration, with a generic (NOT `BL`)
+      default.
+- [x] `grep -rE '"BL-|BL-\\d' scripts/*.mjs` returns nothing besides comments
+      referencing tasks — gate in Verification.
+- [x] A backlog with a prefix other than `BL` goes through the full cycle:
+      `init`, `new`, `build`, `check`, `next-id`, `query`, viewer. End-to-end
+      test on a fixture.
+- [x] `next-id` counts from the correct pattern — test on a tree with TWO
+      prefixes, guarding that the foreign one is not counted.
+- [x] The migration also moves `history/<ID>.jsonl` and rewires
+      `blocked_by`/`blocks` — test on tasks that block each other.
+- [x] References of the form `<repo>#PREFIX-NNNN` still work (see TL-41).
+- [x] The `BL-1448` collision **deliberately resolved as: STAYS for now**,
+      reason below. The mechanism that resolves it is delivered and
+      verified.
 
 ## Verification
 
@@ -103,34 +114,88 @@ od `TL-1` wygląda jak fragment cudzego repozytorium. Bo nim jest.
 # expected: pass
 node --test scripts/tests/id-prefix.test.mjs
 
-# Prefiks nie mieszka już w kodzie — expected: brak trafień poza komentarzami
-grep -rnE '"BL-|BL-\\\\d|BL-\[0' scripts/*.mjs | grep -v '^\s*\*' || echo "czysto"
+# The prefix no longer lives in the code — expected: no matches besides comments
+grep -rnE '"BL-|BL-\\\\d|BL-\[0' scripts/*.mjs | grep -v '^\s*\*' || echo "clean"
 
-# Obcy prefiks przechodzi pełny cykl — expected: same ✓
+# A foreign prefix goes through the full cycle — expected: all ✓
 node scripts/cli.mjs init --dir /tmp/prefix-probe
-# (ustaw task_id_prefix: TASK w /tmp/prefix-probe/config.yaml)
-node scripts/cli.mjs new --dir /tmp/prefix-probe --title "Proba"
+# (set task_id_prefix: TASK in /tmp/prefix-probe/config.yaml)
+node scripts/cli.mjs new --dir /tmp/prefix-probe --title "Try it"
 node scripts/cli.mjs build --dir /tmp/prefix-probe && node scripts/cli.mjs check --dir /tmp/prefix-probe
 ```
 
 ## Notes
 
-- Kolejność z krokiem 4 nie jest kosmetyczna: wypuszczenie konfigurowalnego
-  prefiksu bez migracji daje narzędzie, w którym zmiana ustawienia po cichu
-  odcina użytkownika od jego własnych tasków (`next-id` przestaje je widzieć,
-  `build` przestaje je zbierać). To byłaby utrata danych z widokiem sukcesu.
-- Świadomie poza zakresem: format numeru (zera wiodące, długość). Dziś jest
-  `\d+` i nic nie zgłasza problemu.
+- The ordering with step 4 is not cosmetic: shipping a configurable prefix
+  without a migration produces a tool where changing the setting silently
+  cuts the user off from their own tasks (`next-id` stops seeing them,
+  `build` stops collecting them). That would be data loss disguised as
+  success.
+- Deliberately out of scope: the number format (leading zeros, length).
+  Today it is `\d+` and nothing flags an issue.
 
 ## Log
 
-- 2026-08-31 done — claude — `task_id_prefix` w konfiguracji, wzorce z `scripts/task-id.mjs`, komenda `migrate-prefix`, guard rozjazdu. 12 nowych testów, pełna suita 251/251. Konsument (origin) sprawdzony po każdej zmianie: 1363 taski, wszystkie trzy guardy zielone.
-- 2026-08-31 KROK 5 ROZSTRZYGNIĘTY ODWROTNIE — claude — rekomendowałem przenumerować TEN backlog na własny prefiks. **Nie robię tego**, bo `--dry-run` to zmierzył: 78 plików do zmiany i **215 wzmianek `BL-NNN` w TREŚCI tasków**, których migracja świadomie NIE tyka (nie da się odróżnić odwołania lokalnego od `<repo>#BL-NNNN`). Migracja zostawiłaby 215 zdań wskazujących na numery, których już nie ma — czyli zamieniłaby jedną znaną kolizję na dwieście cichych. Mechanizm jest dowieziony i sprawdzony; przenumerowanie tego repo to osobna decyzja z krokiem przeglądu prozy. Kolizja `BL-1448` jest opisana po obu stronach i kosztuje dziś mało.
-- 2026-08-31 zmiana projektu w trakcie: INFERENCJA — claude — samo „default = TASK" złamałoby **każdy istniejący backlog**: jego `config.yaml` nie ma tego klucza, więc po aktualizacji byłby czytany pod `TASK` i nie znalazłby ani jednego swojego taska. Zmierzone na własnej suicie — 13 testów naraz. Dołożona reguła: **ustawienie jawne wygrywa zawsze; dopiero jego BRAK oddaje głos drzewu.** Konfiguracja zostaje źródłem prawdy, a nietknięty backlog działa bez żadnej edycji.
-- 2026-08-31 guard rozjazdu jest sednem, nie dodatkiem — claude — bez niego pliki `BL-*.md` pod konfiguracją `TASK` czytają się jako ZERO tasków, a `build` przebudowuje widoki jako puste NA REALNYCH DANYCH i wypisuje ✓. To utrata danych z komunikatem o sukcesie. Guard oblewa PRZED zapisem; test sprawdza, że `INDEX.yaml` w ogóle nie powstał. Kontrola negatywna osobno: pusty backlog to legalny stan, nie rozjazd.
-- 2026-08-31 defekt złapany kontrolą pozytywną na realnym drzewie — claude — wykrywanie obcego prefiksu było ZACHŁANNE i z `TL-25-domknij-walidacje-flag-w-5-komendach.md` czytało prefiks `TL-25-domknij-walidacje-flag-w` (bo dalej też stoi `-5-`). Komunikat o rozjeździe podawał śmieci zamiast nazwy. Naprawione kwantyfikatorem leniwym, przypięte testem. Zobaczyłbym to tylko na prawdziwych nazwach plików — fixture z `BL-1-x.md` przechodził.
-- 2026-08-31 DRUGI egzemplarz tej samej zachłanności, znaleziony po ARTEFAKCIE — claude — `git status` pokazał plik `backlog/history/TL-25-domknij-walidacje-flag-w-5.jsonl`, którego nikt nie zakładał. Wyciąganie ID z nazwy pliku (`ANY_TASK_FILE_ID`) miało ten sam zachłanny wzorzec, więc hook zapisał historię pod zmyślonym identyfikatorem. To nie było znalezione testem ani przeglądem kodu, tylko przez niepasujący plik na dysku. Naprawione, plik usunięty, klasa przypięta testem na PRAWDZIWEJ nazwie pliku — fixture `BL-1-x.md` przechodził oba defekty.
-- 2026-08-31 przy okazji: `next-id` przestał wymagać gita — claude — poza repozytorium git kończył się błędem, a `--dir` może wskazywać dowolny katalog. Teraz spada na skan własnego katalogu i **głośno mówi**, że to węższe źródło (numer może być zajęty na cudzej gałęzi); `new` przekazuje to ostrzeżenie dalej zamiast je połknąć. Pusty backlog daje `1` zamiast błędu.
-- 2026-08-31 trzy własne pomyłki — claude — (1) pythonowa zamiana zjadła backslashe i `"^TASK-\\d+"` stało się `^TASK-d+` (ta sama klasa co template literal zjadający regexy); naprawione przez budowanie wzorców w testach z FUNKCJI narzędzia, nie z przepisanego stringa; (2) backtick w komentarzu wewnątrz template literala urwał `init-backlog.mjs`; (3) import wstrzyknięty po ostatniej linii `import` wylądował W ŚRODKU wieloliniowego importu w `serve-backlog.mjs`.
-- 2026-08-31 świadomie NIE zrobione — claude — `history.mjs`, `regen-hook.mjs` i walidator ścieżek w `serve-backlog.mjs` dostały wzorce BEZ prefiksu (`ANY_TASK_*`). Log historii jest kluczowany tym ID, które task ma; nadanie mu opinii o słownictwie sprawiłoby, że po migracji przestałby czytać własną historię — dokładnie wtedy, gdy jest najbardziej potrzebna.
-- 2026-08-30 created — claude — 31 wystąpień w 13 plikach zmierzone; wywołane realną kolizją `BL-1448` między tym repo a `origin` po podziale backlogu
+- 2026-08-31 done — claude — `task_id_prefix` in the configuration, patterns
+  from `scripts/task-id.mjs`, `migrate-prefix` command, drift guard. 12 new
+  tests, full suite 251/251. Consumer (origin) checked after every
+  change: 1363 tasks, all three guards green.
+- 2026-08-31 STEP 5 RESOLVED THE OPPOSITE WAY — claude — I had recommended
+  renumbering THIS backlog to its own prefix. **I am not doing that**,
+  because `--dry-run` measured it: 78 files to change and **215 mentions of
+  `BL-NNN` in task BODIES**, which the migration deliberately does NOT touch
+  (there is no way to distinguish a local reference from `<repo>#BL-NNNN`).
+  The migration would leave 215 sentences pointing at numbers that no longer
+  exist — trading one known collision for two hundred silent ones. The
+  mechanism is delivered and verified; renumbering this repository is a
+  separate decision with its own prose-review step. The `BL-1448` collision
+  is documented on both sides and costs little today.
+- 2026-08-31 mid-task design change: INFERENCE — claude — a plain "default =
+  TASK" would break **every existing backlog**: its `config.yaml` has no
+  such key, so after the update it would be read under `TASK` and would find
+  none of its own tasks. Measured on our own suite — 13 tests at once. Added
+  rule: **an explicit setting always wins; only its ABSENCE hands the
+  decision to the tree.** The configuration remains the source of truth, and
+  an untouched backlog works with no edits at all.
+- 2026-08-31 the drift guard is the core of it, not an add-on — claude —
+  without it, `BL-*.md` files under a `TASK` configuration read as ZERO
+  tasks, and `build` rebuilds the views as empty ON REAL DATA and prints ✓.
+  That is data loss with a success message. The guard FAILS before any
+  write; the test checks that `INDEX.yaml` is not produced at all. Negative
+  control kept separate: an empty backlog is a legitimate state, not drift.
+- 2026-08-31 defect caught by a positive control on a real tree — claude —
+  foreign-prefix detection was GREEDY and read the prefix
+  `TL-25-domknij-walidacje-flag-w` from
+  `TL-25-domknij-walidacje-flag-w-5-komendach.md` (because a further `-5-`
+  also appears). The drift message reported garbage instead of the name.
+  Fixed with a lazy quantifier, pinned with a test. I would only have seen
+  this on real filenames — the fixture with `BL-1-x.md` passed.
+- 2026-08-31 A SECOND instance of the same greediness, found from an
+  ARTIFACT — claude — `git status` showed a file
+  `backlog/history/TL-25-domknij-walidacje-flag-w-5.jsonl` that no one had
+  created. Extracting the ID from the filename (`ANY_TASK_FILE_ID`) had the
+  same greedy pattern, so the hook wrote history under a fabricated
+  identifier. This was not found by a test or a code review, only by a stray
+  file on disk. Fixed, the file removed, the class pinned with a test on the
+  REAL filename — the `BL-1-x.md` fixture had passed both defects.
+- 2026-08-31 in passing: `next-id` no longer requires git — claude — outside
+  a git repository it used to fail, but `--dir` can point at any directory.
+  Now it falls back to scanning its own directory and **loudly says** that
+  this is a narrower source (the number may be taken on a foreign branch);
+  `new` forwards this warning instead of swallowing it. An empty backlog now
+  yields `1` instead of an error.
+- 2026-08-31 three of my own mistakes — claude — (1) a Python-based
+  replacement ate backslashes and `"^TASK-\\d+"` became `^TASK-d+` (the same
+  class as a template literal swallowing regexes); fixed by building patterns
+  in tests from the tool's own FUNCTION, not from a copied string; (2) a
+  backtick in a comment inside a template literal broke `init-backlog.mjs`;
+  (3) an import inserted after the last `import` line landed IN THE MIDDLE
+  of a multi-line import in `serve-backlog.mjs`.
+- 2026-08-31 deliberately NOT done — claude — `history.mjs`, `regen-hook.mjs`
+  and the path validator in `serve-backlog.mjs` were given patterns WITHOUT a
+  prefix (`ANY_TASK_*`). The history log is keyed by whatever ID a task has;
+  giving it an opinion about vocabulary would make it stop reading its own
+  history after a migration — exactly when it is needed most.
+- 2026-08-30 created — claude — 31 occurrences across 13 files measured;
+  triggered by a real `BL-1448` collision between this repository and
+  `origin` after the backlog split

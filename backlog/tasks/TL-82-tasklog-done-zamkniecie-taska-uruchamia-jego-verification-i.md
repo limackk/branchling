@@ -1,10 +1,10 @@
 ---
 id: TL-82
-title: "worktrail done — zamknięcie taska uruchamia jego verification i odmawia przy porażce"
+title: "worktrail done — closing a task runs its verification and refuses on failure"
 type: code
 labels: [pre-launch]
 board: main
-epic: "Integralność danych"
+epic: "Data integrity"
 priority: P0
 status: done
 owner: agent:claude
@@ -25,138 +25,146 @@ verification:
   - id: skill-refers
     bash: "grep -q 'worktrail done <ID>' .claude/skills/backlog-workflow/SKILL.md"
   - id: red-run-observed
-    manual: "Na fixturze z wpisem `verification` który oblewa: `worktrail done <ID>` wychodzi z kodem !=0, wypisuje wyjście komendy, a plik taska DALEJ ma `status: pending`"
+    manual: "On a fixture with a `verification` entry that fails: `worktrail done <ID>` exits with code !=0, prints the command's output, and the task file STILL has `status: pending`"
 ---
 
-## Cel
+## Goal
 
-`worktrail done <ID>` uruchamia każdy wpis z `verification:` tego taska, pokazuje
-wyjście i USTAWIA `status: done` wyłącznie wtedy, gdy wszystkie przeszły. Po tym
-tasku „zrobione" przestaje być deklaracją wykonawcy, a staje się kodem wyjścia
-procesu.
+`worktrail done <ID>` runs every entry from this task's `verification:` block, shows
+the output, and SETS `status: done` only when all of them pass. After this
+task, "done" stops being a declaration by the executor and becomes the exit code
+of a process.
 
-## Kontekst
+## Context
 
-`verification:` jest jedyną cechą, która odróżnia to narzędzie od Backlog.md
-i od każdego innego markdown-owego trackera. Tam kontraktem zamknięcia są
-checkboxy (acceptance criteria + Definition of Done), które odhacza ten sam,
-kto wykonywał pracę. Gdy pracę wykonuje agent, jest on zarazem jedynym
-świadkiem i ma strukturalny interes w uznaniu roboty za skończoną: kontekst mu
-się kończy, a „prawie działa" wygląda z jego strony identycznie jak „działa".
-Odpowiedzią Backlog.md są trzy LUDZKIE punkty kontrolne, czyli skalowanie po
-uwadze człowieka — po zasobie, który sami w README nazywają wąskim gardłem.
+`verification:` is the only feature that distinguishes this tool from Backlog.md
+and from every other markdown-based tracker. There, the closing contract is
+checkboxes (acceptance criteria + Definition of Done), ticked off by the same
+party who did the work. When the work is done by an agent, that agent is at
+the same time the sole witness and has a structural interest in declaring the
+work finished: its context is running out, and "almost works" looks from its
+side identical to "works". Backlog.md's answer is three HUMAN checkpoints,
+i.e. scaling by human attention — by the very resource their own README calls
+a bottleneck.
 
-**Problem: u nas ta przewaga dziś nie istnieje jako mechanizm.** Sprawdzone w
-kodzie: `verification` jest walidowane jako pole (`scripts/task-fields.mjs:146`),
-wypełniane przy zakładaniu taska (`scripts/new-task.mjs:172`) i tłumaczone w
-onboardingu (`scripts/init-backlog.mjs:157`) — ale ŻADEN skrypt go nie
-uruchamia. Egzekucję pełni dziś skill `backlog-workflow`, czyli instrukcja dla
-tego samego agenta, którego miała pilnować. To jest konwencja dyscypliny
-udająca gwarancję, i dlatego P0: dopóki jej nie ma, wszystkie pozostałe taski
-dokładają funkcje do narzędzia, którego jedyna wyróżniająca cecha nie działa.
+**Problem: for us this advantage does not exist today as a mechanism.** Verified
+in the code: `verification` is validated as a field (`scripts/task-fields.mjs:146`),
+filled in when a task is created (`scripts/new-task.mjs:172`), and explained in
+onboarding (`scripts/init-backlog.mjs:157`) — but NO script runs it. Execution
+today is carried by the `backlog-workflow` skill, i.e. an instruction for the
+very agent it was supposed to police. This is a convention of discipline
+masquerading as a guarantee, and that is why it is P0: until it exists, every
+other task adds features to a tool whose one distinguishing feature does not
+work.
 
-Sześć rzeczy rozstrzygniętych przed startem — każda jest miejscem, w którym
-naiwna implementacja zamienia bramkę w atrapę:
+Six things settled before starting — each one a place where a naive
+implementation turns the gate into a decoy:
 
-1. **Pusty `verification:` NIE zamyka taska.** Guard, który przechodzi na
-   zerowej próbce, jest zielony bez mocy dowodowej (CLAUDE.md). Brak wpisów,
-   pusta lista i literał z szablonu (`"komenda do uruchomienia"`) mają OBLEWAĆ
-   z komunikatem, że task nie ma kontraktu zamknięcia.
-2. **`manual:` to jedyna furtka i musi boleć.** Jeśli `manual:` przechodzi po
-   cichu, wszyscy zaczną pisać `manual: "sprawdziłem"` i bramka umiera w
-   tydzień. Wymaga jawnego potwierdzenia, a potwierdzenie ląduje w historii z
-   aktorem w przestrzeni nazw — wiadomo, KTO zaręczył.
-3. **`verification` nie uruchamia się nigdy samo.** Ani w `build`, ani w
-   `check`, ani w `serve`, ani w `regen-hook`. Wyłącznie na jawne `worktrail
-   done`. Task przychodzący w cudzym pull requeście niesie komendę powłoki;
-   ma się ona wykonać dopiero, gdy człowiek świadomie zamyka ten task, i po
-   wypisaniu jej treści przed uruchomieniem.
-4. **To podnosi koszt kłamstwa, nie czyni go niemożliwym.** Plik taska zawsze
-   da się edytować ręcznie. Bramka ma zatrzymać optymizm, nie złą wolę — i tak
-   ma być opisana w README. Obiecywanie więcej byłoby tym samym rodzajem
-   nieprawdy, przeciw któremu ten task powstał.
-5. **Katalog roboczy komend to korzeń repozytorium**, nie katalog backlogu.
-   W układzie ko-lokowanym to nie jest ta sama ścieżka — bierz ją z
-   `resolveBacklogDir()`/gita, nigdy własnym liczeniem w górę.
-6. **`manual:` musi powiedzieć, co JEST dowodem, nie tylko wymagać potwierdzenia.**
-   Wyliczenie z Backlog.md jest tu lepsze niż nasza cisza i wchodzi wprost do
-   komunikatu potwierdzenia: obecność kodu, wynik grepa i sama intencja
-   implementacji NIE są dowodem. Przy pracy interaktywnej dowodem jest przejście
-   przez przeglądarkę, skrypt na DOM-ie, runner testów albo opisany wynik ręcznej
-   interakcji — nie „sprawdziłem". Ogólne „zweryfikuj porządnie" nie działa;
-   działa konkretne wyliczenie tego, co nie przechodzi.
-7. **`--force` istnieje albo nie istnieje, ale nie po cichu.** Jeśli tak: głośne
-   ostrzeżenie plus wpis w historii z aktorem i powodem. Cicha flaga obejścia
-   jest gorsza niż jej brak, bo daje pozór gwarancji.
+1. **An empty `verification:` does NOT close the task.** A guard that passes on
+   a zero sample is green with no evidentiary force (CLAUDE.md). No entries, an
+   empty list, and the template literal (`"command to run"`) are all to FAIL,
+   with a message saying the task has no closing contract.
+2. **`manual:` is the only loophole and it must hurt.** If `manual:` passes
+   silently, everyone will start writing `manual: "checked"` and the gate dies
+   within a week. It requires explicit confirmation, and the confirmation lands
+   in the history with a namespaced actor — so it is known WHO vouched for it.
+3. **`verification` never runs on its own.** Not in `build`, not in `check`, not
+   in `serve`, not in `regen-hook`. Only on an explicit `worktrail done`. A task
+   arriving in someone else's pull request carries a shell command; it should
+   run only when a human consciously closes that task, and only after its
+   contents are printed before running.
+4. **This raises the *cost* of a lie, it does not make it impossible.** A task
+   file can always be edited by hand. The gate is meant to stop optimism, not
+   bad faith — and it is to be described that way in the README. Promising more
+   would be the same kind of untruth this task was created against.
+5. **The working directory for commands is the repository root**, not the
+   backlog directory. In a co-located layout that is not the same path — take
+   it from `resolveBacklogDir()`/git, never from your own counting upward.
+6. **`manual:` must say what COUNTS as proof, not merely require confirmation.**
+   The enumeration from Backlog.md is better here than our silence and goes
+   directly into the confirmation message: the presence of code, a grep result,
+   and the intent of the implementation itself are NOT proof. For interactive
+   work, proof is a pass through the browser, a script against the DOM, a test
+   runner, or a described result of manual interaction — not "I checked". A
+   generic "verify it properly" does not work; a concrete enumeration of what
+   does not count does.
+7. **`--force` either exists or it does not, but never quietly.** If it does: a
+   loud warning plus a history entry with actor and reason. A silent escape
+   hatch flag is worse than not having one, because it gives the appearance of
+   a guarantee.
 
 ## Pre-flight reading
 
-1. `scripts/task-fields.mjs:146` — jak `verification` jest dziś walidowane i
-   jaki ma kształt (`bash:` / `manual:`).
-2. `scripts/new-task.mjs:172-178` — literał z szablonu, który musi oblewać.
-3. `scripts/init-backlog.mjs:157-222` — dlaczego przykładowy task z `init` ma
-   URUCHAMIALNE `verification`; ta decyzja jest już podjęta, nie podważaj jej.
-4. `scripts/history-record.mjs` — jak dopisać zdarzenie z aktorem.
-5. `scripts/paths.mjs` — `resolveBacklogDir()` i korzeń repozytorium.
-6. `.claude/skills/backlog-workflow/SKILL.md`, sekcja „Close a task" — dziś
-   opisuje ręczną procedurę; po tym tasku ma odsyłać do komendy.
+1. `scripts/task-fields.mjs:146` — how `verification` is validated today and
+   its shape (`bash:` / `manual:`).
+2. `scripts/new-task.mjs:172-178` — the template literal that must fail.
+3. `scripts/init-backlog.mjs:157-222` — why the example task from `init` has
+   RUNNABLE `verification`; that decision is already made, do not second-guess
+   it.
+4. `scripts/history-record.mjs` — how to append an event with an actor.
+5. `scripts/paths.mjs` — `resolveBacklogDir()` and the repository root.
+6. `.claude/skills/backlog-workflow/SKILL.md`, "Close a task" section — today
+   it describes a manual procedure; after this task it should point to the
+   command.
 
-## Kroki
+## Steps
 
-1. `worktrail done <ID>`: wczytaj task, wypisz wpisy `verification` PRZED
-   uruchomieniem, wykonaj po kolei w korzeniu repozytorium.
-2. Strumieniuj wyjście każdej komendy. Pierwsza porażka kończy bieg, wychodzi
-   z kodem !=0 i NIE dotyka pliku taska.
-3. Pusta lista, brak pola i literał szablonu — oblewają z osobnym komunikatem
-   (to inny błąd niż „weryfikacja nie przeszła").
-4. `manual:` — jawne potwierdzenie, zapisane w historii z aktorem. Komunikat
-   potwierdzenia wylicza, co dowodem NIE jest (punkt 6 kontekstu).
-5. Odhacz kryteria akceptacji z powiązania wprowadzonego w TL-86 i odmów
-   zamknięcia, gdy kryterium nie ma zielonego dowodu. Bez tego bramka przepuszcza
-   task z martwymi checkboksami — zmierzone: 12 z 44 zamkniętych tasków.
-6. Po komplecie zielonych: `status: done`, `updated:` na dziś, wpis w `## Log`,
-   wpis w historii, `build`. Jedna komenda zamyka cały rytuał z SKILL.md.
-7. `--json` (koperta z TL-72): wynik każdego wpisu, kod wyjścia, czas.
-8. `--dry-run`: uruchom weryfikacje, nie zmieniaj statusu. To jest tryb, w
-   którym agent sprawdza się PRZED zgłoszeniem gotowości.
-9. README: opisz bramkę razem z jej granicą z punktu 4 kontekstu.
-10. `scripts/tests/verification-gate.test.mjs`, fixture na każdy przypadek:
-   wszystko zielone → status zmieniony; jedna porażka → status NIETKNIĘTY;
-   pusty `verification` → oblewa; literał z szablonu → oblewa; `manual:` bez
-   potwierdzenia → nie zamyka; potwierdzony `manual:` → wpis w historii z
-   aktorem.
+1. `worktrail done <ID>`: read the task, print the `verification` entries BEFORE
+   running them, execute them in order at the repository root.
+2. Stream the output of each command. The first failure ends the run, exits
+   with code !=0, and does NOT touch the task file.
+3. An empty list, a missing field, and the template literal — all fail with a
+   separate message (this is a different error from "verification failed").
+4. `manual:` — explicit confirmation, recorded in the history with an actor.
+   The confirmation message enumerates what does NOT count as proof (context
+   point 6).
+5. Tick off acceptance criteria from the link introduced in TL-86 and refuse to
+   close when a criterion has no green proof. Without this the gate would let a
+   task through with dead checkboxes — measured: 12 out of 44 closed tasks.
+6. Once everything is green: `status: done`, `updated:` set to today, an entry
+   in `## Log`, an entry in the history, `build`. One command closes the whole
+   ritual from SKILL.md.
+7. `--json` (envelope from TL-72): each entry's result, exit code, timing.
+8. `--dry-run`: run the verifications, do not change the status. This is the
+   mode in which an agent checks itself BEFORE announcing it is ready.
+9. README: describe the gate together with its boundary from context point 4.
+10. `scripts/tests/verification-gate.test.mjs`, a fixture for every case: all
+   green → status changed; one failure → status UNTOUCHED; empty
+   `verification` → fails; template literal → fails; `manual:` without
+   confirmation → does not close; confirmed `manual:` → history entry with
+   actor.
 
 ## Acceptance criteria
 
-- [x] `worktrail done <ID>` zamyka task wyłącznie po zielonym komplecie `verification`. [proof: gate-tests]
-- [x] Porażka zostawia plik taska bez zmian i wychodzi z kodem !=0. [proof: gate-tests, red-run-observed]
-- [x] Brak, pusta lista i literał z szablonu OBLEWAJĄ, z komunikatem odróżnialnym od porażki weryfikacji. [proof: gate-tests]
-- [x] `manual:` wymaga jawnego potwierdzenia zapisanego w historii z aktorem w przestrzeni nazw. [proof: gate-tests]
-- [x] Komunikat potwierdzenia `manual:` wylicza, co dowodem NIE jest (obecność kodu, grep, intencja). [proof: gate-tests]
-- [x] Kryteria akceptacji są odhaczane z dowodów; kryterium bez zielonego dowodu blokuje zamknięcie. [proof: gate-tests]
-- [x] Żadna inna komenda (`build`, `check`, `serve`, `regen-hook`) nie uruchamia `verification`. [proof: gate-tests]
-- [x] Komendy startują w korzeniu repozytorium także w układzie ko-lokowanym. [proof: gate-tests]
-- [x] `--dry-run` sprawdza bez zmiany statusu; `--json` zwraca wynik każdego wpisu. [proof: gate-tests]
-- [x] README nazywa granicę: bramka podnosi koszt kłamstwa, nie eliminuje go. [proof: readme-limit]
-- [x] Skill `backlog-workflow` odsyła do komendy zamiast opisywać ręczną procedurę. [proof: skill-refers]
-- [x] Test ma fixture na KAŻDY z sześciu przypadków, w tym kontrolę pozytywną na pustym `verification`. [proof: gate-tests]
+- [x] `worktrail done <ID>` closes a task only after a green set of `verification`. [proof: gate-tests]
+- [x] Failure leaves the task file unchanged and exits with code !=0. [proof: gate-tests, red-run-observed]
+- [x] Missing, empty list, and the template literal all FAIL, with a message distinguishable from a verification failure. [proof: gate-tests]
+- [x] `manual:` requires explicit confirmation recorded in the history with a namespaced actor. [proof: gate-tests]
+- [x] The `manual:` confirmation message enumerates what does NOT count as proof (presence of code, grep, intent). [proof: gate-tests]
+- [x] Acceptance criteria are ticked off from proofs; a criterion without green proof blocks closing. [proof: gate-tests]
+- [x] No other command (`build`, `check`, `serve`, `regen-hook`) runs `verification`. [proof: gate-tests]
+- [x] Commands start at the repository root even in a co-located layout. [proof: gate-tests]
+- [x] `--dry-run` checks without changing status; `--json` returns the result of each entry. [proof: gate-tests]
+- [x] The README names the boundary: the gate raises the *cost* of a lie, it does not eliminate it. [proof: readme-limit]
+- [x] The `backlog-workflow` skill points to the command instead of describing a manual procedure. [proof: skill-refers]
+- [x] The test has a fixture for EACH of the six cases, including a positive control on an empty `verification`. [proof: gate-tests]
 
 ## Log
 
-2026-08-31 pending — agent:claude — założony po analizie Backlog.md. Powód P0: `verification:` jest dziś zapisywane i walidowane, ale nieuruchamiane przez żaden skrypt — jedyna wyróżniająca cecha narzędzia istnieje jako konwencja, nie mechanizm.
-2026-08-31 pending — agent:claude — dopisane: zależność od TL-86 (bramka odhacza kryteria, nie tylko uruchamia komendy) i wyliczenie fałszywych dowodów w potwierdzeniu `manual:`.
-2026-09-01 pending — agent:claude — PRZEKAZANIE Z TL-86 (krok 6). Mechanizm powiązania stoi; `worktrail done` ma go SKONSUMOWAĆ, nie zaprojektować drugi raz. Co dostajesz gotowe w `scripts/criteria.mjs`: (1) `parseVerification(frontmatter)` → wpisy `{id, bash, manual}` plus lista problemów — wpis może mieć stabilne `id:`, nieznany klucz OBLEWA, duplikat `id` OBLEWA; (2) `parseCriteria(body)` → pozycje `{text, checked, proofs}`, gdzie `proofs` pochodzą ze znacznika `[proof: a, b]` na końcu linii kryterium; (3) `auditTask({frontmatter, body, policy})` → `{errors, warnings}`; (4) `applyProofs(raw, passedIds)` → `{text, ticked}`, idempotentne, odhacza WYŁĄCZNIE kryteria, których WSZYSTKIE dowody przeszły, i nigdy nie cofa odhaczenia. CO BRAMKA MA ODHACZAĆ: kryteria, których każdy wskazany wpis `verification` wyszedł zielony — `applyProofs` liczy to za ciebie, zapisz zwrócony tekst. PRZY CZYM MA ODMÓWIĆ: (a) `auditTask(...).errors` niepuste — to znaczy powiązanie jest ZEPSUTE (kryterium wskazuje nieistniejący `id`), a nie tylko go brak; (b) kryterium, które po przebiegu DALEJ jest nieodhaczone — to jest AC „kryterium bez zielonego dowodu blokuje zamknięcie", i liczy się tak samo dla kryterium bez dowodu, jak dla kryterium, którego dowód oblał. UWAGA NA MIGRACJĘ: domyślna polityka `criteria_links: warn` (config.yaml) sprawia, że 69 obecnych tasków nie ma powiązań — gdyby `done` odmawiał przy braku powiązania, ŻADEN z nich nie dałby się zamknąć. Odmowa ma iść z polityki: przy `warn` brak powiązania nie blokuje, przy `require` blokuje. Zepsute powiązanie blokuje ZAWSZE. `manual:` jest już parsowane i może być wskazane przez kryterium — jego „zaliczenie" to twoja decyzja o potwierdzeniu, nie moja.
-2026-09-01 pending — agent:claude — ODBLOKOWANY: TL-86 zamknięty. `blocked_by` zostaje jako zapis zależności, która była prawdziwa — guard referencji liczy `done` jako istniejące, więc nie ma powodu kasować historii, żeby dostać zielone.
-2026-09-01 in_progress — agent:claude — wzięty; jedyny wykonalny P0 (TL-81 jest decyzyjny, TL-48 czeka na właściciela).
-2026-09-01 in_progress — agent:claude — SIEDEM ROZSTRZYGNIĘĆ Z KONTEKSTU, każde zaimplementowane i otestowane.
-  (1) PUSTY KONTRAKT — brak pola, pusta lista i literał `command to run` odmawiają z komunikatem „no closing contract", jawnie innym niż „verification failed"; test porównuje oba komunikaty, żeby nie zlały się w jeden. Kontrola pozytywna na pustym `verification` jest pierwszym testem w pliku, bo bramka zamykająca task bez kontraktu przeszłaby każdy inny test w tym pliku.
-  (2) `manual:` — pytanie o człowieka z wyliczeniem, co dowodem NIE JEST (obecność kodu, grep, intencja implementacji, „sprawdziłem" — łącznie z prawdziwym). Potwierdzenie wymaga wpisania słowa `confirm`, nie `y`: zgoda, którą da się dać jednym palcem po drodze do czegoś innego, nie jest aktem świadomym. Ląduje w historii jako nowe pseudo-pole `__verified__` z aktorem i TREŚCIĄ wpisu — `diffMeta` tego nie zobaczy, bo frontmatter się nie zmienia, więc bez własnego zdarzenia jedyna rzecz, którą `manual:` ma do zaoferowania zamiast komendy — KTO zaręczył — nie zostawiałaby śladu.
-  (3) NIC INNEGO NIE URUCHAMIA `verification` — test iteruje po `build`, `check`, `query`, `stats`, `viewer` i szuka markera, PLUS kontrola pozytywna, że ten sam marker odpala się pod `done`. Bez tej drugiej połowy test przechodziłby też wtedy, gdyby marker nie odpalał się nigdzie.
-  (4) GRANICA W README — „podnosi koszt kłamstwa, nie eliminuje go", razem z powodem, dla którego nie ma `--force`.
-  (5) KORZEŃ REPOZYTORIUM — `repoRootFor()` pyta gita (`rev-parse --show-toplevel`), a przy jego braku zwraca katalog backlogu i mówi to w komentarzu. Test zakłada PRAWDZIWE repozytorium i sprawdza oba układy: zagnieżdżony i ko-lokowany. `join(root, "..")` dałoby w ko-lokowanym katalog NAD repozytorium.
-  (6) WYLICZENIE ZAMIAST PROŚBY — treść z Backlog.md wchodzi wprost do promptu; test asertuje obecność `grep` i „I checked" na liście, więc skrócenie jej oblewa.
-  (7) `--force` NIE ISTNIEJE. Powód nie jest purystyczny: flaga nie dodałaby możliwości — ręczna edycja pliku i tak jest dostępna — dodałaby coś gorszego, czyli WSPIERANE, skryptowalne obejście długości jednego słowa, które wyląduje w jobie CI, gdzie nikt go już nie przeczyta. Obejście kosztujące widoczny diff w review jest właściwą ceną. Zapisane w `--help`, w README i w skillu, żeby brak flagi był decyzją, a nie przeoczeniem.
-  DECYZJE POZA LISTĄ: (a) status zamknięcia bierze się z `archived_statuses`, NIGDY z literału „done" — backlog nazywający to `shipped` ma działać bez zmiany kodu; `--status` wybiera inny status archiwalny (np. `cancelled`), ale zawsze archiwalny, bo `done` zamyka, a przeniesienie do statusu otwartego to edycja, nie zamknięcie. (b) `--json` odmawia obsługi niepotwierdzonego `manual:` zamiast wstrzykiwać prompt w środek JSON-a — pytanie człowieka o zgodę, gdy wyjście parsuje program, jest niespójne samo w sobie. (c) Odmowy też są JSON-em (`reason`, `refusal`), bo skrypt potrzebuje maszynowej odpowiedzi na „dlaczego nie" bardziej niż na „tak". (d) Kryteria bez dowodu odmawiają PRZED uruchomieniem czegokolwiek (przy `criteria_links: require`) — palenie czasu na komendy, żeby potem odrzucić wynik, nic nie odpowiada. Po zielonym przebiegu został asercyjny bezpiecznik na niespójność między runnerem a `applyProofs`: kryterium, którego WSZYSTKIE dowody przeszły, a nie zostało odhaczone, to defekt narzędzia i odmawia zawsze.
-  ZMIERZONE RĘCZNIE na fixturze (wpis `verification` oblewający z kodem 4): `done` wypisał wyjście komendy, wyszedł z kodem 1, a plik został z `status: pending` — to jest dokładnie wpis `manual:` tego taska i na TEJ obserwacji go zaręczam, nie na przeczytaniu kodu.
-2026-09-01 in_progress — agent:claude — pierwsza próba zamknięcia OBLAŁA na własnym wpisie `readme-limit`: grep szukał frazy „raises the *cost* of a lie" w jednej linii, a zdanie łamie się w README między „*cost*" a „of a lie". Zapisane, bo to jest dokładnie ten rodzaj rzeczy, którą ręczne odhaczenie checkboksa by przepuściło — README było poprawne, dowód był zły, a bez uruchomienia nikt by się nie dowiedział, który z dwóch.
+2026-08-31 pending — agent:claude — created after analysis of Backlog.md. Reason P0: `verification:` is today recorded and validated, but not run by any script — the tool's one distinguishing feature exists as a convention, not a mechanism.
+2026-08-31 pending — agent:claude — added: dependency on TL-86 (the gate ticks off criteria, not just runs commands) and enumeration of false proofs in the `manual:` confirmation.
+2026-09-01 pending — agent:claude — HANDOFF FROM TL-86 (step 6). The linking mechanism is in place; `worktrail done` is to CONSUME it, not design it a second time. What you get ready-made in `scripts/criteria.mjs`: (1) `parseVerification(frontmatter)` → entries `{id, bash, manual}` plus a list of problems — an entry may have a stable `id:`, an unknown key FAILS, a duplicate `id` FAILS; (2) `parseCriteria(body)` → items `{text, checked, proofs}`, where `proofs` come from the `[proof: a, b]` marker at the end of the criterion line; (3) `auditTask({frontmatter, body, policy})` → `{errors, warnings}`; (4) `applyProofs(raw, passedIds)` → `{text, ticked}`, idempotent, ticks off ONLY criteria whose ALL proofs passed, and never unticks. WHAT THE GATE IS TO TICK OFF: criteria whose every referenced `verification` entry came out green — `applyProofs` computes this for you, save the returned text. WHAT IT IS TO REFUSE ON: (a) `auditTask(...).errors` non-empty — this means the link is BROKEN (a criterion references a nonexistent `id`), not merely missing; (b) a criterion that is STILL unticked after the run — this is the AC "a criterion without green proof blocks closing", and it counts the same for a criterion with no proof as for a criterion whose proof failed. WATCH THE MIGRATION: the default policy `criteria_links: warn` (config.yaml) means 69 current tasks have no links — if `done` refused on a missing link, NONE of them could be closed. The refusal follows the policy: under `warn` a missing link does not block, under `require` it does. A broken link ALWAYS blocks. `manual:` is already parsed and can be referenced by a criterion — its "passing" is your decision about confirmation, not mine.
+2026-09-01 pending — agent:claude — UNBLOCKED: TL-86 closed. `blocked_by` stays as a record of a dependency that was real — the reference guard counts `done` as existing, so there is no reason to erase the history to get green.
+2026-09-01 in_progress — agent:claude — taken; the only actionable P0 (TL-81 is a decision item, TL-48 is waiting on an owner).
+2026-09-01 in_progress — agent:claude — SEVEN DECISIONS FROM THE CONTEXT, each implemented and tested.
+  (1) EMPTY CONTRACT — a missing field, an empty list, and the `command to run` literal refuse with a "no closing contract" message, explicitly different from "verification failed"; a test compares both messages so they do not merge into one. The positive control on an empty `verification` is the first test in the file, because a gate that closes a task with no contract would pass every other test in this file.
+  (2) `manual:` — asks a human with an enumeration of what does NOT count as proof (presence of code, grep, intent of the implementation, "I checked" — including a true one). Confirmation requires typing the word `confirm`, not `y`: a consent that can be given with one finger on the way to something else is not a conscious act. It lands in the history as a new pseudo-field `__verified__` with the actor and the CONTENT of the entry — `diffMeta` will not see this, because the frontmatter does not change, so without its own event the one thing `manual:` has to offer instead of a command — WHO vouched — would leave no trace.
+  (3) NOTHING ELSE RUNS `verification` — the test iterates over `build`, `check`, `query`, `stats`, `viewer` and looks for the marker, PLUS a positive control that the same marker does fire under `done`. Without that second half the test would also pass if the marker fired nowhere at all.
+  (4) THE BOUNDARY IN THE README — "raises the cost of a lie, does not eliminate it", together with the reason there is no `--force`.
+  (5) REPOSITORY ROOT — `repoRootFor()` asks git (`rev-parse --show-toplevel`), and in its absence returns the backlog directory and says so in a comment. The test assumes a REAL repository and checks both layouts: nested and co-located. `join(root, "..")` would give, in the co-located layout, a directory ABOVE the repository.
+  (6) ENUMERATION INSTEAD OF A REQUEST — the content from Backlog.md goes straight into the prompt; the test asserts the presence of `grep` and "I checked" in the list, so shortening it fails.
+  (7) `--force` DOES NOT EXIST. The reason is not purist: the flag would not add a capability — manual editing of the file is available regardless — it would add something worse, namely a SUPPORTED, scriptable one-word bypass that ends up in a CI job where nobody will ever read it again. A bypass that costs a visible diff in review is the right price. Recorded in `--help`, in the README, and in the skill, so the absence of the flag is a decision, not an oversight.
+  DECISIONS OUTSIDE THE LIST: (a) the closing status comes from `archived_statuses`, NEVER from the literal "done" — a backlog that calls it `shipped` should work without a code change; `--status` selects a different archival status (e.g. `cancelled`), but always archival, because `done` closes, and moving to an open status is an edit, not a closing. (b) `--json` refuses to handle an unconfirmed `manual:` instead of injecting a prompt in the middle of the JSON — asking a human for consent when the output is parsed by a program is inherently inconsistent. (c) Refusals are also JSON (`reason`, `refusal`), because a script needs a machine-readable answer to "why not" more than to "yes". (d) Criteria without proof refuse BEFORE running anything (under `criteria_links: require`) — burning time on commands only to then reject the result answers nothing. After a green run there is an assertion-based safeguard against inconsistency between the runner and `applyProofs`: a criterion whose ALL proofs passed but was not ticked off is a tool defect and always refuses.
+  MANUALLY MEASURED on a fixture (a `verification` entry failing with code 4): `done` printed the command's output, exited with code 1, and the file was left with `status: pending` — this is exactly this task's own `manual:` entry, and I vouch for it on THIS observation, not on having read the code.
+2026-09-01 in_progress — agent:claude — the first attempt to close FAILED on its own `readme-limit` entry: the grep looked for the phrase "raises the *cost* of a lie" on a single line, but the sentence breaks in the README between "*cost*" and "of a lie". Recorded because this is exactly the kind of thing manually ticking a checkbox would let through — the README was correct, the proof was wrong, and without running it nobody would have known which of the two.
 2026-09-01 done — agent:claude — closed by `worktrail done`: 3 command(s) + 1 vouched-for entry green.

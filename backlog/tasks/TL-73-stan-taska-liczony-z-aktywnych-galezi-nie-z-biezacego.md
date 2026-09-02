@@ -1,10 +1,10 @@
 ---
 id: TL-73
-title: "Stan taska liczony z aktywnych gałęzi, nie z bieżącego checkoutu"
+title: "Task state computed from active branches, not from the current checkout"
 type: code
 labels: [post-launch]
 board: main
-epic: "Integralność danych"
+epic: "Data integrity"
 priority: P1
 status: done
 owner: agent:claude
@@ -17,80 +17,85 @@ blocks: []
 related_docs:
   - docs/worktrail-state-and-sync.md
 verification:
-  # Jeden wpis na CAŁY plik, nie po jednym na kryterium: każdy test w nim ma
-  # własną kontrolę pozytywną, a wzorzec nazwy, który nie trafia w żaden test,
-  # kończy się zielono i zerem testów — dowód bez mocy dowodowej.
+  # One entry for the WHOLE file, not one per criterion: every test in it has
+  # its own positive control, and a name pattern that matches no test ends up
+  # green with zero tests run — proof with no evidentiary force.
   - id: suite
     bash: "node --test scripts/tests/cross-branch-state.test.mjs"
   - id: no-regression
     bash: "node --test scripts/tests/*.test.mjs"
   - id: manual-two-branches
-    manual: "W repo z dwiema gałęziami, gdzie task jest `pending` na main i `in_progress` na feature: `worktrail query --status in_progress` z main pokazuje go i mówi, z której gałęzi pochodzi stan"
+    manual: "In a repo with two branches, where a task is `pending` on main and `in_progress` on feature: `worktrail query --status in_progress` from main shows it and says which branch the state comes from"
 ---
 
-## Cel
+## Goal
 
-`query`, `stats` i viewer pokazują stan taska widziany na WSZYSTKICH aktywnych
-gałęziach, nie tylko na bieżącym checkoucie — i mówią wprost, skąd stan
-pochodzi. Po tym tasku dwie sesje w dwóch worktree nie widzą dwóch różnych
-backlogów.
+`query`, `stats`, and the viewer show a task's state as seen across ALL active
+branches, not only the current checkout — and say explicitly where the state
+comes from. After this task, two sessions in two worktrees no longer see two
+different backlogs.
 
-## Kontekst
+## Context
 
-I prawo: dane jadą z gałęzią. To jest zaleta (task przechodzi przez review) i
-zarazem jedyna wada tego modelu: widok policzony z jednego checkoutu KŁAMIE o
-reszcie. Task ruszony na gałęzi `feature/x` jest na `main` wciąż `pending`, a
-`worktrail query --status pending` poda go jako wolny do wzięcia. Dokładnie ten
-tryb awarii, dla którego odrzuciliśmy zewnętrzne trackery, tylko odwrócony.
+Law I: data travels with the branch. This is an advantage (a task goes
+through review) and at the same time the sole weakness of this model: a view
+computed from a single checkout LIES about the rest. A task started on branch
+`feature/x` is still `pending` on `main`, and `worktrail query --status
+pending` will report it as free to take. Exactly the failure mode external
+trackers were rejected for, only inverted.
 
-Połowa maszynerii już istnieje i jest sprawdzona w boju: `next-backlog-id.mjs`
-skanuje `git worktree list` i `git for-each-ref refs/heads`, a taski czyta przez
-`git ls-tree` — właśnie po to, żeby nie przydzielić numeru zajętego gdzie
-indziej. Ten task uogólnia ten sam skan z „jakie numery są zajęte" na „jaki jest
-stan taska".
+Half the machinery already exists and is battle-tested: `next-backlog-id.mjs`
+scans `git worktree list` and `git for-each-ref refs/heads`, and reads tasks
+via `git ls-tree` — precisely so as not to assign a number already taken
+elsewhere. This task generalizes that same scan from "which numbers are taken"
+to "what is a task's state".
 
-Rozstrzygnięcia do podjęcia w trakcie, nie z góry:
+Decisions to be made along the way, not up front:
 
-1. **Co znaczy „aktywna" gałąź.** Backlog.md używa okna dni od ostatniego commita
-   (`activeBranchDays: 30`), z wyłącznikiem na wydajność. Bez okna skan rośnie
-   z liczbą martwych gałęzi w repo.
-2. **Konflikt stanów.** Gdy dwie gałęzie mają różny `status` tego samego taska,
-   narzędzie NIE wybiera zwycięzcy po cichu. Pokazuje oba i nazywa gałęzie.
-   Milczący wybór to ta sama klasa błędu co widok z jednego checkoutu.
-3. **Praca offline.** Skan czyta wyłącznie lokalne refy. Żadnego `git fetch` bez
-   jawnej zgody — narzędzie ma działać bez sieci.
+1. **What "active" branch means.** Backlog.md uses a day window since the last
+   commit (`activeBranchDays: 30`), with a performance kill switch. Without a
+   window the scan grows with the number of dead branches in the repo.
+2. **Conflicting states.** When two branches have a different `status` for the
+   same task, the tool does NOT silently pick a winner. It shows both and names
+   the branches. A silent choice is the same class of bug as a view from a
+   single checkout.
+3. **Offline work.** The scan reads only local refs. No `git fetch` without
+   explicit consent — the tool is meant to work without a network.
 
 ## Pre-flight reading
 
 1. `scripts/next-backlog-id.mjs:89-160` — `worktreeRoots()`, `localRefs()`,
-   `fromWorkingTree()`. To jest kod do wydzielenia, nie do napisania od nowa.
-2. `scripts/query.mjs` — gdzie dziś wchodzą taski i gdzie wpiąć drugie źródło.
-3. `docs/worktrail-state-and-sync.md` — co już rozstrzygnięto o synchronizacji
-   stanu; nie podważaj tego bez powodu.
+   `fromWorkingTree()`. This is code to extract, not to write anew.
+2. `scripts/query.mjs` — where tasks enter today and where to plug in the
+   second source.
+3. `docs/worktrail-state-and-sync.md` — what has already been decided about
+   state synchronization; do not second-guess it without reason.
 
-## Kroki
+## Steps
 
-1. Wydziel skan gałęzi/worktree z `next-backlog-id.mjs` do wspólnego modułu
-   (`scripts/branch-scan.mjs`), bez zmiany zachowania `next-id`.
-2. Dołóż czytanie frontmattera tasków z każdej aktywnej gałęzi (`git ls-tree` +
-   `git show`), z oknem czasowym z configu.
-3. Klucze konfiguracji w warstwie projektu: okno w dniach i wyłącznik skanu.
-   Nieznany klucz oblewa (III prawo) — nie dokładaj warstwy priorytetów.
-4. `query` i `stats`: gdy stan na innej gałęzi różni się od lokalnego, pokaż oba
-   i nazwij gałąź. Bez skanu (poza repo git) zachowanie jak dziś, z komunikatem.
-5. Viewer: ten sam sygnał, ta sama definicja różnicy.
-6. `scripts/tests/cross-branch-state.test.mjs` — fixture z dwiema gałęziami i
-   rozbieżnym statusem. Test MUSI oblewać, gdy skan zwraca tylko lokalny stan.
+1. Extract the branch/worktree scan from `next-backlog-id.mjs` into a shared
+   module (`scripts/branch-scan.mjs`), without changing `next-id`'s behavior.
+2. Add reading of task frontmatter from each active branch (`git ls-tree` +
+   `git show`), with the time window from config.
+3. Configuration keys in the project layer: the window in days and the scan
+   kill switch. An unknown key fails (Law III) — do not add a priority layer.
+4. `query` and `stats`: when the state on another branch differs from the
+   local one, show both and name the branch. Without the scan (outside a git
+   repo) behave as today, with a message.
+5. Viewer: the same signal, the same definition of a difference.
+6. `scripts/tests/cross-branch-state.test.mjs` — a fixture with two branches
+   and a diverging status. The test MUST fail when the scan returns only the
+   local state.
 
 ## Acceptance criteria
 
-- [x] Skan gałęzi i worktree jest w jednym module, używanym przez `next-id` i przez odczyt stanu. [proof: suite]
-- [x] Rozbieżny status jest pokazany z nazwą gałęzi, nigdy rozstrzygnięty po cichu. [proof: suite, manual-two-branches]
-- [x] Okno aktywności i wyłącznik skanu są kluczami konfiguracji projektu. [proof: suite]
-- [x] Żadna ścieżka nie robi `git fetch` bez jawnej zgody użytkownika. [proof: suite]
-- [x] Poza repozytorium git komenda działa i mówi, że stan jest tylko lokalny. [proof: suite]
-- [x] Test ma fixture z realną rozbieżnością między gałęziami. [proof: suite, no-regression]
+- [x] The branch and worktree scan is in one module, used by both `next-id` and by state reading. [proof: suite]
+- [x] A diverging status is shown with the branch name, never resolved silently. [proof: suite, manual-two-branches]
+- [x] The activity window and the scan kill switch are project configuration keys. [proof: suite]
+- [x] No path does a `git fetch` without the user's explicit consent. [proof: suite]
+- [x] Outside a git repository the command works and says the state is local only. [proof: suite]
+- [x] The test has a fixture with a real divergence between branches. [proof: suite, no-regression]
 
 ## Log
 
-2026-08-31 pending — agent:claude — założony z analizy Backlog.md (github.com/MrLesk/Backlog.md), punkt 2 (`checkActiveBranches`).
+2026-08-31 pending — agent:claude — created from analysis of Backlog.md (github.com/MrLesk/Backlog.md), point 2 (`checkActiveBranches`).

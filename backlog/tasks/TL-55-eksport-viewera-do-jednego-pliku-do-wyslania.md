@@ -1,6 +1,6 @@
 ---
 id: TL-55
-title: "Eksport viewera do jednego pliku do wysłania"
+title: "Viewer export to a single file for sending"
 type: task
 labels: [post-launch]
 board: main
@@ -17,73 +17,85 @@ blocks: []
 related_docs:
   - .claude/skills/worktrail-viewer/SKILL.md
 verification:
-  - bash: "d=$(mktemp -d) && node scripts/cli.mjs export --out \"$d/backlog.html\" >/dev/null && test -s \"$d/backlog.html\" && echo 'eksport powstaje — OK'"
-  - bash: "d=$(mktemp -d) && node scripts/cli.mjs export --out \"$d/backlog.html\" >/dev/null && grep -q 'localhost\\|127.0.0.1\\|EventSource' \"$d/backlog.html\" && { echo 'eksport odwołuje się do serwera'; exit 1; }; echo 'eksport samodzielny — OK'"
-  - manual: "Plik wysłany osobie bez terminala: otwiera się dwuklikiem, filtry i wyszukiwanie działają, edycja jest wyraźnie niedostępna."
+  - bash: "d=$(mktemp -d) && node scripts/cli.mjs export --out \"$d/backlog.html\" >/dev/null && test -s \"$d/backlog.html\" && echo 'export is produced — OK'"
+  - bash: "d=$(mktemp -d) && node scripts/cli.mjs export --out \"$d/backlog.html\" >/dev/null && grep -q 'localhost\\|127.0.0.1\\|EventSource' \"$d/backlog.html\" && { echo 'export references a server'; exit 1; }; echo 'export is self-contained — OK'"
+  - manual: "File sent to someone with no terminal: opens with a double-click, filtering and search work, editing is clearly unavailable."
 ---
 
-## Cel
+## Goal
 
-Dać nietechnicznemu odbiorcy backlog **bez terminala**: jeden plik, który da się
-wysłać, otworzyć dwuklikiem i przefiltrować.
+Give a non-technical recipient the backlog **without a terminal**: a single
+file that can be sent, opened with a double-click, and filtered.
 
-## Kontekst
+## Context
 
-Viewer jest już samodzielny — `build-viewer.mjs` osadza wszystkie dane w jednym
-pliku HTML, bez pobierania czegokolwiek w trakcie działania, więc działa przez
-`file://`. Brakuje **drogi do niego dla kogoś, kto nie ma terminala**:
-`backlog/viewer.html` jest gitignorowany (i słusznie — to agregat wszystkich
-tasków, więc wersjonowany konfliktowałby przy rozłącznych zmianach), a jedyne
-wejście to `worktrail serve`, czyli polecenie w powłoce.
+The viewer is already self-contained — `build-viewer.mjs` embeds all data in
+a single HTML file, fetching nothing at runtime, so it works over `file://`.
+What is missing is **a way to get it to someone without a terminal**:
+`backlog/viewer.html` is gitignored (rightly so — it is an aggregate of every
+task, so versioning it would conflict on disjoint changes), and the only
+entry point is `worktrail serve`, which is a shell command.
 
-Skutek jest taki, że analityk albo menedżer musi kogoś poprosić o uruchomienie
-serwera. To jest dokładnie ta rola, dla której przeglądarkowy widok w ogóle
-powstał.
+The consequence is that an analyst or a manager has to ask someone to start
+the server. That is exactly the role the browser view was built for in the
+first place.
 
-**Co trzeba rozstrzygnąć, zanim to powstanie — dlatego `confidence: low`:**
+**What needs to be settled before this can be built — hence `confidence:
+low`:**
 
-1. **Czy eksport jest tylko do odczytu.** Viewer potrafi edytować pola i zapisuje
-   historię z aktorem. Plik wysłany mailem nie ma dokąd zapisać; przyciski, które
-   nic nie robią, są gorsze od ich braku. Prawdopodobnie eksport = tryb tylko do
-   odczytu, z widocznym oznaczeniem, i to jest decyzja produktowa, nie techniczna.
-2. **Znacznik czasu.** Plik jest zdjęciem stanu z konkretnej chwili i po tygodniu
-   kłamie. Data budowy musi być widoczna w samym dokumencie, nie w nazwie pliku,
-   bo nazwa nie przeżyje przesłania dalej.
-3. **Co się w nim znajdzie.** Wysłanie całego backlogu bywa niepożądane. Eksport
-   powinien przyjmować te same filtry co `query`, żeby dało się wysłać przekrój,
-   a nie wszystko.
+1. **Whether the export is read-only.** The viewer can edit fields and writes
+   history with an actor. A file sent by email has nowhere to write to;
+   buttons that do nothing are worse than not having them. The export is
+   probably a read-only mode, visibly marked as such, and that is a product
+   decision, not a technical one.
+2. **A timestamp.** The file is a snapshot of a state at a specific moment,
+   and after a week it lies. The build date must be visible in the document
+   itself, not in the filename, because the filename will not survive being
+   forwarded.
+3. **What ends up in it.** Sending the whole backlog is sometimes unwanted.
+   The export should accept the same filters as `query`, so a slice can be
+   sent instead of everything.
 
-Alternatywa, którą warto rozważyć zamiast eksportu ręcznego: publikacja na
-GitHub Pages z CI. Nie wyklucza się z tym taskiem — obie drogi używają tego samego
-generatora — ale ma inną cenę (backlog staje się publiczny) i dlatego jest osobną
-decyzją, nie krokiem tutaj.
+An alternative worth considering instead of a manual export: publishing to
+GitHub Pages via CI. It does not rule out this task — both paths use the same
+generator — but it has a different price (the backlog becomes public), and so
+it is a separate decision, not a step here.
 
 ## Pre-flight reading
 
-1. `scripts/build-viewer.mjs` — `buildHtml()`; strona już jest samodzielna.
-2. `scripts/serve-backlog.mjs` — co dokłada serwer (SSE, zapisy) i co musi zniknąć w eksporcie.
-3. `.claude/skills/worktrail-viewer/SKILL.md` — jeden renderer; eksport nie może być drugą kopią szablonu.
-4. `scripts/query.mjs` — kontrakt filtrów do ponownego użycia.
+1. `scripts/build-viewer.mjs` — `buildHtml()`; the page is already
+   self-contained.
+2. `scripts/serve-backlog.mjs` — what the server adds (SSE, writes) and what
+   must disappear in the export.
+3. `.claude/skills/worktrail-viewer/SKILL.md` — one renderer; the export must
+   not be a second copy of the template.
+4. `scripts/query.mjs` — the filter contract to reuse.
 
-## Kroki
+## Steps
 
-1. `worktrail export --out <plik>` na tym samym generatorze co `viewer` i `serve`. Nie druga ścieżka renderowania.
-2. Tryb tylko do odczytu: bez edytorów pól, bez SSE, bez odwołań do `127.0.0.1`. Widoczna informacja, że to migawka.
-3. Data i godzina budowy w nagłówku dokumentu.
-4. Filtry `query` jako opcjonalne zawężenie eksportu.
-5. Test: eksport powstaje, nie zawiera odwołań do serwera, zawiera datę budowy.
-6. README: jedno zdanie o tym, jak wysłać backlog komuś, kto nie otwiera terminala.
+1. `worktrail export --out <file>` on the same generator as `viewer` and
+   `serve`. Not a second rendering path.
+2. Read-only mode: no field editors, no SSE, no references to `127.0.0.1`.
+   Visible notice that this is a snapshot.
+3. Build date and time in the document header.
+4. `query` filters as an optional narrowing of the export.
+5. Test: the export is produced, contains no server references, contains the
+   build date.
+6. README: one sentence on how to send the backlog to someone who does not
+   open a terminal.
 
 ## Acceptance criteria
 
-- [ ] `worktrail export --out <plik>` daje jeden samodzielny plik HTML.
-- [ ] Plik nie odwołuje się do serwera ani nie pokazuje nieczynnych edytorów.
-- [ ] Data budowy widoczna w dokumencie.
-- [ ] Eksport przyjmuje filtry `query`.
-- [ ] Ten sam generator co `viewer` i `serve`.
+- [ ] `worktrail export --out <file>` produces a single self-contained HTML
+      file.
+- [ ] The file does not reference a server or show inactive editors.
+- [ ] The build date is visible in the document.
+- [ ] The export accepts `query` filters.
+- [ ] The same generator as `viewer` and `serve`.
 
 ## Log
 
-Append-only. Format: `YYYY-MM-DD status — kto — notatka`.
+Append-only. Format: `YYYY-MM-DD status — who — note`.
 
-- 2026-08-31 created — agent:claude — z audytu ścieżki dla ról nietechnicznych
+- 2026-08-31 created — agent:claude — from the audit of the path for
+  non-technical roles

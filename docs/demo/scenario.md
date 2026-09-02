@@ -1,52 +1,54 @@
-# Demo pierwszego kontaktu — 60 sekund
+# First-contact demo — 60 seconds
 
-Skrypt nagrania, które wisi w nagłówku README. **To jest plik wykonywalny w
-sensie dosłownym**: `scripts/tests/demo-scenario.test.mjs` odtwarza poniższe
-komendy przy każdym uruchomieniu testów i oblewa, jeśli CLI przestało zachowywać
-się tak, jak opisuje ten dokument. Screenshot gnije po cichu; ten scenariusz nie.
+The script for the recording that sits in the README's header. **This file
+is executable in the literal sense**:
+`scripts/tests/demo-scenario.test.mjs` replays the commands below on every
+test run and fails if the CLI stops behaving the way this document describes.
+A screenshot rots silently; this scenario does not.
 
-## Co ma zobaczyć widz
+## What the viewer should see
 
-Jedną scenę, której nie da się nagrać żadnym innym narzędziem z tej kategorii:
-**`worktrail done` ODMAWIA zamknięcia taska**, bo jego własna weryfikacja oblała.
-Pokazuje wyjście testu, zostawia plik nietknięty i mówi to wprost. Dopiero po
-naprawie kodu to samo wywołanie przechodzi i samo odhacza kryterium.
+One scene that no other tool in this category can record: **`worktrail done`
+REFUSES to close a task**, because its own verification failed. It shows the
+test's output, leaves the file untouched, and says so outright. Only after
+the code is fixed does the same call succeed and tick the criterion itself.
 
-Kolejność jest odwrotna niż w typowym demo — **porażka najpierw**. Sukces bez
-poprzedzającej odmowy wygląda jak każdy inny tracker.
+The order is the reverse of a typical demo — **failure comes first**. Success
+with no preceding refusal looks like every other tracker.
 
-Wszystko, co widać na ekranie — komendy, komentarze, treść taska — jest po
-angielsku. Nagranie jedzie do cudzych repozytoriów, tak jak reszta powierzchni
-publicznej.
+Everything visible on screen — commands, comments, task content — is in
+English. The recording travels into other people's repositories, like the
+rest of the public surface.
 
-## Warunki nagrania
+## Recording conditions
 
-- Świeży, pusty katalog z `git init` — widz ma zobaczyć start od zera.
-- Binarka `worktrail` na `PATH` (`npm link` albo instalacja globalna). Na
-  nagraniu nie może pojawić się `node …/scripts/cli.mjs` — to ścieżka
-  developerska, nie sposób użycia narzędzia.
-- Prompt skrócony do jednego znaku; szeroki terminal (min. 100 kolumn), żeby
-  czerwony blok odmowy nie zawijał się w połowie zdania.
+- A fresh, empty directory with `git init` — the viewer should see a start
+  from zero.
+- The `worktrail` binary on `PATH` (`npm link` or a global install). The
+  recording must never show `node …/scripts/cli.mjs` — that is a developer
+  path, not how the tool is used.
+- The prompt shortened to one character; a wide terminal (min. 100 columns),
+  so the red refusal block does not wrap mid-sentence.
 
-## Scenariusz
+## Scenario
 
-### Scena 0 — start od zera (ok. 8 s)
+### Scene 0 — start from zero (~8 s)
 
 ```bash
 mkdir parser && cd parser && git init -q
 worktrail init --dir ./backlog
 ```
 
-Oczekiwane: lista utworzonych katalogów i jedna linia `next:`.
+Expected: a list of created directories and one `next:` line.
 
-### Scena 1 — task, który obiecuje dowód (ok. 12 s)
+### Scene 1 — a task that promises proof (~12 s)
 
 ```bash
 worktrail new --title "Parser accepts an empty file"
 ```
 
-W wygenerowanym pliku podmieniamy dwie rzeczy z szablonu — i to jest jedyna
-edycja ręczna w całym nagraniu:
+In the generated file we swap two things from the template — the only
+manual edit in the whole recording:
 
 ```yaml
 verification:
@@ -58,11 +60,12 @@ verification:
 - [ ] `parse("")` returns no rows. [proof: empty-file]
 ```
 
-oraz `status: in_progress`.
+and `status: in_progress`.
 
-To jest cały kontrakt: kryterium wskazuje wpis weryfikacji, który je udowadnia.
+That is the whole contract: the criterion points to the verification entry
+that proves it.
 
-### Scena 2 — kod, który „prawie" działa (ok. 8 s)
+### Scene 2 — code that "almost" works (~8 s)
 
 `parse.mjs`:
 
@@ -85,16 +88,16 @@ test("an empty file parses to no rows", () => {
 });
 ```
 
-Pusty tekst rozpada się na jedną pustą linię. Błąd jednoznaczny i mieszczący się
-na ekranie — nie o niego tu chodzi.
+Empty text splits into one empty line. The bug is unambiguous and fits on
+screen — it is not the point here.
 
-### Scena 3 — ODMOWA (ok. 18 s, to jest cała pointa)
+### Scene 3 — REFUSAL (~18 s, this is the whole point)
 
 ```bash
 worktrail done TASK-2
 ```
 
-Oczekiwane wyjście, w tej kolejności:
+Expected output, in this order:
 
 ```
   TASK-2 — 1 verification entry, run in /…/parser
@@ -110,13 +113,14 @@ Oczekiwane wyjście, w tej kolejności:
   The task file was NOT touched — its status is still `in_progress`.
 ```
 
-Kod wyjścia: **niezerowy**. Trzy rzeczy muszą być czytelne na stopklatce:
-komenda, która oblała, wyjście prawdziwego testu, i zdanie o nietkniętym pliku.
-Ta ostatnia linia jest tezą całego narzędzia — status nie jest deklaracją.
+Exit code: **non-zero**. Three things must be legible on the freeze frame:
+the command that failed, the real test's output, and the sentence about the
+untouched file. That last line is the whole tool's thesis — status is not a
+declaration.
 
-Jeśli nagranie ma mieć jedną klatkę w miniaturze GIF-a, to jest ta klatka.
+If the recording gets one frame in the GIF thumbnail, this is it.
 
-### Scena 4 — naprawa i zielone zamknięcie (ok. 14 s)
+### Scene 4 — the fix and a green close (~14 s)
 
 ```js
 export function parse(text) {
@@ -129,7 +133,7 @@ export function parse(text) {
 worktrail done TASK-2
 ```
 
-Oczekiwane:
+Expected:
 
 ```
   1/1  empty-file  bash: node --test parse.test.mjs
@@ -139,20 +143,20 @@ Oczekiwane:
     ticked 1 criterion from the run
 ```
 
-### Scena 5 — kto to odhaczył (ok. 6 s)
+### Scene 5 — who ticked it (~6 s)
 
 ```bash
 git diff --stat
 ```
 
-Kryterium jest odhaczone `[x]`, w `## Log` przybyła linia, a wpis w
-`backlog/history/` mówi kto i czym. Nikt nie kliknął „done".
+The criterion is ticked `[x]`, `## Log` has a new line, and the entry in
+`backlog/history/` says who and by what. Nobody clicked "done".
 
-## Poza kadrem
+## Out of frame
 
-- Żadnego tour po komendach. `query`, `stats`, viewer — nie w tym nagraniu.
-- Żadnego przyspieszania w scenie 3; widz ma zdążyć przeczytać odmowę.
-- Pliki nagrania (`.cast`, `.gif`) **nie jadą w paczce npm** — `files` w
-  `package.json` jest listą dozwoleń i nie zawiera `docs/`. Z tego samego powodu
-  odnośnik w README musi być URL-em absolutnym: README jedzie w tarballu, a
-  ścieżka względna byłaby tam martwa.
+- No tour of commands. `query`, `stats`, the viewer — not in this recording.
+- No speeding up scene 3; the viewer needs time to read the refusal.
+- The recording files (`.cast`, `.gif`) **do not ship in the npm package** —
+  `files` in `package.json` is an allowlist and does not include `docs/`.
+  For the same reason the link in the README must be an absolute URL: the
+  README ships in the tarball, and a relative path would be dead there.

@@ -1,10 +1,10 @@
 ---
 id: TL-89
-title: "Komentarz PR z dowodami pracy: GitHub Action"
+title: "PR comment with proof of work: GitHub Action"
 type: task
 labels: []
 board: main
-epic: "Wyróżniki agentowe"
+epic: "Agentic differentiators"
 priority: P2
 status: pending
 owner: unassigned
@@ -21,83 +21,93 @@ verification:
   - bash: "node --test scripts/tests/pr-summary.test.mjs"
 ---
 
-## Cel
+## Goal
 
-`worktrail pr-summary --base main` wypisuje (markdown na stdout) podsumowanie
-tasków, których dotyka bieżąca gałąź: przejścia statusów, autora zmian per pole
-(człowiek vs `agent:`), a gdy dane pomiaru istnieją — estymatę kontra czas i
-tokeny. Cienki workflow GitHub Actions publikuje to jako komentarz PR.
+`worktrail pr-summary --base main` prints (markdown to stdout) a summary of
+the tasks the current branch touches: status transitions, per-field change
+authorship (human vs `agent:`), and — when measurement data exists — estimate
+versus time and tokens. A thin GitHub Actions workflow publishes this as a PR
+comment.
 
-Efekt: recenzent widzi w PR nie tylko diff kodu, ale diff backlogu i rachunek
-pracy agenta — a każdy PR konsumenta jest reklamą narzędzia w cudzym repo.
-Task jedzie z gałęzią (Prawo 1), więc tylko narzędzie o tej architekturze może
-to zrobić bez integracji z zewnętrznym trackerem.
+Effect: the reviewer sees not just the code diff in the PR, but the backlog
+diff and the agent's work accounting — and every consumer's PR becomes an
+advertisement for the tool inside someone else's repository. The task travels
+with the branch (Law 1), so only a tool with this architecture can do this
+without integrating with an external tracker.
 
-## Kontekst
+## Context
 
-Powstało z przeglądu wyróżników wobec Backlog.md (2026-08-31).
+Came out of a review of differentiators against Backlog.md (2026-08-31).
 
-Podział odpowiedzialności jest tu decyzją, nie szczegółem:
-- **Cała inteligencja w komendzie CLI** — `git diff --name-only <base>...HEAD
-  -- <backlog>/tasks/` daje listę tasków, `history/` daje przejścia i aktorów,
-  `activity/rollup/` (gdy istnieje po TL-27/25) daje czas i tokeny.
-- **Action jest głupi** — checkout, `npx worktrail pr-summary`, komentarz.
-  Zgodnie z Prawem 4 (rozszerzalność przez kompozycję): Action to skrypt nad
-  stabilnym wyjściem, nie wtyczka. Ta sama komenda działa w GitLab CI czy
-  hooku bez ani jednej zmiany.
+The split of responsibilities is a decision here, not a detail:
+- **All the intelligence lives in the CLI command** — `git diff --name-only
+  <base>...HEAD -- <backlog>/tasks/` gives the list of tasks, `history/` gives
+  transitions and actors, `activity/rollup/` (once it exists, after
+  TL-27/25) gives time and tokens.
+- **The Action is dumb** — checkout, `npx worktrail pr-summary`, comment. Per
+  Law 4 (extensibility through composition): the Action is a script over a
+  stable output, not a plugin. The same command works in GitLab CI or a hook
+  with no change at all.
 
-Sekcje czasu/tokenów są WARUNKOWE: brak danych pomiaru = sekcji nie ma. Nie
-blokować tego taska na fazach pomiaru — przejścia statusów i atrybucja per pole
-są wartościowe same i istnieją już dziś w `history/`.
+The time/token sections are CONDITIONAL: no measurement data means no
+section. Do not block this task on the measurement phases — status
+transitions and per-field attribution are valuable on their own and already
+exist today in `history/`.
 
-**Koszt w komentarzu PR jest opt-in.** Komentarz trafia do miejsca publicznego
-(albo firmowego z szeroką widocznością), a kwoty, liczby tokenów i nazwy modeli
-to informacja o wydatkach i stacku autora. Domyślnie sekcja pomiaru pokazuje
-czas; tokeny, model i kwotę włącza dopiero `--cost`. Kwota podlega przy tym
-trybom rozliczenia z TL-30 (krok 4): dane z abonamentu (Claude Code, Codex)
-dają tokeny bez kwoty, model lokalny — zadeklarowane zero; komentarz nie
-zmyśla dolarów tam, gdzie ich nie ma.
+**The cost information in the PR comment is opt-in.** The comment lands in a
+public place (or a company-wide visible one), and amounts, token counts and
+model names are information about the author's spend and stack. By default
+the measurement section shows time; tokens, model and amount are only turned
+on by `--cost`. The amount is then subject to the billing modes from TL-30
+(step 4): subscription-based data (Claude Code, Codex) gives tokens without
+an amount, a local model — a declared zero; the comment does not invent
+dollar figures where none exist.
 
 ## Pre-flight reading
 
 - [docs/backlog-field-editing-history.md](../../docs/backlog-field-editing-history.md)
-  — format wpisu historii, przestrzenie aktorów, czego atrybucja nie
-  gwarantuje (§4) — komentarz nie może obiecywać więcej niż dane.
+  — history record format, actor namespaces, what attribution does NOT
+  guarantee (§4) — the comment cannot promise more than the data supports.
 - [docs/worktrail-state-and-sync.md](../../docs/worktrail-state-and-sync.md) §2 —
-  dlaczego widoki nie są wersjonowane; pr-summary czyta taski i historię,
-  nigdy `INDEX.yaml`.
-- `scripts/history.mjs` — odczyt i dedup wpisów.
+  why views are not versioned; pr-summary reads tasks and history, never
+  `INDEX.yaml`.
+- `scripts/history.mjs` — reading and deduplicating entries.
 
-## Kroki
+## Steps
 
-1. Komenda `pr-summary`: taski dotknięte względem `--base` (git diff po
-   ścieżkach `tasks/`), per task: przejścia statusów z zakresu gałęzi, udział
-   aktorów w zmianach pól, wynik `verification:` jeśli zapisany.
-2. Sekcja pomiaru (warunkowa): estymata vs engaged time z rollupu; tokeny,
-   model i kwota dopiero pod `--cost`, z zachowaniem trybów rozliczenia.
-3. Wyjścia: markdown (domyślne) i `--json`.
-4. Szablon workflow w repo (`.github/workflows/` przykład w README lub
-   `examples/`), publikujący komentarz z aktualizacją w miejscu (nie nowy
-   komentarz na każdy push).
-5. Testy na repozytorium tymczasowym z gałęzią: dotknięte taski wykryte,
-   nietknięte pominięte; kontrola pozytywna — gałąź bez zmian w `tasks/` daje
-   jawne „brak tasków", nie pusty komentarz.
+1. `pr-summary` command: tasks touched relative to `--base` (git diff over
+   `tasks/` paths), per task: status transitions within the branch range,
+   actor share of field changes, `verification:` result if recorded.
+2. Measurement section (conditional): estimate vs engaged time from the
+   rollup; tokens, model and amount only under `--cost`, respecting the
+   billing modes.
+3. Outputs: markdown (default) and `--json`.
+4. A workflow template in the repo (`.github/workflows/` example in README
+   or `examples/`), publishing a comment that updates in place (not a new
+   comment on every push).
+5. Tests on a temporary repository with a branch: touched tasks detected,
+   untouched ones skipped; positive control — a branch with no changes under
+   `tasks/` gives an explicit "no tasks", not an empty comment.
 
 ## Acceptance criteria
 
-- [ ] Wykrywanie tasków po diffie gita, nie po żadnym widoku wyliczonym.
-- [ ] Sekcje czasu/tokenów znikają w całości przy braku danych — żadnych zer.
-- [ ] Bez `--cost` wyjście nie zawiera tokenów, kwot ani nazw modeli.
-- [ ] Wyjście markdown renderuje się poprawnie jako komentarz GitHuba
-      (sprawdzone na realnym PR przed zamknięciem).
-- [ ] Komenda działa bez GitHuba (stdout) — Action jest tylko transportem.
+- [ ] Task detection via git diff, not via any computed view.
+- [ ] The time/token sections disappear entirely when there is no data — no
+      zeros.
+- [ ] Without `--cost`, the output contains no tokens, amounts or model
+      names.
+- [ ] The markdown output renders correctly as a GitHub comment (checked on a
+      real PR before closing).
+- [ ] The command works without GitHub (stdout) — the Action is only the
+      transport.
 
 ## Log
 
-Append-only. Format: `YYYY-MM-DD status — kto — notatka`.
+Append-only. Format: `YYYY-MM-DD status — who — note`.
 
-- 2026-08-31 pending — agent:claude — task założony z przeglądu wyróżników
-  agentowych; sekcja pomiarowa celowo warunkowa zamiast blokady na TL-27/25.
-- 2026-08-31 revised — agent:claude — sekcja kosztów opt-in (`--cost`):
-  komentarz jest publiczny, a tokeny/model/kwota to informacja o wydatkach
-  i stacku; kwoty wg trybów rozliczenia z TL-30.
+- 2026-08-31 pending — agent:claude — task opened from a review of agentic
+  differentiators; the measurement section is deliberately conditional
+  instead of blocking on TL-27/25.
+- 2026-08-31 revised — agent:claude — cost section made opt-in (`--cost`):
+  the comment is public, and tokens/model/amount are information about spend
+  and stack; amounts follow the billing modes from TL-30.

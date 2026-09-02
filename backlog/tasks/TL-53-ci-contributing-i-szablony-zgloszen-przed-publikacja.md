@@ -1,10 +1,10 @@
 ---
 id: TL-53
-title: "CI, CONTRIBUTING i szablony zgłoszeń przed publikacją"
+title: "CI, CONTRIBUTING and issue templates before publication"
 type: task
 labels: [pre-launch]
 board: main
-epic: "Backlog — publikacja open source"
+epic: "Backlog — open source publication"
 priority: P2
 status: pending
 owner: unassigned
@@ -17,69 +17,79 @@ blocks: []
 related_docs:
   - .claude/skills/worktrail-release/SKILL.md
 verification:
-  - bash: "ls .github/workflows/*.yml >/dev/null 2>&1 && echo 'workflow jest — OK'"
-  - bash: "test -f CONTRIBUTING.md && echo 'CONTRIBUTING jest — OK'"
-  - bash: "grep -q 'node --test' .github/workflows/*.yml && grep -q 'cli.mjs check' .github/workflows/*.yml && echo 'CI odpala testy i guardy — OK'"
-  - manual: "Zielony przebieg widoczny publicznie przy pierwszym pushu; badge w README prowadzi do niego."
+  - bash: "ls .github/workflows/*.yml >/dev/null 2>&1 && echo 'workflow present — OK'"
+  - bash: "test -f CONTRIBUTING.md && echo 'CONTRIBUTING present — OK'"
+  - bash: "grep -q 'node --test' .github/workflows/*.yml && grep -q 'cli.mjs check' .github/workflows/*.yml && echo 'CI runs the tests and guards — OK'"
+  - manual: "A green run is publicly visible on the first push; the badge in README links to it."
 ---
 
-## Cel
+## Goal
 
-Zamienić „263 testy przechodzą" z twierdzenia autora w zielony znacznik, który
-widzi ktoś obcy — i powiedzieć wprost, jak wygląda dobra kontrybucja.
+Turn "263 tests pass" from an author's claim into a green badge that a
+stranger can see — and say plainly what a good contribution looks like.
 
-## Kontekst
+## Context
 
-Stan 2026-08-31: brak `.github/`, brak workflow, brak `CONTRIBUTING.md`, brak
-`CHANGELOG.md`, brak zdalnego repozytorium. Zestaw testów jest mocny (263 testy,
-zielony, ~2.4 s, bez zależności) — po prostu nikt poza autorem nie ma jak tego
-zobaczyć.
+State on 2026-08-31: no `.github/`, no workflow, no `CONTRIBUTING.md`, no
+`CHANGELOG.md`, no remote repository. The test suite is strong (263 tests,
+green, ~2.4s, no dependencies) — nobody but the author has any way to see
+that.
 
-Dla dewelopera oceniającego nieznane narzędzie kolejność wygląda tak: strona
-repozytorium → czy jest zielone CI → README → kod. Zielony przebieg jest
-najtańszym sygnałem zaufania, jaki ten projekt może kupić, bo praca, która za nim
-stoi, **już jest zrobiona**.
+For a developer evaluating an unfamiliar tool, the order looks like this:
+repository page → is CI green → README → code. A green run is the cheapest
+signal of trust this project can buy, because the work behind it **is
+already done**.
 
-Dwie rzeczy do rozstrzygnięcia przy okazji, bo obie są deklaracjami, których
-potem trzeba dotrzymać:
+Two things to settle along the way, because both are commitments that will
+later have to be honored:
 
-- **Czy przyjmujemy pull requesty**, i jeśli tak, to na jakich zasadach. Brak
-  odpowiedzi też jest odpowiedzią, tylko udzieloną przez ciszę.
-- **Matryca wersji Node.** `engines` mówi `>=18`; jeśli CI testuje tylko jedną
-  wersję, to `>=18` jest niesprawdzone. Albo mierzymy, albo zawężamy deklarację.
+- **Whether we accept pull requests**, and if so, under what terms. No
+  answer is also an answer, just one given by silence.
+- **The Node version matrix.** `engines` says `>=18`; if CI only tests one
+  version, `>=18` is unverified. Either we measure it, or we narrow the
+  declaration.
 
-Wąska korzyść, o której łatwo zapomnieć: CI jest jedynym miejscem, gdzie testy
-lecą **w układzie niekolokowanym** — na świeżym klonie, z pustym cachem, bez
-wygenerowanych widoków. Dokładnie ta różnica złapała klasę błędów opisaną w
-`scripts/tests/non-colocated-layout.test.mjs`.
+A narrow benefit that is easy to forget: CI is the only place where tests run
+in the **non-co-located** layout — on a fresh clone, with an empty cache, with
+no generated views. Exactly the difference that caught the class of bugs
+described in `scripts/tests/non-colocated-layout.test.mjs`.
 
 ## Pre-flight reading
 
-1. `scripts/tests/_repo.mjs` — dlaczego testy nie mogą zakładać jednego układu katalogów.
-2. `.gitignore` — widoki są generowane; świeży klon ich nie ma i CI to potwierdza.
-3. `.claude/skills/worktrail-release/SKILL.md` §8 — czego szuka obcy deweloper.
+1. `scripts/tests/_repo.mjs` — why the tests cannot assume a single directory layout.
+2. `.gitignore` — views are generated; a fresh clone has none and CI confirms it.
+3. `.claude/skills/worktrail-release/SKILL.md` §8 — what an outside developer looks for.
 
-## Kroki
+## Steps
 
-1. `.github/workflows/test.yml`: `node --test scripts/tests/*.test.mjs` plus `node scripts/cli.mjs check` na świeżym klonie. Bez `npm install` — zależności nie ma i CI ma to udowadniać.
-2. Matryca wersji Node zgodna z `engines` (18 / 20 / 22), na Linuksie i macOS.
-3. Krok `npm pack --dry-run` z asercją, że w tarballu nie ma `tasks/`, `history/`, `archive/`, `boards/`, `config.yaml`, `viewer.html`. Lista dozwoleń, która nie jest sprawdzana, obowiązuje do pierwszej pomyłki.
-4. `CONTRIBUTING.md`: jak uruchomić testy, czym jest backlog tego repozytorium, że narzędzie śledzi samo siebie, i co musi mieć zmiana (test, aktualizacja pomocy, `worktrail check`).
-5. Badge w README.
-6. Szablony zgłoszeń: błąd (z wersją, systemem, wyjściem `worktrail --version`) i propozycja funkcji.
-7. Zdecyduj o `CHANGELOG.md` — ręczny czy generowany z tagów.
+1. `.github/workflows/test.yml`: `node --test scripts/tests/*.test.mjs` plus
+   `node scripts/cli.mjs check` on a fresh clone. No `npm install` — there
+   are no dependencies, and CI is meant to prove that.
+2. Node version matrix matching `engines` (18 / 20 / 22), on Linux and macOS.
+3. An `npm pack --dry-run` step with an assertion that the tarball does not
+   contain `tasks/`, `history/`, `archive/`, `boards/`, `config.yaml`,
+   `viewer.html`. An allowlist that is not checked holds only until the
+   first mistake.
+4. `CONTRIBUTING.md`: how to run the tests, what this repository's backlog
+   is, that the tool tracks itself with itself, and what a change must
+   carry (a test, a help update, `worktrail check`).
+5. Badge in the README.
+6. Issue templates: bug report (with version, system, `worktrail --version`
+   output) and feature request.
+7. Decide on `CHANGELOG.md` — hand-written or generated from tags.
 
 ## Acceptance criteria
 
-- [ ] CI odpala testy i `worktrail check` na każdym pushu.
-- [ ] CI sprawdza zawartość tarballa.
-- [ ] Matryca wersji Node pokrywa to, co deklaruje `engines`.
-- [ ] `CONTRIBUTING.md` odpowiada, jak uruchomić testy i czy PR-y są przyjmowane.
-- [ ] Badge w README prowadzi do przebiegu.
+- [ ] CI runs the tests and `worktrail check` on every push.
+- [ ] CI checks the tarball contents.
+- [ ] The Node version matrix covers what `engines` declares.
+- [ ] `CONTRIBUTING.md` answers how to run the tests and whether PRs are accepted.
+- [ ] The README badge links to the run.
 
 ## Log
 
-Append-only. Format: `YYYY-MM-DD status — kto — notatka`.
+Append-only. Format: `YYYY-MM-DD status — who — note`.
 
-- 2026-08-31 created — agent:claude — z audytu gotowości do publikacji
-- 2026-09-01 pending — agent:claude — ZABLOKOWANE przez TL-112. `CONTRIBUTING.md` ma powiedzieć kontrybutorowi, na jakich warunkach przyjmujemy jego kod — a te warunki nie są jeszcze rozstrzygnięte (DCO czy CLA, i gdzie biegnie granica open/chmura). Napisany wcześniej byłby deklaracją, którą trzeba potem wycofać wobec ludzi, którzy już na niej polegli.
+- 2026-08-31 created — agent:claude — from the publication-readiness audit
+- 2026-09-01 pending — agent:claude — BLOCKED by TL-112. `CONTRIBUTING.md` has to tell a contributor under what terms we accept their code — and those terms are not yet decided (DCO or CLA, and where the open/cloud boundary runs). Written earlier, it would be a commitment that would later have to be walked back in front of people who already relied on it.
+</content>

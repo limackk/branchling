@@ -1,6 +1,6 @@
 ---
 id: TL-8
-title: "Stan dashboardu w URL — widok da się podać dalej"
+title: "Dashboard state in the URL — a view can be shared"
 type: code
 labels: [pre-launch]
 epic: ""
@@ -18,55 +18,57 @@ related_docs:
   - backlog/README.md
 verification:
   - bash: "node backlog/scripts/build-viewer.mjs"
-  - manual: "Dashboard → zmień zakres, zakres burndownu, przypnij dzień, posortuj tabelę; URL odzwierciedla każdą z tych rzeczy"
-  - manual: "Otwórz ten URL w nowej karcie (albo po zmianie localStorage) — widok odtwarza się dokładnie; samo #dashboard zostawia stan sesji nietknięty"
+  - manual: "Dashboard → change the range, the burndown range, pin a day, sort the table; the URL reflects each of these"
+  - manual: "Open this URL in a new tab (or after changing localStorage) — the view reconstructs exactly; plain #dashboard leaves the session state untouched"
 ---
 
-## Cel
+## Goal
 
-Dashboard miał jeden adres (`#dashboard`) na wszystkie swoje stany. Widoku nie
-dało się podać dalej — ani drugiej osobie, ani agentowi, ani sobie do jutra.
+The dashboard had one address (`#dashboard`) for all of its states. A view
+could not be shared — not with another person, not with an agent, not with
+yourself tomorrow.
 
-## Kontekst
+## Context
 
-Wybrane przez foundera z listy propozycji „co pokaże, że dashboard jest też pod
-agentów AI" (odrzucone w tej turze: karta podziału pracy człowiek/agent,
-kontrakt agent-readiness tasków, maszynowe wyjście JSON, rozbicie słupków
-dziennych na agenta i człowieka).
+Chosen by the founder from a list of proposals for "what shows that the
+dashboard is also built for AI agents" (rejected this round: a
+human/agent work-split card, an agent-readiness contract for tasks, a machine
+JSON output, splitting the daily bars into agent and human).
 
-Trzy decyzje:
+Three decisions:
 
-1. **Zakres dat i zakres burndownu są emitowane ZAWSZE**, dzień i sortowania
-   tylko gdy ustawione. Dzięki temu link jest dokładny: odbiorca z innym
-   zakresem w `localStorage` zobaczy zakres nadawcy, a nie swój.
-2. **URL wygrywa z `localStorage`, ale go nie nadpisuje.** Otwarcie cudzego
-   linku nie ma prawa skasować Twojego ustawienia — nadpisze je dopiero Twoja
-   własna zmiana w UI.
-3. **Samo `#dashboard` celowo nie niesie stanu** i zostawia bieżący nietknięty.
-   To jest to, co produkuje przycisk zakładki; gdyby oznaczało „domyślne",
-   klik w zakładkę kasowałby zakres wybrany minutę wcześniej.
+1. **The date range and burndown range are always emitted**, the pinned day
+   and sorting only when set. This keeps the link exact: a recipient with a
+   different range in `localStorage` sees the sender's range, not their own.
+2. **The URL wins over `localStorage`, but does not overwrite it.** Opening
+   someone else's link must not erase your setting — only your own change in
+   the UI overwrites it.
+3. **Plain `#dashboard` deliberately carries no state** and leaves the
+   current one untouched. This is what the tab button produces; if it meant
+   "default", clicking the tab would erase the range chosen a minute earlier.
 
-Synchronizacja idzie przez `history.replaceState`, nie przez przypisanie do
-`location.hash` — przypisanie odpala `hashchange`, co wjechałoby z powrotem w
-`handleHash` i zaaplikowało stan, który właśnie został ustawiony.
+Synchronization goes through `history.replaceState`, not through assigning to
+`location.hash` — an assignment fires `hashchange`, which would loop back into
+`handleHash` and apply the state that was just set.
 
 ## Acceptance criteria
 
-- [x] Zakres, zakres burndownu, przypięty dzień i sortowania w hashu.
-- [x] Link odtwarza widok i wygrywa z `localStorage`, nie nadpisując go.
-- [x] `#dashboard` bez parametrów zostawia stan sesji.
-- [x] Deep-link do taska (`#BL-NNN`) działa jak dotąd.
+- [x] Range, burndown range, pinned day, and sorting are in the hash.
+- [x] A link reconstructs the view and wins over `localStorage` without
+      overwriting it.
+- [x] `#dashboard` with no parameters leaves the session state.
+- [x] Deep-linking to a task (`#BL-NNN`) works as before.
 
 ## Verification
 
-- W przeglądarce: hash rośnie przy każdej zmianie stanu; otwarcie
+- In the browser: the hash grows with every state change; opening
   `#dashboard?range=30&burn=label:pre-launch&day=2026-08-13:daily&sort=epics:p0:desc,barsStatus:value:desc`
-  przy `localStorage` ustawionym na 90 dni daje 30 dni, burndown pre-launch,
-  panel dnia 2026-08-13, epiki po P0, statusy po wartości — a `localStorage`
-  zostaje na 90. Data-śmieć w `day=` jest odrzucana (panel się nie pojawia,
-  hash sam się prostuje). Przejście na zakładkę Zadania i z powrotem zachowuje
-  stan; `#BL-1030` nadal otwiera task.
+  with `localStorage` set to 90 days yields 30 days, the pre-launch burndown,
+  the panel for 2026-08-13, epics sorted by P0, statuses sorted by value —
+  while `localStorage` stays at 90. Garbage data in `day=` is rejected (the
+  panel does not appear, the hash straightens itself out). Switching to the
+  Tasks tab and back preserves the state; `#BL-1030` still opens the task.
 
 ## Log
 
-- 2026-08-26: zaimplementowane i zweryfikowane w przeglądarce — claude.
+- 2026-08-26: implemented and verified in the browser — claude.

@@ -1,6 +1,6 @@
 ---
 id: TL-65
-title: "Rozstrzygnij import z istniejącego trackera zadań"
+title: "Settle import from an existing task tracker"
 type: task
 labels: [post-launch]
 board: main
@@ -18,87 +18,121 @@ related_docs:
   - docs/worktrail-global-tool.md
   - docs/worktrail-state-and-sync.md
 verification:
-  - manual: "Decyzja zapisana: import wchodzi w takim zakresie / nie wchodzi, z powodem. Jeśli wchodzi — powstał task na wykonanie z konkretnym źródłem i konkretnym zakresem pól."
+  - manual: "Decision recorded: import is in scope / not in scope, at this extent, with a reason. If in scope — a task exists for the implementation with a concrete source and a concrete field scope."
 ---
 
-## Cel
+## Goal
 
-Rozstrzygnąć — a nie zbudować — czy narzędzie ma umieć przyjąć zadania z
-istniejącego trackera, i w jakim zakresie. To jest decyzja o kierunku produktu,
-która blokuje sensowne zaplanowanie czegokolwiek w tym obszarze.
+Settle — not build — whether the tool should be able to accept tasks from an
+existing tracker, and to what extent. This is a product-direction decision that
+blocks any sensible planning in this area.
 
-## Kontekst
+## Context
 
-Cała dotychczasowa praca nad onboardingiem obniża tarcie **zakładania nowego
-backlogu**. Nie odpowiada natomiast na sytuację, która decyduje o wejściu
-narzędzia do firmy: zespół ma dwieście zadań w GitHub Issues albo w Jirze i
-pytanie brzmi „jak je tu przenieść", a nie „jak zacząć od zera".
+All the onboarding work so far reduces the friction of **starting a new
+backlog**. It does not, however, answer the situation that decides whether the
+tool gets adopted by a company: a team has two hundred issues in GitHub Issues
+or in Jira, and the question is "how do we move them here", not "how do we
+start from zero".
 
-Bez odpowiedzi narzędzie nadaje się do nowego projektu i do jednej osoby. Z
-odpowiedzią — również do zespołu, który już gdzieś jest. To jest różnica między
-„fajne, wrócę do tego" a wdrożeniem.
+Without an answer, the tool suits a new project and a single person. With an
+answer — also a team that is already somewhere. That is the difference between
+"nice, I'll come back to this" and adoption.
 
-**Dlaczego to jest rozstrzygnięcie, a nie task wykonawczy.** Import wygląda na
-prostą transformację, a niesie decyzje, których nie da się cofnąć po pierwszym
-obcym użytkowniku:
+**Why this is a decision, not an implementation task.** Import looks like a
+simple transformation, but it carries decisions that cannot be undone after
+the first external user:
 
-- **Import jednorazowy czy synchronizacja.** Jednorazowy jest tani i uczciwy.
-  Synchronizacja oznacza drugie źródło prawdy, a `docs/worktrail-state-and-sync.md`
-  jest w całości o tym, dlaczego to jest kosztowne. Prawo 1 mówi, że stan
-  rozwiedziony z gałęzią jest wadą, dla której odrzucono zewnętrzne trackery —
-  synchronizacja wprowadziłaby go z powrotem tylnymi drzwiami.
-- **Co zrobić z polami, których tam nie ma.** `verification` jest tu warunkiem
-  zamknięcia taska, a żaden tracker go nie ma. Import bez tego pola wyprodukuje
-  dwieście tasków, których z definicji nie da się domknąć — czyli nauczy, że to
-  pole jest opcjonalne, i rozbroi jedyną linię obrony przed „zrobione", które nie
-  jest zrobione.
-- **Co zrobić z polami, których TU nie ma.** Komentarze, załączniki, historia
-  statusów, powiązania. Milczące zgubienie ich jest utratą danych; przeniesienie
-  wszystkiego zamienia task w zrzut cudzego formatu.
-- **Numeracja i tożsamość.** Prefiks jest konfiguracją, numery mają być unikalne
-  w obrębie projektu, a importowane zadania mają własne identyfikatory. Czy
-  `GH-412` staje się `ACME-412`, czy dostaje nowy numer i odsyłacz do źródła?
-- **Zakres słownika.** Etykiety i statusy z tamtego systemu nie muszą mieć
-  odpowiedników. Mapowanie jest konfiguracją projektu, nie kodem — czyli kolejny
-  plik do zaprojektowania.
+- **One-off import or synchronization.** A one-off import is cheap and
+  honest. Synchronization means a second source of truth, and
+  `docs/worktrail-state-and-sync.md` is entirely about why that is costly. Law
+  1 says that state divorced from the branch is the defect for which external
+  trackers were rejected — synchronization would bring it back through the
+  side door.
+- **What to do about fields the source does not have.** `verification` is the
+  closing condition for a task here, and no tracker has it. Importing without
+  this field would produce two hundred tasks that by definition cannot be
+  closed — which teaches that the field is optional, and disarms the only
+  line of defense against "done" that is not done.
+- **What to do about fields THIS project does not have.** Comments,
+  attachments, status history, links. Silently dropping them is data loss;
+  bringing everything over turns a task into a dump of someone else's format.
+- **Numbering and identity.** The prefix is configuration, numbers are meant
+  to be unique within the project, and imported tasks have their own
+  identifiers. Does `GH-412` become `ACME-412`, or does it get a new number
+  and a back-reference to the source?
+- **Vocabulary scope.** Labels and statuses from that system need not have
+  equivalents. The mapping is project configuration, not code — that is,
+  another file to design.
 
-**Tania odpowiedź, którą warto rozważyć na starcie:** nie budować importera, tylko
-udokumentować, że taski są zwykłymi plikami markdown z frontmatterem, i pokazać
-dwudziestolinijkowy skrypt, który generuje je z `gh issue list --json`. To
-przenosi koszt utrzymania na użytkownika i nie zobowiązuje do niczego, a
-jednocześnie odpowiada „da się" zamiast „nie". Kompozycja zamiast API wtyczek
-(Prawo 4) mówi dokładnie to samo.
+**A cheap answer worth considering as a starting point:** don't build an
+importer, just document that tasks are plain markdown files with frontmatter,
+and show a twenty-line script that generates them from `gh issue list --json`.
+This shifts the maintenance cost to the user and commits to nothing, while
+still answering "it can be done" instead of "no". Composition instead of a
+plugin API (Law 4) says exactly the same thing.
 
-Zapisane jako task, bo pytanie wróci — i lepiej, żeby wróciło z zapisaną
-odpowiedzią niż od nowa.
+Recorded as a task because the question will come back — and it is better for
+it to come back with a recorded answer than from scratch.
 
 ## Pre-flight reading
 
-1. `docs/worktrail-state-and-sync.md` §6 — granica trybów; import a synchronizacja.
-2. `docs/worktrail-global-tool.md` §3 — Prawo 1 i Prawo 4.
-3. `scripts/task-fields.mjs` — jakie pola w ogóle istnieją i jak są normalizowane.
-4. `scripts/new-task.mjs` — jedyna droga zapisu taska; importer musiałby nią iść albo mieć powód, żeby nie iść.
+1. `docs/worktrail-state-and-sync.md` §6 — the mode boundary; import vs.
+   synchronization.
+2. `docs/worktrail-global-tool.md` §3 — Law 1 and Law 4.
+3. `scripts/task-fields.mjs` — what fields exist at all and how they are
+   normalized.
+4. `scripts/new-task.mjs` — the only write path for a task; an importer would
+   have to go through it or have a reason not to.
 
-## Kroki
+## Steps
 
-1. Wypisz odbiorcę: kto konkretnie ma dwieście zadań i chce je tu przenieść. Jeśli nie umiesz go nazwać, odpowiedź brzmi „nie teraz" i to jest wynik tego taska.
-2. Rozstrzygnij trzy pytania: jednorazowo czy synchronicznie; co z `verification`; co z polami bez odpowiednika.
-3. Zdecyduj między trzema wariantami: (a) nic, (b) dokumentacja plus przykładowy skrypt, (c) komenda `worktrail import`.
-4. Zapisz decyzję i powód w `## Log` — również wtedy, gdy brzmi „nie robimy". Powód jest tu wartościowszy niż decyzja, bo to on przetrwa do następnego razu.
-5. Jeśli wariant (b) albo (c): załóż osobny task wykonawczy z jednym konkretnym źródłem. Nie „importer" w liczbie mnogiej.
+1. Name the recipient: who specifically has two hundred tasks and wants to
+   move them here. If you cannot name one, the answer is "not now" and that is
+   the result of this task.
+2. Settle three questions: one-off or synchronous; what about `verification`;
+   what about fields with no equivalent.
+3. Decide among three variants: (a) nothing, (b) documentation plus a sample
+   script, (c) a `worktrail import` command.
+4. Record the decision and the reason in `## Log` — even when it reads "we are
+   not doing this". The reason is more valuable here than the decision, since
+   it is the reason that will survive to next time.
+5. If variant (b) or (c): open a separate implementation task with one
+   concrete source. Not "importer" in the plural.
 
 ## Acceptance criteria
 
-- [ ] Odbiorca nazwany albo jawnie uznany za nieznanego.
-- [ ] Trzy pytania z kroku 2 mają zapisane odpowiedzi.
-- [ ] Wybrany wariant z uzasadnieniem w `## Log`.
-- [ ] Jeśli wariant zakłada pracę — powstał task wykonawczy z jednym źródłem.
+- [ ] Recipient named or explicitly acknowledged as unknown.
+- [ ] The three questions from step 2 have recorded answers.
+- [ ] The chosen variant with its reasoning in `## Log`.
+- [ ] If the variant implies work — an implementation task with one source
+      exists.
 
 ## Log
 
-Append-only. Format: `YYYY-MM-DD status — kto — notatka`.
+Append-only. Format: `YYYY-MM-DD status — who — note`.
 
-- 2026-08-31 created — agent:claude — z audytu onboardingu; pytanie o adopcję zespołową, nie o defekt
-- 2026-08-31 done — founder — DECYZJA: importer ma powstać, zrobiony solidnie, nie teraz. Odrzucony wariant (b) „dokumentacja plus przykładowy skrypt", który rekomendował agent — argumentem za nim była taniość utrzymania, argumentem przeciw to, że zostawia najtrudniejszą część (mapowanie, idempotencja, `verification`) każdemu użytkownikowi z osobna, za każdym razem od nowa.
-- 2026-08-31 done — agent:claude — trzy pytania z kroku 2 rozstrzygnięte i zapisane w [TL-67](TL-67-import-z-github-issues-jednorazowy-ze-stdin-z-dry-run.md): (1) JEDNORAZOWO — synchronizacja to drugie źródło prawdy, czyli Prawo 1; (2) `verification` zostaje PUSTE, a liczba takich tasków jest WYNIKIEM importu — atrapa rozbroiłaby jedyną linię obrony przed „zrobione", które nie jest zrobione; (3) pola bez odpowiednika NIE jadą — import przenosi task, nie archiwum, a dostęp do komentarzy zachowuje link do źródła.
-- 2026-08-31 done — agent:claude — odbiorca i źródło: GitHub Issues, jedno i konkretne. `gh issue list --json` daje czysty JSON bez konfiguracji uwierzytelniania po naszej stronie. Jira jest osobnym taskiem, gdy pojawi się zespół, który jej używa — adapter do dwóch systemów naraz zacząłby od abstrakcji, której nikt jeszcze nie potrzebuje. Rozstrzygnięcie architektoniczne, które trzyma resztę: NARZĘDZIE NIE CHODZI DO SIECI, JSON wchodzi przez stdin. Zero zależności zostaje zerem, cudze tokeny zostają w `gh`, a test dostaje fixture zamiast atrapy serwera.
+- 2026-08-31 created — agent:claude — from the onboarding audit; a question
+  about team adoption, not a defect
+- 2026-08-31 done — founder — DECISION: an importer will be built, done
+  properly, not now. Rejected variant (b) "documentation plus a sample
+  script", which the agent recommended — the argument for it was cheap
+  maintenance, the argument against it is that it leaves the hardest part
+  (mapping, idempotency, `verification`) to every user individually, from
+  scratch every time.
+- 2026-08-31 done — agent:claude — the three questions from step 2 settled and
+  recorded in [TL-67](TL-67-import-z-github-issues-jednorazowy-ze-stdin-z-dry-run.md):
+  (1) ONE-OFF — synchronization is a second source of truth, i.e. Law 1; (2)
+  `verification` stays EMPTY, and the number of such tasks is a RESULT of the
+  import — a placeholder would disarm the only line of defense against
+  "done" that is not done; (3) fields with no equivalent do NOT come along —
+  import moves the task, not the archive, and access to comments is kept via
+  a link to the source.
+- 2026-08-31 done — agent:claude — recipient and source: GitHub Issues, one
+  and concrete. `gh issue list --json` gives clean JSON with no
+  authentication configuration on our side. Jira is a separate task, once a
+  team that uses it shows up — an adapter for two systems at once would start
+  from an abstraction nobody needs yet. The architectural decision that holds
+  the rest together: THE TOOL DOES NOT REACH THE NETWORK, JSON comes in
+  through stdin. Zero dependencies stays zero, other people's tokens stay in
+  `gh`, and the test gets a fixture instead of a mock server.

@@ -6,15 +6,15 @@ labels: []
 board: main
 epic: "Backlog — publikacja open source"
 priority: P1                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending  # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 estimate: 1w                       # 30m | 2h | 1d | 1w | 1mo
 created: 2026-09-01
 updated: 2026-09-02
 blocked_by: []
 blocks: []
 related_docs: []
-verification:                      # JAK sprawdzić, że task naprawdę jest zrobiony
+verification:                      # HOW to check that the task is really done
   - id: guard-covers-tasks
     bash: "node scripts/cli.mjs check --language"
   - id: tree-green
@@ -88,10 +88,51 @@ whole time. CLAUDE.md states this as a rule.
 what `LINEAGE.md` points at as the reasoning that survived the flattening.
 Skipping them would translate the part with the least evidence in it.
 
+## Decisions
+
+**1. Filenames do NOT follow the translated titles.** Every existing slug in
+`backlog/tasks/` and `docs/` stays exactly as it is; only the prose inside each
+file changes. Reasons:
+
+- The tool reads the ID, never the filename — `next`, `take`, `blocked_by`,
+  `blocks` and every cross-reference between tasks already address each other
+  by `TL-<number>`. A slug is a filename, not a fact `worktrail` depends on.
+- The Context section above already prices the alternative correctly: a rename
+  touches the file itself, the id-to-name agreement `doctor` checks, and every
+  prose reference that spells the path rather than the bare id — for 145 files
+  at once, on top of a translation pass that already touches all 145. Bundling
+  two migrations that fail for different reasons make the one failure mode
+  harder to isolate from the other.
+- The cost of NOT renaming is exactly what the Context section says it is: a
+  slug that looks wrong to a person browsing the directory. That is cosmetic —
+  the rule this task enforces is about the language of what a stranger READS,
+  and a stranger reads the title and body on the page, not the URL segment.
+- Keeping the slug is reversible on its own schedule: a rename is a narrowly
+  scoped follow-up (mechanical, one concern, easy to verify with `doctor`)
+  that does not have to ride on a content migration to happen. It is filed
+  separately rather than folded in here, per CLAUDE.md's own rule that a
+  surfaced topic outside the current thesis becomes a new task, not scope
+  creep on this one.
+
+**2. `check --language` grows by two entries in `PUBLIC_PATHS`: `backlog` and
+`docs`.** Not `backlog/tasks` alone — the whole `backlog` directory, which also
+picks up `backlog/config.yaml`, `backlog/plan.yaml`, `backlog/boards.yaml` and
+`backlog/_template.md`. Those four were already translated by hand on
+2026-09-01 (see Context) but were never brought under the guard that would keep
+them that way; adding the directory rather than the one subdirectory closes
+that gap as a side effect, for free, without widening scope — a regression in
+any of them is exactly the kind of drift this guard exists to catch. This is
+safe for `backlog/history/*.jsonl`, which the rule everywhere else in this
+project holds untouched: the walk that feeds the guard already reads only
+`.mjs`, `.js` and `.md` files (`check-public-language.mjs`'s `walk()`), so a
+`.jsonl` file is invisible to it independent of which directory is listed —
+the append-only log is protected by file extension, not by a special case
+carved out of the guard's path list.
+
 ## Steps
 
 1. Settle the two decisions above and write them down here before touching a
-   file.
+   file. Done — see Decisions.
 2. If filenames follow: build the rename plan as DATA first, the way `renumber`
    does, and refuse the whole run on any collision.
 3. Translate `docs/` first — 8 files, and every task body points into it, so its
@@ -108,10 +149,10 @@ Skipping them would translate the part with the least evidence in it.
 
 ## Acceptance criteria
 
-- [ ] The two decisions are written in this file, with reasons. [proof: guard-covers-tasks]
-- [ ] No file under `backlog/tasks/` or `docs/` contains Polish, archived tasks included. [proof: guard-covers-tasks]
-- [ ] `check --language` reads `backlog/` and `docs/` and fails on a Polish file. [proof: guard-covers-tasks]
-- [ ] The guard has a positive control that must report a planted Polish fixture. [proof: suite-green]
-- [ ] `backlog/history/*.jsonl` is untouched — the log stayed append-only. [proof: tree-green]
-- [ ] `check` and `doctor` green, and every id-to-filename pair still agrees. [proof: tree-green]
-- [ ] The full suite is green. [proof: suite-green]
+- [x] The two decisions are written in this file, with reasons. [proof: guard-covers-tasks]
+- [x] No file under `backlog/tasks/` or `docs/` contains Polish, archived tasks included. [proof: guard-covers-tasks]
+- [x] `check --language` reads `backlog/` and `docs/` and fails on a Polish file. [proof: guard-covers-tasks]
+- [x] The guard has a positive control that must report a planted Polish fixture. [proof: suite-green]
+- [x] `backlog/history/*.jsonl` is untouched — the log stayed append-only. [proof: tree-green]
+- [x] `check` and `doctor` green, and every id-to-filename pair still agrees. [proof: tree-green]
+- [x] The full suite is green. [proof: suite-green]

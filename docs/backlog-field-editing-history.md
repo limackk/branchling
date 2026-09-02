@@ -1,167 +1,337 @@
-# Backlog — edycja pól i historia zmian
+# Backlog — field editing and change history
 
 **Status:** IMPLEMENTED 2026-08-29 ([TL-16](../backlog/tasks/TL-16-edycja-kazdego-pola-taska-w-viewerze.md), [TL-17](../backlog/tasks/TL-17-historia-zmian-pol-taska-z-autorem.md))
-**SSOT kodu:** `backlog/scripts/task-fields.mjs`, `backlog/scripts/history.mjs`, `backlog/scripts/serve-backlog.mjs`, `backlog/scripts/build-viewer.mjs`
-**Testy:** `node --test backlog/scripts/tests/task-fields.test.mjs backlog/scripts/tests/history.test.mjs`
+**Code SSOT:** `backlog/scripts/task-fields.mjs`, `backlog/scripts/history.mjs`, `backlog/scripts/serve-backlog.mjs`, `backlog/scripts/build-viewer.mjs`
+**Tests:** `node --test backlog/scripts/tests/task-fields.test.mjs backlog/scripts/tests/history.test.mjs`
 
 ---
 
-## 1. Cel
+## 1. Goal
 
-Dwie rzeczy, które backlog dotąd miał tylko w połowie:
+Two things the backlog previously only had half of:
 
-1. **Edycja** — viewer umiał zmienić wyłącznie `status`. Każde inne pole (priorytet, owner, estymata, labels, epic, board, blocked_by, related_docs, tytuł) wymagało otwarcia `.md` w edytorze.
-2. **Atrybucja** — plik taska mówi, *jaki jest stan*, ale nie *kto go ustawił*. Sekcja `## Log` jest ręczna i wypełniana nieregularnie, a `git blame` nie odpowiada na pytanie „kto zmienił priorytet tego taska", bo commit obejmuje zwykle kilkanaście plików i kilka pól naraz. Przy jednym founderze to niedogodność; przy founderze + agentach + kolejnych ludziach to brak dowodu.
+1. **Editing** — the viewer could change only `status`. Every other field
+   (priority, owner, estimate, labels, epic, board, blocked_by, related_docs,
+   title) required opening the `.md` file in an editor.
+2. **Attribution** — a task file says *what the state is*, but not *who set
+   it*. The `## Log` section is manual and filled in irregularly, and
+   `git blame` does not answer "who changed this task's priority", because a
+   commit usually spans a dozen files and several fields at once. With one
+   founder this is an inconvenience; with a founder plus agents plus more
+   people, it is a missing piece of evidence.
 
-Docelowo: kliknięcie w dowolne pole je edytuje, a przy polu widać, **kto** i **kiedy** zmienił je ostatnio.
+Target state: clicking any field edits it, and beside the field you can see
+**who** changed it last and **when**.
 
 ---
 
-## 2. Model danych
+## 2. Data model
 
 ```
-backlog/history/BL-NNNN.jsonl    ← append-only, WERSJONOWANE w gicie
-backlog/history/.snapshot.json   ← ostatnio widziany frontmatter (gitignored)
-backlog/history/.migrations.jsonl ← zmiany prefiksu ID, WERSJONOWANE (TL-111)
+backlog/history/BL-NNNN.jsonl    ← append-only, VERSIONED in git
+backlog/history/.snapshot.json   ← last-seen frontmatter (gitignored)
+backlog/history/.migrations.jsonl ← id prefix changes, VERSIONED (TL-111)
 ```
 
-Jeden wiersz = jedna zmiana jednego pola:
+One row = one change to one field:
 
 ```json
 {"ts":"2026-08-29T13:17:10.970Z","task":"TASK-9999","field":"status",
  "from":"pending","to":"in_progress","actor":"local:founder","source":"viewer"}
 ```
 
-- `from` / `to` — string albo tablica (pola listowe: `labels`, `blocked_by`, `blocks`, `related_docs`).
-- `field` — klucz frontmattera albo pseudo-pole zdarzenia taska: `__created__`, `__deleted__`, `__verified__`, `__role_override__`, `__comment__`.
-- `actor` — **`<przestrzeń>:<nazwa>`** (TL-21): `local:` zadeklarowany i niezweryfikowany, `agent:` zapis automatyczny, `user:` konto uwierzytelnione; `unknown` to jedyna wartość bez przestrzeni. **Słownik nazw jest OTWARTY** — walidujemy kształt, nie przynależność do listy — ale przestrzeń jest ZAMKNIĘTA i kod jej nie zgaduje: goła nazwa w nowym zapisie ląduje jako `unknown`. Wpisy sprzed TL-21 zostają nietknięte i przy odczycie dostają przestrzeń `legacy`. Model docelowy: [worktrail-state-and-sync.md](worktrail-state-and-sync.md) §7 krok 4.
-- `id` — ULID (TL-21). Sortowanie po nim jest sortowaniem po czasie, więc jest gotowym kursorem synchronizacji; `readHistory()` deduplikuje po nim wpisy, które union-merge mógł wstawić dwa razy.
+- `from` / `to` — a string or an array (list fields: `labels`,
+  `blocked_by`, `blocks`, `related_docs`).
+- `field` — a frontmatter key or a task-event pseudo-field: `__created__`,
+  `__deleted__`, `__verified__`, `__role_override__`, `__comment__`.
+- `actor` — **`<namespace>:<name>`** (TL-21): `local:` declared and
+  unverified, `agent:` automated write, `user:` authenticated account;
+  `unknown` is the only value with no namespace. **The name vocabulary is
+  OPEN** — we validate shape, not membership in a list — but the namespace is
+  CLOSED and the code does not guess it: a bare name in a new write lands as
+  `unknown`. Entries from before TL-21 stay untouched and are given the
+  `legacy` namespace on read. Target model:
+  [worktrail-state-and-sync.md](worktrail-state-and-sync.md) §7 step 4.
+- `id` — a ULID (TL-21). Sorting by it is sorting by time, so it is a
+  ready-made sync cursor; `readHistory()` deduplicates by it entries that a
+  union merge might have inserted twice.
 
-**`__created__` i `__deleted__` są ZDARZENIAMI TASKA, nie zmianami pola** (TL-39), i mają własną regułę deduplikacji przy odczycie:
+**`__created__` and `__deleted__` are TASK EVENTS, not field changes** (TL-39),
+and have their own dedup rule on read:
 
-- **Kluczem jest zdarzenie, nie zapis.** Jedno założenie taska ma dać jeden wpis, ilu by go obserwatorów nie zobaczyło. Dedup po `id` tego nie łapie, bo ULID identyfikuje ZAPIS — dwa zapisy o tym samym zdarzeniu mają różne ULID-y z definicji.
-- **Kluczem nie jest `task + field + to`.** Przy `__created__` wartością `to` jest tytuł, a tytuł bywa zmieniony między jednym obserwatorem a drugim; wtedy duplikat przeszedłby bramkę opartą o treść.
-- **Ale nie „najwyżej jedno na task".** Task skasowany i założony ponownie ma DWA prawdziwe założenia. Duplikatem jest powtórzenie, które nie zmienia stanu: sąsiadujące w czasie wpisy tego samego rodzaju, bez zdarzenia przeciwnego pomiędzy.
-- **Przy duplikacie wygrywa wpis LEPIEJ PRZYPISANY** (`local:`/`agent:`/`user:` bije `unknown`), a przy remisie wcześniejszy. „Ostatni zapis wygrywa" byłoby tu najgorszym wyborem: drugi obserwator z definicji wie mniej niż ten, który zdarzenie widział.
-- **Zwykłe pola tej reguły NIE mają.** Dwa przejścia `pending → in_progress` w różnym czasie to dwa zdarzenia; deduplikacja po wartości zjadałaby prawdziwą historię.
-- **`__comment__` też jej nie ma, i to jest decyzja** (TL-99). Komentarz jest pseudo-polem, ale nie zdarzeniem taska: dwa razy to samo zdanie w różnym czasie to dwie wypowiedzi, a zjedzenie drugiej byłoby redagowaniem cudzej rozmowy. Zostaje sam dedup po `id`, ten sam co wszędzie. Całą treścią komentarza jest `to`; `from` jest puste, bo komentarz niczego nie zastępuje.
-- `source` — którą drogą przyszła zmiana: `viewer` | `hook` | `external` | `boot` | `cli`. To jest metadana o wiarygodności `actor`, nie ozdoba (§4).
+- **The key is the event, not the write.** One task being founded should
+  yield one entry, no matter how many observers saw it. Dedup by `id` does
+  not catch this, because a ULID identifies the WRITE — two writes of the
+  same event have different ULIDs by definition.
+- **The key is not `task + field + to`.** For `__created__` the value of `to`
+  is the title, and the title can be changed between one observer and the
+  next; a duplicate would then pass a content-based gate.
+- **But not "at most one per task".** A task deleted and founded again has
+  TWO genuine foundings. A duplicate is a repeat that changes no state:
+  entries of the same kind adjacent in time, with no opposing event between
+  them.
+- **On a duplicate, the BETTER-ATTRIBUTED entry wins** (`local:`/`agent:`/
+  `user:` beats `unknown`), and on a tie, the earlier one. "Last write wins"
+  would be the worst choice here: the second observer knows less by
+  definition than the one who actually saw the event.
+- **Ordinary fields do NOT have this rule.** Two `pending → in_progress`
+  transitions at different times are two events; deduplicating by value would
+  eat genuine history.
+- **`__comment__` does not have it either, and that is a decision** (TL-99).
+  A comment is a pseudo-field but not a task event: the same sentence twice
+  at different times is two utterances, and eating the second would be
+  editing someone else's conversation. What remains is plain dedup by `id`,
+  the same as everywhere. The whole comment content is `to`; `from` is empty,
+  because a comment replaces nothing.
+- `source` — which route the change arrived by: `viewer` | `hook` |
+  `external` | `boot` | `cli`. This is metadata about how much `actor` is
+  worth, not decoration (§4).
 
-### Dlaczego JSONL per task, a nie jeden plik / SQLite / git
+### Why JSONL per task, not one file / SQLite / git
 
-| Opcja | Odpada, bo |
+| Option | Rejected because |
 |---|---|
-| Jeden `history.jsonl` | Dwie sesje edytujące różne taski konfliktują w gicie w tej samej linii; odczyt historii jednego taska czyta całą historię backlogu (1350+ tasków). |
-| SQLite | Backlog jest z założenia plikowy i wersjonowany razem z kodem (README §1). Baza binarna zabiera diff, code review i `grep`. |
-| Sam `git log` | Nie wymaga niczego nowego, ale commit to zła jednostka: obejmuje wiele plików i wiele pól, a autor commita ≠ autor pola (agent commituje jako founder). Do **backfillu** historii sprzed tego mechanizmu git zostaje jedynym źródłem — patrz §6. |
-| Sekcja `## Log` w `.md` | Była narracją („dlaczego"), ręczną i nieparsowalną maszynowo. Zniesiona w TL-105 przy zerowej adopcji: powód jedzie z ZAPISEM, w polu `reason`. Sekcje w starych taskach zostają. |
+| One `history.jsonl` | Two sessions editing different tasks conflict in git on the same line; reading one task's history reads the whole backlog's history (1350+ tasks). |
+| SQLite | The backlog is file-based by design and versioned together with the code (README §1). A binary database removes diff, code review and `grep`. |
+| Plain `git log` | Needs nothing new, but a commit is the wrong unit: it spans many files and many fields, and the commit author ≠ the field's author (an agent commits as the founder). For **backfilling** history predating this mechanism, git remains the only source — see §6. |
+| A `## Log` section in `.md` | Was narrative ("why"), manual and not machine-parseable. Retired in TL-105 at zero adoption: the reason travels with the WRITE, in the `reason` field. Sections in old tasks stay. |
 
-Snapshot (`.snapshot.json`) **nie jest źródłem prawdy** — to punkt odniesienia do diffa, odtwarzalny z plików tasków. Dlatego jest gitignored: gdyby wjechał do repo, każdy `git pull` produkowałby konflikt na pliku, którego nikt nie czyta.
+The snapshot (`.snapshot.json`) **is not a source of truth** — it is a
+reference point for diffing, reconstructible from the task files. That is why
+it is gitignored: if it went into the repo, every `git pull` would produce a
+conflict on a file nobody reads.
 
-`.migrations.jsonl` (TL-111) jest odwrotnością snapshotu: WERSJONOWANY, bo jego czytelnikiem jest KAŻDY klon. Jeden wiersz = jedna zmiana prefiksu ID:
+`.migrations.jsonl` (TL-111) is the snapshot's opposite: VERSIONED, because
+its reader is EVERY clone. One row = one id-prefix change:
 
 ```json
 {"id":"01K…","ts":"2026-09-01T07:13:34.277Z","kind":"prefix",
  "from":"BL","to":"TL","actor":"local:founder","source":"migrate-prefix"}
 ```
 
-Bez tego zapisu `migrate-prefix` był dla historii **skasowaniem całego backlogu i założeniem go od nowa**: snapshot zostawał na starych kluczach, a najbliższa rekoncyliacja uczciwie meldowała 74 zniknięcia i 74 nowe taski. Zmierzone w tym repozytorium: 42 pliki `history/BL-*.jsonl` z jednym rekordem `__deleted__`, wszystkie z jednego przebiegu. Ponieważ `history/*.jsonl` jedzie w gicie z regułą `merge=union`, nagrobki byłyby trwałe — a każdy wiek i tempo policzone z takiego logu wskazywałyby dzień migracji jako dzień narodzin backlogu.
+Without this record, `migrate-prefix` was, as far as history was concerned,
+**deleting the whole backlog and founding it anew**: the snapshot stayed on
+the old keys, and the next reconciliation honestly reported 74 disappearances
+and 74 new tasks. Measured in this repository: 42 `history/BL-*.jsonl` files
+with a single `__deleted__` record, all from one run. Because `history/*.jsonl`
+travels in git with the `merge=union` rule, the tombstones would be
+permanent — and any age or pace computed from such a log would point to the
+migration day as the backlog's birthday.
 
-Odrzucono ROZPOZNAWANIE migracji przez rekoncyliację („znikło `X-N`, pojawiło się `Y-N` o tej samej treści"): to zgadywanie, a ten mechanizm deklaruje uczciwość zamiast zgadywania (§4). Równość treści jest dokładnie tym, czego migracja nie gwarantuje — renumeracja w jednym commicie z edycją psuje dopasowanie, a dwa niezwiązane taski o tym samym numerze i tytule je fałszywie spełniają. Rekord jest FAKTEM do odczytania, nie heurystyką.
+RECOGNISING a migration through reconciliation ("`X-N` disappeared, `Y-N`
+appeared with the same content") was rejected: that is guessing, and this
+mechanism declares honesty instead of guessing (§4). Content equality is
+exactly what a migration does not guarantee — a renumbering combined with an
+edit in one commit breaks the match, and two unrelated tasks with the same
+number and title falsely satisfy it. The record is a FACT to be read, not a
+heuristic.
 
-Klucz snapshotu przenosi się **tylko wtedy, gdy stary task zniknął z drzewa, a nowy w nim jest** — dzięki temu klon, który ma rekord, ale nie ma jeszcze przemianowanych plików (starszy checkout, migracja przerwana w połowie), nie wyprodukuje właśnie tej pary nagrobków, a przerwana migracja domyka się przy następnym przebiegu.
+The snapshot key only carries over **when the old task has disappeared from
+the tree and the new one is present in it** — this means a clone that has the
+record but not yet the renamed files (an older checkout, a migration
+interrupted midway) does not produce that same tombstone pair, and an
+interrupted migration completes itself on the next run.
 
 ---
 
-## 3. Trzy drogi zapisu, jedna definicja pola
+## 3. Three write paths, one field definition
 
-Wszystko, co wie „czym jest pole taska", siedzi w `task-fields.mjs`: lista pól edytowalnych, ich typy, słowniki wartości, walidacja, zapis do frontmattera i porównanie dwóch wersji. Ten sam plik:
+Everything that knows "what a task field is" lives in `task-fields.mjs`: the
+list of editable fields, their types, value vocabularies, validation, writing
+to the frontmatter, and comparing two versions. The same file:
 
-- waliduje żądania w `serve-backlog.mjs`,
-- jest **wklejany źródłem** do wygenerowanego viewera (jak `viewer-url.mjs` od TL-15), więc przeglądarka rysuje edytory z tej samej schemy i nie może wysłać wartości, którą serwer odrzuci,
-- jest uruchamiany przez `node --test`.
+- validates requests in `serve-backlog.mjs`,
+- is **pasted as source** into the generated viewer (like `viewer-url.mjs`
+  since TL-15), so the browser draws editors from the same schema and cannot
+  send a value the server would reject,
+- is run by `node --test`.
 
-Konsekwencja praktyczna: **nowe pole albo nowy status dodaje się w jednym miejscu.** Wcześniej lista statusów żyła w trzech (server, viewer, README) — przy tej zmianie zostały zredukowane do jednej.
+Practical consequence: **a new field or a new status is added in one place.**
+Previously the list of statuses lived in three (server, viewer, README); this
+change reduced it to one.
 
-### 3.1 Viewer (autor: znany)
+### 3.1 Viewer (author: known)
 
-`POST /api/field {id, field, value, actor}` → walidacja → zapis `.md` → `updated: <dziś>` → wpis w historii → `build-backlog.mjs` (regeneracja NOW/INDEX/archive).
+`POST /api/field {id, field, value, actor}` → validation → write to `.md` →
+`updated: <today>` → history entry → `build-backlog.mjs` (regenerating
+NOW/INDEX/archive).
 
-Historia powstaje z porównania stanu **sprzed zapisu** ze stanem **odczytanym po zapisie z pliku**, a nie z tego, co przysłała przeglądarka — wpis opisuje to, co naprawdę wylądowało na dysku.
+History is built from comparing the state **before the write** with the state
+**read from the file after the write**, not with what the browser sent — the
+entry describes what genuinely landed on disk.
 
-`POST /api/status` został aliasem tej samej funkcji. Dwa endpointy piszące frontmatter oznaczałyby dwa miejsca decydujące o walidacji, o `updated:` i o historii.
+`POST /api/status` became an alias of the same function. Two endpoints
+writing the frontmatter would mean two places deciding validation, `updated:`,
+and history.
 
-### 3.2 Agent (autor: znany)
+### 3.2 Agent (author: known)
 
-Hook `PostToolUse` (`worktrail regen-hook`) po każdym Edit/Write na `backlog/tasks/BL-*.md` woła:
+The `PostToolUse` hook (`worktrail regen-hook`), after every Edit/Write on
+`backlog/tasks/BL-*.md`, calls:
 
 ```bash
-node backlog/scripts/history-record.mjs --file <plik> --actor claude --source hook
+node backlog/scripts/history-record.mjs --file <file> --actor claude --source hook
 ```
 
-To **jedyny moment, w którym system wie na pewno**, że task zmienił agent — sam plik tego nie mówi. `$BACKLOG_ACTOR` nadpisuje autora, gdy hook odpala kto inny.
+This is the **only moment the system knows for certain** that an agent
+changed the task — the file alone doesn't say so. `$BACKLOG_ACTOR` overrides
+the author when someone else triggers the hook.
 
-### 3.3 Reszta świata (autor: `unknown`)
+### 3.3 The rest of the world (author: `unknown`)
 
-Serwer viewera obserwuje `tasks/` (`fs.watch`) i 2,5 s po zmianie robi rekoncyliację: diff wszystkich tasków wobec snapshotu, wpisy z `actor: "unknown"`, `source: "external"`. To łapie edytor, `git checkout`, `git pull` i agenta pracującego bez hooka. Ten sam przebieg leci przy starcie serwera (`source: "boot"`) — domyka lukę „serwer był wyłączony".
+The viewer's server watches `tasks/` (`fs.watch`) and, 2.5 s after a change,
+runs a reconciliation: diffing every task against the snapshot, entries with
+`actor: "unknown"`, `source: "external"`. This catches an editor, `git
+checkout`, `git pull`, and an agent working without the hook. The same pass
+runs at server startup (`source: "boot"`) — closing the "the server was off"
+gap.
 
-Opóźnienie 2,5 s jest po to, żeby hook agenta zdążył zapisać wpis **pierwszy**; wtedy rekoncyliacja nie widzi już różnicy i milczy. Kolejność, nie zgadywanie: „skoro nie viewer, to pewnie agent" dałoby wpisy podpisane kimś, kto ich nie zrobił.
+The 2.5 s delay exists so the agent's hook has time to write its entry
+**first**; then reconciliation sees no difference left and stays silent.
+Ordering, not guessing: "if it wasn't the viewer, it was probably the agent"
+would produce entries signed by someone who didn't make them.
 
 ---
 
-## 4. Czego ten mechanizm NIE gwarantuje
+## 4. What this mechanism does NOT guarantee
 
-Historia jest **dziennikiem obserwacji lokalnego narzędzia**, nie logiem audytowym. Świadome ograniczenia:
+History is an **observation log of a local tool**, not an audit log.
+Deliberate limitations:
 
-1. **`unknown` znaczy `unknown`.** Serwer widzi zmieniony bajt, nie rękę. Pole `source` mówi, ile warta jest atrybucja: `viewer`/`hook` = autor deklarowany przez proces, który wie; `external`/`boot` = nikt nie widział.
-2. **Aktor w viewerze to deklaracja, nie uwierzytelnienie.** Przełącznik „Edytuję jako founder/claude" ustawia podpis; nie ma logowania ani sesji. Przy jednym userze na loopbacku to adekwatne — przy wielu trzeba tożsamości (§7).
-3. **Zmiany przy wyłączonym serwerze i bez hooka trafiają do historii dopiero przy następnym starcie serwera**, zbiorczo i jako `unknown`. Nie giną, ale tracą i czas, i autora.
-4. **Snapshot jest lokalny.** Świeży klon nie ma snapshotu → pierwszy przebieg tylko go zakłada i **nie dopisuje ani jednego wpisu**. To decyzja: 1350 zmyślonych „zmian" w dniu pierwszego uruchomienia byłoby gorsze niż brak historii sprzed niego.
-5. **Nie wersjonujemy treści body.** Historia dotyczy frontmattera. Zmiany sekcji `## Cel`, `## Kroki` itd. zostają w gicie — pola są tym, po czym backlog filtruje, planuje i liczy dashboard.
-6. **Snapshot jest lokalny, historia wspólna — i to trzeba było uzgodnić.** Task albo zmiana przyniesiona `git merge`/`git pull` nie istnieje w TWOIM snapshocie, więc rekoncyliacja brała ją za nową i zapisywała drugi raz — do tego samego, wersjonowanego pliku (zmierzone 2026-08-29 na `TL-18.jsonl` po merge'u worktree do `main`: dwa `__created__` o tej samej treści). Naprawione u przyczyny: zanim rekoncyliacja cokolwiek zapisze, pyta plik historii, co już wie — brak taska w snapshocie przy NIEPUSTEJ historii znaczy „przyszedł z zewnątrz", a zmiana pola, której `to` równa się ostatniemu zapisanemu wpisowi, jest pomijana. Świadoma cena: gdy ktoś ustawi lokalnie tę samą wartość, którą już ktoś inny zapisał, wpis nie powstanie drugi raz — stan i tak się zgadza, a autor pierwszego zapisu zostaje.
-7. **Bramka na ZAPISIE nie wystarcza, bo jej przesłanka podróżuje osobnym kanałem.** Rekoncyliacja pyta plik historii, zanim dopisze `__created__` (punkt 6) — i działa, kiedy ma co czytać. `.md` jedzie gitem zawsze, `.jsonl` tylko wtedy, gdy ktoś go zacommitował; zmierzone 2026-08-31 w repozytorium konsumenta: 28 z 71 logów historii było nieśledzonych. Dlatego druga warstwa siedzi przy ODCZYCIE (§2) i działa też wtedy, gdy oba wpisy już powstały.
-8. **Nie ma undo.** Wpis mówi, co było wcześniej; przywrócenie to zwykła edycja (która zapisze kolejny wpis).
+1. **`unknown` means `unknown`.** The server sees a changed byte, not a hand.
+   The `source` field says how much the attribution is worth: `viewer`/`hook`
+   = an author declared by a process that knows; `external`/`boot` = nobody
+   saw it.
+2. **The actor in the viewer is a declaration, not authentication.** The
+   "Editing as founder/claude" switch sets the signature; there is no login
+   or session. With one user on loopback that is adequate — with several,
+   identity is needed (§7).
+3. **Changes made while the server is off and without the hook only reach
+   history at the next server startup**, in bulk and as `unknown`. They are
+   not lost, but they lose both time and author.
+4. **The snapshot is local.** A fresh clone has no snapshot → the first pass
+   only founds it and **appends not a single entry**. This is deliberate:
+   1350 invented "changes" on first run would be worse than no history before
+   it.
+5. **We do not version the body's content.** History covers the frontmatter.
+   Changes to the `## Goal`, `## Steps` sections etc. stay in git — fields
+   are what the backlog filters, plans and computes the dashboard from.
+6. **The snapshot is local, history is shared — and this had to be
+   reconciled.** A task or change brought in by `git merge`/`git pull` does
+   not exist in YOUR snapshot, so reconciliation used to take it for new and
+   write it again — into the same, versioned file (measured 2026-08-29 on
+   `TL-18.jsonl` after merging a worktree into `main`: two `__created__`
+   entries with identical content). Fixed at the source: before writing
+   anything, reconciliation asks the history file what it already knows — a
+   task missing from the snapshot but with NON-EMPTY history means "it came
+   from outside", and a field change whose `to` equals the last recorded
+   entry is skipped. Deliberate cost: when someone locally sets the same
+   value someone else already recorded, no second entry is created — the
+   state matches either way, and the first write's author stays attributed.
+7. **A gate on WRITE is not enough, because its premise travels on a separate
+   channel.** Reconciliation asks the history file before appending
+   `__created__` (point 6) — and works when there is something to read.
+   `.md` always travels with git; `.jsonl` only when someone committed it;
+   measured 2026-08-31 in a consumer repository: 28 of 71 history logs were
+   untracked. Hence a second layer sits at READ time (§2), and works even
+   when both entries already exist.
+8. **There is no undo.** An entry says what came before; restoring it is an
+   ordinary edit (which writes another entry).
 
 ---
 
 ## 5. UI
 
-Detal taska renderuje wiersz per pole ze specu `EDITABLE_FIELDS`:
+The task detail view renders one row per field from the `EDITABLE_FIELDS`
+spec:
 
-- **klik / Enter / Spacja** na wartości otwiera edytor odpowiedni dla typu: `select` (enum), `input` + datalist (tekst z podpowiedziami z realnych danych), checkboxy (labels — słownik zamknięty), textarea „jedna wartość na linię" (blocked_by / blocks / related_docs). **Esc** anuluje.
-- przy etykiecie pola stoi znacznik **`autor · kiedy`** ostatniej zmiany; kliknięcie zawęża listę historii do tego pola.
-- pod siatką pól: **Historia zmian (N)** — oś czasu od najnowszej: data, aktor, `pole: stara → nowa`, źródło.
-- zapis jest optymistyczny i **cofa się do stanu poprzedniego, gdy serwer odrzuci** — pokazany stan ma zawsze odpowiadać plikowi.
+- **click / Enter / Space** on a value opens the editor appropriate to its
+  type: `select` (enum), `input` + a datalist (text with suggestions from
+  real data), checkboxes (labels — a closed vocabulary), a "one value per
+  line" textarea (blocked_by / blocks / related_docs). **Esc** cancels.
+- next to a field's label sits an **`author · when`** marker for its last
+  change; clicking it narrows the history list to that field.
+- below the field grid: **Change history (N)** — a timeline from newest:
+  date, actor, `field: old → new`, source.
+- the write is optimistic and **reverts to the previous state if the server
+  rejects it** — the displayed state always matches the file.
 
-**Edycja działa wyłącznie w trybie serwera** (`backlog` w terminalu). W trybie `file://` pola są tylko do odczytu, a historia widoczna (wbudowana w build). Powód: druga ścieżka zapisu przez File System Access API oznaczałaby drugi komplet reguł walidacji, drugie miejsce znające historię i regenerację widoków — przy pierwszej zmianie schemy rozjechałyby się po cichu. Przy okazji zniknęła istniejąca wcześniej duplikacja zapisu statusu (fetch + FS Access).
-
----
-
-## 6. Backfill historii sprzed mechanizmu — świadomie NIE zrobiony
-
-Da się odtworzyć historię pól z gita: `git log -p --follow backlog/tasks/BL-*.md`, diff frontmattera commit po commicie, `actor` z autora commita. Nie robimy tego teraz, bo:
-
-- autor commita w tym repo to **zawsze founder**, także dla pracy agentów — backfill wyprodukowałby 1350 tasków „zmienionych przez foundera", czyli atrybucję ładną i nieprawdziwą;
-- data commita ≠ data zmiany (praca bywa commitowana zbiorczo).
-
-Gdyby backfill był potrzebny, jedyną uczciwą formą jest `actor: "unknown"`, `source: "git"` i `ts` commita. Warunkiem sensu jest wcześniejsze rozróżnianie autorów w commitach (np. trailer `Co-Authored-By`) — dopóki go nie ma, wynik nie niesie informacji, której szukamy.
-
----
-
-## 7. Droga do wielu użytkowników
-
-Kolejność kroków, gdy dojdą realni użytkownicy poza founderem i agentami:
-
-1. **Rejestr aktorów** — `backlog/actors.yaml` (slug, nazwa, typ `human|agent`), guard pre-commit odrzucający wpis z aktorem spoza rejestru. Schema wpisu się nie zmienia; dochodzi walidacja przynależności.
-2. **Tożsamość zamiast deklaracji** — przestrzeń nazw (`local:` vs `user:`) jest już w schemacie od TL-21, ale nikt jej nie EGZEKWUJE: serwer nadal ufa polu `actor` z żądania. Domknięcie: bierze je z sesji (choćby z nagłówka ustawianego przez reverse proxy albo z `git config user.email` przy dostępie lokalnym). Dopiero to zamienia dziennik w log audytowy.
-3. **Historia jako źródło dla dashboardu** — mając `ts` przejść statusu, dashboard przestaje liczyć „ukończone dnia X" z `status: done` + `updated:` (dziś udokumentowane jako przybliżenie — patrz komentarz w `build-viewer.mjs`) i zaczyna liczyć z realnych przejść.
-4. **Presence / konflikt zapisu** — przy równoległej edycji dwóch osób dochodzi test „czy plik zmienił się od odczytu" (ETag/mtime) i odmowa nadpisania. Dziś ostatni zapis wygrywa, co przy jednym userze jest właściwym uproszczeniem.
+**Editing works only in server mode** (`backlog` in the terminal). In
+`file://` mode fields are read-only, and history is visible (built in). The
+reason: a second write path through the File System Access API would mean a
+second set of validation rules, a second place aware of history and view
+regeneration — the first schema change would drift silently between the two.
+This also removed the previously existing duplication of writing the status
+(fetch + FS Access).
 
 ---
 
-## 8. Klasy błędów, które ten mechanizm już złapał
+## 6. Backfilling history predating this mechanism — deliberately NOT done
 
-- **Jedno zdarzenie, po jednym wpisie na obserwatora.** Task założony w worktree zapisywał `__created__` u siebie; drugi checkout, który tego wpisu nie miał, uznawał task za nowy i zapisywał własny — jako `unknown`/`external`. Trzy wystąpienia (TL-33, BL-1445, BL-1446), ostatnie **bez żadnego merge'a**: wystarczył drugi obserwator tego samego pliku. Każde znalezione ręcznie, żadne testem — mechanizm nie miał na tę klasę bramki, bo dedup po `id` z definicji jej nie widzi.
-- **Zapis pola listowego kasował sąsiedni klucz.** Naiwne „podmień linię" przy `related_docs:` (lista blokowa) zjadało blok `verification:` poniżej. Test `lista blokowa nie zjada następnego klucza` pilnuje tego wprost; to ta sama klasa co „kotwica `replace` obejmująca sąsiada" — dopasowanie szersze niż zamierzone kasuje blok, którego nikt nie czytał.
-- **Pętla render → fetch → render.** `renderDetail()` dociągał historię, a odpowiedź wywoływała `renderDetail()` — kasowało to otwarty edytor w trakcie pisania i biło w serwer bez końca. Historia jest teraz dociągana raz na task i przerysowuje widok tylko, gdy naprawdę się zmieniła.
-- **Backslash w kodzie wklejanym do template literala.** Kod klienta viewera żyje w JS-owym template literalu — `\n` albo `\'` napisane wprost są zjadane przy generowaniu strony. Moduły wklejane **źródłem** (jak `task-fields.mjs`) tego problemu nie mają, bo są interpolowane, a nie parsowane; kod pisany w literale musi podwajać backslashe.
+History of field changes can be reconstructed from git:
+`git log -p --follow backlog/tasks/BL-*.md`, diffing the frontmatter commit
+by commit, `actor` from the commit author. We are not doing this now,
+because:
+
+- the commit author in this repository is **always the founder**, even for
+  agent work — backfilling would produce 1350 tasks "changed by the founder",
+  a pretty and untrue attribution;
+- commit date ≠ change date (work is sometimes committed in batches).
+
+If a backfill were ever needed, the only honest form is `actor: "unknown"`,
+`source: "git"`, and the commit's `ts`. Its being worthwhile depends on
+commits already distinguishing authors beforehand (e.g. a `Co-Authored-By`
+trailer) — until they do, the result carries none of the information we are
+looking for.
+
+---
+
+## 7. The road to multiple users
+
+Order of steps once real users besides the founder and agents arrive:
+
+1. **An actor registry** — `backlog/actors.yaml` (slug, name, type
+   `human|agent`), a pre-commit guard rejecting an actor not in the registry.
+   The entry schema does not change; membership validation is added.
+2. **Identity instead of declaration** — the namespace (`local:` vs `user:`)
+   has been in the schema since TL-21, but nobody ENFORCES it: the server
+   still trusts the `actor` field from the request. Closing this: take it
+   from the session (even from a header set by a reverse proxy, or from
+   `git config user.email` for local access). Only this turns the log into
+   an audit log.
+3. **History as the dashboard's source** — with the `ts` of a status
+   transition, the dashboard stops counting "completed on day X" from
+   `status: done` + `updated:` (today documented as an approximation — see
+   the comment in `build-viewer.mjs`) and starts counting from real
+   transitions.
+4. **Presence / write conflicts** — with two people editing in parallel, a
+   "has the file changed since it was read" test is added (ETag/mtime) and
+   overwrites are refused. Today the last write wins, which is the right
+   simplification for one user.
+
+---
+
+## 8. Classes of bug this mechanism has already caught
+
+- **One event, one entry per observer.** A task founded in a worktree wrote
+  `__created__` on its own; a second checkout that lacked that entry took the
+  task for new and wrote its own — as `unknown`/`external`. Three occurrences
+  (TL-33, BL-1445, BL-1446), the last one **with no merge at all**: a second
+  observer of the same file was enough. Each found by hand, none by a test —
+  the mechanism had no gate for this class, because dedup by `id` cannot see
+  it by definition.
+- **Writing a list field ate the neighbouring key.** A naive "swap the line"
+  approach on `related_docs:` (a block list) ate the `verification:` block
+  below it. The test `a block list does not eat the next key` guards this
+  directly; it is the same class as "a replace anchor spanning the neighbour"
+  — a match wider than intended erases a block nobody read.
+- **A render → fetch → render loop.** `renderDetail()` fetched history, and
+  the response called `renderDetail()` again — this erased an open editor
+  mid-keystroke and hammered the server endlessly. History is now fetched
+  once per task and redraws the view only when it genuinely changed.
+- **A backslash in code pasted into a template literal.** The viewer's client
+  code lives in a JS template literal — `\n` or `\'` written literally get
+  eaten when the page is generated. Modules pasted **as source** (like
+  `task-fields.mjs`) don't have this problem, because they are interpolated,
+  not parsed; code written directly in the literal has to double its
+  backslashes.

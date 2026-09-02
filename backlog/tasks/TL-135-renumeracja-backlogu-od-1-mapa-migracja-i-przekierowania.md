@@ -1,10 +1,10 @@
 ---
 id: TL-135
-title: "Renumeracja backlogu od 1: mapa, migracja i przekierowania"
+title: "Renumbering the backlog from 1: map, migration and redirects"
 type: task
 labels: []
 board: main
-epic: "Integralność danych"
+epic: "Data integrity"
 priority: P3                       # P0 blocker | P1 critical | P2 nice | P3 backlog
 status: done  # pending | in_progress | blocked | done | cancelled
 owner: agent:claude
@@ -14,74 +14,78 @@ updated: 2026-09-01
 blocked_by: []
 blocks: []
 related_docs: []
-verification:                      # JAK sprawdzić, że task naprawdę jest zrobiony
+verification:                      # HOW to check the task is actually done
   - id: decyzja-zapisana
-    manual: "W tym pliku stoi rozstrzygnięcie WARIANTU (A/B/C) z uzasadnieniem, albo task jest cancelled z powodem."
+    manual: "This file records the resolved VARIANT (A/B/C) with justification, or the task is cancelled with a reason."
   - id: tree-green
     bash: "node scripts/cli.mjs check && node scripts/cli.mjs doctor"
   - id: suite-green
     bash: "node --test scripts/tests/*.test.mjs"
 ---
 
-## Cel
+## Goal
 
-Backlog ma ciągłą numerację `TL-1`..`TL-135`, a żadne odwołanie nie wskazuje po
-migracji na INNY task niż przed nią. **Zrobione 2026-09-01.**
+The backlog has continuous numbering `TL-1`..`TL-135`, and no reference
+points, after the migration, to a DIFFERENT task than it did before it.
+**Done 2026-09-01.**
 
-## Decyzja
+## Decision
 
-**Wybrany wariant A — pełna renumeracja.** Analiza rekomendowała wariant C
-(numer porządkowy jako wyliczony widok, `id:` bez zmian), bo koszt A leży
-w miejscach, których migracja nie dosięga. Decyzja właściciela repozytorium
-padła na A i została podtrzymana po przedstawieniu tego kosztu.
+**Variant A — full renumbering — was chosen.** The analysis recommended
+variant C (the ordinal number as a computed view, `id:` unchanged), because
+the cost of A lands in places the migration cannot reach. The repository
+owner's decision fell on A and was upheld after that cost was presented.
 
-Co to kosztowało, wprost — te trzy rzeczy są nadal prawdziwe i nie da się ich
-cofnąć migracją:
+What this cost, plainly — these three things remain true and cannot be
+undone by a migration:
 
-1. **62 commity mają stary numer w tytule**, a 108 unikalnych ID stoi
-   w tytułach i treściach `git log`. Historia jest niezmienna.
-2. **192 markery `BL-*` w 50 z 101 plików `scripts/`** przestały zestawiać się
-   z drzewem po numerze. Zostawione świadomie: to ślad pochodzenia sprzed
-   wydzielenia, a nie odwołanie, które narzędzie ma prawo przepiąć.
-3. **Wzmianki wewnątrz rekordów `history/*.jsonl`** (4 sztuki) mówią starymi
-   numerami. Log jest append-only — `reason` napisany przez człowieka jest jego
-   zdaniem, nie polem, które migracja może poprawić.
+1. **62 commits carry the old number in their title**, and 108 unique IDs
+   appear in `git log` titles and bodies. History is immutable.
+2. **192 `BL-*` markers across 50 of 101 `scripts/` files** stopped lining
+   up with the tree by number. Left deliberately: this is a trace of origin
+   from before the extraction, not a reference the tool has the right to
+   repoint.
+3. **Mentions inside `history/*.jsonl` records** (4 of them) use the old
+   numbers. The log is append-only — a `reason` written by a person is
+   their sentence, not a field a migration may correct.
 
-Wszystkie trzy zakrywa **tabela przekierowań w `LINEAGE.md`**, kluczowana
-NUMEREM, nie prefiksem — dzięki temu obsługuje i `TL-1404`, i `BL-1404`.
+All three are covered by the **redirect table in `LINEAGE.md`**, keyed by
+NUMBER, not prefix — so it serves both `TL-1404` and `BL-1404`.
 
-## Jak to zrobiono
+## How it was done
 
-`worktrail renumber` (`scripts/renumber.mjs`) — osobna komenda, nie flaga do
-`migrate-prefix`, bo trzy rzeczy różnią się co do istoty:
+`worktrail renumber` (`scripts/renumber.mjs`) — a separate command, not a
+flag on `migrate-prefix`, because the two differ in kind:
 
-- **Rekord niesie CAŁĄ mapę.** Migracja prefiksu jest funkcją starego ID i jej
-  rekord może być regułą; renumeracja funkcją nie jest. Stąd
-  `kind: "renumber"` w `history/.migrations.jsonl`, a `applyPrefixMigrations`
-  zmieniło nazwę na `applyIdMigrations` i rozgałęzia się po rodzaju.
-- **Proza jest PRZEPISYWANA, nie liczona.** Po zmianie prefiksu odwołanie
-  zostawione w prozie prowadzi donikąd i czytelnik wie, że coś się przesunęło.
-  Po renumeracji stary numer nadal istnieje i oznacza inny task — czytelnik nie
-  zostaje zatrzymany, tylko wprowadzony w błąd.
-- **Przestrzenie ID zachodzą na siebie**, więc rename idzie przez nazwę
-  tymczasową w dwóch przebiegach.
+- **The record carries the WHOLE map.** Prefix migration is a function of
+  the old ID and its record can be a rule; renumbering is not a function.
+  Hence `kind: "renumber"` in `history/.migrations.jsonl`, and
+  `applyPrefixMigrations` was renamed to `applyIdMigrations` and branches by
+  kind.
+- **Prose is REWRITTEN, not counted.** After a prefix change, a reference
+  left in prose leads nowhere, and the reader knows something has shifted.
+  After renumbering, the old number still exists and means a different
+  task — the reader is not stopped, only misled.
+- **ID spaces overlap**, so the rename goes through a temporary name in two
+  passes.
 
-Przebieg: 135 tasków, 135 logów historii, **1375 odwołań przepisanych w 368
-plikach**, 20 ID nieznanych mapie zostawionych nietkniętych i wypisanych.
+Run: 135 tasks, 135 history logs, **1375 references rewritten across 368
+files**, 20 IDs unknown to the map left untouched and printed out.
 
-## Co wyszło po drodze i jest osobnym tematem
+## What came up along the way and is a separate topic
 
-Komenda **nie odróżnia odwołania od PRZYKŁADU**. Komentarze ilustrujące
-(„`TL-1303` staje się `TL-1`") zwinęły się w „`TL-1` staje się `TL-1`"
-w `scripts/renumber.mjs`, `scripts/history.mjs` i `scripts/task-id.mjs`.
-Naprawione ręcznie przez przepięcie przykładów na obcy prefiks `PROJ-`, którego
-żadna mapa nie obejmie. Osobny task na to: [[TL-136]].
+The command **does not distinguish a reference from an EXAMPLE**.
+Illustrative comments ("`TL-1303` becomes `TL-1`") collapsed into "`TL-1`
+becomes `TL-1`" in `scripts/renumber.mjs`, `scripts/history.mjs`, and
+`scripts/task-id.mjs`. Fixed by hand by repointing the examples to a
+foreign prefix, `PROJ-`, which no map will ever cover. Separate task for
+this: [[TL-136]].
 
 ## Acceptance criteria
 
-- [x] Wariant (A / B / C) jest rozstrzygnięty i uzasadniony w tym pliku. [proof: decyzja-zapisana]
-- [x] Jeśli A: mapa `old → new` jest zacommitowanym plikiem, a nie efektem ubocznym uruchomienia. [proof: decyzja-zapisana]
-- [x] Jeśli A: `LINEAGE.md` niesie tabelę przekierowań dla ID wspominanych w `git log`. [proof: decyzja-zapisana]
-- [x] Jeśli A: żadne odwołanie w prozie nie wskazuje po migracji na INNY task niż przed nią — pominięcia są wypisane, nie przemilczane. [proof: tree-green]
-- [x] `check` i `doctor` zielone po zmianie. [proof: tree-green]
-- [x] Pełna suita zielona po zmianie. [proof: suite-green]
+- [x] The variant (A / B / C) is decided and justified in this file. [proof: decyzja-zapisana]
+- [x] If A: the `old → new` map is a committed file, not a side effect of a run. [proof: decyzja-zapisana]
+- [x] If A: `LINEAGE.md` carries a redirect table for IDs mentioned in `git log`. [proof: decyzja-zapisana]
+- [x] If A: no reference in prose points, after the migration, to a DIFFERENT task than before it — omissions are printed out, not passed over in silence. [proof: tree-green]
+- [x] `check` and `doctor` are green after the change. [proof: tree-green]
+- [x] The full suite is green after the change. [proof: suite-green]

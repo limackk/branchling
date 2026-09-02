@@ -1,10 +1,10 @@
 ---
 id: TL-78
-title: "on_status_change — konfigurowalna komenda przy zmianie statusu"
+title: "on_status_change — configurable command on status change"
 type: code
 labels: [post-launch]
 board: main
-epic: "Konfigurowalność"
+epic: "Configurability"
 priority: P3
 status: pending
 owner: unassigned
@@ -20,58 +20,65 @@ verification:
   - bash: "node --test scripts/tests/on-status-change.test.mjs"
 ---
 
-## Cel
+## Goal
 
-Zmiana statusu taska może uruchomić komendę z konfiguracji, z ID, tytułem oraz
-starym i nowym statusem w środowisku. Uogólnienie `regen-hook` z jednego
-zaszytego przypadku na wyzwalacz, który użytkownik konfiguruje sam.
+A task's status change can trigger a command from configuration, with the ID,
+title, and the old and new status in the environment. A generalization of
+`regen-hook` from one hardcoded case into a trigger the user configures
+themselves.
 
-## Kontekst
+## Context
 
-`worktrail regen-hook` obsługuje JEDEN scenariusz: edytor zapisał task, przebuduj
-widoki. Wejście jest, mechanizm jest, brakuje tylko tego, żeby użytkownik mógł
-podpiąć własną reakcję (powiadomienie, wpis do CI, `git commit`) bez patchowania
-naszego kodu. To jest IV prawo — rozszerzalność przez kompozycję — zastosowane
-do strony piszącej.
+`worktrail regen-hook` handles ONE scenario: the editor saved a task, rebuild
+the views. The input exists, the mechanism exists, all that is missing is
+letting the user attach their own reaction (a notification, a CI entry, `git
+commit`) without patching our code. This is Law IV — extensibility through
+composition — applied to the writing side.
 
-Backlog.md ma `onStatusChange` z `$TASK_ID`, `$OLD_STATUS`, `$NEW_STATUS`,
-`$TASK_TITLE` i nadpisaniem per task w frontmatterze.
+Backlog.md has `onStatusChange` with `$TASK_ID`, `$OLD_STATUS`, `$NEW_STATUS`,
+`$TASK_TITLE`, and a per-task override in the frontmatter.
 
-Rozstrzygnięcia:
+Decisions:
 
-1. **Warstwa.** Klucz należy do warstwy UŻYTKOWNIKA lub projektu — rozstrzygnij
-   i uzasadnij w tasku. Wersjonowana komenda powłoki, która odpala się każdemu,
-   kto sklonuje repo, to wykonanie cudzego kodu przy `worktrail build`. Skłaniaj
-   się ku warstwie użytkownika i jawnej zgodzie.
-2. **Awaria komendy nie może zjeść zapisu taska.** Status jest zapisany, hook
-   zawiódł — narzędzie mówi to głośno i wychodzi z kodem !=0, ale nie cofa
-   zapisu.
-3. **Nadpisanie per task** (jak u nich) rozważ dopiero, gdy warstwa jest
-   rozstrzygnięta; klucz w frontmatterze to ta sama kwestia zaufania.
+1. **Layer.** The key belongs to the USER layer or the project layer — decide
+   and justify it in the task. A versioned shell command that runs for anyone
+   who clones the repo is arbitrary code execution on `worktrail build`. Lean
+   toward the user layer and explicit consent.
+2. **A failing command must not swallow the task write.** The status is
+   written, the hook failed — the tool says so loudly and exits with code
+   !=0, but does not undo the write.
+3. **A per-task override** (as they have) — consider only once the layer is
+   settled; a frontmatter key is the same trust question.
 
 ## Pre-flight reading
 
-1. `scripts/regen-hook.mjs` — istniejące wejście hookowe i jego kontrakt na stdin.
-2. `scripts/config.mjs` — warstwy konfiguracji i to, która za co odpowiada.
-3. `docs/backlog-config-and-portability.md` — rozstrzygnięcia o przenośności
-   konfiguracji; nie podważaj ich mimochodem.
+1. `scripts/regen-hook.mjs` — the existing hook entry point and its stdin
+   contract.
+2. `scripts/config.mjs` — configuration layers and what each is responsible
+   for.
+3. `docs/backlog-config-and-portability.md` — decisions already made about
+   configuration portability; do not second-guess them in passing.
 
-## Kroki
+## Steps
 
-1. Rozstrzygnij warstwę klucza i zapisz uzasadnienie (bezpieczeństwo, nie gust).
-2. Wykryj zmianę statusu przy zapisie i uruchom komendę ze zmiennymi środowiska.
-3. Kod wyjścia !=0 z hooka jest zgłaszany i propagowany; zapis taska zostaje.
-4. Udokumentuj w README, wraz z ostrzeżeniem o wykonaniu cudzej komendy.
-5. `scripts/tests/on-status-change.test.mjs` — hook dostaje właściwe zmienne;
-   awaria hooka nie cofa zapisu; brak klucza to brak wywołania.
+1. Decide the key's layer and record the justification (security, not taste).
+2. Detect a status change on write and run the command with environment
+   variables.
+3. A nonzero exit code from the hook is reported and propagated; the task
+   write stays.
+4. Document it in the README, along with a warning about running someone
+   else's command.
+5. `scripts/tests/on-status-change.test.mjs` — the hook receives the right
+   variables; a failing hook does not undo the write; no key means no
+   invocation.
 
 ## Acceptance criteria
 
-- [ ] Zmiana statusu uruchamia komendę z ID, tytułem, starym i nowym statusem.
-- [ ] Warstwa klucza jest rozstrzygnięta i uzasadniona bezpieczeństwem.
-- [ ] Awaria hooka jest głośna i nie cofa zapisanego statusu.
-- [ ] Bez skonfigurowanego klucza nic się nie uruchamia.
+- [ ] A status change runs a command with the ID, title, old and new status.
+- [ ] The key's layer is settled and justified on security grounds.
+- [ ] A failing hook is loud and does not undo the written status.
+- [ ] With no key configured, nothing runs.
 
 ## Log
 
-2026-08-31 pending — agent:claude — założony z analizy Backlog.md (github.com/MrLesk/Backlog.md), punkt 7.
+2026-08-31 pending — agent:claude — created from analysis of Backlog.md (github.com/MrLesk/Backlog.md), point 7.

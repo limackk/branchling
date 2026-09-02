@@ -1,10 +1,10 @@
 ---
 id: TL-47
-title: "Brak backlogu wychodzi jako nieobsłużony wyjątek ze stack tracem"
+title: "A missing backlog exits as an unhandled exception with a stack trace"
 type: bug
 labels: []
 board: main
-epic: "Backlog — publikacja open source"
+epic: "Backlog — open source publication"
 priority: P3
 status: pending
 owner: unassigned
@@ -17,21 +17,21 @@ blocks: []
 related_docs:
   - docs/backlog-config-and-portability.md
 verification:
-  - bash: "cd /tmp && node <ścieżka>/bin/worktrail.mjs query --count 2>&1 | head -3   # expected: sam komunikat, bez `at ...`"
+  - bash: "cd /tmp && node <path>/bin/worktrail.mjs query --count 2>&1 | head -3   # expected: message only, no `at ...`"
 ---
 
-## Cel
+## Goal
 
-Przewidziany, opisany stan („nie ma tu backlogu") ma wychodzić jako komunikat i
-kod wyjścia, a nie jako zrzut wyjątku.
+A foreseen, documented state ("no backlog here") should exit as a message and
+an exit code, not as an exception dump.
 
-## Kontekst
+## Context
 
-Zmierzone 2026-08-31 z pustego katalogu:
+Measured 2026-08-31 from an empty directory:
 
 ```
-Error: Nie znalazłem katalogu backlogu. Wskaż go: --dir <ścieżka> albo
-BACKLOG_DIR=<ścieżka>, albo uruchom z katalogu repozytorium, które ma backlog/tasks/.
+Error: Could not find the backlog directory. Point to it: --dir <path> or
+BACKLOG_DIR=<path>, or run from a repository directory that has backlog/tasks/.
     at resolveBacklogDir (file:///…/scripts/paths.mjs:119:9)
     at file:///…/scripts/query.mjs:81:34
     at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
@@ -39,46 +39,50 @@ BACKLOG_DIR=<ścieżka>, albo uruchom z katalogu repozytorium, które ma backlog
 Node.js v24.18.0
 ```
 
-**Treść jest dobra, opakowanie nie.** Kod wyjścia to 1 i nic nie jest zapisywane
-— zachowanie jest poprawne. Problem jest w tym, co to komunikuje: stack trace
-mówi „narzędzie się wysypało", a nie „nie tu, spróbuj `--dir`". Dla użytkownika,
-który właśnie zainstalował `worktrail` i wywołał go z katalogu domowego, jest to
-**pierwszy kontakt z narzędziem**.
+**The content is good, the packaging is not.** The exit code is 1 and nothing
+is written — this behavior is correct. The problem is what it communicates: a
+stack trace says "the tool crashed", not "not here, try `--dir`". For a user
+who just installed `worktrail` and ran it from their home directory, this is
+**the first contact with the tool**.
 
-Ten sam stan jest w dokumentacji opisany jako projektowany, nie awaryjny — więc
-prezentacja przeczy projektowi.
+The same state is described in the documentation as by design, not as a
+failure — so the presentation contradicts the design.
 
-**Druga połowa problemu, zmierzona 2026-08-31 przy audycie onboardingu:** sama
-treść komunikatu też jest niepełna. Wymienia trzy sposoby WSKAZANIA istniejącego
-backlogu (`--dir`, `BACKLOG_DIR`, uruchomienie z repozytorium) i ani jednego na
-ZAŁOŻENIE nowego. Człowiek, który przed chwilą zainstalował narzędzie i wywołał
-je pierwszy raz, jest dokładnie w tym drugim przypadku — a `worktrail init --dir
-<ścieżka>` nie pada w komunikacie ani razu. Rozstrzygnięcie, którą podpowiedź dać
-pierwszą, można oprzeć na kontekście: katalog wygląda na korzeń repozytorium bez
-backlogu → prawdopodobnie `init`; katalog domowy → prawdopodobnie `--dir`.
+**The second half of the problem, measured 2026-08-31 during an onboarding
+audit:** the message's content is itself incomplete. It lists three ways to
+POINT to an existing backlog (`--dir`, `BACKLOG_DIR`, running from a
+repository) and not one for CREATING a new one. A person who just installed
+the tool and ran it for the first time is exactly in that second case — and
+`worktrail init --dir <path>` never appears in the message. Which hint to give
+first can be decided from context: a directory that looks like a repository
+root with no backlog → probably `init`; a home directory → probably `--dir`.
 
-## Kroki
+## Steps
 
-1. Znaleźć WSZYSTKIE wejścia, w których `resolveBacklogDir` może rzucić poza
-   `try` — nie tylko `query`. Poprawka w jednej komendzie zostawiłaby resztę.
-2. Rozstrzygnąć miejsce: łapanie w `cli.mjs` (jedno miejsce, ale omija
-   bezpośrednie `node scripts/*.mjs`) czy typowany błąd rozpoznawany w każdym
-   wejściu. Zapisać powód wyboru.
-3. Zachować kod wyjścia i BRAK zapisu — to jest dziś poprawne i ma takie zostać.
-4. Sprawdzić przy okazji, czy inne przewidziane stany (nieznana flaga, nieznana
-   komenda, brak rejestru boardów) też nie wychodzą wyjątkiem.
+1. Find ALL entry points where `resolveBacklogDir` can throw outside a `try` —
+   not just `query`. A fix in one command would leave the rest untouched.
+2. Decide where to catch it: in `cli.mjs` (a single place, but bypassed by a
+   direct `node scripts/*.mjs`) or a typed error recognized at each entry
+   point. Record the reason for the choice.
+3. Keep the exit code and the ABSENCE of any write — this is correct today and
+   is to stay that way.
+4. Check along the way whether other foreseen states (an unknown flag, an
+   unknown command, a missing board registry) also do not exit as exceptions.
 
 ## Acceptance criteria
 
-- [ ] Wywołanie z katalogu bez backlogu: komunikat, kod ≠ 0, **zero linii `at `**.
-- [ ] To samo dla wszystkich komend czytających, nie tylko `query` — test iteruje
-      po słowniku `COMMANDS`, żeby nowa komenda nie wypadła z pokrycia po cichu.
-- [ ] Prawdziwy błąd programisty (np. `TypeError`) **nadal** pokazuje stack —
-      wyciszanie wszystkiego byłoby lekarstwem gorszym od choroby. Test negatywny.
-- [ ] Komunikat podaje `worktrail init --dir <ścieżka>` jako drogę założenia
-      backlogu, obok dzisiejszych trzech sposobów wskazania istniejącego.
+- [ ] A call from a directory with no backlog: a message, a nonzero exit code,
+      **zero `at ` lines**.
+- [ ] The same for every reading command, not just `query` — the test iterates
+      over the `COMMANDS` dictionary, so a new command cannot silently fall
+      out of coverage.
+- [ ] A genuine programmer error (e.g. `TypeError`) **still** shows a stack —
+      silencing everything would be a cure worse than the disease. A negative
+      test.
+- [ ] The message gives `worktrail init --dir <path>` as a way to create a
+      backlog, alongside today's three ways to point to an existing one.
 
 ## Log
 
-- 2026-08-31 created — claude — znalezione przy uruchamianiu (nie czytaniu) bloku `verification` z TL-33; sam blok wskazywał wtedy ścieżkę, która już nie istnieje, i to jego naprawa odsłoniła ten defekt
-- 2026-08-31 updated — agent:claude — dopisana druga połowa: komunikat nie wymienia `worktrail init`; zakres taska rozszerzony zamiast zakładania duplikatu
+- 2026-08-31 created — claude — found while running (not reading) the `verification` block of TL-33; that block at the time pointed to a path that no longer exists, and fixing it is what exposed this defect
+- 2026-08-31 updated — agent:claude — added the second half: the message does not mention `worktrail init`; task scope expanded instead of creating a duplicate

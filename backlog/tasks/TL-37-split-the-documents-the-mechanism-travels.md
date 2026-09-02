@@ -1,10 +1,10 @@
 ---
 id: TL-37
-title: "Rozdziel dokumenty — mechanizm jedzie, pomiary zostają"
+title: "Split the documents — the mechanism travels, the measurements stay"
 type: code
 labels: [post-launch]
 board: main
-epic: "Backlog — publikacja open source"
+epic: "Backlog — open source publication"
 priority: P3
 status: pending
 owner: unassigned
@@ -17,102 +17,169 @@ blocks: []
 related_docs:
   - origin#docs/architecture/worktrail-extraction.md
 verification:
-  - bash: "test -z \"$(grep -rlniE 'origin|client-app|sync-layer|kamil|founder@' /Users/limack/workspace/tasklog/docs /Users/limack/workspace/tasklog/README.md 2>/dev/null)\" && echo 'zero kontekstu the origin project — OK'"
-  - bash: "test -z \"$(grep -rnE '\\b(1[0-9]{3}|[0-9]{2})% commitów|1[0-9]{3} tasków|45 tasków' /Users/limack/workspace/tasklog/docs 2>/dev/null)\" && echo 'zero pomiarów z cudzego repo — OK'"
+  - bash: "test -z \"$(grep -rlniE 'origin|client-app|sync-layer|kamil|founder@' /Users/limack/workspace/tasklog/docs /Users/limack/workspace/tasklog/README.md 2>/dev/null)\" && echo 'zero the origin project context — OK'"
+  - bash: "test -z \"$(grep -rnE '\\b(1[0-9]{3}|[0-9]{2})% commitów|1[0-9]{3} tasków|45 tasków' /Users/limack/workspace/tasklog/docs 2>/dev/null)\" && echo 'zero measurements from another repo — OK'"   # language-guard: allow — the regex deliberately matches the Polish words it is proving are gone
 ---
 
-## Cel
+## Goal
 
-Rozdzielić pięć dokumentów architektury na **dwie wersje dla dwóch czytelników**: w the origin project zostaje zapis „dlaczego MY tak zdecydowaliśmy" z pomiarami, do narzędzia jedzie „jak to działa i jak sprawdzisz to u siebie". Bez ani jednej danej o the origin project w nowym repozytorium.
+Split five architecture documents into **two versions for two readers**:
+the origin project keeps the record of "why WE decided this way" with the measurements,
+the tool gets "how it works and how to verify it for yourself". Not a single
+piece of data about the origin project in the new repository.
 
-## Kontekst
+## Context
 
-**Decyzja foundera 2026-08-30: żadnych informacji o the origin project w repo narzędzia.** Ten task realizował wcześniej wariant „zanonimizuj liczby i zabierz je" — został przepisany, bo tamten wariant był po prostu słabszy.
+**Founder's decision, 2026-08-30: no information about the origin project in the tool's
+repo.** This task previously implemented the variant "anonymize the numbers
+and keep them" — it was rewritten because that variant was simply weaker.
 
-Powód warto zapisać, bo to samo pytanie wróci przy każdym kolejnym dokumencie:
+The reason is worth recording, because the same question will come back with
+every next document:
 
-> **Niesprawdzalny pomiar nie jest dowodem dla obcego czytelnika.** „78% commitów dotykało widoków" w repozytorium, do którego nikt nie ma dostępu, wymaga wiary w autora. Wewnątrz the origin project ta liczba BYŁA dowodem, bo każdy mógł ją przeliczyć. Na zewnątrz przestaje nim być — a nadal niesie informację o firmie. Najgorszy możliwy stosunek: zero zysku, niezerowy koszt.
+> **An unverifiable measurement is not evidence for a stranger.** "78% of
+> commits touched views" in a repository nobody has access to requires
+> trusting the author. Inside the origin project that number WAS evidence, because anyone
+> could recompute it. Outside, it stops being evidence — while still
+> carrying information about the company. The worst possible ratio: zero
+> gain, nonzero cost.
 
-Czytelnika open source przekonuje **mechanizm**, a jeszcze bardziej **komenda, którą sam odtworzy pomiar u siebie**. Dokument mówiący „`INDEX.yaml` jest agregatem wszystkich tasków, więc każda gałąź przepisuje ten sam plik — sprawdź: `git merge-tree` na dwóch gałęziach o rozłącznych taskach" jest mocniejszy niż ten podający wynik z cudzego drzewa.
+The open source reader is convinced by the **mechanism**, and even more by
+**the command that lets them reproduce the measurement themselves**. A
+document that says "`INDEX.yaml` is an aggregate of all tasks, so every
+branch rewrites the same file — check it: `git merge-tree` on two branches
+with disjoint tasks" is stronger than one that states a result from someone
+else's tree.
 
-To jest ta sama granica, którą moduł już zna z TL-19 — **kod zna kształt, konfiguracja zna wartości** — zastosowana do dokumentacji:
+This is the same boundary the module already knows from TL-19 — **the code
+knows the shape, the configuration knows the values** — applied to
+documentation:
 
-| | Trzyma | Gdzie |
+| | Holds | Where |
 |---|---|---|
-| dokument narzędzia | mechanizm, decyzję, uzasadnienie, komendę do odtworzenia | `worktrail/docs/` |
-| dokument the origin project | pomiary z datami, komendami i kontekstem | `origin/docs/architecture/` |
+| the tool's document | mechanism, decision, rationale, the command to reproduce it | `worktrail/docs/` |
+| the origin project's document | measurements with dates, commands and context | `origin/docs/architecture/` |
 
-**Dokumenty w origin zostają NIETKNIĘTE.** To nasz zapis rozumowania i nie ma powodu go kaleczyć — ten task nie edytuje ani jednego pliku w origin.
+**The documents in origin stay UNTOUCHED.** That is our record of
+reasoning and there is no reason to maim it — this task does not edit a
+single file in origin.
 
-Zakres NIE obejmuje tłumaczenia — to [TL-32](TL-32-angielska-powierzchnia-publiczna-modulu.md). Oba taski przepisują te same pliki, więc **sekwencyjnie, nie równolegle**.
+The scope does NOT include translation — that is
+[TL-32](TL-32-angielska-powierzchnia-publiczna-modulu.md). Both tasks
+rewrite the same files, so **sequentially, not in parallel**.
 
 ## Pre-flight reading
 
-1. `docs/architecture/worktrail-extraction.md` §6 — podział i trzy przykłady przepisania.
-2. Pięć dokumentów w `docs/` nowego repo, w całości. Wycięcie liczby bez zrozumienia, czego dowodziła, kaleczy argument — a celem jest argument mocniejszy, nie krótszy.
-3. `TL-32` — zakres językowy, żeby nie robić tej samej pracy dwa razy.
+1. `docs/architecture/worktrail-extraction.md` §6 — the split and three
+   examples of rewriting.
+2. The five documents in `docs/` of the new repo, in full. Cutting a number
+   without understanding what it proved maims the argument — and the goal is
+   an argument that is stronger, not shorter.
+3. `TL-32` — the language scope, so the same work is not done twice.
 
-## Kroki
+## Steps
 
-1. **Inwentarz przed edycją**: każde wystąpienie „the origin project", ścieżek `client-app/`, `origin-*`, the sync layer, nazwisk, adresów **oraz każdy pomiar** w `docs/` i `README.md` nowego repo. Lista jest kryterium kompletności na końcu.
-2. Dla każdego pomiaru rozstrzygnąć, **czego dowodził**, i zastąpić go jedną z trzech form:
-   - **mechanizm** — gdy liczba tylko ilustrowała regułę („agregat = każda gałąź przepisuje ten sam plik");
-   - **komenda odtwarzająca** — gdy pomiar jest sprawdzalny u czytelnika (`git merge-tree`, `git log --name-only`, zliczenie własnych `in_progress`);
-   - **ostrzeżenie warunkowe** — gdy liczba opisywała nasz przypadek, nie regułę („`in_progress` bywa stanem parkingowym — policz swoje, zanim zaufasz cycle time").
-3. Ścieżki przykładowe → neutralne (`/path/to/repo`, `myproject/backlog`).
-4. Odwołania do dokumentów, które **nie jadą** (`legal-and-compliance.md`, `repositories.md`, `worktrail-extraction.md`) — usunąć albo zastąpić opisem. Martwy link w publicznym repo to gorsza wizytówka niż jego brak.
-5. Odwołania `BL-NNNN` **zostają** — to numery tasków narzędzia, które jadą razem z nim; `LINEAGE.md` wyjaśnia pochodzenie.
-6. Guard `check-no-foreign-context.mjs` w nowym repo: oblewa na nazwach (`origin`, `client-app`, `sync-layer`, nazwiska) **i na wzorcach pomiarowych** („N% commitów", „N tasków"). Wpiąć w `worktrail check`.
-7. Przejrzeć `LINEAGE.md`, README i commit inicjalny tym samym kryterium.
-8. Przeczytać każdy przepisany dokument od nowa i sprawdzić, czy **argument nadal stoi**. Jeśli po wyjęciu liczby akapit nie ma czego bronić, akapit był o the origin project, a nie o narzędziu — wyciąć go w całości.
+1. **Inventory before editing**: every occurrence of "the origin project", the paths
+   `client-app/`, `origin-*`, the sync layer, names, addresses **and every
+   measurement** in `docs/` and `README.md` of the new repo. The list is the
+   completeness criterion at the end.
+2. For each measurement, decide **what it proved**, and replace it with one
+   of three forms:
+   - **mechanism** — when the number only illustrated a rule ("aggregate =
+     every branch rewrites the same file");
+   - **reproducing command** — when the measurement is verifiable by the
+     reader (`git merge-tree`, `git log --name-only`, counting one's own
+     `in_progress`);
+   - **conditional warning** — when the number described our case, not the
+     rule ("`in_progress` can be a parking state — count your own before
+     trusting the cycle time").
+3. Example paths → neutral (`/path/to/repo`, `myproject/backlog`).
+4. References to documents that **do not travel** (`legal-and-compliance.md`,
+   `repositories.md`, `worktrail-extraction.md`) — remove or replace with a
+   description. A dead link in a public repo is a worse calling card than no
+   link at all.
+5. References to `BL-NNNN` **stay** — those are the tool's own task numbers,
+   which travel with it; `LINEAGE.md` explains the origin.
+6. The `check-no-foreign-context.mjs` guard in the new repo: fails on names
+   (`origin`, `client-app`, `sync-layer`, personal names) **and on measurement
+   patterns** ("N% of commits", "N tasks"). Wire it into `worktrail check`.
+7. Review `LINEAGE.md`, the README and the initial commit against the same
+   criterion.
+8. Read every rewritten document again and check whether **the argument
+   still stands**. If, after removing the number, a paragraph has nothing
+   left to defend, the paragraph was about the origin project, not about the tool — cut it
+   entirely.
 
 ## Acceptance criteria
 
-- [ ] `grep -rlniE 'origin|client-app|sync-layer|kamil|founder@'` po `docs/` i `README.md` nowego repo nie zwraca nic.
-- [ ] Żaden pomiar z naszego repozytorium nie przetrwał — bramka wzorcowa w Verification plus przegląd inwentarza z kroku 1.
-- [ ] Każdy usunięty pomiar zastąpiony mechanizmem, komendą albo ostrzeżeniem warunkowym — **żaden nie zniknął bez zamiennika**.
-- [ ] Co najmniej trzy dokumenty zyskały komendę, którą czytelnik odtworzy pomiar u siebie.
-- [ ] Żaden dokument nie linkuje do pliku, którego w nowym repo nie ma.
-- [ ] **Dokumenty w origin nietknięte** — `git -C origin status docs/` czysty.
-- [ ] Guard wpięty w `worktrail check`, z testem negatywnym na celowo wstawionej nazwie i na wzorcu pomiaru.
-- [ ] `LINEAGE.md`, README i commit inicjalny przeszły ten sam przegląd.
-- [ ] Nie kolidowało z TL-32 — jeden task skończony przed startem drugiego (zapisane w `## Log`).
+- [ ] `grep -rlniE 'origin|client-app|sync-layer|kamil|founder@'` over `docs/`
+      and `README.md` of the new repo returns nothing.
+- [ ] No measurement from our repository survived — the pattern gate in
+      Verification plus a review of the step 1 inventory.
+- [ ] Every removed measurement was replaced with a mechanism, a command, or
+      a conditional warning — **none disappeared without a replacement**.
+- [ ] At least three documents gained a command the reader can use to
+      reproduce the measurement themselves.
+- [ ] No document links to a file that does not exist in the new repo.
+- [ ] **The documents in origin are untouched** — `git -C
+      origin status docs/` is clean.
+- [ ] The guard is wired into `worktrail check`, with a negative test on a
+      deliberately inserted name and on a measurement pattern.
+- [ ] `LINEAGE.md`, the README and the initial commit went through the same
+      review.
+- [ ] Did not conflict with TL-32 — one task finished before the other
+      started (recorded in `## Log`).
 
 ## Verification
 
 ```bash
-# 1. Zero kontekstu the origin project — expected: komunikat OK
+# 1. Zero the origin project context — expected: OK message
 test -z "$(grep -rlniE 'origin|client-app|sync-layer|kamil|founder@' \
   /Users/limack/workspace/tasklog/docs /Users/limack/workspace/tasklog/README.md 2>/dev/null)" \
-  && echo 'zero kontekstu the origin project — OK'
+  && echo 'zero the origin project context — OK'
 
-# 2. Zero pomiarów z cudzego repo — expected: komunikat OK
+# 2. Zero measurements from a foreign repo — expected: OK message (language-guard: allow — regex matches the Polish words it proves are gone)
 test -z "$(grep -rnE '[0-9]+% commitów|1[0-9]{3} tasków|45 tasków' /Users/limack/workspace/tasklog/docs 2>/dev/null)" \
-  && echo 'zero pomiarów z cudzego repo — OK'
+  && echo 'zero measurements from a foreign repo — OK'
 
-# 3. Źródło nietknięte — expected: brak zmian
+# 3. Source untouched — expected: no changes
 git -C /Users/limack/workspace/origin status --porcelain docs/
 
-# 4. Brak martwych linków — expected: brak trafień
+# 4. No dead links — expected: no matches
 cd /Users/limack/workspace/tasklog && grep -rhoE '\]\(([^)]+\.md)\)' docs README.md \
   | sed -E 's/.*\((.*)\)/\1/' | sort -u | while read f; do
-    [ -e "docs/$f" ] || [ -e "$f" ] || echo "martwy link: $f"; done
+    [ -e "docs/$f" ] || [ -e "$f" ] || echo "dead link: $f"; done
 
-# 5. Guard łapie regresję — expected: kod wyjścia != 0
+# 5. Guard catches the regression — expected: nonzero exit code
 cd /Users/limack/workspace/tasklog && printf '\nthe origin project ma 1394 taski.\n' >> docs/worktrail-global-tool.md
-node scripts/cli.mjs check; test $? -ne 0 && echo 'guard łapie — OK'
+node scripts/cli.mjs check; test $? -ne 0 && echo 'guard catches it — OK'
 git checkout docs/worktrail-global-tool.md
 ```
 
 ## Notes
 
-- **To jest bramka publikacji, nie warunek działania.** Repo może istnieć lokalnie z pełnym kontekstem; nie może z nim wyjechać na publiczny hosting.
-- Krok 8 jest tam, gdzie leży realna wartość: akapit, który po wyjęciu naszej liczby nie ma czego bronić, **nie był o narzędziu**. Znalezienie takich akapitów jest zyskiem, nie stratą.
-- Świadomie poza zakresem: tłumaczenie (TL-32), historia gita (spłaszczona w BL-1445, nie ma czego audytować), push (osobna decyzja foundera).
+- **This is a publication gate, not a condition for functioning.** The repo
+  can exist locally with full context; it must not travel with it to public
+  hosting.
+- Step 8 is where the real value lies: a paragraph that, after removing our
+  number, has nothing left to defend **was not about the tool**. Finding
+  such paragraphs is a gain, not a loss.
+- Deliberately out of scope: translation (TL-32), git history (flattened in
+  BL-1445, nothing left to audit), push (a separate founder decision).
 
 ## Log
 
-- 2026-08-30 blocker zdjęty — claude — `blocked_by: [BL-1445]` wskazywał na task, który mieszka w backlogu KONSUMENTA (`origin#BL-1445`), nie tutaj, i jest tam `done`. Wiszące odwołanie było niewidoczne dla `build` i `check` — brak tej bramki zgłoszony osobno.
+- 2026-08-30 blocker removed — claude — `blocked_by: [BL-1445]` pointed at a
+  task that lives in the CONSUMER's backlog (`origin#BL-1445`), not
+  here, and is `done` there. The dangling reference was invisible to `build`
+  and `check` — the absence of this gate reported separately.
 
-- 2026-08-30 created — claude — z docs/architecture/worktrail-extraction.md §6; trzy warianty obsługi liczb, rekomendacja „zanonimizowane"
-- 2026-08-30 revised — claude — **decyzja foundera: zero danych o the origin project w repo narzędzia.** Task przepisany z „czyszczenia" na ROZDZIAŁ dokumentów: pomiary zostają w the origin project, do narzędzia idzie mechanizm + komenda odtwarzająca. Powód, dla którego poprzedni wariant był słabszy: niesprawdzalny pomiar z cudzego repozytorium nie jest dowodem dla obcego czytelnika, a nadal niesie informację o firmie
+- 2026-08-30 created — claude — from
+  docs/architecture/worktrail-extraction.md §6; three variants for handling
+  the numbers, recommendation "anonymized"
+- 2026-08-30 revised — claude — **founder's decision: zero data about the origin project
+  in the tool's repo.** The task was rewritten from "cleanup" to a SPLIT of
+  the documents: measurements stay in the origin project, the tool gets the mechanism plus
+  a reproducing command. The reason the previous variant was weaker: an
+  unverifiable measurement from someone else's repository is not evidence
+  for a stranger, while still carrying information about the company

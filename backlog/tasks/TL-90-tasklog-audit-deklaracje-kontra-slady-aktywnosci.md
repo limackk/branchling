@@ -1,10 +1,10 @@
 ---
 id: TL-90
-title: "worktrail audit — deklaracje kontra ślady aktywności"
+title: "worktrail audit — declarations versus traces of activity"
 type: task
 labels: []
 board: main
-epic: "Wyróżniki agentowe"
+epic: "Agentic distinguishers"
 priority: P2
 status: pending
 owner: unassigned
@@ -21,81 +21,88 @@ verification:
   - bash: "node --test scripts/tests/audit.test.mjs"
 ---
 
-## Cel
+## Goal
 
-`worktrail audit` krzyżuje deklaracje backlogu ze śladami w logu zdarzeń
-i raportuje rozjazdy:
+`worktrail audit` cross-checks the backlog's declarations against traces in
+the event log and reports divergences:
 
-- task `done` bez jednego zdarzenia przejścia w `history/` — zamknięty bez
-  śladu;
-- task reopenowany po `done` — rework, zliczany per aktor zamykający
-  („done od agent:claude wraca w N% przypadków");
-- `in_progress` bez zmiany pola od `audit_stale_days` — parking, nie praca;
-- `blocked` z pustym `blocked_by` — deklaracja bez przesłanki.
+- a task marked `done` with not a single transition event in `history/` —
+  closed without a trace;
+- a task reopened after `done` — rework, counted per closing actor
+  ("done by agent:claude comes back N% of the time");
+- `in_progress` with no field change for `audit_stale_days` — parked, not
+  being worked on;
+- `blocked` with an empty `blocked_by` — a declaration with no premise.
 
-Backlog przestaje być zbiorem deklaracji na wiarę: każde „done" ma dowód albo
-jest wskazane. Żaden sąsiad (Backlog.md, mdtask) nie może tego zrobić, bo nie
-ma zdarzeń przejść ani atrybucji.
+The backlog stops being a set of declarations taken on faith: every "done"
+either has proof or is flagged. No competitor (Backlog.md, mdtask) can do
+this, because none of them has transition events or attribution.
 
-## Kontekst
+## Context
 
-Powstało z przeglądu wyróżników wobec Backlog.md (2026-08-31). Klasa błędu
-jest realna i lokalna: commit 27776f0 („TL-52 was done and said pending")
-oraz stan parkingowy `in_progress` opisany w
+Grew out of a review of distinguishers against Backlog.md (2026-08-31). The
+class of bug is real and local: commit 27776f0 ("TL-52 was done and said
+pending") and the parked `in_progress` state described in
 [docs/backlog-time-tracking.md](../../docs/backlog-time-tracking.md) §3.1
-(45 tasków `in_progress`, 32 z `owner: claude` — to nie jest 32 pracujących
-agentów).
+(45 `in_progress` tasks, 32 with `owner: claude` — that is not 32 working
+agents).
 
-Zasady, bez których ten raport sam by kłamał:
-- **Brak śladu to podejrzenie, nie wyrok.** Historia ruszyła 2026-08-30
-  i jest dziennikiem obserwacji, nie logiem audytowym
+Rules, without which this report would itself be lying:
+- **No trace is a suspicion, not a verdict.** History started on 2026-08-30
+  and is a log of observations, not an audit log
   ([docs/backlog-field-editing-history.md](../../docs/backlog-field-editing-history.md)
-  §4). Taski zamknięte przed dniem zero mają być odfiltrowane po dacie, nie
-  raportowane hurtem jako anomalie.
-- **Progi w konfiguracji** (`audit_stale_days` itd.) — kod zna kształt.
-- **To narzędzie higieny backlogu, nie oceny ludzi** — ta sama granica, którą
-  time-tracking §13 stawia pomiarowi czasu; zdanie ma stać w opisie komendy.
-- Kubełki per aktor poniżej progu `n` raportują „za mało danych" (reguła
-  z §11 time-trackingu).
+  §4). Tasks closed before day zero are to be filtered out by date, not
+  reported in bulk as anomalies.
+- **Thresholds live in configuration** (`audit_stale_days` etc.) — the code
+  knows the shape.
+- **This is a backlog-hygiene tool, not a tool for evaluating people** — the
+  same boundary that time-tracking §13 sets for time measurement; the
+  sentence has to appear in the command's description.
+- Per-actor buckets below a threshold `n` report "insufficient data" (the
+  rule from time-tracking §11).
 
-Odrębność od `worktrail check`: check waliduje SPÓJNOŚĆ STRUKTURALNĄ (kolizje ID,
-boardy, wiszące referencje) i oblewa commit; audit waliduje WIARYGODNOŚĆ
-DEKLARACJI i jest raportem dla człowieka. Nie łączyć — inny moment użycia,
-inny kod wyjścia.
+Distinction from `worktrail check`: check validates STRUCTURAL CONSISTENCY
+(ID collisions, boards, dangling references) and fails a commit; audit
+validates the TRUSTWORTHINESS OF DECLARATIONS and is a report for a human.
+Do not merge them — different moment of use, different exit code.
 
 ## Pre-flight reading
 
 - [docs/backlog-field-editing-history.md](../../docs/backlog-field-editing-history.md)
-  §2, §4 — format wpisów, dedup, świadome ograniczenia atrybucji.
+  §2, §4 — entry format, deduplication, deliberate limits of attribution.
 - [docs/backlog-time-tracking.md](../../docs/backlog-time-tracking.md) §3.1,
-  §8.2 — pułapka cycle time i zasada „unknown jest liczbą".
-- `scripts/check-backlog-refs.mjs` — istniejący wzorzec przechodzenia po
-  taskach z referencjami.
+  §8.2 — the cycle-time trap and the "unknown is a number" rule.
+- `scripts/check-backlog-refs.mjs` — the existing pattern for walking tasks
+  with references.
 
-## Kroki
+## Steps
 
-1. Detektory jako osobne funkcje nad wspólnym odczytem (taski + historia):
-   done-bez-śladu, reopen-po-done, stale-in-progress, blocked-bez-przesłanki.
-2. Raport tekstowy pogrupowany detektorem + `--json`; liczność każdej klasy
-   w nagłówku; filtr `--since` domyślnie od dnia zero historii.
-3. Wskaźnik reworku per aktor z progiem `n` i „za mało danych" poniżej.
-4. Kody wyjścia: 0 czysto, 1 znaleziono rozjazdy, 2 błąd wywołania — spójnie
-   z resztą CLI.
-5. Testy na fixture'ach: każdy detektor ma przypadek pozytywny i negatywny;
-   kontrola pozytywna obowiązkowa (guard przechodzący na pustym drzewie jest
-   zielony bez mocy dowodowej — CLAUDE.md).
+1. Detectors as separate functions over a shared read (tasks + history):
+   done-with-no-trace, reopen-after-done, stale-in-progress,
+   blocked-with-no-premise.
+2. Text report grouped by detector + `--json`; count of each class in the
+   header; `--since` filter defaulting to history's day zero.
+3. Rework rate per actor with a threshold `n` and "insufficient data" below
+   it.
+4. Exit codes: 0 clean, 1 divergences found, 2 call error — consistent with
+   the rest of the CLI.
+5. Tests on fixtures: each detector has a positive case and a negative case;
+   a positive control is mandatory (a guard that passes on an empty tree is
+   green with no evidentiary force — CLAUDE.md).
 
 ## Acceptance criteria
 
-- [ ] Każdy detektor ma test, w którym COŚ znajduje, i test, w którym słusznie
-      milczy.
-- [ ] Taski sprzed startu historii nie są raportowane jako „done bez śladu".
-- [ ] Progi pochodzą z `config.yaml`; nieznany klucz oblewa jak dotąd.
-- [ ] Raport per aktor stosuje próg `n` i nie ocenia poniżej niego.
+- [ ] Each detector has a test where it finds SOMETHING, and a test where it
+      rightly stays silent.
+- [ ] Tasks predating the start of history are not reported as "done with no
+      trace".
+- [ ] Thresholds come from `config.yaml`; an unknown key fails as before.
+- [ ] The per-actor report applies the threshold `n` and does not evaluate
+      below it.
 
 ## Log
 
-Append-only. Format: `YYYY-MM-DD status — kto — notatka`.
+Append-only. Format: `YYYY-MM-DD status — who — note`.
 
-- 2026-08-31 pending — agent:claude — task założony z przeglądu wyróżników
-  agentowych; motywacja: 27776f0 i §3.1 dokumentu pomiaru czasu.
+- 2026-08-31 pending — agent:claude — task created from a review of agentic
+  distinguishers; motivation: 27776f0 and §3.1 of the time-tracking document.

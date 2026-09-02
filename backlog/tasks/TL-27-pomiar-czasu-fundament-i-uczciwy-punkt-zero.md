@@ -1,10 +1,10 @@
 ---
 id: TL-27
-title: "Pomiar czasu pracy — fundament i uczciwy punkt zero"
+title: "Work time measurement — foundation and an honest point zero"
 type: code
 labels: [post-launch]
 board: main
-epic: "Backlog — pomiar czasu pracy"
+epic: "Backlog — work time measurement"
 priority: P2
 status: done
 owner: agent:session
@@ -27,23 +27,23 @@ verification:                      # paths corrected to THIS repository: see Dec
     bash: "git check-ignore -q backlog/activity/TL-27.jsonl && ! git check-ignore -q backlog/activity/rollup/TL-27.json && echo 'raw log out of git, rollup in it — OK'"
 ---
 
-## Cel
+## Goal
 
-Postawić warstwę danych pod pomiar czasu pracy (`backlog/activity/`) i domknąć jedyną część historii, która jest odtwarzalna uczciwie: **moment ukończenia** tasków. Po tym tasku `worktrail time` odpowiada na pytania o przepustowość na 1023 zamkniętych taskach, a fundament pod engaged time (TL-28) stoi.
+Put in place the data layer for work time measurement (`backlog/activity/`) and close off the only part of history that can be reconstructed honestly: the **moment of completion** of tasks. After this task, `worktrail time` answers questions about throughput across 1023 closed tasks, and the foundation for engaged time (TL-28) stands.
 
-## Kontekst
+## Context
 
-Backlog ma 1016 tasków `done` z wpisaną estymatą i **zero** liczb mówiących, ile ta praca zajęła. Estymaty są nieweryfikowalne.
+The backlog has 1016 `done` tasks with an estimate recorded and **zero** numbers saying how long that work actually took. Estimates are unverifiable.
 
-Pomiar wykonany 2026-08-30 przed projektem (pełna tabela: [`backlog-time-tracking.md §2`](../../docs/backlog-time-tracking.md)) obalił trzy „oczywiste" źródła danych historycznych:
+A measurement done on 2026-08-30, before the design (full table: [`backlog-time-tracking.md §2`](../../docs/backlog-time-tracking.md)), disproved three "obvious" sources of historical data:
 
-- log zmian pól (`history/*.jsonl`) ruszył 2026-08-30 — 9 tasków, 13 wpisów, **1** z parą `in_progress`+`done`;
-- frontmatter `created`→`updated` ma rozdzielczość dobową, a **71% tasków** kończy się tego samego dnia, w którym powstało — zero dla 7 na 10;
-- rozpiętość commitów na pliku taska jest zanieczyszczona masowymi backfillami pól (mediana 722 h przy 71% „tego samego dnia" — dwa rzędy wielkości rozjazdu, więc żadne z dwóch nie mierzy pracy).
+- the field-change log (`history/*.jsonl`) started on 2026-08-30 — 9 tasks, 13 entries, **1** with an `in_progress`+`done` pair;
+- frontmatter `created`→`updated` has day-level resolution, and **71% of tasks** finish on the same day they were created — zero for 7 out of 10;
+- the commit span on a task file is contaminated by mass field backfills (median 722 h against 71% "same day" — two orders of magnitude of divergence, so neither of the two measures the work).
 
-Co pomiar POTWIERDZIŁ: `git log -S"status: done"` trafia **20/20** z rozdzielczością sekundową, ~60 s dla całego katalogu. Natomiast `-S"status: in_progress"` trafia **3/20** — agent zwykle commituje `pending → done` jednym ruchem, więc stan pośredni nigdy nie powstał.
+What the measurement CONFIRMED: `git log -S"status: done"` hits **20/20** at second-level resolution, ~60 s for the whole directory. But `-S"status: in_progress"` hits only **3/20** — the agent usually commits `pending → done` in one move, so the intermediate state never existed.
 
-Stąd granica tego taska, i jest ona świadoma: **backfillujemy stempel ukończenia, NIE backfillujemy czasu pracy.** Czas pracy sprzed dnia zero nie istnieje i wywnioskowanie go byłoby tą samą klasą ładnej nieprawdy, dla której [`backlog-field-editing-history.md §6`](../../docs/backlog-field-editing-history.md) odrzucił backfill autorstwa z gita.
+Hence this task's boundary, and it is deliberate: **we backfill the completion stamp, we do NOT backfill work time.** Work time from before day zero does not exist, and inferring it would be the same class of a nice-sounding lie for which [`backlog-field-editing-history.md §6`](../../docs/backlog-field-editing-history.md) rejected backfilling authorship from git.
 
 ## Decision (2026-09-02)
 
@@ -74,63 +74,63 @@ somebody to discover in a chart.
 
 ## Pre-flight reading
 
-1. `docs/architecture/backlog-time-tracking.md` — §2 (pomiar), §4 (model danych), §7 (prywatność). Bez §2 zakres tego taska wygląda na sztucznie okrojony.
-2. `backlog/scripts/history.mjs` — `eventId()`, `appendEntries()`, `readHistory()` z dedupem po `id`. Nowy moduł ma powtórzyć te wzorce, nie wymyślić własne.
-3. `backlog/scripts/estimate.mjs` — kontrakt „`null`, nigdy zero" i `sumHours()` zwracające `{hours, unknown}`. To jest wzorzec raportowania, którego trzyma się `worktrail time`.
-4. `backlog/scripts/cli.mjs` — tabela `COMMANDS`, sposób dokładania podkomendy.
-5. `backlog/.gitignore` — gdzie i jak wykluczamy artefakty lokalne.
+1. `docs/architecture/backlog-time-tracking.md` — §2 (measurement), §4 (data model), §7 (privacy). Without §2, this task's scope looks artificially trimmed.
+2. `backlog/scripts/history.mjs` — `eventId()`, `appendEntries()`, `readHistory()` with dedup by `id`. The new module should repeat these patterns, not invent its own.
+3. `backlog/scripts/estimate.mjs` — the "`null`, never zero" contract and `sumHours()` returning `{hours, unknown}`. This is the reporting pattern `worktrail time` follows.
+4. `backlog/scripts/cli.mjs` — the `COMMANDS` table, how a subcommand is added.
+5. `backlog/.gitignore` — where and how local artifacts are excluded.
 
-## Kroki
+## Steps
 
-1. `backlog/scripts/activity.mjs` — zapis/odczyt `backlog/activity/BL-NNNN.jsonl`: `appendActivity()`, `readActivity()` (dedup po `id`, uszkodzony wiersz nie kasuje reszty), `activityPath()`. ULID i przestrzenie nazw aktora importowane z `history.mjs`, nie kopiowane.
-2. Kształt wiersza z §4 dokumentu: `{id, ts, task, kind, actor, source, session, attribution}`. `kind` ∈ `tool|prompt|commit|edit` — nieznane oblewa.
-3. `backlog/scripts/backfill-completions.mjs` — jedno przejście `git log --format --name-only` po katalogu + pickaxe `-S"status: done"` per task `done`. Zapisuje `kind: "commit"`, `source: "git-backfill"`, `attribution: "path"`. **Nie zapisuje niczego o czasie trwania.**
-4. Guard idempotencji: powtórny backfill nie dokłada drugiego stempla (dedup po `id` nie wystarczy — ULID jest losowy; klucz to `(task, kind=commit, ts)`). Flaga `--dry-run` drukuje, ile wierszy BY dopisała, i nie dotyka plików — to jest ta bramka, którą sprawdza Verification.
-5. `backlog/scripts/time-report.mjs` + podkomenda `time` w `cli.mjs`: lead time (mediana/p80/p95), throughput per tydzień, liczba tasków BEZ stempla. Ostatnia liczba jest obowiązkowa — suma bez niej udaje kompletną.
-6. `backlog/.gitignore`: `activity/*.jsonl` (surowe stemple lokalnie). Katalog `activity/rollup/` zostaje **wersjonowany** — agregat jest PER TASK (`rollup/BL-NNNN.json`), nigdy jednym plikiem zbiorczym, bo zbiorczy byłby drugim `INDEX.yaml` (uzasadnienie zmierzone, komentarz w tym samym `.gitignore`).
-7. `config.yaml` — komplet kluczy epiku od razu, bo nieznany klucz OBLEWA i rozbijanie tego na cztery taski oznaczałoby cztery zmiany schemy: `activity_privacy: local`, `idle_gap_minutes: 10`, `heartbeat_throttle_seconds: 60`, `min_report_n: 8`, `activity_retention_days: 90`. Używają ich dopiero TL-28/1426/1429.
-8. Testy `backlog/scripts/tests/activity.test.mjs` — red-first, autor testu ≠ autor kodu.
+1. `backlog/scripts/activity.mjs` — write/read `backlog/activity/BL-NNNN.jsonl`: `appendActivity()`, `readActivity()` (dedup by `id`, a corrupted row does not wipe out the rest), `activityPath()`. ULID and actor namespaces imported from `history.mjs`, not copied.
+2. Row shape from §4 of the document: `{id, ts, task, kind, actor, source, session, attribution}`. `kind` ∈ `tool|prompt|commit|edit` — unknown fails.
+3. `backlog/scripts/backfill-completions.mjs` — a single pass of `git log --format --name-only` over the directory + pickaxe `-S"status: done"` per `done` task. Writes `kind: "commit"`, `source: "git-backfill"`, `attribution: "path"`. **Writes nothing about duration.**
+4. Idempotency guard: a repeated backfill does not add a second stamp (dedup by `id` is not enough — the ULID is random; the key is `(task, kind=commit, ts)`). The `--dry-run` flag prints how many rows it WOULD have appended, and does not touch any files — this is the gate that Verification checks.
+5. `backlog/scripts/time-report.mjs` + a `time` subcommand in `cli.mjs`: lead time (median/p80/p95), throughput per week, count of tasks WITHOUT a stamp. The last number is mandatory — a total without it pretends to be complete.
+6. `backlog/.gitignore`: `activity/*.jsonl` (raw stamps stay local). The `activity/rollup/` directory stays **versioned** — the aggregate is PER TASK (`rollup/BL-NNNN.json`), never one combined file, because a combined file would be a second `INDEX.yaml` (the reasoning is measured, comment in the same `.gitignore`).
+7. `config.yaml` — the full set of epic keys added at once, because an unknown key FAILS and splitting this across four tasks would mean four schema changes: `activity_privacy: local`, `idle_gap_minutes: 10`, `heartbeat_throttle_seconds: 60`, `min_report_n: 8`, `activity_retention_days: 90`. They are only used starting with TL-28/1426/1429.
+8. Tests `backlog/scripts/tests/activity.test.mjs` — red-first, test author ≠ code author.
 
 ## Acceptance criteria
 
-- [ ] `node backlog/scripts/cli.mjs time` drukuje lead time i throughput na realnym backlogu.
-- [ ] Raport podaje liczbę tasków `done` BEZ stempla ukończenia (nie pomija ich po cichu).
-- [ ] Backfill uruchomiony dwa razy pod rząd daje ten sam stan (idempotencja) — jest na to test.
-- [ ] `activity/*.jsonl` jest gitignored, a `activity/rollup/` NIE jest; `git check-ignore` potwierdza oba kierunki.
-- [ ] Nieznane `kind` oblewa zapis zamiast trafić do pliku.
-- [ ] Uszkodzony wiersz JSONL nie wywraca odczytu — jest na to test.
-- [ ] Nowe pole w `config.yaml` nie oblewa `config.mjs` (nieznany klucz oblewa — trzeba je DODAĆ do schemy).
-- [ ] `docs/architecture/backlog-time-tracking.md` §10 zaktualizowane o stan „wdrożone".
-- [ ] `qa/backlog-time-tracking.yaml` założone.
+- [ ] `node backlog/scripts/cli.mjs time` prints lead time and throughput on the real backlog.
+- [ ] The report states the count of `done` tasks WITHOUT a completion stamp (does not silently omit them).
+- [ ] Backfill run twice in a row yields the same state (idempotency) — there is a test for this.
+- [ ] `activity/*.jsonl` is gitignored, and `activity/rollup/` is NOT; `git check-ignore` confirms both directions.
+- [ ] An unknown `kind` fails the write instead of landing in the file.
+- [ ] A corrupted JSONL row does not break the read — there is a test for this.
+- [ ] The new field in `config.yaml` does not fail `config.mjs` (an unknown key fails — it has to be ADDED to the schema).
+- [ ] `docs/architecture/backlog-time-tracking.md` §10 updated with the "implemented" status.
+- [ ] `qa/backlog-time-tracking.yaml` created.
 
 ## Verification
 
 ```bash
-# 1. Testy jednostkowe — expected: wszystkie pass
+# 1. Unit tests — expected: all pass
 node --test backlog/scripts/tests/activity.test.mjs
 
-# 2. Backfill + raport — expected: >900 tasków ze stemplem (1023 done, część sprzed konwencji)
+# 2. Backfill + report — expected: >900 tasks with a stamp (1023 done, some predating the convention)
 node backlog/scripts/backfill-completions.mjs
 node backlog/scripts/cli.mjs time
 
-# 3. Idempotencja — expected: druga liczba identyczna z pierwszą
+# 3. Idempotency — expected: second number identical to the first
 node backlog/scripts/backfill-completions.mjs --dry-run | tail -1
 
-# 4. Prywatność — expected: surowe poza gitem, agregat W gicie
-git check-ignore -q backlog/activity/TL-27.jsonl && echo 'surowy log: poza gitem — OK'
-git check-ignore -q backlog/activity/rollup/TL-27.json || echo 'agregat: wersjonowany — OK'
+# 4. Privacy — expected: raw data outside git, aggregate IN git
+git check-ignore -q backlog/activity/TL-27.jsonl && echo 'raw log: outside git — OK'
+git check-ignore -q backlog/activity/rollup/TL-27.json || echo 'aggregate: versioned — OK'
 
-# 5. Guardy modułu nadal zielone
+# 5. Module guards still green
 node backlog/scripts/cli.mjs check
 ```
 
 ## Notes
 
-- Poza zakresem świadomie: heartbeaty (TL-28), kalibracja (TL-29), tokeny (TL-30), retencja i korekta atrybucji (TL-31).
-- Backfill `in_progress` NIE jest robiony — pokrycie 15% i rozrzut 0,2 h ÷ 554 h czynią z niego szum udający dane.
-- `min_report_n` i `idle_gap_minutes` lądują w konfiguracji już tutaj, żeby TL-28 nie musiał ruszać schemy config przy okazji logiki klastrowania.
+- Deliberately out of scope: heartbeats (TL-28), calibration (TL-29), tokens (TL-30), retention and attribution correction (TL-31).
+- Backfilling `in_progress` is NOT done — 15% coverage and a spread of 0.2 h ÷ 554 h make it noise pretending to be data.
+- `min_report_n` and `idle_gap_minutes` land in the configuration here already, so TL-28 does not have to touch the config schema while implementing clustering logic.
 
 ## Log
 
-- 2026-08-30 created — claude — rozpisane z analizy pomiaru czasu (docs/architecture/backlog-time-tracking.md)
-- 2026-08-30 revised — claude — po adwersarialnym przeglądzie: agregat per task zamiast zbiorczego `rollup.json`, komplet kluczy config w jednym miejscu, `--dry-run` domówiony w krokach (bramka go wołała, spec nie zamawiał)
+- 2026-08-30 created — claude — drafted from the time-measurement analysis (docs/architecture/backlog-time-tracking.md)
+- 2026-08-30 revised — claude — after an adversarial review: aggregate per task instead of a combined `rollup.json`, the full set of config keys in one place, `--dry-run` spelled out in the steps (the gate called for it, the spec had not ordered it)

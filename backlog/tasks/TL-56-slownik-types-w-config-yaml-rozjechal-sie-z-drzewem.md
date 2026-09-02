@@ -1,10 +1,10 @@
 ---
 id: TL-56
-title: "Słownik types w config.yaml rozjechał się z drzewem"
+title: "The types vocabulary in config.yaml has drifted from the tree"
 type: bug
 labels: [pre-launch]
 board: main
-epic: "Integralność danych"
+epic: "Data integrity"
 priority: P2
 status: done
 owner: unassigned
@@ -22,82 +22,139 @@ verification:
   - bash: "d=$(mktemp -d) && node scripts/cli.mjs init --dir \"$d\" >/dev/null 2>&1 && T=$(node -e \"import('./scripts/config.mjs').then(m=>console.log(m.loadConfig(process.argv[1]).types[0]))\" \"$d\") && node scripts/cli.mjs new --dir \"$d\" --title Sonda --type \"$T\" >/dev/null 2>&1 || { echo 'typ z konfiguracji ODRZUCONY przy zapisie'; exit 1; }; node scripts/cli.mjs new --dir \"$d\" --title Sonda2 --type nie-ma-takiego >/dev/null 2>&1 && { echo 'wartosc spoza slownika PRZESZLA'; exit 1; }; echo \"OK: typ z konfiguracji ($T) przechodzi, wartosc spoza slownika odrzucona\""
 ---
 
-## Cel
+## Goal
 
-Doprowadzić do zgodności słownik `types` z zawartością drzewa — i sprawić, żeby
-rozjazd w KAŻDYM słowniku oblewał przy odczycie, a nie dopiero przy próbie zapisu.
+Bring the `types` vocabulary into agreement with the contents of the tree —
+and make a drift in ANY vocabulary fail at read time, not only when a write
+is attempted.
 
-## Kontekst
+## Context
 
-Trafione 2026-08-31 przy zakładaniu tasków z audytu:
+Hit on 2026-08-31 while creating tasks from the audit:
 
 ```
 $ worktrail new --title "…" --type code
-[worktrail new] `code` nie jest dozwoloną wartością pola `type`
-  dozwolone: task
+[worktrail new] `code` is not an allowed value for field `type`
+  allowed: task
 ```
 
-Tymczasem w drzewie stoi: **43 taski z `type: code`**, 3 z `type: bug`, 1 z
-`type: manual` — i ani jednego z `type: task`, czyli jedyną wartością, jaką zna
-`config.yaml`. `worktrail check` i `worktrail build` przechodzą na zielono.
+Meanwhile the tree holds: **43 tasks with `type: code`**, 3 with `type: bug`,
+1 with `type: manual` — and not one with `type: task`, the only value
+`config.yaml` knows. `worktrail check` and `worktrail build` pass green.
 
-To jest **asymetria między zapisem a odczytem**: ścieżka pisząca egzekwuje
-słownik, ścieżka czytająca go nie sprawdza. Konsekwencja jest dokładnie odwrotna
-do zamierzonej — 47 plików narusza słownik bez słowa protestu, a jedyną rzeczą,
-którą narzędzie blokuje, jest zapisanie kolejnego pliku takiego, jak wszystkie
-istniejące.
+This is an **asymmetry between write and read**: the write path enforces the
+vocabulary, the read path does not check it. The consequence is exactly the
+opposite of what was intended — 47 files violate the vocabulary without a
+word of protest, and the one thing the tool blocks is writing one more file
+just like all the existing ones.
 
-Klasa błędu jest już w tym projekcie nazwana. Prefiks ID rozstrzygnięto tak, że
-**rozjazd konfiguracji z drzewem OBLEWA przed zapisem** (`detectPrefixMismatch`
-w `task-id.mjs`, `CLAUDE.md` §„Zanim zmienisz kod"). Ta sama zasada nie została
-zastosowana do pozostałych słowników, więc `types` mógł się rozjechać po cichu —
-i nie wiadomo bez sprawdzenia, czy jest jedyny.
+This class of bug already has a name in this project. The ID prefix was
+settled so that **a drift between configuration and tree FAILS before the
+write** (`detectPrefixMismatch` in `task-id.mjs`, `CLAUDE.md` §"Before you
+change the code"). The same principle was not applied to the other
+vocabularies, so `types` could drift silently — and there is no way to know
+without checking whether it is the only one.
 
-**Do rozstrzygnięcia jest kierunek naprawy, nie sam fakt.** Albo `config.yaml`
-jest w błędzie i ma wymieniać `[code, bug, manual]` (wtedy drzewo jest prawdą),
-albo drzewo ma zostać przemigrowane na `task`. Pierwsze jest niemal na pewno
-poprawne — 47 plików to udokumentowana praktyka, a `types: [task]` wygląda na
-wartość domyślną, której nikt nie zaktualizował — ale to decyzja właściciela, bo
-`type` jest słownikiem projektu.
+**What needs deciding is the direction of the fix, not the fact of it.**
+Either `config.yaml` is wrong and should list `[code, bug, manual]` (in which
+case the tree is the truth), or the tree gets migrated to `task`. The first is
+almost certainly correct — 47 files is documented practice, and `types:
+[task]` looks like a default value nobody updated — but this is the owner's
+decision, because `type` is a project vocabulary.
 
-Powód, dla którego to jedzie przed publikacją: obcy użytkownik dostanie ten sam
-efekt na własnym backlogu, tyle że bez wiedzy, że w ogóle istnieje plik
-konfiguracji, który to rozstrzyga.
+The reason this ships before publication: a stranger will hit the same effect
+on their own backlog, except without knowing there is even a configuration
+file that settles this.
 
 ## Pre-flight reading
 
-1. `scripts/config.mjs` — `DEFAULTS`, ładowanie i walidacja `config.yaml`.
-2. `scripts/task-fields.mjs` — `buildFieldSpecs()` / `normalizeValue()`, czyli miejsce, w którym zapis egzekwuje słownik.
-3. `scripts/task-id.mjs` — `detectPrefixMismatch()`, wzorzec „rozjazd oblewa przed zapisem".
+1. `scripts/config.mjs` — `DEFAULTS`, loading and validating `config.yaml`.
+2. `scripts/task-fields.mjs` — `buildFieldSpecs()` / `normalizeValue()`, the
+   place where the write path enforces the vocabulary.
+3. `scripts/task-id.mjs` — `detectPrefixMismatch()`, the pattern "a drift
+   fails before the write".
 4. `backlog/config.yaml` — `types: [task]`.
 
-## Kroki
+## Steps
 
-1. Zmierz rozjazd we WSZYSTKICH słownikach: `type`, `status`, `priority`, `owner`, `estimate`, `label`, `board`. Wynik zapisz w `## Log` — nie zakładaj, że `types` jest jedyny.
-2. Rozstrzygnij kierunek dla każdego rozjazdu z właścicielem.
-3. Popraw `config.yaml` (albo drzewo, jeśli taka będzie decyzja).
-4. Dołóż guard, który porównuje słowniki z drzewem i OBLEWA — na wzór `detectPrefixMismatch`. Komunikat ma nazywać pole, wartości spoza słownika i liczbę plików, w których stoją.
-5. Podłącz guard do `worktrail check`, żeby jechał w tym samym miejscu co pozostałe.
-6. Kontrola pozytywna w teście: fixture z wartością spoza słownika MUSI oblać. Bez niej test przejdzie na czystym drzewie i będzie zielony bez mocy dowodowej.
+1. Measure the drift across ALL vocabularies: `type`, `status`, `priority`,
+   `owner`, `estimate`, `label`, `board`. Record the result in `## Log` — do
+   not assume `types` is the only one.
+2. Settle the direction for each drift with the owner.
+3. Fix `config.yaml` (or the tree, if that is the decision).
+4. Add a guard that compares vocabularies against the tree and FAILS — on
+   the pattern of `detectPrefixMismatch`. The message should name the field,
+   the out-of-vocabulary values, and the number of files carrying them.
+5. Wire the guard into `worktrail check`, so it runs alongside the others.
+6. A positive control in the test: a fixture with an out-of-vocabulary value
+   MUST fail. Without it the test would pass on a clean tree and be green
+   with no evidentiary force.
 
 ## Acceptance criteria
 
-- [x] `config.yaml` i drzewo zgadzają się w każdym słowniku.
-- [x] Rozjazd słownika oblewa `worktrail check`, nie tylko zapis.
-- [x] Komunikat nazywa pole, wartości i liczbę plików.
-- [x] Test ma kontrolę pozytywną — fixture z wartością spoza słownika oblewa.
-- [x] Wynik przeglądu wszystkich słowników zapisany w `## Log`.
+- [x] `config.yaml` and the tree agree on every vocabulary.
+- [x] A vocabulary drift fails `worktrail check`, not just a write.
+- [x] The message names the field, the values, and the number of files.
+- [x] The test has a positive control — a fixture with an out-of-vocabulary
+      value fails.
+- [x] The result of reviewing all vocabularies is recorded in `## Log`.
 
 ## Log
 
-Append-only. Format: `YYYY-MM-DD status — kto — notatka`.
+Append-only. Format: `YYYY-MM-DD status — who — note`.
 
-- 2026-08-31 created — agent:claude — trafione przy `worktrail new --type code`; 43 taski `code`, 3 `bug`, 1 `manual`, słownik zna tylko `task`
-- 2026-08-31 pending — agent:claude — TL-62 dołożył `auditVocabulary(metas, config)` w `task-fields.mjs` i wypina wynik w `worktrail doctor`. Ten task ma więc już gotowy pomiar: zostaje decyzja kierunku (poprawić `types` w config czy drzewo) i wpięcie funkcji w `check` z kontrolą pozytywną. Zmierzone dziś przez doctor: `type` — code ×43, bug ×10, manual ×1, przy słowniku `[task]`.
-- 2026-09-01 done — agent:claude — przegląd WSZYSTKICH słowników, bo krok 1 zabraniał zakładać, że `types` jest jedyny. Zamknięte enumy: `type` — jedyny rozjazd; `status` (5 wartości) i `priority` (4) czyste. `owner` (`claude`, `agent:claude`, `founder` poza `owners:`) i `estimate` (`4h` ×41, `3h`, `1h` poza `estimates:`) NIE są rozjazdem — to pola `kind: "text"` z `suggestFrom`, czyli listy podpowiedzi, nie słowniki. `labels` otwarte przez `labels_closed: false`. `board` ma własnego strażnika i jest wyłączony w `auditVocabulary` świadomie, żeby jeden plik nie był zgłaszany dwa razy.
-- 2026-09-01 done — agent:claude — kierunek: DRZEWO jest prawdą. `types: [task]` stało w pliku od pierwszego commita (aa6d49e) RÓWNOCZEŚNIE z taskami `type: code` — czyli nigdy nie było prawdą; to wartość domyślna narzędzia, nie decyzja projektu. `types: [task, code, bug]`.
-- 2026-09-01 done — agent:claude — `manual` ×1 NIE trafiło do słownika: to pozostałość z innej osi. `manual` jest rodzajem WERYFIKACJI (`VERIFICATION_KEYS` w `criteria.mjs`), a jedyny nosiciel — TL-20 — ma wpis `manual:` w swoim `verification:` i pracę czysto kodową (nazwa w `scripts/`, `package.json`, README). Poprawione na `code`: jeden plik, nie migracja. W całej historii gita istniały tylko cztery wartości `type`, więc literówek nie ma.
-- 2026-09-01 done — agent:claude — `code` (59) i `task` (48) są synonimami i oba są pisane tego samego dnia; zwinięcie to migracja 59 plików i decyzja o słownictwie, więc odłożone jako TL-123, a nie zrobione po cichu przy okazji.
-- 2026-09-01 done — agent:claude — strażnik: `check-backlog-vocabulary.mjs` + `--vocabulary`, w domyślnym przebiegu `check`. Werdykt bierze z `auditVocabulary()` — tej samej funkcji co `doctor` — a dokłada tylko sparowanie wartości z plikami, żeby komunikat mówił GDZIE iść. Przy okazji zamknięta dziura w samym `auditVocabulary`: lista ZAMKNIĘTA z pustym słownikiem (`labels_closed: true`, `labels: []`) była pomijana, choć ścieżka pisząca odrzuca wtedy każdą etykietę — dokładnie ta asymetria, którą ten task zamyka.
-- 2026-09-01 done — agent:claude — fixture w `cli.test.mjs` niósł `type: code`, czyli słownictwo TEGO projektu, działając pod wbudowanymi domyślnymi (`types: ["task"]`). Nowy strażnik go zaczerwienił i miał rację — poprawiony fixture, nie strażnik.
-- 2026-09-01 done — agent:claude — trzecia sonda w `verification:` była zepsuta OD POCZĄTKU i nie mogła przejść przy żadnym stanie kodu: `sed 's/.*\[//'` jest zachłanne, więc na `types: [task]                      # [tree]` sięgało do OSTATNIEGO `[` i wyciągało `tree`, po czym `new --type` dostawał śmieć. Wymieniona na wariant czytający wartość przez `loadConfig()` zamiast przez sed, z obiema kontrolami: typ ze słownika MUSI przejść, wartość spoza niego MUSI zostać odrzucona. Sonda mierząca własne parsowanie zamiast narzędzia jest zielona bez mocy dowodowej — tu była czerwona bez mocy dowodowej.
+- 2026-08-31 created — agent:claude — hit while running `worktrail new
+  --type code`; 43 tasks `code`, 3 `bug`, 1 `manual`, the vocabulary only
+  knows `task`
+- 2026-08-31 pending — agent:claude — TL-62 added `auditVocabulary(metas,
+  config)` in `task-fields.mjs` and surfaces the result in `worktrail
+  doctor`. This task therefore already has a ready-made measurement: what
+  remains is the direction decision (fix `types` in config or the tree) and
+  wiring the function into `check` with a positive control. Measured today
+  by doctor: `type` — code ×43, bug ×10, manual ×1, against the vocabulary
+  `[task]`.
+- 2026-09-01 done — agent:claude — review of ALL vocabularies, since step 1
+  forbade assuming `types` was the only one. Closed enums: `type` — the only
+  drift; `status` (5 values) and `priority` (4) are clean. `owner` (`claude`,
+  `agent:claude`, `founder` outside `owners:`) and `estimate` (`4h` ×41,
+  `3h`, `1h` outside `estimates:`) are NOT a drift — these are `kind: "text"`
+  fields with `suggestFrom`, i.e. suggestion lists, not vocabularies.
+  `labels` is open via `labels_closed: false`. `board` has its own guard and
+  is deliberately excluded from `auditVocabulary` so the same file is not
+  reported twice.
+- 2026-09-01 done — agent:claude — direction: the TREE is the truth. `types:
+  [task]` had been in the file since the first commit (aa6d49e) AT THE SAME
+  TIME as tasks with `type: code` — meaning it was never true; it is the
+  tool's default value, not a project decision. `types: [task, code, bug]`.
+- 2026-09-01 done — agent:claude — `manual` ×1 was NOT added to the
+  vocabulary: it is a leftover from a different axis. `manual` is a kind of
+  VERIFICATION (`VERIFICATION_KEYS` in `criteria.mjs`), and its only carrier
+  — TL-20 — has a `manual:` entry in its `verification:` and purely code
+  work (a name in `scripts/`, `package.json`, README). Fixed to `code`: one
+  file, not a migration. Across the entire git history there were only four
+  `type` values, so there are no typos.
+- 2026-09-01 done — agent:claude — `code` (59) and `task` (48) are synonyms
+  and both are written on the same day; collapsing them is a 59-file
+  migration and a vocabulary decision, so it is deferred as TL-123, rather
+  than done quietly in passing.
+- 2026-09-01 done — agent:claude — guard: `check-backlog-vocabulary.mjs` +
+  `--vocabulary`, in the default `check` run. The verdict comes from
+  `auditVocabulary()` — the same function `doctor` uses — and only adds
+  pairing values with files so the message says WHERE to go. Along the way,
+  a gap in `auditVocabulary` itself was closed: a CLOSED list with an empty
+  vocabulary (`labels_closed: true`, `labels: []`) was being skipped, even
+  though the write path rejects every label in that case — exactly the
+  asymmetry this task closes.
+- 2026-09-01 done — agent:claude — a fixture in `cli.test.mjs` carried
+  `type: code`, i.e. THIS project's vocabulary, while running under the
+  built-in defaults (`types: ["task"]`). The new guard flagged it, and
+  correctly so — the fixture was fixed, not the guard.
+- 2026-09-01 done — agent:claude — the third probe in `verification:` had
+  been broken FROM THE START and could not pass under any state of the
+  code: `sed 's/.*\[//'` is greedy, so on `types: [task]                      # [tree]`
+  it reached the LAST `[` and pulled out `tree`, after which `new --type`
+  received garbage. Replaced with a variant that reads the value through
+  `loadConfig()` instead of sed, with both controls: a type from the
+  vocabulary MUST pass, a value outside it MUST be rejected. A probe that
+  measures its own parsing instead of the tool is green with no evidentiary
+  force — here it was red with no evidentiary force.

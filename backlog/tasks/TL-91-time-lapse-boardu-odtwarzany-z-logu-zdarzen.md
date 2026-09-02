@@ -1,10 +1,10 @@
 ---
 id: TL-91
-title: "Time-lapse boardu odtwarzany z logu zdarzeń"
+title: "Board time-lapse replayed from the event log"
 type: task
 labels: []
 board: main
-epic: "Wyróżniki agentowe"
+epic: "Agentic differentiators"
 priority: P3
 status: pending
 owner: unassigned
@@ -21,71 +21,79 @@ verification:
   - bash: "node --test scripts/tests/board-replay.test.mjs"
 ---
 
-## Cel
+## Goal
 
-Viewer dostaje tryb odtwarzania: log zdarzeń zna każde przejście statusu
-z timestampem, więc board da się przewinąć w czasie — od dnia zero do dziś,
-z suwakiem i animacją, z rozróżnieniem kolorem aktora `agent:` od człowieka.
-Ten sam mechanizm daje „board na dzień X" (wehikuł czasu do retrospektyw).
+The viewer gets a replay mode: the event log knows every status transition
+with a timestamp, so the board can be scrubbed through time — from day zero
+to today, with a slider and animation, distinguishing an `agent:` actor from
+a human by color. The same mechanism gives "board on day X" (a time machine
+for retrospectives).
 
-Wartość produktowa: wizualny dowód architektury (stan = fold(log)) i materiał,
-który krąży po GitHubie — 1400 tasków przepływających przez board w minutę.
+Product value: a visual proof of the architecture (state = fold(log)) and
+material that circulates on GitHub — 1400 tasks flowing through the board in
+a minute.
 
-## Kontekst
+## Context
 
-Powstało z przeglądu wyróżników wobec Backlog.md (2026-08-31). Wszystko jest
-czystą pochodną istniejących danych (Prawo 2 — wyliczone, kasowalne): funkcja
-`stateAt(taskId, ts)` to fold wpisów `history/` do zadanego momentu. Zero
-nowych danych, zero nowych zapisów.
+Came out of a review of differentiators against Backlog.md (2026-08-31).
+Everything is a pure derivative of existing data (Law 2 — computed,
+deletable): the function `stateAt(taskId, ts)` is a fold of `history/`
+entries up to a given moment. Zero new data, zero new writes.
 
-Ograniczenia, które trzeba pokazać, a nie ukryć:
-- **Historia zaczyna się 2026-08-30.** Przed tą datą jedynym uczciwym sygnałem
-  są stemple ukończenia backfillowane z gita (TL-27, gdy powstanie) —
-  zgodnie z regułą „stempel ukończenia backfillujemy, czasu pracy nie"
-  ([docs/backlog-time-tracking.md](../../docs/backlog-time-tracking.md) §2).
-  Bez TL-27 oś czasu zaczyna się w dniu zero historii i suwak ma to jawnie
-  pokazywać, nie udawać pustego projektu przed startem.
-- Wpisy `legacy` (bez ULID) uczestniczą w foldzie po `ts`, jak wszędzie.
+Constraints that must be shown, not hidden:
+- **History starts on 2026-08-30.** Before that date, the only honest signal
+  is completion timestamps backfilled from git (TL-27, once it exists) —
+  following the rule "backfill the completion timestamp, never the work
+  time" ([docs/backlog-time-tracking.md](../../docs/backlog-time-tracking.md)
+  §2). Without TL-27 the timeline starts on the day history begins, and the
+  slider must show that explicitly rather than pretend the project was empty
+  before it started.
+- `legacy` entries (without a ULID) participate in the fold by `ts`, like
+  everything else.
 
-Decyzja techniczna do podjęcia na początku: replay liczony w przeglądarce
-z historii wbudowanej w build (jak dziś historia w trybie `file://`) — bez
-nowego endpointu. Jeśli objętość wpisów uczyni build za ciężkim, dopiero wtedy
-agregat klatek per dzień (też wyliczany, też kasowalny).
+A technical decision to make at the start: compute the replay in the browser
+from the history embedded in the build (as history already is in `file://`
+mode today) — no new endpoint. If the volume of entries makes the build too
+heavy, only then move to a per-day frame aggregate (also computed, also
+deletable).
 
 ## Pre-flight reading
 
 - [docs/backlog-field-editing-history.md](../../docs/backlog-field-editing-history.md)
-  §2 — format wpisu, dedup przy odczycie, pseudo-pola `__created__` /
-  `__deleted__` (klatka musi wiedzieć, kiedy task w ogóle istnieje).
-- `scripts/build-viewer.mjs` — jak historia trafia do builda i jak kod
-  klienta żyje w template literalu (pułapka backslashy, §8 tego samego doc).
-- `scripts/history.mjs` — odczyt wpisów.
+  §2 — entry format, dedup on read, `__created__` / `__deleted__`
+  pseudo-fields (a frame needs to know whether the task exists at all at
+  that point).
+- `scripts/build-viewer.mjs` — how history reaches the build and how client
+  code lives inside a template literal (the backslash trap, §8 of the same
+  doc).
+- `scripts/history.mjs` — reading entries.
 
-## Kroki
+## Steps
 
-1. `stateAt`: fold historii per task do momentu `ts` (status + istnienie);
-   moduł uruchamialny w Node (testowalny) i wklejany źródłem do viewera, jak
-   `task-fields.mjs`.
-2. UI: suwak zakresu dat + odtwarzanie z regulowaną prędkością; licznik dnia
-   i liczby tasków per status; kolor rozróżnia zmiany `agent:` od pozostałych.
-3. Stan widoku w URL (spójnie z istniejącym mechanizmem stanu widoków),
-   żeby dało się podlinkować „board na 2026-07-01".
-4. Jawna granica danych: początek osi czasu opisany („historia od …"),
-   opcjonalne stemple ukończenia z gita gdy dostępne.
-5. Testy `stateAt` na fixture'ach: kolejność zdarzeń, task skasowany
-   i założony ponownie, wpisy legacy.
+1. `stateAt`: fold per-task history up to moment `ts` (status + existence);
+   a module runnable in Node (testable) and inlined as source into the
+   viewer, like `task-fields.mjs`.
+2. UI: a date-range slider + replay at adjustable speed; a day counter and
+   per-status task counts; color distinguishes `agent:` changes from the
+   rest.
+3. View state in the URL (consistent with the existing view-state
+   mechanism), so "board on 2026-07-01" can be linked directly.
+4. Explicit data boundary: the start of the timeline is labeled ("history
+   since …"), optional completion timestamps from git when available.
+5. Tests for `stateAt` on fixtures: event ordering, a task deleted and
+   re-created, legacy entries.
 
 ## Acceptance criteria
 
-- [ ] `stateAt` jest czystą funkcją z testami poza przeglądarką.
-- [ ] Replay nie wykonuje żadnych zapisów i działa w trybie `file://`.
-- [ ] Moment sprzed startu historii jest oznaczony jako brak danych, nie jako
-      pusty board.
-- [ ] Zmiany dokonane przez `agent:` są wizualnie odróżnialne od ludzkich.
+- [ ] `stateAt` is a pure function with tests outside the browser.
+- [ ] Replay performs no writes and works in `file://` mode.
+- [ ] A moment before history begins is marked as no data, not as an empty
+      board.
+- [ ] Changes made by `agent:` are visually distinguishable from human ones.
 
 ## Log
 
-Append-only. Format: `YYYY-MM-DD status — kto — notatka`.
+Append-only. Format: `YYYY-MM-DD status — who — note`.
 
-- 2026-08-31 pending — agent:claude — task założony z przeglądu wyróżników
-  agentowych; czysta pochodna history/, zero nowych danych.
+- 2026-08-31 pending — agent:claude — task created from a review of agentic
+  differentiators; a pure derivative of history/, zero new data.

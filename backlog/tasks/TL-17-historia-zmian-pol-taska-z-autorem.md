@@ -1,6 +1,6 @@
 ---
 id: TL-17
-title: Pokaż historię zmian pól taska wraz z autorem
+title: Show the change history of a task's fields, with the author
 type: code
 labels: [pre-launch]
 board: main
@@ -20,53 +20,73 @@ related_docs:
   - origin#qa/backlog-field-editing-history.yaml
 verification:
   - bash: "node --test backlog/scripts/tests/history.test.mjs"
-  - manual: "Zmień pole w viewerze — przy etykiecie pojawia się znacznik „founder · dziś\", a w sekcji Historia zmian wiersz stara → nowa"
+  - manual: "Change a field in the viewer — a marker „founder · today\" appears next to the label, and in the Change history section a row old → new"
 ---
 
-## Cel
+## Goal
 
-Plik taska mówi, JAKI jest stan, ale nie KTO go ustawił. `## Log` jest ręczny i nieregularny, a `git blame` nie odpowiada na pytanie „kto zmienił priorytet tego taska" — commit obejmuje kilkanaście plików i kilka pól naraz, a agent commituje jako founder. Po tym tasku każda zmiana pola ma wpis z autorem, a przy polu widać, kto zmienił je ostatnio.
+A task file says WHAT the state is, but not WHO set it. `## Log` is manual
+and irregular, and `git blame` does not answer "who changed this task's
+priority" — a commit covers a dozen files and several fields at once, and an
+agent commits as the founder. After this task, every field change gets an
+entry with an author, and the field itself shows who last changed it.
 
-## Kontekst
+## Context
 
-Pełna analiza (model danych, odrzucone alternatywy, granice wiarygodności, droga do wielu użytkowników): [`docs/architecture/backlog-field-editing-history.md`](../../docs/backlog-field-editing-history.md).
+Full analysis (data model, rejected alternatives, trust boundaries, path to
+multiple users): [`docs/architecture/backlog-field-editing-history.md`](../../docs/backlog-field-editing-history.md).
 
-Sedno problemu nie jest w zapisie, tylko w **atrybucji**: nie każda zmiana idzie przez viewer. Agent pisze `.md` przez Edit/Write, człowiek przez edytor, `git checkout` przepisuje setki plików. Stąd trzy drogi i jedna zasada — autora podaje ten, kto go zna, a reszta jest jawnie `unknown`, nie zgadywana.
+The core of the problem is not the write, it is **attribution**: not every
+change goes through the viewer. An agent writes the `.md` via Edit/Write, a
+human through an editor, `git checkout` rewrites hundreds of files at once.
+Hence three paths and one rule — the author is given by whoever knows it,
+and everything else is explicitly `unknown`, never guessed.
 
-## Kroki
+## Steps
 
-1. `backlog/scripts/history.mjs` — JSONL per task (`backlog/history/BL-NNNN.jsonl`), snapshot odniesienia, `recordEdit` (znane „przed/po") i `reconcile` (diff dysk vs snapshot).
-2. `serve-backlog.mjs` — wpis przy każdym `POST /api/field`; `GET /api/history`; rekoncyliacja przy starcie i 2,5 s po zmianie pliku spoza viewera (`unknown`).
-3. `history-record.mjs` + hook `regen-on-task-edit.sh` — zmiany agenta podpisane `claude`, zanim rekoncyliacja zdąży je zobaczyć jako anonimowe.
-4. Viewer — przełącznik „Edytuję jako", znacznik `autor · kiedy` przy każdym polu, sekcja „Historia zmian" z osią czasu i filtrem po polu.
-5. Testy — `backlog/scripts/tests/history.test.mjs`.
+1. `backlog/scripts/history.mjs` — a JSONL file per task
+   (`backlog/history/BL-NNNN.jsonl`), a reference snapshot, `recordEdit`
+   (known "before/after") and `reconcile` (diff disk vs snapshot).
+2. `serve-backlog.mjs` — an entry on every `POST /api/field`; `GET
+   /api/history`; reconciliation at startup and 2.5s after a file change
+   from outside the viewer (`unknown`).
+3. `history-record.mjs` + the `regen-on-task-edit.sh` hook — agent changes
+   signed `claude`, before reconciliation gets a chance to see them as
+   anonymous.
+4. Viewer — an "Editing as" switch, an `author · when` marker on every field,
+   a "Change history" section with a timeline and a per-field filter.
+5. Tests — `backlog/scripts/tests/history.test.mjs`.
 
 ## Acceptance criteria
 
-- [x] Zmiana pola w viewerze zapisuje wpis z `actor`, `field`, `from`, `to`, `ts`, `source`.
-- [x] Zmiana pliku przez agenta (hook) jest podpisana `claude`, nie `unknown`.
-- [x] Zmiana spoza obu dróg trafia do historii jako `unknown` — nie ginie i nie kłamie.
-- [x] Ta sama zmiana nie jest liczona dwa razy (serwer vs rekoncyliacja).
-- [x] Pierwszy przebieg na istniejącym backlogu NIE produkuje zmyślonych wpisów.
-- [x] Uszkodzony wiersz JSONL nie zabiera reszty historii.
-- [x] Historia widoczna w detalu taska; przy polu — kto zmienił ostatnio.
+- [x] A field change in the viewer writes an entry with `actor`, `field`, `from`, `to`, `ts`, `source`.
+- [x] A file change by an agent (hook) is signed `claude`, not `unknown`.
+- [x] A change from outside both paths lands in the history as `unknown` — it is not lost and does not lie.
+- [x] The same change is not counted twice (server vs reconciliation).
+- [x] The first run on an existing backlog does NOT produce fabricated entries.
+- [x] A corrupted JSONL line does not take the rest of the history down with it.
+- [x] History is visible in the task detail view; the field shows who last changed it.
 
 ## Verification
 
 ```bash
-node --test backlog/scripts/tests/history.test.mjs   # 13 testów
+node --test backlog/scripts/tests/history.test.mjs   # 13 tests
 ```
 
-Ręcznie: `backlog` → zmień Status → rozwiń „Historia zmian" → wiersz `founder · Status: pending → in_progress · viewer`. Potem zmień to samo pole edytorem/agentem — po ~3 s dochodzi wiersz z autorem `claude` (hook) albo `unknown` (bez hooka).
+Manual: `backlog` → change Status → expand "Change history" → a row
+`founder · Status: pending → in_progress · viewer`. Then change the same
+field via editor/agent — after ~3s a row appears with author `claude` (hook)
+or `unknown` (no hook).
 
 ## Notes
 
-Świadomie NIE zrobione, uzasadnienie w doc §6–§7:
-- backfill historii z gita (autor commita to zawsze founder — dałoby ładną nieprawdę),
-- uwierzytelnianie aktora (dziś deklaracja, nie tożsamość),
-- historia body taska (tylko frontmatter),
-- wykrywanie konfliktu równoległego zapisu.
+Deliberately NOT done, reasoning in the doc §6–§7:
+- backfilling history from git (a commit's author is always the founder — that would give a nice untruth),
+- authenticating the actor (today a claim, not an identity),
+- history of the task body (only the frontmatter),
+- detecting a parallel-write conflict.
 
 ## Log
 
-- 2026-08-29 done — claude — implementacja + testy + analiza w docs/architecture/
+- 2026-08-29 done — claude — implementation + tests + analysis in docs/architecture/
+</content>

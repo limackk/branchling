@@ -1,10 +1,10 @@
 ---
 id: TL-84
-title: "Rozstrzygnąć i zapisać: czy ręczna edycja pliku taska jest drogą wspieraną"
+title: "Decide and record: is manually editing a task file a supported path"
 type: task
 labels: [pre-launch]
 board: main
-epic: "worktrail — narzędzie"
+epic: "worktrail — the tool"
 priority: P2
 status: pending
 owner: unassigned
@@ -18,73 +18,82 @@ related_docs:
   - CLAUDE.md
   - docs/worktrail-global-tool.md
 verification:
-  - manual: "W README i w instrukcji dla agenta stoi jedno, to samo zdanie o ręcznej edycji pliku taska — i da się wskazać, gdzie zapisano uzasadnienie"
-  - bash: "grep -rn 'ręczn\\|manual' README.md docs/worktrail-global-tool.md | head"
+  - manual: "One and the same sentence about manually editing a task file appears in the README and in the agent instructions — and it is possible to point to where the justification is recorded"
+  - bash: "grep -rn 'by hand\\|manual' README.md docs/worktrail-global-tool.md | head"
 ---
 
-## Cel
+## Goal
 
-Mamy zapisaną, jawną odpowiedź na pytanie „czy wolno edytować plik taska
-ręcznie" — jedną, tę samą w README, w instrukcji dla agenta i w zachowaniu
-narzędzia.
+Have a recorded, explicit answer to the question "is it allowed to edit a
+task file by hand" — one and the same answer in the README, in the agent
+instructions, and in the tool's behavior.
 
-## Kontekst
+## Context
 
-Backlog.md odpowiada na to pytanie twardo i powtarza odpowiedź w trzech
-miejscach (nudge, overview, execution guide): *„Do not edit Backlog markdown
+Backlog.md answers this question firmly and repeats the answer in three
+places (nudge, overview, execution guide): *"Do not edit Backlog markdown
 files directly. Use the CLI so metadata, relationships, and history stay
-consistent."* U nich CLI jest jedyną legalną drogą zapisu.
+consistent."* For them the CLI is the only legal write path.
 
-My mamy model odwrotny i mamy go **niejawnie**. Plik JEST prawdą; `worktrail
-history --source manual` istnieje dokładnie po to, żeby obsłużyć zmiany zrobione
-poza narzędziem; `_template.md` jest szablonem do wypełnienia ręką. Nigdzie
-jednak nie jest napisane, że to jest droga WSPIERANA, a nie tolerowana — więc
-przy każdej kolejnej komendzie piszącej pytanie wraca i jest rozstrzygane od
-nowa, za każdym razem inaczej.
+We have the opposite model, and we have it **implicitly**. The file IS the
+truth; `worktrail history --source manual` exists precisely to handle changes
+made outside the tool; `_template.md` is a template meant to be filled in by
+hand. Nowhere, however, is it written that this is a SUPPORTED path, not a
+merely tolerated one — so every new writing command re-litigates the question
+from scratch, differently each time.
 
-To nie jest task o kodzie. To jest task o zapisaniu decyzji, zanim TL-80,
-TL-82 i TL-83 zaczną ją rozstrzygać po cichu i niespójnie.
+This is not a task about code. It is a task about recording a decision before
+TL-80, TL-82 and TL-83 start settling it quietly and inconsistently.
 
-Co trzeba rozważyć, żeby odpowiedź nie była życzeniem:
+What needs to be weighed so the answer is not wishful thinking:
 
-1. **Cena naszego modelu.** Ręczna edycja rozjeżdża pola wyliczane i omija
-   historię. `history --source manual` łata to po fakcie i tylko wtedy, gdy ktoś
-   pamięta ją uruchomić.
-2. **Cena ich modelu.** Backlog przestaje być zwykłym markdownem — bez
-   zainstalowanego narzędzia nie da się poprawić literówki, a task w cudzym
-   pull requeście przestaje być czytelną, edytowalną treścią.
-3. **Trzecia opcja:** ręczna edycja wspierana, ale narzędzie wykrywa rozjazd i
-   mówi o nim samo (`doctor` / `check`), zamiast wymagać pamiętania o `history`.
-   Sprawdź, ile z tego już robi `doctor`.
-4. Cokolwiek wyjdzie, ma trafić do **jednego** źródła instrukcji z TL-74 —
-   nie do trzech tekstów, które mogą się rozjechać.
+1. **The cost of our model.** Manual editing drifts computed fields and
+   bypasses history. `history --source manual` patches this after the fact,
+   and only when someone remembers to run it.
+2. **The cost of their model.** The backlog stops being plain markdown —
+   without the tool installed you cannot fix a typo, and a task in someone
+   else's pull request stops being readable, editable content.
+3. **A third option:** manual editing supported, but the tool detects the
+   drift and reports it itself (`doctor` / `check`), instead of requiring
+   someone to remember `history`. Check how much of this `doctor` already
+   does.
+4. Whatever comes out of this has to land in the **single** instruction
+   source from TL-74 — not in three texts that can drift apart.
 
 ## Pre-flight reading
 
-1. `scripts/history.mjs` i `scripts/history-record.mjs` — co dziś wychwytuje
-   zmianę zrobioną poza narzędziem i czego nie wychwytuje.
-2. `scripts/doctor.mjs` — ile z wykrywania rozjazdu już istnieje.
-3. `.claude/skills/backlog-workflow/SKILL.md`, sekcja „Editing outside the viewer".
-4. `docs/worktrail-global-tool.md` §3 — cztery prawa; sprawdź, czy któreś z nich
-   już tę odpowiedź implikuje, zamiast wymyślać ją od zera.
+1. `scripts/history.mjs` and `scripts/history-record.mjs` — what today
+   catches a change made outside the tool, and what it does not.
+2. `scripts/doctor.mjs` — how much of the drift detection already exists.
+3. `.claude/skills/backlog-workflow/SKILL.md`, the "Editing outside the
+   viewer" section.
+4. `docs/worktrail-global-tool.md` §3 — the four laws; check whether any of
+   them already implies this answer, instead of inventing it from scratch.
 
-## Kroki
+## Steps
 
-1. Wypisz, co realnie psuje się przy ręcznej edycji (nie hipotetycznie — sprawdź
-   na pliku: pola wyliczane, historia, `updated`).
-2. Sprawdź, ile z tego wykrywa dziś `doctor`/`check` bez pamiętania o `history`.
-3. Rozstrzygnij: wspierana / tolerowana / niewspierana. Zapisz uzasadnienie.
-4. Wpisz odpowiedź do README i do źródła instrukcji z TL-74 — jednym zdaniem,
-   tym samym w obu miejscach.
-5. Jeśli wyszła opcja 3: załóż osobny task na wykrywanie rozjazdu. Nie rób go tutaj.
+1. List out what actually breaks with manual editing (not hypothetically —
+   check it on a file: computed fields, history, `updated`).
+2. Check how much of this `doctor`/`check` detects today without needing
+   `history` to be remembered.
+3. Decide: supported / tolerated / unsupported. Record the justification.
+4. Write the answer into the README and into the instruction source from
+   TL-74 — one sentence, the same in both places.
+5. If option 3 wins: open a separate task for drift detection. Do not do it
+   here.
 
 ## Acceptance criteria
 
-- [ ] Decyzja jest zapisana wraz z uzasadnieniem i listą tego, co realnie się psuje.
-- [ ] README i instrukcja dla agenta mówią to samo, jednym zdaniem.
-- [ ] Sprawdzone (nie założone), ile rozjazdu wykrywa dziś `doctor`/`check`.
-- [ ] Ewentualna praca nad wykrywaniem rozjazdu jest osobnym taskiem, nie doklejona tutaj.
+- [ ] The decision is recorded along with its justification and a list of
+      what actually breaks.
+- [ ] The README and the agent instructions say the same thing, in one
+      sentence.
+- [ ] It has been checked (not assumed) how much drift `doctor`/`check`
+      detects today.
+- [ ] Any work on drift detection is a separate task, not tacked on here.
 
 ## Log
 
-2026-08-31 pending — agent:claude — z analizy Backlog.md: oni zakazują ręcznej edycji i powtarzają to w trzech miejscach; my mamy model odwrotny i nigdzie go nie zapisaliśmy.
+2026-08-31 pending — agent:claude — from an analysis of Backlog.md: they
+forbid manual editing and repeat that in three places; we have the opposite
+model and have never written it down anywhere.

@@ -1,6 +1,6 @@
 ---
 id: TL-19
-title: Wynieś słowniki backlogu z kodu do konfiguracji
+title: Move the backlog's vocabularies out of the code and into configuration
 type: code
 labels: [pre-launch]
 board: main
@@ -20,57 +20,80 @@ related_docs:
   - origin#qa/backlog-config-portability.yaml
 verification:
   - bash: "node --test backlog/scripts/tests/config.test.mjs"
-  - manual: "backlog --dir <obcy backlog z innym config.yaml> — viewer pokazuje TAMTE statusy, labels i typy, zero słownictwa the origin project"
+  - manual: "backlog --dir <someone else's backlog with a different config.yaml> — the viewer shows THEIR statuses, labels and types, zero the origin project vocabulary"
 ---
 
-## Cel
+## Goal
 
-`pre-launch`, `test_env`, `data-gated`, `owner: founder|claude`, siedem statusów i cztery priorytety to proces JEDNEJ firmy. Dopóki siedziały w kodzie, moduł był narzędziem the origin project, a nie narzędziem. Po tym tasku kod zna KSZTAŁT pola (enum / lista / tekst, jak się zapisuje do frontmattera), a WARTOŚCI przychodzą z `backlog/config.yaml`.
+`pre-launch`, `test_env`, `data-gated`, `owner: founder|claude`, seven
+statuses and four priorities are ONE company's process. As long as they sat
+in the code, the module was the origin project's tool, not a tool. After this task the code
+knows the SHAPE of a field (enum / list / text, how it is written to
+frontmatter), and the VALUES come from `backlog/config.yaml`.
 
-## Kontekst
+## Context
 
-Krok 2 z dwóch przygotowujących moduł do wydzielenia (krok 1: [TL-18](TL-18-katalog-danych-backlogu-jako-argument.md)).
+Step 2 of two preparing the module for extraction (step 1: [TL-18](TL-18-katalog-danych-backlogu-jako-argument.md)).
 
-Przy okazji znika trzeci parser `boards.yaml` — ten sam kształt czytały niezależnie `build-backlog`, `build-viewer` i `check-backlog-boards`; komentarz w guardzie nazywał to wprost „ceną braku zależności".
+Along the way, a third `boards.yaml` parser disappears — the same shape was
+read independently by `build-backlog`, `build-viewer` and
+`check-backlog-boards`; a comment in the guard called this outright "the
+price of no dependency".
 
-Pełny kontrakt konfiguracji, lista kluczy i granice: [`docs/architecture/backlog-config-and-portability.md`](../../docs/backlog-config-and-portability.md).
+Full configuration contract, list of keys, and boundaries:
+[`docs/architecture/backlog-config-and-portability.md`](../../docs/backlog-config-and-portability.md).
 
-## Kroki
+## Steps
 
-1. `backlog/scripts/config.mjs` — DEFAULTS (generyczne), wąski parser `config.yaml`, jeden parser `boards.yaml`, walidacja spójności między słownikami.
-2. `backlog/config.yaml` — wartości the origin project, jeden do jednego z tym, co było w kodzie.
-3. `task-fields.mjs` — `FIELD_SHAPES` (kształt) + `buildFieldSpecs(config)` zamiast `EDITABLE_FIELDS` ze stałymi.
-4. `build-backlog.mjs` — statusy archiwalne, kolejność priorytetów, aliasy epików, rejestr boardów i nagłówki widoków z konfiguracji.
-5. `build-viewer.mjs` — opcje facetów, osie labeli, domyślna oś burndownu, chipy statystyk, rozbicia dashboardu, kolory statusów/priorytetów/labeli i tytuł strony z konfiguracji.
+1. `backlog/scripts/config.mjs` — DEFAULTS (generic), a narrow `config.yaml`
+   parser, one `boards.yaml` parser, consistency validation across
+   vocabularies.
+2. `backlog/config.yaml` — the origin project's values, one-to-one with what was in the
+   code.
+3. `task-fields.mjs` — `FIELD_SHAPES` (shape) + `buildFieldSpecs(config)`
+   instead of `EDITABLE_FIELDS` with constants.
+4. `build-backlog.mjs` — archival statuses, priority ordering, epic aliases,
+   the board registry, and view headers from configuration.
+5. `build-viewer.mjs` — facet options, label axes, the default burndown axis,
+   stat chips, dashboard breakdowns, status/priority/label colors, and the
+   page title from configuration.
 
 ## Acceptance criteria
 
-- [x] `config.yaml` the origin project odtwarza co do wartości słowniki sprzed zmiany (test parytetu).
-- [x] DEFAULTS nie zawierają ani jednego słowa ze słownika the origin project.
-- [x] Viewer zbudowany z cudzą konfiguracją nie zawiera słownictwa the origin project (bramka na wynikowym HTML-u).
-- [x] Nieznany klucz w `config.yaml` OBLEWA zamiast zniknąć.
-- [x] Niespójność między słownikami (status archiwalny spoza `statuses`, `default:` boarda spoza listy) oblewa.
-- [x] Wygenerowane widoki bez zmian poza nagłówkiem, który teraz mówi nazwą projektu.
-- [x] Jeden parser `boards.yaml` zamiast trzech.
+- [x] the origin project's `config.yaml` reproduces the pre-change vocabularies value for
+      value (parity test).
+- [x] DEFAULTS contain not a single word from the origin project's vocabulary.
+- [x] A viewer built with a foreign configuration contains no the origin project vocabulary
+      (a gate on the resulting HTML).
+- [x] An unknown key in `config.yaml` FAILS instead of disappearing.
+- [x] Inconsistency between vocabularies (an archival status outside
+      `statuses`, a board's `default:` outside the list) fails.
+- [x] Generated views are unchanged except for the header, which now names
+      the project.
+- [x] One `boards.yaml` parser instead of three.
 
 ## Verification
 
 ```bash
-node --test backlog/scripts/tests/config.test.mjs      # 14 testów
-node --test backlog/scripts/tests/task-fields.test.mjs # 29 testów
+node --test backlog/scripts/tests/config.test.mjs      # 14 tests
+node --test backlog/scripts/tests/task-fields.test.mjs # 29 tests
 ```
 
-Dowód: `backlog --dir <obcy katalog>` z `statuses: [todo, doing, shipped]` pokazuje w viewerze te statusy w filtrach, na kartach i w edytorze pola.
+Proof: `backlog --dir <foreign directory>` with `statuses: [todo, doing,
+shipped]` shows those statuses in the viewer's filters, cards, and field
+editor.
 
 ## Notes
 
-Świadomie zostawione poza zakresem:
-- ekstrakcja rdzenia dashboardu z template literala (osobny krok, warunek `backlog stats` w CLI),
-- `init` (bootstrap katalogu w cudzym repo),
-- wydzielenie repo, `bin/` + `lib/`, dokumentacja po angielsku.
+Deliberately left out of scope:
+- extracting the dashboard core out of the template literal (a separate step,
+  conditional on `backlog stats` in the CLI),
+- `init` (bootstrapping the directory in someone else's repo),
+- extracting the repo, `bin/` + `lib/`, English-language documentation.
 
-Zmiana widoczna gołym okiem: chip statystyk mówi teraz „N zamkniętych (X%)" i liczy `archived_statuses` (done + cancelled), a nie samo `done`.
+Change visible to the naked eye: the stats chip now says "N closed (X%)" and
+counts `archived_statuses` (done + cancelled), not just `done`.
 
 ## Log
 
-- 2026-08-29 done — claude — config.mjs + config.yaml + przejście wszystkich konsumentów
+- 2026-08-29 done — claude — config.mjs + config.yaml + migration of all consumers

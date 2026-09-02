@@ -1,10 +1,10 @@
 ---
 id: TL-101
-title: "Skill backlog-workflow: take i close zamiast recznej edycji"
+title: "Skill backlog-workflow: take and close instead of manual editing"
 type: task
 labels: []
 board: main
-epic: "Wyróżniki agentowe"
+epic: "Agentic hallmarks"
 priority: P2
 status: done
 owner: agent:claude
@@ -22,76 +22,84 @@ verification:
     bash: "grep -q 'worktrail instructions overview' .claude/skills/backlog-workflow/SKILL.md"
 ---
 
-## Cel
+## Goal
 
-Przewodniki, które agent czyta przed pracą i przed zamknięciem taska, KAŻĄ mu
-używać prymitywów (`take`, `done`) i opisują ręczną edycję pól jako drogę
-zapasową — i jest to pilnowane testem, a nie tylko prawdą w dniu, w którym
-ktoś to napisał.
+The guides an agent reads before working and before closing a task REQUIRE it
+to use the primitives (`take`, `done`) and describe manual field editing as
+the fallback path — and this is enforced by a test, not merely true on the
+day someone wrote it.
 
-Tryb bezpośredni („zrób TL-1234" powiedziane głównemu agentowi w Claude Code
-/ Codex) dostaje w ten sposób lock, atrybucję i fokus sesji za darmo — mniej
-kroków dla agenta, lepsze ślady dla człowieka.
+Direct mode ("do TL-1234" said to the main agent in Claude Code / Codex) gets
+a lock, attribution, and session focus for free this way — fewer steps for
+the agent, better traces for the human.
 
-## Kontekst
+## Context
 
-Task przepisany 2026-09-01 przy rozstrzygnięciu TL-139; poprzedni zakres
-(przepisanie sekcji „Work a task" i „Close a task" w
-`.claude/skills/backlog-workflow/SKILL.md`) jest NIEAKTUALNY, bo tych sekcji
-już nie ma. Skill świadomie nie niesie żadnej procedury ani słownictwa i
-odsyła do `worktrail instructions overview`; powód stoi w jego własnym ciele —
-kopia procedury w pliku skilla zamarza w dniu, w którym powstała, i myli się
-wtedy najgorszym możliwym sposobem: nadal konkretnie i pewnie.
+Task rewritten on 2026-09-01 following the resolution of TL-139; the previous
+scope (rewriting the "Work a task" and "Close a task" sections in
+`.claude/skills/backlog-workflow/SKILL.md`) is OUTDATED, because those
+sections no longer exist. The skill deliberately carries no procedure or
+vocabulary and points to `worktrail instructions overview`; the reason is
+stated in its own body — a copy of the procedure inside the skill file
+freezes on the day it was written, and then misleads in the worst possible
+way: still specifically, still confidently.
 
-Treść, której chciał pierwotny TL-101, JEST już dowieziona — tylko gdzie
-indziej. `instructions task-execution` mówi wprost „Do not edit the status by
-hand to claim it" i podaje `next`/`take`; `instructions task-finalization`
-mówi „ONE COMMAND CLOSES A TASK" i zakazuje robienia tych kroków ręcznie;
-oba wskazują `worktrail history --source manual` jako drogę dla zmian zrobionych
-ręcznie. Nie ma więc pracy do wykonania w prozie — brakuje DOWODU, że tak
-zostanie.
+The content the original TL-101 wanted HAS already been delivered — just
+elsewhere. `instructions task-execution` says outright "Do not edit the
+status by hand to claim it" and gives `next`/`take`; `instructions
+task-finalization` says "ONE COMMAND CLOSES A TASK" and forbids doing those
+steps by hand; both point to `worktrail history --source manual` as the path
+for changes made by hand. So there is no prose work left to do — what is
+missing is PROOF that it stays that way.
 
-Bo nic tego nie pilnuje. `scripts/tests/instructions.test.mjs` sprawdza
-routing z `overview`, podstawienie słownictwa i to, że nieznany placeholder
-wywala się zamiast trafić do terminala — ale ani jednej asercji, że przewodniki
-w ogóle każą używać `take`/`done` zamiast edycji pól. Zdanie, na którym stoi
-cały tryb bezpośredni, można dziś usunąć jednym commitem i suita zostanie
-zielona.
+Because nothing guards it. `scripts/tests/instructions.test.mjs` checks
+routing from `overview`, vocabulary substitution, and that an unknown
+placeholder crashes instead of reaching the terminal — but not a single
+assertion that the guides actually require using `take`/`done` instead of
+editing fields. The sentence the entire direct mode rests on could be deleted
+today in one commit and the suite would stay green.
 
-Granica: to jest strażnik nad TEZĄ przewodnika, nie nad jego brzmieniem.
-Asercja na całe zdanie zmusiłaby do poprawiania testu przy każdej redakcji
-stylu, więc byłaby pierwszą rzeczą, którą ktoś rozluźni.
+Boundary: this is a guard over the guide's THESIS, not its wording. An
+assertion on the whole sentence would force a test update at every style
+edit, so it would be the first thing someone loosens.
 
 ## Pre-flight reading
 
-- `scripts/instructions.mjs` — tematy `task-execution` i `task-finalization`;
-  tam stoją zdania, które ten task obejmuje strażnikiem.
-- `scripts/tests/instructions.test.mjs` — czego suita już dowodzi i w jakiej
-  konwencji (kontrola pozytywna przy każdym twierdzeniu).
-- `.claude/skills/backlog-workflow/SKILL.md` — dlaczego skill NIE niesie
-  procedury; kontrakt na ten plik mierzy wyłącznie wskaźnik.
+- `scripts/instructions.mjs` — the `task-execution` and `task-finalization`
+  topics; this is where the sentences this task guards live.
+- `scripts/tests/instructions.test.mjs` — what the suite already proves and
+  in what convention (a positive control for every claim).
+- `.claude/skills/backlog-workflow/SKILL.md` — why the skill does NOT carry a
+  procedure; the contract for this file measures only the pointer.
 
-## Kroki
+## Steps
 
-1. W `instructions.test.mjs`: asercja, że `task-execution` niesie zakaz ręcznej
-   zmiany statusu i podaje `take`/`next`, a `task-finalization` — że zamyka
-   jedna komenda uruchamiająca kontrakt. Nazwy komend brać z `PRODUCT_NAME`
-   i z tabeli komend, nie z literałów.
-2. Kontrola pozytywna: asercja ma OBLEWAĆ, gdy zdanie zniknie z szablonu —
-   test, który przechodzi na pustym tekście, jest zielony bez mocy dowodowej.
-3. Sprawdzić, czy przewodniki opisują ręczną edycję jako drogę zapasową
-   (`history --source manual`); jeśli nie — dopisać jedno zdanie, nie wykład.
+1. In `instructions.test.mjs`: an assertion that `task-execution` carries a
+   ban on manually changing status and gives `take`/`next`, and that
+   `task-finalization` says closing is one command that runs the contract.
+   Take command names from `PRODUCT_NAME` and the command table, not from
+   literals.
+2. Positive control: the assertion must FAIL when the sentence disappears
+   from the template — a test that passes on empty text is green with no
+   evidentiary force.
+3. Check whether the guides describe manual editing as the fallback path
+   (`history --source manual`); if not — add one sentence, not an essay.
 
 ## Acceptance criteria
 
-- [x] `task-execution` każe wziąć task komendą i zabrania ręcznej zmiany statusu; strażnik oblewa, gdy to zdanie zniknie. [proof: guides-say-primitives]
-- [x] `task-finalization` mówi, że zamyka jedna komenda uruchamiająca `verification:`. [proof: guides-say-primitives]
-- [x] Skill nie niesie procedury — jego kontrakt sprawdza wyłącznie, że odsyła do przewodnika. [proof: skill-points-at-the-guide]
-- [x] Żaden wpis `verification:` nie wymaga wpisania procedury z powrotem do `.claude/skills/`. [proof: skill-points-at-the-guide]
+- [x] `task-execution` requires taking a task via a command and forbids
+      manually changing status; the guard fails when that sentence
+      disappears. [proof: guides-say-primitives]
+- [x] `task-finalization` says closing is one command running
+      `verification:`. [proof: guides-say-primitives]
+- [x] The skill carries no procedure — its contract checks only that it
+      points to the guide. [proof: skill-points-at-the-guide]
+- [x] No `verification:` entry requires writing the procedure back into
+      `.claude/skills/`. [proof: skill-points-at-the-guide]
 
 ## Log
 
-Append-only. Format: `YYYY-MM-DD status — kto — notatka`.
+Append-only. Format: `YYYY-MM-DD status — who — note`.
 
-- 2026-08-31 blocked — agent:claude — task założony z decyzji o trybie
-  bezpośrednim; czeka na take (TL-87) i close (TL-93).
+- 2026-08-31 blocked — agent:claude — task created from the decision on
+  direct mode; waiting on take (TL-87) and close (TL-93).

@@ -1,10 +1,10 @@
 ---
 id: TL-59
-title: "Ko-lokacja: widoki nie są ignorowane w istniejącym repo"
+title: "Co-location: views are not ignored in an existing repo"
 type: bug
 labels: [pre-launch]
 board: main
-epic: "Integralność danych"
+epic: "Data integrity"
 priority: P1
 status: done
 owner: claude
@@ -18,86 +18,102 @@ related_docs:
   - docs/backlog-config-and-portability.md
 verification:
   - bash: "node --test scripts/tests/init-gitignore.test.mjs"
-  - bash: "d=$(mktemp -d) && cd \"$d\" && git init -q . && printf 'node_modules/\\n' > .gitignore && node /Users/limack/workspace/tasklog/bin/worktrail.mjs init --dir . >/dev/null && git check-ignore -q INDEX.yaml && echo 'widoki ignorowane w istniejącym repo — OK'"
+  - bash: "d=$(mktemp -d) && cd \"$d\" && git init -q . && printf 'node_modules/\\n' > .gitignore && node /Users/limack/workspace/tasklog/bin/worktrail.mjs init --dir . >/dev/null && git check-ignore -q INDEX.yaml && echo 'views ignored in an existing repo — OK'"
   - bash: "node --test scripts/tests/views-not-versioned.test.mjs"
 ---
 
-## Cel
+## Goal
 
-Po `worktrail init` widoki mają być ignorowane przez gita **w obu układach
-katalogów** — także wtedy, gdy repozytorium ma już własny `.gitignore`.
+After `worktrail init`, views must be ignored by git in **both directory
+layouts** — including when the repository already has its own `.gitignore`.
 
-## Kontekst
+## Context
 
-Zmierzone 2026-08-31, świeże repo z jednolinijkowym `.gitignore`:
+Measured 2026-08-31, a fresh repo with a one-line `.gitignore`:
 
 ```
 $ worktrail init --dir .
-  pominięte (już istniały, nie ruszam): .gitignore
-$ worktrail new --title "Zadanie" && worktrail build
+  skipped (already existed, not touching): .gitignore
+$ worktrail new --title "Task" && worktrail build
 $ git check-ignore -v INDEX.yaml NOW.yaml
-(pusto — NIE są ignorowane)
+(empty — NOT ignored)
 $ git status --porcelain
 ?? INDEX.yaml
 ?? NOW.yaml
 ```
 
-Mechanizm: `init` pisze własny `.gitignore` z regułami na widoki, ale zasada
-„istniejący plik jest POMIJANY, nigdy nadpisywany" — słuszna i nie do ruszenia —
-sprawia, że w układzie **ko-lokowanym** (`--dir .`, czyli `tasks/` w korzeniu
-repozytorium) reguły nie powstają wcale. Pominięcie jest wypisane, ale jako jedna
-pozycja wśród dziewięciu, w linii, która czyta się jak informacja porządkowa.
+Mechanism: `init` writes its own `.gitignore` with rules for the views, but
+the rule "an existing file is SKIPPED, never overwritten" — correct and not
+to be touched — means that in the **co-located** layout (`--dir .`, i.e.
+`tasks/` at the repository root) the rules never get written at all. The
+skip is printed, but as one line among nine, in a sentence that reads like
+routine bookkeeping information.
 
-W układzie zagnieżdżonym (`--dir ./backlog`) problemu nie ma, bo `backlog/.gitignore`
-powstaje od zera. Oba układy są wspierane — rozstrzyga to `scripts/tests/_repo.mjs`
-— więc bramka nie może działać tylko w jednym.
+In the nested layout (`--dir ./backlog`) there is no problem, because
+`backlog/.gitignore` is created from scratch. Both layouts are supported —
+`scripts/tests/_repo.mjs` settles this — so the gate cannot work in only one
+of them.
 
-**Dlaczego to jest P1, a nie drobiazg.** Skutkiem jest zacommitowany `INDEX.yaml`,
-czyli posortowany agregat WSZYSTKICH tasków. Wtedy każda gałąź przepisuje ten sam
-plik i dwie gałęzie konfliktują nawet wtedy, gdy nie mają wspólnego taska — to
-jest dokładnie ta awaria, dla której widoki w ogóle są nieversjonowane, i którą
-`scripts/tests/views-not-versioned.test.mjs` udowadnia kontrolą pozytywną. Cena
-jest płacona później i przez kogoś innego niż ten, kto uruchomił `init`.
+**Why this is a P1, not a nit.** The result is a committed `INDEX.yaml`, the
+sorted aggregate of ALL tasks. Every branch then rewrites the same file, and
+two branches conflict even when they do not share a single task — this is
+exactly the failure for which views are unversioned in the first place, and
+which `scripts/tests/views-not-versioned.test.mjs` proves with a positive
+control. The price is paid later, and by someone other than whoever ran
+`init`.
 
-Ten sam problem dotyczy `.gitattributes` (`history/*.jsonl merge=union`). Bez
-tej reguły append-only log historii konfliktuje przy każdym scaleniu, mimo że
-semantycznie sporu nie ma.
+The same problem affects `.gitattributes` (`history/*.jsonl merge=union`).
+Without this rule, the append-only history log conflicts on every merge, even
+though there is no semantic conflict at all.
 
-**Ograniczenie, które kształtuje rozwiązanie.** Nadpisanie cudzego `.gitignore`
-jest niedopuszczalne. Dopisanie do niego też nie jest oczywiste — plik może być
-generowany, może być współdzielony, a `init` pisze do cudzego katalogu i nie ma
-cofnięcia. Bezpieczna wersja minimalna: **wykryj i powiedz głośno**, z gotowym
-blokiem do wklejenia. Wersja wygodniejsza: dopisz blok oznaczony znacznikiem,
-gdy plik nie jest tylko do odczytu, i wypisz dokładnie, co dopisano.
+**A constraint that shapes the fix.** Overwriting someone else's
+`.gitignore` is unacceptable. Appending to it is not obviously fine either —
+the file may be generated, may be shared, and `init` is writing into someone
+else's directory with no undo. The safe minimal version: **detect it and say
+so loudly**, with a ready-to-paste block. The more convenient version:
+append a block marked with a sentinel, when the file is not read-only, and
+print exactly what was appended.
 
 ## Pre-flight reading
 
-1. `scripts/init-backlog.mjs` — `GITIGNORE`, `GITATTRIBUTES`, pętla po `FILES` i zasada pomijania.
-2. `scripts/tests/views-not-versioned.test.mjs` — dowód, dlaczego wersjonowany agregat konfliktuje.
-3. `.gitignore` tego repozytorium — komentarz wyjaśniający powód; ta treść ma trafić do użytkownika.
-4. `scripts/tests/_repo.mjs` — dlaczego oba układy katalogów muszą być obsłużone.
+1. `scripts/init-backlog.mjs` — `GITIGNORE`, `GITATTRIBUTES`, the loop over `FILES` and the skip rule.
+2. `scripts/tests/views-not-versioned.test.mjs` — proof of why a versioned aggregate conflicts.
+3. This repository's `.gitignore` — the comment explaining the reason; this text is meant to reach the user.
+4. `scripts/tests/_repo.mjs` — why both directory layouts must be handled.
 
-## Kroki
+## Steps
 
-1. Po zapisie plików `init` sprawdza, czy widoki są faktycznie ignorowane w katalogu docelowym — nie „czy zapisałem `.gitignore`", tylko czy REGUŁA OBOWIĄZUJE. `git check-ignore` jest do tego właściwym narzędziem, bo zna też `.git/info/exclude` i pliki nadrzędne.
-2. Gdy nie obowiązuje: wypisz to jako OSTRZEŻENIE (nie jako pozycję listy pominięć), z gotowym blokiem reguł i jednym zdaniem, dlaczego to ważne.
-3. Rozstrzygnij dopisywanie: blok ze znacznikiem (`# worktrail: …`), tylko za jawną zgodą (`--gitignore` / pytanie), nigdy po cichu. Dopisanie ma być idempotentne — drugi `init` nie dokłada drugiego bloku.
-4. To samo dla `.gitattributes` i reguły `merge=union`.
-5. Jeśli katalog nie jest repozytorium gita, nie strasz — powiedz neutralnie, że reguły będą potrzebne po `git init`.
-6. Test `scripts/tests/init-gitignore.test.mjs`: repo BEZ `.gitignore` (dziś działa) i repo Z `.gitignore` (dziś oblewa) — w obu przypadkach po `init` widoki są ignorowane albo użytkownik dostał ostrzeżenie. Kontrola pozytywna: bez poprawki drugi przypadek MUSI oblewać.
+1. After `init` writes its files, check whether the views are actually
+   ignored in the target directory — not "did I write `.gitignore`" but
+   whether the RULE APPLIES. `git check-ignore` is the right tool for this,
+   because it also knows about `.git/info/exclude` and parent files.
+2. When it does not apply: print this as a WARNING (not as an item in the
+   skip list), with a ready-to-paste block of rules and one sentence on why
+   it matters.
+3. Decide on appending: a block with a sentinel (`# worktrail: …`), only with
+   explicit consent (`--gitignore` / a prompt), never silently. Appending
+   must be idempotent — a second `init` must not add a second block.
+4. The same for `.gitattributes` and the `merge=union` rule.
+5. If the directory is not a git repository, do not alarm — say neutrally
+   that the rules will be needed after `git init`.
+6. Test `scripts/tests/init-gitignore.test.mjs`: a repo WITHOUT `.gitignore`
+   (works today) and a repo WITH `.gitignore` (fails today) — in both cases,
+   after `init` the views are either ignored or the user got a warning.
+   Positive control: without the fix, the second case MUST fail.
 
 ## Acceptance criteria
 
-- [ ] Po `init` w repo z istniejącym `.gitignore` widoki są ignorowane ALBO użytkownik dostał wyraźne ostrzeżenie z gotowym blokiem.
-- [ ] Istniejący `.gitignore` nigdy nie jest nadpisany.
-- [ ] Dopisanie (jeśli zaimplementowane) jest idempotentne i oznaczone znacznikiem.
-- [ ] To samo rozstrzygnięcie dla `.gitattributes`.
-- [ ] Test pokrywa oba układy katalogów i ma kontrolę pozytywną.
+- [ ] After `init` in a repo with an existing `.gitignore`, the views are ignored OR the user got a clear warning with a ready-to-paste block.
+- [ ] An existing `.gitignore` is never overwritten.
+- [ ] Appending (if implemented) is idempotent and marked with a sentinel.
+- [ ] The same resolution for `.gitattributes`.
+- [ ] The test covers both directory layouts and has a positive control.
 
 ## Log
 
-Append-only. Format: `YYYY-MM-DD status — kto — notatka`.
+Append-only. Format: `YYYY-MM-DD status — who — note`.
 
-- 2026-08-31 created — agent:claude — zmierzone na świeżym repo podczas audytu onboardingu
-- 2026-08-31 in_progress — agent:claude — start implementacji
-- 2026-08-31 done — agent:claude — `init` sprawdza `git check-ignore` po zapisie i dopisuje blok ze znacznikiem `# >>> worktrail` do istniejącego `.gitignore`/`.gitattributes`; `--no-gitignore` wyłącza i podaje reguły do wklejenia. Reguły wyciągnięte do `IGNORE_RULES`/`ATTRIBUTE_RULES` — jedno źródło dla zapisu i dopisania. Dodatkowo: śledzony już widok jest nazwany wprost, z `git rm --cached`, bo ignorowanie nie działa wstecz. Test `init-gitignore.test.mjs`, 10 asercji; moc dowodowa sprawdzona przez wyłączenie zachowania — wtedy oblewa asercja ko-lokacji, a układ zagnieżdżony nadal przechodzi. 273/273.
+- 2026-08-31 created — agent:claude — measured on a fresh repo during an onboarding audit
+- 2026-08-31 in_progress — agent:claude — starting implementation
+- 2026-08-31 done — agent:claude — `init` checks `git check-ignore` after writing and appends a block marked with the `# >>> worktrail` sentinel to an existing `.gitignore`/`.gitattributes`; `--no-gitignore` disables this and prints the rules to paste in. Rules extracted into `IGNORE_RULES`/`ATTRIBUTE_RULES` — a single source for both writing and appending. Additionally: an already-tracked view is named explicitly, with `git rm --cached`, because ignoring does not act retroactively. Test `init-gitignore.test.mjs`, 10 assertions; evidentiary strength checked by disabling the behavior — the co-location assertion then fails while the nested layout still passes. 273/273.
+</content>

@@ -1,10 +1,10 @@
 ---
 id: TL-103
-title: "Materiał launchowy — pomiar 27% jako teza i Show HN"
+title: "Launch material — the 27% measurement as thesis, and Show HN"
 type: task
 labels: [pre-launch]
 board: main
-epic: "Backlog — publikacja open source"
+epic: "Backlog — open source publication"
 priority: P1
 status: pending
 owner: unassigned
@@ -18,70 +18,76 @@ related_docs:
   - docs/funkcjonalnosci.md
 verification:
   - bash: "test -f docs/launch/post.md && grep -qi 'verification' docs/launch/post.md"
-  - manual: "Post da się przeczytać w 3 minuty, otwiera się pomiarem z własnego backlogu (z komendą do powtórzenia), a nie opisem funkcji; tytuł Show HN i pierwsze zdanie nazywają problem, nie narzędzie"
+  - manual: "The post can be read in 3 minutes, opens with a measurement from our own backlog (with a command to repeat it), not a description of features; the Show HN title and first sentence name the problem, not the tool"
 ---
 
-## Cel
+## Goal
 
-Gotowy materiał launchowy: post (do repo i na blog/HN) z pomiarem z własnego
-backlogu jako tezą, tytuł Show HN i plan publikacji. Projekt w tej kategorii
-rośnie z jednego dobrego launchu, nie z SEO — ten task robi ten launch
-przygotowanym artefaktem, a nie improwizacją w dniu publikacji.
+Ready launch material: a post (for the repo and for a blog/HN) with a
+measurement from our own backlog as the thesis, a Show HN title, and a
+publication plan. A project in this category grows from one good launch, not
+from SEO — this task turns that launch into a prepared artifact instead of
+an improvisation on publication day.
 
-## Kontekst
+## Context
 
-Mamy historię, której konkurencja nie ma, bo wymaga odwagi zmierzenia siebie:
-**12 z 44 zamkniętych tasków własnego backlogu miało łącznie 60 nieodhaczonych
-kryteriów akceptacji — przy sprawnym `verification:`** (pomiar 2026-08-31,
-metodologia i komenda w `## Kontekst` TL-86). Wniosek posta: checkbox
-odhaczany przez wykonawcę nie niesie informacji, gdy wykonawcą jest agent;
-dlatego u nas „done" jest kodem wyjścia procesu, a kryteria odhacza narzędzie
-z dowodów.
+We have a story competitors do not, because it takes the nerve to measure
+yourself: **12 out of 44 closed tasks in our own backlog had a combined 60
+unchecked acceptance criteria — with a working `verification:`** (measurement
+2026-08-31, methodology and command in `## Context` of TL-86). The post's
+conclusion: a checkbox ticked by the executor carries no information when
+the executor is an agent; that is why here "done" is a process exit code,
+and the tool checks criteria off from evidence.
 
-Rama posta: **problem → pomiar → mechanizm → demo**. NIE „przedstawiamy
-narzędzie do zarządzania taskami" (kategoria zajęta, czytelnik zamyka kartę),
-tylko „agent mówi zrobione i to nieprawda — zmierzyliśmy, jak często, i
-zbudowaliśmy bramkę". Narzędzie pojawia się jako konsekwencja tezy, w drugiej
-połowie.
+Post frame: **problem → measurement → mechanism → demo**. NOT "we present a
+task management tool" (category taken, the reader closes the tab), but "the
+agent says done and that is not true — we measured how often, and built a
+gate". The tool appears as a consequence of the thesis, in the second half.
 
-`confidence: low`, bo pomiar trzeba POWTÓRZYĆ przed publikacją: liczby z
-2026-08-31 będą w dniu launchu stare, a post z komendą do samodzielnego
-powtórzenia nie może podawać wyniku, którego ta komenda już nie daje. Jeśli
-po wdrożeniu TL-86 świeży pomiar da inną liczbę — post używa świeżej i mówi
-o poprawie, co jest nawet lepszą historią.
+`confidence: low`, because the measurement has to be REPEATED before
+publication: the numbers from 2026-08-31 will be stale on launch day, and a
+post with a command for the reader to repeat it cannot state a result that
+command no longer produces. If a fresh measurement after TL-86 is
+implemented gives a different number — the post uses the fresh one and talks
+about improvement, which is an even better story.
 
-Zasada nadrzędna: **każda liczba w poście ma obok komendę, którą czytelnik
-powtórzy pomiar na własnym backlogu.** To odróżnia pomiar od marketingu i jest
-spójne z całym charakterem narzędzia.
+Overriding principle: **every number in the post has, next to it, the
+command the reader will use to repeat the measurement on their own
+backlog.** This is what separates a measurement from marketing, and it is
+consistent with the whole character of the tool.
 
 ## Pre-flight reading
 
-1. `backlog/tasks/TL-86-*.md`, sekcja `## Kontekst` — pomiar źródłowy i jego
-   metodologia; post nie może twierdzić więcej, niż pomiar pokazał.
-2. `docs/funkcjonalnosci.md` §4 — czego świadomie nie będzie; post nie obiecuje
-   rzeczy z tej listy.
-3. `backlog/tasks/TL-81-*.md` — ustalona nazwa pakietu i kanały; post musi
-   podawać działającą komendę instalacji.
+1. `backlog/tasks/TL-86-*.md`, `## Context` section — the source
+   measurement and its methodology; the post must not claim more than the
+   measurement showed.
+2. `docs/funkcjonalnosci.md` §4 — what will deliberately not exist; the post
+   does not promise anything from this list.
+3. `backlog/tasks/TL-81-*.md` — the settled package name and channels; the
+   post must give a working install command.
 
-## Kroki
+## Steps
 
-1. Powtórz pomiar na bieżącym drzewie; zapisz skrypt pomiaru w `docs/launch/`.
-2. Napisz `docs/launch/post.md` w ramie problem → pomiar → mechanizm → demo,
-   po angielsku, ≤3 minuty czytania.
-3. Tytuł Show HN + 2–3 warianty; pierwszy komentarz autora (kontekst, ograniczenia,
-   czego narzędzie NIE robi — uczciwość gra na HN lepiej niż entuzjazm).
-4. Plan publikacji: kolejność (repo → post → HN), dzień tygodnia, kto odpowiada
-   na komentarze w pierwszych godzinach.
-5. Przejdź listę twierdzeń posta i sprawdź każde na bieżącej wersji narzędzia.
+1. Repeat the measurement on the current tree; save the measurement script
+   in `docs/launch/`.
+2. Write `docs/launch/post.md` in the problem → measurement → mechanism →
+   demo frame, in English, ≤3 minutes to read.
+3. Show HN title + 2-3 variants; the author's first comment (context,
+   limitations, what the tool does NOT do — honesty plays better on HN than
+   enthusiasm).
+4. Publication plan: order (repo → post → HN), day of the week, who answers
+   comments in the first hours.
+5. Go through the post's list of claims and check each one against the
+   current version of the tool.
 
 ## Acceptance criteria
 
-- [ ] Post otwiera się pomiarem, nie opisem narzędzia; każda liczba ma obok komendę do powtórzenia.
-- [ ] Pomiar jest powtórzony na drzewie z dnia publikacji, skryptem zapisanym w repo.
-- [ ] Tytuł i pierwsze zdanie nazywają problem, nie kategorię produktu.
-- [ ] Komenda instalacji w poście działa (zależność od rozstrzygnięć TL-81).
-- [ ] Istnieje przygotowany pierwszy komentarz autora z ograniczeniami narzędzia.
+- [ ] The post opens with a measurement, not a description of the tool; every number has the command to repeat it next to it.
+- [ ] The measurement is repeated on the tree from publication day, with a script saved in the repo.
+- [ ] The title and first sentence name the problem, not the product category.
+- [ ] The install command in the post works (depends on the decisions in TL-81).
+- [ ] A prepared first author comment with the tool's limitations exists.
 
 ## Log
 
-2026-09-01 pending — agent:claude — założony z analizy konkurencyjności: launch to artefakt do przygotowania, nie zdarzenie; teza posta to pomiar 27% z TL-86, do powtórzenia przed publikacją.
+2026-09-01 pending — agent:claude — created from a competitive analysis: a launch is an artifact to prepare, not an event; the post's thesis is the 27% measurement from TL-86, to be repeated before publication.

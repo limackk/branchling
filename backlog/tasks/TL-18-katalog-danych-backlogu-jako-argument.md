@@ -1,6 +1,6 @@
 ---
 id: TL-18
-title: Odklej katalog danych backlogu od położenia kodu
+title: Detach the backlog data directory from the code's location
 type: code
 labels: [pre-launch]
 board: main
@@ -24,41 +24,64 @@ verification:
   - manual: "backlog --dir <inny katalog> — viewer pokazuje TAMTEN backlog, kod zostaje ten sam"
 ---
 
-## Cel
+## Goal
 
-Każdy skrypt liczył katalog danych ze swojego własnego położenia (`join(__dirname, "..")`). Działa to dokładnie tak długo, jak długo kod i dane są jednym katalogiem — czyli do pierwszej próby uruchomienia modułu nad innym repozytorium. Po tym tasku katalog danych jest argumentem, a nie właściwością miejsca, w którym leży plik `.mjs`.
+Every script computed the data directory from its own location
+(`join(__dirname, "..")`). This works for exactly as long as the code and
+the data are the same directory — that is, until the first attempt to run
+the module over a different repository. After this task, the data directory
+is an argument, not a property of where the `.mjs` file happens to sit.
 
-## Kontekst
+## Context
 
-Krok 1 z dwóch, które przygotowują moduł do wydzielenia jako osobne narzędzie (rozmowa z founderem 2026-08-29, wątek „open source + CLI"). Krok 2 to [TL-19](TL-19-slowniki-backlogu-do-konfiguracji.md).
+Step 1 of two that prepare the module to be extracted as a separate tool
+(conversation with the founder, 2026-08-29, the "open source + CLI" thread).
+Step 2 is [TL-19](TL-19-slowniki-backlogu-do-konfiguracji.md).
 
-Nie robimy tu wydzielenia repo ani przenoszenia plików — celem jest usunięcie ZAŁOŻENIA, żeby wydzielenie było później jednym `git subtree split`, a nie archeologią.
+We are not extracting the repo here, nor moving files — the goal is to
+remove the ASSUMPTION, so that the extraction later is one `git subtree
+split`, not archaeology.
 
-Pełne uzasadnienie i granice: [`docs/architecture/backlog-config-and-portability.md`](../../docs/backlog-config-and-portability.md).
+Full justification and boundaries:
+[`docs/architecture/backlog-config-and-portability.md`](../../docs/backlog-config-and-portability.md).
 
-## Kroki
+## Steps
 
-1. `backlog/scripts/paths.mjs` — `resolveBacklogDir()` z kolejnością źródeł: `--dir` → `BACKLOG_DIR` → wykrywanie w górę od cwd → ko-lokacja; `backlogPaths()` jako jedyne miejsce znające nazwy plików w katalogu.
-2. Wszystkie skrypty (`build-backlog`, `build-viewer`, `serve-backlog`, `query`, `history-record`, `suggest-board`, oba guardy) przechodzą na resolver; `--dir` przyjmują tak samo.
-3. `readTasks(root)` / `buildHtml(tasks, stats, config)` — funkcje eksportowane biorą katalog i konfigurację, zamiast czytać moduł-globalne stałe.
+1. `backlog/scripts/paths.mjs` — `resolveBacklogDir()` with source order:
+   `--dir` → `BACKLOG_DIR` → detection upward from cwd → co-location;
+   `backlogPaths()` as the only place that knows the file names in the
+   directory.
+2. All scripts (`build-backlog`, `build-viewer`, `serve-backlog`, `query`,
+   `history-record`, `suggest-board`, both guards) move to the resolver;
+   `--dir` is accepted the same way everywhere.
+3. `readTasks(root)` / `buildHtml(tasks, stats, config)` — the exported
+   functions take the directory and configuration as arguments, instead of
+   reading module-global constants.
 
 ## Acceptance criteria
 
-- [x] Żaden skrypt nie wywodzi katalogu danych z `__dirname` inaczej niż jako OSTATNIEGO fallbacku.
-- [x] `--dir` działa w każdym skrypcie, który dotyka danych.
-- [x] Wykrywanie wymaga znacznika (`tasks/` + `boards.yaml`/`config.yaml`/`_template.md`), a nie samego `tasks/`.
-- [x] Katalog wskazany wprost, który nie jest backlogiem, jest BŁĘDEM, a nie cichym przejściem do następnego źródła.
-- [x] Alias `backlog` uruchamiany z dowolnego katalogu dalej trafia w ten backlog (ko-lokacja).
-- [x] Widoki wygenerowane po zmianie są bajtowo identyczne (poza nagłówkiem z TL-19).
+- [x] No script derives the data directory from `__dirname` other than as a
+      LAST fallback.
+- [x] `--dir` works in every script that touches data.
+- [x] Detection requires a marker (`tasks/` plus `boards.yaml` /
+      `config.yaml` / `_template.md`), not `tasks/` alone.
+- [x] A directory pointed to explicitly that is not a backlog is an ERROR,
+      not a silent fall-through to the next source.
+- [x] The `backlog` alias, run from any directory, still hits this backlog
+      (co-location).
+- [x] Views generated after the change are byte-identical (apart from the
+      header from TL-19).
 
 ## Verification
 
 ```bash
-node --test backlog/scripts/tests/paths.test.mjs   # 9 testów
+node --test backlog/scripts/tests/paths.test.mjs   # 9 tests
 ```
 
-Dowód rozdziału: `node backlog/scripts/build-backlog.mjs --dir <obcy katalog>` generuje widoki TAMTEGO drzewa, a `git diff` w tym repozytorium jest pusty.
+Proof of the separation: `node backlog/scripts/build-backlog.mjs --dir
+<foreign directory>` generates views for THAT tree, and `git diff` in this
+repository is empty.
 
 ## Log
 
-- 2026-08-29 done — claude — resolver + przejście wszystkich skryptów
+- 2026-08-29 done — claude — resolver plus migration of every script

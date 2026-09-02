@@ -1,10 +1,10 @@
 ---
 id: TL-45
-title: "Bramka na martwe linki i related_docs w dokumentach narzędzia"
+title: "Gate on dead links and related_docs in the tool's documents"
 type: code
 labels: []
 board: main
-epic: "Backlog — publikacja open source"
+epic: "Backlog — open source publication"
 priority: P2
 status: pending
 owner: unassigned
@@ -19,52 +19,60 @@ verification:
   - bash: "node scripts/cli.mjs check --docs"
 ---
 
-## Cel
+## Goal
 
-Link w dokumencie albo `related_docs`, który wskazuje na nieistniejący plik,
-**oblewa**. Dziś nic tego nie pilnuje, a to jest nawigacja, po której porusza się
-agent — martwy link nie daje błędu, tylko cichą ślepą uliczkę.
+A link in a document, or a `related_docs` entry, pointing to a file that does
+not exist, **fails**. Today nothing guards this, and this is the navigation
+an agent moves through — a dead link produces no error, just a silent dead
+end.
 
-## Kontekst
+## Context
 
-Zmierzone 2026-08-31, po przeniesieniu narzędzia do własnego repozytorium:
-**61 ze 101 linków `.md` było martwych** (60%), plus **27 wpisów `related_docs`**
-wskazujących na układ katalogów, którego w tym repo nie ma
-(`docs/architecture/…`, `qa/…` — kształt projektu, z którego moduł wyszedł).
+Measured 2026-08-31, after the tool was moved to its own repository:
+**61 of 101 `.md` links were dead** (60%), plus **27 `related_docs`
+entries** pointing at a directory layout that does not exist in this
+repository (`docs/architecture/…`, `qa/…` — the shape of the project this
+module came out of).
 
-Naprawione ręcznie w tej samej sesji, ale **naprawa bez bramki zgnije tak samo**:
-każde przeniesienie pliku dokumentacji odtwarza ten stan i nikt się nie dowie.
+Fixed by hand in the same session, but **a fix without a gate rots the same
+way**: every documentation-file move reproduces this state, and nobody finds
+out.
 
-**Klasa jest ogólniejsza niż linki.** Ścieżka w `related_docs` to jedyne miejsce,
-w którym task mówi „przeczytaj to, zanim zaczniesz". Gdy wskazuje w pustkę,
-agent nie dostaje błędu — dostaje mniej kontekstu i nie wie, że go dostał.
+**The class is broader than links.** A path in `related_docs` is the one
+place a task says "read this before you start". When it points into a void,
+the agent doesn't get an error — it gets less context, and doesn't know it.
 
-Konsument (`origin`) ma swój `check-docs-links` i on właśnie tę klasę
-łapie u siebie; narzędzie wyszło spod tamtej bramki i nie zabrało jej ze sobą.
+The consumer (`origin`) has its own `check-docs-links`, and that is
+exactly the class it catches there; the tool came out from under that gate
+and didn't bring it along.
 
-## Kroki
+## Steps
 
-1. `check --docs`: linki markdown w `README.md`, `CLAUDE.md`, `docs/**`,
-   `backlog/tasks/**` + wszystkie `related_docs` z frontmatterów.
-2. Rozstrzygnąć formę odwołania do INNEGO repozytorium. Dziś zapisane jako
-   `origin#docs/architecture/…` — bramka ma je **rozpoznawać i pomijać**,
-   a nie próbować rozwiązać jako ścieżkę lokalną.
-3. Zdecydować, czy `check --docs` wchodzi do bezargumentowego `check`.
-4. Kontrola pozytywna: repo z jednym martwym linkiem oblewa, po naprawie
-   przechodzi. Bez tego kroku bramka może nie mieć mocy dowodowej.
+1. `check --docs`: markdown links in `README.md`, `CLAUDE.md`, `docs/**`,
+   `backlog/tasks/**` + all `related_docs` entries from frontmatter.
+2. Decide the form of a reference to ANOTHER repository. Today it's written
+   as `origin#docs/architecture/…` — the gate must **recognize and
+   skip it**, not try to resolve it as a local path.
+3. Decide whether `check --docs` becomes part of the argument-less `check`.
+4. Positive control: a repository with one dead link fails, and passes after
+   the fix. Without this step the gate may have no evidentiary force.
 
 ## Acceptance criteria
 
-- [ ] Martwy link i martwe `related_docs` raportowane z plikiem i celem, exit ≠ 0.
-- [ ] Odwołanie `<repo>#<ścieżka>` pomijane świadomie, nie przez przypadek.
-- [ ] Kotwice (`#sekcja`) nie wywracają walidacji ścieżki.
-- [ ] Kontrola pozytywna w teście, nie tylko opis.
+- [ ] Dead links and dead `related_docs` are reported with file and target,
+      exit ≠ 0.
+- [ ] A `<repo>#<path>` reference is skipped deliberately, not by accident.
+- [ ] Anchors (`#section`) do not break path validation.
+- [ ] Positive control in the test, not just described.
 
 ## Notes
 
-- Powiązane z TL-37 (rozdział dokumentów), ale to NIE to samo: tam chodzi
-  o treść i kontekst the origin project, tu o to, czy ścieżka w ogóle prowadzi do pliku.
+- Related to TL-37 (document split), but NOT the same thing: that one is
+  about content and the origin project's context, this one is about whether a path leads
+  to a file at all.
 
 ## Log
 
-- 2026-08-31 created — claude — wydzielone po zmierzeniu 61/101 martwych linków przy odpowiadaniu na pytanie „czy mamy pełne rozdzielenie"; linki naprawione od razu, bramka została jako dług
+- 2026-08-31 created — claude — split out after measuring 61/101 dead links
+  while answering "do we have full separation"; links fixed immediately, the
+  gate remained as debt

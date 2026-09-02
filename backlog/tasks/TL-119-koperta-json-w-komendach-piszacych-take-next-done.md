@@ -1,10 +1,10 @@
 ---
 id: TL-119
-title: "Koperta JSON w komendach piszących: take, next, handoff, done"
+title: "JSON envelope in the writing commands: take, next, handoff, done"
 type: code
 labels: []
 board: main
-epic: "Powierzchnia CLI"
+epic: "CLI surface"
 priority: P2
 status: pending                    # pending | in_progress | blocked | done | cancelled
 owner: unassigned
@@ -19,70 +19,78 @@ verification:
   - bash: "node --test scripts/tests/json-envelope.test.mjs"
 ---
 
-## Cel
+## Goal
 
-`take`, `next`, `handoff` i `done` odpowiadają na `--json` w tej samej kopercie
-co komendy czytające (`schemaVersion`, `kind`, ładunek). Po tym tasku konsument JSON-a ma
-JEDEN kontrakt na całe CLI, a nie dwa zależne od tego, czy komenda pisze.
+`take`, `next`, `handoff` and `done` answer `--json` in the same envelope as
+the reading commands (`schemaVersion`, `kind`, payload). After this task a
+JSON consumer has ONE contract for the whole CLI, not two depending on
+whether the command writes.
 
-## Kontekst
+## Context
 
-TL-72 wprowadził kopertę (`scripts/json-envelope.mjs`) i przepiął na nią
-`query`, `stats`, `doctor`, `board` i `next-id`. Zakres tamtego taska był
-rozstrzygnięty przed startem na komendy CZYTAJĄCE i celowo nie został
-rozszerzony w trakcie — stąd ten task, a nie cicha zmiana obok.
+TL-72 introduced the envelope (`scripts/json-envelope.mjs`) and switched
+`query`, `stats`, `doctor`, `board` and `next-id` over to it. That task's
+scope was settled before it started as covering the READING commands, and
+was deliberately not expanded mid-flight — hence this task, rather than a
+quiet change alongside it.
 
-To, co zostało, jest dokładnie tym problemem, dla którego powstała koperta:
-`worktrail next --actor agent:claude --json` zwraca goły obiekt, więc dołożenie
-do odpowiedzi pola (na przykład ostrzeżenia o przejętym locku) wymaga zmiany
-korzenia. README opisuje ten stan jawnie — sekcja „The `--json` contract" mówi,
-że komendy piszące jadą jeszcze bez koperty — i to zdanie ma zniknąć razem
-z tym taskiem.
+What is left is exactly the problem the envelope was built for:
+`worktrail next --actor agent:claude --json` returns a bare object, so adding
+a field to the response (say, a warning about a taken-over lock) requires
+changing the root. The README describes this state explicitly — the section
+"The `--json` contract" says the writing commands still go without an
+envelope — and that sentence is meant to disappear along with this task.
 
-`handoff` (TL-99) DOŁĄCZYŁ do tej trójki świadomie, choć powstał już po
-kopercie. Powód: gdyby wszedł od razu w kopertę, cztery komendy piszące
-odpowiadałyby dwoma kształtami naraz — konsument `take`/`next` czytałby jeden
-obiekt, a konsument `handoff` drugi. Jeden kształt dziś i jedna zmiana dla
-wszystkich czterech jest tańsza niż jedna komenda „już poprawna" i trzy do
-nadrobienia. Test koperty pilnuje kompletu przez tabelę rodzajów, więc dopisanie
-`handoff` do niej jest jedną linią.
+`handoff` (TL-99) JOINED this trio deliberately, even though it was created
+after the envelope existed. Reason: if it had gone straight into the
+envelope, the four writing commands would answer with two shapes at once —
+a `take`/`next` consumer would read one object, a `handoff` consumer another.
+One shape today and one change for all four is cheaper than one command
+"already correct" and three to catch up. The envelope test guards
+completeness through a table of kinds, so adding `handoff` to it is one line.
 
-Uwaga na `done --json`: jego ładunek niesie `entries[]` z kodami wyjścia
-weryfikacji i jest czytany przez `jq` w README. Zmiana kształtu jest łamiąca,
-a wersja pakietu to nadal `0.1.0` — robimy ją bez ścieżki migracyjnej.
+Note on `done --json`: its payload carries `entries[]` with verification exit
+codes and is read by `jq` in the README. The shape change is breaking, and
+the package version is still `0.1.0` — we make the change without a
+migration path.
 
 ## Pre-flight reading
 
-1. `scripts/json-envelope.mjs` — tabela `KINDS` i reguły pustki; nowe rodzaje
-   dopisuje się TAM, nie w emiterze.
+1. `scripts/json-envelope.mjs` — the `KINDS` table and the emptiness rules;
+   new kinds are added THERE, not in the emitter.
 2. `scripts/take-task.mjs` (`takeJson()`), `scripts/next-task.mjs`,
    `scripts/handoff-task.mjs` (`handoffJson()`), `scripts/done-task.mjs` —
-   cztery dzisiejsze emitery i ich ścieżki odmowy
-   (`{ ok: false, kind, id, message, details }`), które też są odpowiedzią.
-3. README, sekcja „The `--json` contract" — tabela rodzajów i zdanie o komendach
-   piszących do usunięcia.
-4. `scripts/tests/json-envelope.test.mjs` — tabela `READING` i kontrola
-   pozytywna; nowe rodzaje mają wejść w ten sam mechanizm.
+   the four current emitters and their refusal paths
+   (`{ ok: false, kind, id, message, details }`), which are also a response.
+3. README, section "The `--json` contract" — the kinds table and the
+   sentence about writing commands to remove.
+4. `scripts/tests/json-envelope.test.mjs` — the `READING` table and the
+   positive control; new kinds are meant to enter the same mechanism.
 
-## Kroki
+## Steps
 
-1. Nadaj rodzaje: `task-take` (wspólny dla `take` i `next` — obie zwracają ten
-   sam ładunek), `verification-run` dla `done`, osobny dla `handoff` (jego
-   ładunek to trzy pary `from`/`to` i komentarz, nie zadanie do wykonania). Rozstrzygnij JEDNĄ decyzję:
-   czy odmowa (`ok: false`) to ten sam rodzaj z polem `ok`, czy osobny rodzaj
-   `refusal`; zapisz powód w komentarzu przy `KINDS`.
-2. Przepnij emitery na `printJson`; żaden nie buduje koperty sam.
-3. `next --json` niesie dziś `passedOver` i `considered` — zadeklaruj je
-   w rodzaju zamiast doklejać do ładunku `take`.
-4. Zaktualizuj README (tabela + usunięcie zdania o komendach piszących) i
-   przykłady `jq`.
-5. Rozszerz `scripts/tests/json-envelope.test.mjs`: rodzaje piszące wchodzą do
-   tej samej tabeli, więc test „rodzaj bez komendy" dalej pilnuje kompletu.
-   Dołóż przypadek ODMOWY — to ścieżka, którą łatwo zostawić bez koperty.
+1. Assign kinds: `task-take` (shared by `take` and `next` — both return the
+   same payload), `verification-run` for `done`, a separate one for
+   `handoff` (its payload is three `from`/`to` pairs and a comment, not a
+   task to perform). Settle ONE decision: whether a refusal (`ok: false`) is
+   the same kind with an `ok` field, or a separate `refusal` kind; record the
+   reason in a comment beside `KINDS`.
+2. Switch the emitters to `printJson`; none of them build the envelope
+   themselves.
+3. `next --json` today carries `passedOver` and `considered` — declare them
+   in the kind instead of tacking them onto the `take` payload.
+4. Update the README (table + removal of the sentence about writing
+   commands) and the `jq` examples.
+5. Extend `scripts/tests/json-envelope.test.mjs`: the writing kinds enter
+   the same table, so the "kind without a command" test keeps guarding
+   completeness. Add a REFUSAL case — that is the path most easily left
+   without an envelope.
 
 ## Acceptance criteria
 
-- [ ] `take`, `next`, `handoff` i `done` z `--json` zwracają kopertę z `schemaVersion` i `kind`.
-- [ ] Odmowa (`ok: false`) też jest kopertą, nie gołym obiektem.
-- [ ] README nie zawiera już zdania o komendach piszących bez koperty.
-- [ ] Test pokrywa rodzaje piszące i ścieżkę odmowy.
+- [ ] `take`, `next`, `handoff` and `done` with `--json` return an envelope
+      with `schemaVersion` and `kind`.
+- [ ] A refusal (`ok: false`) is also an envelope, not a bare object.
+- [ ] The README no longer contains the sentence about writing commands
+      without an envelope.
+- [ ] The test covers the writing kinds and the refusal path.

@@ -1,6 +1,6 @@
 ---
 id: TL-85
-title: "Rozstrzygnąć politykę zakresu dla agenta: zakładać task czy pytać"
+title: "Settle the scope policy for the agent: open a task or ask"
 type: task
 labels: [post-launch]
 board: main
@@ -17,69 +17,76 @@ blocks: []
 related_docs:
   - .claude/skills/backlog-workflow/SKILL.md
 verification:
-  - manual: "Instrukcja dla agenta zawiera jedną, jednoznaczną regułę na wypadek pracy wykrytej poza zakresem taska, a `## Log` tego taska niesie liczby z przeglądu backlogu, na których decyzja zapadła"
+  - manual: "The agent instructions contain one, unambiguous rule for work discovered outside a task's scope, and this task's `## Log` carries the numbers from the backlog review the decision was based on"
 ---
 
-## Cel
+## Goal
 
-Wiadomo, co agent ma zrobić, gdy w trakcie taska odkryje pracę poza jego
-zakresem: założyć nowy task samodzielnie czy zatrzymać się i zapytać. Reguła
-jest jedna i wynika z danych z naszego backlogu, nie z przeczucia.
+Know what the agent should do when, during a task, it discovers work outside
+its scope: open a new task on its own, or stop and ask. There is one rule,
+and it follows from data in our own backlog, not from a hunch.
 
-## Kontekst
+## Context
 
-Nasz `backlog-workflow` mówi: *„If the scope grows, open a new task instead of
-inflating this one"* — czyli agent zakłada taski sam, bez pytania.
-Backlog.md mówi dokładnie odwrotnie, i to w dwóch miejscach: *„If you discover
+Our `backlog-workflow` says: *"If the scope grows, open a new task instead of
+inflating this one"* — i.e. the agent opens tasks on its own, without asking.
+Backlog.md says exactly the opposite, and in two places: *"If you discover
 work that is outside the task's acceptance criteria, stop and ask the user"*
-oraz *„Do not create or start follow-up tasks without user approval"*.
+and *"Do not create or start follow-up tasks without user approval."*
 
-Obie reguły są obronne i obie mają inny tryb awarii:
+Both rules are defensible and each has a different failure mode:
 
-- **Nasza** produkuje szum. Agent, który zakłada taski bez pytania, zapełnia
-  backlog pozycjami, których nikt nie zamówił, i rozmywa sygnał kolejki.
-  Przy równoległych sesjach w worktree robi to w kilku miejscach naraz.
-- **Ich** produkuje przerwania. Każde odkrycie poza zakresem zatrzymuje pracę i
-  wymaga uwagi człowieka — tego samego zasobu, który cała ta konstrukcja miała
-  oszczędzać.
+- **Ours** produces noise. An agent that opens tasks without asking fills
+  the backlog with items nobody ordered, and dilutes the queue's signal.
+  With parallel sessions in worktrees, it does this in several places at
+  once.
+- **Theirs** produces interruptions. Every out-of-scope discovery stops work
+  and demands a human's attention — the exact resource this whole
+  construction was meant to save.
 
-Sposób rozstrzygnięcia jest empiryczny, nie doktrynalny — dlatego ten task jest
-tani i ma konkretny materiał do przejrzenia. **Przejrzyj taski założone przez
-`agent:claude`** i policz, ile z nich zostało zamkniętych, ile stoi w `pending`
-od dawna, a ile skończyło jako `cancelled`. Jeśli większość została zrobiona,
-nasza reguła się broni i zostaje. Jeśli większość leży — reguła produkuje śmieci
-i wymaga zmiany. `history/*.jsonl` niesie aktora, więc te liczby są policzalne,
-a nie do zgadnięcia.
+The way to settle it is empirical, not doctrinal — which is why this task is
+cheap and has concrete material to review. **Review the tasks opened by
+`agent:claude`** and count how many of them were closed, how many have sat
+in `pending` for a long time, and how many ended up `cancelled`. If most were
+done, our rule holds up and stays. If most are sitting there — the rule
+produces junk and needs to change. `history/*.jsonl` carries the actor, so
+these numbers are countable, not something to guess at.
 
-Trzecia droga do rozważenia: agent zakłada task, ale w wyróżnionym stanie
-(np. `status: pending` + etykieta wskazująca „niezamówione"), tak żeby dało się
-to odsiać jednym zapytaniem. Zachowuje brak przerwań i przywraca sygnał.
+A third path to consider: the agent opens the task, but in a marked state
+(e.g. `status: pending` plus a label indicating "unordered"), so that it can
+be filtered out with a single query. It keeps the no-interruption property
+and restores the signal.
 
 ## Pre-flight reading
 
-1. `.claude/skills/backlog-workflow/SKILL.md`, sekcje „Work a task" i „What does
-   not belong in the backlog" — dzisiejsza reguła i jej sąsiedztwo.
-2. `backlog/history/*.jsonl` — atrybucja `agent:claude`; to jest źródło liczb.
-3. `backlog/config.yaml` — `labels_closed` i lista etykiet, jeśli wyjdzie
-   trzecia droga.
+1. `.claude/skills/backlog-workflow/SKILL.md`, the "Work a task" and "What
+   does not belong in the backlog" sections — today's rule and its
+   neighborhood.
+2. `backlog/history/*.jsonl` — `agent:claude` attribution; this is the
+   source for the numbers.
+3. `backlog/config.yaml` — `labels_closed` and the label list, if the third
+   path is chosen.
 
-## Kroki
+## Steps
 
-1. Policz taski założone przez `agent:claude`: zamknięte / stojące w `pending` /
-   `cancelled`. Zapisz liczby w `## Log` — to jest dowód, nie ozdoba.
-2. Rozstrzygnij regułę: samodzielnie / pytać / trzecia droga z oznaczeniem.
-3. Wpisz ją do jednego źródła instrukcji (TL-74) i do skilla — jednym zdaniem,
-   tym samym w obu.
-4. Jeśli wyszła trzecia droga: dodaj etykietę do `config.yaml` i zapytanie, które
-   ją odsiewa.
+1. Count tasks opened by `agent:claude`: closed / sitting in `pending` /
+   `cancelled`. Record the numbers in `## Log` — this is evidence, not
+   decoration.
+2. Settle the rule: on its own / ask / a third path with marking.
+3. Write it into the single source of instructions (TL-74) and into the
+   skill — one sentence, the same in both.
+4. If the third path is chosen: add a label to `config.yaml` and the query
+   that filters it out.
 
 ## Acceptance criteria
 
-- [ ] Liczby z przeglądu tasków założonych przez agenta są zapisane w `## Log`.
-- [ ] Reguła jest jedna i jednoznaczna, bez „to zależy".
-- [ ] Instrukcja dla agenta i skill mówią to samo.
-- [ ] Jeśli wybrano oznaczanie: etykieta jest w `config.yaml`, a odsianie to jedno zapytanie.
+- [ ] The numbers from the review of tasks opened by the agent are recorded in `## Log`.
+- [ ] The rule is single and unambiguous, with no "it depends."
+- [ ] The instructions for the agent and the skill say the same thing.
+- [ ] If marking was chosen: the label is in `config.yaml`, and filtering it out is a single query.
 
 ## Log
 
-2026-08-31 pending — agent:claude — z analizy Backlog.md: ich task-execution i task-finalization zakazują agentowi zakładania tasków bez zgody; nasz skill mu to nakazuje. Rozbieżność wykryta, nierozstrzygnięta.
+2026-08-31 pending — agent:claude — from analysis of Backlog.md: their
+task-execution and task-finalization forbid the agent from opening tasks
+without approval; our skill instructs it to. Discrepancy found, unresolved.

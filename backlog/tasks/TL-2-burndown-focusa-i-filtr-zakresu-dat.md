@@ -1,6 +1,6 @@
 ---
 id: TL-2
-title: "Burndown focusa i filtr zakresu dat na dashboardzie backlogu"
+title: "Focus burndown and date-range filter on the backlog dashboard"
 type: code
 labels: [pre-launch]
 epic: ""
@@ -18,74 +18,78 @@ related_docs:
   - backlog/README.md
 verification:
   - bash: "node backlog/scripts/build-viewer.mjs"
-  - manual: "Dashboard → pasek „Zakres dat": presety 30/60/90/cała historia + własne daty; wykresy, tempo, bilans i lead time idą za zakresem, a otwarte/epiki/rozkłady nie"
-  - manual: "Karta „Burndown focusa" — linia ciągła (zostało) i kreskowana (zakres focusa), tekst o tempie wypalania, nota o fladze focus"
+  - manual: "Dashboard → \"Date range\" bar: presets 30/60/90/whole history + custom dates; charts, pace, balance, and lead time follow the range, while open/epics/distributions do not"
+  - manual: "\"Focus burndown\" card — solid line (remaining) and dashed line (focus scope), pace text, note about the focus flag"
 ---
 
-## Cel
+## Goal
 
-Dashboard (TL-1) pokazywał stan całej historii i nie umiał odpowiedzieć na
-„jak idzie bieżący focus" ani „co się działo w ostatnich 30 dniach". Dwa
-brakujące elementy: burndown zestawu focus i filtr zakresu dat.
+The dashboard (TL-1) showed the state of the whole history and could not
+answer "how is the current focus going" or "what happened in the last 30
+days". Two missing pieces: a burndown of the focus set and a date-range
+filter.
 
-## Kontekst
+## Context
 
-Obie rzeczy uderzają w to samo ograniczenie źródła — **frontmatter nie ma
-historii**, ma tylko stan bieżący plus `created`/`updated`:
+Both hit the same limitation of the source — **frontmatter has no history**,
+only the current state plus `created`/`updated`:
 
-- **Burndown focusa** musiał zostać zbudowany na `focus: true` jako fladze
-  DZISIEJSZEJ. Nic nie zapisuje, kiedy task wszedł do focusa ani kiedy z niego
-  wyszedł, więc wykres rekonstruuje przeszłość dzisiejszego zestawu: task
-  dorzucony wczoraj jest rysowany tak, jakby był w focusie od dnia utworzenia,
-  a task zdjęty z focusa nie istnieje na wykresie wcale. Dlatego oprócz linii
-  „zostało" jest druga, kreskowana — „ile tasków tego zestawu wtedy istniało".
-  Bez niej rosnąca linia wyglądałaby na regres, a jest rozrostem zakresu.
-  Alternatywa (odczyt historii z gita) odpada: viewer to strona bez dostępu do
-  repo, a serwer-mode musiałby liczyć `git log` po 1266 plikach na każdy render.
-- **Zakres dat rządzi przepływem, nie stanem.** Gdyby filtrował też „otwarte",
-  epiki i rozkłady, ten sam ekran raz znaczyłby „stan backlogu", a raz „stan
-  tego, co powstało w lipcu" — bez niczego na ekranie, co by to rozróżniało.
-  Pasek mówi ten podział wprost.
+- **Focus burndown** had to be built on `focus: true` as TODAY's flag. Nothing
+  records when a task entered the focus or when it left, so the chart
+  reconstructs the past of today's set: a task added yesterday is drawn as if
+  it had been in the focus since its creation date, and a task removed from
+  the focus does not exist on the chart at all. That is why, besides the
+  "remaining" line, there is a second, dashed one — "how many tasks of this
+  set existed at that point". Without it, a rising line would look like a
+  regression, when it is really the scope growing. The alternative (reading
+  history from git) is out: the viewer is a page with no access to the repo,
+  and server-mode would have to run `git log` over 1266 files on every render.
+- **The date range governs flow, not state.** If it also filtered "open",
+  epics, and distributions, the same screen would mean "the state of the
+  backlog" one moment and "the state of what was created in July" the next —
+  with nothing on screen to tell them apart. The bar states this split
+  explicitly.
 
-## Kroki
+## Steps
 
-1. `computeDashboard(tasks, range)` — clamping zakresu, metryki przepływu w
-   zakresie, `focusSeries`.
-2. `dashFocusChart()` + karta burndownu.
-3. Pasek zakresu: presety, dwa pola `date`, persystencja w `localStorage`.
-4. Wykresy kumulatywny i dzienny czytają `rangeSeries`; wspólne etykiety osi X.
+1. `computeDashboard(tasks, range)` — range clamping, flow metrics within the
+   range, `focusSeries`.
+2. `dashFocusChart()` + the burndown card.
+3. Range bar: presets, two `date` fields, persistence in `localStorage`.
+4. The cumulative and daily charts read `rangeSeries`; shared X-axis labels.
 5. `backlog/README.md` §2.2.
 
 ## Acceptance criteria
 
-- [x] Presety 30/60/90/cała historia + własny zakres; wybór przeżywa reload.
-- [x] Zakres zmienia: burn-up, dzień po dniu, burndown focusa, tempo, bilans,
-      próbkę lead time, prognozę. Nie zmienia: otwarte, epiki, rozkłady, listy.
-- [x] Burndown pokazuje „zostało" i „zakres focusa" + tempo wypalania.
-- [x] Nota o `focus` jako fladze bieżącej w UI i w README.
+- [x] Presets 30/60/90/whole history + a custom range; the choice survives a reload.
+- [x] The range changes: burn-up, day by day, focus burndown, pace, balance,
+      the lead-time sample, the forecast. It does not change: open, epics,
+      distributions, lists.
+- [x] The burndown shows "remaining" and "focus scope" + burn pace.
+- [x] A note about `focus` as a point-in-time flag, in the UI and in the README.
 
 ## Verification
 
-- `node backlog/scripts/build-viewer.mjs` — build zielony, 1266 tasków.
-- W przeglądarce (dark + light): presety, własny zakres, persystencja po
-  reloadzie, i cztery przypadki brzegowe bez wyjątku — zakres odwrócony
-  (zamiana stron), zakres spoza danych (przycięcie), jeden dzień, data z
-  przyszłości.
+- `node backlog/scripts/build-viewer.mjs` — build green, 1266 tasks.
+- In the browser (dark + light): presets, custom range, persistence after
+  reload, and four edge cases without an exception — an inverted range
+  (swapped ends), a range outside the data (clamped), a single day, a future
+  date.
 
 ## Notes
 
-Trzy rzeczy, które wyszły dopiero na renderze:
+Three things that only surfaced on render:
 
-- Wykres kumulatywny miał oś przybitą do zera. Na zakresie zaczynającym się od
-  800 utworzonych cały wybrany tydzień ściskał się w górny pasek wykresu —
-  czyli zakres ukrywał dokładnie ten ruch, dla którego się go wybiera. Oś
-  liczy się teraz od `min(cumDone)` w zakresie.
-- Oś X etykietowana miesiącami jest bezużyteczna na oknie 30-dniowym
-  („2026-07 / 2026-08"). Wspólny `dashTimeTicks()`: ≤ 70 dni → etykiety dzienne.
-- Zakres w całości poza danymi renderował etykietę „2026-05-23 → 2026-02-01"
-  (od przycięte w górę, do zostawione) nad pustymi wykresami. Oba końce są
-  teraz przycinane do przedziału danych.
+- The cumulative chart had its axis pinned to zero. On a range starting from
+  800 created, the entire selected week compressed into a thin band at the top
+  of the chart — meaning the range hid exactly the movement it was chosen to
+  show. The axis now starts from `min(cumDone)` within the range.
+- An X-axis labeled by month is useless on a 30-day window
+  ("2026-07 / 2026-08"). A shared `dashTimeTicks()`: ≤ 70 days → daily labels.
+- A range entirely outside the data rendered the label "2026-05-23 →
+  2026-02-01" (start clamped upward, end left as-is) over empty charts. Both
+  ends are now clamped to the data interval.
 
 ## Log
 
-- 2026-08-26: zaimplementowane i zweryfikowane w przeglądarce — claude.
+- 2026-08-26: implemented and verified in the browser — claude.

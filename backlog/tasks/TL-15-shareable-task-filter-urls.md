@@ -1,6 +1,6 @@
 ---
 id: TL-15
-title: "Zakoduj filtry listy zadań w URL viewera"
+title: "Encode the task list filters in the viewer URL"
 type: code
 labels: [pre-launch]
 board: main
@@ -18,65 +18,71 @@ related_docs:
   - backlog/README.md
 verification:
   - bash: "node --test backlog/scripts/tests/viewer-url.test.mjs"
-  - manual: "W viewerze zaznacz Status=blocked + Epic, wklej URL z paska w nowe okno — ta sama lista, ten sam licznik"
+  - manual: "In the viewer select Status=blocked + Epic, paste the URL from the bar into a new window — same list, same count"
 ---
 
-## Cel
+## Goal
 
-Widok `Zadania` gubi to, co ustawisz: filtry, szukajka, sortowanie i scope boarda
-żyją w pamięci i w `localStorage`, więc „popatrz na te 12 blokerów z epiku Legal"
-trzeba opisać słowami zamiast wysłać linkiem. Dashboard ma to od TL-13
-(`#dashboard?range=…`); lista zadań ma dostać ten sam kontrakt.
+The `Tasks` view loses whatever you set: filters, search, sorting and board
+scope live in memory and in `localStorage`, so "look at these 12 blockers
+from the Legal epic" has to be described in words instead of sent as a link.
+The dashboard has had this since TL-13 (`#dashboard?range=…`); the task list
+is to get the same contract.
 
-## Kontekst
+## Context
 
-- Zgłoszenie foundera (2026-08-29): „przy dodaniu filtra i innych parametrów
-  buduje się URL, który da się wysłać komuś i dostanie ten sam zestaw tasków".
-- Precedens i wzorzec do skopiowania: `dashEncodeHash()` / `dashApplyHash()` /
-  `dashSyncHash()` w `build-viewer.mjs` — łącznie z regułą, że parametr, który
-  ma też źródło w `localStorage`, emitowany jest ZAWSZE (inaczej odbiorca z
-  własnym zapisanym scope zobaczy podzbiór nadawcy i link skłamie).
-- Stan przed zmianą: hash niesie tylko `#BL-NNN` (zaznaczony task) albo
-  `#dashboard?…`. Scope boarda da się podać przez query `?board=`.
-- Dlaczego kod URL-a wyjeżdża do osobnego modułu `viewer-url.mjs`: cały viewer
-  jest jednym template literalem w `build-viewer.mjs`, więc nic z jego wnętrza
-  nie da się uruchomić w teście — asercje na HTML regexem to detektor bez mocy
-  dowodowej. Moduł jest importowany przez test i WKLEJANY do strony przy
-  buildzie, więc przeglądarka i `node --test` wykonują ten sam kod, a nie dwie
-  kopie, które się rozjadą.
+- Founder request (2026-08-29): "when you add a filter and other parameters,
+  a URL should be built that can be sent to someone and gets the same set of
+  tasks."
+- Precedent and pattern to copy: `dashEncodeHash()` / `dashApplyHash()` /
+  `dashSyncHash()` in `build-viewer.mjs` — including the rule that a
+  parameter which also has a source in `localStorage` is ALWAYS emitted
+  (otherwise a recipient with their own saved scope would see a subset of
+  the sender's, and the link would lie).
+- State before the change: the hash carries only `#BL-NNN` (the selected
+  task) or `#dashboard?…`. Board scope can be passed through the `?board=`
+  query.
+- Why the URL code moves to a separate `viewer-url.mjs` module: the whole
+  viewer is one template literal in `build-viewer.mjs`, so nothing inside it
+  can be run in a test — regex assertions on the HTML are a detector with no
+  evidentiary force. The module is imported by the test and INLINED into the
+  page at build time, so the browser and `node --test` run the same code,
+  not two copies that can drift apart.
 
-## Kroki
+## Steps
 
-1. `backlog/scripts/viewer-url.mjs` — czyste `encodeTasksHash()` / `parseTasksHash()`.
-2. `backlog/scripts/tests/viewer-url.test.mjs` — round-trip, przecinek w nazwie
-   epiku, pominięty parametr wraca do domyślnego, nieznany sort.
-3. `build-viewer.mjs` — wstrzyknięcie źródła modułu do strony + spięcie z
-   `render()`, `selectTask()`, szukajką, zakładkami i `handleHash()`.
-4. `backlog/README.md` §2.1 — format linku.
+1. `backlog/scripts/viewer-url.mjs` — pure `encodeTasksHash()` / `parseTasksHash()`.
+2. `backlog/scripts/tests/viewer-url.test.mjs` — round-trip, a comma in an
+   epic name, an omitted parameter falls back to the default, an unknown
+   sort.
+3. `build-viewer.mjs` — inject the module source into the page + wire it
+   into `render()`, `selectTask()`, search, tabs, and `handleHash()`.
+4. `backlog/README.md` §2.1 — the link format.
 
 ## Acceptance criteria
 
-- [x] Każda zmiana filtra / szukajki / sortowania / boarda / zaznaczenia przepisuje URL.
-- [x] Otwarcie URL-a odtwarza dokładnie ten zestaw tasków — także u kogoś, kto ma
-      w `localStorage` inny board.
-- [x] Parametr nieobecny w linku wraca do wartości domyślnej (link nie zawęża się
-      resztkami po stanie odbiorcy).
-- [x] Stare linki `#BL-NNN` dalej działają.
-- [x] `node --test backlog/scripts/tests/viewer-url.test.mjs` zielony.
+- [x] Every change to filter / search / sort / board / selection rewrites the URL.
+- [x] Opening the URL reproduces exactly that set of tasks — even for someone
+      with a different board in their `localStorage`.
+- [x] A parameter absent from the link falls back to its default value (the
+      link does not get narrowed by leftovers from the recipient's state).
+- [x] Old `#BL-NNN` links still work.
+- [x] `node --test backlog/scripts/tests/viewer-url.test.mjs` green.
 
 ## Verification
 
 ```bash
-# Testy modułu URL — expected: pass, 0 fail
+# URL module tests — expected: pass, 0 fail
 node --test backlog/scripts/tests/viewer-url.test.mjs
-# Kontrakt boardów nadal zielony (ten sam plik generatora) — expected: pass
+# Board contract still green (same generator file) — expected: pass
 node --test backlog/scripts/tests/boards.test.mjs
 ```
 
 ## Log
 
-- 2026-08-29 created — claude — zgłoszenie foundera: link z filtrami do wysłania
-- 2026-08-29 in_progress — claude — start implementacji
-- 2026-08-29 done — claude — `viewer-url.mjs` + 8 testów; zweryfikowane w przeglądarce na klikach, nie na kodzie: filtr/szukajka/sort/board/zaznaczenie budują URL, a ten sam URL u „odbiorcy" z `localStorage=backlog-project` odtworzył zestaw nadawcy (4/1349, ta sama kolejność, to samo zaznaczenie) i NIE nadpisał jego zapisanego scope. Drill-down z dashboardu daje teraz link zamiast czyszczenia hasha; stare `#BL-NNN` normalizuje się do pełnej postaci.
-- 2026-08-29 follow-up — claude — przycisk „⧉ Kopiuj link" w headerze na prośbę foundera. Trzy drogi (clipboard API → execCommand → prompt), bo `file://` nie jest secure context. Zweryfikowane klikiem: toast „Link skopiowany ✓" na obu ścieżkach — druga sprawdzona z wyłączonym `navigator.clipboard`, żeby nie testować tylko tej, która i tak działa.
-- 2026-08-29 renumber — claude — z BL-1389 na TL-15: `next-backlog-id.mjs` w worktree widzi tylko własne drzewo, a równoległa sesja zajęła 1389 w głównym checkoucie (`BL-1389-nazwa-aktywnego-dziecka-z-nieswiezej-listy.md`, wtedy jeszcze niezacommitowany). Numer ustąpiłem ja, bo tamten plik jest w cudzym stage'u, a mój siedział na własnej gałęzi.
+- 2026-08-29 created — claude — founder request: a link with filters to send
+- 2026-08-29 in_progress — claude — starting implementation
+- 2026-08-29 done — claude — `viewer-url.mjs` + 8 tests; verified in the browser through clicks, not through code: filter/search/sort/board/selection build the URL, and the same URL for a "recipient" with `localStorage=backlog-project` reproduced the sender's set (4/1349, same order, same selection) and did NOT overwrite their saved scope. Dashboard drill-down now gives a link instead of clearing the hash; old `#BL-NNN` links normalize to the full form.
+- 2026-08-29 follow-up — claude — a "⧉ Copy link" button in the header at the founder's request. Three paths (clipboard API → execCommand → prompt), because `file://` is not a secure context. Verified by clicking: a "Link copied ✓" toast on both paths — the second checked with `navigator.clipboard` disabled, so as not to test only the one that would work anyway.
+- 2026-08-29 renumber — claude — from BL-1389 to TL-15: `next-backlog-id.mjs` in the worktree only sees its own tree, and a parallel session had taken 1389 in the main checkout (`BL-1389-nazwa-aktywnego-dziecka-z-nieswiezej-listy.md`, still uncommitted at the time). I yielded the number, because that file was in someone else's stage and mine was sitting on its own branch.
+</content>

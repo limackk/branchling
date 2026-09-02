@@ -1,10 +1,10 @@
 ---
 id: TL-92
-title: "worktrail session — raport z sesji agenta"
+title: "worktrail session — report from an agent's session"
 type: task
 labels: []
 board: main
-epic: "Wyróżniki agentowe"
+epic: "Agentic differentiators"
 priority: P2
 status: blocked
 owner: unassigned
@@ -21,83 +21,86 @@ verification:
   - bash: "node --test scripts/tests/session-report.test.mjs"
 ---
 
-## Cel
+## Goal
 
-Czarna skrzynka pracy agentów:
+A black box for agent work:
 
-- `worktrail sessions --since yesterday` — lista sesji: kto, jaki task, jak
-  długo, czym się skończyło;
-- `worktrail session <id>` — narracja jednej sesji: wzięte taski, zmienione pola
-  (z historii), klastry aktywności, tokeny/koszt gdy adapter je dał.
+- `worktrail sessions --since yesterday` — a list of sessions: who, which
+  task, how long, how it ended;
+- `worktrail session <id>` — the narrative of one session: tasks taken,
+  fields changed (from history), activity clusters, tokens/cost when the
+  adapter provided them.
 
-Scenariusz docelowy: rano po nocnej pracy floty agentów jedna komenda mówi, co
-każda sesja dowiozła — Z SESJAMI PUSTYMI włącznie. Sesja z heartbeatami i bez
-żadnego przejścia statusu to sygnał („agent pracował i nic nie zamknął"),
-nie cisza.
+Target scenario: in the morning after a night of work by a fleet of agents,
+one command says what each session delivered — EMPTY SESSIONS included. A
+session with heartbeats and no status transition at all is a signal ("the
+agent worked and closed nothing"), not silence.
 
-## Kontekst
+## Context
 
-Powstało z przeglądu wyróżników wobec Backlog.md (2026-08-31). Klucz `session`
-jest już w projekcie heartbeatu
+Emerged from a review of differentiators against Backlog.md (2026-08-31). The
+`session` key already exists in the heartbeat design
 ([docs/backlog-time-tracking.md](../../docs/backlog-time-tracking.md) §5) —
-ten task tylko skleja po nim dwa istniejące logi: `activity/` (heartbeaty,
-klastry, atrybucja) i `history/` (zmiany pól z aktorem). Nie dodaje żadnego
-nowego zapisu; jest czystym odczytem, jak `stats`.
+this task only stitches together two existing logs downstream of it:
+`activity/` (heartbeats, clusters, attribution) and `history/` (field changes
+with actor). It adds no new record; it is a pure read, like `stats`.
 
-Zasady przejęte z dokumentów źródłowych:
-- klastrowanie i minuty liczone JEDNĄ implementacją z TL-28 — nie kopiować
-  liczydła (klasa „ta sama decyzja w dwóch miejscach");
-- `unknown` i klastry jednoelementowe raportowane wprost (§6, §8.2);
-- surowe heartbeaty są danymi prywatnymi maszyny (§9) — raport per sesja
-  pokazuje czas i zdarzenia, ale komenda działa na maszynie właściciela logu;
-  nie budować z tego eksportu czyjegoś kalendarza.
+Rules inherited from the source documents:
+- clustering and minutes are counted by ONE implementation from TL-28 — do
+  not copy the counter (the class of "the same decision in two places");
+- `unknown` and single-element clusters are reported explicitly (§6, §8.2);
+- raw heartbeats are the private data of the machine (§9) — the per-session
+  report shows time and events, but the command runs on the log owner's
+  machine; do not build someone's calendar export out of this.
 
-Naturalne rozszerzenie na później (nie w tym tasku): `worktrail standup` —
-zbiorcza notatka ze wszystkich aktorów za wczoraj.
+A natural extension for later (not in this task): `worktrail standup` — an
+aggregate note across all actors for yesterday.
 
 ## Pre-flight reading
 
 - [docs/backlog-time-tracking.md](../../docs/backlog-time-tracking.md) §5–§8
-  — format heartbeatu, klastrowanie, łańcuch atrybucji, rola `session`.
+  — heartbeat format, clustering, the attribution chain, the `session` role.
 - [docs/backlog-field-editing-history.md](../../docs/backlog-field-editing-history.md)
-  §2 — wpisy historii; korelacja z sesją wymaga, żeby hook zapisywał
-  identyfikator sesji także przy zmianie pola — jeśli TL-28 tego nie
-  przewidział, zgłosić tam, nie obchodzić tutaj.
-- `scripts/history.mjs` — odczyt i dedup.
+  §2 — history entries; correlating with a session requires the hook to also
+  record a session identifier on a field change — if TL-28 did not provide
+  for that, report it there, do not work around it here.
+- `scripts/history.mjs` — reading and dedup.
 
-## Kroki
+## Steps
 
-1. Odczyt sesji: grupowanie heartbeatów po `session`, złączenie z wpisami
-   `history/` tego samego aktora i okna czasowego (lub identyfikatora sesji,
-   jeśli TL-28 go tam dopisuje).
-2. `sessions`: tabela sesji z filtrem `--since` / `--actor` / `--task`;
-   sesje bez przejść statusu oznaczone jawnie.
-3. `session <id>`: chronologiczna narracja — fokus, zmiany pól, klastry
-   z minutami, suma tokenów (kolumna warunkowa) wraz z polem `model`
-   z wiersza aktywności — „280k tokenów" znaczy co innego dla Sonneta przez
-   API, agenta w abonamencie i lokalnej llamy na Ollamie, więc liczba bez
-   modelu jest niedointerpretowalna. Kwota wg trybów rozliczenia z TL-30
-   (kwota / tokeny-bez-kwoty / zero zadeklarowane / null).
-4. `--json` na obu komendach.
-5. Testy na fixture'ach: dwie sesje równoległe na jednym tasku nie zlewają
-   się; sesja pusta jest widoczna; brak kolumny kosztu ≠ zero.
+1. Reading sessions: group heartbeats by `session`, join with `history/`
+   entries of the same actor and time window (or session identifier, if
+   TL-28 records it there).
+2. `sessions`: a table of sessions with `--since` / `--actor` / `--task`
+   filters; sessions without status transitions marked explicitly.
+3. `session <id>`: a chronological narrative — focus, field changes,
+   clusters with minutes, total tokens (a conditional column) together with
+   the `model` field from the activity row — "280k tokens" means something
+   different for Sonnet over the API, an agent on a subscription, and a
+   local llama on Ollama, so a number without a model is under-interpretable.
+   Amount by billing mode from TL-30 (amount / tokens-without-amount / zero
+   declared / null).
+4. `--json` on both commands.
+5. Tests on fixtures: two parallel sessions on one task do not blend
+   together; an empty session is visible; missing cost column ≠ zero.
 
 ## Acceptance criteria
 
-- [ ] Dwie równoległe sesje na tym samym tasku raportują się osobno.
-- [ ] Sesja bez przejść statusu pojawia się w `sessions` z jawnym oznaczeniem.
-- [ ] Minuty liczy implementacja klastrowania z TL-28 — w tym tasku nie ma
-      drugiego liczydła.
-- [ ] Brak danych kosztu nie jest raportowany jako 0.
-- [ ] Suma tokenów w narracji sesji jest zawsze opatrzona modelem; sesja
-      z heartbeatami z więcej niż jednego modelu raportuje tokeny per model,
-      nie jedną sumę.
+- [ ] Two parallel sessions on the same task are reported separately.
+- [ ] A session without status transitions appears in `sessions` with an
+      explicit marker.
+- [ ] Minutes are counted by the clustering implementation from TL-28 — this
+      task has no second counter.
+- [ ] Missing cost data is not reported as 0.
+- [ ] The token total in a session narrative always carries a model; a
+      session with heartbeats from more than one model reports tokens per
+      model, not a single sum.
 
 ## Log
 
-Append-only. Format: `YYYY-MM-DD status — kto — notatka`.
+Append-only. Format: `YYYY-MM-DD status — who — note`.
 
-- 2026-08-31 blocked — agent:claude — task założony z przeglądu wyróżników
-  agentowych; czeka na heartbeaty i pole session z TL-28.
-- 2026-08-31 revised — agent:claude — tokeny w narracji zawsze z modelem
-  i per model; kwoty wg trybów rozliczenia z TL-30.
+- 2026-08-31 blocked — agent:claude — task created from the review of agentic
+  differentiators; waiting on heartbeats and the session field from TL-28.
+- 2026-08-31 revised — agent:claude — tokens in the narrative always carry a
+  model, and are shown per model; amounts follow billing modes from TL-30.

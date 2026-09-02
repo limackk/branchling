@@ -1,300 +1,316 @@
-# Funkcjonalności — stan i kierunek
+# Functionality — state and direction
 
-Co `worktrail` robi dzisiaj i co ma robić. Stan na **2026-09-01**.
+What `worktrail` does today and what it is meant to do. State as of **2026-09-01**.
 
-Ten dokument opisuje ZAKRES. Uzasadnienia decyzji mieszkają gdzie indziej:
-[`docs/worktrail-global-tool.md`](worktrail-global-tool.md) (cztery prawa),
-[`LINEAGE.md`](../LINEAGE.md) (kolejność decyzji), i w `## Kontekst` każdego
-taska. Sekcja „Co będzie" jest migawką backlogu, nie obietnicą — źródłem prawdy
-są `backlog/tasks/*.md`, a nie ta lista.
+This document describes SCOPE. The reasoning behind decisions lives elsewhere:
+[`docs/worktrail-global-tool.md`](worktrail-global-tool.md) (the four laws),
+[`LINEAGE.md`](../LINEAGE.md) (the order of decisions), and in the `## Context`
+section of each task. The "What's coming" section is a snapshot of the backlog,
+not a promise — the source of truth is `backlog/tasks/*.md`, not this list.
 
-> `README.md` w korzeniu repozytorium jest jeszcze dokumentem projektu, z
-> którego to narzędzie wydzielono: mówi `backlog` zamiast `worktrail`, `BL-NNN`
-> zamiast `TL-NNN` i niesie słownictwo tamtego projektu. Wymienia go TL-49;
-> do tego czasu ten plik jest dokładniejszy.
-
----
-
-## 1. Czym to jest
-
-Backlog w plikach markdown, obsługiwany z terminala. Jeden task to jeden plik
-z frontmatterem YAML, wersjonowany w gicie razem z kodem, którego dotyczy.
-Wszystko poza plikami tasków — indeksy, widoki, boardy, viewer — jest
-WYLICZANE i nieśledzone w gicie.
-
-Cztery reguły, z których bierze się reszta:
-
-1. **Dane w repozytorium, wskaźniki globalnie.** Task jedzie z gałęzią i
-   przechodzi przez review. Stan rozwiedziony z gałęzią to wada, dla której
-   odrzucono zewnętrzne trackery.
-2. **Co wyliczone, wolno skasować.** Jeśli skasowanie widoku boli, rzecz zdążyła
-   zostać prawdą i to jest błąd projektu.
-3. **Warstwy konfiguracji są ROZŁĄCZNE, nie priorytetowe.** Klucz w złej warstwie
-   oblewa; warstwa użytkownika nie nadpisuje słownictwa projektu.
-4. **Rozszerzalność przez kompozycję** — `--json` na każdej komendzie czytającej,
-   wywoływalne wejście na każdej piszącej. Bez API wtyczek.
+> The root `README.md` is still a document of the project this tool was
+> extracted from: it says `backlog` instead of `worktrail`, `BL-NNN`
+> instead of `TL-NNN`, and carries that project's vocabulary. TL-49 lists it;
+> until then this file is the more accurate one.
 
 ---
 
-## 2. Co działa dzisiaj
+## 1. What this is
 
-### 2.1 Model danych
+A backlog in markdown files, driven from the terminal. One task is one file
+with a YAML frontmatter, versioned in git together with the code it concerns.
+Everything besides the task files — indexes, views, boards, the viewer — is
+COMPUTED and untracked in git.
 
-| Rzecz | Gdzie | Wersjonowane |
+Four rules everything else follows from:
+
+1. **Data in the repository, pointers globally.** A task travels with its
+   branch and goes through review. State divorced from the branch is the
+   defect that external trackers were rejected for.
+2. **What is computed may be deleted.** If deleting a view hurts, it has
+   become a truth it was never meant to be, and that is a design error.
+3. **Configuration layers are DISJOINT, not prioritised.** A key in the wrong
+   layer fails; the user layer does not override the project's vocabulary.
+4. **Extensibility through composition** — `--json` on every reading command,
+   a callable input on every writing one. No plugin API.
+
+---
+
+## 2. What works today
+
+### 2.1 Data model
+
+| Thing | Where | Versioned |
 |---|---|---|
-| Task | `backlog/tasks/TL-NNN-slug.md` | tak |
-| Słowniki projektu | `backlog/config.yaml` | tak |
-| Rejestr boardów | `backlog/boards.yaml` | tak |
-| Historia zmian pól | `backlog/history/TL-NNN.jsonl` | tak |
-| Szablon taska | `backlog/_template.md` | tak |
-| Indeksy, boardy, viewer | `INDEX.yaml`, `NOW.yaml`, `archive/`, `viewer.html` | **nie** |
+| Task | `backlog/tasks/TL-NNN-slug.md` | yes |
+| Project vocabularies | `backlog/config.yaml` | yes |
+| Board registry | `backlog/boards.yaml` | yes |
+| Field change history | `backlog/history/TL-NNN.jsonl` | yes |
+| Task template | `backlog/_template.md` | yes |
+| Indexes, boards, viewer | `INDEX.yaml`, `NOW.yaml`, `archive/`, `viewer.html` | **no** |
 
-**Frontmatter taska** niesie: `id`, `title`, `type`, `labels`, `board`, `epic`,
+**A task's frontmatter** carries: `id`, `title`, `type`, `labels`, `board`, `epic`,
 `priority`, `status`, `owner`, `estimate`, `confidence`, `created`, `updated`,
 `blocked_by`, `blocks`, `related_docs`, `verification`.
 
-**Kod zna KSZTAŁT pola, `config.yaml` zna WARTOŚCI.** Statusy, priorytety,
-etykiety, typy, właściciele, estymaty i prefiks ID są słownikami projektu.
-Nieznany klucz oblewa build. `labels_closed: true` zamienia literówkę w etykiecie
-w błąd zamiast w nową, cichą kategorię.
+**The code knows the SHAPE of a field, `config.yaml` knows the VALUES.**
+Statuses, priorities, labels, types, owners, estimates and the id prefix are
+the project's vocabularies. An unknown key fails the build. `labels_closed: true`
+turns a typo in a label into an error instead of a new, silent category.
 
-**Board to partycja, epic to grupa.** Każdy task ma dokładnie jeden `board:`
-ze słownika zamkniętego (`boards.yaml`); `epic:` jest wolnym tekstem wewnątrz
-boarda. Nie zastępują się nawzajem.
+**A board is a partition, an epic is a group.** Every task has exactly one
+`board:` from a closed vocabulary (`boards.yaml`); `epic:` is free text
+within a board. Neither replaces the other.
 
-**`verification:` mówi, JAK sprawdzić, że task jest zrobiony** — listą komend
-(`- bash: "…"`) albo kroków ręcznych (`- manual: "…"`). To jest pole, które
-odróżnia to narzędzie od innych markdown-owych trackerów: „zrobione" ma być
-sprawdzalne, nie deklarowane.
+**`verification:` says HOW to check that a task is done** — as a list of
+commands (`- bash: "…"`) or manual steps (`- manual: "…"`). This is the field
+that sets this tool apart from other markdown-based trackers: "done" is meant
+to be checkable, not declared.
 
-### 2.2 Komendy
+### 2.2 Commands
 
-Nieznana komenda i nieznana flaga **oblewają** — cichy no-op wygląda jak
-działanie. `--dir <ścieżka>` działa w każdej komendzie; katalog danych rozwiązuje
-`resolveBacklogDir()` z czterech źródeł: `--dir` → `BACKLOG_DIR` → wykrywanie
-w górę od cwd → ko-lokacja.
+An unknown command and an unknown flag **fail** — a silent no-op looks like it
+worked. `--dir <path>` works on every command; the data directory is resolved
+by `resolveBacklogDir()` from four sources: `--dir` → `BACKLOG_DIR` →
+detection upwards from cwd → co-location.
 
-**Czytające**
+**Reading**
 
-| Komenda | Co robi |
+| Command | What it does |
 |---|---|
-| `query` | pytania o taski prosto z `tasks/*.md`, więc widzi zmiany bez regeneracji; filtry po statusie, priorytecie, boardzie, etykiecie, epicu; `--json` / `--files` / `--count` |
-| `stats` | stan backlogu na jednym ekranie: statusy, priorytety, blokery, godziny; `--json` |
-| `doctor` | czy backlog jest dobrze ustawiony — konfiguracja, drzewo, git, guardy; `--json` |
-| `board <plik>` | który board dla taska — z reguł ścieżek, nie ze zgadywania |
-| `next-id` | następny wolny numer, liczony ze WSZYSTKICH gałęzi i worktree; `--explain` |
-| `check` | guardy: kolizje numerów, partycja boardów, wiszące odwołania |
+| `query` | questions about tasks straight from `tasks/*.md`, so it sees changes without regeneration; filters by status, priority, board, label, epic; `--json` / `--files` / `--count` |
+| `stats` | backlog state on one screen: statuses, priorities, blockers, hours; `--json` |
+| `doctor` | whether the backlog is well set up — configuration, tree, git, guards; `--json` |
+| `board <file>` | which board a task belongs to — from path rules, not guessing |
+| `next-id` | next free number, counted across ALL branches and worktrees; `--explain` |
+| `check` | guards: id collisions, board partition, dangling references |
 
-**Piszące**
+**Writing**
 
-| Komenda | Co robi |
+| Command | What it does |
 |---|---|
-| `new --title "…"` | zakłada task z szablonu; numer ze skanu wszystkich gałęzi, nie `max+1` |
-| `init --dir <ścieżka>` | zakłada nowy backlog w pustym katalogu, z przykładowym taskiem |
-| `history --actor …` | dopisuje do historii zmiany zrobione przy wyłączonym serwerze |
-| `migrate-prefix --to X` | przenumerowuje cały backlog na inny prefiks (nazwy, ID, zależności, historia); `--dry-run` |
+| `new --title "…"` | founds a task from the template; the number comes from scanning all branches, not `max+1` |
+| `init --dir <path>` | founds a new backlog in an empty directory, with a sample task |
+| `history --actor …` | appends to history changes made while the server was off |
+| `migrate-prefix --to X` | renumbers the whole backlog to a different prefix (filenames, IDs, dependencies, history); `--dry-run` |
 
-**Utrzymaniowe**
+**Maintenance**
 
-| Komenda | Co robi |
+| Command | What it does |
 |---|---|
-| `build` | przebudowuje widoki z `tasks/*.md` |
-| `serve` | viewer na `127.0.0.1` (komenda domyślna) |
-| `viewer` | przebudowuje `viewer.html` bez uruchamiania serwera |
-| `regen-hook` | wejście dla hooka edytora: regeneracja po edycji taska (JSON na stdin) |
+| `build` | rebuilds views from `tasks/*.md` |
+| `serve` | viewer on `127.0.0.1` (the default command) |
+| `viewer` | rebuilds `viewer.html` without starting a server |
+| `regen-hook` | input for the editor hook: regeneration after a task edit (JSON on stdin) |
 
-### 2.3 Widoki wyliczane
+### 2.3 Computed views
 
-`build` produkuje: `INDEX.yaml` (aktywne), `NOW.yaml` (w toku), `archive/done.yaml`
-(zamknięte), `boards/<slug>/{INDEX,NOW}.yaml` oraz `viewer.html`. Wszystkie są
-w `.gitignore` — i to nie z estetyki: są posortowanymi agregatami WSZYSTKICH
-tasków, więc każda gałąź przepisywałaby ten sam plik i dwie gałęzie konfliktowałyby
-nawet bez wspólnego taska.
+`build` produces: `INDEX.yaml` (active), `NOW.yaml` (in progress), `archive/done.yaml`
+(closed), `boards/<slug>/{INDEX,NOW}.yaml` and `viewer.html`. All of them are
+in `.gitignore` — and not out of aesthetics: they are sorted aggregates of
+ALL tasks, so every branch would rewrite the same file and two branches would
+conflict even without a task in common.
 
 ### 2.4 Viewer
 
-Jedna samowystarczalna strona HTML plus lokalny serwer. Dla czytelnika, który
-nie pracuje w terminalu.
+One self-contained HTML page plus a local server. For a reader who does not
+work in the terminal.
 
-- **Lista zadań** — filtry, szukajka, sortowanie, detal taska.
-- **Board jako scope, nie filtr** — przełącza zakres list, liczników i dashboardu.
-- **Stan widoku w URL-u** — każdy filtr, szukajka, sortowanie, scope i zaznaczony
-  task lądują w hashu, więc widok da się podać dalej linkiem. Parametr nieobecny
-  znaczy „domyślny", a nie „zostaw, co masz" — inaczej link kłamałby u odbiorcy.
-- **Dashboard** — KPI, wykres kumulatywny, dzień po dniu, tabela epików, rozkłady,
-  listy uwagi (stale, blocked, najstarsze P0-P1), prognoza. Ignoruje filtry listy
-  (odpowiada na „jak stoi backlog", nie „co mam otwarte"), respektuje scope boarda.
-  Drill-down: klik w epic, status, priorytet, etykietę ustawia filtr listy.
-- **Edycja pól w miejscu**, z zapisem do pliku taska.
-- **Historia zmian w detalu** — znacznik `autor · kiedy` przy każdym polu i oś czasu.
-- **Live-mode** — SSE, viewer odświeża się po zmianie pliku.
-- Dark mode, paleta wyprowadzona z `config.yaml`.
+- **Task list** — filters, search, sorting, task detail.
+- **Board as scope, not filter** — switches the scope of lists, counters and
+  the dashboard.
+- **View state in the URL** — every filter, search, sort, scope and selected
+  task lands in the hash, so the view can be handed on as a link. An absent
+  parameter means "default", not "leave what you have" — otherwise the link
+  would lie to the recipient.
+- **Dashboard** — KPIs, a cumulative chart, day by day, an epic table,
+  distributions, attention lists (stale, blocked, oldest P0-P1), a forecast.
+  Ignores list filters (it answers "how does the backlog stand", not "what do
+  I have open"), respects board scope. Drill-down: clicking an epic, status,
+  priority, label sets the list filter.
+- **In-place field editing**, saved to the task file.
+- **Change history in the detail view** — an `author · when` marker beside
+  each field and a timeline.
+- **Live mode** — SSE, the viewer refreshes when the file changes.
+- Dark mode, palette derived from `config.yaml`.
 
-### 2.5 Guardy
+### 2.5 Guards
 
-`check` uruchamia trzy i wychodzi z NAJGORSZYM wynikiem:
+`check` runs three and exits with the WORST result:
 
-- **Kolizje ID** — jeden `TL-NNN` = jeden task; właściwość ZBIORU, czyta całe drzewo.
-- **Partycja boardów** — każdy task ma board z rejestru; właściwość JEDNEGO pliku,
-  więc `--boards <pliki…>` sądzi tylko wskazane (tyle powinien robić pre-commit hook).
-- **Wiszące odwołania** — `blocked_by` / `blocks` wskazują na istniejące taski.
+- **ID collisions** — one `TL-NNN` = one task; a property of the WHOLE SET,
+  reads the entire tree.
+- **Board partition** — every task has a board from the registry; a property
+  of ONE file, so `--boards <files…>` judges only the ones given (which is
+  all a pre-commit hook should do).
+- **Dangling references** — `blocked_by` / `blocks` point to existing tasks.
 
-`doctor` odpowiada na szersze pytanie „czy ten backlog jest dobrze ustawiony":
-konfiguracja, drzewo, git, obecność guardów.
+`doctor` answers the broader question "is this backlog well set up":
+configuration, tree, git, presence of guards.
 
-### 2.6 Historia zmian
+### 2.6 Change history
 
-Każda zmiana pola dopisuje wiersz do `history/TL-NNN.jsonl` (append-only,
-wersjonowane): `ts`, `task`, `field`, `from`, `to`, `actor`, `source`.
+Every field change appends a row to `history/TL-NNN.jsonl` (append-only,
+versioned): `ts`, `task`, `field`, `from`, `to`, `actor`, `source`.
 
-**Aktor ma obowiązkową przestrzeń nazw** — `local:<nick>` (zadeklarowany,
-niezweryfikowany), `agent:<nazwa>` (zapis automatyczny), `user:<id>` (konto
-uwierzytelnione). Przestrzeń mówi, ILE ta atrybucja jest warta; `source` mówi,
-którą drogą przyszła (`viewer`, `hook`, `manual`, `external`). Goła nazwa jest
-odrzucana głośno, nie zgadywana.
+**An actor carries a mandatory namespace** — `local:<nick>` (declared,
+unverified), `agent:<name>` (automated write), `user:<id>` (authenticated
+account). The namespace says HOW MUCH this attribution is worth; `source`
+says which route it arrived by (`viewer`, `hook`, `manual`, `external`). A
+bare name is rejected loudly, not guessed.
 
-### 2.7 Testy
+### 2.7 Tests
 
 ```bash
 node --test scripts/tests/*.test.mjs
 ```
 
-**341/341 zielone** (2026-08-31), w 28 plikach. Dwie reguły, które utrzymują je uczciwymi: katalog backlogu
-bierze się z `scripts/tests/_repo.mjs` (rozstrzyga oba układy — `<repo>/backlog`
-i ko-lokowany), a testy nie asertują wartości cudzego projektu — statusy,
-etykiety i slugi boardów to DANE, nie kontrakt narzędzia.
+**341/341 green** (2026-08-31), across 28 files. Two rules keep them honest: the
+backlog directory comes from `scripts/tests/_repo.mjs` (it settles both
+layouts — `<repo>/backlog` and co-located), and the tests do not assert
+another project's values — statuses, labels and board slugs are DATA, not the
+tool's contract.
 
 ---
 
-## 3. Co będzie
+## 3. What's coming
 
-43 taski otwarte. Poniżej pogrupowane tematycznie; ID prowadzi do pliku
-z pełnym uzasadnieniem.
+43 tasks open. Grouped below by topic; the ID leads to the file with the full
+reasoning.
 
-### 3.1 Zamknięcie taska musi być dowiedzione — priorytet najwyższy
+### 3.1 Closing a task must be proven — the highest priority
 
-Dziś `verification:` jest zapisywane i walidowane, ale **żaden skrypt go nie
-uruchamia**. Egzekucję pełni instrukcja dla agenta, czyli ten sam agent, którego
-miała pilnować. To jest jedyna wyróżniająca cecha narzędzia i istnieje dziś jako
-konwencja, nie mechanizm.
+Today `verification:` is written and validated, but **no script runs it**.
+Execution is carried out by the instructions given to the agent — the same
+agent it was meant to police. This is the tool's single distinguishing
+feature and today it exists only as a convention, not a mechanism.
 
-- **TL-86** — kryteria akceptacji odhaczane z `verification:`, nie deklarowane.
-  Pomiar, który to wywołał: 12 z 44 zamkniętych tasków ma łącznie 60
-  nieodhaczonych kryteriów, przy sprawnym `verification:`. Dwie listy o tym
-  samym „done", realna jedna.
-- **TL-82** — `worktrail done <ID>` uruchamia `verification:`, pokazuje wyjście
-  i ODMAWIA zamknięcia przy porażce. Pusta lista i literał z szablonu też oblewają;
-  `manual:` wymaga potwierdzenia zapisanego w historii.
+- **TL-86** — acceptance criteria ticked from `verification:`, not declared.
+  The measurement that prompted this: 12 of 44 closed tasks have 60
+  unticked criteria between them, despite working `verification:`. Two lists
+  about the same "done", only one of them real.
+- **TL-82** — `worktrail done <ID>` runs `verification:`, shows its output
+  and REFUSES to close on failure. An empty list and a template literal also
+  fail the check; `manual:` requires confirmation recorded in the history.
 
-### 3.2 Przed publikacją
+### 3.2 Before publication
 
-- **TL-48** — LICENSE i metadane pakietu (dziś `private`, `UNLICENSED`).
-- **TL-49** — README jest dokumentem cudzego projektu.
-- **TL-81** — kanały dystrybucji i kolizja nazwy w `npx`.
-- **TL-53** — CI, CONTRIBUTING, szablony zgłoszeń.
-- **TL-56**, **TL-69** — słownik `types` rozjechał się z drzewem; szablon
-  przemyca wartość spoza słowników.
-- **TL-68** — log mówi `done`, frontmatter mówi `pending`, nikt tego nie łapie.
-- **TL-57** — `--json` na `check`, `next-id`, `board`.
-- **TL-84** — rozstrzygnąć i zapisać, czy ręczna edycja pliku taska jest drogą
-  wspieraną, czy tolerowaną.
+- **TL-48** — LICENSE and package metadata (today `private`, `UNLICENSED`).
+- **TL-49** — the README is a document of a different project.
+- **TL-81** — distribution channels and the name collision on `npx`.
+- **TL-53** — CI, CONTRIBUTING, issue templates.
+- **TL-56**, **TL-69** — the `types` vocabulary has drifted from the tree; the
+  template smuggles in a value outside the vocabularies.
+- **TL-68** — the log says `done`, the frontmatter says `pending`, nobody
+  catches it.
+- **TL-57** — `--json` on `check`, `next-id`, `board`.
+- **TL-84** — settle and record whether manually editing a task file is a
+  supported path or merely a tolerated one.
 
-### 3.3 Kontrakt maszynowy
+### 3.3 Machine contract
 
-- **TL-72** — koperta JSON z `schemaVersion` i `kind` zamiast gołej tablicy.
-  `--json` JEST naszym API rozszerzeń, a goła tablica nie może urosnąć o pole
-  bez zerwania konsumentów.
-- **TL-83** — enumy ze słowników w `--help --json` i `--append-<pole>` na
-  komendach piszących (sandboksy agentowe odrzucają składnię `$'…\n…'`).
-- **TL-76** — przechodni graf zależności wyliczany przy odczycie, z jawną
-  obsługą cyklu, powtórzenia oraz nieznanego i niejednoznacznego ID.
-- **TL-75** — `modified_files` i wyszukiwanie tasków po dotkniętym pliku.
-- **TL-77** — completions do shella z wartościami ze słowników.
-- **TL-79** — `board export` jako markdown do wklejenia.
+- **TL-72** — a JSON envelope with `schemaVersion` and `kind` instead of a
+  bare array. `--json` IS our extension API, and a bare array cannot grow a
+  field without breaking consumers.
+- **TL-83** — enums from the vocabularies in `--help --json` and
+  `--append-<field>` on writing commands (agent sandboxes reject
+  `$'…\n…'` syntax).
+- **TL-76** — a transitive dependency graph computed on read, with explicit
+  handling of cycles, repeats, and unknown or ambiguous IDs.
+- **TL-75** — `modified_files` and searching for tasks by touched file.
+- **TL-77** — shell completions with values from the vocabularies.
+- **TL-79** — `board export` as markdown to paste elsewhere.
 
-### 3.4 Stan w poprzek gałęzi
+### 3.4 State across branches
 
-- **TL-73** — stan taska liczony z aktywnych gałęzi, nie z bieżącego checkoutu.
-  Skan gałęzi i worktree już istnieje (`next-id`); ten task uogólnia go z „jakie
-  numery są zajęte" na „jaki jest stan taska". Rozbieżność jest pokazywana z nazwą
-  gałęzi, nigdy rozstrzygana po cichu.
+- **TL-73** — a task's state computed from active branches, not from the
+  current checkout. The branch and worktree scan already exists (`next-id`);
+  this task generalises it from "which numbers are taken" to "what is this
+  task's state". A discrepancy is shown with the branch name, never resolved
+  silently.
 
-### 3.5 Powierzchnia dla agentów
+### 3.5 Surface for agents
 
-- **TL-74** — `worktrail instructions`: instrukcje workflow wydaje CLI, nie plik
-  gnijący w cudzym repo. Tekst szablonowany słownictwem czytanego backlogu,
-  podzielony na rozdzielnię i przewodniki fazowe.
-- **TL-104** — pętla autonomiczna: `next --claim`, odzyskiwanie porzuconych
-  tasków, wzorzec świeżej sesji na task (kompaktacja kontekstu u vendorów jest
-  stratna; pamięcią pętli jest plik taska).
-- **TL-85** — rozstrzygnąć politykę zakresu: agent zakłada task sam czy pyta.
-- **TL-54** — skill `backlog-workflow` jedzie w pakiecie do użytkownika.
-- **TL-46** — `init --hooks`: bramka, która sama się instaluje.
-- **TL-78** — `on_status_change`: konfigurowalna komenda przy zmianie statusu.
-- **TL-80** — rozdział komentarzy, notatek wykonawczych i podsumowania końcowego.
+- **TL-74** — `worktrail instructions`: workflow instructions issued by the
+  CLI, not a file rotting in someone else's repo. Text templated with the
+  vocabulary of the backlog being read, split into a dispatcher and phase
+  guides.
+- **TL-104** — an autonomous loop: `next --claim`, recovery of abandoned
+  tasks, a fresh-session-per-task pattern (context compaction at vendors is
+  lossy; the loop's memory is the task file).
+- **TL-85** — settle the scope policy: does an agent found a task itself or ask.
+- **TL-54** — the `backlog-workflow` skill ships in the package to the user.
+- **TL-46** — `init --hooks`: a gate that installs itself.
+- **TL-78** — `on_status_change`: a configurable command on status change.
+- **TL-80** — separating comments, execution notes and the final summary.
 
-### 3.6 Pomiar czasu pracy
+### 3.6 Time tracking
 
-Osobna oś, opisana w [`docs/backlog-time-tracking.md`](backlog-time-tracking.md).
+A separate axis, described in [`docs/backlog-time-tracking.md`](backlog-time-tracking.md).
 
-- **TL-27** — fundament i uczciwy punkt zero.
-- **TL-28** — heartbeaty aktywności i łańcuch atrybucji.
-- **TL-31** — retencja, korekta atrybucji, prawo do usunięcia.
-- **TL-35** — surowy log aktywności do katalogu domowego.
-- **TL-29**, **TL-30** — kalibracja estymat z danych; adapter tokenów i kosztu.
+- **TL-27** — the foundation and an honest point zero.
+- **TL-28** — activity heartbeats and the attribution chain.
+- **TL-31** — retention, attribution correction, the right to deletion.
+- **TL-35** — the raw activity log moved to the home directory.
+- **TL-29**, **TL-30** — estimate calibration from data; a token and cost
+  adapter.
 
-### 3.7 Wiele projektów
+### 3.7 Multiple projects
 
-- **TL-34** — katalog domowy: preferencje i rejestr projektów (wskaźniki
-  globalnie, dane w repozytorium).
-- **TL-36** — widok przekrojowy nad wieloma projektami.
+- **TL-34** — home directory: preferences and project registry (pointers
+  globally, data in the repository).
+- **TL-36** — a cross-project view over multiple projects.
 
-### 3.8 Wejście i wyjście
+### 3.8 Input and output
 
-- **TL-67** — import z GitHub Issues: jednorazowy, ze stdin, z `--dry-run`.
-  Podniesiony do P2: ścieżka spróbowania bez kosztu migracji.
-- **TL-55** — eksport viewera do jednego pliku do wysłania.
-- **TL-37** — rozdzielenie dokumentów: mechanizm jedzie, pomiary zostają.
-- **TL-32** — angielska powierzchnia publiczna (P1): warunek wejścia na rynek.
+- **TL-67** — import from GitHub Issues: one-off, from stdin, with
+  `--dry-run`. Raised to P2: a path to trying the tool without migration cost.
+- **TL-55** — exporting the viewer to a single file to send.
+- **TL-37** — splitting the documents apart: the mechanism ships, the
+  measurements stay.
+- **TL-32** — an English public surface (P1): the condition for entering the
+  market.
 
 ### 3.9 Launch
 
-Z analizy konkurencyjności (2026-09-01): mechanizm bez demo jest niewidzialny,
-a projekt w tej kategorii rośnie z jednego dobrego launchu.
+From a competitive analysis (2026-09-01): a mechanism without a demo is
+invisible, and a project in this category grows from one good launch.
 
-- **TL-102** — demo pierwszego kontaktu: odmowa `worktrail done` w 60 sekund,
-  w nagłówku README.
-- **TL-103** — materiał launchowy: pomiar 27% jako teza, Show HN, każda liczba
-  z komendą do powtórzenia.
+- **TL-102** — the first-contact demo: `worktrail done` refusing to close in
+  60 seconds, in the README's header.
+- **TL-103** — launch material: the 27% measurement as the thesis, Show HN,
+  every number paired with a command to reproduce it.
 
-### 3.10 Higiena
+### 3.10 Hygiene
 
-- **TL-43** — log historii bywa nieśledzony w gicie, bramka traci przesłankę.
-- **TL-45** — bramka na martwe linki i `related_docs`.
-- **TL-47** — brak backlogu wychodzi jako nieobsłużony wyjątek ze stack tracem.
-- **TL-58** — wartość zaczynająca się od myślnika oblewa w `new`.
+- **TL-43** — the history log sometimes goes untracked in git, and the gate
+  loses its premise.
+- **TL-45** — a gate against dead links and `related_docs`.
+- **TL-47** — a missing backlog surfaces as an unhandled exception with a
+  stack trace.
+- **TL-58** — a value starting with a hyphen fails in `new`.
 
 ---
 
-## 4. Czego świadomie nie będzie
+## 4. What deliberately will not happen
 
-Odrzucone przy analizie Backlog.md (2026-08-31) i wcześniej. Zapisane, żeby nie
-wracały jako „a może jednak".
+Rejected during the Backlog.md analysis (2026-08-31) and earlier. Recorded so
+they don't come back as "maybe after all".
 
-| Rzecz | Dlaczego nie |
+| Thing | Why not |
 |---|---|
-| **Serwer MCP** | Druga powierzchnia z własnym cyklem życia. `worktrail instructions` (TL-74) daje ten sam zasięg za ułamek kosztu utrzymania. |
-| **Warstwy konfiguracji z priorytetem** | Sprzeczne z III prawem. Wygodniejsze i cichsze — i dokładnie dlatego odrzucone. |
-| **Drafts jako osobny byt** | To jest `status: pending`. Dodatkowy stan nie kupuje niczego. |
-| **Milestones jako pliki z własnymi ID** | `epic:` jako wolny tekst wewnątrz boarda wystarcza i zdejmuje koszt operacji na cudzych ID. |
-| **API wtyczek** | IV prawo: rozszerzalność przez kompozycję. `--json` i wywoływalne wejścia zamiast rejestru hooków. |
-| **Zewnętrzny tracker jako źródło prawdy** | I prawo: stan rozwiedziony z gałęzią to wada, dla której ten projekt powstał. |
+| **An MCP server** | A second surface with its own lifecycle. `worktrail instructions` (TL-74) gives the same reach at a fraction of the maintenance cost. |
+| **Prioritised configuration layers** | Contradicts law III. More convenient and quieter — and rejected for exactly that reason. |
+| **Drafts as a separate entity** | This is `status: pending`. An extra state buys nothing. |
+| **Milestones as files with their own IDs** | `epic:` as free text within a board is enough and removes the cost of operating on someone else's IDs. |
+| **A plugin API** | Law IV: extensibility through composition. `--json` and callable inputs instead of a hook registry. |
+| **An external tracker as source of truth** | Law I: state divorced from the branch is the defect this project exists to fix. |
 
 ---
 
-## 5. Jak sprawdzić, czy ten dokument jest aktualny
+## 5. How to check whether this document is current
 
-Nie jest źródłem prawdy — backlog nim jest. Migawkę odtworzysz:
+It is not the source of truth — the backlog is. Reproduce the snapshot with:
 
 ```bash
 node scripts/cli.mjs stats

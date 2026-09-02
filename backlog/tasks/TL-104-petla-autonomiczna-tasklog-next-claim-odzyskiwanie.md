@@ -1,10 +1,10 @@
 ---
 id: TL-104
-title: "Pętla autonomiczna: worktrail next --claim, odzyskiwanie porzuconych tasków, wzorzec świeżej sesji"
+title: "Autonomous loop: worktrail next --claim, recovering abandoned tasks, fresh-session pattern"
 type: code
 labels: [post-launch]
 board: main
-epic: "Powierzchnia CLI"
+epic: "CLI surface"
 priority: P1
 status: done
 owner: agent:claude-opus-5
@@ -19,92 +19,106 @@ related_docs:
   - docs/worktrail-state-and-sync.md
 verification:
   - bash: "node --test scripts/tests/next-claim.test.mjs"
-  - manual: "Dwie równoległe pętle `while worktrail next --claim` na tym samym backlogu nie biorą nigdy tego samego taska; task porzucony (in_progress, stary `updated`) wraca do puli z wpisem w logu, nie po cichu"
+  - manual: "Two parallel loops of `while worktrail next --claim` on the same backlog never take the same task; an abandoned task (in_progress, stale `updated`) returns to the pool with an entry in the log, not silently"
 ---
 
-## Cel
+## Goal
 
-Backlog może napędzać pętlę autonomiczną — `claude -p` albo `codex exec` w
-świeżej sesji na każdy task — bez żadnej logiki wyboru po stronie pętli.
-`worktrail next` mówi, co teraz; `--claim` bierze to atomowo; task porzucony
-przez martwą sesję wraca do puli sam. Kryterium wyjścia sesji jest
-`worktrail done` (TL-82), nie opinia agenta.
+The backlog can drive an autonomous loop — `claude -p` or `codex exec` in a
+fresh session per task — with no selection logic on the loop's side.
+`worktrail next` says what's now; `--claim` takes it atomically; a task
+abandoned by a dead session returns to the pool by itself. The session's exit
+criterion is `worktrail done` (TL-82), not the agent's own opinion.
 
-## Kontekst
+## Context
 
-Kompaktacja kontekstu u obu vendorów jest stratna z konstrukcji: degradacja od
-~70% zapełnienia, kontekst decyzyjny jako pierwsza ofiara streszczenia (Claude),
-zawieszenia przy progu i cykle wracające od razu na ~80% (Codex, issues #19116,
-#35032). Oficjalna rada Anthropic: co ma przeżyć granicę kompaktacji, musi
-mieszkać POZA rozmową. Właściwa architektura trybu autonomicznego to więc
-świeża sesja na task — a nasz plik taska (Cel / Kontekst / Pre-flight / Kroki /
-verification) jest już zaprojektowany jako pakiet rehydracji dla kogoś bez
-pamięci rozmowy. Ten task domyka trzy dziury, przez które ta pętla dziś nie
-może istnieć:
+Context compaction at both vendors is lossy by construction: degradation from
+~70% fill, decision context as the first casualty of summarization (Claude),
+stalls at the threshold and cycles returning immediately to ~80% (Codex,
+issues #19116, #35032). Anthropic's official advice: whatever needs to survive
+the compaction boundary must live OUTSIDE the conversation. The correct
+architecture for autonomous mode is therefore a fresh session per task — and
+our task file (Goal / Context / Pre-flight / Steps / verification) is already
+designed as a rehydration package for someone with no memory of the
+conversation. This task closes three gaps that today keep this loop from
+existing:
 
-1. **Polityka wyboru mieszka w pętli, nie w narzędziu.** `query` filtruje, ale
-   „pending, nieblokowany, najwyższy priorytet, najstarszy" każda pętla
-   pisałaby sama — i każda inaczej. Polityka ma być JEDNA i testowalna.
-2. **Brak atomowego wzięcia.** Dwie pętle w dwóch worktree (nasz własny model
-   pracy równoległej) wezmą ten sam task. Uwaga na granicę trudności: dwa
-   PROCESY na jednym drzewie rozstrzyga zapis pliku; dwa WORKTREE widzą się
-   dopiero po commicie — `--claim` gwarantuje atomowość w obrębie jednego
-   drzewa, a dla wielu worktree dokumentuje wzorzec (skan gałęzi jak w
-   `next-id` / TL-73), zamiast obiecywać atomowość, której git nie daje.
-3. **Martwa sesja zostawia `in_progress` na zawsze** i pętla staje. Staleness:
-   `in_progress` + `updated` starsze niż okno → task wraca do puli z wpisem w
-   logu i historii (aktor `agent:`), nigdy po cichu. Okno jest kluczem
-   konfiguracji projektu. To sąsiaduje z heartbeatami (TL-28), ale ich nie
-   wymaga — `updated` wystarcza na start.
+1. **Selection policy lives in the loop, not in the tool.** `query` filters,
+   but "pending, unblocked, highest priority, oldest" would be written by
+   every loop itself — and each differently. The policy must be ONE and
+   testable.
+2. **No atomic take.** Two loops in two worktrees (our own model of parallel
+   work) would take the same task. Note the boundary of difficulty: two
+   PROCESSES on one tree are settled by the file write; two WORKTREES only see
+   each other after a commit — `--claim` guarantees atomicity within a single
+   tree, and for multiple worktrees documents the pattern (a branch scan like
+   in `next-id` / TL-73), instead of promising an atomicity git does not give.
+3. **A dead session leaves `in_progress` forever** and the loop stalls.
+   Staleness: `in_progress` + `updated` older than a window → the task
+   returns to the pool with an entry in the log and in history (actor
+   `agent:`), never silently. The window is a project configuration key. This
+   is adjacent to heartbeats (TL-28), but does not require them — `updated` is
+   enough to start.
 
-Rozstrzygnięte: `next` NIE wykonuje pracy i NIE uruchamia agenta. Wybór i
-wzięcie to komendy worktrail; pętla zewnętrzna (shell, cron, hook) jest poza
-narzędziem i dostaje przykładowy skrypt w dokumentacji. Uzasadnienie: IV prawo —
-kompozycja zamiast wbudowanego orkiestratora, który musiałby znać vendorów.
+Decided: `next` does NOT perform work and does NOT launch an agent. Selection
+and taking are worktrail commands; the outer loop (shell, cron, hook) is
+outside the tool and gets a sample script in the documentation. Rationale: Law
+IV — composition instead of a built-in orchestrator that would have to know
+about vendors.
 
-Zależność od TL-82 jest realna: bez bramki `done` pętla nie ma mechanicznego
-kryterium wyjścia i „autonomia" znaczy „agent sam sobie wierzy".
+The dependency on TL-82 is real: without the `done` gate the loop has no
+mechanical exit criterion and "autonomy" means "the agent trusts itself".
 
 ## Pre-flight reading
 
-1. `scripts/query.mjs` — istniejące filtry i sortowanie; `next` ma z tego
-   korzystać, nie liczyć drugi raz.
-2. `scripts/check-backlog-refs.mjs` — rozstrzyganie `blocked_by`; „nieblokowany"
-   znaczy: każdy bloker w statusie archiwalnym wg `config.yaml`, nie literału.
-3. `scripts/history-record.mjs` — wpis historii dla claim i dla odzyskania.
-4. `backlog/tasks/TL-82-*.md` — kontrakt `done`, który zamyka pętlę.
-5. `backlog/tasks/TL-28-*.md` — heartbeaty; nie dubluj, zostaw punkt zaczepienia.
+1. `scripts/query.mjs` — existing filters and sorting; `next` should build on
+   this, not compute it a second time.
+2. `scripts/check-backlog-refs.mjs` — resolving `blocked_by`; "unblocked"
+   means: every blocker in an archival status per `config.yaml`, not a
+   literal.
+3. `scripts/history-record.mjs` — history entry for the claim and for
+   recovery.
+4. `backlog/tasks/TL-82-*.md` — the `done` contract that closes the loop.
+5. `backlog/tasks/TL-28-*.md` — heartbeats; do not duplicate, leave a hook
+   point.
 
-## Kroki
+## Steps
 
-1. `worktrail next [--json]`: jeden task albo jawne „pusta kolejka" (exit 0 z
-   komunikatem, odróżnialne od błędu) — pending, nieblokowany, najwyższy
-   priorytet, najstarszy `created`, remis rozstrzyga ID.
-2. `worktrail next --claim --owner <aktor>`: atomowo `in_progress` + `owner` +
-   `updated` + wpis historii. Aktor obowiązkowo z przestrzenią nazw.
-3. Odzyskiwanie: `next` traktuje przeterminowany `in_progress` jako dostępny;
-   przejęcie zapisuje w `## Log` i historii, od kogo i dlaczego. Okno w
-   konfiguracji projektu; nieznany klucz oblewa (III prawo).
-4. `--json` w kopercie z TL-72.
-5. Dokumentacja wzorca: przykładowa pętla dla `claude -p` i `codex exec`,
-   hook SessionStart → `worktrail instructions overview`, hook PreCompact →
-   checkpoint do `## Log`. Jako temat `autonomous-loop` w `instructions`
-   (TL-74), nie osobny plik.
-6. `scripts/tests/next-claim.test.mjs`: kolejność wyboru na fixture z remisami;
-   task zablokowany niewybieralny, dopóki bloker nie jest archiwalny; dwa
-   `--claim` pod rząd nie dają tego samego taska; przeterminowany `in_progress`
-   wraca z wpisem; pusta kolejka to nie błąd. Kontrola pozytywna: fixture z
-   NIEDOMYŚLNYMI statusami w configu.
+1. `worktrail next [--json]`: one task, or an explicit "empty queue" (exit 0
+   with a message, distinguishable from an error) — pending, unblocked,
+   highest priority, oldest `created`, ties settled by ID.
+2. `worktrail next --claim --owner <actor>`: atomically `in_progress` + `owner`
+   + `updated` + a history entry. Actor mandatory with a namespace.
+3. Recovery: `next` treats an expired `in_progress` as available; the takeover
+   is recorded in `## Log` and history, saying from whom and why. The window
+   is in the project configuration; an unknown key fails (Law III).
+4. `--json` in the envelope from TL-72.
+5. Documentation of the pattern: a sample loop for `claude -p` and
+   `codex exec`, a SessionStart hook → `worktrail instructions overview`, a
+   PreCompact hook → checkpoint into `## Log`. As the `autonomous-loop` topic
+   in `instructions` (TL-74), not a separate file.
+6. `scripts/tests/next-claim.test.mjs`: selection order on a fixture with
+   ties; a blocked task not selectable until the blocker is archival; two
+   `--claim` calls in a row do not give the same task; an expired
+   `in_progress` returns with an entry; an empty queue is not an error.
+   Positive control: fixture with NON-DEFAULT statuses in the config.
 
 ## Acceptance criteria
 
-- [ ] `next` zwraca dokładnie jeden task wg jednej, udokumentowanej polityki, albo jawną pustą kolejkę.
-- [ ] Wzięcie jest atomowe w obrębie drzewa; granica gwarancji dla wielu worktree jest zapisana w dokumentacji, nie przemilczana.
-- [ ] Porzucony task wraca do puli po skonfigurowanym oknie, z wpisem w historii i ostrzeżeniem na stdout — nigdy po cichu.
-- [ ] Wybór respektuje `blocked_by` przez statusy archiwalne z configu, nie literały.
-- [ ] Wzorzec pętli (Claude i Codex, z hookami) jest tematem w `instructions`.
-- [ ] Testy pokrywają remisy, blokady, podwójny claim, staleness i pustą kolejkę, na niedomyślnym configu.
+- [ ] `next` returns exactly one task per one documented policy, or an
+      explicit empty queue.
+- [ ] The take is atomic within a tree; the boundary of the guarantee for
+      multiple worktrees is documented, not left unsaid.
+- [ ] An abandoned task returns to the pool after the configured window, with
+      a history entry and a warning on stdout — never silently.
+- [ ] Selection respects `blocked_by` through archival statuses from the
+      config, not literals.
+- [ ] The loop pattern (Claude and Codex, with hooks) is a topic in
+      `instructions`.
+- [ ] Tests cover ties, blocks, double claim, staleness and an empty queue, on
+      a non-default config.
 
 ## Log
 
-2026-09-01 pending — agent:claude — założony z analizy trybu autonomicznego: kompaktacja u obu vendorów jest stratna, więc architektura to świeża sesja na task; plik taska jest pakietem rehydracji, brakowało wyboru, atomowego wzięcia i odzyskiwania porzuconych.
+2026-09-01 pending — agent:claude — founded on an analysis of autonomous mode: compaction at both vendors is lossy, so the architecture is a fresh session per task; the task file is a rehydration package, what was missing was selection, atomic taking, and recovery of abandoned tasks.
+</content>

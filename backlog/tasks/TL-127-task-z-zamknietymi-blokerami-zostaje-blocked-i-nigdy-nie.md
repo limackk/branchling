@@ -1,6 +1,6 @@
 ---
 id: TL-127
-title: "Task z zamknietymi blokerami zostaje blocked i nigdy nie wychodzi z next"
+title: "A task with closed blockers stays blocked and never leaves next"
 type: task
 labels: []
 board: main
@@ -14,72 +14,84 @@ updated: 2026-09-02
 blocked_by: []
 blocks: []
 related_docs: []
-verification:                      # JAK sprawdzić, że task naprawdę jest zrobiony
+verification:                      # HOW to check the task is actually done
   - id: unblocked-is-issuable
     bash: "node --test scripts/tests/unblocking.test.mjs"
 ---
 
-## Cel
+## Goal
 
-Task, którego wszystkie pozycje `blocked_by` są zamknięte, przestaje być dla
-`worktrail next` niewidoczny. Po zmianie kolejka wydaje pracę, która naprawdę
-jest gotowa, bez ręcznej edycji statusu przez człowieka.
+A task whose every `blocked_by` entry is closed stops being invisible to
+`worktrail next`. After the change the queue hands out work that is genuinely
+ready, without a human manually editing the status.
 
-## Kontekst
+## Context
 
-Zmierzone 2026-09-01, po zamknięciu TL-94: TRZY taski (TL-95, TL-96,
-TL-101) mają status `blocked`, a KAŻDY ich bloker jest już `done`. Żaden z nich
-nie wyjdzie z `worktrail next`, bo dyspozytor pomija statusy chronione przez
-`reason_required_statuses` (tu: `blocked`, `cancelled`) — słusznie, bo do
-`blocked` wchodzi się decyzją, której agent nie ma prawa cofnąć po cichu. Efekt
-netto jest jednak taki, że gotowa praca stoi w kolejce, której nikt nie obsłuży,
-i wygląda przy tym na zablokowaną.
+Measured on 2026-09-01, after TL-94 was closed: THREE tasks (TL-95, TL-96,
+TL-101) have status `blocked`, and EVERY one of their blockers is already
+`done`. None of them will come out of `worktrail next`, because the
+dispatcher skips statuses protected by `reason_required_statuses` (here:
+`blocked`, `cancelled`) — rightly so, since entering `blocked` is a decision
+that an agent has no right to silently reverse. The net effect, though, is
+that ready work sits in a queue nobody will service, while looking blocked.
 
-To jest ta sama klasa wady co niescalona gałąź: stan, który wygląda na aktualny,
-a nie jest. Różnica jest istotna: `blocked_by` to FAKT wyliczalny z drzewa
-(bloker jest zamknięty albo nie), a `status: blocked` to DEKLARACJA człowieka.
-Rozjazd między nimi nie ma dziś żadnego strażnika.
+This is the same class of defect as an unmerged branch: a state that looks
+current but isn't. The distinction matters: `blocked_by` is a FACT computable
+from the tree (a blocker is closed or it isn't), while `status: blocked` is a
+human's DECLARATION. Today nothing guards the drift between them.
 
-Rozstrzygnąć trzeba jedno i to jest decyzja projektowa, nie implementacja:
+One thing has to be decided and it is a design decision, not an
+implementation detail:
 
-- **Kto zdejmuje `blocked`.** Kandydaci: `done` przy zamknięciu blokera (zna
-  `blocks:`, ale pisze wtedy do CUDZEGO pliku taska), osobna komenda
-  (`worktrail unblock`, jawna i audytowalna), albo NIKT — `next` przestaje
-  pomijać `blocked`, gdy `blocked_by` jest domknięte, i sam zdejmuje status przy
-  wydaniu, tak jak dziś ustawia `in_progress`.
-- **Czy `blocked` z pustym `blocked_by` to inny przypadek.** Task zablokowany
-  „z zewnątrz" (czekamy na cudzą decyzję) nie ma czego domknąć i MUSI zostać
-  pominięty — inaczej ta zmiana zacznie wydawać pracę, której nie da się zrobić.
-- **Ślad w historii.** Zdjęcie `blocked` to zmiana statusu i ma trafić do
-  `history/` z aktorem i powodem; powodem jest zamknięcie blokera, nie
-  „unknown".
+- **Who clears `blocked`.** Candidates: `done`, when closing a blocker (it
+  knows `blocks:`, but would then write to SOMEONE ELSE'S task file), a
+  separate command (`worktrail unblock`, explicit and auditable), or NOBODY —
+  `next` stops skipping `blocked` once `blocked_by` is fully closed, and
+  clears the status itself at issuance time, the same way it sets
+  `in_progress` today.
+- **Whether `blocked` with an empty `blocked_by` is a different case.** A
+  task blocked "externally" (waiting on someone else's decision) has nothing
+  to clear and MUST still be skipped — otherwise this change would start
+  handing out work that cannot actually be done.
+- **A trace in history.** Clearing `blocked` is a status change and must land
+  in `history/` with an actor and a reason; the reason is the blocker's
+  closure, not "unknown".
 
-Trzeci wariant wygląda najlepiej, bo nie pisze do cudzego pliku w cudzym
-commicie i nie wymaga od nikogo pamiętania o dodatkowej komendzie — ale to jest
-teza do sprawdzenia w tym tasku, nie rozstrzygnięcie.
+The third option looks best, because it does not write to someone else's file
+in someone else's commit and does not require anyone to remember an extra
+command — but that is a hypothesis to test in this task, not a foregone
+conclusion.
 
 ## Pre-flight reading
 
-1. `scripts/next-task.mjs` — `queueStatuses()` i `selectCandidates()`: gdzie
-   dokładnie wypadają statusy chronione i gdzie sprawdzane jest `blocked_by`.
-2. `scripts/done-task.mjs` — co `done` już wie o `blocks:` przy zamknięciu.
-3. `scripts/history.mjs` — `requiresReason()`: reguła mówi o WEJŚCIU w status
-   wymagający powodu; wyjście z niego jest dziś nieopisane.
-4. `backlog/config.yaml` — `reason_required_statuses`; to WARTOŚCI projektu,
-   więc rozwiązanie nie może wpisywać `blocked` do kodu.
+1. `scripts/next-task.mjs` — `queueStatuses()` and `selectCandidates()`:
+   exactly where protected statuses are excluded and where `blocked_by` is
+   checked.
+2. `scripts/done-task.mjs` — what `done` already knows about `blocks:` when
+   closing.
+3. `scripts/history.mjs` — `requiresReason()`: the rule talks about ENTERING
+   a status that requires a reason; leaving one is undocumented today.
+4. `backlog/config.yaml` — `reason_required_statuses`; these are project
+   VALUES, so the solution must not hardcode `blocked` into the code.
 
-## Kroki
+## Steps
 
-1. Rozstrzygnij, kto zdejmuje status, i zapisz odrzucone warianty w tym pliku.
-2. Zaimplementuj; nazwa statusu ma pochodzić z konfiguracji, nie z literału.
-3. Test `scripts/tests/unblocking.test.mjs`: task `blocked` z domkniętymi
-   blokerami JEST wydawany przez `next`, task `blocked` z otwartym blokerem NIE
-   JEST, task `blocked` z pustym `blocked_by` NIE JEST (kontrola pozytywna dla
-   blokady zewnętrznej), a zmiana statusu ma wpis w `history/` z aktorem.
-4. Przejrzyj trzy taski wymienione w kontekście — po zmianie mają być wydawalne.
+1. Decide who clears the status, and record the rejected options in this
+   file.
+2. Implement it; the status name should come from configuration, not a
+   literal.
+3. Test `scripts/tests/unblocking.test.mjs`: a `blocked` task with closed
+   blockers IS issued by `next`, a `blocked` task with an open blocker is
+   NOT, a `blocked` task with an empty `blocked_by` is NOT (positive control
+   for external blocking), and the status change has an entry in `history/`
+   with an actor.
+4. Review the three tasks named in the context — after the change they
+   should be issuable.
 
 ## Acceptance criteria
 
-- [x] `next` wydaje task `blocked`, którego wszystkie blokery są zamknięte. [proof: unblocked-is-issuable]
-- [x] `next` NADAL pomija `blocked` z otwartym blokerem i `blocked` z pustym `blocked_by`. [proof: unblocked-is-issuable]
-- [x] Zdjęcie statusu zostawia wpis w `history/` z aktorem i powodem innym niż `unknown`. [proof: unblocked-is-issuable]
+- [x] `next` issues a `blocked` task whose blockers are all closed. [proof: unblocked-is-issuable]
+- [x] `next` STILL skips `blocked` with an open blocker, and `blocked` with an
+      empty `blocked_by`. [proof: unblocked-is-issuable]
+- [x] Clearing the status leaves an entry in `history/` with an actor and a
+      reason other than `unknown`. [proof: unblocked-is-issuable]

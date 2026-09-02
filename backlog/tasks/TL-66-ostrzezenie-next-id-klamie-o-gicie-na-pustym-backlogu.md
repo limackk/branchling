@@ -1,10 +1,10 @@
 ---
 id: TL-66
-title: "Ostrzeżenie next-id kłamie o gicie na pustym backlogu"
+title: "next-id warning lies about git on an empty backlog"
 type: bug
 labels: [pre-launch]
 board: main
-epic: "Powierzchnia CLI"
+epic: "CLI surface"
 priority: P2
 status: done
 owner: claude
@@ -18,75 +18,89 @@ related_docs:
   - .claude/skills/worktrail-cli/references/output-style.md
 verification:
   - bash: "node --test scripts/tests/next-id-empty-backlog.test.mjs"
-  - bash: "d=$(mktemp -d)/p; mkdir -p \"$d\"; cd \"$d\"; git init -q .; echo x > a; git add -A; git -c user.email=t@t -c user.name=t commit -qm i >/dev/null; T=/Users/limack/workspace/tasklog/bin/worktrail.mjs; node $T init --dir ./backlog >/dev/null; node $T new --dir ./backlog --title Proba 2>&1 | grep -q 'poza repozytorium git' && { echo 'nadal kłamie'; exit 1; }; echo 'pierwszy task bez fałszywego ostrzeżenia — OK'"
+  - bash: "d=$(mktemp -d)/p; mkdir -p \"$d\"; cd \"$d\"; git init -q .; echo x > a; git add -A; git -c user.email=t@t -c user.name=t commit -qm i >/dev/null; T=/Users/limack/workspace/tasklog/bin/worktrail.mjs; node $T init --dir ./backlog >/dev/null; node $T new --dir ./backlog --title Test 2>&1 | grep -q 'not in a git repository' && { echo 'still lying'; exit 1; }; echo 'first task without a false warning — OK'"
 ---
 
-## Cel
+## Goal
 
-Ostrzeżenie o węższym źródle numeru ma padać wtedy, gdy źródło NAPRAWDĘ jest
-węższe — a nie za każdym razem, gdy skan po gałęziach nic nie znalazł.
+The warning about a narrower number source should fire when the source
+REALLY IS narrower — not every time a scan across branches finds nothing.
 
-## Kontekst
+## Context
 
-Zmierzone 2026-08-31 w normalnym repozytorium gita, z commitem, zaraz po
+Measured 2026-08-31 in a normal git repository, with a commit, right after
 `worktrail init`:
 
 ```
 $ worktrail new --dir ./backlog --title "Proba"
+<!-- language-guard: allow — verbatim historical CLI transcript, not prose -->
 next-backlog-id: numer z LOKALNEGO katalogu — poza repozytorium git
+<!-- language-guard: allow — verbatim historical CLI transcript, not prose -->
   nie widzę innych gałęzi ani worktree, więc ten numer może być gdzieś zajęty.
 [worktrail new] …/backlog/tasks/TASK-1-proba.md
 ```
 
-Zdanie „poza repozytorium git" jest nieprawdziwe: jesteśmy w repozytorium, skan
-po gałęziach i worktree **wykonał się w całości** i po prostu nic nie znalazł, bo
-backlog powstał sekundę wcześniej.
+The sentence "outside the git repository" is untrue: we are inside a
+repository, the scan across branches and worktrees **ran to completion** and
+simply found nothing, because the backlog had been created a second earlier.
 
-Przyczyna jest w warunku: `if (sources.size === 0)`. Zbiór źródeł jest pusty w
-dwóch różnych sytuacjach, których ten warunek nie rozróżnia:
+The cause is in the condition: `if (sources.size === 0)`. The set of sources
+is empty in two different situations that this condition does not
+distinguish:
 
-| Sytuacja | Czy odpowiedź jest węższa |
+| Situation | Is the answer narrower |
 |---|---|
-| katalog poza repozytorium gita | **tak** — nie widzieliśmy cudzych gałęzi |
-| repozytorium jest, backlog pusty | **nie** — widzieliśmy wszystkie i nie ma nic |
+| directory outside a git repository | **yes** — we did not see other branches |
+| repository exists, backlog is empty | **no** — we saw all of them and there is nothing |
 
-Intencja ostrzeżenia jest słuszna i zapisana w kodzie: węższe źródło MUSI się
-odezwać, bo numer z jednego katalogu wygląda tak samo wiarygodnie jak numer ze
-skanu wszystkich gałęzi. Zła jest tylko przesłanka.
+The intent of the warning is sound and is written into the code: a narrower
+source MUST speak up, because a number from a single directory looks just as
+credible as a number from a scan of all branches. Only the premise is wrong.
 
-**Dlaczego to jest P2, a nie kosmetyka.** To zdanie pada przy PIERWSZYM tasku
-każdego nowego użytkownika — czyli w jedynym momencie, gdy nie ma jeszcze
-podstaw, żeby ocenić, które komunikaty narzędzia są wiarygodne. Ostrzeżenie,
-które kłamie za pierwszym razem, uczy ignorować wszystkie następne; a to
-akurat ostrzeżenie ma kiedyś uratować przed dwoma taskami o tym samym numerze.
+**Why this is P2, not cosmetic.** This sentence appears on the FIRST task of
+every new user — the one moment when there are no grounds yet to judge which
+of the tool's messages are trustworthy. A warning that lies the first time
+teaches people to ignore every subsequent one; and this particular warning is
+meant to one day save someone from two tasks with the same number.
 
 ## Pre-flight reading
 
-1. `scripts/next-backlog-id.mjs` — warunek `sources.size === 0` i komentarz nad nim.
-2. `scripts/git-rules.mjs` — `insideGitRepo()`; pytanie jest już zadane gdzie indziej.
-3. `scripts/new-task.mjs` — `nextId()` przekazuje to ostrzeżenie dalej na stderr.
+1. `scripts/next-backlog-id.mjs` — the `sources.size === 0` condition and the
+   comment above it.
+2. `scripts/git-rules.mjs` — `insideGitRepo()`; the question is already asked
+   elsewhere.
+3. `scripts/new-task.mjs` — `nextId()` forwards this warning on to stderr.
 
-## Kroki
+## Steps
 
-1. Rozdziel przesłanki: ostrzegaj, gdy katalog backlogu NIE leży w repozytorium
-   gita, a nie gdy skan wrócił pusty.
-2. Użyj `insideGitRepo()` z `git-rules.mjs` zamiast wnioskować z liczby źródeł.
-3. Zachowaj ostrzeżenie tam, gdzie jest prawdziwe — jego intencja nie jest błędem.
-4. Test: pusty backlog W repozytorium nie ostrzega; backlog poza repozytorium
-   ostrzega. Obie strony, bo poprawka usuwająca ostrzeżenie w ogóle byłaby
-   „zielona" przy jednostronnym teście.
+1. Separate the premises: warn when the backlog directory is NOT inside a
+   git repository, not when the scan came back empty.
+2. Use `insideGitRepo()` from `git-rules.mjs` instead of inferring from the
+   number of sources.
+3. Keep the warning where it is true — its intent is not the bug.
+4. Test: an empty backlog INSIDE a repository does not warn; a backlog
+   outside a repository does warn. Both sides, because a fix that just
+   removed the warning entirely would be "green" on a one-sided test.
 
 ## Acceptance criteria
 
-- [ ] Pusty backlog wewnątrz repozytorium gita: brak ostrzeżenia.
-- [ ] Backlog poza repozytorium gita: ostrzeżenie nadal jest.
-- [ ] Treść ostrzeżenia nie mówi o gicie rzeczy nieprawdziwych.
-- [ ] Test pokrywa obie strony.
+- [ ] Empty backlog inside a git repository: no warning.
+- [ ] Backlog outside a git repository: warning still present.
+- [ ] The warning's text does not say anything untrue about git.
+- [ ] The test covers both sides.
 
 ## Log
 
-Append-only. Format: `YYYY-MM-DD status — kto — notatka`.
+Append-only. Format: `YYYY-MM-DD status — who — note`.
 
-- 2026-08-31 created — agent:claude — trafione przy TL-64; blokuje czystą ścieżkę pierwszego uruchomienia
-- 2026-08-31 in_progress — agent:claude — start implementacji
-- 2026-08-31 done — agent:claude — przesłanką jest teraz `insideGitRepo(OWN_ROOT)` z `git-rules.mjs`, a nie liczba znalezionych źródeł. Treść poprawiona: „backlog nie leży w repozytorium git" zamiast „poza repozytorium git" — bo pierwsze jest sprawdzalne, a drugie było zdaniem o kontekście wywołania. Test `next-id-empty-backlog.test.mjs` sprawdza OBIE strony: pusty backlog w repo milczy, backlog poza repo nadal ostrzega. Sam test na ciszę byłby zielony także dla poprawki kasującej ostrzeżenie w całości. 313/313.
+- 2026-08-31 created — agent:claude — found while working on TL-64; blocks a
+  clean first-run path
+- 2026-08-31 in_progress — agent:claude — implementation started
+- 2026-08-31 done — agent:claude — the premise is now `insideGitRepo(OWN_ROOT)`
+  from `git-rules.mjs`, not the number of sources found. Text corrected:
+  "backlog is not inside a git repository" instead of "outside the git
+  repository" — because the first is checkable, and the second was a
+  statement about the calling context. Test `next-id-empty-backlog.test.mjs`
+  checks BOTH sides: an empty backlog inside a repo stays silent, a backlog
+  outside a repo still warns. A test for silence alone would also pass for a
+  fix that removed the warning entirely. 313/313.

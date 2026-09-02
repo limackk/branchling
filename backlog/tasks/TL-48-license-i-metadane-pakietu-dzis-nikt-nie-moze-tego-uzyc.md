@@ -1,10 +1,10 @@
 ---
 id: TL-48
-title: "LICENSE i metadane pakietu — dziś nikt nie może tego użyć"
+title: "LICENSE and package metadata — today nobody can use this"
 type: task
 labels: [pre-launch]
 board: main
-epic: "Backlog — publikacja open source"
+epic: "Backlog — open-source publication"
 priority: P1
 status: in_progress
 owner: agent:claude
@@ -18,81 +18,180 @@ related_docs:
   - docs/worktrail-global-tool.md
   - .claude/skills/worktrail-release/SKILL.md
 verification:
-  - bash: "test -f LICENSE && echo 'LICENSE jest — OK'"
-  - bash: "grep -q '\"private\": true' package.json && { echo 'nadal private'; exit 1; }; echo 'private zdjęte — OK'"
-  - bash: "for k in license repository bugs homepage keywords description; do grep -q \"\\\"$k\\\"\" package.json || { echo \"brak metadanej: $k\"; exit 1; }; done; echo 'metadane komplet — OK'"
+  - bash: "test -f LICENSE && echo 'LICENSE present — OK'"
+  - bash: "grep -q '\"private\": true' package.json && { echo 'still private'; exit 1; }; echo 'private removed — OK'"
+  - bash: "for k in license repository bugs homepage keywords description; do grep -q \"\\\"$k\\\"\" package.json || { echo \"missing metadata: $k\"; exit 1; }; done; echo 'metadata complete — OK'"
 ---
 
-## Cel
+## Goal
 
-Doprowadzić pakiet do stanu, w którym **da się go legalnie i praktycznie
-przyjąć**: plik licencji, zdjęte `private`, i te pola `package.json`, które
-składają się na stronę pakietu w npm.
+Bring the package to a state where it **can be legally and practically
+adopted**: a license file, `private` removed, and the `package.json` fields
+that make up the package's page on npm.
 
-## Kontekst
+## Context
 
-Zmierzone 2026-08-31 na czystym drzewie:
+Measured on 2026-08-31 on a clean tree:
 
-| Co | Stan |
+| What | State |
 |---|---|
-| `LICENSE` | **nie istnieje** |
-| `package.json` → `private` | `true` — `npm publish` odmawia |
+| `LICENSE` | does not exist |
+| `package.json` → `private` | `true` — `npm publish` refuses |
 | `package.json` → `license` | `"UNLICENSED"` |
-| `repository`, `bugs`, `homepage`, `keywords` | brak wszystkich |
+| `repository`, `bugs`, `homepage`, `keywords` | all missing |
 
-Dwie różne konsekwencje, obie twarde:
+Two different consequences, both hard:
 
-**Prawna.** Kod bez pliku licencji jest domyślnie „wszystkie prawa
-zastrzeżone". W firmie przegląd prawny kończy się na brakującym pliku, niezależnie
-od tego, co obiecuje README — a to właśnie firmowe wdrożenia są celem, do którego
-ma prowadzić entuzjazm dewelopera.
+**Legal.** Code without a license file is, by default, "all rights
+reserved". At a company, legal review stops at the missing file, regardless
+of what the README promises — and it is precisely corporate adoption that a
+developer's enthusiasm is meant to lead to.
 
-**Handlowa.** Bez `repository`/`homepage`/`keywords` strona pakietu na npm jest
-pustym prostokątem, a to ona jest ostatnim ekranem przed decyzją „spróbuję".
+**Commercial.** Without `repository`/`homepage`/`keywords` the package's
+page on npm is an empty rectangle, and it is the last screen before the
+decision "I'll try it".
 
-[TL-33](TL-33-packaging-instalacja-globalna-i-npx.md) (zamknięty) miał krok 5
-„Licencja — wybór należy do foundera; task ma go wymusić, nie zgadnąć". Wymuszenie
-nie zadziałało: task został zamknięty, pliku nie ma. Ten task jest tym samym
-wymuszeniem, tym razem z weryfikacją, która oblewa na braku pliku.
+[TL-33](TL-33-packaging-instalacja-globalna-i-npx.md) (closed) had step 5
+"License — the choice belongs to the founder; the task has to force it, not
+guess it". The enforcement did not work: the task was closed, the file does
+not exist. This task is the same enforcement, this time with a verification
+that fails when the file is missing.
 
-**Wybór licencji należy do właściciela i nie jest do zgadnięcia.** MIT i Apache-2.0
-różnią się w rzeczy, która ma znaczenie akurat dla adopcji firmowej: Apache-2.0
-zawiera jawną klauzulę patentową, której działy prawne części firm oczekują, i jest
-dłuższy. To jest decyzja do podjęcia, nie do wydedukowania z kodu.
+**The choice of license belongs to the owner and is not to be guessed.** MIT
+and Apache-2.0 differ in something that matters specifically for corporate
+adoption: Apache-2.0 contains an explicit patent clause that the legal
+departments of some companies expect, and it is longer. This is a decision
+to be made, not deduced from the code.
 
 ## Pre-flight reading
 
-1. `package.json` — całość; to sześć linii do zmiany, ale każda coś obiecuje.
-2. `.claude/skills/worktrail-release/SKILL.md` §1 i §7 — bramka publikacji.
-3. [TL-33](TL-33-packaging-instalacja-globalna-i-npx.md) — co już zrobiono w pakowaniu i dlaczego `files` jest listą dozwoleń.
+1. `package.json` — the whole file; it's six lines to change, but each one
+   is a promise.
+2. `.claude/skills/worktrail-release/SKILL.md` §1 and §7 — the publication
+   gate.
+3. [TL-33](TL-33-packaging-instalacja-globalna-i-npx.md) — what has already
+   been done in packaging, and why `files` is an allow-list.
 
-## Kroki
+## Steps
 
-1. **Zapytaj właściciela o licencję** (MIT / Apache-2.0 / inna) — nie wybieraj sam.
-2. Dodaj `LICENSE` z pełnym tekstem wybranej licencji, z rokiem i właścicielem praw.
-3. `package.json`: `"license"` na SPDX-owy identyfikator wybranej licencji, usuń `"private": true`.
-4. Dodaj `repository` (typ + URL), `bugs`, `homepage`, `keywords`, dopracuj `description`.
-5. `LICENSE` do listy `files` — pakiet bez tekstu licencji w tarballu nie niesie jej dalej.
-6. `npm pack --dry-run` — potwierdź, że `LICENSE` jest w środku.
+1. **Ask the owner about the license** (MIT / Apache-2.0 / other) — do not
+   choose it yourself.
+2. Add `LICENSE` with the full text of the chosen license, with the year and
+   the rights holder.
+3. `package.json`: `"license"` set to the SPDX identifier of the chosen
+   license, remove `"private": true`.
+4. Add `repository` (type + URL), `bugs`, `homepage`, `keywords`, refine
+   `description`.
+5. `LICENSE` into the `files` list — a package without the license text in
+   the tarball does not carry it forward.
+6. `npm pack --dry-run` — confirm that `LICENSE` is inside.
 
 ## Acceptance criteria
 
-- [x] `LICENSE` istnieje i zawiera pełny tekst wybranej licencji.
-- [x] `package.json` nie ma `"private": true`.
-- [x] `license` jest identyfikatorem SPDX zgodnym z plikiem `LICENSE`.
-- [ ] `repository`, `bugs`, `homepage`, `keywords`, `description` wypełnione.
-- [x] `npm pack --dry-run` pokazuje `LICENSE` w tarballu.
+- [x] `LICENSE` exists and contains the full text of the chosen license.
+- [x] `package.json` does not have `"private": true`.
+- [x] `license` is an SPDX identifier matching the `LICENSE` file.
+- [ ] `repository`, `bugs`, `homepage`, `keywords`, `description` filled in.
+- [x] `npm pack --dry-run` shows `LICENSE` in the tarball.
 
 ## Log
 
-Append-only. Format: `YYYY-MM-DD status — kto — notatka`.
+Append-only. Format: `YYYY-MM-DD status — who — note`.
 
-- 2026-08-31 created — agent:claude — z audytu gotowości do publikacji
-- 2026-09-01 in_progress — agent:claude — DECYZJA LICENCYJNA: **Apache-2.0**. Właściciel zapytany zgodnie z krokiem 1, oddelegował wybór po analizie. Trzy powody z TEGO projektu, nie z ogólnej tabelki: (1) task sam nazywa firmowe wdrożenia celem, a jawna klauzula patentowa §3 jest jedyną osią, na której MIT i Apache-2.0 różnią się w sposób dotykający tego celu; (2) §6 rezerwuje znak towarowy — ma to wartość, bo nazwa (wtedy `tasklog`, od 2026-09-01 `worktrail`) jest wciąż wstępna, a TL-81 zgłasza podejrzenie kolizji w npm, i MIT o nazwie nie mówi nic; (3) §5 definiuje warunki wkładu, więc pierwszy zewnętrzny PR nie wymaga osobnego CLA. Zero zależności = brak jakiegokolwiek ograniczenia zgodności od dołu. Koszt: ~200 linii zamiast ~20 i konwencja NOTICE. KONTRARGUMENT ZAPISANY UCZCIWIE: MIT jest normą npm i niższym progiem dla pojedynczego dewelopera; jeśli priorytetem jest rozpoznawalność, a nie przegląd prawny, MIT jest lepszy. Zamiana jest tania DOPÓKI właściciel jest jedynym posiadaczem praw autorskich — od pierwszego przyjętego PR-a wymaga zgody współautorów. To jest moment, w którym ta decyzja drożeje, a nie moment publikacji.
-- 2026-09-01 in_progress — agent:claude — tekst licencji pobrany z kanonicznego źródła (https://www.apache.org/licenses/LICENSE-2.0.txt, 202 linie, 11358 B), nie przepisany z pamięci; sprawdzone obecnością pięciu znaczników (§3 patenty, §6 znaki towarowe, §9 gwarancje, nagłówek wersji, APPENDIX). Placeholder appendixu wypełniony: `Copyright 2026 Kamil Kwiatkowski`. NOTICE świadomie NIE utworzony — Apache-2.0 §4(d) czyni go obowiązkowym dla redystrybutorów dopiero gdy istnieje, a pusty NOTICE w projekcie bez cudzego kodu to zobowiązanie bez treści (skill worktrail-release §8: zgłaszaj braki, nie twórz ich bez pytania).
-- 2026-09-01 in_progress — agent:claude — NIE ZAMKNIĘTY: weryfikacja 3/3 oblewa na `repository`, `bugs`, `homepage`. Właściciel wstrzymał metadane URL — repozytorium nie ma remote'a i adres nie jest do wydedukowania. Zrobione: LICENSE, zdjęte `private`, `license: Apache-2.0`, `keywords` (10), dopracowany `description`, LICENSE w `files` i potwierdzony w tarballu (11.3 kB, 35 plików, zero danych backlogu). Do domknięcia brakuje JEDNEGO wejścia: adresu repozytorium. Osobnego taska celowo nie zakładam — to krok 4 tego taska, odłożony decyzją właściciela, a nie nowy zakres. UWAGA: zdjęcie `private: true` usunęło bramkę przed przypadkową publikacją, którą TL-33 postawił świadomie; `npm publish` już nie oblewa, a nazwa pakietu jest wciąż otwarta w TL-81.
-- 2026-09-01 in_progress — agent:claude — **DECYZJA ZMIENIONA: Apache-2.0 → MIT.** Właściciel podważył rekomendację kontrprzykładem (Backlog.md, bezpośredni odpowiednik w tej samej niszy, jest na MIT) i miał rację. Trzy argumenty za Apache rozebrane: (1) argument patentowy był PRZEJĘTY Z TREŚCI TEGO TASKA, nie zweryfikowany — korporacyjne polityki OSS mają listy dozwolonych licencji i MIT jest na każdej, a §3 chroni przed współautorem egzekwującym patent, co dla CLI czytającego markdown jest bliskie zeru; (2) argument o znaku towarowym był BŁĘDNY — §6 Apache doprecyzowuje, że licencja nie przyznaje praw do znaku, ale MIT też ich nie przyznaje: licencja copyright nie obejmuje nazwy, więc §6 nie jest ochroną, tylko doprecyzowaniem; (3) argument o CLA jest realny, ale mały — na GitHubie inbound=outbound wynika z regulaminu. PRZECIW Apache, niedoważone wcześniej: §4(b) wymaga od forkujących zaznaczania zmian, a to narzędzie jest z założenia wciągane do CUDZYCH repozytoriów — lżejszy warunek MIT to mniej pytań u adoptującego.
-- 2026-09-01 in_progress — agent:claude — USŁUGA W CHMURZE (nowa informacja od właściciela, nieobecna dotąd w backlogu) NIE zmienia tego wyboru. MIT i Apache-2.0 są IDENTYCZNE na osi „czy konkurent może postawić usługę na moim kodzie" — obie na to pozwalają. Zamykają to dopiero AGPL (samobójcza tutaj: wiele korporacyjnych polityk zakazuje jej wprost, a to narzędzie jedzie do cudzych repozytoriów) albo BSL/SSPL (nie są open source). Ochrona usługi ma iść z ARCHITEKTURY — niepublikowany kod serwera, znak towarowy, wartość operacyjna — a nie z licencji CLI. Wniosek pochodny: nazwa awansuje z kosmetyki na aktywo, patrz TL-81. Model kontrybucji wydzielony do osobnego taska decyzyjnego, bo jako jedyna rzecz z tej analizy ma TERMIN WAŻNOŚCI.
-- 2026-09-01 in_progress — agent:claude — tekst MIT pobrany ze SPDX (https://spdx.org/licenses/MIT.txt), zawinięty do 80 kolumn i sprawdzony słowo w słowo względem źródła (porównanie po tokenach: identyczne). `license: "MIT"` w manifeście, `LICENSE` w tarballu (1.1 kB, 35 plików bez zmian).
-- 2026-09-01 in_progress — agent:claude — HAMULEC ODTWORZONY. Zdjęcie `private: true` usunęło bramkę, którą TL-33 postawił świadomie; w jej miejsce `scripts/check-publish-metadata.mjs` wpięty w `prepublishOnly`. `npm publish --dry-run` oblewa z kodem 2, dopóki brakuje `repository`/`bugs`/`homepage`. Świadome decyzje: (1) `prepublishOnly`, nie `prepublish` — ten drugi odpala się też przy zwykłym `npm install` i psułby stawianie drzewa roboczego; (2) bramka NIE jedzie w tarballu (`!scripts/check-publish-metadata.mjs` w `files`) — to narzędzie wydawcy, nie instalującego, potwierdzone `npm pack --dry-run` (35 plików bez zmian); (3) sprawdza WYŁĄCZNIE trzy adresy i mówi to w nagłówku pliku — pełna lista przedpublikacyjna jest procedurą ludzką (skill worktrail-release), a skrypt udający tę listę byłby gorszy niż jego brak, bo zielony przebieg czytałoby się jako „pakiet gotowy"; (4) placeholder (`example.com`, `<…>`, `TODO`) NIE przechodzi — bramka akceptująca wypełniacz uczy dokładnie tego, przed czym stoi. Test `scripts/tests/publish-gate.test.mjs`, 8 asercji, w tym kontrola pozytywna na WPIĘCIE (rozpięcie `prepublishOnly` oblewa test) — bramka podpięta do niczego przechodzi każdy test o własnej logice, a `npm publish` przelatuje obok. 375/375.
-- 2026-09-01 in_progress — agent:claude — przy okazji dodany `scripts.test` (`node --test scripts/tests/*.test.mjs`) — blok `scripts` z samym `prepublishOnly` i bez `npm test` byłby dziwny, a TL-53 (CI) i tak tego potrzebuje. Poza zakresem tego taska; do usunięcia jedną linią, jeśli ma tam nie być.
+- 2026-08-31 created — agent:claude — from the publication-readiness audit
+- 2026-09-01 in_progress — agent:claude — LICENSE DECISION: **Apache-2.0**.
+  The owner was asked per step 1, and delegated the choice after analysis.
+  Three reasons from THIS project, not from a generic table: (1) the task
+  itself names corporate adoption as the goal, and the explicit patent
+  clause in §3 is the only axis on which MIT and Apache-2.0 differ in a way
+  that touches that goal; (2) §6 reserves the trademark — this has value
+  because the name (`tasklog` at the time, `worktrail` since 2026-09-01) is
+  still provisional, and TL-81 flags a suspected collision on npm, and MIT
+  says nothing about the name; (3) §5 defines the terms of contribution, so
+  the first external PR does not require a separate CLA. Zero dependencies =
+  no downstream compatibility constraint of any kind. Cost: ~200 lines
+  instead of ~20, and the NOTICE convention. COUNTERARGUMENT RECORDED
+  HONESTLY: MIT is the npm norm and a lower bar for a solo developer; if the
+  priority is recognizability rather than legal review, MIT is better. The
+  swap is cheap AS LONG AS the owner is the sole copyright holder — from the
+  first accepted PR onward it requires the co-authors' consent. That is the
+  moment this decision gets expensive, not the moment of publication.
+- 2026-09-01 in_progress — agent:claude — the license text was fetched from
+  the canonical source (https://www.apache.org/licenses/LICENSE-2.0.txt, 202
+  lines, 11358 B), not retyped from memory; verified by the presence of five
+  markers (§3 patents, §6 trademarks, §9 warranty, the version header,
+  APPENDIX). The appendix placeholder filled in: `Copyright 2026 Kamil
+  Kwiatkowski`. `NOTICE` deliberately NOT created — Apache-2.0 §4(d) only
+  makes it mandatory for redistributors once it exists, and an empty
+  `NOTICE` in a project with no third-party code is an obligation with no
+  content (skill worktrail-release §8: report gaps, do not create them
+  without asking).
+- 2026-09-01 in_progress — agent:claude — NOT CLOSED: verification 3/3 fails
+  on `repository`, `bugs`, `homepage`. The owner held back the URL metadata
+  — the repository has no remote and the address cannot be deduced. Done:
+  `LICENSE`, `private` removed, `license: Apache-2.0`, `keywords` (10), a
+  refined `description`, `LICENSE` in `files` and confirmed in the tarball
+  (11.3 kB, 35 files, zero backlog data). Closing this is blocked on ONE
+  missing input: the repository address. Deliberately not opening a
+  separate task for it — this is step 4 of this task, deferred by the
+  owner's decision, not new scope. NOTE: removing `private: true` removed
+  the gate against accidental publication that TL-33 deliberately put in
+  place; `npm publish` no longer fails, and the package name is still open
+  in TL-81.
+- 2026-09-01 in_progress — agent:claude — **DECISION CHANGED: Apache-2.0 →
+  MIT.** The owner challenged the recommendation with a counterexample
+  (Backlog.md, a direct equivalent in the same niche, is under MIT) and was
+  right. The three arguments for Apache dismantled: (1) the patent argument
+  was CARRIED OVER FROM THIS TASK'S OWN TEXT, not verified — corporate OSS
+  policies keep allow-lists of licenses and MIT is on every one, and §3
+  protects against a co-author enforcing a patent, which for a CLI that
+  reads markdown is close to zero; (2) the trademark argument was WRONG —
+  Apache §6 clarifies that the license does not grant rights to the
+  trademark, but MIT does not grant them either: a copyright license does
+  not cover a name, so §6 is not protection, only clarification; (3) the CLA
+  argument is real, but small — on GitHub, inbound=outbound follows from the
+  terms of service. AGAINST Apache, underweighted earlier: §4(b) requires
+  forkers to mark their changes, and this tool is by design pulled into
+  OTHER PEOPLE'S repositories — MIT's lighter condition means fewer
+  questions for the adopter.
+- 2026-09-01 in_progress — agent:claude — A CLOUD SERVICE (new information
+  from the owner, absent from the backlog until now) does NOT change this
+  choice. MIT and Apache-2.0 are IDENTICAL on the axis of "can a competitor
+  put my code behind a service" — both allow it. Only AGPL closes that off
+  (suicidal here: many corporate policies forbid it outright, and this tool
+  goes into other people's repositories) or BSL/SSPL (not open source).
+  Protecting the service has to come from ARCHITECTURE — unpublished server
+  code, the trademark, operational value — not from the CLI's license.
+  Downstream conclusion: the name is promoted from cosmetics to an asset,
+  see TL-81. The contribution model was split off into a separate decision
+  task, because it is the only thing in this analysis with an EXPIRATION
+  DATE.
+- 2026-09-01 in_progress — agent:claude — the MIT text fetched from SPDX
+  (https://spdx.org/licenses/MIT.txt), wrapped to 80 columns and checked
+  word for word against the source (token comparison: identical). `license:
+  "MIT"` in the manifest, `LICENSE` in the tarball (1.1 kB, 35 files
+  unchanged).
+- 2026-09-01 in_progress — agent:claude — BRAKE RESTORED. Removing
+  `private: true` removed the gate that TL-33 deliberately put in place; in
+  its place `scripts/check-publish-metadata.mjs` was wired into
+  `prepublishOnly`. `npm publish --dry-run` fails with exit code 2 as long
+  as `repository`/`bugs`/`homepage` are missing. Deliberate decisions: (1)
+  `prepublishOnly`, not `prepublish` — the latter also fires on a plain `npm
+  install` and would break setting up the working tree; (2) the gate does
+  NOT ship in the tarball (`!scripts/check-publish-metadata.mjs` in
+  `files`) — it is a tool for the publisher, not the installer, confirmed by
+  `npm pack --dry-run` (35 files unchanged); (3) it checks EXCLUSIVELY three
+  addresses and says so in the file's header — the full pre-publication list
+  is a human procedure (skill worktrail-release), and a script pretending to
+  be that list would be worse than not having it, because a green run would
+  read as "package ready"; (4) a placeholder (`example.com`, `<…>`, `TODO`)
+  does NOT pass — a gate that accepts filler teaches exactly the thing it is
+  supposed to guard against. Test `scripts/tests/publish-gate.test.mjs`, 8
+  assertions, including a positive control on the WIRING ITSELF (unhooking
+  `prepublishOnly` fails the test) — a gate wired to nothing passes every
+  test about its own logic while `npm publish` slips right by. 375/375.
+- 2026-09-01 in_progress — agent:claude — along the way, `scripts.test` was
+  added (`node --test scripts/tests/*.test.mjs`) — a `scripts` block with
+  only `prepublishOnly` and no `npm test` would be odd, and TL-53 (CI) needs
+  it anyway. Out of scope for this task; remove in one line if it should not
+  be there.
