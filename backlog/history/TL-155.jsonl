@@ -1,0 +1,3 @@
+{"id":"01M1GV2D7H6FZ2M6Q2MCFME321","ts":"2026-09-02T10:36:38.513Z","task":"TL-155","field":"__created__","from":"","to":"The manual lists JSON payload keys and nothing checks them","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GV36HDZRC0D0F17WRX8BV3","ts":"2026-09-02T10:37:04.429Z","task":"TL-155","field":"priority","from":"P1","to":"P2","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GV36HDM46CWG1TWNFDSKC7","ts":"2026-09-02T10:37:04.429Z","task":"TL-155","field":"type","from":"task","to":"bug","actor":"unknown","source":"external","reason":"unknown"}
