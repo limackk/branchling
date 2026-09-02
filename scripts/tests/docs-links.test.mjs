@@ -27,8 +27,9 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  auditLinks, classifyTarget, documentRoot, documentsToCheck, linksIn, relatedDocsIn,
+  auditLinks, classifyTarget, documentsToCheck, linksIn, relatedDocsIn,
 } from "../check-docs-links.mjs";
+import { repositoryRoot } from "../paths.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CLI = join(HERE, "..", "cli.mjs");
@@ -225,8 +226,8 @@ test("it reads top-level markdown, docs/ and the task files — and not node_mod
 });
 
 test("the document root is the repository, and the backlog's parent without git", () => {
-  assert.equal(documentRoot("/r/backlog", { run: () => ({ status: 0, stdout: "/r\n" }) }), "/r");
-  assert.equal(documentRoot("/r/backlog", { run: () => ({ status: 128, stdout: "" }) }), "/r");
+  assert.equal(repositoryRoot("/r/backlog", { run: () => ({ status: 0, stdout: "/r\n" }) }), "/r");
+  assert.equal(repositoryRoot("/r/backlog", { run: () => ({ status: 128, stdout: "" }) }), "/r");
 });
 
 // ── the whole repository ──────────────────────────────────────────────────

@@ -29,6 +29,7 @@
  * Tests: `node --test scripts/tests/paths.test.mjs`
  */
 
+import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 
@@ -181,4 +182,25 @@ export function backlogForTaskPath(filePath) {
   const tasksDir = dirname(filePath);
   if (basename(tasksDir) !== "tasks") return null;
   return { root: dirname(tasksDir) };
+}
+
+/**
+ * The repository a backlog belongs to — the tree its relative paths resolve
+ * against, and where a repository-level file (`.claude/`, `README.md`) belongs.
+ *
+ * WHY IT IS NOT SIMPLY THE PARENT. A backlog may sit at any depth, and the
+ * things anchored to it — a task's `related_docs`, a skill directory an editor
+ * reads — are anchored to the REPOSITORY, not to the directory above the
+ * backlog. Asking git is the only way to know which one that is.
+ *
+ * WITHOUT GIT IT FALLS BACK TO THE PARENT, deliberately, rather than refusing:
+ * `init` runs before `git init` often enough that a refusal would make the
+ * common first minute fail, and the parent is the right answer in the layout
+ * `init` creates. The runner is injectable so both branches are testable.
+ */
+export function repositoryRoot(backlogRoot, opts = {}) {
+  const run = opts.run || spawnSync;
+  const r = run("git", ["-C", backlogRoot, "rev-parse", "--show-toplevel"], { encoding: "utf8" });
+  const top = r && r.status === 0 ? String(r.stdout || "").trim() : "";
+  return top || resolve(backlogRoot, "..");
 }

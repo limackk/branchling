@@ -22,6 +22,7 @@
   "files": [
     "bin/",
     "scripts/",
+    "skills/",
     "!scripts/tests/",
     "!scripts/check-publish-metadata.mjs",
     "_template.md",

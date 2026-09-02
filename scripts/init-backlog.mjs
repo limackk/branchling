@@ -32,7 +32,8 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 
 import { DEFAULT_TASK_ID_PREFIX } from "./task-id.mjs";
 import { loadConfig } from "./config.mjs";
-import { TEMPLATE_FILENAME, backlogPaths } from "./paths.mjs";
+import { TEMPLATE_FILENAME, backlogPaths, repositoryRoot } from "./paths.mjs";
+import { installSkills, renderInstall } from "./install-skills.mjs";
 import { registerQuietly } from "./registry.mjs";
 import { PRODUCT_NAME as N, BLOCK_MARKER_NAME as BLOCK_LABEL } from "./product.mjs";
 import { failure } from "./ui.mjs";
@@ -414,7 +415,7 @@ function dirFlag(argv) {
   return i >= 0 && argv[i + 1] ? argv[i + 1] : null;
 }
 
-const BOOL_FLAGS = ["--no-gitignore", "--no-example", "--no-nudge"];
+const BOOL_FLAGS = ["--no-gitignore", "--no-example", "--no-nudge", "--skills"];
 
 export function main(argv) {
   const unknown = argv.filter(
@@ -422,7 +423,7 @@ export function main(argv) {
   );
   if (unknown.length) {
     console.error(`${N} init: unknown flag: ` + unknown[0]);
-    console.error(`  usage: ${N} init --dir <path> [--no-gitignore] [--no-example] [--no-nudge]`);
+    console.error(`  usage: ${N} init --dir <path> [--no-gitignore] [--no-example] [--no-nudge] [--skills]`);
     console.error("  available: --dir <path> " + BOOL_FLAGS.join(" "));
     return 2;
   }
@@ -498,6 +499,17 @@ export function main(argv) {
   // with a step the tool can perform by itself.
   const built = spawnSync(process.execPath, [join(HERE, "build-backlog.mjs"), "--dir", root], { stdio: "ignore" });
   if (built.status !== 0) console.log(`  WARNING: could not build the views — run \`${N} build\``);
+
+  // The agent instructions, ON REQUEST ONLY (TL-54). `.claude/` is the user's
+  // own directory, and writing into it unasked is a surprise — so this is a
+  // flag rather than a default, it never overwrites, and it says what it
+  // skipped. The same entry point `skills install` uses, because two commands
+  // writing the same files two ways is one of them being wrong later.
+  if (argv.indexOf("--skills") >= 0) {
+    const result = installSkills(repositoryRoot(root));
+    if (result.ok) console.log(renderInstall(result));
+    else console.log("  WARNING: " + result.message);
+  }
 
   // The new backlog joins this machine's index (TL-34) — BEST EFFORT, and the
   // distinction matters. Creating a backlog is what the user asked for; putting

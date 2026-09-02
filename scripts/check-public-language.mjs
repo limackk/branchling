@@ -115,7 +115,11 @@ const STOP_WORDS =
   /\b(nie|jest|się|sie|przez|który|ktory|która|które|żeby|zeby|czyli|więc|wiec|jeśli|jesli|może|moze|musi|trzeba|zamiast|katalog|katalogu|widok|widoki|widoków|plik|pliku|plików|taska|tasku|tego|jak|bez|oraz|albo|wtedy|nigdy|zawsze|gdy|kiedy|liczy|daje|robi|zapis|odczyt|słownik|slownik|prefiks|numer|drzewo|drzewa|kolejka|kolejki|zakres|zakresu|pole|pola|polu|dzień|dni|godzin)\b/gi;   // language-guard: allow — the word list itself
 
 /** The files whose text reaches a user of the tool, or a stranger reading it. */
-export const PUBLIC_PATHS = ["scripts", "bin", "README.md", "_template.md", "backlog", "docs"];
+// `skills` joined the list in TL-54, when the agent instructions started
+// travelling in the tarball: a file installed into somebody else's editor is as
+// public a surface as `--help`, and it had never been under a guard that would
+// keep it English.
+export const PUBLIC_PATHS = ["scripts", "bin", "README.md", "_template.md", "backlog", "docs", "skills"];
 
 const SKIP_DIRS = new Set(["node_modules", ".git"]);
 

@@ -355,6 +355,19 @@ freezes on the day it was copied and goes on teaching flags that no longer
 exist; a command ships with the tool and cannot drift from it. `worktrail init`
 writes one short pointer to that command into `CLAUDE.md` or `AGENTS.md`.
 
+**For editors that load skills**, the same pointer ships as one:
+
+```bash
+worktrail skills install     # or `worktrail init --skills` while creating a backlog
+```
+
+It writes `.claude/skills/backlog-workflow/SKILL.md` into your repository and
+**never overwrites** — the file may be your own edit of it. The skill itself
+holds no procedure and no vocabulary; it exists so that an editor loading skills
+by description knows a backlog is here and knows to run `worktrail instructions
+overview`, which is rendered with *your* `config.yaml`. A skill that listed
+statuses would be a second truth about them, wrong the moment you renamed one.
+
 ---
 
 ## What it records about you

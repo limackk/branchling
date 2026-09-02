@@ -45,13 +45,12 @@
  * Tests: `node --test scripts/tests/docs-links.test.mjs`
  */
 
-import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadConfigOrExit } from "./config.mjs";
-import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { backlogPaths, repositoryRoot, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { splitFrontmatter, stripComment } from "./task-fields.mjs";
 import { MARK, color } from "./ui.mjs";
@@ -154,16 +153,6 @@ export function relatedDocsIn(frontmatter) {
   return out;
 }
 
-/** The repository a backlog belongs to — the tree every relative path in it is
- *  resolved against. Falls back to the backlog's parent when there is no git,
- *  because a path still has to resolve somewhere. */
-export function documentRoot(backlogRoot, opts = {}) {
-  const run = opts.run || spawnSync;
-  const r = run("git", ["-C", backlogRoot, "rev-parse", "--show-toplevel"], { encoding: "utf8" });
-  const top = r && r.status === 0 ? String(r.stdout || "").trim() : "";
-  return top || resolve(backlogRoot, "..");
-}
-
 function walkMarkdown(dir, out) {
   if (!existsSync(dir)) return out;
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -242,7 +231,7 @@ export function main(argv) {
   const backlog = resolveBacklogDir({ dir: dir || undefined, moduleDir: __dirname }).root;
   loadConfigOrExit(backlog);
   const paths = backlogPaths(backlog);
-  const root = documentRoot(backlog);
+  const root = repositoryRoot(backlog);
 
   const documents = documentsToCheck(root, paths.tasksDir).map((file) => ({
     file, text: readFileSync(file, "utf8"),
