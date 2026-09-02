@@ -21,11 +21,17 @@
  *   query --epic "Legal compliance" --priority P0,P1
  *   query --text sync --limit 10
  *   query --blocked-by TASK-003 --files | xargs code
+ *   query --modified-file scripts/cli.mjs        (as part of what was it touched)
+ *   query --modified-file scripts/               (the whole directory)
  *   query --status done --text audit --count
  *
  * Filters (AND between axes, OR inside an axis — comma-separated values):
  *   --status --priority --board --label --epic --owner --type --role --executor
  *   --blocked-by
+ *   --modified-file  which task touched this file — COMPUTED from commit
+ *                    messages naming the task id, so there is nothing to keep
+ *                    up to date. Paths are relative to the REPOSITORY root; a
+ *                    trailing `/` matches a whole directory
  *   --text
  * By default only ACTIVE ones (status not in archived_statuses); passing
  * --status explicitly lifts that restriction, so `--status done` searches the
@@ -44,6 +50,7 @@ import { fileURLToPath } from "node:url";
 import { crossBranchState, describeDivergence, divergences, scanNote } from "./branch-scan.mjs";
 import { DEFAULTS, loadConfigOrExit } from "./config.mjs";
 import { printJson } from "./json-envelope.mjs";
+import { explain as explainIndex, modifiedFiles, repoRoot, touches } from "./modified-files.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
 import { SORT_KEYS, filterTasks, readTaskRecords, sortTasks, splitList } from "./task-select.mjs";
 
@@ -52,6 +59,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const VALUE_FLAGS = new Set([
   "--status", "--priority", "--board", "--label", "--epic", "--owner", "--type",
   "--role", "--executor", "--blocked-by", "--text", "--limit", "--sort", "--tasks", "--dir",
+  "--modified-file",
 ]);
 const BOOL_FLAGS = new Set(["--json", "--files", "--count", "--help", "-h"]);
 
@@ -136,6 +144,21 @@ try {
 const SCAN = ROOT ? crossBranchState(ROOT, CFG) : { scanned: false, reason: "no-configuration", byId: new Map(), branches: [], trees: [] };
 for (const t of tasks) t.elsewhere = divergences(t.status, SCAN.byId.get(t.id));
 
+// WHICH FILES EACH TASK TOUCHED, computed from git (TL-75). Asked for ONLY when
+// the flag is present: it is one `git log` over the whole history, and a listing
+// that pays for it unasked would make every other query slower for an answer
+// nobody wanted.
+const FILE_QUERY = opts["modified-file"];
+let INDEX = null;
+if (FILE_QUERY !== undefined) {
+  if (!CFG) {
+    console.error("✗ --modified-file needs the configuration, which `--tasks <dir>` bypasses");
+    console.error("  the task id prefix is what links a commit message to a task");
+    process.exit(2);
+  }
+  INDEX = modifiedFiles({ root: repoRoot(ROOT), prefix: CFG.taskIdPrefix });
+}
+
 const f = {
   status: splitList(opts.status),
   priority: splitList(opts.priority),
@@ -157,7 +180,14 @@ const f = {
 // With no explicit --status we are asking about work to be done, not about the
 // archive: in a backlog of any age most tasks are closed and would flood every
 // answer. Measure your own: `query --status done --count`.
-const hits = filterTasks(tasks, f, ARCHIVED);
+let hits = filterTasks(tasks, f, ARCHIVED);
+
+// APPLIED AFTER the shared filters, and deliberately not inside `filterTasks`:
+// that module is the one `next` also uses to choose work, and a criterion that
+// needs a git process has no business in the dispatcher's hot path.
+if (INDEX) {
+  hits = hits.filter((t) => touches(INDEX.byTask.get(t.id) || new Set(), FILE_QUERY));
+}
 
 // The priority order comes from `config.yaml`; without a configuration
 // (`--tasks <dir>` bypasses the root) it falls back to the generic default,
@@ -196,6 +226,11 @@ if (opts.json) {
     total,
     limit,
     scan: { scanned: SCAN.scanned, reason: SCAN.reason, branches: SCAN.branches, trees: SCAN.trees.length },
+    // `null` unless asked for, and then it says whether the index could be
+    // computed at all — zero matches and an unscanned repository are otherwise
+    // the same empty `tasks` (TL-75). Present either way: the envelope's rule is
+    // that a declared key never goes missing.
+    modifiedFile: INDEX ? { query: FILE_QUERY, scanned: INDEX.scanned, reason: INDEX.reason } : null,
   });
   process.exit(0);
 }
@@ -207,6 +242,10 @@ if (opts.files) {
   // On stderr, so a path list stays a path list for `xargs`.
   const note = scanNote(SCAN.reason);
   if (note) console.error("# " + note);
+  if (INDEX) {
+    const why = explainIndex(INDEX.reason);
+    if (why) console.error("# " + why);
+  }
   process.exit(0);
 }
 
@@ -242,4 +281,11 @@ if (limit && total > shown.length) {
 {
   const note = scanNote(SCAN.reason);
   if (note) console.log("# " + note);
+}
+
+// The same rule for the file index: an empty answer has two causes and only one
+// of them is an answer.
+if (INDEX) {
+  const why = explainIndex(INDEX.reason);
+  if (why) console.log("# " + why);
 }

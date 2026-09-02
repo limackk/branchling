@@ -103,7 +103,20 @@ export const COMMANDS = {
   query: {
     script: "query.mjs",
     summary: "ask about tasks — reads tasks/*.md, so it sees changes before a rebuild",
-    usage: `${N} query [--status s] [--priority p] [--board b] [--label l] [--epic e] [--json|--files|--count]`,
+    usage: [
+      `${N} query [--status s] [--priority p] [--board b] [--label l] [--epic e]`,
+      `            [--modified-file <path>] [--json|--files|--count]`,
+      "",
+      "  --modified-file <path>  which task touched this file, and therefore WHY it looks",
+      "                          the way it does. Computed from the commit messages that",
+      "                          name a task id — nothing to fill in and nothing that can",
+      "                          go stale. Paths are relative to the REPOSITORY root, not",
+      "                          to the backlog directory; a trailing `/` matches a whole",
+      "                          directory. Remember the default filter still hides closed",
+      "                          work, and most files were touched by tasks that are closed",
+      "",
+      `  ${N} query --modified-file scripts/cli.mjs --status done`,
+    ].join("\n"),
   },
   build: {
     script: "build-backlog.mjs",

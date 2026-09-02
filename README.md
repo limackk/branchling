@@ -307,6 +307,28 @@ worktrail doctor --json | jq -e '.ok'          # a gate in CI
 worktrail done TASK-42 --json | jq '.entries[] | select(.ok | not)'
 ```
 
+### Why does this file look like this
+
+`git log <file>` says who changed a file and when. It does not say **as part of
+what** — and that is the question you actually have while reading somebody
+else's code. The answer is already in the backlog, in the task's `## Goal` and
+`## Context`:
+
+```bash
+worktrail query --modified-file scripts/cli.mjs --status done
+worktrail query --modified-file scripts/            # a whole directory
+```
+
+**There is one data source and it is the commit messages.** A task's files are
+COMPUTED from every commit whose message names its id — the convention this
+tool already asks for, so there is no field to fill in and nothing that can go
+stale. Paths are relative to the repository root, not to the backlog directory;
+those differ whenever the backlog is not co-located with the code.
+
+A repository whose commits do not name task ids gets told so, rather than being
+handed an empty list that reads like an answer. This is the one thing an
+external tracker cannot do at all: it needs the tasks and the code in one tree.
+
 The envelope's promises — which keys are guaranteed, what may be reworded, and
 what requires a new `schemaVersion` — are in
 [the manual](docs/manual.md#the---json-contract).

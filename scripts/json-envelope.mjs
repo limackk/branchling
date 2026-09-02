@@ -50,7 +50,10 @@ export const KINDS = {
   // `scan` says whether the branch and worktree scan ran (TL-73) — without
   // it, an empty `elsewhere` on every task is ambiguous between "the branches
   // agree" and "nobody looked", and those two call for opposite decisions.
-  "task-list": { tasks: [], total: null, limit: null, scan: null },
+  // `modifiedFile` is `null` unless `--modified-file` was asked for, and then it
+  // says whether the git index could be computed at all (TL-75): zero matches
+  // and an unscanned repository are otherwise the same empty `tasks`.
+  "task-list": { tasks: [], total: null, limit: null, scan: null, modifiedFile: null },
   // `stats --json`. The tallies stay nested under `stats` instead of being
   // spread across the root: a future tally called `kind` would otherwise
   // overwrite the envelope's own key and nobody would notice until a consumer

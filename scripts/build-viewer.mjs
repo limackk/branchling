@@ -21,6 +21,7 @@ import { fileURLToPath } from "node:url";
 import { extractMeta, splitFrontmatter } from "./task-fields.mjs";
 import { crossBranchState, divergences } from "./branch-scan.mjs";
 import { readAllHistory } from "./history.mjs";
+import { modifiedFilesCached, repoRoot } from "./modified-files.mjs";
 import { loadConfig, loadConfigOrExit } from "./config.mjs";
 import { taskIdPatterns } from "./task-id.mjs";
 import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
@@ -273,7 +274,17 @@ export function buildHtml(
   history = readAllHistory(config.root),
   plan = loadPlan(backlogPaths(config.root).planPath)
 ) {
-  const tasksJson = JSON.stringify(tasks).replace(/</g, "\\u003c");
+  // WHICH FILES EACH TASK CHANGED (TL-75). Attached here rather than stored in
+  // the frontmatter, for the reason modified-files.mjs gives at length: the
+  // commits are the record, and an index over them is a view. Cached on HEAD, so
+  // a `serve` rebuilding on every keystroke pays for one `git log` per commit
+  // rather than one per rebuild.
+  const fileIndex = modifiedFilesCached({ root: repoRoot(config.root), prefix: config.taskIdPrefix });
+  const withFiles = tasks.map((t) => ({
+    ...t,
+    modified_files: [...(fileIndex.byTask.get(t.id) || [])].sort(),
+  }));
+  const tasksJson = JSON.stringify(withFiles).replace(/</g, "\\u003c");
   const statsJson = JSON.stringify(stats);
   const boardsJson = JSON.stringify(config.boards.map((b) => ({ slug: b.slug, name: b.name }))).replace(/</g, "\\u003c");
   // The colours are generated from the project's VOCABULARIES (BL-1400), not from
@@ -3568,9 +3579,20 @@ function renderDetail() {
   const rows = FIELDS.filter(function (spec) { return spec.key !== "title"; })
     .map(function (spec) { return metaRowHtml(t, spec); }).join("");
 
+  const files = t.modified_files || [];
+  const filesRow = files.length
+    ? '<div class="meta-row meta-row-wide"><div class="meta-label">Files changed</div><div class="meta-value">' +
+      files.map(function (p) { return "<code>" + escape(p) + "</code>"; }).join(" ") + "</div></div>"
+    : "";
+
   const readOnlyRows =
     '<div class="meta-row"><div class="meta-label">Utworzony</div><div class="meta-value">' + escape(t.created || "—") + "</div></div>" +
-    '<div class="meta-row"><div class="meta-label">Updated</div><div class="meta-value">' + escape(t.updated || "—") + "</div></div>";
+    '<div class="meta-row"><div class="meta-label">Updated</div><div class="meta-value">' + escape(t.updated || "—") + "</div></div>" +
+    // COMPUTED from commit messages, so there is no pen: it is not a field
+    // anybody may edit, and offering one would invite a value that contradicts
+    // the history it was derived from. Absent when the task has no commits yet —
+    // an empty row would read as "this task changed nothing".
+    filesRow;
 
   const titleEditing = state.editing && state.editing.id === t.id && state.editing.field === "title";
   const titleHtml = titleEditing

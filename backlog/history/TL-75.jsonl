@@ -1,3 +1,6 @@
 {"id":"01M1E04664X74F3RTRP0BW75ZJ","ts":"2026-09-01T08:07:16.420Z","task":"TL-75","field":"__created__","from":"","to":"Pole modified_files i wyszukiwanie tasków po dotkniętym pliku","actor":"unknown","source":"external"}
 {"id":"01M1GFKZK5EPKV8G98AV42QKQA","ts":"2026-09-02T07:16:31.461Z","task":"TL-75","field":"title","from":"Pole modified_files i wyszukiwanie tasków po dotkniętym pliku","to":"The modified_files field and searching tasks by touched file","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK5GW43E41HMQ4C39VC","ts":"2026-09-02T07:16:31.461Z","task":"TL-75","field":"epic","from":"Integralność danych","to":"Data integrity","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1H167ZWQXATSR5HDPSVRJZH","ts":"2026-09-02T12:23:35.676Z","task":"TL-75","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1H167ZWQWDBT30XGT82K3E2","ts":"2026-09-02T12:23:35.676Z","task":"TL-75","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1H1KQHCJHTVVBPKN8WJDPJZ","ts":"2026-09-02T12:30:57.580Z","task":"TL-75","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
