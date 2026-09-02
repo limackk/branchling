@@ -213,7 +213,10 @@ test("doctor exits non-zero on the failing direction and zero on the stale one",
   assert.equal(run(["doctor", "--dir", bad.dir]).status, 1);
 
   const stale = backlogWith({ status: "done", log: "- 2026-01-01 pending — local:me — opened" });
-  assert.equal(run(["doctor", "--dir", stale.dir]).status, 0, "a warning must not fail doctor");
+  const r = run(["doctor", "--dir", stale.dir]);
+  // The whole run is in the message: this assertion has been seen to fail under
+  // heavy parallel load, and "1 !== 0" alone says nothing about which row did it.
+  assert.equal(r.status, 0, "a warning must not fail doctor\n" + r.stdout + r.stderr);
 });
 
 test("this repository's own tree has no log running ahead of a field", () => {

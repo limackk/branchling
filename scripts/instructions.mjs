@@ -139,6 +139,15 @@ is invisible there, and the stale answer reads exactly like a real one.
 An unknown command and an unknown flag both FAIL. A non-zero exit is the tool
 saying the invocation was wrong, not that the backlog is empty. Read the message.
 
+EDITING A TASK FILE BY HAND IS SUPPORTED, not merely tolerated: the file is the
+truth, and this tool's job is to notice what changed, not to be the only way to
+change it. Two things then fall to you, because nothing else can do them:
+\`{{tool}} build\` after a frontmatter change, and \`{{tool}} history --actor
+<ns:name> --source manual\` so the change reaches the log. What the tool cannot
+recover is the REASON — a change it merely saw is recorded as \`unknown\` — so a
+transition into {{reason_statuses}} is the one case where the command is worth
+more than the editor.
+
 SHOULD THIS BE A TASK AT ALL?
 
   One question: do I have to think about HOW to do it?
@@ -274,7 +283,11 @@ WHILE YOU WORK.
                        skipping it leaves the views disagreeing with the file you
                        just edited.
   You edited by hand   \`{{tool}} history --actor <ns:name> --source manual\`
-                       records what the viewer would have recorded for you.
+                       records what the viewer would have recorded for you. This
+                       is a SUPPORTED path, not a fallback — but the reason
+                       cannot be recovered after the fact, so a change into
+                       {{reason_statuses}} belongs in the command that asks for
+                       one, not in the editor.
 
 Status transitions and rebuilds are part of doing the work, not decisions to
 raise with anybody. Committing and pushing are not — those stay explicit.

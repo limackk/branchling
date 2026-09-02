@@ -1,0 +1,5 @@
+{"id":"01M1H2SYS2EKW0W7NEQFPYB7N8","ts":"2026-09-02T12:51:50.178Z","task":"TL-163","field":"__created__","from":"","to":"The suite fails intermittently under parallel load, and the message does not say why","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1H2TRHMZD3CPN2EHVDV932V","ts":"2026-09-02T12:52:16.564Z","task":"TL-163","field":"priority","from":"P1","to":"P2","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1H2TRHM1E4CRD8Z7P6AYNDQ","ts":"2026-09-02T12:52:16.564Z","task":"TL-163","field":"type","from":"task","to":"bug","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1H2TRHM5X8K4HWHJPV20AVW","ts":"2026-09-02T12:52:16.564Z","task":"TL-163","field":"estimate","from":"2h","to":"4h","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1H2TRHMFFCR39MKE7Y8HTNF","ts":"2026-09-02T12:52:16.564Z","task":"TL-163","field":"epic","from":"","to":"worktrail — the tool","actor":"unknown","source":"external","reason":"unknown"}

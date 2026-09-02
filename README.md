@@ -180,6 +180,38 @@ write, as the `reason` field of the record in `history/` — which is why
 ships with the headings above; the tool does not require any particular set of
 them.
 
+### Editing a task by hand
+
+**Editing a task file by hand is supported, not merely tolerated: the file is
+the truth, and this tool's job is to notice what changed, not to be the only way
+to change it.** Open the file, fix the typo, change the status in a code review
+— all of that is a normal way to use this.
+
+That is a deliberate decision rather than an omission, and it is the opposite of
+what most file-based trackers choose. Requiring the CLI for every write would
+keep the history perfect and cost the thing files were chosen for: a backlog you
+cannot fix without the tool installed is not plain markdown, and a task in
+somebody else's pull request stops being editable content.
+
+**What it costs you**, measured rather than assumed:
+
+| | |
+|---|---|
+| The views go stale | Run `worktrail build`. They are computed and unversioned, so this is a rebuild, not a repair |
+| The change misses the history | Run `worktrail history --actor <ns:name> --source manual`; it diffs the tree against its own reference point and records what changed |
+| The **reason** cannot be recovered | A change the tool merely *saw* is recorded as `unknown`, and no later pass can fill it in |
+| `updated:` is not touched | Nothing rewrites it for you — the field says what the last tool write set |
+
+Only the third of those is permanent, and it is why the writing commands still
+earn their place: a transition into a status listed in
+`reason_required_statuses` is refused without a reason precisely because
+afterwards there is nobody left to ask. Everything the tool *can* work out on
+its own it does — `worktrail check --vocabulary` and `worktrail doctor` both
+catch a hand-written value that is outside your vocabulary, and they catch it
+without anybody remembering to ask.
+
+---
+
 **`board` versus `epic`** are two different questions, so they have two
 different rules: `board` is a CLOSED vocabulary from `boards.yaml`, exactly one
 per task, and a typo fails the build; `epic` is free text, optional, and a typo

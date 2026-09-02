@@ -6,20 +6,26 @@ labels: [pre-launch]
 board: main
 epic: "worktrail — the tool"
 priority: P2
-status: pending
-owner: unassigned
+status: done
+owner: agent:claude
 estimate: 2h
 confidence: high
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-02
 blocked_by: []
 blocks: []
 related_docs:
   - CLAUDE.md
   - docs/worktrail-global-tool.md
 verification:
-  - manual: "One and the same sentence about manually editing a task file appears in the README and in the agent instructions — and it is possible to point to where the justification is recorded"
-  - bash: "grep -rn 'by hand\\|manual' README.md docs/worktrail-global-tool.md | head"
+  - id: one-sentence
+    bash: "grep -q 'Editing a task file by hand is supported, not merely tolerated' README.md && node scripts/cli.mjs instructions overview | grep -qi 'EDITING A TASK FILE BY HAND IS SUPPORTED, not merely tolerated' && echo 'the same sentence stands in the README and in the instruction source — OK'"
+  - id: one-source
+    bash: "node scripts/cli.mjs instructions task-execution | grep -q 'SUPPORTED path, not a fallback' && test $(grep -c 'instructions overview' .claude/skills/backlog-workflow/SKILL.md) -ge 1 && echo 'the agent instructions come from the tool, so there is nothing to keep in step — OK'"
+  - id: measured
+    bash: "grep -q 'measured rather than assumed' README.md && grep -q 'check --vocabulary' README.md && echo 'what breaks was measured, and what already catches it is named — OK'"
+  - id: separate-task
+    bash: "test -n \"$(node scripts/cli.mjs query --text 'hand edit' --status pending --files)\" && echo 'drift detection is its own task — OK'"
 ---
 
 ## Goal
@@ -84,16 +90,41 @@ What needs to be weighed so the answer is not wishful thinking:
 
 ## Acceptance criteria
 
-- [ ] The decision is recorded along with its justification and a list of
-      what actually breaks.
-- [ ] The README and the agent instructions say the same thing, in one
-      sentence.
-- [ ] It has been checked (not assumed) how much drift `doctor`/`check`
-      detects today.
-- [ ] Any work on drift detection is a separate task, not tacked on here.
+- [x] The decision is recorded along with its justification and a list of what actually breaks. [proof: measured]
+- [x] The README and the agent instructions say the same thing, in one sentence. [proof: one-sentence]
+- [x] It has been checked (not assumed) how much drift `doctor`/`check` detects today. [proof: measured]
+- [x] Any work on drift detection is a separate task, not tacked on here. [proof: separate-task]
 
 ## Log
 
 2026-08-31 pending — agent:claude — from an analysis of Backlog.md: they
 forbid manual editing and repeat that in three places; we have the opposite
 model and have never written it down anywhere.
+- 2026-09-02 in_progress — agent:claude — MEASURED first, on a real tree, rather
+  than reasoned about. A hand edit costs four things and only one of them is
+  permanent. (1) The views go stale — a rebuild, not a repair, and exactly what
+  Law 2 says a view is for. (2) The change misses the history until somebody
+  runs `history --source manual`: `build` does NOT reconcile, and neither does
+  `query`, `stats` or `check`. (3) The REASON is unrecoverable — a change the
+  tool merely saw is recorded as `unknown`, and no later pass can fill it in.
+  (4) `updated:` is not touched by anything, so it keeps saying what the last
+  tool write set. What is ALREADY caught without anybody remembering a command:
+  `check --vocabulary` and `doctor`'s vocabulary row both fail on a hand-written
+  value outside the vocabulary (verified: `priority: URGENT` exits 1 and names
+  the file), and `check --reasons` reports the `unknown` reasons.
+- 2026-09-02 in_progress — agent:claude — step 3 settled: SUPPORTED, not
+  tolerated. Reason: the file is the truth (Law 1), and the tool's job is to
+  notice what changed rather than to be the only way to change it. The opposite
+  model buys a perfect history at the cost of the thing files were chosen for —
+  a backlog nobody can fix without the tool installed is not plain markdown, and
+  a task in somebody else's pull request stops being editable content. The one
+  thing that genuinely justifies a command is the reason, which is why
+  `reason_required_statuses` refuses at write time: afterwards there is nobody
+  left to ask. Option 3's other half — the tool NOTICING an unrecorded change —
+  went to TL-162, per step 5, rather than being tacked on here.
+- 2026-09-02 in_progress — agent:claude — step 4 needed no coordination between
+  three texts: since TL-74 the agent instructions come from `worktrail
+  instructions`, and the skill file only points at that command. The sentence
+  therefore has ONE source in the tool and one copy in the README, which is the
+  smallest number that can exist while the README is still a document a stranger
+  reads before installing anything.
