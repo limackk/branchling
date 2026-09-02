@@ -411,3 +411,40 @@ export function readRollup(root, taskId) {
   if (!existsSync(file)) return null;
   try { return JSON.parse(readFileSync(file, "utf8")); } catch { return null; }
 }
+
+/**
+ * What was estimated against what it measurably cost — one row per ARCHIVED
+ * task, the input `calibration.mjs` works from (TL-29).
+ *
+ * IT LIVES HERE because it is the disk side of the join: `calibration.mjs` is
+ * pure and pasted into the viewer by source, so it may not read a rollup itself.
+ * Two callers need exactly this list — `stats --calibration` and the hint
+ * `new --estimate` prints — and two copies of it would be two answers to "which
+ * tasks count", which is the question the whole report rests on.
+ *
+ * ARCHIVED ONLY, and not for tidiness: a task still in flight has a rollup that
+ * is a FRACTION of its final one, so admitting it would pull every bucket's
+ * median down by an amount that depends on when the report was run. A task's
+ * measured time becomes a fact when the task stops.
+ *
+ * A closed task with NO rollup stays in the list with `actual_minutes` absent
+ * rather than being filtered out — how many closed tasks this mechanism never
+ * saw is part of what the table is worth, and a filter here would delete that
+ * number before anybody could report it.
+ */
+export function calibrationSamples(root, tasks, config) {
+  const archived = (config && config.archivedStatuses) || [];
+  return (tasks || [])
+    .filter((t) => archived.indexOf(t && t.status) >= 0)
+    .map((t) => {
+      const rollup = readRollup(root, t.id);
+      return {
+        id: t.id,
+        estimate: t.estimate,
+        board: t.board,
+        type: t.type,
+        owner: t.owner,
+        actual_minutes: rollup ? rollup.minutes : undefined,
+      };
+    });
+}

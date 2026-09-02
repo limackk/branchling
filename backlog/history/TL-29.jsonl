@@ -4,3 +4,6 @@
 {"id":"01M1F5BNKGQ54N1VWH7G11M4DM","ts":"2026-09-01T18:57:58.896Z","task":"TL-29","field":"blocks","from":["TL-1498"],"to":["TL-88"],"actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK5M6JWBMYWBQC0JFEQ","ts":"2026-09-02T07:16:31.461Z","task":"TL-29","field":"title","from":"Kalibracja estymat z danych rzeczywistych","to":"Estimate calibration from real data","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK5ND1JKDCH2EGY7C9N","ts":"2026-09-02T07:16:31.461Z","task":"TL-29","field":"epic","from":"Backlog — pomiar czasu pracy","to":"Backlog — work time measurement","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1HVQ09Q9P119H7YEXEJTPZ8","ts":"2026-09-02T20:07:07.831Z","task":"TL-29","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown","session":"tree-6185cd1f78d5"}
+{"id":"01M1HVQ09QA253VS45ES72TT1B","ts":"2026-09-02T20:07:07.831Z","task":"TL-29","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown","session":"tree-6185cd1f78d5"}
+{"id":"01M1HWFVVMSHH5C3XHV2GWEN8R","ts":"2026-09-02T20:20:42.484Z","task":"TL-29","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven","session":"tree-6185cd1f78d5"}

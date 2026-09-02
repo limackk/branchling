@@ -86,7 +86,11 @@ export const KINDS = {
   // broke.
   // `divergent` is the list behind the `divergent` tally inside `stats`: the
   // tasks another branch disagrees with, each naming both statuses (TL-73).
-  stats: { root: null, stats: null, scan: null, divergent: [], elsewhereOnly: [] },
+  // `calibration` is absent from the ordinary summary and present only under
+  // `--calibration` / `--correlation-only` (TL-29): it answers a question about
+  // CLOSED work, from `activity/rollup/`, while every other key here describes
+  // the queue.
+  stats: { root: null, stats: null, scan: null, divergent: [], elsewhereOnly: [], calibration: null },
   // `check --json` (TL-57). `ok` is what CI reads, `failed` is what it acts on —
   // a consumer must not have to filter `guards` to learn which one to look at.
   // `output` beside each guard is text written for a PERSON and may be reworded;

@@ -6,19 +6,32 @@ labels: [post-launch]
 board: main
 epic: "Backlog — work time measurement"
 priority: P3
-status: pending
-owner: unassigned
+status: done
+owner: agent:claude
 estimate: 4h
 confidence: medium
 created: 2026-08-30
-updated: 2026-08-30
+updated: 2026-09-02
 blocked_by: [TL-28]
 blocks: [TL-88]
 related_docs:
   - docs/backlog-time-tracking.md
 verification:
-  - bash: "node --test backlog/scripts/tests/calibration.test.mjs"
-  - bash: "node backlog/scripts/cli.mjs stats --calibration --correlation-only"
+  # The paths are `scripts/…`, not `backlog/scripts/…`. This task was written
+  # before the extraction, when code and data were co-located; the contract
+  # inherited that layout and would have failed on a path, not on the work.
+  - id: calibration-fixtures
+    bash: "node --test scripts/tests/calibration.test.mjs"
+  - id: correlation-gate
+    bash: "node scripts/cli.mjs stats --calibration --correlation-only"
+  - id: rollup-merge
+    bash: "node --test scripts/tests/rollup-merge.test.mjs"
+  - id: one-source
+    bash: "node scripts/build-viewer.mjs >/dev/null && grep -q 'function calibrate' backlog/viewer.html"
+  - id: gate-recorded
+    bash: "grep -q 'Result (2026-09-02, TL-29)' docs/backlog-time-tracking.md"
+  - id: privacy-split
+    bash: "git check-ignore -q backlog/activity/TL-29.jsonl && ! git check-ignore -q backlog/activity/rollup/TL-29.json"
 ---
 
 ## Goal
@@ -101,45 +114,53 @@ enough data" permanently.
 
 ## Acceptance criteria
 
-- [ ] Step 0 carried out and its result recorded in §14 point 1 of the
-      document — regardless of whether the outcome was positive.
-- [ ] A bucket with `n` below the threshold reports "not enough data", not a
-      number — tested on a FIXTURE.
-- [ ] The report gives a range (p20–p80 or min–max), not just the median.
-- [ ] A breakdown per board/type/owner appears only when every cell meets the
-      threshold.
-- [ ] Tasks WITHOUT measured time are counted separately and visible in the
-      report.
-- [ ] The aggregate is per task (`rollup/BL-NNNN.json`) and versioned; the raw
-      `activity/*.jsonl` files still are not.
-- [ ] Two branches touching DIFFERENT tasks do not produce a conflict in the
+- [x] Step 0 carried out and its result recorded in §14 point 1 of the
+      document — regardless of whether the outcome was positive. [proof: gate-recorded, correlation-gate]
+- [x] A bucket with `n` below the threshold reports "not enough data", not a
+      number — tested on a FIXTURE. [proof: calibration-fixtures]
+- [x] The report gives a range (p20–p80 or min–max), not just the median. [proof: calibration-fixtures]
+- [x] A breakdown per board/type/owner appears only when every cell meets the
+      threshold. [proof: calibration-fixtures]
+- [x] Tasks WITHOUT measured time are counted separately and visible in the
+      report. [proof: calibration-fixtures]
+- [x] The aggregate is per task (`rollup/TL-NNN.json`) and versioned; the raw
+      `activity/*.jsonl` files still are not. [proof: privacy-split, rollup-merge]
+- [x] Two branches touching DIFFERENT tasks do not produce a conflict in the
       rollup — there is a test for this (`git merge-tree`), because that is
-      the whole point of the per-task split.
-- [ ] The viewer and the terminal give the same number for the same task
-      (module pasted as source, not a second implementation).
-- [ ] `worktrail new --estimate 2h` does not print calibration when the bucket
-      is below the threshold.
-- [ ] No gate in Verification asserts a property of the PRODUCTION data (it
-      passes the same way on a sparse and on a rich backlog).
+      the whole point of the per-task split. [proof: rollup-merge]
+- [x] The viewer and the terminal give the same number for the same task
+      (module pasted as source, not a second implementation). [proof: one-source]
+- [x] `worktrail new --estimate 2h` does not print calibration when the bucket
+      is below the threshold. [proof: calibration-fixtures]
+- [x] No gate in Verification asserts a property of the PRODUCTION data (it
+      passes the same way on a sparse and on a rich backlog). [proof: correlation-gate]
 
 ## Verification
 
+The runnable contract is `verification:` in the frontmatter; this is the same
+list in prose. The paths lost their `backlog/` prefix: they were written while
+code and data were co-located, and after the extraction the code lives in
+`scripts/` (CLAUDE.md, "Before you change the code").
+
 ```bash
 # 1. Calibration tests on fixtures — expected: pass, including a bucket below the threshold
-node --test backlog/scripts/tests/calibration.test.mjs
+node --test scripts/tests/calibration.test.mjs
 
-# 2. Correlation gate — expected: a verdict (positive or negative), exit code 0
-node backlog/scripts/cli.mjs stats --calibration --correlation-only
+# 2. Correlation gate — expected: a verdict (positive, negative or `insufficient`), exit code 0
+node scripts/cli.mjs stats --calibration --correlation-only
 
-# 3. The rollup does not conflict between branches touching different tasks — expected: no conflict
-node backlog/scripts/tests/rollup-merge-check.mjs
+# 3. The rollup does not conflict between branches touching different tasks — expected: no
+#    conflict, AND the positive control (one shared file) conflicts
+node --test scripts/tests/rollup-merge.test.mjs
 
 # 4. A single source for the number — expected: the calibration module present in the built viewer
-node backlog/scripts/build-viewer.mjs && grep -c 'calibration' backlog/viewer.html
+node scripts/build-viewer.mjs && grep -q 'function calibrate' backlog/viewer.html
 
 # 5. Privacy preserved — expected: raw data outside git, aggregate in git
-git check-ignore -q backlog/activity/TL-29.jsonl && echo 'raw: outside git'
-git check-ignore -q backlog/activity/rollup/TL-29.json || echo 'rollup: in git'
+git check-ignore -q backlog/activity/TL-29.jsonl && ! git check-ignore -q backlog/activity/rollup/TL-29.json
+
+# 6. Step 0's result is recorded in the document, not only in a terminal
+grep -q 'Result (2026-09-02, TL-29)' docs/backlog-time-tracking.md
 ```
 
 ## Notes

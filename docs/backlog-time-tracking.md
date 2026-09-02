@@ -438,6 +438,29 @@ before it closes.
    Falsification is cheap and **comes FIRST in TL-29**: if the spread within
    a bucket is larger than the difference between buckets, calibrating on
    time is worthless and a report for it is not worth building.
+
+   **Result (2026-09-02, TL-29): the gate is built and runs; in this tree it
+   answers `insufficient`, and that is its whole answer so far.**
+   `worktrail stats --correlation-only` compares the mean p20–p80 span inside
+   a bucket against the span of the bucket medians and returns one of three
+   verdicts. Here it reports 0 measured samples against 141 closed tasks,
+   because the raw heartbeats live outside the repository (§9) and no
+   `activity/rollup/` aggregate has been committed yet — every closed task is
+   counted under "closed, never measured", which is the number that says so.
+   So the assumption is **neither confirmed nor falsified**: what changed is
+   that it is now answerable by a command instead of by an argument, and the
+   answer will change on its own as aggregates accumulate. The third verdict
+   exists for exactly this state and says "not answered yet" rather than
+   inventing a reading from thin data — the failure §11 rule 1 is about, one
+   level up.
+
+   **The report was built anyway, and deliberately.** §14 said a negative
+   gate means not building the rest; `insufficient` is not a negative gate,
+   it is the absence of one, and withholding the machinery until data exists
+   would leave nothing for the data to arrive INTO. What the gate does buy is
+   that the verdict is printed ABOVE the table every time, and that an
+   `uncorrelated` reading labels the table below it "for inspection, not for
+   planning" instead of silently continuing to look authoritative.
 2. **That `unknown` can be kept low.** If after phase 1 it exceeds ~30%, the
    attribution chain (§8) is broken, not the data.
 3. **That the 10-minute threshold is right.** Taken from WakaTime's practice,
@@ -573,3 +596,62 @@ about the calendar for anything older than the squash — the numbers are real
 measurements of a history that was rewritten. In a repository whose history was
 never flattened the same command reads the real dates. The report cannot detect
 this and does not pretend to; it is recorded here instead.
+
+## 18. What is implemented (2026-09-02, TL-29)
+
+Phase 2 of §12: the estimates stop being unfalsifiable.
+
+- **`scripts/calibration.mjs` — pure, and importing only `estimate.mjs`.** It
+  is pasted BY SOURCE into the viewer, the pattern `task-fields.mjs` and
+  `estimate.mjs` already use, so the browser and `stats --calibration` cannot
+  round the same minutes two different ways. That constraint is the reason
+  `percentile()` is written out there instead of imported from
+  `time-report.mjs`, which reads the disk.
+- **Buckets are keyed by HOURS, through `estimateHours()`.** `2h` and `120m`
+  are the same estimate written twice; splitting them would halve both
+  samples. The label is derived from the key, not remembered from the
+  frontmatter.
+- **`worktrail stats --correlation-only`** — step 0 alone, and it exits 0 on
+  every verdict including `uncorrelated`. A negative measurement is a result,
+  and a non-zero exit would turn the honest answer into something a pipeline
+  reads as a broken command.
+- **`worktrail stats --calibration`** — the gate, then the table. §11's three
+  rules are the code: under `min_report_n` a bucket prints "not enough data"
+  and carries no median at all (not a median nobody is meant to read); a
+  bucket that speaks prints p20–p80 beside its median; a breakdown by board,
+  type or owner is returned only when EVERY cell clears the threshold, and is
+  `null` — not partial — otherwise.
+- **What never reached a bucket is printed with what did**, always, zero
+  included: closed and measured, closed but never measured, closed with no
+  countable estimate. A calibration built from 9 of 141 closed tasks and one
+  built from 130 look identical once the medians are on screen.
+- **`minutes: 0` is not a measurement of zero work.** §6 rule 1 gives a
+  single-heartbeat cluster zero minutes, so a zero means "nothing lasted long
+  enough to count"; averaging it in would drag every bucket towards a number
+  produced by the throttling window rather than by the work. Such a task is
+  counted as unmeasured.
+- **Only ARCHIVED tasks are sampled.** A task in flight has an aggregate that
+  is a fraction of its final one, so admitting it would move every median by
+  an amount depending on when the report was run.
+- **`worktrail new --estimate 2h` prints that bucket's calibration**, and
+  prints nothing below the threshold. Writing the estimate is the only moment
+  the number can still change a decision; a hint drawn from three samples
+  would be a guess with the authority of a measurement.
+- **The viewer shows `Measured` on a closed task**, read from
+  `activity/rollup/` and with no pen beside it. There is no `actual:` field in
+  the frontmatter and there will not be one — it would be a copy of a computed
+  number, drifting from its source at the first recompute (§11).
+- **The per-task split is proved by a real merge**, not by an assertion about
+  a path: `scripts/tests/rollup-merge.test.mjs` merges two branches with
+  `git merge-tree` and carries the positive control — the same two branches
+  against ONE shared aggregate file, which must conflict. Without that half,
+  the test would pass against a check that cannot see a conflict at all.
+- **No gate in TL-29's verification asserts a property of the production
+  data.** Every calibration test runs on fixtures, so the suite answers the
+  same on a sparse backlog and on a rich one; an assertion like "the 2h bucket
+  is above the threshold" would go red because somebody closed a task.
+
+**What is deliberately NOT here.** Regression or predictive modelling: a
+median and a p80 are all an `n` in the tens can justify, and anything fitted
+to it would be a curve through noise with a confidence interval nobody would
+print.

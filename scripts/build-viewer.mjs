@@ -18,6 +18,7 @@ import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { readRollup } from "./activity.mjs";
 import { extractMeta, splitFrontmatter } from "./task-fields.mjs";
 import { crossBranchState, divergences } from "./branch-scan.mjs";
 import { readAllHistory } from "./history.mjs";
@@ -222,9 +223,18 @@ export function readTasks(root = defaultRoot()) {
     const raw = readFileSync(join(TASKS_DIR, file), "utf8");
     const { frontmatter, body } = splitFrontmatter(raw);
     const meta = extractMeta(frontmatter);
+    // MEASURED TIME, from `activity/rollup/` and never from the frontmatter
+    // (TL-29). There is no `actual:` field and there will not be one: it would
+    // be a copy of a number computed elsewhere, drifting from its source at the
+    // first recompute. `null` when nothing measured this task — which the page
+    // must be able to say, since "not measured" and "took no time" are different
+    // answers.
+    const rollup = readRollup(root, meta.id);
     return {
       ...meta,
       file,
+      actual_minutes: rollup && typeof rollup.minutes === "number" ? rollup.minutes : null,
+      actual_sessions: rollup ? rollup.sessions : null,
       elsewhere: divergences(meta.status, scan.byId.get(meta.id)),
       bodyHtml: md2html(body.trim()),
     };
@@ -361,6 +371,11 @@ export function buildHtml(
   // the `stats` command (BL-1412). A second copy would mean the terminal and the
   // browser could give two different numbers for the same question.
   const estimateModuleSrc = readModuleSource("estimate.mjs");
+  // Estimate calibration (TL-29). AFTER `estimate.mjs`, which it reads
+  // `estimateHours` from — the paste order is the module graph, written out by
+  // hand. The page uses `spanLabel()` for the measured-time row, so the browser
+  // and `stats --calibration` cannot round the same number two ways.
+  const calibrationModuleSrc = readModuleSource("calibration.mjs");
   const elsewhereModuleSrc = readModuleSource("elsewhere.mjs");
   // The plan's arithmetic and the Execution view. `plan.mjs` comes first:
   // `viewer-plan.mjs` renders what `planState()` returns.
@@ -2139,6 +2154,12 @@ ${fieldsModuleSrc}
 
 ${estimateModuleSrc}
 
+// ─── Pasted source of scripts/calibration.mjs (TL-29) ──────────────────
+// Estimate calibration. The same module \`stats --calibration\` runs, so the
+// dashboard and the terminal cannot give two different numbers for one task.
+${calibrationModuleSrc}
+// ─── end of the pasted module ─────────────────────────────────────────
+
 // ─── Pasted source of scripts/elsewhere.mjs (TL-124) ─────────────────
 // How a cross-branch divergence is worded and marked. The terminal imports the
 // same file, so the page cannot name the situation differently than \`query\` does.
@@ -3758,9 +3779,22 @@ function renderDetail() {
       files.map(function (p) { return "<code>" + escape(p) + "</code>"; }).join(" ") + "</div></div>"
     : "";
 
+  // MEASURED TIME, and only on a task that has stopped (TL-29). On an open task
+  // the number is a fraction of its final one, and a figure that grows while you
+  // watch reads as an actual — so the row is absent there rather than qualified.
+  // No pen either: it is computed from \`activity/rollup/\`, and an editable copy
+  // would be a second, drifting truth about the same minutes.
+  const measuredRow = CONFIG.archivedStatuses.indexOf(t.status) >= 0 && t.actual_minutes != null
+    ? '<div class="meta-row"><div class="meta-label">Measured</div><div class="meta-value">' +
+      escape(t.actual_minutes > 0 ? spanLabel(t.actual_minutes / 60) : "under the measurable threshold") +
+      (t.estimate ? ' <span style="color:var(--fg-muted);font-size:11px">(estimated ' + escape(t.estimate) + ")</span>" : "") +
+      "</div></div>"
+    : "";
+
   const readOnlyRows =
     '<div class="meta-row"><div class="meta-label">Created</div><div class="meta-value">' + escape(t.created || "—") + "</div></div>" +
     '<div class="meta-row"><div class="meta-label">Updated</div><div class="meta-value">' + escape(t.updated || "—") + "</div></div>" +
+    measuredRow +
     // COMPUTED from commit messages, so there is no pen: it is not a field
     // anybody may edit, and offering one would invite a value that contradicts
     // the history it was derived from. Absent when the task has no commits yet —
