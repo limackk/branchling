@@ -503,6 +503,33 @@ newlines are collapsed there. `--append-reason` still preserves your order, and
 the field is the first of several — the commands that write longer prose join
 the same mechanism rather than inventing their own.
 
+**An agent that is not a shell reaches it over MCP.** `worktrail mcp` speaks the
+Model Context Protocol on stdio, and every tool it offers is one of the commands
+above — the adapter validates nothing of its own, so an unknown flag, a bare
+actor and a `done` whose contract fails come back as the same refusals a shell
+gets. The phase guides are exposed as MCP resources, rendered with *your*
+backlog's vocabulary.
+
+Claude Code:
+
+```bash
+claude mcp add worktrail -- worktrail mcp --dir /path/to/repo/backlog
+```
+
+Codex, Gemini CLI, Kiro and the editors that read a JSON config take the same
+two lines:
+
+```json
+{
+  "mcpServers": {
+    "worktrail": { "command": "worktrail", "args": ["mcp", "--dir", "/path/to/repo/backlog"] }
+  }
+}
+```
+
+`--dir` is optional: without it every call resolves the backlog the way the CLI
+does, starting from the directory your client launched the server in.
+
 ---
 
 ### Why does this file look like this

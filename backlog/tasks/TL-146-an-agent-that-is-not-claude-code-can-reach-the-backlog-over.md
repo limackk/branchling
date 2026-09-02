@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""
 priority: P2                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 estimate: 1d                       # 30m | 2h | 1d | 1w | 1mo
 created: 2026-09-02
 updated: 2026-09-02
@@ -86,9 +86,9 @@ stdio. HTTP is the hosted mode's concern (§6 of
 
 ## Acceptance criteria
 
-- [ ] `worktrail mcp` speaks MCP over stdio and lists its tools. [proof: suite-green]
-- [ ] Every tool routes through the CLI's own code path; no rule exists only in the MCP layer. [proof: suite-green]
-- [ ] An unknown tool or argument is refused with a non-zero-style error, never ignored. [proof: suite-green]
-- [ ] `take` over MCP creates the same reservation the CLI creates, and a bare actor is refused. [proof: suite-green]
-- [ ] The phase guides are readable as MCP resources. [proof: suite-green]
-- [ ] No new dependency in `package.json`, and no product-name literal. [proof: guards-green]
+- [x] `worktrail mcp` speaks MCP over stdio and lists its tools. [proof: suite-green]
+- [x] Every tool routes through the CLI's own code path; no rule exists only in the MCP layer. [proof: suite-green]
+- [x] An unknown tool or argument is refused with a non-zero-style error, never ignored. [proof: suite-green]
+- [x] `take` over MCP creates the same reservation the CLI creates, and a bare actor is refused. [proof: suite-green]
+- [x] The phase guides are readable as MCP resources. [proof: suite-green]
+- [x] No new dependency in `package.json`, and no product-name literal. [proof: guards-green]

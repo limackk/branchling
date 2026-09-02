@@ -1,1 +1,4 @@
 {"id":"01M1GJQ1ZPG98S3MN2XJQYZWWT","ts":"2026-09-02T08:10:37.942Z","task":"TL-146","field":"__created__","from":"","to":"An agent that is not Claude Code can reach the backlog over MCP","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1HGQKZW0Q7J0AYNYFFVFP9X","ts":"2026-09-02T16:55:13.660Z","task":"TL-146","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1HGQKZWBX2RQ1ZS215XEJ4G","ts":"2026-09-02T16:55:13.660Z","task":"TL-146","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1HH84JTS5S18GKK8A2G21XJ","ts":"2026-09-02T17:04:14.938Z","task":"TL-146","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
