@@ -147,7 +147,7 @@ export const KINDS = {
     // a loop must be able to tell an empty queue from a queue it was not allowed
     // to draw from, and it cannot parse a sentence to do it.
     passedOver: [], considered: null, searchedStatuses: [], skippedBlocked: null,
-    skippedElsewhere: [], skippedExecutor: [], scan: null,
+    skippedElsewhere: [], skippedExecutor: [], skippedHandedBack: [], scan: null,
   },
   // `handoff --json` (TL-99). Three from/to pairs and the comment that carries
   // the reason: a handoff is not a task being performed, it is a task changing

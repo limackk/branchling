@@ -1,1 +1,4 @@
 {"id":"01M1GBFM3MH45KR0V4PHWK7PAA","ts":"2026-09-02T06:04:14.324Z","task":"TL-141","field":"__created__","from":"","to":"A task handed back as too large is re-offered by next immediately","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1HFV377Q52S014A0MRGDTB5","ts":"2026-09-02T16:39:38.983Z","task":"TL-141","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1HFV377P3R39X6NTK331708","ts":"2026-09-02T16:39:38.983Z","task":"TL-141","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1HGCFB92GZR83JD2W6QMF9D","ts":"2026-09-02T16:49:08.457Z","task":"TL-141","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

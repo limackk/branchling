@@ -32,6 +32,17 @@
  * `selectCandidates`. It costs one pass over the local refs per call and is
  * switched off, explicitly, by `cross_branch_state: false`.
  *
+ * A JUDGEMENT THIS SAME ACTOR ALREADY MADE (TL-141). `handoff` records a
+ * decision taken BEFORE the work starts — this task does not fit a session of
+ * mine — and then returns the task to the queue, where it is immediately the
+ * highest-priority candidate again. Offering it back to the actor who handed it
+ * on makes the record worthless, so the last handoff in a task's history is
+ * read as what it is: a fact in the tree, not an opinion a loop keeps to
+ * itself. It holds only against ITS OWN actor — every other session is still
+ * offered the task — and only while it is still the LAST word about the task.
+ * The distinction from `run --max-attempts`, which parks a task after a
+ * contract has failed repeatedly, is that nothing was attempted here.
+ *
  * EXIT CODES. 0 took a task · 3 nothing to take · 1 a refusal about a task that
  * exists · 2 a usage error. "Nothing to take" must be distinguishable from "the
  * call was wrong", or a loop cannot tell an empty queue from its own typo.
@@ -44,7 +55,7 @@ import { fileURLToPath } from "node:url";
 
 import { crossBranchState, describeDivergence, divergences, scanNote } from "./branch-scan.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { ACTOR_NAMESPACES, isValidActor, isValidReason } from "./history.mjs";
+import { ACTOR_NAMESPACES, FIELD_COMMENT, isValidActor, isValidReason, readHistory } from "./history.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { printJson } from "./json-envelope.mjs";
@@ -273,6 +284,33 @@ export function heldElsewhere(task, handedOut) {
  * @returns {{candidates: object[], reclaimable: Set<string>, skippedBlocked: number,
  *            skippedElsewhere: Array<{id: string, elsewhere: object[]}>}}
  */
+/**
+ * WHO, IF ANYBODY, HANDED THIS TASK BACK LAST. PURE — it takes the entries.
+ *
+ * A handoff is a JUDGEMENT MADE BEFORE THE WORK STARTS: this task does not fit
+ * a session of mine. `handoff` records it, clears the owner and returns the
+ * task to the queue — at which point it is once again the highest-priority
+ * executable candidate, and the same session is handed the same task on the
+ * next call. Measured twice in a row on 2026-09-02 (TL-137, TL-141).
+ *
+ * WHY THE LAST EVENT AND NOT "EVER HANDED OFF". Anything recorded after the
+ * handoff — somebody taking it, a field edited, a blocker discharged — is the
+ * tree saying the task moved on, and a stale judgement must not outlive the
+ * state it was made about. So only a handoff that is still the LAST WORD holds.
+ *
+ * @param {Array<object>} entries one task's history, oldest first
+ * @returns {{actor: string, reason: string}|null}
+ */
+export function lastHandoff(entries) {
+  for (let i = (entries || []).length - 1; i >= 0; i--) {
+    const e = entries[i];
+    if (!e || typeof e !== "object") continue;
+    if (e.source !== "handoff") return null;
+    if (e.field === FIELD_COMMENT) return { actor: String(e.actor || ""), reason: String(e.to || e.reason || "") };
+  }
+  return null;
+}
+
 export function selectCandidates(records, config, filters, now) {
   const archived = new Set(config.archivedStatuses);
   // The species gate is applied to the RECORDS, before any selection: a task
@@ -317,13 +355,27 @@ export function selectCandidates(records, config, filters, now) {
   }
   sortTasks(fresh, "priority", config);
 
+  // A judgement this same actor already made about this same task. It is a
+  // fact READ FROM THE TREE, not a rule a caller keeps to itself: selection
+  // policy is the dispatcher's, and a loop that filtered candidates itself
+  // would be a queue with the choosing put back in.
+  const skippedHandedBack = [];
+  const notHandedBack = (t) => {
+    const back = t.handedBack || null;
+    if (!back || !filters.actor || back.actor !== filters.actor) return true;
+    skippedHandedBack.push({ id: t.id, actor: back.actor, reason: back.reason });
+    return false;
+  };
+
   const skippedElsewhere = [];
   const free = (task, held) => {
     if (!held.length) return true;
     skippedElsewhere.push({ id: task.id, elsewhere: held });
     return false;
   };
-  const candidates = fresh.filter((t) => free(t, heldElsewhere(t, handedOut)));
+  // `&&` short-circuits on purpose: a task held back by this actor's own
+  // handoff is reported under that heading and not a second time as `elsewhere`.
+  const candidates = fresh.filter((t) => notHandedBack(t) && free(t, heldElsewhere(t, handedOut)));
 
   const reclaimable = new Set();
   if (!filters.status) {
@@ -340,7 +392,7 @@ export function selectCandidates(records, config, filters, now) {
     candidates.push(...stale);
   }
   return {
-    candidates, reclaimable, unblocked, skippedElsewhere, skippedExecutor,
+    candidates, reclaimable, unblocked, skippedElsewhere, skippedExecutor, skippedHandedBack,
     // The count is of tasks that MATCHED and were held back by an open blocker;
     // the unblocked ones were never in `matching`, so they must not be
     // subtracted from it.
@@ -411,6 +463,7 @@ export function run(argv) {
     role: wantedRoles ? (plan.roleStrict ? wantedRoles : wantedRoles.concat([""])) : null,
     // Not a flag: WHO is asking is already in the actor (TL-113).
     callerSpecies: callerSpecies(actor),
+    actor,
   };
   const now = Date.now();
   const records = readTaskRecords(backlogPaths(root).tasksDir, config.taskId.file);
@@ -419,13 +472,23 @@ export function run(argv) {
   // disagree about the tree they are both looking at.
   const scan = crossBranchState(root, config);
   for (const t of records) t.elsewhere = divergences(t.status, scan.byId.get(t.id));
-  const { candidates, reclaimable, unblocked, skippedBlocked, skippedElsewhere, skippedExecutor } =
+  // Read for the OPEN tasks only. A closed one can never be a candidate, and in
+  // a backlog that has been running a while most of the tree is closed — so
+  // this costs a read per task that could actually be handed out, not per task.
+  for (const t of records) {
+    if (config.archivedStatuses.indexOf(t.status) >= 0) continue;
+    t.handedBack = lastHandoff(readHistory(root, t.id));
+  }
+  const { candidates, reclaimable, unblocked, skippedBlocked, skippedElsewhere, skippedExecutor, skippedHandedBack } =
     selectCandidates(records, config, filters, now);
   // Named, never silent: a candidate that disappears without a word is
   // indistinguishable from an empty queue, and the reader has no second place
   // to look.
   const elsewhereLines = skippedElsewhere.map(
     (s) => s.id + " skipped — " + s.elsewhere.map(describeDivergence).join(", ")
+  );
+  const handedBackLines = skippedHandedBack.map(
+    (s) => s.id + " skipped — you handed it back yourself" + (s.reason ? ": " + s.reason : "")
   );
 
   // Candidates are tried IN ORDER, and a taken one is skipped rather than
@@ -454,9 +517,11 @@ export function run(argv) {
       if (plan.json) {
         printJson("task-take", {
           ...takeJson(result), passedOver, considered: candidates.length,
-          skippedElsewhere, skippedExecutor, scan: { scanned: scan.scanned, reason: scan.reason },
+          skippedElsewhere, skippedExecutor, skippedHandedBack,
+          scan: { scanned: scan.scanned, reason: scan.reason },
         });
       } else {
+        for (const line of handedBackLines) console.log(color.dim(MARK.bullet + " " + line));
         for (const line of elsewhereLines) console.log(color.dim(MARK.bullet + " " + line));
         for (const p of passedOver) {
           console.log(color.dim(MARK.bullet + " " + p.id + " passed over: " + p.why));
@@ -500,6 +565,12 @@ export function run(argv) {
     );
     for (const s of skippedExecutor) details.push("  " + MARK.bullet + " " + s.id + " → " + s.executor);
   }
+  if (handedBackLines.length) {
+    details.push(
+      handedBackLines.length + " candidate(s) YOU handed back — another actor is still offered them"
+    );
+    for (const line of handedBackLines) details.push("  " + MARK.bullet + " " + line);
+  }
   if (elsewhereLines.length) {
     details.push(elsewhereLines.length + " candidate(s) are in another state on another branch or worktree");
     for (const line of elsewhereLines) details.push("  " + MARK.bullet + " " + line);
@@ -523,6 +594,7 @@ export function run(argv) {
       ok: false, taken: false, refusalKind: "nothing-to-take", refusal: "nothing to take",
       details,
       searchedStatuses: searched, skippedBlocked, passedOver, skippedElsewhere, skippedExecutor,
+      skippedHandedBack,
       scan: { scanned: scan.scanned, reason: scan.reason },
     });
   } else {

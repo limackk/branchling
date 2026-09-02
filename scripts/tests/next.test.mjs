@@ -29,7 +29,7 @@ import { fileURLToPath } from "node:url";
 
 import { acquireLock, isExpired, listLocks, lockScope, readLock, releaseLock, stateRoot } from "../lock.mjs";
 import { loadConfig, parseConfigYaml } from "../config.mjs";
-import { callerSpecies, queueStatuses, selectCandidates, servesExecutor } from "../next-task.mjs";
+import { callerSpecies, lastHandoff, queueStatuses, selectCandidates, servesExecutor } from "../next-task.mjs";
 import { readTaskRecords } from "../task-select.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -665,4 +665,89 @@ test("the species comes from the actor's namespace and nothing else", () => {
   assert.equal(servesExecutor({ executor: "" }, "agent"), true);
   assert.equal(servesExecutor({ executor: "human" }, "agent"), false);
   assert.equal(servesExecutor({ executor: "human" }, "human"), true);
+});
+
+// ── A task handed back is not re-offered to the actor who did it (TL-141) ──
+//
+// Measured twice in a row on 2026-09-02: a session judged TL-137 too large for
+// one session, said so with `handoff`, and `next` offered it again on the very
+// next call — because nothing about a handoff was part of selection. The
+// judgement is a fact in the tree, so the dispatcher reads it; a loop that
+// filtered candidates itself would be a queue with the choosing put back in.
+
+test("lastHandoff reads the tree's LAST word, not `was ever handed off`", () => {
+  const back = { source: "handoff", field: "__comment__", actor: "agent:a1", to: "too large" };
+  assert.equal(lastHandoff([]), null);
+  assert.deepEqual(lastHandoff([back]), { actor: "agent:a1", reason: "too large" });
+  // The field rows a handoff writes alongside its comment do not hide it.
+  assert.deepEqual(
+    lastHandoff([{ source: "handoff", field: "owner", actor: "agent:a1" }, back]),
+    { actor: "agent:a1", reason: "too large" },
+  );
+  // Anything recorded AFTER it is the task moving on, and a stale judgement
+  // must not outlive the state it was made about.
+  assert.equal(lastHandoff([back, { source: "take", field: "status", actor: "agent:a2" }]), null);
+});
+
+test("a task this actor handed back is not the next thing it is offered", () => {
+  const { backlog, env, ids } = fixture(["P0", "P2"]);
+  assert.equal(run(["next", "--dir", backlog, "--actor", "agent:a1", "--json"], env).status, 0);
+  const h = run(["handoff", ids[0], "--dir", backlog, "--actor", "agent:a1",
+    "--to-owner", "unassigned", "--reason", "a week of work does not fit a session"], env);
+  assert.equal(h.status, 0, h.stderr);
+
+  const r = run(["next", "--dir", backlog, "--actor", "agent:a1", "--json"], env);
+  assert.equal(r.status, 0, r.stderr);
+  const out = JSON.parse(r.stdout);
+  assert.equal(out.id, ids[1], "the handed-back task was offered straight back");
+  // Never silent: the pass-over is in `--json`, with the reason that was given.
+  assert.equal(out.skippedHandedBack.length, 1);
+  assert.equal(out.skippedHandedBack[0].id, ids[0]);
+  assert.match(out.skippedHandedBack[0].reason, /does not fit a session/);
+
+  // …and on stdout, for the reader who is not parsing anything.
+  const plain = run(["next", "--dir", backlog, "--actor", "agent:a1"], env);
+  assert.equal(plain.status, 3, plain.stdout + plain.stderr);
+  assert.match(plain.stdout + plain.stderr, new RegExp(ids[0] + " skipped — you handed it back yourself"));
+});
+
+test("POSITIVE CONTROL: another actor is still offered the same task", () => {
+  // Without this, a rule that simply hid handed-back work would pass the test
+  // above and empty the queue for everybody.
+  const { backlog, env, ids } = fixture(["P0", "P2"]);
+  assert.equal(run(["next", "--dir", backlog, "--actor", "agent:a1", "--json"], env).status, 0);
+  const h = run(["handoff", ids[0], "--dir", backlog, "--actor", "agent:a1",
+    "--to-owner", "unassigned", "--reason", "too large for me"], env);
+  assert.equal(h.status, 0, h.stderr);
+
+  const r = run(["next", "--dir", backlog, "--actor", "agent:a2", "--json"], env);
+  assert.equal(r.status, 0, r.stderr);
+  const out = JSON.parse(r.stdout);
+  assert.equal(out.id, ids[0], "a handoff held the task back from everybody, not from its author");
+  assert.equal(out.skippedHandedBack.length, 0);
+});
+
+test("the rule lives in the dispatcher: `selectCandidates` decides, no caller does", () => {
+  // The criterion of TL-141 that a test can actually hold: the pure selector
+  // takes the fact and applies it, so nothing in `run` — the loop or any other
+  // caller — has a filter of its own to keep in step.
+  const records = [
+    { id: "T-1", status: "pending", priority: "P0", handedBack: { actor: "agent:a1", reason: "big" } },
+    { id: "T-2", status: "pending", priority: "P2" },
+  ];
+  const config = {
+    statuses: ["pending", "in_progress", "done"],
+    activeStatuses: ["pending", "in_progress"],
+    archivedStatuses: ["done"],
+    inProgressStatus: "in_progress",
+    reasonRequiredStatuses: [],
+    priorities: ["P0", "P1", "P2"],
+  };
+  const mine = selectCandidates(records, config, { actor: "agent:a1" }, Date.now());
+  assert.deepEqual(mine.candidates.map((t) => t.id), ["T-2"]);
+  assert.deepEqual(mine.skippedHandedBack, [{ id: "T-1", actor: "agent:a1", reason: "big" }]);
+
+  const theirs = selectCandidates(records, config, { actor: "agent:a2" }, Date.now());
+  assert.deepEqual(theirs.candidates.map((t) => t.id), ["T-1", "T-2"]);
+  assert.deepEqual(theirs.skippedHandedBack, []);
 });

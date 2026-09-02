@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""
 priority: P2                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 estimate: 4h                       # 30m | 2h | 1d | 1w | 1mo
 created: 2026-09-02
 updated: 2026-09-02
@@ -89,7 +89,7 @@ Candidates, none of them settled:
 
 ## Acceptance criteria
 
-- [ ] A task handed back by an actor is not the next thing offered to that same actor. [proof: handed-back-is-not-reoffered]
-- [ ] The pass-over is named on stdout and present in `--json`. [proof: handed-back-is-not-reoffered]
-- [ ] POSITIVE CONTROL: the task is still offered when the condition no longer holds. [proof: handed-back-is-not-reoffered]
-- [ ] No selection logic moved into `run` or into any caller's loop. [proof: handed-back-is-not-reoffered]
+- [x] A task handed back by an actor is not the next thing offered to that same actor. [proof: handed-back-is-not-reoffered]
+- [x] The pass-over is named on stdout and present in `--json`. [proof: handed-back-is-not-reoffered]
+- [x] POSITIVE CONTROL: the task is still offered when the condition no longer holds. [proof: handed-back-is-not-reoffered]
+- [x] No selection logic moved into `run` or into any caller's loop. [proof: handed-back-is-not-reoffered]
