@@ -55,7 +55,7 @@ import {
   normalizeActor, normalizeReason, reconcile,
 } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
-import { createTask, slugify } from "./new-task.mjs";
+import { createTask, driftMessage, slugify } from "./new-task.mjs";
 import { backlogPaths, looksLikeBacklogDir, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { buildFieldSpecs, fieldSpec, setFrontmatterField } from "./task-fields.mjs";
@@ -626,6 +626,14 @@ export function main(argv) {
   try {
     written = writePlan({ root, config, board, plan });
   } catch (e) {
+    if (e && e.code === "EVOCABULARY") {
+      // A drifted template is not "a failure part-way through" — nothing about the
+      // plan was wrong, and the fix is one line in one file (TL-69). Saying that
+      // instead of a rollback notice is the difference between a user who knows
+      // what to edit and one who re-runs the same seed.
+      console.error(driftMessage(e.divergences, { templatePath: e.templatePath, fields: {}, command: N + " seed" }));
+      return 1;
+    }
     console.error(failure(
       N + " seed", "the seed failed part-way through and was rolled back",
       [e.message, (e.rolledBack || 0) + " task file(s) created by this run were removed"], []

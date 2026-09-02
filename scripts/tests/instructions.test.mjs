@@ -51,7 +51,7 @@ import {
   topicText,
   vocabulary,
 } from "../instructions.mjs";
-import { REPO_ROOT, SCRIPTS_DIR } from "./_repo.mjs";
+import { REPO_ROOT, SCRIPTS_DIR, alignTemplate } from "./_repo.mjs";
 
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
 
@@ -102,6 +102,10 @@ function fixture({ agent = null, agentBody = "" } = {}) {
   const r = run(["init", "--dir", dir, "--no-example", "--no-nudge"]);
   assert.equal(r.status, 0, "init failed: " + r.stderr);
   writeFileSync(join(dir, "config.yaml"), CONFIG_YAML, "utf8");
+  // See `alignTemplate`: the template `init` wrote still carries the default
+  // vocabulary, which this configuration shares nothing with — that is the point
+  // of the fixture, and since TL-69 it is also a refusal at write time.
+  alignTemplate(dir);
   return { repo, dir };
 }
 

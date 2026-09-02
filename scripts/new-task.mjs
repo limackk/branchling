@@ -33,7 +33,9 @@ import { fileURLToPath } from "node:url";
 import { loadConfigOrExit } from "./config.mjs";
 import { detectPrefixMismatch, prefixMismatchMessage, taskIdPatterns } from "./task-id.mjs";
 import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { auditVocabulary, extractMeta, splitFrontmatter } from "./task-fields.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
+import { failure } from "./ui.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -169,6 +171,70 @@ function fail(msg, hint) {
  * @throws {Error & {code: "EEXIST", file: string, taskId: string}}
  */
 /**
+ * Does the ASSEMBLED frontmatter fit inside this project's vocabularies (TL-69)?
+ *
+ * THE DEFECT THIS CLOSES. `main()` validates the values it receives through
+ * FLAGS, and does it correctly. It never validated the values that arrive from
+ * `_template.md` — which is a copy of the DEFAULT vocabularies taken at `init`
+ * and drifts away from `config.yaml` the moment anybody adjusts statuses to
+ * their own process, which is the most common onboarding step there is. The
+ * result was perverse: `new --status pending` was refused, while `new` with no
+ * flags wrote exactly the same value without a word.
+ *
+ * WHY IT REFUSES RATHER THAN SUBSTITUTING OR WARNING. Substituting the first
+ * value from the vocabulary changes somebody else's content silently, and "the
+ * first status" does not always mean "new". Warning and writing anyway puts a
+ * warning on every single `new`, and a warning that always fires stops being
+ * read within a day. A refusal is also the only one of the three whose fix is
+ * ONE-OFF: the cause is one line in one file, not a decision to remake per task.
+ *
+ * ONE MEASUREMENT, NOT A SECOND SET OF RULES. This is `auditVocabulary()` — the
+ * same function `doctor` uses for its "vocabulary vs tree" row. Two readings of
+ * one question would drift, and then the write path and the diagnosis would
+ * disagree about the same file.
+ *
+ * @returns {Array} the divergences, empty when there are none
+ */
+export function templateDrift(text, config) {
+  return auditVocabulary([extractMeta(splitFrontmatter(text).frontmatter)], config);
+}
+
+/**
+ * The refusal, as text. It has to name the field, the value, the vocabulary AND
+ * `_template.md`, because the user did not type the offending value and will
+ * otherwise go looking for the mistake in their own command.
+ *
+ * A value the CALLER passed is reported as the caller's, not as the template's:
+ * a message blaming a file somebody never edited is worse than no message.
+ */
+export function driftMessage(divergences, { templatePath, fields, command }) {
+  const opts = fields || {};
+  const details = [];
+  for (const d of divergences) {
+    for (const f of d.found) {
+      const fromCaller = String(opts[d.field] || "") === f.value;
+      details.push(
+        "`" + d.field + ": " + f.value + "` is not a value this project uses" +
+          (d.allowed.length ? " (" + d.allowed.join(" | ") + ")" : " — the vocabulary is empty")
+      );
+      details.push(
+        fromCaller
+          ? "  it came from the arguments of this call"
+          : "  it came from the template, not from your command — " + templatePath
+      );
+    }
+  }
+  details.push("");
+  details.push("The template is a copy of the DEFAULT vocabularies taken at `init`. Once");
+  details.push("config.yaml changes, the two drift, and every task made from the template");
+  details.push("would carry a value the configuration does not know.");
+  return failure(command, "the template does not fit this project's vocabulary", details, [
+    "edit " + templatePath + " to use a value from config.yaml",
+    "or add the value to config.yaml, if it belongs to this project",
+  ]);
+}
+
+/**
  * One `verification:` entry, as YAML. A plain string is the short form (a bash
  * command with no id); an object may carry `id` — the handle a criterion points
  * at with `[proof: <id>]` (TL-86) — and either `bash` or `manual`.
@@ -233,6 +299,18 @@ export function createTask({ root, config, board, slug, fields, body }) {
     // are disjoint.
     const end = text.indexOf("\n---\n", 3);
     if (end >= 0) text = text.slice(0, end + 5) + body;
+  }
+
+  // BEFORE the write, not after (TL-69). A file already on disk is a value the
+  // tree now carries, and every reader downstream — the views, `next`, the
+  // viewer — would be counting it under a vocabulary that does not contain it.
+  const divergences = templateDrift(text, config);
+  if (divergences.length) {
+    const e = new Error("the template does not fit this project's vocabulary");
+    e.code = "EVOCABULARY";
+    e.divergences = divergences;
+    e.templatePath = join(root, "_template.md");
+    throw e;
   }
 
   try {
@@ -320,6 +398,12 @@ export function main(argv) {
     if (e && e.code === "EEXIST") {
       return fail("the file already exists: " + e.file,
         "the number " + e.taskId + " is taken — check `" + N + " next-id --explain`");
+    }
+    if (e && e.code === "EVOCABULARY") {
+      console.error(driftMessage(e.divergences, {
+        templatePath: e.templatePath, fields: opts, command: N + " new",
+      }));
+      return 1;
     }
     throw e;
   }

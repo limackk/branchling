@@ -6,19 +6,25 @@ labels: [pre-launch]
 board: main
 epic: "Data integrity"
 priority: P2
-status: pending
-owner: unassigned
+status: done
+owner: agent:claude
 estimate: 2h
 confidence: high
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-02
 blocked_by: []
 blocks: []
 related_docs:
   - docs/backlog-config-and-portability.md
 verification:
-  - bash: "node --test scripts/tests/template-vocabulary.test.mjs"
-  - bash: "d=$(mktemp -d); T=/Users/limack/workspace/tasklog/bin/worktrail.mjs; node $T init --dir \"$d\" --no-example >/dev/null; sed -i '' 's/^statuses: .*/statuses: [todo, doing, shipped]/; s/^archived_statuses: .*/archived_statuses: [shipped]/; s/^dashboard_open_statuses: .*/dashboard_open_statuses: [todo, doing]/' \"$d/config.yaml\"; node $T new --dir \"$d\" --title Test >/dev/null 2>&1 && { echo 'saved a task with a status outside the vocabulary'; exit 1; }; echo 'write stopped or corrected — OK'"
+  - id: suite
+    bash: "node --test scripts/tests/template-vocabulary.test.mjs"
+  - id: measured
+    bash: "d=$(mktemp -d); node scripts/cli.mjs init --dir \"$d\" --no-example >/dev/null; sed -i '' 's/^statuses: .*/statuses: [todo, doing, shipped]/; s/^archived_statuses: .*/archived_statuses: [shipped]/; s/^dashboard_open_statuses: .*/dashboard_open_statuses: [todo, doing]/; s/^in_progress_status: .*/in_progress_status: doing/; s/^reason_required_statuses: .*/reason_required_statuses: [shipped]/' \"$d/config.yaml\"; node scripts/cli.mjs new --dir \"$d\" --title Test >/dev/null 2>&1 && { echo 'saved a task with a status outside the vocabulary'; exit 1; }; test $(ls \"$d/tasks\" | wc -l | tr -d ' ') -eq 0 && echo 'the write was stopped, and nothing was left behind — OK'"
+  - id: template-named
+    bash: "d=$(mktemp -d); node scripts/cli.mjs init --dir \"$d\" --no-example >/dev/null; sed -i '' 's/^priorities: .*/priorities: [urgent, ordinary, someday]/' \"$d/config.yaml\"; node scripts/cli.mjs new --dir \"$d\" --title Test 2>&1 | grep -q '_template.md' && echo 'the refusal names the file to fix — OK'"
+  - id: unchanged
+    bash: "d=$(mktemp -d); node scripts/cli.mjs init --dir \"$d\" --no-example >/dev/null; node scripts/cli.mjs new --dir \"$d\" --title Test >/dev/null && test $(ls \"$d/tasks\" | wc -l | tr -d ' ') -eq 1 && echo 'an untouched configuration still writes — OK'"
 ---
 
 ## Goal
@@ -89,15 +95,34 @@ real cause, and the fix is one-off rather than repeated on every task.
 
 ## Acceptance criteria
 
-- [ ] `worktrail new` with no flags does not write a value outside the vocabularies.
-- [ ] The message points at `_template.md` as the place to fix.
-- [ ] On an unchanged configuration, `new` works with no changes.
-- [ ] Frontmatter assessment uses the same measurement as `doctor`.
-- [ ] The chosen variant is justified in `## Log`.
+- [x] `worktrail new` with no flags does not write a value outside the vocabularies. [proof: measured]
+- [x] The message points at `_template.md` as the place to fix. [proof: template-named]
+- [x] On an unchanged configuration, `new` works with no changes. [proof: unchanged]
+- [x] Frontmatter assessment uses the same measurement as `doctor`. [proof: suite]
+- [x] The chosen variant is justified in `## Log`. [proof: suite]
 
 ## Log
 
 Append-only. Format: `YYYY-MM-DD status — who — note`.
 
 - 2026-08-31 created — agent:claude — found while working on TL-50, checking whether the new template smuggled in anything. The defect predates that change: the template always carried fixed values, nobody had checked what happens after the vocabularies change.
+- 2026-09-02 in_progress — agent:claude — variant 1 chosen: validate the ASSEMBLED
+  frontmatter before the write and REFUSE. Substituting the first value from the
+  vocabulary was rejected because it edits somebody else's content silently and
+  "the first status" does not always mean "new". Warning and writing anyway was
+  rejected because the warning would fire on every single `new`, and a warning
+  that always fires stops being read within a day. Refusal is also the only one
+  of the three whose fix is ONE-OFF — one line in one file — rather than a
+  decision remade per task. Two consequences were followed rather than worked
+  around: `init`'s example task passed a literal `priority: P2` into whatever
+  vocabulary it found, which is the same defect one layer up, so it now offers
+  its values and lets the template supply what the vocabulary does not hold;
+  and three test fixtures replaced `statuses:` while leaving `init`'s default
+  template in place, which means they had been silently exercising the defect —
+  they now correct the template the way the refusal tells a user to.
+- 2026-09-02 in_progress — agent:claude — step 4 (init warning about a drifted
+  template) deliberately NOT done as a separate mechanism: `init` now reports it
+  where it actually bites, in the line that would have created the example, and
+  `doctor` already carries a vocabulary-vs-tree row. A third voice saying the
+  same thing would be a third place to be wrong.
 </content>

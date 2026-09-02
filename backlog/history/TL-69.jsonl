@@ -1,3 +1,6 @@
 {"id":"01M1DX1VJ56T3G3ZA81MNXA137","ts":"2026-09-01T07:13:34.277Z","task":"TL-69","field":"__created__","from":"","to":"Szablon po zmianie słowników przemyca wartość spoza nich","actor":"unknown","source":"boot"}
 {"id":"01M1GFKZK5N694RE56KRX4HG7J","ts":"2026-09-02T07:16:31.461Z","task":"TL-69","field":"title","from":"Szablon po zmianie słowników przemyca wartość spoza nich","to":"After a vocabulary change, the template smuggles in a value outside it","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK5R0J1ATR0HXKA7NXY","ts":"2026-09-02T07:16:31.461Z","task":"TL-69","field":"epic","from":"Integralność danych","to":"Data integrity","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1H0KYEJ5QCW780NEQ4K6633","ts":"2026-09-02T12:13:36.082Z","task":"TL-69","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1H0KYEJCG9QQ3MFAHXN13H1","ts":"2026-09-02T12:13:36.082Z","task":"TL-69","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1H15KB4GEE3QDQ62AQ88D7M","ts":"2026-09-02T12:23:14.532Z","task":"TL-69","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

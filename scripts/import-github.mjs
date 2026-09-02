@@ -67,7 +67,7 @@ import {
   normalizeActor, normalizeReason, reconcile,
 } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
-import { createTask, slugify } from "./new-task.mjs";
+import { createTask, driftMessage, slugify } from "./new-task.mjs";
 import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { detectPrefixMismatch, prefixMismatchMessage } from "./task-id.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
@@ -532,6 +532,12 @@ export function main(argv) {
   try {
     written = writeImport({ root, config, board, items: plan.items });
   } catch (e) {
+    if (e && e.code === "EVOCABULARY") {
+      // The same distinction `seed` draws: nothing about the input was wrong, and
+      // the fix is one line in `_template.md` (TL-69).
+      console.error(driftMessage(e.divergences, { templatePath: e.templatePath, fields: {}, command: N + " import" }));
+      return 1;
+    }
     console.error(failure(
       N + " import", "the import failed part-way through and was rolled back",
       [e.message, (e.rolledBack || 0) + " task file(s) created by this run were removed"], []

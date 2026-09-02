@@ -295,14 +295,41 @@ function writeExample(root) {
   if (readdirSync(paths.tasksDir).some((f) => f.endsWith(".md"))) return [];
 
   const config = loadConfig(root);
-  const created = createTask({
-    root,
-    config,
-    board: config.defaultBoard || "main",
-    slug: slugify(EXAMPLE_TITLE),
-    fields: { title: EXAMPLE_TITLE, priority: "P2", estimate: "30m", verification: EXAMPLE_VERIFICATION },
-    body: EXAMPLE_BODY,
-  });
+  // The values are OFFERED, not imposed (TL-69). `init` normally runs beside the
+  // configuration it has just written, where `P2` and `30m` are present — but it
+  // is also idempotent, so it runs again over a config.yaml somebody has since
+  // adjusted. A literal passed into a vocabulary that no longer holds it is the
+  // same defect the template had: the code deciding a VALUE that belongs to the
+  // project. Where the vocabulary does not have it, the field is left to the
+  // template rather than replaced with a guess about what the project meant.
+  const offer = (value, vocabulary) => ((vocabulary || []).indexOf(value) >= 0 ? value : undefined);
+  let created;
+  try {
+    created = createTask({
+      root,
+      config,
+      board: config.defaultBoard || "main",
+      slug: slugify(EXAMPLE_TITLE),
+      fields: {
+        title: EXAMPLE_TITLE,
+        priority: offer("P2", config.priorities),
+        estimate: offer("30m", config.estimates),
+        verification: EXAMPLE_VERIFICATION,
+      },
+      body: EXAMPLE_BODY,
+    });
+  } catch (e) {
+    if (!e || e.code !== "EVOCABULARY") throw e;
+    // The backlog itself is written and correct; only the example could not be.
+    // Saying so beats both a stack trace and a silence — and the same sentence
+    // will meet them again at their first `new`, which is where it matters.
+    return [
+      "  no example task: `_template.md` carries " +
+        e.divergences.map((d) => "`" + d.field + ": " + d.found.map((f) => f.value).join(", ") + "`").join(", ") +
+        ", which config.yaml does not list",
+      "  fix " + e.templatePath + " before `" + N + " new`",
+    ];
+  }
   return ["  example: tasks/" + created.path.split("/").pop() + " (you can delete it)"];
 }
 

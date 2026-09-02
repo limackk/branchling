@@ -19,12 +19,14 @@
  * repository) and `<repo>` itself (a co-located consumer). The tool supports
  * both, so its own tests must not hard-code either.
  */
-import { existsSync, mkdtempSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { HOME_ENV } from "../home.mjs";
+import { loadConfig } from "../config.mjs";
+import { templateDrift } from "../new-task.mjs";
 import { looksLikeBacklogDir } from "../paths.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -83,4 +85,37 @@ export function isolateHome(label = "home") {
   const dir = mkdtempSync(join(tmpdir(), "worktrail-test-" + label + "-"));
   process.env[HOME_ENV] = dir;
   return dir;
+}
+
+
+/**
+ * Move a fixture's `_template.md` onto the vocabulary its `config.yaml` declares.
+ *
+ * WHY EVERY FIXTURE THAT REWRITES A VOCABULARY NEEDS THIS (TL-69). `init`
+ * writes a template carrying the DEFAULT values, and a fixture that then
+ * replaces `statuses:` has manufactured exactly the drift TL-69 made `new`
+ * refuse: the template offers `pending` to a project that has never heard of
+ * it. Before TL-69 those fixtures got away with it, and what they were
+ * silently testing was the defect.
+ *
+ * It corrects the template rather than relaxing the rule, because that is what
+ * the refusal tells a real user to do — a fixture that reached for an escape
+ * hatch would be proving something no user can reproduce.
+ *
+ * The drift is MEASURED with the tool's own audit, not with a list of fields
+ * written here: a field added to the vocabulary later would otherwise start
+ * failing in three test files at once, for a reason none of them mentions.
+ *
+ * Scalar enums only — a list field has no single "first allowed value", and no
+ * fixture needs one.
+ */
+export function alignTemplate(root) {
+  const path = join(root, "_template.md");
+  let text = readFileSync(path, "utf8");
+  for (const d of templateDrift(text, loadConfig(root))) {
+    if (!d.allowed.length) continue;
+    text = text.replace(new RegExp("^" + d.field + ":.*$", "m"), d.field + ": " + d.allowed[0]);
+  }
+  writeFileSync(path, text, "utf8");
+  return path;
 }

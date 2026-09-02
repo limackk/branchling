@@ -27,7 +27,7 @@ import { join } from "node:path";
 
 import { isUnblocked, selectCandidates } from "../next-task.mjs";
 import { unblockedReason } from "../take-task.mjs";
-import { SCRIPTS_DIR } from "./_repo.mjs";
+import { SCRIPTS_DIR, alignTemplate } from "./_repo.mjs";
 
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
 
@@ -63,6 +63,10 @@ function repo() {
     .replace(/^in_progress_status:.*$/m, "")
     .replace(/^reason_required_statuses:.*$/m, "");
   writeFileSync(p, text + "\n" + CONFIG_LINES + "\n", "utf8");
+  // The template still offers the DEFAULT statuses; against this vocabulary that
+  // is the drift `new` refuses since TL-69, so the fixture fixes it the way a
+  // user would.
+  alignTemplate(dir);
   return dir;
 }
 

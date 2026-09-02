@@ -35,7 +35,7 @@ import { join } from "node:path";
 import { FIELD_COMMENT, historyEntryKind } from "../task-fields.mjs";
 import { appendEntries, eventId, readHistory } from "../history.mjs";
 import { requeueStatus } from "../handoff-task.mjs";
-import { SCRIPTS_DIR } from "./_repo.mjs";
+import { SCRIPTS_DIR, alignTemplate } from "./_repo.mjs";
 
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
 
@@ -56,6 +56,10 @@ function repo(configLines) {
   if (configLines) {
     const p = join(dir, "config.yaml");
     writeFileSync(p, readFileSync(p, "utf8") + "\n" + configLines + "\n", "utf8");
+    // A fixture that replaces the vocabulary leaves `init`'s template offering
+    // the default one — the drift `new` refuses since TL-69. Corrected here the
+    // way the refusal tells a user to correct it.
+    alignTemplate(dir);
   }
   return dir;
 }
