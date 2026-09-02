@@ -32,7 +32,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { agentFor, agentInput, blockedReason, parseRunArgs, renderAgentCommand, servedRoles, stuckStatus, waitingForRole } from "../run-loop.mjs";
+import { agentFor, agentInput, blockedReason, parseRunArgs, renderAgentCommand, servedRoles, stuckStatus, waitingForExecutor, waitingForRole } from "../run-loop.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPTS = join(HERE, "..");
@@ -543,4 +543,51 @@ test("waitingForRole counts only OPEN work in roles nobody here serves", () => {
   ];
   assert.deepEqual(waitingForRole(records, config, ["archivist"]), { stonemason: ["FX-2"] });
   assert.deepEqual(waitingForRole(records, config, ["archivist", "stonemason"]), {});
+});
+
+// ── executor: the loop leaves a person's tasks alone (TL-113) ─────────────
+
+test("a run under an agent actor never works a task marked `executor: human`", () => {
+  const { dir, repo, backlog, env, ids } = fixture(2);
+  try {
+    const file = join(backlog, "tasks", readdirSync(join(backlog, "tasks")).find((f) => f.startsWith(ids[0] + "-")));
+    writeFileSync(file, readFileSync(file, "utf8").replace(/^role:(.*)$/m, "role:$1\nexecutor: human"), "utf8");
+
+    const agent = agentScript(dir, "a.sh", 'id=$(grep -m1 "^id: " | sed "s/^id: //"); touch "$id.done"');
+    const r = cli(["run", "--dir", backlog, "--actor", "agent:worker", "--agent", agent, "--json"], env, { cwd: repo });
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(statusOf(backlog, ids[0]), "pending", "the person's task was worked by an agent");
+    assert.equal(statusOf(backlog, ids[1]), "done");
+    const out = JSON.parse(r.stdout);
+    assert.deepEqual(out.waitingForExecutor, [{ executor: "human", count: 1, ids: [ids[0]] }]);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("the report says so in words, not only in the JSON", () => {
+  const { dir, repo, backlog, env, ids } = fixture(1);
+  try {
+    const file = join(backlog, "tasks", readdirSync(join(backlog, "tasks")).find((f) => f.startsWith(ids[0] + "-")));
+    writeFileSync(file, readFileSync(file, "utf8").replace(/^role:(.*)$/m, "role:$1\nexecutor: human"), "utf8");
+    const agent = agentScript(dir, "a.sh", "cat > /dev/null");
+    const r = cli(["run", "--dir", backlog, "--actor", "agent:worker", "--agent", agent], env, { cwd: repo });
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /1 task\(s\) ask for `executor: human`/);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("waitingForExecutor counts only OPEN work this species may not be handed", () => {
+  const config = { archivedStatuses: ["done"], inProgressStatus: "in_progress" };
+  const records = [
+    { id: "FX-1", executor: "human", status: "pending" },
+    { id: "FX-2", executor: "human", status: "done" },          // closed
+    { id: "FX-3", executor: "human", status: "in_progress" },   // somebody has it
+    { id: "FX-4", executor: "", status: "pending" },            // anybody
+    { id: "FX-5", executor: "agent", status: "pending" },       // this run IS one
+  ];
+  assert.deepEqual(waitingForExecutor(records, config, "agent"), { human: ["FX-1"] });
+  assert.deepEqual(waitingForExecutor(records, config, "human"), { agent: ["FX-5"] });
 });

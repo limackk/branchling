@@ -29,7 +29,7 @@ import { fileURLToPath } from "node:url";
 
 import { acquireLock, isExpired, listLocks, lockScope, readLock, releaseLock, stateRoot } from "../lock.mjs";
 import { loadConfig, parseConfigYaml } from "../config.mjs";
-import { queueStatuses, selectCandidates } from "../next-task.mjs";
+import { callerSpecies, queueStatuses, selectCandidates, servesExecutor } from "../next-task.mjs";
 import { readTaskRecords } from "../task-select.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -575,4 +575,90 @@ test("`take <ID>` is untouched by roles — the gate belongs to the dispatcher",
   const r = run(["take", ids[0], "--dir", backlog, "--actor", "agent:a"], env);
   assert.equal(r.status, 0, r.stderr);
   assert.equal(field(taskText(backlog, ids[0]), "status"), "in_progress");
+});
+
+// ── executor: who may be HANDED it (TL-113) ───────────────────────────────
+//
+// A third axis, and the test keeps it separate from the other two on purpose:
+// `role` is a competence and its vocabulary is the project's, `executor` is a
+// species and its two values are the shape of the field. Mixing them in one
+// case would hide which one did the excluding.
+
+function withExecutor(backlog, assignments) {
+  for (const [id, value] of Object.entries(assignments)) {
+    const name = readdirSync(join(backlog, "tasks")).find((f) => f.startsWith(id + "-"));
+    const file = join(backlog, "tasks", name);
+    const text = readFileSync(file, "utf8");
+    writeFileSync(file, /^executor:/m.test(text)
+      ? text.replace(/^executor:.*$/m, "executor: " + value)
+      : text.replace(/^role:(.*)$/m, "role:$1\nexecutor: " + value), "utf8");
+  }
+}
+
+test("an agent is never handed a task marked `executor: human`", () => {
+  const { backlog, env, ids } = fixture(["P1", "P2"]);
+  withExecutor(backlog, { [ids[0]]: "human" });
+
+  const r = run(["next", "--dir", backlog, "--actor", "agent:claude", "--json"], env);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(JSON.parse(r.stdout).id, ids[1], "the P1 marked for a person was handed to an agent");
+
+  // POSITIVE CONTROL: a person asking gets it, and it is the higher priority one.
+  const p = run(["next", "--dir", backlog, "--actor", "local:kamil", "--json"], env);
+  assert.equal(p.status, 0, p.stderr);
+  assert.equal(JSON.parse(p.stdout).id, ids[0]);
+});
+
+test("the skip is counted and named, never silent", () => {
+  const { backlog, env, ids } = fixture(["P1"]);
+  withExecutor(backlog, { [ids[0]]: "human" });
+
+  const r = run(["next", "--dir", backlog, "--actor", "agent:claude"], env);
+  assert.equal(r.status, 3);
+  assert.match(r.stdout, /1 of them wait for a person/);
+  assert.match(r.stdout, new RegExp(ids[0]));
+
+  const j = run(["next", "--dir", backlog, "--actor", "agent:claude", "--json"], env);
+  assert.deepEqual(JSON.parse(j.stdout).skippedExecutor, [{ id: ids[0], executor: "human" }]);
+});
+
+test("`executor: agent` is the mirror image, and a person is the one skipped", () => {
+  const { backlog, env, ids } = fixture(["P1", "P2"]);
+  withExecutor(backlog, { [ids[0]]: "agent" });
+
+  const person = run(["next", "--dir", backlog, "--actor", "local:kamil", "--json"], env);
+  assert.equal(JSON.parse(person.stdout).id, ids[1]);
+  const agent = run(["next", "--dir", backlog, "--actor", "agent:claude", "--json"], env);
+  assert.equal(JSON.parse(agent.stdout).id, ids[0]);
+});
+
+test("`take <ID>` is untouched: naming a task IS the human decision", () => {
+  const { backlog, env, ids } = fixture(["P1"]);
+  withExecutor(backlog, { [ids[0]]: "human" });
+  const r = run(["take", ids[0], "--dir", backlog, "--actor", "agent:claude"], env);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(field(taskText(backlog, ids[0]), "status"), "in_progress");
+  // And it is in the history under the agent that took it, so "who did this"
+  // still has an answer.
+  const row = historyEntries(backlog, ids[0]).find((e) => e.field === "status" && e.to === "in_progress");
+  assert.equal(row.actor, "agent:claude");
+});
+
+test("a task with no `executor` is handed to anybody — the field is optional", () => {
+  const { backlog, env, ids } = fixture(["P1"]);
+  const r = run(["next", "--dir", backlog, "--actor", "agent:claude", "--json"], env);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(JSON.parse(r.stdout).id, ids[0]);
+});
+
+test("the species comes from the actor's namespace and nothing else", () => {
+  assert.equal(callerSpecies("agent:claude"), "agent");
+  assert.equal(callerSpecies("AGENT:Claude"), "agent");
+  assert.equal(callerSpecies("local:kamil"), "human");
+  assert.equal(callerSpecies("user:kamil"), "human");
+  assert.equal(callerSpecies(""), "human");
+  // An empty field means anybody, which is the majority of tasks.
+  assert.equal(servesExecutor({ executor: "" }, "agent"), true);
+  assert.equal(servesExecutor({ executor: "human" }, "agent"), false);
+  assert.equal(servesExecutor({ executor: "human" }, "human"), true);
 });

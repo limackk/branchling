@@ -46,7 +46,7 @@ import { loadConfigOrExit } from "./config.mjs";
 import { repoRootFor } from "./done-task.mjs";
 import { recordEdit } from "./history.mjs";
 import { lockScope, releaseLock, stateRoot } from "./lock.mjs";
-import { queueStatuses, selectCandidates } from "./next-task.mjs";
+import { callerSpecies, queueStatuses, selectCandidates, servesExecutor } from "./next-task.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { rebuildViews, resolveActor, todayStamp } from "./take-task.mjs";
@@ -186,6 +186,27 @@ export function servedRoles(plan) {
  * defect as a silent no-op. So the run reports "3 task(s) waiting for `analyst`
  * — no command was given for that role" and names the ids.
  */
+/**
+ * Open work this invocation may not be handed because of `executor:` (TL-113).
+ * PURE.
+ *
+ * The same rule as `waitingForRole` and for the same reason: a skip nobody
+ * names looks like an empty queue. The usual case is `executor: human` under an
+ * `agent:` actor, and then this list IS the escalation — "N tasks are waiting
+ * for you".
+ */
+export function waitingForExecutor(records, config, species) {
+  const archived = new Set(config.archivedStatuses || []);
+  const inProgress = config.inProgressStatus || null;
+  const out = {};
+  for (const t of records || []) {
+    if (servesExecutor(t, species)) continue;
+    if (archived.has(t.status) || t.status === inProgress) continue;
+    (out[String(t.executor).trim()] = out[String(t.executor).trim()] || []).push(t.id);
+  }
+  return out;
+}
+
 export function waitingForRole(records, config, served) {
   const archived = new Set(config.archivedStatuses || []);
   const inProgress = config.inProgressStatus || null;
@@ -485,6 +506,16 @@ function renderReport(report, plan) {
       lines.push("      " + color.dim(ids.join(", ")));
     }
   }
+  const waitingExecutors = Object.keys(report.waitingExecutor || {}).sort();
+  if (waitingExecutors.length) {
+    lines.push("");
+    lines.push("  waiting for an executor this run is not:");
+    for (const kind of waitingExecutors) {
+      const ids = report.waitingExecutor[kind];
+      lines.push("    " + MARK.warn + " " + ids.length + " task(s) ask for `executor: " + kind + "`");
+      lines.push("      " + color.dim(ids.join(", ")));
+    }
+  }
   lines.push("");
   lines.push("  " + color.dim("stopped: " + report.stopped));
   if (plan.dryRun) lines.push("  " + color.dim("`--dry-run`: no agent was run and nothing was claimed"));
@@ -573,7 +604,7 @@ export function run(argv) {
   // second implementation of the policy — the same module, not a copy of it.
   if (plan.dryRun) {
     const records = readTaskRecords(backlogPaths(root).tasksDir, config.taskId.file);
-    const { candidates } = selectCandidates(records, config, filters, Date.now());
+    const { candidates } = selectCandidates(records, config, { ...filters, callerSpecies: callerSpecies(actor) }, Date.now());
     const shown = plan.maxTasks ? candidates.slice(0, plan.maxTasks) : candidates;
     if (plan.json) {
       console.log(JSON.stringify({
@@ -673,15 +704,17 @@ export function run(argv) {
   // Counted from the tree AFTER the run: what is left that this invocation had
   // no hand for. It is not an error and not a failure — it is the escalation,
   // and naming it is the whole point (a silent skip looks like an empty queue).
-  const waiting = served.length
-    ? waitingForRole(readTaskRecords(backlogPaths(root).tasksDir, config.taskId.file), config, served)
-    : {};
+  const leftover = readTaskRecords(backlogPaths(root).tasksDir, config.taskId.file);
+  const waiting = served.length ? waitingForRole(leftover, config, served) : {};
+  const waitingExecutor = waitingForExecutor(leftover, config, callerSpecies(actor));
 
-  const report = { taken, tally, ms: Date.now() - started, stopped, waiting };
+  const report = { taken, tally, ms: Date.now() - started, stopped, waiting, waitingExecutor };
   if (plan.json) {
     console.log(JSON.stringify({
       ok: true, dryRun: false, agent: plan.agent, agentFor: plan.agentFor, stopped,
       waitingForRole: Object.keys(waiting).sort().map((r) => ({ role: r, count: waiting[r].length, ids: waiting[r] })),
+      waitingForExecutor: Object.keys(waitingExecutor).sort()
+        .map((e) => ({ executor: e, count: waitingExecutor[e].length, ids: waitingExecutor[e] })),
       tally: { ...tally, taken: taken.length },
       ms: report.ms,
       tasks: taken.map((r) => ({

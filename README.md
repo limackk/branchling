@@ -299,6 +299,18 @@ worktrail run --agent "claude -p @{task_file}" --max-attempts 2
 worktrail run --dry-run          # the order it would work in; claims nothing
 ```
 
+**Some decisions are not an agent's to make.** `executor: human` on a task says
+so, whatever its role — the product decision an analyst-agent could phrase but
+must not settle. It gates the DISPATCHER and nothing else: `next` and `run`
+called by an `agent:` actor skip such tasks and count them by name ("N wait for
+a person"), while `take <ID>` still works, because a person naming a task is
+themselves the human decision the field asks for. `executor: agent` is the
+mirror image, for work nobody should do by hand. The species of the caller is
+read off the actor's namespace, so there is nothing to configure; the two values
+are the shape of the field and are not in `config.yaml`, because a project that
+could invent a third species would leave the dispatcher nothing to compare
+against.
+
 **One queue, several hands.** A task may ask for a competence in `role:`, and a
 run can serve more than one of them: `--agent-for <role>=<command>`, repeatable,
 with `--agent` serving the tasks that ask for nobody in particular. A role you

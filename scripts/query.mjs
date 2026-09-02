@@ -17,13 +17,15 @@
  * Usage:
  *   query --status blocked --board main
  *   query --role analyst          (--role "" = the tasks open to anybody)
+ *   query --executor human        (what an agent may not be handed)
  *   query --epic "Legal compliance" --priority P0,P1
  *   query --text sync --limit 10
  *   query --blocked-by TASK-003 --files | xargs code
  *   query --status done --text audit --count
  *
  * Filters (AND between axes, OR inside an axis — comma-separated values):
- *   --status --priority --board --label --epic --owner --type --role --blocked-by
+ *   --status --priority --board --label --epic --owner --type --role --executor
+ *   --blocked-by
  *   --text
  * By default only ACTIVE ones (status not in archived_statuses); passing
  * --status explicitly lifts that restriction, so `--status done` searches the
@@ -49,7 +51,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const VALUE_FLAGS = new Set([
   "--status", "--priority", "--board", "--label", "--epic", "--owner", "--type",
-  "--role", "--blocked-by", "--text", "--limit", "--sort", "--tasks", "--dir",
+  "--role", "--executor", "--blocked-by", "--text", "--limit", "--sort", "--tasks", "--dir",
 ]);
 const BOOL_FLAGS = new Set(["--json", "--files", "--count", "--help", "-h"]);
 
@@ -147,6 +149,7 @@ const f = {
   // rightly means "this axis is not filtered". Here the empty string is one of
   // the values a task can carry, so the flag being PRESENT is what decides.
   role: opts.role === undefined ? null : (splitList(opts.role) || [""]),
+  executor: opts.executor === undefined ? null : (splitList(opts.executor) || [""]),
   blockedBy: splitList(opts["blocked-by"]),
   text: opts.text,
 };
@@ -213,6 +216,7 @@ for (const t of shown) {
   if (t.labels.length) cells.push(`labels: [${t.labels.join(", ")}]`);
   if (t.blocked_by.length) cells.push(`blocked_by: [${t.blocked_by.join(", ")}]`);
   if (t.role) cells.push(`role: ${t.role}`);
+  if (t.executor) cells.push(`executor: ${t.executor}`);
   if (t.epic) cells.push(`epic: ${q(t.epic)}`);
   // The disagreement is NEVER resolved into one status — both values stand, and
   // each is named with the branch it came from (TL-73).

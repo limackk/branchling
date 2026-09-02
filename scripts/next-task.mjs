@@ -133,6 +133,32 @@ export function isExecutable(task, byId, archived) {
 }
 
 /**
+ * Which SPECIES is asking. PURE.
+ *
+ * Read off the actor's namespace and nowhere else (TL-113): `agent:` is an
+ * automated caller, `local:` and `user:` are a person. No new configuration is
+ * needed to know this, because the namespaces already encode it and they are a
+ * closed list in the code (TL-21) — a project that could invent a third species
+ * would leave the dispatcher with nothing to compare against.
+ */
+export function callerSpecies(actor) {
+  return String(actor || "").toLowerCase().startsWith("agent:") ? "agent" : "human";
+}
+
+/**
+ * May this caller be HANDED this task? PURE.
+ *
+ * An empty `executor:` means anybody, which is the overwhelming majority of
+ * tasks and the reason the field is optional. It gates the DISPATCHER only:
+ * `take <ID>` still works, because a person naming a task is themselves the
+ * human decision the field asks for (the rule TL-97 set for `role`).
+ */
+export function servesExecutor(task, species) {
+  const wanted = String((task && task.executor) || "").trim();
+  return !wanted || !species || wanted === species;
+}
+
+/**
  * Is this task in a protected status whose stated blockers are all closed? PURE.
  *
  * THE ASYMMETRY THIS RESTS ON (TL-127). `blocked_by` is a FACT computable from
@@ -248,7 +274,26 @@ export function heldElsewhere(task, handedOut) {
  */
 export function selectCandidates(records, config, filters, now) {
   const archived = new Set(config.archivedStatuses);
+  // The species gate is applied to the RECORDS, before any selection: a task
+  // this caller may not be handed must be invisible to every pool below,
+  // including the reclaim and the unblocked ones. `byId` keeps the WHOLE set —
+  // a blocker is closed or not regardless of who may work it.
   const byId = new Map(records.map((t) => [String(t.id).toUpperCase(), t]));
+  const species = filters.callerSpecies || null;
+  const inProgress = inProgressStatus(config);
+  const skippedExecutor = [];
+  if (species) {
+    const kept = [];
+    for (const t of records) {
+      if (servesExecutor(t, species)) { kept.push(t); continue; }
+      // Only OPEN work is worth naming: a closed task nobody may take is not
+      // waiting for anybody, and a claimed one already has somebody.
+      if (!archived.has(t.status) && t.status !== inProgress) {
+        skippedExecutor.push({ id: t.id, executor: String(t.executor || "").trim() });
+      }
+    }
+    records = kept;
+  }
   const wanted = filters.status || queueStatuses(config);
   const handedOut = new Set(wanted.map((s) => String(s).toLowerCase()));
   const matching = filterTasks(records, { ...filters, status: wanted }, archived)
@@ -294,7 +339,7 @@ export function selectCandidates(records, config, filters, now) {
     candidates.push(...stale);
   }
   return {
-    candidates, reclaimable, unblocked, skippedElsewhere,
+    candidates, reclaimable, unblocked, skippedElsewhere, skippedExecutor,
     // The count is of tasks that MATCHED and were held back by an open blocker;
     // the unblocked ones were never in `matching`, so they must not be
     // subtracted from it.
@@ -363,6 +408,8 @@ export function run(argv) {
     // fleet of specialised agents, is all of them. `--role-strict` is the
     // narrower question, asked explicitly.
     role: wantedRoles ? (plan.roleStrict ? wantedRoles : wantedRoles.concat([""])) : null,
+    // Not a flag: WHO is asking is already in the actor (TL-113).
+    callerSpecies: callerSpecies(actor),
   };
   const now = Date.now();
   const records = readTaskRecords(backlogPaths(root).tasksDir, config.taskId.file);
@@ -371,7 +418,7 @@ export function run(argv) {
   // disagree about the tree they are both looking at.
   const scan = crossBranchState(root, config);
   for (const t of records) t.elsewhere = divergences(t.status, scan.byId.get(t.id));
-  const { candidates, reclaimable, unblocked, skippedBlocked, skippedElsewhere } =
+  const { candidates, reclaimable, unblocked, skippedBlocked, skippedElsewhere, skippedExecutor } =
     selectCandidates(records, config, filters, now);
   // Named, never silent: a candidate that disappears without a word is
   // indistinguishable from an empty queue, and the reader has no second place
@@ -406,7 +453,7 @@ export function run(argv) {
       if (plan.json) {
         console.log(JSON.stringify({
           ...takeJson(result), passedOver, considered: candidates.length,
-          skippedElsewhere, scan: { scanned: scan.scanned, reason: scan.reason },
+          skippedElsewhere, skippedExecutor, scan: { scanned: scan.scanned, reason: scan.reason },
         }, null, 2));
       } else {
         for (const line of elsewhereLines) console.log(color.dim(MARK.bullet + " " + line));
@@ -440,6 +487,18 @@ export function run(argv) {
     );
   }
   if (skippedBlocked) details.push(skippedBlocked + " matching task(s) still have open blockers");
+  // Never silent: a task left out without a word is indistinguishable from an
+  // empty queue, and for `executor: human` the whole point is that somebody is
+  // meant to notice and pick it up.
+  if (skippedExecutor.length) {
+    const waiting = skippedExecutor.filter((s) => s.executor === "human");
+    details.push(
+      skippedExecutor.length + " open task(s) ask for an executor you are not (" +
+        filters.callerSpecies + ")" +
+        (waiting.length ? " — " + waiting.length + " of them wait for a person" : "")
+    );
+    for (const s of skippedExecutor) details.push("  " + MARK.bullet + " " + s.id + " → " + s.executor);
+  }
   if (elsewhereLines.length) {
     details.push(elsewhereLines.length + " candidate(s) are in another state on another branch or worktree");
     for (const line of elsewhereLines) details.push("  " + MARK.bullet + " " + line);
@@ -457,7 +516,7 @@ export function run(argv) {
   if (plan.json) {
     console.log(JSON.stringify({
       ok: false, kind: "nothing-to-take", taken: null,
-      searchedStatuses: searched, skippedBlocked, passedOver, skippedElsewhere,
+      searchedStatuses: searched, skippedBlocked, passedOver, skippedElsewhere, skippedExecutor,
       scan: { scanned: scan.scanned, reason: scan.reason },
     }, null, 2));
   } else {

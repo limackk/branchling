@@ -6,11 +6,11 @@ labels: []
 board: main
 epic: "Wyróżniki agentowe"
 priority: P1
-status: blocked
-owner: unassigned
+status: done
+owner: agent:session
 estimate: 2h
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-02
 blocked_by: [TL-98]
 blocks: [TL-115]
 related_docs:

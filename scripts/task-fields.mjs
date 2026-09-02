@@ -279,6 +279,18 @@ export const FIELD_SHAPES = [
   // (BL-1452); `TASK` is only a fallback for calls made without a configuration.
   { key: "blocked_by", label: "Blocked by", kind: "list", style: "inline", prefixed: true, itemPattern: "^TASK-[0-9]+$", itemHint: "TASK-123" },
   { key: "blocks", label: "Blocks", kind: "list", style: "inline", prefixed: true, itemPattern: "^TASK-[0-9]+$", itemHint: "TASK-123" },
+  // WHO MAY DO IT, as opposed to WHAT COMPETENCE IT NEEDS (TL-113). `role` is
+  // the project's vocabulary; this is the SHAPE of the field, fixed in code and
+  // deliberately absent from config.yaml — the same arrangement the actor
+  // namespaces have had since TL-21. A project does not get to invent a third
+  // species of executor, because the dispatcher would have nothing to compare it
+  // against: it reads the caller's species off the actor's namespace, and that
+  // list is closed too.
+  //
+  // `agent` is admitted for symmetry — a task a person should not do by hand, a
+  // bulk migration — but the case that designed the field is `human`: a product
+  // decision no agent may take, whatever its role.
+  { key: "executor", label: "Executor", kind: "enum", values: ["human", "agent"], allowEmpty: true, dictionaryRequired: true },
   { key: "related_docs", label: "Related docs", kind: "list", style: "block", itemHint: "docs/x.md" },
 ];
 
@@ -323,6 +335,15 @@ export function buildFieldSpecs(config) {
       const p = String(cfg.taskIdPrefix).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       spec.itemPattern = "^" + p + "-[0-9]+$";
       spec.itemHint = cfg.taskIdPrefix + "-123";
+    }
+    // A vocabulary written HERE rather than read from the configuration: the
+    // field's shape is the tool's, not the project's (see `executor` above).
+    if (shape.values) {
+      spec.options = shape.values.slice();
+      // Marked so a report can say WHERE the vocabulary lives. Told that a value
+      // "diverges from config.yaml", a reader would go and edit a key that is not
+      // there.
+      spec.fixed = true;
     }
     if (shape.dynamic) spec.dynamic = shape.dynamic;
     if (shape.dictionary) {
@@ -408,6 +429,7 @@ export function auditVocabulary(metas, config) {
     if (counts.size) {
       out.push({
         field: spec.key,
+        fixed: !!spec.fixed,
         dictionary: spec.dictionary || spec.key,
         label: spec.label,
         allowed: spec.options.slice(),
@@ -470,6 +492,7 @@ export function extractMeta(frontmatter) {
     status: get("status"),
     owner: get("owner"),
     role: get("role") || "",
+    executor: get("executor") || "",
     estimate: get("estimate"),
     confidence: get("confidence"),
     created: get("created"),

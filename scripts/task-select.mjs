@@ -65,6 +65,9 @@ export function parseTaskRecord(raw, file) {
     owner: str(meta.owner),
     // WHO MAY take it, as opposed to `owner` — who holds it now (TL-97).
     role: str(meta.role),
+    // WHICH SPECIES may take it (TL-113) — a different axis from `role`, which
+    // is a competence. Empty means anybody.
+    executor: str(meta.executor),
     type: str(meta.type),
     labels: meta.labels,
     blocked_by: meta.blocked_by,
@@ -134,6 +137,9 @@ export function filterTasks(tasks, f, archived) {
     // "what is open to anybody". `[""]` is therefore a filter, not an absent one
     // — see how query.mjs builds it, which is why it cannot come from splitList.
     if (f.role && !anyOf(f.role, t.role)) return false;
+    // Same treatment as `role`: `--executor ""` asks "what is open to either",
+    // so the flag being present is what decides, not its value.
+    if (f.executor && !anyOf(f.executor, t.executor)) return false;
     if (f.label && !f.label.some((l) => t.labels.includes(l))) return false;
     if (f.epic && !f.epic.some((e) => String(t.epic || "").toLowerCase().includes(e.toLowerCase()))) return false;
     if (f.blockedBy && !f.blockedBy.some((b) => t.blocked_by.includes(b))) return false;

@@ -5,3 +5,6 @@
 {"id":"01M1E4W6RG8P2H29YQPBAG76G5","ts":"2026-09-01T09:30:17.744Z","task":"TL-113","field":"related_docs","from":[],"to":["docs/backlog-human-agent-decisions.md"],"actor":"unknown","source":"external"}
 {"id":"01M1F5BNKG7SHW74YNTYG1TS2A","ts":"2026-09-01T18:57:58.896Z","task":"TL-113","field":"blocked_by","from":["TL-1508"],"to":["TL-98"],"actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1F5BNKGCZBBGR9NF40JX2R3","ts":"2026-09-01T18:57:58.896Z","task":"TL-113","field":"blocks","from":["TL-1525"],"to":["TL-115"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1G8VKH49YK72NWRYAVGNHA2","ts":"2026-09-02T05:18:21.220Z","task":"TL-113","field":"status","from":"blocked","to":"in_progress","actor":"agent:session","source":"next","reason":"left `blocked`: every task it named is closed (TL-98)"}
+{"id":"01M1G8VKH4DX1SHZ7NG22D86F3","ts":"2026-09-02T05:18:21.220Z","task":"TL-113","field":"owner","from":"unassigned","to":"agent:session","actor":"agent:session","source":"next","reason":"left `blocked`: every task it named is closed (TL-98)"}
+{"id":"01M1G9B3HHBF52BMYVWX0ADYZ8","ts":"2026-09-02T05:26:49.137Z","task":"TL-113","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

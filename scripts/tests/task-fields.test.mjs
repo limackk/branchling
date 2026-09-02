@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   FIELD_SHAPES,
+  auditVocabulary,
   buildFieldSpecs,
   extractMeta,
   splitFrontmatter,
@@ -337,4 +338,39 @@ test("the module has no imports — its source is pasted into the viewer", async
   const src = readFileSync(new URL("../task-fields.mjs", import.meta.url), "utf8");
   assert.doesNotMatch(src, /^\s*import\s/m);
   assert.doesNotMatch(src, /<\/script/i);
+});
+
+// ── executor: a fixed shape, not a project vocabulary (TL-113) ────────────
+
+test("`executor` is an enum whose two values come from the code, not config.yaml", () => {
+  // Built with an EMPTY configuration on purpose: a field whose vocabulary were
+  // read from the project would degrade to text here, and the whole point is
+  // that this one does not.
+  const spec = fieldSpec("executor", buildFieldSpecs({}));
+  assert.equal(spec.kind, "enum");
+  assert.deepEqual(spec.options, ["human", "agent"]);
+  assert.equal(spec.allowEmpty, true);
+  assert.equal(spec.fixed, true);
+});
+
+test("`executor` admits its two values and the empty one, and nothing else", () => {
+  const ctx = { fields: buildFieldSpecs({}) };
+  for (const value of ["human", "agent", ""]) {
+    assert.equal(normalizeValue("executor", value, ctx).ok, true, value + " was refused");
+  }
+  const bad = normalizeValue("executor", "robot", ctx);
+  assert.equal(bad.ok, false);
+  assert.match(bad.error, /allowed: human, agent/);
+});
+
+test("a value outside the fixed set is reported as a task to correct, not a key to add", () => {
+  const audit = auditVocabulary([{ executor: "robot" }], {});
+  const entry = audit.find((a) => a.field === "executor");
+  assert.ok(entry, "the audit did not judge `executor` at all");
+  assert.equal(entry.fixed, true);
+  assert.deepEqual(entry.found, [{ value: "robot", count: 1 }]);
+});
+
+test("a task with no `executor` is not a divergence — the field is optional", () => {
+  assert.equal(auditVocabulary([{ executor: "" }, {}], {}).some((a) => a.field === "executor"), false);
 });

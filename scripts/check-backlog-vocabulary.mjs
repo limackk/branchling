@@ -103,9 +103,14 @@ export function report(divergent, names, metas) {
 
   const lines = [];
   const fields = divergent.map((d) => "`" + d.field + "`").join(", ");
-  lines.push(`${ERRM} vocabulary: ${divergent.length} field(s) diverge from config.yaml: ${fields}`);
+  lines.push(`${ERRM} vocabulary: ${divergent.length} field(s) carry a value outside their vocabulary: ${fields}`);
   for (const d of divergent) {
-    lines.push(`  \`${d.field}\` — allowed by \`${d.dictionary}:\` [${d.allowed.join(", ")}]`);
+    // A field whose values are the TOOL's shape has no key in config.yaml, and
+    // saying it "diverges from config.yaml" would send the reader to edit
+    // something that is not there (TL-113).
+    lines.push(d.fixed
+      ? `  \`${d.field}\` — a fixed set, not a vocabulary of this project: [${d.allowed.join(", ")}]`
+      : `  \`${d.field}\` — allowed by \`${d.dictionary}:\` [${d.allowed.join(", ")}]`);
     for (const f of d.found) {
       const carriers = filesCarrying(names, metas, d.field, f.value);
       lines.push(`    ${f.value} ×${f.count} in ${carriers.length} file(s):`);
@@ -115,9 +120,15 @@ export function report(divergent, names, metas) {
       }
     }
   }
-  lines.push("  Two ways out, and they are not equivalent: add the value to config.yaml if the");
-  lines.push("  tree is right, or correct the tasks if the vocabulary is. Which side is the");
-  lines.push("  truth is a decision about this project, so the guard does not pick one.");
+  if (divergent.some((d) => !d.fixed)) {
+    lines.push("  Two ways out, and they are not equivalent: add the value to config.yaml if the");
+    lines.push("  tree is right, or correct the tasks if the vocabulary is. Which side is the");
+    lines.push("  truth is a decision about this project, so the guard does not pick one.");
+  }
+  if (divergent.some((d) => d.fixed)) {
+    lines.push("  A FIXED set has only one way out: correct the task. Those values are the shape");
+    lines.push("  of the field rather than this project's words, so there is no key to add to.");
+  }
   return { lines, code: 1 };
 }
 
