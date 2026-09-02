@@ -31,6 +31,11 @@ export const IGNORE_RULES = [
   "boards/*/NOW.yaml",
   "viewer.html",
   "history/.snapshot.json",
+  // The raw evidence of activity (TL-27). It is somebody's working calendar, and
+  // one `git add -A` in a repository this tool was dropped into would put it in a
+  // public history irreversibly. The per-task AGGREGATE under `activity/rollup/`
+  // is deliberately NOT matched by this pattern and stays versioned.
+  "activity/*.jsonl",
 ];
 
 export const ATTRIBUTE_RULES = ["history/*.jsonl merge=union"];
@@ -51,6 +56,7 @@ export const VIEW_PATHS = [
   "boards/main/INDEX.yaml",
   "viewer.html",
   "history/.snapshot.json",
+  "activity/TASK-1.jsonl",
 ];
 
 function git(root, args) {

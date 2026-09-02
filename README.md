@@ -830,6 +830,8 @@ not invented.
 | `board` | which board a task belongs to | `worktrail board backlog/tasks/TASK-2-….md --json` |
 | `stats` | the state of the backlog, in the terminal | `worktrail stats --json` |
 | `plan` | where the execution order has got to | `worktrail plan --json` |
+| `time` | lead time and throughput, with what is missing | `worktrail time --json` |
+| `backfill-completions` | recover WHEN each closed task was finished, from git | `worktrail backfill-completions --dry-run` |
 | `doctor` | is the backlog set up correctly | `worktrail doctor` |
 | `done` | close a task by RUNNING its verification | `worktrail done TASK-42 --dry-run` |
 | `check` | the backlog guards | `worktrail check --refs` |
@@ -874,6 +876,7 @@ implementation detail. Every reading command answers in the same envelope:
 | `next-id` | `next-id` | `nextId`, `id`, `prefix`, `max`, `source`, `trees`, `branches`, `known` |
 | `instructions` | `instructions` | `topics`, `topic`, `text`, `version` |
 | `plan` | `plan` | `root`, `exists`, `updated`, `rationale`, `waves`, `activeWave`, `nextUp`, `inProgress`, `unplanned`, `stale`, `inProgressStatus` |
+| `time` | `time` | `root`, `closed`, `completed`, `unstamped` (ids, not a count), `leadTimeDays`, `throughput`, `perWeekMean` |
 | `seed` | `seed` | `ok`, `root`, `dryRun`, `created`, `errors` |
 
 **What is promised.**

@@ -90,6 +90,13 @@ export const KINDS = {
     activeWave: null, nextUp: [], inProgress: [], unplanned: [], stale: [],
     inProgressStatus: null,
   },
+  // `unstamped` is a LIST and not a count, for the reason `unplanned` is: the
+  // tasks outside a measurement are the thing a reader has to be able to go and
+  // look at, and a number cannot be acted on (TL-27).
+  time: {
+    root: null, closed: null, completed: null, unstamped: [],
+    leadTimeDays: null, throughput: [], perWeekMean: null,
+  },
 };
 
 /** The envelope's own keys — a payload may never carry them. */

@@ -1,3 +1,6 @@
 {"id":"01M19PNBM1MXAX7KXVDC2W1F9W","ts":"2026-08-30T16:04:55.553Z","task":"TL-27","field":"__created__","from":"","to":"Pomiar czasu pracy — fundament i uczciwy punkt zero","actor":"unknown","source":"external"}
 {"id":"01M19QJREHCPGXEZY505990QNJ","ts":"2026-08-30T16:20:58.961Z","task":"TL-27","field":"blocks","from":["BL-1425"],"to":["BL-1425","BL-1429"],"actor":"unknown","source":"external"}
 {"id":"01M1F5BNKGD4V050W7G1T22307","ts":"2026-09-01T18:57:58.896Z","task":"TL-27","field":"blocks","from":["TL-1425","TL-1429"],"to":["TL-28","TL-31"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GBFW2MHSGD3A56Z6SGBF9A","ts":"2026-09-02T06:04:22.484Z","task":"TL-27","field":"status","from":"pending","to":"in_progress","actor":"agent:session","source":"take","reason":"unknown"}
+{"id":"01M1GBFW2M5NT5F7HMVSN5FY0Z","ts":"2026-09-02T06:04:22.484Z","task":"TL-27","field":"owner","from":"unassigned","to":"agent:session","actor":"agent:session","source":"take","reason":"unknown"}
+{"id":"01M1GC3KHQN14ZM6VBVRP6N0D7","ts":"2026-09-02T06:15:09.111Z","task":"TL-27","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

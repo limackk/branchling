@@ -6,20 +6,25 @@ labels: [post-launch]
 board: main
 epic: "Backlog — pomiar czasu pracy"
 priority: P2
-status: pending
-owner: unassigned
+status: done
+owner: agent:session
 estimate: 1d
 confidence: medium
 created: 2026-08-30
-updated: 2026-08-30
+updated: 2026-09-02
 blocked_by: []
 blocks: [TL-28, TL-31]
 related_docs:
   - docs/backlog-time-tracking.md
-verification:
-  - bash: "node --test backlog/scripts/tests/activity.test.mjs"
-  - bash: "node backlog/scripts/cli.mjs time --json | python3 -c \"import json,sys; d=json.load(sys.stdin); assert d['completed'] > 900, d; print('ukończonych ze stemplem:', d['completed'])\""
-  - bash: "git check-ignore -q backlog/activity/TL-27.jsonl && echo 'surowy log poza gitem — OK'"
+verification:                      # paths corrected to THIS repository: see Decision
+  - id: unit-tests
+    bash: "node --test scripts/tests/activity.test.mjs"
+  - id: stamps-recovered
+    bash: "node scripts/cli.mjs backfill-completions && node scripts/cli.mjs time --json | node -e \"let s='';process.stdin.on('data',c=>s+=c).on('end',()=>{const d=JSON.parse(s);if(!(d.completed>0))throw new Error('no completion stamps: '+s);if(d.unstamped.length)throw new Error('closed tasks with no stamp: '+d.unstamped.join(','));console.log('stamped:',d.completed)})\""
+  - id: idempotent
+    bash: "node scripts/cli.mjs backfill-completions --dry-run | grep -q 'would stamp 0 of' && echo 'a second pass writes nothing — OK'"
+  - id: privacy-both-ways
+    bash: "git check-ignore -q backlog/activity/TL-27.jsonl && ! git check-ignore -q backlog/activity/rollup/TL-27.json && echo 'raw log out of git, rollup in it — OK'"
 ---
 
 ## Cel
@@ -39,6 +44,33 @@ Pomiar wykonany 2026-08-30 przed projektem (pełna tabela: [`backlog-time-tracki
 Co pomiar POTWIERDZIŁ: `git log -S"status: done"` trafia **20/20** z rozdzielczością sekundową, ~60 s dla całego katalogu. Natomiast `-S"status: in_progress"` trafia **3/20** — agent zwykle commituje `pending → done` jednym ruchem, więc stan pośredni nigdy nie powstał.
 
 Stąd granica tego taska, i jest ona świadoma: **backfillujemy stempel ukończenia, NIE backfillujemy czasu pracy.** Czas pracy sprzed dnia zero nie istnieje i wywnioskowanie go byłoby tą samą klasą ładnej nieprawdy, dla której [`backlog-field-editing-history.md §6`](../../docs/backlog-field-editing-history.md) odrzucił backfill autorstwa z gita.
+
+## Decision (2026-09-02)
+
+**The contract was rewritten to this repository's paths, and the reason is
+recorded here rather than done quietly.** The task was written in the repository
+this tool was extracted from: it names `backlog/scripts/`, `docs/architecture/`
+and `qa/`, none of which exist here, and asserts `completed > 900` against a
+backlog of 1023 closed tasks. This one holds 83. Every one of those numbers and
+paths was corrected; nothing about the SUBSTANCE of the contract changed — the
+four questions it asks (do the unit tests pass, are the stamps recovered, is a
+second pass idempotent, is the raw log out of git while the rollup is in it) are
+the ones it always asked.
+
+Two acceptance criteria named files that do not exist in this repository and
+were not created to satisfy a checkbox: `docs/architecture/backlog-time-tracking.md`
+is `docs/backlog-time-tracking.md` here, and it gained a §12 saying what is
+implemented; `qa/backlog-time-tracking.yaml` has no counterpart — this repository
+keeps its evidence in `scripts/tests/`, and inventing a directory to tick a line
+would be the opposite of what the criterion is for.
+
+**A measurement of this repository, recorded because it is uncomfortable.** The
+git history was flattened to one commit at extraction (`LINEAGE.md`), so for
+every task closed before that commit the pickaxe finds the flattening rather
+than the work — here, all 83 stamps land in one week. The stamps are truthful
+about the files and misleading about the calendar, and the tool cannot tell the
+difference. It is written into §12 of the document instead of being left for
+somebody to discover in a chart.
 
 ## Pre-flight reading
 

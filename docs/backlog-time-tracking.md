@@ -248,3 +248,41 @@ TL-31 jest **1b, nie 4**: dane osobowe zaczynają powstawać w chwili uruchomien
 2. **Że `unknown` da się utrzymać nisko.** Jeśli po fazie 1 przekracza ~30%, zły jest łańcuch atrybucji (§8), a nie dane.
 3. **Że próg 10 minut jest właściwy.** Wzięty z praktyki WakaTime, nie z pomiaru na tych danych. Po fazie 1 da się go dobrać z rozkładu odstępów między heartbeatami — i wtedy trzeba, bo dziś to najsłabiej uzasadniona liczba w tym dokumencie.
 4. **Że throttling 60 s nie gubi krótkich sesji.** Praca krótsza niż jeden interwał daje klaster jednoelementowy, czyli zero minut (§6 reguła 1). Jeśli takich klastrów okaże się dużo, próg throttlingu jest za wysoki albo reguła 1 za surowa — rozstrzyga liczba klastrów jednoelementowych, którą raport ma podawać właśnie po to.
+
+## 12. What is implemented (2026-09-02, TL-27)
+
+This section is in English because it is new text; the rest of the document is
+translated by TL-137. What exists now:
+
+- `scripts/activity.mjs` — the append-only row store (§5) and the per-task
+  rollup. `kind` and `attribution` are closed sets in the code; an unknown value
+  is refused before anything is appended, because the file cannot be edited
+  afterwards. A corrupt line is skipped and the rest of the task's rows are
+  returned (§5.4).
+- `scripts/backfill-completions.mjs` and `worktrail backfill-completions` — the
+  completion stamp recovered with `git log -S"status: <archived>"`, written as
+  one `commit` row per closed task. Idempotent by EVENT, not by row id: a ULID
+  is fresh on every run, so the key is `(task, kind, ts)`.
+- `scripts/time-report.mjs` and `worktrail time` — lead time (median, p80, p95
+  by nearest rank) and throughput per ISO week, always with the number of closed
+  tasks that have NO stamp.
+- `backlog/.gitignore` — `activity/*.jsonl` is out of git, `activity/rollup/` is
+  in it, and `worktrail init` writes the same rule into a new backlog.
+- `config.yaml` — `activity_privacy`, `idle_gap_minutes`,
+  `heartbeat_throttle_seconds`, `min_report_n`, `activity_retention_days`. The
+  whole set at once, because an unknown key fails: adding them one task at a time
+  would be four schema changes, each rejecting a config written for the next.
+
+**What is deliberately NOT implemented:** engaged time. Nothing here records how
+long anybody was at the keyboard. The stamps give calendar time only, and
+`worktrail time` says so on every report rather than leaving it to be worked out.
+That measurement starts at the first heartbeat and is TL-28's.
+
+**A limit that belongs to THIS repository, not to the tool.** The git history was
+flattened to a single commit at extraction ([`LINEAGE.md`](../LINEAGE.md)), so
+for every task closed before that commit the pickaxe finds the flattening, not
+the work. The stamps here are therefore truthful about the file and misleading
+about the calendar for anything older than the squash — the numbers are real
+measurements of a history that was rewritten. In a repository whose history was
+never flattened the same command reads the real dates. The report cannot detect
+this and does not pretend to; it is recorded here instead.

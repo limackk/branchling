@@ -105,6 +105,29 @@ export const DEFAULTS = Object.freeze({
   // picking one by guesswork would write into somebody's tree a value they never
   // chose, and it would do it unattended.
   in_progress_status: null,
+  // ── Time measurement (TL-27) ────────────────────────────────────────────
+  // The whole set is declared HERE and now, although only `activity_privacy` is
+  // read yet: an unknown key FAILS, so adding these one task at a time would be
+  // four changes to the schema and four upgrades that reject a config written
+  // for the next one.
+  //
+  // Where the raw heartbeats may go: `local` keeps them out of git (the
+  // `.gitignore` block), `shared` versions them. The default is the one that
+  // cannot leak somebody's working calendar into a public history by way of one
+  // `git add -A`.
+  activity_privacy: "local",
+  // How long a gap between heartbeats ends a working session, in minutes. The
+  // WakaTime model, borrowed deliberately rather than invented.
+  idle_gap_minutes: 10,
+  // How rarely a source may record a heartbeat, in seconds. A tool firing on
+  // every keystroke would measure typing speed, not work.
+  heartbeat_throttle_seconds: 60,
+  // Below this many samples a report says "not enough" rather than a median of
+  // three. A number computed from too little data is read exactly like one that
+  // was not.
+  min_report_n: 8,
+  // How long raw heartbeats are kept, in days. The aggregate outlives them.
+  activity_retention_days: 90,
   // How long a task reservation is honoured, in minutes (TL-87). A killed
   // session leaves its lockfile behind, and a reservation nobody can release is
   // a task that leaves the queue for good; after this long the lock is stale and
@@ -153,7 +176,10 @@ const LIST_KEYS = new Set([
   "dashboard_open_statuses", "status_strikethrough", "reason_required_statuses",
 ]);
 const MAP_KEYS = new Set(["epic_aliases", "status_colors", "priority_colors", "label_colors"]);
-const NUMBER_KEYS = new Set(["title_max_length", "lock_ttl_minutes", "active_branch_days", "abandoned_after_days"]);
+const NUMBER_KEYS = new Set([
+  "title_max_length", "lock_ttl_minutes", "active_branch_days", "abandoned_after_days",
+  "idle_gap_minutes", "heartbeat_throttle_seconds", "min_report_n", "activity_retention_days",
+]);
 const BOOL_KEYS = new Set(["labels_closed", "cross_branch_state"]);
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -471,6 +497,14 @@ export function loadConfig(root, opts = {}) {
     labels: values.labels,
     labelsClosed: values.labels_closed,
     roles: values.roles,
+    // Time measurement (TL-27). Only `activityPrivacy` is consulted today; the
+    // rest are declared so a configuration written for the next task is not
+    // rejected by this one.
+    activityPrivacy: values.activity_privacy,
+    idleGapMinutes: values.idle_gap_minutes,
+    heartbeatThrottleSeconds: values.heartbeat_throttle_seconds,
+    minReportN: values.min_report_n,
+    activityRetentionDays: values.activity_retention_days,
     labelAxes: { timing: values.label_axis_timing, env: values.label_axis_env },
     owners: values.owners,
     estimates: values.estimates,

@@ -80,6 +80,9 @@ const READING = {
   // without an execution order gives — which is the one that has to stay a
   // complete envelope rather than an error.
   plan: ["plan", "--json"],
+  // A backlog with no `activity/` at all: the answer has to stay a complete
+  // envelope, with zero counted rather than a section missing (TL-27).
+  time: ["time", "--json"],
 };
 
 /**

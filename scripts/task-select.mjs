@@ -71,6 +71,10 @@ export function parseTaskRecord(raw, file) {
     type: str(meta.type),
     labels: meta.labels,
     blocked_by: meta.blocked_by,
+    // The day the task was created. Read here because the time report needs the
+    // start of a lead time (TL-27), and a report re-parsing the files a second
+    // time would be a second answer to "what does this task say".
+    created: str(meta.created),
     // The last day a command wrote to this file. Read here because a dispatcher
     // has to tell a claim that is being worked from one nobody came back to
     // (TL-104) — and because it is the only evidence of that in the tree.
