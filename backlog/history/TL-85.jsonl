@@ -1,2 +1,5 @@
 {"id":"01M1CEPQY6FAS9SPYF1MRHW638","ts":"2026-08-31T17:43:35.622Z","task":"TL-85","field":"__created__","from":"","to":"Rozstrzygnąć politykę zakresu dla agenta: zakładać task czy pytać","actor":"agent:claude","source":"manual"}
 {"id":"01M1GFKZK5T74NJ1DKZNKEZ032","ts":"2026-09-02T07:16:31.461Z","task":"TL-85","field":"title","from":"Rozstrzygnąć politykę zakresu dla agenta: zakładać task czy pytać","to":"Settle the scope policy for the agent: open a task or ask","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1H2XFT3GV5GAXFNP3X2BH9M","ts":"2026-09-02T12:53:45.923Z","task":"TL-85","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1H2XFT3DB034CQ03C4PA38J","ts":"2026-09-02T12:53:45.923Z","task":"TL-85","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1H32JVM7SPDG4J6P0K9CKTG","ts":"2026-09-02T12:56:32.884Z","task":"TL-85","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

@@ -158,6 +158,15 @@ SHOULD THIS BE A TASK AT ALL?
     Yes  Write the task first. What you had to decide is the part nobody can
          reconstruct from the diff later, and the task file is where it lives.
 
+A TOPIC THAT SURFACES MID-TASK IS A NEW TASK, AND YOU DO NOT ASK FIRST. The
+criterion is one question, not judgement: does doing it NOW fit inside the
+current task's thesis? A typo on the neighbouring line — fix it. A separate
+design decision, a missing guard, debt spotted along the way — that is a new
+session, so it goes to the backlog. The alternative rule, stopping to ask,
+spends the one resource this whole arrangement exists to save; and a topic left
+in the prose of an answer or in a \`TODO\` comment dies with the session,
+because \`{{tool}} next\` can only hand out what is in the backlog.
+
 WHERE TO GO NEXT — REQUIRED.
 
 This page is a switchboard. It does not carry the procedure, so do not work from
@@ -272,7 +281,10 @@ task, that changes how much you can safely defer.
 WHILE YOU WORK.
 
   The scope grows      Open a NEW task instead of inflating this one, and record
-                       the link in \`blocks:\` here and \`blocked_by:\` there.
+                       the link in \`blocks:\` here and \`blocked_by:\` there. You
+                       do not ask first — see the criterion in \`{{tool}}
+                       instructions overview\`. Adding it to the task in flight
+                       blurs both, and a blurred task has no verification.
   You hit a blocker    Move the task to the status this backlog uses for that and
                        name the blocking id in \`blocked_by:\`. That status with an
                        empty \`blocked_by\` tells the next reader nothing. The
