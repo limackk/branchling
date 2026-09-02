@@ -27,13 +27,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
-  ACTIVITY_KINDS, activityEntry, appendActivity, hasStamp, listActivityTasks, readActivity,
-  readRollup, writeRollup,
+  ACTIVITY_KINDS, activityDir, activityEntry, activityPath, appendActivity, hasStamp,
+  listActivityTasks, readActivity, readRollup, writeRollup,
 } from "../activity.mjs";
 import { backfill, completionStamp, parseBackfillArgs } from "../backfill-completions.mjs";
 import { isoWeek, percentile, renderTime, timeStats } from "../time-report.mjs";
 import { loadConfig } from "../config.mjs";
-import { SCRIPTS_DIR } from "./_repo.mjs";
+import { SCRIPTS_DIR, isolateHome } from "./_repo.mjs";
+
+// Every row this file writes goes to a throwaway home directory, never to
+// the machine's real activity log (TL-35).
+isolateHome("activity");
 
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
 
@@ -144,7 +148,7 @@ test("a corrupt line does not lose the rest of a task's measurement", () => {
   const { dir, ids } = repo();
   try {
     appendActivity(dir, ids[0], [{ kind: "tool", actor: "agent:a", ts: "2026-02-01T10:00:00.000Z" }]);
-    appendFileSync(join(dir, "activity", ids[0] + ".jsonl"), "{not json at all\n", "utf8");
+    appendFileSync(activityPath(dir, ids[0]), "{not json at all\n", "utf8");
     appendActivity(dir, ids[0], [{ kind: "tool", actor: "agent:a", ts: "2026-02-01T10:01:00.000Z" }]);
     const rows = readActivity(dir, ids[0]);
     assert.equal(rows.length, 2, "a torn line took the readable rows with it");
@@ -157,7 +161,7 @@ test("the same row twice is one row: dedup by id, as in the change log", () => {
   const { dir, ids } = repo();
   try {
     const [written] = appendActivity(dir, ids[0], [{ kind: "tool", actor: "agent:a" }]);
-    appendFileSync(join(dir, "activity", ids[0] + ".jsonl"), JSON.stringify(written) + "\n", "utf8");
+    appendFileSync(activityPath(dir, ids[0]), JSON.stringify(written) + "\n", "utf8");
     assert.equal(readActivity(dir, ids[0]).length, 1);
     assert.deepEqual(listActivityTasks(dir), [ids[0]]);
   } finally {
@@ -224,11 +228,11 @@ test("run twice, and the second run writes nothing — idempotent by EVENT, not 
     close(dir, ids[0]);
     const config = loadConfig(dir);
     backfill(dir, config, { repoRoot: dir });
-    const after = readFileSync(join(dir, "activity", ids[0] + ".jsonl"), "utf8");
+    const after = readFileSync(activityPath(dir, ids[0]), "utf8");
     const second = backfill(dir, config, { repoRoot: dir });
     assert.equal(second.written, 0);
     assert.equal(second.already, 1);
-    assert.equal(readFileSync(join(dir, "activity", ids[0] + ".jsonl"), "utf8"), after,
+    assert.equal(readFileSync(activityPath(dir, ids[0]), "utf8"), after,
       "a second pass wrote a second stamp for the same commit");
   } finally {
     cleanup(dir);
@@ -242,7 +246,7 @@ test("`--dry-run` says what it WOULD write and creates no file at all", () => {
     const r = cli(["backfill-completions", "--dry-run", "--dir", "."], dir);
     assert.equal(r.status, 0, r.stderr);
     assert.match(r.stdout, /would stamp 1 of/);
-    assert.equal(existsSync(join(dir, "activity")), false, "a dry run created the directory");
+    assert.equal(existsSync(activityDir(dir)), false, "a dry run created the directory");
   } finally {
     cleanup(dir);
   }

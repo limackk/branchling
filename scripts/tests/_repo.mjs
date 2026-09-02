@@ -19,10 +19,12 @@
  * repository) and `<repo>` itself (a co-located consumer). The tool supports
  * both, so its own tests must not hard-code either.
  */
-import { existsSync } from "node:fs";
+import { existsSync, mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { HOME_ENV } from "../home.mjs";
 import { looksLikeBacklogDir } from "../paths.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -57,3 +59,28 @@ export const BACKLOG_DIR = findOwnBacklog();
 
 /** `<backlog>/tasks` — the only source of truth about tasks. */
 export const TASKS_DIR = join(BACKLOG_DIR, "tasks");
+
+
+/**
+ * Point THIS TEST PROCESS at a throwaway home directory, and return it.
+ *
+ * WHY IT MUTATES `process.env` INSTEAD OF THREADING AN ARGUMENT. Since TL-35
+ * the raw activity log lives in the user's DATA directory, and the functions
+ * that write it take `env` with `process.env` as the default — which is right
+ * for the tool and dangerous for a suite: one call that forgets to pass an env
+ * writes a test's fixture rows into the machine's real log, where they are
+ * indistinguishable from somebody's actual working calendar. Setting the
+ * variable for the whole process closes that hole for every call, including the
+ * ones a future test has not written yet.
+ *
+ * It also reaches spawned commands, because every `cli()` helper here spreads
+ * `process.env` — so the in-process and out-of-process halves of a test agree
+ * on where the data is, which they otherwise would not.
+ *
+ * Call it once, at the top of a test file that touches activity.
+ */
+export function isolateHome(label = "home") {
+  const dir = mkdtempSync(join(tmpdir(), "worktrail-test-" + label + "-"));
+  process.env[HOME_ENV] = dir;
+  return dir;
+}

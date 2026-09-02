@@ -26,6 +26,7 @@
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { activityDir } from "./activity.mjs";
 import { homePaths, loadUserConfig, registryPath, userConfigPath } from "./home.mjs";
 import { projectFor, readRegistry } from "./registry.mjs";
 import { resolveBacklogDir, takeDirFlag } from "./paths.mjs";
@@ -59,6 +60,11 @@ export function whereReport(opts = {}) {
       root: resolved.root,
       source: resolved.source,
       registeredAs: (projectFor(resolved.root, env) || {}).name || null,
+      // Where this backlog's RAW heartbeats go — outside the repository since
+      // TL-35. Printed here because §9 requires a person to have ONE place to
+      // check what the tool holds about them, and a path they cannot find is a
+      // guarantee they cannot verify.
+      activity: activityDir(resolved.root, env),
     };
   } catch (e) {
     error = e.message;
@@ -95,6 +101,7 @@ export function renderWhere(report, opts = {}) {
       ["    directory", report.backlog.root],
       ["    found by", report.backlog.source],
       ["    registered as", report.backlog.registeredAs || "—"],
+      ["    raw activity log", report.backlog.activity],
     ]));
   } else {
     out.push("  " + paint.warn(MARK.warn) + " none found — " + report.error);

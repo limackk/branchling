@@ -27,9 +27,11 @@
  * Tests: `node --test scripts/tests/activity.test.mjs`
  */
 
+import { createHash } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 
+import { homePaths } from "./home.mjs";
 import { backlogPaths } from "./paths.mjs";
 import { eventId, isValidActor } from "./history.mjs";
 
@@ -81,10 +83,70 @@ export const HEARTBEAT_KINDS = ["tool", "prompt", "edit"];
  */
 export const ATTRIBUTIONS = ["focus", "session-state", "path", "branch", "declared", "unknown"];
 
-export function activityPath(root, taskId) {
-  return join(backlogPaths(root).activityDir, taskId + ".jsonl");
+/**
+ * The segment of the data directory belonging to ONE backlog. PURE.
+ *
+ * WHY IT IS KEYED BY THE PATH AND NOT BY THE REGISTRY NAME (TL-35). §6 of
+ * docs/backlog-time-tracking.md says "`<data>/activity/<project>/`" and TL-34's
+ * registry looks like the obvious source of that name. It is not: TL-34 settled
+ * that a registry label is the USER'S OWN, mutable, and that the PATH is the
+ * project's identity. A directory holding a person's raw log is an on-disk key,
+ * so deriving it from a label would move somebody's measurement the first time
+ * they ran `project add --name` — silently, into a directory the tool then
+ * reports as empty, with the old one still on disk and unreachable.
+ *
+ * SO IT IS `<slug>-<hash>`, and both halves earn their place. The hash of the
+ * absolute path is what makes it stable and what keeps two unregistered
+ * projects apart — "default" for anything unregistered would silently sum two
+ * people's projects into one set of minutes. The slug is what makes the
+ * directory legible to somebody who opens it looking for their own data, which
+ * §9 requires them to be able to do.
+ */
+export function projectSegment(backlogRoot) {
+  const abs = resolve(backlogRoot);
+  const own = basename(abs);
+  const parent = basename(dirname(abs));
+  const label = (own === "backlog" && parent ? parent : own).replace(/[^A-Za-z0-9._-]/g, "-");
+  const hash = createHash("sha256").update(abs).digest("hex").slice(0, 8);
+  return (label ? label + "-" : "") + hash;
 }
 
+/** Where this backlog's RAW heartbeats live: the user's data directory, outside
+ *  every repository. See `activityPath` for why. */
+export function activityDir(backlogRoot, env = process.env) {
+  return join(homePaths(env).data, "activity", projectSegment(backlogRoot));
+}
+
+/** Where they USED to live, inside the repository. Kept because `migrate` has
+ *  to find them and because the `.gitignore` rule that covered them stays as a
+ *  safety net for logs written before this change. */
+export function legacyActivityDir(backlogRoot) {
+  return backlogPaths(backlogRoot).activityDir;
+}
+
+/**
+ * One task's raw log — OUTSIDE the repository (TL-35).
+ *
+ * WHY IT MOVED. The old location was `backlog/activity/*.jsonl`, protected by a
+ * `.gitignore` rule. That holds exactly until the first `git add -A` in
+ * somebody else's repository, at which point a record of what hour a particular
+ * person worked lands in public history and cannot be taken out of it — undoing
+ * it means rewriting a history that is not yours to rewrite.
+ *
+ * The difference is qualitative rather than gradual: in the home directory that
+ * failure is IMPOSSIBLE, not discouraged. Protection stops depending on a
+ * correct `.gitignore` in every repository this tool ever reaches, which is a
+ * procedure every future user has to maintain, and becomes a property of where
+ * the file is.
+ */
+export function activityPath(root, taskId, env = process.env) {
+  return join(activityDir(root, env), taskId + ".jsonl");
+}
+
+/** The per-task AGGREGATE, which stays in the repository and stays versioned.
+ *  The split is the same one §9 draws: raw data stays with the person, the
+ *  aggregate travels with the project and goes through review, because estimate
+ *  calibration is a fact about the project. */
 export function rollupPath(root, taskId) {
   return join(backlogPaths(root).rollupDir, taskId + ".json");
 }
@@ -161,11 +223,11 @@ export function activityEntry(row) {
 }
 
 /** Append rows for ONE task. Returns what was written. */
-export function appendActivity(root, taskId, rows) {
+export function appendActivity(root, taskId, rows, env = process.env) {
   if (!rows || !rows.length) return [];
   const entries = rows.map((r) => activityEntry({ ...r, task: r.task || taskId }));
-  ensureDir(backlogPaths(root).activityDir);
-  appendFileSync(activityPath(root, taskId), entries.map((e) => JSON.stringify(e)).join("\n") + "\n", "utf8");
+  ensureDir(activityDir(root, env));
+  appendFileSync(activityPath(root, taskId, env), entries.map((e) => JSON.stringify(e)).join("\n") + "\n", "utf8");
   return entries;
 }
 
@@ -176,8 +238,8 @@ export function appendActivity(root, taskId, rows) {
  * header. Returning nothing would turn one interleaved write into the loss of a
  * whole task's measurement.
  */
-export function readActivity(root, taskId) {
-  const file = activityPath(root, taskId);
+export function readActivity(root, taskId, env = process.env) {
+  const file = activityPath(root, taskId, env);
   if (!existsSync(file)) return [];
   const out = [];
   const seen = new Set();
@@ -210,20 +272,20 @@ export function readActivity(root, taskId) {
  * this function only decides which of them survive. A caller passing a modified
  * row would be rewriting history through a door meant for removing it.
  */
-export function rewriteActivity(root, taskId, rows) {
-  const file = activityPath(root, taskId);
+export function rewriteActivity(root, taskId, rows, env = process.env) {
+  const file = activityPath(root, taskId, env);
   if (!rows || !rows.length) {
     if (existsSync(file)) rmSync(file, { force: true });
     return 0;
   }
-  ensureDir(backlogPaths(root).activityDir);
+  ensureDir(activityDir(root, env));
   writeFileSync(file, rows.map((e) => JSON.stringify(e)).join("\n") + "\n", "utf8");
   return rows.length;
 }
 
 /** Every task this backlog holds activity for. */
-export function listActivityTasks(root) {
-  const dir = backlogPaths(root).activityDir;
+export function listActivityTasks(root, env = process.env) {
+  const dir = activityDir(root, env);
   if (!existsSync(dir)) return [];
   return readdirSync(dir)
     .filter((f) => f.endsWith(".jsonl"))
@@ -292,9 +354,9 @@ export function applyReassignments(rowsByTask) {
  *  report uses — a report reading `readActivity` directly would see the
  *  uncorrected log and would be wrong in exactly the way `reassign` exists to
  *  fix. */
-export function readAllActivity(root) {
+export function readAllActivity(root, env = process.env) {
   const rowsByTask = {};
-  for (const id of listActivityTasks(root)) rowsByTask[id] = readActivity(root, id);
+  for (const id of listActivityTasks(root, env)) rowsByTask[id] = readActivity(root, id, env);
   return applyReassignments(rowsByTask);
 }
 

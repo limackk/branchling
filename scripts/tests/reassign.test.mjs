@@ -32,13 +32,18 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  HEARTBEAT_KINDS, appendActivity, applyReassignments, readActivity, readAllActivity,
+  HEARTBEAT_KINDS, activityPath, appendActivity, applyReassignments, readActivity, readAllActivity,
 } from "../activity.mjs";
 import { engagedReport } from "../cluster.mjs";
 import { reassignPreview } from "../activity-retention.mjs";
+import { isolateHome } from "./_repo.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CLI = join(HERE, "..", "cli.mjs");
+
+// Every row this file writes goes to a throwaway home directory, never to
+// the machine's real activity log (TL-35).
+isolateHome("reassign");
 
 let counter = 0;
 function tmp(prefix) {
@@ -104,13 +109,13 @@ test("a correction is appended; the rows it moves stay on disk untouched", () =>
   appendActivity(backlog, ids[0], [
     row("01A", ids[0], 0, "s1"), row("01B", ids[0], 10, "s1"),
   ]);
-  const before = readFileSync(join(backlog, "activity", ids[0] + ".jsonl"), "utf8");
+  const before = readFileSync(activityPath(backlog, ids[0]), "utf8");
 
   const r = run(["activity", "reassign", "--dir", backlog,
     "--from", ids[0], "--to", ids[1], "--session", "s1", "--actor", "local:a"], env);
   assert.equal(r.status, 0, r.stderr);
 
-  const after = readFileSync(join(backlog, "activity", ids[0] + ".jsonl"), "utf8");
+  const after = readFileSync(activityPath(backlog, ids[0]), "utf8");
   assert.ok(after.startsWith(before), "the original rows were rewritten, not appended to");
   assert.equal(after.trim().split("\n").length, 3, "exactly one row was added");
   const rows = readActivity(backlog, ids[0]);
@@ -133,13 +138,13 @@ test("the reader moves the rows the file still holds", () => {
 test("--dry-run appends nothing but still says what would move", () => {
   const { backlog, env, ids } = fixture();
   appendActivity(backlog, ids[0], [row("01A", ids[0], 0, "s1"), row("01B", ids[0], 10, "s1")]);
-  const before = readFileSync(join(backlog, "activity", ids[0] + ".jsonl"), "utf8");
+  const before = readFileSync(activityPath(backlog, ids[0]), "utf8");
 
   const r = run(["activity", "reassign", "--dir", backlog, "--dry-run",
     "--from", ids[0], "--to", ids[1], "--session", "s1"], env);
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /2 row\(s\) would move/);
-  assert.equal(readFileSync(join(backlog, "activity", ids[0] + ".jsonl"), "utf8"), before);
+  assert.equal(readFileSync(activityPath(backlog, ids[0]), "utf8"), before);
 });
 
 // ── composition and order ─────────────────────────────────────────────────

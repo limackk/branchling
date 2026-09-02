@@ -3,3 +3,6 @@
 {"id":"01M1F5BNKGK0EQFSBKRGG8ZEKA","ts":"2026-09-01T18:57:58.896Z","task":"TL-35","field":"blocked_by","from":["TL-1425","TL-1440"],"to":["TL-28","TL-34"],"actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK5GXD5FV3N4W7FY1JM","ts":"2026-09-02T07:16:31.461Z","task":"TL-35","field":"title","from":"Surowy log aktywności do katalogu domowego","to":"Raw activity log moves to the home directory","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK59KG2DCS7C6FB3G6N","ts":"2026-09-02T07:16:31.461Z","task":"TL-35","field":"epic","from":"Backlog — pomiar czasu pracy","to":"Backlog — work-time measurement","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GWHJE48C6NH8B68WPMSFAB","ts":"2026-09-02T11:02:23.940Z","task":"TL-35","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1GWHJE424PVHESMV5WVEQ97","ts":"2026-09-02T11:02:23.940Z","task":"TL-35","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1GWYC5Z1KWX4FZSC92TTHG4","ts":"2026-09-02T11:09:23.519Z","task":"TL-35","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

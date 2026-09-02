@@ -6,20 +6,28 @@ labels: [post-launch]
 board: main
 epic: "Backlog — work-time measurement"
 priority: P2
-status: pending
-owner: unassigned
+status: done
+owner: agent:claude
 estimate: 4h
 confidence: medium
 created: 2026-08-30
-updated: 2026-08-30
+updated: 2026-09-02
 blocked_by: [TL-28, TL-34]
 blocks: []
 related_docs:
   - docs/worktrail-global-tool.md
   - docs/backlog-time-tracking.md
 verification:
-  - bash: "node --test backlog/scripts/tests/activity-location.test.mjs"
-  - bash: "test -z \"$(git ls-files backlog/activity | grep -v '^backlog/activity/rollup/')\" && echo 'no raw log is tracked — OK'"
+  - id: location
+    bash: "node --test scripts/tests/activity-location.test.mjs"
+  - id: nothing-raw-tracked
+    bash: "test -z \"$(git ls-files backlog/activity | grep -v '^backlog/activity/rollup/')\" && echo 'no raw log is tracked — OK'"
+  - id: writes-go-home
+    bash: "rm -rf /tmp/worktrail-act; WORKTRAIL_HOME=/tmp/worktrail-act node scripts/cli.mjs activity record --task TL-35 --kind tool --actor local:probe --no-throttle > /dev/null; test -n \"$(find /tmp/worktrail-act -name 'TL-35.jsonl')\" && test -z \"$(find backlog/activity -name 'TL-35.jsonl' 2>/dev/null)\" && echo 'the row went home, not into the repo — OK'; rc=$?; rm -rf /tmp/worktrail-act; exit $rc"
+  - id: migrate-idempotent
+    bash: "node scripts/cli.mjs activity migrate --json | python3 -c \"import json,sys; d=json.load(sys.stdin); assert d['rows'] == 0, d; print('nothing left to migrate — OK')\""
+  - id: guards
+    bash: "node scripts/cli.mjs check"
 ---
 
 ## Goal
@@ -60,12 +68,12 @@ a single machine — but is not fit for release.
 
 ## Pre-flight reading
 
-1. `docs/architecture/worktrail-global-tool.md` — §6 (why we are moving
+1. `docs/worktrail-global-tool.md` — §6 (why we are moving
    this), §5 (config vs. data separation).
-2. `docs/architecture/backlog-time-tracking.md` — §5 (data model), §9
+2. `docs/backlog-time-tracking.md` — §5 (data model), §9
    (privacy, retention, correction).
-3. `backlog/scripts/home.mjs` (TL-34) — resolving the data directory.
-4. `backlog/scripts/activity.mjs` (TL-27) — the only place that knows the log
+3. `scripts/home.mjs` (TL-34) — resolving the data directory.
+4. `scripts/activity.mjs` (TL-27) — the only place that knows the log
    paths; it must remain so after this change.
 
 ## Steps
@@ -98,39 +106,78 @@ a single machine — but is not fit for release.
 
 ## Acceptance criteria
 
-- [ ] Raw heartbeats land in the user's **data** directory, not in the
-      repository — there is a test for this with `WORKTRAIL_HOME`.
-- [ ] `git ls-files backlog/activity` returns **no** file besides those
-      under `rollup/` — gate in Verification.
-- [ ] Two different unregistered projects do not merge into a shared
-      directory — test on two backlog paths.
-- [ ] `activity migrate --dry-run` touches nothing; `migrate` run twice
-      produces the same state.
-- [ ] The `rollup/` aggregate remains versioned and unchanged in shape.
-- [ ] `worktrail where` shows the activity log path.
-- [ ] `backlog-time-tracking.md` §5 and §9 describe the post-change state;
-      §6 of the global-tool document is marked as implemented.
-- [ ] `prune` and `forget` work at the new location (or TL-31 has a note, if
-      it does not exist yet).
+One line each: the parser reads the `- [ ]` line and nothing under it (TL-118).
+
+- [x] Raw heartbeats land in the user's DATA directory, not in the repository — proven with `WORKTRAIL_HOME`. [proof: writes-go-home, location]
+- [x] `git ls-files backlog/activity` returns no file outside `rollup/`. [proof: nothing-raw-tracked, location]
+- [x] Two different unregistered projects do not share a directory. [proof: location]
+- [x] `activity migrate --dry-run` touches nothing, and `migrate` run twice leaves the same state. [proof: migrate-idempotent, location]
+- [x] The `rollup/` aggregate stays in the repository, versioned and unchanged in shape. [proof: location]
+- [x] `worktrail where` shows the raw activity log's path. [proof: location]
+- [x] `backlog-time-tracking.md` §5 and §9 describe the state after the move, and §6 of the global-tool document is marked implemented. [proof: guards]
+- [x] `prune` and `forget` work at the new location. [proof: location]
+
+## Decision (2026-09-02)
+
+**The directory is keyed by the backlog PATH, not by the registry name, and this
+departs from step 2 on purpose.** The step says "project name from the registry
+(TL-34)". TL-34 itself settled that a registry label is the USER'S OWN and
+mutable, and that the path is the project's identity — so deriving a data
+directory from the label would move somebody's raw log the first time they ran
+`project add --name`: silently, into a directory the tool then reports as empty,
+with the old one still on disk and unreachable by anything. That is the same
+class of mistake `BLOCK_MARKER_NAME` exists to prevent, and it is worse here,
+because the data is a person's own.
+
+What is used instead is `<slug>-<hash of the absolute path>`. The hash is what
+makes it stable and what keeps two unregistered projects apart — "default" for
+anything unregistered would sum two projects into one set of minutes with
+nothing able to tell. The slug is what makes the directory legible to somebody
+opening it looking for their own data, which §9 requires them to be able to do.
+There is a test for the rename case specifically.
+
+**The contract was rewritten to this repository's paths**, as in TL-27, TL-28,
+TL-31 and TL-34, and the migration check was made an ASSERTION rather than a
+`tail -1` a human reads: `migrate --json` must report zero rows left to move.
+
+**`migrate` is idempotent by ROW ID, not by file.** A file-level "already
+moved?" flag cannot answer the question once a partial move has happened, and
+the failure it would cause — doubled minutes — is the one thing worse than the
+lost measurement this command exists to prevent. It writes the merged set before
+removing the source, because this is the one operation whose input cannot be
+reconstructed from anywhere else.
+
+**The test suite now redirects its own home directory.** `isolateHome()` in
+`scripts/tests/_repo.mjs` points the whole test process at a throwaway
+directory. Without it, every fixture row written through the default
+`process.env` would land in the machine's REAL activity log, where it is
+indistinguishable from somebody's actual working calendar — and it would arrive
+there through the functions whose whole purpose is to keep that file private.
 
 ## Verification
 
 ```bash
-# 1. Location tests — expected: pass
-node --test backlog/scripts/tests/activity-location.test.mjs
+# 1. Location, segmentation and migration — expected: pass
+node --test scripts/tests/activity-location.test.mjs
 
 # 2. Nothing raw is tracked by git — expected: OK message
 test -z "$(git ls-files backlog/activity | grep -v '^backlog/activity/rollup/')" \
   && echo 'no raw log is tracked — OK'
 
-# 3. Writes go to the home directory — expected: file OUTSIDE the repo
-WORKTRAIL_HOME=/tmp/worktrail-act node backlog/scripts/cli.mjs activity record --task TL-35 --kind tool
-find /tmp/worktrail-act -name 'TL-35.jsonl' | head -1
+# 3. Writes go to the home directory — expected: the file is OUTSIDE the repo
+rm -rf /tmp/worktrail-act
+WORKTRAIL_HOME=/tmp/worktrail-act node scripts/cli.mjs activity record \
+  --task TL-35 --kind tool --actor local:probe --no-throttle
+find /tmp/worktrail-act -name 'TL-35.jsonl'
 test -z "$(find backlog/activity -name 'TL-35.jsonl' 2>/dev/null)" && echo 'nothing landed in the repo — OK'
 rm -rf /tmp/worktrail-act
 
-# 4. Migration is idempotent — expected: second count identical
-node backlog/scripts/cli.mjs activity migrate --dry-run | tail -1
+# 4. Migration is idempotent — expected: zero rows left to move
+node scripts/cli.mjs activity migrate --json | python3 -c \
+  "import json,sys; d=json.load(sys.stdin); assert d['rows'] == 0; print('nothing left to migrate — OK')"
+
+# 5. Module guards
+node scripts/cli.mjs check
 ```
 
 ## Notes

@@ -35,12 +35,17 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { appendActivity, readActivity, readRollup } from "../activity.mjs";
+import { activityDir, activityPath, appendActivity, readActivity, readRollup } from "../activity.mjs";
 import { cutoff, forget, privacyReport, prune, recomputeRollups, rollupFor } from "../activity-retention.mjs";
 import { loadConfig } from "../config.mjs";
+import { isolateHome } from "./_repo.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CLI = join(HERE, "..", "cli.mjs");
+
+// Every row this file writes goes to a throwaway home directory, never to
+// the machine's real activity log (TL-35).
+isolateHome("retention");
 
 let counter = 0;
 function tmp(prefix) {
@@ -91,7 +96,7 @@ function session(backlog, task, opts) {
 /** Every activity file's exact bytes — the only honest way to ask whether a
  *  dry run wrote anything. */
 function snapshot(backlog) {
-  const dir = join(backlog, "activity");
+  const dir = activityDir(backlog);
   if (!existsSync(dir)) return {};
   const out = {};
   for (const f of readdirSync(dir)) {
@@ -190,7 +195,7 @@ test("a task whose rows all expire loses its file, not just its rows", () => {
   const { backlog, ids, config } = fixture();
   session(backlog, ids[0], { daysAgo: 200, count: 2, gapMinutes: 10, actor: "local:a", session: "old" });
   prune(backlog, config, { now: NOW });
-  assert.equal(existsSync(join(backlog, "activity", ids[0] + ".jsonl")), false);
+  assert.equal(existsSync(activityPath(backlog, ids[0])), false);
   assert.notEqual(readRollup(backlog, ids[0]), null, "…but the aggregate outlives the rows, which is the point");
 });
 

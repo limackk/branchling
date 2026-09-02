@@ -40,7 +40,7 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { ACTIVITY_KINDS, appendActivity } from "./activity.mjs";
-import { forget, privacyReport, prune, reassignPreview } from "./activity-retention.mjs";
+import { forget, migrate, privacyReport, prune, reassignPreview } from "./activity-retention.mjs";
 import { attribute, currentBranch } from "./attribution.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { readFocus, sessionId, SESSION_ENV, throttleCheck, throttleMark } from "./focus.mjs";
@@ -52,12 +52,13 @@ import { MARK, color, failure, heading, table } from "./ui.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const SUBCOMMANDS = ["record", "prune", "forget", "reassign", "report"];
+const SUBCOMMANDS = ["record", "prune", "forget", "reassign", "report", "migrate"];
 
 const PRUNE_FLAGS = ["--days", "--dry-run", "--json", "--dir"];
 const FORGET_FLAGS = ["--actor", "--dry-run", "--json", "--dir"];
 const REASSIGN_FLAGS = ["--from", "--to", "--session", "--since", "--actor", "--reason", "--dry-run", "--json", "--dir"];
 const REPORT_FLAGS = ["--privacy", "--json", "--dir"];
+const MIGRATE_FLAGS = ["--dry-run", "--json", "--dir"];
 
 /** PURE — one parser shape for the four reading/erasing subcommands. Throws on
  *  a usage error, so an unknown flag FAILS rather than being dropped: these
@@ -439,6 +440,41 @@ function runReport(argv, cliDir) {
   return 0;
 }
 
+function runMigrate(argv, cliDir) {
+  let plan;
+  try {
+    plan = parseSubArgs(argv, MIGRATE_FLAGS, {});
+  } catch (e) {
+    const [head, ...rest] = e.message.split("\n");
+    console.error(failure(N + " activity migrate", head, rest, [N + " activity --help"]));
+    return 2;
+  }
+  const ctx = resolve(cliDir, {});
+  if (ctx.code) return ctx.code;
+
+  const result = migrate(ctx.root, { dryRun: plan.dryRun });
+  if (plan.json) { console.log(JSON.stringify(result, null, 2)); return 0; }
+  console.log(heading("activity — migrate", { color }));
+  console.log("");
+  console.log(table([
+    ["  from (in the repository)", result.from],
+    ["  to (outside every repository)", result.to],
+    ["  files", String(result.files.length)],
+    ["  rows " + (result.dryRun ? "that would move" : "moved"), String(result.rows)],
+  ]));
+  console.log("");
+  if (!result.files.length) {
+    console.log("  " + color.dim("nothing to move — the raw log already lives outside the repository."));
+    return 0;
+  }
+  console.log(table(result.files.map((f) => ["    " + f.task, f.added + " of " + f.rows + " row(s) new"])));
+  console.log("");
+  console.log("  " + color.dim(result.dryRun
+    ? "`--dry-run`: nothing was written and nothing was removed."
+    : "Merged by row id, so running this again moves nothing and doubles nothing."));
+  return 0;
+}
+
 export function main(argv) {
   const sub = argv[0];
   if (SUBCOMMANDS.indexOf(sub) < 0) {
@@ -452,6 +488,7 @@ export function main(argv) {
   if (sub === "forget") return runForget(cli.argv, cli.dir);
   if (sub === "reassign") return runReassign(cli.argv, cli.dir);
   if (sub === "report") return runReport(cli.argv, cli.dir);
+  if (sub === "migrate") return runMigrate(cli.argv, cli.dir);
 
   let plan;
   try {

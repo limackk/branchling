@@ -165,6 +165,12 @@ working name ([TL-20](../backlog/tasks/TL-20-domknij-nazwe-narzedzia-przed-publi
 
 ## 6. The raw activity log moves into the home directory
 
+> **Implemented 2026-09-02 (TL-35).** `<data>/activity/<slug>-<hash>/BL-NNNN.jsonl`,
+> keyed by the backlog PATH and never by the registry label — a label is the
+> user's own and mutable, so deriving the directory from it would orphan
+> somebody's log the first time they relabelled a project. `worktrail activity
+> migrate` moves logs written before the change, idempotently by row id.
+
 [backlog-time-tracking.md §5](backlog-time-tracking.md) currently places it
 in `backlog/activity/` and protects it with gitignore. That works until
 someone runs `git add -A` in a foreign repository — at which point one

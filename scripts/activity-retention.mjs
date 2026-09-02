@@ -39,11 +39,12 @@
  * Tests: `node --test scripts/tests/retention.test.mjs`
  */
 
-import { existsSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { join } from "node:path";
 
 import {
-  HEARTBEAT_KINDS, applyReassignments, listActivityTasks, readActivity, readAllActivity,
-  rewriteActivity, rollupPath, writeRollup,
+  HEARTBEAT_KINDS, activityDir, activityPath, applyReassignments, legacyActivityDir,
+  listActivityTasks, readActivity, readAllActivity, rewriteActivity, rollupPath, writeRollup,
 } from "./activity.mjs";
 import { engagedTime } from "./cluster.mjs";
 import { backlogPaths } from "./paths.mjs";
@@ -235,6 +236,73 @@ export function privacyReport(root, config) {
     // Said as paths rather than as a sentence: "the raw log is not versioned"
     // is a claim, and a path is something a person can go and check.
     versioned: [paths.rollupDir],
-    notVersioned: [paths.activityDir + "/*.jsonl"],
+    // Since TL-35 the raw log is not merely ignored by git, it is OUTSIDE every
+    // repository. Reported as a path rather than as a sentence for the reason
+    // the versioned one is: a person can go and look at a path.
+    notVersioned: [activityDir(root) + "/*.jsonl"],
   };
+}
+
+
+/**
+ * Move a raw log written before TL-35 into the home directory.
+ *
+ * WHY THIS EXISTS AT ALL. The relocation is a structural fix, and a structural
+ * fix that leaves the old data where it was has moved the RULE without moving
+ * the DATA: the measurement simply disappears from every report, which reads
+ * exactly like a tool that never recorded anything. So there is one command,
+ * and it is idempotent.
+ *
+ * IDEMPOTENT BY ROW ID, NOT BY FILE. Running it twice must not double anybody's
+ * minutes, and a file-level "already moved?" check cannot answer that once a
+ * partial move has happened. The rows of both locations are merged on `id` —
+ * the same key `readActivity` already dedups on — and the source file is removed
+ * only after the merged set is safely written.
+ *
+ * IT DOES NOT TOUCH `rollup/`. The aggregate stays in the repository and stays
+ * versioned; that boundary is §9's and this task does not move it.
+ */
+export function migrate(root, opts = {}) {
+  const env = opts.env || process.env;
+  const from = legacyActivityDir(root);
+  const dryRun = Boolean(opts.dryRun);
+  const moved = [];
+  let rows = 0;
+
+  if (!existsSync(from)) return { from, to: activityDir(root, env), files: moved, rows, dryRun };
+
+  for (const file of readdirSync(from).sort()) {
+    if (!file.endsWith(".jsonl")) continue;
+    const task = file.slice(0, -".jsonl".length);
+    const source = join(from, file);
+    const incoming = readJsonl(source);
+    if (!incoming.length) continue;
+
+    const existing = readActivity(root, task, env);
+    const seen = new Set(existing.map((r) => r.id));
+    const added = incoming.filter((r) => r && r.id && !seen.has(r.id));
+    moved.push({ task, rows: incoming.length, added: added.length });
+    rows += added.length;
+    if (dryRun) continue;
+
+    // Written first, removed second. The other order loses the rows if the
+    // write fails, and this is the one operation whose input cannot be
+    // reconstructed from anywhere else.
+    const merged = existing.concat(added).sort((a, b) => String(a.id).localeCompare(String(b.id)));
+    rewriteActivity(root, task, merged, env);
+    rmSync(source, { force: true });
+  }
+  return { from, to: activityDir(root, env), files: moved, rows, dryRun };
+}
+
+/** One file's rows, skipping what does not parse — the same tolerance
+ *  `readActivity` has, and for the same reason. */
+function readJsonl(path) {
+  const out = [];
+  for (const line of readFileSync(path, "utf8").split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try { out.push(JSON.parse(trimmed)); } catch { /* a corrupt line loses itself, not the file */ }
+  }
+  return out;
 }

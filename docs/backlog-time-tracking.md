@@ -110,18 +110,25 @@ second collector.
 ## 5. Data model
 
 ```
-backlog/activity/BL-NNNN.jsonl        ← heartbeats, append-only, gitignored by DEFAULT (§9)
-backlog/activity/rollup/BL-NNNN.json  ← aggregate PER TASK, versioned (§9)
-backlog/history/BL-NNNN.jsonl         ← unchanged: field changes, versioned
+<data>/activity/<project>/BL-NNNN.jsonl  ← heartbeats, append-only, OUTSIDE every repository
+backlog/activity/rollup/BL-NNNN.json     ← aggregate PER TASK, versioned (§9)
+backlog/history/BL-NNNN.jsonl            ← unchanged: field changes, versioned
 ```
 
-> **The raw log's location CHANGES in [TL-35](../backlog/tasks/TL-35-surowy-log-aktywnosci-do-katalogu-domowego.md).**
-> Heartbeats move to the user's home directory (`<data>/activity/<project>/BL-NNNN.jsonl`),
-> because in the repo their protection depends on a correct `.gitignore` in
-> every repository this tool ever reaches — and a single `git add -A` in
-> someone else's tree writes their work calendar into public history
-> irreversibly. **The `rollup/` aggregate stays in the repo unchanged.**
-> Reasoning: [worktrail-global-tool.md §6](worktrail-global-tool.md).
+> **The raw log moved out of the repository in TL-35 (2026-09-02).** It used to
+> be `backlog/activity/*.jsonl`, protected by a `.gitignore` rule — which holds
+> exactly until one `git add -A` in somebody else's tree writes a person's work
+> calendar into a public history it cannot be taken out of. In the data
+> directory that failure is IMPOSSIBLE rather than discouraged, and protection
+> stops depending on a correct `.gitignore` in every repository this tool ever
+> reaches. **The `rollup/` aggregate stays in the repository, unchanged.**
+> `<project>` is `<slug>-<hash of the backlog path>` — keyed by the PATH and
+> never by the registry label, because a label is the user's own and mutable,
+> and a rename must not orphan somebody's log. Reasoning:
+> [worktrail-global-tool.md §6](worktrail-global-tool.md).
+>
+> The `.gitignore` rule stays as a safety net for logs written before the move;
+> `worktrail activity migrate` relocates those, idempotently.
 
 One row = one piece of evidence of activity:
 
@@ -291,12 +298,11 @@ data with everything that entails.
 
 Three mechanisms, all in [TL-31](../backlog/tasks/TL-31-retencja-korekta-atrybucji-i-prawo-do-usuniecia.md):
 
-**Minimisation.** Raw stamps stay on the machine that produced them: today
-via gitignore (`backlog/activity/*.jsonl`, like `history/.snapshot.json`),
-eventually by living **outside any repository**
-([TL-35](../backlog/tasks/TL-35-surowy-log-aktywnosci-do-katalogu-domowego.md))
-— because a procedure every future user has to maintain is weaker than a
-structural guarantee. Only the per-task aggregate (§5.2) is versioned:
+**Minimisation.** Raw stamps stay on the machine that produced them, and since
+TL-35 they do so **structurally**: they live in the user's data directory,
+outside any repository, so no `.gitignore` in anybody's tree has to be correct
+for the guarantee to hold. The gitignore rule remains only as a safety net for
+logs written before the move. Only the per-task aggregate (§5.2) is versioned:
 `minutes`, `sessions`, `first`, `last`, `unknown_ratio`. That is enough for
 calibration and does not reconstruct anyone's calendar.
 `activity_privacy: local | aggregate | full` — `full` exists for teams that

@@ -28,17 +28,21 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { ATTRIBUTIONS } from "../activity.mjs";
+import { ATTRIBUTIONS, activityDir, activityPath } from "../activity.mjs";
 import { ATTRIBUTION_CHAIN, attribute, taskFromBranch, taskFromPath } from "../attribution.mjs";
 import { readFocus, sessionId, writeFocus } from "../focus.mjs";
 import { parseRecordArgs, signalsFromPayload } from "../activity-command.mjs";
 import { parseFocusArgs } from "../focus-command.mjs";
 import { taskIdPatterns } from "../task-id.mjs";
-import { REPO_ROOT } from "./_repo.mjs";
+import { REPO_ROOT, isolateHome } from "./_repo.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CLI = join(HERE, "..", "cli.mjs");
 const PATTERNS = taskIdPatterns("TL");
+
+// Every row this file writes goes to a throwaway home directory, never to
+// the machine's real activity log (TL-35).
+isolateHome("attribution");
 
 let counter = 0;
 function tmp(prefix) {
@@ -74,7 +78,7 @@ function fixture(n = 1) {
 
 /** Every activity row for one task, or `[]` when the file was never created. */
 function rows(backlog, id) {
-  const file = join(backlog, "activity", id + ".jsonl");
+  const file = activityPath(backlog, id);
   if (!existsSync(file)) return [];
   return readFileSync(file, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
 }
@@ -301,7 +305,7 @@ test("nothing is written when no leg names a task", () => {
   const { backlog, env } = fixture();
   const r = run(["activity", "record", "--dir", backlog, "--actor", "local:me", "--branch", "main"], env);
   assert.equal(r.status, 0, "an unattributed heartbeat is not an error");
-  assert.equal(existsSync(join(backlog, "activity")), false, "…and it is not a file either");
+  assert.equal(existsSync(activityDir(backlog)), false, "…and it is not a file either");
 });
 
 // ── the host's payload is a hint ──────────────────────────────────────────
