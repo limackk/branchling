@@ -27,6 +27,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { clearFocus, readFocus, sessionId, writeFocus } from "./focus.mjs";
 import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
@@ -139,7 +140,7 @@ export function main(argv) {
 
   const written = writeFocus(root, {
     task: plan.id,
-    actor: plan.actor || process.env.BACKLOG_ACTOR || "agent:claude",
+    actor: resolveActor(plan.actor),
     origin: "focus",
   });
   if (plan.json) {

@@ -33,6 +33,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { ACTOR_NAMESPACES, FIELD_ROLE_OVERRIDE, appendEntries, changesRequiringReason, eventId, isValidActor, isValidReason, normalizeReason, readHistory, recordEdit } from "./history.mjs";
 import { withDecisions } from "./decisions.mjs";
@@ -78,12 +79,6 @@ export function parseTakeArgs(args) {
     );
   }
   return plan;
-}
-
-/** The actor, from the flag, the environment, or the default — the same chain as
- *  `done` and `history`, so one habit works everywhere. */
-export function resolveActor(flag, env = process.env) {
-  return flag || env.BACKLOG_ACTOR || "agent:claude";
 }
 
 /**

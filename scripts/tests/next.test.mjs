@@ -31,6 +31,12 @@ import { acquireLock, isExpired, listLocks, lockScope, readLock, releaseLock, st
 import { loadConfig, parseConfigYaml } from "../config.mjs";
 import { callerSpecies, lastHandoff, queueStatuses, selectCandidates, servesExecutor } from "../next-task.mjs";
 import { readTaskRecords } from "../task-select.mjs";
+import { isolateHome } from "./_repo.mjs";
+
+// The suite must not read the DEVELOPER's preferences: since TL-157 the actor
+// chain reads the user layer, so a machine with `actor:` in its own config file
+// would otherwise see every default-actor assertion below fail.
+isolateHome("next");
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPTS = join(HERE, "..");

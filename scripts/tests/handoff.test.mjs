@@ -35,7 +35,12 @@ import { join } from "node:path";
 import { FIELD_COMMENT, historyEntryKind } from "../task-fields.mjs";
 import { appendEntries, eventId, readHistory } from "../history.mjs";
 import { requeueStatus } from "../handoff-task.mjs";
-import { SCRIPTS_DIR, alignTemplate } from "./_repo.mjs";
+import { SCRIPTS_DIR, alignTemplate, isolateHome } from "./_repo.mjs";
+// The suite must not read the DEVELOPER's preferences: since TL-157 the actor
+// chain reads the user layer, so a machine with `actor:` in its own config file
+// would otherwise see every default-actor assertion below fail.
+isolateHome("handoff");
+
 
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
 

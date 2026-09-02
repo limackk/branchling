@@ -42,6 +42,7 @@ import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { repoRootFor } from "./done-task.mjs";
 import { recordEdit } from "./history.mjs";
@@ -49,7 +50,7 @@ import { lockScope, releaseLock, stateRoot } from "./lock.mjs";
 import { callerSpecies, queueStatuses, selectCandidates, servesExecutor } from "./next-task.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
-import { rebuildViews, resolveActor, todayStamp } from "./take-task.mjs";
+import { rebuildViews, todayStamp } from "./take-task.mjs";
 import { ACTOR_NAMESPACES, buildFieldSpecs, extractMeta, fieldSpec, isValidActor, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
 import { readTaskRecords, splitList } from "./task-select.mjs";
 import { MARK, color, failure, warn } from "./ui.mjs";
@@ -64,8 +65,8 @@ const CLI = join(__dirname, "cli.mjs");
  * project's config.yaml: the third law makes the layers disjoint, and the user
  * layer that would hold it does not exist yet (TL-34).
  *
- * `BACKLOG_` and not the product's name, like `BACKLOG_DIR`, `BACKLOG_ACTOR` and
- * `BACKLOG_STATE_DIR` before it. A variable set in somebody's shell profile is a
+ * `BACKLOG_` and not the product's name, like `BACKLOG_DIR` and
+ * `BACKLOG_STATE_DIR` before it, and like the actor variable named in `actor.mjs`. A variable set in somebody's shell profile is a
  * key in a file this tool does not own — the same class as the block marker in
  * their `.gitignore` — and naming it after a product that may still be renamed
  * would turn one rename into a silent no-op on every machine.

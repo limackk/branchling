@@ -61,6 +61,7 @@ import { readFileSync, readdirSync, unlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import {
   ACTOR_NAMESPACES, FIELD_CREATED, appendEntries, eventId, isValidActor, isValidReason,
@@ -407,7 +408,7 @@ export function writeImport({ root, config, board, items, createOne = createTask
 }
 
 function recordCreations(root, written, opts) {
-  const actor = opts.actor || process.env.BACKLOG_ACTOR || "unknown";
+  const actor = resolveActor(opts.actor);
   const ts = new Date().toISOString();
   for (const w of written) {
     appendEntries(root, w.id, [{

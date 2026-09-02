@@ -33,6 +33,13 @@ import {
   renderMarkdown, summarizeTask, transitionLine,
 } from "../pr-summary.mjs";
 
+import { isolateHome } from "./_repo.mjs";
+
+// The suite must not read the DEVELOPER's preferences: since TL-157 the actor
+// chain reads the user layer, so a machine with `actor:` in its own config file
+// would otherwise see every default-actor assertion below fail.
+isolateHome("pr-summary");
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CLI = join(HERE, "..", "cli.mjs");
 

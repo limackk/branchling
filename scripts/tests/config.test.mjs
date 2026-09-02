@@ -27,7 +27,12 @@ import {
 
 import { spawnSync } from "node:child_process";
 
-import { BACKLOG_DIR as REAL_BACKLOG, SCRIPTS_DIR } from "./_repo.mjs";
+import { BACKLOG_DIR as REAL_BACKLOG, SCRIPTS_DIR, isolateHome } from "./_repo.mjs";
+// The suite must not read the DEVELOPER's preferences: since TL-157 the actor
+// chain reads the user layer, so a machine with `actor:` in its own config file
+// would otherwise see every default-actor assertion below fail.
+isolateHome("config");
+
 import { queueStatuses } from "../next-task.mjs";
 
 function sandbox(files = {}) {

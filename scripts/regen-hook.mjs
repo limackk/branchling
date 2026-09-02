@@ -24,6 +24,8 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { dirname, join, basename } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { resolveActor } from "./actor.mjs";
 import { backlogForTaskPath } from "./paths.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -70,7 +72,7 @@ export function main() {
     [
       join(HERE, "history-record.mjs"),
       "--file", filePath,
-      "--actor", process.env.BACKLOG_ACTOR || "agent:claude",
+      "--actor", resolveActor(""),
       "--source", "hook",
     ],
     { stdio: ["ignore", "ignore", "ignore"] }

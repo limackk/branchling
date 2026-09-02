@@ -28,6 +28,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { FIELD_CREATED, FIELD_DELETED, appendEntries, readHistory, reconcile } from "../history.mjs";
+import { isolateHome } from "./_repo.mjs";
+
+// The suite must not read the DEVELOPER's preferences: since TL-157 the actor
+// chain reads the user layer, so a machine with `actor:` in its own config file
+// would otherwise see every default-actor assertion below fail.
+isolateHome("history-duplicate-created");
 
 function taskFile(over = {}) {
   const f = Object.assign(

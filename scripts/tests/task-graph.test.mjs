@@ -25,6 +25,13 @@ import {
   ACTOR_GLYPH, actorClass, nodeKind, nodeLabel, renderTaskGraph, stateAt, taskGraph,
 } from "../task-graph.mjs";
 
+import { isolateHome } from "./_repo.mjs";
+
+// The suite must not read the DEVELOPER's preferences: since TL-157 the actor
+// chain reads the user layer, so a machine with `actor:` in its own config file
+// would otherwise see every default-actor assertion below fail.
+isolateHome("task-graph");
+
 let seq = 0;
 /** A day on the axis. Small numbers only — the tests name the days they mean. */
 const at = (n) => "2026-03-" + String(10 + n).padStart(2, "0") + "T09:00:00.000Z";

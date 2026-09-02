@@ -14,9 +14,9 @@
  *   history --file backlog/tasks/TASK-900-x.md
  *   history --actor local:me --source manual
  *
- * The author: --actor, otherwise $BACKLOG_ACTOR, otherwise `agent:claude` (an
- * agent session's hook is what calls this script — that is the default case, not
- * a guess).
+ * The author comes from the one chain in `actor.mjs` — the flag, the
+ * environment, the user layer, then the default. An agent session's hook is
+ * what calls this script, so the default case is an agent, not a guess.
  *
  * A first run with no snapshot only creates one: we do not invent history for
  * changes nobody was watching.
@@ -25,6 +25,7 @@
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { resolveActor } from "./actor.mjs";
 import { ACTOR_NAMESPACES, REASON_SENTINELS, attributeChanges, isValidActor, isValidReason, reconcile, taskIdFromFile, unattributedChanges } from "./history.mjs";
 import { resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
@@ -65,7 +66,7 @@ for (let i = 0; i < argv.length; i++) {
 }
 
 const file = arg("--file", "");
-const actor = arg("--actor", process.env.BACKLOG_ACTOR || "agent:claude");
+const actor = resolveActor(arg("--actor", ""));
 const source = arg("--source", file ? "hook" : "cli");
 const quiet = argv.includes("--quiet");
 

@@ -42,6 +42,7 @@ import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readFileSync, writeFileSync } from "node:fs";
 
+import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import {
   ACTOR_NAMESPACES, EVENT_ID_RE, FIELD_DECISION,
@@ -50,7 +51,7 @@ import {
 } from "./history.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
-import { resolveActor, todayStamp } from "./take-task.mjs";
+import { todayStamp } from "./take-task.mjs";
 import { requeueStatus } from "./handoff-task.mjs";
 import { buildFieldSpecs, extractMeta, fieldSpec, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
 import { readTaskRecords } from "./task-select.mjs";

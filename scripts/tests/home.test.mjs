@@ -26,19 +26,21 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { ACTOR_ENV, DEFAULT_ACTOR, resolveActor } from "../actor.mjs";
 import {
-  HOME_ENV, USER_DEFAULTS, USER_KEYS, homePaths, loadUserConfig, parseUserConfig,
+  CONFIG_FILENAME, HOME_ENV, USER_DEFAULTS, USER_KEYS, homePaths, loadUserConfig, parseUserConfig,
   registryPath, userConfigPath,
 } from "../home.mjs";
 import { COMMANDS } from "../cli.mjs";
 import { DEFAULTS } from "../config.mjs";
 import { renderWhere, whereReport } from "../where-command.mjs";
+import { SCRIPTS_DIR } from "./_repo.mjs";
 import { plain } from "../ui.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -310,4 +312,86 @@ test("the preferences file the tool would read is named in `where`", () => {
   assert.equal(report.preferences.path, join(home, "config", "config.yaml"));
   assert.equal(readFileSync(CLI, "utf8").includes("--project"), false,
     "the dispatcher itself must not learn about a --project flag either");
+});
+
+// ── the actor chain reads this layer (TL-157) ─────────────────────────────
+//
+// The layer existed from TL-34 and nothing consumed it: `actor:` was validated,
+// stored, and then ignored by every command that records anything. These cases
+// are the wiring, and the negative one — the chain written out in only one file
+// — is what stops an eleventh copy appearing.
+
+/** A preferences file inside a `fixture()`'s home. */
+function writePreferences(home, text) {
+  mkdirSync(join(home, "config"), { recursive: true });
+  writeFileSync(join(home, "config", CONFIG_FILENAME), text, "utf8");
+}
+
+test("an `actor:` preference is the actor a command records when nothing else says", () => {
+  const { backlog, home, env } = fixture();
+  writePreferences(home, "actor: local:tester\n");
+  assert.equal(run(["new", "--title", "A task to claim", "--dir", backlog], env).status, 0);
+
+  const taken = run(["take", "TASK-1", "--dir", backlog], { ...env, BACKLOG_ACTOR: "" });
+  assert.equal(taken.status, 0, taken.stderr);
+  assert.match(taken.stdout, /taken by local:tester/);
+});
+
+test("the flag outranks the environment, which outranks the preferences", () => {
+  const { backlog, home, env } = fixture();
+  writePreferences(home, "actor: local:preference\n");
+  for (const title of ["one", "two", "three"]) {
+    assert.equal(run(["new", "--title", title, "--dir", backlog], env).status, 0);
+  }
+
+  const byPreference = run(["take", "TASK-1", "--dir", backlog], { ...env, BACKLOG_ACTOR: "" });
+  const byEnvironment = run(["take", "TASK-2", "--dir", backlog],
+    { ...env, BACKLOG_ACTOR: "agent:from-env" });
+  const byFlag = run(["take", "TASK-3", "--actor", "user:from-flag", "--dir", backlog],
+    { ...env, BACKLOG_ACTOR: "agent:from-env" });
+
+  assert.match(byPreference.stdout, /taken by local:preference/);
+  assert.match(byEnvironment.stdout, /taken by agent:from-env/);
+  assert.match(byFlag.stdout, /taken by user:from-flag/);
+});
+
+test("the chain resolves with no preferences file and with no backlog in sight", () => {
+  // `regen-hook` and `migrate-prefix` resolve an actor where no project
+  // configuration can be loaded, so this must be true of a bare environment as
+  // well as of an empty home — a hook that fails is a hook that breaks somebody
+  // else's edit.
+  const nowhere = join(tmp("nohome"), "home");
+  assert.equal(resolveActor("", { env: { [HOME_ENV]: nowhere } }), DEFAULT_ACTOR);
+  assert.equal(resolveActor("", { env: { [HOME_ENV]: "/dev/null/not-a-directory" } }), DEFAULT_ACTOR);
+  assert.equal(resolveActor("local:me", { env: { [HOME_ENV]: nowhere } }), "local:me");
+  assert.equal(existsSync(nowhere), false, "resolving an actor created a directory");
+});
+
+test("a caller may ask for the chain WITHOUT a default", () => {
+  // The escape hatch for a route that would rather record nothing than record a
+  // guess. It is the same chain; only the last step differs.
+  const nowhere = join(tmp("nohome"), "home");
+  assert.equal(resolveActor("", { env: { [HOME_ENV]: nowhere }, fallback: "" }), "");
+});
+
+test("an actor without a namespace in the preferences is not an actor", () => {
+  // `parseUserConfig` refuses it, so the chain must fall through rather than
+  // carry a value every writing command will then reject.
+  const nowhere = tmp("badactor");
+  mkdirSync(join(nowhere, "config"), { recursive: true });
+  writeFileSync(join(nowhere, "config", CONFIG_FILENAME), "actor: me\n", "utf8");
+  assert.equal(resolveActor("", { env: { [HOME_ENV]: nowhere } }), DEFAULT_ACTOR);
+});
+
+test("the chain is spelled out in ONE file — this is what stops the next copy", () => {
+  // Before TL-157 ten files ended the chain themselves and three of them had
+  // already drifted apart. Nothing compared them, which is why nobody noticed.
+  const scripts = readdirSync(SCRIPTS_DIR)
+    .filter((f) => f.endsWith(".mjs"))
+    .filter((f) => readFileSync(join(SCRIPTS_DIR, f), "utf8").includes(ACTOR_ENV));
+
+  // The positive control: a guard that passes because it found nothing at all
+  // is green with no evidentiary force.
+  assert.deepEqual(scripts, ["actor.mjs"],
+    "the actor environment variable is named outside actor.mjs — the chain has grown a second home");
 });

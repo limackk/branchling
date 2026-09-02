@@ -53,13 +53,14 @@
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { resolveActor } from "./actor.mjs";
 import { crossBranchState, describeDivergence, divergences, scanNote } from "./branch-scan.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { ACTOR_NAMESPACES, FIELD_COMMENT, isValidActor, isValidReason, readHistory } from "./history.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { printJson } from "./json-envelope.mjs";
-import { inProgressStatus, rebuildViews, refusalCode, refusalPayload, renderTake, resolveActor, takeJson, takeTask } from "./take-task.mjs";
+import { inProgressStatus, rebuildViews, refusalCode, refusalPayload, renderTake, takeJson, takeTask } from "./take-task.mjs";
 import { filterTasks, readTaskRecords, sortTasks, splitList } from "./task-select.mjs";
 import { MARK, color, failure, warn } from "./ui.mjs";
 

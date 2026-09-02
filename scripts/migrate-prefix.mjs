@@ -41,6 +41,7 @@ import { existsSync, readFileSync, readdirSync, renameSync, writeFileSync } from
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { ACTOR_NAMESPACES, MIGRATIONS_FILE, SNAPSHOT_FILE, appendMigration, applyIdMigrations, isValidActor, loadSnapshot, saveSnapshot } from "./history.mjs";
 import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
@@ -231,10 +232,10 @@ export function main(argv) {
   const toIdx = rest.indexOf("--to");
   const to = toIdx !== -1 ? rest[toIdx + 1] : null;
   const actorIdx = rest.indexOf("--actor");
-  // The migration record carries an actor like every other entry in the log. No
-  // flag and no environment means `unknown`, which is the honest answer: nobody
-  // said who — not a claim that the tool does not know what it did.
-  const actor = actorIdx !== -1 ? rest[actorIdx + 1] : process.env.BACKLOG_ACTOR;
+  // The migration record carries an actor like every other entry in the log, and
+  // it comes from the same chain as every other command's — including the user
+  // layer, which is why this must not be spelled out here a second time.
+  const actor = actorIdx !== -1 ? rest[actorIdx + 1] : resolveActor("");
   const VALUE_FLAGS = ["--to", "--actor"];
   const unknown = rest.filter(
     (a, i) => a.startsWith("-") && a !== "--dry-run" && VALUE_FLAGS.indexOf(a) === -1 && VALUE_FLAGS.indexOf(rest[i - 1]) === -1

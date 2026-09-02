@@ -26,7 +26,12 @@ import { fileURLToPath } from "node:url";
 import { auditReasons } from "../check-backlog-reasons.mjs";
 import { loadConfig } from "../config.mjs";
 import { TEMPLATE_FILENAME } from "../paths.mjs";
-import { BACKLOG_DIR, REPO_ROOT } from "./_repo.mjs";
+import { BACKLOG_DIR, REPO_ROOT, isolateHome } from "./_repo.mjs";
+// The suite must not read the DEVELOPER's preferences: since TL-157 the actor
+// chain reads the user layer, so a machine with `actor:` in its own config file
+// would otherwise see every default-actor assertion below fail.
+isolateHome("change-reason");
+
 import {
   REASON_PROVEN,
   REASON_UNKNOWN,

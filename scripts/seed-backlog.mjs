@@ -47,6 +47,7 @@ import { readFileSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { PROOF_ID } from "./criteria.mjs";
 import { TEMPLATE_PLACEHOLDER } from "./done-task.mjs";
@@ -787,7 +788,7 @@ function linkDependencies(plan, written, config) {
  * reconciliation runs afterwards only to move the snapshot forward.
  */
 function recordCreations(root, written, opts) {
-  const actor = opts.actor || process.env.BACKLOG_ACTOR || "unknown";
+  const actor = resolveActor(opts.actor);
   const ts = new Date().toISOString();
   for (const w of written) {
     appendEntries(root, w.id, [{

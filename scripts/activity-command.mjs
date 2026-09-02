@@ -39,6 +39,7 @@ import { readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { resolveActor } from "./actor.mjs";
 import { ACTIVITY_KINDS, appendActivity } from "./activity.mjs";
 import { forget, migrate, privacyReport, prune, reassignPreview } from "./activity-retention.mjs";
 import { attribute, currentBranch } from "./attribution.mjs";
@@ -159,7 +160,7 @@ export function record(opts) {
   const now = opts.now || Date.now();
   const hints = signalsFromPayload(opts.payload);
 
-  const actor = plan.actor || env.BACKLOG_ACTOR || "agent:claude";
+  const actor = resolveActor(plan.actor, { env });
   if (!isValidActor(actor)) {
     return {
       ok: false, kind: "actor",
@@ -364,7 +365,7 @@ function runReassign(argv, cliDir) {
     try {
       appendActivity(ctx.root, plan.from, [{
         task: plan.from, to: plan.to, since: plan.since || "", session: plan.session,
-        kind: "reassign", actor: plan.actor || process.env.BACKLOG_ACTOR || "agent:claude",
+        kind: "reassign", actor: resolveActor(plan.actor),
         source: "cli", attribution: "declared",
       }]);
     } catch (e) {

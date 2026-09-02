@@ -36,6 +36,7 @@ import { closeSync, openSync, readFileSync, readSync, readdirSync, writeFileSync
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { resolveActor } from "./actor.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { loadConfigOrExit } from "./config.mjs";
@@ -377,7 +378,7 @@ function run(argv) {
   const config = loadConfigOrExit(root);
   const tasksDir = backlogPaths(root).tasksDir;
 
-  const actor = plan.actor || process.env.BACKLOG_ACTOR || "agent:claude";
+  const actor = resolveActor(plan.actor);
   if (!isValidActor(actor)) {
     console.error(
       failure(N + " done", "the actor `" + actor + "` has no valid namespace", [

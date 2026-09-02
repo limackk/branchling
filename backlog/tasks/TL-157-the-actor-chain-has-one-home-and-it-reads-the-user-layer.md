@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""
 priority: P2                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 estimate: 2h                       # 30m | 2h | 1d | 1w | 1mo
 created: 2026-09-02
 updated: 2026-09-02
@@ -83,11 +83,48 @@ must not turn a hook into a failure. Read the layer directly through
 
 ## Acceptance criteria
 
-- [ ] `BACKLOG_ACTOR` appears in at most one source file. [proof: one-chain]
-- [ ] An `actor:` in the user layer is the actor a command records when no flag and no environment variable is given. [proof: preference-is-read]
-- [ ] A flag still outranks the environment, which still outranks the preferences. [proof: preference-is-read]
-- [ ] Resolution works with no preferences file and with no loadable backlog configuration — a hook must not fail. [proof: preference-is-read]
-- [ ] The decision about the default (`agent:claude` vs something else) is written in this file. [proof: guards]
+- [x] `BACKLOG_ACTOR` appears in at most one source file. [proof: one-chain]
+- [x] An `actor:` in the user layer is the actor a command records when no flag and no environment variable is given. [proof: preference-is-read]
+- [x] A flag still outranks the environment, which still outranks the preferences. [proof: preference-is-read]
+- [x] Resolution works with no preferences file and with no loadable backlog configuration — a hook must not fail. [proof: preference-is-read]
+- [x] The decision about the default (`agent:claude` vs something else) is written in this file. [proof: guards]
+
+## Decisions
+
+**The default is `agent:claude`, and the call sites that said `unknown` are
+aligned onto it.** `unknown` is not a spare word: it is the sentinel for a
+change the tool OBSERVED rather than made — `reconcile()` writes it, and
+`isUnattributed()` treats `unknown` with no stated reason as a row still waiting
+for a person to claim it. A `seed` or an `import` run is not an observation, it
+is an act performed by whoever typed the command, so recording it as `unknown`
+filed a deliberate act into the queue of things nobody witnessed. That was a
+bug, and the two call sites are the evidence it was never decided. The `agent:`
+namespace already carries the right amount of doubt — automated and unverified,
+which is exactly what an unstated actor is — and the honesty argument for
+`unknown` is answered by TL-34: a person who is not an agent now states who they
+are ONCE, in their own config file, instead of on every command.
+
+Rows already written with `unknown` keep it. The log is append-only; a value in
+it is what was true when it was written, not a field a later pass may correct.
+
+**`resolveActor(flag, opts)` takes `opts`, not an env.** The old signature was
+`(flag, env)`, and a second positional whose meaning changed would be a silent
+trap for anything still passing one. `opts.fallback` is the escape hatch for a
+route that would rather record nothing than record a guess: pass `""` and the
+chain ends unstated.
+
+**The user layer is read through `loadUserConfig()` directly, never through
+`loadConfig()`,** and every read is wrapped. `regen-hook` and `migrate-prefix`
+resolve an actor where no project configuration can be loaded, so a hook that
+threw because somebody's home directory is unusual would break an edit this tool
+was only supposed to notice.
+
+**The suite had to be made hermetic in the same change.** Wiring the layer in
+made eight test files depend on the DEVELOPER's `~/.config/<tool>/config.yaml`:
+a machine with `actor:` set would have seen every default-actor assertion fail,
+and on a machine without one — this one — the suite is green for the wrong
+reason. They now call `isolateHome()`. The remaining test files are not covered
+and there is no guard that a new one will be: TL-166.
 
 ## Notes
 

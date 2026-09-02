@@ -2,3 +2,6 @@
 {"id":"01M1GWG5NKM6ANS5EX3QRAH0JS","ts":"2026-09-02T11:01:38.099Z","task":"TL-157","field":"priority","from":"P1","to":"P2","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GWG5NKDRDN8GTRMDQ13S2Q","ts":"2026-09-02T11:01:38.099Z","task":"TL-157","field":"type","from":"task","to":"code","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GWG5NKHG8JAFT76R1Y0CKC","ts":"2026-09-02T11:01:38.099Z","task":"TL-157","field":"blocked_by","from":[],"to":["TL-34"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1HMDZAVS1RH0000SZAK84Q6","ts":"2026-09-02T17:59:51.899Z","task":"TL-157","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1HMDZAV2HHQ1RPXRWBHED85","ts":"2026-09-02T17:59:51.899Z","task":"TL-157","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1HN3D9QXMWT6F7YB1RTV6ZA","ts":"2026-09-02T18:11:34.327Z","task":"TL-157","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
