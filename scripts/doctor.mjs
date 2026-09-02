@@ -42,7 +42,7 @@ import { PRODUCT_NAME as N } from "./product.mjs";
 import { MARK as UI_MARK, color, errColor, heading } from "./ui.mjs";
 import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { summarize } from "./stats.mjs";
-import { auditVocabulary } from "./task-fields.mjs";
+import { vocabularyUsage } from "./task-fields.mjs";
 import { detectPrefixMismatch, taskIdPatterns } from "./task-id.mjs";
 import { listTaskFileNames, readTaskMetas } from "./task-io.mjs";
 
@@ -98,8 +98,15 @@ function checkConfig(root) {
 
 function checkVocabulary(root, config) {
   const metas = readTaskMetas(backlogPaths(root).tasksDir, config);
-  const divergent = auditVocabulary(metas, config);
-  if (!divergent.length) return { metas, row: check("vocabulary", "vocabulary vs tree", OK, "the field values fit inside the vocabularies") };
+  const { divergent, unused, taskCount } = vocabularyUsage(metas, config);
+  // TWO ROWS, because they are two questions with two verdicts: a value the
+  // vocabulary does not allow is wrong, and a value nothing carries is a number
+  // for a person. Folding them into one row would put an ERROR's symbol on a
+  // measurement, or a measurement's symbol on an error.
+  const rows = [unusedRow(unused, taskCount)];
+  if (!divergent.length) {
+    return { metas, row: check("vocabulary", "vocabulary vs tree", OK, "the field values fit inside the vocabularies"), rows };
+  }
 
   const first = divergent[0];
   const detail = divergent
@@ -109,7 +116,31 @@ function checkVocabulary(root, config) {
     metas,
     row: check("vocabulary", "vocabulary vs tree", ERR, detail,
       "add the missing values to `" + first.dictionary + ":` in config.yaml, or correct the tasks"),
+    rows,
   };
+}
+
+/**
+ * The declared values no task carries (TL-156).
+ *
+ * INFO, never a warning and never an error, and the exit code does not move: the
+ * same measurement is a healthy backlog in one repository and a forgotten
+ * workflow in another, and nothing here can tell which. What the row owes the
+ * reader is the number WITH ITS DENOMINATOR — "0 uses" out of 12 tasks is noise
+ * and out of 1397 is a finding — and the two edits that resolve it.
+ */
+function unusedRow(unused, taskCount) {
+  const title = "declared but unused";
+  if (!unused.length) {
+    return check("unused-vocabulary", title, OK,
+      taskCount ? "every declared value is carried by at least one task" : "no tasks yet — nothing to measure against");
+  }
+  const detail = unused
+    .map((u) => "`" + u.field + "`: " + u.values.join(", ") + " carried by 0 of " + taskCount + " task(s)")
+    .join("; ");
+  const where = unused.length === 1 ? "`" + unused[0].dictionary + ":` in config.yaml" : "config.yaml";
+  return check("unused-vocabulary", title, INFO, detail,
+    "use the value, or drop it from " + where + " — nothing here can tell which");
 }
 
 /**
@@ -279,15 +310,15 @@ export function diagnose(root) {
     // Without a configuration that could be read, the remaining questions make no
     // sense: they would be counting under a vocabulary we do not know. "Not
     // checked" is more honest than a result.
-    for (const [id, title] of [["vocabulary", "vocabulary vs tree"], ["prefix", "id prefix"], ["snapshot", "history reference point"], ["log-status", "log vs status field"], ["guards", "backlog guards"], ["volume", "tasks"], ["context", "cost of asking"]]) {
+    for (const [id, title] of [["vocabulary", "vocabulary vs tree"], ["unused-vocabulary", "declared but unused"], ["prefix", "id prefix"], ["snapshot", "history reference point"], ["log-status", "log vs status field"], ["guards", "backlog guards"], ["volume", "tasks"], ["context", "cost of asking"]]) {
       rows.push(check(id, title, INFO, "not checked — the configuration comes first"));
     }
     rows.push(...checkGitIgnore(root));
     return rows;
   }
 
-  const { metas, row: vocabRow } = checkVocabulary(root, config);
-  rows.push(vocabRow);
+  const { metas, row: vocabRow, rows: vocabExtra } = checkVocabulary(root, config);
+  rows.push(vocabRow, ...(vocabExtra || []));
   rows.push(checkPrefix(root, config));
   rows.push(checkSnapshot(root, config));
   rows.push(checkLogStatus(root, config));

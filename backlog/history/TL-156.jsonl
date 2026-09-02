@@ -1,1 +1,4 @@
 {"id":"01M1GW377S7916KQ7CK8AFH81Y","ts":"2026-09-02T10:54:33.721Z","task":"TL-156","field":"__created__","from":"","to":"doctor reports configured values that no task carries","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1HKC1YJCZ6EJFCEJ9DKTZB0","ts":"2026-09-02T17:41:20.466Z","task":"TL-156","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1HKC1YJ5S5S6WZVEZJ2EHWW","ts":"2026-09-02T17:41:20.466Z","task":"TL-156","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1HKPM6DXAK375Q5VVK4X4ND","ts":"2026-09-02T17:47:06.829Z","task":"TL-156","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

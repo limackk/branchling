@@ -19,7 +19,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { auditVocabulary } from "../task-fields.mjs";
+import { auditVocabulary, vocabularyUsage } from "../task-fields.mjs";
 import { filesCarrying, report } from "../check-backlog-vocabulary.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -228,4 +228,87 @@ test("auditVocabulary is the single source of the verdict", () => {
   const divergent = auditVocabulary([{ type: "code" }], config);
   const fields = divergent.map((d) => d.field);
   assert.ok(fields.includes("type"), "the shared audit did not see the divergence");
+});
+
+// ── The other direction: declared, and carried by nothing (TL-156) ─────────
+//
+// Measured on 2026-09-02 in two repositories: `cancelled` here, carried by no
+// task and FINE — a terminal status nobody has needed yet — and `on_queue` in
+// another, carried by none of 1397 and stale. Same number, opposite verdicts,
+// which is the whole reason this is a report and not a gate.
+
+const CONFIG = {
+  statuses: ["pending", "done", "cancelled"], archivedStatuses: ["done", "cancelled"],
+  priorities: ["P1"], types: ["task"], labels: [], labelsClosed: false,
+  owners: ["unassigned"], estimates: ["2h"], taskIdPrefix: "TL",
+};
+
+const unusedFor = (metas, config = CONFIG) =>
+  vocabularyUsage(metas, config).unused.map((u) => u.field + ":" + u.values.join("+"));
+
+test("a declared value no task carries is reported, with the tree size", () => {
+  const usage = vocabularyUsage([{ status: "pending", priority: "P1", type: "task" }], CONFIG);
+  assert.equal(usage.taskCount, 1);
+  const status = usage.unused.find((u) => u.field === "status");
+  assert.deepEqual(status.values, ["done", "cancelled"]);
+  assert.equal(status.dictionary, "statuses", "the report does not say which key to edit");
+});
+
+test("POSITIVE CONTROL: a value carried once is NOT reported", () => {
+  // Without this, a report that listed every declared value would pass the test
+  // above — and would be wrong about every backlog.
+  const metas = [
+    { status: "pending", priority: "P1", type: "task" },
+    { status: "done", priority: "P1", type: "task" },
+    { status: "cancelled", priority: "P1", type: "task" },
+  ];
+  // Narrowed to `status`, the field this fixture actually populates: the
+  // built-in enums a config literal does not mention (`executor`, `role`) keep
+  // their default vocabulary, and nothing in these three tasks carries one —
+  // which is the report working, not failing.
+  assert.ok(!unusedFor(metas).some((u) => u.startsWith("status:")), "a value in use was called unused");
+  assert.deepEqual(unusedFor(metas.slice(0, 1)).filter((u) => u.startsWith("status:")), ["status:done+cancelled"],
+    "the same fixture with two of the three values gone reports nothing — the check has no teeth");
+});
+
+test("an EMPTY tree reports nothing — a fresh project is not told its words are dead", () => {
+  assert.deepEqual(vocabularyUsage([], CONFIG).unused, []);
+  assert.equal(vocabularyUsage([], CONFIG).taskCount, 0);
+});
+
+test("both directions come from ONE traversal, and neither hides the other", () => {
+  // A tree carrying a value nothing declares AND leaving a declared one unused.
+  // The two answers are about the same reading of the same tree; computing them
+  // separately is how a report and a guard come to disagree about one file.
+  const usage = vocabularyUsage([{ status: "pending", priority: "P1", type: "code" }], CONFIG);
+  assert.deepEqual(usage.divergent.map((d) => d.field), ["type"]);
+  assert.ok(usage.unused.some((u) => u.field === "status"));
+  // The out-of-vocabulary value must not be counted as "using" anything, and a
+  // declared value must not turn up in `found`.
+  assert.deepEqual(usage.divergent[0].found, [{ value: "code", count: 1 }]);
+});
+
+test("`auditVocabulary` is unchanged: the guard still sees one direction only", () => {
+  // The gate is deliberately untouched (TL-156): a value nothing carries is not
+  // gateable, so `check --vocabulary` must not learn about it.
+  const divergent = auditVocabulary([{ status: "pending", priority: "P1", type: "task" }], CONFIG);
+  assert.deepEqual(divergent, [], "the guard grew an opinion about unused values");
+
+  const dir = repo();
+  newTask(dir, "One ordinary task");
+  const r = vocabulary(dir);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.doesNotMatch(r.stdout + r.stderr, /unused|carried by 0/, "the gate started reporting the measurement");
+});
+
+test("`doctor` prints the row, with the denominator and both repairs", () => {
+  const dir = repo();
+  newTask(dir, "One ordinary task");
+  const r = run(dir, ["doctor", "--dir", "."]);
+  const out = r.stdout + r.stderr;
+  assert.match(out, /declared but unused/);
+  assert.match(out, /carried by 0 of 1 task\(s\)/, "the count arrived without its denominator");
+  assert.match(out, /use the value, or drop it from/);
+  // A MEASUREMENT, not a failure: the exit code does not move.
+  assert.equal(r.status, 0, out);
 });

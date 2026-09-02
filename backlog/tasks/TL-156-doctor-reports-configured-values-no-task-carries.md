@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Data integrity"
 priority: P2
-status: pending
-owner: unassigned
+status: done
+owner: agent:claude
 estimate: 3h
 confidence: high
 created: 2026-09-02

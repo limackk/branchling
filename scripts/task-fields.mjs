@@ -450,6 +450,32 @@ export function buildFieldSpecs(config) {
  * @returns {Array<{field: string, label: string, allowed: string[], found: Array<{value: string, count: number}>}>}
  */
 export function auditVocabulary(metas, config) {
+  return vocabularyUsage(metas, config).divergent;
+}
+
+/**
+ * BOTH directions of the config↔tree question, from ONE traversal (TL-156).
+ *
+ * `divergent` is what `auditVocabulary` has always returned: a value in the tree
+ * that no vocabulary allows. `unused` is the mirror, and it is the quieter
+ * defect — an entry that sits in `config.yaml`, appears in every dropdown, gets
+ * a colour, is counted by dashboards, and means nothing because nothing carries
+ * it. Nothing is ever red, so nobody looks.
+ *
+ * IT IS A MEASUREMENT, NOT A VERDICT, and that is why it stops here rather than
+ * reaching the guard. Measured in two repositories on 2026-09-02: in one, a
+ * terminal status carried by no task among 165 and FINE — nobody has needed it
+ * yet; in the other, a workflow status carried by none among 1397 and stale —
+ * configured and never adopted. The same number, two opposite conclusions, and
+ * only a person can tell them apart. So the tool reports the count with its
+ * denominator and leaves the two repairs to whoever reads it. Neither example is
+ * spelled out here: this file is pasted into the viewer, and a value from
+ * somebody else's vocabulary would travel with it.
+ *
+ * @returns {{divergent: Array<object>, unused: Array<{field: string, dictionary: string,
+ *            label: string, values: string[], allowed: string[]}>, taskCount: number}}
+ */
+export function vocabularyUsage(metas, config) {
   // AN EMPTY VOCABULARY IS NOT THE SAME ANSWER IN BOTH KINDS. For an enum it
   // means the field has no vocabulary to be judged against, and `buildFieldSpecs`
   // already refuses that shape. For a CLOSED list it is a decision — `labels: []`
@@ -469,6 +495,7 @@ export function auditVocabulary(metas, config) {
   );
 
   const out = [];
+  const unused = [];
   for (const spec of specs) {
     const counts = new Map();
     for (const meta of metas) {
@@ -477,10 +504,22 @@ export function auditVocabulary(metas, config) {
       for (const v of values) {
         const value = String(v == null ? "" : v).trim();
         if (!value) continue;
-        if (spec.options.indexOf(value) >= 0) continue;
         counts.set(value, (counts.get(value) || 0) + 1);
       }
     }
+    // A DECLARED value nothing carries. Read off the same map, so the two
+    // answers cannot be computed from different readings of the tree.
+    const cold = spec.options.filter((v) => !counts.has(v));
+    if (cold.length) {
+      unused.push({
+        field: spec.key,
+        dictionary: spec.dictionary || spec.key,
+        label: spec.label,
+        values: cold,
+        allowed: spec.options.slice(),
+      });
+    }
+    for (const value of spec.options) counts.delete(value);
     if (counts.size) {
       out.push({
         field: spec.key,
@@ -492,7 +531,11 @@ export function auditVocabulary(metas, config) {
       });
     }
   }
-  return out;
+  // AN EMPTY TREE REPORTS NOTHING. Every declared value is unused in a backlog
+  // with no tasks, and telling a fresh project that its whole vocabulary is dead
+  // is the report being wrong in the loudest possible way on somebody's first
+  // run.
+  return { divergent: out, unused: metas.length ? unused : [], taskCount: metas.length };
 }
 
 export function fieldSpec(key, fields) {
