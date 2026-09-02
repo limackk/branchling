@@ -192,15 +192,24 @@ test("no reading command builds an envelope of its own", () => {
   }
 });
 
-test("the README documents every kind the code can emit", () => {
+test("the manual documents every kind the code can emit", () => {
   // The contract is a promise to somebody outside this repository, and a kind
   // nobody wrote down is a promise nobody can rely on. Reading the source of the
-  // README rather than trusting a habit is what keeps the two from drifting.
-  const readme = readFileSync(join(REPO_ROOT, "README.md"), "utf8");
-  const section = readme.slice(readme.indexOf("### The `--json` contract"));
-  assert.ok(section.length > 500, "the README has no `--json` contract section to check");
+  // document rather than trusting a habit is what keeps the two from drifting.
+  //
+  // IT READS THE MANUAL, NOT THE README (TL-154). The `--json` contract moved
+  // there when the README became a front door, and this assertion was pointed
+  // at a heading that no longer exists — so it failed on the ABSENCE of the
+  // section and stopped comparing anything at all. That is the worse of the two
+  // failure modes: a red test nobody has to act on trains people to ignore it,
+  // and it was checking nothing the whole time it was red.
+  const manual = readFileSync(join(REPO_ROOT, "docs", "manual.md"), "utf8");
+  const at = manual.indexOf("## The `--json` contract");
+  assert.notEqual(at, -1, "the manual has no `--json` contract section to check");
+  const section = manual.slice(at);
+  assert.ok(section.length > 500, "the `--json` contract section is too short to be one");
   for (const kind of Object.keys(KINDS)) {
-    assert.ok(section.includes("`" + kind + "`"), "the README does not document the kind `" + kind + "`");
+    assert.ok(section.includes("`" + kind + "`"), "the manual does not document the kind `" + kind + "`");
   }
 });
 

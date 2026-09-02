@@ -533,7 +533,7 @@ implementation detail. Every reading command answers in the same envelope:
 | `next-id` | `next-id` | `nextId`, `id`, `prefix`, `max`, `source`, `trees`, `branches`, `known` |
 | `instructions` | `instructions` | `topics`, `topic`, `text`, `version` |
 | `plan` | `plan` | `root`, `exists`, `updated`, `rationale`, `waves`, `activeWave`, `nextUp`, `inProgress`, `unplanned`, `stale`, `inProgressStatus` |
-| `time` | `time` | `root`, `closed`, `completed`, `unstamped` (ids, not a count), `leadTimeDays`, `throughput`, `perWeekMean` |
+| `time` | `time` | `root`, `closed`, `completed`, `unstamped` (ids, not a count), `leadTimeDays`, `throughput`, `perWeekMean`, `engaged`, `unknown_ratio` |
 | `seed` | `seed` | `ok`, `root`, `dryRun`, `created`, `errors` |
 
 **What is promised.**

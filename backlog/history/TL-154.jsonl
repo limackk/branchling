@@ -1,2 +1,6 @@
 {"id":"01M1GTTTC3JKXFXTXWQNYMBXX3","ts":"2026-09-02T10:32:29.827Z","task":"TL-154","field":"__created__","from":"","to":"Three README tests fail after the front-door rewrite","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GTVPKM3MN8J2BE7P6VV0JE","ts":"2026-09-02T10:32:58.740Z","task":"TL-154","field":"type","from":"task","to":"bug","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GTXXMATH9TB6V18J6PNAFY","ts":"2026-09-02T10:34:11.466Z","task":"TL-154","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1GTXXMAT6J0M7R1FWBRQ5AA","ts":"2026-09-02T10:34:11.466Z","task":"TL-154","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1GV5T9SR94779TKEG3JA95T","ts":"2026-09-02T10:38:30.201Z","task":"TL-154","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
+{"id":"01M1GV5T9V23ABFRT5VYSQH1WP","ts":"2026-09-02T10:38:30.203Z","task":"TL-154","field":"__verified__","from":"","to":"Read the Decision section of this task: does it say README or manual, and WHY? A section that only records what was done is not a decision.","actor":"agent:claude","source":"done","reason":"proven"}

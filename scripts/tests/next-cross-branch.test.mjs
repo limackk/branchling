@@ -273,7 +273,19 @@ test("the guarantee is stated as a CLONE, in the README and in the instructions"
   assert.match(loop.stdout, /clone/, "the loop guide does not say where the guarantee ends");
   assert.match(loop.stdout, /branch/, "it no longer says the branch is part of the boundary");
 
+  // THE README IS ASKED ABOUT ITS SUBSTANCE, NOT ITS WORDING (TL-154). This used
+  // to match one sentence verbatim, and a rewrite that kept the guarantee intact
+  // and reworded the sentence turned it red — a failure that says "the prose
+  // moved" in the voice of "the promise is wrong". So the paragraph is located
+  // by its own heading and then asked the two questions that actually matter:
+  // does it name the clone as the boundary, and does it admit that two clones
+  // can still collide. A rewording passes; a narrowing back to one checkout, or
+  // a paragraph quietly deleted, does not.
   const readme = readFileSync(join(SCRIPTS, "..", "README.md"), "utf8");
-  assert.match(readme, /every branch and worktree of one clone/,
-    "the README still promises a boundary the dispatcher no longer has");
+  const at = readme.indexOf("Where the guarantee ends");
+  assert.notEqual(at, -1, "the README no longer states where the guarantee ends at all");
+  const para = readme.slice(at, at + 1500);
+  assert.match(para, /worktree of one clone/, "the reservation is no longer stated as covering the clone");
+  assert.match(para, /branch and worktree of that clone/, "the scan's reach across branches is no longer stated");
+  assert.match(para, /two clones/, "the README no longer admits that two clones can both take one task");
 });

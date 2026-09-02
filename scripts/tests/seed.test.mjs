@@ -460,11 +460,15 @@ test("`seed --help` states the required fields", () => {
   }
 });
 
-test("the README describes the plan format", () => {
-  const readme = readFileSync(join(SCRIPTS, "..", "README.md"), "utf8");
-  assert.match(readme, /^## Seeding a backlog from a plan$/m);
+test("the manual describes the plan format", () => {
+  // Pointed at the manual by TL-154: the section moved there when the README
+  // became a front door, and an assertion left behind fails on the absence of a
+  // heading instead of on the thing it was written to catch — a plan key the
+  // code accepts and nothing documents.
+  const manual = readFileSync(join(SCRIPTS, "..", "docs", "manual.md"), "utf8");
+  assert.match(manual, /^## Seeding a backlog from a plan$/m);
   for (const key of ["plan_id", "verification", "blocked_by"]) {
-    assert.ok(readme.includes(key), "the README does not mention " + key);
+    assert.ok(manual.includes(key), "the manual does not mention " + key);
   }
 });
 
