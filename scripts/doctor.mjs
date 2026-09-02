@@ -309,9 +309,31 @@ function checkGitIgnore(root) {
   return rows;
 }
 
+/** How long the guards may take before the run is abandoned. Named, because the
+ *  row below has to be able to say the number when it is hit. */
+const GUARD_TIMEOUT_MS = 60_000;
+
 function checkGuards(root) {
-  const r = spawnSync(process.execPath, [join(HERE, "cli.mjs"), "check", "--dir", root], { encoding: "utf8", timeout: 60_000 });
+  const r = spawnSync(process.execPath, [join(HERE, "cli.mjs"), "check", "--dir", root],
+    { encoding: "utf8", timeout: GUARD_TIMEOUT_MS });
   if (r.status === 0) return check("guards", "backlog guards", OK, "id collisions, boards, references — all green");
+
+  // A RUN THAT NEVER FINISHED IS NOT A VERDICT (TL-163). `spawnSync` reports a
+  // timeout, a signal or a failure to start with `status: null`, and the old
+  // code turned every one of them into "a guard failed" — an ERROR row about a
+  // question nobody managed to ask. That is the shape of finding that teaches a
+  // reader to re-run instead of read, after which a real failure looks exactly
+  // like the flake. "I could not ask" is INFO, the same answer this file already
+  // gives when the configuration cannot be read.
+  if (r.status === null) {
+    const why = r.signal === "SIGTERM"
+      ? "it did not finish within " + (GUARD_TIMEOUT_MS / 1000) + "s"
+      : r.error ? "it could not be started: " + (r.error.code || r.error.message)
+      : "it was ended by " + r.signal;
+    return check("guards", "backlog guards", INFO,
+      "not checked — the guard run gave no verdict: " + why, N + " check");
+  }
+
   const firstProblem = String(r.stderr || r.stdout || "").split("\n").filter(Boolean)[0] || "a guard failed";
   return check("guards", "backlog guards", ERR, firstProblem, N + " check");
 }

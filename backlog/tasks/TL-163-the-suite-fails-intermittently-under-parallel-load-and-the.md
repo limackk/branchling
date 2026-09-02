@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "worktrail — the tool"
 priority: P2                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 estimate: 4h                       # 30m | 2h | 1d | 1w | 1mo
 created: 2026-09-02
 updated: 2026-09-02
@@ -81,12 +81,63 @@ nothing the day somebody starts ignoring them.
 
 ## Acceptance criteria
 
-- [ ] Five consecutive full runs of the suite are green. [proof: repeated]
-- [ ] A failing subprocess assertion in these two tests prints what the subprocess said. [proof: repeated]
-- [ ] The cause is recorded, and it is a cause that was reproduced rather than inferred. [proof: repeated]
+- [x] Five consecutive full runs of the suite are green. [proof: repeated]
+- [x] A failing subprocess assertion in these two tests prints what the subprocess said. [proof: repeated]
+- [x] The cause is recorded, and it is a cause that was reproduced rather than inferred. [proof: repeated]
 
 ## Notes
 
 Out of scope: making the suite faster. Speed is a separate concern from
 determinism, and chasing both at once makes it impossible to say which change
 fixed the flake.
+
+## Decisions
+
+**The cause was reproduced, and it is not parallel load.** 144 concurrent
+`doctor` runs against one fixture, from twelve processes at once, produced zero
+failures. What DOES reproduce it, every time:
+
+    $ node scripts/cli.mjs doctor --dir <a fresh fixture>   # exit 0
+    $ printf '// <a Polish sentence>\n' > scripts/zz-probe.mjs
+    $ node scripts/cli.mjs doctor --dir <the same fixture>  # exit 1
+    $ rm scripts/zz-probe.mjs
+    $ node scripts/cli.mjs doctor --dir <the same fixture>  # exit 0
+
+`check --language` and `check --product-name` read THIS INSTALLATION's source —
+they take no `--dir`, and the guard table already said why. What was never drawn
+from that is the consequence: pointed at somebody else's backlog they still ran.
+So `check --dir <anywhere>` returned a verdict about the tool's checkout, and
+`doctor` turns a failing `check` into an ERROR row and exit 1.
+
+That explains every fact in the report and no other hypothesis does. Both failing
+tests spawn `check` or `doctor` against a temporary fixture. Both failed while
+this repository was being edited — the observation was made *while closing
+TL-84*. Both passed in isolation minutes later, when the tree had settled. The
+suite was not intermittent; it was measuring a moving object.
+
+**The fix is scope, not a timeout.** A guard whose subject is this installation
+does not run when `--dir` points outside this checkout. `insideInstallation()`
+accepts the root itself, because a co-located backlog IS the root and a rule
+that only knew the nested layout would switch both guards off for every
+co-located consumer.
+
+**A skipped guard says so, in both output shapes.** Silence and a pass are
+indistinguishable, which is the same defect this project refuses everywhere
+else. The JSON carries `skipped: true` rather than a bare `ok: true`, so a
+consumer counting green guards is not told a question was answered when it was
+never asked.
+
+**This was also a correctness defect for every user of the tool**, not only for
+the suite: a stranger running `worktrail check` in their own repository was
+having the TOOL's source audited and could, in principle, be told their backlog
+had failed because of it.
+
+**`doctor`'s guards row now distinguishes a verdict from a run that never
+produced one.** `spawnSync` reports a timeout, a signal or a failure to start
+with `status: null`, and every one of those became "a guard failed" — an ERROR
+about a question nobody managed to ask. It is INFO now, the same answer this
+file already gives when the configuration cannot be read. This is not the cause
+found above; it is the reason the cause stayed invisible.
+
+**Both flaky assertions now print what the subprocess said.** `1 !== 0` is what
+kept a reproducible cause a guess for a day.

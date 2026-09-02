@@ -31,7 +31,7 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { PRODUCT_NAME as N, PRODUCT_VERSION } from "./product.mjs";
@@ -86,9 +86,13 @@ const CHECK_USAGE = [
   "                       a task it is blocked by. A backlog with no plan.yaml passes: the",
   "                       execution order is an optional decision, not a required file",
   "  --language           only whether the public surface is English — a property of the CODE,",
-  "                       so it reads this installation, not the backlog named by --dir",
+  "                       so it reads this installation, not the backlog named by --dir.",
+  "                       For that reason it does NOT run when --dir points outside this",
+  "                       checkout: it would answer about the tool and fail a run about",
+  "                       somebody else's tree. The run says when it was skipped",
   "  --product-name       only whether the name is written out in scripts/ or bin/ instead of",
-  "                       imported from product.mjs — also a property of the CODE, not the data",
+  "                       imported from product.mjs — also a property of the CODE, not the",
+  "                       data, and skipped outside this checkout for the same reason",
   "  --proofs             re-run the `verification:` contract of every task this tool CLOSED",
   "                       with a proven reason, against the tree as it is now, and name each",
   "                       one that no longer passes. NEVER part of a bare `check`: those",
@@ -1529,12 +1533,20 @@ export const CHECK_GUARDS = [
   // NO `--dir`, and that is not an oversight: this judges the SOURCE of this
   // installation. Pointing it at a backlog would have it read somebody's tasks
   // and report their language as a defect of the tool.
+  //
+  // `installationOnly` draws the consequence that was left undrawn (TL-163): a
+  // guard whose subject is this installation must not run when `check` was
+  // pointed somewhere else, or it answers a question nobody asked and can fail a
+  // run about a tree it never read. Measured: `doctor --dir <a fixture>` exited
+  // 1 because of an unrelated file being edited in this repository's `scripts/`,
+  // which is what made the suite intermittently red — a run during an edit and a
+  // run after it saw two different trees.
   { key: "language", want: "wantLanguage", name: "language", script: "check-public-language.mjs",
-    args: () => [] },
+    installationOnly: true, args: () => [] },
   // No `--dir` either, and for the same reason. A user's task files may name the
   // tool as often as they like — that is their prose, not our literal.
   { key: "product-name", want: "wantProductName", name: "product-name", script: "check-product-name.mjs",
-    args: () => [] },
+    installationOnly: true, args: () => [] },
   // OPT-IN ONLY — see `parseCheckArgs`. It re-runs the contracts of tasks that
   // are already closed, so it costs what those test suites cost.
   { key: "proofs", want: "wantProofs", name: "proofs", script: "check-backlog-proofs.mjs",
@@ -1543,6 +1555,26 @@ export const CHECK_GUARDS = [
     optIn: true,
     args: (root, tasksDir, files, plan) => ["--dir", root].concat(plan.since ? ["--since", plan.since] : []) },
 ];
+
+/**
+ * Is this backlog part of the checkout the tool is running FROM?
+ *
+ * The comparison is between resolved paths, and it accepts the installation
+ * root itself — a co-located backlog IS the root (CLAUDE.md: the tool supports
+ * both layouts, and a rule that only knew the nested one would switch the two
+ * guards off for every co-located consumer of this repository).
+ */
+export function insideInstallation(root, moduleDir = HERE) {
+  const installation = resolve(moduleDir, "..");
+  const target = resolve(root);
+  return target === installation || target.startsWith(installation + sep);
+}
+
+/** One line, so the plain output and the JSON say the same thing. */
+function skippedGuardLine(name) {
+  return "· " + name + ": not run — it judges this tool's own source, and `--dir` " +
+    "points at another backlog";
+}
 
 function runCheck(args) {
   let plan;
@@ -1577,6 +1609,15 @@ function runCheck(args) {
 
   const guards = CHECK_GUARDS.filter((g) => plan[g.want]);
 
+  // WHOSE TREE IS BEING JUDGED (TL-163). Two guards read this installation's own
+  // source and take no `--dir`; run against somebody else's backlog they answer
+  // about the wrong subject, and their verdict then depends on whatever the
+  // TOOL's checkout happens to contain at that moment. That is not a hypothetical
+  // — it is the reproduced cause of an intermittently red suite: dozens of tests
+  // spawn `check` or `doctor` against a temporary fixture, and every one of them
+  // was re-reading the developer's working tree mid-edit.
+  const ownBacklog = insideInstallation(root);
+
   // `--json` CAPTURES the guards instead of letting them print (TL-57). The
   // constraint is absolute: with `--json`, stdout carries the document and
   // nothing else, because a `✓` from one guard breaks parsing for every
@@ -1586,6 +1627,12 @@ function runCheck(args) {
     const results = [];
     let worstJson = 0;
     for (const guard of guards) {
+      if (guard.installationOnly && !ownBacklog) {
+        // `skipped` rather than `ok: true`: a consumer counting green guards must
+        // not be told a question was answered when it was never asked.
+        results.push({ name: guard.name, ok: true, skipped: true, exit: 0, output: skippedGuardLine(guard.name) });
+        continue;
+      }
       const { exit, output } = captureScript(guard.script, guard.args(root, tasksDir, plan.files, plan));
       worstJson = Math.max(worstJson, exit);
       results.push({ name: guard.name, ok: exit === 0, exit, output });
@@ -1603,6 +1650,13 @@ function runCheck(args) {
 
   let worst = 0;
   for (const guard of guards) {
+    if (guard.installationOnly && !ownBacklog) {
+      // SAID OUT LOUD, not silently dropped. A guard that did not run and a
+      // guard that passed look identical in a summary, and this project's whole
+      // argument is that they must not.
+      console.log(skippedGuardLine(guard.name));
+      continue;
+    }
     worst = Math.max(worst, runScript(guard.script, guard.args(root, tasksDir, plan.files, plan)));
   }
   return worst;

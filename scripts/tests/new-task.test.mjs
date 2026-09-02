@@ -254,7 +254,12 @@ test("new: the created task PASSES the guards and enters the views", () => {
   const dir = freshBacklog();
   try {
     assert.equal(run(["new", "--dir", dir, "--title", "Cos do zrobienia"]).status, 0);
-    assert.equal(run(["check", "--dir", dir]).status, 0, "the guards rejected a freshly created task");
+    // The whole run is in the message. This assertion was one of the two that
+    // failed intermittently (TL-163), and `1 !== 0` said nothing about which
+    // guard did it — which is how a reproducible cause stayed a guess.
+    const guards = run(["check", "--dir", dir]);
+    assert.equal(guards.status, 0,
+      "the guards rejected a freshly created task\n" + guards.stdout + guards.stderr);
     assert.equal(run(["build", "--dir", dir]).status, 0, "build did not pass");
     assert.ok(existsSync(join(dir, "INDEX.yaml")));
     assert.match(readFileSync(join(dir, "INDEX.yaml"), "utf8"), /Cos do zrobienia/);
