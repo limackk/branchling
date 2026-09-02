@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""
 priority: P2                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 estimate: 1d                       # 30m | 2h | 1d | 1w | 1mo
 created: 2026-09-02
 updated: 2026-09-02
@@ -87,9 +87,9 @@ where nothing could break is green with no evidentiary force.
 
 ## Acceptance criteria
 
-- [ ] A proven task whose contract now fails is reported with its id, actor and range. [proof: suite-green]
-- [ ] A task closed with `unknown` is not reported as a broken proof. [proof: suite-green]
-- [ ] A `manual:` entry is reported as vouched, not as broken. [proof: suite-green]
-- [ ] Positive control: the intact fixture reports nothing, the broken one reports. [proof: suite-green]
-- [ ] `done` and `--proofs` share one contract runner. [proof: guards-green]
-- [ ] `--json` answers in the envelope and the exit code is non-zero on a broken proof. [proof: suite-green]
+- [x] A proven task whose contract now fails is reported with its id, actor and range. [proof: suite-green]
+- [x] A task closed with `unknown` is not reported as a broken proof. [proof: suite-green]
+- [x] A `manual:` entry is reported as vouched, not as broken. [proof: suite-green]
+- [x] Positive control: the intact fixture reports nothing, the broken one reports. [proof: suite-green]
+- [x] `done` and `--proofs` share one contract runner. [proof: guards-green]
+- [x] `--json` answers in the envelope and the exit code is non-zero on a broken proof. [proof: suite-green]

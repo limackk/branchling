@@ -119,7 +119,7 @@ test("`check --json` names every guard it ran, and the ones that failed", () => 
   assert.equal(answer.ok, true);
   assert.deepEqual(answer.failed, []);
   assert.deepEqual(answer.guards.map((g) => g.name).sort(),
-    CHECK_GUARDS.map((g) => g.name).sort(),
+    CHECK_GUARDS.filter((g) => !g.optIn).map((g) => g.name).sort(),
     "a bare `check --json` did not run the same set the text mode runs");
   for (const guard of answer.guards) {
     assert.equal(typeof guard.output, "string");
@@ -154,8 +154,22 @@ test("the guard table is the one source both modes read", () => {
   // notice a guard that is not there.
   const plan = parseCheckArgs([]);
   for (const guard of CHECK_GUARDS) {
+    if (guard.optIn) {
+      assert.equal(plan[guard.want], false, "`" + guard.name + "` joined the default run");
+      continue;
+    }
     assert.equal(plan[guard.want], true, "`" + guard.name + "` is not in the default run");
   }
+  // The exception is ONE guard, named here on purpose (TL-147): a bare `check`
+  // that re-ran other tasks' contracts would take minutes instead of a second,
+  // and — since a contract in this backlog runs `check` — would call itself. A
+  // second opt-in guard is a decision somebody has to come here to make.
+  assert.deepEqual(CHECK_GUARDS.filter((g) => g.optIn).map((g) => g.name), ["proofs"]);
+  // …and it is still reachable, which is what makes the exception an exception
+  // rather than a guard wired to nothing.
+  assert.equal(parseCheckArgs(["--proofs"]).wantProofs, true);
+  assert.equal(parseCheckArgs(["--proofs"]).wantIds, false, "asking for one guard ran them all");
+
   const narrowed = parseCheckArgs(["--refs"]);
   assert.deepEqual(CHECK_GUARDS.filter((g) => narrowed[g.want]).map((g) => g.name), ["refs"]);
 });

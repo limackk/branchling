@@ -44,7 +44,7 @@ import { FIELD_SHAPES } from "./task-fields.mjs";
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 const CHECK_USAGE = [
-  `${N} check [--dir <path>] [--id-collisions] [--boards] [--refs] [--criteria] [--reasons] [--log-status] [--vocabulary] [--plan] [--language] [--product-name] [task-file.md …]`,
+  `${N} check [--dir <path>] [--id-collisions] [--boards] [--refs] [--criteria] [--reasons] [--log-status] [--vocabulary] [--plan] [--language] [--product-name] [--proofs] [--since <sha>] [task-file.md …]`,
   "",
   "  no selector          every guard; exit code = the WORST of them",
   "  --json               the whole run as one document: which guards ran, which failed,",
@@ -89,6 +89,12 @@ const CHECK_USAGE = [
   "                       so it reads this installation, not the backlog named by --dir",
   "  --product-name       only whether the name is written out in scripts/ or bin/ instead of",
   "                       imported from product.mjs — also a property of the CODE, not the data",
+  "  --proofs             re-run the `verification:` contract of every task this tool CLOSED",
+  "                       with a proven reason, against the tree as it is now, and name each",
+  "                       one that no longer passes. NEVER part of a bare `check`: those",
+  "                       contracts are test suites, and one of them may be this command",
+  "  --since <sha>        with --proofs, keep the closings the range could plausibly have",
+  "                       broken — a file the task changed, or a path its contract names",
 ].join("\n");
 
 /**
@@ -1355,7 +1361,7 @@ function captureScript(script, args) {
  * evidential force. The dispatcher supplies the mode so that nobody has to
  * remember it.
  */
-const CHECK_FLAGS = ["--dir", "--json", "--id-collisions", "--boards", "--refs", "--criteria", "--reasons", "--log-status", "--history", "--docs", "--vocabulary", "--plan", "--language", "--product-name"];
+const CHECK_FLAGS = ["--dir", "--json", "--id-collisions", "--boards", "--refs", "--criteria", "--reasons", "--log-status", "--history", "--docs", "--vocabulary", "--plan", "--language", "--product-name", "--proofs", "--since"];
 
 /** PURE — resolves `check`'s arguments. Throws on a usage error. */
 export function parseCheckArgs(args) {
@@ -1372,6 +1378,8 @@ export function parseCheckArgs(args) {
   let wantPlan = false;
   let wantLanguage = false;
   let wantProductName = false;
+  let wantProofs = false;
+  let since = null;
   let json = false;
   const files = [];
 
@@ -1395,6 +1403,12 @@ export function parseCheckArgs(args) {
     if (a === "--plan") { wantPlan = true; continue; }
     if (a === "--language") { wantLanguage = true; continue; }
     if (a === "--product-name") { wantProductName = true; continue; }
+    if (a === "--proofs") { wantProofs = true; continue; }
+    if (a === "--since") {
+      since = args[++i] || null;
+      if (!since) throw new Error("`--since` with no commit");
+      continue;
+    }
     if (a.startsWith("-")) {
       // The full `usage` is NO LONGER repeated here (TL-52): since `check
       // --help` works (TL-51), the error's job is to name the flag and point
@@ -1417,12 +1431,25 @@ export function parseCheckArgs(args) {
   // (BL-1451): a dangling reference passed `check`, because `check` checked only
   // what somebody had once written into it.
   if (!wantIds && !wantBoards && !wantRefs && !wantCriteria && !wantReasons && !wantLogStatus &&
-      !wantHistory && !wantDocs && !wantVocabulary && !wantPlan && !wantLanguage && !wantProductName) {
+      !wantHistory && !wantDocs && !wantVocabulary && !wantPlan && !wantLanguage && !wantProductName &&
+      !wantProofs) {
     wantIds = true; wantBoards = true; wantRefs = true; wantCriteria = true; wantReasons = true;
     wantLogStatus = true; wantHistory = true; wantDocs = true;
     wantVocabulary = true; wantPlan = true; wantLanguage = true; wantProductName = true;
   }
-  return { dir, json, wantIds, wantBoards, wantRefs, wantCriteria, wantReasons, wantLogStatus, wantHistory, wantDocs, wantVocabulary, wantPlan, wantLanguage, wantProductName, files };
+  // `--proofs` IS NOT IN THAT LIST, and it is the one guard that must never be
+  // (TL-147). It re-runs other tasks' contracts, which are test suites: a bare
+  // `check` would go from a second to minutes, and — since a contract in this
+  // very backlog runs `check` — it would call itself for as long as the machine
+  // let it. So it joins a run only when somebody asks for it by name, which is
+  // the opposite of the rule every other guard follows and needs saying out loud.
+  if (since !== null && !wantProofs) {
+    throw new Error(
+      "`--since` with no `--proofs`\n" +
+        "It narrows which proven closings are re-run; on its own there is nothing for it to narrow."
+    );
+  }
+  return { dir, json, wantIds, wantBoards, wantRefs, wantCriteria, wantReasons, wantLogStatus, wantHistory, wantDocs, wantVocabulary, wantPlan, wantLanguage, wantProductName, wantProofs, since, files };
 }
 
 /**
@@ -1486,6 +1513,13 @@ export const CHECK_GUARDS = [
   // tool as often as they like — that is their prose, not our literal.
   { key: "product-name", want: "wantProductName", name: "product-name", script: "check-product-name.mjs",
     args: () => [] },
+  // OPT-IN ONLY — see `parseCheckArgs`. It re-runs the contracts of tasks that
+  // are already closed, so it costs what those test suites cost.
+  { key: "proofs", want: "wantProofs", name: "proofs", script: "check-backlog-proofs.mjs",
+    // The ONE guard outside the default run, and the flag says so in the table
+    // rather than in a name a test would have to know — see `parseCheckArgs`.
+    optIn: true,
+    args: (root, tasksDir, files, plan) => ["--dir", root].concat(plan.since ? ["--since", plan.since] : []) },
 ];
 
 function runCheck(args) {
@@ -1530,7 +1564,7 @@ function runCheck(args) {
     const results = [];
     let worstJson = 0;
     for (const guard of guards) {
-      const { exit, output } = captureScript(guard.script, guard.args(root, tasksDir, plan.files));
+      const { exit, output } = captureScript(guard.script, guard.args(root, tasksDir, plan.files, plan));
       worstJson = Math.max(worstJson, exit);
       results.push({ name: guard.name, ok: exit === 0, exit, output });
     }
@@ -1547,7 +1581,7 @@ function runCheck(args) {
 
   let worst = 0;
   for (const guard of guards) {
-    worst = Math.max(worst, runScript(guard.script, guard.args(root, tasksDir, plan.files)));
+    worst = Math.max(worst, runScript(guard.script, guard.args(root, tasksDir, plan.files, plan)));
   }
   return worst;
 }

@@ -1,1 +1,4 @@
 {"id":"01M1GK2C8ANB17PZ3GXJYN2P2K","ts":"2026-09-02T08:16:48.906Z","task":"TL-147","field":"__created__","from":"","to":"A closed task's proof is re-run against the current tree, and a broken one is named","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1HH8QDQB6YAEZF58ZFAGH8F","ts":"2026-09-02T17:04:34.231Z","task":"TL-147","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1HH8QDQ7G1PHPW7WN236E10","ts":"2026-09-02T17:04:34.231Z","task":"TL-147","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1HJAHES7F2B836RAVDQV64V","ts":"2026-09-02T17:23:02.233Z","task":"TL-147","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

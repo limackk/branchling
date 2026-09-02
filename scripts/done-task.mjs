@@ -221,6 +221,51 @@ function runBash(command, cwd, capture) {
   };
 }
 
+/**
+ * RUN A CONTRACT. One implementation, shared by the command that closes a task
+ * and by the guard that re-runs a closed one (TL-147).
+ *
+ * WHY THE CALLBACKS RATHER THAN TWO LOOPS. The two callers differ in what they
+ * SAY, not in what they do: `done` narrates each entry and asks a person to
+ * vouch for a `manual:` one; `check --proofs` prints nothing and cannot ask
+ * anybody anything. Two loops would be two answers to "did this contract pass",
+ * which is the one question the guard exists to ask about the other's work.
+ *
+ * IT STOPS AT THE FIRST FAILURE, as `done` always has: the entries after it
+ * would run against a tree the failure already describes, and the time is spent
+ * for nothing.
+ *
+ * `manual` is asked for a decision and may return `null` for "cannot be
+ * re-run", which is neither a pass nor a failure — a distinction the guard
+ * needs, because a task proved only by a person is not broken and is not green
+ * either.
+ *
+ * @param {Array<object>} entries parsed `verification:` entries
+ * @param {string} cwd where the commands run — the repository root
+ * @param {{capture?: boolean, manual?: function, before?: function, after?: function}} opts
+ * @returns {{results: Array<object>, failed: object|null}}
+ */
+export function runContract(entries, cwd, opts = {}) {
+  const results = [];
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    if (e.manual) {
+      const decision = opts.manual ? opts.manual(e, i) : { ok: null };
+      const row = { id: e.id, kind: "manual", command: e.manual, ok: decision.ok, exitCode: null, ms: 0 };
+      if (decision.vouchedBy) row.vouchedBy = decision.vouchedBy;
+      results.push(row);
+      if (decision.ok === false) return { results, failed: { entry: e, kind: "manual" } };
+      continue;
+    }
+    if (opts.before) opts.before(e, i);
+    const r = runBash(e.bash, cwd, opts.capture);
+    results.push({ id: e.id, kind: "bash", command: e.bash, ok: r.ok, exitCode: r.exitCode, ms: r.ms });
+    if (!r.ok) return { results, failed: { entry: e, kind: "bash", ...r } };
+    if (opts.after) opts.after(e, r);
+  }
+  return { results, failed: null };
+}
+
 /** Read one line from the terminal. Returns null when there is no terminal.
  *
  *  It reads `/dev/tty`, not stdin: the command is meant to be usable in a pipe
@@ -421,79 +466,91 @@ function run(argv) {
   }
 
   const cwd = repoRootFor(root);
-  const results = [];
 
   log(plan.json, "");
   log(plan.json, "  " + plan.id + " — " + entries.length + " verification entr" +
     (entries.length === 1 ? "y" : "ies") + ", run in " + cwd);
   log(plan.json, "");
 
-  for (let i = 0; i < entries.length; i++) {
-    const e = entries[i];
-    const tag = "  " + (i + 1) + "/" + entries.length + "  " + (e.id ? e.id + "  " : "");
-
-    if (e.manual) {
+  // ONE runner, shared with `check --proofs` (TL-147). What differs between the
+  // two callers is the narration and the question put to a person, so those are
+  // the callbacks; the loop, the order and the stop-at-first-failure are not
+  // this command's private behaviour any more.
+  const tagOf = (e, i) => "  " + (i + 1) + "/" + entries.length + "  " + (e.id ? e.id + "  " : "");
+  let stop = null;
+  const { results, failed } = runContract(entries, cwd, {
+    capture: plan.json,
+    before: (e, i) => log(plan.json, tagOf(e, i) + "bash: " + e.bash),
+    after: (e, r) => {
+      log(plan.json, "  " + OKM + " passed (" + r.ms + " ms)");
+      log(plan.json, "");
+    },
+    manual: (e, i) => {
       // The text is printed BEFORE anything is asked, and the entry is named as
       // manual, so nobody confirms a sentence they have not read.
-      log(plan.json, tag + "manual");
+      log(plan.json, tagOf(e, i) + "manual");
       log(plan.json, manualPrompt(e, actor));
       let confirmed = plan.confirmManual;
       if (!confirmed && plan.json) {
         // Asking a person for consent while the output is being parsed by a
         // program is incoherent, and the prompt would land in the middle of the
         // JSON besides. `--json` has to say so rather than produce broken output.
-        return refuse(plan, plan.id + ": `--json` cannot ask a person to vouch for a `manual:` entry", [
-          "  " + e.manual,
-          "",
-          "Run it without `--json` and type `" + CONFIRM_WORD + "`, or pass `--confirm-manual`",
-          "if you are vouching for it yourself.",
-        ], results, "manual-needs-person");
+        stop = {
+          kind: "manual-needs-person",
+          headline: plan.id + ": `--json` cannot ask a person to vouch for a `manual:` entry",
+          details: [
+            "  " + e.manual,
+            "",
+            "Run it without `--json` and type `" + CONFIRM_WORD + "`, or pass `--confirm-manual`",
+            "if you are vouching for it yourself.",
+          ],
+          refuse: true,
+        };
+        return { ok: false };
       }
       if (!confirmed) {
         const answer = askLine("  type `" + CONFIRM_WORD + "` to vouch, anything else to stop: ");
         confirmed = answer === CONFIRM_WORD;
         if (answer === null) {
-          console.error("");
-          console.error(
-            failure(N + " done", plan.id + ": a `manual:` entry needs a person, and there is no terminal here", [
+          stop = {
+            headline: plan.id + ": a `manual:` entry needs a person, and there is no terminal here",
+            details: [
               "Nothing was changed. Two ways on:",
               "  · run it in a terminal and type `" + CONFIRM_WORD + "` when asked;",
               "  · or pass `--confirm-manual`, which vouches for EVERY manual entry at once",
               "    and records " + actor + " as the one who did.",
-            ])
-          );
-          results.push({ id: e.id, kind: "manual", command: e.manual, ok: false, exitCode: null, ms: 0 });
-          return finishFailed(plan, results, 1);
+            ],
+          };
+          return { ok: false };
         }
       }
-      results.push({ id: e.id, kind: "manual", command: e.manual, ok: confirmed, exitCode: null, ms: 0, vouchedBy: actor });
       if (!confirmed) {
-        console.error("");
-        console.error(failure(N + " done", plan.id + ": not vouched for — the task file was not touched"));
-        return finishFailed(plan, results, 1);
+        stop = { headline: plan.id + ": not vouched for — the task file was not touched", details: [] };
+        return { ok: false, vouchedBy: actor };
       }
       log(plan.json, "  " + OKM + " vouched for by " + actor);
       log(plan.json, "");
-      continue;
-    }
+      return { ok: true, vouchedBy: actor };
+    },
+  });
 
-    log(plan.json, tag + "bash: " + e.bash);
-    const r = runBash(e.bash, cwd, plan.json);
-    results.push({ id: e.id, kind: "bash", command: e.bash, ok: r.ok, exitCode: r.exitCode, ms: r.ms });
-    if (!r.ok) {
-      if (plan.json && r.output) process.stderr.write(r.output);
-      console.error("");
-      console.error(
-        failure(N + " done", plan.id + ": verification failed (exit " + r.exitCode + ")", [
-          "`" + e.bash + "`",
-          "",
-          "The task file was NOT touched — its status is still `" + before.status + "`.",
-        ])
-      );
-      return finishFailed(plan, results, 1);
-    }
-    log(plan.json, "  " + OKM + " passed (" + r.ms + " ms)");
-    log(plan.json, "");
+  if (stop && stop.refuse) return refuse(plan, stop.headline, stop.details, results, stop.kind);
+  if (stop) {
+    console.error("");
+    console.error(failure(N + " done", stop.headline, stop.details));
+    return finishFailed(plan, results, 1);
+  }
+  if (failed) {
+    if (plan.json && failed.output) process.stderr.write(failed.output);
+    console.error("");
+    console.error(
+      failure(N + " done", plan.id + ": verification failed (exit " + failed.exitCode + ")", [
+        "`" + failed.entry.bash + "`",
+        "",
+        "The task file was NOT touched — its status is still `" + before.status + "`.",
+      ])
+    );
+    return finishFailed(plan, results, 1);
   }
 
   // Every entry is green. Tick what that proves, then refuse if anything is left
