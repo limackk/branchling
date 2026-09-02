@@ -110,7 +110,8 @@ drift apart; a test fails if this copy falls behind it.
 node --test scripts/tests/*.test.mjs
 ```
 
-693/693, green. Two rules keep it that way:
+Green, and the command above is the only thing entitled to say how many.
+Two rules keep it that way:
 
 - **Take the backlog directory from `scripts/tests/_repo.mjs`**, never by
   counting upwards from the test file yourself. That module settles BOTH layouts

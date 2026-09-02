@@ -1,3 +1,6 @@
 {"id":"01M1HTR8CMTBEFEAZDGF0P48CH","ts":"2026-09-02T19:50:20.308Z","task":"TL-172","field":"__created__","from":"","to":"CLAUDE.md claims a test count that rots on every commit","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1HTRRP2GF3GHG0FPM00DEPG","ts":"2026-09-02T19:50:36.994Z","task":"TL-172","field":"priority","from":"P1","to":"P3","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1HTRRP27N5NSPXGMXCWFP21","ts":"2026-09-02T19:50:36.994Z","task":"TL-172","field":"estimate","from":"2h","to":"30m","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1HVAJFPZPAWKVWNG9C4MVWM","ts":"2026-09-02T20:00:20.470Z","task":"TL-172","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1HVAJFP5KD9BH0WQ6PNZTKG","ts":"2026-09-02T20:00:20.470Z","task":"TL-172","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1HVD7109RN3C7H5GES9DEBW","ts":"2026-09-02T20:01:47.040Z","task":"TL-172","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven","session":"tree-526f61f2043f"}

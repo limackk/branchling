@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P3                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 30m
@@ -20,6 +20,8 @@ related_docs: []                   # paths relative to the repository root
 verification:
   - id: no-count
     bash: "grep -qE '^[0-9]+/[0-9]+, green' CLAUDE.md && { echo 'CLAUDE.md still states a count that nothing keeps current'; exit 1; }; echo 'no frozen tally in CLAUDE.md — OK'"
+  - id: guard
+    bash: "node --test scripts/tests/frozen-tally.test.mjs"
 ---
 
 ## Goal
@@ -53,7 +55,16 @@ reads before touching anything.
    way. Check before deciding, so the fix covers the class rather than the
    instance.
 
+   SURVEYED, and the answer is one. The only other counted claim in the file is
+   `TL-137 translated both (145 files)`, and it is a different kind of sentence:
+   a fact about one finished migration, fixed in the past, which no later commit
+   can falsify. A claim about the TREE is falsified by the next commit; a claim
+   about a past act is not. That is the line the guard draws, and it is why it
+   looks for a tally rather than for numbers.
+
 ## Acceptance criteria
 
-- [ ] `CLAUDE.md` no longer states a test tally that nothing keeps current.
+- [x] `CLAUDE.md` no longer states a test tally that nothing keeps current.
       [proof: no-count]
+- [x] It cannot come back unnoticed: a guard fails on the shape that rotted, and
+      is proved against the sentence that was actually there. [proof: guard]
