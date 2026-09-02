@@ -6,12 +6,12 @@ labels: []
 board: main
 epic: "Agent-facing differentiators"
 priority: P2
-status: pending
-owner: unassigned
+status: done
+owner: agent:claude
 estimate: 2h
 confidence: medium
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-02
 blocked_by: [TL-99]
 blocks: []
 related_docs: []
@@ -65,10 +65,10 @@ machinery for one paragraph.
 
 ## Acceptance criteria
 
-- [ ] `instructions task-execution` lists handoff as the response to "a
+- [x] `instructions task-execution` lists handoff as the response to "a
       decision outside the mandate". [proof: guides-render]
-- [ ] The text is true in a backlog WITHOUT `roles:` — it promises nothing
+- [x] The text is true in a backlog WITHOUT `roles:` — it promises nothing
       that is not there. [proof: guides-render]
-- [ ] Every topic still renders without an unknown placeholder.
+- [x] Every topic still renders without an unknown placeholder.
       [proof: guides-render]
 </content>

@@ -218,6 +218,8 @@ function primitivesPromised(guides) {
   need("task-execution", new RegExp(PRODUCT_NAME + " next"), "does not name the dispatcher");
   need("task-execution", /(do not|don't|never)[^.]{0,60}by hand/i, "no longer refuses hand-editing to claim a task");
   need("task-execution", /history[^.]*--source manual/, "does not say how a hand edit is recorded");
+  need("task-execution", new RegExp(PRODUCT_NAME + " handoff"),
+    "does not name the command for a decision outside the executor's mandate (TL-132)");
   need("task-finalization", new RegExp(PRODUCT_NAME + " done"), "does not name the command that closes a task");
   need("task-finalization", /(do not|don't|never)[^.]{0,60}by hand/i, "no longer refuses closing a task by hand");
   return problems;
@@ -250,6 +252,36 @@ test("POSITIVE CONTROL: remove the sentence and the guard says which one went", 
   // And the other half: a guide that says nothing at all fails on every needle
   // it owns, rather than on none of them.
   assert.equal(primitivesPromised({ ...guides, "task-finalization": "" }).length, 2);
+});
+
+/**
+ * TL-132: the handoff the guide teaches has to be callable in the backlog the
+ * guide was rendered for. `roles:` is optional — the fixture declares none, as
+ * this project does — and `handoff --to-role` refuses outright where there are
+ * none, so a guide that taught only that flag would be promising a command that
+ * cannot be called. The unconditional half is `--to-owner`, which needs no
+ * vocabulary; `--to-role` may only appear as the conditional half.
+ */
+test("the handoff the guide teaches works in a backlog that declares no roles", () => {
+  const fx = fixture();
+  const config = loadConfig(fx.dir);
+  assert.equal((config.roles || []).length, 0, "the fixture stopped being a roles-less backlog");
+
+  const flat = topicText("task-execution", config).replace(/\s+/g, " ");
+  assert.match(flat, /handoff <ID> --to-owner/, "the guide's handoff example needs a role");
+
+  // The other direction: `--to-role` is allowed in the text, but only as
+  // something this backlog may not have. A bare mention would read as available.
+  for (const m of flat.matchAll(/--to-role/g)) {
+    const before = flat.slice(Math.max(0, m.index - 120), m.index);
+    assert.match(before, /roles:/, "`--to-role` is offered without saying it needs `roles:`");
+  }
+
+  // And the command really does refuse there, which is what makes the above
+  // matter rather than being a style rule about the prose.
+  const r = run(["handoff", "ZZ-1", "--to-role", "reviewer", "--reason", "x", "--dir", fx.dir], fx.repo);
+  assert.equal(r.status, 2, "handoff --to-role no longer fails without roles: " + r.stdout + r.stderr);
+  assert.match(r.stderr + r.stdout, /roles/);
 });
 
 test("a placeholder nobody defined THROWS instead of being printed", () => {

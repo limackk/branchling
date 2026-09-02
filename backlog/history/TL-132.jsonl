@@ -6,3 +6,6 @@
 {"id":"01M1F5BNKGZV7FCXBJFVZ310C9","ts":"2026-09-01T18:57:58.896Z","task":"TL-132","field":"blocked_by","from":["TL-1509"],"to":["TL-99"],"actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK5KJ481BQ03ZFAR3DK","ts":"2026-09-02T07:16:31.461Z","task":"TL-132","field":"title","from":"Przewodnik task-execution nie mówi o handoffie","to":"The task-execution guide does not mention handoff","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK5XBD18S3D5GCX1VSY","ts":"2026-09-02T07:16:31.461Z","task":"TL-132","field":"epic","from":"Wyróżniki agentowe","to":"Agent-facing differentiators","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1HFD390TXPRX6B0HCT67PGD","ts":"2026-09-02T16:32:00.288Z","task":"TL-132","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1HFD390MX782B8KYTEDA2QV","ts":"2026-09-02T16:32:00.288Z","task":"TL-132","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1HFFZCV315V6WP8M26RN5AF","ts":"2026-09-02T16:33:34.619Z","task":"TL-132","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

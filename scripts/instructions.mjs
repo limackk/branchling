@@ -301,6 +301,13 @@ WHILE YOU WORK.
                        writing commands REFUSE rather than ask when a status
                        needs a stated reason; here those statuses are
                        {{reason_statuses}}.
+  Not yours to decide  A trade-off this task does not settle, an approval you
+                       do not hold — that is a handoff, not a guess. \`{{tool}}
+                       handoff <ID> --to-owner <name> --reason "…"\` returns it
+                       to the queue with the question attached and the exchange
+                       recorded, so the next reader inherits the doubt instead of
+                       your guess. Where this backlog declares \`roles:\`,
+                       \`--to-role\` hands it to one of those instead.
   Frontmatter changed  Run \`{{tool}} build\`. It is idempotent and near-instant;
                        skipping it leaves the views disagreeing with the file you
                        just edited.
