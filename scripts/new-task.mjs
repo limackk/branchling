@@ -94,17 +94,28 @@ function nextId(root, tasksDir, numberPattern) {
   // the repository through `git rev-parse --show-toplevel` on the CURRENT
   // directory. Without this, `--dir /somewhere/else` got numbers from whichever
   // repository the shell happened to be standing in — somebody else's.
-  const r = spawnSync(process.execPath, [join(HERE, "next-backlog-id.mjs"), "--dir", root], {
+  const r = spawnSync(process.execPath, [join(HERE, "next-backlog-id.mjs"), "--dir", root, "--json"], {
     encoding: "utf8", timeout: 60_000, cwd: root,
   });
   if (r.status === 0) {
-    const last = String(r.stdout || "").trim().split("\n").pop().trim();
-    if (/^\d+$/.test(last)) {
-      // The warning about a NARROWER source for the number is passed on rather
-      // than swallowed (BL-1452): this is the only place the user will see it.
-      const warn = String(r.stderr || "").trim();
-      if (warn) console.error(warn);
-      return { id: parseInt(last, 10), source: "repo" };
+    // READ AS A FIELD, NOT AS THE LAST LINE OF STDOUT (TL-57). This used to take
+    // the final line and test it against `/^\d+$/`, and the regex was not
+    // caution — it was the only thing standing between a scanner that printed
+    // anything unexpected and a file called `TASK-NaN-*.md`. `--json` is what
+    // Law 4 exists for, and this call site is the reason it is a law rather than
+    // a description: the workaround was here, in the tool's own code.
+    try {
+      const answer = JSON.parse(r.stdout);
+      if (Number.isInteger(answer.nextId)) {
+        // The warning about a NARROWER source for the number is passed on rather
+        // than swallowed (BL-1452): this is the only place the user will see it.
+        const warn = String(r.stderr || "").trim();
+        if (warn) console.error(warn);
+        return { id: answer.nextId, source: "repo" };
+      }
+    } catch {
+      // A broken answer falls through to the local scan below, which is the same
+      // outcome a non-zero exit produces — one fallback, not two.
     }
   }
   return { id: localMax(tasksDir, numberPattern) + 1, source: "local" };

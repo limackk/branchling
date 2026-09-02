@@ -58,6 +58,11 @@ export const KINDS = {
   // `divergent` is the list behind the `divergent` tally inside `stats`: the
   // tasks another branch disagrees with, each naming both statuses (TL-73).
   stats: { root: null, stats: null, scan: null, divergent: [] },
+  // `check --json` (TL-57). `ok` is what CI reads, `failed` is what it acts on —
+  // a consumer must not have to filter `guards` to learn which one to look at.
+  // `output` beside each guard is text written for a PERSON and may be reworded;
+  // `name`, `ok` and `exit` are the contract.
+  check: { ok: null, root: null, failed: [], guards: [] },
   // `doctor --json`. `ok` is the answer CI reads; `checks` is why.
   doctor: { ok: null, root: null, next: null, checks: [] },
   // `board --json`. `rule` and `matched` are null exactly when `isDefault` is

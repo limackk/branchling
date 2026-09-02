@@ -36,6 +36,7 @@ import { fileURLToPath } from "node:url";
 
 import { PRODUCT_NAME as N, PRODUCT_VERSION } from "./product.mjs";
 import { ConfigError, formatConfigError, loadConfig } from "./config.mjs";
+import { printJson } from "./json-envelope.mjs";
 import { failure } from "./ui.mjs";
 import { resolveBacklogDir } from "./paths.mjs";
 
@@ -45,6 +46,11 @@ const CHECK_USAGE = [
   `${N} check [--dir <path>] [--id-collisions] [--boards] [--refs] [--criteria] [--reasons] [--vocabulary] [--plan] [--language] [--product-name] [task-file.md …]`,
   "",
   "  no selector          every guard; exit code = the WORST of them",
+  "  --json               the whole run as one document: which guards ran, which failed,",
+  "                       and what each one said. Stdout carries the JSON and nothing",
+  "                       else — a tick from a guard would break every consumer at once.",
+  "                       The exit code is unchanged: JSON describes the result, it does",
+  "                       not replace it",
   "  --id-collisions      id collisions only — a property of the SET, reads the whole tree",
   "  --boards             boards only — a property of ONE file",
   "  --boards <file…>     judge the named files instead of the whole tree",
@@ -768,6 +774,31 @@ function runScript(script, args, colorForce = null) {
 }
 
 /**
+ * The same run, but with the guard's output CAPTURED instead of inherited (TL-57).
+ *
+ * WHY A SECOND FUNCTION RATHER THAN A FLAG ON THE FIRST. Capturing changes what
+ * the user sees, and `check --json` has one hard constraint: stdout carries the
+ * JSON document and nothing else. A `✓` from a guard, printed "just for a
+ * moment", breaks parsing for every consumer at once — so the guards' own output
+ * cannot reach stdout at all, and there is no invocation where it half does.
+ *
+ * COLOUR IS FORCED OFF. The text goes into a JSON string a program will read;
+ * escape sequences there are noise the consumer has to strip, and a consumer
+ * that forgot to would print them.
+ */
+function captureScript(script, args) {
+  const r = spawnSync(process.execPath, [join(HERE, script)].concat(args), {
+    encoding: "utf8",
+    env: { ...childEnv(false), NO_COLOR: "1" },
+  });
+  if (r.error) {
+    return { exit: 1, output: "could not start " + script + ": " + r.error.message };
+  }
+  const output = (String(r.stdout || "") + String(r.stderr || "")).trimEnd();
+  return { exit: r.signal ? 0 : (r.status === null ? 1 : r.status), output };
+}
+
+/**
  * `check` calls the backlog guards and fails if ANY of them failed.
  *
  * WHY THE GUARDS CAN BE SELECTED SEPARATELY (BL-1450). Their scope differs on
@@ -787,7 +818,7 @@ function runScript(script, args, colorForce = null) {
  * evidential force. The dispatcher supplies the mode so that nobody has to
  * remember it.
  */
-const CHECK_FLAGS = ["--dir", "--id-collisions", "--boards", "--refs", "--criteria", "--reasons", "--history", "--docs", "--vocabulary", "--plan", "--language", "--product-name"];
+const CHECK_FLAGS = ["--dir", "--json", "--id-collisions", "--boards", "--refs", "--criteria", "--reasons", "--history", "--docs", "--vocabulary", "--plan", "--language", "--product-name"];
 
 /** PURE — resolves `check`'s arguments. Throws on a usage error. */
 export function parseCheckArgs(args) {
@@ -803,6 +834,7 @@ export function parseCheckArgs(args) {
   let wantPlan = false;
   let wantLanguage = false;
   let wantProductName = false;
+  let json = false;
   const files = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -812,6 +844,7 @@ export function parseCheckArgs(args) {
       if (!dir) throw new Error("`--dir` with no path");
       continue;
     }
+    if (a === "--json") { json = true; continue; }
     if (a === "--id-collisions") { wantIds = true; continue; }
     if (a === "--boards") { wantBoards = true; continue; }
     if (a === "--refs") { wantRefs = true; continue; }
@@ -850,8 +883,65 @@ export function parseCheckArgs(args) {
     wantHistory = true; wantDocs = true;
     wantVocabulary = true; wantPlan = true; wantLanguage = true; wantProductName = true;
   }
-  return { dir, wantIds, wantBoards, wantRefs, wantCriteria, wantReasons, wantHistory, wantDocs, wantVocabulary, wantPlan, wantLanguage, wantProductName, files };
+  return { dir, json, wantIds, wantBoards, wantRefs, wantCriteria, wantReasons, wantHistory, wantDocs, wantVocabulary, wantPlan, wantLanguage, wantProductName, files };
 }
+
+/**
+ * The guards, as data (TL-57).
+ *
+ * WHY A TABLE AND NOT ELEVEN `if` BLOCKS, which is what this was. `check --json`
+ * has to run the same set the text mode runs, and two lists of eleven guards
+ * would differ the first time somebody added a twelfth to one of them — silently,
+ * because the JSON consumer has no way to notice a guard that is not there.
+ *
+ * `args` IS A FUNCTION BECAUSE THE INPUT CONVENTIONS GENUINELY DIFFER, and the
+ * discrepancy stays on the dispatcher's side rather than being normalised into
+ * eleven guards: one takes the tasks directory positionally, most take the
+ * backlog directory through `--dir`, and two take nothing at all.
+ */
+export const CHECK_GUARDS = [
+  // An id collision is a property of the SET, so this one reads the whole tree.
+  { key: "ids", want: "wantIds", name: "id-collisions", script: "check-backlog-id-collisions.mjs",
+    args: (root, tasksDir) => [tasksDir] },
+  // A board is a property of ONE file, so a pre-commit hook can judge the staged
+  // files — otherwise my commit would fail because of somebody else's task.
+  { key: "boards", want: "wantBoards", name: "boards", script: "check-backlog-boards.mjs",
+    args: (root, tasksDir, files) => (files.length ? files : ["--all", tasksDir]) },
+  // A third input convention: the BACKLOG directory through --dir, not the tasks
+  // directory positionally.
+  { key: "refs", want: "wantRefs", name: "refs", script: "check-backlog-refs.mjs",
+    args: (root) => ["--dir", root] },
+  // Judges the SET, and needs the configuration to know which statuses are closed.
+  { key: "criteria", want: "wantCriteria", name: "criteria", script: "check-backlog-criteria.mjs",
+    args: (root) => ["--dir", root] },
+  // Reads the whole history; the configuration says which statuses require a reason.
+  { key: "reasons", want: "wantReasons", name: "reasons", script: "check-backlog-reasons.mjs",
+    args: (root) => ["--dir", root] },
+  // The only guard whose answer depends on something outside the backlog
+  // directory — it asks git — which is why it says so when there is no git.
+  { key: "history", want: "wantHistory", name: "history", script: "check-backlog-history-tracked.mjs",
+    args: (root) => ["--dir", root] },
+  // Judges the REPOSITORY holding the backlog, not this installation: a
+  // `related_docs` entry resolves against the consumer's tree.
+  { key: "docs", want: "wantDocs", name: "docs", script: "check-docs-links.mjs",
+    args: (root) => ["--dir", root] },
+  // The one guard whose question is entirely the configuration file.
+  { key: "vocabulary", want: "wantVocabulary", name: "vocabulary", script: "check-backlog-vocabulary.mjs",
+    args: (root) => ["--dir", root] },
+  // The plan is judged against the WHOLE tree; a finished blocker outside the
+  // plan is not a gap.
+  { key: "plan", want: "wantPlan", name: "plan", script: "check-backlog-plan.mjs",
+    args: (root) => ["--dir", root] },
+  // NO `--dir`, and that is not an oversight: this judges the SOURCE of this
+  // installation. Pointing it at a backlog would have it read somebody's tasks
+  // and report their language as a defect of the tool.
+  { key: "language", want: "wantLanguage", name: "language", script: "check-public-language.mjs",
+    args: () => [] },
+  // No `--dir` either, and for the same reason. A user's task files may name the
+  // tool as often as they like — that is their prose, not our literal.
+  { key: "product-name", want: "wantProductName", name: "product-name", script: "check-product-name.mjs",
+    args: () => [] },
+];
 
 function runCheck(args) {
   let plan;
@@ -884,70 +974,35 @@ function runCheck(args) {
     return 1;
   }
 
+  const guards = CHECK_GUARDS.filter((g) => plan[g.want]);
+
+  // `--json` CAPTURES the guards instead of letting them print (TL-57). The
+  // constraint is absolute: with `--json`, stdout carries the document and
+  // nothing else, because a `✓` from one guard breaks parsing for every
+  // consumer at once. The EXIT CODE is unchanged either way — JSON describes
+  // the result, it does not replace it.
+  if (plan.json) {
+    const results = [];
+    let worstJson = 0;
+    for (const guard of guards) {
+      const { exit, output } = captureScript(guard.script, guard.args(root, tasksDir, plan.files));
+      worstJson = Math.max(worstJson, exit);
+      results.push({ name: guard.name, ok: exit === 0, exit, output });
+    }
+    printJson("check", {
+      ok: worstJson === 0,
+      root,
+      // The name of the guard that failed is the field a consumer acts on; the
+      // `output` beside it is text written for a person and may be reworded.
+      failed: results.filter((g) => !g.ok).map((g) => g.name),
+      guards: results,
+    });
+    return worstJson;
+  }
+
   let worst = 0;
-  if (plan.wantIds) {
-    worst = Math.max(worst, runScript("check-backlog-id-collisions.mjs", [tasksDir]));
-  }
-  if (plan.wantBoards) {
-    const boardArgs = plan.files.length ? plan.files : ["--all", tasksDir];
-    worst = Math.max(worst, runScript("check-backlog-boards.mjs", boardArgs));
-  }
-  if (plan.wantRefs) {
-    // A third input convention: this guard takes the BACKLOG DIRECTORY through
-    // --dir, not the tasks directory positionally. The discrepancy stays on the
-    // dispatcher's side.
-    worst = Math.max(worst, runScript("check-backlog-refs.mjs", ["--dir", join(tasksDir, "..")]));
-  }
-  if (plan.wantCriteria) {
-    // The backlog directory through --dir, like the reference guard: this one
-    // also judges the SET, and it needs the configuration to know which statuses
-    // count as closed.
-    worst = Math.max(worst, runScript("check-backlog-criteria.mjs", ["--dir", join(tasksDir, "..")]));
-  }
-  if (plan.wantReasons) {
-    // The backlog directory through --dir, like the reference guard: it reads the
-    // whole history and needs the configuration to know which statuses require a
-    // reason at all.
-    worst = Math.max(worst, runScript("check-backlog-reasons.mjs", ["--dir", join(tasksDir, "..")]));
-  }
-  if (plan.wantHistory) {
-    // The backlog directory, like the two guards above. This one also asks git,
-    // which is why it is the only guard whose answer depends on something
-    // outside the backlog directory at all — and why it says so when there is no
-    // git to ask.
-    worst = Math.max(worst, runScript("check-backlog-history-tracked.mjs", ["--dir", join(tasksDir, "..")]));
-  }
-  if (plan.wantDocs) {
-    // The backlog directory, like the guards above — but this one judges the
-    // REPOSITORY that contains it, not this installation: a `related_docs` entry
-    // resolves against the consumer's tree, and their README is part of the same
-    // navigation an agent moves through.
-    worst = Math.max(worst, runScript("check-docs-links.mjs", ["--dir", join(tasksDir, "..")]));
-  }
-  if (plan.wantVocabulary) {
-    // The backlog directory through --dir, like the reference guard: it judges the
-    // SET, and it needs the configuration because the vocabularies ARE the
-    // configuration — this is the one guard whose question is entirely that file.
-    worst = Math.max(worst, runScript("check-backlog-vocabulary.mjs", ["--dir", join(tasksDir, "..")]));
-  }
-  if (plan.wantPlan) {
-    // The backlog directory through --dir, like the reference guard: the plan is
-    // judged against the WHOLE tree, and the configuration says which statuses
-    // count as closed — a finished blocker outside the plan is not a gap.
-    worst = Math.max(worst, runScript("check-backlog-plan.mjs", ["--dir", join(tasksDir, "..")]));
-  }
-  if (plan.wantLanguage) {
-    // No `--dir`, and that is not an oversight: this guard judges the SOURCE of
-    // this installation, not the data it was pointed at. Passing the backlog
-    // directory here would have it read somebody's tasks and report their
-    // language as a defect of the tool.
-    worst = Math.max(worst, runScript("check-public-language.mjs", []));
-  }
-  if (plan.wantProductName) {
-    // No `--dir` either, and for the same reason as the language guard: it
-    // judges the SOURCE of this installation. A user's task files may name the
-    // tool as often as they like — that is their prose, not our literal.
-    worst = Math.max(worst, runScript("check-product-name.mjs", []));
+  for (const guard of guards) {
+    worst = Math.max(worst, runScript(guard.script, guard.args(root, tasksDir, plan.files)));
   }
   return worst;
 }

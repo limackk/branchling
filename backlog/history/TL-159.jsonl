@@ -1,0 +1,5 @@
+{"id":"01M1GYV5Q3GZ1FGCMGDBNNXDY1","ts":"2026-09-02T11:42:35.747Z","task":"TL-159","field":"__created__","from":"","to":"The worktrail-cli skill describes gaps the tool has closed","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GYW47JB4TKZKRAD0R927TB","ts":"2026-09-02T11:43:06.994Z","task":"TL-159","field":"priority","from":"P1","to":"P3","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GYW47J3K1AE59NH1TQGA5Z","ts":"2026-09-02T11:43:06.994Z","task":"TL-159","field":"type","from":"task","to":"bug","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GYW47JDFXK036TGDSFMX1V","ts":"2026-09-02T11:43:06.994Z","task":"TL-159","field":"estimate","from":"2h","to":"30m","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GYW47JSZKYDYAAD2FXB1E7","ts":"2026-09-02T11:43:06.994Z","task":"TL-159","field":"related_docs","from":[],"to":[".claude/skills/worktrail-cli/SKILL.md"],"actor":"unknown","source":"external","reason":"unknown"}

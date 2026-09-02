@@ -529,6 +529,7 @@ implementation detail. Every reading command answers in the same envelope:
 | `query` | `task-list` | `tasks`, `total` (matches BEFORE `--limit`), `limit` |
 | `stats` | `stats` | `root`, `stats` (the tallies) |
 | `doctor` | `doctor` | `ok`, `root`, `next`, `checks` |
+| `check` | `check` | `ok`, `root`, `failed` (the guards that failed), `guards` |
 | `board` | `board` | `board`, `rule`, `matched`, `isDefault`, `reason` |
 | `next-id` | `next-id` | `nextId`, `id`, `prefix`, `max`, `source`, `trees`, `branches`, `known` |
 | `instructions` | `instructions` | `topics`, `topic`, `text`, `version` |

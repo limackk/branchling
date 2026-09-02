@@ -71,6 +71,10 @@ const READING = {
   "task-list": ["query", "--json"],
   stats: ["stats", "--json"],
   doctor: ["doctor", "--json"],
+  // The guards, as one document (TL-57). A NARROW selector on purpose: the
+  // default run reads this installation's whole source, which is a second of
+  // wall clock per fixture and answers nothing this test asks.
+  check: ["check", "--json", "--refs"],
   board: ["board", "--json", "--paths", "docs/guide.md"],
   "next-id": ["next-id", "--json"],
   // A topic is named on purpose: without one the payload carries the listing and
