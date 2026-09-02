@@ -1,11 +1,4 @@
 ---
-# ╭─────────────────────────────────────────────────────────────────────────╮
-# │  THIS BACKLOG'S TASK TEMPLATE. `worktrail new --title "…"` copies it,    │
-# │  assigns the number and fills in the dates — you do not copy it by      │
-# │  hand. The vocabularies below (statuses, priorities, types) come from   │
-# │  `config.yaml`; a value outside them FAILS the build rather than        │
-# │  becoming a new one.                                                    │
-# ╰─────────────────────────────────────────────────────────────────────────╯
 id: TL-167
 title: "A reason that is too long is refused as empty or reserved"
 type: code
