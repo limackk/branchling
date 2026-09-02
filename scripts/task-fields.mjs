@@ -214,7 +214,22 @@ export const FIELD_VERIFIED = "__verified__";
 // were they the intended one" is answerable afterwards.
 export const FIELD_ROLE_OVERRIDE = "__role_override__";
 
-export const PSEUDO_FIELDS = [FIELD_CREATED, FIELD_DELETED, FIELD_BODY, FIELD_COMMENT, FIELD_VERIFIED, FIELD_ROLE_OVERRIDE];
+// A decision recorded as an event of its own (TL-114). The whole content is
+// `to`, exactly like a comment, and an optional `resolves` carries the id of the
+// event it answers.
+//
+// WHY NOT A FLAG ON A COMMENT. The two are told apart MACHINE-SIDE, not
+// stylistically: the panel counts "questions with no decision" and the graph
+// draws decisions as nodes. A boolean on a comment would make both of those a
+// scan for a convention rather than a lookup of an event type, and a convention
+// is what somebody forgets to write.
+//
+// AN AGENT'S DECISION AND A PERSON'S ARE THE SAME SHAPE. What separates them is
+// the actor's namespace, so "which decisions did an agent make" stays one filter
+// over `actor` instead of a second schema that has to be kept in step.
+export const FIELD_DECISION = "__decision__";
+
+export const PSEUDO_FIELDS = [FIELD_CREATED, FIELD_DELETED, FIELD_BODY, FIELD_COMMENT, FIELD_VERIFIED, FIELD_ROLE_OVERRIDE, FIELD_DECISION];
 
 export function isPseudoField(key) {
   return PSEUDO_FIELDS.indexOf(key) !== -1;
@@ -235,7 +250,7 @@ export function isPseudoField(key) {
  */
 export function historyEntryKind(entry) {
   const field = entry && entry.field;
-  if (field === FIELD_COMMENT) return "message";
+  if (field === FIELD_COMMENT || field === FIELD_DECISION) return "message";
   if (isPseudoField(field)) return entry.from && entry.to ? "transition" : "event";
   return "transition";
 }

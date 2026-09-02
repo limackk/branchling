@@ -1174,6 +1174,14 @@ ${paletteBadgeCss}
   .hist-actor.actor-ns-unknown { background: transparent; border: 1px dashed var(--border); color: var(--fg-muted); }
   .hist-what s { color: var(--fg-muted); text-decoration-thickness: 1px; }
   .hist-source { color: var(--fg-muted); font-size: 10px; }
+  .hist-answers {
+    font-size: 10px;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    padding: 0 6px;
+    white-space: nowrap;
+  }
   @media (max-width: 720px) {
     .history-entry { grid-template-columns: 1fr; gap: 2px; }
   }
@@ -3004,6 +3012,7 @@ const HISTORY_FIELD_LABELS = {
   __deleted__: "task deleted",
   __body__: "task body",
   __comment__: "comment",
+  __decision__: "decision",
   __verified__: "manual verification vouched for",
   __role_override__: "taken outside its role",
   updated: "Updated",
@@ -3417,8 +3426,14 @@ function historyHtml(t) {
       // is all content and no transition.
       const label = escape(fieldLabel(e.field));
       const kind = historyEntryKind(e);
+      // A decision that answers a question says so, and says which one: the pair
+      // is the point of the event type (TL-114), and a row that hid the link
+      // would leave the reader to match ULIDs by eye.
+      const answers = e.field === FIELD_DECISION && e.resolves
+        ? ' <span class="hist-answers" title="Answers the event ' + escape(e.resolves) + '">answers a question above</span>'
+        : "";
       const change = kind === "message"
-        ? label + ": " + escape(to)
+        ? label + ": " + escape(to) + answers
         : kind === "event"
         ? label
         : label + ': <s>' + escape(from || "—") + "</s> → <b>" + escape(to || "—") + "</b>";
@@ -3426,7 +3441,11 @@ function historyHtml(t) {
       // for is a why nobody reads. A sentinel gets a muted marker instead — it is
       // an answer about the kind of answer, and dressing it up as somebody's
       // sentence would be the lie this whole field exists to stop.
-      const reasonLine = hasStatedReason(e)
+      // A message row carries its sentence as the content; the same sentence is
+      // also its reason, because a reason belongs to the ACT (TL-105). Printed
+      // twice it reads as two facts, so the second copy is dropped — the row
+      // still shows every word, once.
+      const reasonLine = hasStatedReason(e) && !(kind === "message" && e.reason === to)
         ? '<div class="hist-reason">' + escape(e.reason) + "</div>"
         : (e.reason === REASON_PROVEN
             ? '<div class="hist-reason is-sentinel">proven by the verification run</div>'

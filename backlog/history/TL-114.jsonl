@@ -7,3 +7,6 @@
 {"id":"01M1F3N72A0ANCRGA4FA70XPW3","ts":"2026-09-01T18:28:14.538Z","task":"TL-114","field":"status","from":"blocked","to":"pending","actor":"agent:claude","source":"cli","reason":"blocked_by w całości zamknięte — status blocked był zwietrzały i wykluczał task z next"}
 {"id":"01M1F5BNKGXVVF91986KN7HK9X","ts":"2026-09-01T18:57:58.896Z","task":"TL-114","field":"blocked_by","from":["TL-1509"],"to":["TL-99"],"actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1F5BNKG1TN3Q5YNZP6CYK5E","ts":"2026-09-01T18:57:58.896Z","task":"TL-114","field":"blocks","from":["TL-1525","TL-1526"],"to":["TL-115","TL-116"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1G7K0B08XJ66ZS7X9AY05TF","ts":"2026-09-02T04:56:10.848Z","task":"TL-114","field":"status","from":"pending","to":"in_progress","actor":"agent:session","source":"next","reason":"unknown"}
+{"id":"01M1G7K0B0P7CXZCZBEXT9T1G4","ts":"2026-09-02T04:56:10.848Z","task":"TL-114","field":"owner","from":"unassigned","to":"agent:session","actor":"agent:session","source":"next","reason":"unknown"}
+{"id":"01M1G81ZM85JM4YQHTRFDCS25X","ts":"2026-09-02T05:04:21.640Z","task":"TL-114","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

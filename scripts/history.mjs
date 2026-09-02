@@ -32,7 +32,7 @@ import { randomBytes } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { ACTOR_UNKNOWN, FIELD_CREATED, FIELD_DELETED, REASON_UNKNOWN, TRACKED_FIELDS, diffMeta, extractMeta, formatValue, hasStatedReason, normalizeActor as normalizeActorFn, normalizeReason, splitFrontmatter } from "./task-fields.mjs";
+import { ACTOR_UNKNOWN, FIELD_COMMENT, FIELD_CREATED, FIELD_DECISION, FIELD_DELETED, REASON_UNKNOWN, TRACKED_FIELDS, diffMeta, extractMeta, formatValue, hasStatedReason, normalizeActor as normalizeActorFn, normalizeReason, splitFrontmatter } from "./task-fields.mjs";
 import { ANY_HISTORY_FILE, ANY_TASK_FILE, ANY_TASK_FILE_ID, ANY_TASK_ID, taskIdPatterns } from "./task-id.mjs";
 
 export const HISTORY_DIRNAME = "history";
@@ -43,6 +43,7 @@ export const MIGRATIONS_FILE = ".migrations.jsonl";
 // source, so the browser and node see the same list). Here only a re-export, so
 // that existing imports from history.mjs keep working.
 export { FIELD_CREATED, FIELD_DELETED, FIELD_BODY, FIELD_COMMENT, FIELD_VERIFIED, FIELD_ROLE_OVERRIDE,
+  FIELD_DECISION,
   PSEUDO_FIELDS, isPseudoField,
   ACTOR_NAMESPACES, ACTOR_UNKNOWN, actorParts, isValidActor, normalizeActor,
   REASON_UNKNOWN, REASON_PROVEN, REASON_SENTINELS, REASON_MAX_LENGTH, hasStatedReason, isValidReason,
@@ -211,6 +212,40 @@ function dedupeLifecycle(entries) {
   }
   flush();
   return drop.size ? entries.filter((_, i) => !drop.has(i)) : entries;
+}
+
+/**
+ * The questions in this task's history that nothing has answered (TL-114).
+ *
+ * THE DEFINITION, and it is the whole of the state "waiting for a decision":
+ * a question event that no `__decision__.resolves` points at. Computed from the
+ * log, so there is no second file to keep in step with it (law 2) — the panel
+ * (TL-115) and the graph (TL-116) both read this function rather than each
+ * writing the rule out again.
+ *
+ * WHAT COUNTS AS A QUESTION: a `__comment__`. The tool cannot tell a question
+ * from a remark — both are somebody's sentence — and the honest reading of that
+ * is the generous one: every comment is answerable, and one nobody answered is
+ * open. Guessing at question marks would quietly drop the handoff that ends
+ * "decide which of the two we do", which is the case this exists for.
+ *
+ * PURE, and it takes entries rather than a directory: the callers that matter
+ * (the panel, the graph) already hold the history and must not re-read it per
+ * task.
+ *
+ * @param {object[]} entries one task's history
+ * @returns {object[]} the unanswered comment entries, in the order they arrived
+ */
+export function openQuestions(entries) {
+  const answered = new Set();
+  for (const e of entries || []) {
+    if (e && e.field === FIELD_DECISION && typeof e.resolves === "string" && e.resolves) {
+      answered.add(e.resolves);
+    }
+  }
+  return (entries || []).filter(
+    (e) => e && e.field === FIELD_COMMENT && !(typeof e.id === "string" && answered.has(e.id))
+  );
 }
 
 /** The last lifecycle event in the log, or null. */
