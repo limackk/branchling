@@ -16,7 +16,7 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { crossBranchState, describeDivergence, divergences, scanNote } from "./branch-scan.mjs";
+import { absentHere, crossBranchState, describeDivergence, divergences, scanNote } from "./branch-scan.mjs";
 import { commandRunner, contextBudget, renderBudget } from "./context-budget.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
@@ -56,6 +56,11 @@ const tasks = readTaskMetas(TASKS_DIR, CONFIG);
 // reads like a summary of the backlog.
 const SCAN = crossBranchState(ROOT, CONFIG);
 for (const t of tasks) t.elsewhere = divergences(t.status, SCAN.byId.get(t.id));
+// Counted APART from every row `summarize` produces (TL-145). A task this tree
+// does not have has no priority, no estimate and no board here, so folding it
+// into `active` or into `work to be done` would be inventing the fields that
+// make those numbers mean anything.
+const ELSEWHERE_ONLY = absentHere(SCAN.byId, tasks.map((t) => t.id));
 
 const s = summarize(tasks, CONFIG);
 
@@ -80,6 +85,7 @@ if (argv.includes("--json")) {
     divergent: tasks
       .filter((t) => t.elsewhere.length)
       .map((t) => ({ id: t.id, status: t.status, elsewhere: t.elsewhere })),
+    elsewhereOnly: ELSEWHERE_ONLY,
   });
   process.exit(0);
 }
@@ -143,6 +149,16 @@ if (divergent.length) {
   out.push("status differs on other branches:");
   for (const t of divergent) {
     out.push(line("  " + t.id, t.status, "here; " + t.elsewhere.map(describeDivergence).join(", ")));
+  }
+}
+
+// EXISTENCE, on the same rule as state: named, and never mixed into the tallies
+// above (TL-145).
+if (ELSEWHERE_ONLY.length) {
+  out.push("");
+  out.push("only on another branch, not in this tree:");
+  for (const t of ELSEWHERE_ONLY) {
+    out.push(line("  " + t.id, "", t.elsewhere.map(describeDivergence).join(", ")));
   }
 }
 

@@ -1,3 +1,6 @@
 {"id":"01M1GGG6WNXG4XSP9T5JT7TKPN","ts":"2026-09-02T07:31:56.437Z","task":"TL-145","field":"__created__","from":"","to":"A task created on another branch is invisible, not merely unlisted","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GGH5EGWW7NK6J08DFGYXNE","ts":"2026-09-02T07:32:27.728Z","task":"TL-145","field":"priority","from":"P1","to":"P2","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GGH5EG6PPDF82KFDBT454D","ts":"2026-09-02T07:32:27.728Z","task":"TL-145","field":"blocked_by","from":[],"to":["TL-142"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1HGD180PBCJ1CZZR52JW40N","ts":"2026-09-02T16:49:26.784Z","task":"TL-145","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1HGD180RX4QS2ADFMFVTWTE","ts":"2026-09-02T16:49:26.784Z","task":"TL-145","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1HGQ30A6XKE4BVNQ2AA2QKK","ts":"2026-09-02T16:54:56.266Z","task":"TL-145","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

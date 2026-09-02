@@ -23,6 +23,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { DEFAULT_TASK_ID_PREFIX as P } from "../task-id.mjs";
+import { absentHere } from "../branch-scan.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPTS = join(HERE, "..");
@@ -194,6 +195,121 @@ test("`stats` names the branch too, and counts the divergence", () => {
   } finally {
     cleanup(repoRoot);
   }
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// Existence, not only state (TL-145)
+// ──────────────────────────────────────────────────────────────────────────
+
+const ONLY_ID = P + "-2";
+const ONLY_FILE = ONLY_ID + "-created-on-a-branch.md";
+
+/**
+ * A repository where `feature` carries a task `main` has never seen. The
+ * checkout is left on `main`, which is the tree that used to answer "there is
+ * no such task" — an absence indistinguishable from the task not existing.
+ *
+ * `branch: false` builds the SAME tree with the second task never committed
+ * anywhere: the positive control for a rule that would otherwise pass just as
+ * well by reporting a phantom on every listing.
+ */
+function taskOnlyOnAnotherBranch(opts = {}) {
+  const repoRoot = mkdtempSync(join(tmpdir(), "worktrail-xbranch-only-"));
+  const backlogDir = join(repoRoot, "backlog");
+  const init = cli(["init", "--dir", backlogDir, "--no-example"]);
+  assert.equal(init.status, 0, init.stderr);
+  setConfig(backlogDir, opts.config || []);
+
+  vcs(repoRoot, ["init", "-q", "-b", "main"]);
+  writeFileSync(join(backlogDir, "tasks", TASK_FILE), taskText(ID, "pending"), "utf8");
+  commit(repoRoot, "seed");
+
+  if (opts.branch !== false) {
+    vcs(repoRoot, ["checkout", "-q", "-b", "feature"]);
+    writeFileSync(join(backlogDir, "tasks", ONLY_FILE), taskText(ONLY_ID, "in_progress"), "utf8");
+    commit(repoRoot, "a task that exists only here");
+    vcs(repoRoot, ["checkout", "-q", "main"]);
+    rmSync(join(backlogDir, "tasks", ONLY_FILE), { force: true });
+  }
+  return { repoRoot, backlogDir };
+}
+
+test("a task that exists only on another branch is reported, with the branch named", () => {
+  const { repoRoot, backlogDir } = taskOnlyOnAnotherBranch();
+  try {
+    const r = cli(["query", "--dir", backlogDir], { cwd: repoRoot });
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, new RegExp("# " + ONLY_ID + " is not in this tree"));
+    assert.match(r.stdout, /feature: in_progress/);
+  } finally {
+    cleanup(repoRoot);
+  }
+});
+
+test("it is NOT an ordinary task of this tree: not a row, not in the count", () => {
+  const { repoRoot, backlogDir } = taskOnlyOnAnotherBranch();
+  try {
+    const r = cli(["query", "--dir", backlogDir, "--json"], { cwd: repoRoot });
+    assert.equal(r.status, 0, r.stderr);
+    const out = JSON.parse(r.stdout);
+    assert.deepEqual(out.tasks.map((t) => t.id), [ID], "the branch-only task was listed as a row");
+    assert.equal(out.total, 1);
+    assert.deepEqual(out.elsewhereOnly, [
+      { id: ONLY_ID, elsewhere: [{ status: "in_progress", source: "feature", kind: "branch" }] },
+    ]);
+
+    // The same in the two shapes that print no rows at all — a number and a
+    // path list stay usable, and the fact is on stderr rather than nowhere.
+    const count = cli(["query", "--dir", backlogDir, "--count"], { cwd: repoRoot });
+    assert.equal(count.stdout.trim(), "1");
+    assert.match(count.stderr, new RegExp("# " + ONLY_ID + " is not in this tree"));
+  } finally {
+    cleanup(repoRoot);
+  }
+});
+
+test("POSITIVE CONTROL: with no such branch the same query reports nothing extra", () => {
+  const { repoRoot, backlogDir } = taskOnlyOnAnotherBranch({ branch: false });
+  try {
+    const r = cli(["query", "--dir", backlogDir, "--json"], { cwd: repoRoot });
+    assert.equal(r.status, 0, r.stderr);
+    const out = JSON.parse(r.stdout);
+    assert.equal(out.scan.scanned, true, "the scan did not run, so the empty answer proves nothing");
+    assert.deepEqual(out.elsewhereOnly, []);
+    const text = cli(["query", "--dir", backlogDir], { cwd: repoRoot });
+    assert.doesNotMatch(text.stdout, /is not in this tree/);
+  } finally {
+    cleanup(repoRoot);
+  }
+});
+
+test("`stats` names it too, and keeps it out of every tally", () => {
+  const { repoRoot, backlogDir } = taskOnlyOnAnotherBranch();
+  try {
+    const text = cli(["stats", "--dir", backlogDir], { cwd: repoRoot });
+    assert.equal(text.status, 0, text.stderr);
+    assert.match(text.stdout, /only on another branch, not in this tree:/);
+    assert.match(text.stdout, new RegExp(ONLY_ID + "\\s+feature: in_progress"));
+
+    const json = cli(["stats", "--dir", backlogDir, "--json"], { cwd: repoRoot });
+    const out = JSON.parse(json.stdout);
+    assert.equal(out.stats.total, 1, "a task of another branch was counted as one of this tree's");
+    assert.equal(out.stats.divergent, 0, "existence was counted as a status disagreement");
+    assert.deepEqual(out.elsewhereOnly.map((t) => t.id), [ONLY_ID]);
+  } finally {
+    cleanup(repoRoot);
+  }
+});
+
+test("absentHere, without a repository", () => {
+  const byId = new Map([
+    ["Z-1", [{ status: "pending", source: "feature", kind: "branch" }]],
+    ["Z-2", [{ status: "done", source: "a", kind: "branch" }, { status: "done", source: "a", kind: "branch" }]],
+  ]);
+  assert.deepEqual(absentHere(byId, ["z-1"]).map((t) => t.id), ["Z-2"], "the id comparison is case sensitive");
+  // Duplicates collapse per (status, source), the same rule `divergences` uses.
+  assert.equal(absentHere(byId, []).find((t) => t.id === "Z-2").elsewhere.length, 1);
+  assert.deepEqual(absentHere(new Map(), []), []);
 });
 
 // ──────────────────────────────────────────────────────────────────────────

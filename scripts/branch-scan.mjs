@@ -28,11 +28,15 @@
  *      `active_branch_days`. Branches checked out in a worktree are ALWAYS in,
  *      whatever their age — somebody is standing in them.
  *
- * WHAT IT DELIBERATELY DOES NOT DO. A task that exists only on another branch is
- * not reported. This module answers "what do the others say about the tasks in
- * this tree", not "what tasks exist anywhere" — the second question changes what
- * a listing IS, and `next-id` already covers the one case that costs money
- * (a number taken elsewhere).
+ * EXISTENCE IS THE THIRD QUESTION OF THE SAME SHAPE (TL-145). `next-id` asks it
+ * about NUMBERS, `scanTaskStates` about STATE, and `absentHere` about the tasks
+ * themselves: which ids the rest of the repository knows and this tree does not.
+ * It was left out while the reader and the writer were one person on one disk;
+ * with two, the failure mode reads as success, because the task is not reported
+ * as hidden, it is reported as absent. The rule is TL-73's, applied one level
+ * up: the difference is SHOWN and the branch is NAMED, never resolved — and
+ * such a task is never presented as an ordinary task of this tree, because it
+ * is not one.
  *
  * Tests: `node --test scripts/tests/cross-branch-state.test.mjs`
  */
@@ -387,15 +391,43 @@ export function scanTaskStates(opts) {
  * branches all saying `pending` is one fact, not twelve.
  */
 export function divergences(localStatus, observations) {
+  return collapse((observations || []).filter((o) => String(o.status || "") !== String(localStatus || "")));
+}
+
+/** Twelve branches all saying `pending` is one fact, not twelve. */
+function collapse(observations) {
   const out = [];
   const seen = new Set();
   for (const o of observations || []) {
-    if (String(o.status || "") === String(localStatus || "")) continue;
     const key = o.status + " " + o.source;
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(o);
   }
+  return out;
+}
+
+/**
+ * The tasks the REST of the repository has and this tree does not. PURE.
+ *
+ * WHY IT IS NOT `divergences` WITH AN EMPTY LOCAL STATUS. There is no local
+ * status to differ from — there is no local file at all — so every observation
+ * counts, and filtering by inequality would silently drop a task whose status
+ * happens to be empty on the branch that has it.
+ *
+ * @param {Map<string, Array<object>>} byId the scan's observations
+ * @param {Iterable<string>} knownIds the ids this tree holds
+ * @returns {Array<{id: string, elsewhere: Array<object>}>} sorted by id
+ */
+export function absentHere(byId, knownIds) {
+  const known = new Set();
+  for (const id of knownIds || []) known.add(String(id).toUpperCase());
+  const out = [];
+  for (const [id, observations] of byId || new Map()) {
+    if (!id || known.has(String(id).toUpperCase())) continue;
+    out.push({ id, elsewhere: collapse(observations) });
+  }
+  out.sort((a, b) => String(a.id).localeCompare(String(b.id), undefined, { numeric: true }));
   return out;
 }
 

@@ -53,7 +53,7 @@ export const KINDS = {
   // `modifiedFile` is `null` unless `--modified-file` was asked for, and then it
   // says whether the git index could be computed at all (TL-75): zero matches
   // and an unscanned repository are otherwise the same empty `tasks`.
-  "task-list": { tasks: [], total: null, limit: null, scan: null, modifiedFile: null },
+  "task-list": { tasks: [], total: null, limit: null, scan: null, modifiedFile: null, elsewhereOnly: [] },
   // `<command> --help --json` (TL-83). `flags` describes the input surface, and
   // a flag drawing on a vocabulary carries THIS project's values in `values` —
   // so an agent narrows its input instead of guessing and retrying. `configured`
@@ -84,7 +84,7 @@ export const KINDS = {
   // broke.
   // `divergent` is the list behind the `divergent` tally inside `stats`: the
   // tasks another branch disagrees with, each naming both statuses (TL-73).
-  stats: { root: null, stats: null, scan: null, divergent: [] },
+  stats: { root: null, stats: null, scan: null, divergent: [], elsewhereOnly: [] },
   // `check --json` (TL-57). `ok` is what CI reads, `failed` is what it acts on —
   // a consumer must not have to filter `guards` to learn which one to look at.
   // `output` beside each guard is text written for a PERSON and may be reworded;

@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""
 priority: P2                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 estimate: 2h                       # 30m | 2h | 1d | 1w | 1mo
 created: 2026-09-02
 updated: 2026-09-02
@@ -77,8 +77,8 @@ merits and does not wait for a server that §8 says is not built yet.
 
 ## Acceptance criteria
 
-- [ ] `query` reports a task that exists only on another unmerged branch, naming it. [proof: suite-green]
-- [ ] Such a task is NOT presented as an ordinary task of this tree. [proof: suite-green]
-- [ ] Positive control: the same fixture with no other branch reports it absent. [proof: suite-green]
-- [ ] Branch enumeration stays in `scripts/branch-scan.mjs` — no second enumeration. [proof: one-scanner]
-- [ ] No `git fetch`: the recorded-invocation assertion still holds. [proof: suite-green]
+- [x] `query` reports a task that exists only on another unmerged branch, naming it. [proof: suite-green]
+- [x] Such a task is NOT presented as an ordinary task of this tree. [proof: suite-green]
+- [x] Positive control: the same fixture with no other branch reports it absent. [proof: suite-green]
+- [x] Branch enumeration stays in `scripts/branch-scan.mjs` — no second enumeration. [proof: one-scanner]
+- [x] No `git fetch`: the recorded-invocation assertion still holds. [proof: suite-green]

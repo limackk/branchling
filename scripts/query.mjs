@@ -47,7 +47,7 @@
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { crossBranchState, describeDivergence, divergences, scanNote } from "./branch-scan.mjs";
+import { absentHere, crossBranchState, describeDivergence, divergences, scanNote } from "./branch-scan.mjs";
 import { DEFAULTS, loadConfigOrExit } from "./config.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { explain as explainIndex, modifiedFiles, repoRoot, touches } from "./modified-files.mjs";
@@ -144,6 +144,16 @@ try {
 const SCAN = ROOT ? crossBranchState(ROOT, CFG) : { scanned: false, reason: "no-configuration", byId: new Map(), branches: [], trees: [] };
 for (const t of tasks) t.elsewhere = divergences(t.status, SCAN.byId.get(t.id));
 
+// AND THE TASKS THIS TREE DOES NOT HAVE AT ALL (TL-145). A task created on an
+// unmerged branch used to be reported as absent rather than as hidden, which is
+// a failure mode that reads as success. They are kept OUT of `tasks`: nothing
+// here can be filtered, sorted or counted like a task of this tree, because
+// only its id and the status each branch gives it are known.
+const ELSEWHERE_ONLY = absentHere(SCAN.byId, tasks.map((t) => t.id));
+const elsewhereOnlyLines = ELSEWHERE_ONLY.map(
+  (t) => t.id + " is not in this tree — elsewhere: [" + t.elsewhere.map(describeDivergence).join(", ") + "]"
+);
+
 // WHICH FILES EACH TASK TOUCHED, computed from git (TL-75). Asked for ONLY when
 // the flag is present: it is one `git log` over the whole history, and a listing
 // that pays for it unasked would make every other query slower for an answer
@@ -212,6 +222,9 @@ const shown = limit ? hits.slice(0, limit) : hits;
 
 if (opts.count) {
   console.log(String(total));
+  // On stderr, so a count stays a number for a script. Silence would make a
+  // backlog with work on an unmerged branch indistinguishable from one without.
+  for (const line of elsewhereOnlyLines) console.error("# " + line);
   process.exit(0);
 }
 if (opts.json) {
@@ -226,6 +239,9 @@ if (opts.json) {
     total,
     limit,
     scan: { scanned: SCAN.scanned, reason: SCAN.reason, branches: SCAN.branches, trees: SCAN.trees.length },
+    // Beside `tasks`, never inside it: a consumer that treats these as ordinary
+    // rows would be reporting work this checkout cannot open (TL-145).
+    elsewhereOnly: ELSEWHERE_ONLY,
     // `null` unless asked for, and then it says whether the index could be
     // computed at all — zero matches and an unscanned repository are otherwise
     // the same empty `tasks` (TL-75). Present either way: the envelope's rule is
@@ -240,6 +256,7 @@ if (opts.files) {
     console.error(`# showing ${shown.length} of ${total} (limit ${limit})`);
   }
   // On stderr, so a path list stays a path list for `xargs`.
+  for (const line of elsewhereOnlyLines) console.error("# " + line);
   const note = scanNote(SCAN.reason);
   if (note) console.error("# " + note);
   if (INDEX) {
@@ -274,6 +291,10 @@ if (limit && total > shown.length) {
 } else if (total === 0) {
   console.log("# 0 matching tasks (check whether the filters exclude one another)");
 }
+
+// The tasks that exist only somewhere else, named one per line and kept out of
+// the list above — they are not rows of this tree (TL-145).
+for (const line of elsewhereOnlyLines) console.log("# " + line);
 
 // A scan that could not run has to SAY so. Silence here is indistinguishable
 // from "every branch agrees", and that is the answer this whole mechanism exists

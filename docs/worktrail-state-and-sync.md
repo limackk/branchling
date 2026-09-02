@@ -327,10 +327,18 @@ Four settled decisions that cannot be walked back quietly:
    `main` must not report "main: pending" to itself; the warning shown after
    every `take` stops being read, and the real one gets lost with it.
 
-What this does NOT do: a task existing only on another branch still does not
-show up in the list. That is the question "what tasks exist anywhere", not
-"what do others say about tasks in this tree" — and its one costly case
-(a taken number) is covered by `next-id`.
+**Existence, on the same rule — TL-145.** A task that exists only on an
+unmerged branch used to be left out of the listing entirely. That was
+defensible while the reader and the writer were one person on one disk; with
+two it is not, because the failure mode reads as success — the task is not
+reported as hidden, it is reported as absent. `query` and `stats` now name it
+and name the branch it lives on (`absentHere` in the same module, no second
+enumeration), and they keep it OUT of the rows and the tallies: only its id and
+the status each branch gives it are known, so filtering, sorting or counting it
+like a task of this tree would be inventing the fields that make those numbers
+mean anything. This is the same shape as the two questions already asked of the
+scan — `next-id` asks it about NUMBERS, `scanTaskStates` about STATE — and it
+is what §6 above calls displaying a creation by naming its branch.
 
 This is a **read** using git as transport, i.e. §6's "Sync transport" row. It
 does not replace the log from §4: the true state remains the file on its own
