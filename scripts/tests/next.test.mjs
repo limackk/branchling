@@ -294,8 +294,19 @@ test("the filters narrow the choice, and they are query's filters", () => {
   assert.equal(r.status, 0, r.stderr);
   assert.equal(JSON.parse(r.stdout).id, ids[1], "--priority did not narrow the choice");
 
+  // A filter that matches nothing answers "nothing to take". The value has to
+  // be a REAL one for that to be the answer: labels are an open vocabulary
+  // here, so a label no task carries is a legitimate question with an empty
+  // answer.
+  const nothing = run(["next", "--dir", backlog, "--actor", "agent:a2", "--label", "unused"], env);
+  assert.equal(nothing.status, 3);
+
+  // A value outside a CLOSED vocabulary is a typo, and since TL-161 it fails
+  // instead. Exit 3 is what a loop stops on, so a typo that answered it would
+  // report a queue as finished.
   const board = run(["next", "--dir", backlog, "--actor", "agent:a2", "--board", "nonexistent"], env);
-  assert.equal(board.status, 3);
+  assert.equal(board.status, 2, "a board outside the registry answered `nothing to take`");
+  assert.match(board.stderr, /`nonexistent` is not an allowed value/);
 });
 
 test("statuses a project protects with a reason are not dispatched", () => {

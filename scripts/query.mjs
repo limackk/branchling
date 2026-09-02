@@ -52,7 +52,7 @@ import { DEFAULTS, loadConfigOrExit } from "./config.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { explain as explainIndex, modifiedFiles, repoRoot, touches } from "./modified-files.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
-import { SORT_KEYS, filterTasks, readTaskRecords, sortTasks, splitList } from "./task-select.mjs";
+import { SORT_KEYS, filterTasks, readTaskRecords, sortTasks, splitList, unknownFilterValues } from "./task-select.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -186,6 +186,27 @@ const f = {
   blockedBy: splitList(opts["blocked-by"]),
   text: opts.text,
 };
+
+// A FILTER VALUE OUTSIDE THE VOCABULARY FAILS, exactly as an unknown flag does
+// (TL-161). Zero matches caused by a typo are indistinguishable from "there is
+// nothing like that", and they read like an answer — an agent asking for
+// `--status in-progress` is told there is no work in progress and stops.
+// `--tasks <dir>` has no configuration and therefore nothing to check against;
+// it passes through untouched rather than refusing every value.
+const unknownValues = unknownFilterValues(f, CFG);
+if (unknownValues.length) {
+  for (const p of unknownValues) {
+    console.error("✗ `" + p.value + "` is not an allowed value for the field `" + p.axis + "`");
+    console.error("  allowed: " + p.allowed.join(" | ") + "   (" + p.where + ")");
+  }
+  // Said because the refusal would otherwise look like the archive being closed
+  // off: `--status` is the flag that LIFTS the active-only default, so it is
+  // also how anybody searches closed work.
+  if (unknownValues.some((p) => p.axis === "status")) {
+    console.error("  `--status` is also how you search the archive — with a value from that list.");
+  }
+  process.exit(2);
+}
 
 // With no explicit --status we are asking about work to be done, not about the
 // archive: in a backlog of any age most tasks are closed and would flood every

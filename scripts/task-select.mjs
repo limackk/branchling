@@ -25,7 +25,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
-import { extractMeta } from "./task-fields.mjs";
+import { buildFieldSpecs, extractMeta, fieldSpec } from "./task-fields.mjs";
 
 /** The sort orders a caller may ask for. Exported so the CLI can list them in
  *  an error message instead of keeping its own copy of the names. */
@@ -35,6 +35,81 @@ export const SORT_KEYS = ["priority", "id", "id-desc"];
 export const FILTER_AXES = [
   "status", "priority", "board", "label", "epic", "owner", "type", "role", "blockedBy",
 ];
+
+/**
+ * Which filter values are outside the project's vocabularies? (TL-161)
+ *
+ * WHY A FILTER'S VALUE IS CHECKED AT ALL. `query` already refuses an unknown
+ * FLAG, and says why in its own comment: zero results caused by a typo read
+ * like an answer. The same sentence is true one level down and was not applied
+ * there — `query --status in-progress`, a hyphen where the vocabulary has an
+ * underscore, answered "0 matching tasks", which is not a lie and is exactly
+ * the problem. An agent asking that is told there is no work in progress, and
+ * stops.
+ *
+ * WHY IT LIVES HERE and not in `query`. `next` and `run` filter through this
+ * same module and hand their answer straight to an agent, where the same typo
+ * arrives as "the queue is empty" — exit 3, which the loop protocol treats as a
+ * legitimate answer and stops on. A second copy of this list would let the two
+ * disagree, and the one that disagreed would be the one nobody reads.
+ *
+ * WHICH AXES, AND WHY NOT THE OTHERS. Only the axes with a DECLARED vocabulary:
+ * `status`, `priority`, `type`, `board`, `role`, `executor`, and `label` when
+ * the project has closed that vocabulary. `epic` and `text` are substring
+ * searches over free text and have nothing to check against. `owner` is
+ * deliberately out even though `owners:` exists: the tree is full of values no
+ * configuration ever declared, so refusing them would make the archive
+ * unsearchable. `blocked-by` takes an id, not a vocabulary.
+ *
+ * AN EMPTY VALUE IS A QUESTION, NOT A TYPO. `--role ""` asks "what is open to
+ * anybody" and `--executor ""` asks the same of species; both are values a task
+ * can carry, so they pass whatever the vocabulary says.
+ *
+ * @param {object} f  the filter object — the axes are its keys
+ * @param {object} config  the loaded project configuration, or null when there
+ *        is none. `--tasks <dir>` bypasses the root, and a caller with no
+ *        configuration has nothing to check against: it gets no problems, not
+ *        every value refused.
+ * @returns {Array<{axis: string, value: string, allowed: string[], where: string}>}
+ */
+export function unknownFilterValues(f, config) {
+  if (!config) return [];
+  const boards = (config.boards || []).map((b) => b.slug).filter(Boolean);
+  const axes = [
+    { axis: "status", where: "`statuses` in config.yaml", allowed: config.statuses },
+    { axis: "priority", where: "`priorities` in config.yaml", allowed: config.priorities },
+    { axis: "type", where: "`types` in config.yaml", allowed: config.types },
+    { axis: "board", where: "the board registry, boards.yaml", allowed: boards },
+    { axis: "role", where: "`roles` in config.yaml", allowed: config.roles },
+    { axis: "executor", where: "the tool's own vocabulary, not a project's", allowed: executorValues(config) },
+  ];
+  // A label vocabulary is OPEN unless the project says otherwise, and an open
+  // one has nothing to be outside of.
+  if (config.labelsClosed) axes.push({ axis: "label", where: "`labels` in config.yaml, closed by `labels_closed`", allowed: config.labels });
+
+  const problems = [];
+  for (const { axis, where, allowed } of axes) {
+    const values = f[axis];
+    // An axis nobody filtered on, and a vocabulary the project never declared,
+    // are the same answer: there is nothing to be wrong about.
+    if (!values || !allowed || !allowed.length) continue;
+    for (const value of values) {
+      if (value === "") continue;
+      if (allowed.indexOf(value) < 0) problems.push({ axis, value, allowed, where });
+    }
+  }
+  return problems;
+}
+
+/** The species vocabulary is the TOOL's, not a project's — `executor` says
+ *  which kind of worker may be handed a task, and a dispatcher cannot compare
+ *  itself against a word only one repository knows. READ from the field shapes
+ *  rather than written here a second time: a list copied is a list that drifts,
+ *  and this one already has one home. */
+function executorValues(config) {
+  const spec = fieldSpec("executor", buildFieldSpecs(config));
+  return (spec && spec.options) || [];
+}
 
 /**
  * The subset of the frontmatter that work is chosen by.

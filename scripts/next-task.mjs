@@ -61,7 +61,7 @@ import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { inProgressStatus, rebuildViews, refusalCode, refusalPayload, renderTake, takeJson, takeTask } from "./take-task.mjs";
-import { filterTasks, readTaskRecords, sortTasks, splitList } from "./task-select.mjs";
+import { filterTasks, readTaskRecords, sortTasks, splitList, unknownFilterValues } from "./task-select.mjs";
 import { MARK, color, failure, warn } from "./ui.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -466,6 +466,20 @@ export function run(argv) {
     callerSpecies: callerSpecies(actor),
     actor,
   };
+
+  // A FILTER VALUE OUTSIDE THE VOCABULARY IS A TYPO, and here a typo is worse
+  // than in `query`: it does not answer zero, it answers "nothing to take" —
+  // exit 3, which the loop protocol treats as an empty queue and stops on
+  // (TL-161). The vocabularies are the project's, read from its configuration.
+  const unknownValues = unknownFilterValues(filters, config);
+  if (unknownValues.length) {
+    console.error(failure(N + " next",
+      "`" + unknownValues[0].value + "` is not an allowed value for the field `" + unknownValues[0].axis + "`",
+      unknownValues.map((p) => "allowed for `" + p.axis + "`: " + p.allowed.join(" | ") + "   (" + p.where + ")"),
+      [N + " next --help"]));
+    return 2;
+  }
+
   const now = Date.now();
   const records = readTaskRecords(backlogPaths(root).tasksDir, config.taskId.file);
   // What the REST of this clone says (TL-133). Attached exactly as `query`

@@ -52,7 +52,7 @@ import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { rebuildViews, todayStamp } from "./take-task.mjs";
 import { ACTOR_NAMESPACES, buildFieldSpecs, extractMeta, fieldSpec, isValidActor, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
-import { readTaskRecords, splitList } from "./task-select.mjs";
+import { readTaskRecords, splitList, unknownFilterValues } from "./task-select.mjs";
 import { MARK, color, failure, warn } from "./ui.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -586,6 +586,20 @@ export function run(argv) {
     label: splitList(plan.label),
     epic: splitList(plan.epic),
   };
+
+  // A FILTER VALUE OUTSIDE THE VOCABULARY IS A TYPO, and here a typo is worse
+  // than in `query`: it does not answer zero, it answers "nothing to take" —
+  // exit 3, which the loop protocol treats as an empty queue and stops on
+  // (TL-161). The vocabularies are the project's, read from its configuration.
+  const unknownValues = unknownFilterValues(filters, config);
+  if (unknownValues.length) {
+    console.error(failure(N + " run",
+      "`" + unknownValues[0].value + "` is not an allowed value for the field `" + unknownValues[0].axis + "`",
+      unknownValues.map((p) => "allowed for `" + p.axis + "`: " + p.allowed.join(" | ") + "   (" + p.where + ")"),
+      [N + " run --help"]));
+    return 2;
+  }
+
   const passthrough = [];
   for (const key of ["board", "label", "priority", "epic"]) {
     if (plan[key]) passthrough.push("--" + key, plan[key]);
