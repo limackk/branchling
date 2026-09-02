@@ -29,6 +29,7 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { HEARTBEAT_KINDS, listActivityTasks, readActivity, readAllActivity } from "./activity.mjs";
+import { amountLabel, costReport, tokensLabel } from "./cost.mjs";
 import { engagedReport } from "./cluster.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { printJson } from "./json-envelope.mjs";
@@ -39,7 +40,7 @@ import { MARK, color, failure, heading, table } from "./ui.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const KNOWN_FLAGS = ["--json", "--engaged", "--dir"];
+const KNOWN_FLAGS = ["--json", "--engaged", "--cost", "--dir"];
 
 
 /** The nearest-rank percentile, on a sorted array. PURE.
@@ -197,11 +198,47 @@ export function renderEngaged(engaged, opts = {}) {
   return out.join("\n");
 }
 
+/**
+ * The cost report in the terminal (TL-30).
+ *
+ * EVERY LINE HERE IS ABOUT NOT SAYING `0`. A log with no cost fields is the
+ * NORMAL state for a host with no adapter, and it gets a sentence saying so
+ * rather than a table of zeroes — which would read as "measured, and it came out
+ * free". The three non-null outcomes are printed differently on purpose: an
+ * amount, tokens with the reason there is no amount, and a declared zero.
+ */
+export function renderCost(report, opts = {}) {
+  const paint = opts.color || color;
+  const out = [heading("cost")];
+  out.push("");
+  if (report.tokens == null) {
+    out.push("  " + report.why);
+    out.push("");
+    out.push("  Not zero — nothing measured this. A host reports tokens by writing them on");
+    out.push("  an activity row (`tokens_in`, `tokens_out`, `model`); the adapter that does");
+    out.push("  it for Claude Code is `scripts/cost-adapter.mjs`, wired into SessionEnd.");
+    return out.join("\n");
+  }
+  const rows = [["  model", "in", "out", "total", "amount", ""]];
+  for (const m of report.models) {
+    rows.push(["  " + m.model, tokensLabel(m.tokens_in), tokensLabel(m.tokens_out),
+      tokensLabel(m.tokens), amountLabel(m.amount), m.why || ""]);
+  }
+  out.push(table(rows));
+  out.push("");
+  out.push("  total tokens: " + tokensLabel(report.tokens) +
+    "   amount: " + amountLabel(report.amount));
+  if (report.why) out.push("  " + paint.dim(report.why));
+  for (const p of report.problems) out.push("  " + MARK.warn + " model_pricing — " + p);
+  return out.join("\n");
+}
+
 export function main(argv) {
   const cli = takeDirFlag(argv);
   const rest = cli.argv;
   const asJson = rest.includes("--json");
   const wantEngaged = rest.includes("--engaged");
+  const wantCost = rest.includes("--cost");
   const unknown = rest.filter((a) => !KNOWN_FLAGS.includes(a));
   if (unknown.length) {
     console.error(failure(N + " time", "unexpected argument: " + unknown.join(" "), [],
@@ -242,12 +279,26 @@ export function main(argv) {
   }
   const engaged = engagedReport(rowsByTask, { idleGapMinutes: config.idleGapMinutes });
 
+  // COMPUTED ALWAYS, PRINTED ON THE FLAG — the same rule `--engaged` follows.
+  // `--json` is the extension surface (law 4), and a key that exists only when a
+  // flag was passed is a contract a consumer has to read the help to discover.
+  // The rows come from `readAllActivity`, so a `reassign` has already moved the
+  // tokens with the work they belong to.
+  const cost = costReport(Object.values(corrected).flat(), config.modelPricing);
+
   if (asJson) {
-    printJson("time", { root, ...stats, engaged, unknown_ratio: engaged.unknownRatio });
+    printJson("time", {
+      root, ...stats, engaged, unknown_ratio: engaged.unknownRatio,
+      // `tokens` at the ROOT and null when nothing measured it: this is the key
+      // TL-30's contract is stated in, and a consumer must be able to read it
+      // without walking into `cost`.
+      tokens: cost.tokens, cost,
+    });
     return 0;
   }
   console.log(renderTime(stats, config));
   if (wantEngaged) console.log(renderEngaged(engaged));
+  if (wantCost) console.log(renderCost(cost));
   return 0;
 }
 

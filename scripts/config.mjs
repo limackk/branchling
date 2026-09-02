@@ -129,6 +129,14 @@ export const DEFAULTS = Object.freeze({
   min_report_n: 8,
   // How long raw heartbeats are kept, in days. The aggregate outlives them.
   activity_retention_days: 90,
+  // What a model costs, as DATA (TL-30). `<model>: "<in>/<out>"` in dollars per
+  // MILLION tokens, or the word `subscription` (tokens are reported, an amount
+  // is not — the marginal cost of one task on a plan is fiction) or `local` (the
+  // rate is a DECLARED zero, which is a fact about the deployment and not an
+  // absence of data). Empty is the honest default: a rate typed into the tool is
+  // wrong the week after it ships, and wrong silently. A model in the log with
+  // no entry here is counted apart as "no rate", never as free.
+  model_pricing: {},
   // After how many days without a recorded change `audit` calls a task in
   // progress PARKED (TL-90). A REPORT's threshold, not a rule: nothing acts on
   // it, unlike `abandoned_after_days`, which hands the task to somebody else.
@@ -216,7 +224,7 @@ const LIST_KEYS = new Set([
   "dashboard_open_statuses", "status_strikethrough", "reason_required_statuses",
   "docs_status_pending_patterns",
 ]);
-const MAP_KEYS = new Set(["epic_aliases", "status_colors", "priority_colors", "label_colors"]);
+const MAP_KEYS = new Set(["epic_aliases", "status_colors", "priority_colors", "label_colors", "model_pricing"]);
 const NUMBER_KEYS = new Set([
   "title_max_length", "lock_ttl_minutes", "active_branch_days", "abandoned_after_days",
   "idle_gap_minutes", "heartbeat_throttle_seconds", "min_report_n", "activity_retention_days",
@@ -598,6 +606,10 @@ export function loadConfig(root, opts = {}) {
       role: values.docs_role,
     },
     activityRetentionDays: values.activity_retention_days,
+    // Prices are DATA and reach the code as the raw map; `cost.mjs` parses it,
+    // and names the entries it cannot read instead of failing the whole load —
+    // one model's typo must not cost the other models' tokens their report.
+    modelPricing: values.model_pricing,
     labelAxes: { timing: values.label_axis_timing, env: values.label_axis_env },
     owners: values.owners,
     estimates: values.estimates,

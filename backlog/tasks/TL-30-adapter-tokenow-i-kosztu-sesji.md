@@ -6,19 +6,30 @@ labels: [post-launch]
 board: main
 epic: "Backlog — work time measurement"
 priority: P3
-status: pending
-owner: unassigned
+status: done
+owner: agent:claude
 estimate: 4h
 confidence: low
 created: 2026-08-30
-updated: 2026-08-31
+updated: 2026-09-02
 blocked_by: [TL-28]
 blocks: []
 related_docs:
   - docs/backlog-time-tracking.md
 verification:
-  - bash: "node --test backlog/scripts/tests/cost-adapter.test.mjs"
-  - bash: "node backlog/scripts/cli.mjs time --cost --json | python3 -c \"import json,sys; d=json.load(sys.stdin); assert d['tokens'] is None or isinstance(d['tokens'], int), 'a missing adapter must give null, not zero'; print('tokens:', d['tokens'])\""
+  # `scripts/…`, not `backlog/scripts/…`: this task predates the extraction,
+  # when code and data were co-located, and the contract inherited that layout.
+  # `adapter-is-a-plugin` uses `[[:space:]]` and not `\s`: inside a
+  # double-quoted YAML value a `\s` reaches grep as an escaped backslash and the
+  # pattern then matches nothing — a guard green with no evidentiary force.
+  - id: cost-tests
+    bash: "node --test scripts/tests/cost-adapter.test.mjs"
+  - id: null-not-zero
+    bash: "node scripts/cli.mjs time --cost --json | node -e \"let s='';process.stdin.on('data',c=>s+=c).on('end',()=>{const d=JSON.parse(s);if(d.tokens!==null&&!Number.isInteger(d.tokens))throw new Error('a missing adapter must give null, not zero');console.log('tokens:',d.tokens)})\""
+  - id: adapter-is-a-plugin
+    bash: "! grep -rlE '^[[:space:]]*import[^;]*from +.[^\"'\"'\"']*cost-adapter[.]mjs' scripts --include='*.mjs' | grep -v tests"
+  - id: pricing-is-data
+    bash: "! grep -rn 'inPerMillion: *[0-9]' scripts --include='*.mjs' | grep -v tests"
 ---
 
 ## Goal
@@ -72,29 +83,38 @@ same contract that `estimateHours()` upholds.
 
 ## Acceptance criteria
 
-- [ ] The core works without an adapter — there is a test running
-      `worktrail time --cost` on a log with no cost fields.
-- [ ] Missing cost data gives `null` and a message, never `0`.
-- [ ] Pricing is data in `config.yaml`, not a number in the code.
-- [ ] An unknown model in the log does not break the report — it is counted
-      separately as "no rate."
-- [ ] The `subscription` and `local` modes produce report outputs
+- [x] The core works without an adapter — there is a test running
+      `worktrail time --cost` on a log with no cost fields. [proof: cost-tests, null-not-zero]
+- [x] Missing cost data gives `null` and a message, never `0`. [proof: cost-tests, null-not-zero]
+- [x] Pricing is data in `config.yaml`, not a number in the code. [proof: cost-tests, pricing-is-data]
+- [x] An unknown model in the log does not break the report — it is counted
+      separately as "no rate." [proof: cost-tests]
+- [x] The `subscription` and `local` modes produce report outputs
       distinguishable from each other and from `null` — there is a test for
-      each of the three cases.
-- [ ] The adapter is not required by any other script in the module (import test).
+      each of the three cases. [proof: cost-tests]
+- [x] The adapter is not required by any other script in the module (import test). [proof: cost-tests, adapter-is-a-plugin]
 
 ## Verification
 
+The runnable contract is `verification:` in the frontmatter; this is the same
+list in prose, with the paths corrected to the post-extraction layout
+(code in `scripts/`, data in `backlog/`).
+
 ```bash
 # 1. Adapter tests — expected: pass, including a run WITHOUT the adapter
-node --test backlog/scripts/tests/cost-adapter.test.mjs
+node --test scripts/tests/cost-adapter.test.mjs
 
-# 2. No adapter gives null, not zero — expected: "tokens: None"
-node backlog/scripts/cli.mjs time --cost --json | python3 -c \
-  "import json,sys; d=json.load(sys.stdin); assert d['tokens'] is None or isinstance(d['tokens'], int); print('tokens:', d['tokens'])"
+# 2. No adapter gives null, not zero — expected: "tokens: null"
+node scripts/cli.mjs time --cost --json | node -e "…assert tokens is null or an integer…"
 
-# 3. Core independence — expected: no matches
-grep -rl "cost-adapter" backlog/scripts/ --include=*.mjs | grep -v tests | grep -v cost-adapter
+# 3. Core independence — expected: no matches. The check is on the IMPORT, not on
+#    the word: two modules name the adapter in a comment so a reader can find it,
+#    and a grep for the string would fail on prose while missing an aliased import.
+#    The programmatic version, with its positive control, is in the test file.
+grep -rlE '^[[:space:]]*import[^;]*from +.[^"'\'']*cost-adapter[.]mjs' scripts --include='*.mjs' | grep -v tests
+
+# 4. Prices are DATA — expected: no rate literals in the code
+grep -rn 'inPerMillion: *[0-9]' scripts --include='*.mjs' | grep -v tests
 ```
 
 ## Notes

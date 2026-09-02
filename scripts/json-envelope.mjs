@@ -206,6 +206,11 @@ export const KINDS = {
     root: null, closed: null, completed: null, unstamped: [],
     leadTimeDays: null, throughput: [], perWeekMean: null,
     engaged: null, unknown_ratio: null,
+    // The cost axis (TL-30). `tokens` sits at the ROOT and is `null` — never 0 —
+    // when no adapter has written any: that distinction IS the contract, and a
+    // consumer must be able to read it without walking into `cost`, which
+    // carries the per-model breakdown and the reason an amount is missing.
+    tokens: null, cost: null,
   },
 };
 

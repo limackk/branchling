@@ -43,7 +43,7 @@ import { eventId, isValidActor } from "./history.mjs";
  * consumer has to know the whole set to weigh it. A project inventing a sixth
  * would produce rows nothing knows how to read.
  */
-export const ACTIVITY_KINDS = ["tool", "prompt", "commit", "edit", "reassign"];
+export const ACTIVITY_KINDS = ["tool", "prompt", "commit", "edit", "reassign", "session"];
 
 /**
  * Which of those kinds are evidence that somebody was AT THE KEYBOARD.
@@ -63,6 +63,12 @@ export const ACTIVITY_KINDS = ["tool", "prompt", "commit", "edit", "reassign"];
  * `reassign` is excluded because it is a CORRECTION to attribution, not
  * activity: counting it would make fixing a mistake look like doing more work,
  * and would leave a one-row cluster on the task somebody corrected AWAY from.
+ *
+ * `session` is excluded for a third reason again (TL-30): it is an AGGREGATE
+ * written once when a session ends, carrying that session's token counts. Its
+ * timestamp is the moment of writing, not a moment of work, so clustering on it
+ * would add a spurious run at the end of every session — inflating exactly the
+ * count of runs too short to measure that §14 point 4 is to be settled with.
  */
 export const HEARTBEAT_KINDS = ["tool", "prompt", "edit"];
 
@@ -215,6 +221,35 @@ export function activityEntry(row) {
   // there is nothing to say and the field is absent.
   const derived = String((row && row.derived) || "").trim();
   if (derived && derived !== entry.session) entry.derived = derived;
+
+  // THE COST AXIS IS OPTIONAL AND ITS ABSENCE IS NOT A ZERO (TL-30). The module
+  // goes open source and must run over somebody else's process, so a host with
+  // no adapter has to produce a log that is complete in every other respect —
+  // which means these three fields are written only where a source actually
+  // supplied them. A `tokens_in: 0` on every row would say "measured, and it
+  // came out free", the same untruth `estimateHours()` refuses when it returns
+  // `null` rather than 0 for an estimate it cannot parse.
+  //
+  // `model` travels WITH the tokens because tokens of different models are
+  // incomparable units of effort, and a report that averaged across them would
+  // be adding apples to a local llama.
+  for (const field of ["tokens_in", "tokens_out"]) {
+    const raw = row && row[field];
+    if (raw === undefined || raw === null || raw === "") continue;
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < 0) {
+      throw new Error("`" + field + "` must be a whole number of tokens, not " + JSON.stringify(raw));
+    }
+    entry[field] = n;
+  }
+  const model = String((row && row.model) || "").trim();
+  if (model) entry.model = model;
+  if ((entry.tokens_in !== undefined || entry.tokens_out !== undefined) && !entry.model) {
+    throw new Error(
+      "tokens with no `model` — the number is unusable without it\n" +
+        "Tokens of different models are different units of effort; a report cannot mix them."
+    );
+  }
 
   // A CORRECTION CARRIES TWO EXTRA FIELDS AND NOTHING ELSE DOES (TL-31). The
   // log is append-only, so a misattributed row cannot be edited — the fix is a

@@ -85,6 +85,10 @@ export function parseSubArgs(args, known, defaults) {
 
 const RECORD_FLAGS = [
   "--task", "--kind", "--actor", "--session", "--source", "--file", "--branch",
+  // The cost axis (TL-30). On `record` rather than only in the adapter, because
+  // the adapter is Claude Code's and the contract has to be reachable by any
+  // host — that is what makes the cost axis a plugin instead of a dependency.
+  "--tokens-in", "--tokens-out", "--model",
   "--no-throttle", "--json", "--dir",
 ];
 
@@ -93,6 +97,9 @@ export function parseRecordArgs(args) {
   const plan = {
     task: null, kind: "tool", actor: null, session: null, source: null,
     file: null, branch: null, throttle: true, json: false,
+    // ABSENT, not zero. A host with no adapter writes rows that are complete in
+    // every other respect, and `0` here would claim the work was free.
+    tokensIn: null, tokensOut: null, model: null,
   };
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -103,6 +110,17 @@ export function parseRecordArgs(args) {
       const value = args[++i];
       if (!value) throw new Error("`" + a + "` with no value");
       plan[a.slice(2)] = value;
+      continue;
+    }
+    if (a === "--tokens-in" || a === "--tokens-out" || a === "--model") {
+      const value = args[++i];
+      if (!value) throw new Error("`" + a + "` with no value");
+      if (a === "--model") { plan.model = value; continue; }
+      const n = Number(value);
+      if (!Number.isInteger(n) || n < 0) {
+        throw new Error("`" + a + "` takes a whole number of tokens, not `" + value + "`");
+      }
+      plan[a === "--tokens-in" ? "tokensIn" : "tokensOut"] = n;
       continue;
     }
     // An unknown FLAG fails rather than being ignored — the rule the whole CLI
@@ -224,6 +242,12 @@ export function record(opts) {
   const [entry] = appendActivity(root, task, [{
     ts: new Date(now).toISOString(),
     task, kind: plan.kind, actor,
+    // `undefined` and not `null` where the caller said nothing: `activityEntry`
+    // writes these fields only where a source supplied them, so an absent value
+    // must not reach it as a value (TL-30).
+    tokens_in: plan.tokensIn == null ? undefined : plan.tokensIn,
+    tokens_out: plan.tokensOut == null ? undefined : plan.tokensOut,
+    model: plan.model || undefined,
     source: plan.source || (hints.tool ? "hook" : "cli"),
     session,
     // The key every OTHER process of this tool derives for the session, so the

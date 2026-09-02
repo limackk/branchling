@@ -2,3 +2,6 @@
 {"id":"01M1F5BNKGMC6F6B6TYD4SCN66","ts":"2026-09-01T18:57:58.896Z","task":"TL-30","field":"blocked_by","from":["TL-1425"],"to":["TL-28"],"actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK5QTWM7ZH5N6Z8VDXX","ts":"2026-09-02T07:16:31.461Z","task":"TL-30","field":"title","from":"Adapter tokenów i kosztu sesji","to":"Token and session cost adapter","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK51S7RFEP6NM1X4WQ1","ts":"2026-09-02T07:16:31.461Z","task":"TL-30","field":"epic","from":"Backlog — pomiar czasu pracy","to":"Backlog — work time measurement","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1HWJXYPJ0R92BV4PHQJJ9WJ","ts":"2026-09-02T20:22:22.934Z","task":"TL-30","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown","session":"tree-6185cd1f78d5"}
+{"id":"01M1HWJXYPVFEG52R30XW15EES","ts":"2026-09-02T20:22:22.934Z","task":"TL-30","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown","session":"tree-6185cd1f78d5"}
+{"id":"01M1HX1F6RQ9B7HF59SCFMCCV7","ts":"2026-09-02T20:30:19.352Z","task":"TL-30","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven","session":"tree-6185cd1f78d5"}

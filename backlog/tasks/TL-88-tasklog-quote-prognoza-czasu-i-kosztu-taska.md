@@ -6,12 +6,12 @@ labels: []
 board: main
 epic: "Agent-facing differentiators"
 priority: P2
-status: blocked
-owner: unassigned
+status: in_progress
+owner: agent:claude
 estimate: 1d
 confidence: medium
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-02
 blocked_by: [TL-29]
 blocks: []
 related_docs:

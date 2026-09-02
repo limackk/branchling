@@ -353,6 +353,8 @@ An adapter that can, adds `tokens_in`, `tokens_out`, `model` to the row.
 Cost calibration is then a derivative, not a separate mechanism. No adapter =
 **no column, not zero** — zero would mean "measured and it came out free".
 
+Implemented in TL-30 — §19.
+
 ## 11. Calibration — the whole point of this
 
 The value is not in the sentence "TL-27 took 3 h". It is in the distribution
@@ -655,3 +657,59 @@ Phase 2 of §12: the estimates stop being unfalsifiable.
 median and a p80 are all an `n` in the tens can justify, and anything fitted
 to it would be a curve through noise with a confidence interval nobody would
 print.
+
+## 19. What is implemented (2026-09-02, TL-30)
+
+Phase 3 of §12: the second axis, and the four answers it is allowed to give.
+
+- **`tokens_in`, `tokens_out`, `model` are OPTIONAL fields on an activity
+  row.** A host with no adapter writes rows complete in every other respect,
+  which is the whole content of "an adapter, not a dependency" (§7). The three
+  travel together and a count with no model is REFUSED at the writer: tokens of
+  two models are two different units of effort, and a row carrying their sum
+  could not be priced at all.
+- **`kind: "session"`** is the aggregate written once when a session ends. It
+  is deliberately NOT a heartbeat kind: its timestamp is the moment of writing,
+  not a moment of work, so clustering on it would add a spurious run at the end
+  of every session — inflating exactly the count of single-heartbeat clusters
+  §14 point 4 is to be settled with.
+- **`worktrail time --cost`** gives four distinguishable answers, and the
+  distinction IS the feature: an amount (`api` with a rate), tokens with no
+  amount and the reason (`subscription` — the marginal dollar cost of one task
+  on a plan is fiction), a declared zero (`local`), and `null` — no adapter, or
+  a model with no pricing entry. `null` is never printed as `0`. The total
+  refuses an amount unless every model that contributed has one: a partial sum
+  is a number smaller than the truth wearing the authority of a total.
+- **Prices are DATA: `model_pricing` in config.yaml**, `<in>/<out>` in dollars
+  per million tokens, or the word `subscription` or `local`. A rate typed into
+  the code is wrong the week after it ships, and wrong silently. A model the
+  log carries and the pricing does not is counted apart as "no rate" — the
+  tokens are real even when the amount is not knowable — and one model's
+  unreadable entry is named rather than failing the other models' report.
+- **The Claude Code adapter is `scripts/cost-adapter.mjs`, and nothing in the
+  tool imports it.** That is asserted as an IMPORT check with a positive
+  control, not as a grep for the word: a comment naming the file must not fail
+  the guard, and an import must not pass it. It reaches the log through
+  `record()` rather than writing rows itself, so attribution, the session key
+  and throttling stay decided in one place.
+- **One row per model, never one per session**, and never throttled: the
+  throttle window exists to stop a tool firing on every keystroke, and here it
+  would silently drop the second model's tokens for looking like a repeat of
+  the first.
+- **A half-written transcript line is skipped, not fatal.** The file is written
+  by another program and appended to while a session runs, so the last line of
+  a killed session is routinely truncated — an adapter that threw there would
+  fail exactly at the end of the sessions that ended badly.
+
+**Cache tokens are counted as input**, because that is how they are billed and
+because dropping them would understate a long session by most of its cost.
+Cache READS are billed at a discount that `model_pricing` cannot express, so an
+amount over a cache-heavy session is an over-estimate. That is stated here
+rather than papered over with a second rate this tool would have to guess at.
+
+**§12 item 1 is still open.** Whether tokens are a more stable predictor than
+time cannot be answered from this tree: §14 point 1 records that the time gate
+has 0 measured samples here, and the token axis starts from the same zero. Both
+become answerable from the same data, which is the point of having two axes
+recorded by one mechanism; neither is answerable today, and this document says
+so instead of picking a winner.
