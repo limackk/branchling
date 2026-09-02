@@ -34,6 +34,7 @@ import { fileURLToPath } from "node:url";
 
 import { auditLogStatus, readTaskTexts } from "./check-backlog-log-status.mjs";
 import { ConfigError, formatConfigError, loadConfig } from "./config.mjs";
+import { commandRunner, contextBudget } from "./context-budget.mjs";
 import { ATTRIBUTE_RULES, IGNORE_RULES, hasUnionMerge, insideGitRepo, trackedViews, unignoredViews } from "./git-rules.mjs";
 import { SNAPSHOT_FILE, loadSnapshot, readMigrations } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
@@ -236,6 +237,29 @@ function checkGuards(root) {
   return check("guards", "backlog guards", ERR, firstProblem, N + " check");
 }
 
+/**
+ * What asking "what should I work on" costs this backlog (TL-106).
+ *
+ * A WARNING, never an error: a large backlog is not a defect, and the answer is
+ * to ask differently rather than to delete tasks. The threshold is a share of a
+ * reference window rather than a raw count of tasks, because the number that
+ * hurts is tokens — a backlog of short tasks and one of long ones cross it in
+ * very different places.
+ */
+function checkContextBudget(root, config) {
+  const budget = contextBudget({
+    root, config, run: commandRunner(join(HERE, "cli.mjs"), root),
+  });
+  const share = (budget.listTokens / budget.window) * 100;
+  const detail = "the full list costs ~" + budget.listTokens + " tok (" + share.toFixed(1) +
+    "% of a " + (budget.window / 1000) + "k window)";
+  return budget.listOverBudget
+    ? check("context", "cost of asking", WARN,
+        detail + " — looking for work now costs more than doing it",
+        N + " next   # one task, constant cost; or query with a filter")
+    : check("context", "cost of asking", OK, detail);
+}
+
 function checkVolume(metas, config) {
   const s = summarize(metas, config);
   return check("volume", "tasks", INFO,
@@ -255,7 +279,7 @@ export function diagnose(root) {
     // Without a configuration that could be read, the remaining questions make no
     // sense: they would be counting under a vocabulary we do not know. "Not
     // checked" is more honest than a result.
-    for (const [id, title] of [["vocabulary", "vocabulary vs tree"], ["prefix", "id prefix"], ["snapshot", "history reference point"], ["log-status", "log vs status field"], ["guards", "backlog guards"], ["volume", "tasks"]]) {
+    for (const [id, title] of [["vocabulary", "vocabulary vs tree"], ["prefix", "id prefix"], ["snapshot", "history reference point"], ["log-status", "log vs status field"], ["guards", "backlog guards"], ["volume", "tasks"], ["context", "cost of asking"]]) {
       rows.push(check(id, title, INFO, "not checked — the configuration comes first"));
     }
     rows.push(...checkGitIgnore(root));
@@ -270,6 +294,7 @@ export function diagnose(root) {
   rows.push(...checkGitIgnore(root));
   rows.push(checkGuards(root));
   rows.push(checkVolume(metas, config));
+  rows.push(checkContextBudget(root, config));
   return rows;
 }
 

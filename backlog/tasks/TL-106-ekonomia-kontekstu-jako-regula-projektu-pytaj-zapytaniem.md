@@ -6,12 +6,12 @@ labels: [post-launch]
 board: main
 epic: "Onboarding"
 priority: P2
-status: pending
-owner: unassigned
+status: done
+owner: agent:claude
 estimate: 3h
 confidence: high
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-02
 blocked_by: []
 blocks: []
 related_docs:

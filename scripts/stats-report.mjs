@@ -13,10 +13,11 @@
  * the last rebuild.
  */
 
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { crossBranchState, describeDivergence, divergences, scanNote } from "./branch-scan.mjs";
+import { commandRunner, contextBudget, renderBudget } from "./context-budget.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { ranked, summarize } from "./stats.mjs";
@@ -31,7 +32,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const cli = takeDirFlag(process.argv.slice(2));
 const argv = cli.argv;
 
-const KNOWN_FLAGS = ["--json"];
+const KNOWN_FLAGS = ["--json", "--context"];
 for (const a of argv) {
   if (KNOWN_FLAGS.indexOf(a) < 0) {
     console.error(`${N} stats: unknown flag: ` + a);
@@ -57,6 +58,17 @@ const SCAN = crossBranchState(ROOT, CONFIG);
 for (const t of tasks) t.elsewhere = divergences(t.status, SCAN.byId.get(t.id));
 
 const s = summarize(tasks, CONFIG);
+
+// WHAT AN ANSWER COSTS (TL-106). A separate report rather than a section of the
+// ordinary one: it spawns the commands it measures, and a summary that took a
+// second and a half to print is a summary people stop asking for.
+if (argv.includes("--context")) {
+  const budget = contextBudget({
+    root: ROOT, config: CONFIG, run: commandRunner(join(__dirname, "cli.mjs"), ROOT),
+  });
+  console.log(renderBudget(budget));
+  process.exit(0);
+}
 
 if (argv.includes("--json")) {
   // The tallies stay under `stats` rather than at the root (TL-72): a tally

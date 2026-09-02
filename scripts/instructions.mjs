@@ -44,6 +44,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadConfigOrExit } from "./config.mjs";
+import { CONTEXT_RULE, commandRunner, contextBudget } from "./context-budget.mjs";
 import { queueStatuses } from "./next-task.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { resolveBacklogDir, takeDirFlag } from "./paths.mjs";
@@ -176,6 +177,7 @@ it alone: open the guide that matches what you are about to do.
   {{tool}} instructions task-execution     before starting work on one
   {{tool}} instructions task-finalization  before calling one finished
   {{tool}} instructions autonomous-loop    running it as a queue, unattended
+  {{tool}} instructions context-budget     what an answer costs a session
 
 THIS BACKLOG'S OWN WORDS, read from its configuration. Do not carry values over
 from another backlog and do not assume these:
@@ -254,6 +256,14 @@ ago; a generated view does not.
   {{tool}} query --count                      a number instead of hundreds of lines
   {{tool}} stats                              the whole backlog on one screen
 
+ASK; DO NOT READ. \`query\` and \`stats\` cost what the answer is worth; reading
+\`tasks/*.md\` in bulk spends most of a context window before any work starts,
+and a GENERATED view is disqualified twice over — it costs several times what
+\`stats\` costs and answers from the last build. Looking for work must not scale
+with the backlog: prefer \`next\`, then \`--count\`, and ask for the full list only
+with a filter narrow enough to act on. \`{{tool}} instructions context-budget\`
+prints what each path costs in THIS tree, measured.
+
 \`--json\`, \`--files\` and \`--count\` change the SHAPE of the answer, not the
 question. The values \`<s>\` and \`<p>\` take are this backlog's own:
 
@@ -305,7 +315,8 @@ Status transitions and rebuilds are part of doing the work, not decisions to
 raise with anybody. Committing and pushing are not — those stay explicit.
 
 When you believe you are finished:  \`{{tool}} instructions task-finalization\`
-Running this unattended, in a loop:  \`{{tool}} instructions autonomous-loop\``;
+Running this unattended, in a loop:  \`{{tool}} instructions autonomous-loop\`
+What an answer costs a session:      \`{{tool}} instructions context-budget\``;
 
 const TASK_FINALIZATION = `{{tool}} — closing a task
 
@@ -459,6 +470,31 @@ give the loop a task id: a dispatcher that names tasks is a queue with the
 choosing put back in.`;
 
 /**
+ * The context budget, as a guide page.
+ *
+ * IT HAS NO COST TABLE IN IT. The numbers come from `measure` below, which runs
+ * the commands against the backlog being read — a table typed here would be
+ * this repository's numbers printed into somebody else's terminal, which is the
+ * defect law 3 exists to prevent, in prose.
+ */
+const CONTEXT_BUDGET = `{{tool}} — what an answer from this backlog costs
+
+{{context_rule}}
+
+MEASURED HERE, NOW, over {{context_tasks}}:
+
+{{context_table}}
+
+WHY THE TABLE IS COMPUTED AND NOT WRITTEN DOWN. A cost typed into a guide is
+correct on the day it is typed and teaches a falsehood ever after — and a
+backlog grows precisely when the tool is working, so the number goes wrong in
+the direction that matters. Tokens are estimated at four characters each; what
+carries is the ratio between two rows, and that survives any tokenizer.
+
+  {{tool}} stats --context     the same table, on its own
+`;
+
+/**
  * The topics. `summary` is what the switchboard and `--json` list; `text` is the
  * guide, in placeholders.
  *
@@ -486,6 +522,27 @@ export const TOPICS = {
     summary: "running the backlog as a queue: one task per session, the exit codes, and what the claim does not cover",
     text: AUTONOMOUS_LOOP,
   },
+  "context-budget": {
+    summary: "what an answer costs a session, measured on this tree — ask with a query, do not read the tree",
+    text: CONTEXT_BUDGET,
+    // The one topic whose text is not fully known until a tree is in front of
+    // it. `measure` runs the same module `stats --context` runs, so the two can
+    // never disagree about what a path costs.
+    measure: (config) => {
+      const budget = contextBudget({
+        root: config.root, config,
+        run: commandRunner(join(HERE, "cli.mjs"), config.root),
+      });
+      return {
+        context_rule: CONTEXT_RULE.join("\n"),
+        context_tasks: budget.tasks + " task file(s)",
+        context_table: budget.rows
+          .map((r) => "  " + r.label.padEnd(34) + String(r.tokens).padStart(7) + " tok   " +
+            (r.share * 100).toFixed(r.share < 0.01 ? 2 : 1) + "%")
+          .join("\n"),
+      };
+    },
+  },
 };
 
 export const TOPIC_NAMES = Object.keys(TOPICS);
@@ -495,7 +552,11 @@ export const TOPIC_NAMES = Object.keys(TOPICS);
 export function topicText(name, config) {
   const topic = TOPICS[name];
   if (!topic) throw new Error("unknown topic: " + name);
-  return render(topic.text, vocabulary(config));
+  // A topic MAY measure the tree it is being rendered against. The measurements
+  // join the vocabulary rather than replacing it, so the placeholder rule — an
+  // unknown key throws — still covers them.
+  const measured = topic.measure ? topic.measure(config) : {};
+  return render(topic.text, { ...vocabulary(config), ...measured });
 }
 
 /** The listing printed when no topic is named. */

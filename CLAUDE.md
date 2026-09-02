@@ -25,6 +25,28 @@ Extensibility comes from these rules, not from a plugin API. Full reasoning:
 4. **Extensibility through composition** — `--json` on every reading command, a
    callable input on every writing one. No plugin API.
 
+## Context economy: ask, do not read
+
+**Ask the backlog a question; do not read it.** `worktrail query`, `stats`
+and `next` answer from the task files and cost what the answer is worth.
+Reading `tasks/*.md` in bulk, or grepping across them, spends most of a
+context window before any work starts.
+
+**A generated view is disqualified twice**: `INDEX.yaml` and the boards cost
+several times what `stats` costs AND answer from the last `build`, so a status
+changed a minute ago is invisible there — and the stale answer reads exactly
+like a real one.
+
+**Looking for work must not scale with the backlog.** Prefer `next` (one task,
+constant cost), then `--count` and `stats`; ask for the full list only with a
+filter narrow enough to act on. `worktrail stats --context` prints what each
+of those costs in THIS tree.
+
+This paragraph is not prose about the tool — it is `CONTEXT_RULE` in
+[`scripts/context-budget.mjs`](scripts/context-budget.mjs), which is also what
+`worktrail instructions context-budget` prints. One source, so the two cannot
+drift apart; a test fails if this copy falls behind it.
+
 ## Before you change the code
 
 - **The data directory is resolved by `resolveBacklogDir()`** — four sources:
