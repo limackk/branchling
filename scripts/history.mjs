@@ -253,6 +253,36 @@ export function readHistory(backlogDir, taskId) {
   return dedupeLifecycle(out);
 }
 
+/**
+ * The reason a task carries while it waits for an answer, and how to read it
+ * back. PURE, and a PAIR on purpose (TL-148).
+ *
+ * A blocking status may not be entered without a stated reason, so the question
+ * is what that sentence says. It names the question's event id, because that is
+ * the only thing a later `decide --resolves` can be matched against — and
+ * matching it is what lifts the block. A reason that merely said "a question is
+ * open" would leave the tool unable to tell WHICH answer discharges it, which is
+ * the whole of the mechanism.
+ *
+ * The sentence is a sentence, not a code: it is read by people in `query`, in
+ * the viewer and in `git log`. The id is parsed back out of it rather than kept
+ * in a second field, because a second field is a second thing to keep true
+ * (law 2).
+ */
+export const QUESTION_BLOCK_PREFIX = "waiting for an answer to ";
+
+export function questionBlockReason(questionId) {
+  return QUESTION_BLOCK_PREFIX + questionId;
+}
+
+/** The question id a block's reason names, or null. */
+export function questionIdFromReason(reason) {
+  const text = String(reason || "");
+  if (!text.startsWith(QUESTION_BLOCK_PREFIX)) return null;
+  const id = text.slice(QUESTION_BLOCK_PREFIX.length).trim();
+  return EVENT_ID_RE.test(id) ? id : null;
+}
+
 /** { "<ID>": [...], ... } — only the tasks that have a history file. */
 export function readAllHistory(backlogDir) {
   const dir = historyDir(backlogDir);

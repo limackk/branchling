@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""
 priority: P2                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 estimate: 1d                       # 30m | 2h | 1d | 1w | 1mo
 created: 2026-09-02
 updated: 2026-09-02
@@ -89,10 +89,10 @@ expected shape, and the history should make that shape visible.
 
 ## Acceptance criteria
 
-- [ ] `ask` moves the task to `blocked` with a reason naming the question ULID, and `next` skips it. [proof: suite-green]
-- [ ] `decide --resolves <ULID>` lifts the block and restores the prior status. [proof: suite-green]
-- [ ] A decision with a non-matching ULID leaves the task blocked. [proof: suite-green]
-- [ ] The next `next` prints the decision inside the task file, above the body. [proof: suite-green]
-- [ ] The TL-134 guard accepts a question-block as a premise and still fails an empty one. [proof: suite-green]
-- [ ] A bare actor on `ask` is refused. [proof: suite-green]
-- [ ] No new field in the task file; open questions are computed from history. [proof: guards-green]
+- [x] `ask` moves the task to `blocked` with a reason naming the question ULID, and `next` skips it. [proof: suite-green]
+- [x] `decide --resolves <ULID>` lifts the block and restores the prior status. [proof: suite-green]
+- [x] A decision with a non-matching ULID leaves the task blocked. [proof: suite-green]
+- [x] The next `next` prints the decision inside the task file, above the body. [proof: suite-green]
+- [x] The TL-134 guard accepts a question-block as a premise and still fails an empty one. [proof: suite-green]
+- [x] A bare actor on `ask` is refused. [proof: suite-green]
+- [x] No new field in the task file; open questions are computed from history. [proof: guards-green]

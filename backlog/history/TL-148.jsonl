@@ -1,1 +1,4 @@
 {"id":"01M1GK3BW068E7CRWMTHQAVXTN","ts":"2026-09-02T08:17:21.280Z","task":"TL-148","field":"__created__","from":"","to":"An agent's open question blocks the task until a person decides","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1HJB31J7Y1WTM72DK7BERGW","ts":"2026-09-02T17:23:20.242Z","task":"TL-148","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1HJB31JHR50311MNBS4ZA4T","ts":"2026-09-02T17:23:20.242Z","task":"TL-148","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
+{"id":"01M1HK4E2MY9A12XB18AKVRBKW","ts":"2026-09-02T17:37:10.740Z","task":"TL-148","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

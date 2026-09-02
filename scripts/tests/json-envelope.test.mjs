@@ -134,6 +134,12 @@ const WRITING = {
   },
   // A task that is not there: same reason as above — the refusal path.
   "verification-run": { args: ["done", "TASK-404", "--json"], refuses: true },
+  // A question about a task that is not there (TL-148): the refusal path again,
+  // and `--question` is required before the refusal is reached, so it is given.
+  "task-ask": {
+    args: ["ask", "TASK-404", "--question", "which of the two?", "--actor", "agent:test", "--json"],
+    refuses: true,
+  },
   seed: {
     args: ["seed", "--json"],
     input: JSON.stringify({

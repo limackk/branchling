@@ -34,7 +34,8 @@ import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadConfigOrExit } from "./config.mjs";
-import { ACTOR_NAMESPACES, FIELD_ROLE_OVERRIDE, appendEntries, changesRequiringReason, eventId, isValidActor, isValidReason, normalizeReason, recordEdit } from "./history.mjs";
+import { ACTOR_NAMESPACES, FIELD_ROLE_OVERRIDE, appendEntries, changesRequiringReason, eventId, isValidActor, isValidReason, normalizeReason, readHistory, recordEdit } from "./history.mjs";
+import { withDecisions } from "./decisions.mjs";
 import { focusQuietly } from "./focus.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { acquireLock, releaseLock } from "./lock.mjs";
@@ -376,7 +377,10 @@ export function renderTake(result, root, opts = {}) {
   }
   out.push("  " + paint.dim(shown));
   out.push("");
-  out.push(result.text.replace(/\n+$/, ""));
+  // The answers a person has already given, placed where the reader starts
+  // (TL-148). Print time only: nothing of this reaches the file on disk.
+  const entries = opts.entries || (root ? readHistory(root, result.id) : []);
+  out.push(withDecisions(result.text, entries).replace(/\n+$/, ""));
   return out.join("\n");
 }
 

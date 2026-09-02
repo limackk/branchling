@@ -526,7 +526,7 @@ implementation detail. Every reading command answers in the same envelope:
 
 | Command | `kind` | Payload |
 |---|---|---|
-| `query` | `task-list` | `tasks`, `total` (matches BEFORE `--limit`), `limit` |
+| `query` | `task-list` | `tasks`, `total` (matches BEFORE `--limit`), `limit`, `scan`, `modifiedFile`, `elsewhereOnly` (the tasks only another branch has) |
 | `stats` | `stats` | `root`, `stats` (the tallies) |
 | `doctor` | `doctor` | `ok`, `root`, `next`, `checks` |
 | `check` | `check` | `ok`, `root`, `failed` (the guards that failed), `guards` |
@@ -540,8 +540,9 @@ implementation detail. Every reading command answers in the same envelope:
 | `<command> --help` | `command-help` | `command`, `summary`, `usage`, `configured`, `flags` |
 | `pr-summary` | `pr-summary` | `base`, `scanned`, `reason`, `tasks`, `engaged`, `cost` |
 | `audit` | `audit` | `since`, `dayZero`, `tasks`, `findings`, `closedWithoutTrace`, `skippedBeforeSince`, `reopened`, `rework`, `parked`, `withoutPremise` |
-| `take`, `next` | `task-take` | `ok`, `taken`, `id`, `file`, `task`, `text`, `warnings`, `reclaimed`, `lock`, `refusalKind`, `refusal`, `details`, and — filled in by `next` — `passedOver`, `considered`, `searchedStatuses`, `skippedBlocked`, `skippedElsewhere`, `skippedExecutor`, `scan` |
+| `take`, `next` | `task-take` | `ok`, `taken`, `id`, `file`, `task`, `text`, `warnings`, `reclaimed`, `lock`, `refusalKind`, `refusal`, `details`, and — filled in by `next` — `passedOver`, `considered`, `searchedStatuses`, `skippedBlocked`, `skippedElsewhere`, `skippedExecutor`, `skippedHandedBack`, `scan` |
 | `handoff` | `task-handoff` | `ok`, `id`, `file`, `task`, `role`, `owner`, `status` (each a `from`/`to` pair), `comment`, `released`, `warnings`, `refusalKind`, `refusal`, `details` |
+| `ask` | `task-ask` | `ok`, `id`, `file`, `question` (its event id, timestamp, text and asker), `changes`, `blockedReason`, `refusalKind`, `refusal`, `details` |
 | `done` | `verification-run` | `ok`, `task`, `dryRun`, `closed`, `entries` (one per `verification:` entry, with its exit code), `status`, `wouldBe`, `ticked`, `refusalKind`, `refusal`, `details` |
 | `docs-drift` | `docs-drift` | `documents`, `minSignals`, `flagged`, `tooLittle`, `seeded` (absent unless `--seed-tasks` ran) |
 | `sessions` | `sessions` | `correlation`, `total`, `sessions` |

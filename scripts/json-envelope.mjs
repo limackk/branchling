@@ -158,6 +158,13 @@ export const KINDS = {
     warnings: [],
     refusalKind: null, refusal: null, details: [],
   },
+  // `ask --json` (TL-148). The question's EVENT ID is the payload that matters:
+  // it is what a later `decide --resolves` has to name, and the reason the task
+  // now carries names it too — so a consumer never has to parse a sentence.
+  "task-ask": {
+    ok: null, id: null, file: null, question: null, changes: [], blockedReason: null,
+    refusalKind: null, refusal: null, details: [],
+  },
   // `done --json`. `entries` carries one row per `verification:` entry with its
   // exit code — the evidence, which is the whole point of the command. `ticked`
   // is the criteria the run granted; `closed` says whether the file actually

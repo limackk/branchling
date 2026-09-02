@@ -40,15 +40,19 @@
 
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readFileSync, writeFileSync } from "node:fs";
 
 import { loadConfigOrExit } from "./config.mjs";
 import {
   ACTOR_NAMESPACES, EVENT_ID_RE, FIELD_DECISION,
-  appendEntries, eventId, isValidActor, isValidReason, normalizeReason, openQuestions, readHistory,
+  appendEntries, eventId, isValidActor, isValidReason, normalizeReason, openQuestions, questionIdFromReason,
+  readHistory, recordEdit,
 } from "./history.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
-import { resolveActor } from "./take-task.mjs";
+import { resolveActor, todayStamp } from "./take-task.mjs";
+import { requeueStatus } from "./handoff-task.mjs";
+import { buildFieldSpecs, extractMeta, fieldSpec, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
 import { readTaskRecords } from "./task-select.mjs";
 import { MARK, color, failure } from "./ui.mjs";
 
@@ -159,7 +163,80 @@ export function decideTask(opts) {
   appendEntries(root, id, [decision]);
 
   const after = entries.concat([decision]);
-  return { ok: true, id, decision, file: join(paths.historyDir, id + ".jsonl"), open: openQuestions(after) };
+  // THE BLOCK IS LIFTED AS A CONSEQUENCE, not by a second command (TL-148). A
+  // task stopped by `ask` carries a reason naming the question's id; answering
+  // THAT question is what discharges the stop, so nobody has to remember a
+  // follow-up write in exactly the situation where one would be forgotten.
+  const lifted = liftQuestionBlock({ root, config, id, actor, entries: after, decision, now, paths });
+  return {
+    ok: true, id, decision, file: join(paths.historyDir, id + ".jsonl"),
+    open: openQuestions(after), lifted,
+  };
+}
+
+/**
+ * Put a question-blocked task back where it came from, or leave it alone.
+ *
+ * THREE CONDITIONS, and each one is a way the answer might not be the answer:
+ * this decision ANSWERS something (`--resolves`, not a note in passing); the
+ * task stands in a protected status entered with a reason naming a question;
+ * and after this answer no question on the task is open at all.
+ *
+ * WHY THE LAST ONE IS "NOTHING OPEN" AND NOT "IT ANSWERS THE NAMED QUESTION".
+ * A session may ask twice, and the second `ask` changes no status — the task is
+ * already stopped — so the reason in force still names the FIRST question.
+ * Matching against that name would deadlock: answering the first would not lift
+ * it (the second is open), and answering the second would not match. The set
+ * being empty is the same rule seen from the other side, and it is the one that
+ * stays true however many questions were asked. A decision naming some OTHER
+ * event still leaves the task blocked, because the question it waits on is
+ * still in that set.
+ *
+ * WHERE IT GOES BACK TO is read from the history, never chosen: `requeueStatus`
+ * finds the `from` of the change that entered the blocking status. Restoring it
+ * is undoing a transition, not making one.
+ */
+function liftQuestionBlock(ctx) {
+  const { root, config, id, actor, entries, decision, now, paths } = ctx;
+  if (!decision.resolves) return null;
+
+  const records = readTaskRecords(paths.tasksDir, config.taskId.file);
+  const record = records.find((t) => String(t.id).toUpperCase() === String(id).toUpperCase());
+  if (!record) return null;
+  const protectedOnes = new Set(
+    (config.reasonRequiredStatuses || []).filter((s) => (config.archivedStatuses || []).indexOf(s) < 0)
+  );
+  if (!protectedOnes.has(record.status)) return null;
+
+  // The reason of the LAST change into this status — that is the stop currently
+  // in force. An older one described a block that was already lifted.
+  let blockedOn = null;
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const e = entries[i];
+    if (!e || e.field !== "status" || e.to !== record.status) continue;
+    blockedOn = questionIdFromReason(e.reason);
+    break;
+  }
+  if (!blockedOn) return null;
+  if (openQuestions(entries).length) return null;
+
+  const back = requeueStatus(config, entries, record.status);
+  if (back.ambiguous) return { ambiguous: back.ambiguous };
+
+  const file = join(paths.tasksDir, String(record.file).replace(/^tasks\//, ""));
+  const raw = readFileSync(file, "utf8");
+  const before = extractMeta(splitFrontmatter(raw).frontmatter);
+  const specs = buildFieldSpecs(config);
+  let text = setFrontmatterField(raw, "status", back.status, fieldSpec("status", specs));
+  text = setFrontmatterField(text, "updated", todayStamp(now));
+  writeFileSync(file, text, "utf8");
+  const after = extractMeta(splitFrontmatter(text).frontmatter);
+  // The REASON is the decision's own sentence: what lifted the block is what
+  // was decided, and a row saying "unblocked" would lose it.
+  recordEdit(root, {
+    taskId: id, before, after, actor, ts: decision.ts, source: "decide", reason: decision.to,
+  });
+  return { from: record.status, to: back.status, question: blockedOn, source: back.from };
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -181,6 +258,18 @@ export function renderDecision(result, opts = {}) {
     "  open questions left: " +
       (result.open.length ? String(result.open.length) : paint.ok("0"))
   );
+  if (result.lifted && result.lifted.to) {
+    out.push(
+      "  " + paint.ok(MARK.ok) + " the block is lifted — " +
+        result.lifted.from + " " + MARK.arrow + " " + result.lifted.to +
+        (result.lifted.source === "history" ? " (where it came from)" : " (the only status it could go back to)")
+    );
+  } else if (result.lifted && result.lifted.ambiguous) {
+    out.push(
+      "  " + paint.warn(MARK.warn) + " the question is answered and the status was NOT changed: " +
+        "this backlog has " + result.lifted.ambiguous.length + " statuses it could go back to"
+    );
+  }
   out.push("  " + paint.dim(shown));
   return out.join("\n");
 }
@@ -197,6 +286,11 @@ export function decideJson(result) {
       resolves: result.decision.resolves || null,
     },
     openQuestions: result.open.map((e) => ({ id: e.id, ts: e.ts, text: e.to, actor: e.actor })),
+    // `null` when nothing was blocked on this answer — a consumer must be able
+    // to tell "the queue is moving again" from "it never stopped".
+    lifted: result.lifted && result.lifted.to
+      ? { from: result.lifted.from, to: result.lifted.to, question: result.lifted.question }
+      : null,
   };
 }
 

@@ -70,6 +70,7 @@ import { loadConfigOrExit } from "./config.mjs";
 import { taskIdPatterns } from "./task-id.mjs";
 import { MARK, color, errColor } from "./ui.mjs";
 import { stripComment, unquote } from "./task-fields.mjs";
+import { openQuestions, questionIdFromReason, readHistory } from "./history.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 
 
@@ -201,27 +202,70 @@ export function auditRefs(tasksDir, prefix, read = readFileSync, list = readdirS
  * the reason a `blocked_by` list states is discharged when every task in it
  * closes.
  *
- * AN EMPTY `blocked_by` IS NOT STALE. Such a task waits on something outside the
- * tree — a decision, another team — and nothing here can observe that arriving.
- * Reporting it would ask people to justify a state the tool cannot judge, which
- * is how a guard teaches people to work around it.
+ * AN EMPTY `blocked_by` IS NOT STALE — unless a QUESTION is the premise
+ * (TL-148). A task stopped by `ask` has no blockers at all: what it waits on is
+ * an answer, and the reason it carries names the question. That shape is a
+ * premise, and the guard has to read it as one or it would report every
+ * question-blocked task the moment the feature existed. The mirror case is the
+ * one worth catching: the question was ANSWERED and the status was left behind,
+ * which is exactly the "every blocker closed" defect one level up.
+ *
+ * With neither premise the task is left alone, for the original reason: it waits
+ * on something outside the tree — a decision, another team — that nothing here
+ * can observe arriving, and reporting it would ask people to justify a state the
+ * tool cannot judge.
  *
  * @param {Array<{id: string, status: string, blocked_by: string[]}>} tasks
  * @param {{archivedStatuses?: string[], reasonRequiredStatuses?: string[]}} config
+ * @param {Map<string, {question: string|null, open: boolean}>} [questions]
+ *        per task: which question its block names, and whether it is still open.
+ *        Supplied by the caller, which holds the history — this stays pure.
  */
-export function staleBlocked(tasks, config = {}) {
+export function staleBlocked(tasks, config = {}, questions = new Map()) {
   const archived = new Set(config.archivedStatuses || []);
   const blocking = (config.reasonRequiredStatuses || []).filter((s) => !archived.has(s));
   const byId = new Map((tasks || []).map((t) => [t.id, t]));
   const out = [];
   for (const t of tasks || []) {
     if (blocking.indexOf(t.status) < 0) continue;
+    const asked = (questions && questions.get(t.id)) || null;
+    if (asked && asked.question) {
+      if (asked.open) continue;
+      out.push({ id: t.id, file: t.file, status: t.status, blockers: [], question: asked.question });
+      continue;
+    }
     const refs = t.blocked_by || [];
     if (!refs.length) continue;
     // An unknown id is not a closed one — that is the dangling-reference defect,
     // and reporting the same task under both rules would say one problem twice.
     if (!refs.every((r) => byId.has(r) && archived.has(byId.get(r).status))) continue;
-    out.push({ id: t.id, file: t.file, status: t.status, blockers: refs.slice() });
+    out.push({ id: t.id, file: t.file, status: t.status, blockers: refs.slice(), question: null });
+  }
+  return out;
+}
+
+/**
+ * What each blocking-status task is waiting on, read from its history.
+ *
+ * The I/O half of the rule above, kept apart so the rule stays testable without
+ * a tree. Only tasks in a protected status are read: in a backlog that has been
+ * running a while that is a handful of files, not the archive.
+ */
+export function questionPremises(root, tasks, config, read = readHistory) {
+  const archived = new Set(config.archivedStatuses || []);
+  const blocking = new Set((config.reasonRequiredStatuses || []).filter((s) => !archived.has(s)));
+  const out = new Map();
+  for (const t of tasks || []) {
+    if (!blocking.has(t.status)) continue;
+    const entries = read(root, t.id);
+    let question = null;
+    for (let i = entries.length - 1; i >= 0; i--) {
+      const e = entries[i];
+      if (!e || e.field !== "status" || e.to !== t.status) continue;
+      question = questionIdFromReason(e.reason);
+      break;
+    }
+    out.set(t.id, { question, open: question ? openQuestions(entries).some((q) => q.id === question) : false });
   }
   return out;
 }
@@ -241,7 +285,7 @@ function main(argv) {
   const pat = taskIdPatterns(prefix);
   const { checked, dangling, unresolvable, taskCount, tasks, pathsChecked, danglingPaths } =
     auditRefs(backlogPaths(root).tasksDir, prefix);
-  const stale = staleBlocked(tasks, config);
+  const stale = staleBlocked(tasks, config, questionPremises(root, tasks, config));
 
   // REPORTED, NEVER FAILED, and the level is the decision this task asked for.
   // Closing a blocker and lifting the status are two writes by nature, so a
@@ -258,7 +302,9 @@ function main(argv) {
         "whose every stated blocker is closed"
     );
     for (const t of stale) {
-      staleLines.push(`  - ${t.file}: \`${t.status}\`, waiting on ${t.blockers.join(", ")} — all closed`);
+      staleLines.push(t.question
+        ? `  - ${t.file}: \`${t.status}\`, waiting for an answer to ${t.question} — which was given`
+        : `  - ${t.file}: \`${t.status}\`, waiting on ${t.blockers.join(", ")} — all closed`);
     }
     staleLines.push(
       "  Nothing was changed. `" + N + " next` will hand these out and record leaving the status;"
