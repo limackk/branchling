@@ -25,6 +25,7 @@
     "skills/",
     "!scripts/tests/",
     "!scripts/check-publish-metadata.mjs",
+    "templates/",
     "_template.md",
     "README.md",
     "LICENSE"

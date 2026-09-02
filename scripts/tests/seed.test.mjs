@@ -347,7 +347,13 @@ test("an unknown flag and a positional argument both fail", () => {
   assert.throws(() => parseSeedArgs(["plan.json"]), /the plan comes in on stdin/);
   assert.throws(() => parseSeedArgs(["--actor", "nobody"]), /no valid namespace/);
   assert.throws(() => parseSeedArgs(["--reason", "unknown"]), /reserved/);
-  assert.deepEqual(parseSeedArgs(["--dry-run", "--json"]), { dryRun: true, json: true, actor: null, reason: null });
+  assert.deepEqual(parseSeedArgs(["--dry-run", "--json"]),
+    { dryRun: true, json: true, actor: null, reason: null, from: null });
+  // `--from` (TL-95) is a description rather than a plan, and it still has to
+  // name a file: a flag that silently means nothing is the defect this suite
+  // exists for.
+  assert.equal(parseSeedArgs(["--from", "spec.md"]).from, "spec.md");
+  assert.throws(() => parseSeedArgs(["--from"]), /`--from` with no file/);
 });
 
 // ── The contract between verification and criteria ────────────────────────

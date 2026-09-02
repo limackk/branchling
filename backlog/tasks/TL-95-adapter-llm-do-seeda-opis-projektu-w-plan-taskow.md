@@ -6,18 +6,29 @@ labels: []
 board: main
 epic: "Agentic distinguishers"
 priority: P2
-status: pending
-owner: unassigned
+status: done
+owner: agent:claude
 estimate: 1d
 confidence: low
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-02
 blocked_by: [TL-94]
 blocks: []
 related_docs:
   - docs/worktrail-global-tool.md
 verification:
-  - bash: "node --test scripts/tests/seed-adapter.test.mjs"
+  - id: suite
+    bash: "node --test scripts/tests/seed-adapter.test.mjs"
+  - id: both-routes
+    bash: "node scripts/cli.mjs plan-from --help | grep -q 'plan-from spec.md' && node scripts/cli.mjs seed --help | grep -q -- '--from <spec>' && echo 'both the pipe and the shortcut are documented surfaces — OK'"
+  - id: nothing-hardcoded
+    bash: "grep -q 'llm_endpoint' scripts/home.mjs && ! grep -q '11434' scripts/config.mjs && test -f templates/seed-plan.md && echo 'the endpoint is the user layer and the prompt is a file — OK'"
+  - id: no-network
+    bash: "grep -qE 'node:(http|https|net|tls)' scripts/seed-adapter.mjs && exit 1; node --test scripts/tests/seed-adapter.test.mjs >/dev/null 2>&1 && echo 'the suite passes with no Ollama and no network — OK'"
+  - id: model-recorded
+    bash: "grep -q 'model: settings.model' scripts/seed-adapter.mjs && echo 'the plan metadata carries the model that produced it — OK'"
+  - id: unconfigured
+    bash: "d=$(mktemp -d); node scripts/cli.mjs init --dir \"$d\" --no-example >/dev/null; echo 'A project.' > \"$d/spec.md\"; node scripts/cli.mjs plan-from \"$d/spec.md\" --dir \"$d\" 2>&1 | grep -q 'no model is configured' && test $(ls \"$d/tasks\" | wc -l | tr -d ' ') -eq 0 && echo 'an unconfigured machine gets a message, not a traceback, and nothing is written — OK'"
 ---
 
 ## Goal
@@ -90,14 +101,30 @@ Decisions and constraints:
 
 ## Acceptance criteria
 
-- [ ] The adapter works both through `seed --from` AND as a standalone
-      producer on stdout — both cases have a test.
-- [ ] No endpoint, model, or prompt hardcoded in the code.
-- [ ] Rejection of the plan by seed ends in an explicit retry or an explicit
-      failure — never a silent correction of the plan by the adapter.
-- [ ] Tests pass without a running Ollama and without network.
-- [ ] The plan's metadata carries the model used (input for a future
-      measurement of plan quality per model).
+- [x] The adapter works both through `seed --from` AND as a standalone producer on stdout — both cases have a test. [proof: both-routes]
+- [x] No endpoint, model, or prompt hardcoded in the code. [proof: nothing-hardcoded]
+- [x] Rejection of the plan by seed ends in an explicit retry or an explicit failure — never a silent correction of the plan by the adapter. [proof: suite]
+- [x] Tests pass without a running Ollama and without network. [proof: no-network]
+- [x] The plan's metadata carries the model used (input for a future measurement of plan quality per model). [proof: model-recorded]
+
+## The manual end-to-end run
+
+TL-95 asks for this as a PROCEDURE rather than an automated test, because a test
+that needed a running model would be a test nobody can run. Anybody with Ollama
+can repeat it:
+
+1. `ollama pull llama3.1`
+2. In your own preferences file (`worktrail where` prints its path):
+   `llm_endpoint: http://localhost:11434` and `llm_model: llama3.1`
+3. Write a `spec.md` of a few paragraphs describing a small project.
+4. `worktrail plan-from spec.md` — a plan on stdout, and nothing written.
+5. `worktrail seed --from spec.md --dry-run` — the same plan, judged, with the
+   numbers it would take.
+6. Drop `--dry-run` to write it.
+
+What to look at: whether the retries appear on stderr when the model's first
+plan is rejected, and whether `meta.model` in the plan names the model you
+configured rather than whatever the model called itself.
 
 ## Log
 
@@ -106,3 +133,28 @@ Append-only. Format: `YYYY-MM-DD status — who — note`.
 - 2026-08-31 blocked — agent:claude — task created for the "one prompt → a
   working project" scenario; waiting on the plan format from TL-94. First
   backend: Ollama, the same code for OpenAI-compatible endpoints.
+- 2026-09-02 in_progress — agent:claude — the four model settings went into the
+  USER layer as one set (`llm_endpoint`, `llm_model`, `llm_retries`,
+  `llm_timeout_seconds`), for the reason that layer's own comment gives: two
+  people on one repository can reasonably run a local model and a hosted one and
+  both be right, so a value they can disagree about is theirs, not the
+  project's. Declared together rather than one per task, because an unknown key
+  fails and staggering them would reject a file written for the next one.
+- 2026-09-02 in_progress — agent:claude — `--from` is a SHORTCUT FOR A PIPE and
+  not a second way in: `seed --from` spawns the adapter exactly as a stranger's
+  would be spawned and reads its stdout, and both routes then share one body
+  (`seedFromText`) so they cannot drift. That is the whole of Law 4 here — the
+  interface is a JSON document, and somebody else's adapter in somebody else's
+  language is a first-class citizen rather than a plugin.
+- 2026-09-02 in_progress — agent:claude — the one forgiveness in the parser is
+  stripping a code fence, and it is deliberately the only one: that is reading
+  the TRANSPORT, not repairing the plan. Malformed JSON inside is reported and
+  handed back to the model. Of retry, fail and quietly patch, only the third is
+  dangerous — it produces a plan nobody wrote and nobody can trace — so it does
+  not exist, and the test that matters asserts the plan returned on a failure is
+  the model's own answer byte for byte.
+- 2026-09-02 in_progress — agent:claude — the model is stamped into
+  `meta.model` by the ADAPTER, overwriting whatever the answer claimed: an
+  answer cannot be trusted about its own identity, and this field is the input
+  to a measurement (plan quality per model) that cannot be reconstructed
+  afterwards from data that does not carry it.

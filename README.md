@@ -339,6 +339,42 @@ worktrail doctor --json | jq -e '.ok'          # a gate in CI
 worktrail done TASK-42 --json | jq '.entries[] | select(.ok | not)'
 ```
 
+### One description, a whole backlog
+
+```bash
+worktrail seed --from spec.md --dry-run     # what it would create
+worktrail plan-from spec.md | worktrail seed --dir ./backlog
+```
+
+The first is the convenience; **the second is the interface.** `plan-from`
+prints a plan on stdout and writes nothing, `seed` validates it and writes, and
+the two halves only ever meet through a JSON document on a pipe — so somebody
+else's adapter, in somebody else's language, calling somebody else's model, is a
+first-class citizen here rather than a plugin.
+
+**The model is yours and lives in your own preferences file**, not in the
+project's `config.yaml`: two people working on one repository can reasonably run
+a local model and a hosted one, and both be right.
+
+```yaml
+llm_endpoint: http://localhost:11434
+llm_model: llama3.1
+```
+
+With [Ollama](https://ollama.com) that is `ollama pull llama3.1` and nothing
+else — no key, no account. Any OpenAI-compatible endpoint goes through the same
+code. **The prompt is a file** (`templates/seed-plan.md`), not a string in the
+source: tuning what the model is told must not need a fork.
+
+**A plan is never repaired for you.** It goes to `seed --dry-run`, and a
+rejected one goes back to the model with the errors attached, `llm_retries`
+times. After that the plan and the complaints are printed and the command
+fails. Of the three things a tool could do here — retry, fail, or quietly patch
+the JSON — only the last is dangerous: it produces a plan nobody wrote and
+nobody can trace.
+
+---
+
 ### The morning after a fleet of agents worked
 
 ```bash

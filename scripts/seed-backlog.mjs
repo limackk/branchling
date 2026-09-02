@@ -114,11 +114,21 @@ export function parseSeedArgs(args) {
   let json = false;
   let actor = null;
   let reason = null;
+  let from = null;
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === "--dry-run") { dryRun = true; continue; }
     if (a === "--json") { json = true; continue; }
+    if (a === "--from") {
+      // The convenient route (TL-95): a description instead of a plan. The plan
+      // still arrives through the same door — the adapter produces it and this
+      // command validates and writes it — so `--from` is a shortcut, never a
+      // second way in.
+      from = args[++i] || null;
+      if (!from) throw new Error("`--from` with no file\nit takes a project description: `" + N + " seed --from spec.md`");
+      continue;
+    }
     if (a === "--actor") {
       actor = args[++i] || null;
       if (!actor) throw new Error("`--actor` with no name");
@@ -150,7 +160,7 @@ export function parseSeedArgs(args) {
         "agent: automated, user: an authenticated account."
     );
   }
-  return { dryRun, json, actor, reason };
+  return { dryRun, json, actor, reason, from };
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -535,6 +545,20 @@ export function main(argv) {
     return 2;
   }
 
+  if (opts.from) {
+    // Composition, not a special case: the adapter is spawned exactly as a
+    // stranger's would be, and its stdout is this command's stdin. `--from`
+    // therefore cannot do anything a pipe could not.
+    const produced = spawnSync(process.execPath, [join(HERE, "seed-adapter.mjs"), opts.from, "--dir", cli.dir || "."], {
+      encoding: "utf8", stdio: ["ignore", "pipe", "inherit"], timeout: 600_000,
+    });
+    if (produced.status !== 0) {
+      console.error(failure(N + " seed", "no plan came out of " + opts.from, [], []));
+      return produced.status === null ? 1 : produced.status;
+    }
+    return seedFromText(produced.stdout, cli, opts);
+  }
+
   if (process.stdin.isTTY) {
     console.error(failure(
       N + " seed", "no plan on stdin",
@@ -552,7 +576,12 @@ export function main(argv) {
     console.error(failure(N + " seed", "could not read the plan from stdin", [e.message], []));
     return 2;
   }
+  return seedFromText(input, cli, opts);
+}
 
+/** Everything after the plan is in hand, whoever produced it — stdin, or the
+ *  adapter `--from` spawned. One body, so the two routes cannot drift. */
+function seedFromText(input, cli, opts) {
   // FIRST, and against nothing on disk: a plan judged before the directory is
   // touched is a plan whose refusal costs nothing to undo.
   const { plan, errors } = parsePlan(input);

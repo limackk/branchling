@@ -165,11 +165,35 @@ export const USER_DEFAULTS = Object.freeze({
   // How dates are rendered for a reader. `iso` is unambiguous everywhere and is
   // what the files themselves use; `local` follows the machine's locale.
   date_format: "iso",
+  // ── The model that turns prose into a plan (TL-95) ──────────────────────
+  // ALL FOUR ARE FACTS ABOUT A MACHINE, and that is why they are here rather
+  // than in a project's config.yaml: two people working on one repository can
+  // reasonably run a local model and a hosted one and both be right. A URL or a
+  // model name written into the code would be this tool deciding whose machine
+  // everybody has.
+  //
+  // Declared as a set now for the reason the block above gives: an unknown key
+  // fails, so adding them one at a time would reject a file written for the next.
+  //
+  // Empty means "not configured", and the command says so with instructions
+  // rather than falling back to somebody's default endpoint.
+  llm_endpoint: "",
+  // The model name as that endpoint spells it. There is no default: a wrong
+  // guess here fails at the network with somebody else's error message.
+  llm_model: "",
+  // How many times the adapter may hand a REJECTED plan back to the model with
+  // the errors attached. Zero means one attempt and no retry. It never fixes a
+  // plan itself — see the adapter's header for why that would be the worst of
+  // the three options.
+  llm_retries: 2,
+  // How long to wait for one answer, in seconds. A model on a laptop is slow in
+  // a way a hosted one is not, so this is a fact about the machine too.
+  llm_timeout_seconds: 120,
 });
 
 export const USER_KEYS = Object.keys(USER_DEFAULTS);
 
-const USER_NUMBER_KEYS = new Set(["port"]);
+const USER_NUMBER_KEYS = new Set(["port", "llm_retries", "llm_timeout_seconds"]);
 const USER_ENUMS = { theme: ["auto", "light", "dark"], date_format: ["iso", "local"] };
 
 /**
