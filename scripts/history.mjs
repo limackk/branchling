@@ -43,8 +43,8 @@ export const MIGRATIONS_FILE = ".migrations.jsonl";
 // The pseudo-fields live in task-fields.mjs (which is pasted into the viewer by
 // source, so the browser and node see the same list). Here only a re-export, so
 // that existing imports from history.mjs keep working.
-export { FIELD_CREATED, FIELD_DELETED, FIELD_BODY, FIELD_COMMENT, FIELD_VERIFIED, FIELD_ROLE_OVERRIDE,
-  FIELD_DECISION, FIELD_ATTRIBUTED, openQuestions,
+export { FIELD_CREATED, FIELD_DELETED, FIELD_BODY, FIELD_COMMENT, FIELD_VERIFIED, FIELD_UNVERIFIED,
+  FIELD_ROLE_OVERRIDE, FIELD_DECISION, FIELD_ATTRIBUTED, openQuestions, outstandingVouches, VOUCH_REFUSALS,
   PSEUDO_FIELDS, isPseudoField,
   ACTOR_NAMESPACES, ACTOR_UNKNOWN, actorParts, isValidActor, normalizeActor,
   REASON_UNKNOWN, REASON_PROVEN, REASON_SENTINELS, REASON_MAX_LENGTH, hasStatedReason, isValidReason,

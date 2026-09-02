@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Agentic differentiators"
 priority: P1
-status: pending
-owner: unassigned
+status: done
+owner: agent:claude
 role: ""
 executor: ""
 estimate: 4h
@@ -20,9 +20,9 @@ related_docs:
   - docs/worktrail-state-and-sync.md
 verification:
   - id: suite
-    bash: "node --test scripts/tests/done-task.test.mjs"
+    bash: "node --test scripts/tests/verification-gate.test.mjs scripts/tests/audit.test.mjs"
   - id: residue
-    bash: "node scripts/tests/manual-refusal-residue.test.mjs"
+    bash: "node --test scripts/tests/manual-refusal-residue.test.mjs"
 ---
 
 ## Goal
@@ -96,11 +96,11 @@ The implementer settles these; do not treat the list below as the design.
 
 ## Acceptance criteria
 
-- [ ] A `done` that refuses on a `manual:` entry with no terminal leaves a
+- [x] A `done` that refuses on a `manual:` entry with no terminal leaves a
       record naming the task, the manual entry's text, and the fact that every
       automatic entry passed. [proof: residue]
-- [ ] The same holds under `--json`. [proof: residue]
-- [ ] A reader who did not run the command can find that reason from the backlog
+- [x] The same holds under `--json`. [proof: residue]
+- [x] A reader who did not run the command can find that reason from the backlog
       alone — no re-run of the gate. [proof: residue]
-- [ ] `--confirm-manual` still vouches exactly as it does today, and the
+- [x] `--confirm-manual` still vouches exactly as it does today, and the
       existing refusal messages are not weakened. [proof: suite]

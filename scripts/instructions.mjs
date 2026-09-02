@@ -364,6 +364,13 @@ when you actually hold the evidence it names — the prompt lists what is not
 evidence, and "I checked" is on that list. With no terminal to ask at,
 \`--confirm-manual\` vouches for every manual entry at once, under your actor.
 
+A REFUSAL IS RECORDED TOO (TL-170). Declining, or having nobody to ask, leaves a
+\`__unverified__\` entry in the log naming which entry stopped the run — the task
+file is still untouched. \`{{tool}} audit\` lists those under \`awaiting a vouch\`,
+so a task stopped at a human check is not read as one somebody walked away from.
+That is the whole difference the record buys, and it is why you do not need to
+re-run the contract to find out what a task is waiting for.
+
 AFTERWARDS. Look at \`blocks:\` — a task you have just unblocked has a reader who
 needs to know why it became actionable. Then \`{{tool}} check\` before the commit,
 because the guards judge the SET and your change joined it.`;

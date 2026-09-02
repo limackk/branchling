@@ -2,3 +2,6 @@
 {"id":"01M1HSNRS2PYW5NP1YAKTR6SEH","ts":"2026-09-02T19:31:30.210Z","task":"TL-170","field":"estimate","from":"2h","to":"4h","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1HSNRS2MF8F3H0Z5V8K62Z8","ts":"2026-09-02T19:31:30.210Z","task":"TL-170","field":"epic","from":"","to":"Agentic differentiators","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1HSNRS285F97RD8S8Z5E2DY","ts":"2026-09-02T19:31:30.210Z","task":"TL-170","field":"related_docs","from":[],"to":["docs/worktrail-state-and-sync.md"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1HT495DB70NTJJAHSB8T4GX","ts":"2026-09-02T19:39:25.741Z","task":"TL-170","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1HT495DKJ5ZVVW4F11KMEVP","ts":"2026-09-02T19:39:25.741Z","task":"TL-170","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1HTPE0TQ7F25A8N226ZD884","ts":"2026-09-02T19:49:20.538Z","task":"TL-170","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven","session":"tree-526f61f2043f"}

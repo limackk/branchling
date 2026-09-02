@@ -201,6 +201,45 @@ export const FIELD_COMMENT = "__comment__";
 // stood behind it — would leave no trace at all.
 export const FIELD_VERIFIED = "__verified__";
 
+// A closing run STOPPED by a `manual:` entry nobody vouched for (TL-170). `to`
+// carries the entry's own text, exactly as `__verified__` does, so the two read
+// as one pair: the vouch that was given, and the vouch that was asked for and
+// not given.
+//
+// WHY AN EVENT AND NOT A STATUS CHANGE. `done` promises that a refused run
+// leaves the task file untouched, and it says so in the words it prints. Moving
+// the task into a waiting status would make every view correct for free, but it
+// would buy that by breaking the one promise the refusal exists to keep. So the
+// file is not touched and the REASON travels the way this project says a reason
+// travels — with a write to the log, not as prose in a file.
+//
+// WHY IT IS WRITTEN AT ALL. Without it the fact that every automatic entry
+// passed and one human vouch is missing exists only in the terminal that
+// printed it, and dies with that session. What is left behind is a task in
+// progress, indistinguishable from one somebody abandoned — which is how TL-89
+// sat for a day while three separate views showed it as ordinary work in
+// flight.
+//
+// `reason` names WHICH refusal it was, through `VOUCH_REFUSALS`: nobody to ask,
+// a program that cannot ask, or a person who was asked and declined. The third
+// is a human answer and the most informative of the three; collapsing them into
+// one event type would throw that away.
+export const FIELD_UNVERIFIED = "__unverified__";
+
+/**
+ * WHICH refusal a `__unverified__` entry records, as a code a program can
+ * branch on. It stands BESIDE the entry's `reason`, not instead of it, the way
+ * `__attributed__` carries both a sentence and the id it claims: the reason is
+ * for the person reading the log, the code is for whatever counts them.
+ *
+ *   no-terminal  there was nobody to ask — an unattended run
+ *   json         the output was being parsed, so asking was incoherent
+ *   declined     a person WAS asked and did not vouch. The only one of the
+ *                three that carries a human judgement, which is why it is not
+ *                folded into the others
+ */
+export const VOUCH_REFUSALS = ["no-terminal", "json", "declined"];
+
 // A task taken by somebody outside the role it asks for (TL-97). A
 // pseudo-field for the same reason as `__verified__`: nothing in the frontmatter
 // changes, so `diffMeta` cannot see it. `from` is the role the task asks for,
@@ -244,7 +283,8 @@ export const FIELD_DECISION = "__decision__";
 // attribution, which is worse than the gap it fills.
 export const FIELD_ATTRIBUTED = "__attributed__";
 
-export const PSEUDO_FIELDS = [FIELD_CREATED, FIELD_DELETED, FIELD_BODY, FIELD_COMMENT, FIELD_VERIFIED, FIELD_ROLE_OVERRIDE, FIELD_DECISION, FIELD_ATTRIBUTED];
+export const PSEUDO_FIELDS = [FIELD_CREATED, FIELD_DELETED, FIELD_BODY, FIELD_COMMENT, FIELD_VERIFIED,
+  FIELD_UNVERIFIED, FIELD_ROLE_OVERRIDE, FIELD_DECISION, FIELD_ATTRIBUTED];
 
 export function isPseudoField(key) {
   return PSEUDO_FIELDS.indexOf(key) !== -1;
@@ -288,6 +328,28 @@ export function openQuestions(entries) {
   return (entries || []).filter(
     (e) => e && e.field === FIELD_COMMENT && !(typeof e.id === "string" && answered.has(e.id))
   );
+}
+
+/**
+ * The `manual:` entries this task was asked to vouch for and has not (TL-170).
+ *
+ * An `__unverified__` is outstanding until a `__verified__` for the SAME entry
+ * text arrives after it. Pairing on the text rather than on an id is deliberate:
+ * a verification entry has no identity of its own beyond what it says, and two
+ * runs of the same contract are asking about the same thing. Pairing on time as
+ * well is what makes the log readable in both directions — a task refused,
+ * vouched for, then refused again on a later contract is three facts, and only
+ * the last one is open.
+ */
+export function outstandingVouches(entries) {
+  const list = (entries || []).filter((e) => e && (e.field === FIELD_UNVERIFIED || e.field === FIELD_VERIFIED));
+  const open = new Map();
+  for (const e of list.slice().sort((a, b) => String(a.ts).localeCompare(String(b.ts)))) {
+    const key = String(e.to || "");
+    if (e.field === FIELD_UNVERIFIED) open.set(key, e);
+    else open.delete(key);
+  }
+  return [...open.values()];
 }
 
 /**

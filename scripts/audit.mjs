@@ -47,7 +47,7 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadConfigOrExit } from "./config.mjs";
-import { readAllHistory } from "./history.mjs";
+import { outstandingVouches, readAllHistory } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
@@ -71,6 +71,8 @@ export const USAGE = [
   "                           `audit_stale_days` days",
   "    no premise             a status you may not enter without saying why,",
   "                           carrying an empty `blocked_by`",
+  "    awaiting a vouch       open, with a closing run stopped at a `manual:`",
+  "                           entry nobody has vouched for",
   "",
   "  --since <date>  the earliest closing date to judge. Defaults to the day the",
   "                  log first recorded a status transition: a task closed before",
@@ -268,6 +270,36 @@ export function withoutPremise(tasks, { reasonRequired, archived }) {
   return { found, reason: null };
 }
 
+/**
+ * An OPEN task whose closing run was stopped by a `manual:` entry nobody
+ * vouched for (TL-170).
+ *
+ * WHY IT IS NOT LEFT TO `parked`. A task waiting on a vouch does eventually
+ * show up there, but only after `audit_stale_days` — and it shows up as a task
+ * nobody has touched, which is the one thing it is not. The tool knows exactly
+ * what this is waiting for, so reporting it as an unexplained silence would be
+ * throwing away an answer it already holds. This finding has no staleness
+ * threshold for the same reason: the fact is complete the moment the run
+ * refused.
+ *
+ * The refusal code travels with the finding, because "there was nobody to ask"
+ * and "a person was asked and said no" call for different next moves.
+ */
+export function awaitingVouch(tasks, history, { archived }) {
+  const closed = new Set(archived || []);
+  const found = [];
+  for (const t of tasks) {
+    if (closed.has(t.status)) continue;
+    for (const e of outstandingVouches(history[t.id] || [])) {
+      found.push({
+        task: t.id, title: t.title, status: t.status, owner: t.owner || "",
+        refusal: e.refusal || "", actor: e.actor || "", since: day(e.ts), manual: e.to || "",
+      });
+    }
+  }
+  return { found, reason: null };
+}
+
 /** Every detector, over one read. PURE. */
 export function auditBacklog({ tasks, history, config, since, today }) {
   const archived = config.archivedStatuses || [];
@@ -280,8 +312,10 @@ export function auditBacklog({ tasks, history, config, since, today }) {
     inProgressStatus: config.inProgressStatus, staleDays: config.auditStaleDays, today,
   });
   const premise = withoutPremise(tasks, { reasonRequired: config.reasonRequiredStatuses, archived });
+  const vouch = awaitingVouch(tasks, history, { archived });
 
-  const findings = trace.found.length + reopen.found.length + stale.found.length + premise.found.length;
+  const findings = trace.found.length + reopen.found.length + stale.found.length +
+    premise.found.length + vouch.found.length;
   return {
     since: from,
     dayZero,
@@ -291,6 +325,7 @@ export function auditBacklog({ tasks, history, config, since, today }) {
     reopened: { found: reopen.found, rework: reworkRates(reopen.byActor, config.minReportN) },
     parked: stale,
     withoutPremise: premise,
+    awaitingVouch: vouch,
   };
 }
 
@@ -342,6 +377,11 @@ export function render(report, config) {
     report.withoutPremise.found.map((f) => [f.task, f.status, f.title]),
     report.withoutPremise.reason || "a status that may not be entered without saying why, and an empty `blocked_by`");
 
+  section(out,
+    "awaiting a vouch",
+    report.awaitingVouch.found.map((f) => [f.task, f.refusal || "—", "since " + f.since, f.manual]),
+    "a closing run stopped at a `manual:` entry; the automatic ones passed and nobody has vouched for this");
+
   out.push("");
   out.push(report.findings
     ? "  " + color.warn(MARK.warn) + " " + report.findings + " finding(s). This is a REPORT: nothing was changed, and nothing failed."
@@ -389,6 +429,7 @@ export function main(argv, today = new Date().toISOString().slice(0, 10)) {
       rework: report.reopened.rework,
       parked: report.parked.found,
       withoutPremise: report.withoutPremise.found,
+      awaitingVouch: report.awaitingVouch.found,
     });
     return report.findings ? 1 : 0;
   }

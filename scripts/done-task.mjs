@@ -42,7 +42,7 @@ import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { applyProofs, auditTask, parseCriteria, parseVerification } from "./criteria.mjs";
 import { buildFieldSpecs, extractMeta, fieldSpec, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
-import { ACTOR_NAMESPACES, appendEntries, currentSession, eventId, FIELD_VERIFIED, isValidActor, isValidReason, REASON_PROVEN, recordEdit, requiresReason } from "./history.mjs";
+import { ACTOR_NAMESPACES, appendEntries, currentSession, eventId, FIELD_UNVERIFIED, FIELD_VERIFIED, isValidActor, isValidReason, REASON_PROVEN, recordEdit, requiresReason } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { releaseLock } from "./lock.mjs";
 import { MARK, color, errColor, failure } from "./ui.mjs";
@@ -498,6 +498,8 @@ function run(argv) {
         // JSON besides. `--json` has to say so rather than produce broken output.
         stop = {
           kind: "manual-needs-person",
+          refusal: "json",
+          manual: e.manual,
           headline: plan.id + ": `--json` cannot ask a person to vouch for a `manual:` entry",
           details: [
             "  " + e.manual,
@@ -514,6 +516,8 @@ function run(argv) {
         confirmed = answer === CONFIRM_WORD;
         if (answer === null) {
           stop = {
+            refusal: "no-terminal",
+            manual: e.manual,
             headline: plan.id + ": a `manual:` entry needs a person, and there is no terminal here",
             details: [
               "Nothing was changed. Two ways on:",
@@ -526,7 +530,12 @@ function run(argv) {
         }
       }
       if (!confirmed) {
-        stop = { headline: plan.id + ": not vouched for — the task file was not touched", details: [] };
+        stop = {
+          refusal: "declined",
+          manual: e.manual,
+          headline: plan.id + ": not vouched for — the task file was not touched",
+          details: [],
+        };
         return { ok: false, vouchedBy: actor };
       }
       log(plan.json, "  " + OKM + " vouched for by " + actor);
@@ -534,6 +543,40 @@ function run(argv) {
       return { ok: true, vouchedBy: actor };
     },
   });
+
+  // THE REFUSAL LEAVES A TRACE (TL-170). Everything below this point used to
+  // return without a single write, and two of the messages say so out loud —
+  // which made the promise true about the task FILE and false about the fact:
+  // "every automatic entry passed, one human vouch is missing" existed only in
+  // the terminal that printed it and died with that session. What the next
+  // reader found instead was a task in progress, indistinguishable from one
+  // somebody walked away from.
+  //
+  // The task file is still not touched. The reason travels with a write to the
+  // LOG, which is where this project says a reason travels.
+  //
+  // NOT UNDER `--dry-run`. That flag promises the whole contract runs and
+  // nothing changes, and a history entry is a change. A rehearsal that annotated
+  // the task would make the honest move — checking yourself before announcing
+  // you are finished — the one that leaves marks.
+  if (stop && !plan.dryRun) {
+    const ran = results.filter((r) => r.kind === "bash");
+    const notRun = entries.length - results.length;
+    const ts = new Date().toISOString();
+    appendEntries(root, before.id, [{
+      id: eventId(ts), ts, task: before.id, field: FIELD_UNVERIFIED,
+      from: "", to: stop.manual || "", actor, source: "done",
+      refusal: stop.refusal,
+      // Counted, not asserted: a `manual:` entry can stand anywhere in a
+      // contract, so "everything else passed" is only true when nothing was
+      // left unrun. Saying it unconditionally would be the same class of claim
+      // this whole gate exists to refuse.
+      reason: "stopped at a `manual:` entry (" + stop.refusal + "); " +
+        ran.length + " automatic entr" + (ran.length === 1 ? "y" : "ies") + " passed" +
+        (notRun > 0 ? ", " + notRun + " not run" : ", none left to run"),
+      session: currentSession(root),
+    }]);
+  }
 
   if (stop && stop.refuse) return refuse(plan, stop.headline, stop.details, results, stop.kind);
   if (stop) {
