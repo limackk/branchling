@@ -65,6 +65,15 @@ content barely changes, a task's state changes constantly.** Today both live
 in the same file, on the same branch, under the same merge mechanism — the
 architecture does not reflect a boundary that genuinely exists.
 
+**Two limits of this number, because everything below leans on it.** The
+filter is `--diff-filter=M`, so **creation is excluded by construction** — the
+one act that writes a whole task body at once contributes nothing to the 9%.
+And it was taken from a backlog worked by one person and their agents, where
+the author of a task is almost always the person who then does it. Neither
+limit makes the number wrong; both mean it describes THIS population, and a
+team whose normal flow is one person writing a task for another has not been
+measured at all. §9 assumption 4.
+
 ## 3. What we already have (and did not know we had)
 
 [TL-17](../backlog/tasks/TL-17-historia-zmian-pol-taska-z-autorem.md)
@@ -100,6 +109,11 @@ Today, however:
 > **Content in git. State in an append-only event log, which IS the source
 > of truth for state. SQLite as a local, rebuildable index — never as SSOT.
 > Hosting = the same log + auth + roles.**
+>
+> **"Content in git" states where content lives in the LOCAL mode.** In the
+> hosted mode the server holds it and the repository is a replica — §6 says
+> so in the table, and §4.4 says why that is the same decision at a
+> different scale rather than a second answer to one question.
 
 ### 4.1. Why not "just SQLite"
 
@@ -125,6 +139,36 @@ of the traffic**. A bad trade.
 The open-source tool has to work after `git clone`, without an account and
 without a token. An external service breaks mode 1, which is the core of the
 project.
+
+### 4.4. Why the hosted mode moves content to the server
+
+This is the sentence that used to be missing, and its absence read as a
+contradiction: §4 said content lives in git, the §6 table said the hosted
+mode's source of truth for content is the server. Both are true, of different
+modes, and the reason is forced rather than chosen.
+
+**A person without a repository cannot write content into git first.** §5.2
+names the two roles the hosted mode exists for — analyst and support — and
+what they do is read, *found new tasks*, comment, and change status. Founding
+a task is authoring content. So either those roles cannot create a task, which
+removes the reason for hosting them at all, or the server accepts content
+directly. There is no third option that keeps `git clone` as the only write
+path.
+
+**This is not what §4.2 rejected.** §4.2 rejected moving the task INTO a
+database, in place of files. Here the files stay and so does everything that
+was defended with them: the repository remains a full replica, a developer
+still edits `.md` in the tree, content still travels through a pull request,
+and the offline mode still works. What moves is only **who wins when the two
+diverge**, and §5.3 already answers that — the web writer carries a
+base-version hash and is refused with a 409, the git writer gets an ordinary
+file conflict.
+
+**What it costs, stated plainly:** in the hosted mode a task's body can change
+without a commit. That is a real loss against the local mode, where every
+change to content is in somebody's history. It buys the only thing that makes
+a team plausible — a task written by a person who will never clone the
+repository.
 
 ## 5. Data model
 
@@ -200,6 +244,27 @@ the SSOT and the decision in §4 has been broken.
 | Locks | within one machine (lockfile, TL-87) | **guaranteed** |
 | Access without a repo | none | **available** (analyst, support) |
 | Account | not needed | required |
+
+**Creating a task is the one action this table cuts through**, because it
+writes content and state in a single stroke. The rule that follows from the
+row above: in the hosted mode `new` is **server-first** — the task, body
+included, exists for everyone before it exists on any branch, and the file
+that later appears on a branch is the replica the table already calls it. A
+teammate therefore reads the body immediately, which is what a hand-off
+between two people requires; in the local mode the same creation reaches
+nobody until the branch is merged, and that is a difference between modes, not
+a defect in either.
+
+**Offline is the remainder, and it is shown, never guessed.** `new` with no
+server reachable writes locally and reconciles on the next sync, content
+settled by the base-version check of §5.3. Until that sync the creation exists
+as a `__created__` event with no body behind it on the server — which is also
+the shape of a task created on an unmerged branch in the local mode (§6.2).
+Both are displayed by naming the branch, the way TL-73 decided for state:
+divergence is SHOWN, not resolved. A task whose branch is abandoned keeps its
+creation event, because a creation did happen; the log is append-only and
+retracting it is a `__deleted__` written by whoever abandons the branch, never
+an edit to what is already recorded.
 
 ### 6.1. What the local version cannot give — and why that is a fair paid boundary
 
@@ -407,3 +472,11 @@ Things I did NOT measure, which would overturn part of the above:
    everyone on the team has the repo and syncs regularly. A team with one
    non-technical member breaks this assumption from day one — and then the
    server is needed earlier than §8 says.
+4. **Whether content really is 9% of the traffic for a TEAM.** §2.1 measured
+   modifications only (`--diff-filter=M`), so it excluded creation, and it
+   measured one person plus their agents. The team flow this document exists
+   to support — one person writing a task for another to pick up — is content
+   authored for somebody else, and it is absent from the sample. If content
+   turns out to dominate a team's traffic, §4.2's "a bad trade" is being
+   argued from the wrong population, and the balance between the modes in §6
+   shifts towards the server.

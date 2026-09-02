@@ -1,0 +1,3 @@
+{"id":"01M1GGG6WNXG4XSP9T5JT7TKPN","ts":"2026-09-02T07:31:56.437Z","task":"TL-145","field":"__created__","from":"","to":"A task created on another branch is invisible, not merely unlisted","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GGH5EGWW7NK6J08DFGYXNE","ts":"2026-09-02T07:32:27.728Z","task":"TL-145","field":"priority","from":"P1","to":"P2","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1GGH5EG6PPDF82KFDBT454D","ts":"2026-09-02T07:32:27.728Z","task":"TL-145","field":"blocked_by","from":[],"to":["TL-142"],"actor":"unknown","source":"external","reason":"unknown"}

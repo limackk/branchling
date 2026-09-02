@@ -6,16 +6,19 @@ labels: []
 board: main
 epic: ""
 priority: P3                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 estimate: 1d                       # 30m | 2h | 1d | 1w | 1mo
 created: 2026-09-02
 updated: 2026-09-02
 blocked_by: []
-blocks: []
+blocks: ["TL-145"]
 related_docs: ["docs/worktrail-state-and-sync.md"]
 verification:                      # HOW to check that the task is really done
-  - bash: "node --test scripts/tests/cross-branch-state.test.mjs"
+  - id: guards-green
+    bash: "node scripts/cli.mjs check"
+  - id: sections-read
+    manual: "Sections 4, 4.4, 6, 2.1 and 9 of docs/worktrail-state-and-sync.md were read end to end in ONE pass, and give a single answer to where content lives in each mode: 4 scoped to local and pointing onward, 4.4 stating why hosted is forced, 6 stating the server-first rule for `new` and the offline rule, 2.1 and 9 carrying the limit that creation was excluded from the measurement"
 ---
 
 ## Goal
@@ -85,22 +88,23 @@ data exists, because afterwards it is a migration of other people's history.
 3. Decide the orphan rule: a `__created__` whose file never lands. Options
    include leaving it (a creation did happen), and a `__deleted__` written by
    whoever abandons the branch. Do NOT let the log be rewritten.
-4. Extend `scripts/branch-scan.mjs` for existence, reusing the same branch
-   enumeration.
-5. Record the outcome in `docs/worktrail-state-and-sync.md` §6, which today
+4. Record the outcome in `docs/worktrail-state-and-sync.md` §6, which today
    states the opposite boundary.
+
+Deliberately NOT here: extending `scripts/branch-scan.mjs` so `query` reports a
+task that exists only on an unmerged branch. That is code against the rule this
+task writes, it is worth doing for the local mode alone, and it has its own
+positive control to earn — TL-145, which `blocks:` records. Keeping it here
+would have given one task two deliverables and one verification covering
+neither.
 
 ## Acceptance criteria
 
-- [ ] A task created on another branch and not merged is reported by `query`
-      with its branch named, and is NOT reported as an ordinary task of this
-      tree.
-- [ ] The scan enumerates branches through `scripts/branch-scan.mjs` — a grep
-      finds no second branch enumeration.
-- [ ] Positive control: a test in which the task is present on NO other branch
-      must show it absent, so the guard cannot pass on a zero sample.
-- [ ] `docs/worktrail-state-and-sync.md` §4 and §6 no longer contradict each
-      other on where content lives in hosted mode, and §6 states the
-      server-first rule for `new` and the offline rule.
-- [ ] §9 carries the measurement caveat: §2.1 excluded creation and was taken
-      from a single-person backlog.
+- [x] §4's headline scopes itself to the LOCAL mode and sends the reader on. [proof: sections-read]
+- [x] §4.4 states why hosted mode is FORCED to move content, and what that costs. [proof: sections-read]
+- [x] §4.4 separates that from what §4.2 rejected, so the two are not read as one. [proof: sections-read]
+- [x] §6 states the server-first rule for `new`. [proof: sections-read]
+- [x] The offline remainder is SHOWN by naming the branch, not resolved. [proof: sections-read]
+- [x] The orphan rule is written: retraction is a new event, never an edit to the log. [proof: sections-read]
+- [x] §2.1 and §9 both carry the limit that creation was excluded from the measurement. [proof: sections-read]
+- [x] The backlog guards pass with this change in the set. [proof: guards-green]
