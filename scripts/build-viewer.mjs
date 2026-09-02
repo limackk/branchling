@@ -3250,6 +3250,9 @@ const HISTORY_FIELD_LABELS = {
   __comment__: "comment",
   __decision__: "decision",
   __verified__: "manual verification vouched for",
+  // TL-130: somebody claiming a change the log had recorded as nobody's. The
+  // earlier row still says "unknown", and this one stands beside it.
+  __attributed__: "claimed as their own change",
   __role_override__: "taken outside its role",
   updated: "Updated",
   created: "Utworzony",

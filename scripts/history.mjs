@@ -32,7 +32,7 @@ import { randomBytes } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { ACTOR_UNKNOWN, FIELD_COMMENT, FIELD_CREATED, FIELD_DECISION, FIELD_DELETED, REASON_UNKNOWN, TRACKED_FIELDS, diffMeta, extractMeta, formatValue, hasStatedReason, normalizeActor as normalizeActorFn, normalizeReason, splitFrontmatter } from "./task-fields.mjs";
+import { ACTOR_UNKNOWN, FIELD_ATTRIBUTED, FIELD_COMMENT, FIELD_CREATED, FIELD_DECISION, FIELD_DELETED, REASON_UNKNOWN, TRACKED_FIELDS, diffMeta, extractMeta, formatValue, hasStatedReason, normalizeActor as normalizeActorFn, normalizeReason, splitFrontmatter } from "./task-fields.mjs";
 import { ANY_HISTORY_FILE, ANY_TASK_FILE, ANY_TASK_FILE_ID, ANY_TASK_ID, taskIdPatterns } from "./task-id.mjs";
 
 export const HISTORY_DIRNAME = "history";
@@ -43,7 +43,7 @@ export const MIGRATIONS_FILE = ".migrations.jsonl";
 // source, so the browser and node see the same list). Here only a re-export, so
 // that existing imports from history.mjs keep working.
 export { FIELD_CREATED, FIELD_DELETED, FIELD_BODY, FIELD_COMMENT, FIELD_VERIFIED, FIELD_ROLE_OVERRIDE,
-  FIELD_DECISION, openQuestions,
+  FIELD_DECISION, FIELD_ATTRIBUTED, openQuestions,
   PSEUDO_FIELDS, isPseudoField,
   ACTOR_NAMESPACES, ACTOR_UNKNOWN, actorParts, isValidActor, normalizeActor,
   REASON_UNKNOWN, REASON_PROVEN, REASON_SENTINELS, REASON_MAX_LENGTH, hasStatedReason, isValidReason,
@@ -668,4 +668,93 @@ export function reconcile(backlogDir, opts = {}) {
   for (const e of entries) appendEntries(backlogDir, e.task, [e]);
   saveSnapshot(backlogDir, snap);
   return { entries, seeded: seeding };
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Claiming a change the log recorded as nobody's (TL-130)
+// ──────────────────────────────────────────────────────────────────────────
+//
+// THE DEFECT. The viewer's server reconciles the tree on a timer, so a change
+// made by hand while it is running is recorded before the session that made it
+// can say so — as `actor: unknown`, `source: external`, `reason: unknown`.
+// Reconcile then updates the snapshot, so the documented path (`history --actor
+// <ns:name> --source manual --reason "…"`) finds no DIFFERENCE and prints "no
+// changes to record". It looks like it worked. Measured on 2026-09-01 against
+// TL-99 and TL-100.
+//
+// WHY NOT A LONGER GRACE WINDOW. `RECONCILE_DELAY_MS` already is one, and it
+// works for a hook that writes in milliseconds. Widening it is still a bet on
+// timing: a person who edits a file and attributes the change a minute later
+// loses whatever the number is. A rule that holds regardless of when the two
+// writers happen to run is worth more than a bigger number.
+//
+// WHY NOT MAKE RECONCILE READ-ONLY. Then a change nobody ever claims never
+// reaches the log at all, and the mechanism's whole point — that a change leaves
+// a trace even when its author says nothing — would be traded away to fix the
+// case where the author DOES say something.
+//
+// SO: THE ENTRY STAYS AND IS CLAIMED BESIDE IT. The log remains append-only, no
+// timing is assumed, and the original entry keeps saying `unknown` — which was
+// true when it was written.
+
+/** Whether this entry is one nobody has claimed: the tool wrote it because it
+ *  saw a change, not because anybody said they made it. */
+export function isUnattributed(e) {
+  return !!e && normalizeActorFn(e.actor) === ACTOR_UNKNOWN && !hasStatedReason(e);
+}
+
+/**
+ * The recorded changes that nobody has claimed, per task.
+ *
+ * A change already claimed by an `__attributed__` entry is not offered again —
+ * two people claiming one change is a conversation the log cannot represent, and
+ * the FIRST claim is the one that was made in good faith.
+ *
+ * @param {string} backlogDir
+ * @param {{only?: string[]}} opts  restrict to these task ids
+ * @returns {Array<{task: string, entry: object}>} oldest first
+ */
+export function unattributedChanges(backlogDir, opts = {}) {
+  const only = opts.only && opts.only.length ? new Set(opts.only) : null;
+  const all = readAllHistory(backlogDir);
+  const out = [];
+  for (const task of Object.keys(all).sort()) {
+    if (only && !only.has(task)) continue;
+    const entries = all[task] || [];
+    const claimed = new Set(
+      entries.filter((e) => e.field === FIELD_ATTRIBUTED && e.attributes).map((e) => e.attributes)
+    );
+    for (const e of entries) {
+      // An `__attributed__` entry is itself always attributed — it exists
+      // because somebody spoke. Offering it back would let a claim be claimed.
+      if (e.field === FIELD_ATTRIBUTED) continue;
+      if (!isUnattributed(e)) continue;
+      if (e.id && claimed.has(e.id)) continue;
+      out.push({ task, entry: e });
+    }
+  }
+  return out.sort((a, b) => String(a.entry.ts).localeCompare(String(b.entry.ts)));
+}
+
+/**
+ * Claim them: one `__attributed__` entry per change, appended.
+ *
+ * @param {string} backlogDir
+ * @param {Array<{task: string, entry: object}>} changes  from `unattributedChanges`
+ * @param {{actor: string, reason: string, source?: string, ts?: string}} by
+ * @returns {Array<object>} the entries written
+ */
+export function attributeChanges(backlogDir, changes, by) {
+  const ts = by.ts || new Date().toISOString();
+  const written = [];
+  for (const { task, entry: target } of changes) {
+    // `to` is the FIELD that was changed, so the row reads as a sentence
+    // without following the link; `attributes` is the link, and it is what a
+    // second claim of the same change is refused by.
+    const e = entry(task, FIELD_ATTRIBUTED, "", target.field, by.actor, by.source || "manual", ts, by.reason);
+    e.attributes = target.id || null;
+    appendEntries(backlogDir, task, [e]);
+    written.push(e);
+  }
+  return written;
 }

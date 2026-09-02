@@ -25,7 +25,7 @@
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { ACTOR_NAMESPACES, REASON_SENTINELS, isValidActor, isValidReason, reconcile, taskIdFromFile } from "./history.mjs";
+import { ACTOR_NAMESPACES, REASON_SENTINELS, attributeChanges, isValidActor, isValidReason, reconcile, taskIdFromFile, unattributedChanges } from "./history.mjs";
 import { resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 
@@ -47,7 +47,7 @@ const arg = (name, fallback) => {
 // appended history entries in a real session. It is the same class of defect
 // BL-1411 fixed in the server: a silent no-op with a side effect is worse than an
 // error, because it looks like the tool working.
-const KNOWN_FLAGS = ["--file", "--actor", "--source", "--quiet", "--reason"];
+const KNOWN_FLAGS = ["--file", "--actor", "--source", "--quiet", "--reason", "--attribute"];
 const FLAGS_WITH_VALUE = ["--file", "--actor", "--source", "--reason"];
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
@@ -109,13 +109,32 @@ if (file) {
   only = [id];
 }
 
+const attribute = argv.includes("--attribute");
+if (attribute && !reasonFlag) {
+  console.error(
+    `${N} history: \`--attribute\` needs \`--reason "…"\`.\n` +
+      "  Claiming a change the log recorded as nobody's IS the statement of a reason;\n" +
+      "  without one the claim would replace `unknown` with a name and nothing else."
+  );
+  process.exit(2);
+}
+
 const { entries, seeded } = reconcile(BACKLOG_DIR, { actor, source, only, reason: reasonFlag || undefined });
+
+// WHAT RECONCILE COULD NOT SEE (TL-130). A change already written by somebody
+// else's reconcile — the running server's, typically — is no longer a DIFFERENCE
+// in the tree, so the run above finds nothing and used to say "no changes to
+// record". It is not nothing: it is a change standing in the log with no author.
+const unclaimed = seeded ? [] : unattributedChanges(BACKLOG_DIR, { only });
+const claimed = attribute && unclaimed.length
+  ? attributeChanges(BACKLOG_DIR, unclaimed, { actor, reason: reasonFlag, source })
+  : [];
 
 if (quiet) process.exit(0);
 if (seeded) {
   console.log(`${N} history: reference point (snapshot) created — no history entries written`);
 } else if (!entries.length) {
-  console.log(`${N} history: no changes to record`);
+  if (!unclaimed.length) console.log(`${N} history: no changes to record`);
 } else {
   console.log(`${N} history: recorded ` + entries.length + " change(s) (" + actor + "):");
   for (const e of entries.slice(0, 20)) {
@@ -123,4 +142,27 @@ if (seeded) {
     console.log("  " + e.task + " · " + e.field + ": " + fmt(e.from) + " → " + fmt(e.to));
   }
   if (entries.length > 20) console.log("  … and " + (entries.length - 20) + " more");
+}
+
+if (claimed.length) {
+  console.log(`${N} history: claimed ` + claimed.length + " recorded change(s) for " + actor + ":");
+  for (const c of claimed.slice(0, 20)) console.log("  " + c.task + " · " + c.to);
+  if (claimed.length > 20) console.log("  … and " + (claimed.length - 20) + " more");
+  console.log("  the original entries still say `unknown` — this log is append-only, so a");
+  console.log("  claim stands BESIDE the change rather than rewriting it.");
+} else if (unclaimed.length) {
+  // NEVER "no changes to record" while this is true. That sentence is what made
+  // the defect invisible: it reads as "everything is recorded", and what was
+  // actually true was "everything is recorded as nobody's".
+  console.log(
+    `${N} history: ` + unclaimed.length + " recorded change(s) carry no author — somebody else's " +
+      "reconcile\n  (a running `" + N + " serve`, a `git pull`) got to them first:"
+  );
+  for (const u of unclaimed.slice(0, 20)) {
+    console.log("  " + u.task + " · " + u.entry.field + " · " + String(u.entry.ts).slice(0, 19));
+  }
+  if (unclaimed.length > 20) console.log("  … and " + (unclaimed.length - 20) + " more");
+  console.log("  If they are yours, say so:");
+  console.log("    " + N + ' history --attribute --actor ' + actor + ' --reason "…"');
+  console.log("  The tool cannot work out whose they are, and guessing would invent attribution.");
 }

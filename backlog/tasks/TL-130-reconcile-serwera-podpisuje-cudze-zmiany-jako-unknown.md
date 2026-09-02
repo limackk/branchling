@@ -6,12 +6,12 @@ labels: []
 board: main
 epic: "History and attribution"
 priority: P2
-status: pending
-owner: unassigned
+status: done
+owner: agent:claude
 estimate: 4h
 confidence: medium
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-02
 blocked_by: []
 blocks: []
 related_docs:
@@ -87,12 +87,12 @@ this separate task exists for):
 
 ## Acceptance criteria
 
-- [ ] Positive control: a test reproduces the race — a change in the file,
+- [x] Positive control: a test reproduces the race — a change in the file,
       "server" reconcile, then `history --actor … --reason …` — and today it
       FAILS. [proof: attribution-race]
-- [ ] After the fix, the author and reason given by the session are in the
+- [x] After the fix, the author and reason given by the session are in the
       history, not `unknown/unknown`. [proof: attribution-race]
-- [ ] The log stays append-only: no existing entry is rewritten or removed.
+- [x] The log stays append-only: no existing entry is rewritten or removed.
       [proof: attribution-race]
-- [ ] `worktrail history` does not say "no changes to record" in a situation
+- [x] `worktrail history` does not say "no changes to record" in a situation
       where a change exists but only lacks attribution. [proof: attribution-race]

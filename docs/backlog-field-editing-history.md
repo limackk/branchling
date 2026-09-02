@@ -191,6 +191,37 @@ The 2.5 s delay exists so the agent's hook has time to write its entry
 Ordering, not guessing: "if it wasn't the viewer, it was probably the agent"
 would produce entries signed by someone who didn't make them.
 
+#### 3.3.1 Claiming a change afterwards (TL-130)
+
+**The delay is a bet on timing, and a person loses it.** It works for a hook,
+which writes in milliseconds. It does not work for somebody who edits a file
+and attributes the change a minute later: by then the server's reconciliation
+has written the change as `unknown` *and updated the snapshot*, so `worktrail
+history --actor … --reason "…"` finds no difference left and answers `no
+changes to record`. Measured on 2026-09-01 against TL-99 and TL-100. That
+sentence reads as "everything is recorded" while the truth is "everything is
+recorded as nobody's", and the author is then gone for good — the log is
+append-only and is never rewritten.
+
+Widening the window would still be a bet, only a bigger one. Making
+reconciliation read-only would trade away the property that a change leaves a
+trace even when nobody speaks for it. So the entry stays and is **claimed
+beside it**: `worktrail history --attribute --actor <ns:name> --reason "…"`
+appends an `__attributed__` event carrying the id of the change it claims.
+
+Three properties this keeps that a correction would not:
+
+- the log stays append-only, so nothing already read can change under a reader;
+- the original entry goes on saying `unknown`, which was **true** when it was
+  written — a claim is a later fact, not a repair of an earlier one;
+- the claim carries its own author, timestamp and reason, so it is evidence of
+  the same kind as everything else here.
+
+A change is claimable **once**: two people claiming one change is a
+conversation this log cannot represent, and the first claim was the one made in
+good faith. Nothing is claimed automatically — reconciliation writes `unknown`
+because it genuinely does not know, and only the caller does.
+
 ---
 
 ## 4. What this mechanism does NOT guarantee

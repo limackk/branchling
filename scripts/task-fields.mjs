@@ -229,7 +229,22 @@ export const FIELD_ROLE_OVERRIDE = "__role_override__";
 // over `actor` instead of a second schema that has to be kept in step.
 export const FIELD_DECISION = "__decision__";
 
-export const PSEUDO_FIELDS = [FIELD_CREATED, FIELD_DELETED, FIELD_BODY, FIELD_COMMENT, FIELD_VERIFIED, FIELD_ROLE_OVERRIDE, FIELD_DECISION];
+// Somebody claiming a change the log recorded as nobody's (TL-130). `to` is the
+// field of the entry being claimed, and `attributes` carries that entry's id.
+//
+// WHY AN ENTRY RATHER THAN A CORRECTION. The log is append-only, and that is not
+// a convenience: an `actor` that could be rewritten afterwards is an `actor`
+// nobody can rely on, which is the one property the whole history exists for. So
+// the earlier entry keeps saying `unknown` — truthfully, because at the moment it
+// was written nobody knew — and the claim stands beside it as a second fact with
+// its own author, its own timestamp and its own reason.
+//
+// WHY IT CANNOT BE INFERRED. Reconcile writes `unknown` because it genuinely
+// does not know; only the caller does. A tool that guessed would be inventing
+// attribution, which is worse than the gap it fills.
+export const FIELD_ATTRIBUTED = "__attributed__";
+
+export const PSEUDO_FIELDS = [FIELD_CREATED, FIELD_DELETED, FIELD_BODY, FIELD_COMMENT, FIELD_VERIFIED, FIELD_ROLE_OVERRIDE, FIELD_DECISION, FIELD_ATTRIBUTED];
 
 export function isPseudoField(key) {
   return PSEUDO_FIELDS.indexOf(key) !== -1;

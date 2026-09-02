@@ -32,7 +32,11 @@ import {
   actorParts,
   FIELD_BODY,
   FIELD_COMMENT,
+  FIELD_ATTRIBUTED,
   PSEUDO_FIELDS,
+  attributeChanges,
+  isUnattributed,
+  unattributedChanges,
 } from "../history.mjs";
 import { diffMeta } from "../task-fields.mjs";
 
@@ -507,3 +511,152 @@ test("CLI: a valid actor passes and is reported in line with what was written", 
   rmSync(dir, { recursive: true, force: true });
 });
 
+
+// ── A change the log recorded as nobody's (TL-130) ────────────────────────
+//
+// THE RACE, measured on 2026-09-01. A session edits a task by hand and then
+// follows the documented path — `history --actor <ns:name> --source manual
+// --reason "…"`. Meanwhile a running `worktrail serve` reconciles on its timer,
+// writes the change as `unknown/external/unknown`, and updates the snapshot. The
+// session's command then finds no DIFFERENCE and answers "no changes to record":
+// it looks like it worked, and the author is gone for good, because the log is
+// append-only and is never rewritten.
+//
+// The two halves that have to be proved separately: that the situation is
+// RECOGNISED (a change with no author is not "no changes"), and that a claim
+// LANDS without touching what is already written.
+
+/** What the server's reconcile does: record the difference as nobody's. */
+function serverReconcile(dir) {
+  return reconcile(dir, { actor: "unknown", source: "external" });
+}
+
+test("REPRODUCES the race: the server's reconcile leaves the change with no author", () => {
+  const dir = cliSandbox();
+  const file = join(dir, "tasks", "BL-900-zrob-rzecz.md");
+  runRecorder(dir, file, []);                       // the reference point
+  writeFileSync(file, taskFile({ status: "done" }), "utf8");
+
+  serverReconcile(dir);                             // the server gets there first
+
+  const entries = readHistory(dir, "BL-900");
+  const status = entries.filter((e) => e.field === "status");
+  assert.equal(status.length, 1);
+  assert.equal(status[0].actor, "unknown");
+  assert.equal(status[0].source, "external");
+  assert.ok(isUnattributed(status[0]));
+
+  // And the session's own command finds nothing left to diff — this is the
+  // step that used to end the story.
+  const { entries: mine } = reconcile(dir, { actor: "local:me", source: "manual", reason: "I made this change" });
+  assert.deepEqual(mine, [], "the snapshot has moved on; there is no difference left to see");
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("the unclaimed change is FOUND rather than reported as nothing", () => {
+  const dir = cliSandbox();
+  const file = join(dir, "tasks", "BL-900-zrob-rzecz.md");
+  runRecorder(dir, file, []);
+  writeFileSync(file, taskFile({ status: "done" }), "utf8");
+  serverReconcile(dir);
+
+  const unclaimed = unattributedChanges(dir);
+  assert.equal(unclaimed.length, 1);
+  assert.equal(unclaimed[0].task, "BL-900");
+  assert.equal(unclaimed[0].entry.field, "status");
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("a claim lands BESIDE the change and rewrites nothing", () => {
+  const dir = cliSandbox();
+  const file = join(dir, "tasks", "BL-900-zrob-rzecz.md");
+  runRecorder(dir, file, []);
+  writeFileSync(file, taskFile({ status: "done" }), "utf8");
+  serverReconcile(dir);
+
+  const before = readHistory(dir, "BL-900").map((e) => JSON.stringify(e));
+  const written = attributeChanges(dir, unattributedChanges(dir), {
+    actor: "local:me", reason: "I edited it by hand while the server was up", source: "manual",
+  });
+  assert.equal(written.length, 1);
+
+  const after = readHistory(dir, "BL-900");
+  // APPEND-ONLY: every earlier line is byte-identical, and there is exactly one
+  // more. An `actor` that could be rewritten afterwards is one nobody can rely on.
+  assert.deepEqual(after.slice(0, before.length).map((e) => JSON.stringify(e)), before);
+  assert.equal(after.length, before.length + 1);
+
+  const claim = after[after.length - 1];
+  assert.equal(claim.field, FIELD_ATTRIBUTED);
+  assert.equal(claim.actor, "local:me");
+  assert.equal(claim.reason, "I edited it by hand while the server was up");
+  assert.equal(claim.to, "status", "the row has to read as a sentence without following the link");
+  assert.equal(claim.attributes, after.find((e) => e.field === "status").id);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("a change is claimed ONCE — a second run offers nothing", () => {
+  const dir = cliSandbox();
+  const file = join(dir, "tasks", "BL-900-zrob-rzecz.md");
+  runRecorder(dir, file, []);
+  writeFileSync(file, taskFile({ status: "done" }), "utf8");
+  serverReconcile(dir);
+
+  attributeChanges(dir, unattributedChanges(dir), { actor: "local:me", reason: "mine" });
+  assert.deepEqual(unattributedChanges(dir), [],
+    "two people claiming one change is a conversation the log cannot represent");
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("a change that already has an author is never offered for claiming", () => {
+  const dir = cliSandbox();
+  const file = join(dir, "tasks", "BL-900-zrob-rzecz.md");
+  runRecorder(dir, file, []);
+  writeFileSync(file, taskFile({ status: "done" }), "utf8");
+  // The ordinary path, with nobody racing it.
+  reconcile(dir, { actor: "local:me", source: "manual", reason: "an ordinary hand edit" });
+  assert.deepEqual(unattributedChanges(dir), []);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("CLI: it does NOT say `no changes to record` when a change has no author", () => {
+  const dir = cliSandbox();
+  const file = join(dir, "tasks", "BL-900-zrob-rzecz.md");
+  runRecorder(dir, file, []);
+  writeFileSync(file, taskFile({ status: "done" }), "utf8");
+  serverReconcile(dir);
+
+  const r = runRecorder(dir, file, ["--actor", "local:me", "--source", "manual", "--reason", "mine"]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(!/no changes to record/.test(r.stdout),
+    "that sentence reads as `all recorded` while the truth is `recorded as nobody's`");
+  assert.match(r.stdout, /carry no author/);
+  assert.match(r.stdout, /--attribute/, "and it has to say what to do about it");
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("CLI: --attribute claims it, and reports what it claimed", () => {
+  const dir = cliSandbox();
+  const file = join(dir, "tasks", "BL-900-zrob-rzecz.md");
+  runRecorder(dir, file, []);
+  writeFileSync(file, taskFile({ status: "done" }), "utf8");
+  serverReconcile(dir);
+
+  const r = runRecorder(dir, file, [
+    "--attribute", "--actor", "local:me", "--source", "manual", "--reason", "I made this change",
+  ]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /claimed 1 recorded change/);
+  const claim = readHistory(dir, "BL-900").find((e) => e.field === FIELD_ATTRIBUTED);
+  assert.equal(claim.actor, "local:me");
+  assert.equal(claim.reason, "I made this change");
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("CLI: --attribute without a reason is REFUSED", () => {
+  const dir = cliSandbox();
+  const r = runRecorder(dir, join(dir, "tasks", "BL-900-zrob-rzecz.md"), ["--attribute", "--actor", "local:me"]);
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /needs `--reason/);
+  rmSync(dir, { recursive: true, force: true });
+});
