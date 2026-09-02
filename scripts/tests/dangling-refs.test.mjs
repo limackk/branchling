@@ -238,7 +238,7 @@ test("POSITIVE CONTROL: the same path, spelled right, passes and is COUNTED", ()
     (dir) => {
       const r = run(["--dir", dir]);
       assert.equal(r.code, 0, r.out);
-      const m = r.out.match(/(\d+) task file path\(s\) written in prose/);
+      const m = r.out.match(/(\d+) path\(s\) to a task file written in prose/);
       assert.ok(m && Number(m[1]) === 1, "the path was not checked at all: " + r.out);
     },
   );
@@ -264,7 +264,7 @@ test("a filename NOT written as a path is data about a name, not a pointer", () 
 test("the real tree of THIS repository has no path leading nowhere, on a non-zero sample", () => {
   const r = run(["--dir", join(TASKS_DIR, "..")]);
   assert.equal(r.code, 0, r.out);
-  const m = r.out.match(/(\d+) task file path\(s\) written in prose/);
+  const m = r.out.match(/(\d+) path\(s\) to a task file written in prose/);
   assert.ok(m && Number(m[1]) > 0, "zero paths checked — green with no evidential force: " + r.out);
 });
 

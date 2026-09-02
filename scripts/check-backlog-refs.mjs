@@ -271,7 +271,7 @@ function main(argv) {
       `${OKM} backlog: ${checked} blocked_by/blocks references across ${taskCount} tasks all point at tasks that exist`
     );
     console.log(
-      `${OKM} backlog: ${pathsChecked} task file path(s) written in prose, each one leading to a file that exists`
+      `${OKM} backlog: ${pathsChecked} path(s) to a task file written in prose, each one leading to a file that exists`
     );
     for (const line of staleLines) console.log(line);
     return 0;
