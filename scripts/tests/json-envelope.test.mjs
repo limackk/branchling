@@ -265,6 +265,71 @@ test("the manual documents every kind the code can emit", () => {
   }
 });
 
+/**
+ * The keys the manual's table promises for one kind. PURE (TL-155).
+ *
+ * IT READS THE ROW, NOT THE SECTION, and that is the whole difficulty. Half the
+ * key names are ordinary words — `ok`, `id`, `root`, `text` — which occur all
+ * over the surrounding prose, so "the section mentions it" is satisfied by a
+ * table that says nothing. The row for a kind is the only place the promise is
+ * actually made.
+ *
+ * EVERY BACKTICKED IDENTIFIER IN THE ROW IS A KEY, which is a rule about how the
+ * table is written and not only about how it is read: a flag (`--limit`) and a
+ * field name with a colon (`verification:`) are not identifiers and fall out on
+ * their own, but a word like `next` or `from` used as prose has to lose its
+ * backticks. That cost is worth paying — the alternative is a checker that
+ * guesses which backticks were meant, and it would guess wrong silently.
+ */
+export function keysInManualRow(section, kind) {
+  const row = section.split("\n").find((l) => l.startsWith("|") && l.includes("| `" + kind + "` |"));
+  if (!row) return null;
+  // Columns are: command | kind | keys. The rest is joined back because the key
+  // cell is prose and may itself contain a pipe one day.
+  const cell = row.split("|").slice(3).join("|");
+  return new Set([...cell.matchAll(/`([A-Za-z_][A-Za-z0-9_]*)`/g)].map((m) => m[1]));
+}
+
+test("the manual's key list matches KINDS, in BOTH directions", () => {
+  // A key in the code and not in the row is an undocumented promise; a key in
+  // the row and not in the code is a promise the tool does not keep. Neither is
+  // detectable by hand, because the table is long and the code is elsewhere.
+  const manual = readFileSync(join(REPO_ROOT, "docs", "manual.md"), "utf8");
+  const section = manual.slice(manual.indexOf("## The `--json` contract"));
+  const problems = [];
+  for (const kind of Object.keys(KINDS)) {
+    const listed = keysInManualRow(section, kind);
+    if (!listed) { problems.push(kind + ": no row in the table"); continue; }
+    for (const key of Object.keys(KINDS[kind])) {
+      if (!listed.has(key)) problems.push(kind + ": the manual does not list `" + key + "`");
+    }
+    for (const key of listed) {
+      if (!(key in KINDS[kind])) problems.push(kind + ": the manual lists `" + key + "`, which nothing emits");
+    }
+  }
+  assert.deepEqual(problems, []);
+});
+
+test("POSITIVE CONTROL: one misspelled key in the table is caught, twice over", () => {
+  // Without this the check above passes just as well against a row parser that
+  // returns nothing — every "the document mentions it" test's failure mode. The
+  // manual is not touched: the row is misspelled in a COPY of the text.
+  const manual = readFileSync(join(REPO_ROOT, "docs", "manual.md"), "utf8");
+  const section = manual.slice(manual.indexOf("## The `--json` contract"));
+  const [kind] = Object.keys(KINDS);
+  const [key] = Object.keys(KINDS[kind]);
+  const broken = section.replace("`" + key + "`", "`" + key + "X`");
+  const listed = keysInManualRow(broken, kind);
+  assert.ok(!listed.has(key), "misspelling a key did not remove it from the row");
+  assert.ok(listed.has(key + "X"), "the parser ignored the row and answered from somewhere else");
+
+  // And the words that are NOT keys stay out: the row for `task-take` carries
+  // the command name `next` in prose, and the parser must not read it as a key.
+  const takeRow = keysInManualRow(section, "task-take");
+  assert.ok(takeRow.has("passedOver"), "the row parser found nothing at all");
+  assert.ok(!takeRow.has("next"), "a command name in the prose was read as a payload key");
+});
+
 // ── Every reading command, end to end ─────────────────────────────────────
 
 test("every command with a kind answers in the envelope — on an empty backlog and on a full one", () => {

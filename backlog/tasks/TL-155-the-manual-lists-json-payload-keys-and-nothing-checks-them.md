@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""
 priority: P2                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 estimate: 2h                       # 30m | 2h | 1d | 1w | 1mo
 created: 2026-09-02
 updated: 2026-09-02
@@ -75,9 +75,9 @@ emits is a promise the tool does not keep.
 
 ## Acceptance criteria
 
-- [ ] The test compares the table's keys with `KINDS` in BOTH directions. [proof: keys-checked]
-- [ ] A key misspelled in the table turns the suite red — the check is not satisfied by prose elsewhere in the section. [proof: positive-control]
-- [ ] `scan` on `task-list` and `scan`/`divergent` on `stats` are documented. [proof: keys-checked]
+- [x] The test compares the table's keys with `KINDS` in BOTH directions. [proof: keys-checked]
+- [x] A key misspelled in the table turns the suite red — the check is not satisfied by prose elsewhere in the section. [proof: positive-control]
+- [x] `scan` on `task-list` and `scan`/`divergent` on `stats` are documented. [proof: keys-checked]
 
 ## Notes
 

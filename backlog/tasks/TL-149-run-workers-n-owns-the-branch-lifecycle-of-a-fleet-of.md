@@ -6,7 +6,7 @@ labels: []
 board: main
 epic: ""
 priority: P2                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
+status: pending  # pending | in_progress | blocked | done | cancelled
 owner: unassigned
 estimate: 1w                       # 30m | 2h | 1d | 1w | 1mo
 created: 2026-09-02
