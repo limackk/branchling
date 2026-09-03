@@ -1,0 +1,2 @@
+{"id":"01M1MFSD1W486MMT6MS49P5TNN","ts":"2026-09-03T20:36:26.812Z","task":"TL-228","field":"__created__","from":"","to":"The prefix and renumber migrations write the snapshot outside the mutex","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1MFW1H7BDMHRBFVX273RQF2","ts":"2026-09-03T20:37:53.319Z","task":"TL-228","field":"__attributed__","from":"","to":"__created__","actor":"agent:dev","source":"hook","reason":"filed by the dev hand during the wave-6 pipeline","attributes":"01M1MFSD1W486MMT6MS49P5TNN"}
