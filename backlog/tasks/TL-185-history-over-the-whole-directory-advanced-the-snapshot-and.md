@@ -135,12 +135,20 @@ a task even when an entry WAS written for it — the log vouching for one field
 says nothing about the other sixteen, and naming only the tasks nothing was
 recorded for would imply the rest were fully accounted for.
 
-**The ten changes from 2026-09-03 stay unrecorded.** The snapshot has since
-absorbed them and the log has no `from` for them, so any entry written now would
-be invented. `--attribute` cannot help either: it stands beside an existing
-`unknown` entry, and these have no entry at all. The tree is otherwise healthy —
-191 of 194 tasks are in the snapshot, the three missing ones being today's, which
-have no history yet.
+**Nine of the ten changes from 2026-09-03 turned out to be recorded after
+all — in ANOTHER tree.** Found while merging: the MAIN checkout has a running
+`serve`, and its reconcile wrote all nine `executor` entries at 09:26, as
+`unknown`/`external`, into history files that are still uncommitted there. That
+does not soften the defect — this worktree's own run absorbed them and wrote
+nothing, which is what the fix addresses — but it changes what is left to do.
+Once those nine files are committed, `history --attribute` has an `unknown`
+entry to stand beside and the changes can be claimed.
+
+**TL-183's `priority` P2 → P1 is recorded nowhere and stays that way.** No tree
+caught it. The snapshot has absorbed it and the log has no `from` for it, so any
+entry written now would be invented; `--attribute` has nothing to stand beside.
+
+This tree is otherwise healthy: all 195 tasks are in the snapshot.
 
 **Not done:** `scripts/regen-hook.mjs` spawns `history-record.mjs` without
 `--dir` while it already knows the file's own root. That is TL-195, and it is a
