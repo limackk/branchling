@@ -15,8 +15,8 @@ updated: 2026-08-31
 blocked_by: [TL-51]
 blocks: []
 related_docs:
-  - .claude/skills/worktrail-cli/SKILL.md
-  - .claude/skills/worktrail-cli/references/output-style.md
+  - .claude/skills/branchling-cli/SKILL.md
+  - .claude/skills/branchling-cli/references/output-style.md
 verification:
   - bash: "node --test scripts/tests/ui.test.mjs"
   - bash: "grep -q $'\\033' scripts/ui.mjs || { echo 'positive control: ui.mjs has not a single sequence, so the test below would be green on an empty sample'; exit 1; }; test -z \"$(grep -rl $'\\033' scripts --include='*.mjs' | grep -v 'scripts/ui.mjs' | grep -v 'scripts/tests/')\" && echo 'control sequences only in ui.mjs — OK'"
@@ -62,7 +62,7 @@ cannot distinguish shades.
 information. Whatever color says, a word or a symbol must say too. The full
 contract — when coloring is allowed, six palette roles across 16 ANSI
 colors, symbols, the anatomy of an error, the layout of help — lives in
-`.claude/skills/worktrail-cli/references/output-style.md`, and this task
+`.claude/skills/branchling-cli/references/output-style.md`, and this task
 implements it rather than inventing it anew.
 
 **Order relative to
@@ -72,7 +72,7 @@ designing the layout of text that does not exist in eight commands.
 
 ## Pre-flight reading
 
-1. `.claude/skills/worktrail-cli/references/output-style.md` — the WHOLE
+1. `.claude/skills/branchling-cli/references/output-style.md` — the WHOLE
    thing; this task implements it.
 2. `scripts/stats-report.mjs` — today's formatting (`pad`, `line`), to be
    carried over.

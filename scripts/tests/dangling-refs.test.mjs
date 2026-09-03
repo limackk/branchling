@@ -63,7 +63,7 @@ function task(dir, id, { blocked_by = [], blocks = [], status = "pending" } = {}
 }
 
 function sandbox(build) {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-refs-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-refs-"));
   mkdirSync(join(dir, "tasks"));
   writeFileSync(join(dir, "_template.md"), "---\nid: BL-NNN\n---\n", "utf8");
   writeFileSync(join(dir, "boards.yaml"), 'default: main\nboards:\n  - slug: main\n    name: "Main"\n', "utf8");
@@ -161,7 +161,7 @@ test("an EMPTY tree does not fake success", () => {
 test("an entry in a format outside `BL-NNN` fails and SAYS where to record an external dependency", () => {
   // The fields accept only numbers from THIS backlog (`itemPattern` in
   // task-fields.mjs). A cross-repo dependency cannot be resolved — the tool does
-  // not know whether `worktrail#BL-1` is done — so it lives in prose, and the guard
+  // not know whether `branchling#BL-1` is done — so it lives in prose, and the guard
   // has to say so instead of staying silent.
   withSandbox(
     (d) => {
@@ -204,7 +204,7 @@ test("the real tree of THIS repository is clean — and on a non-zero sample", (
 //
 // A THIRD question of the same tree, and a different defect again: the fields
 // are correct, and a path in the body points at a filename that no longer
-// exists. It happened here — a product rename rewrote `worktrail` in PROSE
+// exists. It happened here — a product rename rewrote `branchling` in PROSE
 // while the slugs on disk kept the old word — and nothing saw it, because the
 // reference check reads ids and not paths.
 

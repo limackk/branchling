@@ -53,7 +53,7 @@ function freePort() {
 
 /** A real backlog on disk, created by the tool itself, named as we ask. */
 function makeBacklog(projectName) {
-  const dir = realpathSync(mkdtempSync(join(tmpdir(), "worktrail-identity-")));
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), "branchling-identity-")));
   const init = spawnSync(process.execPath, [CLI, "init", "--dir", dir], {
     encoding: "utf8",
     timeout: 30_000,
@@ -238,7 +238,7 @@ test("the same backlog reached through a symlink is the SAME backlog", async () 
   // A worktree behind a symlink compared as a raw string reads as a stranger,
   // and the tool would start a second writer over one directory.
   const dir = makeBacklog("Linked Project");
-  const link = join(mkdtempSync(join(tmpdir(), "worktrail-link-")), "backlog");
+  const link = join(mkdtempSync(join(tmpdir(), "branchling-link-")), "backlog");
   symlinkSync(dir, link);
   const port = await freePort();
   let server = null;

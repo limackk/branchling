@@ -16,7 +16,7 @@ blocked_by: [TL-87, TL-97]
 blocks: [TL-114]
 related_docs:
   - docs/backlog-field-editing-history.md
-  - docs/worktrail-state-and-sync.md
+  - docs/branchling-state-and-sync.md
 verification:
   - id: handoff
     bash: "node --test scripts/tests/handoff.test.mjs"
@@ -44,7 +44,7 @@ Emerged from the decision about subagent roles (2026-08-31). Handoff is a
 command composed from existing primitives: field change through
 `task-fields.mjs`, events through `history.mjs`, lock from TL-87. Only one
 thing is new: **the first use of the reserved event type `__comment__`**
-([worktrail-state-and-sync.md](../../docs/worktrail-state-and-sync.md) §7 item 5,
+([worktrail-state-and-sync.md](../../docs/branchling-state-and-sync.md) §7 item 5,
 `PSEUDO_FIELDS` in `task-fields.mjs`) — the reason for the handoff is a
 comment, not a field change, and like comments it is append-only and
 conflict-free (§5.1 of that document). The `__comment__` implementation is
@@ -69,7 +69,7 @@ Decisions:
 
 - [docs/backlog-field-editing-history.md](../../docs/backlog-field-editing-history.md)
   §2 — pseudo-fields, dedup rules; a comment has to fit into them.
-- [docs/worktrail-state-and-sync.md](../../docs/worktrail-state-and-sync.md)
+- [docs/branchling-state-and-sync.md](../../docs/branchling-state-and-sync.md)
   §5.1–§5.2 — comments as an append-only, conflict-free class.
 - `scripts/task-fields.mjs` — `PSEUDO_FIELDS`; `scripts/history.mjs` —
   writing and reading events.

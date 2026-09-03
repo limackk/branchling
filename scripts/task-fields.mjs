@@ -179,7 +179,7 @@ export function actorParts(actor) {
 // decision in two places".
 //
 // __body__ is RESERVED, not implemented (BL-1404 step 5) — body history is the
-// plan in docs/worktrail-state-and-sync.md §5.2-5.3; // product-name: allow
+// plan in docs/branchling-state-and-sync.md §5.2-5.3; // product-name: allow
 // the schema admits it today so that adding it is an append rather than a
 // migration of somebody's existing data. __comment__ was reserved the same way
 // and is now WRITTEN, first by `handoff` (TL-99).

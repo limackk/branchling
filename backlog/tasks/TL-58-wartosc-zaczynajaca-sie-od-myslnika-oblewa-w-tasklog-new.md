@@ -15,7 +15,7 @@ updated: 2026-08-31
 blocked_by: []
 blocks: []
 related_docs:
-  - .claude/skills/worktrail-cli/SKILL.md
+  - .claude/skills/branchling-cli/SKILL.md
 verification:
   - bash: "node --test scripts/tests/new-task.test.mjs"
   - bash: "d=$(mktemp -d) && node scripts/cli.mjs init --dir \"$d\" >/dev/null && node scripts/cli.mjs new --dir \"$d\" --title -- '--json on reading commands' >/dev/null && ls \"$d\"/tasks | grep -q json && echo 'title with a dash — OK'"

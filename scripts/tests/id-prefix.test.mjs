@@ -44,7 +44,7 @@ function cli(args, opts) {
 }
 
 function backlog({ prefix, ids = [], extra = "" } = {}) {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-prefix-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-prefix-"));
   mkdirSync(join(dir, "tasks"));
   writeFileSync(join(dir, "_template.md"), "---\nid: X-NNN\n---\n", "utf8");
   writeFileSync(join(dir, "boards.yaml"), 'default: main\nboards:\n  - slug: main\n    name: "Main"\n', "utf8");
@@ -130,7 +130,7 @@ test("a backlog with the TASK prefix passes new → build → check → next-id 
 });
 
 test("`init` creates a backlog that works straight away on the default prefix", () => {
-  const dir = join(mkdtempSync(join(tmpdir(), "worktrail-init-")), "bl");
+  const dir = join(mkdtempSync(join(tmpdir(), "branchling-init-")), "bl");
   try {
     const init = cli(["init", "--dir", dir]);
     assert.equal(init.code, 0, init.out);
@@ -184,7 +184,7 @@ test("the prefix is the part BEFORE the first number, even when the slug has dig
   // The same greediness sat in extracting the id from a filename and REALLY
   // created a file `history/BL-1417-close-flag-validation-in-5.jsonl` before this
   // test existed. The proof was on disk, not in a test.
-  const f = "BL-1417-domknij-walidacje-flag-w-5-komendach-worktrail.md";
+  const f = "BL-1417-domknij-walidacje-flag-w-5-komendach-branchling.md";
   assert.equal(f.match(ANY_TASK_FILE_ID)[1], "BL-1417");
 });
 

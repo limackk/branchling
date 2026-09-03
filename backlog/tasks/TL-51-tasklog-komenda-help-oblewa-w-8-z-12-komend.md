@@ -15,8 +15,8 @@ updated: 2026-08-31
 blocked_by: []
 blocks: [TL-52]
 related_docs:
-  - .claude/skills/worktrail-cli/SKILL.md
-  - .claude/skills/worktrail-cli/references/output-style.md
+  - .claude/skills/branchling-cli/SKILL.md
+  - .claude/skills/branchling-cli/references/output-style.md
 verification:
   - bash: "node --test scripts/tests/cli-help.test.mjs"
   - bash: "node scripts/cli.mjs stats --help >/dev/null 2>&1 && echo 'stats --help — OK' || { echo 'still fails'; exit 1; }"
@@ -68,7 +68,7 @@ loop.
 1. `scripts/cli.mjs` — `COMMANDS` (the `usage` field is already in the table), `HELP_FLAGS`, `runScript`.
 2. `scripts/query.mjs` — the flag validation pattern and today's `--help` handling.
 3. [TL-25](TL-25-domknij-walidacje-flag-w-5-komendach-tasklog.md) — why an unknown flag fails; this rule stays.
-4. `.claude/skills/worktrail-cli/references/output-style.md` §7 — the help layout.
+4. `.claude/skills/branchling-cli/references/output-style.md` §7 — the help layout.
 
 ## Steps
 

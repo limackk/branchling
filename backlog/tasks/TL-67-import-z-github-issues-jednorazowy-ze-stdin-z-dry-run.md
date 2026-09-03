@@ -15,9 +15,9 @@ updated: 2026-09-02
 blocked_by: []
 blocks: []
 related_docs:
-  - docs/worktrail-state-and-sync.md
-  - docs/worktrail-global-tool.md
-  - .claude/skills/worktrail-cli/SKILL.md
+  - docs/branchling-state-and-sync.md
+  - docs/branchling-global-tool.md
+  - .claude/skills/branchling-cli/SKILL.md
 verification:
   - id: suite
     bash: "node --test scripts/tests/import-github.test.mjs"
@@ -78,7 +78,7 @@ i.e. state divorced from the branch — the defect external trackers were
 rejected for in the first place (Law 1). Import copies and forgets. If a need
 for synchronization ever arises, that is a different document and a different
 decision:
-[`docs/worktrail-state-and-sync.md`](../../docs/worktrail-state-and-sync.md) §6.
+[`docs/branchling-state-and-sync.md`](../../docs/branchling-state-and-sync.md) §6.
 
 **3. `verification` stays EMPTY — and import says so loudly.** No tracker has
 this field. It is tempting to insert a placeholder so tasks "look complete" —
@@ -134,12 +134,12 @@ meant to close.
 
 ## Pre-flight reading
 
-1. `docs/worktrail-state-and-sync.md` §6 — the boundary between modes; why import is not synchronization.
-2. `docs/worktrail-global-tool.md` §3 — Laws 1, 3 and 4; all three are violable here.
+1. `docs/branchling-state-and-sync.md` §6 — the boundary between modes; why import is not synchronization.
+2. `docs/branchling-global-tool.md` §3 — Laws 1, 3 and 4; all three are violable here.
 3. `scripts/new-task.mjs` — `createTask()`; import MUST go through this path, not its own.
 4. `scripts/migrate-prefix.mjs` — the `--dry-run` pattern for a command that changes many files at once.
 5. `scripts/task-fields.mjs` — `FIELD_SHAPES`, if the `source:` field variant is chosen.
-6. `.claude/skills/worktrail-cli/SKILL.md` — the command's contract: flag validation, `--dir`, exit codes.
+6. `.claude/skills/branchling-cli/SKILL.md` — the command's contract: flag validation, `--dir`, exit codes.
 
 ## Steps
 

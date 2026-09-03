@@ -65,7 +65,7 @@ No `plan.yaml` = exit 0 with a "no plan file" message and empty JSON
    `--json`, exit codes.
 4. `scripts/ui.mjs` — terminal output style, NO_COLOR/TTY handling.
 5. `scripts/cli.mjs` — the command table, flag validation, the `--help` entry.
-6. `.claude/skills/worktrail-cli/SKILL.md` — CLI surface conventions.
+6. `.claude/skills/branchling-cli/SKILL.md` — CLI surface conventions.
 
 ## Steps
 

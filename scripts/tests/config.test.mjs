@@ -284,7 +284,7 @@ test("config: an unknown actor namespace FAILS", () => {
 // ── What a FRESH backlog protects (TL-140) ────────────────────────────────
 
 test("`init` DECLARES reason_required_statuses, so a fresh backlog matches the documentation", () => {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-fresh-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-fresh-"));
   try {
     const r = spawnSync(process.execPath, [join(SCRIPTS_DIR, "cli.mjs"), "init", "--dir", dir, "--no-example"], {
       encoding: "utf8", env: { ...process.env, NO_COLOR: "1" },

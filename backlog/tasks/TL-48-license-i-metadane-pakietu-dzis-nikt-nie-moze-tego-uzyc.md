@@ -15,8 +15,8 @@ updated: 2026-09-01
 blocked_by: []
 blocks: []
 related_docs:
-  - docs/worktrail-global-tool.md
-  - .claude/skills/worktrail-release/SKILL.md
+  - docs/branchling-global-tool.md
+  - .claude/skills/branchling-release/SKILL.md
 verification:
   - bash: "test -f LICENSE && echo 'LICENSE present — OK'"
   - bash: "grep -q '\"private\": true' package.json && { echo 'still private'; exit 1; }; echo 'private removed — OK'"
@@ -67,7 +67,7 @@ to be made, not deduced from the code.
 
 1. `package.json` — the whole file; it's six lines to change, but each one
    is a promise.
-2. `.claude/skills/worktrail-release/SKILL.md` §1 and §7 — the publication
+2. `.claude/skills/branchling-release/SKILL.md` §1 and §7 — the publication
    gate.
 3. [TL-33](TL-33-packaging-instalacja-globalna-i-npx.md) — what has already
    been done in packaging, and why `files` is an allow-list.

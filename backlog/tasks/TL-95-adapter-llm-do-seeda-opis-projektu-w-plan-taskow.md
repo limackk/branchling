@@ -15,7 +15,7 @@ updated: 2026-09-02
 blocked_by: [TL-94]
 blocks: []
 related_docs:
-  - docs/worktrail-global-tool.md
+  - docs/branchling-global-tool.md
 verification:
   - id: suite
     bash: "node --test scripts/tests/seed-adapter.test.mjs"
@@ -56,7 +56,7 @@ for other people's adapters (Law 4).
 Decisions and constraints:
 - **The endpoint and model are the user layer** (`~/.worktrail/config.yaml`,
   TL-34): a fact about the human's machine, not about the project — per Law 3
-  ([docs/worktrail-global-tool.md](../../docs/worktrail-global-tool.md) §3).
+  ([docs/branchling-global-tool.md](../../docs/branchling-global-tool.md) §3).
   No URL and no model name in the code.
 - **The prompt template is data** (a file in the package, overridable), not
   a string in the code — the user has to be able to tune it without a fork.
@@ -78,7 +78,7 @@ Decisions and constraints:
 
 - `backlog/tasks/TL-94-tasklog-seed-plan-projektu-jako-wejscie-do-backlogu.md`
   — the plan format and validation behavior; the adapter is its client.
-- [docs/worktrail-global-tool.md](../../docs/worktrail-global-tool.md) §3 —
+- [docs/branchling-global-tool.md](../../docs/branchling-global-tool.md) §3 —
   Law 3 (user layer) and Law 4 (composition).
 - `scripts/config.mjs` — how configuration is read; the adapter's keys
   belong to the user layer, not the project layer.

@@ -17,7 +17,7 @@
  * it was never meant to be.
  *
  * THE UNIT IS THE BACKLOG DIRECTORY, NOT THE GIT REPOSITORY (§8 of
- * docs/worktrail-global-tool.md — a real path, product-name: allow). This is
+ * docs/branchling-global-tool.md — a real path, product-name: allow). This is
  * not a nicety: the workspace this tool grew up in is a repository with no
  * remote holding `backlog/`, with nine separate repositories inside it. A
  * registry assuming "one repo = one project" produces ten entries there, nine of

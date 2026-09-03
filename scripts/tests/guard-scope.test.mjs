@@ -47,7 +47,7 @@ function run(args) {
 }
 
 function fixture() {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-guard-scope-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-guard-scope-"));
   assert.equal(run(["init", "--dir", dir, "--no-example"]).status, 0);
   return dir;
 }

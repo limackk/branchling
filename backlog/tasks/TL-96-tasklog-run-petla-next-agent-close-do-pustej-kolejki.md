@@ -15,8 +15,8 @@ updated: 2026-09-01
 blocked_by: [TL-87, TL-93]
 blocks: [TL-98]
 related_docs:
-  - docs/worktrail-global-tool.md
-  - docs/worktrail-state-and-sync.md
+  - docs/branchling-global-tool.md
+  - docs/branchling-state-and-sync.md
 verification:
   - id: loop
     bash: "node --test scripts/tests/run.test.mjs"
@@ -51,7 +51,7 @@ within the four laws:
   loop's code.
 - **This is not a daemon**: the process lives only during the run and ends
   with an empty queue or when only blocked tasks remain; the "no daemon"
-  decision ([docs/worktrail-global-tool.md](../../docs/worktrail-global-tool.md)
+  decision ([docs/branchling-global-tool.md](../../docs/branchling-global-tool.md)
   §10) stays intact.
 - **Honest failure instead of an infinite loop**: exhausted attempts =
   `blocked` with an entry stating which verifications failed. After the run,
@@ -73,7 +73,7 @@ within the four laws:
   — the `next` contract: selection, lock, exit codes.
 - `backlog/tasks/TL-93-bramka-weryfikacji-w-tasklog-close.md` — the
   `close` contract: when the status stays untouched, the verification event.
-- [docs/worktrail-global-tool.md](../../docs/worktrail-global-tool.md) §3, §10 —
+- [docs/branchling-global-tool.md](../../docs/branchling-global-tool.md) §3, §10 —
   Law 4 and the "no daemon" decision.
 
 ## Steps

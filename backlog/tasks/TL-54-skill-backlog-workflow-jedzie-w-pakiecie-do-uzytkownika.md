@@ -16,7 +16,7 @@ blocked_by: []
 blocks: []
 related_docs:
   - .claude/skills/backlog-workflow/SKILL.md
-  - docs/worktrail-global-tool.md
+  - docs/branchling-global-tool.md
 verification:
   - id: in-the-tarball
     bash: "npm pack --dry-run 2>&1 | grep -q 'skills/backlog-workflow/SKILL.md' && echo 'skill in the tarball — OK'"

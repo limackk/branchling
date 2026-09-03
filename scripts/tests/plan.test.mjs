@@ -253,7 +253,7 @@ function task(dir, id, { blocked_by = [], status = "pending" } = {}) {
 }
 
 function withSandbox(build, fn) {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-plan-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-plan-"));
   mkdirSync(join(dir, "tasks"));
   writeFileSync(join(dir, "_template.md"), "---\nid: TL-NNN\n---\n", "utf8");
   writeFileSync(join(dir, "config.yaml"), "task_id_prefix: TL\n", "utf8");

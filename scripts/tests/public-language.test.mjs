@@ -165,7 +165,7 @@ test("a Polish task file under backlog/tasks/ in the real PUBLIC_PATHS shape is 
   // force (CLAUDE.md). This plants a fixture in a throwaway root that has
   // the same shape auditTree() walks — a `backlog/tasks/*.md` file — and
   // asserts the walk actually finds and flags it.
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-lang-guard-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-lang-guard-"));
   try {
     mkdirSync(join(dir, "backlog", "tasks"), { recursive: true });
     writeFileSync(
@@ -184,7 +184,7 @@ test("a Polish task file under backlog/tasks/ in the real PUBLIC_PATHS shape is 
 });
 
 test("a Polish doc file under docs/ in the real PUBLIC_PATHS shape is caught", () => {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-lang-guard-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-lang-guard-"));
   try {
     mkdirSync(join(dir, "docs"), { recursive: true });
     // language-guard: allow — deliberately Polish, the fixture this positive control plants
@@ -203,7 +203,7 @@ test("backlog/history/*.jsonl stays invisible to the guard even once backlog/ is
   // The append-only log is protected by file EXTENSION (walk() only collects
   // .mjs/.js/.md), not by a special case carved out of PUBLIC_PATHS — this
   // proves that holds even with a Polish `reason` field in a real .jsonl.
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-lang-guard-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-lang-guard-"));
   try {
     mkdirSync(join(dir, "backlog", "history"), { recursive: true });
     writeFileSync(
@@ -326,7 +326,7 @@ test("POSITIVE CONTROL: putting a Polish label back FAILS the guard", () => {
   // The assertion TL-131 asks for by name. Without it, fixing the two labels
   // would leave a guard that is green because nobody has written another one
   // yet, rather than because it would catch one.
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-lang-label-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-lang-label-"));
   mkdirSync(join(dir, "scripts"), { recursive: true });
   writeFileSync(join(dir, "scripts", "build-viewer.mjs"),
     // language-guard: allow — the regression this control exists to catch
@@ -393,7 +393,7 @@ test("a path is a token with a slash and a known extension, and nothing wider", 
 test("POSITIVE CONTROL: a Polish path-shaped line that is prose still FAILS in a tree", () => {
   // The tree-level counterpart: stripping happens inside auditText, so the
   // control has to run through the whole walk to prove the walk still catches.
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-lang-path-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-lang-path-"));
   mkdirSync(join(dir, "scripts"), { recursive: true });
   writeFileSync(join(dir, "scripts", "x.mjs"),
     // language-guard: allow — the regression this control exists to catch

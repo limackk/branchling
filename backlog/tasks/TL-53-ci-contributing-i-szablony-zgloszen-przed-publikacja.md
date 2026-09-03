@@ -15,7 +15,7 @@ updated: 2026-09-02
 blocked_by: [TL-112]
 blocks: []
 related_docs:
-  - .claude/skills/worktrail-release/SKILL.md
+  - .claude/skills/branchling-release/SKILL.md
 verification:
   - id: workflow
     bash: "ls .github/workflows/*.yml >/dev/null 2>&1 && echo 'workflow present — OK'"
@@ -70,7 +70,7 @@ described in `scripts/tests/non-colocated-layout.test.mjs`.
 
 1. `scripts/tests/_repo.mjs` — why the tests cannot assume a single directory layout.
 2. `.gitignore` — views are generated; a fresh clone has none and CI confirms it.
-3. `.claude/skills/worktrail-release/SKILL.md` §8 — what an outside developer looks for.
+3. `.claude/skills/branchling-release/SKILL.md` §8 — what an outside developer looks for.
 
 ## Steps
 

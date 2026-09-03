@@ -1,9 +1,9 @@
 ---
-name: worktrail-cli
-description: Add or change a command in the worktrail CLI, or change anything it prints. Covers the command table in scripts/cli.mjs, flag validation, --help, --json, --dir, exit codes, error message shape, and the terminal output style (color, symbols, alignment, TTY and NO_COLOR handling). Use this skill whenever work touches scripts/cli.mjs, a scripts/*.mjs command, bin/worktrail.mjs, or anything a user reads in the terminal — including requests like "add a command", "the help is wrong", "add colors", "make the output prettier", "this error is unclear", "add --json to X".
+name: branchling-cli
+description: Add or change a command in the branchling CLI, or change anything it prints. Covers the command table in scripts/cli.mjs, flag validation, --help, --json, --dir, exit codes, error message shape, and the terminal output style (color, symbols, alignment, TTY and NO_COLOR handling). Use this skill whenever work touches scripts/cli.mjs, a scripts/*.mjs command, bin/branchling.mjs, or anything a user reads in the terminal — including requests like "add a command", "the help is wrong", "add colors", "make the output prettier", "this error is unclear", "add --json to X".
 ---
 
-# Building worktrail's terminal surface
+# Building branchling's terminal surface
 
 The CLI is what a developer meets before anything else, and this project is
 betting on developers liking it enough to push for it at work. That makes output
@@ -13,7 +13,7 @@ that worked.
 
 ## How the CLI is wired
 
-`bin/worktrail.mjs` is a shim with no logic. `scripts/cli.mjs` holds the `COMMANDS`
+`bin/branchling.mjs` is a shim with no logic. `scripts/cli.mjs` holds the `COMMANDS`
 table and `resolveCommand()`, which is pure so tests can assert that `frobnicate`
 fails without launching anything. Each command is a standalone program in
 `scripts/`, spawned as a child process with its exit code propagated.
@@ -27,8 +27,8 @@ separate piece of work with its own test surface.
 
 1. Write `scripts/<name>.mjs` as a program that runs standalone.
 2. Register it in `COMMANDS` with a `summary` (one line, lowercase, says what it
-   does — this is what `worktrail --help` prints) and a `usage` string built from
-   the `PRODUCT_NAME` import, never a `"worktrail"` literal.
+   does — this is what `branchling --help` prints) and a `usage` string built from
+   the `PRODUCT_NAME` import, never a `"branchling"` literal.
 3. Validate flags against an explicit allow-list and exit 2 on anything unknown,
    naming the available flags. Copy the shape used in `query.mjs`.
 4. Accept `--dir` via `takeDirFlag()` from `paths.mjs`, and resolve the data
@@ -66,7 +66,7 @@ that isn't there.
 
 Measured on the tree, worth fixing before publication rather than after:
 
-- **`worktrail <command> --help` fails for most commands.** The top-level help
+- **`branchling <command> --help` fails for most commands.** The top-level help
   promises it; `build`, `viewer`, `next-id`, `board`, `history`, `new`, `init`
   and `stats` answer with "unknown flag" and exit 2. Only `query`, `check` and
   `migrate-prefix` honour it.
@@ -74,7 +74,7 @@ Measured on the tree, worth fixing before publication rather than after:
   It reads as an internal note, because it is one.
 - **Error prefixes leak internal script names**: `[build-backlog]`,
   `[backlog-viewer]`, `next-backlog-id:`, `[backlog-history]`. A user who typed
-  `worktrail build` should be told `worktrail build:`.
+  `branchling build` should be told `branchling build:`.
 - **There is no color anywhere**, and therefore no `NO_COLOR` handling either.
 
 ## Output style

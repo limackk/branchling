@@ -1,5 +1,5 @@
 {
-  "name": "worktrail",
+  "name": "branchling",
   "version": "0.1.0",
   "description": "A backlog that lives in markdown files and is driven from the terminal: one task is one file with YAML frontmatter, and every index, view and aggregate is computed from those files rather than committed.",
   "keywords": [
@@ -17,7 +17,7 @@
   "license": "MIT",
   "type": "module",
   "bin": {
-    "worktrail": "bin/worktrail.mjs"
+    "branchling": "bin/branchling.mjs"
   },
   "files": [
     "bin/",

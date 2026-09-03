@@ -15,8 +15,8 @@ updated: 2026-08-31
 blocked_by: []
 blocks: [TL-67]
 related_docs:
-  - docs/worktrail-global-tool.md
-  - docs/worktrail-state-and-sync.md
+  - docs/branchling-global-tool.md
+  - docs/branchling-state-and-sync.md
 verification:
   - manual: "Decision recorded: import is in scope / not in scope, at this extent, with a reason. If in scope — a task exists for the implementation with a concrete source and a concrete field scope."
 ---
@@ -45,7 +45,7 @@ the first external user:
 
 - **One-off import or synchronization.** A one-off import is cheap and
   honest. Synchronization means a second source of truth, and
-  `docs/worktrail-state-and-sync.md` is entirely about why that is costly. Law
+  `docs/branchling-state-and-sync.md` is entirely about why that is costly. Law
   1 says that state divorced from the branch is the defect for which external
   trackers were rejected — synchronization would bring it back through the
   side door.
@@ -77,9 +77,9 @@ it to come back with a recorded answer than from scratch.
 
 ## Pre-flight reading
 
-1. `docs/worktrail-state-and-sync.md` §6 — the mode boundary; import vs.
+1. `docs/branchling-state-and-sync.md` §6 — the mode boundary; import vs.
    synchronization.
-2. `docs/worktrail-global-tool.md` §3 — Law 1 and Law 4.
+2. `docs/branchling-global-tool.md` §3 — Law 1 and Law 4.
 3. `scripts/task-fields.mjs` — what fields exist at all and how they are
    normalized.
 4. `scripts/new-task.mjs` — the only write path for a task; an importer would

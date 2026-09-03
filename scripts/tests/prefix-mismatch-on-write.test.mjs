@@ -3,13 +3,13 @@
  *
  * WHY A SEPARATE FILE. The `detectPrefixMismatch` gate was tested from `build`'s
  * side and worked there. The defect lay in WHERE it stood: `build` refused while
- * `worktrail new` in the same tree happily appended a task under the new prefix. A
+ * `branchling new` in the same tree happily appended a task under the new prefix. A
  * test that asks only about `build` passed for the whole lifetime of that defect
  * — so the question has to be put to the command that writes.
  *
  * THE POSITIVE CONTROL matters here more than usual: a gate that blocks TOO MUCH
  * would break the most common onboarding step — changing the prefix to your own
- * just after `worktrail init`, while the tree is still empty. So next to an assertion
+ * just after `branchling init`, while the tree is still empty. So next to an assertion
  * refuse" there stands an assertion "it has to let this through".
  */
 import { test } from "node:test";
@@ -35,7 +35,7 @@ function run(cwd, args) {
 }
 
 function backlog() {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-prefix-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-prefix-"));
   // `--no-example` (TL-64): "an empty tree" has to mean EMPTY here. The example
   // task would make the positive control examine a tree with one task in it —
   // that is, exactly the case it is meant to tell apart.

@@ -15,7 +15,7 @@ updated: 2026-09-01
 blocked_by: []
 blocks: [TL-95]
 related_docs:
-  - docs/worktrail-global-tool.md
+  - docs/branchling-global-tool.md
 verification:
   - id: seed-suite
     bash: "node --test scripts/tests/seed.test.mjs"
@@ -41,7 +41,7 @@ Came out of a product decision (2026-08-31): the effect meant to attract
 users is bootstrapping a project from a description, taken by the tool from
 zero to a first working version. Splitting this into a core (this task) and
 an LLM adapter (TL-95) is an application of Law 4
-([docs/worktrail-global-tool.md](../../docs/worktrail-global-tool.md) §3):
+([docs/branchling-global-tool.md](../../docs/branchling-global-tool.md) §3):
 every writing command has a form callable from outside, and the intelligence
 arrives from outside through a stable input. The core must not depend on any
 LLM host — the same principle TL-30 adopted for the cost adapter.
@@ -72,7 +72,7 @@ Scope decisions:
 - `scripts/task-fields.mjs` — the only path for writing frontmatter.
 - `_template.md` — the shape of a task and the verification placeholder that
   must be recognized.
-- [docs/worktrail-global-tool.md](../../docs/worktrail-global-tool.md) §3 —
+- [docs/branchling-global-tool.md](../../docs/branchling-global-tool.md) §3 —
   Law 4; seed is its textbook case.
 
 ## Steps

@@ -68,7 +68,7 @@ test("POSITIVE CONTROL: a literal key IS caught", () => {
 });
 
 test("the prefix is the FROZEN constant, not the display name", () => {
-  assert.equal(STORAGE_KEY_PREFIX, "worktrail");
+  assert.equal(STORAGE_KEY_PREFIX, "branchling");
   assert.match(VIEWER_SOURCE, /STORAGE_KEY_PREFIX \+ "-backlog"/,
     "the page's prefix must be derived from the frozen constant in product.mjs");
 });

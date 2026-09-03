@@ -15,7 +15,7 @@ updated: 2026-09-02
 blocked_by: []
 blocks: []
 related_docs:
-  - docs/worktrail-state-and-sync.md
+  - docs/branchling-state-and-sync.md
   - docs/backlog-time-tracking.md
 verification:
   - id: suite
@@ -79,7 +79,7 @@ dollar figures where none exist.
 - [docs/backlog-field-editing-history.md](../../docs/backlog-field-editing-history.md)
   — history record format, actor namespaces, what attribution does NOT
   guarantee (§4) — the comment cannot promise more than the data supports.
-- [docs/worktrail-state-and-sync.md](../../docs/worktrail-state-and-sync.md) §2 —
+- [docs/branchling-state-and-sync.md](../../docs/branchling-state-and-sync.md) §2 —
   why views are not versioned; pr-summary reads tasks and history, never
   `INDEX.yaml`.
 - `scripts/history.mjs` — reading and deduplicating entries.

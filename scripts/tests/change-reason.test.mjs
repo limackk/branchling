@@ -343,7 +343,7 @@ test("a bare `check` runs the report — a guard wired to nothing proves nothing
 /**
  * TL-105 deleted `## Log` from the template that SHIPS, and its guard named
  * that ONE path. This repository keeps a second template — its own, the one
- * `new` actually reads here — and it kept the section, so `worktrail new` went
+ * `new` actually reads here — and it kept the section, so `branchling new` went
  * on writing "Append-only" into every task created in this checkout while the
  * guard stayed green. A rule about "the template" has to hold for every
  * template on disk, which is why the list below is derived, not typed.

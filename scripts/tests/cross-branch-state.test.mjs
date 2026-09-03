@@ -105,7 +105,7 @@ function setConfig(backlogDir, lines) {
  *        narrow `active_branch_days`.
  */
 function twoBranchesDisagreeing(opts = {}) {
-  const repoRoot = mkdtempSync(join(tmpdir(), "worktrail-xbranch-"));
+  const repoRoot = mkdtempSync(join(tmpdir(), "branchling-xbranch-"));
   const backlogDir = join(repoRoot, "backlog");
   const init = cli(["init", "--dir", backlogDir, "--no-example"]);
   assert.equal(init.status, 0, init.stderr);
@@ -222,7 +222,7 @@ const ONLY_FILE = ONLY_ID + "-created-on-a-branch.md";
  * well by reporting a phantom on every listing.
  */
 function taskOnlyOnAnotherBranch(opts = {}) {
-  const repoRoot = mkdtempSync(join(tmpdir(), "worktrail-xbranch-only-"));
+  const repoRoot = mkdtempSync(join(tmpdir(), "branchling-xbranch-only-"));
   const backlogDir = join(repoRoot, "backlog");
   const init = cli(["init", "--dir", backlogDir, "--no-example"]);
   assert.equal(init.status, 0, init.stderr);
@@ -353,7 +353,7 @@ test("a branch checked out in a worktree is read however old it is", () => {
   // standing in is the single most likely holder of a task, and dropping it
   // would reintroduce the collision this whole task exists to remove.
   const { repoRoot, backlogDir } = twoBranchesDisagreeing({ stale: true, config: ["active_branch_days: 1"] });
-  const wt = join(repoRoot, "..", "worktrail-xbranch-wt-" + process.pid);
+  const wt = join(repoRoot, "..", "branchling-xbranch-wt-" + process.pid);
   try {
     vcs(repoRoot, ["worktree", "add", "-q", wt, "feature"]);
     const r = cli(["query", "--dir", backlogDir, "--status", "in_progress"], { cwd: repoRoot });
@@ -370,7 +370,7 @@ test("an UNCOMMITTED change in another worktree is visible", () => {
   // The state the ref scan cannot see, and the one that matters most: another
   // agent has just taken the task and has not committed yet.
   const { repoRoot, backlogDir } = twoBranchesDisagreeing();
-  const wt = join(repoRoot, "..", "worktrail-xbranch-dirty-" + process.pid);
+  const wt = join(repoRoot, "..", "branchling-xbranch-dirty-" + process.pid);
   try {
     vcs(repoRoot, ["branch", "-q", "sidecar", "main"]);
     vcs(repoRoot, ["worktree", "add", "-q", wt, "sidecar"]);
@@ -407,7 +407,7 @@ test("the caller's own uncommitted change is not reported as somebody else's", (
 // ──────────────────────────────────────────────────────────────────────────
 
 test("outside a git repository the query works and SAYS the state is local only", () => {
-  const backlogDir = mkdtempSync(join(tmpdir(), "worktrail-xbranch-nogit-"));
+  const backlogDir = mkdtempSync(join(tmpdir(), "branchling-xbranch-nogit-"));
   try {
     const init = cli(["init", "--dir", backlogDir, "--no-example"]);
     assert.equal(init.status, 0, init.stderr);
@@ -441,7 +441,7 @@ test("NO PATH RUNS `git fetch` — the tool works with no network", () => {
   // a `fetch` reached through a helper or an alias would be invisible to a grep
   // and would show up here as a recorded argument list.
   const { repoRoot, backlogDir } = twoBranchesDisagreeing();
-  const shimDir = mkdtempSync(join(tmpdir(), "worktrail-xbranch-shim-"));
+  const shimDir = mkdtempSync(join(tmpdir(), "branchling-xbranch-shim-"));
   const log = join(shimDir, "calls.log");
   try {
     const realGit = execFileSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).trim();

@@ -15,7 +15,7 @@ updated: 2026-09-02
 blocked_by: [TL-28, TL-34]
 blocks: []
 related_docs:
-  - docs/worktrail-global-tool.md
+  - docs/branchling-global-tool.md
   - docs/backlog-time-tracking.md
 verification:
   - id: location
@@ -68,7 +68,7 @@ a single machine — but is not fit for release.
 
 ## Pre-flight reading
 
-1. `docs/worktrail-global-tool.md` — §6 (why we are moving
+1. `docs/branchling-global-tool.md` — §6 (why we are moving
    this), §5 (config vs. data separation).
 2. `docs/backlog-time-tracking.md` — §5 (data model), §9
    (privacy, retention, correction).

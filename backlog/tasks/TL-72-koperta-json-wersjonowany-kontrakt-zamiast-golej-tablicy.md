@@ -15,7 +15,7 @@ updated: 2026-09-01
 blocked_by: []
 blocks: []
 related_docs:
-  - docs/worktrail-global-tool.md
+  - docs/branchling-global-tool.md
 verification:
   - id: envelope-suite
     bash: "node --test scripts/tests/json-envelope.test.mjs"
@@ -58,7 +58,7 @@ migration path and no compatibility flag.
 1. `scripts/query.mjs:205` — the only place today that emits an array.
 2. `scripts/doctor.mjs`, `scripts/stats-report.mjs`, `scripts/ui.mjs` — the
    remaining `--json` emitters; check the shape each of them returns today.
-3. `docs/worktrail-global-tool.md` §3 — the wording of Law IV, so the
+3. `docs/branchling-global-tool.md` §3 — the wording of Law IV, so the
    contract is written down where the rationale already lives.
 
 ## Steps

@@ -15,7 +15,7 @@ updated: 2026-08-31
 blocked_by: []
 blocks: []
 related_docs:
-  - .claude/skills/worktrail-viewer/SKILL.md
+  - .claude/skills/branchling-viewer/SKILL.md
 verification:
   - bash: "d=$(mktemp -d) && node scripts/cli.mjs export --out \"$d/backlog.html\" >/dev/null && test -s \"$d/backlog.html\" && echo 'export is produced — OK'"
   - bash: "d=$(mktemp -d) && node scripts/cli.mjs export --out \"$d/backlog.html\" >/dev/null && grep -q 'localhost\\|127.0.0.1\\|EventSource' \"$d/backlog.html\" && { echo 'export references a server'; exit 1; }; echo 'export is self-contained — OK'"
@@ -67,7 +67,7 @@ it is a separate decision, not a step here.
    self-contained.
 2. `scripts/serve-backlog.mjs` — what the server adds (SSE, writes) and what
    must disappear in the export.
-3. `.claude/skills/worktrail-viewer/SKILL.md` — one renderer; the export must
+3. `.claude/skills/branchling-viewer/SKILL.md` — one renderer; the export must
    not be a second copy of the template.
 4. `scripts/query.mjs` — the filter contract to reuse.
 

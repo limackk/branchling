@@ -45,7 +45,7 @@ function git(cwd, ...args) {
 
 /** A git repository with a backlog in it. */
 function repo() {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-hooks-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-hooks-"));
   assert.equal(git(dir, "init", "-q", ".").status, 0);
   assert.equal(run(dir, ["init", "--dir", "backlog", "--no-example"]).status, 0);
   return dir;
@@ -66,14 +66,14 @@ test("print shows the block and writes nothing", () => {
 });
 
 test("print works outside a repository and says why, instead of a stack trace", () => {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-hooks-bare-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-hooks-bare-"));
   const r = run(dir, ["hooks", "print"]);
   assert.equal(r.status, 0, "print has something to say even with no repository");
   assert.match(r.stdout, /not a git repository/);
 });
 
 test("install outside a repository is a readable refusal, not a crash", () => {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-hooks-bare2-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-hooks-bare2-"));
   const r = run(dir, ["hooks", "install"]);
   assert.equal(r.status, 1);
   assert.match(r.stderr, /not a git repository/);
@@ -127,7 +127,7 @@ test("inside a worktree the hook goes to the COMMON directory git actually reads
   writeFileSync(join(dir, "a.txt"), "x\n", "utf8");
   git(dir, "add", "-A");
   assert.equal(git(dir, "commit", "-qm", "base").status, 0);
-  const tree = join(dir, "..", "worktrail-hooks-wt-" + Date.now());
+  const tree = join(dir, "..", "branchling-hooks-wt-" + Date.now());
   assert.equal(git(dir, "worktree", "add", "-q", "-b", "side", tree).status, 0);
 
   const target = hooksTarget(tree);
@@ -198,7 +198,7 @@ test("POSITIVE CONTROL: with the hook installed, a commit with a real defect FAI
   // not how a shell finds the command.
   const path = hookPath(dir);
   writeFileSync(path, readFileSync(path, "utf8")
-    .replace(/^worktrail check \|\| exit 1$/m,
+    .replace(/^branchling check \|\| exit 1$/m,
       process.execPath + " " + CLI + " check --id-collisions --dir " + join(dir, "backlog") + " || exit 1"), "utf8");
   chmodSync(path, 0o755);
 

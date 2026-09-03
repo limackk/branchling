@@ -18,8 +18,8 @@ related_docs:
   - docs/backlog-config-and-portability.md
 verification:
   - bash: "node --test scripts/tests/config-strictness.test.mjs"
-  - bash: "d=$(mktemp -d) && node /Users/limack/workspace/tasklog/bin/worktrail.mjs init --dir \"$d\" >/dev/null && printf 'statusess: [a, b]\\n' >> \"$d/config.yaml\" && ! node /Users/limack/workspace/tasklog/bin/worktrail.mjs check --dir \"$d\" >/dev/null 2>&1 && echo 'an unknown key fails check — OK'"
-  - bash: "d=$(mktemp -d) && node /Users/limack/workspace/tasklog/bin/worktrail.mjs init --dir \"$d\" >/dev/null && printf 'statusess: [a, b]\\n' >> \"$d/config.yaml\" && node /Users/limack/workspace/tasklog/bin/worktrail.mjs stats --dir \"$d\" 2>&1 | grep -q ' at ' && { echo 'still a stack trace'; exit 1; }; echo 'a message instead of an exception — OK'"
+  - bash: "d=$(mktemp -d) && node /Users/limack/workspace/tasklog/bin/branchling.mjs init --dir \"$d\" >/dev/null && printf 'statusess: [a, b]\\n' >> \"$d/config.yaml\" && ! node /Users/limack/workspace/tasklog/bin/branchling.mjs check --dir \"$d\" >/dev/null 2>&1 && echo 'an unknown key fails check — OK'"
+  - bash: "d=$(mktemp -d) && node /Users/limack/workspace/tasklog/bin/branchling.mjs init --dir \"$d\" >/dev/null && printf 'statusess: [a, b]\\n' >> \"$d/config.yaml\" && node /Users/limack/workspace/tasklog/bin/branchling.mjs stats --dir \"$d\" 2>&1 | grep -q ' at ' && { echo 'still a stack trace'; exit 1; }; echo 'a message instead of an exception — OK'"
 ---
 
 ## Goal

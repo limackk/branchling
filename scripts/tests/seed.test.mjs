@@ -44,7 +44,7 @@ const CLI = join(SCRIPTS, "cli.mjs");
 
 let counter = 0;
 function tmp(prefix) {
-  return mkdtempSync(join(tmpdir(), "worktrail-seed-" + prefix + "-" + counter++ + "-"));
+  return mkdtempSync(join(tmpdir(), "branchling-seed-" + prefix + "-" + counter++ + "-"));
 }
 
 /** Run `seed` with the plan on stdin, exactly as a caller would. */

@@ -18,7 +18,7 @@ related_docs:
   - docs/backlog-config-and-portability.md
 verification:
   - bash: "node --test scripts/tests/prefix-mismatch-on-write.test.mjs"
-  - bash: "d=$(mktemp -d); T=/Users/limack/workspace/tasklog/bin/worktrail.mjs; node $T init --dir \"$d\" >/dev/null; node $T new --dir \"$d\" --title First >/dev/null 2>&1; sed -i '' 's/^task_id_prefix: .*/task_id_prefix: OTHER/' \"$d/config.yaml\"; node $T new --dir \"$d\" --title Second >/dev/null 2>&1 && { echo 'new still writes despite the mismatch'; exit 1; }; echo 'new refuses on a mismatch — OK'"
+  - bash: "d=$(mktemp -d); T=/Users/limack/workspace/tasklog/bin/branchling.mjs; node $T init --dir \"$d\" >/dev/null; node $T new --dir \"$d\" --title First >/dev/null 2>&1; sed -i '' 's/^task_id_prefix: .*/task_id_prefix: OTHER/' \"$d/config.yaml\"; node $T new --dir \"$d\" --title Second >/dev/null 2>&1 && { echo 'new still writes despite the mismatch'; exit 1; }; echo 'new refuses on a mismatch — OK'"
 ---
 
 ## Goal

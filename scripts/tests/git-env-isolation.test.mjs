@@ -45,7 +45,7 @@ const TESTS_DIR = join(SCRIPTS_DIR, "tests");
  *  commit with a key that cannot possibly work. Deterministic — it does not
  *  depend on an ssh agent being present or refusing. */
 function hostileConfig() {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-hostile-git-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-hostile-git-"));
   const file = join(dir, "gitconfig");
   writeFileSync(file, [
     "[user]", "\tname = Somebody", "\temail = somebody@example.invalid",
@@ -58,7 +58,7 @@ function hostileConfig() {
 
 /** A one-commit repository, built with the environment the caller gives. */
 function commitUnder(env) {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-git-env-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-git-env-"));
   const git = (...args) => spawnSync("git", args, { cwd: dir, env, encoding: "utf8" });
   git("init", "-q", ".");
   writeFileSync(join(dir, "a.txt"), "x\n", "utf8");

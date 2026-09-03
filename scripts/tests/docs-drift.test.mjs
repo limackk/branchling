@@ -313,7 +313,7 @@ function git(dir, args, env = {}) {
 
 /** A repository with its OWN vocabulary, a git history and a `docs/` tree. */
 function repo() {
-  const dir = realpathSync(mkdtempSync(join(tmpdir(), "worktrail-drift-" + counter++ + "-")));
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), "branchling-drift-" + counter++ + "-")));
   git(dir, ["init", "-q"]);
   git(dir, ["config", "user.email", "fixture@example.invalid"]);
   git(dir, ["config", "user.name", "Fixture"]);
@@ -422,12 +422,12 @@ test("what --seed-tasks writes passes check, and its contract really runs", () =
   assert.equal(run(["docs-drift", "--dir", dir, "--seed-tasks"]).status, 1);
 
   // The contract as written into the task, run the way `done` would run it: from
-  // the repository root, through a `worktrail` on PATH.
+  // the repository root, through a `branchling` on PATH.
   const file = run(["query", "--dir", dir, "--role", "scribe", "--files"]).stdout.trim();
   const contract = readFileSync(join(dir, file), "utf8").match(/bash: "(.+)"/)[1];
   const bin = join(dir, ".bin");
   mkdirSync(bin, { recursive: true });
-  const shim = join(bin, "worktrail");
+  const shim = join(bin, "branchling");
   writeFileSync(shim, '#!/bin/sh\nexec "' + process.execPath + '" "' + CLI + '" "$@"\n', "utf8");
   chmodSync(shim, 0o755);
   const sh = (cmd) => spawnSync("/bin/sh", ["-c", cmd], {

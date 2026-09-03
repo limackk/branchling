@@ -1,5 +1,5 @@
 /**
- * `worktrail init` i `worktrail stats` (BL-1412).
+ * `branchling init` i `branchling stats` (BL-1412).
  *
  * Two commands with opposite risks, so the assertions are opposite too:
  *
@@ -38,7 +38,7 @@ function run(args) {
 }
 
 function emptyDir() {
-  return mkdtempSync(join(tmpdir(), "worktrail-init-"));
+  return mkdtempSync(join(tmpdir(), "branchling-init-"));
 }
 
 function task(over) {
@@ -278,7 +278,7 @@ test("init creates EXACTLY one example task, and a working one", () => {
     // An example with a placeholder in `verification` would teach that the field is
     // decorative — while it is the only line of defence against a "done" that is not.
     assert.doesNotMatch(text, /command to run/, "verification was left as the template placeholder");
-    assert.match(text, /- id: doctor-clean\n\s+bash: "worktrail doctor"/, "the verification is not runnable");
+    assert.match(text, /- id: doctor-clean\n\s+bash: "branchling doctor"/, "the verification is not runnable");
     // Since TL-86 the example also has to demonstrate the LINK: a criterion
     // that names the entry proving it. An example carrying two unlinked lists
     // teaches the very redundancy that mechanism removes.

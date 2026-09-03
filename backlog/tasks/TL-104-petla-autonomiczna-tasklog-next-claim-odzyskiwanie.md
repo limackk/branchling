@@ -16,7 +16,7 @@ blocked_by: [TL-82]
 blocks: []
 related_docs:
   - docs/funkcjonalnosci.md
-  - docs/worktrail-state-and-sync.md
+  - docs/branchling-state-and-sync.md
 verification:
   - bash: "node --test scripts/tests/next-claim.test.mjs"
   - manual: "Two parallel loops of `while worktrail next --claim` on the same backlog never take the same task; an abandoned task (in_progress, stale `updated`) returns to the pool with an entry in the log, not silently"

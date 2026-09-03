@@ -15,7 +15,7 @@ updated: 2026-09-01
 blocked_by: []
 blocks: []
 related_docs:
-  - docs/worktrail-state-and-sync.md
+  - docs/branchling-state-and-sync.md
 verification:
   # One entry for the WHOLE file, not one per criterion: every test in it has
   # its own positive control, and a name pattern that matches no test ends up
@@ -68,7 +68,7 @@ Decisions to be made along the way, not up front:
    `fromWorkingTree()`. This is code to extract, not to write anew.
 2. `scripts/query.mjs` — where tasks enter today and where to plug in the
    second source.
-3. `docs/worktrail-state-and-sync.md` — what has already been decided about
+3. `docs/branchling-state-and-sync.md` — what has already been decided about
    state synchronization; do not second-guess it without reason.
 
 ## Steps

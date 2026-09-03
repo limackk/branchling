@@ -1,15 +1,15 @@
 # Functionality — state and direction
 
-What `worktrail` does today and what it is meant to do. State as of **2026-09-01**.
+What `branchling` does today and what it is meant to do. State as of **2026-09-01**.
 
 This document describes SCOPE. The reasoning behind decisions lives elsewhere:
-[`docs/worktrail-global-tool.md`](worktrail-global-tool.md) (the four laws),
+[`docs/branchling-global-tool.md`](branchling-global-tool.md) (the four laws),
 [`LINEAGE.md`](../LINEAGE.md) (the order of decisions), and in the `## Context`
 section of each task. The "What's coming" section is a snapshot of the backlog,
 not a promise — the source of truth is `backlog/tasks/*.md`, not this list.
 
 > The root `README.md` is still a document of the project this tool was
-> extracted from: it says `backlog` instead of `worktrail`, `BL-NNN`
+> extracted from: it says `backlog` instead of `branchling`, `BL-NNN`
 > instead of `TL-NNN`, and carries that project's vocabulary. TL-49 lists it;
 > until then this file is the more accurate one.
 
@@ -176,7 +176,7 @@ DATA, not the tool's contract.
 
 ## 3. What's coming
 
-What is still open — `worktrail stats` counts it, this list does not. Grouped
+What is still open — `branchling stats` counts it, this list does not. Grouped
 below by topic; the ID leads to the file with the full reasoning.
 
 ### 3.1 Closing a task must be proven — the highest priority
@@ -188,10 +188,10 @@ feature and today it exists only as a convention, not a mechanism.
 
 - **TL-86** — acceptance criteria ticked from `verification:`, not declared.
   The measurement that prompted this, taken on this repository and
-  reproducible on any other with `worktrail check --criteria`: a quarter of
+  reproducible on any other with `branchling check --criteria`: a quarter of
   the closed tasks had criteria left unticked while their `verification:` was
   green and real. Two lists about the same "done", only one of them run.
-- **TL-82** — `worktrail done <ID>` runs `verification:`, shows its output
+- **TL-82** — `branchling done <ID>` runs `verification:`, shows its output
   and REFUSES to close on failure. An empty list and a template literal also
   fail the check; `manual:` requires confirmation recorded in the history.
 
@@ -233,7 +233,7 @@ feature and today it exists only as a convention, not a mechanism.
 
 ### 3.5 Surface for agents
 
-- **TL-74** — `worktrail instructions`: workflow instructions issued by the
+- **TL-74** — `branchling instructions`: workflow instructions issued by the
   CLI, not a file rotting in someone else's repo. Text templated with the
   vocabulary of the backlog being read, split into a dispatcher and phase
   guides.
@@ -278,7 +278,7 @@ A separate axis, described in [`docs/backlog-time-tracking.md`](backlog-time-tra
 From a competitive analysis (2026-09-01): a mechanism without a demo is
 invisible, and a project in this category grows from one good launch.
 
-- **TL-102** — the first-contact demo: `worktrail done` refusing to close in
+- **TL-102** — the first-contact demo: `branchling done` refusing to close in
   60 seconds, in the README's header.
 - **TL-103** — launch material: the 27% measurement as the thesis, Show HN,
   every number paired with a command to reproduce it.
@@ -301,7 +301,7 @@ they don't come back as "maybe after all".
 
 | Thing | Why not |
 |---|---|
-| **An MCP server** | A second surface with its own lifecycle. `worktrail instructions` (TL-74) gives the same reach at a fraction of the maintenance cost. |
+| **An MCP server** | A second surface with its own lifecycle. `branchling instructions` (TL-74) gives the same reach at a fraction of the maintenance cost. |
 | **Prioritised configuration layers** | Contradicts law III. More convenient and quieter — and rejected for exactly that reason. |
 | **Drafts as a separate entity** | This is `status: pending`. An extra state buys nothing. |
 | **Milestones as files with their own IDs** | `epic:` as free text within a board is enough and removes the cost of operating on someone else's IDs. |

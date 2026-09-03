@@ -48,7 +48,7 @@ function run(cwd, args) {
 
 /** A backlog with one task, and a history that has already seen it. */
 function settled() {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-unrecorded-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-unrecorded-"));
   assert.equal(spawnSync("git", ["init", "-q", "."], { cwd: dir }).status, 0);
   assert.equal(run(dir, ["init", "--dir", ".", "--no-example"]).status, 0);
   assert.equal(run(dir, ["new", "--dir", ".", "--title", "A task to edit"]).status, 0);
@@ -112,7 +112,7 @@ test("the row names the command that resolves it, with the actor placeholder", (
 });
 
 test("a tree with no reference point yet says so, rather than counting to zero", () => {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-unrecorded-fresh-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-unrecorded-fresh-"));
   assert.equal(run(dir, ["init", "--dir", ".", "--no-example"]).status, 0);
   assert.equal(existsSync(join(dir, "history", SNAPSHOT_FILE)), false,
     "the fixture already has a snapshot — the case is not the one being tested");

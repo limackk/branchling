@@ -5,7 +5,7 @@
  * WHY A LOCKFILE AND NOT AN EVENT IN THE HISTORY. A lock written as an event is
  * settled by last-writer-wins, which decides AFTER the fact — and a decision
  * after the fact is not mutual exclusion, it is a report of a collision
- * (docs/worktrail-state-and-sync.md §6.1 — product-name: allow, a real path).
+ * (docs/branchling-state-and-sync.md §6.1 — product-name: allow, a real path).
  * Exclusion needs a single writer, and on one machine the filesystem is one: a
  * name either gets created or it does not, and no two processes can both win.
  * See `createExclusively` for why creating the name and writing what is behind it

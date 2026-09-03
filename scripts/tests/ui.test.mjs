@@ -132,7 +132,7 @@ test("escape sequences are written ONLY by ui.mjs", () => {
 
 test("messages introduce themselves by the COMMAND name, not by a filename", () => {
   // `[build-backlog]` or `next-backlog-id:` appear in no help text and in no
-  // document — the user typed `worktrail build` and has never heard of those.
+  // document — the user typed `branchling build` and has never heard of those.
   const leaked = ["[build-backlog]", "[backlog-viewer]", "next-backlog-id:", "suggest-board:",
     "[backlog-history]", "[backlog-serve]", "check-backlog-refs:"];
   // `ui.mjs` is excluded deliberately: its comment LISTS those prefixes as an
@@ -151,11 +151,11 @@ test("messages introduce themselves by the COMMAND name, not by a filename", () 
 // ── Shape ─────────────────────────────────────────────────────────────────
 
 test("the anatomy of an error: what happened, what was expected, what to do", () => {
-  const text = failure("worktrail query", "unknown flag: --statu", ["available: --status --board"], ["worktrail query --help"]);
+  const text = failure("branchling query", "unknown flag: --statu", ["available: --status --board"], ["branchling query --help"]);
   const lines = text.split("\n");
-  assert.match(lines[0], /worktrail query: unknown flag: --statu/);
+  assert.match(lines[0], /branchling query: unknown flag: --statu/);
   assert.match(lines[1], /available: --status --board/);
-  assert.match(lines[2], /worktrail query --help/, "the command to paste is missing");
+  assert.match(lines[2], /branchling query --help/, "the command to paste is missing");
 });
 
 test("numbers right-aligned, the table aligned to the widest value", () => {

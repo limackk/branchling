@@ -56,7 +56,7 @@ function run(args, cwd) {
 let BIG = null;
 function bigBacklog() {
   if (BIG) return BIG;
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-json-pipe-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-json-pipe-"));
   assert.equal(run(["init", "--dir", dir, "--no-example"]).status, 0);
   for (let i = 0; i < 120; i++) {
     const made = run(["new", "--dir", dir, "--title", "Task number " + i + " with a title long enough to matter to the size of the answer"]);
@@ -86,7 +86,7 @@ test("--files survives the same pipe — it exists to be handed to xargs", () =>
 });
 
 test("POSITIVE CONTROL: the old pattern truncates over the same number of bytes", () => {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-json-pipe-control-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-json-pipe-control-"));
   const script = join(dir, "old-pattern.mjs");
   writeFileSync(script,
     'console.log(JSON.stringify({ blob: "x".repeat(' + PAYLOAD_BYTES + ') }));\n' +

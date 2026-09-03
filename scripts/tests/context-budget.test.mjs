@@ -55,7 +55,7 @@ function run(args) {
 
 /** A backlog with its OWN vocabulary and `n` tasks in the queue status. */
 function backlog(n) {
-  const repo = mkdtempSync(join(tmpdir(), "worktrail-budget-" + counter++ + "-"));
+  const repo = mkdtempSync(join(tmpdir(), "branchling-budget-" + counter++ + "-"));
   execFileSync("git", ["init", "-q", "-b", "main", "."], { cwd: repo, stdio: "ignore" });
   const dir = join(repo, "backlog");
   assert.equal(run(["init", "--dir", dir, "--no-example"]).status, 0);

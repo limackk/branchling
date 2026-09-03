@@ -55,7 +55,7 @@ const OWN = {
 };
 
 function backlog() {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-input-" + counter++ + "-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-input-" + counter++ + "-"));
   assert.equal(run(["init", "--dir", dir, "--no-example"]).status, 0);
   const p = join(dir, "config.yaml");
   writeFileSync(p, readFileSync(p, "utf8")
@@ -80,7 +80,7 @@ const helpJson = (dir, command) => {
   // backlog and "no configuration" is never actually tested.
   const r = dir
     ? run([command, "--help", "--json", "--dir", dir])
-    : run([command, "--help", "--json"], { cwd: mkdtempSync(join(tmpdir(), "worktrail-nobacklog-" + counter++ + "-")) });
+    : run([command, "--help", "--json"], { cwd: mkdtempSync(join(tmpdir(), "branchling-nobacklog-" + counter++ + "-")) });
   assert.equal(r.status, 0, r.stderr);
   return JSON.parse(r.stdout);
 };

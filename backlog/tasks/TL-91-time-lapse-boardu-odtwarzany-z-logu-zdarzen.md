@@ -16,7 +16,7 @@ blocked_by: []
 blocks: []
 related_docs:
   - docs/backlog-field-editing-history.md
-  - docs/worktrail-state-and-sync.md
+  - docs/branchling-state-and-sync.md
 verification:
   - bash: "node --test scripts/tests/board-replay.test.mjs"
 ---

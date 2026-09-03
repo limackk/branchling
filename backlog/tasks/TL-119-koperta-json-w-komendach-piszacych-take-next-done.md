@@ -14,7 +14,7 @@ updated: 2026-09-02
 blocked_by: []
 blocks: []
 related_docs:
-  - docs/worktrail-global-tool.md
+  - docs/branchling-global-tool.md
 verification:
   - bash: "node --test scripts/tests/json-envelope.test.mjs"
 ---

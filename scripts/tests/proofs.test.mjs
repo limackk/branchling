@@ -42,7 +42,7 @@ let counter = 0;
  * test is what the guard makes of a history that already exists.
  */
 function backlog({ command = "true", reason = REASON_PROVEN, manual = null } = {}) {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-proofs-" + counter++ + "-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-proofs-" + counter++ + "-"));
   const init = spawnSync(process.execPath, [CLI, "init", "--dir", dir, "--no-example"], { encoding: "utf8" });
   assert.equal(init.status, 0, init.stderr);
 

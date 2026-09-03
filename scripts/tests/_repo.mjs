@@ -82,7 +82,7 @@ export const TASKS_DIR = join(BACKLOG_DIR, "tasks");
  * Call it once, at the top of a test file that touches activity.
  */
 export function isolateHome(label = "home") {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-test-" + label + "-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-test-" + label + "-"));
   process.env[HOME_ENV] = dir;
   isolateGit(dir);
   return dir;
@@ -121,9 +121,9 @@ export function isolateGit(homeDir) {
   Object.assign(process.env, {
     GIT_CONFIG_GLOBAL: config,
     GIT_CONFIG_SYSTEM: config,
-    GIT_AUTHOR_NAME: "worktrail tests",
+    GIT_AUTHOR_NAME: "branchling tests",
     GIT_AUTHOR_EMAIL: "tests@example.invalid",
-    GIT_COMMITTER_NAME: "worktrail tests",
+    GIT_COMMITTER_NAME: "branchling tests",
     GIT_COMMITTER_EMAIL: "tests@example.invalid",
     // Stated OUTRIGHT as well as by emptying the config, so the intent survives
     // somebody later pointing GIT_CONFIG_GLOBAL at a file with content in it.

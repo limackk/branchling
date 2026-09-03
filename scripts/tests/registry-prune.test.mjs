@@ -48,10 +48,10 @@ function run(args, home) {
 /** A home with three registered projects: one live, one whose directory is
  *  gone, and one that still exists but is no longer a backlog. */
 function threeKinds() {
-  const home = mkdtempSync(join(tmpdir(), "worktrail-prune-home-"));
+  const home = mkdtempSync(join(tmpdir(), "branchling-prune-home-"));
   const made = {};
   for (const name of ["live", "gone", "hollow"]) {
-    const dir = mkdtempSync(join(tmpdir(), "worktrail-prune-" + name + "-"));
+    const dir = mkdtempSync(join(tmpdir(), "branchling-prune-" + name + "-"));
     assert.equal(run(["init", "--dir", dir, "--no-example"], home).status, 0);
     assert.equal(run(["project", "add", dir, "--name", name], home).status, 0);
     made[name] = dir;
@@ -128,7 +128,7 @@ test("pruning a registry with nothing dead in it says so and changes nothing", (
 });
 
 test("pruning with no registry at all is an answer, not an error", () => {
-  const home = mkdtempSync(join(tmpdir(), "worktrail-prune-empty-"));
+  const home = mkdtempSync(join(tmpdir(), "branchling-prune-empty-"));
   const r = run(["project", "prune"], home);
   assert.equal(r.status, 0);
   assert.match(r.stdout, /nothing to forget/);

@@ -55,7 +55,7 @@ function run(cwd, args) {
 
 /** A fresh co-located backlog with the given extra configuration lines. */
 function repo(configLines) {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-handoff-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-handoff-"));
   assert.equal(spawnSync("git", ["init", "-q", "."], { cwd: dir }).status, 0);
   assert.equal(run(dir, ["init", "--dir", ".", "--no-example"]).status, 0);
   if (configLines) {

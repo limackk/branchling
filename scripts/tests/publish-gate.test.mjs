@@ -29,9 +29,9 @@ isolateHome("publish-gate");
 const MANIFEST = JSON.parse(readFileSync(join(REPO_ROOT, "package.json"), "utf8"));
 
 const complete = {
-  repository: { type: "git", url: "git+https://github.com/owner/worktrail.git" },
-  bugs: { url: "https://github.com/owner/worktrail/issues" },
-  homepage: "https://github.com/owner/worktrail#readme",
+  repository: { type: "git", url: "git+https://github.com/owner/branchling.git" },
+  bugs: { url: "https://github.com/owner/branchling/issues" },
+  homepage: "https://github.com/owner/branchling#readme",
 };
 
 const names = (r) => r.missing.map(([k]) => k);
@@ -66,7 +66,7 @@ test("a placeholder does not get past the gate", () => {
 });
 
 test("repository is accepted both as a string and as {type,url}", () => {
-  assert.equal(checkPublishMetadata({ ...complete, repository: "github:owner/worktrail" }).ok, true);
+  assert.equal(checkPublishMetadata({ ...complete, repository: "github:owner/branchling" }).ok, true);
 });
 
 // ── Whether anything calls it ─────────────────────────────────────────────

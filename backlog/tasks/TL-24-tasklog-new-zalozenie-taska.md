@@ -93,7 +93,7 @@ unfilled field.
 **Deliberately out of scope:** `--body` / opening an editor after creation,
 automatic `suggest-board` (the router reads PATHS that a new task does not
 yet have), reserving a number between concurrent sessions (requires a lock —
-[worktrail-state-and-sync.md §6.1](../../docs/worktrail-state-and-sync.md)).
+[worktrail-state-and-sync.md §6.1](../../docs/branchling-state-and-sync.md)).
 
 ## Log
 

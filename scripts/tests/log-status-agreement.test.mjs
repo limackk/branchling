@@ -47,7 +47,7 @@ const CLI = join(HERE, "..", "cli.mjs");
 
 let counter = 0;
 function tmp() {
-  return mkdtempSync(join(tmpdir(), "worktrail-logstatus-" + counter++ + "-"));
+  return mkdtempSync(join(tmpdir(), "branchling-logstatus-" + counter++ + "-"));
 }
 
 function run(args) {

@@ -14,10 +14,10 @@ updated: 2026-09-02
 blocked_by: []
 blocks: []
 related_docs:
-  - .claude/skills/worktrail-cli/SKILL.md
+  - .claude/skills/branchling-cli/SKILL.md
 verification:                      # HOW to check that the task is really done
   - id: no-closed-gap-listed
-    bash: "for q in 'There is no color anywhere' 'fails for most commands' 'prints the module.s source comment' 'still Polish'; do grep -qi \"$q\" .claude/skills/worktrail-cli/SKILL.md && { echo \"the skill still lists a closed gap: $q\"; exit 1; }; done; echo 'no closed gap is listed as open — OK'"
+    bash: "for q in 'There is no color anywhere' 'fails for most commands' 'prints the module.s source comment' 'still Polish'; do grep -qi \"$q\" .claude/skills/branchling-cli/SKILL.md && { echo \"the skill still lists a closed gap: $q\"; exit 1; }; done; echo 'no closed gap is listed as open — OK'"
   - id: decision-recorded
     manual: "Read the Decision section: does it say whether a `known gaps` list belongs in a skill at all, and why? A section that only records what was deleted is not a decision."
   - id: the-gaps-really-are-closed
@@ -26,7 +26,7 @@ verification:                      # HOW to check that the task is really done
 
 ## Goal
 
-`.claude/skills/worktrail-cli/SKILL.md` describes the CLI as it is, so a session
+`.claude/skills/branchling-cli/SKILL.md` describes the CLI as it is, so a session
 that loads it is not told to fix things that are already fixed.
 
 ## Context
@@ -64,7 +64,7 @@ hand them out — with the skill pointing at a query instead of a list.
 
 ## Pre-flight reading
 
-1. `.claude/skills/worktrail-cli/SKILL.md` — the two stale sections.
+1. `.claude/skills/branchling-cli/SKILL.md` — the two stale sections.
 2. `scripts/ui.mjs` — the colour and symbol module the skill says does not exist.
 3. `scripts/tests/cli-help.test.mjs` — what `--help` is now asserted to do.
 

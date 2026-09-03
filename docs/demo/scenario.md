@@ -8,7 +8,7 @@ A screenshot rots silently; this scenario does not.
 
 ## What the viewer should see
 
-One scene that no other tool in this category can record: **`worktrail done`
+One scene that no other tool in this category can record: **`branchling done`
 REFUSES to close a task**, because its own verification failed. It shows the
 test's output, leaves the file untouched, and says so outright. Only after
 the code is fixed does the same call succeed and tick the criterion itself.
@@ -24,7 +24,7 @@ rest of the public surface.
 
 - A fresh, empty directory with `git init` — the viewer should see a start
   from zero.
-- The `worktrail` binary on `PATH` (`npm link` or a global install). The
+- The `branchling` binary on `PATH` (`npm link` or a global install). The
   recording must never show `node …/scripts/cli.mjs` — that is a developer
   path, not how the tool is used.
 - The prompt shortened to one character; a wide terminal (min. 100 columns),
@@ -36,7 +36,7 @@ rest of the public surface.
 
 ```bash
 mkdir parser && cd parser && git init -q
-worktrail init --dir ./backlog
+branchling init --dir ./backlog
 ```
 
 Expected: a list of created directories and one `next:` line.
@@ -44,7 +44,7 @@ Expected: a list of created directories and one `next:` line.
 ### Scene 1 — a task that promises proof (~12 s)
 
 ```bash
-worktrail new --title "Parser accepts an empty file"
+branchling new --title "Parser accepts an empty file"
 ```
 
 In the generated file we swap two things from the template — the only
@@ -94,7 +94,7 @@ screen — it is not the point here.
 ### Scene 3 — REFUSAL (~18 s, this is the whole point)
 
 ```bash
-worktrail done TASK-2
+branchling done TASK-2
 ```
 
 Expected output, in this order:
@@ -107,7 +107,7 @@ Expected output, in this order:
   AssertionError [ERR_ASSERTION]: expected 0 rows, got [""]
   …
 
-✗ worktrail done: TASK-2: verification failed (exit 1)
+✗ branchling done: TASK-2: verification failed (exit 1)
   `node --test parse.test.mjs`
 
   The task file was NOT touched — its status is still `in_progress`.
@@ -130,7 +130,7 @@ export function parse(text) {
 ```
 
 ```bash
-worktrail done TASK-2
+branchling done TASK-2
 ```
 
 Expected:

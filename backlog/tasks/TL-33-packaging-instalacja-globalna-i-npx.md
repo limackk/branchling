@@ -15,7 +15,7 @@ updated: 2026-08-30
 blocked_by: []
 blocks: [TL-34]
 related_docs:
-  - docs/worktrail-global-tool.md
+  - docs/branchling-global-tool.md
 verification:
   - bash: "node --test scripts/tests/packaging.test.mjs"
   - bash: "cd /tmp && npx --yes /Users/limack/workspace/tasklog -- --help >/dev/null && echo 'npx from an empty directory — OK'"
@@ -29,7 +29,7 @@ way to a global tool — and to publishing at all.
 
 ## Context
 
-[worktrail-state-and-sync.md §1](../../docs/worktrail-state-and-sync.md)
+[worktrail-state-and-sync.md §1](../../docs/branchling-state-and-sync.md)
 promises a "`git clone && npx worktrail`, no account and no server" mode.
 **This promise is false today:** `backlog/` has neither a `package.json` nor
 a `bin/` (checked 2026-08-30). The only entry point is
@@ -62,9 +62,9 @@ between "backlog not found" and "wrote tasks into `node_modules`."
 ## Steps
 
 1. `backlog/package.json` — `name`, `version`, `type: module`,
-   `bin: { worktrail: "bin/worktrail.mjs" }`, `files` (a whitelist, so that
+   `bin: { worktrail: "bin/branchling.mjs" }`, `files` (a whitelist, so that
    the origin project's tasks and `history/` don't end up in the package), `engines.node`.
-2. `backlog/bin/worktrail.mjs` — a thin shim: shebang, forwarding `argv` to
+2. `backlog/bin/branchling.mjs` — a thin shim: shebang, forwarding `argv` to
    `cli.mjs`, propagating the exit code. No logic of its own.
 3. **Disable co-location when the code runs from `node_modules`** — detected
    by the package path, not by an environment variable. A missing backlog
@@ -132,10 +132,10 @@ node --test scripts/tests/packaging.test.mjs
 npm pack --dry-run 2>&1 | grep -E "tasks/|history/|archive/|boards/|viewer.html" && echo "WARNING: data in the package" || echo "tarball clean — OK"
 
 # 3. Working from a directory without a backlog — expected: error with hint, NOT a write
-cd /tmp && node /Users/limack/workspace/tasklog/bin/worktrail.mjs query --count; echo "exit=$?"
+cd /tmp && node /Users/limack/workspace/tasklog/bin/branchling.mjs query --count; echo "exit=$?"
 
 # 4. Version from a single source — expected: matching
-test "$(node bin/worktrail.mjs --version)" = "$(node -p "require('./package.json').version")" && echo 'version consistent — OK'
+test "$(node bin/branchling.mjs --version)" = "$(node -p "require('./package.json').version")" && echo 'version consistent — OK'
 ```
 
 ## Notes
@@ -160,7 +160,7 @@ test "$(node bin/worktrail.mjs --version)" = "$(node -p "require('./package.json
 - 2026-08-30 created — claude — from the global-tool design
   (docs/architecture/worktrail-global-tool.md); packaging is the only hard
   gap left, the rest of the portability layer was done in TL-18/TL-19/TL-23
-- 2026-08-30 done — claude — `package.json` + `bin/worktrail.mjs` +
+- 2026-08-30 done — claude — `package.json` + `bin/branchling.mjs` +
   `scripts/product.mjs`; 11 tests in `packaging.test.mjs`, full module suite
   224/224 green.
   **Step 3 turned out unnecessary as CODE.** I had planned to "disable

@@ -39,7 +39,7 @@ function run(cwd, args) {
 }
 
 function gitRepo() {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-nextid-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-nextid-"));
   spawnSync("git", ["init", "-q", "."], { cwd: dir });
   writeFileSync(join(dir, "a.txt"), "x\n", "utf8");
   spawnSync("git", ["add", "-A"], { cwd: dir });
@@ -66,7 +66,7 @@ test("the first task in a fresh repo: `new` is quiet too", () => {
 });
 
 test("a backlog OUTSIDE a repository: the warning stays", () => {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-nogit-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-nogit-"));
   assert.equal(run(dir, ["init", "--dir", ".", "--no-example"]).status, 0);
   const r = run(dir, ["next-id", "--dir", "."]);
   assert.equal(r.status, 0);

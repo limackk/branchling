@@ -83,7 +83,7 @@ TL-110):
    our own writes); this is where the watch on `plan.yaml` will be added.
 5. `scripts/viewer-url.mjs` — view state in the URL.
 6. `scripts/history.mjs` — where to get the time of entering `in_progress`.
-7. `.claude/skills/worktrail-viewer/SKILL.md` — conventions for working on
+7. `.claude/skills/branchling-viewer/SKILL.md` — conventions for working on
    the viewer.
 
 ## Steps

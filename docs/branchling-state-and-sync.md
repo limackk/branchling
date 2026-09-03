@@ -1,7 +1,7 @@
-# worktrail — state, synchronization and the boundary between modes
+# branchling — state, synchronization and the boundary between modes
 
 **Status:** FOUNDATION IMPLEMENTED 2026-08-29 ([TL-21](../backlog/tasks/TL-21-fundament-logu-zdarzen-tasklog.md)) — **all 5 steps from §7 done; from §6, locks (TL-87, §6.1) and reading state across multiple branches (TL-73, §6.2) are done; §5 and the rest of §6 (reversing the direction, SQLite, the server) are still a project**
-**Concerns:** `backlog/` as the future `worktrail` tool (working name — [TL-20](../backlog/tasks/TL-20-domknij-nazwe-narzedzia-przed-publikacja.md))
+**Concerns:** `backlog/` as the future `branchling` tool (working name — [TL-20](../backlog/tasks/TL-20-domknij-nazwe-narzedzia-przed-publikacja.md))
 **Predecessors:** [backlog-field-editing-history.md](backlog-field-editing-history.md) (the field change log), [backlog-config-and-portability.md](backlog-config-and-portability.md) (separating code from data)
 
 ---
@@ -10,7 +10,7 @@
 
 The tool is eventually meant to work in three modes at once:
 
-1. **Locally, open source** — `git clone && npx worktrail`, no account and no
+1. **Locally, open source** — `git clone && npx branchling`, no account and no
    server.
 2. **As a team, hosted** — an account and a paid plan, in the shape any hosted
    sync product takes.
@@ -230,7 +230,7 @@ log is the right foundation, should this ever need to be added.
 break the module's zero-dependency rule.
 
 The database is **100% rebuildable from the log** and lives **outside git**
-(`.worktrail/` or `backlog/.state/`, gitignored). **Deleting the database
+(`.branchling/` or `backlog/.state/`, gitignored). **Deleting the database
 file must be harmless — and that is this architecture's correctness test.**
 If it is ever no longer harmless, it means the database has quietly become
 the SSOT and the decision in §4 has been broken.
@@ -277,7 +277,7 @@ atomic lock exists only where there is one writer: locally, the filesystem
 (which covers today's case of seven worktrees on one disk); in a team, only
 the server does.
 
-**Done in TL-87** — `worktrail take` / `worktrail next`, `scripts/lock.mjs`.
+**Done in TL-87** — `branchling take` / `branchling next`, `scripts/lock.mjs`.
 The single writer is the filesystem, not SQLite: `link()` from a temporary
 file into the target name either succeeds or fails on EEXIST, whereas the
 database would be a dependency and a second source of truth for one bit. Two
@@ -410,7 +410,7 @@ line today, and after release — a migration of other people's data.
    in two places" class disappeared along the way.
 
    **`__comment__` is IMPLEMENTED since TL-99**, `__body__` still is not. The
-   first writer is `worktrail handoff`, but the shape is generic and knows
+   first writer is `branchling handoff`, but the shape is generic and knows
    nothing about handoff: the whole content is `to`, `from` stays empty
    (a comment replaces nothing), and dedup works **by `id` alone** — the
    event rule from `__created__` does NOT apply to it, because the same

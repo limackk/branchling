@@ -15,7 +15,7 @@ updated: 2026-09-02
 blocked_by: [TL-87, TL-96, TL-97]
 blocks: [TL-113]
 related_docs:
-  - docs/worktrail-global-tool.md
+  - docs/branchling-global-tool.md
 verification:
   - bash: "node --test scripts/tests/next.test.mjs scripts/tests/run.test.mjs"
 ---
@@ -72,7 +72,7 @@ Decisions:
   — the contracts this task extends.
 - `backlog/tasks/TL-97-pole-role-taska-wymog-roli-ze-slownika-konfiguracji.md`
   — the semantics of the field and the dictionary.
-- [docs/worktrail-global-tool.md](../../docs/worktrail-global-tool.md) §3 —
+- [docs/branchling-global-tool.md](../../docs/branchling-global-tool.md) §3 —
   Law 3: the command map is the user layer, the role dictionary is the
   project layer; validation of consistency between them.
 

@@ -31,7 +31,7 @@
  *
  * WHAT IS DELIBERATELY NOT EXPOSED: see `NOT_EXPOSED`. And no transport other
  * than stdio — HTTP belongs to the hosted mode, which §8 of
- * `docs/worktrail-state-and-sync.md` says is not built yet.  product-name: allow
+ * `docs/branchling-state-and-sync.md` says is not built yet.  product-name: allow
  *
  * Tests: `node --test scripts/tests/mcp.test.mjs`
  */

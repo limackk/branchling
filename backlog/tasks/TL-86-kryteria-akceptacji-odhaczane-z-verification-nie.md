@@ -25,7 +25,7 @@ verification:
   - id: closed-untouched
     bash: 'grep -lE "^status: (done|cancelled)" backlog/tasks/*.md | xargs grep -l "\[proof:" && { echo "the mechanism was applied to a closed task"; exit 1; }; echo "no closed task carries a proof link"'
   - id: doc-distinction
-    bash: "grep -q 'Computed is not the same as reconstructible' docs/worktrail-global-tool.md"
+    bash: "grep -q 'Computed is not the same as reconstructible' docs/branchling-global-tool.md"
 ---
 
 ## Goal
@@ -105,7 +105,7 @@ deliberately, and with a log entry.
 3. `scripts/task-fields.mjs:146` — how `verification` is validated today; the
    link has to go through the same validation.
 4. `backlog/tasks/TL-82-*.md` — the closing gate that will consume this.
-5. `docs/worktrail-global-tool.md` §3 — Law II, for resolving point 4.
+5. `docs/branchling-global-tool.md` §3 — Law II, for resolving point 4.
 
 ## Steps
 
@@ -141,7 +141,7 @@ deliberately, and with a log entry.
   (1) IDENTIFICATION — the criterion points to the proof, not the other way around; a `verification` entry gets an optional `id:`, and the criterion ends with a visible `[proof: <id>]`. List-position numbering was dropped, as the task said it should be. Of the two remaining directions, this one won because the criterion is the MOVING side — it gets rewritten and reordered — while the verification entry stays put. A reference kept on the moving side travels with the sentence it belongs to, so reordering the list is a no-op BY CONSTRUCTION, not thanks to anyone's care. The reverse direction would additionally force the proof to enumerate its own criteria — exactly the list that rots when a criterion is deleted. The marker is VISIBLE, not an HTML comment: these files are read with `cat` as often as in a renderer, an HTML comment is invisible in only one of the two, and a link nobody can see is a link nobody maintains.
   (2) MIGRATION — a `criteria_links` policy in config.yaml: `off` / `warn` (default) / `require`, plus a split between errors and warnings. A BROKEN link (a criterion pointing at a nonexistent `id`, a duplicate `id`, an unknown key in the entry) always fails, even under `off` — only someone already using the mechanism could have written one, so failing on it cannot make an old task unclosable. A MISSING link only fails under `require`. Measured effect: 69 active tasks with no links, `check` green, the message states how many there are. Rejected: a requirement keyed to the `created` date — a rule that depends on an invisible field, where two tasks sitting side by side behave differently with no visible reason why.
   (3) EMPTY SAMPLE — a missing `## Acceptance criteria` section and an empty list are judged SEPARATELY and before everything else, with different messages. Without this, a task with no criteria would pass the gate trivially — a guard green on a zero sample.
-  (4) RUN RECORD — the distinction written into `docs/worktrail-global-tool.md` §3, next to Law II, with a reusable deciding criterion: if the task files alone are enough to reconstruct something, it is a view (delete it); if it also needs the TIME at which something happened, it is an event record and falls under Law I.
+  (4) RUN RECORD — the distinction written into `docs/branchling-global-tool.md` §3, next to Law II, with a reusable deciding criterion: if the task files alone are enough to reconstruct something, it is a view (delete it); if it also needs the TIME at which something happened, it is an event record and falls under Law I.
   DONE: `scripts/criteria.mjs` (parser + audit + `applyProofs`), `scripts/check-backlog-criteria.mjs`, `check --criteria` in the dispatcher (runs as part of the full set with no selector), `criteria_links` in config.mjs and in the `init` template, `_template.md` and the example task from `init` SHOW the link instead of describing it, `scripts/tests/criteria-mapping.test.mjs` (19 assertions). 394/394 green.
   ALONG THE WAY, OUT OF SCOPE: the regex replacing the `verification` block in `new-task.mjs` only swallowed `- ` lines, so it left an orphan on a two-line entry; `createTask` now accepts an entry as an object `{id, bash|manual}`. `manual:` was added to the allowed keys — the backlog already uses it (TL-82), and a parser that fails on the project's own data is useless.
   NOTE FOR THE NEXT SESSION: `applyProofs` is a function, not a command — NOTHING calls it yet in the normal flow. Checking off is turned on by `worktrail done` from TL-82; until then a checkbox can still be set by hand and can still lie. The `check --criteria` gate guards the LINK, not the truth of the checkmark.

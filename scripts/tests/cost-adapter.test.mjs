@@ -54,7 +54,7 @@ test("a log with no cost fields reports null and says why — never 0", () => {
 });
 
 test("`time --cost --json` on a tree with no adapter gives tokens: null", () => {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-cost-none-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-cost-none-"));
   assert.equal(spawnSync(process.execPath, [CLI, "init", "--dir", ".", "--no-example"],
     { cwd: dir, encoding: "utf8" }).status, 0);
   const out = spawnSync(process.execPath, [CLI, "time", "--cost", "--json", "--dir", "."],
@@ -184,7 +184,7 @@ test("nothing in scripts/ IMPORTS the adapter", () => {
 });
 
 test("POSITIVE CONTROL: the import check catches a file that does import it", () => {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-cost-import-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-cost-import-"));
   writeFileSync(join(dir, "guilty.mjs"), 'import { usageFromTranscript } from "./cost-adapter.mjs";\n', "utf8");
   const offenders = readdirSync(dir)
     .filter((f) => f.endsWith(".mjs") && f !== "cost-adapter.mjs")

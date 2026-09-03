@@ -43,7 +43,7 @@ function run(args) {
 }
 
 function backlog() {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-vouch-" + counter++ + "-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-vouch-" + counter++ + "-"));
   assert.equal(run(["init", "--dir", dir, "--no-example"]).status, 0);
   alignTemplate(dir);
   return dir;

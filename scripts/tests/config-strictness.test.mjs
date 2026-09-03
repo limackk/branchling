@@ -42,7 +42,7 @@ function run(cwd, args) {
 }
 
 function backlog() {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-strict-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-strict-"));
   // `--no-example` (TL-64): the "it wrote nothing" assertion counts files in tasks/.
   assert.equal(run(dir, ["init", "--dir", ".", "--no-example"]).status, 0);
   return dir;

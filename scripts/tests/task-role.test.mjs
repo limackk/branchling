@@ -51,7 +51,7 @@ function run(cwd, args) {
 /** A fresh co-located backlog. `--dir .` everywhere, so nothing depends on cwd
  *  discovery finding the right tree. */
 function repo(configLines) {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-role-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-role-"));
   assert.equal(spawnSync("git", ["init", "-q", "."], { cwd: dir }).status, 0);
   assert.equal(run(dir, ["init", "--dir", ".", "--no-example"]).status, 0);
   if (configLines) {

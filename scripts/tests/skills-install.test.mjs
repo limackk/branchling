@@ -46,7 +46,7 @@ const CLI = join(HERE, "..", "cli.mjs");
 
 let counter = 0;
 function tmp(prefix) {
-  return mkdtempSync(join(tmpdir(), "worktrail-" + prefix + "-" + (counter++) + "-"));
+  return mkdtempSync(join(tmpdir(), "branchling-" + prefix + "-" + (counter++) + "-"));
 }
 
 function run(args, cwd, env) {
@@ -80,7 +80,7 @@ test("the skill is in the tarball", () => {
 });
 
 test("only the user-facing skill ships — not the ones about developing the tool", () => {
-  // `worktrail-cli`, `worktrail-release` and `worktrail-viewer` are this
+  // `branchling-cli`, `branchling-release` and `branchling-viewer` are this
   // project's own development procedure. In somebody else's editor they are
   // noise at best.
   assert.deepEqual(USER_SKILLS, ["backlog-workflow"]);

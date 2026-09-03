@@ -55,7 +55,7 @@ BEFORE publication and drops to zero after it.
 
 **Where the literal must stay** and this is not debt: the `bin` key and the
 `name` field in `package.json` (that is the source), the file name
-`bin/worktrail.mjs`, and the fallback in `product.mjs`.
+`bin/branchling.mjs`, and the fallback in `product.mjs`.
 
 **Note on `git-rules.mjs`.** `BLOCK_OPEN` / `BLOCK_CLOSE` (`# >>> worktrail`)
 are written into **other people's** `.gitignore` and `.gitattributes`. The
@@ -166,8 +166,8 @@ changes the cost of the NEXT change.
   `scripts/` and `bin/`, not just `*.mjs` at one level; it also checks the
   frozen marker). The only difference on the minus side is the
   `product-name: allow` escape hatch, which a raw grep cannot express, used
-  in TWO places — both for a REAL path on disk (`docs/worktrail-state-and-sync.md`,
-  `.claude/skills/worktrail-release/SKILL.md`). These are not occurrences of
+  in TWO places — both for a REAL path on disk (`docs/branchling-state-and-sync.md`,
+  `.claude/skills/branchling-release/SKILL.md`). These are not occurrences of
   the product name to switch over, just file names; changing them is a
   separate decision.
 - 2026-09-01 in_progress — agent:claude — CLAUDE.md stops lying: the

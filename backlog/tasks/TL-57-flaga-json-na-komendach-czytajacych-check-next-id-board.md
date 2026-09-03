@@ -15,8 +15,8 @@ updated: 2026-09-02
 blocked_by: []
 blocks: []
 related_docs:
-  - docs/worktrail-global-tool.md
-  - .claude/skills/worktrail-cli/SKILL.md
+  - docs/branchling-global-tool.md
+  - .claude/skills/branchling-cli/SKILL.md
 verification:
   - id: json-only
     bash: "node --test scripts/tests/json-output.test.mjs"
@@ -47,7 +47,7 @@ Measured 2026-08-31, `grep '--json' scripts/*.mjs`:
 | `next-id` | yes | **missing** |
 | `board` | yes | **missing** |
 
-`docs/worktrail-global-tool.md` §3 states this as one of the four laws and
+`docs/branchling-global-tool.md` §3 states this as one of the four laws and
 derives all extensibility from it: "no plugin API, because `--json` on every
 reading command and a callable input on every writing one." A law that holds
 in two commands out of five is not a basis for extensibility — it is a
@@ -72,7 +72,7 @@ fails. JSON describes the result, it does not replace the exit code.
 
 ## Pre-flight reading
 
-1. `docs/worktrail-global-tool.md` §3, Law 4.
+1. `docs/branchling-global-tool.md` §3, Law 4.
 2. `scripts/json-envelope.mjs` — the envelope every `--json` answer shares
    (TL-72), and the rule that a declared key is never absent.
 3. `scripts/new-task.mjs` — the `nextId()` function, the workaround this

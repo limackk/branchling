@@ -76,7 +76,7 @@ draws decisions as nodes.
 - An agent's decision and a human's decision share an identical schema —
   the actor namespace tells them apart; auditing "agent decisions" is one
   filter.
-- Inputs: `worktrail decide` (CLI, Law 4) and an action in the viewer — both
+- Inputs: `branchling decide` (CLI, Law 4) and an action in the viewer — both
   through the same write path; both also leave a human-readable line in the
   task's `## Log`.
 

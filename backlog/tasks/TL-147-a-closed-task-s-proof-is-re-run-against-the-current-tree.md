@@ -13,7 +13,7 @@ created: 2026-09-02
 updated: 2026-09-02
 blocked_by: []
 blocks: []
-related_docs: ["docs/worktrail-state-and-sync.md"]
+related_docs: ["docs/branchling-state-and-sync.md"]
 verification:                      # HOW to check that the task is really done
   - id: suite-green
     bash: "node --test scripts/tests/*.test.mjs"

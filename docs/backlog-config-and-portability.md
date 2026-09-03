@@ -158,7 +158,7 @@ project has no such axes.
 - **Does not change `suggest-board.mjs`** beyond the registry path — the
   `paths:` routing rules still live in `boards.yaml`, i.e. in data.
 
-## 6. The tool's name — tentatively `worktrail`
+## 6. The tool's name — tentatively `branchling`
 
 The module is meant to eventually live outside this repository, at which
 point the name stops being cosmetic: **the binary has to be free for every
@@ -171,13 +171,13 @@ user.** Measured on 2026-08-29 against `registry.npmjs.org`:
 | `backlog-cli` | taken (2014, dead) | `backlog` |
 
 So the `backlog` command on a machine with [Backlog.md](https://github.com/MrLesk/Backlog.md)
-already installed means something else entirely. Hence **`worktrail`** (free
+already installed means something else entirely. Hence **`branchling`** (free
 on npm, no PATH collision) as a working name: the same number of characters
 as the previous command, and it names the distinguishing feature — an
 append-only field change history with an author, which none of the
 neighbouring tools have (`backlog.md`, `mdtask`, `taskmd`).
 
-Implementation state: `scripts/worktrail` is the only wrapper. The
+Implementation state: `scripts/branchling` is the only wrapper. The
 compatibility alias `scripts/backlog`, the `npm run backlog` script and the
 `backlog` shell alias were removed on 2026-08-29 by the founder's decision —
 two names for one tool would have kept the old one alive in documents and

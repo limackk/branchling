@@ -9,7 +9,7 @@
  * more than one project.
  *
  * THE BOUNDARY IS DISJOINT, NOT PRIORITISED, and this is the whole risk of the
- * feature — Law 3, §3 of docs/worktrail-global-tool.md (product-name: allow)
+ * feature — Law 3, §3 of docs/branchling-global-tool.md (product-name: allow)
  * Two layers that may both speak about the same thing
  * WILL drift. So the user layer may not override the project's vocabulary — not
  * "does not by default", may not: `statuses` in a user file FAILS, and the
@@ -57,7 +57,7 @@ const HOME_DIRNAME = BLOCK_MARKER_NAME;
  * cannot reach to fix — and it would stop working silently, by falling back to
  * the default directory.
  */
-export const HOME_ENV = "WORKTRAIL_HOME";  // product-name: allow
+export const HOME_ENV = "BRANCHLING_HOME";  // product-name: allow
 
 export const CONFIG_FILENAME = "config.yaml";
 export const REGISTRY_FILENAME = "projects.yaml";

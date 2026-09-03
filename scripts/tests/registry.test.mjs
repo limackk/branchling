@@ -2,7 +2,7 @@
  * The project registry, and the four ways an index turns into a truth (TL-34).
  *
  * THE CASE THIS FILE WAS WRITTEN FOR is the multi-repository workspace (§8 of
- * docs/worktrail-global-tool.md). The workspace this tool grew up in is a
+ * docs/branchling-global-tool.md). The workspace this tool grew up in is a
  * repository with no remote holding `backlog/`, with nine separate repositories
  * inside it. A registry whose unit is the git repository produces ten entries
  * there, nine of them with no tasks — and every count across projects is then
@@ -22,7 +22,7 @@
  *      same directory twice must rename rather than duplicate — otherwise every
  *      count across projects double-counts a project somebody re-registered.
  *
- * Every case injects `WORKTRAIL_HOME`; none of them can reach a real registry.
+ * Every case injects `BRANCHLING_HOME`; none of them can reach a real registry.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -54,7 +54,7 @@ function tmp(prefix) {
   // the tool reports has been through `resolve`/`realpath` already: comparing a
   // reported path against an unresolved fixture path fails on a difference the
   // user never sees.
-  return realpathSync(mkdtempSync(join(tmpdir(), "worktrail-" + prefix + "-" + (counter++) + "-")));
+  return realpathSync(mkdtempSync(join(tmpdir(), "branchling-" + prefix + "-" + (counter++) + "-")));
 }
 
 function run(args, env, cwd) {

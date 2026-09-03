@@ -1,6 +1,6 @@
 # Origin
 
-`worktrail` was built inside a private repository as the module that drove its
+`branchling` was built inside a private repository as the module that drove its
 backlog, and was extracted from it on 2026-08-30. **The history was deliberately
 flattened to a single commit** — the earlier commits mixed the tool's code with
 changes to somebody else's private data, so they could not be carried across
@@ -24,7 +24,7 @@ Not in `git log`. In two places that travel with the code:
 
 - **`docs/`** — seven architecture documents. Each describes one decision, its
   mechanism, and what would refute it.
-- **`backlog/tasks/`** — this tool's own tasks; `worktrail stats` counts them,
+- **`backlog/tasks/`** — this tool's own tasks; `branchling stats` counts them,
   and a number written here would be stale by the next commit. This is its real
   development history: what was done, in what order, and what was deliberately
   left alone. The tool tracks itself with itself.
@@ -45,7 +45,7 @@ Ids carry both identities: the number they had before the extraction renamed
 | BL-1399 → TL-18 | **The data directory is an ARGUMENT**, not a property of where the code sits |
 | BL-1400 → TL-19 | **The code knows the SHAPE, the configuration knows the VALUES** — vocabularies into `config.yaml` |
 | BL-1404 → TL-21 | The foundation of the **event log**: ULID, actor namespaces, views outside git |
-| BL-1411 → TL-22 | One entry point (`worktrail`), and an unknown command FAILS |
+| BL-1411 → TL-22 | One entry point (`branchling`), and an unknown command FAILS |
 | BL-1412 → TL-23 / BL-1413 → TL-24 | `init` and `new` — creating a backlog and creating tasks |
 | BL-1417 → TL-25 | Flag validation: a typo fails instead of passing silently |
 | BL-1439 → TL-33 | **An installable package** — `package.json`, `bin/`, the name from one constant |

@@ -1,19 +1,19 @@
 ---
-name: worktrail-viewer
-description: Change the worktrail browser viewer — the single self-contained HTML page (and the local server behind it) that non-technical readers use to browse, filter, edit and chart the backlog. Covers scripts/build-viewer.mjs, scripts/serve-backlog.mjs, scripts/viewer-url.mjs, the config-derived palette, dark mode, URL view state, inline field editing and change history. Use this skill for any work on the viewer, the dashboard, the board or filter UI, the served page, or requests like "the viewer looks wrong", "add a column", "make the chart clickable", "add a filter", "share this view with someone".
+name: branchling-viewer
+description: Change the branchling browser viewer — the single self-contained HTML page (and the local server behind it) that non-technical readers use to browse, filter, edit and chart the backlog. Covers scripts/build-viewer.mjs, scripts/serve-backlog.mjs, scripts/viewer-url.mjs, the config-derived palette, dark mode, URL view state, inline field editing and change history. Use this skill for any work on the viewer, the dashboard, the board or filter UI, the served page, or requests like "the viewer looks wrong", "add a column", "make the chart clickable", "add a filter", "share this view with someone".
 ---
 
 # Changing the viewer
 
 The viewer is the only surface most non-technical readers will ever touch. An
-analyst or a manager will not run `worktrail query`; they will open a page,
+analyst or a manager will not run `branchling query`; they will open a page,
 filter it, and send someone a link. That makes the viewer the adoption path into
 a team, and it is why breaking it silently costs more than breaking a command.
 
 ## Where the page comes from
 
 `backlog/viewer.html` is **generated and gitignored**. Editing it produces work
-that the next `worktrail viewer` erases. The source is `scripts/build-viewer.mjs`,
+that the next `branchling viewer` erases. The source is `scripts/build-viewer.mjs`,
 which reads `tasks/*.md`, parses frontmatter, and emits one self-contained file
 with all data embedded — no runtime fetch, so it works over `file://` and can be
 mailed or dropped in a shared folder.
@@ -24,7 +24,7 @@ copy of the template. Keep that import. Two copies of a template diverge on the
 first change, and the divergence shows up as "it looks different when served",
 which nobody debugs quickly.
 
-After any change: `worktrail viewer` to rebuild, or restart `worktrail serve`.
+After any change: `branchling viewer` to rebuild, or restart `branchling serve`.
 
 ## Modules are shared by source, not by copy
 
@@ -108,11 +108,11 @@ The audience here has not read `README.md` and will not open a terminal.
 ## Verifying a change
 
 ```bash
-worktrail viewer                                   # rebuild
+branchling viewer                                   # rebuild
 node --test scripts/tests/viewer-url.test.mjs \
              scripts/tests/task-fields.test.mjs \
              scripts/tests/views-not-versioned.test.mjs
-worktrail serve                                    # then check both themes and a resize
+branchling serve                                    # then check both themes and a resize
 ```
 
 Check dark mode explicitly. It is the half of the theme nobody looks at while

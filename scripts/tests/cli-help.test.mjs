@@ -1,7 +1,7 @@
 /**
- * `worktrail <command> --help` works in EVERY command (TL-51).
+ * `branchling <command> --help` works in EVERY command (TL-51).
  *
- * WHAT WAS BROKEN. The main help promises "`worktrail <command> --help` prints
+ * WHAT WAS BROKEN. The main help promises "`branchling <command> --help` prints
  * that command's flags". Measured before the fix: the promise was false in eight
  * commands out of twelve — `build`, `viewer`, `next-id`, `board`, `history`,
  * `new`, `init` and `stats` answered "unknown flag: --help" with exit code 2. It
@@ -105,8 +105,8 @@ test("the help scan stops at `--`", () => {
 });
 
 test("a bare `help` in a command's arguments is a VALUE, not a request for help", () => {
-  // `worktrail help` has to work, because there the word stands where a command
-  // goes. But `worktrail query --text help` has to SEARCH — otherwise the help
+  // `branchling help` has to work, because there the word stands where a command
+  // goes. But `branchling query --text help` has to SEARCH — otherwise the help
   // swallows the query and looks like the tool working, which is exactly the
   // dispatcher (BL-1411).
   assert.equal(wantsHelp(["--text", "help"]), false);
@@ -116,7 +116,7 @@ test("a bare `help` in a command's arguments is a VALUE, not a request for help"
   assert.match(r.stdout, /^\d+/, "the help came out instead of a count of matches:\n" + r.stdout);
 
   const bare = spawnSync(process.execPath, [CLI, "help"], { encoding: "utf8", timeout: 15_000 });
-  assert.equal(bare.status, 0, "`worktrail help` stopped working");
+  assert.equal(bare.status, 0, "`branchling help` stopped working");
 });
 
 test("a command's help is assembled from the table, not from a second description", () => {

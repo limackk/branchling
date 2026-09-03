@@ -1,8 +1,8 @@
 # Backlog — measuring time spent on a task
 
 **Status:** PROJECT (2026-08-30, revised 2026-08-30 after adversarial review) — none of this is implemented
-**Concerns:** `backlog/` as the future `worktrail` tool ([TL-20](../backlog/tasks/TL-20-domknij-nazwe-narzedzia-przed-publikacja.md))
-**Predecessors:** [backlog-field-editing-history.md](backlog-field-editing-history.md) (the field change log), [worktrail-state-and-sync.md](worktrail-state-and-sync.md) (the event log as SSOT), [backlog-config-and-portability.md](backlog-config-and-portability.md) (code knows the shape, configuration knows the values)
+**Concerns:** `backlog/` as the future `branchling` tool ([TL-20](../backlog/tasks/TL-20-domknij-nazwe-narzedzia-przed-publikacja.md))
+**Predecessors:** [backlog-field-editing-history.md](backlog-field-editing-history.md) (the field change log), [branchling-state-and-sync.md](branchling-state-and-sync.md) (the event log as SSOT), [backlog-config-and-portability.md](backlog-config-and-portability.md) (code knows the shape, configuration knows the values)
 **Tasks:** [TL-27](../backlog/tasks/TL-27-pomiar-czasu-fundament-i-uczciwy-punkt-zero.md) · [TL-28](../backlog/tasks/TL-28-heartbeaty-aktywnosci-i-lancuch-atrybucji.md) · [TL-29](../backlog/tasks/TL-29-kalibracja-estymat-z-danych-rzeczywistych.md) · [TL-30](../backlog/tasks/TL-30-adapter-tokenow-i-kosztu-sesji.md) · [TL-31](../backlog/tasks/TL-31-retencja-korekta-atrybucji-i-prawo-do-usuniecia.md)
 
 ---
@@ -15,8 +15,8 @@ unverifiable: `confidence: medium` means "that's what I thought" and, a year
 later, means exactly the same thing. Count your own:
 
 ```bash
-worktrail query --status done --count          # closed work
-worktrail stats --calibration                  # and how much of it was measured
+branchling query --status done --count          # closed work
+branchling stats --calibration                  # and how much of it was measured
 ```
 
 Goal: **collect the AI agent's working time on a task well enough to calibrate
@@ -32,10 +32,10 @@ are yours, and a figure from somebody else's tree is not evidence you can check.
 
 | Source hypothesis | What it can give | Measure it yourself |
 |---|---|---|
-| The field change log (`history/*.jsonl`) already has this | Nothing before the day the log started, which is the day the tool was installed | `worktrail audit --json` — how many closed tasks have no logged transition |
-| Frontmatter `created` → `updated` | DAY resolution, so zero for everything finished the day it was opened | `worktrail query --status done --json` and difference the two fields |
+| The field change log (`history/*.jsonl`) already has this | Nothing before the day the log started, which is the day the tool was installed | `branchling audit --json` — how many closed tasks have no logged transition |
+| Frontmatter `created` → `updated` | DAY resolution, so zero for everything finished the day it was opened | `branchling query --status done --json` and difference the two fields |
 | Git — the commit span on a task file | Contaminated by mass field backfills: one `board:` migration touches every task file on one day | `git log --name-only --format=%ad -- backlog/tasks` and look for a day with hundreds of files |
-| Git pickaxe on `-S"status: done"` | ✅ The moment of COMPLETION, at second resolution, one commit per task | `worktrail backfill-completions --dry-run` |
+| Git pickaxe on `-S"status: done"` | ✅ The moment of COMPLETION, at second resolution, one commit per task | `branchling backfill-completions --dry-run` |
 | Git pickaxe on `-S"status: in_progress"` | Almost nothing: the intermediate state is usually never committed | the same command, and compare the counts |
 
 The last two rows settle the project, and the reason is structural rather than
@@ -75,9 +75,9 @@ number is the most common mistake in this class of tool.
 **Count your own before trusting a cycle time:**
 
 ```bash
-worktrail query --status in_progress --count
-worktrail query --status in_progress --owner <an agent> --count
-worktrail audit          # `parked`: in progress, and untouched for days
+branchling query --status in_progress --count
+branchling query --status in_progress --owner <an agent> --count
+branchling audit          # `parked`: in progress, and untouched for days
 ```
 
 If that first number is far larger than the number of sessions that could
@@ -123,7 +123,7 @@ task (§8) — and that is the only thing this module has to build itself. The
 rest (heartbeat clustering, an idle threshold) is a deliberately borrowed
 model from WakaTime, not an invention.
 
-Practical consequence: `worktrail activity record` is an **open input** (§7).
+Practical consequence: `branchling activity record` is an **open input** (§7).
 Whoever already has WakaTime can feed this log from it, instead of writing a
 second collector.
 
@@ -145,10 +145,10 @@ backlog/history/BL-NNNN.jsonl            ← unchanged: field changes, versioned
 > `<project>` is `<slug>-<hash of the backlog path>` — keyed by the PATH and
 > never by the registry label, because a label is the user's own and mutable,
 > and a rename must not orphan somebody's log. Reasoning:
-> [worktrail-global-tool.md §6](worktrail-global-tool.md).
+> [branchling-global-tool.md §6](branchling-global-tool.md).
 >
 > The `.gitignore` rule stays as a safety net for logs written before the move;
-> `worktrail activity migrate` relocates those, idempotently.
+> `branchling activity migrate` relocates those, idempotently.
 
 One row = one piece of evidence of activity:
 
@@ -166,13 +166,13 @@ One row = one piece of evidence of activity:
   instead of twice. It is also the **attribution scope key** (§8).
 - `derived` — **the other name this session answers to**, written only when it
   differs from `session` (TL-168). The host's id arrives inside the hook
-  payload and reaches nothing else: a plain `worktrail done` is not run by the
+  payload and reaches nothing else: a plain `branchling done` is not run by the
   hook and has only the environment, so the field-change log stamps the key
   every process DERIVES from the checkout (`sessionId()` in `focus.mjs`).
   Without this pair the two logs name one session twice and never meet —
   measured on 2026-09-02, with activity rows keyed
   `3d71196b-2eae-4664-833f-be84f1e1da16`, history entries keyed
-  `tree-cb84986431a6`, and `worktrail session <id>` reporting no changes for a
+  `tree-cb84986431a6`, and `branchling session <id>` reporting no changes for a
   session that had closed seven tasks. This writer is the only place that sees
   both at the same moment, which is why it is the one that says they are the
   same session.
@@ -259,7 +259,7 @@ The thresholds (`idle_gap_minutes`, `min_session_minutes`) go into
 
 ## 7. Where heartbeats come from — and why from EVERY tool
 
-The core is `worktrail activity record --task BL-N --kind tool` — an ordinary
+The core is `branchling activity record --task BL-N --kind tool` — an ordinary
 CLI reading flags and stdin. Adapters are thin plugins on top of it: a Claude
 Code hook, a git hook, WakaTime, a shell prompt. **The core must not require
 any of them**, because the module has to work over someone else's process.
@@ -294,7 +294,7 @@ Order, first match wins:
 
 | # | Leg | `attribution` | Note |
 |---|---|---|---|
-| 1 | `worktrail focus BL-NNNN` — an explicit session marker, or `BACKLOG_TASK` in the environment | `focus` | also set AUTOMATICALLY — §8.1 |
+| 1 | `branchling focus BL-NNNN` — an explicit session marker, or `BACKLOG_TASK` in the environment | `focus` | also set AUTOMATICALLY — §8.1 |
 | 2 | the most recent transition to `status: in_progress` in this **session** by this actor | `session-state` | §8.1 |
 | 3 | the edited file's path, when it is `backlog/tasks/BL-NNNN-*.md` | `path` | |
 | 4 | a regex on the branch/worktree name (`task_id_pattern` from configuration) | `branch` | |
@@ -311,7 +311,7 @@ Without this the chain does not work — and this is measured, not predicted:
   `claude/task-<description>`, without a BL number. It remains useful for
   other repositories, where the convention may differ.
 
-That leaves leg 1 — and a manual `worktrail focus` at the start of every
+That leaves leg 1 — and a manual `branchling focus` at the start of every
 session is exactly the same failure that disqualifies `timetrace` (§4): a
 mechanism that depends on someone remembering.
 
@@ -322,7 +322,7 @@ existing `focus` signal — it only needs the `in_progress` write to also set
 the session's focus.
 
 **Critical condition: the scope is the SESSION, never global state.**
-`worktrail query --status in_progress --count` on any backlog of any age
+`branchling query --status in_progress --count` on any backlog of any age
 answers with a number larger than one: the question "which task is in progress"
 has no single answer globally and never will. It has an unambiguous answer within one session, because one
 session takes one task (one session = one worktree). The same number that
@@ -361,9 +361,9 @@ than the window are deleted; **the aggregate survives**, because it is no
 longer personal data at that resolution. Without this the log grows forever
 and there is no answer to "how long do you keep this".
 
-**The right to deletion and to correction.** `worktrail activity forget
+**The right to deletion and to correction.** `branchling activity forget
 --actor <a>` deletes an actor's raw rows and recomputes the aggregates.
-Separately, `worktrail activity reassign --from BL-A --to BL-B --session S`
+Separately, `branchling activity reassign --from BL-A --to BL-B --session S`
 appends a `kind: "reassign"` event — the log is append-only, so a correction
 is a **new event, not an edit to history**. Without this path the first
 attribution mistake stays forever, and that is a guaranteed first bug report.
@@ -417,8 +417,8 @@ closed work is distributed across estimate buckets, and how fast you close
 things.
 
 ```bash
-worktrail stats --calibration     # n per bucket, and how many were measured
-worktrail time                    # tasks closed per week
+branchling stats --calibration     # n per bucket, and how many were measured
+branchling time                    # tasks closed per week
 ```
 
 Divide the threshold by the weekly rate in the buckets you actually use. The
@@ -432,10 +432,10 @@ quietly start reporting a median of three.
 
 | Phase | Task | What it delivers | Standalone value |
 |---|---|---|---|
-| 0 | [TL-27](../backlog/tasks/TL-27-pomiar-czasu-fundament-i-uczciwy-punkt-zero.md) | `activity/` + `worktrail time` + backfill of **completion stamps only** from git | velocity and throughput over every task already closed |
+| 0 | [TL-27](../backlog/tasks/TL-27-pomiar-czasu-fundament-i-uczciwy-punkt-zero.md) | `activity/` + `branchling time` + backfill of **completion stamps only** from git | velocity and throughput over every task already closed |
 | 1 | [TL-28](../backlog/tasks/TL-28-heartbeaty-aktywnosci-i-lancuch-atrybucji.md) | heartbeats from ALL tools, clustering, attribution with auto-focus | engaged time starts to exist |
 | 1b | [TL-31](../backlog/tasks/TL-31-retencja-korekta-atrybucji-i-prawo-do-usuniecia.md) | retention, `forget`, `reassign` | **condition for releasing this beyond this machine** |
-| 2 | [TL-29](../backlog/tasks/TL-29-kalibracja-estymat-z-danych-rzeczywistych.md) | calibration in `worktrail stats` + a viewer column | estimates stop being unverifiable |
+| 2 | [TL-29](../backlog/tasks/TL-29-kalibracja-estymat-z-danych-rzeczywistych.md) | calibration in `branchling stats` + a viewer column | estimates stop being unverifiable |
 | 3 | [TL-30](../backlog/tasks/TL-30-adapter-tokenow-i-kosztu-sesji.md) | a token/cost adapter | a second axis, immune to model speed |
 
 TL-31 is **1b, not 4**: personal data starts being produced the moment phase 1
@@ -471,7 +471,7 @@ before it closes.
 
    **Result (2026-09-02, TL-29): the gate is built and runs; in this tree it
    answers `insufficient`, and that is its whole answer so far.**
-   `worktrail stats --correlation-only` compares the mean p20–p80 span inside
+   `branchling stats --correlation-only` compares the mean p20–p80 span inside
    a bucket against the span of the bucket medians and returns one of three
    verdicts. Here it reports 0 measured samples against 141 closed tasks,
    because the raw heartbeats live outside the repository (§9) and no
@@ -513,15 +513,15 @@ translated by TL-137. What exists now:
   is refused before anything is appended, because the file cannot be edited
   afterwards. A corrupt line is skipped and the rest of the task's rows are
   returned (§5.4).
-- `scripts/backfill-completions.mjs` and `worktrail backfill-completions` — the
+- `scripts/backfill-completions.mjs` and `branchling backfill-completions` — the
   completion stamp recovered with `git log -S"status: <archived>"`, written as
   one `commit` row per closed task. Idempotent by EVENT, not by row id: a ULID
   is fresh on every run, so the key is `(task, kind, ts)`.
-- `scripts/time-report.mjs` and `worktrail time` — lead time (median, p80, p95
+- `scripts/time-report.mjs` and `branchling time` — lead time (median, p80, p95
   by nearest rank) and throughput per ISO week, always with the number of closed
   tasks that have NO stamp.
 - `backlog/.gitignore` — `activity/*.jsonl` is out of git, `activity/rollup/` is
-  in it, and `worktrail init` writes the same rule into a new backlog.
+  in it, and `branchling init` writes the same rule into a new backlog.
 - `config.yaml` — `activity_privacy`, `idle_gap_minutes`,
   `heartbeat_throttle_seconds`, `min_report_n`, `activity_retention_days`. The
   whole set at once, because an unknown key fails: adding them one task at a time
@@ -541,7 +541,7 @@ Engaged time. The hole §15 named is closed; what fills it:
   recorded it as "does not fire at all in this repository" because branches are
   named `tl-<number>-<slug>` while the prefix is `TL`, and that is a defect in
   the leg rather than a fact about branch naming.
-- `scripts/focus.mjs` and `worktrail focus` — legs 1 and 2, and the throttle
+- `scripts/focus.mjs` and `branchling focus` — legs 1 and 2, and the throttle
   window. **The pointer lives outside the repository**, keyed like the locks by
   the shared git directory plus the session, not in a gitignored file: every
   worktree has its own checkout, so a pointer in the backlog would be a
@@ -552,7 +552,7 @@ Engaged time. The hole §15 named is closed; what fills it:
 - **Auto-focus in `take`** — §8.1's condition. Writing `status: in_progress`
   sets THIS session's focus, best effort: a state directory that cannot be
   written loses a leg of the chain, never a claim.
-- `scripts/activity-record.mjs` and `worktrail activity record` — the callable
+- `scripts/activity-record.mjs` and `branchling activity record` — the callable
   input of §7. Flags are an instruction, a host payload on stdin is a hint. A
   throttled call SUCCEEDS and writes nothing: the adapter fires after every tool
   call, so an error there would be a banner over most of an editing session.
@@ -560,7 +560,7 @@ Engaged time. The hole §15 named is closed; what fills it:
   **every** tool. The throttle is what makes the wide matcher affordable, and it
   lives in the command rather than in the script because the window's value is
   in `config.yaml` and because §7 expects more adapters than this one.
-- `worktrail time --engaged` — effort (sessions summed) beside calendar time
+- `branchling time --engaged` — effort (sessions summed) beside calendar time
   (sessions merged), the count of runs too short to measure, and
   `unknown_ratio`, which `--json` carries whether or not `--engaged` was passed.
 
@@ -579,7 +579,7 @@ to the whole, and a test asserts it.
 What the log gives BACK. §9 makes these a condition of the module rather than a
 follow-up, and they land one iteration after the collection they answer for.
 
-- `worktrail activity prune` — raw rows past `activity_retention_days` go, the
+- `branchling activity prune` — raw rows past `activity_retention_days` go, the
   per-task aggregate stays. **The aggregates are recomputed from the FULL log
   BEFORE anything is deleted**, and the order is not an implementation detail:
   deleting first would silently rewrite every historical figure to "the last N
@@ -590,20 +590,20 @@ follow-up, and they land one iteration after the collection they answer for.
 - **`prune` runs when the viewer starts**, beside the view rebuild, silently and
   best effort. A retention window somebody has to remember to apply is a
   paragraph in a document, not a mechanism.
-- `worktrail activity forget --actor` — one person's raw rows go **and the
+- `branchling activity forget --actor` — one person's raw rows go **and the
   aggregates are recomputed WITHOUT them**. That inversion is the whole
   difference from `prune`: expiry keeps the summary because time passing revokes
   nothing, erasure does not because an aggregate left standing over deleted rows
   is the data coming back at the next report. `--dry-run` is required rather
   than offered — there is no undo — and the test compares the files' BYTES.
-- `worktrail activity reassign --from --to --session [--since]` — the log is
+- `branchling activity reassign --from --to --session [--since]` — the log is
   append-only, so a correction is a new row and `applyReassignments()` applies
   it at read time, deterministically by ULID, so corrections compose. Nothing on
   disk is edited, which matters because the person disputing an attribution is
   being asked to trust the tool a second time. `--session` is REQUIRED: without
   it the correction would move every row ever recorded on the task, which is a
   merge.
-- `worktrail activity report --privacy` — the window, the mode, how many raw
+- `branchling activity report --privacy` — the window, the mode, how many raw
   rows exist, whose they are, and which paths are versioned. One place a person
   can see what the tool holds about them, and it says in as many words that it
   is a set of mechanisms and not a compliance claim.
@@ -641,11 +641,11 @@ Phase 2 of §12: the estimates stop being unfalsifiable.
   are the same estimate written twice; splitting them would halve both
   samples. The label is derived from the key, not remembered from the
   frontmatter.
-- **`worktrail stats --correlation-only`** — step 0 alone, and it exits 0 on
+- **`branchling stats --correlation-only`** — step 0 alone, and it exits 0 on
   every verdict including `uncorrelated`. A negative measurement is a result,
   and a non-zero exit would turn the honest answer into something a pipeline
   reads as a broken command.
-- **`worktrail stats --calibration`** — the gate, then the table. §11's three
+- **`branchling stats --calibration`** — the gate, then the table. §11's three
   rules are the code: under `min_report_n` a bucket prints "not enough data"
   and carries no median at all (not a median nobody is meant to read); a
   bucket that speaks prints p20–p80 beside its median; a breakdown by board,
@@ -663,7 +663,7 @@ Phase 2 of §12: the estimates stop being unfalsifiable.
 - **Only ARCHIVED tasks are sampled.** A task in flight has an aggregate that
   is a fraction of its final one, so admitting it would move every median by
   an amount depending on when the report was run.
-- **`worktrail new --estimate 2h` prints that bucket's calibration**, and
+- **`branchling new --estimate 2h` prints that bucket's calibration**, and
   prints nothing below the threshold. Writing the estimate is the only moment
   the number can still change a decision; a hint drawn from three samples
   would be a guess with the authority of a measurement.
@@ -701,7 +701,7 @@ Phase 3 of §12: the second axis, and the four answers it is allowed to give.
   not a moment of work, so clustering on it would add a spurious run at the end
   of every session — inflating exactly the count of single-heartbeat clusters
   §14 point 4 is to be settled with.
-- **`worktrail time --cost`** gives four distinguishable answers, and the
+- **`branchling time --cost`** gives four distinguishable answers, and the
   distinction IS the feature: an amount (`api` with a rate), tokens with no
   amount and the reason (`subscription` — the marginal dollar cost of one task
   on a plan is fiction), a declared zero (`local`), and `null` — no adapter, or
@@ -744,7 +744,7 @@ so instead of picking a winner.
 
 ## 20. What is implemented (2026-09-02, TL-88)
 
-`worktrail quote <ID>` — the same distribution, read forwards.
+`branchling quote <ID>` — the same distribution, read forwards.
 
 - **It computes nothing of its own.** The same buckets, the same `min_report_n`,
   the same refusals as §11. Two answers to one question would leave nothing to

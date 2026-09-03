@@ -15,7 +15,7 @@ updated: 2026-09-03
 blocked_by: [TL-34]
 blocks: []
 related_docs:
-  - docs/worktrail-global-tool.md
+  - docs/branchling-global-tool.md
 verification:
   # `scripts/…`, not `backlog/scripts/…`: written before the extraction, when
   # code and data were co-located. The second entry no longer goes through a
@@ -42,7 +42,7 @@ This is the only step in the global-tool project that **gives the user
 something new**; TL-33/1440/1441 clear things that block publication out of
 the way. That is why it comes last, not first.
 
-**It explicitly has an uncertain audience** ([worktrail-global-tool.md §11](../../docs/worktrail-global-tool.md) item 1): today there is only one
+**It explicitly has an uncertain audience** ([worktrail-global-tool.md §11](../../docs/branchling-global-tool.md) item 1): today there is only one
 project. If, a quarter after TL-34, the registry still has a single entry,
 this task **should not be created** — rather than built "just in case". The
 estimate entered here assumes the condition has been met.
@@ -141,7 +141,7 @@ time node backlog/scripts/cli.mjs query --all-projects --count
 - If the measurement from step 5 comes out badly, an index is a separate task
   with its own numeric justification; SQLite as a reproducible index is
   already anticipated in
-  [worktrail-state-and-sync.md §5.4](../../docs/worktrail-state-and-sync.md)
+  [worktrail-state-and-sync.md §5.4](../../docs/branchling-state-and-sync.md)
   and that is its natural home.
 
 ## Log

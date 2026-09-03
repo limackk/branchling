@@ -5,7 +5,7 @@
  * with a trailing `# …`, and `epic: ""` is the one whose default value is a
  * quoted empty string. Six readers of a frontmatter line existed; one stripped
  * the comment and five stripped only the quotes, so a task straight out of
- * `worktrail new` reported
+ * `branchling new` reported
  *
  *     epic: "\"                           # free text — the group this task …"
  *
@@ -146,7 +146,7 @@ test("the refs guard SEES a blocked_by that has a comment beside it", () => {
 // ── End to end: a fresh backlog, as a stranger meets it ───────────────────
 
 function freshBacklog(fn) {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-comments-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-comments-"));
   try {
     const init = spawnSync(process.execPath, [CLI, "init", "--dir", dir], { encoding: "utf8" });
     assert.equal(init.status, 0, "init failed: " + init.stdout + init.stderr);

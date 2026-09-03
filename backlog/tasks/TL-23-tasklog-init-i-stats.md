@@ -15,7 +15,7 @@ updated: 2026-08-29
 blocked_by: []
 blocks: []
 related_docs:
-  - docs/worktrail-state-and-sync.md
+  - docs/branchling-state-and-sync.md
 verification:
   - bash: "./scripts/worktrail init --dir /tmp/x && ./scripts/worktrail build --dir /tmp/x && ./scripts/worktrail stats --dir /tmp/x"
   - bash: "./scripts/worktrail stats --json | python3 -c \"import json,sys; print(json.load(sys.stdin)['active'])\""

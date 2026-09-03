@@ -15,7 +15,7 @@ updated: 2026-09-01
 blocked_by: []
 blocks: [TL-96, TL-98, TL-99, TL-101]
 related_docs:
-  - docs/worktrail-state-and-sync.md
+  - docs/branchling-state-and-sync.md
   - docs/backlog-time-tracking.md
 verification:
   # One entry for the WHOLE file, not one per criterion via `--test-name-pattern`:
@@ -60,13 +60,13 @@ competing tools are "agent-friendly" passively; none of them distributes
 work. The foundation already exists: an event log with ULIDs (TL-21), an
 attribution chain and the notion of a session (the time-tracking project),
 locks scoped to a machine described in
-[docs/worktrail-state-and-sync.md](../../docs/worktrail-state-and-sync.md) §6.1 —
+[docs/branchling-state-and-sync.md](../../docs/branchling-state-and-sync.md) §6.1 —
 atomicity on a single machine is guaranteed by a single writer, not by
 consensus.
 
 Variants rejected:
 - **A dispatcher daemon** — breaks the "no daemon" decision
-  ([docs/worktrail-global-tool.md](../../docs/worktrail-global-tool.md) §10).
+  ([docs/branchling-global-tool.md](../../docs/branchling-global-tool.md) §10).
 - **A lock as an event in the log** — LWW resolves after the fact, so it does
   not give mutual exclusion (state-and-sync §6.1). The lock has to be a local
   primitive: a SQLite transaction, and until that exists, a lockfile created
@@ -81,7 +81,7 @@ do not pretend to provide it here.
 
 ## Pre-flight reading
 
-- [docs/worktrail-state-and-sync.md](../../docs/worktrail-state-and-sync.md) §5–§6
+- [docs/branchling-state-and-sync.md](../../docs/branchling-state-and-sync.md) §5–§6
   — who wins on divergence, the boundary of local locks.
 - `scripts/task-fields.mjs` — the single definition of frontmatter writes;
   `next` writes through it, not with its own code.
@@ -144,7 +144,7 @@ decision from TL-97).
 Append-only. Format: `YYYY-MM-DD status — who — note`.
 
 - 2026-08-31 pending — agent:claude — task created from a review of agentic
-  distinguishers against Backlog.md; source: docs/worktrail-state-and-sync.md §6.1.
+  distinguishers against Backlog.md; source: docs/branchling-state-and-sync.md §6.1.
 - 2026-08-31 revised — agent:claude — split into the take/next primitives, so
   that direct mode ("do TL-1234" said to an agent) gets a lock, attribution
   and focus without a dispatcher; taking outside a role is recorded, not

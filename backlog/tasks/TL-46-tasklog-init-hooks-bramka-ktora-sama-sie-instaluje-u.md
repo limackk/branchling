@@ -15,7 +15,7 @@ updated: 2026-09-03
 blocked_by: []
 blocks: []
 related_docs:
-  - docs/worktrail-global-tool.md
+  - docs/branchling-global-tool.md
 verification:
   - id: hooks-behaviour
     bash: "node --test scripts/tests/hooks-install.test.mjs"
@@ -38,7 +38,7 @@ in `scripts/`, covered by `files` in `package.json`, and are exposed as
 Today whoever remembers runs them.
 
 The distinction this task grew out of at all
-([worktrail-global-tool.md §10.1](../../docs/worktrail-global-tool.md)): a
+([worktrail-global-tool.md §10.1](../../docs/branchling-global-tool.md)): a
 hook in a consumer's repo is their own file, a dogfooding hook here does not
 ship in the package, and so **neither of the two solves the user's
 problem.** The missing piece is a command, not a config file on our side.

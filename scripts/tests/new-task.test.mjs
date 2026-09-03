@@ -1,5 +1,5 @@
 /**
- * `worktrail new` (BL-1413).
+ * `branchling new` (BL-1413).
  *
  * The risk in this command is the NUMBER. The rule is "never max+1 from your own
  * tree", because another session holds the next id on its branch before any file
@@ -49,7 +49,7 @@ function run(args, cwd) {
  *  frontmatter: the example task would take number 1 and the assertions would be
  *  about it rather than about the write. */
 function freshBacklog() {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-new-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-new-"));
   const r = run(["init", "--dir", dir, "--no-example"]);
   assert.equal(r.status, 0, r.stderr);
   return dir;

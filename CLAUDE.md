@@ -1,9 +1,9 @@
-# worktrail
+# branchling
 
 A backlog in markdown files, driven from the terminal. Tasks are files in git;
 views, indexes and aggregates are COMPUTED and are not versioned.
 
-- **Entry point:** `node scripts/cli.mjs` (or `worktrail` once installed). An
+- **Entry point:** `node scripts/cli.mjs` (or `branchling` once installed). An
   unknown command and an unknown flag **fail** — a silent no-op looks like it
   worked.
 - **Its own backlog:** `backlog/` — the tool tracks itself with itself.
@@ -12,7 +12,7 @@ views, indexes and aggregates are COMPUTED and are not versioned.
 ## Four laws
 
 Extensibility comes from these rules, not from a plugin API. Full reasoning:
-[`docs/worktrail-global-tool.md`](docs/worktrail-global-tool.md) §3.
+[`docs/branchling-global-tool.md`](docs/branchling-global-tool.md) §3.
 
 1. **Data in the repository, pointers globally.** A task travels with its branch
    and goes through review. State divorced from the branch is the defect that
@@ -27,7 +27,7 @@ Extensibility comes from these rules, not from a plugin API. Full reasoning:
 
 ## Context economy: ask, do not read
 
-**Ask the backlog a question; do not read it.** `worktrail query`, `stats`
+**Ask the backlog a question; do not read it.** `branchling query`, `stats`
 and `next` answer from the task files and cost what the answer is worth.
 Reading `tasks/*.md` in bulk, or grepping across them, spends most of a
 context window before any work starts.
@@ -39,12 +39,12 @@ like a real one.
 
 **Looking for work must not scale with the backlog.** Prefer `next` (one task,
 constant cost), then `--count` and `stats`; ask for the full list only with a
-filter narrow enough to act on. `worktrail stats --context` prints what each
+filter narrow enough to act on. `branchling stats --context` prints what each
 of those costs in THIS tree.
 
 This paragraph is not prose about the tool — it is `CONTEXT_RULE` in
 [`scripts/context-budget.mjs`](scripts/context-budget.mjs), which is also what
-`worktrail instructions context-budget` prints. One source, so the two cannot
+`branchling instructions context-budget` prints. One source, so the two cannot
 drift apart; a test fails if this copy falls behind it.
 
 ## Before you change the code
@@ -58,13 +58,13 @@ drift apart; a test fails if this copy falls behind it.
 - **The task id prefix comes from `config.yaml`**, never from a literal in the
   code — the patterns are built by `scripts/task-id.mjs`. A missing key means the
   prefix is read from the tree; a mismatch between configuration and tree FAILS
-  before anything is written. Changing the prefix is `worktrail migrate-prefix`,
-  not an edit to one line. Closing gaps in the NUMBERS is `worktrail renumber`.
+  before anything is written. Changing the prefix is `branchling migrate-prefix`,
+  not an edit to one line. Closing gaps in the NUMBERS is `branchling renumber`.
 - **The code knows the SHAPE of a field, `backlog/config.yaml` knows the
   VALUES.** An unknown key fails. Do not write the project's vocabulary into the
   code.
 - **An id in a comment that is an EXAMPLE, not a reference, is marked
-  `renumber: allow` on that ONE line** (TL-136). `worktrail renumber` rewrites
+  `renumber: allow` on that ONE line** (TL-136). `branchling renumber` rewrites
   prose deliberately — after a renumbering an id left behind still exists and
   names a DIFFERENT task — and it cannot tell the two roles apart, so the
   sentence on the next line collapses into "one becomes one" with every guard
@@ -73,7 +73,7 @@ drift apart; a test fails if this copy falls behind it.
   The marker is the author's declaration; a foreign prefix (`PROJ-1303`) is the
   other way out, because no map of this repository will ever cover it.
 - **The reason for a change travels with the WRITE, not as prose in the file**
-  (TL-105). `## Log` exists neither in the template nor in what `worktrail done`
+  (TL-105). `## Log` exists neither in the template nor in what `branchling done`
   writes; the "why" is the `reason` field of a record in `backlog/history/`.
   `reason_required_statuses` in `config.yaml` says which statuses may not be
   entered without one (here: `blocked`, `cancelled`) — writing commands REFUSE
@@ -83,7 +83,7 @@ drift apart; a test fails if this copy falls behind it.
   sentences nobody will reconstruct, not debt to tidy away.
 - **The product name comes from `scripts/product.mjs`** (read from
   `package.json`), not from literals — in messages, in `--help`, in comments and
-  in templates written into other people's repositories. `worktrail check
+  in templates written into other people's repositories. `branchling check
   --product-name` enforces this (TL-117): a literal in `scripts/` or `bin/`
   FAILS, and an exception (a real path on disk) is marked `product-name: allow`
   beside that ONE line. `scripts/tests/` is DELIBERATELY outside the guard — a
@@ -140,7 +140,7 @@ titles and bodies, branch names, worktree names.
 
 Three things are enforced by a guard; the rest is this rule:
 
-- `worktrail check --language` reads `scripts/`, `bin/`, `README.md`,
+- `branchling check --language` reads `scripts/`, `bin/`, `README.md`,
   `_template.md`, the whole `backlog/` directory, and `docs/` (TL-137). A
   markdown link's target and an inline `` `code span` `` are not searched — a
   task's filename is data, not prose (TL-137's Decisions: filenames are never
@@ -195,7 +195,7 @@ A typo on the neighbouring line — you fix it. A separate design decision, a
 refactor of an adjacent module, a missing guard, debt spotted along the way —
 that is a new session, so it goes to the backlog. A topic left only in the prose
 of an answer or in a `TODO` comment dies with the session; the backlog is the
-only place `worktrail next` can ever hand it out from.
+only place `branchling next` can ever hand it out from.
 
 - **Create it with `node scripts/cli.mjs new --title "…"`**, not by writing the
   file by hand — the id and the shape of the frontmatter come from the tool.
@@ -232,7 +232,7 @@ expire.
   after it; the body wrapped at 72. No emoji and no `feat:`-style tags — the
   task id already says what the commit is about, and a second taxonomy beside it
   is a second place to be wrong.
-- **Commit a task closed by `worktrail done` together with its entry in
+- **Commit a task closed by `branchling done` together with its entry in
   `backlog/history/`** — the evidence of closing is part of the closing.
 - **A task that did not pass its own verification is NOT finished** and this rule
   does not apply to it. Commit the progress with an honest description in the
@@ -249,7 +249,7 @@ explicit request.
 
 The reason is not tidiness but measurement. A task closed on a branch nobody
 merged is still OPEN as far as the rest of the repository is concerned: every
-worktree has its own `backlog/`, and `worktrail next` picks candidates from ITS
+worktree has its own `backlog/`, and `branchling next` picks candidates from ITS
 OWN tree — a reservation only excludes sessions running at the same moment, and
 knows nothing about the state on somebody else's branch. This really happened:
 on 2026-09-01 TL-74 was closed at 13:41, and at 13:43 a second session was
@@ -260,7 +260,7 @@ to do it a second time.
 - **Fast-forward where possible** — `git -C <main checkout> merge --ff-only
   <branch>`. No fast-forward means `main` has moved: use a merge commit, and
   settle conflicts by task id, not by file.
-- **Rebuild the views in the main checkout** — `worktrail build`. The views are
+- **Rebuild the views in the main checkout** — `branchling build`. The views are
   computed and unversioned, so after a merge they still show the state from
   before it.
 - **Remove the worktree** — `git worktree remove <path>`. A worktree with no

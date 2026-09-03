@@ -13,7 +13,7 @@ created: 2026-09-02
 updated: 2026-09-02
 blocked_by: ["TL-142"]
 blocks: []
-related_docs: ["docs/worktrail-state-and-sync.md"]
+related_docs: ["docs/branchling-state-and-sync.md"]
 verification:                      # HOW to check that the task is really done
   - id: suite-green
     bash: "node --test scripts/tests/*.test.mjs"
@@ -26,7 +26,7 @@ verification:                      # HOW to check that the task is really done
 `query` must report a task that exists only on an unmerged branch, naming that
 branch, instead of behaving as though the task does not exist.
 
-Today it does not, and `docs/worktrail-state-and-sync.md` §6.2 records that as
+Today it does not, and `docs/branchling-state-and-sync.md` §6.2 records that as
 a deliberate boundary: *a task existing only on another branch still does not
 appear in the list*. That was defensible while the reader and the writer were
 the same person on one disk. It stops being defensible the moment a second

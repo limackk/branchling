@@ -1,5 +1,5 @@
 /**
- * `worktrail check --vocabulary` (TL-56).
+ * `branchling check --vocabulary` (TL-56).
  *
  * WHAT THIS IS DEFENDING. The writing path enforced the vocabularies and the
  * reading path did not, so a tree could — and did — drift wholesale outside
@@ -38,7 +38,7 @@ function run(cwd, args) {
 }
 
 function repo() {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-vocab-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-vocab-"));
   assert.equal(spawnSync("git", ["init", "-q", "."], { cwd: dir }).status, 0);
   assert.equal(run(dir, ["init", "--dir", ".", "--no-example"]).status, 0);
   return dir;

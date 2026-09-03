@@ -10,7 +10,7 @@
  * `'backlog'`. The script then looks for `<root>/backlog/tasks`, which does not
  * exist, because the tasks are in `<root>/tasks`.
  *
- * That is exactly the layout after `worktrail init --dir .` in a fresh repository,
+ * That is exactly the layout after `branchling init --dir .` in a fresh repository,
  * where the backlog IS the whole repository — not a subdirectory of a larger
  * workspace. Both layouts have a test, so that fixing one does not break the other.
  */
@@ -46,9 +46,9 @@ function vcs(cwd, ...args) {
     { cwd, encoding: "utf8" });
 }
 
-/** The backlog is the ROOT of the git repo — exactly `worktrail init --dir .`. */
+/** The backlog is the ROOT of the git repo — exactly `branchling init --dir .`. */
 function backlogAtRepoRoot() {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-root-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-root-"));
   const r = run("init-backlog.mjs", ["--dir", dir]);
   assert.equal(r.status, 0, r.stderr);
   vcs(dir, "init", "-q", "-b", "main");
@@ -60,7 +60,7 @@ function backlogAtRepoRoot() {
 
 /** The backlog in a SUBDIRECTORY of the repo — the other layout. A positive control. */
 function backlogInSubdir() {
-  const repoRoot = mkdtempSync(join(tmpdir(), "worktrail-sub-"));
+  const repoRoot = mkdtempSync(join(tmpdir(), "branchling-sub-"));
   const dir = join(repoRoot, "backlog");
   const r = run("init-backlog.mjs", ["--dir", dir]);
   assert.equal(r.status, 0, r.stderr);
@@ -117,7 +117,7 @@ test("backlog at the root: the number sees tasks from OTHER branches, not just t
   }
 });
 
-test("`worktrail new` in a repo whose backlog is the root does NOT warn about a local scan", () => {
+test("`branchling new` in a repo whose backlog is the root does NOT warn about a local scan", () => {
   // The warning "NOTE: the number comes from a LOCAL scan" is meant to appear only
   // when next-backlog-id.mjs REALLY cannot scan the branches — not on every call
   // in this one, entirely ordinary repository layout.

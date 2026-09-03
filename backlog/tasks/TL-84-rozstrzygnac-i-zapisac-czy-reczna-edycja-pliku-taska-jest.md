@@ -16,7 +16,7 @@ blocked_by: []
 blocks: []
 related_docs:
   - CLAUDE.md
-  - docs/worktrail-global-tool.md
+  - docs/branchling-global-tool.md
 verification:
   - id: one-sentence
     bash: "grep -q 'Editing a task file by hand is supported, not merely tolerated' README.md && node scripts/cli.mjs instructions overview | grep -qi 'EDITING A TASK FILE BY HAND IS SUPPORTED, not merely tolerated' && echo 'the same sentence stands in the README and in the instruction source — OK'"
@@ -73,7 +73,7 @@ What needs to be weighed so the answer is not wishful thinking:
 2. `scripts/doctor.mjs` — how much of the drift detection already exists.
 3. `.claude/skills/backlog-workflow/SKILL.md`, the "Editing outside the
    viewer" section.
-4. `docs/worktrail-global-tool.md` §3 — the four laws; check whether any of
+4. `docs/branchling-global-tool.md` §3 — the four laws; check whether any of
    them already implies this answer, instead of inventing it from scratch.
 
 ## Steps

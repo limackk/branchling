@@ -19,7 +19,7 @@
  * are not the same fact. The reason on the `role:` row explains that field's
  * change and is bounded like every reason. The comment is an EVENT with an id of
  * its own — append-only and conflict-free by construction (§5.1 of
- * docs/worktrail-state-and-sync.md, a real path — product-name: allow) — which
+ * docs/branchling-state-and-sync.md, a real path — product-name: allow) — which
  * makes it addressable: TL-114's `__decision__` answers a comment by pointing
  * at it, and nothing can point at a field's reason. This is
  * the first use of the pseudo-field reserved in BL-1404, and it is deliberately

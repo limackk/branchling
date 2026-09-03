@@ -2,7 +2,7 @@
  * Dispatcher CLI (BL-1411).
  *
  * The defect this fixes: `serve-backlog.mjs` read only the flags it knew and
- * IGNORED the rest. `worktrail query --status blocked` went through without a trace,
+ * IGNORED the rest. `branchling query --status blocked` went through without a trace,
  * after which the server opened a browser tab — a silent no-op with a side effect,
  * which is worse than an error, because it looks like the tool working.
  *
@@ -36,7 +36,7 @@ function run(args, opts) {
 }
 
 function sandbox() {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-cli-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-cli-"));
   mkdirSync(join(dir, "tasks"));
   writeFileSync(join(dir, "_template.md"), "---\nid: BL-NNN\n---\n", "utf8");
   // The board guard requires a registry — without it `board:` has no vocabulary.
@@ -54,7 +54,7 @@ function sandbox() {
 
 // ── Resolving the command (pure) ──────────────────────────────────────────
 
-test("no arguments means the server — the `worktrail` habit is untouched", () => {
+test("no arguments means the server — the `branchling` habit is untouched", () => {
   assert.equal(resolveCommand([]).name, "serve");
 });
 
@@ -65,14 +65,14 @@ test("a subcommand picks the script, the remaining arguments go on", () => {
 });
 
 test("the server flags with no subcommand still work", () => {
-  // `worktrail --port 4400` meant "start the server" and has to keep meaning it.
+  // `branchling --port 4400` meant "start the server" and has to keep meaning it.
   const r = resolveCommand(["--port", "4400", "--no-open"]);
   assert.equal(r.name, "serve");
   assert.deepEqual(r.args, ["--port", "4400", "--no-open"]);
 });
 
 test("an unknown COMMAND is an error, not a silent fall-through to the server", () => {
-  // This is the reported bug: `worktrail query …` used to open a page.
+  // This is the reported bug: `branchling query …` used to open a page.
   assert.throws(() => resolveCommand(["frobnicate"]), /frobnicate/);
   assert.throws(() => resolveCommand(["frobnicate"]), /query|build|check/);
 });
@@ -293,7 +293,7 @@ test("`regen-hook` takes the backlog directory FROM THE FILE, not from cwd", () 
   // The heart of portability: a hook installed in node_modules has no neighbours,
   // and cwd can be anything. The task's path IS the pointer to the data directory.
   const dir = sandbox();
-  const elsewhere = mkdtempSync(join(tmpdir(), "worktrail-cwd-"));
+  const elsewhere = mkdtempSync(join(tmpdir(), "branchling-cwd-"));
   try {
     const file = join(dir, "tasks", "BL-900-zrob-rzecz.md");
     const r = run(["regen-hook"], {

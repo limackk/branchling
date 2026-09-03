@@ -255,7 +255,7 @@ test("an answer that is not JSON is retried, with the parse error told to the mo
 // ── The real gate ─────────────────────────────────────────────────────────
 
 function backlog() {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-adapter-" + counter++ + "-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-adapter-" + counter++ + "-"));
   assert.equal(run(["init", "--dir", dir, "--no-example"]).status, 0);
   return dir;
 }

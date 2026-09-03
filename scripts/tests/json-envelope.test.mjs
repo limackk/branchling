@@ -54,7 +54,7 @@ function run(args, cwd, input) {
  * The point here is the ordinary path.
  */
 function backlog({ tasks = 0, rule = false } = {}) {
-  const repo = mkdtempSync(join(tmpdir(), "worktrail-envelope-" + counter++ + "-"));
+  const repo = mkdtempSync(join(tmpdir(), "branchling-envelope-" + counter++ + "-"));
   execFileSync("git", ["init", "-q", "-b", "main", "."], { cwd: repo, stdio: "ignore" });
   const dir = join(repo, "backlog");
   assert.equal(run(["init", "--dir", dir, "--no-example"]).status, 0, "init failed");

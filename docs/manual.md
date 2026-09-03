@@ -1,4 +1,4 @@
-# worktrail — the manual
+# branchling — the manual
 
 **This is a reference for using the tool, not a design document.** The other
 files in `docs/` record a decision, the measurement behind it, and what would
@@ -8,8 +8,8 @@ the tool's own `--help` wins over both.
 The [README](../README.md) is the front door: what this is, how to install it,
 and the first five minutes. Everything here is what you reach for afterwards.
 
-**Nothing in this file lists the commands.** `worktrail --help` does that, and
-`worktrail <command> --help` prints one command's flags. A copy of a list the
+**Nothing in this file lists the commands.** `branchling --help` does that, and
+`branchling <command> --help` prints one command's flags. A copy of a list the
 tool generates is wrong the moment a command is added, in the way that is
 hardest to notice — still specific, still confident, no longer true.
 
@@ -39,7 +39,7 @@ hardest to notice — still specific, still confident, no longer true.
    cancelled — deliberately dropped, with a note saying why
 ```
 
-Those are the **defaults** written by `worktrail init`, not a contract of the
+Those are the **defaults** written by `branchling init`, not a contract of the
 tool: the list of statuses, their order (which is the sort order of the views)
 and which of them fall out into the archive are all stated by your project's
 `config.yaml`.
@@ -49,7 +49,7 @@ There is no "focus" field. `NOW.yaml` is derived from status and priority —
 untouched). You shape it by working, not by declaring: you start a task, you put
 it down, you close it, and it leaves on its own.
 
-**You do not mark a task done — you close it with `worktrail done <ID>`, and the
+**You do not mark a task done — you close it with `branchling done <ID>`, and the
 command runs its `verification:` first.** Every entry is printed before it runs
 and executed from the repository root; the first failure ends the run, exits
 non-zero and leaves the task file untouched. A green run sets the status, ticks
@@ -57,8 +57,8 @@ the acceptance criteria its entries prove, appends a line to `## Log` and
 rebuilds the views.
 
 ```bash
-worktrail done TASK-42 --dry-run    # run the whole contract, change nothing
-worktrail done TASK-42              # close it, if and only if it passes
+branchling done TASK-42 --dry-run    # run the whole contract, change nothing
+branchling done TASK-42              # close it, if and only if it passes
 ```
 
 Three things it deliberately does:
@@ -88,7 +88,7 @@ STATUSES, PRIORITIES, LABELS or TYPES exist in your project is stated by
 backlog with a completely different process, and it is why no project's
 vocabulary has to live inside the tool.
 
-`worktrail init` writes that file with a comment on every key, including the
+`branchling init` writes that file with a comment on every key, including the
 **cost of changing it** (`free` / `tree` / `migration`). Here is a made-up
 project — a bicycle shop whose process has two extra statuses and a closed set
 of labels:
@@ -149,8 +149,8 @@ task_id_prefix: TASK
 - **Changing the prefix is a command, not a one-line edit:**
 
 ```bash
-worktrail migrate-prefix --to PROJ --dry-run   # the plan: what becomes what
-worktrail migrate-prefix --to PROJ             # filenames, ids, blocked_by/blocks,
+branchling migrate-prefix --to PROJ --dry-run   # the plan: what becomes what
+branchling migrate-prefix --to PROJ             # filenames, ids, blocked_by/blocks,
                                              # history logs and config.yaml
 ```
 
@@ -183,7 +183,7 @@ One file, one diff.
 
 The plan is **advisory**: `status:` stays the only truth about what has happened,
 and nothing here blocks a task. The single hard rule is that the order must be
-executable, which `worktrail check --plan` decides:
+executable, which `branchling check --plan` decides:
 
 | Situation | Verdict |
 |---|---|
@@ -195,13 +195,13 @@ executable, which `worktrail check --plan` decides:
 | a `done`/`cancelled` task in the plan | fine — a plan keeps its history |
 | **no `plan.yaml` at all** | fine — ordering is optional, and the guard says so |
 
-The guard runs inside the plain `worktrail check` as well.
+The guard runs inside the plain `branchling check` as well.
 
-**Where the order has got to** is computed, not written down — `worktrail plan`
+**Where the order has got to** is computed, not written down — `branchling plan`
 measures the file against `tasks/*.md`:
 
 ```
-$ worktrail plan
+$ branchling plan
     wave 1  Foundation  0 open  1 closed
   → wave 2  Consumers   2 open  0 closed  active
 
@@ -220,14 +220,14 @@ later wave, the sign that the order wants reshuffling.
 
 ## Seeding a backlog from a plan
 
-`worktrail seed` reads a structured plan on **standard input** and turns it into
+`branchling seed` reads a structured plan on **standard input** and turns it into
 a backlog — a task file per item, dependencies wired up, numbers allocated by the
 tool. A `--dir` that is not a backlog yet is created first, exactly as `init`
 would.
 
 ```bash
-worktrail seed --dir ./backlog --actor agent:claude < plan.json
-worktrail seed --dir ./backlog --dry-run < plan.json   # what would be created
+branchling seed --dir ./backlog --actor agent:claude < plan.json
+branchling seed --dir ./backlog --dry-run < plan.json   # what would be created
 ```
 
 **No model is involved.** Turning prose into a plan is somebody else's program —
@@ -235,7 +235,7 @@ which is why the input is a format and not a prompt, and why anybody's adapter
 can write to it:
 
 ```bash
-my-planner spec.md | worktrail seed --dir ./backlog --json
+my-planner spec.md | branchling seed --dir ./backlog --json
 ```
 
 ```json
@@ -329,7 +329,7 @@ asks the same question by hand and hands out that role *or* the tasks with none;
 `--role-strict` narrows it to exactly that role.
 
 ```bash
-worktrail run --agent "codex exec" \
+branchling run --agent "codex exec" \
   --agent-for docs="claude -p @{task_file}" \
   --agent-for analyst="…"      # omit it, and analyst tasks wait for you
 ```
@@ -372,8 +372,8 @@ Left at `0`, the default, a claim waits for a person.
 ## Guards
 
 ```bash
-worktrail check     # every guard; exit code = the worst of them
-worktrail doctor    # is this backlog set up correctly at all
+branchling check     # every guard; exit code = the worst of them
+branchling doctor    # is this backlog set up correctly at all
 ```
 
 `check` answers four questions, and each has its own selector
@@ -383,9 +383,9 @@ worktrail doctor    # is this backlog set up correctly at all
   from parallelism: each worktree computes "highest + 1" from *its own* view of
   `tasks/`, so two branches hand the same number to different work. Nothing is
   broken in either tree on its own — the defect exists only in the union, which
-  means it appears at merge time. Hence `worktrail next-id`, which computes from
+  means it appears at merge time. Hence `branchling next-id`, which computes from
   the **union of all branches and worktrees** (`--explain` says where the
-  maximum came from), and hence `worktrail new`, which calls it for you.
+  maximum came from), and hence `branchling new`, which calls it for you.
 - **Boards come from the registry.** A slug that is not in `boards.yaml` stops
   the build.
 - **`blocked_by` / `blocks` point at tasks that exist.** Dangling references are
@@ -415,10 +415,10 @@ applicable, and for anything failing it prints the fix. It takes `--json`;
 ## Viewer
 
 ```bash
-worktrail                       # server, plus an open tab
-worktrail serve --port 4400     # a different port
-worktrail serve --no-open       # do not open a window
-worktrail viewer                # just rebuild viewer.html, no server
+branchling                       # server, plus an open tab
+branchling serve --port 4400     # a different port
+branchling serve --no-open       # do not open a window
+branchling viewer                # just rebuild viewer.html, no server
 ```
 
 The server listens **on 127.0.0.1 only**, validates every field it writes with
@@ -479,7 +479,7 @@ audit log.
 Changes made outside the viewer while the server was down are recorded by you:
 
 ```bash
-worktrail history --actor local:me --source manual
+branchling history --actor local:me --source manual
 ```
 
 The first run against a tree with no reference point only establishes that point
@@ -489,7 +489,7 @@ not invented.
 ## What is computed may be deleted
 
 `tasks/*.md` is the **only** source of truth. Everything else is derived from it
-and is listed in the `.gitignore` that `worktrail init` writes:
+and is listed in the `.gitignore` that `branchling init` writes:
 
 | File | What it holds | When to read it |
 |---|---|---|
@@ -497,14 +497,14 @@ and is listed in the `.gitignore` that `worktrail init` writes:
 | `INDEX.yaml` | every active task, **one line each**, grouped by epic | picking the next piece of work |
 | `archive/done.yaml` | closed tasks, minimal entries | grep: "was X already done?" |
 | `boards/<slug>/*` | the same, narrowed to one board | working inside one context |
-| `viewer.html` | the browser page | `worktrail` / `worktrail viewer` |
+| `viewer.html` | the browser page | `branchling` / `branchling viewer` |
 
 **The views are not committed, and the reason is measured rather than
 aesthetic.** `INDEX.yaml` and `archive/done.yaml` are sorted aggregates of
 *every* task, so every branch rewrites the same file — two branches that share
 **no task at all** still conflict. The consequence you have to know about: a
-fresh clone and a new worktree have no views until a generator runs. `worktrail
-build` recreates them, and starting the viewer does it for you. `worktrail query`
+fresh clone and a new worktree have no views until a generator runs. `branchling
+build` recreates them, and starting the viewer does it for you. `branchling query`
 does not need them at all.
 
 **The index points, it does not describe.** A row carries only what you choose

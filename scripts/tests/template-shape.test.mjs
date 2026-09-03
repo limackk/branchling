@@ -3,7 +3,7 @@
  *
  * WHY THERE ARE TWO AT ALL. The root `_template.md` ships in the tarball into
  * other people's repositories; `backlog/_template.md` is the one THIS backlog's
- * `worktrail new` copies. Two files is not the defect — they drifted apart along
+ * `branchling new` copies. Two files is not the defect — they drifted apart along
  * the one dimension where they must not, and the drift was invisible because
  * every missing field is optional to the parser.
  *

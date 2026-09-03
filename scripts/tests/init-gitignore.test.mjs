@@ -1,5 +1,5 @@
 /**
- * `worktrail init` — does git REALLY ignore the views (TL-59).
+ * `branchling init` — does git REALLY ignore the views (TL-59).
  *
  * WHAT IS BEING TESTED. Not "was a `.gitignore` created", but whether the rule is
  * IN FORCE — because those are two different things, and they differ in exactly
@@ -38,7 +38,7 @@ isolateHome("init-gitignore");
 const CLI = join(dirname(fileURLToPath(import.meta.url)), "..", "cli.mjs");
 
 function repo() {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-gitignore-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-gitignore-"));
   const r = spawnSync("git", ["init", "-q", "."], { cwd: dir, encoding: "utf8" });
   assert.equal(r.status, 0, "git init: " + r.stderr);
   return dir;
@@ -104,7 +104,7 @@ test("appending is idempotent — a second init does not add a second block", ()
   init(dir, ["--dir", "."]);
   init(dir, ["--dir", "."]);
   const blocks = readFileSync(join(dir, ".gitignore"), "utf8").split(BLOCK_OPEN).length - 1;
-  assert.equal(blocks, 1, "the worktrail block appeared " + blocks + " times");
+  assert.equal(blocks, 1, "the branchling block appeared " + blocks + " times");
 });
 
 // ── Rezygnacja ────────────────────────────────────────────────────────────
@@ -143,7 +143,7 @@ test("a view already tracked: init mentions `git rm --cached`", () => {
 });
 
 test("outside a git repository: it says so once and does not pretend to be a crash", () => {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-nogit-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-nogit-"));
   const r = init(dir, ["--dir", "."]);
   assert.equal(r.status, 0, "the absence of a repository is not an error");
   assert.ok(/not a repository/.test(r.stdout), "it did not say why it is not checking:\n" + r.stdout);

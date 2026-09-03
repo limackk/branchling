@@ -9,7 +9,7 @@
  * its dependencies are explicit, which is what `next` needs to hand work out.
  *
  * WHY THERE IS NO MODEL IN HERE. This is the fourth law applied literally
- * (docs/worktrail-global-tool.md §3 — product-name: allow, a real path): a
+ * (docs/branchling-global-tool.md §3 — product-name: allow, a real path): a
  * writing command gets a callable input, and intelligence arrives from outside
  * through it rather than from in here. Turning prose into a plan is somebody
  * else's program — ours, in TL-95, or a stranger's. So this file imports

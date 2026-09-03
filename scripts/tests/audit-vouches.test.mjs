@@ -127,7 +127,7 @@ test("a vouch is never counted as a FINDING — this reports, it does not gate",
 // ── The command ───────────────────────────────────────────────────────────
 
 function backlog() {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-vouches-" + counter++ + "-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-vouches-" + counter++ + "-"));
   assert.equal(run(["init", "--dir", dir, "--no-example"]).status, 0);
   alignTemplate(dir);
   return dir;

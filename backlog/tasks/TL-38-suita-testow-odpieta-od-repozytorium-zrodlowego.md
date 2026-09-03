@@ -15,7 +15,7 @@ updated: 2026-08-30
 blocked_by: []
 blocks: []
 related_docs:
-  - docs/worktrail-global-tool.md
+  - docs/branchling-global-tool.md
 verification:
   - bash: "node --test scripts/tests/*.test.mjs"
 ---

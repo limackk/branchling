@@ -17,7 +17,7 @@ blocks: []
 related_docs:
   - docs/backlog-config-and-portability.md
 verification:
-  - bash: "d=$(mktemp -d); node /Users/limack/workspace/tasklog/bin/worktrail.mjs init --dir \"$d\" >/dev/null; for k in statuses priorities labels task_id_prefix owners estimates; do grep -q \"^$k:\" \"$d/config.yaml\" || { echo \"missing key $k in template\"; exit 1; }; done; echo 'all keys present — OK'"
+  - bash: "d=$(mktemp -d); node /Users/limack/workspace/tasklog/bin/branchling.mjs init --dir \"$d\" >/dev/null; for k in statuses priorities labels task_id_prefix owners estimates; do grep -q \"^$k:\" \"$d/config.yaml\" || { echo \"missing key $k in template\"; exit 1; }; done; echo 'all keys present — OK'"
   - bash: "node --test scripts/tests/init-config-comments.test.mjs"
   - manual: "Someone who does not know the tool can, after reading only the generated config.yaml, say which changes are free and which requires a migration."
 ---

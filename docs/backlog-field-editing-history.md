@@ -55,7 +55,7 @@ One row = one change to one field:
   CLOSED and the code does not guess it: a bare name in a new write lands as
   `unknown`. Entries from before TL-21 stay untouched and are given the
   `legacy` namespace on read. Target model:
-  [worktrail-state-and-sync.md](worktrail-state-and-sync.md) §7 step 4.
+  [branchling-state-and-sync.md](branchling-state-and-sync.md) §7 step 4.
 - `id` — a ULID (TL-21). Sorting by it is sorting by time, so it is a
   ready-made sync cursor; `readHistory()` deduplicates by it entries that a
   union merge might have inserted twice.
@@ -92,7 +92,7 @@ and have their own dedup rule on read:
   worth, not decoration (§4).
 - `session` — which session wrote it (TL-164). **The same identifier the
   activity log records**, from `sessionId()` in `focus.mjs`, because
-  `worktrail session <id>` joins the two logs and a second derivation of
+  `branchling session <id>` joins the two logs and a second derivation of
   "which session is this" would break the join in exactly the cases it exists
   for. Before this field the report correlated by task and time window and
   said so on every answer; two agents working one task at overlapping times
@@ -106,7 +106,7 @@ and have their own dedup rule on read:
 
   **Absent, never empty.** An empty string would be a third state beside
   "absent" and "present" meaning the same as the first. An entry with no
-  session belongs to no session; `worktrail session` counts such changes
+  session belongs to no session; `branchling session` counts such changes
   apart instead of listing them under whichever session was running.
 
 ### Why JSONL per task, not one file / SQLite / git
@@ -188,7 +188,7 @@ and history.
 
 ### 3.2 Agent (author: known)
 
-The `PostToolUse` hook (`worktrail regen-hook`), after every Edit/Write on
+The `PostToolUse` hook (`branchling regen-hook`), after every Edit/Write on
 `backlog/tasks/BL-*.md`, calls:
 
 ```bash
@@ -218,7 +218,7 @@ would produce entries signed by someone who didn't make them.
 **The delay is a bet on timing, and a person loses it.** It works for a hook,
 which writes in milliseconds. It does not work for somebody who edits a file
 and attributes the change a minute later: by then the server's reconciliation
-has written the change as `unknown` *and updated the snapshot*, so `worktrail
+has written the change as `unknown` *and updated the snapshot*, so `branchling
 history --actor … --reason "…"` finds no difference left and answers `no
 changes to record`. Measured on 2026-09-01 against TL-99 and TL-100. That
 sentence reads as "everything is recorded" while the truth is "everything is
@@ -228,7 +228,7 @@ append-only and is never rewritten.
 Widening the window would still be a bet, only a bigger one. Making
 reconciliation read-only would trade away the property that a change leaves a
 trace even when nobody speaks for it. So the entry stays and is **claimed
-beside it**: `worktrail history --attribute --actor <ns:name> --reason "…"`
+beside it**: `branchling history --attribute --actor <ns:name> --reason "…"`
 appends an `__attributed__` event carrying the id of the change it claims.
 
 Three properties this keeps that a correction would not:

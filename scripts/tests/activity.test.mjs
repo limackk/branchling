@@ -85,7 +85,7 @@ const CLOSED_AT = "2026-02-05T15:30:00+00:00";
 /** A real repository with a real history: two tasks created, then closed in two
  *  separate commits, so the pickaxe has something true to find. */
 function repo() {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-activity-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-activity-"));
   assert.equal(git(dir, ["init", "-q", "."]).status, 0);
   assert.equal(cli(["init", "--dir", ".", "--no-example"], dir).status, 0);
   const ids = [];

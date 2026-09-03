@@ -73,7 +73,7 @@ function twoBranches(root, pathFor) {
 }
 
 test("aggregates split per task let two branches merge cleanly", () => {
-  const root = mkdtempSync(join(tmpdir(), "worktrail-rollup-split-"));
+  const root = mkdtempSync(join(tmpdir(), "branchling-rollup-split-"));
   try {
     twoBranches(root, (task) => join("backlog", "activity", "rollup", task + ".json"));
     assert.equal(merges(root, "left", "right"), true,
@@ -84,7 +84,7 @@ test("aggregates split per task let two branches merge cleanly", () => {
 });
 
 test("POSITIVE CONTROL: one shared aggregate file conflicts on the same two branches", () => {
-  const root = mkdtempSync(join(tmpdir(), "worktrail-rollup-shared-"));
+  const root = mkdtempSync(join(tmpdir(), "branchling-rollup-shared-"));
   try {
     twoBranches(root, () => join("backlog", "activity", "rollup.json"));
     assert.equal(merges(root, "left", "right"), false,

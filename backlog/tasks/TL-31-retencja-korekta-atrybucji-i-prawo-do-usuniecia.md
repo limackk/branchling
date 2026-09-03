@@ -197,7 +197,7 @@ node scripts/cli.mjs check
   data subjects, and impact assessment remain with whoever deploys it.
 - Deliberately out of scope: actor authentication (without it, `forget
   --actor` relies on a claim, not proof — the same limitation that
-  [worktrail-state-and-sync.md §6.1](../../docs/worktrail-state-and-sync.md)
+  [worktrail-state-and-sync.md §6.1](../../docs/branchling-state-and-sync.md)
   names as the local-version boundary), log encryption, exporting a person's
   data.
 - `--dry-run` on `forget` is required, not optional: this command deletes data

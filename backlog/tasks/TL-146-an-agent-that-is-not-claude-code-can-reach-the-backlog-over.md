@@ -13,7 +13,7 @@ created: 2026-09-02
 updated: 2026-09-02
 blocked_by: []
 blocks: []
-related_docs: ["docs/worktrail-global-tool.md"]
+related_docs: ["docs/branchling-global-tool.md"]
 verification:                      # HOW to check that the task is really done
   - id: suite-green
     bash: "node --test scripts/tests/*.test.mjs"
@@ -39,7 +39,7 @@ actor and a reason, atomic reservation) are ever reached.
 ## Context
 
 **This is a thin adapter, not a second interface.** Law 4 in
-`docs/worktrail-global-tool.md` §3 is what makes it thin: every reading
+`docs/branchling-global-tool.md` §3 is what makes it thin: every reading
 command already answers in a `--json` envelope with `schemaVersion` (TL-72),
 and every writing command is callable from outside. The MCP server maps tools
 onto those two surfaces and adds NOTHING of its own — no logic, no second
@@ -69,7 +69,7 @@ Constraints that follow directly from the repository's rules:
 What this deliberately does NOT do: it does not replace `worktrail
 instructions` for Claude Code, and it does not add a transport other than
 stdio. HTTP is the hosted mode's concern (§6 of
-`docs/worktrail-state-and-sync.md`) and is not built before §8's gate opens.
+`docs/branchling-state-and-sync.md`) and is not built before §8's gate opens.
 
 ## Steps
 

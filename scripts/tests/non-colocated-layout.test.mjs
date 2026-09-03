@@ -11,7 +11,7 @@
  * It shows only in the layout the module is intended for — code in
  * `<repo>/scripts`, data in `<repo>/backlog`. There `__dirname/..` is the ROOT
  * of the REPO, not the backlog, and the generator looks for `boards.yaml` in the
- * wrong place. Found at the first real `worktrail init` in the extracted repository.
+ * wrong place. Found at the first real `branchling init` in the extracted repository.
  *
  * This test reproduces that layout. Before the fix it FAILS, and that is its only
  * reason to exist: without it the regression comes back with every installation in
@@ -39,7 +39,7 @@ const SCRIPTS = join(HERE, "..");
 
 /** Builds a tree shaped like the extracted repo: code BESIDE the data, not ABOVE it. */
 function makeSplitRepo() {
-  const root = mkdtempSync(join(tmpdir(), "worktrail-split-"));
+  const root = mkdtempSync(join(tmpdir(), "branchling-split-"));
   cpSync(SCRIPTS, join(root, "scripts"), { recursive: true });
 
   const bl = join(root, "backlog");

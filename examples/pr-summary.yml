@@ -2,14 +2,14 @@
 #
 # Copy this file to `.github/workflows/pr-summary.yml` in your repository.
 #
-# WHAT IT DOES. On every push to a pull request it runs `worktrail pr-summary`
+# WHAT IT DOES. On every push to a pull request it runs `branchling pr-summary`
 # and posts the result as ONE comment, updated in place. A reviewer then sees
 # which tasks the branch touched and which statuses moved, beside the code diff
 # they were already going to read.
 #
 # WHY THE JOB IS THIS SHORT. Every decision is in the command; this file is
 # checkout, run, comment. That is the point rather than an economy: the same
-# `worktrail pr-summary` works unchanged in GitLab CI, in a git hook, or typed
+# `branchling pr-summary` works unchanged in GitLab CI, in a git hook, or typed
 # into a terminal, because the interface is its output and not a plugin API.
 # If you need something different in the comment, change the command's flags
 # here — do not add logic to this file.
@@ -50,7 +50,7 @@ jobs:
       - name: Summarise the backlog
         id: summary
         run: |
-          npx --yes worktrail pr-summary \
+          npx --yes branchling pr-summary \
             --base "origin/${{ github.event.pull_request.base.ref }}" \
             > summary.md
           cat summary.md
@@ -63,7 +63,7 @@ jobs:
           script: |
             const fs = require("node:fs");
             const body = fs.readFileSync("summary.md", "utf8");
-            const marker = "<!-- worktrail-pr-summary -->";
+            const marker = "<!-- branchling-pr-summary -->";
             const { owner, repo } = context.repo;
             const issue_number = context.issue.number;
 

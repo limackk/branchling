@@ -45,7 +45,7 @@ const CLI = join(HERE, "..", "cli.mjs");
 
 let counter = 0;
 function fixture() {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-mcp-" + counter++ + "-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-mcp-" + counter++ + "-"));
   const backlog = join(dir, "bl");
   const state = join(dir, "state");
   const env = { ...process.env, BACKLOG_STATE_DIR: state, NO_COLOR: "1" };

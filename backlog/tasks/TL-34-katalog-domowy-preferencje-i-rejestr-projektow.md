@@ -15,7 +15,7 @@ updated: 2026-09-02
 blocked_by: [TL-33]
 blocks: [TL-35, TL-36]
 related_docs:
-  - docs/worktrail-global-tool.md
+  - docs/branchling-global-tool.md
   - docs/backlog-config-and-portability.md
 verification:
   - id: home-and-registry
@@ -46,7 +46,7 @@ home: actor identity, machine preferences, and the knowledge that there can be
 more than one project.
 
 **This task's biggest risk is not technical — it is Law 3**
-([worktrail-global-tool.md §3](../../docs/worktrail-global-tool.md)). Two
+([worktrail-global-tool.md §3](../../docs/branchling-global-tool.md)). Two
 configuration layers are guaranteed to drift apart if both can speak about the
 same thing. The boundary must therefore be **disjoint, not prioritized**:
 
@@ -67,7 +67,7 @@ must not duplicate that** — it is an index, and deleting it must be harmless
 
 ## Pre-flight reading
 
-1. `docs/worktrail-global-tool.md` — §3 (the four laws), §5
+1. `docs/branchling-global-tool.md` — §3 (the four laws), §5
    (where the directory lives), §7 (the registry as index), §8
    (multi-repository workspace).
 2. `scripts/config.mjs` — `DEFAULTS`, `KNOWN_KEYS`, how an unknown key
@@ -202,7 +202,7 @@ node scripts/cli.mjs check
 - **No daemon.** The registry is a YAML file read at startup; a resident
   process would add a lifecycle, logs, and restarts, just to save one read.
 - **No home-directory sync** across machines — that is the hosted version's
-  problem ([worktrail-state-and-sync.md §6](../../docs/worktrail-state-and-sync.md)).
+  problem ([worktrail-state-and-sync.md §6](../../docs/branchling-state-and-sync.md)).
 - An assumption to be disproven: the registry may never gain a second entry
   (§11 point 1). In that case [TL-36](TL-36-widok-przekrojowy-nad-wieloma-projektami.md)
   has no recipient, but this task justifies itself regardless — the

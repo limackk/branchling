@@ -13,7 +13,7 @@
  *
  * WHY IT CHECKS THE URLS AND NOT EVERYTHING. This is a brake, not a review. The
  * full pre-publication checklist is a human procedure — see
- * `.claude/skills/worktrail-release/SKILL.md` (product-name: allow) — and a script pretending to be that
+ * `.claude/skills/branchling-release/SKILL.md` (product-name: allow) — and a script pretending to be that
  * checklist would be worse than none, because a green run would read as "the
  * package is ready". It answers one question: does the npm page have an address
  * to point at. Add a check by adding an entry to REQUIRED, not by widening the

@@ -15,7 +15,7 @@ updated: 2026-09-02
 blocked_by: []
 blocks: [TL-53]
 related_docs:
-  - .claude/skills/worktrail-release/SKILL.md
+  - .claude/skills/branchling-release/SKILL.md
 verification:                      # English filename and probes: CLAUDE.md admits no
                                    # directory-shaped exception, and the original contract
                                    # grepped for a Polish stem that English text cannot carry
@@ -76,7 +76,7 @@ paid side.
 3. [TL-53](TL-53-ci-contributing-i-szablony-zgloszen-przed-publikacja.md) —
    `CONTRIBUTING.md` is where this decision MATERIALIZES; that is why this
    task blocks it.
-4. `.claude/skills/worktrail-release/SKILL.md` §8 — "report gaps, do not
+4. `.claude/skills/branchling-release/SKILL.md` §8 — "report gaps, do not
    create them without asking"; every item on this list is a commitment
    someone has to keep.
 

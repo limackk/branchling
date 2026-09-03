@@ -72,7 +72,7 @@ first publication, and only until then.
 
 1. `backlog/tasks/TL-81-kanaly-dystrybucji-i-kolizja-nazwy-tasklog-w-npx.md` — what was measured about the name, and the reasoning that made it a business asset rather than a label.
 2. `docs/license-and-contributions.md` §3 — where the open/cloud line runs, which is why the name matters commercially.
-3. `.claude/skills/worktrail-release/SKILL.md` §7 — the pre-publication name checks as they stand; this task's finding belongs there.
+3. `.claude/skills/branchling-release/SKILL.md` §7 — the pre-publication name checks as they stand; this task's finding belongs there.
 
 ## Steps
 
@@ -85,7 +85,7 @@ first publication, and only until then.
 
 - [x] The task records what the `worktrail` organisation is, with the evidence it was read from. [proof: the-finding]
 - [x] The decision — keep the name or reopen it — is recorded with its reasoning, not just the finding. Recorded in `## Decisions`: REOPENED, and handed back to TL-20.
-- [x] The release gate's name checks cover a namespace beyond npm. `.claude/skills/worktrail-release/SKILL.md` §7 now checks forges, GitLab, Docker Hub, PyPI and the domains, and says what to ask of a hit.
+- [x] The release gate's name checks cover a namespace beyond npm. `.claude/skills/branchling-release/SKILL.md` §7 now checks forges, GitLab, Docker Hub, PyPI and the domains, and says what to ask of a hit.
 
 ## Findings
 

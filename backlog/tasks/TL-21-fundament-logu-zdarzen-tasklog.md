@@ -15,7 +15,7 @@ updated: 2026-08-29
 blocked_by: []
 blocks: []
 related_docs:
-  - docs/worktrail-state-and-sync.md
+  - docs/branchling-state-and-sync.md
   - docs/backlog-field-editing-history.md
 verification:
   - bash: "git merge-tree --write-tree <two branches with no task in common> — NO conflict in INDEX.yaml"
@@ -35,7 +35,7 @@ are in one task despite their different weight.
 
 ## Context
 
-Analysis and full rationale: [worktrail-state-and-sync.md](../../docs/worktrail-state-and-sync.md).
+Analysis and full rationale: [worktrail-state-and-sync.md](../../docs/branchling-state-and-sync.md).
 In short — what was measured on this repository on 2026-08-29:
 
 - **7 live worktrees**, but **0 tasks touched by more than one branch**.
@@ -114,7 +114,7 @@ identifier and an actor namespace.
       promoting bare names to human — and `claude` is an agent and would have
       landed as one. A bare name in a new write = no declaration (`unknown`);
       an old entry gets the `legacy` namespace on read. Rationale:
-      [worktrail-state-and-sync.md §7 step 4](../../docs/worktrail-state-and-sync.md).
+      [worktrail-state-and-sync.md §7 step 4](../../docs/branchling-state-and-sync.md).
 - [x] STEP 5 — `__body__` and `__comment__` reserved in `PSEUDO_FIELDS` (in
       `task-fields.mjs`, so the viewer gets them from the source);
       `diffMeta` does not produce them.
@@ -144,7 +144,7 @@ rm -f backlog/history/.snapshot.json backlog/INDEX.yaml backlog/NOW.yaml
 **Deliberately OUT of scope** (separate tasks, when the time comes):
 
 - Reversing the direction of reconciliation for coordination fields (the log
-  wins over the file) — [worktrail-state-and-sync.md §5.1](../../docs/worktrail-state-and-sync.md).
+  wins over the file) — [worktrail-state-and-sync.md §5.1](../../docs/branchling-state-and-sync.md).
 - SQLite as an index (§5.4), locks (§6.1), server, accounts, roles, web UI.
 - History of the task body and comments — step 5 reserves a place for them, it
   does not build them.

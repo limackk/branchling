@@ -15,7 +15,7 @@ updated: 2026-08-29
 blocked_by: []
 blocks: []
 related_docs:
-  - docs/worktrail-state-and-sync.md
+  - docs/branchling-state-and-sync.md
 verification:
   - bash: "./scripts/worktrail query --status blocked --priority P0,P1  # a list of tasks, NOT an open browser"
   - bash: "./scripts/worktrail querry  # exit 2 with a list of commands"

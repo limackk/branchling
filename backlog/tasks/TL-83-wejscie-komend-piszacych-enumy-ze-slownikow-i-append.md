@@ -15,7 +15,7 @@ updated: 2026-09-02
 blocked_by: []
 blocks: []
 related_docs:
-  - docs/worktrail-global-tool.md
+  - docs/branchling-global-tool.md
 verification:
   - id: suite
     bash: "node --test scripts/tests/write-input-surface.test.mjs"
@@ -78,7 +78,7 @@ Decisions:
 2. `scripts/config.mjs` — reading the project's dictionaries.
 3. `scripts/new-task.mjs` — today's only writing command; the pattern for
    the rest.
-4. `docs/worktrail-global-tool.md` §3 — the wording of Law IV.
+4. `docs/branchling-global-tool.md` §3 — the wording of Law IV.
 
 ## Steps
 

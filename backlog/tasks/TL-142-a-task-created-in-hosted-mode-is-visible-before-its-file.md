@@ -13,18 +13,18 @@ created: 2026-09-02
 updated: 2026-09-02
 blocked_by: []
 blocks: ["TL-145"]
-related_docs: ["docs/worktrail-state-and-sync.md"]
+related_docs: ["docs/branchling-state-and-sync.md"]
 verification:                      # HOW to check that the task is really done
   - id: guards-green
     bash: "node scripts/cli.mjs check"
   - id: sections-read
-    manual: "Sections 4, 4.4, 6, 2.1 and 9 of docs/worktrail-state-and-sync.md were read end to end in ONE pass, and give a single answer to where content lives in each mode: 4 scoped to local and pointing onward, 4.4 stating why hosted is forced, 6 stating the server-first rule for `new` and the offline rule, 2.1 and 9 carrying the limit that creation was excluded from the measurement"
+    manual: "Sections 4, 4.4, 6, 2.1 and 9 of docs/branchling-state-and-sync.md were read end to end in ONE pass, and give a single answer to where content lives in each mode: 4 scoped to local and pointing onward, 4.4 stating why hosted is forced, 6 stating the server-first rule for `new` and the offline rule, 2.1 and 9 carrying the limit that creation was excluded from the measurement"
 ---
 
 ## Goal
 
 Define what `worktrail new` writes to, and what the rest of a team sees, in the
-hosted mode — and make the two places in `docs/worktrail-state-and-sync.md`
+hosted mode — and make the two places in `docs/branchling-state-and-sync.md`
 that answer this agree with each other.
 
 They do not agree today. The headline decision in §4 says **content in git**.
@@ -56,7 +56,7 @@ What has to be true when this is done:
 
 ## Context
 
-`docs/worktrail-state-and-sync.md` §6.2 records the current boundary
+`docs/branchling-state-and-sync.md` §6.2 records the current boundary
 deliberately: a task that exists only on another branch does NOT appear in the
 list. That is defensible while git is the only transport, because the reader and
 the writer are the same person on the same disk. In hosted mode the question
@@ -88,7 +88,7 @@ data exists, because afterwards it is a migration of other people's history.
 3. Decide the orphan rule: a `__created__` whose file never lands. Options
    include leaving it (a creation did happen), and a `__deleted__` written by
    whoever abandons the branch. Do NOT let the log be rewritten.
-4. Record the outcome in `docs/worktrail-state-and-sync.md` §6, which today
+4. Record the outcome in `docs/branchling-state-and-sync.md` §6, which today
    states the opposite boundary.
 
 Deliberately NOT here: extending `scripts/branch-scan.mjs` so `query` reports a

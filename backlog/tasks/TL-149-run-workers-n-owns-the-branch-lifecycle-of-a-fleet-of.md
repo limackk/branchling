@@ -13,7 +13,7 @@ created: 2026-09-02
 updated: 2026-09-02
 blocked_by: []
 blocks: []
-related_docs: ["docs/worktrail-state-and-sync.md"]
+related_docs: ["docs/branchling-state-and-sync.md"]
 verification:                      # HOW to check that the task is really done
   - id: suite-green
     bash: "node --test scripts/tests/*.test.mjs"
@@ -83,7 +83,7 @@ unversioned, so after a merge they still show the state from before it.
 **What is deliberately NOT here:** starting agents on other machines. The
 boundary is the clone, as the guide states, and the fleet lives inside it.
 Two clones still hand out the same task and find out when they merge; that
-is the hosted mode's problem (§6 of `docs/worktrail-state-and-sync.md`).
+is the hosted mode's problem (§6 of `docs/branchling-state-and-sync.md`).
 
 ## Steps
 

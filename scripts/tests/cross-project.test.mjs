@@ -41,7 +41,7 @@ const CLI = join(dirname(fileURLToPath(import.meta.url)), "..", "cli.mjs");
 /** Every run in this file gets its OWN registry, so one test's projects cannot
  *  reach another's — and none of them can reach the machine's. */
 function withHome() {
-  return mkdtempSync(join(tmpdir(), "worktrail-xp-home-"));
+  return mkdtempSync(join(tmpdir(), "branchling-xp-home-"));
 }
 
 function run(args, home, cwd) {
@@ -53,7 +53,7 @@ function run(args, home, cwd) {
 
 /** A backlog with one task, registered under `name`. */
 function project(home, name, title) {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-xp-" + name + "-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-xp-" + name + "-"));
   assert.equal(run(["init", "--dir", dir, "--no-example"], home).status, 0);
   const made = run(["new", "--dir", dir, "--title", title], home);
   assert.equal(made.status, 0, made.stderr);

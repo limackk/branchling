@@ -17,7 +17,7 @@ updated: 2026-09-03
 blocked_by: [TL-176]
 blocks: []
 related_docs:
-  - docs/worktrail-global-tool.md
+  - docs/branchling-global-tool.md
 verification:
   - id: viewer-project-column
     bash: "node --test scripts/tests/viewer-projects.test.mjs"

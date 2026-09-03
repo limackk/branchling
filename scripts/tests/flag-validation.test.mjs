@@ -10,7 +10,7 @@
  * The most dangerous is `history-record.mjs`: an unknown flag fell into
  * `arg("--file", "")`, did not land, so the script took the "whole directory" path
  * and performed a REAL reconciliation — appending history entries to disk.
- * `worktrail history --help` genuinely did that in a real session. Hence a test for
+ * `branchling history --help` genuinely did that in a real session. Hence a test for
  * ZERO side effect, not only for the exit code.
  *
  * `build-viewer.mjs` has the opposite trap: it is imported as a module by
@@ -47,7 +47,7 @@ function run(script, args, opts) {
 }
 
 function freshBacklog() {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-flags-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-flags-"));
   const r = run("init-backlog.mjs", ["--dir", dir]);
   assert.equal(r.status, 0, r.stderr);
   return dir;
@@ -64,12 +64,12 @@ function freshBacklog() {
  * empty) is a separate case, found while writing this test: `BACKLOG_REL`
  * treats an empty string as invalid and quietly substitutes 'backlog', so it
  * script looks for `<root>/backlog/tasks` instead of `<root>/tasks` and finds
- * NOTHING. That is a real scenario for `worktrail init --dir .` in a fresh
+ * NOTHING. That is a real scenario for `branchling init --dir .` in a fresh
  * (open source), but that is a SEPARATE defect from flag validation — outside the
  * BL-1417, reported separately.
  */
 function gitBacklog() {
-  const repoRoot = mkdtempSync(join(tmpdir(), "worktrail-flags-repo-"));
+  const repoRoot = mkdtempSync(join(tmpdir(), "branchling-flags-repo-"));
   const dir = join(repoRoot, "backlog");
   const r = run("init-backlog.mjs", ["--dir", dir]);
   assert.equal(r.status, 0, r.stderr);

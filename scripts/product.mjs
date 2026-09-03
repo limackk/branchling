@@ -4,10 +4,11 @@
  *
  * WHY. Before this file the name was written out 47 times across 9 scripts,
  * almost all of it inside help and usage text. That is fine right up to the
- * moment the name changes, and the name HAS changed: the tool was called
- * `tasklog` until 2026-09-01, when it became `worktrail`. Nothing is published
- * yet, so a rename is still cheap — and it must STAY cheap. One constant keeps
- * a rename an edit instead of a sweep.
+ * moment the name changes, and the name has now changed TWICE: `tasklog` until
+ * 2026-09-01, `worktrail` until 2026-09-03, `branchling` since (TL-20, after
+ * TL-169 found `worktrail` was an incumbent's name on this shelf). Nothing is
+ * published yet, so a rename is still cheap — and it must STAY cheap. One
+ * constant keeps a rename an edit instead of a sweep.
  *
  * That rename showed the claim was not yet true: most of `scripts/` still spelled
  * the name out in help and error text, so the change was a sweep after all. Since
@@ -47,7 +48,7 @@ function readManifest(path = MANIFEST_PATH) {
 const manifest = readManifest();
 
 /** Name used in help, usage and error text. Never a literal elsewhere. */
-export const PRODUCT_NAME = (manifest && manifest.name) || "worktrail";
+export const PRODUCT_NAME = (manifest && manifest.name) || "branchling";
 
 /**
  * The name written INTO other people's files as a marker, frozen on purpose
@@ -61,10 +62,17 @@ export const PRODUCT_NAME = (manifest && manifest.name) || "worktrail";
  * SECOND block instead of an update — in repositories we cannot reach to fix.
  * Display text may change freely; a key that identifies existing data may not.
  *
- * The cost is accepted and small: after a rename the marker keeps the old word.
- * That is a cosmetic surprise inside a comment; a duplicated block is a defect.
+ * WHY IT NEVERTHELESS MOVED ON 2026-09-03. The freeze protects blocks that
+ * EXIST in repositories we cannot reach. Nothing has been published, so no such
+ * repository exists: the set this constant defends was empty, and holding a
+ * dead product's word forever to defend an empty set is a cost with no payer.
+ * It was therefore updated ONCE, with the rename, and the freeze begins at the
+ * first publish — the same window TL-81 named for the name itself. After that
+ * publish this value never changes again, whatever `PRODUCT_NAME` becomes; the
+ * cost of a later rename is that the marker keeps the old word, which is a
+ * cosmetic surprise inside a comment, while a duplicated block is a defect.
  */
-export const BLOCK_MARKER_NAME = "worktrail";
+export const BLOCK_MARKER_NAME = "branchling";
 
 /**
  * The prefix of every key the VIEWER writes into somebody's browser (TL-178):
@@ -84,8 +92,14 @@ export const BLOCK_MARKER_NAME = "worktrail";
  * else's repository, the other keys state in somebody else's browser. A single
  * constant would make a decision about one of them silently a decision about
  * the other, and those are different blast radii.
+ *
+ * IT MOVED ON 2026-09-03 for the reason given on `BLOCK_MARKER_NAME`: no
+ * unreachable browser holds this state yet, so the set being defended was
+ * empty. The only viewers affected are on machines we can reach, and what they
+ * forget is a board selection and a chart range. The freeze begins at the first
+ * publish.
  */
-export const STORAGE_KEY_PREFIX = "worktrail";  // product-name: allow
+export const STORAGE_KEY_PREFIX = "branchling";  // product-name: allow
 
 /** Version, or null when the manifest is missing/unreadable. Never faked. */
 export const PRODUCT_VERSION = (manifest && manifest.version) || null;

@@ -123,7 +123,7 @@ test("an empty query matches nothing rather than everything", () => {
  *  REPOSITORY root and one relative to the backlog differ — which is the only
  *  layout in which that claim can be tested at all. */
 function repo() {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-modfiles-" + counter++ + "-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-modfiles-" + counter++ + "-"));
   execFileSync("git", ["init", "-q", "-b", "main", "."], { cwd: dir, stdio: "ignore" });
   execFileSync("git", ["config", "user.email", "t@example.test"], { cwd: dir });
   execFileSync("git", ["config", "user.name", "Test"], { cwd: dir });
@@ -204,7 +204,7 @@ test("a repository whose commits name no task says so instead of answering zero"
 });
 
 test("outside git the answer is named as such, not printed as an empty list", () => {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-modfiles-nogit-" + counter++ + "-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-modfiles-nogit-" + counter++ + "-"));
   assert.equal(run(dir, ["init", "--dir", "backlog", "--no-example"]).status, 0);
   const r = run(dir, ["query", "--dir", "backlog", "--modified-file", "a.mjs", "--status", "pending"]);
   assert.equal(r.status, 0);

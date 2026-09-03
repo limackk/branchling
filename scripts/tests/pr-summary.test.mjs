@@ -214,7 +214,7 @@ test("the markdown stays narrow — no HTML block, one table shape, escaped pipe
 // ── A real branch ─────────────────────────────────────────────────────────
 
 function repo() {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-prsummary-" + counter++ + "-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-prsummary-" + counter++ + "-"));
   execFileSync("git", ["init", "-q", "-b", "main", "."], { cwd: dir, stdio: "ignore" });
   execFileSync("git", ["config", "user.email", "t@example.test"], { cwd: dir });
   execFileSync("git", ["config", "user.name", "Test"], { cwd: dir });
@@ -289,7 +289,7 @@ test("--json carries the same summary, and says whether the range was read", () 
 });
 
 test("outside git it answers with a complete envelope, not a crash", () => {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-prsummary-nogit-" + counter++ + "-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-prsummary-nogit-" + counter++ + "-"));
   assert.equal(run(dir, ["init", "--dir", "backlog", "--no-example"]).status, 0);
   const r = run(dir, ["pr-summary", "--dir", "backlog", "--json"]);
   assert.equal(r.status, 0);
@@ -304,7 +304,7 @@ test("the example workflow is checkout, run, comment — and keeps the full hist
   const yml = readFileSync(join(HERE, "..", "..", "examples", "pr-summary.yml"), "utf8");
   assert.match(yml, /fetch-depth: 0/, "a shallow checkout has no base to compare against");
   assert.match(yml, /pr-summary/);
-  assert.match(yml, /worktrail-pr-summary/, "no marker means a new comment on every push");
+  assert.match(yml, /branchling-pr-summary/, "no marker means a new comment on every push");
   // Only what the job RUNS counts — the file explains `--cost` in a comment on
   // purpose, and a test that could not tell the two apart would forbid
   // documenting the flag at all.

@@ -56,7 +56,7 @@ function run(cwd, args) {
 
 /** A co-located backlog whose vocabulary is its own, not this repository's. */
 function repo(configLines) {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-query-vocab-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-query-vocab-"));
   assert.equal(spawnSync("git", ["init", "-q", "."], { cwd: dir }).status, 0);
   assert.equal(run(dir, ["init", "--dir", ".", "--no-example"]).status, 0);
   if (configLines) {

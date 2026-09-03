@@ -24,7 +24,7 @@ verification:
   - id: no-stack-for-a-foreseen-state
     bash: "node --test scripts/tests/no-backlog-message.test.mjs"
   - id: message-not-a-crash
-    bash: "cd \"$(mktemp -d)\" && ! node \"$OLDPWD/bin/worktrail.mjs\" query --count 2>&1 | grep -q '^    at '"
+    bash: "cd \"$(mktemp -d)\" && ! node \"$OLDPWD/bin/branchling.mjs\" query --count 2>&1 | grep -q '^    at '"
 ---
 
 ## Goal

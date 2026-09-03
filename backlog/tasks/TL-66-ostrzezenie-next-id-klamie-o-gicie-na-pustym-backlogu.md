@@ -15,10 +15,10 @@ updated: 2026-08-31
 blocked_by: []
 blocks: [TL-64]
 related_docs:
-  - .claude/skills/worktrail-cli/references/output-style.md
+  - .claude/skills/branchling-cli/references/output-style.md
 verification:
   - bash: "node --test scripts/tests/next-id-empty-backlog.test.mjs"
-  - bash: "d=$(mktemp -d)/p; mkdir -p \"$d\"; cd \"$d\"; git init -q .; echo x > a; git add -A; git -c user.email=t@t -c user.name=t commit -qm i >/dev/null; T=/Users/limack/workspace/tasklog/bin/worktrail.mjs; node $T init --dir ./backlog >/dev/null; node $T new --dir ./backlog --title Test 2>&1 | grep -q 'not in a git repository' && { echo 'still lying'; exit 1; }; echo 'first task without a false warning — OK'"
+  - bash: "d=$(mktemp -d)/p; mkdir -p \"$d\"; cd \"$d\"; git init -q .; echo x > a; git add -A; git -c user.email=t@t -c user.name=t commit -qm i >/dev/null; T=/Users/limack/workspace/tasklog/bin/branchling.mjs; node $T init --dir ./backlog >/dev/null; node $T new --dir ./backlog --title Test 2>&1 | grep -q 'not in a git repository' && { echo 'still lying'; exit 1; }; echo 'first task without a false warning — OK'"
 ---
 
 ## Goal

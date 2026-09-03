@@ -15,14 +15,14 @@ The code is MIT, and your contribution goes out under MIT.
 Node 18 or newer. **There are no dependencies**, so there is nothing to install:
 
 ```bash
-git clone <repository-url> worktrail
-cd worktrail
+git clone <repository-url> branchling
+cd branchling
 node --test scripts/tests/*.test.mjs   # the suite
 node scripts/cli.mjs check             # the guards
 node scripts/cli.mjs --help            # what the tool does
 ```
 
-`npm link` puts a `worktrail` binary on your PATH if you would rather type that
+`npm link` puts a `branchling` binary on your PATH if you would rather type that
 than `node scripts/cli.mjs`.
 
 CI runs both of the above on Node 18, 20 and 22, on Linux and macOS, on every
@@ -34,7 +34,7 @@ appeared, because the absence of one is a promise the README makes.
 
 ## This repository tracks itself with itself
 
-`backlog/` is worktrail's own backlog, kept in the tool's own format. It is not
+`backlog/` is branchling's own backlog, kept in the tool's own format. It is not
 a demo: it is the development history, because the git history was flattened
 when the project was extracted ([`LINEAGE.md`](LINEAGE.md)). If you want to know
 why something is the way it is, the task that decided it is usually a better
@@ -88,7 +88,7 @@ discovered at review.
 Two other places worth reading first, because they are where the project's
 opinions live rather than its code:
 
-- [`docs/worktrail-global-tool.md`](docs/worktrail-global-tool.md) §3 — the four
+- [`docs/branchling-global-tool.md`](docs/branchling-global-tool.md) §3 — the four
   rules everything else follows from. Data in the repository and pointers
   globally; what is computed may be deleted; configuration layers are disjoint
   rather than ranked; extension by composition and not a plugin API.
@@ -100,7 +100,7 @@ opinions live rather than its code:
 
 ## Reporting something
 
-An issue template asks for `worktrail --version`, your Node version and your
+An issue template asks for `branchling --version`, your Node version and your
 operating system. They are asked for because the three of them settle most
 questions before anybody has to guess, not as ceremony — and a report without
 them usually costs a round trip.

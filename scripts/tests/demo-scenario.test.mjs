@@ -4,7 +4,7 @@
  *
  * `docs/demo/scenario.md` is the script for the recording that hangs in the
  * README header. A recording is a frozen claim about how the tool behaves: the
- * moment `worktrail done` changes a word of its refusal, the recording starts
+ * moment `branchling done` changes a word of its refusal, the recording starts
  * lying and nothing says so. Re-recording is a manual act; noticing that it is
  * needed must not be.
  *
@@ -93,7 +93,7 @@ test("an empty file parses to no rows", () => {
 
 /** Walks scenes 0-2: a fresh backlog, a task carrying its own contract, broken code. */
 function stageDemo() {
-  const root = mkdtempSync(join(tmpdir(), "worktrail-demo-"));
+  const root = mkdtempSync(join(tmpdir(), "branchling-demo-"));
   // Scene 0 runs `git init` on purpose: verification entries run from the
   // REPOSITORY root, so without it the relative `parse.test.mjs` in the
   // contract resolves against the backlog directory and fails for a reason
@@ -186,9 +186,9 @@ test("scene 4: after the fix the same invocation closes the task and ticks the c
 test("the scenario document still describes the commands this test replays", () => {
   const doc = readFileSync(SCENARIO, "utf8");
   for (const beat of [
-    "worktrail init --dir ./backlog",
-    'worktrail new --title "Parser accepts an empty file"',
-    "worktrail done TASK-2",
+    "branchling init --dir ./backlog",
+    'branchling new --title "Parser accepts an empty file"',
+    "branchling done TASK-2",
     "was NOT touched",
     'bash: "node --test parse.test.mjs"',
   ]) {

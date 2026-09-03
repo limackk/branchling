@@ -68,7 +68,7 @@ no scope attached is the shape of answer that gets re-asked at every release.
 1. `backlog/tasks/TL-169-the-name-worktrail-is-already-a-github-organisation-the.md` — the `## Findings` section: who TaPo-IT OG are, what they operate, and exactly which register lookups failed and how.
 2. `backlog/tasks/TL-81-kanaly-dystrybucji-i-kolizja-nazwy-tasklog-w-npx.md` — the argument that makes the name a business asset rather than a label.
 3. `docs/license-and-contributions.md` §3 — the open/cloud line, which is the class of goods the search has to cover.
-4. `.claude/skills/worktrail-release/SKILL.md` §7 — where the finding belongs once it exists.
+4. `.claude/skills/branchling-release/SKILL.md` §7 — where the finding belongs once it exists.
 
 ## Steps
 

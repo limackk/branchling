@@ -167,9 +167,9 @@ cd /Users/limack/workspace/tasklog && grep -rhoE '\]\(([^)]+\.md)\)' docs README
     [ -e "docs/$f" ] || [ -e "$f" ] || echo "dead link: $f"; done
 
 # 5. Guard catches the regression — expected: nonzero exit code
-cd /Users/limack/workspace/tasklog && printf '\nthe origin project ma 1394 taski.\n' >> docs/worktrail-global-tool.md
+cd /Users/limack/workspace/tasklog && printf '\nthe origin project ma 1394 taski.\n' >> docs/branchling-global-tool.md
 node scripts/cli.mjs check; test $? -ne 0 && echo 'guard catches it — OK'
-git checkout docs/worktrail-global-tool.md
+git checkout docs/branchling-global-tool.md
 ```
 
 ## Decisions

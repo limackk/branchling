@@ -241,7 +241,7 @@ test("--actor and --task narrow without changing what a session is", () => {
  *  commands included — without it this fixture would write into the machine's
  *  real log. */
 function backlog(rowsByTask) {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-sessions-" + counter++ + "-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-sessions-" + counter++ + "-"));
   assert.equal(run(["init", "--dir", dir, "--no-example"]).status, 0);
   const activity = activityDir(dir);
   mkdirSync(activity, { recursive: true });
@@ -306,7 +306,7 @@ test("both commands say the join is on the session id, in text and in JSON", () 
 
 test("a command stamps the session it ran in, and the report finds it", () => {
   // End to end, through the real commands: nothing above proves the WRITE side.
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-session-e2e-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-session-e2e-"));
   const env = { ...process.env, NO_COLOR: "1", BACKLOG_SESSION: "s-real",
     BACKLOG_STATE_DIR: join(dir, ".state") };
   const cli = (args) => spawnSync(process.execPath, [CLI].concat(args),
@@ -336,7 +336,7 @@ test("tokens reach the report per model, once an adapter writes them", () => {
 // ── one session, two names (TL-168) ───────────────────────────────────────
 //
 // The activity row is keyed by the HOST's session id, which reaches its writer
-// inside a hook payload and reaches nothing else: a plain `worktrail done` has
+// inside a hook payload and reaches nothing else: a plain `branchling done` has
 // only the environment, so the history log stamps the key every process DERIVES
 // from the checkout. Measured after TL-164 landed: activity rows keyed
 // `3d71196b-…`, history entries keyed `tree-cb84986431a6`, and the report

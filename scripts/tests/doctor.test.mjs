@@ -1,5 +1,5 @@
 /**
- * `worktrail doctor` (TL-62).
+ * `branchling doctor` (TL-62).
  *
  * EVERY ROW HAS ITS OWN POSITIVE CONTROL. A diagnosis that is green on a healthy
  * tree prints nothing but ticks is green with no evidential force — and this is a
@@ -33,7 +33,7 @@ function run(cwd, args) {
 }
 
 function repo(initArgs) {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-doctor-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-doctor-"));
   assert.equal(spawnSync("git", ["init", "-q", "."], { cwd: dir }).status, 0);
   assert.equal(run(dir, ["init", "--dir", "."].concat(initArgs || [])).status, 0);
   return dir;
@@ -110,7 +110,7 @@ test("a prefix mismatch: the `prefix` row is red and names migrate-prefix", () =
 });
 
 test("views that are not ignored: the `git-ignore` row is red", () => {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-doctor-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-doctor-"));
   spawnSync("git", ["init", "-q", "."], { cwd: dir });
   writeFileSync(join(dir, ".gitignore"), "node_modules/\n", "utf8");
   run(dir, ["init", "--dir", ".", "--no-gitignore"]);
@@ -147,7 +147,7 @@ test("a failing guard: the `guards` row is red", () => {
 });
 
 test("the absence of a git repository is information, not an error", () => {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-doctor-nogit-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-doctor-nogit-"));
   run(dir, ["init", "--dir", "."]);
   const d = rows(dir);
   assert.equal(d.byId["git-repo"].status, "info");
@@ -157,7 +157,7 @@ test("the absence of a git repository is information, not an error", () => {
 // ── A diagnosis stays a diagnosis ─────────────────────────────────────────
 
 test("doctor changes NOTHING", () => {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-doctor-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-doctor-"));
   spawnSync("git", ["init", "-q", "."], { cwd: dir });
   writeFileSync(join(dir, ".gitignore"), "node_modules/\n", "utf8");
   run(dir, ["init", "--dir", ".", "--no-gitignore"]);
@@ -186,7 +186,7 @@ test("--json is pure JSON and nothing besides", () => {
 });
 
 test("with no backlog: it points at `init`, exits non-zero, with no stack trace", () => {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-doctor-empty-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-doctor-empty-"));
   const r = run(dir, ["doctor"]);
   assert.notEqual(r.status, 0);
   assert.match(r.stderr, /init --dir/);

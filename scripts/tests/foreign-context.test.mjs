@@ -74,7 +74,7 @@ test("a fenced block is exempt — the command IS the replacement", () => {
   const doc = [
     "Measure it yourself:",
     "```bash",
-    "worktrail query --status done --count   # prints 1362 tasks",
+    "branchling query --status done --count   # prints 1362 tasks",
     "```",
   ].join("\n");
   assert.deepEqual(reasons(doc), [],
@@ -117,7 +117,7 @@ test("POSITIVE CONTROL: a violation inserted into a real document IS caught", ()
   // The document is not touched on disk: the violation goes into a COPY of the
   // text. A guard proved only against hand-written strings could still be
   // failing to read the files it claims to read.
-  const text = readFileSync(join(REPO_ROOT, "docs", "worktrail-global-tool.md"), "utf8");
+  const text = readFileSync(join(REPO_ROOT, "docs", "branchling-global-tool.md"), "utf8");
   assert.deepEqual(auditText(text, []), []);
   assert.deepEqual(reasons(text + "\nThe backlog holds 1363 tasks.\n"), ["measurement"]);
   assert.deepEqual(reasons(text + "\nSee /Users/jane/workspace.\n"), ["personal-path"]);

@@ -33,7 +33,7 @@ function run(cwd, args) {
 }
 
 function fresh() {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-cfgdoc-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-cfgdoc-"));
   assert.equal(run(dir, ["init", "--dir", ".", "--no-example"]).status, 0);
   return dir;
 }

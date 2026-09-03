@@ -39,7 +39,7 @@ const CLI = join(dirname(fileURLToPath(import.meta.url)), "..", "cli.mjs");
 const SERVERS = new Set(["serve", "mcp"]);
 
 function inEmptyDir(args) {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-nobacklog-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-nobacklog-"));
   return spawnSync(process.execPath, [CLI, ...args], {
     cwd: dir, encoding: "utf8", timeout: 60_000, input: "",
   });
@@ -76,7 +76,7 @@ test("POSITIVE CONTROL: a genuine programmer error STILL shows its stack", () =>
   // Silencing everything would be a worse cure than the disease. Only the named
   // type becomes a message; a TypeError stays a TypeError, with the trace that
   // makes it findable.
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-boom-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-boom-"));
   const script = join(dir, "boom.mjs");
   writeFileSync(script,
     'import { resolveBacklogDirOrExit } from ' + JSON.stringify(join(dirname(CLI), "paths.mjs")) + ';\n' +

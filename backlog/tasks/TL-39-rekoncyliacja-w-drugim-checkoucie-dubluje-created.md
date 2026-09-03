@@ -16,7 +16,7 @@ blocked_by: []
 blocks: []
 related_docs:
   - docs/backlog-field-editing-history.md
-  - docs/worktrail-state-and-sync.md
+  - docs/branchling-state-and-sync.md
 verification:
   - bash: "node --test scripts/tests/history-duplicate-created.test.mjs"
 ---
@@ -62,7 +62,7 @@ definition.
 1. `docs/backlog-field-editing-history.md` §2 (entry shape), §4 (what the
    mechanism does not guarantee) — check whether this class is already named
    there.
-2. `docs/worktrail-state-and-sync.md` §5.1 (who wins on divergence, per field
+2. `docs/branchling-state-and-sync.md` §5.1 (who wins on divergence, per field
    class) — `__created__` is a pseudo-field and may need its own rule.
 3. `scripts/history.mjs` — `reconcile()`, `readHistory()`, deduplication by
    `id`.
@@ -116,7 +116,7 @@ node -e 'import("./scripts/history.mjs").then(m=>{const h=m.readAllHistory("back
 
 - Found manually while merging branches, not by a test — i.e. the mechanism
   today has no gate at all for this class.
-- Related to `docs/worktrail-state-and-sync.md`: the direction of
+- Related to `docs/branchling-state-and-sync.md`: the direction of
   reconciliation is still a design there, so the resolution here should not
   foreclose that path.
 

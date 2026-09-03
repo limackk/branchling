@@ -510,7 +510,7 @@ test("CLI: a valid actor passes and is reported in line with what was written", 
 //
 // THE RACE, measured on 2026-09-01. A session edits a task by hand and then
 // follows the documented path — `history --actor <ns:name> --source manual
-// --reason "…"`. Meanwhile a running `worktrail serve` reconciles on its timer,
+// --reason "…"`. Meanwhile a running `branchling serve` reconciles on its timer,
 // writes the change as `unknown/external/unknown`, and updates the snapshot. The
 // session's command then finds no DIFFERENCE and answers "no changes to record":
 // it looks like it worked, and the author is gone for good, because the log is

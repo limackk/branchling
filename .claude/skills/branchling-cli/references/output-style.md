@@ -1,4 +1,4 @@
-# worktrail terminal output style
+# branchling terminal output style
 
 Contents:
 
@@ -107,13 +107,13 @@ decorative line above it; something is parsing it.
 Three parts, in this order, on stderr:
 
 ```
-✗ worktrail query: unknown flag: --statu
+✗ branchling query: unknown flag: --statu
   available: --status --priority --board --label --epic --json --files --count
-  → worktrail query --help
+  → branchling query --help
 ```
 
 1. **What went wrong**, prefixed with the command *as the user typed it* — not
-   the script's filename. `worktrail build`, not `[build-backlog]`.
+   the script's filename. `branchling build`, not `[build-backlog]`.
 2. **What was expected**, concretely. A list of valid values beats the word
    "invalid".
 3. **What to do next**, as a command that can be pasted.
@@ -121,7 +121,7 @@ Three parts, in this order, on stderr:
 The best error names the thing the user can act on. Compare:
 
 - `Error: Cannot find backlog directory` + a stack trace
-- `✗ worktrail: no backlog here (looked upward from /home/me)` / `→ worktrail init
+- `✗ branchling: no backlog here (looked upward from /home/me)` / `→ branchling init
   --dir ./backlog` / `→ or point at an existing one: --dir <path>`
 
 The second one costs three lines and turns a first-contact failure into an
@@ -131,11 +131,11 @@ documented state should never be presented as a crash.
 ## 7. Help layout
 
 ```
-worktrail — a backlog that lives in markdown files
+branchling — a backlog that lives in markdown files
 
 usage
-  worktrail                     start the viewer (same as `worktrail serve`)
-  worktrail <command> [flags]
+  branchling                     start the viewer (same as `branchling serve`)
+  branchling <command> [flags]
 
 commands
   serve      start the viewer on 127.0.0.1 (default command)
@@ -143,18 +143,18 @@ commands
   …
 
 examples
-  worktrail query --status blocked
-  worktrail new --title "Fix the retry loop" --priority P1
-  worktrail check
+  branchling query --status blocked
+  branchling new --title "Fix the retry loop" --priority P1
+  branchling check
 
-`worktrail <command> --help` shows that command's flags.
+`branchling <command> --help` shows that command's flags.
 `--dir <path>` points at another backlog; it works in every command.
 ```
 
 Examples earn their space: they are the fastest path from reading help to a
 working command, and they show flag combinations that a flag list cannot.
 
-If the top-level help promises `worktrail <command> --help`, every command has to
+If the top-level help promises `branchling <command> --help`, every command has to
 honour it. A promise the program breaks is worse than no promise.
 
 ## 8. Worked example: the stats report
@@ -169,7 +169,7 @@ Current shape (correct, plain):
 Target shape — same numbers, structure made visible:
 
 ```
-worktrail · /home/me/project/backlog
+branchling · /home/me/project/backlog
 
   tasks            47      14 active · 33 archived
 

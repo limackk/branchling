@@ -64,7 +64,7 @@ function cli(args, opts) {
  * state could not see the defect at all.
  */
 function backlog({ prefix = "BL", count = 2 } = {}) {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-migr-hist-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-migr-hist-"));
   mkdirSync(join(dir, "tasks"));
   writeFileSync(join(dir, "_template.md"), "---\nid: X-NNN\n---\n", "utf8");
   writeFileSync(join(dir, "boards.yaml"), 'default: main\nboards:\n  - slug: main\n    name: "Main"\n', "utf8");

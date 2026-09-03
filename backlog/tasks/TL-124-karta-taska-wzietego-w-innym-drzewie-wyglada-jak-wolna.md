@@ -14,7 +14,7 @@ updated: 2026-09-01
 blocked_by: []
 blocks: []
 related_docs:
-  - docs/worktrail-state-and-sync.md
+  - docs/branchling-state-and-sync.md
 verification:
   - id: suite
     bash: "node --test scripts/tests/viewer-elsewhere-card.test.mjs"

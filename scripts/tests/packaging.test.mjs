@@ -36,7 +36,7 @@ isolateHome("packaging");
 
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const BIN = join(PKG_ROOT, "bin", "worktrail.mjs");
+const BIN = join(PKG_ROOT, "bin", "branchling.mjs");
 const CLI = join(PKG_ROOT, "scripts", "cli.mjs");
 
 function manifest() {
@@ -76,13 +76,13 @@ test("files excludes the tests — they talk about this repo and are not needed 
 // ── 2. An install under node_modules must not point at itself ─────────────
 
 test("co-location does NOT fire from a package directory with no tasks/", () => {
-  // The shape of an install: node_modules/worktrail/{scripts,_template.md}.
+  // The shape of an install: node_modules/branchling/{scripts,_template.md}.
   // `_template.md` is a MARKER, so if the rule required only a marker, this
   // layout would be taken for a backlog and the write would go into
   // node_modules. The rule also requires `tasks/` — this test enforces that.
-  const root = mkdtempSync(join(tmpdir(), "worktrail-pkg-"));
+  const root = mkdtempSync(join(tmpdir(), "branchling-pkg-"));
   try {
-    const pkg = join(root, "node_modules", "worktrail");
+    const pkg = join(root, "node_modules", "branchling");
     mkdirSync(join(pkg, "scripts"), { recursive: true });
     writeFileSync(join(pkg, "_template.md"), "# szablon\n");
 
@@ -105,7 +105,7 @@ test("ON THE PACKED ARTEFACT: the tarball carries no data, and the install does 
   // The assertion on `package.json` speaks only about INTENT. What npm actually
   // pack is settled by `npm pack` — and only the installed copy answers the
   // question "will this behave correctly from somebody else's directory".
-  const work = mkdtempSync(join(tmpdir(), "worktrail-install-"));
+  const work = mkdtempSync(join(tmpdir(), "branchling-install-"));
   try {
     const packed = execFileSync("npm", ["pack", "--pack-destination", work, "--silent"], {
       cwd: PKG_ROOT,
@@ -121,7 +121,7 @@ test("ON THE PACKED ARTEFACT: the tarball carries no data, and the install does 
       assert.ok(!listing.includes(forbidden), `tarball zawiera ${forbidden}`);
     }
     assert.ok(listing.includes("package/scripts/cli.mjs"), "the tarball has to carry the dispatcher");
-    assert.ok(listing.includes("package/bin/worktrail.mjs"), "the tarball has to carry the binary");
+    assert.ok(listing.includes("package/bin/branchling.mjs"), "the tarball has to carry the binary");
 
     // 2. An install in a directory UNRELATED to any backlog.
     const home = join(work, "elsewhere");
@@ -131,12 +131,12 @@ test("ON THE PACKED ARTEFACT: the tarball carries no data, and the install does 
       cwd: home,
       encoding: "utf8",
     });
-    const installed = join(home, "node_modules", ".bin", "worktrail");
+    const installed = join(home, "node_modules", ".bin", "branchling");
 
     // `--version` works with no backlog anywhere in reach.
     assert.match(
       execFileSync(installed, ["--version"], { cwd: home, encoding: "utf8" }),
-      /^worktrail \d+\.\d+\.\d+/
+      /^branchling \d+\.\d+\.\d+/
     );
 
     // A command that needs data FAILS instead of creating a backlog in node_modules.
@@ -156,7 +156,7 @@ test("ON THE PACKED ARTEFACT: the tarball carries no data, and the install does 
     assert.notEqual(code, 0, "a missing backlog has to fail, not pass silently");
     assert.match(out, /backlog/i, "the message has to say what is missing");
     assert.equal(
-      looksLikeBacklogDir(join(home, "node_modules", "worktrail")),
+      looksLikeBacklogDir(join(home, "node_modules", "branchling")),
       false,
       "an installed package must not look like a backlog"
     );
@@ -178,8 +178,8 @@ test("a rename in the manifest carries through to the help texts", () => {
   const name = manifest().name;
   const help = helpText();
   assert.ok(help.includes(name), "the help has to use the name from the manifest");
-  const literals = help.match(/\bworktrail\b/g) || [];
-  if (name !== "worktrail") {
+  const literals = help.match(/\bbranchling\b/g) || [];
+  if (name !== "branchling") {
     assert.equal(literals.length, 0, "the help holds an old name hardcoded");
   }
 });

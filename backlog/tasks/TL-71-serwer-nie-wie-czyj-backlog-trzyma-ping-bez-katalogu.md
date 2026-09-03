@@ -14,7 +14,7 @@ updated: 2026-09-01
 blocked_by: []
 blocks: []
 related_docs:
-  - docs/worktrail-global-tool.md
+  - docs/branchling-global-tool.md
 verification:
   # One entry for the WHOLE file, not one per criterion: a `--test-name-pattern`
   # that matches no test ends green with zero tests run, so such a proof would

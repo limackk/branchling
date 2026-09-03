@@ -52,7 +52,7 @@ function run(cwd, args) {
 const ROLES = "roles: [archivist, stonemason]";
 
 function repo() {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-decide-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-decide-"));
   assert.equal(spawnSync("git", ["init", "-q", "."], { cwd: dir }).status, 0);
   assert.equal(run(dir, ["init", "--dir", ".", "--no-example"]).status, 0);
   const p = join(dir, "config.yaml");

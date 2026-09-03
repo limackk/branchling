@@ -1,6 +1,6 @@
 ---
-name: worktrail-release
-description: Run the pre-publication gate for worktrail before it is pushed to a public repository, published to npm, or tagged as a release. Checks the license and package metadata, what the tarball actually ships, that no other project's data or vocabulary leaks into the public surface, that user-facing text is English, and that a stranger's first five minutes work. Use this skill for requests like "are we ready to publish", "prepare the release", "cut a version", "publish to npm", "open source this", "check the package contents", or before any commit that changes package.json, README.md, LICENSE or _template.md.
+name: branchling-release
+description: Run the pre-publication gate for branchling before it is pushed to a public repository, published to npm, or tagged as a release. Checks the license and package metadata, what the tarball actually ships, that no other project's data or vocabulary leaks into the public surface, that user-facing text is English, and that a stranger's first five minutes work. Use this skill for requests like "are we ready to publish", "prepare the release", "cut a version", "publish to npm", "open source this", "check the package contents", or before any commit that changes package.json, README.md, LICENSE or _template.md.
 ---
 
 # Publication gate
@@ -86,7 +86,7 @@ generated HTML does nothing.
 
 ```bash
 node --test scripts/tests/*.test.mjs
-worktrail check
+branchling check
 ```
 
 Both green, and the test count in `CLAUDE.md` updated if it moved.
@@ -108,16 +108,16 @@ What to look for:
 - A missing backlog is a **predicted state**, so it must read as a message and an
   exit code, never as an unhandled exception with a stack trace. A stack trace on
   first contact says the tool is broken; this one is not.
-- The error names the next command (`--dir`, `BACKLOG_DIR`, `worktrail init`).
+- The error names the next command (`--dir`, `BACKLOG_DIR`, `branchling init`).
 - Nothing is ever written inside the installed package directory. Co-location is
   the last resort when resolving the data directory, and it must stay silent when
   the code lives in `node_modules`.
-- `worktrail --version` prints a number that came from the manifest. An invented
+- `branchling --version` prints a number that came from the manifest. An invented
   version number ends up in a bug report.
 
 ## 6b. Is the demo still telling the truth
 
-The recording in the README header is a frozen claim about how `worktrail done`
+The recording in the README header is a frozen claim about how `branchling done`
 behaves. Once the wording of the refusal changes, that claim becomes a lie and
 nothing says so — a stale recording is worse than none, because it is the first
 thing a stranger trusts.
@@ -169,7 +169,7 @@ cd /tmp && npx --yes <name>       # where npx actually lands today
 which <name>                      # PATH: a binary from another package shadowing this one
 ```
 
-Settled for worktrail on 2026-09-01 (TL-81): registry 404, search 0 results,
+Settled for branchling on 2026-09-01 (TL-81): registry 404, search 0 results,
 no `PATH` collision, no Homebrew formula, and `name` == the single `bin` key, so
 the trap above cannot open. The name is free but **not reserved** — that window
 closes only at the first publish.
@@ -177,7 +177,7 @@ closes only at the first publish.
 **A free registry is not a free name (TL-169).** A package registry answers one
 question: can I publish under this string. It says nothing about who already
 sells a product called that, and the answer to the second question is the one
-that decides whether the name is an asset or a liability. `worktrail` was
+that decides whether the name is an asset or a liability. `branchling` was
 cleared on npm in 2026-09-01 and turned out on 2026-09-03 to belong, on the
 largest forge and on the `.net` domain, to a commercial time-tracking service
 running since 2013 — on the same shelf as this tool. Nothing in the checks above
@@ -213,7 +213,7 @@ Then read what you found, with three questions in this order:
 
 **Record why a collision was ACCEPTED, never that nothing was found.** "Nothing
 found" has no scope attached and gets re-asked at every release, which is how a
-known fact gets discounted twice — TL-20 saw `github.com/worktrail` was taken on
+known fact gets discounted twice — TL-20 saw `github.com/branchling` was taken on
 2026-08-29 and wrote it off as "only an account".
 
 **The registers are not part of this and cannot be `curl`ed.** Whether somebody
@@ -222,7 +222,7 @@ EUIPO and TMview all refuse an unauthenticated request — and it is TL-179, not
 line to add to the block above.
 
 **Channels: npm only, decided 2026-09-01 (TL-81).** The README promises
-`npm i -g worktrail` and `npx worktrail`, and nothing else. Homebrew and Nix each
+`npm i -g branchling` and `npx branchling`, and nothing else. Homebrew and Nix each
 add a release ritual and a second place a version can go stale; a tap lagging the
 npm version is worse than no tap. They get their own task when someone asks for
 them, not before.

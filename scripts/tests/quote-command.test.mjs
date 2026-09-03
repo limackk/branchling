@@ -37,7 +37,7 @@ function run(cwd, args) {
 /** A backlog with one task, and no measured time anywhere — the state every
  *  fresh clone is in, and the one the command has to answer honestly. */
 function backlog() {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-quote-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-quote-"));
   assert.equal(run(dir, ["init", "--dir", ".", "--no-example"]).status, 0);
   const made = run(dir, ["new", "--dir", ".", "--title", "A task to quote"]);
   assert.equal(made.status, 0, made.stderr);

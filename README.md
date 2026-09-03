@@ -1,15 +1,15 @@
-# worktrail
+# branchling
 
 **A queue your agents draw from, and a tool that does not take their word for
 it.** Tasks are markdown files in your repository. What makes this different
 from every other file-based backlog is what sits on top of them:
 
-- **A queue.** `worktrail next` chooses a task and reserves it in the same
+- **A queue.** `branchling next` chooses a task and reserves it in the same
   act, so two sessions asking at the same moment get two different tasks. It
   answers with that one task, so asking "what now" costs your agent the same
   whether the backlog holds forty tasks or four hundred — listing them does
   not.
-- **A contract.** `worktrail done` RUNS the task's `verification:` commands
+- **A contract.** `branchling done` RUNS the task's `verification:` commands
   and refuses to close it if they fail. There is no `--force`. A checkbox
   ticked by whoever did the work carries no information when that whoever is
   an agent.
@@ -18,11 +18,11 @@ from every other file-based backlog is what sits on top of them:
   without a stated reason at all.
 
 ```bash
-worktrail run --agent "claude -p @{task_file}" --max-attempts 2
+branchling run --agent "claude -p @{task_file}" --max-attempts 2
 ```
 
 That is the loop: `next` → your agent → `done`, until the queue is empty.
-worktrail never starts an agent and never will — `--agent` is *your* command
+branchling never starts an agent and never will — `--agent` is *your* command
 template, run through *your* shell. A task that fails its contract twice is
 parked with the reason, never closed: a run that could not verify a task may
 not say it is done. Add `--agent-for <role>=<command>` and one queue feeds
@@ -43,7 +43,7 @@ Because the state of a task should travel with the branch and go through review
 together with the code it describes. That is the whole difference; everything
 else follows from it.
 
-| | External tracker | GitHub Issues | **worktrail** |
+| | External tracker | GitHub Issues | **branchling** |
 |---|---|---|---|
 | State follows the branch, and `git revert` takes it back | ✗ | ✗ | ✓ |
 | A task is readable with no login and no network | ✗ | ✗ | ✓ |
@@ -65,16 +65,16 @@ The package is not published to the npm registry yet, so the entry point is a
 clone.
 
 ```bash
-git clone <repository-url> ~/tools/worktrail
-cd ~/tools/worktrail
-npm link                          # puts the `worktrail` binary on your PATH
-worktrail --version
+git clone <repository-url> ~/tools/branchling
+cd ~/tools/branchling
+npm link                          # puts the `branchling` binary on your PATH
+branchling --version
 ```
 
 Two routes that write nothing to your global `node_modules`, if you prefer:
-an `alias worktrail="$HOME/tools/worktrail/bin/worktrail.mjs"` in `~/.zshrc`
+an `alias branchling="$HOME/tools/branchling/bin/branchling.mjs"` in `~/.zshrc`
 (not `~/.zprofile` — zsh reads that one only for login shells), or
-`npx --yes ~/tools/worktrail`, which leaves nothing behind at all.
+`npx --yes ~/tools/branchling`, which leaves nothing behind at all.
 
 ---
 
@@ -85,7 +85,7 @@ that creates new files, so a guessed directory would scatter them through
 somebody else's tree.
 
 ```bash
-worktrail init --dir ./backlog
+branchling init --dir ./backlog
 ```
 
 It creates `tasks/`, `archive/`, `history/`, `boards/`, `config.yaml`,
@@ -99,7 +99,7 @@ inside the repository — see [Where the data lives](#where-the-data-lives).
 **2. Create a task.** The tool assigns the number, not you.
 
 ```bash
-worktrail new --title "Write a README for a new user" --priority P1 --estimate 2h
+branchling new --title "Write a README for a new user" --priority P1 --estimate 2h
 ```
 
 It prints the path of the file it wrote, the board it chose and why.
@@ -112,23 +112,23 @@ The shape of the fields is described in [The task file](#the-task-file).
 **4. Rebuild the views** — after every frontmatter change.
 
 ```bash
-worktrail build
+branchling build
 ```
 
 **5. Ask, instead of reading everything.** `query` reads `tasks/*.md` rather
 than the generated views, so it sees a status change before the next rebuild.
 
 ```console
-$ worktrail query --status pending --priority P0,P1
+$ branchling query --status pending --priority P0,P1
 - {id: TASK-2, priority: P1, status: pending, board: main, title: "Write a README for a new user"}
 ```
 
-Filters combine with AND between axes and OR inside one; `worktrail query
+Filters combine with AND between axes and OR inside one; `branchling query
 --help` lists them. **A misspelled flag fails** with exit code 2 — zero results
 caused by `--prioriti` reads exactly like the answer "there are no such tasks",
 and it is not that answer.
 
-**6. Open the viewer.** `worktrail` with no arguments serves it on
+**6. Open the viewer.** `branchling` with no arguments serves it on
 `127.0.0.1:4321` and opens your browser. `Ctrl-C` stops it.
 
 ---
@@ -139,7 +139,7 @@ A task is markdown: YAML frontmatter for machines, prose for people.
 
 ```yaml
 ---
-id: TASK-2                  # prefix from config.yaml, number from `worktrail new`
+id: TASK-2                  # prefix from config.yaml, number from `branchling new`
 title: ""                   # imperative, short
 board: main                 # the backlog PARTITION, a CLOSED vocabulary (boards.yaml)
 priority: P1
@@ -155,7 +155,7 @@ verification:               # HOW to check the task is actually done
 ---
 ```
 
-`worktrail new` copies `_template.md`, which ships with the package and
+`branchling new` copies `_template.md`, which ships with the package and
 carries the rest — `type`, `labels`, `epic`, `confidence`, `created`,
 `updated`, `blocks`, `related_docs` — each annotated in place.
 
@@ -175,7 +175,7 @@ claim rather than evidence.
 
 **The reason for a change is not one of these sections.** It travels with the
 write, as the `reason` field of the record in `history/` — which is why
-`worktrail done` asks for nothing and the statuses in
+`branchling done` asks for nothing and the statuses in
 `reason_required_statuses` refuse to be entered without one. The template
 ships with the headings above; the tool does not require any particular set of
 them.
@@ -197,8 +197,8 @@ somebody else's pull request stops being editable content.
 
 | | |
 |---|---|
-| The views go stale | Run `worktrail build`. They are computed and unversioned, so this is a rebuild, not a repair |
-| The change misses the history | Run `worktrail history --actor <ns:name> --source manual`; it diffs the tree against its own reference point and records what changed |
+| The views go stale | Run `branchling build`. They are computed and unversioned, so this is a rebuild, not a repair |
+| The change misses the history | Run `branchling history --actor <ns:name> --source manual`; it diffs the tree against its own reference point and records what changed |
 | The **reason** cannot be recovered | A change the tool merely *saw* is recorded as `unknown`, and no later pass can fill it in |
 | `updated:` is not touched | Nothing rewrites it for you — the field says what the last tool write set |
 
@@ -206,7 +206,7 @@ Only the third of those is permanent, and it is why the writing commands still
 earn their place: a transition into a status listed in
 `reason_required_statuses` is refused without a reason precisely because
 afterwards there is nobody left to ask. Everything the tool *can* work out on
-its own it does — `worktrail check --vocabulary` and `worktrail doctor` both
+its own it does — `branchling check --vocabulary` and `branchling doctor` both
 catch a hand-written value that is outside your vocabulary, and they catch it
 without anybody remembering to ask.
 
@@ -216,7 +216,7 @@ without anybody remembering to ask.
 different rules: `board` is a CLOSED vocabulary from `boards.yaml`, exactly one
 per task, and a typo fails the build; `epic` is free text, optional, and a typo
 costs one extra group in the index. `boards.yaml` accepts `paths:` rules, so a
-new task's board can be computed rather than guessed — `worktrail board <file>`
+new task's board can be computed rather than guessed — `branchling board <file>`
 prints the slug and which rule decided.
 
 ---
@@ -226,8 +226,8 @@ prints the slug and which rule decided.
 Taking a task is a command, because two sessions can want the same one.
 
 ```bash
-worktrail take TASK-42 --actor agent:claude   # "do TASK-42", with a reservation
-worktrail next --actor agent:claude --json    # "what should I do", answered and claimed
+branchling take TASK-42 --actor agent:claude   # "do TASK-42", with a reservation
+branchling next --actor agent:claude --json    # "what should I do", answered and claimed
 ```
 
 Both do the same thing to the task — reserve it, set it to the status your
@@ -240,8 +240,8 @@ and the backlog empties itself with no dispatcher process, no server and no
 orchestrator:
 
 ```bash
-while task=$(worktrail next --actor agent:claude --json); do
-  # … work on "$task", then: worktrail done <ID>
+while task=$(branchling next --actor agent:claude --json); do
+  # … work on "$task", then: branchling done <ID>
 done   # exits 3 — nothing left to take
 ```
 
@@ -249,13 +249,13 @@ done   # exits 3 — nothing left to take
 closed, not yours) · `2` a bad invocation. An empty queue is not an error, and
 it does not look like one.
 
-**That loop, with the accounting, is `worktrail run`.** The command is a
+**That loop, with the accounting, is `branchling run`.** The command is a
 template of yours: `{task_file}` and `{id}` are substituted, and the task —
 plus, from the second attempt, what `done` refused — arrives on stdin.
 
 ```bash
-worktrail run --agent "claude -p @{task_file}" --max-attempts 2
-worktrail run --dry-run          # the order it would work in; claims nothing
+branchling run --agent "claude -p @{task_file}" --max-attempts 2
+branchling run --dry-run          # the order it would work in; claims nothing
 ```
 
 **One queue, several hands.** A task may ask for a competence in `role:`, and
@@ -276,7 +276,7 @@ reads every branch and worktree of that clone (local refs only, never a
 `git fetch`), naming the branch it defers to rather than skipping silently:
 
 ```
-$ worktrail query --status in_progress
+$ branchling query --status in_progress
 - {id: TASK-42, priority: P1, status: pending, board: main,
    elsewhere: [feature/x: in_progress], title: "…"}
 ```
@@ -292,7 +292,7 @@ prints, and [the manual](docs/manual.md#the-dispatcher-in-full) carries the
 rest:
 
 ```bash
-worktrail instructions autonomous-loop
+branchling instructions autonomous-loop
 ```
 
 ---
@@ -310,13 +310,13 @@ Every command resolves it the same way, in this order:
 | 4 | the directory above the code (co-location) | last resort; it is what lets a backlog sit next to the scripts |
 
 `--dir` works on every command, so one checkout of the tool drives any number
-of backlogs: `worktrail query --dir ~/other-project/backlog --status blocked`.
+of backlogs: `branchling query --dir ~/other-project/backlog --status blocked`.
 
 ---
 
 ## Commands
 
-**`worktrail --help` lists the commands, and `worktrail <command> --help`
+**`branchling --help` lists the commands, and `branchling <command> --help`
 prints one command's flags.** There is no table of them here on purpose: a
 copy of a list the tool generates is wrong the moment a command is added, and
 wrong in the way that is hardest to notice — still specific, still confident,
@@ -333,18 +333,18 @@ script. `next-id` and `board` also keep printing their one value alone on the
 first line, so they drop straight into substitution.
 
 ```bash
-worktrail query --status blocked --files | xargs $EDITOR
-worktrail stats --json | jq '.stats.byStatus.blocked'
-worktrail doctor --json | jq -e '.ok'          # a gate in CI
-worktrail done TASK-42 --json | jq '.entries[] | select(.ok | not)'
-worktrail next --actor agent:worker --json | jq -r '.refusalKind // .id'
+branchling query --status blocked --files | xargs $EDITOR
+branchling stats --json | jq '.stats.byStatus.blocked'
+branchling doctor --json | jq -e '.ok'          # a gate in CI
+branchling done TASK-42 --json | jq '.entries[] | select(.ok | not)'
+branchling next --actor agent:worker --json | jq -r '.refusalKind // .id'
 ```
 
 ### One description, a whole backlog
 
 ```bash
-worktrail seed --from spec.md --dry-run     # what it would create
-worktrail plan-from spec.md | worktrail seed --dir ./backlog
+branchling seed --from spec.md --dry-run     # what it would create
+branchling plan-from spec.md | branchling seed --dir ./backlog
 ```
 
 The first is the convenience; **the second is the interface.** `plan-from`
@@ -379,8 +379,8 @@ nobody can trace.
 ### The morning after a fleet of agents worked
 
 ```bash
-worktrail sessions --since 2026-09-02     # who worked, on what, for how long
-worktrail session <id>                    # one session's narrative
+branchling sessions --since 2026-09-02     # who worked, on what, for how long
+branchling session <id>                    # one session's narrative
 ```
 
 **A session that moved nothing is listed, marked `nothing moved`.** That is the
@@ -402,12 +402,12 @@ records them yet — and an absent section is not a zero.
 
 ### Is the "done" actually done
 
-`worktrail check` judges structure and fails a commit. `worktrail audit` judges
+`branchling check` judges structure and fails a commit. `branchling audit` judges
 something else — whether a declaration left the trace it should have — and is a
 report a person reads:
 
 ```bash
-worktrail audit                 # 0 = nothing found, 1 = findings
+branchling audit                 # 0 = nothing found, 1 = findings
 ```
 
 It names four disagreements between what the files declare and what the history
@@ -434,7 +434,7 @@ touched or which statuses moved — the half of the change a reviewer cannot
 reconstruct from the diff:
 
 ```bash
-worktrail pr-summary --base main        # markdown on stdout
+branchling pr-summary --base main        # markdown on stdout
 ```
 
 Copy [`examples/pr-summary.yml`](examples/pr-summary.yml) into
@@ -463,7 +463,7 @@ it takes a value, whether it is required, and for a flag drawing on a vocabulary
 the values *this* project allows:
 
 ```bash
-worktrail new --help --json | jq '.flags[] | select(.dictionary) | {flag, values}'
+branchling new --help --json | jq '.flags[] | select(.dictionary) | {flag, values}'
 ```
 
 The lists come from your `config.yaml`, so nothing has to be guessed. An unknown
@@ -478,13 +478,13 @@ that the vocabulary is empty.
 **Multiline values have three forms, and only two of them work everywhere:**
 
 ```bash
-worktrail handoff TASK-42 --to-role reviewer --reason "First line.
+branchling handoff TASK-42 --to-role reviewer --reason "First line.
 Second line."                                    # a real newline: fine in a shell
 
-worktrail handoff TASK-42 --to-role reviewer --reason $'First line.\nSecond line.'
+branchling handoff TASK-42 --to-role reviewer --reason $'First line.\nSecond line.'
                                                  # rejected by some agent sandboxes
 
-worktrail handoff TASK-42 --to-role reviewer \
+branchling handoff TASK-42 --to-role reviewer \
   --reason "First line." --append-reason "Second line."   # works everywhere
 ```
 
@@ -503,7 +503,7 @@ newlines are collapsed there. `--append-reason` still preserves your order, and
 the field is the first of several — the commands that write longer prose join
 the same mechanism rather than inventing their own.
 
-**An agent that is not a shell reaches it over MCP.** `worktrail mcp` speaks the
+**An agent that is not a shell reaches it over MCP.** `branchling mcp` speaks the
 Model Context Protocol on stdio, and every tool it offers is one of the commands
 above — the adapter validates nothing of its own, so an unknown flag, a bare
 actor and a `done` whose contract fails come back as the same refusals a shell
@@ -513,7 +513,7 @@ backlog's vocabulary.
 Claude Code:
 
 ```bash
-claude mcp add worktrail -- worktrail mcp --dir /path/to/repo/backlog
+claude mcp add branchling -- branchling mcp --dir /path/to/repo/backlog
 ```
 
 Codex, Gemini CLI, Kiro and the editors that read a JSON config take the same
@@ -522,7 +522,7 @@ two lines:
 ```json
 {
   "mcpServers": {
-    "worktrail": { "command": "worktrail", "args": ["mcp", "--dir", "/path/to/repo/backlog"] }
+    "branchling": { "command": "branchling", "args": ["mcp", "--dir", "/path/to/repo/backlog"] }
   }
 }
 ```
@@ -540,8 +540,8 @@ else's code. The answer is already in the backlog, in the task's `## Goal` and
 `## Context`:
 
 ```bash
-worktrail query --modified-file scripts/cli.mjs --status done
-worktrail query --modified-file scripts/            # a whole directory
+branchling query --modified-file scripts/cli.mjs --status done
+branchling query --modified-file scripts/            # a whole directory
 ```
 
 **There is one data source and it is the commit messages.** A task's files are
@@ -566,7 +566,7 @@ If your tasks are already in GitHub Issues, you do not have to retype them.
 
 ```bash
 gh issue list --state all --limit 500 --json number,title,body,state,labels,url \
-  | worktrail import --from github --dry-run
+  | branchling import --from github --dry-run
 ```
 
 `--dry-run` prints what it would create and writes nothing; drop the flag to
@@ -588,7 +588,7 @@ repository is not free on somebody else's branch.
 **And `verification:` arrives empty**, because no tracker has that field. The
 import says how many tasks it left in that state rather than filling it with a
 placeholder: those tasks are readable and searchable straight away, and
-`worktrail done` will refuse them until somebody writes down how to check the
+`branchling done` will refuse them until somebody writes down how to check the
 outcome.
 
 ---
@@ -606,7 +606,7 @@ A task is **discrete, one-off, verifiable work with a concrete outcome**.
 
 It is the single line of defence against "everything is done" turning out not to
 be done. If you cannot write down how to check the outcome, the task is badly
-formed — fix it before you start. `worktrail done` enforces this rather than
+formed — fix it before you start. `branchling done` enforces this rather than
 asking for it: a task with no contract is refused, and the message says so in
 different words from a verification that ran and failed.
 
@@ -622,7 +622,7 @@ The protocol around the task — when to open one at all, how to claim it, what 
 do before closing it — is printed by the tool:
 
 ```bash
-worktrail instructions overview
+branchling instructions overview
 ```
 
 `overview` is a switchboard; it sends the reader to `task-creation`,
@@ -632,19 +632,19 @@ teaches somebody else's statuses.
 
 It is a command rather than a file on purpose. A guide copied into a repository
 freezes on the day it was copied and goes on teaching flags that no longer
-exist; a command ships with the tool and cannot drift from it. `worktrail init`
+exist; a command ships with the tool and cannot drift from it. `branchling init`
 writes one short pointer to that command into `CLAUDE.md` or `AGENTS.md`.
 
 **For editors that load skills**, the same pointer ships as one:
 
 ```bash
-worktrail skills install     # or `worktrail init --skills` while creating a backlog
+branchling skills install     # or `branchling init --skills` while creating a backlog
 ```
 
 It writes `.claude/skills/backlog-workflow/SKILL.md` into your repository and
 **never overwrites** — the file may be your own edit of it. The skill itself
 holds no procedure and no vocabulary; it exists so that an editor loading skills
-by description knows a backlog is here and knows to run `worktrail instructions
+by description knows a backlog is here and knows to run `branchling instructions
 overview`, which is rendered with *your* `config.yaml`. A skill that listed
 statuses would be a second truth about them, wrong the moment you renamed one.
 
@@ -668,7 +668,7 @@ share of minutes nothing could attribute. At that resolution it is a fact about
 a task rather than about a person, and it is the whole input to estimate
 calibration.
 
-**For how long.** `activity_retention_days`, 90 by default. `worktrail activity
+**For how long.** `activity_retention_days`, 90 by default. `branchling activity
 prune` deletes raw rows past the window and keeps the aggregate — recomputing it
 from the full log *before* deleting anything, so the window does not eat the
 history it exists to make safe to keep. It also runs when the viewer starts: a
@@ -677,9 +677,9 @@ retention window somebody has to remember to apply is not a retention window.
 **How to get rid of it.**
 
 ```bash
-worktrail activity report --privacy              # what is kept, whose, for how long
-worktrail activity forget --actor you --dry-run  # what would go. There is no undo
-worktrail activity forget --actor you
+branchling activity report --privacy              # what is kept, whose, for how long
+branchling activity forget --actor you --dry-run  # what would go. There is no undo
+branchling activity forget --actor you
 ```
 
 `forget` deletes the raw rows **and recomputes the aggregates without them**,
@@ -690,7 +690,7 @@ the next report.
 so the fix is a new row rather than an edit:
 
 ```bash
-worktrail activity reassign --from TASK-1 --to TASK-2 --session <s> [--since <ts>]
+branchling activity reassign --from TASK-1 --to TASK-2 --session <s> [--since <ts>]
 ```
 
 **What this is not.** It is a set of mechanisms — minimisation, retention,
@@ -700,7 +700,7 @@ the people being measured, and any assessment stay with whoever deploys it.
 which is the same single-machine boundary the reservation has.
 
 **If you want none of it**, wire no hook. Nothing is recorded unless something
-calls `worktrail activity record`, and the tool never installs that for you.
+calls `branchling activity record`, and the tool never installs that for you.
 
 ---
 
@@ -711,7 +711,7 @@ calls `worktrail activity record`, and the tool never installs that for you.
 `--json` contract. The documents below record decisions and the measurements
 behind them.
 
-- [`docs/worktrail-global-tool.md`](docs/worktrail-global-tool.md) — the tool
+- [`docs/branchling-global-tool.md`](docs/branchling-global-tool.md) — the tool
   outside a single repository; §3 is the four rules everything else follows from.
 - [`docs/backlog-config-and-portability.md`](docs/backlog-config-and-portability.md)
   — the shape/values boundary, and the full list of config keys.
@@ -719,7 +719,7 @@ behind them.
   — the limits of what the history can be trusted to say.
 - [`docs/backlog-time-tracking.md`](docs/backlog-time-tracking.md) — estimates
   and time.
-- [`docs/worktrail-state-and-sync.md`](docs/worktrail-state-and-sync.md) — the
+- [`docs/branchling-state-and-sync.md`](docs/branchling-state-and-sync.md) — the
   log as the source of truth about state.
 - [`docs/license-and-contributions.md`](docs/license-and-contributions.md) — the
   licence, the DCO, and the open/hosted line. Read before opening a pull

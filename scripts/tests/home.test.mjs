@@ -55,7 +55,7 @@ const CLI = join(HERE, "..", "cli.mjs");
 
 let counter = 0;
 function tmp(prefix) {
-  return mkdtempSync(join(tmpdir(), "worktrail-" + prefix + "-" + (counter++) + "-"));
+  return mkdtempSync(join(tmpdir(), "branchling-" + prefix + "-" + (counter++) + "-"));
 }
 
 function run(args, env) {
@@ -84,7 +84,7 @@ function fixture() {
 
 // ── where the directory is ────────────────────────────────────────────────
 
-test("WORKTRAIL_HOME wins over everything, and is the hook the rest is tested through", () => {
+test("BRANCHLING_HOME wins over everything, and is the hook the rest is tested through", () => {
   const paths = homePaths({
     [HOME_ENV]: "/somewhere/mine",
     XDG_CONFIG_HOME: "/xdg/config",
@@ -99,21 +99,21 @@ test("WORKTRAIL_HOME wins over everything, and is the hook the rest is tested th
 
 test("XDG is respected when set, and each variable is honoured on its own", () => {
   const both = homePaths({ XDG_CONFIG_HOME: "/xdg/config", XDG_DATA_HOME: "/xdg/data" }, "linux");
-  assert.equal(both.config, "/xdg/config/worktrail");
-  assert.equal(both.data, "/xdg/data/worktrail");
+  assert.equal(both.config, "/xdg/config/branchling");
+  assert.equal(both.data, "/xdg/data/branchling");
   assert.equal(both.source, "xdg");
 
   // Only one of the two set is a real configuration, not an error: the other
   // falls back to the platform default rather than dragging both into it.
   const half = homePaths({ XDG_CONFIG_HOME: "/xdg/config" }, "linux");
-  assert.equal(half.config, "/xdg/config/worktrail");
-  assert.equal(half.data, join(homedir(), ".local", "share", "worktrail"));
+  assert.equal(half.config, "/xdg/config/branchling");
+  assert.equal(half.data, join(homedir(), ".local", "share", "branchling"));
 });
 
 test("with nothing set it is ~/.config and ~/.local/share", () => {
   const paths = homePaths({}, "linux");
-  assert.equal(paths.config, join(homedir(), ".config", "worktrail"));
-  assert.equal(paths.data, join(homedir(), ".local", "share", "worktrail"));
+  assert.equal(paths.config, join(homedir(), ".config", "branchling"));
+  assert.equal(paths.data, join(homedir(), ".local", "share", "branchling"));
   assert.equal(paths.source, "default");
 });
 
@@ -122,7 +122,7 @@ test("on Windows it is APPDATA, and LOCALAPPDATA when there is one", () => {
   // the suite, and an unreachable rule is one nobody has checked.
   const roaming = homePaths({ APPDATA: "C:\\Users\\x\\AppData\\Roaming" }, "win32");
   assert.equal(roaming.source, "appdata");
-  assert.ok(roaming.config.endsWith("worktrail"));
+  assert.ok(roaming.config.endsWith("branchling"));
   assert.ok(roaming.config.includes("Roaming") || roaming.config.includes("AppData"));
 
   const both = homePaths({

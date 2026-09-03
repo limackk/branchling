@@ -16,7 +16,7 @@ blocked_by: []
 blocks: []
 related_docs:
   - docs/backlog-config-and-portability.md
-  - .claude/skills/worktrail-release/SKILL.md
+  - .claude/skills/branchling-release/SKILL.md
 verification:
   - bash: "grep -qiE 'origin|sync-layer|supabase|railway|DPA' README.md && { echo 'README still carries a foreign project'; exit 1; }; echo 'README free of foreign context — OK'"
   - bash: "grep -q 'node backlog/scripts/' README.md && { echo 'paths from before packaging'; exit 1; }; echo 'commands via worktrail, not via paths — OK'"
@@ -71,7 +71,7 @@ applies here just the same.
    the shape, the configuration knows the values".
 3. [TL-37](TL-37-split-the-documents-the-mechanism-travels.md) — the same rule for
    `docs/`.
-4. `.claude/skills/worktrail-release/SKILL.md` §2–§3 — what is allowed to ship
+4. `.claude/skills/branchling-release/SKILL.md` §2–§3 — what is allowed to ship
    in the tarball.
 
 ## Steps

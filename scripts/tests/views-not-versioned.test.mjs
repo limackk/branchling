@@ -97,7 +97,7 @@ function mergeConflicts(root) {
 }
 
 test("positive control: a VERSIONED aggregate conflicts despite disjoint tasks", () => {
-  const root = mkdtempSync(join(tmpdir(), "worktrail-views-ctl-"));
+  const root = mkdtempSync(join(tmpdir(), "branchling-views-ctl-"));
   try {
     twoBranchesAddingDifferentTasks(root, true);
     assert.equal(mergeConflicts(root), true, "without this conflict the whole of step 3 would have nothing to fix");
@@ -107,7 +107,7 @@ test("positive control: a VERSIONED aggregate conflicts despite disjoint tasks",
 });
 
 test("an aggregate outside git: the same two branches merge cleanly", () => {
-  const root = mkdtempSync(join(tmpdir(), "worktrail-views-"));
+  const root = mkdtempSync(join(tmpdir(), "branchling-views-"));
   try {
     twoBranchesAddingDifferentTasks(root, false);
     assert.equal(mergeConflicts(root), false);

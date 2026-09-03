@@ -50,7 +50,7 @@ const FIXTURE = join(HERE, "fixtures", "gh-issues.json");
 
 let counter = 0;
 function tmp(prefix) {
-  return mkdtempSync(join(tmpdir(), "worktrail-import-" + prefix + "-" + counter++ + "-"));
+  return mkdtempSync(join(tmpdir(), "branchling-import-" + prefix + "-" + counter++ + "-"));
 }
 
 function run(args, input) {

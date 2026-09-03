@@ -97,7 +97,7 @@ test("the backlog's .gitattributes exists and lives IN the backlog directory", (
 });
 
 test("a REAL merge: two branches appending to the same log do not conflict", () => {
-  const root = mkdtempSync(join(tmpdir(), "worktrail-merge-"));
+  const root = mkdtempSync(join(tmpdir(), "branchling-merge-"));
   try {
     const log = twoBranchesAppending(root, true);
     vcs(root, "merge", "-q", "--no-edit", "left");
@@ -114,7 +114,7 @@ test("a REAL merge: two branches appending to the same log do not conflict", () 
 test("positive control: WITHOUT .gitattributes the same merge CONFLICTS", () => {
   // Without this test the green result above could mean "git would have merged it
   // anyway", that is, zero evidential force for the rule.
-  const root = mkdtempSync(join(tmpdir(), "worktrail-merge-ctl-"));
+  const root = mkdtempSync(join(tmpdir(), "branchling-merge-ctl-"));
   try {
     const log = twoBranchesAppending(root, false);
     assert.throws(() => vcs(root, "merge", "-q", "--no-edit", "left"), /./, "without the rule the merge MUST conflict");

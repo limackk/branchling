@@ -242,7 +242,7 @@ test("a clean backlog reports nothing — and one edit makes it report something
 // ── The command ───────────────────────────────────────────────────────────
 
 function backlog() {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-audit-" + counter++ + "-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-audit-" + counter++ + "-"));
   assert.equal(run(["init", "--dir", dir, "--no-example"]).status, 0);
   const p = join(dir, "config.yaml");
   writeFileSync(p, readFileSync(p, "utf8")

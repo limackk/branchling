@@ -74,7 +74,7 @@ function audit(raw, policy) {
 }
 
 function sandbox(files, config = "") {
-  const dir = mkdtempSync(join(tmpdir(), "worktrail-criteria-"));
+  const dir = mkdtempSync(join(tmpdir(), "branchling-criteria-"));
   mkdirSync(join(dir, "tasks"));
   writeFileSync(join(dir, "_template.md"), "---\nid: BL-NNN\n---\n", "utf8");
   writeFileSync(join(dir, "boards.yaml"), 'default: main\nboards:\n  - slug: main\n    name: "Main"\n', "utf8");
