@@ -42,6 +42,20 @@ waves:
     # fills the silence BETWEEN a task's two writes from the heartbeat log —
     # without it the other two only deliver two frames of a two-hour film.
 
+  - name: "A question a person can answer in a minute"
+    tasks: [TL-204, TL-205]
+    # Asked for on 2026-09-03 after reading `Waiting on you` on this backlog:
+    # eleven rows, every one the same box in the same weight, and the two real
+    # questions in it are paragraphs of prose because the asker had nowhere to
+    # put structure. TL-204 gives a question its options and names the one it
+    # recommends — the most solid, and the one that composes with what is
+    # already here — so an agent that asks has done the analysis rather than
+    # moved it. TL-205 renders that, and is blocked by it so the panel is
+    # designed once against the final shape.
+    #
+    # It stands ahead of the loop's own honesty because every wave below can
+    # stall on a question, and today answering one costs more than it should.
+
   - name: "What the loop says of itself is true"
     tasks: [TL-200, TL-186, TL-193, TL-194, TL-199]
     # Three things the tool states and cannot back. TL-186: a `--plan` run that
