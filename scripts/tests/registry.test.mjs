@@ -201,7 +201,10 @@ test("an entry whose path no longer exists is REPORTED, never skipped", () => {
 
   const listed = run(["project", "list"], env);
   assert.equal(listed.status, 0);
-  assert.match(listed.stdout, /not a backlog any more/);
+  // The wording distinguishes the two ways an entry dies (TL-176): this
+  // directory was DELETED, which is a different problem from one that is still
+  // there but no longer holds a backlog — and they have different fixes.
+  assert.match(listed.stdout, /does not exist any more/);
   assert.ok(listed.stdout.includes(other), "the path a person has to go and look at is printed");
 });
 

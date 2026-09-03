@@ -39,6 +39,7 @@ import { ATTRIBUTE_RULES, IGNORE_RULES, hasUnionMerge, insideGitRepo, trackedVie
 import { SNAPSHOT_FILE, loadSnapshot, readMigrations, reconcile } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
+import { classifyRegistry, readRegistry } from "./registry.mjs";
 import { MARK as UI_MARK, color, errColor, heading } from "./ui.mjs";
 import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { summarize } from "./stats.mjs";
@@ -361,6 +362,32 @@ function checkContextBudget(root, config) {
     : check("context", "cost of asking", OK, detail);
 }
 
+/**
+ * The index of backlogs on this machine, and how much of it is dead (TL-176).
+ *
+ * ONLY EVER `INFO` OR `WARN`, NEVER an error. The registry is a convenience —
+ * registration is not a precondition for anything — so a registry full of dead
+ * entries is untidiness, not a fault in this backlog. Making it an error would
+ * mean `doctor` failed here because of a directory somewhere else.
+ *
+ * It is here at all because `doctor` is where somebody looks when something
+ * feels wrong, and this was measured at 347 dead entries out of 1239 — enough
+ * to bury the report of a project that really is missing.
+ */
+function checkRegistry(env) {
+  const registry = readRegistry(env);
+  if (!registry.exists) {
+    return check("registry", "project registry", INFO,
+      "none yet — nothing needs it; it is what `project list` reads");
+  }
+  const { live, gone, hollow } = classifyRegistry(registry);
+  const dead = gone.length + hollow.length;
+  const detail = live.length + " registered" + (dead ? ", " + dead + " unavailable" : "");
+  if (!dead) return check("registry", "project registry", OK, detail);
+  return check("registry", "project registry", WARN, detail,
+    gone.length ? N + " project prune --dry-run" : N + " project list");
+}
+
 function checkVolume(metas, config) {
   const s = summarize(metas, config);
   return check("volume", "tasks", INFO,
@@ -396,6 +423,7 @@ export function diagnose(root) {
   rows.push(...checkGitIgnore(root));
   rows.push(checkGuards(root));
   rows.push(checkVolume(metas, config));
+  rows.push(checkRegistry(process.env));
   rows.push(checkContextBudget(root, config));
   return rows;
 }

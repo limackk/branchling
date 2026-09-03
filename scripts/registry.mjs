@@ -244,6 +244,52 @@ export function removeProject(nameOrPath, opts = {}) {
   return { ok: true, removed: all.length - kept.length, path: write(env, kept) };
 }
 
+/**
+ * Which registered entries are dead, and in which of the two ways (TL-176).
+ *
+ * THE TWO ARE NOT THE SAME PROBLEM AND MUST NOT SHARE A FIX. A path that does
+ * not exist is a project moved or deleted — nothing can be done with the entry
+ * and nobody will miss it. A path that EXISTS but no longer looks like a backlog
+ * is somebody's checkout mid-surgery, or a `tasks/` deleted by accident: the
+ * directory is still there, and forgetting it would throw away the only record
+ * that it used to be a project.
+ *
+ * PURE apart from the existence check it is handed.
+ */
+export function classifyRegistry(registry, exists = existsSync) {
+  const gone = [];
+  const hollow = [];
+  for (const p of registry.missing || []) (exists(p.path) ? hollow : gone).push(p);
+  return { live: registry.projects || [], gone, hollow };
+}
+
+/**
+ * Forget the entries whose directory is gone.
+ *
+ * NEVER AUTOMATIC, and never on a schedule. The registry is the one file that
+ * records a decision the user made; a network share that did not mount this
+ * morning is not a reason to forget a project. So this is a command somebody
+ * runs, `--dry-run` is offered first, and it names every entry it takes.
+ *
+ * `includeHollow` extends it to directories that exist but are no longer
+ * backlogs — off by default, for the reason `classifyRegistry` gives.
+ */
+export function pruneProjects(opts = {}) {
+  const env = opts.env || process.env;
+  const registry = readRegistry(env);
+  if (!registry.exists) {
+    return { ok: true, removed: [], kept: 0, dryRun: Boolean(opts.dryRun), path: registry.path, existed: false };
+  }
+  const { live, gone, hollow } = classifyRegistry(registry);
+  const removed = opts.includeHollow ? gone.concat(hollow) : gone;
+  const kept = live.concat(opts.includeHollow ? [] : hollow);
+  if (opts.dryRun || !removed.length) {
+    return { ok: true, removed, kept: kept.length, dryRun: Boolean(opts.dryRun), path: registry.path, existed: true };
+  }
+  ensureHome(env);
+  return { ok: true, removed, kept: kept.length, dryRun: false, path: write(env, kept), existed: true };
+}
+
 /** Registration that must never fail the command it rode in on — `init` calls
  *  this. Creating a backlog is the user's request; putting it in an index is
  *  the tool's convenience, and a read-only home directory may not turn the

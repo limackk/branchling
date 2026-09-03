@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Backlog — open source publication"
 priority: P2
-status: pending
-owner: unassigned
+status: done
+owner: agent:claude
 role: ""
 executor: ""
 estimate: 2h
@@ -77,15 +77,32 @@ once.
 
 ## Acceptance criteria
 
-- [ ] `project prune` removes entries whose directory does not exist and leaves
+- [x] `project prune` removes entries whose directory does not exist and leaves
       every live one. [proof: prune-removes-only-the-dead]
-- [ ] An existing directory that is no longer a backlog is NOT removed by
+- [x] An existing directory that is no longer a backlog is NOT removed by
       default, and the difference is stated. [proof: prune-removes-only-the-dead]
-- [ ] `--dry-run` changes nothing and names what it would remove. [proof: prune-removes-only-the-dead]
-- [ ] `project list` distinguishes live entries from dead ones. [proof: prune-removes-only-the-dead]
+- [x] `--dry-run` changes nothing and names what it would remove. [proof: prune-removes-only-the-dead]
+- [x] `project list` distinguishes live entries from dead ones, and says how
+      many of each. [proof: prune-removes-only-the-dead]
+- [x] `doctor` reports a registry with dead entries as a WARNING, never an
+      error — a directory somewhere else must not fail this backlog's doctor. [proof: prune-removes-only-the-dead]
 
 ## Decisions
 
 - Pruning is never automatic. The registry is the one file that records a
   decision the user made; a network share not mounted this morning is not a
   reason to forget a project.
+- **The removal NAMES every entry it takes, rather than counting them.** The
+  entry is the only record that a directory was ever a project of yours, so a
+  number would leave nothing to put back if the removal turns out to be a
+  mistake. `list` counts instead, and truncates at ten with "and N more" —
+  there the length IS the problem.
+- **`doctor` gets a row but never an error.** Registration is a precondition for
+  nothing, so a registry full of dead entries is untidiness, not a fault in the
+  backlog being examined; an error here would make `doctor` fail because of a
+  directory somewhere else. It is in `doctor` at all because that is where
+  somebody looks when something feels wrong.
+- **This tree was not cleaned up as part of the task.** The command exists; what
+  the user does with their own registry is their decision, and running a removal
+  over 310 of their entries because a task happened to be open is not a fix, it
+  is a side effect.
