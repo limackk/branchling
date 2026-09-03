@@ -43,7 +43,7 @@ waves:
     # without it the other two only deliver two frames of a two-hour film.
 
   - name: "What the loop says of itself is true"
-    tasks: [TL-186, TL-193, TL-194]
+    tasks: [TL-200, TL-186, TL-193, TL-194, TL-199]
     # Three things the tool states and cannot back. TL-186: a `--plan` run that
     # stops cannot say whether the plan is finished or merely waiting. TL-193:
     # a task parked because its contract asks a PERSON is recorded as having
@@ -51,6 +51,15 @@ waves:
     # accepts are absent from its own `--help`. All three were found by agents
     # while working on something else, and each is a sentence a reader would
     # act on.
+    #
+    # TL-200 and TL-199 were added after the runs of 2026-09-03 and are the same
+    # failure one level apart. TL-200: five consecutive successful runs reported
+    # `0 closed`, because this project tells an agent to close its own task and
+    # the loop calls that `closed-elsewhere` — true, and read by a cron as
+    # nothing happened. TL-199: a wave stalled on an `executor: human` task
+    # looks exactly like a wave stalled on work. TL-200 stands first: a false
+    # negative in the one field an unattended caller reads is worse than a
+    # missing explanation in a report a person is already reading.
 
   - name: "The dispatcher can follow a plan"
     tasks: [TL-183]
