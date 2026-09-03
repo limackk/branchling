@@ -1623,6 +1623,19 @@ ${paletteBadgeCss}
   .exec-card.is-closed { opacity: .6; }
   .exec-card.is-running { border-color: var(--accent); }
   .exec-card.is-unknown { border-style: dashed; }
+  /* Running, but in ANOTHER working tree (TL-210). The card has to read as
+     running — that is the fact the view was standing still about — without
+     reading as work this reader can pick up. Two signals, as on the Tasks card:
+     the border keeps the running colour and turns DASHED, which survives a
+     printout and a reader who does not separate the shades, and the head names
+     the tree in words. */
+  .exec-card.is-elsewhere { border-style: dashed; }
+  /* The bar under a foreign card is measured from that tree's log, and its fill
+     says so — the accent belongs to work in this tree. */
+  .exec-card.is-elsewhere .exec-bar-fill { background: rgba(217, 119, 6, 0.22); }
+  @media (prefers-color-scheme: dark) {
+    .exec-card.is-elsewhere .exec-bar-fill { background: rgba(251, 191, 36, 0.24); }
+  }
   /* ── The critical path, the selected chain, and motion (TL-110) ──────────
      Every state below is carried by MORE than a hue: the critical path adds a
      thicker border, a left rule and the words "critical path" on the card; the
@@ -1694,7 +1707,9 @@ ${paletteBadgeCss}
     .exec-card.just-changed,
     .exec-wave.just-closed { animation: none; }
   }
-  .exec-card-head { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  /* Wrapping, because the badge naming another tree (TL-210) is a directory
+     name and does not shorten to fit beside the id and the status. */
+  .exec-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 4px; }
   .exec-id { font-size: 11px; font-weight: 600; color: var(--accent); text-decoration: none; }
   .exec-id:hover { text-decoration: underline; }
   .exec-title { font-size: 12px; line-height: 1.35; }

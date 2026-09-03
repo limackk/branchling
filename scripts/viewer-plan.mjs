@@ -22,14 +22,19 @@
  * measures the cards and fills the geometry in. That keeps the part worth
  * testing — which dependency is a line and which is a badge — inside a test.
  *
- * NO IMPORTS. The page is not a module: every inlined file has to stand on its
- * own. What cannot be recomputed here (parsing an `estimate:`) arrives as a
- * function in `opts`.
+ * WHAT MAY BE IMPORTED. The page is not a module — the inlined files share one
+ * scope and `readModuleSource` strips their imports — so this file may only call
+ * into a module PASTED BEFORE it, and the paste order in build-viewer.mjs is the
+ * module graph written out by hand. `elsewhere.mjs` qualifies and is imported;
+ * anything further away arrives as a function in `opts` (parsing an `estimate:`)
+ * or is written out here.
  *
  * Tests: `node --test scripts/tests/viewer-plan.test.mjs`
  */
 
-/** HTML escaping, local on purpose: see NO IMPORTS above. */
+import { ELSEWHERE_HINT, elsewhereSourceLabel, runningElsewhere } from "./elsewhere.mjs";
+
+/** HTML escaping, local on purpose: see WHAT MAY BE IMPORTED above. */
 function planEsc(s) {
   return String(s == null ? "" : s)
     .replace(/&/g, "&amp;")
@@ -64,6 +69,15 @@ export function enteredInProgressAt(entries, inProgressStatus) {
     if (!Number.isNaN(t)) last = t;
   }
   return last;
+}
+
+/** An ISO timestamp as epoch ms, with an unreadable one spelled `null` rather
+ *  than `NaN` — every caller here treats "the log does not say" as a reason to
+ *  draw nothing, and `NaN` would flow into a width. */
+function parseTs(ts) {
+  if (!ts) return null;
+  const t = Date.parse(ts);
+  return Number.isNaN(t) ? null : t;
 }
 
 /** `45m`, `3h 10m`, `2d 4h` — a duration a person reads at a glance, not a
@@ -265,6 +279,7 @@ export function planViewModel(state, tasks, opts = {}) {
 
   const cardFor = (entry, groupIndex) => {
     const task = byId.get(entry.id) || null;
+    const away = runningElsewhere(task, inProgressStatus);
     const blockedBy = (task && task.blocked_by) || [];
     const openBlocker = (id) => {
       const b = byId.get(id);
@@ -283,13 +298,31 @@ export function planViewModel(state, tasks, opts = {}) {
       // anything — it becomes a badge, so the card still says it is waiting.
       waitingOn: blockedBy.filter((id) => !planned.has(id) && openBlocker(id)),
       inProgress: !!inProgressStatus && entry.status === inProgressStatus,
+      // WORK RUNNING IN ANOTHER TREE (TL-210). The scan already reports it and
+      // the Tasks view already draws it; without this the wave stands still on
+      // screen while an agent is moving through it, and a reader watching the
+      // Execution view concludes that nothing is happening.
+      elsewhereRunning: away
+        ? { source: away.source, label: elsewhereSourceLabel(away), since: away.since || "" }
+        : null,
+      // What the border and the bar are about: work in flight, here or not.
+      // `inProgress` stays the LOCAL fact — the two are different claims and the
+      // card has to be able to make both.
+      running: (!!inProgressStatus && entry.status === inProgressStatus) || !!away,
       elapsedMs: null,
       elapsedLabel: "",
       estimateLabel: "",
       pct: null,
     };
-    if (card.inProgress) {
-      const startedAt = enteredInProgressAt(history[entry.id], inProgressStatus);
+    if (card.running) {
+      // A foreign card is measured from the record the OTHER tree wrote, never
+      // from this one's history: that would be the last time WE held the task,
+      // which is a duration nobody has been working. When the scan could not
+      // read that tree's log there is no bar at all — the card still says it is
+      // running and where, and says nothing it cannot support.
+      const startedAt = card.inProgress
+        ? enteredInProgressAt(history[entry.id], inProgressStatus)
+        : parseTs(card.elsewhereRunning && card.elsewhereRunning.since);
       if (startedAt) {
         card.elapsedMs = Math.max(now - startedAt, 0);
         card.elapsedLabel = durationLabel(card.elapsedMs);
@@ -368,7 +401,10 @@ function renderCard(card) {
   const cls = ["exec-card"];
   if (!card.known) cls.push("is-unknown");
   if (!card.open && card.known) cls.push("is-closed");
-  if (card.inProgress) cls.push("is-running");
+  if (card.running) cls.push("is-running");
+  // Running HERE and running SOMEWHERE ELSE are not the same card: a reader can
+  // take over one and cannot touch the other, so the two must not look alike.
+  if (card.elsewhereRunning) cls.push("is-elsewhere");
   if (card.critical) cls.push("is-critical");
   const bits = [];
   bits.push('<a class="exec-id" href="#' + planEsc(card.id) + '">' + planEsc(card.id) + "</a>");
@@ -381,6 +417,19 @@ function renderCard(card) {
   } else {
     bits.push('<span class="badge exec-missing">not in this backlog</span>');
   }
+  // The tree is NAMED, in the head and not in a tooltip — the whole point of the
+  // mark is that somebody else is holding this task, and a name in a tooltip is
+  // a name a printout and a hurried reader both lose. The full source stays in
+  // the title, worded by elsewhere.mjs so this view and the Tasks view cannot
+  // describe one situation two ways.
+  if (card.elsewhereRunning) {
+    const away = card.elsewhereRunning;
+    bits.push(
+      '<span class="badge badge-elsewhere" title="' +
+        planEsc(ELSEWHERE_HINT + " — running in " + away.source) + '">running in ' +
+        planEsc(away.label) + "</span>"
+    );
+  }
   const meta = [];
   // A WORD, not only a colour and a thicker border (TL-52). The critical path is
   // the one claim on this view a reader might act on, and a claim carried by
@@ -392,10 +441,11 @@ function renderCard(card) {
     meta.push('<span class="exec-waiting" title="Waiting on a task the plan does not schedule">⇠ ' + planEsc(id) + "</span>");
   }
   let bar = "";
-  if (card.inProgress && card.elapsedLabel) {
+  if (card.running && card.elapsedLabel) {
     const width = card.pct === null ? 0 : Math.round(card.pct * 100);
+    const where = card.elsewhereRunning ? " in " + card.elsewhereRunning.label : "";
     bar =
-      '<div class="exec-bar" role="img" aria-label="Running ' + planEsc(card.elapsedLabel) +
+      '<div class="exec-bar" role="img" aria-label="Running' + planEsc(where) + " " + planEsc(card.elapsedLabel) +
       (card.estimateLabel ? " of " + planEsc(card.estimateLabel) : "") + '">' +
       '<div class="exec-bar-fill" style="width:' + width + '%"></div>' +
       '<span class="exec-bar-label">' + planEsc(card.elapsedLabel) +

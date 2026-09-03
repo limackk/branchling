@@ -44,3 +44,46 @@ export function elsewhereCardAttrs(task) {
     title: ELSEWHERE_HINT + " — " + list.map(describeElsewhere).join(", "),
   };
 }
+
+/**
+ * The observation that says this task is being WORKED ON somewhere else.
+ *
+ * WHY THIS ONE NAMES A STATUS while `elsewhereCardAttrs()` above refuses to.
+ * The two answer different questions. "Something disagrees with this value" is
+ * true of any difference, so it must not name one. "Somebody is working on it
+ * right now" is a claim about ONE status, and the caller supplies which — from
+ * `in_progress_status` in the project's config.yaml, never from a literal here.
+ * With no such status configured the answer is simply "nobody", which is the
+ * honest reading of a vocabulary that does not distinguish work in flight.
+ *
+ * @param {{elsewhere?: Array<{status: string, source: string, kind?: string, since?: string|null}>}} task
+ * @param {string} inProgressStatus the project's value
+ * @returns {object|null} the first such observation, or null
+ */
+export function runningElsewhere(task, inProgressStatus) {
+  if (!inProgressStatus) return null;
+  const list = (task && task.elsewhere) || [];
+  for (const o of list) {
+    if (o && String(o.status || "") === String(inProgressStatus)) return o;
+  }
+  return null;
+}
+
+/**
+ * The source shortened to what fits on a card.
+ *
+ * A worktree is named by an absolute path, and the path is mostly somebody's
+ * home directory: the DIRECTORY NAME is the part that identifies the tree, and
+ * it is what the person running the session sees in their prompt. A branch name
+ * is left whole — it is already short, and it contains slashes of its own, so
+ * cutting at the last one would turn `feature/x` into `x`.
+ *
+ * The full value never disappears: the caller keeps it in the title, the way the
+ * Tasks view already does.
+ */
+export function elsewhereSourceLabel(observation) {
+  const source = String((observation && observation.source) || "");
+  if (!observation || observation.kind !== "worktree") return source;
+  const name = source.replace(/[/\\]+$/, "").split(/[/\\]/).pop();
+  return name || source;
+}

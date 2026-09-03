@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h
@@ -97,6 +97,45 @@ answers correctly today.
 
 ## Decisions
 
-Nothing decided. Open: whether the elapsed bar is drawn at all for a foreign
-card, or only the running state — the bar's honesty depends on the other
-tree's history being readable, which the scan can answer.
+**The bar is drawn, and the scan was made able to answer for it.** The open
+question was whether a foreign card gets an elapsed bar at all. Drawing one
+from THIS tree's history would have measured the last time WE held the task —
+a duration nobody has been working, drawn as if somebody were. So the scan now
+reports `since` on a worktree observation: the timestamp of the last entry in
+THAT tree's `history/<ID>.jsonl` which set the status it is reporting
+(`statusSetAt()` in `branch-scan.mjs`). The bar comes from that record or it is
+not drawn.
+
+**`since` is worktrees only.** A branch's log would have to be read as a blob
+per ref, and a branch nobody has checked out has nobody standing in it — the
+state is committed, not being worked on this minute. A branch observation
+therefore carries no start, and the card degrades to the running state and the
+branch's name with no bar. That is the honest half, not a gap to fill later.
+
+**No status name entered the code.** `statusSetAt()` is asked about the status
+the other tree is CURRENTLY reporting, whatever a project calls it;
+`runningElsewhere()` in `elsewhere.mjs` takes `in_progress_status` from the
+caller. `elsewhereCardAttrs()` beside it still refuses to name a status,
+because it answers a different question — "something disagrees" is true of any
+difference, "somebody is working on it" is a claim about one value.
+
+**`inProgress` kept its local meaning; `running` is the new one.** The card has
+to be able to make both claims: `inProgress` is this tree's status, `running`
+is work in flight anywhere, and only the second drives the border and the bar.
+Collapsing them would have left no way to ask which of the two a card is.
+
+**Two marks, neither a hue alone.** `is-elsewhere` turns the running border
+dashed — the same mark the Tasks view puts on a card seen differently (TL-124)
+— and the head carries `running in <tree>` in words, with the full path in the
+title. A reader must not act on a foreign card thinking it is local, and a
+colour is not a signal on a printout.
+
+**`viewer-plan.mjs` may now import from `elsewhere.mjs`.** Its header said NO
+IMPORTS; the real constraint is the paste order in `build-viewer.mjs`, which is
+the module graph written by hand, and `elsewhere.mjs` is pasted first
+(`plan.mjs` already relies on the same arrangement for `task-fields.mjs`). The
+header now says that rather than a rule the file was about to break.
+
+**Still not done here:** push (TL-122), so the page shows the foreign state as
+of its last render; and the worktree switcher (TL-188), which makes another
+tree the SUBJECT of the view rather than a fact on a card.
