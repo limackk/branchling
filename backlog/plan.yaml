@@ -103,7 +103,7 @@ waves:
     # it stands first, and it is the one task in this arc that the arc is about.
 
   - name: "The record says who did what"
-    tasks: [TL-180, TL-187, TL-195]
+    tasks: [TL-214, TL-180, TL-187, TL-195]
     # Everything downstream reads the history as evidence — the audit, the PR
     # comment, an actor's record. TL-181 (the rollup was never committed) and
     # TL-182 (`new` wrote no history) were closed on 2026-09-03 and are the
