@@ -1,0 +1,2 @@
+{"id":"01M1M73047HAVM0XZCXJ46SKC1","ts":"2026-09-03T18:04:24.071Z","task":"TL-220","field":"__created__","from":"","to":"Refusing an unknown flag has four shapes, and regen-hook has none","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1M7E9NF2G894JJ072V8GBQF","ts":"2026-09-03T18:10:34.287Z","task":"TL-220","field":"__attributed__","from":"","to":"__created__","actor":"agent:sub-a","source":"manual","reason":"created during the parallel wave-4 run; the log recorded it as nobody's","attributes":"01M1M73047HAVM0XZCXJ46SKC1"}

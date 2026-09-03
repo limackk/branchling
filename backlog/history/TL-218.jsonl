@@ -1,0 +1,2 @@
+{"id":"01M1M72W8JS3BYGP00KQ3P2HRQ","ts":"2026-09-03T18:04:20.114Z","task":"TL-218","field":"__created__","from":"","to":"Six tasks still carry executor: human; TL-212 accounted for four","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1M7E9EPNV58RTRCB45CRJ6E","ts":"2026-09-03T18:10:34.070Z","task":"TL-218","field":"__attributed__","from":"","to":"__created__","actor":"agent:sub-d","source":"manual","reason":"created during the parallel wave-4 run; the log recorded it as nobody's","attributes":"01M1M72W8JS3BYGP00KQ3P2HRQ"}

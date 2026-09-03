@@ -1,0 +1,2 @@
+{"id":"01M1M730472G4CDYBK0T3GFPDM","ts":"2026-09-03T18:04:24.071Z","task":"TL-217","field":"__created__","from":"","to":"Four commands accept flags their --help never declares","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1M7E9BE6BE4T6ZEN664XJ07","ts":"2026-09-03T18:10:33.966Z","task":"TL-217","field":"__attributed__","from":"","to":"__created__","actor":"agent:sub-a","source":"manual","reason":"created during the parallel wave-4 run; the log recorded it as nobody's","attributes":"01M1M730472G4CDYBK0T3GFPDM"}

@@ -1,0 +1,2 @@
+{"id":"01M1M75HZ8NPVSDQZYY22PHSH0","ts":"2026-09-03T18:05:47.880Z","task":"TL-219","field":"__created__","from":"","to":"skippedUnplanned counts open work outside the active wave, not work the plan does not schedule","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1M7E9J1X5J13TPVK8JTXAQH","ts":"2026-09-03T18:10:34.177Z","task":"TL-219","field":"__attributed__","from":"","to":"__created__","actor":"agent:sub-b","source":"manual","reason":"created during the parallel wave-4 run; the log recorded it as nobody's","attributes":"01M1M75HZ8NPVSDQZYY22PHSH0"}

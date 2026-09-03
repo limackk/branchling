@@ -1,0 +1,2 @@
+{"id":"01M1M75HZ8PR80MF6FNMYSCNQM","ts":"2026-09-03T18:05:47.880Z","task":"TL-216","field":"__created__","from":"","to":"ask refuses a long --question with a message that names the wrong cause","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1M7E98494VXMZDWXEPMH42C","ts":"2026-09-03T18:10:33.860Z","task":"TL-216","field":"__attributed__","from":"","to":"__created__","actor":"agent:sub-b","source":"manual","reason":"created during the parallel wave-4 run; the log recorded it as nobody's","attributes":"01M1M75HZ8PR80MF6FNMYSCNQM"}
