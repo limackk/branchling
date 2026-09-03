@@ -135,7 +135,7 @@ waves:
     # another session is committing destroys that session's work.
 
   - name: "Refusals the writing commands still lack"
-    tasks: [TL-167, TL-173, TL-58]
+    tasks: [TL-211, TL-167, TL-173, TL-58]
     # Three inputs a command accepts today and should not: a reason long enough
     # to be empty or reserved, a comment between verification entries, a value
     # starting with a dash. They are grouped because they are the same defect
