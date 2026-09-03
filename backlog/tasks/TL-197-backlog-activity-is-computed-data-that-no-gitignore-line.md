@@ -1,13 +1,13 @@
 ---
 id: TL-197
-title: "backlog/activity/ is computed data that no .gitignore line keeps out of a commit"
+title: "The aggregate that is supposed to travel with the project never left this tree"
 type: task
 labels: [hygiene]
 board: main
 epic: ""                           # free text — the group this task counts towards
-priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+priority: P1
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 30m
@@ -19,65 +19,76 @@ blocks: []                         # ids this task will unblock
 related_docs:
   - .gitignore
 verification:
-  - bash: "git check-ignore -q backlog/activity && echo 'backlog/activity ignored — OK' || { echo 'still committable'; exit 1; }"
-  - bash: "test -z \"$(git status --porcelain -uall | grep 'backlog/activity')\" && echo 'no activity file offered to a commit — OK'"
+  # NOT "the directory is ignored" — that was this task's original premise and it
+  # was wrong. The rollup is meant to be versioned; what must stay ignored is the
+  # raw log beside it.
+  - id: raw-log-stays-out
+    bash: "cd backlog && git check-ignore -q -- activity/TASK-1.jsonl && echo 'the raw activity log is ignored — OK'"
+  - id: aggregate-travels
+    bash: "cd backlog && git check-ignore -q -- activity/rollup/TL-100.json && { echo 'the aggregate is ignored — it cannot reach a report on another machine'; exit 1; }; echo 'the aggregate is versioned — OK'"
+  - id: none-left-behind
+    bash: "N=$(git status --porcelain -uall -- backlog/activity/rollup | grep -c \"^??\" || true); test \"$N\" = \"0\" && echo 'every rollup is tracked — OK' || { echo \"$N rollup file(s) written and never committed\"; exit 1; }"
 ---
 
 ## Goal
 
-`backlog/activity/` must not be committable, for the same reason `INDEX.yaml`
-is not.
+Every per-task rollup under `backlog/activity/rollup/` is tracked, because the
+aggregate is what a report is built from and it is supposed to travel with the
+project.
 
 ## Context
 
-Found on 2026-09-03, auditing the tree before the first push.
+**This task was filed on 2026-09-03 with the opposite thesis and it was wrong.**
+It said the rollup was computed data that law 2 lets you delete, that it was the
+only such artefact missing from `.gitignore`, and that the fix was to ignore it.
+Its own step 1 said to confirm first that nothing reads it expecting it to be
+shared — and that check is what disproved the task.
 
-`git status -uall` offers 31 untracked files under `backlog/activity/rollup/`
-(124 kB). Their content is an aggregate — minutes, session count, first and
-last timestamp per task:
+What the tree actually says, measured on 2026-09-03:
 
-```json
-{ "minutes": 13.1, "sessions": 1, "first": "...", "last": "...", "unknown_ratio": 0 }
-```
+| Where | What it says |
+|---|---|
+| `scripts/activity.mjs:153` | "raw data stays with the person, **the aggregate travels with the project and goes through review**, because estimate calibration is a fact about the project" |
+| `scripts/git-rules.mjs` | `activity/*.jsonl` is ignored; "the per-task AGGREGATE under `activity/rollup/` is deliberately NOT matched by this pattern and stays versioned" |
+| `scripts/init-backlog.mjs` | writes exactly that block into the `.gitignore` of every repository `branchling init` touches |
+| `backlog/.gitignore:22` | this repository already has that rule — the raw log IS ignored |
+| `git ls-files` | 10 rollups tracked, **34 written and never committed** |
 
-That is COMPUTED data, which law 2 says may be deleted, and every other
-computed artefact in this repository is named in `.gitignore`: `INDEX.yaml`,
-`NOW.yaml`, `archive/done.yaml`, the boards, `viewer.html`,
-`history/.snapshot.json`. `backlog/activity/` is the one that is not, so it
-survives on nothing but the author of the next `git add -A` noticing.
+So the rule is right, it is applied, and `doctor` is honestly green. The defect
+is narrower and duller than the one filed: the files are written as a side
+effect of the activity hook, nobody stages them, and 34 of 44 never made it into
+a commit. Ignoring them would have made that permanent and turned a bug into
+policy.
 
-Two costs if it is committed, and they are the same ones the existing
-`.gitignore` comment already spells out for the views: every branch rewrites
-the same rollup files, so two branches conflict even when they share no task;
-and a committed rollup reads exactly like a fact while showing the state of
-whichever machine last ran the hook.
+**Why it matters at all.** `calibration.mjs` (TL-29) builds "what was estimated
+against what it measurably cost" from these files. A rollup that stays in one
+working tree makes that report a fact about one machine — and, worse, an
+incomplete report looks exactly like a complete one.
 
-There is a third, smaller: the rollups are a per-task timesheet of the owner's
-working hours. Harmless here, and not the reason for this task, but it is not
-something to publish by accident either.
-
-`backlog/history/*.jsonl` is DELIBERATELY not in this category — it is
-append-only truth, tracked on purpose, and a guard already fails when it is
-untracked (TL-43).
+**The original worry was not baseless, just misdirected.** A per-task file does
+not conflict the way `INDEX.yaml` does: `writeRollup`'s own comment says a
+branch touches only its own tasks' files, so a conflict there is a real
+conflict. And the privacy concern belongs to `activity/*.jsonl`, the raw
+calendar, which is ignored — the aggregate is minutes and a session count.
 
 ## Pre-flight reading
 
-1. `.gitignore` — the comment above the views says the reasoning; this entry
-   belongs under the same one.
-2. `scripts/activity-hook.sh` — what writes these files, and whether anything
-   reads them back across machines.
+1. `scripts/git-rules.mjs` — `IGNORE_RULES` and `VIEW_PATHS`, the rule and what
+   `doctor` checks against it.
+2. `scripts/activity.mjs` around `rollupPath` — the split this task got backwards.
 
 ## Steps
 
-1. Confirm that nothing reads `backlog/activity/` expecting it to be shared —
-   if something does, this task is wrong and says so instead.
-2. Add `backlog/activity/` to `.gitignore`, under the existing comment about
-   generated views.
-3. Check the same question for `.claude/settings.local.json`, which is also
-   unignored today and is by convention a machine-local file.
+1. `git add backlog/activity/rollup/` — the 34 files that were written and never
+   committed.
+2. Confirm the raw log stays ignored and the aggregate stays out of the ignore
+   rules. Both directions matter; this task got them the wrong way round once.
 
 ## Acceptance criteria
 
-- [ ] `git check-ignore backlog/activity` succeeds.
-- [ ] `git status -uall` offers no file from that directory.
-- [ ] A decision recorded about `.claude/settings.local.json`, either way.
+- [x] `activity/*.jsonl` is ignored — the working calendar does not travel.
+      [proof: raw-log-stays-out]
+- [x] `activity/rollup/*.json` is NOT ignored — the aggregate does.
+      [proof: aggregate-travels]
+- [x] `git status -uall` offers no rollup file that was written and never
+      committed. [proof: none-left-behind]

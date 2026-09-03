@@ -5,3 +5,8 @@
 {"id":"01M1KGT9Y1ZZF9JJ7N9AXPCRWT","ts":"2026-09-03T11:35:10.529Z","task":"TL-197","field":"confidence","from":"medium","to":"high","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1KGT9Y14SQ8R6JC6GS9X3YE","ts":"2026-09-03T11:35:10.529Z","task":"TL-197","field":"labels","from":[],"to":["hygiene"],"actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1KGT9Y1EFWSPHFKNS4B83H9","ts":"2026-09-03T11:35:10.529Z","task":"TL-197","field":"related_docs","from":[],"to":[".gitignore"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1M2X28K3BDNQT3YCBNJFAGH","ts":"2026-09-03T16:51:15.347Z","task":"TL-197","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1M2X28KW7ZA0P2CHQK7T5SH","ts":"2026-09-03T16:51:15.347Z","task":"TL-197","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1M331ZE4E7YP5PFSA8S0AYJ","ts":"2026-09-03T16:54:31.662Z","task":"TL-197","field":"title","from":"backlog/activity/ is computed data that no .gitignore line keeps out of a commit","to":"The aggregate that is supposed to travel with the project never left this tree","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1M331ZEBEJZZG1Y5G2JAWAP","ts":"2026-09-03T16:54:31.662Z","task":"TL-197","field":"priority","from":"P2","to":"P1","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1M33SSTKNWS37B9RGBP1RMA","ts":"2026-09-03T16:54:56.058Z","task":"TL-197","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven","session":"tree-526f61f2043f"}

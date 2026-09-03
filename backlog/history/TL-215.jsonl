@@ -1,0 +1,4 @@
+{"id":"01M1M34B0JQTG02H18EJNC65BT","ts":"2026-09-03T16:55:13.682Z","task":"TL-215","field":"__created__","from":"","to":"An untracked rollup makes a calibration report look complete when it is not","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1M3541181HZX9XQXHSTN5GC","ts":"2026-09-03T16:55:39.297Z","task":"TL-215","field":"priority","from":"P1","to":"P2","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1M35411XQZDQHHE7CGKK2Y0","ts":"2026-09-03T16:55:39.297Z","task":"TL-215","field":"labels","from":[],"to":["hygiene"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1M35411EPX8CJRNS8STG8VZ","ts":"2026-09-03T16:55:39.297Z","task":"TL-215","field":"related_docs","from":[],"to":["scripts/check-backlog-history-tracked.mjs","scripts/git-rules.mjs"],"actor":"unknown","source":"external","reason":"unknown"}
