@@ -1,0 +1,1 @@
+{"id":"01M1KBJKP0PMBFEPKXMT6Z732M","ts":"2026-09-03T10:03:35.488Z","task":"TL-186","field":"__created__","from":"","to":"run --plan reports the queue as empty when the plan is merely waiting","actor":"agent:claude","source":"manual","reason":"Filing the watchability tasks that came out of watching the run."}

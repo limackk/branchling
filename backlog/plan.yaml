@@ -19,6 +19,16 @@ waves:
     # snapshot and recorded nowhere. A fleet whose report and whose log cannot
     # be believed is not worth pointing at the waves below.
 
+  - name: "The run can be watched while it happens"
+    tasks: [TL-188, TL-122, TL-189]
+    # Asked for on 2026-09-03, while the first unattended run was working: the
+    # viewer, served from the main checkout, showed a board that had not moved
+    # for two hours, because the work was on a branch in a worktree and that is
+    # exactly what law 1 promises. TL-188 lets the page be pointed at another
+    # worktree, TL-122 pushes the change instead of waiting for F5, and TL-189
+    # fills the silence BETWEEN a task's two writes from the heartbeat log —
+    # without it the other two only deliver two frames of a two-hour film.
+
   - name: "The dispatcher can follow a plan"
     tasks: [TL-183]
     # Written on 2026-09-03 while preparing this very plan: `next` and `run`

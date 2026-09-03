@@ -1,0 +1,1 @@
+{"id":"01M1KBJKP03FZGEK8RK8X25BRB","ts":"2026-09-03T10:03:35.488Z","task":"TL-190","field":"__created__","from":"","to":"run reads verdict.reason, a field done --json never writes, so no refusal is terminal","actor":"agent:claude","source":"manual","reason":"Filing the watchability tasks that came out of watching the run."}
