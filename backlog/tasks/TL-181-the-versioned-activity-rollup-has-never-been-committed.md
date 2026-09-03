@@ -6,7 +6,7 @@ labels: []
 board: main
 epic: "History and attribution"
 priority: P2
-status: pending
+status: done
 owner: unassigned
 role: ""
 executor: ""
@@ -74,7 +74,7 @@ plus a guard so it cannot silently drift out of the tree again.
 
 ## Acceptance criteria
 
-- [ ] The tree and the ignore rule agree, and a guard fails if they stop agreeing. [proof: the-rollup-is-tracked]
+- [x] The tree and the ignore rule agree, and a guard fails if they stop agreeing. [proof: the-rollup-is-tracked]
 - [ ] The decision is recorded with the reason, including what a rollup entry reveals about a person.
 - [ ] If versioned, the 31 existing files are in git; if not, they are ignored and the comment no longer promises otherwise.
 
