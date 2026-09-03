@@ -203,12 +203,21 @@ function inline(s) {
 // Read all tasks
 // ──────────────────────────────────────────────────────────────────────────
 
-export function readTasks(root = defaultRoot()) {
+/**
+ * @param {string} root the backlog directory
+ * @param {object} [preloaded] a configuration the caller has ALREADY loaded.
+ *        The server passes one when the directory is another worktree's
+ *        (TL-188): `loadConfigOrExit` ends the process, which is the right
+ *        answer for a command and the wrong one for a server that would be
+ *        taken down by an unreadable config.yaml in a tree it merely offered to
+ *        show. Loading it once also removes the read-it-twice race.
+ */
+export function readTasks(root = defaultRoot(), preloaded = null) {
   const TASKS_DIR = backlogPaths(root).tasksDir;
   // The prefix from this backlog's configuration (BL-1452), not from a constant.
   // STRICT (TL-60): a page built under a configuration that could not be read
   // shows emptiness or somebody else's vocabulary — and looks correct doing it.
-  const config = loadConfigOrExit(root);
+  const config = preloaded || loadConfigOrExit(root);
   const taskFile = taskIdPatterns(config.taskIdPrefix).file;
   // THE SAME SCAN AND THE SAME DEFINITION OF A DIFFERENCE AS THE TERMINAL
   // (TL-73). The page is the view non-technical readers work from, so a status
@@ -277,13 +286,35 @@ export function computeStats(tasks) {
  *   (the `viewer` command and the server) hand in tasks and a config, and neither
  *   should have to learn where the plan file lives to keep working.
  */
+/**
+ * @param {object} [viewer] what the SERVER knows and a file:// page cannot
+ *        (TL-188): `worktrees` is the list of trees this clone offers as
+ *        subjects, `worktree` the key of the one being rendered, and `canEdit`
+ *        whether writes may reach it. Absent by default, and that is the
+ *        file:// case: with no server there is nothing to switch to and no
+ *        write path, so the page renders no switcher rather than one that
+ *        cannot work.
+ */
 export function buildHtml(
   tasks,
   stats,
   config = loadConfig(defaultRoot()),
   history = readAllHistory(config.root),
-  plan = loadPlan(backlogPaths(config.root).planPath)
+  plan = loadPlan(backlogPaths(config.root).planPath),
+  viewer = {}
 ) {
+  const worktreesJson = JSON.stringify(
+    (viewer.worktrees || []).map((w) => ({
+      key: w.key, label: w.label, branch: w.branch, isSelf: !!w.isSelf,
+    }))
+  ).replace(/</g, "\\u003c");
+  const worktreeJson = JSON.stringify(viewer.worktree || null);
+  // Whether the SUBJECT may be written to — not whether there is anywhere to
+  // write. The client ands this with SERVER_MODE, which is what actually gates
+  // a file:// page, so the default here can stay permissive without opening a
+  // write path: the only caller that ever renders a foreign tree is the server,
+  // and it passes the flag explicitly.
+  const canEditJson = JSON.stringify(viewer.canEdit !== false);
   // WHICH FILES EACH TASK CHANGED (TL-75). Attached here rather than stored in
   // the frontmatter, for the reason modified-files.mjs gives at length: the
   // commits are the record, and an index over them is a view. Cached on HEAD, so
@@ -413,6 +444,12 @@ export function buildHtml(
     --shadow-lg: 0 12px 32px rgba(30, 58, 92, 0.16), 0 2px 6px rgba(30, 58, 92, 0.08);
     --code-bg: #2D3748;
     --code-fg: #E2E8F0;
+    /* The "you are looking at another worktree" surface (TL-188). A token, not a
+       colour written into the rule, and not borrowed from the priority palette —
+       that palette is this project's VOCABULARY and a project without a P2 would
+       lose the tint. */
+    --foreign-border: #B4530E;
+    --foreign-bg: rgba(180, 83, 14, 0.09);
 ${paletteVarCss}
   }
   @media (prefers-color-scheme: dark) {
@@ -430,6 +467,8 @@ ${paletteVarCss}
       --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4);
       --code-bg: #0F1419;
       --code-fg: #CBD5E1;
+      --foreign-border: #E8A25D;
+      --foreign-bg: rgba(232, 162, 93, 0.12);
     }
   }
   html, body { margin: 0; padding: 0; height: 100%; }
@@ -1132,6 +1171,18 @@ ${paletteBadgeCss}
   }
   /* ─── Field editing + history (BL-1396/BL-1397) ─────────────────────── */
   .actor-picker { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+  /* The worktree switcher (TL-188). It sits in the connection bar because that
+     bar already answers the two questions a foreign tree changes the answers to:
+     what am I looking at, and may I edit it. */
+  .worktree-picker { display: flex; align-items: center; gap: 6px; }
+  .worktree-label { font-size: 11px; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .worktree-select {
+    font: inherit; font-size: 12px; padding: 3px 8px; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--bg-card); color: var(--fg); cursor: pointer;
+    max-width: 260px;
+  }
+  .worktree-select:disabled { cursor: default; opacity: 0.6; }
+  .connection-bar.foreign { border-color: var(--foreign-border); background: var(--foreign-bg); }
   .actor-label { font-size: 11px; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.04em; }
   .actor-btn {
     font: inherit; font-size: 12px; padding: 3px 9px; border-radius: 999px;
@@ -2105,8 +2156,9 @@ ${paletteBadgeCss}
 
   <div class="connection-bar snapshot" id="connectionBar">
     <span class="connection-dot"></span>
-    <span class="connection-status" id="connectionStatus">Tryb snapshot</span>
+    <span class="connection-status" id="connectionStatus">Snapshot mode</span>
     <span class="connection-hint" id="connectionHint">Data from the moment of the build. Connect to the folder to work on live files and edit statuses.</span>
+    <div class="worktree-picker" id="worktreePicker" style="display:none"></div>
     <button class="btn-action primary" id="btnConnect">Connect to the backlog folder</button>
     <button class="btn-action" id="btnRefresh" style="display:none">Refresh from disk</button>
     <button class="btn-action" id="btnDisconnect" style="display:none">Disconnect</button>
@@ -2225,6 +2277,20 @@ const CONFIG = ${configJson};
 // The plan file as it was read from disk. Mutable: the server hands a fresh copy
 // back on /api/tasks, so an edit to plan.yaml reaches an open tab.
 let PLAN = ${planJson};
+
+// ─── The subject of this page: which WORKTREE (TL-188) ────────────────
+// Every worktree of one clone has its own backlog/ — that is law 1, data
+// travelling with the branch — so a server standing in the main checkout shows a
+// board that does not move while a run drives a task somewhere else. These three
+// come from the SERVER; a file:// page gets an empty list and renders no
+// switcher, because with no server there is nothing to switch to.
+const WORKTREES = ${worktreesJson};
+const WORKTREE = ${worktreeJson};
+// Whether writes may reach the tree being shown. Read-only for every tree but the
+// one the server was started in: the server reads their files and will never
+// write them, so an editable-looking field would promise an edit that must fail.
+const SUBJECT_WRITABLE = ${canEditJson};
+const FOREIGN_WORKTREE = !SUBJECT_WRITABLE;
 
 // The id prefix is a PROJECT value (BL-1452), and the client had it hardcoded in
 // three places (TL-44): the file filter when reading from disk and two sorts by
@@ -2564,7 +2630,7 @@ async function connectToFolder(handle) {
 }
 async function refreshFromServer(quiet) {
   try {
-    const res = await fetch("api/tasks", { cache: "no-store" });
+    const res = await fetch(apiUrl("api/tasks"), { cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     ALL_TASKS = data.tasks;
@@ -2634,6 +2700,62 @@ function changeTaskStatus(taskId, newStatus) {
   return saveField(taskId, "status", newStatus);
 }
 
+// ─── The worktree switcher (TL-188) ──────────────────────────────────
+//
+// SWITCHING IS A NAVIGATION, not a swap of the data under an open page. The
+// alternative — fetching the other tree's tasks as JSON and replacing ALL_TASKS
+// — was rejected because a worktree brings its OWN backlog/config.yaml: its
+// statuses, its priorities, its boards, and the palette generated from them. The
+// page would then paint one tree's data in another tree's vocabulary, and a
+// status with no colour is exactly the kind of wrong that still looks rendered.
+// A navigation makes the server build the page from that tree's configuration,
+// which is the same guarantee \`${N} viewer\` gives in the terminal.
+//
+// The subject travels in the QUERY STRING, not the hash: the hash is per-view
+// (#tasks, #dashboard, #execution) and clicking a tab would drop the subject,
+// while ?worktree= survives every view and is what makes "look at the fleet's
+// worktree" one link.
+// WORKTREE_PARAM, readWorktreeParam() and withWorktree() come from the pasted
+// source of viewer-url.mjs above — the link contract is one file, and
+// node --test runs the same code the browser does.
+
+/** The query string every read route needs, so a fetch answers about the tree
+ *  the page is showing rather than the one the server stands in. */
+function apiUrl(path) {
+  if (!WORKTREE) return path;
+  return path + (path.indexOf("?") >= 0 ? "&" : "?") + WORKTREE_PARAM + "=" + encodeURIComponent(WORKTREE);
+}
+
+function switchWorktree(key) {
+  const self = (WORKTREES.find((w) => w.isSelf) || {}).key;
+  window.location.href = withWorktree(window.location, key, self);
+}
+
+function renderWorktreePicker() {
+  const el = document.getElementById("worktreePicker");
+  if (!el) return;
+  // One tree is not a choice, and a page the server did not build has no trees
+  // to offer. Either way an empty control would be furniture.
+  if (WORKTREES.length < 2) { el.style.display = "none"; return; }
+  el.style.display = "";
+  // escape(), not escapeHtmlStr(): the key goes into an ATTRIBUTE and only the
+  // first of the two escapes quotes. Declared further down the page and reached
+  // here by hoisting, as the rest of the render functions do.
+  const options = WORKTREES.map((w) => {
+    const sel = w.key === WORKTREE ? " selected" : "";
+    return '<option value="' + escape(w.key) + '"' + sel + ">" +
+      escape(w.label) + (w.isSelf ? " (this server)" : "") + "</option>";
+  }).join("");
+  el.innerHTML =
+    '<span class="worktree-label">Worktree</span>' +
+    '<select class="worktree-select" id="worktreeSelect" ' +
+    'title="Each worktree has its own copy of the backlog. Picking one shows the tasks in THAT tree; only the tree this server was started in can be edited.">' +
+    options + "</select>";
+  document.getElementById("worktreeSelect").addEventListener("change", (e) => {
+    switchWorktree(e.target.value);
+  });
+}
+
 // ─── Connection bar UI ───────────────────────────────────────────────
 function updateConnectionBar() {
   const bar = document.getElementById("connectionBar");
@@ -2642,8 +2764,24 @@ function updateConnectionBar() {
   const btnConnect = document.getElementById("btnConnect");
   const btnRefresh = document.getElementById("btnRefresh");
   const btnDisconnect = document.getElementById("btnDisconnect");
+  renderWorktreePicker();
+  if (SERVER_MODE && FOREIGN_WORKTREE) {
+    // The reason has to be ON THE PAGE, not only in a disabled field: the reader
+    // who came here from a shared link has no other way to learn why the pens are
+    // gone, and "the fields stopped working" is the report that follows silence.
+    const here = (WORKTREES.find((w) => w.key === WORKTREE) || {}).label || WORKTREE;
+    const home = (WORKTREES.find((w) => w.isSelf) || {}).label || "the server tree";
+    bar.classList.remove("snapshot", "live"); bar.classList.add("foreign");
+    status.textContent = "Read-only — another worktree";
+    hint.textContent = "You are looking at " + here + ". Its files are read, never written: this server was started in " +
+      home + " and edits go there. Switch back to it to change anything.";
+    btnConnect.style.display = "none";
+    btnDisconnect.style.display = "none";
+    btnRefresh.style.display = "";
+    return;
+  }
   if (SERVER_MODE) {
-    bar.classList.remove("snapshot"); bar.classList.add("live");
+    bar.classList.remove("snapshot", "foreign"); bar.classList.add("live");
     status.textContent = "Live (local server)";
     hint.textContent = "The .md files are read and written by the server. Click any field in the detail panel to change it — a write appends to the history and rebuilds NOW/INDEX/archive.";
     btnConnect.style.display = "none";
@@ -3270,7 +3408,25 @@ function selectTask(id) {
 // the .md, appends to the history and rebuilds the views. Under file:// the fields
 // are read-only — a second write path (File System Access) would mean a second set
 // of rules and a second place that knows about the history.
-const CAN_EDIT = SERVER_MODE;
+// SERVER_MODE says there IS somewhere to write; SUBJECT_WRITABLE says the tree
+// being shown is the one the server may write to (TL-188). Both, or nothing.
+const CAN_EDIT = SERVER_MODE && SUBJECT_WRITABLE;
+
+/**
+ * WHY editing is off — there are now two answers and they call for opposite
+ * actions (TL-188). "Run the server" is the wrong advice to a reader whose
+ * server is running and who is simply looking at another worktree; they have to
+ * switch back, not start anything.
+ */
+function readOnlyReason() {
+  if (SERVER_MODE && FOREIGN_WORKTREE) {
+    const home = (WORKTREES.find((w) => w.isSelf) || {}).label || "the tree the server was started in";
+    return "You are looking at another worktree — its files are read, never written. Switch back to " +
+      home + " to edit.";
+  }
+  return "Editing fields only works through the local server — run ${N} in a terminal";
+}
+
 const ACTOR_STORAGE_KEY = STORAGE_PREFIX + "-actor";
 const ACTORS = CONFIG.actors || [];
 
@@ -3386,7 +3542,7 @@ async function refreshHistory(id, force) {
   if (!force && historyLoaded[id]) return;
   historyLoaded[id] = true;
   try {
-    const res = await fetch("api/history?id=" + encodeURIComponent(id), { cache: "no-store" });
+    const res = await fetch(apiUrl("api/history?id=" + encodeURIComponent(id)), { cache: "no-store" });
     if (!res.ok) return;
     const data = await res.json();
     const next = data.entries || [];
@@ -3419,7 +3575,7 @@ function histTime(ts) {
 // ─── Field editors ──────────────────────────────────────────────
 function startEdit(id, field) {
   if (!CAN_EDIT) {
-    toast("Editing fields only works through the local server — run ${N} in a terminal", "error");
+    toast(readOnlyReason(), "error");
     return;
   }
   state.editing = { id: id, field: field };
@@ -3510,7 +3666,7 @@ async function saveField(taskId, field, value, reason) {
   const task = ALL_TASKS.find(function (t) { return t.id === taskId; });
   if (!task) return;
   if (!CAN_EDIT) {
-    toast("Editing fields only works through the local server — run ${N} in a terminal", "error");
+    toast(readOnlyReason(), "error");
     return;
   }
   const norm = normalizeValue(field, value, { fields: FIELDS, options: dynamicOptions() });
@@ -3820,6 +3976,8 @@ function renderDetail() {
 
   const editHint = CAN_EDIT
     ? ""
+    : SERVER_MODE && FOREIGN_WORKTREE
+    ? '<div class="status-changer-disabled-hint">' + escape(readOnlyReason()) + "</div>"
     : '<div class="status-changer-disabled-hint">The fields are read-only — editing and history recording work in server mode (<code>${N}</code> in a terminal).</div>'
 
   el.innerHTML =
@@ -5524,8 +5682,10 @@ function renderDecisions() {
  *  an apostrophe — the reason the dashboard binds its own buttons that way. */
 function decisionForm(id, eventId) {
   if (!CAN_EDIT) {
-    return '<div class="dec-actions"><span class="dec-hint">Read-only: connect to the folder ' +
-      "(or run the server) to record a decision from here.</span></div>";
+    const why = SERVER_MODE && FOREIGN_WORKTREE
+      ? escapeHtmlStr(readOnlyReason())
+      : "Read-only: connect to the folder (or run the server) to record a decision from here.";
+    return '<div class="dec-actions"><span class="dec-hint">' + why + "</span></div>";
   }
   return '<div class="dec-actions">' +
     '<input type="text" placeholder="What was decided, and why" ' +

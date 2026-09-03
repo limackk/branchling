@@ -39,9 +39,10 @@ import {
   setFrontmatterField,
   splitFrontmatter,
 } from "./task-fields.mjs";
-import { loadConfigOrExit } from "./config.mjs";
+import { loadConfig, loadConfigOrExit } from "./config.mjs";
 import { PLAN_FILENAME, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { loadPlan } from "./plan.mjs";
+import { listWorktrees, resolveWorktree } from "./viewer-worktrees.mjs";
 import { decideTask } from "./decide-task.mjs";
 import { ANY_TASK_ID } from "./task-id.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
@@ -77,7 +78,6 @@ if (cliArgs.argv.some((a) => a === "--help" || a === "-h")) {
 }
 const BACKLOG_DIR = resolveBacklogDirOrExit({ dir: cliArgs.dir, moduleDir: __dirname }, N + " serve").root;
 const TASKS_DIR = join(BACKLOG_DIR, "tasks");
-const PLAN_PATH = join(BACKLOG_DIR, PLAN_FILENAME);
 const CONFIG = loadConfigOrExit(BACKLOG_DIR);
 const FIELDS = buildFieldSpecs(CONFIG);
 
@@ -195,12 +195,16 @@ function readBody(req, limitBytes = 64 * 1024) {
  * prefix — never by interpolating client input into a path, so a crafted id
  * cannot escape tasks/.
  */
-function fileForTaskId(id) {
+function fileForTaskId(id, dir = TASKS_DIR) {
   // A shape with no prefix: this validator defends the PATH (no `/`, no `..`),
   // not the project's vocabulary — whether a task exists is settled by reading the
   // file.
   if (!ANY_TASK_ID.test(id)) return null;
-  const match = listTaskFiles(TASKS_DIR).find((f) => f.startsWith(id + "-"));
+  // `dir` is either this server's tasks/ or a worktree's backlog directory that
+  // `resolveWorktree()` matched against git's own list — never a path a request
+  // composed (TL-188).
+  const tasksDir = dir === TASKS_DIR ? TASKS_DIR : join(dir, "tasks");
+  const match = listTaskFiles(tasksDir).find((f) => f.startsWith(id + "-"));
   return match || null;
 }
 
@@ -386,14 +390,103 @@ async function handleFieldEdit(res, payload) {
 
 /** The plan file in the shape the page embeds it in — one definition, so a
  *  refresh cannot deliver a different structure than the first paint did. */
-function planPayload() {
-  const loaded = loadPlan(PLAN_PATH);
+function planPayload(dir = BACKLOG_DIR) {
+  const loaded = loadPlan(join(dir, PLAN_FILENAME));
   return {
     exists: loaded.exists,
-    path: `${basename(BACKLOG_DIR)}/${PLAN_FILENAME}`,
+    path: `${basename(dir)}/${PLAN_FILENAME}`,
     plan: loaded.plan,
     problems: loaded.problems,
   };
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// The subject: WHICH worktree this request is about (TL-188)
+// ──────────────────────────────────────────────────────────────────────────
+//
+// Every worktree of one clone has its own backlog/ — law 1, data travelling with
+// the branch — so a server standing in the main checkout shows a board that does
+// not move while a run drives a task somewhere else. `?worktree=<key>` points a
+// READ at one of the others.
+//
+// THE ENUMERATION IS THE ALLOWLIST, and it is redone per request rather than
+// cached at boot: `git worktree add` during a session is the normal case here,
+// and a switcher that needed a restart to see the tree a run just made would
+// miss exactly the moment it exists for. The cost is one `git worktree list`.
+//
+// NOTHING WRITES THROUGH THIS. The write routes below take no directory at all —
+// they address BACKLOG_DIR and only BACKLOG_DIR — so a foreign tree cannot be
+// written to even by mistake. What they add is a REFUSAL when a request names
+// one, because the failure to prevent is not "the wrong file changed" but "the
+// caller believed it was editing another tree and this one changed instead".
+
+/** The worktree a request names, or null when it names one that does not exist.
+ *  An unknown key is never quietly the server's own tree: that would answer
+ *  about the wrong backlog and look like it worked. */
+function subjectFor(url) {
+  const requested = url.searchParams.get("worktree");
+  const state = listWorktrees(BACKLOG_DIR);
+  const entry = resolveWorktree(state.entries, requested);
+  return { requested, state, entry };
+}
+
+/**
+ * The configuration of a tree that is NOT this process's own.
+ *
+ * `loadConfigOrExit` ends the program, which is right for a command and fatal
+ * here: an unreadable config.yaml in a worktree the server merely OFFERED to
+ * show would take the viewer down for everybody. So it is loaded by hand, and a
+ * failure becomes an answer rather than an exit.
+ */
+function configFor(entry) {
+  if (!entry || entry.isSelf) return { config: CONFIG, error: null };
+  try {
+    return { config: loadConfig(entry.backlogDir), error: null };
+  } catch (e) {
+    return { config: null, error: e.message };
+  }
+}
+
+/** 404 for a key nothing answers to, 502 for a tree whose configuration cannot
+ *  be read — a distinction worth keeping: the first is a stale link, the second
+ *  is a real problem in a real tree. */
+function subjectOrFail(res, url) {
+  const { requested, state, entry } = subjectFor(url);
+  if (!entry) {
+    sendJson(res, 404, {
+      error: "No worktree of this repository is called `" + String(requested || "") + "`",
+      worktrees: state.entries.map((w) => w.key),
+    });
+    return null;
+  }
+  const { config, error } = configFor(entry);
+  if (!config) {
+    sendJson(res, 502, { error: "The backlog in " + entry.path + " cannot be read: " + error });
+    return null;
+  }
+  return { entry, config, dir: entry.backlogDir, state };
+}
+
+/**
+ * A write that names a worktree other than this server's is REFUSED.
+ *
+ * The routes cannot reach another tree — they have no directory to reach it
+ * with. This is about the caller's belief: a request that says `worktree=other`
+ * and gets a 200 has been told its edit landed there, and it landed here.
+ */
+function refusesForeignWrite(res, url, payload) {
+  const named = url.searchParams.get("worktree") || (payload && payload.worktree) || "";
+  if (!named) return false;
+  const state = listWorktrees(BACKLOG_DIR);
+  const entry = resolveWorktree(state.entries, named);
+  if (entry && entry.isSelf) return false;
+  const home = (state.entries.find((w) => w.isSelf) || {}).key || BACKLOG_DIR;
+  sendJson(res, 403, {
+    error: "This server writes only to the worktree it was started in (`" + home +
+      "`). Another tree is read-only here — start a server in it to edit it.",
+    kind: "foreign-worktree",
+  });
+  return true;
 }
 
 async function handle(req, res) {
@@ -402,13 +495,44 @@ async function handle(req, res) {
 
   if (path === "/" || path === "/index.html") {
     // Rendered fresh per request, so the first paint is already live data.
-    const tasks = readTasks(BACKLOG_DIR);
-    const html = buildHtml(tasks, computeStats(tasks), CONFIG);
+    // AND rendered from the SUBJECT's own configuration (TL-188): a worktree
+    // brings its own statuses, priorities, boards and the palette generated from
+    // them, so painting its tasks with this tree's vocabulary would leave values
+    // with no colour and no badge — rendered, and wrong.
+    const subject = subjectOrFail(res, url);
+    if (!subject) return;
+    const tasks = readTasks(subject.dir, subject.config);
+    const html = buildHtml(
+      tasks,
+      computeStats(tasks),
+      subject.config,
+      readAllHistory(subject.dir),
+      loadPlan(join(subject.dir, PLAN_FILENAME)),
+      {
+        worktrees: subject.state.entries,
+        worktree: subject.entry.key,
+        canEdit: subject.entry.isSelf,
+      }
+    );
     res.writeHead(200, {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "no-store",
     });
     res.end(html);
+    return;
+  }
+
+  // What the switcher offers. Its own route so a caller can ask the question
+  // without downloading a page — and so `--json` composition (law 4) reaches it.
+  if (path === "/api/worktrees") {
+    const state = listWorktrees(BACKLOG_DIR);
+    sendJson(res, 200, {
+      listed: state.listed,
+      reason: state.reason,
+      worktrees: state.entries.map((w) => ({
+        key: w.key, label: w.label, branch: w.branch, path: w.path, isSelf: w.isSelf,
+      })),
+    });
     return;
   }
 
@@ -426,8 +550,15 @@ async function handle(req, res) {
   }
 
   if (path === "/api/tasks") {
-    const tasks = readTasks(BACKLOG_DIR);
-    sendJson(res, 200, { tasks, stats: computeStats(tasks), plan: planPayload() });
+    const subject = subjectOrFail(res, url);
+    if (!subject) return;
+    const tasks = readTasks(subject.dir, subject.config);
+    sendJson(res, 200, {
+      tasks,
+      stats: computeStats(tasks),
+      plan: planPayload(subject.dir),
+      worktree: { key: subject.entry.key, label: subject.entry.label, writable: subject.entry.isSelf },
+    });
     return;
   }
 
@@ -447,13 +578,15 @@ async function handle(req, res) {
   }
 
   if (path === "/api/history") {
+    const subject = subjectOrFail(res, url);
+    if (!subject) return;
     const id = url.searchParams.get("id");
     if (id) {
-      if (!fileForTaskId(id)) { sendJson(res, 404, { error: "Task not found: " + id }); return; }
-      sendJson(res, 200, { id, entries: readHistory(BACKLOG_DIR, id) });
+      if (!fileForTaskId(id, subject.dir)) { sendJson(res, 404, { error: "Task not found: " + id }); return; }
+      sendJson(res, 200, { id, entries: readHistory(subject.dir, id) });
       return;
     }
-    sendJson(res, 200, { history: readAllHistory(BACKLOG_DIR) });
+    sendJson(res, 200, { history: readAllHistory(subject.dir) });
     return;
   }
 
@@ -473,6 +606,7 @@ async function handle(req, res) {
       sendJson(res, 400, { error: "Malformed JSON: " + e.message });
       return;
     }
+    if (refusesForeignWrite(res, url, payload)) return;
     await handleFieldEdit(res, payload || {});
     return;
   }
@@ -485,6 +619,7 @@ async function handle(req, res) {
       sendJson(res, 400, { error: "Malformed JSON: " + e.message });
       return;
     }
+    if (refusesForeignWrite(res, url, payload)) return;
     const { id, status, actor } = payload || {};
     await handleFieldEdit(res, { id, field: "status", value: status, actor });
     return;
@@ -503,6 +638,7 @@ async function handle(req, res) {
       sendJson(res, 400, { error: "Malformed JSON: " + e.message });
       return;
     }
+    if (refusesForeignWrite(res, url, payload)) return;
     const { id, reason, resolves, actor } = payload || {};
     const who = normalizeActor(actor || ACTOR_UNKNOWN);
     if (!isValidActor(who)) {

@@ -186,6 +186,16 @@ entry describes what genuinely landed on disk.
 writing the frontmatter would mean two places deciding validation, `updated:`,
 and history.
 
+**Both refuse a request that names another worktree** (TL-188). Since the
+viewer can be pointed at any working tree of the clone with `?worktree=<key>`,
+a write could arrive carrying that parameter — and these routes take no
+directory at all, so it would have landed in the tree the server was started
+in. They cannot reach another tree; what they add is the refusal, because the
+failure worth preventing is not "the wrong file changed" but "the caller was
+told its edit went somewhere it did not". A foreign subject is read-only end to
+end: the page renders with no edit pens and says why, and the route answers
+403 `foreign-worktree` to anything that tries anyway.
+
 ### 3.2 Agent (author: known)
 
 The `PostToolUse` hook (`branchling regen-hook`), after every Edit/Write on

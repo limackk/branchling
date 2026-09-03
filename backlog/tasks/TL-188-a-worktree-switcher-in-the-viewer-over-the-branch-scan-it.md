@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1d
@@ -94,5 +94,57 @@ worse, silently write to the wrong tree.
 
 ## Decisions
 
-Nothing decided yet. Open: whether the selection re-runs the server-side build
-for that directory or the page fetches a JSON view of it.
+**The selection re-runs the server-side build for that directory.** The open
+question is settled against the JSON-fetch alternative, and the reason is the
+configuration: a worktree brings its own `backlog/config.yaml` — its statuses,
+its priorities, its boards, and the palette generated from all three. Swapping
+only the tasks under an open page would paint one tree's data in another tree's
+vocabulary, and a status with no badge and no colour is the kind of wrong that
+still looks rendered. A navigation makes the server build the page from the
+subject's own configuration, which is the same guarantee the terminal gives.
+
+The cost is a reload, and it is paid for: the hash goes along, so the filters,
+the sort, the board scope and the open task all survive the switch. This was
+measured in the browser, not assumed.
+
+**The subject lives in the QUERY STRING, not the hash.** The hash is per-view —
+`#tasks`, `#dashboard`, `#execution` — so a subject encoded there would be
+dropped the moment somebody clicked a tab; the worktree is not part of a view,
+it is what every view is a view OF. It also has to be readable by the server
+before the page exists, and a browser never sends a fragment. The link functions
+therefore live in `viewer-url.mjs` (`withWorktree`, `readWorktreeParam`) beside
+the hash contract, which is what makes them testable: the page carries that file
+as pasted source, so `node --test` runs the same code the browser does.
+
+**The key is the tree's directory name, not its path.** A shared link is the
+whole point, and an absolute path is both unreadable in a URL and specific to
+one machine. Two trees that share a name get a digest of the full path appended,
+so a key does not change when a third tree appears.
+
+**`resolveWorktree()` is an allowlist, and an unknown key is refused rather than
+falling back.** The parameter arrives from a URL anyone can type, so it is
+matched against the trees `git worktree list` itself reported and never turned
+into a directory a request composed. Falling back to the server's own tree on a
+typo would answer about the wrong backlog and look exactly like a correct
+answer — the failure this whole task exists to remove.
+
+**A foreign tree's configuration is loaded by hand, not with
+`loadConfigOrExit`.** That function ends the process, which is right for a
+command and fatal here: an unreadable `config.yaml` in a worktree the server
+merely OFFERED to show would take the viewer down for everybody. It becomes a
+502 naming the tree instead. `readTasks()` grew an optional pre-loaded config
+for the same reason.
+
+**Nothing writes through the switch.** The write routes take no directory —
+they address the server's own backlog and only that — so a foreign tree cannot
+be written to even by mistake. They still REFUSE a request naming another tree
+(403 `foreign-worktree`, query or payload), because the failure worth preventing
+is not "the wrong file changed" but "the caller believed its edit went elsewhere
+and this tree changed instead". The page matches: no edit pens, no actor picker,
+and a bar that says which tree it is showing and where edits do go.
+
+**Deliberately NOT done.** The SSE push still watches only the server's own
+tree, so a foreign subject needs a refresh to show a change made a second ago —
+that is TL-122, and the two together are the feature. A `file://` page renders
+no switcher at all: with no server there is nothing to switch to, and a control
+that cannot work is furniture.
