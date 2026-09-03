@@ -85,7 +85,7 @@ waves:
     # already shown what it costs when the answer is nobody's.
 
   - name: "The guards over the public surface hold"
-    tasks: [TL-202, TL-201, TL-198, TL-196]
+    tasks: [TL-203, TL-202, TL-201, TL-198, TL-196]
     # Four findings about the checks that decide what a stranger may read.
     # TL-202 first, because it is the only one that has already stopped the
     # tool: a session moved `foreign_context_words` to the user layer — the
@@ -96,6 +96,15 @@ waves:
     # TL-201 replaces the language heuristic with a dictionary, which is why
     # TL-198 (the word it passes over) is blocked by it rather than patched.
     # TL-196 extends the foreign-context guard past `docs/`.
+    #
+    # TL-203 stands first and is the only task in this plan marked
+    # `executor: human`. TL-196 took the origin project's name out of the tree
+    # and the reconciler, doing its job, copied the old values into an
+    # append-only log — so the name is out of the working tree and still in the
+    # objects. Taking it out of the objects is a history rewrite: every other
+    # session must stop, the refs must be bundled first, and every worktree
+    # reset afterwards. No unattended run can do that, and one started while
+    # another session is committing destroys that session's work.
 
   - name: "Refusals the writing commands still lack"
     tasks: [TL-167, TL-173, TL-58]
