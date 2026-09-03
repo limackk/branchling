@@ -11,7 +11,13 @@ updated: 2026-09-03
 rationale: "The loop is built, so this arc is executed BY it: first make its report and its log believable, then teach the dispatcher to read this file at all, then the record of who did what, then the refusals the writing commands still lack, then the stale premises, then what a dead session leaves behind, then the fleet, and measurement of the run last."
 waves:
   - name: "The loop may be trusted unattended"
-    tasks: [TL-191, TL-190, TL-184, TL-185]
+    tasks: [TL-191, TL-190, TL-184, TL-185, TL-192]
+    #
+    # TL-192 was written by the agent that fixed TL-191, about its own fix: the
+    # guard asks whether the status is archived and nothing else, so a task
+    # taken from this run by somebody else is still written over. It belongs to
+    # this wave's thesis rather than to a later one, because a wave that closes
+    # while the hole is open would say the loop can be trusted when it cannot.
     # Both were measured on 2026-09-03, in the first unattended run of this very
     # plan, and both are about the tool lying quietly. TL-184: an agent that
     # could not authenticate never ran, and the loop wrote that into the task
@@ -36,6 +42,16 @@ waves:
     # fills the silence BETWEEN a task's two writes from the heartbeat log —
     # without it the other two only deliver two frames of a two-hour film.
 
+  - name: "What the loop says of itself is true"
+    tasks: [TL-186, TL-193, TL-194]
+    # Three things the tool states and cannot back. TL-186: a `--plan` run that
+    # stops cannot say whether the plan is finished or merely waiting. TL-193:
+    # a task parked because its contract asks a PERSON is recorded as having
+    # run out of attempts, which it did not. TL-194: eight flags `query`
+    # accepts are absent from its own `--help`. All three were found by agents
+    # while working on something else, and each is a sentence a reader would
+    # act on.
+
   - name: "The dispatcher can follow a plan"
     tasks: [TL-183]
     # Written on 2026-09-03 while preparing this very plan: `next` and `run`
@@ -45,12 +61,19 @@ waves:
     # it stands first, and it is the one task in this arc that the arc is about.
 
   - name: "The record says who did what"
-    tasks: [TL-180]
+    tasks: [TL-180, TL-187, TL-195]
     # Everything downstream reads the history as evidence — the audit, the PR
     # comment, an actor's record. TL-181 (the rollup was never committed) and
     # TL-182 (`new` wrote no history) were closed on 2026-09-03 and are the
     # other two thirds of this wave; TL-180 is the last one left: a fresh
     # worktree signs the whole tree as created by whoever reconciled it first.
+    #
+    # TL-187 and TL-195 joined after the runs of 2026-09-03. TL-187: TL-182 is
+    # closed and `new` still writes no history, and its contract could not tell.
+    # TL-195: the post-edit hook reconciles the tree the working directory
+    # points at, not the one the edited file lives in. All three are the same
+    # question asked in three places — whose change is this — and TL-185 has
+    # already shown what it costs when the answer is nobody's.
 
   - name: "Refusals the writing commands still lack"
     tasks: [TL-167, TL-173, TL-58]
