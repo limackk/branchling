@@ -1,3 +1,4 @@
 {"id":"01M1KBTKDQ6BNAE782ZN57K1EE","ts":"2026-09-03T10:07:57.367Z","task":"TL-191","field":"__created__","from":"","to":"The stuck-status write may not overwrite an archived status","actor":"agent:claude","source":"manual","reason":"Filing the defect the second run produced."}
 {"id":"01M1KBWTVBDQERB1TTA9F3TMS0","ts":"2026-09-03T10:09:10.507Z","task":"TL-191","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown","session":"tree-3d81645067d3"}
 {"id":"01M1KBWTVB046D6V4HFGGYQ84J","ts":"2026-09-03T10:09:10.507Z","task":"TL-191","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown","session":"tree-3d81645067d3"}
+{"id":"01M1KCBMFVSX6M78PP6KJNAVJ2","ts":"2026-09-03T10:17:15.515Z","task":"TL-191","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven","session":"tree-3d81645067d3"}
