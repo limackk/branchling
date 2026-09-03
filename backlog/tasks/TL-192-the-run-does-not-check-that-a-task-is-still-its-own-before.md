@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P2                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
@@ -90,14 +90,46 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] A task whose owner changed while the run worked keeps its status and its
+- [x] A task whose owner changed while the run worked keeps its status and its
       owner, and the run records no change to it. [proof: not-ours]
-- [ ] The report distinguishes "closed elsewhere" from "taken by somebody
+- [x] The report distinguishes "closed elsewhere" from "taken by somebody
       else". [proof: not-ours]
-- [ ] Nothing else in the suite changed behaviour. [proof: suite-green]
+- [x] Nothing else in the suite changed behaviour. [proof: suite-green]
 
 ## Decisions
 
-Nothing decided. Surfaced while TL-191 was being fixed, from its own Decisions
-section: the re-read that guards the archived statuses is also where this
-question would be answered.
+**"Still ours" means `owner:` names this run's actor.** The weaker test — the
+task is still in the in-progress status the run left it in — was rejected
+because the two fields answer different questions: an owner is what a claim IS,
+while a status says where the work stands. An agent that moves its own task
+between two open statuses has not given it up, and a status test would refuse
+to park exactly the task the run still holds. `take` writes `owner:` at the
+claim, so that line is the run's whole title to the task, and it travels with
+the branch — which is the point the lock cannot serve (it expires on a TTL and
+lives on one machine).
+
+**A handoff is not an exception; it is the clearest case of the rule.** An
+agent that legitimately hands its task on leaves either somebody else's name in
+`owner:` or, for `handoff --to-role`, nobody's — the field is CLEARED
+deliberately. Parking the task afterwards would undo the very act the agent was
+asked to perform, so a cleared owner is refused by the same line as a changed
+one. Nobody is still not us.
+
+**A third outcome, `held-elsewhere`, not a wider `closed-elsewhere`.** Both
+refusals leave the tree untouched and there the resemblance ends: one says the
+work is finished, the other that it is still open and somebody else is doing
+it. Renaming the existing outcome to cover both would cost the reader the only
+distinction that matters when a run comes back with nothing closed. It is
+counted apart in the tally (`heldElsewhere`), printed as `held elsewhere`, and
+carries WHO holds it in the detail line — the reader's next question, which the
+file will no longer answer for them. Its mark is the warning one, not the tick
+`closed-elsewhere` gets: nothing was proven.
+
+**The archived guard answers first.** A task that was taken over AND closed is
+reported as closed elsewhere, because "somebody finished it" is the stronger
+fact of the two.
+
+**One line of an existing test changed.** `the guard reads archived_statuses`
+now claims the task before writing to it: it is about which statuses stop the
+write, so its subject has to be a task the run may write to at all. No
+behaviour it asserted was weakened.
