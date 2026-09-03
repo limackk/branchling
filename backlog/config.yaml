@@ -88,7 +88,7 @@ title_max_length: 60
 # declares one role, because it has one specialised queue: documentation.
 # `docs-drift --seed-tasks` (TL-100) writes into it, and a dispatcher pointed at
 # `--role docs` is what empties it.
-roles: [docs]
+roles: [docs, spec, dev, review]
 
 # ── Documentation drift (TL-100) ──────────────────────────────────────────
 # Which role a seeded documentation task asks for. Empty would make

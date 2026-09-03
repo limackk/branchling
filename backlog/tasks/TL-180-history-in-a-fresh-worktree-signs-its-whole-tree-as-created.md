@@ -7,8 +7,8 @@ board: main
 epic: "History and attribution"
 priority: P2
 status: pending
-owner: unassigned
-role: ""
+owner: ""
+role: spec
 executor: ""
 estimate: 2h
 confidence: medium

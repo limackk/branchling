@@ -7,8 +7,8 @@ board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P2
 status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
-role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
+owner: ""
+role: spec  # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
