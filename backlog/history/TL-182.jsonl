@@ -1,1 +1,2 @@
 {"id":"01M1K7D6056PSK5G75D2Q1WNYK","ts":"2026-09-03T08:50:43.333Z","task":"TL-182","field":"__created__","from":"","to":"new writes no history, so a task's birth is recorded by whoever reconciles first","actor":"agent:claude","source":"manual","reason":"TL-182 created: new writes no history of its own"}
+{"id":"01M1K8QVHJPRA23RX0EP8HAAPF","ts":"2026-09-03T09:14:01.650Z","task":"TL-182","field":"status","from":"pending","to":"done","actor":"agent:claude","source":"done","reason":"proven","session":"tree-3d81645067d3"}

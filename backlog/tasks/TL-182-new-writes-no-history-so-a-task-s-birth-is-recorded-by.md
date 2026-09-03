@@ -6,7 +6,7 @@ labels: []
 board: main
 epic: "History and attribution"
 priority: P2
-status: pending
+status: done
 owner: unassigned
 role: ""
 executor: ""
@@ -78,7 +78,7 @@ not be made to depend on this one.
 
 ## Acceptance criteria
 
-- [ ] `new` leaves a `__created__` entry naming the actor that ran it. [proof: new-records-itself]
+- [x] `new` leaves a `__created__` entry naming the actor that ran it. [proof: new-records-itself]
 - [ ] A `build` straight after `new` appends nothing — the entry is not written twice.
 - [ ] The behaviour when no actor is supplied is decided and recorded, not defaulted silently.
 - [ ] Any other writing command with the same gap is either fixed here or has its own task.
