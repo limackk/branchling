@@ -174,6 +174,53 @@ no `PATH` collision, no Homebrew formula, and `name` == the single `bin` key, so
 the trap above cannot open. The name is free but **not reserved** — that window
 closes only at the first publish.
 
+**A free registry is not a free name (TL-169).** A package registry answers one
+question: can I publish under this string. It says nothing about who already
+sells a product called that, and the answer to the second question is the one
+that decides whether the name is an asset or a liability. `worktrail` was
+cleared on npm in 2026-09-01 and turned out on 2026-09-03 to belong, on the
+largest forge and on the `.net` domain, to a commercial time-tracking service
+running since 2013 — on the same shelf as this tool. Nothing in the checks above
+could have caught it, because none of them looks outside npm.
+
+So run these too, and read the ANSWERS rather than the status codes — a 200 on a
+forge is the start of the question, not the end of it:
+
+```bash
+curl -s https://api.github.com/users/<name>                 # a forge namespace: 200 = someone holds it
+curl -s "https://api.github.com/search/repositories?q=<name>&sort=stars"
+curl -s -o /dev/null -w '%{http_code}\n' https://gitlab.com/api/v4/groups/<name>
+curl -s -o /dev/null -w '%{http_code}\n' https://hub.docker.com/v2/users/<name>/
+curl -s -o /dev/null -w '%{http_code}\n' https://pypi.org/pypi/<name>/json
+for t in com net org io dev app sh; do host "<name>.$t" >/dev/null 2>&1 \
+  && echo "<name>.$t resolves"; done
+```
+
+Then read what you found, with three questions in this order:
+
+1. **Is anything behind the namespace?** Follow the `blog`/`homepage` field and
+   the repository descriptions. Six repositories named after a product, with
+   JIRA and git integrations, are a product; an empty account is an account.
+2. **Is it alive?** Not one signal but the spread of them — a renewed TLS
+   certificate, the last commit, the last blog post, the copyright year, whether
+   the mobile apps are still listed. They disagree, and the disagreement is the
+   answer: a live checkout page over a 2015 blog is an incumbent in maintenance,
+   which is neither free to take nor safe to ignore.
+3. **Is it on this shelf?** Adjacency is what costs, not identity of product. A
+   collision in an unrelated field is normal and can be accepted on the record;
+   one in developer tooling or project management sends the name back to the
+   decision that chose it.
+
+**Record why a collision was ACCEPTED, never that nothing was found.** "Nothing
+found" has no scope attached and gets re-asked at every release, which is how a
+known fact gets discounted twice — TL-20 saw `github.com/worktrail` was taken on
+2026-08-29 and wrote it off as "only an account".
+
+**The registers are not part of this and cannot be `curl`ed.** Whether somebody
+holds a registered mark on the name is a separate route — USPTO, Justia, WIPO,
+EUIPO and TMview all refuse an unauthenticated request — and it is TL-179, not a
+line to add to the block above.
+
 **Channels: npm only, decided 2026-09-01 (TL-81).** The README promises
 `npm i -g worktrail` and `npx worktrail`, and nothing else. Homebrew and Nix each
 add a release ritual and a second place a version can go stale; a tap lagging the

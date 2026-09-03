@@ -2,17 +2,17 @@
 id: TL-20
 title: Close the tool's name before open source publication
 type: code
-labels: [post-launch]
+labels: [pre-launch]
 board: main
 epic: "Backlog — open source publication"
-priority: P3
-status: done
+priority: P0
+status: pending
 owner: founder
 estimate: 30m
 confidence: medium
 created: 2026-08-29
-updated: 2026-09-01
-blocked_by: []
+updated: 2026-09-03
+blocked_by: [TL-169]
 blocks: []
 related_docs:
   - docs/backlog-config-and-portability.md
@@ -129,3 +129,47 @@ command in `PATH` has to be free for EVERY user.
   this file, `worktrail` applies.
   **The same external action is still open:** reserving the name on npm. The
   risk has gone up, not down — the name is freshly chosen and unreserved.
+
+## Reopened 2026-09-03
+
+**This task is open again, and the reason is a false premise inside its own
+last decision.** The reversal of 2026-09-01 chose `worktrail` and dismissed the
+known GitHub collision twice — "lost back then only on a taken GitHub account",
+and "GitHub: 17 scattered hits, none an active tool on this shelf". Both
+sentences above stay as written; they record what was believed that day, and
+correcting them in place would falsify the record.
+
+[TL-169](TL-169-the-name-worktrail-is-already-a-github-organisation-the.md)
+measured it on 2026-09-03. `github.com/worktrail` is an organisation behind a
+live commercial product: **WorkTrail**, time tracking by TaPo-IT OG, running
+since 2013 at `worktrail.net`, whose own repositories sync **JIRA worklogs** and
+**git commits**. The search still returns 17 hits and four of the top five are
+that one company's. The hits are not scattered and the shelf is not clear. The
+full evidence is in TL-169's `## Findings`; the reasoning for reopening rather
+than accepting is in its `## Decisions`.
+
+**What this task now has to settle, and what it does not.** It picks a name. It
+does not re-litigate whether the collision matters — that is decided, and the
+argument is identity, not law: a brand's only job is to be an unambiguous
+pointer, and an adjacent niche destroys exactly that. It also does not wait on
+[TL-179](TL-179-a-trademark-clearance-search-for-the-published-name-is-not.md);
+a registered mark could only make the case stronger, never weaker.
+
+**The candidate table above is no longer sufficient**, and that is the second
+finding. Its columns are npm, `PATH` and a GitHub account — and a GitHub
+account is precisely the column that was read as "taken, so what". The checks a
+candidate has to survive now live in `.claude/skills/worktrail-release/SKILL.md`
+§7, extended by TL-169: forge namespaces with **what is behind them**, GitLab,
+Docker Hub, PyPI, the domains, and three questions asked of any hit — is
+anything behind it, is it alive, is it on this shelf. A row in the table is no
+longer a status code; it is an answer.
+
+**One rule carries over from TL-81 unchanged and is not negotiable:** the
+package name and the single `bin` key must be the same string, or `npx <name>`
+hands users to whoever owns that package name.
+
+**The cost is at its lowest and rises from here.** Nothing is published,
+`registry.npmjs.org/worktrail` was still 404 on 2026-09-03, and
+[TL-117](TL-117-nazwa-produktu-z-jednej-stalej-a-nie-z-literalu.md) has already
+pulled the name into `scripts/product.mjs`, so this is not the 158-file pass the
+last rename was.
