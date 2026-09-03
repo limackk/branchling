@@ -242,8 +242,15 @@ export function renderAgentCommand(template, task) {
  * The feedback is the point. An agent that is told only "try again" repeats
  * itself; the failing command and its output are the difference between a
  * second attempt and a second identical attempt.
+ *
+ * `ran` says whether the contract was REACHED. It is not decoration: several
+ * refusals happen before a single command is executed (no contract at all, a
+ * broken criterion link), and the agent is killed by `--timeout` before `done`
+ * is even called. Telling that agent "the contract ran and refused" sends it
+ * looking for a failing command that was never run — a sentence the loop knows
+ * to be false, which is the worst kind to put in a prompt.
  */
-export function agentInput(taskText, feedback) {
+export function agentInput(taskText, feedback, ran) {
   if (!feedback) return taskText;
   return [
     taskText,
@@ -251,7 +258,9 @@ export function agentInput(taskText, feedback) {
     "---",
     "",
     "THE PREVIOUS ATTEMPT DID NOT CLOSE THIS TASK.",
-    "`" + N + " done` ran the `verification:` contract and refused. What it said:",
+    ran
+      ? "`" + N + " done` ran the `verification:` contract and refused. What it said:"
+      : "The `verification:` contract was never reached. What stopped the attempt:",
     "",
     feedback.trim(),
     "",
@@ -450,10 +459,41 @@ export function failedEntry(verdict) {
   return failed.id ? failed.id + ": " + command : command;
 }
 
+/**
+ * The refusals from `done` that no further attempt can turn into a closure, and
+ * the outcome each of them ends the task with.
+ *
+ * THE KEYS ARE `refusalKind` FROM THE ENVELOPE (`scripts/done-task.mjs`), which
+ * is the published name — `scripts/json-envelope.mjs` says why that word and not
+ * `kind`. This map used to be an inline comparison against `verdict.reason`, a
+ * key nothing writes, so it matched nothing and every refusal below spent the
+ * whole `--max-attempts` budget arriving at the same sentence (TL-190).
+ *
+ * What earns a place here is one property: the refusal happens BEFORE any
+ * command runs, and no work an agent can do changes the answer.
+ *
+ *   · `manual-needs-person` — the contract asks a PERSON to vouch, and an
+ *     unattended loop is exactly the case where there is none.
+ *   · `no-contract`, `criteria` — the task file itself is the problem; an agent
+ *     told to "fix the cause" would have to edit the contract it is measured by.
+ *   · `already-closed` — the task is finished. `closed-elsewhere` rather than
+ *     `needs-person` because nobody is needed: it is the outcome TL-191 gave the
+ *     same situation found one step later, at the stuck-status write.
+ *
+ * Everything else stays retryable, including a contract that genuinely failed.
+ */
+export const TERMINAL_REFUSALS = {
+  "manual-needs-person": "needs-person",
+  "no-contract": "needs-person",
+  "criteria": "needs-person",
+  "already-closed": "closed-elsewhere",
+};
+
 function workOne(ctx, task) {
   const logPath = logPathFor(ctx.root, task.id, { logDir: ctx.plan.logDir, env: process.env });
   writeFileSync(logPath, "", "utf8");
   let feedback = "";
+  let feedbackRan = false;
   let failure = "";
   let attempts = 0;
   const started = Date.now();
@@ -466,7 +506,7 @@ function workOne(ctx, task) {
       shell: true,
       cwd: ctx.cwd,
       encoding: "utf8",
-      input: agentInput(task.text, feedback),
+      input: agentInput(task.text, feedback, feedbackRan),
       timeout: ctx.plan.timeout * 1000,
       maxBuffer: 64 * 1024 * 1024,
     });
@@ -479,6 +519,7 @@ function workOne(ctx, task) {
     if (timedOut) {
       appendFileSync(logPath, "\n=== the agent was killed after " + ctx.plan.timeout + "s\n", "utf8");
       feedback = "the agent was killed after " + ctx.plan.timeout + "s (`--timeout`)";
+      feedbackRan = false;
       failure = feedback;
       continue;
     }
@@ -489,15 +530,17 @@ function workOne(ctx, task) {
       return { id: task.id, outcome: "closed", attempts, ms: Date.now() - started, log: logPath };
     }
     const verdict = parseJson(closing.stdout) || {};
-    // A `manual:` entry is not something a further attempt can change: it asks a
-    // PERSON, and this loop is the case where there is none. Retrying would burn
-    // the whole budget to arrive at the same sentence.
-    if (verdict.reason === "manual-needs-person" || verdict.reason === "no-contract" || verdict.reason === "criteria") {
+    const kind = String(verdict.refusalKind || "");
+    if (TERMINAL_REFUSALS[kind]) {
       return {
-        id: task.id, outcome: "needs-person", attempts, ms: Date.now() - started, log: logPath,
-        detail: verdict.refusal || "`" + N + " done` refused: " + verdict.reason,
+        id: task.id, outcome: TERMINAL_REFUSALS[kind], attempts, ms: Date.now() - started, log: logPath,
+        detail: verdict.refusal || "`" + N + " done` refused: " + kind,
       };
     }
+    // Whether the agent gets told the contract ran is read off the envelope, not
+    // guessed from the refusal: every shape of it carries `entries`, and an empty
+    // one is the gate saying it stopped before executing anything.
+    feedbackRan = Array.isArray(verdict.entries) && verdict.entries.length > 0;
     feedback = (closing.stderr || "").trim() || (verdict.refusal || "the contract did not pass");
     // The REASON gets the entry that failed, not the first line of the refusal:
     // "verification failed (exit 1)" is what a reader already knows by the time

@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P0
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h
@@ -116,8 +116,8 @@ what the loop does with an answer it did receive.
 
 ## Acceptance criteria
 
-- [ ] `run` against a task the agent closed itself spends one attempt, not
+- [x] `run` against a task the agent closed itself spends one attempt, not
       `--max-attempts`. [proof: terminal-refusal]
-- [ ] The `needs-person` outcome is reachable and asserted, and no code path can
+- [x] The `needs-person` outcome is reachable and asserted, and no code path can
       print `undefined` as a refusal kind. [proof: terminal-refusal]
-- [ ] The suite stays green. [proof: suite-green]
+- [x] The suite stays green. [proof: suite-green]

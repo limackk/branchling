@@ -377,9 +377,23 @@ test("the template substitutes the file and the id, and leaves the rest alone", 
 
 test("the first attempt gets the task alone; a later one gets the refusal too", () => {
   assert.equal(agentInput("the task", ""), "the task");
-  const second = agentInput("the task", "  exit 1: test -f X.done  ");
+  const second = agentInput("the task", "  exit 1: test -f X.done  ", true);
   assert.match(second, /^the task/);
   assert.match(second, /exit 1: test -f X\.done/);
+});
+
+test("the preamble claims the contract ran only when it did (TL-190)", () => {
+  // A refusal that happened BEFORE any command — or an agent killed by
+  // `--timeout`, which never reaches `done` at all — must not be handed to the
+  // next agent as "the contract ran and refused": it would go looking for a
+  // failing command nobody executed.
+  const ran = agentInput("the task", "exit 1: test -f X.done", true);
+  assert.match(ran, /ran the `verification:` contract and refused/);
+
+  const notRun = agentInput("the task", "the agent was killed after 60s (`--timeout`)", false);
+  assert.doesNotMatch(notRun, /ran the `verification:` contract/);
+  assert.match(notRun, /never reached/);
+  assert.match(notRun, /killed after 60s/);
 });
 
 test("the blocked reason states the evidence, not a verdict", () => {
