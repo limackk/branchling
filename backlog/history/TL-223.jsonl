@@ -1,0 +1,2 @@
+{"id":"01M1M8TG8YN41XCKD1HWVX40BR","ts":"2026-09-03T18:34:42.846Z","task":"TL-223","field":"__created__","from":"","to":"A run of specialists is refused because --agent is mandatory","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1M8VMA2H2JXDYB01F9A3RRV","ts":"2026-09-03T18:35:19.746Z","task":"TL-223","field":"__attributed__","from":"","to":"__created__","actor":"agent:claude","source":"manual","reason":"filed while preparing the role field, TL-222","attributes":"01M1M8TG8YN41XCKD1HWVX40BR"}
