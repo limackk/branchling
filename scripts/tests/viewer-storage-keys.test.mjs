@@ -95,9 +95,12 @@ test("the page's CODE carries no forbidden word; its DATA is the backlog and may
   assert.ok(cut > 0 && Number.isFinite(cut),
     "the page's data region was not found — the split this test rests on has moved");
   const code = html.slice(0, cut);
-  assert.deepEqual(auditText(code, ["origin", "sync-layer"]).map((p) => p.reason), []);
-  assert.deepEqual(auditText('const K = "origin-backlog-board";', ["origin"]).map((p) => p.reason), ["word:origin"],
-    "POSITIVE CONTROL: the same check must fire on the key this task removed");
+  // The word is SYNTHETIC on purpose. This asserts the MECHANISM — that a
+  // storage key carrying a foreign name is caught — and a test that had to
+  // spell the real name would put it back into the tree the guard protects.
+  assert.deepEqual(auditText(code, ["acme", "sync-layer"]).map((p) => p.reason), []);
+  assert.deepEqual(auditText('const K = "acme-backlog-board";', ["acme"]).map((p) => p.reason), ["word:acme"],
+    "POSITIVE CONTROL: the same check must fire on a key shaped like the one this task removed");
 });
 
 test("no state is silently carried over, and that is the decision", () => {
@@ -105,6 +108,6 @@ test("no state is silently carried over, and that is the decision", () => {
   // name in the page — the exact thing this task removes. So the state is not
   // migrated, the loss is one board selection, one actor and two chart ranges
   // per browser, and there is no fallback in the source pretending otherwise.
-  assert.equal(VIEWER_SOURCE.includes("origin"), false,
-    "a migration fallback would put the name back into every published page");
+  assert.doesNotMatch(VIEWER_SOURCE, /"[A-Za-z0-9_-]+-backlog-(?:board|actor|range)"/,
+    "a migration fallback would put an old storage key back into every published page");
 });

@@ -1,0 +1,3 @@
+{"id":"01M1KHEVX8H9736JCTND9H9RM1","ts":"2026-09-03T11:46:24.296Z","task":"TL-196","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown","session":"tree-555c09727ea2"}
+{"id":"01M1KHEVX839CVPN0QBZRJS05Z","ts":"2026-09-03T11:46:24.296Z","task":"TL-196","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown","session":"tree-555c09727ea2"}
+{"id":"01M1KK3FVA3P39KR6GN0W5NYSS","ts":"2026-09-03T12:15:08.650Z","task":"TL-196","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven","session":"tree-555c09727ea2"}

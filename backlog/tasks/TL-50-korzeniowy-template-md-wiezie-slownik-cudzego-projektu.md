@@ -18,7 +18,7 @@ related_docs:
   - docs/backlog-config-and-portability.md
   - .claude/skills/branchling-release/SKILL.md
 verification:
-  - bash: "printf 'send DPA\\nboard: backlog-project\\n' > /tmp/tl1460-probe && grep -qwiE 'origin|DPA|backlog-project|pre-launch|Legal compliance|Mobile redesign' /tmp/tl1460-probe || { echo 'positive control: pattern does not catch even an obvious match'; exit 1; }; grep -qwiE 'origin|DPA|backlog-project|pre-launch|Legal compliance|Mobile redesign' _template.md && { echo 'template still carries a foreign vocabulary'; exit 1; }; echo 'template is generic — OK'"
+  - bash: "printf 'send DPA\\nboard: backlog-project\\n' > /tmp/tl1460-probe && grep -qwiE 'DPA|backlog-project|pre-launch|Legal compliance|Mobile redesign' /tmp/tl1460-probe || { echo 'positive control: pattern does not catch even an obvious match'; exit 1; }; grep -qwiE 'DPA|backlog-project|pre-launch|Legal compliance|Mobile redesign' _template.md && { echo 'template still carries a foreign vocabulary'; exit 1; }; echo 'template is generic — OK'"
   - bash: "grep -q 'node backlog/scripts/' _template.md && { echo 'paths from before packaging'; exit 1; }; echo 'no script paths — OK'"
   - bash: "npm pack --dry-run 2>&1 | grep -q '_template.md' && echo 'template still in the tarball (co-location marker) — OK'"
 ---

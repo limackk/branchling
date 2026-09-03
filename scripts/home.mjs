@@ -157,6 +157,16 @@ export const USER_DEFAULTS = Object.freeze({
   // The command used to open a task file. A fact about a machine if ever there
   // was one.
   editor: "",
+  // Names that must not appear in this repository's public documents, comma
+  // separated — `check --foreign-context` reads them from here (TL-196).
+  //
+  // WHY THIS LAYER AND NOT THE PROJECT'S config.yaml. A list of names a
+  // repository may not contain cannot live inside that repository: writing it
+  // down is the disclosure it exists to prevent. It also is not the project's
+  // vocabulary — it is a fact about the person running the guard, namely which
+  // OTHER repository they also have open. A stranger who clones this gets an
+  // empty list, which is the right answer for them: they have nothing to leak.
+  foreign_context_words: "",
   // The viewer's appearance: `auto` follows the browser, the other two do not.
   theme: "auto",
   // The port the viewer prefers. Two people on one repository disagreeing about

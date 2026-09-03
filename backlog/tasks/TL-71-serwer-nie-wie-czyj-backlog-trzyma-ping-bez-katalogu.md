@@ -22,7 +22,7 @@ verification:
   - id: identity
     bash: "node --test scripts/tests/serve-identity.test.mjs"
   - id: no-stale-name
-    bash: "! grep -n 'origin' scripts/serve-backlog.mjs"
+    bash: "! grep -nE '\\"[A-Za-z0-9_-]+-backlog-viewer\\"' scripts/serve-backlog.mjs"
   - id: no-regression
     bash: "node --test scripts/tests/*.test.mjs"
 ---
@@ -74,7 +74,7 @@ server WRITES (`.md` writes, history appends, view regeneration), and one
 process writing to N repositories divorces state from the branch (Law 1).
 
 Out of scope: a fixed port per project from a registry (that's TL-34) and the
-`origin-backlog-*` keys in the viewer's `localStorage`/IndexedDB — those persist
+the viewer's `localStorage`/IndexedDB keys, which carried the old product name — those persist
 on the user's machine and changing them requires a migration, so they go in a
 separate task. `PING_ID` is the one exception here, because it is a handshake
 token computed at runtime, not persisted anywhere — changing it costs nothing,
@@ -109,7 +109,7 @@ name comes from `scripts/product.mjs`".
    `port + 1`, and the message names both projects and both ports. Without
    names the user does not know what is sitting on that port and goes back to
    `ps aux`.
-5. `PING_ID` computed from `product.mjs`, not the literal `"origin-backlog-viewer"`.
+5. `PING_ID` computed from `product.mjs`, not a `"<name>-backlog-viewer"` literal.
 6. Test `scripts/tests/serve-identity.test.mjs` starts two servers on the same
    starting port over two backlog fixtures and asserts that the second one
    serves ITS OWN backlog on a different port. A positive control is
@@ -125,7 +125,7 @@ name comes from `scripts/product.mjs`".
 - [x] A second `worktrail serve` over a DIFFERENT backlog brings up its own server on the next free port; its page has its own project's `project_name`. [proof: identity]
 - [x] The message for this case names both projects and both ports. [proof: identity]
 - [x] A second `worktrail serve` over the SAME backlog still only opens a tab and exits with `exit 0` — no second process. [proof: identity]
-- [x] `grep origin scripts/serve-backlog.mjs` returns nothing. [proof: no-stale-name]
+- [x] No `"<name>-backlog-viewer"` literal is left in `serve-backlog.mjs`. [proof: no-stale-name]
 - [x] `node --test scripts/tests/*.test.mjs` fully green. [proof: no-regression]
 - [x] The test does not leave a running process behind, even after a failed assertion. [proof: identity]
 
@@ -136,7 +136,7 @@ name comes from `scripts/product.mjs`".
 node --test scripts/tests/serve-identity.test.mjs
 
 # 2. The other project's name was not left in the code — expected: exit 0 (no matches)
-! grep -n 'origin' scripts/serve-backlog.mjs
+! grep -nE '"[A-Za-z0-9_-]+-backlog-viewer"' scripts/serve-backlog.mjs
 
 # 3. The whole suite — expected: pass, no regressions
 node --test scripts/tests/*.test.mjs

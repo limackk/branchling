@@ -41,10 +41,29 @@
  * OWN dated measurements carry it: they are reproducible by anybody who clones
  * this repository, which is the whole distinction.
  *
- * WHAT IT READS. `docs/`, `README.md`, `LINEAGE.md`, `CONTRIBUTING.md` — the
- * documents a stranger opens. Not `backlog/`: the tasks are this tool's
- * development history and are where the record of the decision lives, including
- * this one.
+ * WHAT IT READS. `docs/`, `README.md`, `LINEAGE.md`, `CONTRIBUTING.md` AND
+ * `backlog/` — the documents a stranger opens. The backlog was outside this
+ * perimeter until TL-196, on the argument that the tasks are this tool's
+ * development history and hold the record of the decision, including this one.
+ * That argument was backwards: LINEAGE.md says the tasks ARE the history
+ * BECAUSE the git history was flattened at extraction, which makes the backlog
+ * the primary document a stranger reads, not an internal appendix. A perimeter
+ * that covered 12 files and skipped 197 answered the question without looking.
+ *
+ * Only `.md` is read, so `backlog/history/*.jsonl` stays outside — the log is
+ * append-only, and a guard that demanded edits to it would be asking for the
+ * one thing that file may never have.
+ *
+ * NOT EVERY DETECTOR APPLIES EVERYWHERE. A NAME and a PERSONAL PATH are wrong
+ * in any file — they name somebody. A MEASUREMENT is different: the rule that a
+ * number must be reproducible by the reader protects a document that ARGUES,
+ * and a task's dated `## Log` does not argue, it records what was true on a
+ * date. Applying it there produced 124 findings against this repository's own
+ * history — "337 tasks", "158 files", "1375 references rewritten" — every one
+ * of them the kind of entry CLAUDE.md asks for. A guard that flags the practice
+ * it is supposed to protect gets silenced, so the measurement rule stops at the
+ * backlog's edge. What a number about ANOTHER repository leaks is caught by the
+ * name and the cross-repository reference instead.
  *
  * Tests: `node --test scripts/tests/foreign-context.test.mjs`
  */
@@ -53,8 +72,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { loadConfig } from "./config.mjs";
-import { resolveBacklogDir } from "./paths.mjs";
+import { loadUserConfig, USER_KEYS } from "./home.mjs";
 import { MARK, color, errColor } from "./ui.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -63,9 +81,8 @@ const ERRM = errColor.err(MARK.err);
 
 export const ALLOW_MARKER = "foreign-context: allow";
 
-/** The documents a stranger opens. `backlog/` is deliberately absent — see the
- *  header. */
-export const PUBLIC_DOCS = ["docs", "README.md", "LINEAGE.md", "CONTRIBUTING.md"];
+/** The documents a stranger opens — the backlog among them (TL-196). */
+export const PUBLIC_DOCS = ["docs", "README.md", "LINEAGE.md", "CONTRIBUTING.md", "backlog"];
 
 /** A home directory with somebody's name in it. `/path/to/...` and
  *  `/Users/x/...` in an obviously schematic example are NOT exempt: a reader
@@ -109,7 +126,7 @@ function fenceState(line, inside) {
  * @param {string[]} words  extra forbidden words from `config.yaml`; empty here
  * @returns {Array<{line: number, text: string, reason: string}>}
  */
-export function auditText(text, words = []) {
+export function auditText(text, words = [], { measurements = true } = {}) {
   const lines = String(text || "").split(/\r?\n/);
   const forbidden = (words || []).filter(Boolean)
     .map((w) => new RegExp("\\b" + w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "i"));
@@ -147,6 +164,7 @@ export function auditText(text, words = []) {
       continue;
     }
     if (wasInFence || inFence) continue;
+    if (!measurements) continue;
     if (BIG_COUNT.test(line)) {
       problems.push({ line: i + 1, text: line.trim(), reason: "measurement" });
       continue;
@@ -174,15 +192,26 @@ function walk(abs, out) {
   return out;
 }
 
+/** Entries whose files are a dated record rather than an argument — the
+ *  measurement rule does not run there. See the header. */
+export const HISTORICAL_RECORD = ["backlog"];
+
 export function auditTree(root, words = []) {
   const files = [];
-  for (const entry of PUBLIC_DOCS) walk(join(root, entry), files);
+  for (const entry of PUBLIC_DOCS) {
+    const found = [];
+    walk(join(root, entry), found);
+    const measurements = HISTORICAL_RECORD.indexOf(entry) < 0;
+    for (const abs of found) files.push({ abs, measurements });
+  }
   const findings = [];
   let linesChecked = 0;
-  for (const file of files) {
-    const text = readFileSync(file, "utf8");
+  for (const { abs, measurements } of files) {
+    const text = readFileSync(abs, "utf8");
     linesChecked += text.split(/\r?\n/).length;
-    for (const p of auditText(text, words)) findings.push({ file: relative(root, file), ...p });
+    for (const p of auditText(text, words, { measurements })) {
+      findings.push({ file: relative(root, abs), ...p });
+    }
   }
   return { findings, filesChecked: files.length, linesChecked };
 }
@@ -191,15 +220,18 @@ function main(argv = process.argv.slice(2)) {
   const repoRoot = join(HERE, "..");
   let words = [];
   try {
-    words = loadConfig(resolveBacklogDir({ moduleDir: HERE }).root).foreignContextWords || [];
+    // THE LIST COMES FROM THE USER LAYER, NOT FROM THE REPOSITORY (TL-196). A
+    // list of names this tree may not contain cannot be stored in this tree —
+    // writing it down is the disclosure. It used to live in a task's
+    // `verification:`, which is why the backlog named another project 101
+    // times while the guard reported green.
+    const raw = loadUserConfig(process.env, []).values.foreign_context_words;
+    words = String(raw || "").split(",").map((w) => w.trim()).filter(Boolean);
   } catch {
-    // No backlog, or one that will not load: the shape checks still run. This
-    // guard is about the documents, not about the configuration.
+    // No preferences file, or one that will not load: the structural checks
+    // still run. This guard is about the documents, not the configuration.
   }
-  // `--words a,b` ADDS to the configured list for one run (TL-37). It exists
-  // because this project's list is deliberately empty — the names it must not
-  // contain live in TL-37's own `verification:`, in the backlog, which is where
-  // the record of the decision belongs and where publishing them costs nothing.
+  // `--words a,b` ADDS to that list for one run.
   const at = argv.indexOf("--words");
   if (at >= 0) {
     const value = argv[at + 1];
