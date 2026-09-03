@@ -1,0 +1,1 @@
+{"id":"01M1KBTKDQ6BNAE782ZN57K1EE","ts":"2026-09-03T10:07:57.367Z","task":"TL-191","field":"__created__","from":"","to":"The stuck-status write may not overwrite an archived status","actor":"agent:claude","source":"manual","reason":"Filing the defect the second run produced."}

@@ -11,13 +11,20 @@ updated: 2026-09-03
 rationale: "The loop is built, so this arc is executed BY it: first make its report and its log believable, then teach the dispatcher to read this file at all, then the record of who did what, then the refusals the writing commands still lack, then the stale premises, then what a dead session leaves behind, then the fleet, and measurement of the run last."
 waves:
   - name: "The loop may be trusted unattended"
-    tasks: [TL-184, TL-185]
+    tasks: [TL-191, TL-190, TL-184, TL-185]
     # Both were measured on 2026-09-03, in the first unattended run of this very
     # plan, and both are about the tool lying quietly. TL-184: an agent that
     # could not authenticate never ran, and the loop wrote that into the task
     # as `blocked` and exited 0. TL-185: ten hand edits were absorbed into the
     # snapshot and recorded nowhere. A fleet whose report and whose log cannot
     # be believed is not worth pointing at the waves below.
+    #
+    # TL-191 and TL-190 were added after the SECOND run, on the same day and
+    # for the same reason. TL-191 stands first because it is the only one of
+    # the four that destroyed a fact: the loop wrote `blocked` over a task that
+    # was done, committed and merged. TL-190 is the misread refusal that made
+    # that path reachable, and the two must be fixed together or the first fix
+    # will look like it worked.
 
   - name: "The run can be watched while it happens"
     tasks: [TL-188, TL-122, TL-189]
