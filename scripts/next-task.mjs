@@ -589,8 +589,20 @@ export function run(argv) {
     // history has to name the tasks that discharged the status — a change whose
     // why is "the tool decided" is the `unknown` this project refuses.
     const cleared = unblocked.has(key) ? { blockers: (candidate.blocked_by || []).slice() } : null;
+    // THE ROLE THIS CLAIM WAS MADE AS (TL-227). The dispatcher knows it — `run`
+    // passed `--role` — and it is the one path a fleet uses, so a claim written
+    // without it leaves a whole stage unattributed.
+    //
+    // THE MATCH, NOT THE FILTER. `--role a,b` may select a task asking for `b`;
+    // the actor was acting as `b` for THIS task, not as the list. And a roleless
+    // task, which `--role r` still selects unless `--role-strict` narrows it, was
+    // not worked as `r` — saying it was would be a guess, so it stamps nothing.
+    const candidateRole = String(candidate.role || "").trim();
+    const actingAs = wantedRoles && candidateRole && wantedRoles.indexOf(candidateRole) >= 0
+      ? candidateRole
+      : null;
     const result = takeTask({
-      root, config, id: candidate.id, actor, reason: plan.reason,
+      root, config, id: candidate.id, actor, reason: plan.reason, role: actingAs,
       source: reclaim ? "reclaim" : "next", reclaim, unblocked: cleared, now,
     });
     if (result.ok) {

@@ -13,13 +13,14 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { COMMANDS, helpText, resolveCommand } from "../cli.mjs";
+import { STDIN_WAIT_MS } from "../regen-hook.mjs";
 
 import { isolateHome } from "./_repo.mjs";
 
@@ -284,6 +285,105 @@ test("`regen-hook` on a file outside tasks/ is SILENT and exits zero", () => {
     assert.equal(r.status, 0, r.stderr);
     assert.equal((r.stdout || "").trim(), "", "the hook spoke up about a file that does not concern it");
     assert.ok(!existsSync(join(dir, "INDEX.yaml")), "the hook rebuilt the views for a foreign file");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("`regen-hook` gives up on a stdin nobody closes instead of waiting forever",
+  async () => {
+  // THE DEFECT (TL-224). The payload was read with `readFileSync(0)`, which
+  // reads to EOF. An editor pipes its JSON and closes, so the command was only
+  // ever exercised on the one input shape that ends by itself. A terminal does
+  // not end, and neither does a parent that leaves stdin inherited: the hook
+  // waited for an EOF that was never coming — no output, no prompt, nothing to
+  // tell it apart from slow work. Measured before the fix: `( sleep 4 ) |
+  // regen-hook` took the whole four seconds, and a terminal took forever.
+  //
+  // THE PIPE HAS TO BE HELD OPEN BY THIS TEST. `spawnSync` with no `input`
+  // closes the child's stdin immediately, so a test written that way passes
+  // against the BROKEN code — it is the one arrangement the defect never had.
+  // Here the parent keeps the writable and never ends it.
+  const child = spawn(process.execPath, [CLI, "regen-hook"], {
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  const started = Date.now();
+
+  const outcome = await new Promise((resolve) => {
+    // The backstop: without it, a regression does not fail this test, it hangs
+    // the suite — which reads as infrastructure trouble rather than as this bug.
+    const killer = setTimeout(() => {
+      child.kill("SIGKILL");
+      resolve("still blocking");
+    }, 15000);
+    child.on("exit", () => {
+      clearTimeout(killer);
+      resolve("exited");
+    });
+  });
+  const elapsed = Date.now() - started;
+  child.stdin.destroy();
+
+  assert.equal(outcome, "exited", `the hook never returned (${elapsed}ms)`);
+  assert.ok(
+    elapsed < STDIN_WAIT_MS * 3,
+    `the hook waited ${elapsed}ms on a stdin nobody closes (bound is ` +
+      `${STDIN_WAIT_MS}ms) — it is blocking again`
+  );
+});
+
+test("`regen-hook` still reads a payload that arrives late", () => {
+  // The positive control for the test above, and the reason the wait is bounded
+  // rather than abolished. Without it, "returns quickly" would also be satisfied
+  // by a hook that stopped reading stdin altogether — which passes every timing
+  // assertion and does nothing for anybody.
+  const dir = sandbox();
+  try {
+    const file = join(dir, "tasks", "BL-900-zrob-rzecz.md");
+    const r = run(["regen-hook"], {
+      input: JSON.stringify({ tool_input: { file_path: file } }),
+    });
+    assert.equal(r.status, 0, r.stderr);
+    assert.ok(existsSync(join(dir, "INDEX.yaml")), "the views were not rebuilt");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a payload that arrives WITHOUT the writer closing is still honoured",
+  async () => {
+  // The other half of the bound: a caller that writes its JSON and then holds
+  // the pipe open has told the hook everything it needs. Discarding that at the
+  // deadline would be the same mistake pointing the other way.
+  const dir = sandbox();
+  try {
+    const file = join(dir, "tasks", "BL-900-zrob-rzecz.md");
+    const child = spawn(process.execPath, [CLI, "regen-hook"], {
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    child.stdin.write(JSON.stringify({ tool_input: { file_path: file } }));
+    // Deliberately no `end()`.
+    //
+    // The same backstop as the test above, for the same reason: against the
+    // pre-fix read this child never exits, and an unguarded `await` on its exit
+    // hangs the whole suite instead of failing this one case. Measured while
+    // writing it — the run sat for five minutes and reported nothing.
+    const exited = await new Promise((resolve) => {
+      const killer = setTimeout(() => {
+        child.kill("SIGKILL");
+        resolve(false);
+      }, 15000);
+      child.on("exit", () => {
+        clearTimeout(killer);
+        resolve(true);
+      });
+    });
+    child.stdin.destroy();
+    assert.ok(exited, "the hook never returned on a payload whose writer stayed open");
+    assert.ok(
+      existsSync(join(dir, "INDEX.yaml")),
+      "a payload that arrived was thrown away because its writer stayed open"
+    );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
