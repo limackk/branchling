@@ -1,0 +1,5 @@
+{"id":"01M1MD1VV7X18F6AVV8P2AXGHF","ts":"2026-09-03T19:48:38.375Z","task":"TL-227","field":"__created__","from":"","to":"The claim a dispatched run makes records no role","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1MD3J4C3KE3FNAZWZRM2724","ts":"2026-09-03T19:49:33.964Z","task":"TL-227","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1MD3J4CGSHPDQR8GK5GRWT8","ts":"2026-09-03T19:49:33.964Z","task":"TL-227","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1MD5DPDMB19F0ZRECGF3CDJ","ts":"2026-09-03T19:50:34.957Z","task":"TL-227","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven","session":"tree-526f61f2043f"}
+{"id":"01M1MD5QM0VCVDVZFYBVJTKPVF","ts":"2026-09-03T19:50:45.120Z","task":"TL-227","field":"__attributed__","from":"","to":"__created__","actor":"agent:claude","source":"hook","reason":"filed and worked while the pipeline ran","attributes":"01M1MD1VV7X18F6AVV8P2AXGHF"}

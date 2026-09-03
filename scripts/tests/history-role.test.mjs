@@ -249,3 +249,48 @@ test("reconciliation stamps no role — it records a change it merely SAW", () =
     cleanup(dir);
   }
 });
+
+test("`next` stamps the role it dispatched on, and only on a real match", () => {
+  const { dir, backlog, env, id } = fixture("Work a dispatcher hands out", PASSING);
+  try {
+    const file = taskFile(backlog, id);
+    writeFileSync(file, readFileSync(file, "utf8").replace(/^role: .*$/m, "role: " + MAKER), "utf8");
+    cli(["build", "--dir", backlog], env);
+
+    const r = cli(["next", "--dir", backlog, "--actor", "agent:fleet", "--role", MAKER + "," + CHECKER], env);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    const claim = history(backlog, id).filter((e) => e.field === "status" && e.source === "next");
+    assert.equal(claim.length, 1, "the dispatcher left no claim record");
+    assert.equal(claim[0].role, MAKER,
+      "the one path a fleet uses records no role — the whole stage is unattributed");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("`next` with no role filter records none, and a roleless task caught by one records none", () => {
+  const loose = fixture("Work nobody asked a role for", PASSING);
+  try {
+    // No filter at all: the caller was acting as nobody in particular.
+    assert.equal(cli(["next", "--dir", loose.backlog, "--actor", "agent:fleet"], loose.env).status, 0);
+    for (const e of history(loose.backlog, loose.id)) {
+      assert.ok(!("role" in e), "a claim made under no role carries one");
+    }
+  } finally {
+    cleanup(loose.dir);
+  }
+
+  const widened = fixture("Work with no role, selected by a role filter", PASSING);
+  try {
+    // `--role r` still selects a roleless task unless `--role-strict` narrows it.
+    // That task was not worked AS `r`, so nothing may be stamped.
+    assert.equal(cli(["next", "--dir", widened.backlog, "--actor", "agent:fleet", "--role", MAKER],
+      widened.env).status, 0);
+    for (const e of history(widened.backlog, widened.id)) {
+      assert.ok(!("role" in e),
+        "a roleless task caught by the widening was recorded as worked in that role — a guess, in the log");
+    }
+  } finally {
+    cleanup(widened.dir);
+  }
+});
