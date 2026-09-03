@@ -186,6 +186,93 @@ test("no plan file is an instruction, not an error", () => {
   assert.match(renderPlanMissing({ planPath: "fixture/plan.yaml" }), /fixture\/plan\.yaml/);
 });
 
+// ── Work running in another worktree (TL-210) ─────────────────────────────
+//
+// The scan reports it and the Tasks view already draws it; the Execution view
+// used to derive every class from the LOCAL status, so a wave stood still on
+// screen while an agent moved through it. The fixture below is the situation
+// that produced the bug: from this tree FX-3 is `queued`, and a worktree says it
+// is `running`.
+
+/** FX-3 seen as running in another tree, with that tree's own record of when. */
+function awayTasks(observation) {
+  return TASKS.map((t) => (t.id === "FX-3" ? { ...t, elsewhere: [observation] } : t));
+}
+
+const AWAY = {
+  status: "running",
+  source: "/home/somebody/worktrees/fx-side",
+  kind: "worktree",
+  since: "2026-01-02T07:00:00Z",
+};
+
+function awayModel(observation) {
+  const tasks = awayTasks(observation);
+  return planViewModel(planState(PLAN, tasks, CONFIG), tasks, {
+    history: {},
+    now: NOW,
+    estimateHours,
+    archivedStatuses: CONFIG.archivedStatuses,
+  });
+}
+
+test("a task running in another worktree is running on this view too, and names the tree", () => {
+  const fx3 = awayModel(AWAY).waves[1].cards[0];
+  assert.equal(fx3.status, "queued", "the LOCAL status is still what this tree says");
+  assert.equal(fx3.inProgress, false, "nobody is working on it HERE");
+  assert.equal(fx3.running, true, "the card does not know that work is under way");
+  assert.equal(fx3.elsewhereRunning.label, "fx-side");
+  assert.equal(fx3.elsewhereRunning.source, AWAY.source, "the full path has to survive for the title");
+});
+
+test("the elapsed bar of a foreign card is measured from THAT tree's record", () => {
+  // 07:00 there, 12:00 now: five hours against a one-day estimate — a WORKING
+  // day, whatever `estimate.mjs` says one is, which is why the fraction is
+  // computed here rather than typed. Reading this tree's history instead would
+  // be reading a session that is not the one running.
+  const fx3 = awayModel(AWAY).waves[1].cards[0];
+  assert.equal(fx3.elapsedLabel, "5h");
+  assert.equal(fx3.estimateLabel, "1d");
+  assert.equal(fx3.pct, 5 / estimateHours("1d"));
+});
+
+test("a foreign card whose tree's log could not be read gets no bar, only the state", () => {
+  // The honest degradation: the scan cannot read a branch's log, so `since` is
+  // absent. The card still says work is under way and where — it does not invent
+  // a duration out of this tree's history.
+  const vm = awayModel({ status: "running", source: "feature/side", kind: "branch" });
+  const fx3 = vm.waves[1].cards[0];
+  assert.equal(fx3.running, true);
+  assert.equal(fx3.elapsedLabel, "", "a bar was drawn from a start nobody reported");
+  assert.equal(fx3.pct, null);
+  assert.equal(fx3.elsewhereRunning.label, "feature/side", "a branch name is not cut at its slash");
+});
+
+test("a divergence that is NOT the in-progress status leaves the card alone", () => {
+  // POSITIVE CONTROL for the rule: the trigger is the configured in-progress
+  // status, not the mere existence of a divergence — otherwise a task closed on
+  // another branch would render as running here.
+  const fx3 = awayModel({ status: "shipped", source: "/w/other", kind: "worktree" }).waves[1].cards[0];
+  assert.equal(fx3.running, false);
+  assert.equal(fx3.elsewhereRunning, null);
+});
+
+test("the rendered foreign card carries both the running mark and the foreign one", () => {
+  const tasks = awayTasks(AWAY);
+  const html = renderExecution(planViewModel(planState(PLAN, tasks, CONFIG), tasks, {
+    history: {}, now: NOW, estimateHours, archivedStatuses: CONFIG.archivedStatuses,
+  }));
+  const card = html.slice(html.indexOf('data-plan-card="FX-3"') - 400, html.indexOf('data-plan-card="FX-3"') + 700);
+  assert.match(card, /is-running/, "the card does not read as running");
+  assert.match(card, /is-elsewhere/, "foreign work is indistinguishable from work in this tree");
+  assert.match(card, /running in fx-side/, "the tree is not named on the card itself");
+  assert.match(card, /exec-bar/);
+  // A card running HERE keeps the plain running mark — without this the two
+  // assertions above would pass on a view that marked everything foreign.
+  const fx2 = html.slice(html.indexOf('data-plan-card="FX-2"'));
+  assert.doesNotMatch(fx2.slice(0, 500), /is-elsewhere/);
+});
+
 test("a title carrying HTML cannot break out of a card", () => {
   const tasks = TASKS.map((t) => (t.id === "FX-1" ? { ...t, title: '</article><script>x</script>' } : t));
   const html = renderExecution(planViewModel(planState(PLAN, tasks, CONFIG), tasks, { estimateHours, now: NOW }));

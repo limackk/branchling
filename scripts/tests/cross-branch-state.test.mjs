@@ -23,7 +23,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { DEFAULT_TASK_ID_PREFIX as P } from "../task-id.mjs";
-import { absentHere } from "../branch-scan.mjs";
+import { absentHere, crossBranchState, statusSetAt } from "../branch-scan.mjs";
+import { loadConfig } from "../config.mjs";
 
 import { isolateHome } from "./_repo.mjs";
 
@@ -380,6 +381,56 @@ test("an UNCOMMITTED change in another worktree is visible", () => {
     assert.equal(r.status, 0, r.stderr);
     assert.match(r.stdout, new RegExp("id: " + ID + "\\b"), "an uncommitted status in another worktree is invisible");
     assert.match(r.stdout, /: blocked/);
+  } finally {
+    rmSync(wt, { recursive: true, force: true });
+    cleanup(repoRoot);
+  }
+});
+
+test("statusSetAt: the LAST entry setting that status wins, and a torn line is skipped", () => {
+  // A task taken, handed back and taken again is in flight since the last take.
+  // The trailing fragment is what a log being appended to right now looks like:
+  // it must not cost the answer the complete lines before it.
+  const log = [
+    '{"ts":"2026-01-01T08:00:00Z","field":"status","to":"in_progress"}',
+    '{"ts":"2026-01-01T09:00:00Z","field":"status","to":"pending"}',
+    '{"ts":"2026-01-01T10:00:00Z","field":"owner","to":"in_progress"}',
+    '{"ts":"2026-01-01T11:00:00Z","field":"status","to":"in_progress"}',
+    '{"ts":"2026-01-01T12:00:00Z","field":"sta',
+  ].join("\n");
+  assert.equal(statusSetAt(log, "in_progress"), "2026-01-01T11:00:00Z");
+  assert.equal(statusSetAt(log, "blocked"), null, "a status the log never set was given a time anyway");
+  assert.equal(statusSetAt("", "in_progress"), null);
+});
+
+test("a task taken in another worktree reports WHEN that tree took it", () => {
+  // What the Execution view draws its elapsed bar from (TL-210). This tree's own
+  // history cannot answer it — the take was written over there and has not been
+  // committed — so the scan reads that tree's log or says nothing.
+  const { repoRoot, backlogDir } = twoBranchesDisagreeing();
+  const wt = join(repoRoot, "..", "branchling-xbranch-since-" + process.pid);
+  try {
+    vcs(repoRoot, ["branch", "-q", "sidecar", "main"]);
+    vcs(repoRoot, ["worktree", "add", "-q", wt, "sidecar"]);
+    // The take, made by the tool in THAT tree: the file and the log entry.
+    const took = cli(["take", ID, "--dir", join(wt, "backlog"), "--actor", "agent:other"], { cwd: wt });
+    assert.equal(took.status, 0, took.stderr);
+
+    const scan = crossBranchState(backlogDir, loadConfig(backlogDir));
+    const seen = (scan.byId.get(ID) || []).find((o) => o.kind === "worktree");
+    assert.ok(seen, "the uncommitted take in the other worktree was not seen at all");
+    assert.equal(seen.status, "in_progress");
+    assert.ok(seen.since, "the tree that holds the task did not say when it took it");
+    assert.ok(Date.parse(seen.since) > 0, "`since` is not a timestamp anything can be measured from");
+
+    // POSITIVE CONTROL: with that tree's log removed the answer becomes null
+    // rather than a time invented from THIS tree's history, which still holds
+    // the task's own entries.
+    rmSync(join(wt, "backlog", "history", ID + ".jsonl"), { force: true });
+    const blind = crossBranchState(backlogDir, loadConfig(backlogDir));
+    const after = (blind.byId.get(ID) || []).find((o) => o.kind === "worktree");
+    assert.ok(after, "the observation itself disappeared with the log");
+    assert.equal(after.since, null, "a start time was produced with nothing to read it from");
   } finally {
     rmSync(wt, { recursive: true, force: true });
     cleanup(repoRoot);

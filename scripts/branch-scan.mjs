@@ -45,6 +45,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { join, relative } from "node:path";
 
+import { HISTORY_DIRNAME } from "./history.mjs";
 import { parseTaskRecord } from "./task-select.mjs";
 
 /** A day, in seconds — the unit `active_branch_days` is expressed in. */
@@ -272,6 +273,62 @@ export function dirtyTaskFiles(worktreePath, backlogRel) {
   return paths;
 }
 
+/**
+ * When the log says a status was last SET — the timestamp of the last entry that
+ * moved `status` TO the value asked about.
+ *
+ * NO VOCABULARY HERE. The caller passes the status the tree is CURRENTLY
+ * reporting, whatever a project calls it, so this function never names one.
+ *
+ * THE LAST ENTRY WINS, for the same reason `enteredInProgressAt()` in
+ * viewer-plan.mjs takes the last one: a task taken, handed back and taken again
+ * has been in flight since the LAST take, and counting from the first reports an
+ * elapsed time nobody has been working.
+ *
+ * @param {string} log the contents of one `history/<ID>.jsonl`
+ * @param {string} status the value to look for on the right-hand side
+ * @returns {string|null} the entry's `ts`, or null when the log does not say
+ */
+export function statusSetAt(log, status) {
+  if (!log || !status) return null;
+  let ts = null;
+  for (const line of String(log).split("\n")) {
+    if (!line.trim()) continue;
+    let e;
+    try {
+      e = JSON.parse(line);
+    } catch {
+      // A truncated last line is what a log being appended to right now looks
+      // like. It is not a reason to answer nothing about the lines before it.
+      continue;
+    }
+    if (e && e.field === "status" && String(e.to || "") === String(status) && e.ts) ts = String(e.ts);
+  }
+  return ts;
+}
+
+/**
+ * The same question asked of ANOTHER working tree's log (TL-210).
+ *
+ * WHY THAT TREE'S LOG AND NEVER THIS ONE'S. The Execution view draws an elapsed
+ * bar under a running card. For a task running in another worktree the only
+ * honest source of "since when" is the record that tree wrote: this tree's log
+ * would answer with the last time IT held the task — a bar measured from a
+ * session that ended days ago, drawn as if somebody were working now.
+ *
+ * A log that cannot be read is answered with null and no bar, which is the whole
+ * reason the reading happens here rather than being reconstructed by the page.
+ */
+function statusSetAtIn(worktreePath, backlogRel, id, status) {
+  const file = join(worktreePath, backlogRel, HISTORY_DIRNAME, id + ".jsonl");
+  if (!existsSync(file)) return null;
+  try {
+    return statusSetAt(readFileSync(file, "utf8"), status);
+  } catch {
+    return null;
+  }
+}
+
 // ──────────────────────────────────────────────────────────────────────────
 // The state itself
 // ──────────────────────────────────────────────────────────────────────────
@@ -303,8 +360,11 @@ function samePathKey(p) {
  *        `self` is the working tree the caller has already read for itself; its
  *        uncommitted files are the caller's own answer, not a second opinion,
  *        and so is the committed state of the branch it has checked out.
- * @returns {{byId: Map<string, Array<{status: string, source: string, kind: string}>>,
+ * @returns {{byId: Map<string, Array<{status: string, source: string, kind: string,
+ *                                     since?: string|null}>>,
  *            branches: string[], trees: string[]}}
+ *        `since` is when THAT tree last set the status it reports, read from its
+ *        own history log; only worktrees carry it, and only when the log says.
  */
 export function scanTaskStates(opts) {
   const { repoRoot, backlogRel, taskFile } = opts;
@@ -374,7 +434,17 @@ export function scanTaskStates(opts) {
       } catch {
         continue;
       }
-      if (rec) observe(byId, rec.id, { status: rec.status, source: w.path, kind: "worktree" });
+      // `since` only for worktrees, deliberately. A branch's log would have to be
+      // read as a blob per ref, and a branch nobody has checked out has nobody
+      // standing in it — the state is committed, not being worked on this minute.
+      if (rec) {
+        observe(byId, rec.id, {
+          status: rec.status,
+          source: w.path,
+          kind: "worktree",
+          since: statusSetAtIn(w.path, backlogRel, rec.id, rec.status),
+        });
+      }
     }
   }
 
