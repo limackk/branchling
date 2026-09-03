@@ -1,1 +1,4 @@
 {"id":"01M1KYR2HH309DXSC72ZK03M10","ts":"2026-09-03T15:38:37.489Z","task":"TL-207","field":"__created__","from":"","to":"the decision panel shows a question's options, not only its text","actor":"agent:claude","source":"manual","reason":"unknown"}
+{"id":"01M1M0MBXJYSBV30534KRN8SAF","ts":"2026-09-03T16:11:33.170Z","task":"TL-207","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown","session":"tree-3d81645067d3"}
+{"id":"01M1M0MBXJ8F2KY31FTYTRKK2F","ts":"2026-09-03T16:11:33.170Z","task":"TL-207","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown","session":"tree-3d81645067d3"}
+{"id":"01M1M0PBM55QMQCA6NC3JASHMK","ts":"2026-09-03T16:12:38.405Z","task":"TL-207","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven","session":"tree-3d81645067d3"}

@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P2                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
@@ -76,10 +76,44 @@ to a row nothing rendered would have been speculative data.
 4. Extend `scripts/tests/decision-panel.test.mjs` — with a positive control: a
    question asked with NO options must still render, and invent none.
 
+## Decisions
+
+**Delivered by TL-205, and this task was the one that had to give way.** Its
+three rendering steps are step 2 of TL-205 — "render options as choices, with
+the recommended one marked" — and TL-205 was already in flight with
+`blocked_by: [TL-204]` set for the express purpose of designing the panel's row
+ONCE against the final shape of a question. Rendering the menu into the
+wall-of-boxes layout and then redesigning it would have been the second design
+that dependency exists to prevent, so the overlap was resolved in TL-205's
+favour rather than by splitting a row's design across two commits.
+
+What that commit put in place, against the steps above:
+
+  1. `decisionPanel()` carries `options` and `recommend` onto a `kind:
+     "question"` row, normalised to an array and a number-or-null so no caller
+     has to distinguish the three states on disk (absent key, `[]`, a list).
+  2. The viewer renders them as a numbered list of choices, the recommended one
+     marked with the WORD `recommended` beside its fill — and the word takes
+     `--fg` rather than `--accent`, which reaches about 2.3:1 on
+     `--accent-soft` in the light theme. The numbers are the ones
+     `decide --choose <n>` takes.
+  3. A row is answerable: `/api/decision` learned `choose`, and the page posts
+     the NUMBER, which `decideTask` resolves against the event the question was
+     asked in. The free-text input stays beside the menu for an answer that is
+     not on it.
+  4. `scripts/tests/decision-panel.test.mjs` covers the carried fields with the
+     positive control this task asked for — a question asked with NO options
+     invents none — plus the copy and the malformed-`recommend` cases;
+     `scripts/tests/decision-api.test.mjs` covers the write path.
+
+**Closed `done` rather than `cancelled`** because every criterion below is now
+true and its verification RUNS: `cancelled` would say the panel still shows a
+question without its menu, which is the one thing that is no longer the case.
+
 ## Acceptance criteria
 
-- [ ] A panel row for a question asked with options carries them, in order,
+- [x] A panel row for a question asked with options carries them, in order,
       and names the recommended one. [proof: panel-options]
-- [ ] A question asked without options renders with no invented menu.
+- [x] A question asked without options renders with no invented menu.
       [proof: panel-options]
-- [ ] The suite stays green. [proof: suite-green]
+- [x] The suite stays green. [proof: suite-green]
