@@ -289,14 +289,21 @@ export function waitingForExecutor(records, config, species) {
   return out;
 }
 
-export function waitingForRole(records, config, served) {
+export function waitingForRole(records, config, served, servesRoleless = true) {
   const archived = new Set(config.archivedStatuses || []);
   const inProgress = config.inProgressStatus || null;
   const serving = new Set(served);
   const out = {};
   for (const t of records || []) {
     const role = String(t.role || "").trim();
-    if (!role || serving.has(role)) continue;
+    // THE ROLELESS REMAINDER IS ONE MORE UNSERVED AUDIENCE (TL-223), under the
+    // empty key rather than a word of its own: a run with no `--agent` steps
+    // over those tasks for exactly the reason it steps over a role nobody gave
+    // a command for, and a reader counting what was left behind should not have
+    // to look in two places. With a generalist there is nothing to report.
+    if (!role) {
+      if (servesRoleless) continue;
+    } else if (serving.has(role)) continue;
     if (archived.has(t.status) || t.status === inProgress) continue;
     (out[role] = out[role] || []).push(t.id);
   }
@@ -888,8 +895,13 @@ function renderReport(report, plan) {
     lines.push("  waiting for a role this run does not serve:");
     for (const role of waitingRoles) {
       const ids = report.waiting[role];
-      lines.push("    " + MARK.warn + " " + ids.length + " task(s) ask for `" + role +
-        "` — no `--agent-for " + role + "=…` was given");
+      // The roleless remainder comes through the same block under the empty key
+      // (TL-223). It is named for what it is — those tasks ask for nobody in
+      // particular — rather than as a role called "", which no reader would
+      // recognise and no `--agent-for` could ever answer.
+      lines.push("    " + MARK.warn + " " + ids.length + " task(s) " + (role
+        ? "ask for `" + role + "` — no `--agent-for " + role + "=…` was given"
+        : "ask for no role in particular — no `--agent` was given"));
       lines.push("      " + color.dim(ids.join(", ")));
     }
   }
@@ -965,7 +977,12 @@ export function run(argv) {
   }
 
   plan.agent = plan.agent || process.env[AGENT_ENV] || null;
-  if (!plan.agent && !plan.dryRun) {
+  // A RUN OF SPECIALISTS IS A RUN (TL-223). `--agent` is the hand for tasks that
+  // ask for no role, and a queue where every task asks for one needs no such
+  // hand. Requiring it anyway made the arrangement `--agent-for` exists for the
+  // one arrangement that could not be invoked. What is refused is a run with no
+  // command of ANY kind, which is still what this message is about.
+  if (!plan.agent && !Object.keys(plan.agentFor || {}).length && !plan.dryRun) {
     console.error(failure(N + " run", "no agent command — this tool does not have one of its own", [
       "Pass `--agent \"<command>\"` or set " + AGENT_ENV + ".",
       "`{task_file}` and `{id}` are substituted; the task, and the last refusal,",
@@ -1014,9 +1031,18 @@ export function run(argv) {
   // actor with nobody working on it — the dispatcher must not hand out what this
   // invocation cannot serve.
   const served = servedRoles(plan);
+  // A GENERALIST IS WHAT MAKES `--role r` MEAN `r OR NO ROLE` (TL-223). `next`
+  // widens the filter that way on purpose, so a fleet of specialists does not
+  // strand every roleless task; that widening is right exactly when this run has
+  // a hand for the roleless ones. Without `--agent` it would hand out work this
+  // invocation cannot serve — the thing the comment above forbids — so the
+  // filter is narrowed to the roles themselves, with the flag `next` already
+  // has for it.
+  const generalist = !!plan.agent;
   if (served.length) {
     passthrough.push("--role", served.join(","));
-    filters.role = served.concat([""]);
+    if (!generalist) passthrough.push("--role-strict");
+    filters.role = generalist ? served.concat([""]) : served.slice();
   }
 
   // `--dry-run` asks WHICH tasks, in what order, and must not claim any of them.
@@ -1277,7 +1303,7 @@ export function run(argv) {
   // no hand for. It is not an error and not a failure — it is the escalation,
   // and naming it is the whole point (a silent skip looks like an empty queue).
   const leftover = readTaskRecords(backlogPaths(root).tasksDir, config.taskId.file);
-  const waiting = served.length ? waitingForRole(leftover, config, served) : {};
+  const waiting = served.length ? waitingForRole(leftover, config, served, !!plan.agent) : {};
   const waitingExecutor = waitingForExecutor(leftover, config, callerSpecies(actor));
 
   const report = { taken, tally, ms: Date.now() - started, stopped, waiting, waitingExecutor, neverStarted };
