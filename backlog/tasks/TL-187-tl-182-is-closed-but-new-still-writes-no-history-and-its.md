@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P2
-status: pending  # pending | in_progress | blocked | done | cancelled
-owner: ""
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:dev
 role: dev  # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
@@ -86,8 +86,8 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] `new` in a fixture tree leaves a history log for the task it created,
+- [x] `new` in a fixture tree leaves a history log for the task it created,
       naming the actor that ran it. [proof: new-writes-history]
-- [ ] The test fails when the write is removed — established by running it
+- [x] The test fails when the write is removed — established by running it
       against the current code before the fix. [proof: new-writes-history]
-- [ ] Nothing else in the suite changed. [proof: suite-green]
+- [x] Nothing else in the suite changed. [proof: suite-green]

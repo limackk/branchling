@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "History and attribution"
 priority: P2
-status: pending
-owner: ""
+status: done
+owner: agent:dev
 role: dev
 executor: ""
 estimate: 2h
@@ -80,7 +80,7 @@ remembering a flag is not a safeguard.
 
 ## Acceptance criteria
 
-- [ ] A first pass in a tree whose snapshot has never seen the tasks writes no `__created__` entry naming the caller. [proof: the-seed]
+- [x] A first pass in a tree whose snapshot has never seen the tasks writes no `__created__` entry naming the caller. [proof: the-seed]
 - [ ] A change to a task the snapshot DOES know is still recorded under the caller — the fix does not buy safety by recording nothing.
 - [ ] The command's output distinguishes "seeded N tasks" from "nothing to record".
 - [ ] The regression test establishes its own fixture and fails against the current code.
