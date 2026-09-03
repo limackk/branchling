@@ -1,6 +1,6 @@
 # The execution ORDER — DATA, not a view: a person or an agent arranges it, and
 # the tool only checks that it does not contradict `blocked_by`
-# (`worktrail check --plan`). The plan is ADVISORY: the truth about state stays
+# (`branchling check --plan`). The plan is ADVISORY: the truth about state stays
 # in the task file's `status:`.
 updated: 2026-09-01
 rationale: "First the dispatcher stops lying, then the loop, then roles and the human in the loop; the view reads finished state, so it goes last."
@@ -22,7 +22,7 @@ waves:
     # selects from the local tree and does not read the branch scan, so a fleet
     # is handed tasks that were finished elsewhere — a loop built on that would
     # be measuring its own defect. TL-125: TL-96 and TL-101 both call
-    # `worktrail close` and no command by that name exists. Settling the name
+    # `branchling close` and no command by that name exists. Settling the name
     # AFTER both consumers are written means rewriting both.
 
   - name: "The execution loop"
@@ -45,7 +45,7 @@ waves:
   - name: "The human in the loop"
     tasks: [TL-113, TL-114]
     # TL-113 enforces `executor:` in the dispatcher — it needs the roles from
-    # TL-98. TL-114 (`__decision__` and `worktrail decide`) is independent, but
+    # TL-98. TL-114 (`__decision__` and `branchling decide`) is independent, but
     # it stands here because the panel in the next wave needs BOTH: what a
     # demand for a human is, and what their answer is.
 
