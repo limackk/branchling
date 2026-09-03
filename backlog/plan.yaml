@@ -33,7 +33,7 @@ waves:
     # will look like it worked.
 
   - name: "The run can be watched while it happens"
-    tasks: [TL-188, TL-122, TL-189]
+    tasks: [TL-210, TL-188, TL-122, TL-189]
     # Asked for on 2026-09-03, while the first unattended run was working: the
     # viewer, served from the main checkout, showed a board that had not moved
     # for two hours, because the work was on a branch in a worktree and that is
@@ -41,6 +41,12 @@ waves:
     # worktree, TL-122 pushes the change instead of waiting for F5, and TL-189
     # fills the silence BETWEEN a task's two writes from the heartbeat log —
     # without it the other two only deliver two frames of a two-hour film.
+    #
+    # TL-210 joined on 2026-09-03 and stands first because it is the cheap
+    # nine tenths of TL-188: the scan already reports a task running in another
+    # worktree and the Tasks view already renders it, but an Execution card
+    # derives everything from the local status, so a wave being worked on right
+    # now stands still. The elapsed bar it would need is already built.
 
   - name: "A question a person can answer in a minute"
     tasks: [TL-204, TL-205]
