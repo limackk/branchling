@@ -110,9 +110,19 @@ export function renderPlan(state, config, opts = {}) {
     }
     for (const entry of state.nextUp) {
       const ids = entry.ids.map((id) => paint.id(id)).join(", ");
+      // The mark is APPENDED to the row the plan was going to print anyway
+      // (TL-199): the order is somebody's decision and `executor:` is a filter
+      // the dispatcher applies, so nothing here may reorder or drop a row.
+      const mark = entry.waitsOnHuman ? "  " + paint.dim("— asks for an executor an unattended run is not (human)") : "";
       // The group is named as a group. Splitting it into three bullets would
       // lose the one thing `together:` says.
-      out.push("  " + (entry.together ? "together: " + ids : ids));
+      out.push("  " + (entry.together ? "together: " + ids : ids) + mark);
+    }
+    // Said per wave as well as per row, because the two answers differ: a wave
+    // whose only `executor: human` task is still behind a blocker marks no row
+    // here and yet cannot be finished by a fleet either.
+    if (w.endsOnHuman) {
+      out.push("  " + paint.dim("this wave ends on a person — an unattended run cannot close it on its own"));
     }
   }
   out.push("");

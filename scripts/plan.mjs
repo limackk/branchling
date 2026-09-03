@@ -352,8 +352,24 @@ export function validatePlan(plan, tasks, config = {}) {
  * `known: false` rather than skipped, but it is `validatePlan` that calls it an
  * error; this function describes, it does not judge.
  *
+ * `executor:` IS REPORTED, NEVER APPLIED (TL-199). Each task entry carries the
+ * field, each `next up` entry carries `executors` and `waitsOnHuman`, and each
+ * wave carries `endsOnHuman` — whether an open task of it asks for a person, so
+ * an unattended fleet cannot close the wave on its own. Nothing is reordered,
+ * refused or hidden by any of it: `executor:` is a filter the DISPATCHER
+ * applies, and a task waiting on a person is still part of the order somebody
+ * decided. Without this a stalled wave and a busy one printed identical rows,
+ * and the run's own report — which does say what it could not take — is gone
+ * the moment the run is.
+ *
+ * `waitsOnHuman` is a JUDGEMENT and `executors` is the FACT beside it, so the
+ * symmetric question (does a HUMAN reader want `executor: agent` marked too?)
+ * can be answered later by a consumer without this function having pre-empted
+ * it. A `together` group waits on a person if ANY of its members does — the
+ * group is one act, and an act half of which needs a person needs a person.
+ *
  * @param {object} plan  as returned by `parsePlanYaml` (null = no plan file)
- * @param {Array<{id: string, status: string, blocked_by: string[]}>} tasks
+ * @param {Array<{id: string, status: string, executor?: string, blocked_by: string[]}>} tasks
  * @param {{archivedStatuses?: string[], inProgressStatus?: string|null}} config
  */
 export function planState(plan, tasks, config = {}) {
@@ -361,13 +377,17 @@ export function planState(plan, tasks, config = {}) {
   const inProgressStatus = config.inProgressStatus || null;
   const byId = new Map(tasks.map((t) => [t.id, t]));
   const isOpen = (t) => !!t && !archived.has(t.status);
+  // "human" is the value FIELD_SHAPES declares for `executor`, the same literal
+  // `decision-panel.mjs` compares against. Empty means anybody, which is the
+  // overwhelming majority of tasks and the reason the field is optional.
+  const executorOf = (t) => String((t && t.executor) || "").trim();
 
   const waveOf = new Map();
   const waves = ((plan && plan.waves) || []).map((w, i) => {
     const entries = w.tasks.map((id) => {
       if (!waveOf.has(id)) waveOf.set(id, i);
       const t = byId.get(id);
-      return { id, status: t ? t.status : null, known: !!t, open: isOpen(t) };
+      return { id, status: t ? t.status : null, known: !!t, open: isOpen(t), executor: executorOf(t) };
     });
     return {
       index: i,
@@ -376,6 +396,9 @@ export function planState(plan, tasks, config = {}) {
       together: w.together.map((g) => g.slice()),
       open: entries.filter((e) => e.open).length,
       closed: entries.filter((e) => e.known && !e.open).length,
+      // A CLOSED task that asked for a person no longer stops anybody, so only
+      // the open ones count: a wave finished by a person yesterday is finished.
+      endsOnHuman: entries.some((e) => e.open && e.executor === "human"),
       active: false,
     };
   });
@@ -396,17 +419,23 @@ export function planState(plan, tasks, config = {}) {
     const groupOf = new Map();
     w.together.forEach((g, gi) => g.forEach((id) => groupOf.set(id, gi)));
     const seen = new Set();
+    // The order of `nextUp` is the plan's, and marking an entry must not change
+    // it: this only decorates the entry that was going to be pushed anyway.
+    const entry = (together, ids) => {
+      const executors = [...new Set(ids.map((id) => executorOf(byId.get(id))).filter(Boolean))].sort();
+      return { together, ids, executors, waitsOnHuman: executors.includes("human") };
+    };
     for (const id of openIds) {
       if (seen.has(id)) continue;
       const gi = groupOf.get(id);
       if (gi === undefined) {
         seen.add(id);
-        if (cleared(byId.get(id))) nextUp.push({ together: false, ids: [id] });
+        if (cleared(byId.get(id))) nextUp.push(entry(false, [id]));
         continue;
       }
       const members = w.together[gi].filter((m) => openSet.has(m));
       for (const m of members) seen.add(m);
-      if (members.every((m) => cleared(byId.get(m)))) nextUp.push({ together: true, ids: members });
+      if (members.every((m) => cleared(byId.get(m)))) nextUp.push(entry(true, members));
     }
   }
 
