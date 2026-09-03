@@ -6,18 +6,21 @@ labels: [post-launch]
 board: main
 epic: "Backlog — open source publication"
 priority: P3
-status: pending
-owner: unassigned
+status: done
+owner: agent:claude
 estimate: 4h
 confidence: medium
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-03
 blocked_by: []
 blocks: []
 related_docs:
   - docs/worktrail-global-tool.md
 verification:
-  - bash: "node --test scripts/tests/hooks-install.test.mjs"
+  - id: hooks-behaviour
+    bash: "node --test scripts/tests/hooks-install.test.mjs"
+  - id: print-writes-nothing
+    bash: "node scripts/cli.mjs hooks print | grep -q 'Nothing was written'"
 ---
 
 ## Goal
@@ -69,15 +72,46 @@ happened to someone:
 
 ## Acceptance criteria
 
-- [ ] An existing `pre-commit` is NOT overwritten — the command refuses and
-      names the file.
-- [ ] A set `core.hooksPath` is recognized; the command writes to the right
-      place or refuses, but **never writes to a place git does not read**.
-- [ ] `--uninstall` restores the pre-install state — tested byte for byte.
-- [ ] A repository without `.git` → a readable error, not a stack trace.
-- [ ] Positive control: after installation, a commit with an ID collision
+- [x] An existing `pre-commit` is NOT overwritten — the command refuses and
+      names the file. [proof: hooks-behaviour]
+- [x] A set `core.hooksPath` is recognized; the command writes to the right
+      place or refuses, but **never writes to a place git does not read**. [proof: hooks-behaviour]
+- [x] `uninstall` restores the pre-install state — tested byte for byte. [proof: hooks-behaviour]
+- [x] A repository without `.git` → a readable error, not a stack trace. [proof: hooks-behaviour]
+- [x] Positive control: after installation, a commit with an ID collision
       **fails**. Without this step the test only proves the file was
-      created.
+      created. [proof: hooks-behaviour]
+- [x] `print` is the default answer and writes nothing at all. [proof: print-writes-nothing, hooks-behaviour]
+
+## Decisions
+
+- **The form is all three, with `print` as the modest default.** The Notes
+  called `--print` "90% of the problem for 10% of the risk", and that is right —
+  so it is the subcommand somebody reaches first, it writes nothing, and it
+  works even outside a repository. `install` exists because the alternative is a
+  paragraph in a README, which is a gate nothing runs.
+- **A separate command, not a flag on `init`.** `init` creates a backlog in an
+  empty directory; a hook concerns a repository that already exists. Those are
+  two different moments in somebody's life, and a flag would tie the second to
+  the first.
+- **REFUSE, never merge.** Appending to an existing `pre-commit` means guessing
+  where in somebody's gate this belongs and what their `exit` does to it. The
+  refusal prints the block, so the person is not left stuck — the choice stays
+  with whoever wrote the file.
+- **The path is asked of git: `git rev-parse --git-path hooks`.** It is the one
+  answer right in every layout — it honours `core.hooksPath`, and inside a
+  WORKTREE it names the common directory rather than
+  `.git/worktrees/<name>/hooks`, which git never reads. Assembling the path from
+  `--absolute-git-dir` looks correct and installs a hook nothing runs: trap 2
+  arrived at from a second direction, and it is now a test of its own.
+- **`core.hooksPath` is a statement, not a refusal.** The path is somebody's
+  deliberate choice, often another hook manager's, and writing there is
+  legitimate as long as the person is told whose directory it is. What would not
+  be legitimate is writing to `.git/hooks/` while it is set.
+- **The block is fenced by the same markers `init` uses in a `.gitignore`**, so
+  `uninstall` removes exactly what was installed. A file left holding only a
+  shebang is DELETED rather than left empty: an executable `pre-commit` that
+  does nothing is a gate that always passes.
 
 ## Notes
 
