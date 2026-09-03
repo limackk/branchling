@@ -650,10 +650,14 @@ export function recordEdit(backlogDir, opts) {
  * @param {string} backlogDir
  * @param {{actor?: string, source?: string, ts?: string, only?: string[], reason?: string,
  *          dryRun?: boolean}} opts
- *        `only` narrows to selected ids (the hook knows one file — there is no
- *        reason for it to read the whole tree). `dryRun` computes the entries
- *        and writes NOTHING — neither the log nor the snapshot.
- * @returns {{entries: object[], seeded: boolean, dryRun?: boolean}}
+ *        `only` narrows which ids may produce ENTRIES (the hook knows one file).
+ *        It does NOT narrow the seed: a first run writes a reference point for
+ *        the whole tree, or it leaves 193 tasks in a state where their edits are
+ *        absorbed unrecorded (TL-185). `dryRun` computes the entries and writes
+ *        NOTHING — neither the log nor the snapshot.
+ * @returns {{entries: object[], seeded: boolean, adopted: string[], dryRun?: boolean}}
+ *          `adopted` names the tasks taken into the snapshot on the log's word
+ *          alone, for fields the log has never mentioned and cannot vouch for.
  */
 export function reconcile(backlogDir, opts = {}) {
   const tasksDir = join(backlogDir, "tasks");
@@ -679,12 +683,23 @@ export function reconcile(backlogDir, opts = {}) {
 
   const seenIds = new Set();
   const entries = [];
+  const adopted = [];
 
   for (const file of taskFiles) {
     const id = taskIdFromFile(file);
     if (!id) continue;
     seenIds.add(id);
-    if (only && !only.has(id)) continue;
+    const selected = !only || only.has(id);
+    // A SEED COVERS THE WHOLE TREE, even when the run names ONE file (TL-185).
+    // The `only` filter says which task may produce ENTRIES; it must not decide
+    // how much of the tree gets a reference point. It used to do both, and a
+    // single post-edit hook firing in a tree with no snapshot — which is EVERY
+    // fresh worktree, `.snapshot.json` being gitignored — wrote a snapshot
+    // holding one task out of 194. From that moment the other 193 were "missing
+    // from the snapshot", and the branch below absorbed their edits in silence.
+    // Measured on 2026-09-03: nine `executor` fields and one `priority` moved
+    // into the snapshot and reached no log.
+    if (!selected && !seeding) continue;
     let meta;
     try {
       meta = metaFromText(readFileSync(join(tasksDir, file), "utf8"));
@@ -693,7 +708,7 @@ export function reconcile(backlogDir, opts = {}) {
     }
     const after = pickTracked(meta);
     const before = snap.tasks[id];
-    if (!seeding) {
+    if (!seeding && selected) {
       // The snapshot is LOCAL, the history file is SHARED (versioned). A task
       // missing from the snapshot does not mean "new": it also means "it arrived
       // by a merge or a pull". Before writing anything, we ask the history what
@@ -715,6 +730,32 @@ export function reconcile(backlogDir, opts = {}) {
         const life = lastLifecycleEvent(hist);
         if (!Object.keys(known).length || (life && life.field === FIELD_DELETED)) {
           entries.push(entry(id, FIELD_CREATED, "", meta.title || id, actor, source, ts, reason));
+        } else {
+          // THE HISTORY IS THE REFERENCE POINT WHEN THE SNAPSHOT HAS NONE
+          // (TL-185). Deciding the task is not new used to end the matter: the
+          // file was taken as the reference point and every pending change went
+          // into the snapshot unrecorded. The log already holds the last value
+          // of every field it has ever seen — that is a reference point, and it
+          // is the same one `alreadyRecorded` trusts in the branch below, so the
+          // two cannot disagree about what counts as recorded.
+          //
+          // A task that arrived by a pull carries its OWN log, so the values
+          // agree and nothing is written — the case this branch was built for is
+          // unaffected. A task edited by hand while absent from the snapshot
+          // disagrees, and that disagreement IS the unrecorded change.
+          const fromLog = {};
+          for (const key of TRACKED_FIELDS) if (known[key] !== undefined) fromLog[key] = known[key].to;
+          const attested = Object.keys(fromLog);
+          for (const c of diffMeta(fromLog, after, attested)) {
+            entries.push(entry(id, c.field, c.from, c.to, actor, source, ts, reason));
+          }
+          // WHAT THE LOG CANNOT ATTEST TO. A field the log has never mentioned
+          // has no last value, so there is no honest `from` to write and no way
+          // to tell an edit apart from the value the task was created with.
+          // Inventing `from: ""` would put a fabricated change in an append-only
+          // log. It is absorbed — and NAMED, because absorbing it in silence is
+          // the whole defect this task was opened for.
+          if (attested.length < TRACKED_FIELDS.length) adopted.push(id);
         }
       } else {
         for (const c of diffMeta(before, after)) {
@@ -752,11 +793,16 @@ export function reconcile(backlogDir, opts = {}) {
   // it, which is the defect TL-130 describes on the server's side. The snapshot
   // is left alone too — moving it forward is what makes a change invisible to
   // the person who is about to claim it.
-  if (opts.dryRun) return { entries, seeded: seeding, dryRun: true };
+  if (opts.dryRun) return { entries, seeded: seeding, adopted, dryRun: true };
 
+  // THE LOG FIRST, THE SNAPSHOT AFTER, and the order is the guarantee (TL-185):
+  // a crash between the two loses the reference point, which the next run
+  // rebuilds, and never the entries, which nothing can rebuild. Reversed, the
+  // snapshot would say the change had been seen while no log recorded it — the
+  // one failure this whole mechanism exists to prevent.
   for (const e of entries) appendEntries(backlogDir, e.task, [e]);
   saveSnapshot(backlogDir, snap);
-  return { entries, seeded: seeding };
+  return { entries, seeded: seeding, adopted };
 }
 
 // ──────────────────────────────────────────────────────────────────────────

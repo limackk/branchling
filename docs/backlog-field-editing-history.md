@@ -281,6 +281,25 @@ Deliberate limitations:
    entry is skipped. Deliberate cost: when someone locally sets the same
    value someone else already recorded, no second entry is created — the
    state matches either way, and the first write's author stays attributed.
+
+   **The half of that rule which was missing (TL-185).** Deciding a task "came
+   from outside" used to END the comparison: the file was taken as the
+   reference point and any pending edit went into the snapshot with nothing
+   written. Measured 2026-09-03: nine `executor:` fields and one `priority`
+   were absorbed and reached no log, silently. What the log knows is now used
+   as the reference point in that case — `lastChangeByField` gives the last
+   recorded value of every field it has ever seen, so a pulled task still
+   records nothing (its own log agrees with it) while a hand-edited one
+   records the difference, with a real `from`. A field the log has never
+   mentioned has no earlier value at all; it is absorbed, because inventing
+   `from: ""` would put a fabricated change in an append-only log — and the
+   task is NAMED in the run's output rather than passed over in silence.
+
+   The state was manufactured by a second defect fixed with it: `--file`
+   narrowed the SEED as well as the entries, so the post-edit hook firing in a
+   worktree with no snapshot — every fresh worktree, the file being
+   gitignored — wrote a reference point holding one task out of 194. A seed now
+   covers the whole tree; `--file` still narrows only what may be recorded.
 7. **A gate on WRITE is not enough, because its premise travels on a separate
    channel.** Reconciliation asks the history file before appending
    `__created__` (point 6) — and works when there is something to read.

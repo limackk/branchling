@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h
@@ -93,5 +93,55 @@ green command.
 
 ## Decisions
 
-Nothing decided. Note that a fix which only reorders the report would leave
-the recording bug in place; the test must assert the LOG, not the output.
+**The cause was not one of the three candidates, and two of the three Steps
+rested on a wrong premise.** Steps 2 and 3 were written as if the snapshot
+advanced before the log was appended, and as if the `--attribute` report
+suppressed the "recorded N" line. Neither is true. `reconcile()` already
+appended every entry BEFORE `saveSnapshot()`, and a run reporting both counts
+was reproduced against a copy of this repository's real backlog — the full log,
+all 778 unattributed entries — where it recorded fifteen changes and printed
+both blocks. The 778 count matching exactly is what proves the replication was
+the same tree. The order guarantee was left as it was and given a comment plus a
+test, rather than presented as a fix.
+
+**The cause is two defects that only bite together.**
+
+1. `reconcile()` used `only` to decide both which tasks may produce ENTRIES and
+   which tasks get a REFERENCE POINT. The post-edit hook always passes `--file`,
+   and `.snapshot.json` is gitignored, so every fresh worktree starts without
+   one: the first hook run wrote a snapshot holding ONE task out of 194.
+2. For a task absent from the snapshot, the branch asked a single question — is
+   this a creation? — and if the task had history it wrote nothing and moved the
+   snapshot on. The other 193 tasks were in that state, so every hand edit to
+   any of them was absorbed in silence.
+
+That explains the whole report, including the detail that looked incidental:
+TL-183's `__created__` was the one history file in commit 78d2262 because TL-183
+was created that day and had an EMPTY log, which is the only case the old branch
+still wrote for.
+
+**The reference point for a task the snapshot has never seen is the LOG.**
+`lastChangeByField` already holds the last recorded value of every field it has
+seen, and it is the same map `alreadyRecorded` trusts on the other branch, so
+the two cannot disagree about what counts as recorded. A pulled task carries its
+own log, agrees with it, and still records nothing — the case that branch exists
+for is untouched.
+
+**A field the log has never mentioned is absorbed, and named.** There is no
+earlier value for it, so there is no honest `from`; writing `from: ""` would put
+a fabricated change into an append-only log. Absorbing it silently is the defect
+this task was opened for, so the run prints the tasks it adopted. The list names
+a task even when an entry WAS written for it — the log vouching for one field
+says nothing about the other sixteen, and naming only the tasks nothing was
+recorded for would imply the rest were fully accounted for.
+
+**The ten changes from 2026-09-03 stay unrecorded.** The snapshot has since
+absorbed them and the log has no `from` for them, so any entry written now would
+be invented. `--attribute` cannot help either: it stands beside an existing
+`unknown` entry, and these have no entry at all. The tree is otherwise healthy —
+191 of 194 tasks are in the snapshot, the three missing ones being today's, which
+have no history yet.
+
+**Not done:** `scripts/regen-hook.mjs` spawns `history-record.mjs` without
+`--dir` while it already knows the file's own root. That is TL-195, and it is a
+different call site from the one fixed here.
