@@ -52,6 +52,7 @@ import { DEFAULTS, loadConfigOrExit } from "./config.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { explain as explainIndex, modifiedFiles, repoRoot, touches } from "./modified-files.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
+import { collectAllProjects, collectProject, unknownEverywhere } from "./cross-project.mjs";
 import { SORT_KEYS, filterTasks, readTaskRecords, sortTasks, splitList, unknownFilterValues } from "./task-select.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -61,7 +62,7 @@ const VALUE_FLAGS = new Set([
   "--role", "--executor", "--blocked-by", "--text", "--limit", "--sort", "--tasks", "--dir",
   "--modified-file",
 ]);
-const BOOL_FLAGS = new Set(["--json", "--files", "--count", "--help", "-h"]);
+const BOOL_FLAGS = new Set(["--json", "--files", "--count", "--all-projects", "--help", "-h"]);
 
 // An unknown flag MUST fail. Zero results caused by a typo are indistinguishable
 // from "there is no such thing" — and they read like an answer.
@@ -106,69 +107,86 @@ if (opts.help || opts.h) {
   process.exit(0);
 }
 
-// The data directory: --tasks (pointing straight at tasks/), otherwise the same
-// backlog directory resolution as in every other script (BL-1399).
-const ROOT = opts.tasks ? null : resolveBacklogDir({ dir: opts.dir, moduleDir: __dirname }).root;
-const TASKS_DIR = opts.tasks || backlogPaths(ROOT).tasksDir;
-
-// Which status means "closed" is stated by the project's configuration
-// (BL-1400). STRICT (TL-60): a typo in `archived_statuses` changes what
-// "closed" means, so slipping through quietly it would change the ANSWER, not
-// just the appearance. Zero matches caused by a typo read like an answer.
-const CFG = ROOT ? loadConfigOrExit(ROOT) : null;
-const ARCHIVED = new Set(CFG ? CFG.archivedStatuses : ["done", "cancelled"]);
-// `--tasks <dir>` bypasses the root, so there is no configuration — in that case
-// we assume the default "prefix-number" shape without knowing which prefix.
-const TASK_FILE = CFG ? CFG.taskId.file : /^[A-Za-z][A-Za-z0-9._-]*-\d+.*\.md$/;
-
-// WHICH TASKS MATCH, AND IN WHAT ORDER, IS NOT DECIDED HERE (TL-87). The
-// parser, the filters and the sort orders live in `task-select.mjs`, because
-// `next` asks the same question and hands its answer straight to an agent — two
-// copies could disagree, and the disagreement would surface as work done on the
-// wrong task. This file keeps what is its own: the flags, the output shapes and
-// the exit codes.
-
-let tasks;
-try {
-  tasks = readTaskRecords(TASKS_DIR, TASK_FILE);
-} catch (e) {
-  console.error(`✗ cannot read ${TASKS_DIR}: ${e.message}`);
+// ACROSS EVERY REGISTERED BACKLOG (TL-36). It is a VIEW: the pass reads N
+// directories and assembles the answer in memory. Deleting the registry takes
+// this flag away and nothing else — every command inside a repository is found
+// by walking upwards, and that answer must never be contradicted by a file.
+const ALL_PROJECTS = Boolean(opts["all-projects"]);
+if (ALL_PROJECTS && (opts.tasks || opts.dir)) {
+  // Both name ONE backlog, so the combination has two answers and no way to
+  // pick between them. Refused rather than silently letting one win.
+  console.error("✗ --all-projects cannot be combined with " + (opts.tasks ? "--tasks" : "--dir"));
+  console.error("  those name one backlog; --all-projects asks every registered one");
   process.exit(2);
 }
 
-// WHAT THE OTHER BRANCHES SAY (TL-73). A listing computed from this checkout
-// alone reports a task as `pending` while another branch has it `in_progress` —
-// the first law's one cost, and the reason this scan is on unless the project
-// turns it off. It runs BEFORE the filters, because `--status in_progress` has
-// to be able to match a status only another branch has.
-const SCAN = ROOT ? crossBranchState(ROOT, CFG) : { scanned: false, reason: "no-configuration", byId: new Map(), branches: [], trees: [] };
-for (const t of tasks) t.elsewhere = divergences(t.status, SCAN.byId.get(t.id));
+// The data directory: --tasks (pointing straight at tasks/), otherwise the same
+// backlog directory resolution as in every other script (BL-1399).
+const ROOT = opts.tasks || ALL_PROJECTS ? null : resolveBacklogDir({ dir: opts.dir, moduleDir: __dirname }).root;
+const TASKS_DIR = opts.tasks || (ROOT ? backlogPaths(ROOT).tasksDir : null);
 
-// AND THE TASKS THIS TREE DOES NOT HAVE AT ALL (TL-145). A task created on an
-// unmerged branch used to be reported as absent rather than as hidden, which is
-// a failure mode that reads as success. They are kept OUT of `tasks`: nothing
-// here can be filtered, sorted or counted like a task of this tree, because
-// only its id and the status each branch gives it are known.
-const ELSEWHERE_ONLY = absentHere(SCAN.byId, tasks.map((t) => t.id));
-const elsewhereOnlyLines = ELSEWHERE_ONLY.map(
-  (t) => t.id + " is not in this tree — elsewhere: [" + t.elsewhere.map(describeDivergence).join(", ") + "]"
-);
-
-// WHICH FILES EACH TASK TOUCHED, computed from git (TL-75). Asked for ONLY when
-// the flag is present: it is one `git log` over the whole history, and a listing
-// that pays for it unasked would make every other query slower for an answer
-// nobody wanted.
+// WHERE THE ANSWER COMES FROM. One project, or every registered one — and the
+// per-project pipeline is the SAME function either way (`collectProject`), so
+// asking five projects gives exactly the five answers asking each of them
+// separately would. Two pipelines would be two definitions of what a row is.
+//
+// `--tasks <dir>` is the third case and stays apart: it points straight at a
+// tasks directory, so there is no configuration to read and no branch scan to
+// run. It is the only path where the vocabularies are unknown.
 const FILE_QUERY = opts["modified-file"];
-let INDEX = null;
-if (FILE_QUERY !== undefined) {
-  if (!CFG) {
+let COLLECTED = [];
+let UNAVAILABLE = [];
+let REGISTERED = 0;
+
+if (opts.tasks) {
+  if (FILE_QUERY !== undefined) {
     console.error("✗ --modified-file needs the configuration, which `--tasks <dir>` bypasses");
     console.error("  the task id prefix is what links a commit message to a task");
     process.exit(2);
   }
-  INDEX = modifiedFiles({ root: repoRoot(ROOT), prefix: CFG.taskIdPrefix });
+  let tasks;
+  try {
+    // Without a configuration we assume the default "prefix-number" shape
+    // without knowing which prefix.
+    tasks = readTaskRecords(TASKS_DIR, /^[A-Za-z][A-Za-z0-9._-]*-\d+.*\.md$/);
+  } catch (e) {
+    console.error(`✗ cannot read ${TASKS_DIR}: ${e.message}`);
+    process.exit(2);
+  }
+  for (const t of tasks) { t.elsewhere = []; t.project = null; }
+  COLLECTED = [{
+    root: null, project: null, config: null, tasks,
+    scan: { scanned: false, reason: "no-configuration", byId: new Map(), branches: [], trees: [] },
+    elsewhereOnly: [], index: null, error: null,
+  }];
+} else if (ALL_PROJECTS) {
+  const pass = collectAllProjects({ modifiedFile: FILE_QUERY });
+  COLLECTED = pass.collected;
+  UNAVAILABLE = pass.unavailable;
+  REGISTERED = pass.registered;
+} else {
+  // STRICT (TL-60/TL-64): the configuration is loaded by the function that
+  // refuses with the right message and the right exit code, and handed to the
+  // pass. A typo in `archived_statuses` changes what "closed" means, so slipping
+  // through quietly would change the ANSWER, not the appearance.
+  const one = collectProject(ROOT, { modifiedFile: FILE_QUERY, config: loadConfigOrExit(ROOT) });
+  if (one.error) {
+    console.error(`✗ ${ROOT}: ${one.error}`);
+    process.exit(2);
+  }
+  COLLECTED = [one];
 }
 
+// A FILTER VALUE OUTSIDE THE VOCABULARY FAILS, exactly as an unknown flag does
+// (TL-161). Zero matches caused by a typo are indistinguishable from "there is
+// nothing like that", and they read like an answer — an agent asking for
+// `--status in-progress` is told there is no work in progress and stops.
+// `--tasks <dir>` has no configuration and therefore nothing to check against;
+// it passes through untouched rather than refusing every value.
+//
+// ACROSS PROJECTS the rule is the INTERSECTION: a value is refused only if
+// EVERY project refuses it. Judging against one project's vocabulary would
+// refuse a query that is perfectly meaningful in the second.
 const f = {
   status: splitList(opts.status),
   priority: splitList(opts.priority),
@@ -187,13 +205,10 @@ const f = {
   text: opts.text,
 };
 
-// A FILTER VALUE OUTSIDE THE VOCABULARY FAILS, exactly as an unknown flag does
-// (TL-161). Zero matches caused by a typo are indistinguishable from "there is
-// nothing like that", and they read like an answer — an agent asking for
-// `--status in-progress` is told there is no work in progress and stops.
-// `--tasks <dir>` has no configuration and therefore nothing to check against;
-// it passes through untouched rather than refusing every value.
-const unknownValues = unknownFilterValues(f, CFG);
+const withConfig = COLLECTED.filter((c) => c.config);
+const unknownValues = ALL_PROJECTS
+  ? unknownEverywhere(withConfig, f, unknownFilterValues)
+  : unknownFilterValues(f, withConfig.length ? withConfig[0].config : null);
 if (unknownValues.length) {
   for (const p of unknownValues) {
     console.error("✗ `" + p.value + "` is not an allowed value for the field `" + p.axis + "`");
@@ -208,10 +223,42 @@ if (unknownValues.length) {
   process.exit(2);
 }
 
+// FILTERED PER PROJECT, THEN CONCATENATED. Which status counts as closed is a
+// project's own decision (`archived_statuses`), so one shared set would apply
+// somebody else's definition of "done" to a project that never agreed to it.
+//
 // With no explicit --status we are asking about work to be done, not about the
 // archive: in a backlog of any age most tasks are closed and would flood every
 // answer. Measure your own: `query --status done --count`.
-let hits = filterTasks(tasks, f, ARCHIVED);
+let hits = [];
+for (const one of COLLECTED) {
+  const archived = new Set(one.config ? one.config.archivedStatuses : ["done", "cancelled"]);
+  let some = filterTasks(one.tasks, f, archived);
+  // APPLIED AFTER the shared filters, and deliberately not inside `filterTasks`:
+  // that module is the one `next` also uses to choose work, and a criterion that
+  // needs a git process has no business in the dispatcher's hot path.
+  if (one.index) some = some.filter((t) => touches(one.index.byTask.get(t.id) || new Set(), FILE_QUERY));
+  hits = hits.concat(some);
+}
+
+// The first project that answered decides the vocabularies the OUTPUT is shaped
+// by — the scan note, the sort order and the JSON's `scan` key. Across projects
+// those are per project and are reported per row; this is the single-project
+// answer's shape kept intact.
+const PRIMARY = COLLECTED[0] || { config: null, scan: { scanned: false, reason: "no-configuration", branches: [], trees: [] }, index: null };
+const CFG = PRIMARY.config;
+const SCAN = PRIMARY.scan;
+const INDEX = PRIMARY.index;
+const ELSEWHERE_ONLY = COLLECTED.flatMap((c) => c.elsewhereOnly);
+const elsewhereOnlyLines = ELSEWHERE_ONLY.map(
+  (t) => (t.project ? t.project + "/" : "") + t.id +
+    " is not in this tree — elsewhere: [" + t.elsewhere.map(describeDivergence).join(", ") + "]"
+);
+const unavailableLines = UNAVAILABLE.map(
+  (p) => "project " + p.project + " did not answer: " + p.why + " (" + p.root + ")"
+).concat(ALL_PROJECTS && !COLLECTED.length
+  ? ["no registered project could be read — `" + "project list" + "` shows what is registered"]
+  : []);
 
 // APPLIED AFTER the shared filters, and deliberately not inside `filterTasks`:
 // that module is the one `next` also uses to choose work, and a criterion that
@@ -246,6 +293,7 @@ if (opts.count) {
   // On stderr, so a count stays a number for a script. Silence would make a
   // backlog with work on an unmerged branch indistinguishable from one without.
   for (const line of elsewhereOnlyLines) console.error("# " + line);
+  for (const line of unavailableLines) console.error("# " + line);
   process.exit(0);
 }
 if (opts.json) {
@@ -268,6 +316,13 @@ if (opts.json) {
     // the same empty `tasks` (TL-75). Present either way: the envelope's rule is
     // that a declared key never goes missing.
     modifiedFile: INDEX ? { query: FILE_QUERY, scanned: INDEX.scanned, reason: INDEX.reason } : null,
+    // WHAT THE PASS COULD NOT REACH (TL-36). In the RESULT and not only on
+    // stderr: a consumer reading this envelope would otherwise count an
+    // incomplete set as complete, and "you moved the repository" would arrive
+    // as "that project has no tasks". Always present, `[]` when everything
+    // answered — the envelope's rule is that a declared key never goes missing.
+    unavailable: UNAVAILABLE,
+    projects: ALL_PROJECTS ? { registered: REGISTERED, answered: COLLECTED.length } : null,
   });
   process.exit(0);
 }
@@ -278,6 +333,7 @@ if (opts.files) {
   }
   // On stderr, so a path list stays a path list for `xargs`.
   for (const line of elsewhereOnlyLines) console.error("# " + line);
+  for (const line of unavailableLines) console.error("# " + line);
   const note = scanNote(SCAN.reason);
   if (note) console.error("# " + note);
   if (INDEX) {
@@ -289,7 +345,11 @@ if (opts.files) {
 
 const q = (s) => `"${String(s ?? "").replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 for (const t of shown) {
-  const cells = [`id: ${t.id}`, `priority: ${t.priority}`, `status: ${t.status}`, `board: ${t.board}`];
+  // THE IDENTITY IS THE PAIR (project, id), NEVER THE ID (TL-36). Numbers are
+  // unique within a project, so two backlogs both holding a TL-12 is the normal
+  // case; a row that does not name its project is unusable.
+  const cells = t.project ? [`project: ${t.project}`, `id: ${t.id}`] : [`id: ${t.id}`];
+  cells.push(`priority: ${t.priority}`, `status: ${t.status}`, `board: ${t.board}`);
   if (t.labels.length) cells.push(`labels: [${t.labels.join(", ")}]`);
   if (t.blocked_by.length) cells.push(`blocked_by: [${t.blocked_by.join(", ")}]`);
   if (t.role) cells.push(`role: ${t.role}`);
@@ -316,6 +376,11 @@ if (limit && total > shown.length) {
 // The tasks that exist only somewhere else, named one per line and kept out of
 // the list above — they are not rows of this tree (TL-145).
 for (const line of elsewhereOnlyLines) console.log("# " + line);
+
+// AND THE PROJECTS THAT DID NOT ANSWER (TL-36). Never silent: a registry entry
+// whose directory moved would otherwise turn into "that project has no tasks",
+// and the answer would look complete.
+for (const line of unavailableLines) console.log("# " + line);
 
 // A scan that could not run has to SAY so. Silence here is indistinguishable
 // from "every branch agrees", and that is the answer this whole mechanism exists

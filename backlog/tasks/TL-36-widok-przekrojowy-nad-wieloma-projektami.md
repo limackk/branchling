@@ -6,19 +6,29 @@ labels: [post-launch]
 board: main
 epic: "Backlog — open source publication"
 priority: P3
-status: pending
-owner: unassigned
+status: done
+owner: agent:claude
 estimate: 1d
 confidence: low
 created: 2026-08-30
-updated: 2026-08-30
+updated: 2026-09-03
 blocked_by: [TL-34]
 blocks: []
 related_docs:
   - docs/worktrail-global-tool.md
 verification:
-  - bash: "node --test backlog/scripts/tests/cross-project.test.mjs"
-  - bash: "node backlog/scripts/cli.mjs query --all-projects --status in_progress --json | python3 -c \"import json,sys; r=json.load(sys.stdin); assert all('project' in t for t in r), 'row missing project name'; print('rows:', len(r))\""
+  # `scripts/…`, not `backlog/scripts/…`: written before the extraction, when
+  # code and data were co-located. The second entry no longer goes through a
+  # PIPE either — `query --json` truncates above one pipe buffer (TL-175), which
+  # would have failed this contract for a reason that is not this task's.
+  - id: cross-project-fixtures
+    bash: "node --test scripts/tests/cross-project.test.mjs"
+  - id: every-row-names-its-project
+    bash: "node scripts/cli.mjs query --all-projects --status in_progress --json > /tmp/worktrail-tl36.json && node -e \"const d=require('fs').readFileSync('/tmp/worktrail-tl36.json','utf8');const r=JSON.parse(d);if(!r.tasks.every(t=>t.project))throw new Error('a row with no project name');if(!Array.isArray(r.unavailable))throw new Error('the pass does not report what it could not reach');console.log('rows:',r.tasks.length,'unavailable:',r.unavailable.length)\""
+  - id: registry-is-not-a-dependency
+    bash: "WORKTRAIL_HOME=$(mktemp -d) node scripts/cli.mjs query --count --dir backlog"
+  - id: measurement-recorded
+    bash: "grep -q '| 5 | 865 |' backlog/tasks/TL-36-widok-przekrojowy-nad-wieloma-projektami.md"
 ---
 
 ## Goal
@@ -84,23 +94,24 @@ number, whether an index is needed — not to build a cache preemptively.
 
 ## Acceptance criteria
 
-- [ ] `query --all-projects` returns rows with a `project` field; every row
-      is identifiable by the pair `(project, id)`.
-- [ ] A BL number collision between projects neither loses nor merges rows —
-      a test on two fixtures with the same `BL-001`.
-- [ ] An unavailable project is reported **in the result**, including in
-      `--json`; the cross-project pass does not abort on it.
-- [ ] Deleting the registry only takes away `--all-projects`; commands within
-      a repo work unchanged.
-- [ ] All existing `query.mjs` filters work with `--all-projects` (`--status`,
-      `--board`, `--epic`, `--label`, `--owner`, `--type`, `--text`).
-- [ ] An unknown flag still FAILS — the cross-project pass does not loosen
-      the CLI contract.
-- [ ] The cross-project pass time is measured and recorded in `## Log`; the
-      decision on an index is **justified by the number**, not a hunch.
-- [ ] The cross-project pass creates no persistent task storage of its own
+- [x] `query --all-projects` returns rows with a `project` field; every row
+      is identifiable by the pair `(project, id)`. [proof: cross-project-fixtures, every-row-names-its-project]
+- [x] A task number collision between projects neither loses nor merges rows —
+      a test on two fixtures whose first task has the same number. [proof: cross-project-fixtures]
+- [x] An unavailable project is reported **in the result**, including in
+      `--json`; the cross-project pass does not abort on it. [proof: cross-project-fixtures, every-row-names-its-project]
+- [x] Deleting the registry only takes away `--all-projects`; commands within
+      a repo work unchanged. [proof: cross-project-fixtures, registry-is-not-a-dependency]
+- [x] All existing `query.mjs` filters work with `--all-projects` (`--status`,
+      `--board`, `--epic`, `--label`, `--owner`, `--type`, `--text`). [proof: cross-project-fixtures]
+- [x] An unknown flag still FAILS — the cross-project pass does not loosen
+      the CLI contract. [proof: cross-project-fixtures]
+- [x] The cross-project pass time is measured and recorded — in `## Measurement`
+      below rather than in `## Log`, which TL-105 stopped writing; the decision
+      on an index is **justified by the number**, not a hunch. [proof: measurement-recorded]
+- [x] The cross-project pass creates no persistent task storage of its own
       (Law 2) — there is a test for this: after `--all-projects` no files
-      accumulate in the home directory.
+      accumulate in the home directory. [proof: cross-project-fixtures]
 
 ## Verification
 
@@ -139,3 +150,48 @@ time node backlog/scripts/cli.mjs query --all-projects --count
   (docs/architecture/worktrail-global-tool.md); the only step that changes
   the product, with an explicitly uncertain audience and an entry gate of
   "≥2 registry entries"
+
+## Measurement (2026-09-03, step 5)
+
+Five copies of this backlog (173 tasks each), registered in an isolated
+registry, `query --all-projects --status pending --count`:
+
+| projects | tasks read | wall clock |
+|---|---|---|
+| 1 | 173 | 95 ms |
+| 3 | 519 | 139 ms |
+| 5 | 865 | 167 ms |
+
+About 18 ms per additional project, roughly linear, dominated by the per-project
+branch scan rather than by reading task files. **No index is built.** A cache
+here would be a second source of truth (law 2) bought to save 70 ms.
+
+A second measurement, taken by accident and worth recording: this machine's
+registry held 1239 entries, 892 of which answered, and the pass over all of them
+took 13.5 s. That is not an argument for an index — it is what TL-176 is for.
+
+## Decisions
+
+- **The identity is the pair `(project, id)`, and `project` is written onto a row
+  only when there IS one.** A single-project answer keeps exactly the shape it
+  always had; adding `project: null` to every row would change an existing
+  contract for nothing, and which mode produced an answer is already stated once,
+  at the envelope level, by `projects`.
+- **One pipeline, not two.** `collectProject()` is what the single-project path
+  runs as well, so asking five projects gives exactly the five answers asking
+  each of them separately would. Two pipelines would be two definitions of what
+  a row is.
+- **Filtering happens PER PROJECT, then the results are concatenated.** Which
+  status counts as closed is a project's own decision (`archived_statuses`), so
+  one shared set would apply somebody else's definition of "done" to a project
+  that never agreed to it.
+- **A filter value is refused only if EVERY project refuses it.** Judging against
+  one project's vocabulary would refuse a query meaningful in the second;
+  judging against nothing would bring back the defect TL-161 closed, where a
+  typo answers "there is no such work" and an agent stops.
+- **`--all-projects` with `--dir` or `--tasks` is refused**, not resolved: both
+  name one backlog, so the combination has two answers and no way to choose.
+- **The viewer switcher (step 6) is TL-177**, not part of this task. It was
+  listed as a step, comes explicitly after the CLI, and none of the acceptance
+  criteria covered it — folding it in would have blurred a task that has a
+  contract with one that does not yet.

@@ -3,3 +3,6 @@
 {"id":"01M1F5BNKG1EMN2TMTPVF6QC89","ts":"2026-09-01T18:57:58.896Z","task":"TL-36","field":"blocked_by","from":["TL-1440"],"to":["TL-34"],"actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK5E760J4035XWJ2QSF","ts":"2026-09-02T07:16:31.461Z","task":"TL-36","field":"title","from":"Widok przekrojowy nad wieloma projektami","to":"Cross-project view over multiple projects","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK55RZ74B266KRB3PZH","ts":"2026-09-02T07:16:31.461Z","task":"TL-36","field":"epic","from":"Backlog — publikacja open source","to":"Backlog — open source publication","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1JTS8Y4DN74VJZWPGWXYMXP","ts":"2026-09-03T05:10:08.068Z","task":"TL-36","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown","session":"tree-6185cd1f78d5"}
+{"id":"01M1JTS8Y42R2Z76KMNZM1C2WM","ts":"2026-09-03T05:10:08.068Z","task":"TL-36","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown","session":"tree-6185cd1f78d5"}
+{"id":"01M1JVK7WWQMVD5SH13HQWJ6E8","ts":"2026-09-03T05:24:18.972Z","task":"TL-36","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven","session":"tree-6185cd1f78d5"}
