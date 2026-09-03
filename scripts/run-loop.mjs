@@ -47,6 +47,15 @@
  * a person, is no longer this run's to park — it is reported as held elsewhere,
  * counted apart from a task somebody closed, and left exactly as it is.
  *
+ * WORKED, UNVERIFIED IS ITS OWN ENDING (TL-212). A contract whose last line is a
+ * `manual:` entry can be satisfied to that line by an agent and still not close,
+ * because the line asks a PERSON. That is not a failure and it is not work left
+ * to do: parking it in the status this project protects with a reason files
+ * finished work under "cannot move", and the person reading that queue then sees
+ * a whole task where a signature is what is actually theirs. A backlog that names
+ * an `awaiting_vouch_status` gets the task parked there instead, with the agent's
+ * work standing; one that names none is unchanged, and told so.
+ *
  * WHERE THE AGENT'S OUTPUT GOES. One log file per task, OUTSIDE the repository,
  * in the same state directory the locks live in (TL-87): it is session state,
  * not data that should travel with a branch, and twenty tasks' worth of agent
@@ -292,6 +301,23 @@ export function blockedReason(attempts, detail) {
   return tail ? head + ": " + tail : head;
 }
 
+/**
+ * The sentence written into the history when a run parks a task as awaiting a
+ * person's vouch (TL-212). PURE, for the same reason `blockedReason` is: the
+ * words end up permanently in an append-only log and a test is entitled to
+ * assert them without a tree.
+ *
+ * IT SAYS BOTH FACTS, and the first one is the one that was previously lost: the
+ * agent's work STANDS. A reader who finds only "needs a person" has to open the
+ * task to learn whether anything was done, which is exactly the reading cost
+ * this status exists to remove.
+ */
+export function vouchReason(detail) {
+  const head = "the agent's work stands; a `manual:` entry is waiting for a person to vouch";
+  const tail = String(detail || "").split("\n").map((s) => s.trim()).filter(Boolean)[0] || "";
+  return tail ? head + ": " + tail : head;
+}
+
 /** The word the DEFAULT vocabulary uses for work that has stopped. Not a fact
  *  about any project — the same standing as DEFAULT_IN_PROGRESS_STATUS, and used
  *  the same way: only when the project actually declares this status. */
@@ -331,7 +357,13 @@ export const DEFAULT_STUCK_STATUS = "blocked";
 export function stuckStatus(config, requested) {
   const archived = new Set(config.archivedStatuses || []);
   const dispatched = new Set(queueStatuses(config));
-  const parkable = (s) => !archived.has(s) && !dispatched.has(s);
+  // The vouch status is parkable in every mechanical sense and still may not be
+  // used here (TL-212): it says a person has to SIGN for finished work, and a
+  // task that spent its attempts failing has none to sign for. Filing a failure
+  // there would put it in front of the one reader whose queue is meant to be
+  // thirty seconds of checking.
+  const vouch = config.awaitingVouchStatus || null;
+  const parkable = (s) => !archived.has(s) && !dispatched.has(s) && s !== vouch;
   const stillDispatched = (s) => [
     "`" + s + "` is a status this backlog still hands out — `next` would take the task",
     "straight back and the run would never end.",
@@ -350,6 +382,14 @@ export function stuckStatus(config, requested) {
     }
     if (dispatched.has(requested)) {
       return { error: "`--stuck-status " + requested + "` would be handed straight back", details: stillDispatched(requested) };
+    }
+    if (requested === vouch) {
+      return { error: "`--stuck-status " + requested + "` is this backlog's `awaiting_vouch_status`",
+        details: [
+          "That status means the work is FINISHED and a person has to vouch for it.",
+          "A task that spent its attempts without verification has nothing to vouch for,",
+          "and filing it there would put a failure in the queue somebody skims in seconds.",
+        ] };
     }
     return { status: requested };
   }
@@ -665,6 +705,13 @@ function workOne(ctx, task) {
     if (TERMINAL_REFUSALS[kind]) {
       return {
         id: task.id, outcome: TERMINAL_REFUSALS[kind], attempts, ms: Date.now() - started, log: logPath,
+        // THE KIND TRAVELS WITH THE RESULT, not only the outcome it maps to
+        // (TL-212). Three refusals share the outcome `needs-person` and they do
+        // not share an ending: a contract asking a person to VOUCH leaves work
+        // that is finished, while a missing contract or a broken criterion link
+        // leaves a task file nobody has written properly. The caller parks those
+        // in two different places and cannot tell them apart from the outcome.
+        refusalKind: kind,
         detail: verdict.refusal || "`" + N + " done` refused: " + kind,
       };
     }
@@ -687,6 +734,7 @@ function renderReport(report, plan) {
   lines.push("");
   lines.push("  " + report.taken.length + " task(s) taken · " + tally.closed + " closed · " +
     tally.blocked + " blocked · " +
+    (tally.awaitingVouch ? tally.awaitingVouch + " awaiting a vouch · " : "") +
     (tally.closedElsewhere ? tally.closedElsewhere + " closed elsewhere · " : "") +
     (tally.heldElsewhere ? tally.heldElsewhere + " held elsewhere · " : "") +
     Math.round(report.ms / 1000) + "s");
@@ -696,7 +744,12 @@ function renderReport(report, plan) {
     // part in it was declining to write over that (TL-191). `held-elsewhere`
     // does NOT (TL-192): nothing was proven, the task is still open, and the
     // warning mark is what tells the eye those two are different endings.
-    const mark = r.outcome === "closed" || r.outcome === "closed-elsewhere" ? MARK.ok
+    // `awaiting-vouch` reads as an ok for the same reason as the first (TL-212):
+    // the work is finished and nothing about the run went wrong — what is left is
+    // a signature, and a warning mark beside it would restate the very confusion
+    // between "cannot move" and "needs thirty seconds" this ending removes.
+    const mark = r.outcome === "closed" || r.outcome === "closed-elsewhere" ||
+      r.outcome === "awaiting-vouch" ? MARK.ok
       : r.outcome === "agent-never-ran" ? MARK.err : MARK.warn;
     lines.push("  " + mark + " " + r.id + "  " + r.outcome + "  " + r.attempts +
       " attempt" + (r.attempts === 1 ? "" : "s") + "  " + Math.round(r.ms / 1000) + "s");
@@ -928,9 +981,15 @@ export function run(argv) {
   const cwd = repoRootFor(root);
   const ctx = { root, config, actor, cwd, plan };
 
+  // Where a task whose contract ends in a `manual:` entry is parked (TL-212).
+  // Null when this backlog has not declared one, and then nothing changes: such
+  // a task goes where it went before, and the run says so once, per task, rather
+  // than filing finished work under failure in silence.
+  const vouchStatus = config.awaitingVouchStatus || null;
+
   const started = Date.now();
   const taken = [];
-  const tally = { closed: 0, blocked: 0, closedElsewhere: 0, heldElsewhere: 0 };
+  const tally = { closed: 0, blocked: 0, awaitingVouch: 0, closedElsewhere: 0, heldElsewhere: 0 };
   let stopped = "the queue is empty";
   // The one result that ends the run without being a fact about a task (TL-184).
   let neverStarted = null;
@@ -1003,8 +1062,27 @@ export function run(argv) {
     if (result.outcome === "closed") {
       tally.closed++;
     } else {
-      const reason = blockedReason(result.attempts, result.detail);
-      const blocked = writeStatus({ root, config, id: task.id, actor, reason, status: stuck.status });
+      // WORKED, UNVERIFIED IS NOT FAILED (TL-212). A contract that ends in a
+      // `manual:` entry is one an agent can satisfy to the last automatic line
+      // and still not close, because the last line asks for a person. Parking
+      // that in the status this project protects with a reason says the work
+      // failed, and the reader who acts on the panel then sees a whole task where
+      // thirty seconds of checking is what is actually theirs.
+      //
+      // ONLY THIS ONE REFUSAL. `no-contract` and `criteria` share the outcome
+      // `needs-person` and are the opposite case: nothing was verified because
+      // the task FILE is not finished, and there is no work to vouch for.
+      const toVouch = result.refusalKind === "manual-needs-person" && !!vouchStatus;
+      if (result.refusalKind === "manual-needs-person" && !vouchStatus) {
+        console.error(warn(task.id + ": its contract asks a person to vouch, and this backlog declares no " +
+          "`awaiting_vouch_status` — parking it as `" + stuck.status + "`, which says the work failed"));
+      }
+      const reason = toVouch
+        ? vouchReason(result.detail)
+        : blockedReason(result.attempts, result.detail);
+      const blocked = writeStatus({
+        root, config, id: task.id, actor, reason, status: toVouch ? vouchStatus : stuck.status,
+      });
       if (blocked.reason === "closed-elsewhere") {
         // NOT a failure of this run and not a task it may park: somebody closed
         // it while the agents were working (TL-191). It is counted apart from
@@ -1028,6 +1106,19 @@ export function run(argv) {
         result.detail = blocked.message;
       } else if (!blocked.ok) {
         console.error(warn(task.id + ": " + blocked.message));
+      } else if (toVouch) {
+        // Counted apart from `blocked` and that is the whole point (TL-212): a
+        // summary line that adds the two together is the sentence the panel was
+        // repeating — ten rows of "cannot move" for five tasks that only need a
+        // signature.
+        tally.awaitingVouch++;
+        // A FOURTH ENDING, named like the other two the run distinguishes. The
+        // outcome is only renamed once the park has actually happened: a backlog
+        // that declares no vouch status ends the same task as `needs-person`,
+        // which is still true of it, and nothing downstream reads an ending this
+        // run did not reach.
+        result.outcome = "awaiting-vouch";
+        result.status = blocked.status;
       } else {
         tally.blocked++;
         result.status = blocked.status;

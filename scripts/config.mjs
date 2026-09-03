@@ -106,6 +106,24 @@ export const DEFAULTS = Object.freeze({
   // picking one by guesswork would write into somebody's tree a value they never
   // chose, and it would do it unattended.
   in_progress_status: null,
+  // Which status means "the work is done and a PERSON still has to vouch for it"
+  // (TL-212). A task whose contract ends in a `manual:` entry can be written by
+  // an agent to the last line and still cannot be closed by one — `done` refuses,
+  // correctly, because nobody was there to vouch. Without this key the only place
+  // an unattended run had to put such a task was the status that means FAILURE,
+  // and the result was a queue of finished work filed under "cannot move".
+  //
+  // `null` — the default — means the project has not declared one, and then
+  // nothing changes: the run parks such a task where it parked it before. There
+  // is deliberately NO default word, unlike `in_progress_status`: `blocked` and
+  // `in_progress` are in everybody's vocabulary and this state is in nobody's,
+  // so a guess here would write a status the project never chose.
+  //
+  // A dispatcher does NOT hand this status out (`queueStatuses`) — the task is
+  // not work any more, it is evidence waiting for a signature. Whether entering
+  // it needs a stated sentence is a separate question, and the project answers it
+  // by listing the status in `reason_required_statuses` or leaving it out.
+  awaiting_vouch_status: null,
   // ── Time measurement (TL-27) ────────────────────────────────────────────
   // The whole set is declared HERE and now, although only `activity_privacy` is
   // read yet: an unknown key FAILS, so adding these one task at a time would be
@@ -637,6 +655,10 @@ export function loadConfig(root, opts = {}) {
     inProgressStatus:
       values.in_progress_status ||
       (values.statuses.indexOf(DEFAULT_IN_PROGRESS_STATUS) >= 0 ? DEFAULT_IN_PROGRESS_STATUS : null),
+    // No fallback of any kind, deliberately (TL-212): a project that has not
+    // named this status does not have one, and the run says so instead of
+    // inventing a word.
+    awaitingVouchStatus: values.awaiting_vouch_status || null,
     lockTtlMinutes: values.lock_ttl_minutes,
     abandonedAfterDays: values.abandoned_after_days,
     crossBranchState: values.cross_branch_state,
@@ -707,6 +729,31 @@ export function validateConfig(config) {
     problems.push(
       "`in_progress_status` = `" + config.inProgressStatus + "`, which is also in `archived_statuses`"
     );
+  }
+  // The three ways `awaiting_vouch_status` can be a word that does not mean what
+  // the key means (TL-212). Checked here rather than at the one caller for the
+  // same reason as the pair above: a configuration that says this is broken for
+  // everybody, not for whoever happened to run `run` first.
+  if (config.awaitingVouchStatus) {
+    if (config.statuses.indexOf(config.awaitingVouchStatus) < 0) {
+      problems.push(
+        "`awaiting_vouch_status` = `" + config.awaitingVouchStatus + "`, which is not in `statuses`"
+      );
+    }
+    if (config.archivedStatuses.indexOf(config.awaitingVouchStatus) >= 0) {
+      // Parking a task there would CLOSE it, on the strength of a vouch nobody
+      // gave — the one substitution the whole gate exists to prevent.
+      problems.push(
+        "`awaiting_vouch_status` = `" + config.awaitingVouchStatus + "`, which is also in `archived_statuses`"
+      );
+    }
+    if (config.awaitingVouchStatus === config.inProgressStatus) {
+      // The park would write the status the task already has, so a run would
+      // report a move that never happened.
+      problems.push(
+        "`awaiting_vouch_status` = `" + config.awaitingVouchStatus + "`, which is also `in_progress_status`"
+      );
+    }
   }
   if (!Number.isFinite(config.lockTtlMinutes) || config.lockTtlMinutes <= 0) {
     problems.push("`lock_ttl_minutes` = `" + config.lockTtlMinutes + "` — expecting a positive number of minutes");

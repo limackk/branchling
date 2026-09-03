@@ -1,1 +1,4 @@
 {"id":"01M1M19W5ZCXP0A6G3XVENTWS6","ts":"2026-09-03T16:23:17.951Z","task":"TL-212","field":"__created__","from":"","to":"A task needing a person to vouch is not a task needing a person to do it","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1M5PSJRNE87PCZ6WJBANFSH","ts":"2026-09-03T17:40:15.576Z","task":"TL-212","field":"status","from":"pending","to":"in_progress","actor":"agent:sub-d","source":"take","reason":"unknown","session":"tree-027687c57be4"}
+{"id":"01M1M5PSJRNK20T5F10XYSYE32","ts":"2026-09-03T17:40:15.576Z","task":"TL-212","field":"owner","from":"unassigned","to":"agent:sub-d","actor":"agent:sub-d","source":"take","reason":"unknown","session":"tree-027687c57be4"}
+{"id":"01M1M6MW0CN93C1FYD2EN0B156","ts":"2026-09-03T17:56:41.100Z","task":"TL-212","field":"status","from":"in_progress","to":"done","actor":"agent:sub-d","source":"done","reason":"proven","session":"tree-027687c57be4"}

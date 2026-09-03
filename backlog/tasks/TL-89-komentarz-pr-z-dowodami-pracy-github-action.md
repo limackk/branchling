@@ -8,7 +8,7 @@ epic: "Agentic differentiators"
 priority: P2
 status: in_progress
 owner: agent:claude
-executor: "human"
+executor: ""
 estimate: 1d
 confidence: medium
 created: 2026-08-31

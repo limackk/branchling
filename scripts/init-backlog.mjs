@@ -128,6 +128,14 @@ title_max_length: 60               # [free]
 # this is, or those two commands refuse rather than pick one for you.
 # in_progress_status: in_progress
 
+# [free] Where \`${N} run\` parks a task whose WORK is finished and whose
+# \`verification:\` ends in a \`manual:\` entry only a person can vouch for. Both the
+# status and the name are yours; add the word to \`statuses:\` above first.
+# Commented out because there is no default for it — with no value, such a task
+# is parked wherever a failing one goes, which says the work failed. A dispatcher
+# never hands this status out.
+# awaiting_vouch_status: awaiting_vouch
+
 # [free] How long a task reservation is honoured, in minutes. A session that is
 # killed leaves its lock behind; after this long the next caller takes it over
 # and says so. The reservation is local to one machine — see \`${N} take --help\`.

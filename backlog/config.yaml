@@ -20,9 +20,21 @@ task_id_prefix: TL
 
 
 # Task statuses. The ORDER matters — it is how the views are sorted.
-statuses: [pending, in_progress, blocked, done, cancelled]
+statuses: [pending, in_progress, awaiting_vouch, blocked, done, cancelled]
 # Which statuses drop out of INDEX into archive/ and stop counting for the queue.
 archived_statuses: [done, cancelled]
+
+# Where a task goes when the WORK is finished and the contract's last word is a
+# `manual:` entry only a person can vouch for (TL-212). It sits directly after
+# `in_progress` above because that is what it is: what in_progress becomes when
+# there is nothing left for an agent to do.
+#
+# It is NOT in `reason_required_statuses` below, and that is a decision rather
+# than an omission. The content of this state is the `manual:` entry itself,
+# which `done` already writes into `backlog/history/` as `__unverified__` when it
+# refuses — a second sentence demanded at the write would restate it. `next` skips
+# the status on its own rule (`queueStatuses`): the task is not work any more.
+awaiting_vouch_status: awaiting_vouch
 
 # Statuses that may not be entered without a stated reason (TL-105). The code
 # knows the SHAPE of the rule, this line knows the VALUES. With the key absent

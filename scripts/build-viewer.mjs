@@ -460,6 +460,13 @@ export function buildHtml(
        this is a fact about the heartbeat log, not about a status. */
     --in-flight: #059669;
     --in-flight-bg: rgba(5, 150, 105, 0.13);
+    /* "Worked, and waiting for somebody to sign" (TL-212). A token for the same
+       reason as the two above: it marks a fact about the VERIFICATION — an
+       unsigned \`manual:\` entry — and a status colour would tie it to one
+       project's vocabulary. Deliberately not \`--in-flight\`: nobody is on this
+       one, which is the whole difference. */
+    --vouch: #0F766E;
+    --vouch-bg: rgba(15, 118, 110, 0.10);
 ${paletteVarCss}
   }
   @media (prefers-color-scheme: dark) {
@@ -481,6 +488,8 @@ ${paletteVarCss}
       --foreign-bg: rgba(232, 162, 93, 0.12);
       --in-flight: #34D399;
       --in-flight-bg: rgba(52, 211, 153, 0.15);
+      --vouch: #5EEAD4;
+      --vouch-bg: rgba(94, 234, 212, 0.11);
     }
   }
   html, body { margin: 0; padding: 0; height: 100%; }
@@ -1794,13 +1803,16 @@ ${paletteBadgeCss}
     cursor: pointer;
   }
   .dec-filter.is-on { background: var(--accent-soft); border-color: var(--accent); color: var(--fg); }
-  /* TWO KINDS, TWO SHAPES (TL-205). A question is a paragraph somebody has to
-     think about; a task marked for a person has nothing to read and one action.
+  /* THREE KINDS, THREE SHAPES (TL-205, TL-212). A question is a paragraph
+     somebody has to think about; a task marked for a person has nothing to read
+     and one action; a vouch is finished work with one line to check.
      Rendered as the same bordered box they cost the same to scan, so the reader
      had to open every row to learn which was which. An ELEVATED card carries a
      question; a FLAT line carries a marked task, and the difference in vertical
-     rhythm (14px against 2px) is visible before a word is read.
-     The ORDER is untouched: both kinds stay in ONE list sorted by what the
+     rhythm (14px against 2px) is visible before a word is read. A vouch sits
+     between them — inset, not elevated — because it is neither a decision to make
+     nor work to start.
+     The ORDER is untouched: every kind stays in ONE list sorted by what the
      decision releases (TL-115), because grouping by kind would put a question
      that frees nothing above a task that frees nine. */
   .dec-q {
@@ -1825,6 +1837,37 @@ ${paletteBadgeCss}
     border-radius: 0 8px 8px 0;
   }
   .dec-t:hover { background: var(--bg-card); border-left-color: var(--fg-muted); }
+  /* WORKED, WAITING FOR A SIGNATURE (TL-212). Tinted rather than elevated: the
+     tint says "this one is different" at a glance, and the absence of a shadow
+     says it is not asking to be thought about. */
+  .dec-v {
+    border-left: 3px solid var(--vouch);
+    background: var(--vouch-bg);
+    padding: 9px 14px 10px 13px;
+    margin: 6px 0;
+    border-radius: 0 8px 8px 0;
+  }
+  .dec-v .dec-src { align-items: baseline; }
+  /* The \`manual:\` entry's own words — the ONE thing the reader has to do, and
+     the only place it is written. Monospaced because it is quoted from a
+     contract, not prose the page wrote. */
+  .dec-do {
+    margin: 7px 0 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    line-height: 1.5;
+    max-width: 78ch;
+    color: var(--fg);
+  }
+  .dec-vtag {
+    flex: none;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    font-weight: 600;
+    color: var(--vouch);
+    white-space: nowrap;
+  }
   /* The provenance of a question, above it and quieter than it: which task it
      was asked on is context, the question is the text. */
   .dec-src { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 11px; }
@@ -5869,6 +5912,9 @@ window.addEventListener("resize", () => {
 function decisionRows() {
   const items = decisionPanel(ALL_TASKS, HISTORY, {
     archivedStatuses: CONFIG.archivedStatuses,
+    // The project's word for "worked, unverified" (TL-212), or nothing at all
+    // when it declares none — the page never invents one.
+    awaitingVouchStatus: CONFIG.awaitingVouchStatus,
     now: Date.now(),
     // \`servedRoles\` is deliberately NOT passed: the map of roles to agent
     // commands lives in somebody's \`run\` invocation and the page has never seen
@@ -5890,14 +5936,19 @@ function renderDecisions() {
     // THE LEDE CARRIES WHAT IS CONSTANT so the rows do not have to (TL-205): a
     // card is a question to answer, a plain line is a task somebody marked for
     // a person. Stated once here, it is not repeated eleven times below.
-    '<p class="dec-lede">Work that cannot move until a person decides. A <strong>card</strong> is a question ' +
+    // THE HEADING NO LONGER CLAIMS EVERY ROW IS STUCK (TL-212). Half of them
+    // were finished work waiting for a signature, and calling that "cannot move"
+    // is what made the count above it a number of the wrong thing.
+    '<p class="dec-lede">Work that needs you. A <strong>card</strong> is a question ' +
     "somebody asked that nothing has answered; a <strong>plain line</strong> is a task marked for a person, " +
-    "with nothing to read and one thing to do. Ordered by how many tasks the decision would release, " +
-    "counted through the chain — not by age.</p>";
+    "with nothing to read and one thing to do; a <strong>tinted row</strong> is work an agent already " +
+    "finished, waiting only for you to check the one line printed on it. Ordered by how many tasks the " +
+    "decision would release, counted through the chain — not by age.</p>";
 
   if (!rows.length) {
     host.innerHTML = head + '<p class="dec-empty">Nothing is waiting on a person. A task gets here by ' +
-      'carrying <code>executor: human</code>, or when a handoff leaves a question nobody has answered yet.</p>';
+      'carrying <code>executor: human</code>, when a handoff leaves a question nobody has answered yet, ' +
+      'or when a run finishes the work and stops at a <code>manual:</code> entry only you can vouch for.</p>';
     updateDecisionsCount();
     return;
   }
@@ -5921,6 +5972,28 @@ function renderDecisions() {
         '<div class="dec-meta">asked by ' + escapeHtmlStr(r.asker || "somebody") + age + "</div>" +
         decisionForm(r.id, r.eventId, r.options.length ? "menu" : "question") +
         "</article>";
+    }
+    if (r.kind === "vouch") {
+      // THE CONTRACT'S OWN WORDS, and nothing invented where there are none: a
+      // task moved into this status by hand has no \`__unverified__\` event behind
+      // it, and a sentence the page made up would read exactly like a quotation.
+      const age = r.ageDays === null ? "" :
+        (r.ageDays === 0 ? "today" : r.ageDays + " day" + (r.ageDays === 1 ? "" : "s") + " ago");
+      const asked = r.manual
+        ? '<p class="dec-do">' + escapeHtmlStr(r.manual) + "</p>"
+        : '<p class="dec-do">The contract asks for a vouch; the entry\\'s text is not in this task\\'s ' +
+          "history. Open the task and read its <code>verification:</code> block.</p>";
+      // \`done\` is named because it is the ONE way back in, and it re-runs the
+      // whole contract — the automatic entries may have gone stale while the task
+      // sat here, so a shortcut that recorded the vouch alone would close a task
+      // on evidence nobody re-checked.
+      const meta = '<div class="dec-meta">the agent\\'s work stands — check the line above, then ' +
+        "<code>${N} done " + escapeHtmlStr(r.id) + "</code>" +
+        (age ? " · parked " + age : "") + "</div>";
+      return '<div class="dec-v">' +
+        '<div class="dec-src">' + srcHead(r) +
+        '<span class="dec-vtag">awaiting your vouch</span>' + unblocks + "</div>" +
+        asked + meta + "</div>";
     }
     // ONLY THE EXCEPTION IS SPELLED OUT. \`marked executor: human\` was on nearly
     // every one of these rows; the flat shape and the lede now say it, and the
@@ -6073,7 +6146,10 @@ function toggleDecisionsMine() {
 function updateDecisionsCount() {
   const tab = document.getElementById("tabDecisions");
   if (!tab) return;
-  const n = decisionPanel(ALL_TASKS, HISTORY, { archivedStatuses: CONFIG.archivedStatuses }).length;
+  const n = decisionPanel(ALL_TASKS, HISTORY, {
+    archivedStatuses: CONFIG.archivedStatuses,
+    awaitingVouchStatus: CONFIG.awaitingVouchStatus,
+  }).length;
   tab.innerHTML = "Waiting on you" + (n ? '<span class="tab-count">' + n + "</span>" : "");
 }
 

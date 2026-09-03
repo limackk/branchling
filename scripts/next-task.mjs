@@ -123,14 +123,26 @@ export function parseNextArgs(args) {
  *
  * DERIVED from vocabulary the project has already declared, rather than asking
  * for one more key: `statuses` minus `archived_statuses` minus
- * `in_progress_status` minus `reason_required_statuses`. Every one of those
- * lists already means something in this backlog, and a fifth key would be a
- * fourth place to keep the same decision in sync.
+ * `in_progress_status` minus `reason_required_statuses` minus
+ * `awaiting_vouch_status`. Every one of those lists already means something in
+ * this backlog, and a key of its own for the queue would be one more place to
+ * keep the same decision in sync.
+ *
+ * THE VOUCH STATUS IS EXCLUDED BY ITS OWN RULE (TL-212), not by asking the
+ * project to also list it under `reason_required_statuses`. A task waiting for a
+ * person to vouch has already been worked: handing it out again would spend a
+ * whole agent budget re-doing finished work and arrive at the same refusal. That
+ * the exclusion does not run through `reason_required_statuses` is what keeps
+ * "must a sentence be stated to enter it" a question the project still answers
+ * for itself — the two are different decisions and only one of them is ours.
  */
 export function queueStatuses(config) {
   const inProgress = inProgressStatus(config);
+  const awaitingVouch = config.awaitingVouchStatus || null;
   const protectedOnes = new Set(config.reasonRequiredStatuses || []);
-  return config.activeStatuses.filter((s) => s !== inProgress && !protectedOnes.has(s));
+  return config.activeStatuses.filter(
+    (s) => s !== inProgress && s !== awaitingVouch && !protectedOnes.has(s)
+  );
 }
 
 /**

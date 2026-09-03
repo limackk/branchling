@@ -8,7 +8,7 @@ epic: "CLI surface"
 priority: P3
 status: pending
 owner: unassigned
-executor: "human"
+executor: ""
 estimate: 4h
 confidence: medium
 created: 2026-08-31
