@@ -483,3 +483,38 @@ export function calibrationSamples(root, tasks, config) {
       };
     });
 }
+
+/**
+ * The same list as `calibrationSamples()`, with the cost axis attached (TL-88).
+ *
+ * TOKENS COME FROM THE RAW ROWS, NOT FROM THE AGGREGATE, and that is a
+ * limitation worth stating rather than hiding. §9 froze the versioned rollup at
+ * five fields, so per-task token totals exist only where the raw log still does
+ * — which means they are local to one machine and disappear at
+ * `activity_retention_days`. A forecast therefore says "no token column" on a
+ * fresh clone and on an old task, instead of a zero.
+ *
+ * `applyReassignments` has already run inside `readAllActivity`, so a correction
+ * moves a session's tokens with the work they belong to.
+ */
+export function forecastSamples(root, tasks, config, env = process.env) {
+  const rowsByTask = readAllActivity(root, env);
+  return calibrationSamples(root, tasks, config).map((s) => {
+    const byModel = new Map();
+    for (const r of rowsByTask[s.id] || []) {
+      const inTok = Number.isInteger(r.tokens_in) ? r.tokens_in : 0;
+      const outTok = Number.isInteger(r.tokens_out) ? r.tokens_out : 0;
+      if ((!inTok && !outTok) || !r.model) continue;
+      const cell = byModel.get(r.model) || { model: r.model, tokens_in: 0, tokens_out: 0 };
+      cell.tokens_in += inTok;
+      cell.tokens_out += outTok;
+      byModel.set(r.model, cell);
+    }
+    const rollup = readRollup(root, s.id);
+    return {
+      ...s,
+      unknown_ratio: rollup && typeof rollup.unknown_ratio === "number" ? rollup.unknown_ratio : null,
+      models: [...byModel.values()].sort((a, b) => a.model.localeCompare(b.model)),
+    };
+  });
+}

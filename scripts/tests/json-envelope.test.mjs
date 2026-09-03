@@ -119,6 +119,11 @@ const READING = {
   // and still an envelope, with `session: null` and a non-zero exit. A consumer
   // must not have to parse stderr to learn that.
   session: ["session", "no-such-session", "--json"],
+  // A forecast on a backlog whose bucket is empty (TL-88): "not enough data" is
+  // an ANSWER and still a complete envelope with `insufficient: true`. The
+  // fixture's own first task is quoted, because the id has to exist — a missing
+  // task exits 1 and would exercise the refusal instead.
+  quote: ["quote", "TL-1", "--json"],
 };
 
 /**

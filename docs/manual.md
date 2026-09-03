@@ -527,6 +527,7 @@ implementation detail. Every reading command answers in the same envelope:
 | Command | `kind` | Payload |
 |---|---|---|
 | `query` | `task-list` | `tasks`, `total` (matches BEFORE `--limit`), `limit`, `scan`, `modifiedFile`, `elsewhereOnly` (the tasks only another branch has) |
+| `quote` | `quote` | `root`, `quote` (the forecast: the bucket used, whether it degraded, the sample count, the time range, the per-model token cells and the share of unattributed minutes behind it) |
 | `stats` | `stats` | `root`, `stats` (the tallies), `scan`, `divergent` (one row per task another branch disagrees with), `elsewhereOnly` (the tasks only another branch has), `calibration` (null unless `--calibration` or `--correlation-only`: the step-0 gate, the buckets, and what never reached one) |
 | `doctor` | `doctor` | `ok`, `root`, `next`, `checks` |
 | `check` | `check` | `ok`, `root`, `failed` (the guards that failed), `guards` |

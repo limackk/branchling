@@ -96,6 +96,10 @@ export const KINDS = {
   // `output` beside each guard is text written for a PERSON and may be reworded;
   // `name`, `ok` and `exit` are the contract.
   check: { ok: null, root: null, failed: [], guards: [] },
+  // `quote --json` (TL-88). One key, because the forecast is one object and
+  // spreading it across the root would put `n` and `bucket` next to the
+  // envelope's own fields — where a future key called `task` would collide.
+  quote: { root: null, quote: null },
   // `doctor --json`. `ok` is the answer CI reads; `checks` is why.
   doctor: { ok: null, root: null, next: null, checks: [] },
   // `board --json`. `rule` and `matched` are null exactly when `isDefault` is

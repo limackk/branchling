@@ -6,7 +6,7 @@ labels: []
 board: main
 epic: "Agent-facing differentiators"
 priority: P2
-status: in_progress
+status: done
 owner: agent:claude
 estimate: 1d
 confidence: medium
@@ -17,7 +17,12 @@ blocks: []
 related_docs:
   - docs/backlog-time-tracking.md
 verification:
-  - bash: "node --test scripts/tests/quote.test.mjs"
+  - id: quote-fixtures
+    bash: "node --test scripts/tests/quote.test.mjs"
+  - id: quote-answers
+    bash: "node scripts/cli.mjs quote TL-88 --json | node -e \"let s='';process.stdin.on('data',c=>s+=c).on('end',()=>{const q=JSON.parse(s).quote;if(!('insufficient' in q)||!('bucket' in q)||!('tokens' in q))throw new Error('the envelope lost a key the text output shows');console.log('bucket:',q.bucket,'n:',q.n)})\""
+  - id: quote-end-to-end
+    bash: "node --test scripts/tests/quote-command.test.mjs"
 ---
 
 ## Goal
@@ -90,17 +95,18 @@ is exceeded. Do not fold this in here.
 
 ## Acceptance criteria
 
-- [ ] A bucket with `n` below the threshold gives "not enough data", never a
-      number.
-- [ ] The answer is always a range; never a single average.
-- [ ] No cost adapter = no token column in the output.
-- [ ] A dollar amount is not produced from `subscription` data; `local` data
-      gives a declared zero, distinguishable from missing data.
-- [ ] A bucket with data from more than one model does not average tokens
-      across models.
-- [ ] `--json` carries the same fields as the text output.
-- [ ] Tests do not assert values from this project's own data — dedicated
-      fixtures (rule from CLAUDE.md).
+- [x] A bucket with `n` below the threshold gives "not enough data", never a
+      number. [proof: quote-fixtures]
+- [x] The answer is always a range; never a single average. [proof: quote-fixtures]
+- [x] No cost adapter = no token column in the output. [proof: quote-fixtures]
+- [x] A dollar amount is not produced from `subscription` data; `local` data
+      gives a declared zero, distinguishable from missing data. [proof: quote-fixtures]
+- [x] A bucket with data from more than one model does not average tokens
+      across models. [proof: quote-fixtures]
+- [x] `--json` carries the same fields as the text output. [proof: quote-answers]
+- [x] A task with no estimate is an input error, not an empty answer. [proof: quote-fixtures, quote-end-to-end]
+- [x] Tests do not assert values from this project's own data — dedicated
+      fixtures (rule from CLAUDE.md). [proof: quote-fixtures]
 
 ## Log
 

@@ -713,3 +713,47 @@ has 0 measured samples here, and the token axis starts from the same zero. Both
 become answerable from the same data, which is the point of having two axes
 recorded by one mechanism; neither is answerable today, and this document says
 so instead of picking a winner.
+
+## 20. What is implemented (2026-09-02, TL-88)
+
+`worktrail quote <ID>` — the same distribution, read forwards.
+
+- **It computes nothing of its own.** The same buckets, the same `min_report_n`,
+  the same refusals as §11. Two answers to one question would leave nothing to
+  say which was right, so the forecast is the calibration inverted and not a
+  second implementation of it.
+- **The bucket is estimate x type, falling back to the estimate alone**, and the
+  fallback is PRINTED. A two-hour `bug` and a two-hour `code` task are not
+  obviously the same animal, so the narrow cell is tried first; a fallback
+  nobody can see is indistinguishable from a narrower answer than the tool
+  actually has. When neither cell fills, the `n` reported is the WIDEST one —
+  the best case that exists, not the first cell looked in.
+- **Tokens are the primary axis and the amount is a conditional derivative.** No
+  adapter means no token column — `null`, not an empty list and never zeroes.
+  A subscription gives tokens with no amount and the reason; a local model gives
+  a declared zero.
+- **A bucket never mixes models.** Each model is its own cell with its own `n`,
+  and a thin cell says "not enough data" rather than borrowing the other
+  model's samples. The in/out split used to price a range is the BUCKET's, not
+  the quoted task's — a forecast cannot know its own split, and the bucket's is
+  the only honest reading.
+- **The share of unattributed minutes travels with the forecast.** A number that
+  hides how much of its input was guesswork is a metric asserting its own
+  trustworthiness (§8.2). It is `null`, not 0, when no sample carried one.
+- **A task with no estimate is an INPUT error (exit 2)**, not "not enough data":
+  it names no bucket at all, and blaming the backlog for an empty field would
+  send the reader to look for data instead of to the frontmatter. "Not enough
+  data" exits 0 — a refusal for want of samples is an answer, and a non-zero
+  exit would make it look to a pipeline like a broken command.
+
+**Token totals per task come from the RAW rows, and that is a stated limit.** §9
+froze the versioned aggregate at five fields, so a per-task token total exists
+only where the raw log still does — local to one machine, and gone at
+`activity_retention_days`. A fresh clone therefore gets a time forecast and no
+token column, which is the honest answer rather than a zero. Moving tokens into
+the versioned aggregate is a decision about what may leave a person's machine
+(§9), not a gap in this command.
+
+**Out of scope, deliberately:** a `budget:` field in the frontmatter and a hook
+warning when a multiple of the forecast is exceeded. That is a separate task,
+once the forecast has proved out against data this tree does not yet have.
