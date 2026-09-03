@@ -218,6 +218,23 @@ wave; **unplanned** are the open tasks the plan does not schedule — listed by 
 because that is how a plan rots; **stale** are plan tasks already closed in a
 later wave, the sign that the order wants reshuffling.
 
+**A wave that ends on a person says so.** A task carrying `executor: human` is
+one no unattended run can take, so `next up` marks its row and the wave carries
+`endsOnHuman` — otherwise a wave stalled waiting for somebody prints exactly
+like a wave waiting for work, and the fleet's own account of what it could not
+take disappears with the run. In `--json` every `nextUp` entry carries
+`waitsOnHuman` beside `executors`, which is what a dispatcher decides on when it
+asks whether to keep polling. Nothing is filtered, reordered or hidden by any of
+it: `executor:` gates the dispatcher, and the plan reports the order somebody
+decided.
+
+```
+next up (wave 2 — Consumers):
+  TASK-18
+  TASK-20  — asks for an executor an unattended run is not (human)
+  this wave ends on a person — an unattended run cannot close it on its own
+```
+
 **Asking the dispatcher to follow it** is `--plan`, on `next` and on `run`. The
 queue then holds only what the plan schedules, and only the earliest wave still
 holding an open task; inside that wave priority and id decide as they always

@@ -97,7 +97,8 @@ test("every task in the plan closed: no active wave, and nothing is next up", ()
 
 test("a `together` group is ONE entry, and only when every open member is ready", () => {
   const ready = state(THREE_WAVES, [t("TL-1", "done"), t("TL-2"), t("TL-3"), t("TL-4")]);
-  assert.deepEqual(ready.nextUp, [{ together: true, ids: ["TL-2", "TL-3"] }]);
+  assert.deepEqual(ready.nextUp,
+    [{ together: true, ids: ["TL-2", "TL-3"], executors: [], waitsOnHuman: false }]);
 
   // TL-3 waits on something open, so the GROUP is not next up — half a group is
   // not the one act `together:` describes.
@@ -110,7 +111,8 @@ test("a `together` group is ONE entry, and only when every open member is ready"
 test("a task waiting on an open blocker is not next up; a closed blocker does not hold it", () => {
   const plan = ["waves:", '  - name: "A"', "    tasks: [TL-2, TL-3]", ""].join("\n");
   const blocked = state(plan, [t("TL-2", "pending", ["TL-9"]), t("TL-3"), t("TL-9")]);
-  assert.deepEqual(blocked.nextUp, [{ together: false, ids: ["TL-3"] }]);
+  assert.deepEqual(blocked.nextUp,
+    [{ together: false, ids: ["TL-3"], executors: [], waitsOnHuman: false }]);
 
   const cleared = state(plan, [t("TL-2", "pending", ["TL-9"]), t("TL-3"), t("TL-9", "done")]);
   assert.deepEqual(cleared.nextUp.map((e) => e.ids[0]), ["TL-2", "TL-3"]);
@@ -150,7 +152,7 @@ test("stale = a plan task already closed in a wave AFTER the active one", () => 
 test("a plan naming a task that is not in the tree marks it, rather than dropping it", () => {
   const s = state(THREE_WAVES, [t("TL-1", "done"), t("TL-2"), t("TL-3")]);
   const missing = s.waves[2].tasks[0];
-  assert.deepEqual(missing, { id: "TL-4", status: null, known: false, open: false });
+  assert.deepEqual(missing, { id: "TL-4", status: null, known: false, open: false, executor: "" });
 });
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -270,7 +272,8 @@ test("POSITIVE CONTROL: a real plan reports a wave, a next-up group and the unpl
       const answer = JSON.parse(run(["--dir", dir, "--json"]).out);
       assert.equal(answer.exists, true);
       assert.equal(answer.activeWave, 1);
-      assert.deepEqual(answer.nextUp, [{ together: true, ids: ["TL-2", "TL-3"] }]);
+      assert.deepEqual(answer.nextUp,
+        [{ together: true, ids: ["TL-2", "TL-3"], executors: [], waitsOnHuman: false }]);
       assert.deepEqual(answer.unplanned, [{ id: "TL-9", status: "pending" }]);
       assert.deepEqual(answer.inProgress, [{ id: "TL-2", wave: 1, status: "in_progress" }]);
       // The text and the JSON are the SAME computation, not two readings of it.
