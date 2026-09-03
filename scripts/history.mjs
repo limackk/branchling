@@ -670,7 +670,16 @@ export function recordEdit(backlogDir, opts) {
   // never sees a snapshot that has moved past entries nobody has written yet.
   return withMutex(snapshotSection(backlogDir), () => {
     appendEntries(backlogDir, taskId, entries);
-    const snap = loadSnapshot(backlogDir) || { version: 1, tasks: {} };
+    // A SNAPSHOT THIS ROUTE CREATES COVERS ONE TASK, AND SAYS SO (TL-180). Every
+    // writing command comes through here, and `.snapshot.json` is computed, so
+    // it is gitignored and never travels: in a fresh worktree the first `next`
+    // or `take` is what brings the reference point into existence, holding the
+    // single task it just wrote. Unmarked, that file claims to be a reference
+    // point for the whole tree, and every other task reads as "absent from the
+    // snapshot" — which `reconcile` cannot then tell apart from "created here".
+    // The flag is that missing fact; the first pass over the whole tree clears
+    // it, because such a pass really does cover everything.
+    const snap = loadSnapshot(backlogDir) || { version: 1, partial: true, tasks: {} };
     snap.tasks[taskId] = pickTracked(after);
     saveSnapshot(backlogDir, snap);
     return entries;
@@ -697,9 +706,13 @@ export function recordEdit(backlogDir, opts) {
  *        the whole tree, or it leaves 193 tasks in a state where their edits are
  *        absorbed unrecorded (TL-185). `dryRun` computes the entries and writes
  *        NOTHING — neither the log nor the snapshot.
- * @returns {{entries: object[], seeded: boolean, adopted: string[], dryRun?: boolean}}
+ * @returns {{entries: object[], seeded: boolean, adopted: string[], seeds: string[],
+ *           dryRun?: boolean}}
  *          `adopted` names the tasks taken into the snapshot on the log's word
  *          alone, for fields the log has never mentioned and cannot vouch for.
+ *          `seeds` names the tasks taken as a reference point with no evidence
+ *          at all — absent from a snapshot that never covered the tree, and
+ *          carrying an empty log (TL-180).
  */
 export function reconcile(backlogDir, opts = {}) {
   // WHY THE WHOLE FUNCTION AND NOT JUST THE SAVE (TL-214). What has to be
@@ -722,6 +735,10 @@ function reconcileLocked(backlogDir, opts) {
   const existing = loadSnapshot(backlogDir);
   const seeding = existing === null;
   const snap = existing || { version: 1, tasks: {} };
+  // A snapshot written by `recordEdit` in a tree that had none holds ONE task,
+  // and says so (TL-180). Until a pass covers the whole tree, absence from it
+  // carries no information about a task at all.
+  const partial = !seeding && existing.partial === true;
 
   const taskFiles = listTaskFiles(tasksDir);
   // BEFORE the diff, not after (TL-111): a prefix migration renamed every task,
@@ -736,6 +753,7 @@ function reconcileLocked(backlogDir, opts) {
   const seenIds = new Set();
   const entries = [];
   const adopted = [];
+  const seeds = [];
 
   for (const file of taskFiles) {
     const id = taskIdFromFile(file);
@@ -780,7 +798,20 @@ function reconcileLocked(backlogDir, opts) {
         // creation, not a repeat of the previous one — without this condition a
         // recreated task would never reach the history at all.
         const life = lastLifecycleEvent(hist);
-        if (!Object.keys(known).length || (life && life.field === FIELD_DELETED)) {
+        const recreated = !!life && life.field === FIELD_DELETED;
+        if (partial && !Object.keys(known).length && !recreated) {
+          // AN EMPTY LOG PROVES A CREATION ONLY AGAINST A SNAPSHOT THAT COVERED
+          // THE TREE (TL-180). Here it did not: it was created by one write, so
+          // the task may equally have arrived on the branch, from a checkout
+          // whose `history/*.jsonl` was never committed — which is how the
+          // incident of 2026-09-03 was set up. Both readings fit the evidence,
+          // and only one of them is recoverable: a missing `__created__` is
+          // written the moment somebody notices, while a false one signs
+          // somebody else's work in an append-only log forever. So this run
+          // takes the file as a reference point and claims nothing, and says
+          // out loud that it did — the silence is what made this invisible.
+          seeds.push(id);
+        } else if (!Object.keys(known).length || recreated) {
           entries.push(entry(id, FIELD_CREATED, "", meta.title || id, actor, source, ts, reason));
         } else {
           // THE HISTORY IS THE REFERENCE POINT WHEN THE SNAPSHOT HAS NONE
@@ -845,7 +876,12 @@ function reconcileLocked(backlogDir, opts) {
   // it, which is the defect TL-130 describes on the server's side. The snapshot
   // is left alone too — moving it forward is what makes a change invisible to
   // the person who is about to claim it.
-  if (opts.dryRun) return { entries, seeded: seeding, adopted, dryRun: true };
+  // A pass over the WHOLE tree is the coverage the flag says the snapshot lacks:
+  // every task present has just been written into it. A run narrowed by `only`
+  // is not — it skips the rest of the tree entirely — so the flag survives it.
+  if (!only) delete snap.partial;
+
+  if (opts.dryRun) return { entries, seeded: seeding, adopted, seeds, dryRun: true };
 
   // THE LOG FIRST, THE SNAPSHOT AFTER, and the order is the guarantee (TL-185):
   // a crash between the two loses the reference point, which the next run
@@ -854,7 +890,7 @@ function reconcileLocked(backlogDir, opts) {
   // one failure this whole mechanism exists to prevent.
   for (const e of entries) appendEntries(backlogDir, e.task, [e]);
   saveSnapshot(backlogDir, snap);
-  return { entries, seeded: seeding, adopted };
+  return { entries, seeded: seeding, adopted, seeds };
 }
 
 // ──────────────────────────────────────────────────────────────────────────

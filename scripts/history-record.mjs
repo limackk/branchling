@@ -120,7 +120,7 @@ if (attribute && !reasonFlag) {
   process.exit(2);
 }
 
-const { entries, seeded, adopted } = reconcile(BACKLOG_DIR, { actor, source, only, reason: reasonFlag || undefined });
+const { entries, seeded, adopted, seeds } = reconcile(BACKLOG_DIR, { actor, source, only, reason: reasonFlag || undefined });
 
 // WHAT RECONCILE COULD NOT SEE (TL-130). A change already written by somebody
 // else's reconcile — the running server's, typically — is no longer a DIFFERENCE
@@ -135,7 +135,7 @@ if (quiet) process.exit(0);
 if (seeded) {
   console.log(`${N} history: reference point (snapshot) created — no history entries written`);
 } else if (!entries.length) {
-  if (!unclaimed.length && !adopted.length) console.log(`${N} history: no changes to record`);
+  if (!unclaimed.length && !adopted.length && !seeds.length) console.log(`${N} history: no changes to record`);
 } else {
   console.log(`${N} history: recorded ` + entries.length + " change(s) (" + actor + "):");
   for (const e of entries.slice(0, 20)) {
@@ -143,6 +143,25 @@ if (seeded) {
     console.log("  " + e.task + " · " + e.field + ": " + fmt(e.from) + " → " + fmt(e.to));
   }
   if (entries.length > 20) console.log("  … and " + (entries.length - 20) + " more");
+}
+
+// TAKEN AS A REFERENCE POINT, WITH NOTHING TO GO ON (TL-180). These tasks were
+// absent from a snapshot that had never covered the whole tree — one written by
+// a single `next` or `take` in a fresh worktree — and their log is empty. That
+// is equally the shape of a task created here and of one that arrived on the
+// branch without its log, so the run declines to sign a `__created__` and
+// records the file as the reference point instead. Said out loud, because a
+// creation that never reaches the log is written the day somebody notices,
+// while a false one cannot be taken back.
+if (seeds.length) {
+  console.log(
+    `${N} history: ` + seeds.length + " task(s) taken as a reference point (seed) — no " +
+      "creation claimed:"
+  );
+  for (const id of seeds.slice(0, 20)) console.log("  " + id);
+  if (seeds.length > 20) console.log("  … and " + (seeds.length - 20) + " more");
+  console.log("  Their log is empty and this snapshot has never covered the tree, so nothing");
+  console.log("  here knows whether they were created in this checkout or arrived on the branch.");
 }
 
 // ABSORBED ON THE LOG'S WORD (TL-185). These tasks were not in the snapshot, so
