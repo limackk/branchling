@@ -1,0 +1,7 @@
+{"id":"01M1KM2BTEJ3VXPHMRCPQF149F","ts":"2026-09-03T12:32:00.334Z","task":"TL-203","field":"__created__","from":"","to":"The origin project's name is gone from the tree but not from the git objects","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1KM44Y0A5TW2YNBK1W88RVG","ts":"2026-09-03T12:32:58.816Z","task":"TL-203","field":"priority","from":"P1","to":"P0","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1KM44Y0P2MF95Q826TG79QA","ts":"2026-09-03T12:32:58.816Z","task":"TL-203","field":"estimate","from":"2h","to":"1h","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1KM44Y0WXHJJ8MENETRWSH1","ts":"2026-09-03T12:32:58.816Z","task":"TL-203","field":"confidence","from":"medium","to":"high","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1KM44Y04MFJGF8W4FKEVJ32","ts":"2026-09-03T12:32:58.816Z","task":"TL-203","field":"epic","from":"","to":"Backlog — open-source publication","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1KM44Y0EK0DATK07AZPTEGC","ts":"2026-09-03T12:32:58.816Z","task":"TL-203","field":"labels","from":[],"to":["pre-launch"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1KM44Y0RHW4EVYQ0NXF1XT5","ts":"2026-09-03T12:32:58.816Z","task":"TL-203","field":"related_docs","from":[],"to":["LINEAGE.md"],"actor":"unknown","source":"external","reason":"unknown"}
