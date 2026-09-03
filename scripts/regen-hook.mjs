@@ -17,16 +17,24 @@
  * the common case is a file that has nothing to do with the backlog. Anything
  * printed there would be noise on every keystroke of unrelated work.
  *
+ * THE WAIT FOR THE PAYLOAD IS BOUNDED (TL-224). Reading stdin to EOF is correct
+ * for the one caller this was written against — an editor writes its JSON and
+ * closes — and it is a trap for every other one. A terminal never sends EOF, and
+ * neither does a parent that leaves stdin inherited, so the command waited for
+ * something that was never coming: no output, no prompt, nothing to tell it
+ * apart from slow work. Measured at the time: `( sleep 8 ) | regen-hook` took
+ * the whole eight seconds, and a terminal took forever.
+ *
  * Tests: `node --test scripts/tests/cli.test.mjs`
  */
 
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
 import { dirname, join, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { resolveActor } from "./actor.mjs";
 import { backlogForTaskPath } from "./paths.mjs";
+import { PRODUCT_NAME as N } from "./product.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -34,18 +42,71 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 // choice of root, so a second copy would mean two definitions of "this is a task".
 export { backlogForTaskPath };
 
+/**
+ * How long a payload has to arrive before the hook concludes that none is coming.
+ *
+ * Generous by two orders of magnitude for the real caller — an editor has the
+ * JSON in hand before it spawns anything — and short enough that a person who
+ * ran the command to see what it does gets their prompt back. There is no knob:
+ * this is not a preference anybody holds, it is the difference between waiting
+ * and hanging.
+ */
+export const STDIN_WAIT_MS = 2000;
+
+/**
+ * The hook payload, or `null` when nobody sent one.
+ *
+ * Whatever HAS arrived when the clock runs out is returned rather than thrown
+ * away: a writer that sends its JSON and then keeps the pipe open has told us
+ * everything we needed, and punishing it for not closing would be the same
+ * mistake in the other direction.
+ */
 function readStdin() {
-  try {
-    return readFileSync(0, "utf8");
-  } catch {
-    return "";
-  }
+  return new Promise((resolve) => {
+    // A terminal is a person, not a hook. It will never send EOF, and it has no
+    // payload to send — waiting on it is waiting on nothing.
+    if (process.stdin.isTTY) {
+      resolve(null);
+      return;
+    }
+
+    let data = "";
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      process.stdin.destroy();
+      resolve(value);
+    };
+    const timer = setTimeout(() => finish(data), STDIN_WAIT_MS);
+    // `unref` so a hook that already has its answer does not hold the process
+    // open for the rest of the window.
+    if (typeof timer.unref === "function") timer.unref();
+
+    process.stdin.setEncoding("utf8");
+    process.stdin.on("data", (chunk) => {
+      data += chunk;
+    });
+    process.stdin.on("end", () => finish(data));
+    process.stdin.on("error", () => finish(null));
+  });
 }
 
-export function main() {
+export async function main() {
+  const raw = await readStdin();
+  if (raw === null) {
+    // Reached only by a person: the hook wiring always pipes. Saying so costs
+    // one line and replaces the silence that used to look like a freeze.
+    console.error(
+      `${N} regen-hook: expects an editor hook's JSON on stdin — nothing arrived.`
+    );
+    return 0;
+  }
+
   let payload;
   try {
-    payload = JSON.parse(readStdin());
+    payload = JSON.parse(raw);
   } catch {
     // A malformed payload is the editor's problem, not the user's; failing the
     // hook here would turn every edit into an error banner.
@@ -82,5 +143,5 @@ export function main() {
 }
 
 if (process.argv[1] && process.argv[1].endsWith("regen-hook.mjs")) {
-  process.exit(main());
+  main().then((code) => process.exit(code));
 }

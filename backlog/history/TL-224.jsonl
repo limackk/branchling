@@ -1,0 +1,1 @@
+{"id":"01M1MBJX4EP1Z76SB82HCSVE06","ts":"2026-09-03T19:22:59.598Z","task":"TL-224","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"The read is bounded: a terminal gets a sentence, every other stdin gets a deadline that keeps whatever arrived. Both directions fail against the pre-fix read.","session":"tree-43baaad0f7d7"}
