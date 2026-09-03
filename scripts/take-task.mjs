@@ -269,6 +269,10 @@ export function takeTask(opts) {
   // (`__verified__`, `__role_override__`); this is not one.
   recordEdit(root, {
     taskId: id, before, after, actor, ts,
+    // The role the CALLER declared with `--role` — what they were acting as, not
+    // what the task asks for (TL-222). The mismatch event below records the two
+    // disagreeing; this records the half a reader cannot reconstruct afterwards.
+    role: opts.role,
     source: opts.source || "take",
     reason:
       opts.reason ||

@@ -630,6 +630,11 @@ export function writeStatus(opts) {
     actor,
     ts: new Date(now).toISOString(),
     source: "run",
+    // The role this invocation dispatched the task on, when it had one (TL-222).
+    // The run is the one writer that always knows it — `--agent-for` chose the
+    // hand by exactly this value — and a parked task whose entry does not say
+    // which hand tried is a record that cannot be read back into a stage.
+    role: opts.role,
     reason,
   });
   return { ok: true, status, file };
@@ -791,7 +796,11 @@ function workOne(ctx, task) {
       };
     }
 
-    const closing = cli(["done", task.id, "--dir", ctx.root, "--actor", ctx.actor, "--json"]);
+    const doneArgs = ["done", task.id, "--dir", ctx.root, "--actor", ctx.actor, "--json"];
+    // The closing entry names the stage, not just the hand (TL-222). Only when
+    // the task asked for a role: passing "" would be a role nobody declared.
+    if (task.role) doneArgs.push("--role", task.role);
+    const closing = cli(doneArgs);
     appendFileSync(logPath, "\n=== done: exit " + closing.status + "\n" + (closing.stderr || ""), "utf8");
     if (closing.status === 0) {
       return { id: task.id, outcome: "closed", attempts, ms: Date.now() - started, log: logPath };
@@ -1142,7 +1151,7 @@ export function run(argv) {
       stopped = task.id + " asks for role `" + role + "`, which no `--agent-for` serves";
       break;
     }
-    const result = workOne(ctx, { id: task.id, file: task.file, text: task.text || "", command });
+    const result = workOne(ctx, { id: task.id, file: task.file, text: task.text || "", command, role });
     result.role = role;
     if (result.outcome === "agent-never-ran") {
       // NOTHING WAS MEASURED, so nothing about the task may change (TL-184). The
@@ -1153,7 +1162,7 @@ export function run(argv) {
       const from = String(task.from || "");
       if (from) {
         const given = writeStatus({
-          root, config, id: task.id, actor, status: from,
+          root, config, id: task.id, actor, status: from, role,
           // The WHY of this write, which is a fact about the run and not about
           // the task: the agent's output stays in the report and the log, where
           // TL-184 says a fact about the machine belongs.
@@ -1192,7 +1201,7 @@ export function run(argv) {
         ? vouchReason(result.detail)
         : blockedReason(result.attempts, result.detail, result.outcome);
       const blocked = writeStatus({
-        root, config, id: task.id, actor, reason, status: toVouch ? vouchStatus : stuck.status,
+        root, config, id: task.id, actor, reason, role, status: toVouch ? vouchStatus : stuck.status,
       });
       if (blocked.reason === "closed-elsewhere") {
         // NOT a failure of this run and not a task it may park: somebody closed

@@ -1,0 +1,4 @@
+{"id":"01M1M8DWFD1EHQAV2HHC37GNBW","ts":"2026-09-03T18:27:49.357Z","task":"TL-222","field":"__created__","from":"","to":"A history record says which role its actor was acting as","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1M8QVJNBEH4DE0BMWWYEKZ8","ts":"2026-09-03T18:33:16.117Z","task":"TL-222","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1M8QVJNZPPV0C664KRY43JY","ts":"2026-09-03T18:33:16.117Z","task":"TL-222","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1M8SMQXVD18PM3WNF0HE0DV","ts":"2026-09-03T18:34:14.653Z","task":"TL-222","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven","session":"tree-526f61f2043f"}

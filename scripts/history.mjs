@@ -533,7 +533,7 @@ function migratedId(m, id) {
  * months on cannot tell them apart. Every entry carries the field; what varies
  * is whether it holds a sentence or a sentinel.
  */
-function entry(taskId, field, from, to, actor, source, ts, reason, session) {
+function entry(taskId, field, from, to, actor, source, ts, reason, session, role) {
   const e = {
     id: eventId(ts), ts, task: taskId, field, from, to,
     actor: normalizeActorFn(actor),
@@ -547,6 +547,17 @@ function entry(taskId, field, from, to, actor, source, ts, reason, session) {
   // absent key is what "nobody recorded which session" already looks like.
   const id = normalizeSession(session);
   if (id) e.session = id;
+  // THE ROLE THE ACTOR WAS ACTING AS, under the same rule as `session` above
+  // (TL-222): omitted when there is none, never written as "". Every line the
+  // log already holds was written before this field existed, so an empty string
+  // would be a third state beside absent and present.
+  //
+  // IT IS THE ACTOR'S ROLE, NOT THE TASK'S. The task's `role:` is a field and
+  // `diffMeta` already reports a change to it; this says which hand made the
+  // change, and the two differ exactly when they matter — a `handoff` writes
+  // `role: dev → review` while the hand performing it is still `dev`.
+  const acting = String(role || "").trim();
+  if (acting) e.role = acting;
   return e;
 }
 
@@ -616,7 +627,7 @@ export function changesRequiringReason(config, changes) {
  * second time as "unknown".
  */
 export function recordEdit(backlogDir, opts) {
-  const { taskId, before, after, actor, source, reason } = opts;
+  const { taskId, before, after, actor, source, reason, role } = opts;
   const ts = opts.ts || new Date().toISOString();
   // This route is a command WRITING a change it is making, so the session is
   // known and is the process's own. A caller may state one (a server acting for
@@ -627,7 +638,7 @@ export function recordEdit(backlogDir, opts) {
   // viewer writes one field at a time, `done` writes status and updated
   // together. Copying it onto every entry of the act is what makes the answer
   // survive reading any one of them alone.
-  const entries = changes.map((c) => entry(taskId, c.field, c.from, c.to, actor, source, ts, reason, session));
+  const entries = changes.map((c) => entry(taskId, c.field, c.from, c.to, actor, source, ts, reason, session, role));
   appendEntries(backlogDir, taskId, entries);
   const snap = loadSnapshot(backlogDir) || { version: 1, tasks: {} };
   snap.tasks[taskId] = pickTracked(after);

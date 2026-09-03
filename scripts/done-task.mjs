@@ -85,7 +85,7 @@ const CONFIRM_WORD = "confirm";
 // Pure helpers
 // ──────────────────────────────────────────────────────────────────────────
 
-const FLAGS = ["--dir", "--dry-run", "--json", "--actor", "--status", "--confirm-manual", "--reason"];
+const FLAGS = ["--dir", "--dry-run", "--json", "--actor", "--role", "--status", "--confirm-manual", "--reason"];
 
 /** PURE — resolves `done`'s arguments. Throws on a usage error. */
 export function parseDoneArgs(args) {
@@ -97,6 +97,7 @@ export function parseDoneArgs(args) {
   let status = null;
   let confirmManual = false;
   let reason = null;
+  let role = null;
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -111,6 +112,11 @@ export function parseDoneArgs(args) {
     if (a === "--actor") {
       actor = args[++i] || null;
       if (!actor) throw new Error("`--actor` with no name");
+      continue;
+    }
+    if (a === "--role") {
+      role = args[++i] || null;
+      if (!role) throw new Error("`--role` with no value");
       continue;
     }
     if (a === "--status") {
@@ -141,7 +147,7 @@ export function parseDoneArgs(args) {
     id = a;
   }
   if (!id) throw new Error("no task id\nusage: " + N + " done <ID> [--dry-run] [--json]");
-  return { id, dir, dryRun, json, actor, status, confirmManual, reason };
+  return { id, dir, dryRun, json, actor, role, status, confirmManual, reason };
 }
 
 /** The task file for an id, or null. */
@@ -379,6 +385,17 @@ function run(argv) {
   const config = loadConfigOrExit(root);
   const tasksDir = backlogPaths(root).tasksDir;
 
+  // A role outside the project's vocabulary is a bad ARGUMENT, wrong whatever
+  // this task says — the same judgement `take` makes, and it fails here with the
+  // other usage errors rather than as a refusal about this particular closure.
+  if (plan.role !== null && (config.roles || []).indexOf(plan.role) < 0) {
+    console.error(failure(N + " done", "unknown role `" + plan.role + "`",
+      (config.roles || []).length
+        ? ["`roles` in config.yaml holds: " + (config.roles || []).join(", ")]
+        : ["This backlog declares no `roles:` in config.yaml, so no task asks for one."],
+      [N + " done --help"]));
+    return 2;
+  }
   const actor = resolveActor(plan.actor);
   if (!isValidActor(actor)) {
     console.error(
@@ -673,6 +690,10 @@ function run(argv) {
   const after = extractMeta(splitFrontmatter(text).frontmatter);
   recordEdit(root, {
     taskId: before.id, before, after, actor, source: "done",
+    // Which hand closed it, when the closer said (TL-222). A run serving several
+    // roles from one queue passes the role it dispatched on, so the closing entry
+    // names the stage rather than leaving it to be guessed from the actor.
+    role: plan.role,
     reason: statedReason || REASON_PROVEN,
   });
 
