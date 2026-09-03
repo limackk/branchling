@@ -5,17 +5,17 @@
 # Everything in this repository is written in English, this file included. The
 # boundary is not what ships in the tarball but what a stranger reads when they
 # open the repository, and a configuration whose comments explain what a change
-# COSTS is exactly what such a reader needs. `worktrail check --language`
+# COSTS is exactly what such a reader needs. `branchling check --language`
 # enforces this over the source (TL-32); the rest is a rule in CLAUDE.md,
 # because a guard cannot read intent.
 
-project_name: "worktrail"
+project_name: "branchling"
 
 # The task id prefix (BL-1452). A project VALUE, not a fact about the code —
 # every pattern in the tool is built from it. Changing this line WITHOUT
 # renumbering the tree makes the tool stop seeing its own tasks; the way to
-# change it is `worktrail migrate-prefix --to <NEW>` (with `--dry-run` first).
-# To close gaps in the NUMBERS while keeping the prefix: `worktrail renumber`.
+# change it is `branchling migrate-prefix --to <NEW>` (with `--dry-run` first).
+# To close gaps in the NUMBERS while keeping the prefix: `branchling renumber`.
 task_id_prefix: TL
 
 
@@ -30,7 +30,7 @@ archived_statuses: [done, cancelled]
 # whose "why" cannot be reconstructed afterwards.
 #
 # This project deliberately does NOT list `done` here: the way into `done` is
-# `worktrail done`, which RUNS the verification and refuses on the first
+# `branchling done`, which RUNS the verification and refuses on the first
 # failure, so the reason for that transition is the run itself, recorded beside
 # it as `proven`. Demanding a sentence here would produce "done" in the reason
 # field, which is noise. `blocked` and `cancelled` are the opposite case: there

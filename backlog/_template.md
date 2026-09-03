@@ -1,16 +1,16 @@
 ---
 # ╭─────────────────────────────────────────────────────────────────────────╮
-# │  THIS BACKLOG'S TASK TEMPLATE. `worktrail new --title "…"` copies it,    │
+# │  THIS BACKLOG'S TASK TEMPLATE. `branchling new --title "…"` copies it,    │
 # │  assigns the number and fills in the dates — you do not copy it by      │
 # │  hand. The vocabularies below (statuses, priorities, types) come from   │
 # │  `config.yaml`; a value outside them FAILS the build rather than        │
 # │  becoming a new one.                                                    │
 # ╰─────────────────────────────────────────────────────────────────────────╯
-id: TL-NNN                         # the prefix is `task_id_prefix` in config.yaml; the number comes from `worktrail new`
+id: TL-NNN                         # the prefix is `task_id_prefix` in config.yaml; the number comes from `branchling new`
 title: ""                          # imperative, short
 type: task
 labels: []
-board: main                        # a CLOSED vocabulary (boards.yaml); do not guess: `worktrail board <file>`
+board: main                        # a CLOSED vocabulary (boards.yaml); do not guess: `branchling board <file>`
 epic: ""                           # free text — the group this task counts towards
 priority: P1                       # P0 blocker | P1 critical | P2 nice | P3 backlog
 status: pending                    # pending | in_progress | blocked | done | cancelled

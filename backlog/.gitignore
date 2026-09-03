@@ -4,7 +4,7 @@
 # aggregates of ALL tasks, so every branch rewrites the same file and two
 # branches conflict even when they share no task.
 #
-# To rebuild them: worktrail build
+# To rebuild them: branchling build
 INDEX.yaml
 NOW.yaml
 archive/done.yaml

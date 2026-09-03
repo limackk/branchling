@@ -79,7 +79,7 @@ jobs:
               console.error("the tarball carries data that is not the tool:\n  " + forbidden.join("\n  "));
               process.exit(1);
             }
-            for (const required of ["package.json", "README.md", "LICENSE", "bin/worktrail.mjs",
+            for (const required of ["package.json", "README.md", "LICENSE", "bin/branchling.mjs",
                                     "scripts/cli.mjs", "_template.md"]) {
               if (!files.includes(required)) {
                 console.error("the tarball is missing " + required);

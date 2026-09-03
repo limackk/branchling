@@ -25,7 +25,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: worktrail --version
+      label: branchling --version
       description: If it prints nothing, say so — a missing version means a broken install and that is itself the answer.
     validations:
       required: true
@@ -47,7 +47,7 @@ body:
     attributes:
       label: Where the backlog is
       description: >
-        The output of `worktrail where`, if the command runs. Most surprises about
+        The output of `branchling where`, if the command runs. Most surprises about
         "it is reading the wrong backlog" are answered by which RULE resolved the
         directory, and that is the half nobody can reconstruct afterwards.
       render: console
