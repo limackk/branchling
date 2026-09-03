@@ -221,7 +221,7 @@ test("the skill states no vocabulary and no path from this repository", () => {
     assert.equal(new RegExp("\\b" + value + "\\b").test(text), false,
       "the skill names this project's vocabulary: " + value);
   }
-  for (const path of ["backlog/tasks/", "docs/", "/Users/", "origin"]) {
+  for (const path of ["backlog/tasks/", "docs/", "/Users/", "another-workspace"]) {
     assert.equal(text.includes(path), false, "the skill carries a path from this repository: " + path);
   }
   // The positive control: it DOES send the reader to the command that renders

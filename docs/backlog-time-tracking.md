@@ -9,10 +9,15 @@
 
 ## 1. The question
 
-The backlog has 1387 tasks, of which 1026 are `done`, and **1019 of those carry
-an estimate**. There is not a single number saying how long that work actually
-took. Estimates are therefore unverifiable today: `confidence: medium` means
-"that's what I thought" and, a year later, means exactly the same thing.
+A backlog of any age holds hundreds of closed tasks carrying an estimate, and
+not one number saying how long that work actually took. Estimates are therefore
+unverifiable: `confidence: medium` means "that's what I thought" and, a year
+later, means exactly the same thing. Count your own:
+
+```bash
+worktrail query --status done --count          # closed work
+worktrail stats --calibration                  # and how much of it was measured
+```
 
 Goal: **collect the AI agent's working time on a task well enough to calibrate
 estimates against it** — and do it in a module that goes open source, so over
@@ -20,22 +25,29 @@ other people's repositories and other people's people.
 
 ## 2. Measurement — why there is no shortcut here
 
-All numbers measured on this repository on 2026-08-30, before a single line of
-the module was written. This section exists because three "obvious" sources of
-historical data look sufficient until they are actually counted.
+Four "obvious" sources of historical data look sufficient until they are
+actually counted. Each row below states what the source can give you and the
+command that measures it **on your own repository** — the numbers that matter
+are yours, and a figure from somebody else's tree is not evidence you can check.
 
-| Source hypothesis | Measured result | Verdict |
+| Source hypothesis | What it can give | Measure it yourself |
 |---|---|---|
-| The field change log (`history/*.jsonl`) already has this | **9 tasks, 13 entries, 1** with an `in_progress` + `done` pair | The log started on 2026-08-30. Coverage ≈ 0.1% |
-| Frontmatter `created` → `updated` | 1016 tasks parseable, median **0 days**, **71% completed the same day** | Day-level resolution. Zero for 7 out of 10 tasks |
-| Git — the commit span on a task file | median **722 h**, against 71% "same day" in the frontmatter | Contaminated by mass field backfills (`board:` touched 1390 files in one day) |
-| Git pickaxe on `-S"status: done"` | **20/20** hits, exactly 1 commit, second-level resolution, ~60 s for 1023 tasks | ✅ The moment of COMPLETION is recoverable |
-| Git pickaxe on `-S"status: in_progress"` | **3/20** (15%); values 0.2 h / 142 h / 554 h | The moment of START does not exist in the data |
+| The field change log (`history/*.jsonl`) already has this | Nothing before the day the log started, which is the day the tool was installed | `worktrail audit --json` — how many closed tasks have no logged transition |
+| Frontmatter `created` → `updated` | DAY resolution, so zero for everything finished the day it was opened | `worktrail query --status done --json` and difference the two fields |
+| Git — the commit span on a task file | Contaminated by mass field backfills: one `board:` migration touches every task file on one day | `git log --name-only --format=%ad -- backlog/tasks` and look for a day with hundreds of files |
+| Git pickaxe on `-S"status: done"` | ✅ The moment of COMPLETION, at second resolution, one commit per task | `worktrail backfill-completions --dry-run` |
+| Git pickaxe on `-S"status: in_progress"` | Almost nothing: the intermediate state is usually never committed | the same command, and compare the counts |
 
-The last two rows settle the project. An agent usually writes `pending → done`
-in a single commit, so **the intermediate state was never produced** — it was
-not "lost", it simply never existed. And where it did exist, a spread of
-0.2 h to 554 h shows it was calendar time regardless, not effort.
+The last two rows settle the project, and the reason is structural rather than
+particular to any one tree. An agent usually writes `pending → done` in a single
+commit, so **the intermediate state was never produced** — it was not "lost", it
+simply never existed. Where it does exist, it is the span between two commits,
+which is calendar time regardless, not effort.
+
+> Run the two pickaxe commands on your own history before believing this. If
+> your tree commits `in_progress` separately, you have a start stamp this
+> document assumes you do not — and the honest zero of §2.1 costs you less
+> than it costs us.
 
 > **A conclusion that changes the plan: history from before day zero does not
 > exist and cannot be inferred.** *When* a task finished can be recovered (git,
@@ -54,17 +66,25 @@ number is the most common mistake in this class of tool.
 | Quantity | Definition | Source | Good for |
 |---|---|---|---|
 | **lead time** | `created` → `done` | git (backfill) + log | queue throughput |
-| **cycle time** | `in_progress` → `done` | the event log, from day zero | ⚠️ **worthless** in this repository, see §3.1 |
+| **cycle time** | `in_progress` → `done` | the event log, from day zero | ⚠️ worthless wherever `in_progress` is a parking state — §3.1 |
 | **engaged time** | sum of real work sessions, gaps cut out | heartbeats (§6–§7) | **estimation** |
 | **cost** | tokens, tool calls, model | host adapter (§10) | budget, immune to model speed |
 
 ### 3.1. Cycle time is a trap metric here
 
-At the time of writing **45 tasks are simultaneously `status: in_progress`, 32
-of them with `owner: claude`.** That does not mean 32 agents are working at
-once — `in_progress` in this repository is a **parking** state: a task stays
-in it when a session ends, when work is waiting on a decision, when something
-was set aside.
+**Count your own before trusting a cycle time:**
+
+```bash
+worktrail query --status in_progress --count
+worktrail query --status in_progress --owner <an agent> --count
+worktrail audit          # `parked`: in progress, and untouched for days
+```
+
+If that first number is far larger than the number of sessions that could
+plausibly be running at this moment, `in_progress` in your repository is a
+**parking** state, not a working one: a task stays in it when a session ends,
+when work is waiting on a decision, when something was set aside. That is the
+common case, and it is why `audit` has a `parked` category at all.
 
 Cycle time computed from such a state therefore measures parking, not work,
 and grows worse the poorer the backlog's hygiene is. **We report it only as a
@@ -176,10 +196,19 @@ there would flood the UI and slow down `readHistory()`. Same discipline
 ### 5.2. Why an aggregate PER TASK, not one `rollup.json`
 
 Because a single collective file would be a second `INDEX.yaml` — and this
-module already paid for that once. `backlog/.gitignore` carries the measured
-reasoning: an aggregate of all tasks means **every branch rewrites the same
-file**, `git merge-tree` on two branches **with not a single task in common**
-produced a conflict, and 78% of commits touching `tasks/` also touched views.
+module already paid for that once. `backlog/.gitignore` carries the reasoning:
+an aggregate of all tasks means **every branch rewrites the same file**, so two
+branches with not a single task in common still conflict. Check it in a minute,
+on any repository:
+
+```bash
+git merge-tree --write-tree <branch-a> <branch-b>   # non-zero exit = conflict
+```
+
+`scripts/tests/rollup-merge.test.mjs` runs exactly that, twice: once over
+aggregates split per task, which must merge cleanly, and once over a single
+shared file, which must conflict. The second half is the point — without it the
+first proves only that the check cannot see a conflict at all.
 
 The time aggregate has exactly the same profile: it grows with every task,
 changes with every session, and merges badly. `activity/rollup/BL-NNNN.json`
@@ -293,9 +322,9 @@ existing `focus` signal — it only needs the `in_progress` write to also set
 the session's focus.
 
 **Critical condition: the scope is the SESSION, never global state.**
-Globally, right now, `in_progress` covers 45 tasks, 32 with `owner: claude` —
-the question "which task is in progress" has no single answer globally and
-never will. It has an unambiguous answer within one session, because one
+`worktrail query --status in_progress --count` on any backlog of any age
+answers with a number larger than one: the question "which task is in progress"
+has no single answer globally and never will. It has an unambiguous answer within one session, because one
 session takes one task (one session = one worktree). The same number that
 breaks cycle time (§3.1) would break attribution — if counted globally.
 
@@ -381,30 +410,29 @@ Three rules for the report:
 from its source a month later. The frontmatter holds what a human decided
 (`estimate`, `confidence`); actuals are computed, like views.
 
-### 11.1. When the buckets will fill up (measured)
+### 11.1. When the buckets will fill up
 
-The estimate distribution among 1026 closed tasks and the closing pace over
-the last 8 weeks:
+Two numbers decide it, and both are yours rather than anybody else's: how your
+closed work is distributed across estimate buckets, and how fast you close
+things.
 
-| estimate | n (done) | | week | closed |
-|---|---|---|---|---|
-| `1d` | 259 | | 2026-08-03 | 134 |
-| `2h` | 238 | | 2026-08-10 | 74 |
-| `4h` | 201 | | 2026-08-17 | 95 |
-| `3h` | 105 | | 2026-08-24 | 142 |
-| `1h` | 62 | | **average** | **~95/week** |
+```bash
+worktrail stats --calibration     # n per bucket, and how many were measured
+worktrail time                    # tasks closed per week
+```
 
-The top five buckets are ~84% of closed tasks, and the pace is ~95 closures a
-week. The `n = 8` threshold **for these buckets is reachable within days of
-launching phase 1**, not weeks. The tail (`1w`, `2d`, `15m`) will never fill
-and should permanently report "too little data" — that is a feature, not a
-gap.
+Divide the threshold by the weekly rate in the buckets you actually use. The
+shape is the same in every backlog: a few estimate values carry most of the
+closed work and reach `n = 8` quickly, while the tail — the values somebody
+picked twice a year — never fills and should permanently report "not enough
+data". That is a feature, not a gap; §11 rule 1 exists so the tail cannot
+quietly start reporting a median of three.
 
 ## 12. Rollout order
 
 | Phase | Task | What it delivers | Standalone value |
 |---|---|---|---|
-| 0 | [TL-27](../backlog/tasks/TL-27-pomiar-czasu-fundament-i-uczciwy-punkt-zero.md) | `activity/` + `worktrail time` + backfill of **completion stamps only** from git | velocity and throughput from 1026 tasks |
+| 0 | [TL-27](../backlog/tasks/TL-27-pomiar-czasu-fundament-i-uczciwy-punkt-zero.md) | `activity/` + `worktrail time` + backfill of **completion stamps only** from git | velocity and throughput over every task already closed |
 | 1 | [TL-28](../backlog/tasks/TL-28-heartbeaty-aktywnosci-i-lancuch-atrybucji.md) | heartbeats from ALL tools, clustering, attribution with auto-focus | engaged time starts to exist |
 | 1b | [TL-31](../backlog/tasks/TL-31-retencja-korekta-atrybucji-i-prawo-do-usuniecia.md) | retention, `forget`, `reassign` | **condition for releasing this beyond this machine** |
 | 2 | [TL-29](../backlog/tasks/TL-29-kalibracja-estymat-z-danych-rzeczywistych.md) | calibration in `worktrail stats` + a viewer column | estimates stop being unverifiable |

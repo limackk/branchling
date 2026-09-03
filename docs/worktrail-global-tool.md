@@ -195,8 +195,8 @@ change is that "stays with the human" stops depending on a correct
 ```yaml
 # <config>/projects.yaml
 projects:
-  - name: origin
-    path: /Users/x/workspace/origin/backlog
+  - name: myproject
+    path: /path/to/myproject/backlog
   - name: acme-api
     path: /Users/x/code/acme/backlog
 ```
@@ -262,10 +262,10 @@ not first.
   disproved this proposal: of four mistakes made in the session that raised
   it, **none** would have been caught by any of the three `check` gates —
   because what broke was prose, a regex, links and untracked files, not id
-  collisions, boards or references. For the consumer, these gates earn their
-  keep through scale (1363 tasks, seven parallel worktrees, four id
-  collisions that survived on `main` for months); here there are 45 tasks
-  and one writer.
+  collisions, boards or references. The gates earn their keep through SCALE —
+  thousands of tasks, several parallel worktrees, and id collisions that can
+  survive on `main` for months before anybody notices. A repository with one
+  writer and no parallel sessions has none of those conditions.
 
   **The one specific condition that reverses this decision:** when more than
   one session starts writing in this tree at once. An id collision arises

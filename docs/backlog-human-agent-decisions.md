@@ -65,7 +65,7 @@ draws decisions as nodes.
 ```json
 {"ts":"…","task":"TL-1234","field":"__decision__",
  "to":"We're going with variant B, because…","resolves":"<question ULID>",
- "actor":"local:kamil","source":"viewer","id":"<ULID>"}
+ "actor":"local:me","source":"viewer","id":"<ULID>"}
 ```
 
 - **Open question** := a question event that no `__decision__.resolves`

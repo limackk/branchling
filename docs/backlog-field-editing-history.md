@@ -263,9 +263,9 @@ Deliberate limitations:
    history at the next server startup**, in bulk and as `unknown`. They are
    not lost, but they lose both time and author.
 4. **The snapshot is local.** A fresh clone has no snapshot → the first pass
-   only founds it and **appends not a single entry**. This is deliberate:
-   1350 invented "changes" on first run would be worse than no history before
-   it.
+   only founds it and **appends not a single entry**. This is deliberate: one
+   invented "change" per task on first run would be worse than no history
+   before it, and there are as many tasks as there are.
 5. **We do not version the body's content.** History covers the frontmatter.
    Changes to the `## Goal`, `## Steps` sections etc. stay in git — fields
    are what the backlog filters, plans and computes the dashboard from.
@@ -326,9 +326,9 @@ History of field changes can be reconstructed from git:
 by commit, `actor` from the commit author. We are not doing this now,
 because:
 
-- the commit author in this repository is **always the founder**, even for
-  agent work — backfilling would produce 1350 tasks "changed by the founder",
-  a pretty and untrue attribution;
+- the commit author is the person who ran the commit, even for work an agent
+  did — backfilling would attribute every task in the tree to that one name, a
+  pretty and untrue answer;
 - commit date ≠ change date (work is sometimes committed in batches).
 
 If a backfill were ever needed, the only honest form is `actor: "unknown"`,

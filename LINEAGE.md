@@ -24,9 +24,10 @@ Not in `git log`. In two places that travel with the code:
 
 - **`docs/`** — seven architecture documents. Each describes one decision, its
   mechanism, and what would refute it.
-- **`backlog/tasks/`** — 137 tasks of this tool, 69 of them closed. This is its
-  real development history: what was done, in what order, and what was
-  deliberately left alone. The tool tracks itself with itself.
+- **`backlog/tasks/`** — this tool's own tasks; `worktrail stats` counts them,
+  and a number written here would be stale by the next commit. This is its real
+  development history: what was done, in what order, and what was deliberately
+  left alone. The tool tracks itself with itself.
 
 ## Milestones
 
@@ -48,8 +49,8 @@ Ids carry both identities: the number they had before the extraction renamed
 | BL-1412 → TL-23 / BL-1413 → TL-24 | `init` and `new` — creating a backlog and creating tasks |
 | BL-1417 → TL-25 | Flag validation: a typo fails instead of passing silently |
 | BL-1439 → TL-33 | **An installable package** — `package.json`, `bin/`, the name from one constant |
-| `origin#BL-1445` | The extraction into this repository |
-| `origin#BL-1446` | The consumer repointed at the installed package; its `backlog/` is now data only |
+| `<origin>#BL-1445` | The extraction into this repository |
+| `<origin>#BL-1446` | The consumer repointed at the installed package; its `backlog/` is now data only |
 
 ## The principle that survived all of those decisions
 
@@ -61,7 +62,7 @@ person who deleted it.
 ## Number redirects — the 2026-09-01 renumbering (TL-135)
 
 The numbering used to start at `TL-1303`, because the tool was a module of
-`origin` and was extracted from it; the lower numbers belonged to the
+another workspace and was extracted from it; the lower numbers belonged to the
 consumer and did not travel. On 2026-09-01 the backlog was renumbered to a
 contiguous `TL-1`..`TL-135`.
 

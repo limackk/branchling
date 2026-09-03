@@ -29,7 +29,7 @@
  *   1. An external URL. Reachability is a network question and this guard does
  *      not ask network questions — one that did would fail on a train.
  *   2. `<repo>#<path>` — a reference to ANOTHER repository, the convention this
- *      backlog already uses (`origin#qa/…`). Skipped DELIBERATELY, by a
+ *      backlog already uses (`other-repo#qa/…`). Skipped DELIBERATELY, by a
  *      rule that recognises the shape, not by accident because the resolution
  *      happened to fail.
  *   3. An anchor. `docs/manual.md#the-contract` is a link to a file that exists;

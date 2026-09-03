@@ -12,8 +12,8 @@ The tool is eventually meant to work in three modes at once:
 
 1. **Locally, open source** — `git clone && npx worktrail`, no account and no
    server.
-2. **As a team, hosted** — an account and a paid plan, like Supabase or
-   the sync layer.
+2. **As a team, hosted** — an account and a paid plan, in the shape any hosted
+   sync product takes.
 3. **For non-technical people** — an analyst, support: no repository clone,
    through the browser.
 
@@ -27,21 +27,23 @@ implemented today — the rest is a project.
 
 ## 2. Measurement — the conflict does not come from tasks
 
-All numbers measured on this repository on 2026-08-29.
+Every claim below is something you can measure on your own repository in a
+couple of minutes. A result from a tree you cannot open is not evidence — it
+asks you to trust the author — so what this table carries is the COMMAND.
 
-| What | Result | How measured |
+| Question | How to measure it | What you will find |
 |---|---|---|
-| Live worktrees | **7** parallel branches | `git worktree list` |
-| Tasks touched by more than one branch | **0** | `git diff --name-only main...<branch> -- backlog/tasks/`, counted |
-| Branches touching generated views | **3 of 7** | same, for `INDEX.yaml`, `NOW.yaml`, `archive/done.yaml`, `boards/` |
-| Trial merge of two branches **with no task in common** | **CONFLICT in `INDEX.yaml`** | `git merge-tree --write-tree` |
-| Commits in 60 days touching `tasks/` | 1142 | `git log --since` |
-| …of those, touching generated views | **896 (78%)** | same |
+| How many branches are live at once | `git worktree list` | more than one, or none of this matters |
+| Do two branches ever touch the same task | `git diff --name-only main...<branch> -- backlog/tasks/` | almost never: work is partitioned by task |
+| Do they touch the generated views | the same, for `INDEX.yaml`, `NOW.yaml`, `archive/done.yaml`, `boards/` | almost always, and that is the problem |
+| Does a merge conflict between branches with NO task in common | `git merge-tree --write-tree <a> <b>` | yes, in `INDEX.yaml` — and that single result is the whole argument |
+| What share of commits touching `tasks/` also touches the views | `git log --since=60.days --name-only` and count | the large majority, in any tree where the views are committed |
 
-The last two rows are the crux. `INDEX.yaml` and `archive/done.yaml` are
-**sorted aggregates of all 1362 tasks**, so every branch rewrites the same
-file — even when working on a completely different task. The conflict is
-structural, not incidental.
+The fourth row is the crux, and it needs no statistics: `INDEX.yaml` and
+`archive/done.yaml` are **sorted aggregates of every task**, so every branch
+rewrites the same file even when working on a completely different one. The
+conflict is structural, not incidental — one trial merge on your own tree
+settles it.
 
 > **The pain does not come from tasks being versioned. It comes from
 > versioning state computed from tasks.**
@@ -120,8 +122,8 @@ Today, however:
 A database with mutable rows works locally and **falls apart the moment
 hosting is added.** Two clients change the `status` of the same task offline
 — now the rows hold two truths and no merge rule. Then `updated_at` gets
-added, then version vectors, then CRDTs — and a year later you have your own,
-worse the sync layer.
+added, then version vectors, then CRDTs — and a year later you have written
+your own, worse copy of a hosted sync product.
 
 An event log does not have this problem, because **there is no conflict by
 definition**: two events are two events. State is `fold(log)`, and the merge
@@ -396,7 +398,7 @@ line today, and after release — a migration of other people's data.
    Degradation had to become LOUD in both places it could have stayed
    quiet: `validateConfig` rejects a bare actor in `config.yaml` with a
    message naming the three allowed forms, and `history-record.mjs` exits
-   with code 2 instead of reporting "changes saved (kamil)" and writing
+   with code 2 instead of reporting "changes saved (me)" and writing
    `unknown` — the output would lie about the author, i.e. about the one
    thing this history exists for.
 5. ✅ **An event type admitting body and comments** — `__body__` and
@@ -454,15 +456,16 @@ would check that the rule was written, not that git applies it.
 
 ## 8. Order and risk
 
-The server gets built **only once someone besides the founder uses the local
+The server gets built **only once somebody besides the author uses the local
 version.** Before that, optimising for a user who does not yet exist comes at
-the expense of the product that already does (the origin project).
+the expense of the users who already do.
 
 What §6 describes is a SaaS product with accounts, roles, billing,
-synchronization and a web UI — run by a one-person team alongside the origin project. The
-document does not advise against it; it records that **order matters here
-more than the choice of technology**, and steps 1–5 are exactly the part that
-is valuable regardless of whether hosting ever gets built.
+synchronization and a web UI, to be run alongside whatever else its authors
+are already responsible for. The document does not advise against it; it
+records that **order matters here more than the choice of technology**, and
+steps 1–5 are exactly the part that is valuable regardless of whether hosting
+ever gets built.
 
 ## 9. Assumptions to be falsified
 

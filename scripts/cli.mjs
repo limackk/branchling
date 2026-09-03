@@ -85,6 +85,11 @@ const CHECK_USAGE = [
   "  --plan               only whether plan.yaml can be executed — that no wave stands before",
   "                       a task it is blocked by. A backlog with no plan.yaml passes: the",
   "                       execution order is an optional decision, not a required file",
+  "  --foreign-context    only whether a public document carries something a reader cannot",
+  "                       check: a personal absolute path, an address, or a count of a corpus",
+  "                       they cannot open. An unverifiable measurement is not evidence for a",
+  "                       stranger — replace it with the mechanism or with the command that",
+  "                       reproduces it. Reads `docs/`, README, LINEAGE and CONTRIBUTING",
   "  --language           only whether the public surface is English — a property of the CODE,",
   "                       so it reads this installation, not the backlog named by --dir.",
   "                       For that reason it does NOT run when --dir points outside this",
@@ -1500,7 +1505,7 @@ function captureScript(script, args) {
  * evidential force. The dispatcher supplies the mode so that nobody has to
  * remember it.
  */
-const CHECK_FLAGS = ["--dir", "--json", "--id-collisions", "--boards", "--refs", "--criteria", "--reasons", "--log-status", "--history", "--docs", "--vocabulary", "--plan", "--language", "--product-name", "--proofs", "--since"];
+const CHECK_FLAGS = ["--dir", "--json", "--id-collisions", "--boards", "--refs", "--criteria", "--reasons", "--log-status", "--history", "--docs", "--vocabulary", "--plan", "--language", "--product-name", "--foreign-context", "--proofs", "--since"];
 
 /** PURE — resolves `check`'s arguments. Throws on a usage error. */
 export function parseCheckArgs(args) {
@@ -1517,6 +1522,7 @@ export function parseCheckArgs(args) {
   let wantPlan = false;
   let wantLanguage = false;
   let wantProductName = false;
+  let wantForeignContext = false;
   let wantProofs = false;
   let since = null;
   let json = false;
@@ -1542,6 +1548,7 @@ export function parseCheckArgs(args) {
     if (a === "--plan") { wantPlan = true; continue; }
     if (a === "--language") { wantLanguage = true; continue; }
     if (a === "--product-name") { wantProductName = true; continue; }
+    if (a === "--foreign-context") { wantForeignContext = true; continue; }
     if (a === "--proofs") { wantProofs = true; continue; }
     if (a === "--since") {
       since = args[++i] || null;
@@ -1571,10 +1578,11 @@ export function parseCheckArgs(args) {
   // what somebody had once written into it.
   if (!wantIds && !wantBoards && !wantRefs && !wantCriteria && !wantReasons && !wantLogStatus &&
       !wantHistory && !wantDocs && !wantVocabulary && !wantPlan && !wantLanguage && !wantProductName &&
-      !wantProofs) {
+      !wantForeignContext && !wantProofs) {
     wantIds = true; wantBoards = true; wantRefs = true; wantCriteria = true; wantReasons = true;
     wantLogStatus = true; wantHistory = true; wantDocs = true;
     wantVocabulary = true; wantPlan = true; wantLanguage = true; wantProductName = true;
+    wantForeignContext = true;
   }
   // `--proofs` IS NOT IN THAT LIST, and it is the one guard that must never be
   // (TL-147). It re-runs other tasks' contracts, which are test suites: a bare
@@ -1588,7 +1596,7 @@ export function parseCheckArgs(args) {
         "It narrows which proven closings are re-run; on its own there is nothing for it to narrow."
     );
   }
-  return { dir, json, wantIds, wantBoards, wantRefs, wantCriteria, wantReasons, wantLogStatus, wantHistory, wantDocs, wantVocabulary, wantPlan, wantLanguage, wantProductName, wantProofs, since, files };
+  return { dir, json, wantIds, wantBoards, wantRefs, wantCriteria, wantReasons, wantLogStatus, wantHistory, wantDocs, wantVocabulary, wantPlan, wantLanguage, wantProductName, wantForeignContext, wantProofs, since, files };
 }
 
 /**
@@ -1660,6 +1668,11 @@ export const CHECK_GUARDS = [
   // tool as often as they like — that is their prose, not our literal.
   { key: "product-name", want: "wantProductName", name: "product-name", script: "check-product-name.mjs",
     installationOnly: true, args: () => [] },
+  // Installation-only for the same reason again (TL-37): the subject is THIS
+  // repository's public documents. Somebody else's `docs/` may name whatever
+  // company they like — it is their repository, and their decision.
+  { key: "foreign-context", want: "wantForeignContext", name: "foreign-context",
+    script: "check-no-foreign-context.mjs", installationOnly: true, args: () => [] },
   // OPT-IN ONLY — see `parseCheckArgs`. It re-runs the contracts of tasks that
   // are already closed, so it costs what those test suites cost.
   { key: "proofs", want: "wantProofs", name: "proofs", script: "check-backlog-proofs.mjs",

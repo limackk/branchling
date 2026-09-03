@@ -8,8 +8,8 @@
 
 ## 1. Why
 
-The `backlog/` module was born as part of the origin project's workspace and had this baked
-into its construction in two ways:
+The `backlog/` module was born inside one product's workspace and had that
+baked into its construction in two ways:
 
 1. **The data directory followed from where the code sat** — every script
    computed it as `join(__dirname, "..")`. Code and data were one directory,
@@ -121,16 +121,18 @@ used to be read independently by `build-backlog`, `build-viewer` and
 
 Three kinds of evidence, because each catches something different:
 
-1. **Parity with the code before the change** — a test checks that the origin project's
-   `config.yaml` reproduces, value for value, the vocabularies that used to
-   be hardcoded. In addition: views generated after the change are
-   **byte-identical** apart from the header, which now names the project.
-2. **Genericness of the defaults** — a test walks `DEFAULTS` and fails if
-   any word of the origin project's turns up in them.
+1. **Parity with the code before the change** — a test checks that the
+   originating project's `config.yaml` reproduces, value for value, the
+   vocabularies that used to be hardcoded. In addition: views generated after
+   the change are **byte-identical** apart from the header, which now names the
+   project. Reproduce the shape of this check on your own tree: rebuild, keep
+   the output, change one value in `config.yaml`, rebuild again, and diff.
+2. **Genericness of the defaults** — a test walks `DEFAULTS` and fails if any
+   word belonging to one project turns up in them.
 3. **A gate on the output** — `buildHtml()` with a foreign configuration is
-   searched for `pre-launch`, `test_env`, `on_queue`, `the origin project`… This one
-   assertion catches **every** new hardcode in the viewer, including ones
-   that don't exist yet.
+   searched for the vocabulary of the project it was NOT given. This one
+   assertion catches **every** new hardcode in the viewer, including ones that
+   do not exist yet.
 
 End-to-end proof (done by hand on 2026-08-29): a directory with
 `statuses: [todo, doing, review, shipped]`, `priorities: [now, next, later]`,
@@ -182,14 +184,14 @@ two names for one tool would have kept the old one alive in documents and
 muscle memory. The name is **not settled** — the decision and a possible npm
 reservation: [TL-20](../backlog/tasks/TL-20-domknij-nazwe-narzedzia-przed-publikacja.md).
 The `backlog/` directory, file names and `project_name` in the configuration
-were left untouched; `project_name` describes the origin project's BACKLOG, not the tool.
+were left untouched; `project_name` describes A BACKLOG, not the tool.
 
 ## 7. The class of bug this closes
 
 "The same vocabulary in two places" — this module's most common silent
 defect. Before the change, the status list lived in `serve-backlog.mjs`, in
 the viewer's client, and in the README; the board registry had three
-parsers; the origin project's labels were in `task-fields.mjs` **and** in the CSS **and**
-in filter predicates. Every such place drifts on the first vocabulary change
+parsers; one project's labels were in `task-fields.mjs` **and** in the CSS
+**and** in filter predicates. Every such place drifts on the first vocabulary change
 and doesn't report it — one surface simply stops showing a value the other
 still accepts.

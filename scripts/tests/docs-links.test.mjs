@@ -83,7 +83,7 @@ test("a `<repo>#<path>` reference is skipped by a RULE, and named as such", () =
   // The convention this backlog already uses. Asserting the reason rather than
   // the absence of a finding is the point: a guard that merely failed to
   // resolve it would look identical from the outside.
-  assert.deepEqual(classifyTarget("origin#qa/backlog.yaml"), { skip: "other-repository" });
+  assert.deepEqual(classifyTarget("other-repo#qa/backlog.yaml"), { skip: "other-repository" });
   assert.deepEqual(classifyTarget("some-repo#docs/architecture/x.md"), { skip: "other-repository" });
 });
 
@@ -200,7 +200,7 @@ test("a dead related_docs entry FAILS and is labelled as one", () => {
 test("a cross-repository reference does not fail the run", () => {
   const fx = fixture();
   writeFileSync(join(fx.dir, "docs", "cross.md"),
-    "See [the plan](origin#qa/plan.yaml) and [a site](https://example.com).\n", "utf8");
+    "See [the plan](other-repo#qa/plan.yaml) and [a site](https://example.com).\n", "utf8");
   const r = check(fx);
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /another repository were skipped on purpose/);

@@ -165,18 +165,19 @@ bare name is rejected loudly, not guessed.
 node --test scripts/tests/*.test.mjs
 ```
 
-**341/341 green** (2026-08-31), across 28 files. Two rules keep them honest: the
-backlog directory comes from `scripts/tests/_repo.mjs` (it settles both
-layouts — `<repo>/backlog` and co-located), and the tests do not assert
-another project's values — statuses, labels and board slugs are DATA, not the
-tool's contract.
+Green, and the command above is the only thing entitled to say how many — a
+number written here is stale by the next commit (TL-172). Two rules keep the
+suite honest: the backlog directory comes from `scripts/tests/_repo.mjs` (it
+settles both layouts — `<repo>/backlog` and co-located), and the tests do not
+assert another project's values, because statuses, labels and board slugs are
+DATA, not the tool's contract.
 
 ---
 
 ## 3. What's coming
 
-43 tasks open. Grouped below by topic; the ID leads to the file with the full
-reasoning.
+What is still open — `worktrail stats` counts it, this list does not. Grouped
+below by topic; the ID leads to the file with the full reasoning.
 
 ### 3.1 Closing a task must be proven — the highest priority
 
@@ -186,9 +187,10 @@ agent it was meant to police. This is the tool's single distinguishing
 feature and today it exists only as a convention, not a mechanism.
 
 - **TL-86** — acceptance criteria ticked from `verification:`, not declared.
-  The measurement that prompted this: 12 of 44 closed tasks have 60
-  unticked criteria between them, despite working `verification:`. Two lists
-  about the same "done", only one of them real.
+  The measurement that prompted this, taken on this repository and
+  reproducible on any other with `worktrail check --criteria`: a quarter of
+  the closed tasks had criteria left unticked while their `verification:` was
+  green and real. Two lists about the same "done", only one of them run.
 - **TL-82** — `worktrail done <ID>` runs `verification:`, shows its output
   and REFUSES to close on failure. An empty list and a template literal also
   fail the check; `manual:` requires confirmation recorded in the history.
