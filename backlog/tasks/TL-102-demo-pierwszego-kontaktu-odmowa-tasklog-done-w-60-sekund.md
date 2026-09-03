@@ -8,6 +8,7 @@ epic: "Backlog — open source publication"
 priority: P1
 status: in_progress
 owner: agent:claude
+executor: "human"
 estimate: 3h
 confidence: medium
 created: 2026-09-01

@@ -8,6 +8,7 @@ epic: "Backlog — open source publication"
 priority: P1
 status: pending
 owner: unassigned
+executor: "human"
 estimate: 4h
 confidence: low
 created: 2026-09-01

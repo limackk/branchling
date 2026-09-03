@@ -8,6 +8,7 @@ epic: "Backlog viewer"
 priority: P3
 status: pending
 owner: unassigned
+executor: "human"
 estimate: 4h
 confidence: low
 created: 2026-08-31

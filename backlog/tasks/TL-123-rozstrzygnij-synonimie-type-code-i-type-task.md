@@ -8,6 +8,7 @@ epic: "Data integrity"
 priority: P3
 status: pending
 owner: unassigned
+executor: "human"
 estimate: 2h
 confidence: high
 created: 2026-09-01
