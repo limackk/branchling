@@ -1,0 +1,3 @@
+{"id":"01M1JTGF9VXGWXVREH1NG8R1E2","ts":"2026-09-03T05:05:19.675Z","task":"TL-174","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown","session":"tree-6185cd1f78d5"}
+{"id":"01M1JTGF9VCG60AJ1GJJBKKTPT","ts":"2026-09-03T05:05:19.675Z","task":"TL-174","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown","session":"tree-6185cd1f78d5"}
+{"id":"01M1JTRKX4DHZVRSS4014JMSNZ","ts":"2026-09-03T05:09:46.532Z","task":"TL-174","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven","session":"tree-6185cd1f78d5"}

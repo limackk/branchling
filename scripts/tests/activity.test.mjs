@@ -63,6 +63,22 @@ function git(cwd, args, when) {
   });
 }
 
+/**
+ * Assert a git call in a FIXTURE BUILDER, with a message naming what git said
+ * (TL-174).
+ *
+ * `assert.equal(git(...).status, 0)` reports `128 !== 0` at a line that has
+ * nothing to do with what is being tested — which is how a global
+ * `commit.gpgsign=true` cost twelve tests in this file an afternoon. The
+ * environment is isolated now, so this should never fire; when the next
+ * environmental difference turns up, it will say what it was.
+ */
+function ranGit(result, what) {
+  assert.equal(result.status, 0,
+    "git could not " + what + " (exit " + result.status + "):\n" + (result.stderr || "").trim());
+  return result;
+}
+
 const ADDED_AT = "2026-02-01T09:00:00+00:00";
 const CLOSED_AT = "2026-02-05T15:30:00+00:00";
 
@@ -79,7 +95,7 @@ function repo() {
     ids.push((r.stdout.match(/([A-Z]+-\d+)/) || [])[1]);
   }
   git(dir, ["add", "-A"]);
-  assert.equal(git(dir, ["commit", "-qm", "two open tasks"], ADDED_AT).status, 0);
+  ranGit(git(dir, ["commit", "-qm", "two open tasks"], ADDED_AT), "commit the two open tasks");
   return { dir, ids };
 }
 
@@ -91,7 +107,7 @@ function close(dir, id) {
   const file = taskFile(dir, id);
   writeFileSync(file, readFileSync(file, "utf8").replace(/^status: .*$/m, "status: done"), "utf8");
   git(dir, ["add", "-A"]);
-  assert.equal(git(dir, ["commit", "-qm", "close " + id], CLOSED_AT).status, 0);
+  ranGit(git(dir, ["commit", "-qm", "close " + id], CLOSED_AT), "commit the closing of " + id);
 }
 
 const cleanup = (dir) => rmSync(dir, { recursive: true, force: true });

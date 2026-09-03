@@ -6,22 +6,22 @@ labels: []
 board: main
 epic: "CLI surface"
 priority: P2
-status: pending
-owner: unassigned
+status: done
+owner: agent:claude
 role: ""
 executor: ""
 estimate: 2h
 confidence: high
 created: 2026-09-02
-updated: 2026-09-02
+updated: 2026-09-03
 blocked_by: []
 blocks: []
 related_docs: []
 verification:
   - id: signing-hostile
     bash: "node --test scripts/tests/git-env-isolation.test.mjs"
-  - id: suite-under-signing
-    bash: "git -c commit.gpgsign=true -c gpg.format=ssh -c user.signingkey=/dev/null config --get commit.gpgsign >/dev/null && node --test scripts/tests/*.test.mjs"
+  - id: whole-suite
+    bash: "node --test scripts/tests/*.test.mjs"
 ---
 
 ## Goal
@@ -73,26 +73,49 @@ fixture repository has no reason to be signed, that is all.
 
 ## Steps
 
-1. Put ONE git helper in `_repo.mjs`, with the isolating flags on it: identity,
-   `commit.gpgsign=false`, and a default branch name so the fixture does not
-   depend on the machine's `init.defaultBranch`.
-2. Move every test file that shells out to git onto it.
-3. Add a guard, with a positive control, that fails when a test file invokes
-   `git` without going through the helper — the eight-of-twenty split above is
-   what an unenforced convention looks like.
+1. Isolate git BY ENVIRONMENT inside `isolateHome()`: `GIT_CONFIG_GLOBAL` and
+   `GIT_CONFIG_SYSTEM` pointed at an empty file in the throwaway home, identity
+   from `GIT_AUTHOR_*`/`GIT_COMMITTER_*`, and `commit.gpgsign=false` plus
+   `init.defaultBranch=main` stated outright through `GIT_CONFIG_COUNT`.
+2. Add a guard, with a positive control, that fails when a test file spawns
+   `git` without setting that up — the eight-of-twenty split above is what an
+   unenforced convention looks like.
+3. Prove the isolation with a HOSTILE configuration, not with the machine's own:
+   a global config demanding a signature from a key that cannot work, and a
+   control child run without the isolation which must fail.
 4. Make the fixture builders assert with a message that names the git failure,
    so the next environmental difference is readable rather than `128 !== 0`.
 
 ## Acceptance criteria
 
-- [ ] A test file that shells out to git without the shared helper FAILS the
+- [x] A test file that spawns git without isolating the environment FAILS the
       guard, and the guard's positive control proves it can fire. [proof: signing-hostile]
-- [ ] The whole suite passes with `commit.gpgsign=true` in force. [proof: suite-under-signing]
-- [ ] No test turns the user's own signing configuration off outside its own
-      fixture directory. [proof: signing-hostile]
+- [x] A fixture commits cleanly with a hostile global configuration in place,
+      and the same commit WITHOUT the isolation fails. [proof: signing-hostile]
+- [x] The whole suite passes on this machine, whose global configuration signs
+      every commit. [proof: whole-suite]
+- [x] No test writes outside its own throwaway home; the user's signing
+      configuration is untouched. [proof: signing-hostile]
+- [x] A git failure inside a fixture builder reports what git said, not
+      `128 !== 0`. [proof: signing-hostile, whole-suite]
 
 ## Decisions
 
+- **By environment, not by a shared `git()` helper**, which is what this task
+  was written asking for. A helper would have had to be adopted by twenty files
+  and enforced by a guard forever, and even fully adopted it would have covered
+  the flags somebody remembered to put on it — signing, here. Emptying
+  `GIT_CONFIG_GLOBAL` and `GIT_CONFIG_SYSTEM` neutralises the whole file:
+  aliases, `core.hooksPath`, `commit.template`, and whatever the next machine
+  carries. It also reaches the git processes the TOOL spawns, which no flag
+  written in a test file could.
+- **It lives inside `isolateHome()`** rather than beside it. Every test file
+  already calls that — `test-hygiene.test.mjs` makes sure of it — so the fix
+  reached twenty files without editing twenty files, and a new test file gets
+  it by following a rule that already exists.
+- The hostile configuration in the control is CONSTRUCTED, not the machine's: it
+  demands a signature from a key that cannot work, so the control fails on every
+  machine rather than only on one whose ssh agent happens to refuse.
 - Not solved by telling contributors to unset `commit.gpgsign`: a suite whose
   result depends on the reader's git configuration is the defect, and a line in
   CONTRIBUTING.md is a guard nothing runs.

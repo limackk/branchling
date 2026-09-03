@@ -84,7 +84,58 @@ export const TASKS_DIR = join(BACKLOG_DIR, "tasks");
 export function isolateHome(label = "home") {
   const dir = mkdtempSync(join(tmpdir(), "worktrail-test-" + label + "-"));
   process.env[HOME_ENV] = dir;
+  isolateGit(dir);
   return dir;
+}
+
+/**
+ * Point every `git` this process spawns at an EMPTY configuration (TL-174).
+ *
+ * THE SAME DEFECT AS THE HOME, ONE LAYER DOWN. `isolateHome` exists so the suite
+ * answers the same on every machine; git's own configuration was never isolated,
+ * so it did not. Measured on 2026-09-02: a global `commit.gpgsign=true` with an
+ * ssh agent that declines to sign turned twelve tests in `activity.test.mjs` red
+ * at the line that BUILDS the fixture — reported as `128 !== 0`, which names
+ * none of the reasons that were true.
+ *
+ * BY ENVIRONMENT, NOT BY FLAGS ON EVERY CALL. Eight of the twenty test files
+ * that shell out to git passed `-c commit.gpgsign=false` and the rest did not,
+ * which is what an unenforced convention looks like — and even complete, that
+ * convention would only cover signing. `GIT_CONFIG_GLOBAL` and
+ * `GIT_CONFIG_SYSTEM` neutralise the WHOLE of the developer's configuration:
+ * aliases, `core.hooksPath`, `init.defaultBranch`, a `commit.template`, and
+ * whatever the next machine turns out to carry. It also reaches git processes
+ * the TOOL spawns, which no flag in a test file ever could.
+ *
+ * IT DOES NOT TOUCH THE USER'S CONFIGURATION. Nothing is written outside the
+ * throwaway home; signing stays on for their own commits, which is the point —
+ * a fixture repository simply has no reason to be signed.
+ *
+ * The identity comes from `GIT_AUTHOR_*`/`GIT_COMMITTER_*` rather than from a
+ * written config, because with the global file empty there is no identity at
+ * all and every commit would fail for a second, unrelated reason.
+ */
+export function isolateGit(homeDir) {
+  const config = join(homeDir, "gitconfig");
+  writeFileSync(config, "", "utf8");
+  Object.assign(process.env, {
+    GIT_CONFIG_GLOBAL: config,
+    GIT_CONFIG_SYSTEM: config,
+    GIT_AUTHOR_NAME: "worktrail tests",
+    GIT_AUTHOR_EMAIL: "tests@example.invalid",
+    GIT_COMMITTER_NAME: "worktrail tests",
+    GIT_COMMITTER_EMAIL: "tests@example.invalid",
+    // Stated OUTRIGHT as well as by emptying the config, so the intent survives
+    // somebody later pointing GIT_CONFIG_GLOBAL at a file with content in it.
+    GIT_CONFIG_COUNT: "2",
+    GIT_CONFIG_KEY_0: "commit.gpgsign",
+    GIT_CONFIG_VALUE_0: "false",
+    // A fixture must not depend on the machine's default branch name either —
+    // the same class of dependency, and it would have been the next one found.
+    GIT_CONFIG_KEY_1: "init.defaultBranch",
+    GIT_CONFIG_VALUE_1: "main",
+  });
+  return config;
 }
 
 
