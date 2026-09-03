@@ -18,7 +18,7 @@ related_docs:
   - docs/backlog-config-and-portability.md
 verification:
   - bash: "node --test scripts/tests/init-gitignore.test.mjs"
-  - bash: "d=$(mktemp -d) && cd \"$d\" && git init -q . && printf 'node_modules/\\n' > .gitignore && node /Users/limack/workspace/tasklog/bin/branchling.mjs init --dir . >/dev/null && git check-ignore -q INDEX.yaml && echo 'views ignored in an existing repo — OK'"
+  - bash: "T=\"$PWD/bin/branchling.mjs\"; d=$(mktemp -d) && cd \"$d\" && git init -q . && printf 'node_modules/\\n' > .gitignore && node $T init --dir . >/dev/null && git check-ignore -q INDEX.yaml && echo 'views ignored in an existing repo — OK'"
   - bash: "node --test scripts/tests/views-not-versioned.test.mjs"
 ---
 

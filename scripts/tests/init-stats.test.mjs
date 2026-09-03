@@ -208,7 +208,11 @@ test("the configuration from init is GENERIC — no project's vocabulary", () =>
   try {
     run(["init", "--dir", dir]);
     const text = readFileSync(join(dir, "config.yaml"), "utf8") + readFileSync(join(dir, "boards.yaml"), "utf8");
-    for (const word of ["the origin project", "origin", "pre-launch", "backlog-project", "founder", "data-gated"]) {
+    // THIS repository's vocabulary, which is what `init` must not copy. The
+    // origin project's name used to be on this list; it is not written down
+    // anywhere in this tree any more (TL-196), and `check --foreign-context`
+    // is what watches for it now, from a list held outside the repository.
+    for (const word of ["pre-launch", "backlog-project", "founder", "data-gated"]) {
       assert.ok(!text.includes(word), "the template carries this repo's vocabulary: " + word);
     }
   } finally {
@@ -337,7 +341,7 @@ test("the example carries no existing project's vocabulary", () => {
     run(["init", "--dir", dir]);
     const tasks = readdirSync(join(dir, "tasks")).filter((f) => f.endsWith(".md"));
     const text = readFileSync(join(dir, "tasks", tasks[0]), "utf8");
-    assert.doesNotMatch(text, /origin|sync-layer|supabase|railway|founder/i, "the example carries a foreign context");
+    assert.doesNotMatch(text, /supabase|railway|founder/i, "the example carries a foreign context");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

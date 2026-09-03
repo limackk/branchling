@@ -47,7 +47,7 @@ out.
 place a task says "read this before you start". When it points into a void,
 the agent doesn't get an error — it gets less context, and doesn't know it.
 
-The consumer (`origin`) has its own `check-docs-links`, and that is
+The consumer (`<origin>`) has its own `check-docs-links`, and that is
 exactly the class it catches there; the tool came out from under that gate
 and didn't bring it along.
 

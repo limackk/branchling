@@ -49,8 +49,8 @@ Ids carry both identities: the number they had before the extraction renamed
 | BL-1412 → TL-23 / BL-1413 → TL-24 | `init` and `new` — creating a backlog and creating tasks |
 | BL-1417 → TL-25 | Flag validation: a typo fails instead of passing silently |
 | BL-1439 → TL-33 | **An installable package** — `package.json`, `bin/`, the name from one constant |
-| `<origin>#BL-1445` | The extraction into this repository |
-| `<origin>#BL-1446` | The consumer repointed at the installed package; its `backlog/` is now data only |
+| `origin#BL-1445` | The extraction into this repository |
+| `origin#BL-1446` | The consumer repointed at the installed package; its `backlog/` is now data only |
 
 ## The principle that survived all of those decisions
 

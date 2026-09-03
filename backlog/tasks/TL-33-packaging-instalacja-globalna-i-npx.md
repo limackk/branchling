@@ -18,7 +18,7 @@ related_docs:
   - docs/branchling-global-tool.md
 verification:
   - bash: "node --test scripts/tests/packaging.test.mjs"
-  - bash: "cd /tmp && npx --yes /Users/limack/workspace/tasklog -- --help >/dev/null && echo 'npx from an empty directory — OK'"
+  - bash: "R=\"$PWD\"; cd /tmp && npx --yes \"$R\" -- --help >/dev/null && echo 'npx from an empty directory — OK'"
 ---
 
 ## Goal
@@ -132,7 +132,7 @@ node --test scripts/tests/packaging.test.mjs
 npm pack --dry-run 2>&1 | grep -E "tasks/|history/|archive/|boards/|viewer.html" && echo "WARNING: data in the package" || echo "tarball clean — OK"
 
 # 3. Working from a directory without a backlog — expected: error with hint, NOT a write
-cd /tmp && node /Users/limack/workspace/tasklog/bin/branchling.mjs query --count; echo "exit=$?"
+cd /tmp && node /path/to/branchling/bin/branchling.mjs query --count; echo "exit=$?"
 
 # 4. Version from a single source — expected: matching
 test "$(node bin/branchling.mjs --version)" = "$(node -p "require('./package.json').version")" && echo 'version consistent — OK'

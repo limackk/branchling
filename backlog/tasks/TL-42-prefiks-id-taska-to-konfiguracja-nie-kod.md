@@ -47,7 +47,7 @@ ID prefix is the last value of one particular project left in the code. The
 shape is "prefix + number"; "BL" is a value — and someone else's at that.
 
 **The side effect that triggered this.** After the backlog was split
-(`origin` and this repository), both trees issue numbers
+(`<origin>` and this repository), both trees issue numbers
 independently from the same space. `next-id` returned `1448` in BOTH, and
 `BL-1448` today means two different things: here, "Test suite decoupled from
 the source repository"; for the consumer, "Expire the backlog-project
@@ -138,7 +138,7 @@ node scripts/cli.mjs build --dir /tmp/prefix-probe && node scripts/cli.mjs check
 
 - 2026-08-31 done — claude — `task_id_prefix` in the configuration, patterns
   from `scripts/task-id.mjs`, `migrate-prefix` command, drift guard. 12 new
-  tests, full suite 251/251. Consumer (origin) checked after every
+  tests, full suite 251/251. Consumer (the origin repository) checked after every
   change: 1363 tasks, all three guards green.
 - 2026-08-31 STEP 5 RESOLVED THE OPPOSITE WAY — claude — I had recommended
   renumbering THIS backlog to its own prefix. **I am not doing that**,
@@ -198,4 +198,4 @@ node scripts/cli.mjs build --dir /tmp/prefix-probe && node scripts/cli.mjs check
   history after a migration — exactly when it is needed most.
 - 2026-08-30 created — claude — 31 occurrences across 13 files measured;
   triggered by a real `BL-1448` collision between this repository and
-  `origin` after the backlog split
+  `<origin>` after the backlog split

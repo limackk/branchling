@@ -41,14 +41,14 @@ a guard.** The same query produces two opposite verdicts:
 | repo | value | uses | verdict |
 |---|---|---|---|
 | this one | `status: cancelled` | 0 of 155 | **fine** — a terminal status nobody has needed yet |
-| `origin` | `status: on_queue` | 0 of 1397 | **stale** — a workflow status configured and never adopted |
+| `<origin>` | `status: on_queue` | 0 of 1397 | **stale** — a workflow status configured and never adopted |
 
 A gate that failed on zero uses would nag this repository for not having
 cancelled anything. Only a person can tell "not needed yet" from "configured and
 forgotten", so the tool's job is to put the number in front of them, next to the
 two edits that resolve it: use the value, or drop it from `config.yaml`.
 
-**Where the cost lands.** `origin` declares seven statuses; its
+**Where the cost lands.** `<origin>` declares seven statuses; its
 `backlog/README.md` §4, the section anyone reads for what a status means,
 diagrams five. The two it omits are `on_hold` (4 tasks) and `on_queue` (0). An
 agent closing an epic there read §4, concluded the vocabulary had no state for
@@ -118,4 +118,4 @@ in this repo is not dead, it is unused. The report should say what it measured
 
 ## Log
 
-- 2026-09-02 created — agent:claude — from closing the "Ochrona danych lokalnych" epic <!-- language-guard: allow — another repository's epic name, a fact rather than prose --> in origin; measured in both repos before filing, and the two opposite verdicts are what turned it from a guard into a report
+- 2026-09-02 created — agent:claude — from closing the "Ochrona danych lokalnych" epic <!-- language-guard: allow — another repository's epic name, a fact rather than prose --> in the origin repository; measured in both repos before filing, and the two opposite verdicts are what turned it from a guard into a report

@@ -1,1 +1,7 @@
 {"id":"01M1KJM4W0NZ3VVT13018H6QAN","ts":"2026-09-03T12:06:45.888Z","task":"TL-197","field":"__created__","from":"","to":"backlog/activity/ is computed data that no .gitignore line keeps out of a commit","actor":"agent:claude","source":"manual","reason":"Filing the two improvements the runs surfaced."}
+{"id":"01M1KGRFMQQKSK95NGF1NJHMSE","ts":"2026-09-03T11:34:10.839Z","task":"TL-197","field":"__created__","from":"","to":"backlog/activity/ is computed data that no .gitignore line keeps out of a commit","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1KGT9Y19G04D17ERB036FNK","ts":"2026-09-03T11:35:10.529Z","task":"TL-197","field":"priority","from":"P1","to":"P2","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1KGT9Y1YHRYQ0M9A3M3PD26","ts":"2026-09-03T11:35:10.529Z","task":"TL-197","field":"estimate","from":"2h","to":"30m","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1KGT9Y1ZZF9JJ7N9AXPCRWT","ts":"2026-09-03T11:35:10.529Z","task":"TL-197","field":"confidence","from":"medium","to":"high","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1KGT9Y14SQ8R6JC6GS9X3YE","ts":"2026-09-03T11:35:10.529Z","task":"TL-197","field":"labels","from":[],"to":["hygiene"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1KGT9Y1EFWSPHFKNS4B83H9","ts":"2026-09-03T11:35:10.529Z","task":"TL-197","field":"related_docs","from":[],"to":[".gitignore"],"actor":"unknown","source":"external","reason":"unknown"}
