@@ -58,6 +58,7 @@ import { crossBranchState, describeDivergence, divergences, scanNote } from "./b
 import { loadConfigOrExit } from "./config.mjs";
 import { ACTOR_NAMESPACES, FIELD_COMMENT, isValidActor, isValidReason, readHistory } from "./history.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
+import { dispatchWave, loadPlanForDispatch } from "./plan.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { inProgressStatus, rebuildViews, refusalCode, refusalPayload, renderTake, takeJson, takeTask } from "./take-task.mjs";
@@ -67,7 +68,7 @@ import { MARK, color, failure, warn } from "./ui.mjs";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export const NEXT_FLAGS = [
-  "--dir", "--actor", "--reason", "--json",
+  "--dir", "--actor", "--reason", "--json", "--plan",
   "--board", "--label", "--priority", "--epic", "--status", "--role",
 ];
 
@@ -76,12 +77,13 @@ export const EXIT_NOTHING_TO_TAKE = 3;
 
 /** PURE — resolves `next`'s arguments. Throws on a usage error. */
 export function parseNextArgs(args) {
-  const plan = { dir: null, actor: null, reason: null, json: false,
+  const plan = { dir: null, actor: null, reason: null, json: false, usePlan: false,
     board: null, label: null, priority: null, epic: null, status: null,
     role: null, roleStrict: false };
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === "--json") { plan.json = true; continue; }
+    if (a === "--plan") { plan.usePlan = true; continue; }
     if (a === "--role-strict") { plan.roleStrict = true; continue; }
     if (NEXT_FLAGS.indexOf(a) >= 0) {
       const value = args[++i] || null;
@@ -282,7 +284,13 @@ export function heldElsewhere(task, handedOut) {
  *            claiming it here would manufacture the divergence. So the local
  *            status has to be one of this call's own.
  *
+ * THE PLAN NARROWS IT AND NEVER REORDERS IT (TL-183). `filters.planIds` keeps
+ * only the tasks of the wave the caller resolved; INSIDE the wave the policy
+ * above still decides, because a wave is a batch and the plan makes no claim
+ * about the order of its members.
+ *
  * @returns {{candidates: object[], reclaimable: Set<string>, skippedBlocked: number,
+ *            skippedUnplanned: number,
  *            skippedElsewhere: Array<{id: string, elsewhere: object[]}>}}
  */
 /**
@@ -331,6 +339,23 @@ export function selectCandidates(records, config, filters, now) {
       if (!archived.has(t.status) && t.status !== inProgress) {
         skippedExecutor.push({ id: t.id, executor: String(t.executor || "").trim() });
       }
+    }
+    records = kept;
+  }
+  // The plan gate (TL-183), applied to the RECORDS for the same reason as the
+  // species one: a task the caller's plan does not schedule must be invisible to
+  // the reclaim and unblocked pools too, not merely absent from the fresh queue.
+  // `filters.planIds` is the ACTIVE WAVE's ids and nothing else — the caller
+  // resolved the wave, because that needs the file and this function does not
+  // read the disk. An EMPTY set is a plan whose every task is closed, and it
+  // correctly leaves nothing: falling through to unplanned work would answer a
+  // question the caller did not ask.
+  let skippedUnplanned = 0;
+  if (filters.planIds) {
+    const kept = [];
+    for (const t of records) {
+      if (filters.planIds.has(String(t.id).toUpperCase())) { kept.push(t); continue; }
+      if (!archived.has(t.status) && t.status !== inProgress) skippedUnplanned++;
     }
     records = kept;
   }
@@ -394,6 +419,7 @@ export function selectCandidates(records, config, filters, now) {
   }
   return {
     candidates, reclaimable, unblocked, skippedElsewhere, skippedExecutor, skippedHandedBack,
+    skippedUnplanned,
     // The count is of tasks that MATCHED and were held back by an open blocker;
     // the unblocked ones were never in `matching`, so they must not be
     // subtracted from it.
@@ -429,6 +455,19 @@ export function run(argv) {
     return 2;
   }
   const config = loadConfigOrExit(root);
+
+  // `--plan` is settled BEFORE the scan and before any claim (TL-183): a caller
+  // who asked for an order, got the priority queue instead and was told nothing
+  // is the defect this flag exists to remove, not one it may reintroduce.
+  let planned = null;
+  if (plan.usePlan) {
+    const loaded = loadPlanForDispatch(backlogPaths(root).planPath);
+    if (loaded.error) {
+      console.error(failure(N + " next", loaded.error, loaded.details, [N + " next --help"]));
+      return 2;
+    }
+    planned = loaded.plan;
+  }
 
   // A role outside the project's vocabulary is a typo, and a typo that silently
   // matches nothing looks exactly like an empty queue (TL-97's rule, applied to
@@ -494,8 +533,25 @@ export function run(argv) {
     if (config.archivedStatuses.indexOf(t.status) >= 0) continue;
     t.handedBack = lastHandoff(readHistory(root, t.id));
   }
-  const { candidates, reclaimable, unblocked, skippedBlocked, skippedElsewhere, skippedExecutor, skippedHandedBack } =
+  // The wave is resolved from the RECORDS just read, never from a generated
+  // view: a view answers from the last `build`, and a wave whose last task
+  // closed a minute ago would still be the one this hands work out of.
+  let wave = null;
+  if (planned) {
+    wave = dispatchWave(planned, records, {
+      archivedStatuses: config.archivedStatuses,
+      inProgressStatus: inProgressStatus(config),
+    });
+    filters.planIds = new Set((wave ? wave.ids : []).map((id) => String(id).toUpperCase()));
+  }
+  const { candidates, reclaimable, unblocked, skippedBlocked, skippedElsewhere, skippedExecutor, skippedHandedBack, skippedUnplanned } =
     selectCandidates(records, config, filters, now);
+  const planJson = planned
+    ? {
+        wave: wave ? wave.index + 1 : null, name: wave ? wave.name : "",
+        scheduled: wave ? wave.ids.length : 0, open: wave ? wave.open : 0, skippedUnplanned,
+      }
+    : null;
   // Named, never silent: a candidate that disappears without a word is
   // indistinguishable from an empty queue, and the reader has no second place
   // to look.
@@ -532,10 +588,15 @@ export function run(argv) {
       if (plan.json) {
         printJson("task-take", {
           ...takeJson(result), passedOver, considered: candidates.length,
-          skippedElsewhere, skippedExecutor, skippedHandedBack,
+          skippedElsewhere, skippedExecutor, skippedHandedBack, plan: planJson,
           scan: { scanned: scan.scanned, reason: scan.reason },
         });
       } else {
+        if (wave) {
+          console.log(color.dim(
+            MARK.bullet + " plan wave " + (wave.index + 1) + ": " + (wave.name || "unnamed")
+          ));
+        }
         for (const line of handedBackLines) console.log(color.dim(MARK.bullet + " " + line));
         for (const line of elsewhereLines) console.log(color.dim(MARK.bullet + " " + line));
         for (const p of passedOver) {
@@ -561,6 +622,20 @@ export function run(argv) {
   const details = [
     "searched statuses: " + (searched.join(", ") || "(none — check `statuses` in config.yaml)"),
   ];
+  // The plan narrowed the queue more than anything else did, so it is said
+  // first: without this line an order somebody wrote and an empty backlog read
+  // identically.
+  if (planned) {
+    details.push(wave
+      ? "plan wave " + (wave.index + 1) + " (" + (wave.name || "unnamed") + ") — " +
+          wave.ids.length + " task(s) scheduled, " + wave.open + " still open"
+      : "the plan schedules nothing that is still open — every wave of it is finished");
+    if (skippedUnplanned) {
+      details.push(
+        skippedUnplanned + " open task(s) the plan does not schedule — `--plan` never hands those out"
+      );
+    }
+  }
   if (wantedRoles) {
     details.push(
       "searched roles: " + wantedRoles.join(", ") +
@@ -609,7 +684,7 @@ export function run(argv) {
       ok: false, taken: false, refusalKind: "nothing-to-take", refusal: "nothing to take",
       details,
       searchedStatuses: searched, skippedBlocked, passedOver, skippedElsewhere, skippedExecutor,
-      skippedHandedBack,
+      skippedHandedBack, plan: planJson,
       scan: { scanned: scan.scanned, reason: scan.reason },
     });
   } else {

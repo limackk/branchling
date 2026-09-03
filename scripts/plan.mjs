@@ -439,3 +439,64 @@ export function planState(plan, tasks, config = {}) {
     inProgressStatus,
   };
 }
+
+/**
+ * The wave a dispatcher may hand work out of (TL-183). PURE.
+ *
+ * ONE DEFINITION OF "ACTIVE WAVE", NOT TWO. `planState` already answers it for
+ * the `plan` command and for the viewer, and a dispatcher that computed its own
+ * would put an agent on a different wave than the page somebody is watching —
+ * the exact disagreement that function's header exists to prevent. So this is a
+ * projection of that answer, not a second reading of the file.
+ *
+ * A PLAN WHOSE EVERY TASK IS CLOSED RETURNS NULL, and the caller has to say
+ * "nothing to take" rather than fall through to the work the plan does not
+ * schedule. The plan is advisory about ORDER, but a caller that asked for it
+ * asked for that order; widening the answer would be answering a different
+ * question, and quietly at that.
+ *
+ * @returns {{index: number, name: string, ids: string[], open: number}|null}
+ */
+export function dispatchWave(plan, tasks, config = {}) {
+  const state = planState(plan, tasks, config);
+  if (state.activeWave === null) return null;
+  const w = state.waves[state.activeWave];
+  return { index: w.index, name: w.name, ids: w.tasks.map((e) => e.id), open: w.open };
+}
+
+/**
+ * Read the plan for a caller that REQUIRES one — `next --plan`, `run --plan`.
+ *
+ * WHY THE ABSENCE OF A PLAN IS A USAGE ERROR AND NOT AN EMPTY FILTER. A filter
+ * that matches everything reads exactly like a plan that schedules everything,
+ * and the caller would watch a fleet work in priority order convinced it was
+ * following an order somebody wrote. The same argument as an unknown `--role`:
+ * silence about a filter that did not apply is the defect.
+ *
+ * A PLAN THAT DOES NOT PARSE IS THE SAME REFUSAL. Half a plan is not a weaker
+ * plan, it is a different one — the waves after the unreadable line are missing,
+ * so the order would be wrong in a way nothing downstream can notice.
+ *
+ * @returns {{plan: object}|{error: string, details: string[]}}
+ */
+export function loadPlanForDispatch(planPath, read = readFileSync, exists = existsSync) {
+  const loaded = loadPlan(planPath, read, exists);
+  if (!loaded.exists) {
+    return {
+      error: "`--plan` was given and there is no plan to follow",
+      details: [
+        "expected: " + planPath,
+        "The flag restricts the queue to what the plan schedules, in wave order. With",
+        "no file there is no order, and matching everything instead would look exactly",
+        "like a plan that schedules everything.",
+      ],
+    };
+  }
+  if (loaded.problems.length) {
+    return {
+      error: "the plan cannot be read, so nothing can be dispatched from it",
+      details: [planPath].concat(loaded.problems.map((p) => "  " + p)),
+    };
+  }
+  return { plan: loaded.plan };
+}

@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1
-status: pending  # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1d
@@ -91,4 +91,48 @@ not sort anything itself — the policy stays in `next`, where it is tested.
 
 ## Decisions
 
-Nothing decided yet beyond what is written above.
+**The wave is a PROJECTION of `planState`, not a second reading of the file.**
+`dispatchWave` in `scripts/plan.mjs` calls the function `plan` and the viewer
+already use and returns its active wave. A dispatcher that computed "earliest
+wave still open" for itself would eventually disagree with the page somebody is
+watching, and the disagreement would surface as an agent starting a task the
+board says is not next.
+
+**The gate is applied to the RECORDS inside `selectCandidates`, not after it.**
+Filtering the answer would have left the reclaim pool and the discharged-blocker
+pool (TL-127) untouched, so `--plan` would have handed out unplanned work by two
+side doors. It also means `run --dry-run`, which calls `selectCandidates`
+directly, obeys the plan through the same implementation rather than a copy.
+
+**The caller resolves the wave, the selector never reads the disk.**
+`selectCandidates` takes `filters.planIds` — a set of ids — because it is pure
+with respect to the disk and the whole suite depends on that.
+
+**An exhausted plan hands out nothing, and says so.** When every scheduled task
+is closed the id set is empty and the answer is exit 3 with "every wave of it is
+finished". Falling back to the unplanned work would answer a question the caller
+did not ask, and quietly.
+
+**No plan, or a plan that does not parse, is exit 2 — before any claim.** Half a
+plan is not a weaker plan but a different one: the waves after the unreadable
+line are missing, and the order would be wrong in a way nothing downstream can
+notice. `run --plan` refuses at the same point the unknown-role check refuses,
+so no task is claimed, no agent spawned and no log written for an order that was
+never going to be followed.
+
+**`run` passes `--plan` down instead of resolving the wave once.** `next`
+re-reads the plan against the tree on every iteration, so the wave finished by
+the task just closed is left behind immediately. A wave computed at the top of
+the run would be the one that was active when it started.
+
+**`--dry-run --plan` walks the waves from the active one onward**, rather than
+showing only the wave `next` would hand out of now — the order is the reason
+somebody passes the flag to a dry run. It deliberately does NOT try to predict
+which currently blocked tasks a later wave will free: the run genuinely would
+reach some of them, so the listing UNDER-reports, and it says so in one line
+rather than guessing.
+
+**What was deliberately not done.** Nothing re-ranks inside a wave; `together`
+groups are not handed out as a unit (`next` claims one task, and a group is a
+statement about one act of work, not about one reservation); and the report a
+`--plan` run prints when it stops is still the old sentence — that is TL-186.

@@ -49,8 +49,9 @@ import { recordEdit } from "./history.mjs";
 import { lockScope, releaseLock, stateRoot } from "./lock.mjs";
 import { callerSpecies, queueStatuses, selectCandidates, servesExecutor } from "./next-task.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
+import { loadPlanForDispatch, planState } from "./plan.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
-import { rebuildViews, todayStamp } from "./take-task.mjs";
+import { inProgressStatus, rebuildViews, todayStamp } from "./take-task.mjs";
 import { ACTOR_NAMESPACES, buildFieldSpecs, extractMeta, fieldSpec, isValidActor, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
 import { readTaskRecords, splitList, unknownFilterValues } from "./task-select.mjs";
 import { MARK, color, failure, warn } from "./ui.mjs";
@@ -75,7 +76,7 @@ export const AGENT_ENV = "BACKLOG_AGENT_COMMAND";
 
 export const RUN_FLAGS = [
   "--dir", "--actor", "--agent", "--agent-for", "--max-attempts", "--max-tasks", "--timeout",
-  "--log-dir", "--stuck-status", "--json", "--dry-run",
+  "--log-dir", "--stuck-status", "--json", "--dry-run", "--plan",
   "--board", "--label", "--priority", "--epic",
 ];
 
@@ -85,7 +86,7 @@ const DEFAULT_TIMEOUT_SECONDS = 900;
 /** PURE — resolves `run`'s arguments. Throws on a usage error. */
 export function parseRunArgs(args) {
   const plan = {
-    dir: null, actor: null, agent: null, agentFor: {}, json: false, dryRun: false,
+    dir: null, actor: null, agent: null, agentFor: {}, json: false, dryRun: false, usePlan: false,
     maxAttempts: DEFAULT_MAX_ATTEMPTS, maxTasks: 0, timeout: DEFAULT_TIMEOUT_SECONDS,
     logDir: null, stuckStatus: null, board: null, label: null, priority: null, epic: null,
   };
@@ -94,6 +95,7 @@ export function parseRunArgs(args) {
     const a = args[i];
     if (a === "--json") { plan.json = true; continue; }
     if (a === "--dry-run") { plan.dryRun = true; continue; }
+    if (a === "--plan") { plan.usePlan = true; continue; }
     if (RUN_FLAGS.indexOf(a) >= 0) {
       const value = args[++i] || null;
       if (!value) throw new Error("`" + a + "` with no value");
@@ -564,6 +566,20 @@ export function run(argv) {
     return 2;
   }
 
+  // The plan is read BEFORE the loop starts, for the same reason as the roles
+  // above: a missing plan found at the first `next` would have cost a claim, a
+  // spawned agent and a log file before anybody was told the order was never
+  // followed (TL-183).
+  let planned = null;
+  if (plan.usePlan) {
+    const loaded = loadPlanForDispatch(backlogPaths(root).planPath);
+    if (loaded.error) {
+      console.error(failure(N + " run", loaded.error, loaded.details, [N + " run --help"]));
+      return 2;
+    }
+    planned = loaded.plan;
+  }
+
   plan.agent = plan.agent || process.env[AGENT_ENV] || null;
   if (!plan.agent && !plan.dryRun) {
     console.error(failure(N + " run", "no agent command — this tool does not have one of its own", [
@@ -604,6 +620,11 @@ export function run(argv) {
   for (const key of ["board", "label", "priority", "epic"]) {
     if (plan[key]) passthrough.push("--" + key, plan[key]);
   }
+  // The loop does not resolve the wave itself and must not: `next` re-reads the
+  // plan against the tree on every iteration, so a wave finished by the task
+  // just closed is left behind at once. A wave computed here would be the one
+  // that was active when the run started.
+  if (planned) passthrough.push("--plan");
   // The roles are pushed into the SELECTION rather than filtered after it. A
   // task claimed and then skipped would be left `in_progress` under this run's
   // actor with nobody working on it — the dispatcher must not hand out what this
@@ -619,19 +640,55 @@ export function run(argv) {
   // second implementation of the policy — the same module, not a copy of it.
   if (plan.dryRun) {
     const records = readTaskRecords(backlogPaths(root).tasksDir, config.taskId.file);
-    const { candidates } = selectCandidates(records, config, { ...filters, callerSpecies: callerSpecies(actor) }, Date.now());
-    const shown = plan.maxTasks ? candidates.slice(0, plan.maxTasks) : candidates;
+    const base = { ...filters, callerSpecies: callerSpecies(actor) };
+    const rows = [];
+    if (planned) {
+      // WAVE BY WAVE, FROM THE ACTIVE ONE ON. A single call would show only the
+      // wave `next` hands out of right now, which answers "what is next" and not
+      // "what order would this run follow" — and the order is the whole reason
+      // somebody passes `--plan` to a dry run.
+      const state = planState(planned, records, {
+        archivedStatuses: config.archivedStatuses,
+        inProgressStatus: inProgressStatus(config),
+      });
+      const from = state.activeWave === null ? state.waves.length : state.activeWave;
+      for (const w of state.waves.slice(from)) {
+        const planIds = new Set(w.tasks.map((e) => String(e.id).toUpperCase()));
+        const { candidates } = selectCandidates(records, config, { ...base, planIds }, Date.now());
+        for (const t of candidates) rows.push({ task: t, wave: w.index + 1, name: w.name });
+      }
+    } else {
+      const { candidates } = selectCandidates(records, config, base, Date.now());
+      for (const t of candidates) rows.push({ task: t, wave: null, name: "" });
+    }
+    const shown = plan.maxTasks ? rows.slice(0, plan.maxTasks) : rows;
     if (plan.json) {
       console.log(JSON.stringify({
-        ok: true, dryRun: true, agent: plan.agent,
-        order: shown.map((t) => ({ id: t.id, priority: t.priority, status: t.status, file: t.file })),
-        considered: candidates.length,
+        ok: true, dryRun: true, agent: plan.agent, plan: planned ? true : false,
+        order: shown.map((r) => ({
+          id: r.task.id, priority: r.task.priority, status: r.task.status, file: r.task.file,
+          ...(planned ? { wave: r.wave, waveName: r.name } : {}),
+        })),
+        considered: rows.length,
       }, null, 2));
     } else {
       console.log("");
       console.log("  " + shown.length + " task(s) would run, in this order:");
-      for (const t of shown) console.log("    " + MARK.bullet + " " + t.id + "  " + t.priority + "  " + t.title);
+      let heading = null;
+      for (const r of shown) {
+        if (planned && r.wave !== heading) {
+          heading = r.wave;
+          console.log("    " + color.dim("wave " + r.wave + " — " + (r.name || "unnamed")));
+        }
+        console.log((planned ? "      " : "    ") + MARK.bullet + " " + r.task.id + "  " +
+          r.task.priority + "  " + r.task.title);
+      }
       console.log("");
+      if (planned) {
+        console.log("  " + color.dim(
+          "a task whose blockers are still open is not listed — a later wave grows as the earlier ones close"
+        ));
+      }
       console.log("  " + color.dim("`--dry-run`: nothing was claimed and no agent was run"));
     }
     return 0;

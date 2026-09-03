@@ -164,6 +164,10 @@ export const KINDS = {
     // to draw from, and it cannot parse a sentence to do it.
     passedOver: [], considered: null, searchedStatuses: [], skippedBlocked: null,
     skippedElsewhere: [], skippedExecutor: [], skippedHandedBack: [], scan: null,
+    // `--plan` only (TL-183): which wave was followed, and how many open tasks
+    // were left alone because the plan does not schedule them. `null` when the
+    // flag was not given — a wave number of 0 would say a plan was consulted.
+    plan: null,
   },
   // `handoff --json` (TL-99). Three from/to pairs and the comment that carries
   // the reason: a handoff is not a task being performed, it is a task changing

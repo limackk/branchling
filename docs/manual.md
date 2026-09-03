@@ -218,6 +218,29 @@ wave; **unplanned** are the open tasks the plan does not schedule — listed by 
 because that is how a plan rots; **stale** are plan tasks already closed in a
 later wave, the sign that the order wants reshuffling.
 
+**Asking the dispatcher to follow it** is `--plan`, on `next` and on `run`. The
+queue then holds only what the plan schedules, and only the earliest wave still
+holding an open task; inside that wave priority and id decide as they always
+did, because a wave is a batch and the plan makes no claim about the order of
+its members. `run --plan --dry-run` prints the order under its wave names.
+
+```
+$ branchling run --plan --dry-run
+  3 task(s) would run, in this order:
+    wave 1 — Foundation
+      · TASK-17  P3  …
+    wave 2 — Consumers
+      · TASK-18  P1  …
+```
+
+It is a **filter the caller asks for**, exactly like `--board` or `--role`, and
+that is deliberate. Making it implicit would mean an unplanned task could never
+be handed out while a plan existed — the plan would have become a truth about
+state it was never meant to be. Without the flag nothing reads `plan.yaml`, and
+the queue is ordered by priority. With the flag and no plan file the call
+**fails**: a filter matching everything reads exactly like a plan that schedules
+everything.
+
 ## Seeding a backlog from a plan
 
 `branchling seed` reads a structured plan on **standard input** and turns it into
@@ -326,7 +349,9 @@ person, and the report counts those tasks by role and names them. That is the
 whole escalation mechanism: an absent entry, not a workflow engine. A role your
 `config.yaml` does not declare fails before the loop starts. `next --role r`
 asks the same question by hand and hands out that role *or* the tasks with none;
-`--role-strict` narrows it to exactly that role.
+`--role-strict` narrows it to exactly that role. `--plan` on either command
+restricts the queue to the wave `plan.yaml` is currently on — see [the execution
+order](#the-execution-order-planyaml).
 
 ```bash
 branchling run --agent "codex exec" \
@@ -541,7 +566,7 @@ implementation detail. Every reading command answers in the same envelope:
 | `<command> --help` | `command-help` | `command`, `summary`, `usage`, `configured`, `flags` |
 | `pr-summary` | `pr-summary` | `base`, `scanned`, `reason`, `tasks`, `engaged`, `cost` |
 | `audit` | `audit` | `since`, `dayZero`, `tasks`, `findings`, `closedWithoutTrace`, `skippedBeforeSince`, `reopened`, `rework`, `parked`, `withoutPremise`, `awaitingVouch`, `vouches`, `vouchesByActor` |
-| `take`, `next` | `task-take` | `ok`, `taken`, `id`, `file`, `task`, `text`, `warnings`, `reclaimed`, `lock`, `refusalKind`, `refusal`, `details`, and — filled in by next — `passedOver`, `considered`, `searchedStatuses`, `skippedBlocked`, `skippedElsewhere`, `skippedExecutor`, `skippedHandedBack`, `scan` |
+| `take`, `next` | `task-take` | `ok`, `taken`, `id`, `file`, `task`, `text`, `warnings`, `reclaimed`, `lock`, `refusalKind`, `refusal`, `details`, and — filled in by next — `passedOver`, `considered`, `searchedStatuses`, `skippedBlocked`, `skippedElsewhere`, `skippedExecutor`, `skippedHandedBack`, `scan`, `plan` |
 | `handoff` | `task-handoff` | `ok`, `id`, `file`, `task`, `role`, `owner`, `status` (each a from/to pair), `comment`, `released`, `warnings`, `refusalKind`, `refusal`, `details` |
 | `ask` | `task-ask` | `ok`, `id`, `file`, `question` (its event id, timestamp, text and asker), `changes`, `blockedReason`, `refusalKind`, `refusal`, `details` |
 | `done` | `verification-run` | `ok`, `task`, `dryRun`, `closed`, `entries` (one per `verification:` entry, with its exit code), `status`, `wouldBe`, `ticked`, `refusalKind`, `refusal`, `details` |
