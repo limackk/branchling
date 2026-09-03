@@ -5,3 +5,4 @@
 {"id":"01M1GV6MDBYWPEKCYY19213RDQ","ts":"2026-09-02T10:38:56.939Z","task":"TL-31","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
 {"id":"01M1GV6MDB0M7JENKSCDMW6199","ts":"2026-09-02T10:38:56.939Z","task":"TL-31","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
 {"id":"01M1GVTXXJWBVKT24KK61RCG2D","ts":"2026-09-02T10:50:02.034Z","task":"TL-31","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
+{"id":"01M1KKYRVSS9DNE04DHAC8Y0F7","ts":"2026-09-03T12:30:02.617Z","task":"TL-31","field":"related_docs","from":["docs/backlog-time-tracking.md","origin#docs/architecture/legal-and-compliance.md"],"to":["docs/backlog-time-tracking.md","origin#docs/architecture/legal-and-compliance.md"],"actor":"unknown","source":"boot","reason":"unknown"}
