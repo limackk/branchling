@@ -301,13 +301,35 @@ WHILE YOU WORK.
                        writing commands REFUSE rather than ask when a status
                        needs a stated reason; here those statuses are
                        {{reason_statuses}}.
-  Not yours to decide  A trade-off this task does not settle, an approval you
-                       do not hold — that is a handoff, not a guess. \`{{tool}}
-                       handoff <ID> --to-owner <name> --reason "…"\` returns it
-                       to the queue with the question attached and the exchange
-                       recorded, so the next reader inherits the doubt instead of
-                       your guess. Where this backlog declares \`roles:\`,
-                       \`--to-role\` hands it to one of those instead.
+  Not yours to decide  A trade-off this task does not settle, an approval you do
+                       not hold — that is a question, not a guess:
+
+                         {{tool}} ask <ID> --question "…" \\
+                           --option "… — why it is a candidate" \\
+                           --option "…" --recommend <n>
+
+                       CARRY THE OPTIONS YOU CONSIDERED, AND NAME ONE. You have
+                       already weighed the candidate answers; sending the prose
+                       alone throws that away and makes the reader redo it from a
+                       worse position. Recommend the option that is SOLID — it
+                       survives the most cases, not the one that is quickest —
+                       and that COMPOSES: it is built from the commands and
+                       vocabularies already here, not from a new layer or a
+                       second source of truth. State both IN the option's text;
+                       an option nobody can judge is not an option. Asking with
+                       no options is still legal, and the event records that none
+                       were offered.
+
+                       The task stops in {{reason_statuses}} and \`next\` passes
+                       over it until somebody answers with \`{{tool}} decide <ID>
+                       --resolves <event id> --choose <n>\`, which lifts the block
+                       and puts the task back where it came from.
+
+                       Where what the work needs is a different OWNER rather than
+                       an answer, that is \`{{tool}} handoff <ID> --to-owner
+                       <name> --reason "…"\`, which returns it to the queue with
+                       the exchange recorded. Where this backlog declares
+                       \`roles:\`, \`--to-role\` hands it to one of those.
   Frontmatter changed  Run \`{{tool}} build\`. It is idempotent and near-instant;
                        skipping it leaves the views disagreeing with the file you
                        just edited.

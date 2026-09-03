@@ -28,7 +28,28 @@
  * `__comment__` has always followed, and a session asking the same thing twice
  * is information rather than noise.
  *
+ * THE QUESTION CARRIES ITS OPTIONS, AND NAMES ONE (TL-204). A session that asks
+ * has already weighed the candidate answers; sending only the prose makes the
+ * reader do that work a second time from a worse position. `--option` is
+ * repeatable and `--recommend <n>` points at one of them, both recorded in the
+ * SAME event — options are part of the question, not a second thing to keep in
+ * step (law 2), and the panel keeps computing from the log.
+ *
+ * WHY `--recommend` IS REQUIRED ONCE OPTIONS EXIST. An agent that offers a menu
+ * and declines to point at a row has moved the work rather than done it: the
+ * analysis that produced the menu is exactly the analysis the reader lacks. A
+ * question with NO options stays legal — some genuinely have no enumerable
+ * answers — and then there is nothing to recommend.
+ *
+ * WHY THE EMPTY LIST IS STILL WRITTEN. Three states, not two: no `options` key
+ * at all is an event recorded before this existed, `[]` is a session that
+ * offered none, and a non-empty list is a menu. Collapsing the first two would
+ * make "we could not record it" and "there was nothing to offer" the same row,
+ * and a review counting how often questions arrive bare would count the wrong
+ * thing.
+ *
  * Tests: `node --test scripts/tests/ask.test.mjs`
+ *        `node --test scripts/tests/ask-options.test.mjs`
  */
 
 import { dirname, join } from "node:path";
@@ -49,15 +70,104 @@ import { MARK, color, failure } from "./ui.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-export const ASK_FLAGS = ["--dir", "--actor", "--question", "--status", "--json"];
+export const ASK_FLAGS = ["--dir", "--actor", "--question", "--option", "--recommend", "--status", "--json"];
+
+/**
+ * The menu and the row it points at. PURE, and exported so a test can reach
+ * every refusal without a subprocess — the arrangement `blockingStatus` uses.
+ *
+ * OPTIONS ARE NUMBERED FROM 1, in the order the flags were given. The number is
+ * what a person types back into `decide --choose`, so it is the number they
+ * READ; a 0-based index stored here would have to be translated at both ends,
+ * and one of the two translations is where the off-by-one lives.
+ *
+ * @param {string[]} rawOptions the `--option` values, in order
+ * @param {string|number|null} rawRecommend the `--recommend` value, unparsed
+ * @returns {{options: string[], recommend: number|null}}
+ */
+export function resolveOptions(rawOptions, rawRecommend) {
+  const options = (rawOptions || []).map((o) => String(o).trim());
+  const seen = new Set();
+  for (const o of options) {
+    // An option becomes the REASON when it is chosen, so it lives under the
+    // same rules a reason does — including the two words the tool reserves for
+    // itself.
+    if (!isValidReason(o)) {
+      throw new Error(
+        "`--option " + o + "` is empty, reserved or longer than 500 characters\n" +
+          "A chosen option is recorded as the decision's reason, so it carries a reason's\n" +
+          "rules: `unknown` and `proven` are what the tool writes when nobody stated one."
+      );
+    }
+    if (seen.has(o)) {
+      throw new Error(
+        "`--option " + o + "` was given twice\n" +
+          "Two options with the same text are one option, and choosing between them\n" +
+          "decides nothing."
+      );
+    }
+    seen.add(o);
+  }
+
+  if (rawRecommend === null || rawRecommend === undefined) {
+    if (options.length) {
+      throw new Error(
+        "`--recommend <n>` is required once `--option` is given\n" +
+          "A menu with nothing recommended hands the analysis back: the reader has to weigh\n" +
+          "the options you already weighed. Name the one that is SOLID — it survives the\n" +
+          "most cases, not the one that is quickest — and that COMPOSES with what is\n" +
+          "already here. Between 1 and " + options.length + "."
+      );
+    }
+    return { options, recommend: null };
+  }
+
+  if (!options.length) {
+    throw new Error(
+      "`--recommend " + rawRecommend + "` with no options to point at\n" +
+        "`--recommend` names one of the `--option` values by number; with none given\n" +
+        "there is nothing for the number to mean."
+    );
+  }
+  if (!/^[0-9]+$/.test(String(rawRecommend))) {
+    throw new Error(
+      "`--recommend " + rawRecommend + "` is not an option number\n" +
+        "Options are numbered from 1, in the order the `--option` flags were given;\n" +
+        "this question has " + options.length + "."
+    );
+  }
+  const n = Number(rawRecommend);
+  if (n < 1 || n > options.length) {
+    throw new Error(
+      "`--recommend " + rawRecommend + "` names no option — this question has " + options.length + "\n" +
+        "They are numbered from 1, in the order the `--option` flags were given."
+    );
+  }
+  return { options, recommend: n };
+}
 
 /** PURE — resolves `ask`'s arguments. Throws on a usage error. */
 export function parseAskArgs(args) {
-  const plan = { id: null, dir: null, actor: null, question: null, status: null, json: false };
+  const plan = {
+    id: null, dir: null, actor: null, question: null,
+    options: [], recommend: null, status: null, json: false,
+  };
   const key = { "--question": "question", "--status": "status", "--dir": "dir", "--actor": "actor" };
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === "--json") { plan.json = true; continue; }
+    if (a === "--option") {
+      const value = args[++i];
+      if (value === undefined) throw new Error("`--option` with no value");
+      plan.options.push(value);
+      continue;
+    }
+    if (a === "--recommend") {
+      const value = args[++i];
+      if (value === undefined) throw new Error("`--recommend` with no value");
+      plan.recommend = value;
+      continue;
+    }
     if (Object.prototype.hasOwnProperty.call(key, a)) {
       const value = args[++i];
       if (value === undefined) throw new Error("`" + a + "` with no value");
@@ -82,6 +192,12 @@ export function parseAskArgs(args) {
         "`unknown` and `proven` are what the tool writes when nobody stated a reason."
     );
   }
+  // THE QUESTION IS CHECKED FIRST on purpose: options with no question they
+  // answer are a menu with no subject, so complaining about the menu while the
+  // subject is missing would name the second defect and hide the first.
+  const menu = resolveOptions(plan.options, plan.recommend);
+  plan.options = menu.options;
+  plan.recommend = menu.recommend;
   return plan;
 }
 
@@ -113,6 +229,7 @@ export function blockingStatus(config, requested) {
  * `handoffTask` and `decideTask` all use.
  *
  * @param {{root: string, config: object, id: string, actor: string, question: string,
+ *          options?: string[], recommend?: number|null,
  *          status?: string|null, now?: number, env?: object}} opts
  */
 export function askTask(opts) {
@@ -178,8 +295,15 @@ export function askTask(opts) {
     id: eventId(ts), ts, task: id, field: FIELD_COMMENT,
     from: "", to: opts.question,
     actor, source: "ask", reason: opts.question,
+    // WRITTEN EVEN WHEN EMPTY — see the header: absent, `[]` and a menu are
+    // three different facts about how the question was asked.
+    options: Array.isArray(opts.options) ? opts.options : [],
     session: currentSession(root, opts.env),
   };
+  // `recommend` is present exactly when the menu is non-empty, which is what
+  // `resolveOptions` enforces; writing a null beside an empty list would be a
+  // second way of saying what the empty list already says.
+  if (opts.recommend) question.recommend = opts.recommend;
   appendEntries(root, id, [question]);
 
   const specs = buildFieldSpecs(config);
@@ -218,8 +342,29 @@ export function renderAsk(result, opts = {}) {
       result.before.status + " " + MARK.arrow + " " + result.after.status
   );
   out.push("  " + paint.dim(result.question.id) + "  " + result.question.to);
+
+  // The menu is printed with the SAME numbers `decide --choose` takes, because
+  // this output is where they are read from.
+  const options = result.question.options || [];
+  if (options.length) {
+    out.push("");
+    const width = String(options.length).length;
+    options.forEach((text, i) => {
+      const n = i + 1;
+      // A WORD, not only a colour: this is read through pipes and CI logs.
+      const mark = n === result.question.recommend ? " " + paint.ok("(recommended)") : "";
+      out.push("  " + String(n).padStart(width) + ". " + text + mark);
+    });
+  }
+
   out.push("");
-  out.push("  answered by: " + N + " decide " + result.id + " --resolves " + result.question.id + " --reason \"…\"");
+  const answer = "  answered by: " + N + " decide " + result.id + " --resolves " + result.question.id;
+  if (options.length) {
+    out.push(answer + " --choose <n>");
+    out.push("  " + paint.dim("or --reason \"…\" for an answer that is not on the menu"));
+  } else {
+    out.push(answer + " --reason \"…\"");
+  }
   out.push("  " + paint.dim("until then `" + N + " next` passes over it — a protected status is not dispatched"));
   return out.join("\n");
 }
@@ -227,7 +372,14 @@ export function renderAsk(result, opts = {}) {
 export function askJson(result) {
   return {
     ok: true, id: result.id, file: result.file,
-    question: { id: result.question.id, ts: result.question.ts, text: result.question.to, actor: result.question.actor },
+    question: {
+      id: result.question.id, ts: result.question.ts, text: result.question.to,
+      actor: result.question.actor,
+      options: result.question.options || [],
+      // `null` rather than absent: a consumer must be able to tell "none
+      // recommended" from a field it forgot to read.
+      recommend: result.question.recommend || null,
+    },
     changes: (result.changes || []).map((c) => ({ field: c.field, from: c.from, to: c.to })),
     blockedReason: questionBlockReason(result.question.id),
   };
@@ -260,7 +412,10 @@ export function run(argv) {
     return 2;
   }
   const config = loadConfigOrExit(root);
-  const result = askTask({ root, config, id: plan.id, actor, question: plan.question, status: plan.status });
+  const result = askTask({
+    root, config, id: plan.id, actor, question: plan.question,
+    options: plan.options, recommend: plan.recommend, status: plan.status,
+  });
 
   if (!result.ok) {
     if (plan.json) {

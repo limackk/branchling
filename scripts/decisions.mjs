@@ -42,6 +42,15 @@ export function withDecisions(text, entries) {
   }
   for (const q of open) {
     block.push("- **Q** (" + q.actor + ", unanswered — `" + q.id + "`): " + q.to);
+    // THE OPTIONS TRAVEL WITH THE QUESTION (TL-204). This block exists because a
+    // reader with none of the conversation starts here; a menu left in the log
+    // while its question is printed makes them reconstruct exactly the analysis
+    // the asker already did.
+    const options = Array.isArray(q.options) ? q.options : [];
+    options.forEach((text, i) => {
+      const n = i + 1;
+      block.push("  " + n + ". " + text + (n === q.recommend ? " **(recommended)**" : ""));
+    });
   }
   block.push("");
   block.push("_Written from the history at print time; it is not in the file on disk._");

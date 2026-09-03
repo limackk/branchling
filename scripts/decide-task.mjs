@@ -24,6 +24,24 @@
  * is a pointer to an event that is not in this task's history — it would leave a
  * question open forever while looking answered, so it fails BEFORE the write.
  *
+ * ANSWERING BY NUMBER (TL-204). A question asked with `ask --option` carries its
+ * menu, and `--choose <n>` answers by picking a row. What is RECORDED is the
+ * option's text, in the same `to` a typed `--reason` fills, so the log reads
+ * identically whether the answer was picked or written — a consumer that had to
+ * resolve a number against another event to know what was decided would be
+ * reading a foreign key, and the log would stop being readable on its own.
+ *
+ * WHY `--choose` REQUIRES `--resolves`. A bare number indexes a menu, and which
+ * menu is not something the tool may guess: one task can carry two open
+ * questions, and picking "option 2" of the wrong one records a real answer to a
+ * question nobody asked. The number and the question it belongs to arrive
+ * together or not at all.
+ *
+ * WHY `--choose` AND `--reason` ARE MUTUALLY EXCLUSIVE. Both say what was
+ * decided, and one field holds it. An answer that is not on the menu is a plain
+ * `--reason`; a caveat ON a chosen option is a second decision, and it reads
+ * better as one.
+ *
  * WHAT IT DOES NOT DO. It does not write a `## Log` line. The analysis in
  * docs/backlog-human-agent-decisions.md §3 asked for one; TL-105 abolished that
  * section afterwards, and `handoff` had already settled the precedent — the
@@ -55,11 +73,11 @@ import { MARK, color, failure } from "./ui.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-export const DECIDE_FLAGS = ["--dir", "--actor", "--reason", "--resolves", "--json"];
+export const DECIDE_FLAGS = ["--dir", "--actor", "--reason", "--resolves", "--choose", "--json"];
 
 /** PURE — resolves `decide`'s arguments. Throws on a usage error. */
 export function parseDecideArgs(args) {
-  const plan = { id: null, dir: null, actor: null, reason: null, resolves: null, json: false };
+  const plan = { id: null, dir: null, actor: null, reason: null, resolves: null, choose: null, json: false };
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === "--json") { plan.json = true; continue; }
@@ -78,14 +96,40 @@ export function parseDecideArgs(args) {
   if (!plan.id) {
     throw new Error("no task id\nusage: " + N + " decide <ID> --reason \"…\" [--resolves <id>]");
   }
-  if (plan.reason === null) {
+
+  if (plan.choose !== null) {
+    if (plan.reason !== null) {
+      throw new Error(
+        "`--choose` and `--reason` both say what was decided\n" +
+          "One of them fills the record. Pick a row from the menu, or write an answer that\n" +
+          "is not on it — a remark ABOUT a chosen option is a second `" + N + " decide`."
+      );
+    }
+    if (plan.resolves === null) {
+      throw new Error(
+        "`--choose " + plan.choose + "` with no `--resolves <event id>`\n" +
+          "A number on its own indexes a menu, and one task can carry two open questions —\n" +
+          "so which question the row belongs to is not something this may guess.\n" +
+          "`" + N + " history <ID> --json` lists the events and their options."
+      );
+    }
+    if (!/^[0-9]+$/.test(String(plan.choose)) || Number(plan.choose) < 1) {
+      throw new Error(
+        "`--choose " + plan.choose + "` is not an option number\n" +
+          "Options are numbered from 1, in the order they were offered."
+      );
+    }
+    plan.choose = Number(plan.choose);
+  } else if (plan.reason === null) {
     throw new Error(
-      "`--reason` is required\n" +
+      "`--reason` is required unless a menu row is chosen\n" +
         "a decision with no content records that something was settled and leaves out\n" +
-        "what — which is the one thing a later reader cannot reconstruct."
+        "what — which is the one thing a later reader cannot reconstruct.\n" +
+        "Where the question was asked with options, `--choose <n>` fills it from one."
     );
   }
-  if (!isValidReason(plan.reason)) {
+
+  if (plan.reason !== null && !isValidReason(plan.reason)) {
     throw new Error(
       "`--reason " + plan.reason + "` is empty or reserved\n" +
         "`unknown` and `proven` are what the tool writes when nobody stated a reason;\n" +
@@ -110,8 +154,8 @@ export function parseDecideArgs(args) {
  * Returns a RESULT rather than printing or exiting, so its shape is testable
  * without a subprocess — the arrangement `takeTask` and `handoffTask` use.
  *
- * @param {{root: string, config: object, id: string, actor: string, reason: string,
- *          resolves?: string|null, now?: number}} opts
+ * @param {{root: string, config: object, id: string, actor: string, reason?: string|null,
+ *          resolves?: string|null, choose?: number|null, now?: number}} opts
  */
 export function decideTask(opts) {
   const { root, config, actor } = opts;
@@ -132,8 +176,9 @@ export function decideTask(opts) {
   // is not — and the question most worth answering is often the one raised by a
   // task that is already finished.
 
+  let target = null;
   if (opts.resolves) {
-    const target = entries.find((e) => e && e.id === opts.resolves);
+    target = entries.find((e) => e && e.id === opts.resolves);
     if (!target) {
       const open = openQuestions(entries);
       return {
@@ -146,18 +191,64 @@ export function decideTask(opts) {
     }
   }
 
+  // THE ROW BECOMES THE REASON. Everything downstream — the log, the lifted
+  // block, the printed task file — reads `to`, and none of it needs to know
+  // whether a person typed the sentence or picked it.
+  let reason = opts.reason;
+  let chosen = null;
+  if (opts.choose) {
+    const options = Array.isArray(target.options) ? target.options : [];
+    if (!options.length) {
+      return {
+        ok: false, kind: "no-options", id,
+        message: "the question " + opts.resolves + " was asked with no options",
+        details: [
+          "`--choose <n>` picks a row from a menu, and this question does not carry one.",
+          "Answer it with `--reason \"…\"`.",
+        ],
+      };
+    }
+    if (opts.choose > options.length) {
+      return {
+        ok: false, kind: "option-range", id,
+        message: "`--choose " + opts.choose + "` names no option — " + opts.resolves + " offers " + options.length,
+        details: options.map((text, i) => "  " + (i + 1) + ". " + text),
+      };
+    }
+    reason = options[opts.choose - 1];
+    // A LOG EDITED BY HAND can hold an option this command may not record: the
+    // two reserved words dressed as somebody's answer is the exact confusion
+    // `isValidReason` exists to prevent, and `normalizeReason` below would turn
+    // an empty one into `unknown` — a machine's word written as a person's.
+    if (!isValidReason(reason)) {
+      return {
+        ok: false, kind: "unusable-option", id,
+        message: "option " + opts.choose + " of " + opts.resolves + " cannot be recorded as a reason",
+        details: [
+          "It is empty, longer than 500 characters, or one of the two words the tool",
+          "reserves for itself. Answer with `--reason \"…\"` instead.",
+        ],
+      };
+    }
+    chosen = { n: opts.choose, of: options.length, recommend: target.recommend || null };
+  }
+
   const ts = new Date(now).toISOString();
   const decision = {
     id: eventId(ts), ts, task: id, field: FIELD_DECISION,
-    from: "", to: opts.reason,
+    from: "", to: reason,
     actor, source: "decide",
-    reason: normalizeReason(opts.reason),
+    reason: normalizeReason(reason),
     session: currentSession(root, opts.env),
   };
   // `resolves` is written only when it holds something: an empty key in every
   // row would make "answers nothing" and "answers a thing named nowhere" the
   // same shape on disk.
   if (opts.resolves) decision.resolves = opts.resolves;
+  // `chose` is not a second copy of the answer — the answer is `to`. It records
+  // WHICH row was taken, which is the only way a later review can ask how often
+  // the recommendation was followed.
+  if (chosen) decision.chose = chosen.n;
   appendEntries(root, id, [decision]);
 
   const after = entries.concat([decision]);
@@ -168,7 +259,7 @@ export function decideTask(opts) {
   const lifted = liftQuestionBlock({ root, config, id, actor, entries: after, decision, now, paths });
   return {
     ok: true, id, decision, file: join(paths.historyDir, id + ".jsonl"),
-    open: openQuestions(after), lifted,
+    open: openQuestions(after), lifted, chosen,
   };
 }
 
@@ -252,6 +343,17 @@ export function renderDecision(result, opts = {}) {
   out.push(paint.ok(MARK.ok) + " " + paint.id(result.id) + " decided by " + result.decision.actor);
   out.push("  " + result.decision.to);
   if (result.decision.resolves) out.push("  answers: " + paint.id(result.decision.resolves));
+  // WHETHER THE RECOMMENDATION WAS TAKEN is printed, not left to be worked out:
+  // it is the one thing about a picked answer that the option's text does not
+  // already say.
+  if (result.chosen) {
+    const followed = result.chosen.recommend
+      ? (result.chosen.n === result.chosen.recommend
+          ? " — the one recommended"
+          : " — the recommendation was " + result.chosen.recommend)
+      : "";
+    out.push("  chose option " + result.chosen.n + " of " + result.chosen.of + followed);
+  }
   out.push(
     "  open questions left: " +
       (result.open.length ? String(result.open.length) : paint.ok("0"))
@@ -282,8 +384,18 @@ export function decideJson(result) {
       text: result.decision.to,
       actor: result.decision.actor,
       resolves: result.decision.resolves || null,
+      chose: result.decision.chose || null,
     },
-    openQuestions: result.open.map((e) => ({ id: e.id, ts: e.ts, text: e.to, actor: e.actor })),
+    // `null` when the answer was typed rather than picked. The menu that was on
+    // offer travels with it, so a consumer can show what was NOT chosen without
+    // going back to the question's own event.
+    chosen: result.chosen
+      ? { n: result.chosen.n, of: result.chosen.of, recommend: result.chosen.recommend }
+      : null,
+    openQuestions: result.open.map((e) => ({
+      id: e.id, ts: e.ts, text: e.to, actor: e.actor,
+      options: e.options || [], recommend: e.recommend || null,
+    })),
     // `null` when nothing was blocked on this answer — a consumer must be able
     // to tell "the queue is moving again" from "it never stopped".
     lifted: result.lifted && result.lifted.to
@@ -327,6 +439,7 @@ export function run(argv) {
 
   const result = decideTask({
     root, config, id: plan.id, actor, reason: plan.reason, resolves: plan.resolves,
+    choose: plan.choose,
   });
   if (!result.ok) {
     if (plan.json) {
