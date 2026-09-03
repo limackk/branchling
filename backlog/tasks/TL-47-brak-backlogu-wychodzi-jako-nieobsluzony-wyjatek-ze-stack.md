@@ -6,18 +6,25 @@ labels: []
 board: main
 epic: "Backlog — open source publication"
 priority: P3
-status: pending
-owner: unassigned
+status: done
+owner: agent:claude
 estimate: 2h
 confidence: high
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-03
 blocked_by: []
 blocks: []
 related_docs:
   - docs/backlog-config-and-portability.md
 verification:
-  - bash: "cd /tmp && node <path>/bin/worktrail.mjs query --count 2>&1 | head -3   # expected: message only, no `at ...`"
+  # The contract as written was a comment with a `<path>` placeholder in it —
+  # unrunnable, so nothing could ever have failed it. It is now a test that
+  # iterates the COMMAND TABLE, so a command added later cannot fall out of
+  # coverage silently.
+  - id: no-stack-for-a-foreseen-state
+    bash: "node --test scripts/tests/no-backlog-message.test.mjs"
+  - id: message-not-a-crash
+    bash: "cd \"$(mktemp -d)\" && ! node \"$OLDPWD/bin/worktrail.mjs\" query --count 2>&1 | grep -q '^    at '"
 ---
 
 ## Goal
@@ -71,16 +78,40 @@ root with no backlog → probably `init`; a home directory → probably `--dir`.
 
 ## Acceptance criteria
 
-- [ ] A call from a directory with no backlog: a message, a nonzero exit code,
-      **zero `at ` lines**.
-- [ ] The same for every reading command, not just `query` — the test iterates
+- [x] A call from a directory with no backlog: a message, a nonzero exit code,
+      **zero `at ` lines**. [proof: no-stack-for-a-foreseen-state, message-not-a-crash]
+- [x] The same for every reading command, not just `query` — the test iterates
       over the `COMMANDS` dictionary, so a new command cannot silently fall
-      out of coverage.
-- [ ] A genuine programmer error (e.g. `TypeError`) **still** shows a stack —
+      out of coverage. [proof: no-stack-for-a-foreseen-state]
+- [x] A genuine programmer error (e.g. `TypeError`) **still** shows a stack —
       silencing everything would be a cure worse than the disease. A negative
-      test.
-- [ ] The message gives `worktrail init --dir <path>` as a way to create a
-      backlog, alongside today's three ways to point to an existing one.
+      test. [proof: no-stack-for-a-foreseen-state]
+- [x] The message gives `worktrail init --dir <path>` as a way to create a
+      backlog, alongside today's three ways to point to an existing one. [proof: no-stack-for-a-foreseen-state]
+
+## Decisions
+
+- **A named type plus `resolveBacklogDirOrExit`, not one central handler.** The
+  central catch was the obvious answer and it cannot work: `cli.mjs` SPAWNS each
+  command as a child process with inherited stdio, so the exception is printed
+  by the child and a handler in the parent never sees it. A handler installed as
+  an import side effect would reach the child — and hiding a process-wide
+  behaviour change inside an import is worse than a dozen call sites a test
+  enforces. The shape follows `loadConfigOrExit`, which already says this here.
+- **Only the named type becomes a message.** A `TypeError` keeps its stack, and
+  there is a negative test for it: silencing everything would be a cure worse
+  than the disease, and it is the whole difference between a type and a `try`
+  that swallows.
+- **Which hint comes first is decided from context.** A directory holding
+  `.git` or `package.json` is somebody standing in a project with no backlog,
+  and they almost certainly want `init`; anywhere else, they want `--dir`. The
+  old message listed three ways to POINT and not one way to CREATE — and the
+  person most likely to read it was in the second case.
+- **A directory NAMED explicitly that is not a backlog stays a usage error**,
+  and is deliberately not folded into the same message: "you pointed at the
+  wrong place" and "there is nothing here" have different fixes.
+- **The exit code and the absence of any write are unchanged**, which is what
+  the task asked for — only the packaging moved.
 
 ## Log
 

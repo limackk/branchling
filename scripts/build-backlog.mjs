@@ -24,7 +24,7 @@ import { fileURLToPath } from "node:url";
 
 import { loadConfigOrExit } from "./config.mjs";
 import { detectPrefixMismatch, prefixMismatchMessage } from "./task-id.mjs";
-import { resolveBacklogDir } from "./paths.mjs";
+import { resolveBacklogDirOrExit } from "./paths.mjs";
 import { buildFieldSpecs, extractMeta as sharedExtractMeta, normalizeValue, stripComment } from "./task-fields.mjs";
 import { MARK, color, errColor } from "./ui.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
@@ -53,10 +53,10 @@ const rootFlag = process.argv.indexOf("--root") !== -1
 // generator looks for `boards.yaml` in the wrong place. The resolver knows four
 // sources and keeps co-location LAST, so the existing behaviour is untouched.
 // Regression: scripts/tests/non-colocated-layout.test.mjs
-const BACKLOG_DIR = resolveBacklogDir({
+const BACKLOG_DIR = resolveBacklogDirOrExit({
   dir: rootFlag !== -1 && process.argv[rootFlag + 1] ? process.argv[rootFlag + 1] : undefined,
   moduleDir: __dirname,
-}).root;
+}, N + " build").root;
 
 // An unknown flag FAILS (BL-1417) — the rest of the process builds the views
 // without asking, so quietly accepting a typo would look like success with zero

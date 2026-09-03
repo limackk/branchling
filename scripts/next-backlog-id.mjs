@@ -41,7 +41,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { backlogRelFor, localRefs, repoRootFor, taskEntriesInRef, worktreeRoots } from './branch-scan.mjs';
-import { resolveBacklogDir, takeDirFlag } from './paths.mjs';
+import { resolveBacklogDirOrExit, takeDirFlag } from './paths.mjs';
 import { loadConfigOrExit } from './config.mjs';
 import { insideGitRepo } from './git-rules.mjs';
 import { taskIdPatterns } from './task-id.mjs';
@@ -51,10 +51,10 @@ import { PRODUCT_NAME as N } from './product.mjs';
 // The prefix comes from THIS backlog's configuration (BL-1452). The scan then
 // goes across other branches and worktrees, but the pattern is one — otherwise
 // `next-id` would be counting numbers from somebody else's namespace.
-const OWN_ROOT = resolveBacklogDir({
+const OWN_ROOT = resolveBacklogDirOrExit({
   dir: takeDirFlag(process.argv.slice(2)).dir,
   moduleDir: dirname(fileURLToPath(import.meta.url)),
-}).root;
+}, N + " next-id").root;
 // STRICT (TL-60): this is OUR OWN configuration, not another branch's — the
 // branch scan reads filenames, not their configurations.
 const PAT = taskIdPatterns(loadConfigOrExit(OWN_ROOT).taskIdPrefix);

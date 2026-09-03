@@ -25,7 +25,7 @@ import { readAllHistory } from "./history.mjs";
 import { modifiedFilesCached, repoRoot } from "./modified-files.mjs";
 import { loadConfig, loadConfigOrExit } from "./config.mjs";
 import { taskIdPatterns } from "./task-id.mjs";
-import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { backlogPaths, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { loadPlan } from "./plan.mjs";
 import { PRODUCT_NAME as N, STORAGE_KEY_PREFIX } from "./product.mjs";
 
@@ -36,7 +36,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * (BL-1399). The default value preserves today's calls with no flags.
  */
 function defaultRoot() {
-  return resolveBacklogDir({ dir: takeDirFlag(process.argv.slice(2)).dir, moduleDir: __dirname }).root;
+  return resolveBacklogDirOrExit({ dir: takeDirFlag(process.argv.slice(2)).dir, moduleDir: __dirname }, N + " viewer").root;
 }
 
 /**

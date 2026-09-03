@@ -27,7 +27,7 @@ import { fileURLToPath } from "node:url";
 
 import { resolveActor } from "./actor.mjs";
 import { ACTOR_NAMESPACES, REASON_SENTINELS, attributeChanges, isValidActor, isValidReason, reconcile, taskIdFromFile, unattributedChanges } from "./history.mjs";
-import { resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -36,7 +36,7 @@ const cli = takeDirFlag(process.argv.slice(2));
 const argv = cli.argv;
 // The data directory from --dir / BACKLOG_DIR / discovery: the hook calls this
 // script for a file that need not live in the same tree as the code (BL-1399).
-const BACKLOG_DIR = resolveBacklogDir({ dir: cli.dir, moduleDir: __dirname }).root;
+const BACKLOG_DIR = resolveBacklogDirOrExit({ dir: cli.dir, moduleDir: __dirname }, N + " history").root;
 const arg = (name, fallback) => {
   const i = argv.indexOf(name);
   return i >= 0 && argv[i + 1] ? argv[i + 1] : fallback;

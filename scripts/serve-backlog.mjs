@@ -40,7 +40,7 @@ import {
   splitFrontmatter,
 } from "./task-fields.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { PLAN_FILENAME, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { PLAN_FILENAME, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { loadPlan } from "./plan.mjs";
 import { decideTask } from "./decide-task.mjs";
 import { ANY_TASK_ID } from "./task-id.mjs";
@@ -75,7 +75,7 @@ if (cliArgs.argv.some((a) => a === "--help" || a === "-h")) {
   console.log("  serve [--port <n>] [--no-open] [--dir <path>]");
   process.exit(0);
 }
-const BACKLOG_DIR = resolveBacklogDir({ dir: cliArgs.dir, moduleDir: __dirname }).root;
+const BACKLOG_DIR = resolveBacklogDirOrExit({ dir: cliArgs.dir, moduleDir: __dirname }, N + " serve").root;
 const TASKS_DIR = join(BACKLOG_DIR, "tasks");
 const PLAN_PATH = join(BACKLOG_DIR, PLAN_FILENAME);
 const CONFIG = loadConfigOrExit(BACKLOG_DIR);

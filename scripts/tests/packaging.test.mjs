@@ -22,7 +22,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 
-import { looksLikeBacklogDir, resolveBacklogDir } from "../paths.mjs";
+import { BacklogNotFoundError, looksLikeBacklogDir, resolveBacklogDir } from "../paths.mjs";
 import { PRODUCT_NAME, PRODUCT_VERSION, MANIFEST_PATH, readManifest } from "../product.mjs";
 import { versionText, helpText } from "../cli.mjs";
 
@@ -90,7 +90,10 @@ test("co-location does NOT fire from a package directory with no tasks/", () => 
 
     assert.throws(
       () => resolveBacklogDir({ cwd: root, moduleDir: join(pkg, "scripts"), env: "" }),
-      /No backlog directory found/,
+      // The NAMED type, not a substring of the message (TL-47): the text is
+      // written for a person and may be reworded, while "there is no backlog
+      // here" is the fact this test is about.
+      BacklogNotFoundError,
       "a missing backlog has to be an error, not a write into node_modules"
     );
   } finally {

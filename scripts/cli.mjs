@@ -38,7 +38,7 @@ import { PRODUCT_NAME as N, PRODUCT_VERSION } from "./product.mjs";
 import { ConfigError, formatConfigError, loadConfig } from "./config.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { failure } from "./ui.mjs";
-import { resolveBacklogDir } from "./paths.mjs";
+import { resolveBacklogDir, resolveBacklogDirOrExit } from "./paths.mjs";
 import { FIELD_SHAPES } from "./task-fields.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -1748,7 +1748,7 @@ function runCheck(args) {
   // BL-1445: the same fix as in build-backlog.mjs — `join(HERE, "..")` is
   // co-location that says nothing about being an assumption. The resolver keeps
   // it as the last of four sources, so nothing changes where it used to work.
-  const root = resolveBacklogDir({ dir: plan.dir || undefined, moduleDir: HERE }).root;
+  const root = resolveBacklogDirOrExit({ dir: plan.dir || undefined, moduleDir: HERE }, N + " check").root;
   const tasksDir = join(root, "tasks");
 
   // The configuration is checked ONCE, here (TL-60). Every guard is a separate

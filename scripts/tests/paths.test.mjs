@@ -20,11 +20,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import {
-  backlogPaths,
-  looksLikeBacklogDir,
-  resolveBacklogDir,
-} from "../paths.mjs";
+import { BacklogNotFoundError, backlogPaths, looksLikeBacklogDir, resolveBacklogDir } from "../paths.mjs";
 
 import { isolateHome } from "./_repo.mjs";
 
@@ -105,11 +101,33 @@ test("when nothing was found — co-location (today's layout, the alias from any
   assert.equal(r.source, "colocated");
 });
 
-test("no backlog at all throws with a message saying WHAT to do", () => {
-  assert.throws(
-    () => resolveBacklogDir({ cwd: "/empty", moduleDir: "/somewhere/scripts", exists: fsWith([]) }),
-    /BACKLOG_DIR|--dir/
-  );
+test("no backlog at all throws a NAMED error saying WHAT to do — creating included", () => {
+  // TL-47: the type is what a caller matches on, so a foreseen absence can be
+  // turned into a message while a genuine programmer error keeps its stack.
+  let thrown = null;
+  try {
+    resolveBacklogDir({ cwd: "/empty", moduleDir: "/somewhere/scripts", exists: fsWith([]) });
+  } catch (e) {
+    thrown = e;
+  }
+  assert.ok(thrown instanceof BacklogNotFoundError, "a bare Error cannot be told from a crash");
+  const said = thrown.message + "\n" + thrown.details.join("\n");
+  assert.match(said, /BACKLOG_DIR|--dir/, "how to point at a backlog that exists");
+  assert.match(said, /init/,
+    "and how to CREATE one — the person most likely to see this has none yet");
+});
+
+test("in a directory that looks like a project, CREATING is offered first", () => {
+  const inProject = (files) => {
+    try {
+      resolveBacklogDir({ cwd: "/repo", moduleDir: "/somewhere/scripts", exists: fsWith(files) });
+    } catch (e) { return e.details[0]; }
+    throw new Error("it found a backlog where the fixture has none");
+  };
+  assert.match(inProject(["/repo/.git"]), /init/,
+    "somebody standing in a repository with no backlog wants to create one");
+  assert.match(inProject([]), /--dir/,
+    "somebody in a home directory wants to point at one they already have");
 });
 
 test("backlogPaths keeps every path in one place", () => {

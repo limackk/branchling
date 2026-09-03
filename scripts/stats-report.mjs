@@ -21,7 +21,7 @@ import { absentHere, crossBranchState, describeDivergence, divergences, scanNote
 import { breakdown, calibrate, correlate, spanLabel } from "./calibration.mjs";
 import { commandRunner, contextBudget, renderBudget } from "./context-budget.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { backlogPaths, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { ranked, summarize } from "./stats.mjs";
 import { readTaskMetas } from "./task-io.mjs";
 import { hoursLabel } from "./estimate.mjs";
@@ -43,7 +43,7 @@ for (const a of argv) {
   }
 }
 
-const ROOT = resolveBacklogDir({ dir: cli.dir, moduleDir: __dirname }).root;
+const ROOT = resolveBacklogDirOrExit({ dir: cli.dir, moduleDir: __dirname }, N + " stats").root;
 // A message instead of a stack trace (TL-60) — `stats` was one of the commands
 // that failed correctly but looked like a crash of the tool while doing it.
 const CONFIG = loadConfigOrExit(ROOT);

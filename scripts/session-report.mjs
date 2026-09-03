@@ -54,7 +54,7 @@ import { clusterHeartbeats, unionMinutes } from "./cluster.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { readAllHistory } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
-import { resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { MARK, color, failure, heading, table } from "./ui.mjs";
 
@@ -417,7 +417,7 @@ export function renderOne(s) {
 // ──────────────────────────────────────────────────────────────────────────
 
 function load(dir) {
-  const root = resolveBacklogDir({ dir, moduleDir: HERE }).root;
+  const root = resolveBacklogDirOrExit({ dir, moduleDir: HERE }, N + " sessions").root;
   const config = loadConfigOrExit(root);
   const rowsByTask = readAllActivity(root);
   const history = readAllHistory(root);

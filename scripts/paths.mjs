@@ -34,6 +34,8 @@ import { existsSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 
 import { ANY_TASK_FILE } from "./task-id.mjs";
+import { PRODUCT_NAME as N } from "./product.mjs";
+import { failure } from "./ui.mjs";
 
 export const CONFIG_FILENAME = "config.yaml";
 export const BOARDS_FILENAME = "boards.yaml";
@@ -127,10 +129,66 @@ export function resolveBacklogDir(opts = {}) {
     return { root: colocated, source: "colocated" };
   }
 
-  throw new Error(
-    "No backlog directory found. Point at one: --dir <path> or BACKLOG_DIR=<path>, " +
-      "or run from a repository that has backlog/tasks/."
-  );
+  // The SAME `exists` the resolution used: a test that injects a filesystem
+  // must get an answer about that filesystem, not about the real one.
+  throw new BacklogNotFoundError(cwd, exists);
+}
+
+/**
+ * "There is no backlog here" — a FORESEEN state with a name (TL-47).
+ *
+ * WHY A TYPE AND NOT A STRING. The documentation describes this state as by
+ * design, and the presentation contradicted the design: a bare `Error` reaching
+ * the top of a script prints a stack trace, which says "the tool crashed" to
+ * somebody who has just installed it and run it from their home directory. That
+ * is the first contact with the tool. A named type lets a caller tell this
+ * apart from a genuine programmer error — which must still show its stack,
+ * because silencing everything would be a worse cure than the disease.
+ */
+export class BacklogNotFoundError extends Error {
+  constructor(cwd, exists = existsSync) {
+    // WHICH HINT COMES FIRST IS DECIDED FROM CONTEXT. Somebody standing in a
+    // repository with no backlog almost certainly wants to CREATE one; somebody
+    // in a home directory almost certainly wants to point at one they already
+    // have. The old message listed three ways to point and not one way to
+    // create — and the person most likely to see it was in the second case.
+    const looksLikeProject = exists(join(cwd, ".git")) || exists(join(cwd, "package.json"));
+    const create = "`" + N + " init --dir <path>` creates one here";
+    const point = "`--dir <path>`, `BACKLOG_DIR=<path>`, or run from a directory that has `backlog/tasks/`";
+    super("no backlog here: " + resolve(cwd));
+    this.name = "BacklogNotFoundError";
+    this.cwd = resolve(cwd);
+    this.details = looksLikeProject
+      ? ["This looks like a project. " + create + ".",
+         "To use one that already exists: " + point + "."]
+      : ["To point at one you already have: " + point + ".",
+         "To start a new one: " + create + "."];
+  }
+}
+
+/**
+ * The same resolution, but a foreseen absence EXITS instead of throwing.
+ *
+ * THE SAME SHAPE AS `loadConfigOrExit`, deliberately: a command that cannot
+ * find its data has nothing left to do, and this is the established way that is
+ * said here. The alternative considered was one `uncaughtException` handler
+ * installed centrally — rejected because `cli.mjs` SPAWNS each command as a
+ * child process with inherited stdio, so the exception is printed by the child
+ * and a handler in the parent never sees it. A handler installed as an import
+ * side effect would reach the child, and hiding a process-wide behaviour change
+ * inside an import is worse than 10 call sites a test enforces.
+ *
+ * A GENUINE PROGRAMMER ERROR IS RE-THROWN, stack and all. Only the named type
+ * is turned into a message.
+ */
+export function resolveBacklogDirOrExit(opts = {}, command = N) {
+  try {
+    return resolveBacklogDir(opts);
+  } catch (e) {
+    if (!(e instanceof BacklogNotFoundError)) throw e;
+    console.error(failure(command, e.message, e.details));
+    process.exit(1);
+  }
 }
 
 /** A shortcut for scripts: returns the full set of paths at once. */

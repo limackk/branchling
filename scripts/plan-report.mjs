@@ -37,7 +37,7 @@ import { fileURLToPath } from "node:url";
 
 import { loadConfigOrExit } from "./config.mjs";
 import { printJson } from "./json-envelope.mjs";
-import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { backlogPaths, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { loadPlan, planState, validatePlan } from "./plan.mjs";
 import { reportPlanErrors } from "./check-backlog-plan.mjs";
 import { readTaskMetas } from "./task-io.mjs";
@@ -158,7 +158,7 @@ function main(argv) {
   }
   const asJson = cli.argv.includes("--json");
 
-  const root = resolveBacklogDir({ dir: cli.dir, moduleDir: __dirname }).root;
+  const root = resolveBacklogDirOrExit({ dir: cli.dir, moduleDir: __dirname }, N + " plan").root;
   const config = loadConfigOrExit(root);
   const loaded = loadPlan(backlogPaths(root).planPath);
 

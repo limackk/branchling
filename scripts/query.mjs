@@ -52,7 +52,8 @@ import { DEFAULTS, loadConfigOrExit } from "./config.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { printLine } from "./stdout.mjs";
 import { explain as explainIndex, modifiedFiles, repoRoot, touches } from "./modified-files.mjs";
-import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
+import { backlogPaths, resolveBacklogDir, resolveBacklogDirOrExit } from "./paths.mjs";
+import { PRODUCT_NAME as N } from "./product.mjs";
 import { collectAllProjects, collectProject, unknownEverywhere } from "./cross-project.mjs";
 import { SORT_KEYS, filterTasks, readTaskRecords, sortTasks, splitList, unknownFilterValues } from "./task-select.mjs";
 
@@ -123,7 +124,7 @@ if (ALL_PROJECTS && (opts.tasks || opts.dir)) {
 
 // The data directory: --tasks (pointing straight at tasks/), otherwise the same
 // backlog directory resolution as in every other script (BL-1399).
-const ROOT = opts.tasks || ALL_PROJECTS ? null : resolveBacklogDir({ dir: opts.dir, moduleDir: __dirname }).root;
+const ROOT = opts.tasks || ALL_PROJECTS ? null : resolveBacklogDirOrExit({ dir: opts.dir, moduleDir: __dirname }, N + " query").root;
 const TASKS_DIR = opts.tasks || (ROOT ? backlogPaths(ROOT).tasksDir : null);
 
 // WHERE THE ANSWER COMES FROM. One project, or every registered one — and the

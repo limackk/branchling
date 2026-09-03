@@ -47,7 +47,7 @@ import { loadConfigOrExit } from "./config.mjs";
 import { CONTEXT_RULE, commandRunner, contextBudget } from "./context-budget.mjs";
 import { queueStatuses } from "./next-task.mjs";
 import { printJson } from "./json-envelope.mjs";
-import { resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { BLOCK_MARKER_NAME as MARKER, PRODUCT_NAME as N } from "./product.mjs";
 import { inProgressStatus } from "./take-task.mjs";
 import { failure } from "./ui.mjs";
@@ -750,7 +750,7 @@ export function run(argv) {
     return 2;
   }
 
-  const root = resolveBacklogDir({ dir: cli.dir || undefined, moduleDir: HERE }).root;
+  const root = resolveBacklogDirOrExit({ dir: cli.dir || undefined, moduleDir: HERE }, N + " instructions").root;
   const config = loadConfigOrExit(root);
 
   if (plan.updateNudge) {

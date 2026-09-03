@@ -53,7 +53,7 @@ import { fileURLToPath } from "node:url";
 
 import { loadConfigOrExit } from "./config.mjs";
 import { ACTOR_NAMESPACES, MIGRATIONS_FILE, appendRenumberMigration, applyIdMigrations, isValidActor, loadSnapshot, saveSnapshot } from "./history.mjs";
-import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { backlogPaths, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { taskIdPatterns, taskIdScanner } from "./task-id.mjs";
 import { MARK, color, errColor } from "./ui.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
@@ -428,7 +428,7 @@ export function main(argv) {
     return 2;
   }
 
-  const root = resolveBacklogDir({ dir: dir || undefined, moduleDir: __dirname }).root;
+  const root = resolveBacklogDirOrExit({ dir: dir || undefined, moduleDir: __dirname }, N + " renumber").root;
   const config = loadConfigOrExit(root);
   const plan = planRenumber(root, config.taskIdPrefix, { start });
 
