@@ -21,6 +21,8 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { ACTOR_ENV } from "../actor.mjs";
+import { FIELD_CREATED, historyPath, readHistory } from "../history.mjs";
 import { slugify } from "../new-task.mjs";
 import { DEFAULT_TASK_ID_PREFIX as P, taskIdPatterns } from "../task-id.mjs";
 
@@ -38,9 +40,19 @@ const PAT = taskIdPatterns(P);
 
 const CLI = join(dirname(fileURLToPath(import.meta.url)), "..", "cli.mjs");
 
-function run(args, cwd) {
+// TWO ACTORS, because one would prove nothing (TL-187). The defect is not only
+// a missing entry, it is an entry written LATER by whoever reconciled first —
+// under their name. A test running everything as the same actor cannot tell the
+// two apart. The variable is named by the tool, not retyped here: `new` has no
+// `--actor` flag, and the second link of the chain is where a test may state
+// one without demanding a flag the command does not have.
+const CREATOR = "local:who-ran-new";
+const PROBE = "local:who-ran-take";
+
+function run(args, cwd, env) {
   return spawnSync(process.execPath, [CLI].concat(args), {
     encoding: "utf8", timeout: 30_000, cwd: cwd || undefined,
+    env: env ? Object.assign({}, process.env, env) : process.env,
   });
 }
 
@@ -321,6 +333,52 @@ test("new: a template whose values drift from the vocabulary is still REFUSED", 
     writeFileSync(path, readFileSync(path, "utf8").replace(/^status: .*$/m, "status: nonsense"), "utf8");
     const r = run(["new", "--dir", dir, "--title", "Drifting"]);
     assert.notEqual(r.status, 0, "a template offering a value outside the vocabulary was accepted");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ── the task's birth reaches the history (TL-187) ─────────────────────────
+
+test("new: the creation is recorded in the history, under the actor that created it", () => {
+  // TL-182 named this defect and was closed without a line of code changing,
+  // because its contract was two suites that pass whether or not `new` records
+  // anything — the zero-sample guard CLAUDE.md warns about. This is the
+  // assertion that could not have been green then.
+  const dir = freshBacklog();
+  try {
+    const r = run(["new", "--dir", dir, "--title", "Recorded at birth"], null, { [ACTOR_ENV]: CREATOR });
+    assert.equal(r.status, 0, r.stderr);
+    const id = tasksIn(dir)[0].match(PAT.fileId)[1];
+
+    // MEASURED HERE, judged below. Everything after this line writes to the same
+    // log, so the state at the moment `new` returned has to be taken now or not
+    // at all.
+    const loggedAtBirth = existsSync(historyPath(dir, id));
+    const atBirth = readHistory(dir, id);
+
+    // THE POSITIVE CONTROL, and it runs BEFORE the assertions it protects. An
+    // empty log is not evidence on its own: a fixture outside a git repository,
+    // an isolated home, a `--dir` some writer resolves differently — each
+    // produces exactly the silence the defect produces. `take` is a writing
+    // command in the same tree, given the same flags; its entries have to be
+    // there before the absence of another one means anything.
+    const probe = run(["take", id, "--dir", dir], null, { [ACTOR_ENV]: PROBE });
+    assert.equal(probe.status, 0, probe.stderr);
+    const taken = readHistory(dir, id).find((e) => e.field === "status");
+    assert.ok(taken, "no command records history in this fixture — the measurement is broken, not `new`");
+    assert.equal(taken.actor, PROBE, "the apparatus does not carry the actor either");
+
+    // And now the thesis.
+    assert.ok(loggedAtBirth, "`new` left no history file for the task it had just created");
+    const created = atBirth.find((e) => e.field === FIELD_CREATED);
+    assert.ok(created, "the task's birth is in no log — whoever reconciles first will sign it");
+    // The ACTOR is half the point (TL-182): an entry written later by another
+    // tree's reconcile would name that tree, not the person who typed `new`.
+    assert.equal(created.actor, CREATOR, "the creation is attributed to somebody who did not create it");
+    assert.equal(created.from, "");
+    // The shape `seed` and `import` already write for this field, not a new one.
+    assert.equal(created.to, "Recorded at birth", "a `__created__` entry carries the task's title");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
