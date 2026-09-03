@@ -66,6 +66,27 @@ export const PRODUCT_NAME = (manifest && manifest.name) || "worktrail";
  */
 export const BLOCK_MARKER_NAME = "worktrail";
 
+/**
+ * The prefix of every key the VIEWER writes into somebody's browser (TL-178):
+ * `localStorage` keys, the IndexedDB database, and the `showDirectoryPicker`
+ * id.
+ *
+ * THE SAME KIND OF NAME AS `BLOCK_MARKER_NAME`, and frozen for the same reason.
+ * These are ON-DISK KEYS in a browser we cannot reach: derived from
+ * `PRODUCT_NAME` they would change with a rename, and every viewer that had
+ * already stored a board selection, an actor or a chart range would silently
+ * forget it — while the directory permission behind the picker id would have to
+ * be granted again. Display text may change freely; a key that identifies
+ * existing data may not.
+ *
+ * WHY IT IS A SECOND CONSTANT AND NOT `BLOCK_MARKER_NAME` ITSELF. They are the
+ * same word today and answer to different owners: one keys a block in somebody
+ * else's repository, the other keys state in somebody else's browser. A single
+ * constant would make a decision about one of them silently a decision about
+ * the other, and those are different blast radii.
+ */
+export const STORAGE_KEY_PREFIX = "worktrail";  // product-name: allow
+
 /** Version, or null when the manifest is missing/unreadable. Never faked. */
 export const PRODUCT_VERSION = (manifest && manifest.version) || null;
 

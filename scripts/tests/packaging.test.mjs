@@ -76,7 +76,7 @@ test("files excludes the tests — they talk about this repo and are not needed 
 // ── 2. An install under node_modules must not point at itself ─────────────
 
 test("co-location does NOT fire from a package directory with no tasks/", () => {
-  // Odwzorowanie instalacji: node_modules/worktrail/{scripts,_template.md}.
+  // The shape of an install: node_modules/worktrail/{scripts,_template.md}.
   // `_template.md` is a MARKER, so if the rule required only a marker, this
   // layout would be taken for a backlog and the write would go into
   // node_modules. The rule also requires `tasks/` — this test enforces that.

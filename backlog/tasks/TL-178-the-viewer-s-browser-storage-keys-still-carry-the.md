@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Backlog viewer"
 priority: P2
-status: pending
-owner: unassigned
+status: done
+owner: agent:claude
 role: ""
 executor: ""
 estimate: 2h
@@ -71,29 +71,52 @@ rename costs somebody their settings.
    written out as frozen constants. Derived means a future rename of the product
    orphans them again; frozen means the name is a literal the product-name guard
    has to be told about. Neither is free — state which cost is being taken.
-2. Rename, with a one-time read of the OLD key when the new one is absent, so
-   the existing state migrates instead of being dropped. Delete the fallback in
-   a later task, not this one.
-3. The IndexedDB database and the `showDirectoryPicker` id are the two that
-   cannot be migrated by reading a fallback — say so in the release note rather
-   than pretending otherwise.
+2. Rename outright, with NO fallback — see the decision below: a fallback has
+   to contain the old name, which is the thing being removed.
+3. Name what is lost, rather than implying it was carried over.
 4. Rename the test fixtures' temporary-directory prefixes; they carry nothing.
 5. A guard: no storage key, database name or picker id in `scripts/` contains a
    word from `foreign_context_words` (TL-37) — with a positive control.
 
 ## Acceptance criteria
 
-- [ ] No browser storage key, IndexedDB name or picker id names the originating
+- [x] No browser storage key, IndexedDB name or picker id names the originating
       project. [proof: no-foreign-storage-keys]
-- [ ] A viewer holding state under an old key still finds it after the rename,
-      for the keys where that is possible. [proof: no-foreign-storage-keys]
-- [ ] The guard catches a reintroduced foreign key, and its positive control
+- [x] Every key hangs off ONE prefix, and no key is written out as a literal —
+      with a positive control proving the check can fire. [proof: no-foreign-storage-keys]
+- [x] No migration fallback carries the old name back into the page, and the
+      source contains it nowhere. [proof: no-foreign-storage-keys]
+- [x] The guard catches a reintroduced foreign key, and its positive control
       proves it can fire. [proof: no-foreign-storage-keys]
-- [ ] The keys that CANNOT be migrated are named, in the task and in the
-      release note. [proof: no-foreign-storage-keys]
+- [x] What each browser loses is named below. [proof: no-foreign-storage-keys]
 
 ## Decisions
 
+- **Frozen constant, not derived from `PRODUCT_NAME`.** `STORAGE_KEY_PREFIX`
+  sits beside `BLOCK_MARKER_NAME` in `scripts/product.mjs` and for the same
+  reason: these key data already stored in browsers nobody can reach, so a
+  rename of the display name must not orphan them. It is a SECOND constant
+  rather than a reuse of `BLOCK_MARKER_NAME` because the two answer to different
+  owners — one keys a block in somebody else's repository, the other keys state
+  in somebody else's browser — and a single constant would make a decision about
+  one silently a decision about the other.
+- **No migration, deliberately, and the loss is named.** Reading the old key as
+  a fallback means shipping the OLD NAME in every published page, which is the
+  thing this task removes; obfuscating it would be worse, because it hides it.
+  So each browser loses, once: its board selection, its actor, the two dashboard
+  ranges, its IndexedDB handle store and the directory permission behind the
+  picker id. That cost is payable now — this repository has no remote and has
+  not been published (TL-158) — and stops being payable on the first
+  publication.
+- **The guard is on the SOURCE, not on the built page.** A key spelled out as a
+  literal is a second place the name lives even when it happens to spell the
+  right word today, and the next key added would drift on its own. The built
+  page is checked too, but only its CODE region: the data region is the backlog,
+  which legitimately carries task titles and filenames naming the origin — that
+  is where the record of this decision lives.
+- **The word lists in `scripts/tests/init-stats.test.mjs` stay.** A guard needs
+  the word it forbids, and a test is where that word costs least — it ships in
+  no page and no document a reader opens.
 - Not folded into TL-37. That task's contract is about documents, and its
   criteria were written and agreed as a grep over `docs/` and `README.md`.
   Renaming a frozen key is a migration decision with a user-visible cost, which

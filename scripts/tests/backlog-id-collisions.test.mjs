@@ -47,7 +47,7 @@ function task(dir, filename, { id, title = "T" } = {}) {
 }
 
 function withTasks(build) {
-  const dir = mkdtempSync(join(tmpdir(), "origin-backlog-guard-"));
+  const dir = mkdtempSync(join(tmpdir(), "worktrail-backlog-guard-"));
   try {
     build(dir);
     try {

@@ -27,7 +27,7 @@ import { loadConfig, loadConfigOrExit } from "./config.mjs";
 import { taskIdPatterns } from "./task-id.mjs";
 import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { loadPlan } from "./plan.mjs";
-import { PRODUCT_NAME as N } from "./product.mjs";
+import { PRODUCT_NAME as N, STORAGE_KEY_PREFIX } from "./product.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -365,6 +365,10 @@ export function buildHtml(
   ).replace(/</g, "\\u003c");
   const configJson = JSON.stringify(config, (k, v) => (k === "paths" || k === "problems" || k === "taskId" ? undefined : v)).replace(/</g, "\\u003c");
   const buildTime = new Date().toISOString();
+  // EVERY KEY THIS PAGE WRITES INTO A BROWSER HANGS OFF ONE PREFIX (TL-178), and
+  // that prefix is a FROZEN constant rather than the display name: it identifies
+  // data already stored in browsers we cannot reach.
+  const storagePrefix = JSON.stringify(STORAGE_KEY_PREFIX + "-backlog");
   const urlModuleSrc = readModuleSource("viewer-url.mjs");
   const fieldsModuleSrc = readModuleSource("task-fields.mjs");
   // Estimate → hours: ONE implementation for the dashboard and for
@@ -2138,6 +2142,12 @@ ${paletteBadgeCss}
 <div class="chart-tip" id="chartTip" hidden></div>
 
 <script>
+// EVERY KEY THIS PAGE WRITES INTO THE BROWSER (TL-178). One prefix, injected
+// from \`STORAGE_KEY_PREFIX\` in scripts/product.mjs, which is FROZEN: these key
+// data already stored in browsers nobody can reach, so they may not follow a
+// rename of the display name.
+const STORAGE_PREFIX = ${storagePrefix};
+
 // ─── Pasted source of scripts/viewer-url.mjs (BL-1390) ────────────────
 // The link format for the tasks view. Edit THAT file — this is the build's copy,
 // which \`node --test scripts/tests/viewer-url.test.mjs\` tests.
@@ -2278,7 +2288,7 @@ function labelTitle(v) {
 }
 
 // ─── Board scope ──────────────────────────────────────────────────────
-const BOARD_STORAGE_KEY = "origin-backlog-board";
+const BOARD_STORAGE_KEY = STORAGE_PREFIX + "-board";
 
 /**
  * Boards to offer in the selector: the registry from the build plus everything that
@@ -2480,7 +2490,7 @@ function md2htmlClient(md) {
 // ─── IndexedDB for persisting FileSystemDirectoryHandle ──────────────
 function dbOpen() {
   return new Promise((res, rej) => {
-    const r = indexedDB.open("origin-backlog-viewer", 1);
+    const r = indexedDB.open(STORAGE_PREFIX + "-viewer", 1);
     r.onupgradeneeded = () => r.result.createObjectStore("handles");
     r.onsuccess = () => res(r.result);
     r.onerror = () => rej(r.error);
@@ -2592,7 +2602,7 @@ async function pickDirectory() {
     return;
   }
   try {
-    const handle = await window.showDirectoryPicker({ mode: "readwrite", id: "origin-backlog" });
+    const handle = await window.showDirectoryPicker({ mode: "readwrite", id: STORAGE_PREFIX });
     if (!(await verifyPermission(handle))) {
       toast("No write permission", "error"); return;
     }
@@ -3261,7 +3271,7 @@ function selectTask(id) {
 // are read-only — a second write path (File System Access) would mean a second set
 // of rules and a second place that knows about the history.
 const CAN_EDIT = SERVER_MODE;
-const ACTOR_STORAGE_KEY = "origin-backlog-actor";
+const ACTOR_STORAGE_KEY = STORAGE_PREFIX + "-actor";
 const ACTORS = CONFIG.actors || [];
 
 const HISTORY_FIELD_LABELS = {
@@ -4567,7 +4577,7 @@ const DASH_PRESETS = [
   { key: "90", label: "90 days", days: 90 },
   { key: "all", label: "Whole history", days: null },
 ];
-const DASH_RANGE_STORE = "origin-backlog-dash-range";
+const DASH_RANGE_STORE = STORAGE_PREFIX + "-dash-range";
 
 function dashLoadRange() {
   try {
@@ -4673,7 +4683,7 @@ function dashDayPanelFor(source, from, to) {
   return dashDayPanel(state.dashDay.day, source);
 }
 
-const DASH_BURN_STORE = "origin-backlog-dash-burn";
+const DASH_BURN_STORE = STORAGE_PREFIX + "-dash-burn";
 
 function dashLoadBurn() {
   try {
