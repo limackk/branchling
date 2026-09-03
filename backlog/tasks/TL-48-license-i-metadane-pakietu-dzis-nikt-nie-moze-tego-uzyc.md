@@ -6,12 +6,12 @@ labels: [pre-launch]
 board: main
 epic: "Backlog — open-source publication"
 priority: P1
-status: in_progress
+status: done
 owner: agent:claude
 estimate: 2h
 confidence: high
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 blocked_by: []
 blocks: []
 related_docs:
@@ -20,7 +20,7 @@ related_docs:
 verification:
   - bash: "test -f LICENSE && echo 'LICENSE present — OK'"
   - bash: "grep -q '\"private\": true' package.json && { echo 'still private'; exit 1; }; echo 'private removed — OK'"
-  - bash: "for k in license repository bugs homepage keywords description; do grep -q \"\\\"$k\\\"\" package.json || { echo \"missing metadata: $k\"; exit 1; }; done; echo 'metadata complete — OK'"
+  - bash: "for k in license repository bugs homepage keywords description author; do node -e \"process.exit(require('./package.json')['$k'] ? 0 : 1)\" || { echo \"missing metadata: $k\"; exit 1; }; done; echo 'metadata complete — OK'"
 ---
 
 ## Goal
@@ -91,7 +91,7 @@ to be made, not deduced from the code.
 - [x] `LICENSE` exists and contains the full text of the chosen license.
 - [x] `package.json` does not have `"private": true`.
 - [x] `license` is an SPDX identifier matching the `LICENSE` file.
-- [ ] `repository`, `bugs`, `homepage`, `keywords`, `description` filled in.
+- [x] `repository`, `bugs`, `homepage`, `keywords`, `description` filled in.
 - [x] `npm pack --dry-run` shows `LICENSE` in the tarball.
 
 ## Log

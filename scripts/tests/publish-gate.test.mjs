@@ -84,11 +84,15 @@ test("the gate itself does not ship — it is the publisher's tool, not the inst
     "the gate would travel to every install for no reason");
 });
 
-test("POSITIVE CONTROL: on THIS repository, today, the gate says no", () => {
-  // The whole point is that publishing is blocked right now. If this ever
-  // passes, either TL-48 was finished — in which case delete this assertion
-  // and say so in its log — or the gate stopped looking at anything.
+test("POSITIVE CONTROL: on THIS repository, today, the gate has an opinion", () => {
+  // This used to assert the opposite: while TL-48 was open the manifest had no
+  // addresses and the gate said no. TL-48 closed on 2026-09-03, when the
+  // repository got one (github.com/limackk/branchling), so the assertion was
+  // INVERTED rather than deleted. Deleting it would leave every case in this
+  // file running against a hand-built fixture, and none against the manifest
+  // that `npm publish` actually reads — a regression there (a field dropped in
+  // a merge, a placeholder pasted back in) would go unnoticed.
   const r = checkPublishMetadata(MANIFEST);
-  assert.equal(r.ok, false, "publishing is no longer blocked; was TL-48 closed?");
-  assert.deepEqual(names(r).sort(), ["bugs", "homepage", "repository"]);
+  assert.equal(r.ok, true,
+    `this repository's own manifest no longer passes its gate: ${names(r).join(", ")}`);
 });

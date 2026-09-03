@@ -14,7 +14,14 @@
     "todo",
     "kanban"
   ],
+  "homepage": "https://github.com/limackk/branchling#readme",
+  "bugs": "https://github.com/limackk/branchling/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/limackk/branchling.git"
+  },
   "license": "MIT",
+  "author": "Kamil Kwiatkowski",
   "type": "module",
   "bin": {
     "branchling": "bin/branchling.mjs"
