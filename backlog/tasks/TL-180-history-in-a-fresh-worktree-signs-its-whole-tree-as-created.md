@@ -6,9 +6,9 @@ labels: []
 board: main
 epic: "History and attribution"
 priority: P2
-status: in_progress
-owner: agent:spec
-role: spec
+status: pending
+owner: ""
+role: dev
 executor: ""
 estimate: 2h
 confidence: medium
