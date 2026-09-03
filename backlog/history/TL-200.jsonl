@@ -1,1 +1,4 @@
 {"id":"01M1KJM4W03VCP7H7DY2R8ZSBQ","ts":"2026-09-03T12:06:45.888Z","task":"TL-200","field":"__created__","from":"","to":"A run whose own agent closed the task reports zero closed","actor":"agent:claude","source":"manual","reason":"Filing the two improvements the runs surfaced."}
+{"id":"01M1M5PRBXB3YAVFPVDEFEXP72","ts":"2026-09-03T17:40:14.333Z","task":"TL-200","field":"status","from":"pending","to":"in_progress","actor":"agent:sub-c","source":"take","reason":"unknown","session":"tree-394168ce5af4"}
+{"id":"01M1M5PRBXHBV0E6FX47HFA29A","ts":"2026-09-03T17:40:14.333Z","task":"TL-200","field":"owner","from":"unassigned","to":"agent:sub-c","actor":"agent:sub-c","source":"take","reason":"unknown","session":"tree-394168ce5af4"}
+{"id":"01M1M6AS7R4M29V038JP0AQ50Y","ts":"2026-09-03T17:51:10.584Z","task":"TL-200","field":"status","from":"in_progress","to":"done","actor":"agent:sub-c","source":"done","reason":"proven","session":"tree-394168ce5af4"}

@@ -47,6 +47,13 @@
  * a person, is no longer this run's to park — it is reported as held elsewhere,
  * counted apart from a task somebody closed, and left exactly as it is.
  *
+ * A TASK THIS RUN'S OWN AGENT CLOSED IS CLOSED (TL-200). The refusal above is
+ * also the success path for any project whose agents end in `done`, so the log
+ * is asked WHO made the closing transition: the run's own actor means the work
+ * was done here and the summary counts it as closed, anybody else means the
+ * collision `closed-elsewhere` was named for. The per-task line keeps both
+ * words and `--json` keeps both counts.
+ *
  * WORKED, UNVERIFIED IS ITS OWN ENDING (TL-212). A contract whose last line is a
  * `manual:` entry can be satisfied to that line by an agent and still not close,
  * because the line asks a PERSON. That is not a failure and it is not work left
@@ -73,7 +80,7 @@ import { fileURLToPath } from "node:url";
 import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { repoRootFor } from "./done-task.mjs";
-import { recordEdit } from "./history.mjs";
+import { readHistory, recordEdit } from "./history.mjs";
 import { lockScope, releaseLock, stateRoot } from "./lock.mjs";
 import { callerSpecies, queueStatuses, selectCandidates, servesExecutor } from "./next-task.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
@@ -292,11 +299,29 @@ export function agentInput(taskText, feedback, ran) {
   ].join("\n");
 }
 
-/** The sentence written into the history when a task is blocked by a run. It
- *  states the EVIDENCE — how many attempts, and what failed — never a verdict
- *  about the work. PURE, so a test can assert the words somebody will read. */
-export function blockedReason(attempts, detail) {
-  const head = "no verification after " + attempts + " agent attempt" + (attempts === 1 ? "" : "s");
+/**
+ * The sentence written into the history when a task is parked by a run. It
+ * states the EVIDENCE — what stopped the run, and what failed — never a verdict
+ * about the work. PURE, so a test can assert the words somebody will read.
+ *
+ * THE HEAD CLAUSE FOLLOWS THE OUTCOME, NOT ONLY THE COUNTER (TL-193). Two
+ * different endings arrive here and only one of them is about the agent's work.
+ * `exhausted` spent its attempts on a contract that ran and refused, and the
+ * count is the reader's first question. `needs-person` never got that far: the
+ * contract asks somebody to vouch, or the task FILE is what refused, and no
+ * number of further attempts moves either. Saying "no verification after 1 agent
+ * attempt" there blames the agent for a stop it had no part in — and a `reason`
+ * is the one thing about a status change nobody can reconstruct afterwards, so
+ * it is the wrong field to be approximately right in.
+ *
+ * The attempt count is deliberately dropped from that sentence rather than kept
+ * as a second clause: it is a true number that answers nothing here, and a
+ * reader who sees a count in a reason will read it as the cause.
+ */
+export function blockedReason(attempts, detail, outcome) {
+  const head = outcome === "needs-person"
+    ? "closing needs a person, not another agent attempt"
+    : "no verification after " + attempts + " agent attempt" + (attempts === 1 ? "" : "s");
   const tail = String(detail || "").split("\n").map((s) => s.trim()).filter(Boolean)[0] || "";
   return tail ? head + ": " + tail : head;
 }
@@ -441,6 +466,27 @@ function parseJson(text) {
 }
 
 /**
+ * WHO moved this task into the archived status it now carries (TL-200).
+ *
+ * The append-only log is the only witness: the file says a task is finished and
+ * says nothing about who finished it, while every transition in
+ * `backlog/history/` names its actor. The last status entry landing in
+ * `archived_statuses` is that transition — read with `readHistory`, which is
+ * also what `history` reads, so a de-duplicated log is de-duplicated here too.
+ *
+ * "" when the log cannot answer — a task closed before the log existed, a
+ * missing file, a status a person set by hand and nothing recorded. The caller
+ * must read that as "not us": an unattributed closure is exactly the case for
+ * the cautious word, not for crediting a run that may have had no part in it.
+ */
+function archivedBy(root, id, archived) {
+  const closings = readHistory(root, id)
+    .filter((e) => e && e.field === "status" && archived.has(e.to));
+  const last = closings[closings.length - 1];
+  return last ? String(last.actor || "") : "";
+}
+
+/**
  * Write a status the RUN decided on, with a stated reason.
  *
  * Written here rather than by shelling out because no command sets an arbitrary
@@ -477,6 +523,12 @@ export function writeStatus(opts) {
       ok: false,
       reason: "closed-elsewhere",
       status: record.status,
+      // WHO closed it, so the caller can tell the success path from the
+      // collision (TL-200). The refusal is the same either way — nothing here
+      // writes over a proven fact — but "the agent this run started closed it"
+      // and "somebody else closed it while we worked" are not the same event,
+      // and only the report can say so.
+      closedBy: archivedBy(root, record.id, archived),
       message: id + " reached `status: " + record.status + "` while this run was working on it",
     };
   }
@@ -748,8 +800,12 @@ function renderReport(report, plan) {
     // the work is finished and nothing about the run went wrong — what is left is
     // a signature, and a warning mark beside it would restate the very confusion
     // between "cannot move" and "needs thirty seconds" this ending removes.
+    // `closed-by-agent` is an ok for the plainest reason of the four (TL-200):
+    // this run's agent finished the work. The per-task line keeps the word, so
+    // a reader can still see which hand closed it; the summary above does not,
+    // because to the summary it is simply one closed task.
     const mark = r.outcome === "closed" || r.outcome === "closed-elsewhere" ||
-      r.outcome === "awaiting-vouch" ? MARK.ok
+      r.outcome === "awaiting-vouch" || r.outcome === "closed-by-agent" ? MARK.ok
       : r.outcome === "agent-never-ran" ? MARK.err : MARK.warn;
     lines.push("  " + mark + " " + r.id + "  " + r.outcome + "  " + r.attempts +
       " attempt" + (r.attempts === 1 ? "" : "s") + "  " + Math.round(r.ms / 1000) + "s");
@@ -989,7 +1045,11 @@ export function run(argv) {
 
   const started = Date.now();
   const taken = [];
-  const tally = { closed: 0, blocked: 0, awaitingVouch: 0, closedElsewhere: 0, heldElsewhere: 0 };
+  // `closedByAgent` is a SUB-COUNT of `closed`, not a further ending beside it
+  // (TL-200): a task the run's own agent closed is closed, and the summary line
+  // says so. It is carried separately only because `--json` must still let a
+  // caller tell which hand did it.
+  const tally = { closed: 0, blocked: 0, awaitingVouch: 0, closedByAgent: 0, closedElsewhere: 0, heldElsewhere: 0 };
   let stopped = "the queue is empty";
   // The one result that ends the run without being a fact about a task (TL-184).
   let neverStarted = null;
@@ -1079,7 +1139,7 @@ export function run(argv) {
       }
       const reason = toVouch
         ? vouchReason(result.detail)
-        : blockedReason(result.attempts, result.detail);
+        : blockedReason(result.attempts, result.detail, result.outcome);
       const blocked = writeStatus({
         root, config, id: task.id, actor, reason, status: toVouch ? vouchStatus : stuck.status,
       });
@@ -1088,10 +1148,28 @@ export function run(argv) {
         // it while the agents were working (TL-191). It is counted apart from
         // both, because calling it `blocked` in the report would be the same lie
         // in prose that the refused write would have been in the tree.
-        tally.closedElsewhere++;
-        result.outcome = "closed-elsewhere";
-        result.status = blocked.status;
-        result.detail = blocked.message;
+        //
+        // WHICH SOMEBODY, THOUGH (TL-200). If the closing transition names the
+        // actor this run handed the task to, the somebody is this run's own
+        // agent — the success path, and the one a project whose agents end in
+        // `done` takes EVERY time. Reporting that as `0 closed` was a false
+        // negative in the one field an unattended caller reads. The refusal
+        // itself does not change: the run still writes nothing over a proven
+        // fact, and it is only the accounting that learns to tell the two
+        // endings apart.
+        if (blocked.closedBy && blocked.closedBy === actor) {
+          tally.closed++;
+          tally.closedByAgent++;
+          result.outcome = "closed-by-agent";
+          result.status = blocked.status;
+          result.detail = task.id + " was closed by " + blocked.closedBy +
+            ", the actor this run handed it to — `" + N + " done` had nothing left to do";
+        } else {
+          tally.closedElsewhere++;
+          result.outcome = "closed-elsewhere";
+          result.status = blocked.status;
+          result.detail = blocked.message;
+        }
       } else if (blocked.reason === "held-elsewhere") {
         // A THIRD OUTCOME, and deliberately not the one above (TL-192). Both
         // refusals leave the tree alone, and there the resemblance ends: one

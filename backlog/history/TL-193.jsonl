@@ -1,1 +1,4 @@
 {"id":"01M1KF5Q6DE6A42A2VMTD5HVVB","ts":"2026-09-03T11:06:27.405Z","task":"TL-193","field":"__created__","from":"","to":"a task parked as needs-person is given a reason blaming the attempt count","actor":"agent:claude","source":"cli","reason":"unknown"}
+{"id":"01M1M6BFR2V5S5TYTZV94S12RP","ts":"2026-09-03T17:51:33.634Z","task":"TL-193","field":"status","from":"pending","to":"in_progress","actor":"agent:sub-c","source":"take","reason":"unknown","session":"tree-394168ce5af4"}
+{"id":"01M1M6BFR227Q6XBEJPG54Y7TK","ts":"2026-09-03T17:51:33.634Z","task":"TL-193","field":"owner","from":"unassigned","to":"agent:sub-c","actor":"agent:sub-c","source":"take","reason":"unknown","session":"tree-394168ce5af4"}
+{"id":"01M1M6X4TKSAPX45VKSDDTS26Q","ts":"2026-09-03T18:01:12.275Z","task":"TL-193","field":"status","from":"in_progress","to":"done","actor":"agent:sub-c","source":"done","reason":"proven","session":"tree-394168ce5af4"}

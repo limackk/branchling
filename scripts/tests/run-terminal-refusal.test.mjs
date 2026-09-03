@@ -59,6 +59,17 @@ function statusOf(backlog, id) {
   return (readFileSync(taskFile(backlog, id), "utf8").match(/^status: ([a-z_]+)/m) || [])[1];
 }
 
+/** The sentence the RUN wrote when it parked the task, read out of the
+ *  append-only log. The file is the artefact, not the report: a `reason` is the
+ *  one thing about a status change nobody can reconstruct later (TL-193). */
+function parkReason(backlog, id) {
+  const f = join(backlog, "history", id + ".jsonl");
+  if (!existsSync(f)) return null;
+  const parked = readFileSync(f, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l))
+    .filter((e) => e.source === "run" && e.field === "status");
+  return parked.length ? String(parked[parked.length - 1].reason || "") : null;
+}
+
 /** A backlog with one task whose contract is `contract` — the frontmatter block
  *  written verbatim — and whose criteria all name `proofId`, so nothing refuses
  *  over the criteria links before the contract is reached. */
@@ -155,6 +166,22 @@ test("a `manual:` contract ends as `needs-person`, also in one attempt", () => {
     assert.equal(row.attempts, 1);
     assert.ok(String(row.detail).length > 0, "the outcome does not say what refused");
     assert.doesNotMatch(String(row.detail), /undefined/, "a refusal printed `undefined`");
+
+    // AND THE SENTENCE THAT SURVIVES THE SESSION (TL-193). The run parks the
+    // task, and what it writes into the history is permanent. The contract was
+    // never reachable by an agent, so the reason may not attribute the stop to
+    // how many agents were sent at it.
+    assert.equal(statusOf(backlog, id), "blocked");
+    const reason = parkReason(backlog, id);
+    assert.ok(reason, "the run parked the task without recording a reason");
+    assert.doesNotMatch(reason, /\d+ agent attempt/,
+      "the parked task blames the attempt count for a stop no attempt could have fixed");
+    assert.doesNotMatch(reason, /no verification after/,
+      "the parked task reads as a verdict on work the agent was never able to do");
+    assert.match(reason, /person/,
+      "the reason does not say that a person is what closing needs");
+    assert.match(reason, /`manual:` entry/,
+      "the reason does not carry what `done` refused over");
   } finally {
     cleanup(dir);
   }
@@ -197,6 +224,14 @@ test("POSITIVE CONTROL: a contract that genuinely fails still takes every attemp
     assert.equal(row.attempts, 2);
     assert.equal(row.outcome, "exhausted");
     assert.equal(statusOf(backlog, id), "blocked");
+
+    // The other half of the control (TL-193): a task that genuinely ran out of
+    // attempts KEEPS the count and the failing entry. A change that dropped the
+    // attempts from every reason would pass the `manual:` assertion above.
+    const reason = parkReason(backlog, id);
+    assert.match(reason, /2 agent attempts/, "the attempts a real failure spent are no longer recorded");
+    assert.match(reason, new RegExp("it-is-done: test -f " + id + "\\.done"),
+      "the reason no longer names the entry that failed");
   } finally {
     cleanup(dir);
   }
