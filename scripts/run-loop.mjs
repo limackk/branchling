@@ -29,6 +29,11 @@
  * board after a run says where it stopped and why, which is the promise that has
  * to hold when a local model gets stuck on task 7 of 20.
  *
+ * THE STUCK STATUS IS NEVER WRITTEN OVER AN ARCHIVED ONE (TL-191). The status a
+ * task was taken in proves nothing by the time the attempts are over, so the
+ * file is re-read at the write: a task that reached `archived_statuses` in the
+ * meantime is reported as closed elsewhere and left exactly as it is.
+ *
  * WHERE THE AGENT'S OUTPUT GOES. One log file per task, OUTSIDE the repository,
  * in the same state directory the locks live in (TL-87): it is session state,
  * not data that should travel with a branch, and twenty tasks' worth of agent
@@ -388,6 +393,25 @@ export function blockTask(opts) {
     .find((t) => String(t.id).toUpperCase() === String(id).toUpperCase());
   if (!record) return { ok: false, message: "no task " + id + " in " + paths.tasksDir };
 
+  // THE FILE AS IT IS NOW, not the status the task was taken in (TL-191). The
+  // record above was read from disk a moment ago, and that re-read is the whole
+  // guard: between the claim and the last attempt the task may have reached an
+  // archived status — the agent closing it itself, a person in another worktree,
+  // a merge arriving, a second run. `done` RUNS the contract and is the only
+  // thing entitled to say a task is finished; a stuck status written over that
+  // would destroy a proven fact with an opinion formed from a refusal. So the
+  // write is refused and the caller is told what it found. The vocabulary is the
+  // project's — `archived_statuses` — never `done` spelled out here.
+  const archived = new Set(config.archivedStatuses || []);
+  if (archived.has(record.status)) {
+    return {
+      ok: false,
+      reason: "closed-elsewhere",
+      status: record.status,
+      message: id + " reached `status: " + record.status + "` while this run was working on it",
+    };
+  }
+
   const file = join(paths.tasksDir, record.file.replace(/^tasks\//, ""));
   const raw = readFileSync(file, "utf8");
   const before = extractMeta(splitFrontmatter(raw).frontmatter);
@@ -488,10 +512,14 @@ function renderReport(report, plan) {
   const tally = report.tally;
   lines.push("");
   lines.push("  " + report.taken.length + " task(s) taken · " + tally.closed + " closed · " +
-    tally.blocked + " blocked · " + Math.round(report.ms / 1000) + "s");
+    tally.blocked + " blocked · " +
+    (tally.closedElsewhere ? tally.closedElsewhere + " closed elsewhere · " : "") +
+    Math.round(report.ms / 1000) + "s");
   lines.push("");
   for (const r of report.taken) {
-    const mark = r.outcome === "closed" ? MARK.ok : MARK.warn;
+    // `closed-elsewhere` reads as an ok: the task IS closed, and the run's only
+    // part in it was declining to write over that (TL-191).
+    const mark = r.outcome === "closed" || r.outcome === "closed-elsewhere" ? MARK.ok : MARK.warn;
     lines.push("  " + mark + " " + r.id + "  " + r.outcome + "  " + r.attempts +
       " attempt" + (r.attempts === 1 ? "" : "s") + "  " + Math.round(r.ms / 1000) + "s");
     lines.push("      " + color.dim(r.log));
@@ -708,7 +736,7 @@ export function run(argv) {
 
   const started = Date.now();
   const taken = [];
-  const tally = { closed: 0, blocked: 0 };
+  const tally = { closed: 0, blocked: 0, closedElsewhere: 0 };
   let stopped = "the queue is empty";
   const seen = new Set();
 
@@ -755,7 +783,16 @@ export function run(argv) {
     } else {
       const reason = blockedReason(result.attempts, result.detail);
       const blocked = blockTask({ root, config, id: task.id, actor, reason, status: stuck.status });
-      if (!blocked.ok) {
+      if (blocked.reason === "closed-elsewhere") {
+        // NOT a failure of this run and not a task it may park: somebody closed
+        // it while the agents were working (TL-191). It is counted apart from
+        // both, because calling it `blocked` in the report would be the same lie
+        // in prose that the refused write would have been in the tree.
+        tally.closedElsewhere++;
+        result.outcome = "closed-elsewhere";
+        result.status = blocked.status;
+        result.detail = blocked.message;
+      } else if (!blocked.ok) {
         console.error(warn(task.id + ": " + blocked.message));
       } else {
         tally.blocked++;
