@@ -1,1 +1,4 @@
 {"id":"01M1KF5Q6DEY9WYPQA344KN25H","ts":"2026-09-03T11:06:27.405Z","task":"TL-194","field":"__created__","from":"","to":"query --text and --limit work but are absent from query --help","actor":"agent:claude","source":"cli","reason":"unknown"}
+{"id":"01M1M5NV848CZV6EDJV6CPPGMN","ts":"2026-09-03T17:39:44.516Z","task":"TL-194","field":"status","from":"pending","to":"in_progress","actor":"agent:sub-a","source":"take","reason":"unknown","session":"tree-ca330e8d864e"}
+{"id":"01M1M5NV84YKPCGZZ1RKG6T22F","ts":"2026-09-03T17:39:44.516Z","task":"TL-194","field":"owner","from":"unassigned","to":"agent:sub-a","actor":"agent:sub-a","source":"take","reason":"unknown","session":"tree-ca330e8d864e"}
+{"id":"01M1M66V56HMGYG8P3PB6WBBNV","ts":"2026-09-03T17:49:01.478Z","task":"TL-194","field":"status","from":"in_progress","to":"done","actor":"agent:sub-a","source":"done","reason":"proven","session":"tree-ca330e8d864e"}
