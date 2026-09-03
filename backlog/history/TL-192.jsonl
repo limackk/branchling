@@ -1,0 +1,1 @@
+{"id":"01M1KF5Q6DRXD5SF03N4XHY01N","ts":"2026-09-03T11:06:27.405Z","task":"TL-192","field":"__created__","from":"","to":"The run does not check that a task is still its own before parking it","actor":"agent:claude","source":"cli","reason":"unknown"}
