@@ -6,3 +6,4 @@
 {"id":"01M1GWHJE48C6NH8B68WPMSFAB","ts":"2026-09-02T11:02:23.940Z","task":"TL-35","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
 {"id":"01M1GWHJE424PVHESMV5WVEQ97","ts":"2026-09-02T11:02:23.940Z","task":"TL-35","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
 {"id":"01M1GWYC5Z1KWX4FZSC92TTHG4","ts":"2026-09-02T11:09:23.519Z","task":"TL-35","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
+{"id":"01M1K5ZWCHTRXZE28QF4V8ZAN1","ts":"2026-09-03T08:25:58.929Z","task":"TL-35","field":"related_docs","from":["docs/worktrail-global-tool.md","docs/backlog-time-tracking.md"],"to":["docs/branchling-global-tool.md","docs/backlog-time-tracking.md"],"actor":"unknown","source":"external","reason":"unknown"}

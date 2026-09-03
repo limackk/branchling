@@ -5,3 +5,4 @@
 {"id":"01M1EGFDWR512B78YSGAG3R6JG","ts":"2026-09-01T12:53:01.976Z","task":"TL-72","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
 {"id":"01M1GFKZK5H9DKAFCB78HGPRPG","ts":"2026-09-02T07:16:31.461Z","task":"TL-72","field":"title","from":"Koperta JSON: wersjonowany kontrakt zamiast gołej tablicy","to":"JSON envelope: a versioned contract instead of a bare array","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK5051Q2BH74VV00PQX","ts":"2026-09-02T07:16:31.461Z","task":"TL-72","field":"epic","from":"Powierzchnia CLI","to":"CLI surface","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1K5ZWCH1X2M2R3AQM6BBRSC","ts":"2026-09-03T08:25:58.929Z","task":"TL-72","field":"related_docs","from":["docs/worktrail-global-tool.md"],"to":["docs/branchling-global-tool.md"],"actor":"unknown","source":"external","reason":"unknown"}

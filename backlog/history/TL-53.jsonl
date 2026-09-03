@@ -7,3 +7,4 @@
 {"id":"01M1GXRRYZFAK71FENPVH0HMBM","ts":"2026-09-02T11:23:48.575Z","task":"TL-53","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
 {"id":"01M1GXRRYZ8KS5ZVQQN5FM7V7V","ts":"2026-09-02T11:23:48.575Z","task":"TL-53","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
 {"id":"01M1GY1XR3E8BX5E5XJHMPY130","ts":"2026-09-02T11:28:48.387Z","task":"TL-53","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
+{"id":"01M1K5ZWCH98ENF8H1AYY0848W","ts":"2026-09-03T08:25:58.929Z","task":"TL-53","field":"related_docs","from":[".claude/skills/worktrail-release/SKILL.md"],"to":[".claude/skills/branchling-release/SKILL.md"],"actor":"unknown","source":"external","reason":"unknown"}

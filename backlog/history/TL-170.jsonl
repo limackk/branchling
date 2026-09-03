@@ -5,3 +5,4 @@
 {"id":"01M1HT495DB70NTJJAHSB8T4GX","ts":"2026-09-02T19:39:25.741Z","task":"TL-170","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
 {"id":"01M1HT495DKJ5ZVVW4F11KMEVP","ts":"2026-09-02T19:39:25.741Z","task":"TL-170","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
 {"id":"01M1HTPE0TQ7F25A8N226ZD884","ts":"2026-09-02T19:49:20.538Z","task":"TL-170","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven","session":"tree-526f61f2043f"}
+{"id":"01M1K5ZWCHCV2N59MHE3EP0C86","ts":"2026-09-03T08:25:58.929Z","task":"TL-170","field":"related_docs","from":["docs/worktrail-state-and-sync.md"],"to":["docs/branchling-state-and-sync.md"],"actor":"unknown","source":"external","reason":"unknown"}

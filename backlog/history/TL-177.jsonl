@@ -1,1 +1,2 @@
 {"id":"01M1JZ6SANV4P4VYEA952TP3NW","ts":"2026-09-03T06:27:25.141Z","task":"TL-177","field":"__created__","from":"","to":"A project switcher in the viewer over the cross-project pass","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1K5ZWCHA5BNAKWF5EP8VYYW","ts":"2026-09-03T08:25:58.929Z","task":"TL-177","field":"related_docs","from":["docs/worktrail-global-tool.md"],"to":["docs/branchling-global-tool.md"],"actor":"unknown","source":"external","reason":"unknown"}

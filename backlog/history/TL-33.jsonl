@@ -5,3 +5,4 @@
 {"id":"01M1F5BNKGN55C2JB301RGDBGP","ts":"2026-09-01T18:57:58.896Z","task":"TL-33","field":"blocks","from":["TL-1440"],"to":["TL-34"],"actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK5KTQTV8W70BVG58CB","ts":"2026-09-02T07:16:31.461Z","task":"TL-33","field":"title","from":"Packaging — instalacja globalna i npx","to":"Packaging — global install and npx","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK583DZS1W358MEFF5P","ts":"2026-09-02T07:16:31.461Z","task":"TL-33","field":"epic","from":"Backlog — publikacja open source","to":"Backlog — open source release","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1K5ZWCH11WCF05PYQCZF756","ts":"2026-09-03T08:25:58.929Z","task":"TL-33","field":"related_docs","from":["docs/worktrail-global-tool.md"],"to":["docs/branchling-global-tool.md"],"actor":"unknown","source":"external","reason":"unknown"}

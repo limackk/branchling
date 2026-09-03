@@ -3,3 +3,4 @@
 {"id":"01M1F5BNKGA5H93K4PHP32SQ2B","ts":"2026-09-01T18:57:58.896Z","task":"TL-66","field":"blocks","from":["TL-1474"],"to":["TL-64"],"actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK5YMKY2B3Z022BP10Y","ts":"2026-09-02T07:16:31.461Z","task":"TL-66","field":"title","from":"Ostrzeżenie next-id kłamie o gicie na pustym backlogu","to":"next-id warning lies about git on an empty backlog","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK541RQBZZBF789M9D0","ts":"2026-09-02T07:16:31.461Z","task":"TL-66","field":"epic","from":"Powierzchnia CLI","to":"CLI surface","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1K5ZWCHY1VGYP9Y7MDH44TF","ts":"2026-09-03T08:25:58.929Z","task":"TL-66","field":"related_docs","from":[".claude/skills/worktrail-cli/references/output-style.md"],"to":[".claude/skills/branchling-cli/references/output-style.md"],"actor":"unknown","source":"external","reason":"unknown"}

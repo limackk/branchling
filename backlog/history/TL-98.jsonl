@@ -8,3 +8,4 @@
 {"id":"01M1G8TT6DPM7JDCZ5SXH51NC5","ts":"2026-09-02T05:17:55.277Z","task":"TL-98","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
 {"id":"01M1GFKZK55NDVGRV1YCTVM4WX","ts":"2026-09-02T07:16:31.461Z","task":"TL-98","field":"title","from":"Role w dyspozytorze i petli: next --role, agent per rola","to":"Roles in the dispatcher and the loop: next --role, agent per role","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK5BASF5KNEFQTMN3AV","ts":"2026-09-02T07:16:31.461Z","task":"TL-98","field":"epic","from":"Wyróżniki agentowe","to":"Agentic distinguishers","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1K5ZWCHQE7423X45QC2729N","ts":"2026-09-03T08:25:58.929Z","task":"TL-98","field":"related_docs","from":["docs/worktrail-global-tool.md"],"to":["docs/branchling-global-tool.md"],"actor":"unknown","source":"external","reason":"unknown"}

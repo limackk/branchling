@@ -5,3 +5,4 @@
 {"id":"01M1HAC33VC295A03D6J1NVDWH","ts":"2026-09-02T15:04:04.475Z","task":"TL-119","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
 {"id":"01M1HAC33VSW10E11776HWZ578","ts":"2026-09-02T15:04:04.475Z","task":"TL-119","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
 {"id":"01M1HASENPP0WNBXH8XTR7SFET","ts":"2026-09-02T15:11:22.294Z","task":"TL-119","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
+{"id":"01M1K5ZWCHWHZ1DY000DP7E8X8","ts":"2026-09-03T08:25:58.929Z","task":"TL-119","field":"related_docs","from":["docs/worktrail-global-tool.md"],"to":["docs/branchling-global-tool.md"],"actor":"unknown","source":"external","reason":"unknown"}

@@ -4,3 +4,4 @@
 {"id":"01M1EEXDQN8SFWW4T4FQC6DKJS","ts":"2026-09-01T12:25:43.413Z","task":"TL-71","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
 {"id":"01M1EFGS0AGF331D2N2HY7VES9","ts":"2026-09-01T12:36:17.546Z","task":"TL-71","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
 {"id":"01M1GFKZK5Q2PS917HEPT1BQXV","ts":"2026-09-02T07:16:31.461Z","task":"TL-71","field":"title","from":"Serwer nie wie, czyj backlog trzyma — ping bez katalogu","to":"The server does not know whose backlog it holds — a ping without a directory","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1K5ZWCHHA5PRKPDE4XEDNJ9","ts":"2026-09-03T08:25:58.929Z","task":"TL-71","field":"related_docs","from":["docs/worktrail-global-tool.md"],"to":["docs/branchling-global-tool.md"],"actor":"unknown","source":"external","reason":"unknown"}

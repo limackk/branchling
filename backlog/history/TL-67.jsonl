@@ -5,3 +5,4 @@
 {"id":"01M1GZNAHX8EX3KRJG5X8GGDEX","ts":"2026-09-02T11:56:52.669Z","task":"TL-67","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
 {"id":"01M1GZNAHX0M0JR5B13V3XE4WF","ts":"2026-09-02T11:56:52.669Z","task":"TL-67","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
 {"id":"01M1H04JGE54GKBCJMDQ6H855P","ts":"2026-09-02T12:05:12.334Z","task":"TL-67","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
+{"id":"01M1K5ZWCHZQT62W25JK0DK2Z7","ts":"2026-09-03T08:25:58.929Z","task":"TL-67","field":"related_docs","from":["docs/worktrail-state-and-sync.md","docs/worktrail-global-tool.md",".claude/skills/worktrail-cli/SKILL.md"],"to":["docs/branchling-state-and-sync.md","docs/branchling-global-tool.md",".claude/skills/branchling-cli/SKILL.md"],"actor":"unknown","source":"external","reason":"unknown"}
