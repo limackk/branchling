@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "CLI surface"
 priority: P1
-status: pending
-owner: unassigned
+status: done
+owner: agent:claude
 role: ""
 executor: ""
 estimate: 2h
@@ -73,14 +73,34 @@ place, not a fix per command.
 
 ## Acceptance criteria
 
-- [ ] A `--json` answer well above one pipe buffer parses after going through a
+- [x] A `--json` answer well above one pipe buffer parses after going through a
       pipe. [proof: large-json-survives-a-pipe]
-- [ ] The positive control fails against the old pattern, so the test cannot
+- [x] The positive control fails against the old pattern, so the test cannot
       pass against a fix that does nothing. [proof: large-json-survives-a-pipe]
-- [ ] Every non-zero exit code the JSON commands give today is unchanged. [proof: large-json-survives-a-pipe]
+- [x] Every non-zero exit code the JSON commands give today is unchanged. [proof: large-json-survives-a-pipe]
 
 ## Decisions
 
+- **Fixed by writing the bytes synchronously, not by auditing every
+  `process.exit()`.** Setting `process.exitCode` and letting each command end on
+  its own is the other correct fix, and it would have meant a convention across
+  every command file, kept correct forever, of exactly the kind TL-174 had just
+  finished removing. `writeSync` in a retry loop makes the callers' existing
+  `process.exit()` correct instead of forbidden: by the time it runs, the data is
+  in the operating system's pipe.
+- **EAGAIN is the normal case and is retried**, with a one-millisecond
+  `Atomics.wait` rather than a bare spin — a full pipe only means the reader has
+  not caught up, and a spin would burn a core against a slow one. EPIPE is
+  silent: the reader closed early (`| head`), and shouting about that would turn
+  an ordinary shell idiom into an error.
+- **`query --files` is fixed too**, though the title says `--json`. It is the
+  same defect, in the same file, in the output most likely to be long — a list
+  cut off at one buffer would silently hand `xargs` the wrong subset of files.
+  Text output elsewhere is left alone: the commands that print unbounded lists
+  are the ones this bug was found in.
+- **The exit codes are asserted, not assumed.** A fix that made every command
+  exit 0 would be far worse than the bug it replaced, so the test pins a usage
+  error, a vocabulary refusal, a successful read and a "no such task" refusal.
 - Not fixed by making stdout synchronous globally: that changes the behaviour of
   every command, including the interactive ones, to solve a problem that belongs
   to one function.

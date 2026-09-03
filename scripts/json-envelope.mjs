@@ -31,6 +31,8 @@
  * Tests: `node --test scripts/tests/json-envelope.test.mjs`
  */
 
+import { printLine } from "./stdout.mjs";
+
 /**
  * The version of the contract, in ONE place. It is not the package version:
  * releases happen for reasons that have nothing to do with the JSON shape, and a
@@ -261,5 +263,10 @@ export function envelope(kind, payload) {
 
 /** Print one answer on stdout. No colour, no ornament: this is for a program. */
 export function printJson(kind, payload) {
-  console.log(JSON.stringify(envelope(kind, payload), null, 2));
+  // SYNCHRONOUSLY (TL-175), not `console.log`. Every caller exits on the next
+  // line, and on a pipe `process.exit` does not wait for stdout to drain — so a
+  // payload above one pipe buffer arrived truncated, and the consumer saw a
+  // parse error instead of an answer. One line here rather than an audit of
+  // every `process.exit()` in the tool.
+  printLine(JSON.stringify(envelope(kind, payload), null, 2));
 }

@@ -50,6 +50,7 @@ import { fileURLToPath } from "node:url";
 import { absentHere, crossBranchState, describeDivergence, divergences, scanNote } from "./branch-scan.mjs";
 import { DEFAULTS, loadConfigOrExit } from "./config.mjs";
 import { printJson } from "./json-envelope.mjs";
+import { printLine } from "./stdout.mjs";
 import { explain as explainIndex, modifiedFiles, repoRoot, touches } from "./modified-files.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
 import { collectAllProjects, collectProject, unknownEverywhere } from "./cross-project.mjs";
@@ -327,7 +328,11 @@ if (opts.json) {
   process.exit(0);
 }
 if (opts.files) {
-  for (const t of shown) console.log(t.file);
+  // SYNCHRONOUSLY (TL-175). `--files` exists to be piped into `xargs`, and a
+  // list cut off at one pipe buffer would silently open the wrong subset of
+  // files — the same defect as the truncated JSON, in the output most likely
+  // to be long.
+  for (const t of shown) printLine(t.file);
   if (limit && total > shown.length) {
     console.error(`# showing ${shown.length} of ${total} (limit ${limit})`);
   }
@@ -361,7 +366,7 @@ for (const t of shown) {
     cells.push(`elsewhere: [${t.elsewhere.map(describeDivergence).join(", ")}]`);
   }
   cells.push(`title: ${q(t.title)}`);
-  console.log(`- {${cells.join(", ")}}`);
+  printLine(`- {${cells.join(", ")}}`);
 }
 
 // The truncation MUST be stated. A list without this line reads as complete —
