@@ -412,6 +412,11 @@ export function buildHtml(
   // and `stats --calibration` cannot round the same number two ways.
   const calibrationModuleSrc = readModuleSource("calibration.mjs");
   const elsewhereModuleSrc = readModuleSource("elsewhere.mjs");
+  // The live signal (TL-189). The SERVER computes it — the raw log is outside
+  // every repository and this generated file gets mailed around — but the WORDING
+  // and the "still working / stopped" rule run in the browser, so the module goes
+  // in whole rather than in halves.
+  const inFlightModuleSrc = readModuleSource("in-flight.mjs");
   // The plan's arithmetic and the Execution view. `plan.mjs` comes first:
   // `viewer-plan.mjs` renders what `planState()` returns.
   const planModuleSrc = readModuleSource("plan.mjs");
@@ -450,6 +455,11 @@ export function buildHtml(
        lose the tint. */
     --foreign-border: #B4530E;
     --foreign-bg: rgba(180, 83, 14, 0.09);
+    /* "Somebody is on this right now" (TL-189). A token of its own for the reason
+       above: a status colour would tie the mark to one project's vocabulary, and
+       this is a fact about the heartbeat log, not about a status. */
+    --in-flight: #059669;
+    --in-flight-bg: rgba(5, 150, 105, 0.13);
 ${paletteVarCss}
   }
   @media (prefers-color-scheme: dark) {
@@ -469,6 +479,8 @@ ${paletteVarCss}
       --code-fg: #CBD5E1;
       --foreign-border: #E8A25D;
       --foreign-bg: rgba(232, 162, 93, 0.12);
+      --in-flight: #34D399;
+      --in-flight-bg: rgba(52, 211, 153, 0.15);
     }
   }
   html, body { margin: 0; padding: 0; height: 100%; }
@@ -899,6 +911,35 @@ ${paletteVarCss}
   /* Dimming must not swallow the fact that this is the card being read. */
   .task-card.elsewhere.active { background: var(--accent-soft); }
   .task-card.elsewhere.active .task-card-title { color: var(--fg); }
+
+  /* A task being worked on RIGHT NOW (TL-189). The left border is already spoken
+     for by the priority and the other three by the elsewhere mark, so this one is an
+     outline: it composes with both instead of arguing with either. */
+  .task-card.in-flight { box-shadow: 0 0 0 1px var(--in-flight); }
+  .badge-in-flight {
+    background: var(--in-flight-bg);
+    color: var(--in-flight);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  /* The dot is a SHAPE, not an animation. A pulse says "alive" on its own, which
+     is the claim this whole signal refuses to make without a timestamp beside it —
+     and it would keep pulsing over a session that died an hour ago. */
+  .badge-in-flight::before {
+    content: "";
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--in-flight);
+  }
+  /* Heard from, but not recently. Grey rather than red: a session that stopped is
+     the normal end of work, and only the reader knows whether it should not have. */
+  .badge-in-flight.stale {
+    background: var(--bg-sidebar);
+    color: var(--fg-muted);
+  }
+  .badge-in-flight.stale::before { background: var(--fg-muted); }
 
   .task-card-head {
     display: flex;
@@ -2228,6 +2269,14 @@ ${calibrationModuleSrc}
 ${elsewhereModuleSrc}
 // ─── end of the pasted module ─────────────────────────────────────────
 
+// ─── Pasted source of scripts/in-flight.mjs (TL-189) ─────────────────
+// A task being worked on, between the take and the close. The server imports the
+// same file to reduce the heartbeat log to one signal per task; this copy turns
+// that signal into words. Tested by
+// node --test scripts/tests/viewer-in-flight.test.mjs.
+${inFlightModuleSrc}
+// ─── end of the pasted module ─────────────────────────────────────────
+
 // ─── Pasted source of scripts/plan.mjs (TL-107) ──────────────────────
 // \`planState()\` — the five definitions of "active wave", "next up", "in
 // progress", "unplanned" and "stale". The \`plan\` command imports THIS file, so the
@@ -2266,6 +2315,18 @@ ${taskGraphModuleSrc}
 // Embedded into the page at render time, refreshed from /api/history after every
 // edit and after an SSE signal. Under file:// the build's copy remains — it reads
 // the same way there, only nothing new can be appended.
+// THE LIVE SIGNAL IS NOT EMBEDDED (TL-189) — it starts empty and is filled from
+// /api/in-flight. This file is also written to backlog/viewer.html and mailed
+// around, and the heartbeat log is a record of what hour a particular person
+// worked; baking it in here would carry that record out of the machine that holds
+// it. Over file:// the map therefore stays empty and no card claims anything,
+// which is the honest state: there is nobody to ask.
+// { "<ID>": {last, actor, session, events, sessions, since} }
+let IN_FLIGHT = {};
+// The SERVER's clock, from the same response. A browser five minutes off would
+// otherwise read a live session as stale, or the reverse, and would do it
+// silently. Held as an OFFSET so the age keeps advancing between fetches.
+let IN_FLIGHT_SKEW_MS = 0;
 let HISTORY = ${historyJson};
 let ALL_TASKS = ${tasksJson};
 let TASKS = ALL_TASKS;
@@ -2640,6 +2701,10 @@ async function refreshFromServer(quiet) {
     applyScope();
     renderBoardScope();
     render();
+    // A status write moves the take, and the take is the window the events are
+    // counted in — so the signal is recomputed with the tasks, not only when a
+    // heartbeat arrives.
+    refreshInFlight();
     if (!quiet) toast("Refreshed " + TASKS.length + " tasks from disk", "success");
   } catch (e) {
     console.error(e);
@@ -3360,6 +3425,9 @@ function renderCards() {
     const card = document.createElement("div");
     card.className = "task-card";
     card.dataset.priority = t.priority || "";
+    // The live signal is repainted in place by paintInFlight(), which finds the
+    // card by this id rather than rebuilding the list every thirty seconds.
+    card.dataset.taskId = t.id || "";
     if (state.selectedId === t.id) card.classList.add("active");
     // The rule is in elsewhere.mjs, tested there: it fires on the EXISTENCE of a
     // divergence, never on a status name out of somebody's config.yaml.
@@ -3368,10 +3436,15 @@ function renderCards() {
       card.classList.add(ew.className);
       card.title = ew.title;
     }
+    // Live NOW gets the outline; heard-from-but-quiet keeps only its badge. The
+    // rule is in in-flight.mjs, so the card and the badge cannot disagree.
+    const live = inFlightFor(t.id);
+    if (live && live.state.working) card.classList.add("in-flight");
     card.innerHTML = \`
       <div class="task-card-head">
         <span class="task-card-id">\${escape(t.id || "")}</span>
         <span class="task-card-meta">
+          <span data-in-flight="\${escape(t.id || "")}">\${inFlightBadgeHtml(t.id)}</span>
           <span class="badge badge-priority-\${t.priority}">\${escape(t.priority || "")}</span>
         </span>
       </div>
@@ -3553,6 +3626,98 @@ async function refreshHistory(id, force) {
     historyLoaded[id] = false;   // we will try again on the next visit
   }
 }
+// ─── The live signal (TL-189) ──────────────────────────────────────
+//
+// The server holds the raw log; this side holds only the reduced signal and the
+// rules for reading it, which come from the pasted in-flight.mjs above.
+async function refreshInFlight() {
+  if (!SERVER_MODE) return;
+  try {
+    const res = await fetch(apiUrl("api/in-flight"), { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    IN_FLIGHT = data.tasks || {};
+    const serverNow = Date.parse(data.now || "");
+    IN_FLIGHT_SKEW_MS = isNaN(serverNow) ? 0 : serverNow - Date.now();
+    paintInFlight();
+  } catch (e) {
+    // A server that stopped answering is not a reason to shout: the last answer
+    // stays on screen and its ages keep advancing, so the cards go stale by
+    // themselves rather than freezing on a number that was true once.
+    console.warn("live signal unavailable:", e.message);
+  }
+}
+
+/** The server's clock, kept advancing between fetches. */
+function inFlightNow() { return Date.now() + IN_FLIGHT_SKEW_MS; }
+
+function inFlightFor(id) {
+  const signal = IN_FLIGHT[id];
+  if (!signal) return null;
+  const st = inFlightState(signal, { now: inFlightNow(), idleGapMinutes: CONFIG.idleGapMinutes });
+  const task = ALL_TASKS.find(function (t) { return t.id === id; });
+  if (!inFlightVisible(task || {}, st, { inProgressStatus: CONFIG.inProgressStatus })) return null;
+  return { signal: signal, state: st };
+}
+
+/** The badge on a card: the age, and the whole sentence in the title. */
+function inFlightBadgeHtml(id) {
+  const live = inFlightFor(id);
+  if (!live) return "";
+  return '<span class="badge badge-in-flight' + (live.state.working ? "" : " stale") +
+    '" title="' + escape(inFlightPhrase(live.signal, live.state)) + '">' +
+    escape(live.state.short) + "</span>";
+}
+
+/** The whole row, hidden when there is nothing to say — an empty row would still
+ *  take a column of the auto-fit grid and read as a field with no value. */
+function inFlightRow(id) {
+  const inner = inFlightRowHtml(id);
+  return '<div class="meta-row in-flight-row" data-in-flight="' + escape(id) + '"' +
+    (inner ? "" : " hidden") + ">" + inner + "</div>";
+}
+
+/** The detail panel says it in words — the panel has the room the card has not,
+ *  and "last heard from 40 minutes ago" is the sentence a reader acts on. */
+function inFlightRowHtml(id) {
+  const live = inFlightFor(id);
+  if (!live) return "";
+  return '<div class="meta-label">Working</div><div class="meta-value">' +
+    escape(inFlightPhrase(live.signal, live.state)) + "</div>";
+}
+
+/**
+ * Repaint the signal WITHOUT re-rendering anything else.
+ *
+ * A full renderCards() + renderDetail() would be simpler and wrong twice:
+ * renderDetail() scrolls the panel back to the top, so a reader half way down a
+ * task description would be thrown to the beginning every tick, and a rebuild of
+ * every card would drop a field editor that happened to be open. Only the slots
+ * change, and everything around them is left alone.
+ */
+function paintInFlight() {
+  const slots = document.querySelectorAll("[data-in-flight]");
+  for (const slot of slots) {
+    const id = slot.getAttribute("data-in-flight");
+    slot.innerHTML = slot.classList.contains("in-flight-row")
+      ? inFlightRowHtml(id)
+      : inFlightBadgeHtml(id);
+    // An empty row still takes a column of the auto-fit grid, so it is removed
+    // from the layout rather than merely left blank.
+    if (slot.classList.contains("in-flight-row")) slot.hidden = !slot.innerHTML;
+  }
+  for (const card of document.querySelectorAll(".task-card[data-task-id]")) {
+    const live = inFlightFor(card.getAttribute("data-task-id"));
+    card.classList.toggle("in-flight", !!(live && live.state.working));
+  }
+}
+
+// A REPAINT ON A TIMER, WITH NO FETCH BEHIND IT. Silence is the signal that has
+// no event: a session that stops sends nothing, so nothing would ever move a card
+// off "1m" — and a card frozen at one minute is exactly the spinner this feature
+// exists instead of. The tick only re-reads a clock.
+const IN_FLIGHT_TICK_MS = 30000;
+
 function histDay(ts) { return String(ts || "").slice(0, 10); }
 function histAgo(ts) {
   const day = histDay(ts);
@@ -3961,6 +4126,10 @@ function renderDetail() {
     '<div class="meta-row"><div class="meta-label">Created</div><div class="meta-value">' + escape(t.created || "—") + "</div></div>" +
     '<div class="meta-row"><div class="meta-label">Updated</div><div class="meta-value">' + escape(t.updated || "—") + "</div></div>" +
     measuredRow +
+    // WHAT IS HAPPENING RIGHT NOW (TL-189), repainted in place on a timer — hence
+    // a slot with an id rather than a value rendered once. Empty until the server
+    // answers, and permanently empty over file://, where there is nobody to ask.
+    inFlightRow(t.id) +
     // COMPUTED from commit messages, so there is no pen: it is not a field
     // anybody may edit, and offering one would invite a value that contradicts
     // the history it was derived from. Absent when the task has no commits yet —
@@ -6033,6 +6202,13 @@ if (SERVER_MODE) {
   const meta = document.querySelector(".build-meta");
   if (meta) meta.textContent = "read from disk: " + new Date().toLocaleTimeString();
   let sseTimer = null;
+  let inFlightTimer = null;
+  // The first answer, before any heartbeat arrives — a page opened onto a session
+  // already two hours in must not have to wait for its next tool call to say so.
+  refreshInFlight();
+  // Silence has no event, so the ages are advanced by a clock rather than by a
+  // signal. No fetch: this only re-reads the answer already held.
+  setInterval(paintInFlight, IN_FLIGHT_TICK_MS);
   try {
     const es = new EventSource("api/events");
     es.addEventListener("tasks-changed", () => {
@@ -6044,6 +6220,13 @@ if (SERVER_MODE) {
     // is a separate signal rather than an appendage to tasks-changed.
     es.addEventListener("history-changed", () => {
       if (state.selectedId) refreshHistory(state.selectedId, true);
+    });
+    // A heartbeat changes nothing in the repository, so it can never arrive as
+    // tasks-changed (TL-189): the whole point of the signal is that it moves while
+    // the task file stands still.
+    es.addEventListener("activity-changed", () => {
+      clearTimeout(inFlightTimer);
+      inFlightTimer = setTimeout(refreshInFlight, 250);
     });
     es.onerror = () => { /* server stopped — keep showing the last render */ };
   } catch (e) {

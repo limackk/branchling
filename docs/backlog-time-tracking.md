@@ -785,3 +785,59 @@ the versioned aggregate is a decision about what may leave a person's machine
 **Out of scope, deliberately:** a `budget:` field in the frontmatter and a hook
 warning when a multiple of the forecast is exceeded. That is a separate task,
 once the forecast has proved out against data this tree does not yet have.
+
+## 21. What is implemented (2026-09-03, TL-189)
+
+The viewer shows a task being worked on, not only its two ends.
+
+A task file changes exactly twice per session — `next`/`take` writes `status`
+and `owner`, `done` writes `status` — so a reader watching a fleet through
+statuses alone sees two frames of a two-hour film, and live push (TL-122) only
+makes those two frames arrive faster. The third frame was already being
+recorded: it is this log.
+
+- **The signal is three facts, never a spinner.** The last heartbeat's
+  timestamp, the actor it names, and how many rows have arrived since the take.
+  A spinner is a claim with no evidence behind it, and it spins just as
+  convincingly over a session that died an hour ago — so the page never says
+  "working" without saying when it last heard anything.
+- **"Stopped" is `idle_gap_minutes`, not a threshold of this feature's own.**
+  The project has already declared how long a gap ends a working session; that
+  is the key §6 splits clusters on. A second number here would let the page call
+  an interval "being worked on" that the same project's own minutes report had
+  already cut in two, with nothing to say which was right. The boundary is `<=`,
+  decided the way §6's rule 2 decides it.
+- **The window is the LAST take**, read from `history/` and from the status
+  `in_progress_status` names. A task picked up, dropped and picked up again has
+  two stints; counting both as one credits this session with the previous
+  person's rows, and a task taken a minute ago whose only heartbeats are a week
+  old reads as "nothing heard yet" rather than as a week-old session.
+- **Two cases are shown and a third is not.** A task the backlog calls in
+  progress carries the signal always, including after three hours of silence —
+  that badge is precisely how a session that died is spotted (TL-151). A task in
+  any other status carries it only while the signal is live, which is the honest
+  anomaly of heartbeats arriving on something already closed. A task closed last
+  week whose log still holds the rows that measured it shows nothing: that is
+  history, `Measured` already reports it, and a badge on every card the log ever
+  saw is no badge.
+- **The age advances on a clock, not on an event.** Silence is the one signal
+  that sends nothing, so a card would otherwise sit at "1m" forever — which is
+  the spinner again, wearing a number.
+
+**The privacy boundary decided the architecture, not just the wording.** The
+signal reaches the page over HTTP from the machine that holds the log, and is
+never embedded in the generated file. `buildHtml` also writes
+`backlog/viewer.html`, which is mailed around and opened over `file://`; baking
+the answer into it would carry a record of what hour a named person worked out
+of the machine that holds it — the exact failure §9 keeps the raw log outside
+every repository to make impossible. A page with no server therefore renders no
+signal, which is the honest state: there is nobody to ask. `activity report
+--privacy`, `prune` and `forget` remain the only ways this data is managed;
+nothing here adds a fourth.
+
+**Out of scope, deliberately:** replay (TL-91), which folds the SAME log over
+time. The reduction here is a fold to ONE instant, and a fold over a series is
+not that function with a parameter added — sharing it would mean either
+recomputing every task's whole history on every SSE tick, or caching a series
+whose value is that it is not cached. The route stays a route; if replay wants
+the rows it reads them itself.
