@@ -31,8 +31,10 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { calibrationSamples } from "./activity.mjs";
+import { resolveActor } from "./actor.mjs";
 import { bucketFor, spanLabel } from "./calibration.mjs";
 import { loadConfigOrExit } from "./config.mjs";
+import { recordCreation } from "./history.mjs";
 import { detectPrefixMismatch, prefixMismatchMessage, taskIdPatterns } from "./task-id.mjs";
 import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { auditVocabulary, extractMeta, splitFrontmatter } from "./task-fields.mjs";
@@ -472,6 +474,22 @@ export function main(argv) {
     throw e;
   }
   const { path: full, taskId, source } = created;
+
+  // THE BIRTH IS RECORDED BY WHOEVER CAUSED IT (TL-187). Left to reconciliation,
+  // the `__created__` entry is written by whichever tree diffs the tasks
+  // directory first, under THAT tree's actor — and on a backlog with no snapshot
+  // yet it is never written at all. The actor comes from the one chain in
+  // `actor.mjs`; `new` has no `--actor` flag, so it is the environment, the user
+  // layer, then the default.
+  //
+  // The failure is NOT fatal: the task file is already on disk, and a command
+  // that wrote the task and then exited non-zero would read as "nothing
+  // happened". The log is the record of the write, not the write itself.
+  try {
+    recordCreation(root, { id: taskId, title: opts.title }, { actor: resolveActor(""), source: "new" });
+  } catch (e) {
+    console.error("  NOTE: the creation could not be recorded in the history: " + (e && e.message));
+  }
 
   console.log(`${N} new: ` + full);
   if (source === "local") {

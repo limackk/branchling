@@ -644,6 +644,33 @@ export function changesRequiringReason(config, changes) {
 }
 
 /**
+ * `__created__` for a task this process has just written, by the observer that
+ * saw it happen.
+ *
+ * WHY NOT `reconcile()` (TL-182, TL-187). Reconciliation is the route for
+ * changes nobody was watching, and it deliberately writes no history on a
+ * backlog that has no snapshot yet — every backlog a fresh `init` produced. The
+ * creation would vanish exactly where the command exists. Worse, when it does
+ * fire it fires in whichever tree reconciles FIRST, under THAT tree's actor: a
+ * task's birth signed by somebody who did not create it.
+ *
+ * The caller moves the snapshot on afterwards (a `reconcile`, or its own
+ * `recordEdit`), so the event is not offered a second time as `unknown`.
+ *
+ * @param {string} backlogDir
+ * @param {{id: string, title: string}} task
+ * @param {{actor: string, source: string, reason?: string, ts?: string}} opts
+ */
+export function recordCreation(backlogDir, task, opts) {
+  const ts = opts.ts || new Date().toISOString();
+  return appendEntries(backlogDir, task.id, [{
+    id: eventId(ts), ts, task: task.id, field: FIELD_CREATED, from: "", to: task.title,
+    actor: normalizeActorFn(opts.actor), source: opts.source, reason: normalizeReason(opts.reason || ""),
+    session: currentSession(backlogDir),
+  }]);
+}
+
+/**
  * Record a change for which we KNOW both states (the server's route: we read the
  * file, we write the file, we have the "before" and the "after"). The snapshot is
  * updated along the way, so that reconciliation does not report the same change a
