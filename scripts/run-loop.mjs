@@ -290,11 +290,29 @@ export function agentInput(taskText, feedback, ran) {
   ].join("\n");
 }
 
-/** The sentence written into the history when a task is blocked by a run. It
- *  states the EVIDENCE — how many attempts, and what failed — never a verdict
- *  about the work. PURE, so a test can assert the words somebody will read. */
-export function blockedReason(attempts, detail) {
-  const head = "no verification after " + attempts + " agent attempt" + (attempts === 1 ? "" : "s");
+/**
+ * The sentence written into the history when a task is parked by a run. It
+ * states the EVIDENCE — what stopped the run, and what failed — never a verdict
+ * about the work. PURE, so a test can assert the words somebody will read.
+ *
+ * THE HEAD CLAUSE FOLLOWS THE OUTCOME, NOT ONLY THE COUNTER (TL-193). Two
+ * different endings arrive here and only one of them is about the agent's work.
+ * `exhausted` spent its attempts on a contract that ran and refused, and the
+ * count is the reader's first question. `needs-person` never got that far: the
+ * contract asks somebody to vouch, or the task FILE is what refused, and no
+ * number of further attempts moves either. Saying "no verification after 1 agent
+ * attempt" there blames the agent for a stop it had no part in — and a `reason`
+ * is the one thing about a status change nobody can reconstruct afterwards, so
+ * it is the wrong field to be approximately right in.
+ *
+ * The attempt count is deliberately dropped from that sentence rather than kept
+ * as a second clause: it is a true number that answers nothing here, and a
+ * reader who sees a count in a reason will read it as the cause.
+ */
+export function blockedReason(attempts, detail, outcome) {
+  const head = outcome === "needs-person"
+    ? "closing needs a person, not another agent attempt"
+    : "no verification after " + attempts + " agent attempt" + (attempts === 1 ? "" : "s");
   const tail = String(detail || "").split("\n").map((s) => s.trim()).filter(Boolean)[0] || "";
   return tail ? head + ": " + tail : head;
 }
@@ -1046,7 +1064,7 @@ export function run(argv) {
     if (result.outcome === "closed") {
       tally.closed++;
     } else {
-      const reason = blockedReason(result.attempts, result.detail);
+      const reason = blockedReason(result.attempts, result.detail, result.outcome);
       const blocked = writeStatus({ root, config, id: task.id, actor, reason, status: stuck.status });
       if (blocked.reason === "closed-elsewhere") {
         // NOT a failure of this run and not a task it may park: somebody closed

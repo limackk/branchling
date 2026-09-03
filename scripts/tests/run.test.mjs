@@ -397,8 +397,25 @@ test("the preamble claims the contract ran only when it did (TL-190)", () => {
 });
 
 test("the blocked reason states the evidence, not a verdict", () => {
-  assert.match(blockedReason(1, "test -f X.done"), /^no verification after 1 agent attempt: test -f X\.done$/);
-  assert.match(blockedReason(3, ""), /^no verification after 3 agent attempts$/);
+  assert.match(blockedReason(1, "test -f X.done", "exhausted"),
+    /^no verification after 1 agent attempt: test -f X\.done$/);
+  assert.match(blockedReason(3, "", "exhausted"), /^no verification after 3 agent attempts$/);
+});
+
+test("a stop no attempt could have fixed does not blame the attempts (TL-193)", () => {
+  // The contract asks a person, or the task file itself refused. The count is a
+  // true number that answers nothing here, so it is not in the sentence.
+  const reason = blockedReason(1, "FX-1: `--json` cannot ask a person to vouch for a `manual:` entry",
+    "needs-person");
+  assert.doesNotMatch(reason, /\d+ agent attempt/,
+    "the reason still attributes the stop to how many agents were sent at it");
+  assert.doesNotMatch(reason, /no verification after/,
+    "the reason still reads as a verdict on the agent's work");
+  assert.match(reason, /^closing needs a person, not another agent attempt: FX-1: /);
+  // The detail survives whichever head clause is chosen — it is what tells the
+  // reader WHICH person is needed and for what.
+  assert.match(reason, /`manual:` entry/);
+  assert.match(blockedReason(2, "", "needs-person"), /^closing needs a person, not another agent attempt$/);
 });
 
 test("the stuck status is derived from the project's own words", () => {

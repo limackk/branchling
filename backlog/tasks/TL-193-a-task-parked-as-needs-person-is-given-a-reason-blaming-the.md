@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P2                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:sub-c
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1h                       # 30m | 2h | 1d | 1w
@@ -88,9 +88,9 @@ It is only the sentence.
 
 ## Acceptance criteria
 
-- [ ] A task parked after a `needs-person` outcome carries a history `reason`
+- [x] A task parked after a `needs-person` outcome carries a history `reason`
       that does not attribute the stop to the number of agent attempts.
       [proof: parked-reason]
-- [ ] A task parked after `exhausted` still states the attempts and the entry
+- [x] A task parked after `exhausted` still states the attempts and the entry
       that failed. [proof: parked-reason]
-- [ ] The suite stays green. [proof: suite-green]
+- [x] The suite stays green. [proof: suite-green]
