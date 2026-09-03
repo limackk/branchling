@@ -1,1 +1,4 @@
 {"id":"01M1KBJKP02Z0RD5R176SC28TT","ts":"2026-09-03T10:03:35.488Z","task":"TL-189","field":"__created__","from":"","to":"The viewer shows a task being worked on, not only its two ends","actor":"agent:claude","source":"manual","reason":"Filing the watchability tasks that came out of watching the run."}
+{"id":"01M1KKFY9S87N0SER2JA30K8WN","ts":"2026-09-03T12:21:56.665Z","task":"TL-189","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown","session":"tree-3d81645067d3"}
+{"id":"01M1KKFY9SYBSFXA73SF30QJMT","ts":"2026-09-03T12:21:56.665Z","task":"TL-189","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown","session":"tree-3d81645067d3"}
+{"id":"01M1KMH6SQSAR87JDDHPSBC93R","ts":"2026-09-03T12:40:06.711Z","task":"TL-189","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven","session":"tree-3d81645067d3"}

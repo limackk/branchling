@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1d
@@ -88,5 +88,45 @@ how a dead session is spotted (see TL-151).
 
 ## Decisions
 
-Nothing decided. Open: whether the same route feeds TL-91's replay, which folds
-the SAME log over time — if it does, it should be written once.
+**The signal is a ROUTE, never a variable in the page.** `buildHtml` also writes
+`backlog/viewer.html`, which is mailed around and opened over `file://`. Baking
+the log's answer into that file would carry a record of what hour a named person
+worked out of the machine that holds it — the exact failure that keeping the raw
+log outside every repository exists to make impossible. So the page starts with
+an empty map and fills it from `/api/in-flight`; over `file://` it stays empty
+and no card claims anything, which is the honest state: there is nobody to ask.
+A test asserts a build made while fresh rows exist carries no session id, no
+actor and no heartbeat timestamp.
+
+**"Stopped" is `idle_gap_minutes`, not a threshold of this feature's own.** The
+project has already declared how long a gap ends a working session — that is the
+key `cluster.mjs` splits runs on. A second number here would let the page call an
+interval "being worked on" that the same project's own minutes report had already
+cut in two, with nothing to say which was right. The boundary is `<=`, decided
+the way rule 2 in `cluster.mjs` decides it.
+
+**The window is the LAST take**, read from `history/` and from the status
+`in_progress_status` names. A task picked up, dropped and picked up again has two
+stints; one window over both would credit this session with the previous person's
+rows, and a task taken a minute ago whose only heartbeats are a week old must
+read as "nothing heard yet" rather than as a week-old session.
+
+**Shown on an in-progress task always, elsewhere only while live.** The badge on
+a task that has been quiet for three hours IS how a dead session is spotted
+(TL-151), so hiding it would restore the two-frame film. Heartbeats arriving on a
+task somebody has already closed are the honest anomaly and are always shown. A
+task closed last week whose log still holds the rows that measured it shows
+nothing — that is history, `Measured` already reports it, and a badge on every
+card the log ever saw is no badge.
+
+**The age advances on a clock, not on an event.** Silence is the one signal that
+sends nothing, so a repaint on a timer — with no fetch behind it — is what turns
+a card from "1m" into "65 minutes ago". Without it the card would sit at one
+minute forever, which is the spinner again, wearing a number.
+
+**Answered: the route does NOT feed TL-91's replay.** This is a fold to ONE
+instant; a fold over a series is not that function with a parameter added.
+Sharing it would mean either recomputing every task's whole history on every SSE
+tick, or caching a series whose whole value is that it is not cached. If replay
+wants the rows it reads them itself — `readAllActivity` is the shared piece, and
+it already exists.
