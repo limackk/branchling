@@ -1,6 +1,6 @@
 ---
 id: TL-202
-title: "foreign_context_words has no layer that may hold it, and an agent found out the hard way"
+title: "A run that writes outside its worktree breaks every other tree at once"
 type: bug
 labels: []
 board: main
@@ -22,92 +22,94 @@ verification:                      # HOW to check the task is really done
     bash: "node --test scripts/tests/*.test.mjs"
   - id: guards-green
     bash: "node scripts/cli.mjs check"
-  - id: has-a-home
-    bash: "node --test scripts/tests/foreign-context-words-home.test.mjs"
+  - id: the-boundary-is-stated
+    bash: "node scripts/cli.mjs instructions autonomous-loop | grep -qi 'outside' && echo 'the guide states what a run may write outside its tree — OK'"
 ---
 
 ## Goal
 
-`foreign_context_words` must have exactly one place it can legitimately live,
-and the tool must say where. Today it has none: the project layer documents
-itself as deliberately empty, and the user layer REFUSES the key.
+It is decided, and written where an agent will read it, what an unattended run
+may write outside the worktree it was given. Today nothing says, and the first
+time it happened every branchling command on the machine stopped working.
 
 ## Context
 
-Measured on 2026-09-03, and it stopped every command on this machine.
+Measured on 2026-09-03. The first half of this task's original premise was
+answered by TL-196 while this one was being written, and what is left is the
+half that still has no answer.
 
-At 14:10, during an unattended run, an agent created
-`~/.config/branchling/config.yaml` containing:
+WHAT HAPPENED. At 14:10 a session working on TL-196 in another worktree moved
+`foreign_context_words` from the project layer to the user layer — the right
+call, argued in that task: a rejected-word list naming the company IS the
+company's name, published in the repository the decision was made to keep it
+out of. As part of that it created
+`~/.config/branchling/config.yaml` and put the real words in it.
 
-    # Names that must never appear in a repository's public documents. Kept
-    # here, outside every repository, because a list of names a tree may not
-    # contain cannot be stored in that tree — writing it down is the disclosure.
-    foreign_context_words: "…"
+That file is machine-level. Every other tree on this machine was still running
+code in which `foreign_context_words` is a PROJECT key, so from that moment
+every command in those trees exited 2 with `cannot read the user preferences`
+— including a `run` that was in flight, which ended at exit 1 having taken
+nothing. The failure looked like a defect in the run and was not.
 
-Every branchling command afterwards exited 2 with `cannot read the user
-preferences`, including the run that was in flight, which ended at exit 1
-having taken nothing. The file was moved aside by hand to make the tool usable
-again.
+WHY THIS IS NOT TL-196'S MISTAKE. The decision was correct and the file had to
+be written for the feature to work. The problem is that a write outside the
+worktree is INSTANT for every other tree, while a write inside it travels with
+a branch and arrives only when somebody merges — which is the whole point of
+law 1. One session moved a boundary and, for as long as it took to merge, the
+other trees were running the old code against the new world. Nothing warned
+anybody, in either direction.
 
-**The agent's reasoning was right and the tool has no answer for it.** The
-project layer says so itself, in `scripts/config.mjs:143`:
+WHY IT MATTERS MORE SOON. `run --workers N` (TL-149) puts several sessions on
+one machine at once, all sharing this one directory. Today the window was
+minutes and one operator noticed. With a fleet the window is every worker's
+next command.
 
-    // EMPTY here on purpose: a rejected-word list naming the company is the
-    // company's name, published, in the repository the decision was made to
-    // keep it out of.
+WHAT THIS TASK IS NOT. It is not a ban: the user layer exists precisely so
+that facts about the person live outside every repository, and a run must be
+able to write the lock file, the activity log and this configuration. It is
+also not a rollback of TL-196.
 
-So the values may not go in the repository. Law 3 says the user layer may not
-hold a project's vocabulary, and `config.mjs:232` enforces it. The key is
-therefore declared, validated, consumed by
-`scripts/check-no-foreign-context.mjs:194` — and unfillable. The guard runs on
-SHAPES alone and the VALUES half has never been reachable.
+WHAT IT HAS TO PRODUCE. A decision, stated in
+`branchling instructions autonomous-loop` where an unattended agent will read
+it, covering: which paths outside the worktree a session may write (the state
+directory and the user configuration are the candidates), and what it owes the
+other trees when it does — at minimum saying so in the report, so the operator
+of a tree that breaks can tell a shared-state change from a defect in their
+own work.
 
-**Three ways out, and the choice is the task.** (a) The list is not a project
-vocabulary but a fact about the machine's operator, and the user layer's rule
-gets an explicit, documented exception. (b) A third location — a path NAMED in
-the project config, pointing outside the tree, so the repository records where
-the list is without recording what is in it. (c) The key is removed and the
-guard is honestly shape-only, which is what it has always been in practice.
-
-None is obviously right. (a) weakens a law to fit one key. (b) adds a layer,
-and law 3 exists to stop exactly that. (c) deletes a capability nobody has
-ever been able to use — the cheapest, and it must be argued against rather
-than assumed wrong.
-
-**The second defect is separate and must not be lost in the first.** An
-unattended agent wrote to a machine-level configuration file OUTSIDE every
-repository, and nothing stopped it or noticed. The blast radius of a run is
-supposed to be a worktree; here it was the operator's home directory, and the
-damage was to every future invocation rather than to the task at hand. With
-`run --workers N` (TL-149) that radius is shared by every worker at once.
-Whether the answer is a guard, a documented boundary in the agent template, or
-nothing at all, it has to be DECIDED here rather than discovered again.
+Whether anything is ENFORCED is part of the decision and may honestly be "no".
+A guard here is cheap to write and easy to make wrong, and the loop is
+composition: it does not own the agent's filesystem access and never will.
 
 ## Pre-flight reading
 
-1. `scripts/config.mjs:140-150` — the key, its default, and the comment
-   explaining why it is empty.
-2. `scripts/config.mjs:225-235` — `KNOWN_KEYS` and the layer split that
-   refuses it in the user file.
-3. `scripts/check-no-foreign-context.mjs:194` — the only consumer.
-4. `docs/branchling-global-tool.md` §3 — law 3, in full, before proposing any
-   exception to it.
-5. `CLAUDE.md` §Before you change the code — the disjoint-layers rule as this
-   project states it.
+1. `scripts/home.mjs` — the user layer as TL-34 defined it, and the disjoint
+   boundary in its header.
+2. `backlog/tasks/TL-196-*.md` and commit `639e644` — the decision that moved
+   the word list, and why it was right.
+3. `branchling instructions autonomous-loop` — the guide this decision has to
+   land in, and in particular its existing paragraph on what the claim
+   guarantees and where it stops: this is the same shape of argument, about
+   state rather than about claims.
+4. `scripts/lock.mjs` — the precedent. Session state already lives outside the
+   repository on purpose (TL-87), and the reasoning there is the model for
+   this one.
 
 ## Steps
 
-1. Decide between (a), (b) and (c), and write the reasoning and the rejected
-   options into Decisions.
-2. Implement it, including what the ERROR says when somebody puts the key in
-   the wrong layer: today it names the rule and not the way out.
-3. Decide separately what a run may write outside its worktree, and record
-   that decision even if the answer is "nothing changes".
-4. `scripts/tests/foreign-context-words-home.test.mjs` over a fixture: the key
-   in its chosen home is read, and in any other layer it fails with a message
-   naming the home.
+1. Write down which paths outside the worktree a session may write, with the
+   reason for each.
+2. Decide what a run reports when it writes one, and implement that much.
+3. Put the decision in `instructions autonomous-loop`, not only in a task.
+4. Record in Decisions whether anything is enforced, including a deliberate
+   "nothing is".
 
 ## Decisions
 
-Nothing decided. Note that whichever way (1) goes, the sentence in
-`config.mjs` about the disclosure stays true and must survive the change.
+The first half of the original task — that `foreign_context_words` had no
+layer that could hold it — was settled by TL-196 on the same day: it is a user
+key now, `scripts/home.mjs:169`, and the file that broke this machine is valid
+under that code. This task was rewritten rather than closed, because the
+breakage it recorded had a second cause that nobody has decided about. The
+title changed with it; the filename did not, following TL-137's rule that a
+task's filename is data, not part of its content.

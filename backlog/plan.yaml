@@ -88,9 +88,11 @@ waves:
     tasks: [TL-202, TL-201, TL-198, TL-196]
     # Four findings about the checks that decide what a stranger may read.
     # TL-202 first, because it is the only one that has already stopped the
-    # tool: `foreign_context_words` is declared, validated and consumed, and no
-    # layer may hold it — an agent worked that out, put it in the user file,
-    # and every command on the machine exited 2 until the file was moved aside.
+    # tool: a session moved `foreign_context_words` to the user layer — the
+    # right call, TL-196's — and every other tree on the machine, still running
+    # code that calls it a project key, exited 2 until it merged. A write
+    # outside the worktree is instant everywhere; a write inside it waits for a
+    # merge, which is the whole of law 1.
     # TL-201 replaces the language heuristic with a dictionary, which is why
     # TL-198 (the word it passes over) is blocked by it rather than patched.
     # TL-196 extends the foreign-context guard past `docs/`.
