@@ -19,8 +19,8 @@ related_docs:
   - .claude/skills/branchling-cli/references/output-style.md
 verification:
   - bash: "node --test scripts/tests/doctor.test.mjs"
-  - bash: "d=$(mktemp -d); T=/Users/limack/workspace/tasklog/bin/branchling.mjs; node $T init --dir \"$d\" >/dev/null && node $T doctor --dir \"$d\" >/dev/null && echo 'a fresh backlog passes doctor — OK'"
-  - bash: "d=$(mktemp -d); T=/Users/limack/workspace/tasklog/bin/branchling.mjs; node $T init --dir \"$d\" >/dev/null; printf 'statusess: [a]\\n' >> \"$d/config.yaml\"; node $T doctor --dir \"$d\" >/dev/null 2>&1 && { echo 'doctor does not see the broken configuration'; exit 1; }; echo 'doctor catches the typo — OK'"
+  - bash: "d=$(mktemp -d); T="$PWD/bin/branchling.mjs"; node $T init --dir \"$d\" >/dev/null && node $T doctor --dir \"$d\" >/dev/null && echo 'a fresh backlog passes doctor — OK'"
+  - bash: "d=$(mktemp -d); T="$PWD/bin/branchling.mjs"; node $T init --dir \"$d\" >/dev/null; printf 'statusess: [a]\\n' >> \"$d/config.yaml\"; node $T doctor --dir \"$d\" >/dev/null 2>&1 && { echo 'doctor does not see the broken configuration'; exit 1; }; echo 'doctor catches the typo — OK'"
   - bash: "node scripts/cli.mjs doctor --json | node -e \"let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{JSON.parse(s);console.log('doctor --json parses — OK')})\""
 ---
 

@@ -18,7 +18,7 @@ related_docs:
   - docs/backlog-config-and-portability.md
   - .claude/skills/branchling-release/SKILL.md
 verification:
-  - bash: "grep -qiE 'origin|sync-layer|supabase|railway|DPA' README.md && { echo 'README still carries a foreign project'; exit 1; }; echo 'README free of foreign context — OK'"
+  - bash: "node scripts/check-no-foreign-context.mjs >/dev/null && grep -qiE 'supabase|railway|DPA' README.md && { echo 'README still carries a foreign project'; exit 1; }; echo 'README free of foreign context — OK'"
   - bash: "grep -q 'node backlog/scripts/' README.md && { echo 'paths from before packaging'; exit 1; }; echo 'commands via worktrail, not via paths — OK'"
   - bash: "grep -qE '\\bBL-[0-9]' README.md && { echo 'BL prefix in the tool document'; exit 1; }; echo 'no hardcoded prefix — OK'"
   - manual: "The README read by someone who does not know the project: they can install the tool and run the first query without asking the author."

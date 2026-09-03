@@ -143,7 +143,6 @@ export const DEFAULTS = Object.freeze({
   // a company name, a product, a person. EMPTY here on purpose: a rejected-word
   // list naming the company is the company's name, published, in the repository
   // the decision was made to keep it out of.
-  foreign_context_words: [],
   // After how many days without a recorded change `audit` calls a task in
   // progress PARKED (TL-90). A REPORT's threshold, not a rule: nothing acts on
   // it, unlike `abandoned_after_days`, which hands the task to somebody else.
@@ -229,7 +228,7 @@ const LIST_KEYS = new Set([
   "statuses", "archived_statuses", "priorities", "types", "confidence",
   "labels", "label_axis_timing", "label_axis_env", "owners", "estimates", "actors", "roles",
   "dashboard_open_statuses", "status_strikethrough", "reason_required_statuses",
-  "docs_status_pending_patterns", "foreign_context_words",
+  "docs_status_pending_patterns",
 ]);
 const MAP_KEYS = new Set(["epic_aliases", "status_colors", "priority_colors", "label_colors", "model_pricing"]);
 const NUMBER_KEYS = new Set([
@@ -617,7 +616,6 @@ export function loadConfig(root, opts = {}) {
     // and names the entries it cannot read instead of failing the whole load —
     // one model's typo must not cost the other models' tokens their report.
     modelPricing: values.model_pricing,
-    foreignContextWords: values.foreign_context_words,
     labelAxes: { timing: values.label_axis_timing, env: values.label_axis_env },
     owners: values.owners,
     estimates: values.estimates,

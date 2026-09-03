@@ -34,7 +34,7 @@ where it is needed.
 
 ## Context
 
-Measured on 2026-08-31 in a consumer repository (`origin`): **28 of
+Measured on 2026-08-31 in a consumer repository (`<origin>`): **28 of
 71** history logs were untracked, while the corresponding task files were
 committed.
 
@@ -122,7 +122,7 @@ green for the same reason an empty sample is green: an empty set has no
 asymmetry in it. Both roots now go through `realpathSync`.
 
 **Step 5 is out of reach and is not silently dropped.** The 28 untracked logs
-were measured in `origin`, a repository this one was extracted from and
+were measured in `<origin>`, a repository this one was extracted from and
 cannot touch. What this task can deliver is the guard that finds them, and it
 does; running it there is somebody's command in that tree, not a change to this
 one. This repository's own 157 logs are all tracked, which is what the

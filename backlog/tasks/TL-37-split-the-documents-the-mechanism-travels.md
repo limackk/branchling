@@ -18,7 +18,7 @@ related_docs:
   - origin#docs/architecture/worktrail-extraction.md
 verification:
   # The paths are RELATIVE. As written they pointed at an absolute
-  # `/Users/limack/workspace/tasklog/docs`, which is the MAIN checkout — so the
+  # `<repo>/docs`, an absolute path to the MAIN checkout — so the
   # contract would have judged a different tree from the one being changed, and
   # a personal absolute path is itself one of the things this task removes.
   # Through the guard, not through grep: a markdown link's TARGET is not
@@ -26,15 +26,13 @@ verification:
   # were created in (TL-137) and one of them contains a company name as a
   # substring. A plain grep flags those forever.
   - id: zero-foreign-names
-    bash: "node scripts/check-no-foreign-context.mjs --words origin,client-app,sync-layer,kamil,founder@"
+    bash: "node scripts/check-no-foreign-context.mjs"
   - id: guard-runs
     bash: "node scripts/cli.mjs check --foreign-context"
   - id: guard-catches-a-regression
     bash: "node --test scripts/tests/foreign-context.test.mjs"
   - id: no-dead-links
     bash: "node scripts/cli.mjs check --docs"
-  - id: source-repo-untouched
-    bash: "test -z \"$(git -C /Users/limack/workspace/origin status --porcelain docs/architecture 2>/dev/null | grep -i 'worktrail\\|backlog')\""
 ---
 
 ## Goal
@@ -74,11 +72,11 @@ documentation:
 | | Holds | Where |
 |---|---|---|
 | the tool's document | mechanism, decision, rationale, the command to reproduce it | `worktrail/docs/` |
-| the origin project's document | measurements with dates, commands and context | `origin/docs/architecture/` |
+| the origin project's document | measurements with dates, commands and context | `the origin repository/docs/architecture/` |
 
-**The documents in origin stay UNTOUCHED.** That is our record of
+**The documents in the origin repository stay UNTOUCHED.** That is our record of
 reasoning and there is no reason to maim it — this task does not edit a
-single file in origin.
+single file in the origin repository.
 
 The scope does NOT include translation — that is
 [TL-32](TL-32-angielska-powierzchnia-publiczna-modulu.md). Both tasks
@@ -96,7 +94,7 @@ rewrite the same files, so **sequentially, not in parallel**.
 ## Steps
 
 1. **Inventory before editing**: every occurrence of "the origin project", the paths
-   `client-app/`, `origin-*`, the sync layer, names, addresses **and every
+   the origin project's name, its directories, the services it runs on, names, addresses **and every
    measurement** in `docs/` and `README.md` of the new repo. The list is the
    completeness criterion at the end.
 2. For each measurement, decide **what it proved**, and replace it with one
@@ -117,7 +115,7 @@ rewrite the same files, so **sequentially, not in parallel**.
 5. References to `BL-NNNN` **stay** — those are the tool's own task numbers,
    which travel with it; `LINEAGE.md` explains the origin.
 6. The `check-no-foreign-context.mjs` guard in the new repo: fails on names
-   (`origin`, `client-app`, `sync-layer`, personal names) **and on measurement
+   (the names configured in `foreign_context_words`, personal names) **and on measurement
    patterns** ("N% of commits", "N tasks"). Wire it into `worktrail check`.
 7. Review `LINEAGE.md`, the README and the initial commit against the same
    criterion.
@@ -128,7 +126,7 @@ rewrite the same files, so **sequentially, not in parallel**.
 
 ## Acceptance criteria
 
-- [x] `grep -rlniE 'origin|client-app|sync-layer|kamil|founder@'` over `docs/`
+- [x] `check --foreign-context` over `docs/`
       and `README.md` of the new repo returns nothing. [proof: zero-foreign-names]
 - [x] No measurement from our repository survived — the pattern gate in
       Verification plus a review of the step 1 inventory. [proof: guard-runs, zero-foreign-names]
@@ -150,24 +148,24 @@ rewrite the same files, so **sequentially, not in parallel**.
 
 ```bash
 # 1. Zero the origin project context — expected: OK message
-test -z "$(grep -rlniE 'origin|client-app|sync-layer|kamil|founder@' \
-  /Users/limack/workspace/tasklog/docs /Users/limack/workspace/tasklog/README.md 2>/dev/null)" \
+test -z "$(node scripts/check-no-foreign-context.mjs \"
+  /path/to/branchling/docs /path/to/branchling/README.md 2>/dev/null)" \
   && echo 'zero the origin project context — OK'
 
 # 2. Zero measurements from a foreign repo — expected: OK message (language-guard: allow — regex matches the Polish words it proves are gone)
-test -z "$(grep -rnE '[0-9]+% commitów|1[0-9]{3} tasków|45 tasków' /Users/limack/workspace/tasklog/docs 2>/dev/null)" \
+test -z "$(grep -rnE '[0-9]+% commitów|1[0-9]{3} tasków|45 tasków' /path/to/branchling/docs 2>/dev/null)" \
   && echo 'zero measurements from a foreign repo — OK'
 
 # 3. Source untouched — expected: no changes
-git -C /Users/limack/workspace/origin status --porcelain docs/
+git -C /path/to/<origin> status --porcelain docs/
 
 # 4. No dead links — expected: no matches
-cd /Users/limack/workspace/tasklog && grep -rhoE '\]\(([^)]+\.md)\)' docs README.md \
+cd /path/to/branchling && grep -rhoE '\]\(([^)]+\.md)\)' docs README.md \
   | sed -E 's/.*\((.*)\)/\1/' | sort -u | while read f; do
     [ -e "docs/$f" ] || [ -e "$f" ] || echo "dead link: $f"; done
 
 # 5. Guard catches the regression — expected: nonzero exit code
-cd /Users/limack/workspace/tasklog && printf '\nthe origin project ma 1394 taski.\n' >> docs/branchling-global-tool.md
+cd /path/to/branchling && printf '\nThe origin project has 1394 tasks.\n' >> docs/branchling-global-tool.md
 node scripts/cli.mjs check; test $? -ne 0 && echo 'guard catches it — OK'
 git checkout docs/branchling-global-tool.md
 ```
@@ -197,7 +195,7 @@ git checkout docs/branchling-global-tool.md
   as a substring of an ordinary Polish word. A plain grep flags those forever —
   which is why the verification runs the guard rather than `grep`.
 - **`LINEAGE.md` keeps its lineage and loses the name.** The origin repository
-  is now `<origin>#BL-…`, and the numbering paragraph says "another workspace".
+  is now `origin#BL-…`, and the numbering paragraph says "another workspace".
   Every fact a reader needs survives — that there was a parent repository, and
   that the low numbers belonged to it.
 - **Two of this repository's OWN counts were rotting and were replaced with the

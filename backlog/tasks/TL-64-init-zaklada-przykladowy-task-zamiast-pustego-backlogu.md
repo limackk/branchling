@@ -17,9 +17,9 @@ blocks: []
 related_docs:
   - .claude/skills/backlog-workflow/SKILL.md
 verification:
-  - bash: "d=$(mktemp -d); T=/Users/limack/workspace/tasklog/bin/branchling.mjs; node $T init --dir \"$d\" >/dev/null && test \"$(ls \"$d/tasks\" | wc -l | tr -d ' ')\" = 1 && echo 'init creates one task — OK'"
-  - bash: "d=$(mktemp -d); T=/Users/limack/workspace/tasklog/bin/branchling.mjs; node $T init --dir \"$d\" >/dev/null && node $T check --dir \"$d\" && node $T stats --dir \"$d\" | head -3"
-  - bash: "d=$(mktemp -d); T=/Users/limack/workspace/tasklog/bin/branchling.mjs; node $T init --dir \"$d\" --no-example >/dev/null && test \"$(ls \"$d/tasks\" | wc -l | tr -d ' ')\" = 0 && echo 'can be disabled — OK'"
+  - bash: "d=$(mktemp -d); T="$PWD/bin/branchling.mjs"; node $T init --dir \"$d\" >/dev/null && test \"$(ls \"$d/tasks\" | wc -l | tr -d ' ')\" = 1 && echo 'init creates one task — OK'"
+  - bash: "d=$(mktemp -d); T="$PWD/bin/branchling.mjs"; node $T init --dir \"$d\" >/dev/null && node $T check --dir \"$d\" && node $T stats --dir \"$d\" | head -3"
+  - bash: "d=$(mktemp -d); T="$PWD/bin/branchling.mjs"; node $T init --dir \"$d\" --no-example >/dev/null && test \"$(ls \"$d/tasks\" | wc -l | tr -d ' ')\" = 0 && echo 'can be disabled — OK'"
 ---
 
 ## Goal

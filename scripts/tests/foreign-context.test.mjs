@@ -17,11 +17,12 @@
  *   2. THE REPLACEMENT BEING FORBIDDEN. The fix for a measurement is the
  *      command that reproduces it, and a command routinely prints a big number.
  *      A guard that flagged fenced blocks would forbid its own remedy.
- *   3. A NAME LIST SHIPPED IN THE CODE. The values come from `config.yaml` and
- *      are empty in this project on purpose — a rejected-word list naming the
- *      company IS the company's name, published, in the repository the decision
- *      was made to keep it out of. So the mechanism is tested with a word the
- *      TEST supplies.
+ *   3. A NAME LIST SHIPPED IN THE CODE. A rejected-word list naming the company
+ *      IS the company's name, published, in the repository the decision was
+ *      made to keep it out of. Since TL-196 the list lives in the USER layer
+ *      (`foreign_context_words` in the preferences file), outside every
+ *      repository; `isolateHome` keeps this suite from reading the developer's
+ *      copy, so the mechanism is tested with a word the TEST supplies.
  *   4. THE REAL TREE REGRESSING. This repository's own documents are audited,
  *      with a positive control that inserts a violation into a copy of the text.
  */
@@ -30,7 +31,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { ALLOW_MARKER, auditText, auditTree } from "../check-no-foreign-context.mjs";
+import { ALLOW_MARKER, auditText, auditTree, PUBLIC_DOCS, HISTORICAL_RECORD } from "../check-no-foreign-context.mjs";
 import { REPO_ROOT, isolateHome } from "./_repo.mjs";
 
 isolateHome("foreign-context");
@@ -125,4 +126,39 @@ test("POSITIVE CONTROL: a violation inserted into a real document IS caught", ()
   // placeholder project name, and a control word the fixture already contains
   // would be testing the fixture rather than the rule.
   assert.deepEqual(reasons(text + "\nNorthwind decided this.\n", ["northwind"]), ["word:northwind"]);
+});
+
+// ── the perimeter itself (TL-196) ─────────────────────────────────────────
+
+test("POSITIVE CONTROL: the backlog is inside the perimeter", () => {
+  // The defect this replaces: the guard read 12 documents, skipped 197 task
+  // files, and reported green while the backlog named another project 101
+  // times. If `backlog` ever leaves this list the guard goes back to answering
+  // a question it did not ask, so the assertion is on the list itself.
+  assert.ok(PUBLIC_DOCS.includes("backlog"),
+    "the backlog left the perimeter — the guard now passes over the larger half of what a stranger reads");
+  const { filesChecked } = auditTree(REPO_ROOT, []);
+  assert.ok(filesChecked > 100,
+    "the walk read " + filesChecked + " documents; with the backlog in scope this repository has hundreds");
+});
+
+test("a dated record is not an argument: the measurement rule stops at the backlog", () => {
+  // A task's `## Log` says what was true on a date. Auditing it as if it were
+  // prose meant to persuade produced 124 findings against entries CLAUDE.md
+  // asks for — "337 tasks", "1375 references rewritten". A guard that flags the
+  // practice it protects gets silenced, so the rule is scoped instead.
+  assert.ok(HISTORICAL_RECORD.includes("backlog"));
+  const line = "- 2026-09-01 done — agent:claude — migration of 1145 tasks";
+  assert.deepEqual(auditText(line, []).map((p) => p.reason), ["measurement"]);
+  assert.deepEqual(auditText(line, [], { measurements: false }), []);
+});
+
+test("the detectors that name somebody run EVERYWHERE, the record included", () => {
+  // Scoping the measurement rule must not become a hole: a name and a personal
+  // path are wrong in a dated log exactly as they are in a document.
+  const opts = { measurements: false };
+  assert.deepEqual(auditText("- 2026-09-01 — see /Users/jane/workspace", [], opts).map((p) => p.reason),
+    ["personal-path"]);
+  assert.deepEqual(auditText("- 2026-09-01 — measured in northwind", ["northwind"], opts).map((p) => p.reason),
+    ["word:northwind"]);
 });
