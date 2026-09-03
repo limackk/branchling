@@ -1,0 +1,1 @@
+{"id":"01M1K9DGTXW3J0M3GWVZQT6BC6","ts":"2026-09-03T09:25:51.581Z","task":"TL-184","field":"__created__","from":"","to":"run cannot tell an agent that never started from work that failed","actor":"agent:claude","source":"manual","reason":"Restoring TL-183 and filing the two defects the run measured."}
