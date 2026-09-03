@@ -157,15 +157,33 @@ Three things are enforced by a guard; the rest is this rule:
 
 The commit history no longer carries a Polish exception. It was squashed to a
 single English commit on 2026-09-01, while the repository had no remote and
-nothing had been published, so no hash anybody relied on was voided. That
-window has now closed: **from here on the history is immutable again**, and a
-commit written in the wrong language is fixed by writing the next one correctly,
-never by rewriting the old one.
+nothing had been published, so no hash anybody relied on was voided.
+
+**The window was reopened once more, on 2026-09-03, and closed again.** The
+history was rewritten with `git filter-repo` to remove the name of the project
+this tool was extracted from, which TL-196 had already removed from the working
+tree but which remained in the objects of every commit and in nine records of
+the append-only history logs — `git log -S` handed all of it to anyone with a
+clone. The same two conditions held as in September's squash: no remote, no
+push, nothing in anybody's hands. 278 commits were preserved; this was a
+substitution, not a second squash (TL-203).
+
+**From here on the history is immutable again**, and this time the repository
+has a published address to make that stick. A commit written in the wrong
+language is fixed by writing the next one correctly, never by rewriting the old
+one. A third window would need a reason at least as strong as "the alternative
+is publishing somebody else's project name forever", and the person opening it
+owes this paragraph another entry.
 
 **What was written in Polish before this rule STAYS, and always will:**
 
 - **`backlog/history/*.jsonl`.** The log is append-only. A `reason` written by a
-  person is their sentence, not a field a later pass may correct.
+  person is their sentence, not a field a later pass may correct. The
+  2026-09-03 rewrite above is the single exception, and it did not touch a
+  `reason`: it substituted a foreign project's name inside nine machine-written
+  `related_docs` records (`actor: unknown`, `source: external`). Append-only
+  protects what a person wrote; it was never a licence to publish a name that
+  was not ours to publish.
 
 `backlog/tasks/` and `docs/` were the last two directories carrying this
 exception; TL-137 translated both (145 files) and is why the guard above now

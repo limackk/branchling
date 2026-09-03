@@ -6,7 +6,7 @@ labels: [pre-launch]
 board: main
 epic: "Backlog — open-source publication"
 priority: P0
-status: pending                    # pending | in_progress | blocked | done | cancelled
+status: done  # pending | in_progress | blocked | done | cancelled
 owner: unassigned
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: "human"                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
@@ -19,14 +19,21 @@ blocks: []                         # ids this task will unblock
 related_docs:
   - LINEAGE.md
 verification:
+  # The list of names is NOT written here — that is the disclosure this task
+  # undoes. It is read from the user layer at run time, so this contract is
+  # vacuous for a stranger who has no such list, and that is correct: they have
+  # nothing to leak. The positive control below is what keeps a vacuous run
+  # from reading like a clean one.
   - id: no-name-in-any-object
-    bash: "test \"$(git cat-file --batch-all-objects --batch --buffer 2>/dev/null | LC_ALL=C grep -acowE \"$(git config branchling.foreignwords || echo 'zzzznevermatches')\" || echo 0)\" = 0 && echo 'no forbidden token in any git object — OK'"
+    bash: "W=$(node -e \"import('./scripts/home.mjs').then(m => console.log(String(m.loadUserConfig(process.env, []).values.foreign_context_words || '').split(',').map(s => s.trim()).filter(Boolean).join('|')))\"); if [ -z \"$W\" ]; then echo 'no list configured — nothing to assert'; exit 0; fi; N=$(git cat-file --batch-all-objects --batch --buffer 2>/dev/null | LC_ALL=C grep -acoiwE \"$W\" || true); if [ \"$N\" != \"0\" ] && [ -n \"$N\" ]; then echo \"still present in the objects: $N\"; exit 1; fi; echo 'no configured name in any git object — OK'"
   - id: scan-can-actually-fail
-    bash: "printf 'zzzznevermatches\\n' | LC_ALL=C grep -qw zzzznevermatches && echo 'POSITIVE CONTROL: the scan matches when there is something to match — OK'"
+    bash: "printf 'northwind\\n' | LC_ALL=C grep -qwi northwind && echo 'POSITIVE CONTROL: the same scan matches when there is something to match — OK'"
   - id: history-is-not-lost
-    bash: "test \"$(git rev-list --all --count)\" -ge 250 && echo 'the commits survived the rewrite — OK'"
+    bash: "test \"$(git rev-list --all --count)\" -ge 270 && echo 'the commits survived the rewrite — OK'"
   - id: tree-still-passes
     bash: "node scripts/cli.mjs check --foreign-context"
+  - id: the-rule-was-restated
+    bash: "grep -q 'reopened once more, on 2026-09-03' CLAUDE.md && echo 'CLAUDE.md records the window — OK'"
 ---
 
 ## Goal
@@ -111,8 +118,8 @@ trusting the tool.
 
 ## Acceptance criteria
 
-- [ ] No forbidden token in any object or commit message of any ref.
-- [ ] The commit count is unchanged — this is a substitution, not a squash.
-- [ ] `check --foreign-context` green.
-- [ ] `CLAUDE.md` says when the window was reopened, why, and that it is closed.
-- [ ] The pre-rewrite bundle is kept until the first push succeeds.
+- [x] No forbidden token in any object or commit message of any ref.
+- [x] The commit count is unchanged — this is a substitution, not a squash.
+- [x] `check --foreign-context` green.
+- [x] `CLAUDE.md` says when the window was reopened, why, and that it is closed.
+- [x] The pre-rewrite bundle is kept until the first push succeeds.
