@@ -84,6 +84,17 @@ waves:
     # question asked in three places — whose change is this — and TL-185 has
     # already shown what it costs when the answer is nobody's.
 
+  - name: "The guards over the public surface hold"
+    tasks: [TL-202, TL-201, TL-198, TL-196]
+    # Four findings about the checks that decide what a stranger may read.
+    # TL-202 first, because it is the only one that has already stopped the
+    # tool: `foreign_context_words` is declared, validated and consumed, and no
+    # layer may hold it — an agent worked that out, put it in the user file,
+    # and every command on the machine exited 2 until the file was moved aside.
+    # TL-201 replaces the language heuristic with a dictionary, which is why
+    # TL-198 (the word it passes over) is blocked by it rather than patched.
+    # TL-196 extends the foreign-context guard past `docs/`.
+
   - name: "Refusals the writing commands still lack"
     tasks: [TL-167, TL-173, TL-58]
     # Three inputs a command accepts today and should not: a reason long enough

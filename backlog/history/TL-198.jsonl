@@ -1,1 +1,2 @@
 {"id":"01M1KJ7YQ5T5RRY17J4BRP3VFW","ts":"2026-09-03T12:00:06.373Z","task":"TL-198","field":"__created__","from":"","to":"The language guard misses a Polish word that carries no accent and no known ending","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1KKADB0K7DBJWRV6PFJA49B","ts":"2026-09-03T12:18:55.456Z","task":"TL-198","field":"blocked_by","from":[],"to":["TL-201"],"actor":"agent:claude","source":"manual","reason":"Filing the public-surface guard wave."}
