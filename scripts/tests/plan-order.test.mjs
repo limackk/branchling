@@ -349,3 +349,71 @@ test("`run --plan` with no plan.yaml fails before a single task is claimed", () 
   assert.match(r.err, /plan\.yaml/);
   assert.equal(statusOf(f.backlog, f.ids.only), "pending");
 });
+
+// ── Why the run stopped, under `--plan` (TL-186) ──────────────────────────
+//
+// `next` answers exit 3 for facts that are not the same fact, and the loop used
+// to print `the queue is empty` for all of them. Each case below asserts BOTH
+// halves — the true sentence is there AND the false one is gone — because a
+// report that says both is no better than one that says the wrong thing.
+
+/** The `stopped` sentence of a `run --json` report. */
+function stoppedBy(result) {
+  assert.equal(result.code, 0, result.out + result.err);
+  return JSON.parse(result.out).stopped;
+}
+
+test("a run that stops on a wave somebody else holds names the wave", () => {
+  const f = twoWaveTree();
+  // Wave 1's only task is claimed by another session, so it is open work this
+  // run may not be handed — the case a fleet meets on every wave with fewer
+  // tasks than workers.
+  assert.equal(
+    taken(cli(["next", "--dir", f.backlog, "--plan", "--json", "--actor", "agent:other"], f.env)),
+    f.ids.early,
+  );
+
+  const stopped = stoppedBy(
+    cli(["run", "--dir", f.backlog, "--plan", "--agent", "true", "--actor", "agent:mine", "--json"], f.env)
+  );
+  assert.match(stopped, /plan wave 1 \(Foundations\)/);
+  assert.match(stopped, /1 of 1 task\(s\) in it are still open/);
+  assert.doesNotMatch(stopped, /the queue is empty/);
+  // The wave 2 task is open and this run stepped over it. It is NOT unscheduled
+  // — the plan schedules it later — so the sentence must not say it is (TL-219).
+  assert.match(stopped, /1 open task\(s\) outside that wave were left alone/);
+  assert.doesNotMatch(stopped, /does not schedule/);
+
+  // POSITIVE CONTROL: the backlog is not empty and the plan is what stopped the
+  // run — the same tree without the flag hands the wave 2 task straight out.
+  assert.equal(
+    taken(cli(["next", "--dir", f.backlog, "--json", "--actor", "agent:mine"], f.env)),
+    f.ids.late,
+  );
+});
+
+test("a run that stops with a finished plan says so, and counts what it left", () => {
+  const f = fixture([
+    { key: "planned", title: "The only planned task", priority: "P3" },
+    { key: "unplanned", title: "A task nobody put in the plan", priority: "P0" },
+  ]);
+  writePlan(f.backlog, [["Only this", [f.ids.planned]]]);
+  close(f.backlog, f.ids.planned);
+
+  const stopped = stoppedBy(
+    cli(["run", "--dir", f.backlog, "--plan", "--agent", "true", "--actor", "agent:mine", "--json"], f.env)
+  );
+  assert.match(stopped, /every wave of the plan is finished/);
+  assert.match(stopped, /1 open task\(s\) the plan does not schedule were left alone/);
+  assert.doesNotMatch(stopped, /the queue is empty/);
+  assert.equal(statusOf(f.backlog, f.ids.unplanned), "pending", "the run took unplanned work");
+});
+
+test("without `--plan` the run still reports an empty queue in the old words", () => {
+  const f = fixture([{ key: "only", title: "The only task here", priority: "P1" }]);
+  close(f.backlog, f.ids.only);
+  const stopped = stoppedBy(
+    cli(["run", "--dir", f.backlog, "--agent", "true", "--actor", "agent:mine", "--json"], f.env)
+  );
+  assert.equal(stopped, "the queue is empty");
+});
