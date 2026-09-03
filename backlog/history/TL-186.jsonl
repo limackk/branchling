@@ -1,1 +1,4 @@
 {"id":"01M1KBJKP0PMBFEPKXMT6Z732M","ts":"2026-09-03T10:03:35.488Z","task":"TL-186","field":"__created__","from":"","to":"run --plan reports the queue as empty when the plan is merely waiting","actor":"agent:claude","source":"manual","reason":"Filing the watchability tasks that came out of watching the run."}
+{"id":"01M1M5Z4VMGS1MSP60ECS3NK43","ts":"2026-09-03T17:44:49.268Z","task":"TL-186","field":"status","from":"pending","to":"in_progress","actor":"agent:sub-b","source":"take","reason":"unknown","session":"tree-fae2eb8be1a2"}
+{"id":"01M1M5Z4VMT3FBHVE509KE0FM2","ts":"2026-09-03T17:44:49.268Z","task":"TL-186","field":"owner","from":"unassigned","to":"agent:sub-b","actor":"agent:sub-b","source":"take","reason":"unknown","session":"tree-fae2eb8be1a2"}
+{"id":"01M1M6DTDV45F7SSNTDM4CAVAC","ts":"2026-09-03T17:52:50.107Z","task":"TL-186","field":"status","from":"in_progress","to":"done","actor":"agent:sub-b","source":"done","reason":"proven","session":"tree-fae2eb8be1a2"}

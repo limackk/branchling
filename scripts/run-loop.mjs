@@ -217,6 +217,50 @@ export function servedRoles(plan) {
 }
 
 /**
+ * Why a `--plan` run has nothing left to take. PURE (TL-186).
+ *
+ * `next` answers exit 3 for several different facts, and the loop printed one
+ * sentence for all of them: `the queue is empty`. That sentence is a claim about
+ * the BACKLOG, and under `--plan` the backlog is usually not empty at all — the
+ * plan's active wave is open and every one of its tasks is already in somebody's
+ * hands, or the plan is finished while work it never scheduled is still waiting.
+ * A run whose report cannot be believed is the TL-184 defect in prose.
+ *
+ * IT IS BUILT FROM `next`'s OWN ANSWER and never from a second reading of the
+ * plan. The loop deliberately does not resolve the wave itself (see the
+ * `passthrough` above), so describing a wave it had computed here would be
+ * describing a different wave than the dispatcher refused from.
+ *
+ * ENDING THE RUN IS STILL RIGHT: this tool has no work for this session, and
+ * waiting for a wave somebody else is finishing is a different feature. Only the
+ * sentence changes.
+ *
+ * @param {object|null} answer the `task-take` envelope `next` printed on exit 3
+ * @returns {string|null} the sentence, or null when that answer carries no plan
+ */
+export function planStop(answer) {
+  const plan = answer && answer.plan;
+  if (!plan) return null;
+  // Never silent: open work this run stepped over is exactly the part a reader
+  // would otherwise take "the queue is empty" to cover.
+  //
+  // THE TWO BRANCHES WORD IT DIFFERENTLY BECAUSE THE NUMBER MEANS TWO THINGS
+  // (TL-219). `skippedUnplanned` counts the open tasks outside the ACTIVE WAVE,
+  // which under an active wave includes everything the plan schedules LATER —
+  // so "the plan does not schedule them" would be false here. With no active
+  // wave there is no later, and an open task really is one the plan does not
+  // schedule. The field's name is wrong, not this sentence; TL-219 owns that.
+  const n = plan.skippedUnplanned;
+  if (!plan.wave) {
+    return "every wave of the plan is finished" +
+      (n ? ", and " + n + " open task(s) the plan does not schedule were left alone" : "");
+  }
+  return "plan wave " + plan.wave + " (" + (plan.name || "unnamed") + ") is not finished — " +
+    plan.open + " of " + plan.scheduled + " task(s) in it are still open and none was free to take" +
+    (n ? ", and " + n + " open task(s) outside that wave were left alone" : "");
+}
+
+/**
  * Open work this invocation cannot serve, counted per role. PURE.
  *
  * A SKIP IS NEVER SILENT. A task quietly left out is indistinguishable from an
@@ -1061,7 +1105,14 @@ export function run(argv) {
       break;
     }
     const handed = cli(["next", "--dir", root, "--actor", actor, "--json"].concat(passthrough));
-    if (handed.status === 3) break;
+    if (handed.status === 3) {
+      // `nothing to take` is not `the backlog is empty`, and under `--plan` the
+      // difference is the whole report (TL-186). The answer already carries the
+      // wave and what was left alone; without the flag the sentence is untouched.
+      const why = planned ? planStop(parseJson(handed.stdout)) : null;
+      if (why) stopped = why;
+      break;
+    }
     if (handed.status !== 0) {
       console.error(handed.stderr || handed.stdout);
       stopped = "`" + N + " next` refused (exit " + handed.status + ")";
