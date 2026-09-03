@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending  # pending | in_progress | blocked | done | cancelled
-owner: ""
+status: in_progress  # pending | in_progress | blocked | done | cancelled
+owner: agent:dev
 role: dev  # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
@@ -62,4 +62,21 @@ is separate and was deliberately left out of it.
 
 ## Decisions
 
-Nothing decided.
+**The fix is the argument that was missing, not a new resolution rule.** The
+hook already resolves the file's own root with `backlogForTaskPath()` and hands
+it to `build-backlog.mjs`; the `history-record.mjs` spawn beside it now gets the
+same `--dir`. `--dir` is the one source that outranks `BACKLOG_DIR`, so passing
+the root that is already computed is what closes both divergences the task
+names.
+
+**Rejected: teaching `history-record.mjs` to derive the root from `--file`.**
+That would put a second definition of "which tree owns this file" beside
+`resolveBacklogDir()`, and it would only cover the callers that pass a file. The
+defect is a caller that knows the answer and declines to pass it on; the repair
+belongs at that call site.
+
+**Deliberately not done: the hook still runs with `stdio: ignore`.** The silence
+that makes this class of defect invisible is real, but a hook that fires after
+every edit cannot start printing on the unrelated ones, and choosing what it may
+say is a separate design decision — not something to settle inside a one-argument
+fix.

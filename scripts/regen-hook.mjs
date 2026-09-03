@@ -128,10 +128,18 @@ export async function main() {
 
   // History is best-effort: a task edited before its history file exists must
   // not fail the edit that created it.
+  //
+  // `--dir` for the same reason `build` gets one (TL-195): the root is already
+  // known from the file, and a spawn that withholds it sends the child back to
+  // `BACKLOG_DIR` and discovery from cwd. Those agree with the file's own tree
+  // only by coincidence — a session standing in another worktree, or a stray
+  // export, and the reconcile diffs a DIFFERENT directory, advances ITS snapshot
+  // and loses the change from both trees. `stdio: ignore` makes that silent.
   spawnSync(
     process.execPath,
     [
       join(HERE, "history-record.mjs"),
+      "--dir", target.root,
       "--file", filePath,
       "--actor", resolveActor(""),
       "--source", "hook",
