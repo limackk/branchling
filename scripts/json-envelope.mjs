@@ -157,6 +157,10 @@ export const KINDS = {
   // doing it by hand.
   "task-take": {
     ok: null, taken: null, id: null, file: null, task: null, text: null,
+    // The status the take moved the task out of (TL-184). `task` is the state
+    // after the write, so a caller that has to give a claim back — `run` when
+    // its agent never started — has nowhere else to read it.
+    from: null,
     warnings: [], reclaimed: null, lock: null,
     refusalKind: null, refusal: null, details: [],
     // `next` only, and the reason each is here rather than in prose on stderr:

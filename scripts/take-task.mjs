@@ -402,6 +402,14 @@ export function takeJson(result) {
     id: result.id,
     file: result.file,
     task: result.after,
+    // The status the take moved the task OUT of — what an undo has to put back
+    // (TL-184). It cannot be read off `task`, which is the state AFTER the
+    // write, and reconstructing it from the project's queue statuses is a guess
+    // with several answers. `run` needs it for exactly one case: an agent that
+    // never started, where nothing was measured and the claim is given back.
+    // Equal to the in-progress status when the task was already the caller's,
+    // which makes the undo the no-op it should be.
+    from: (result.before && result.before.status) || null,
     text: result.text,
     warnings: result.warnings || [],
     // Who held it before, when this take was a takeover of an abandoned claim

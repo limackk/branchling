@@ -1,1 +1,4 @@
 {"id":"01M1K9DGTXW3J0M3GWVZQT6BC6","ts":"2026-09-03T09:25:51.581Z","task":"TL-184","field":"__created__","from":"","to":"run cannot tell an agent that never started from work that failed","actor":"agent:claude","source":"manual","reason":"Restoring TL-183 and filing the two defects the run measured."}
+{"id":"01M1KDMJR48ZJ3QZ2NCYT5T67S","ts":"2026-09-03T10:39:37.220Z","task":"TL-184","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown","session":"tree-3d81645067d3"}
+{"id":"01M1KDMJR4MAKZY33X0QV7X80Y","ts":"2026-09-03T10:39:37.220Z","task":"TL-184","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown","session":"tree-3d81645067d3"}
+{"id":"01M1KE6F5QET3TYP09XM7HKMPJ","ts":"2026-09-03T10:49:23.383Z","task":"TL-184","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven","session":"tree-3d81645067d3"}

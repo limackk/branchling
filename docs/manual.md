@@ -366,6 +366,17 @@ run says where it stopped and why. Agent output goes to one log file per task
 outside the repository, and the report names the path. The process ends with the
 queue; nothing is scheduled and there is no daemon.
 
+**An agent that never *started* costs the task nothing.** "Did the agent fail"
+and "did the agent run" are different questions, and only the first is a fact
+about the task — an expired login is a fact about your machine, and parking a
+task as `blocked` over it writes a lie that outlives the session. So an agent
+that printed nothing on stdout and left the tree byte-for-byte as it found it
+has not made an attempt: the task gets back the status it was taken from, the
+run stops rather than handing the rest of the queue to a command that cannot
+start, and the exit code is **1** — the command and what it said go to the
+report and the log, never into the task file. Both signals are required, and
+neither is a guess about exit codes, which every agent uses differently.
+
 Two statuses are never handed out unattended: the one that means *in progress*
 (somebody has it) and any status your `reason_required_statuses` protects —
 `blocked` was entered by a decision, and an agent must not undo it silently.
@@ -566,7 +577,7 @@ implementation detail. Every reading command answers in the same envelope:
 | `<command> --help` | `command-help` | `command`, `summary`, `usage`, `configured`, `flags` |
 | `pr-summary` | `pr-summary` | `base`, `scanned`, `reason`, `tasks`, `engaged`, `cost` |
 | `audit` | `audit` | `since`, `dayZero`, `tasks`, `findings`, `closedWithoutTrace`, `skippedBeforeSince`, `reopened`, `rework`, `parked`, `withoutPremise`, `awaitingVouch`, `vouches`, `vouchesByActor` |
-| `take`, `next` | `task-take` | `ok`, `taken`, `id`, `file`, `task`, `text`, `warnings`, `reclaimed`, `lock`, `refusalKind`, `refusal`, `details`, and — filled in by next — `passedOver`, `considered`, `searchedStatuses`, `skippedBlocked`, `skippedElsewhere`, `skippedExecutor`, `skippedHandedBack`, `scan`, `plan` |
+| `take`, `next` | `task-take` | `ok`, `taken`, `id`, `file`, `task`, `from`, `text`, `warnings`, `reclaimed`, `lock`, `refusalKind`, `refusal`, `details`, and — filled in by next — `passedOver`, `considered`, `searchedStatuses`, `skippedBlocked`, `skippedElsewhere`, `skippedExecutor`, `skippedHandedBack`, `scan`, `plan` |
 | `handoff` | `task-handoff` | `ok`, `id`, `file`, `task`, `role`, `owner`, `status` (each a from/to pair), `comment`, `released`, `warnings`, `refusalKind`, `refusal`, `details` |
 | `ask` | `task-ask` | `ok`, `id`, `file`, `question` (its event id, timestamp, text and asker), `changes`, `blockedReason`, `refusalKind`, `refusal`, `details` |
 | `done` | `verification-run` | `ok`, `task`, `dryRun`, `closed`, `entries` (one per `verification:` entry, with its exit code), `status`, `wouldBe`, `ticked`, `refusalKind`, `refusal`, `details` |

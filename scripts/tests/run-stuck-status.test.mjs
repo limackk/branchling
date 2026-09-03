@@ -14,7 +14,7 @@
  * between the take and the write — and then asserts on the TREE, not on the
  * loop's opinion of it.
  *
- * THE POSITIVE CONTROL is `blockTask` on a task that is NOT archived, in the
+ * THE POSITIVE CONTROL is `writeStatus` on a task that is NOT archived, in the
  * same file: without it a guard that refused every write would pass here.
  */
 import { test } from "node:test";
@@ -25,7 +25,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { blockTask } from "../run-loop.mjs";
+import { writeStatus } from "../run-loop.mjs";
 import { loadConfig } from "../config.mjs";
 
 import { isolateHome } from "./_repo.mjs";
@@ -156,12 +156,12 @@ test("the same run, read on the terminal, does not call it blocked", () => {
 });
 
 test("POSITIVE CONTROL: the same write still lands on a task that is NOT archived", () => {
-  // Without this, a `blockTask` that refused everything would pass above.
+  // Without this, a `writeStatus` that refused everything would pass above.
   const { dir, backlog, env, id } = fixture();
   try {
     assert.equal(cli(["take", id, "--dir", backlog, "--actor", "agent:worker"], env).status, 0);
     const config = loadConfig(backlog);
-    const done = blockTask({
+    const done = writeStatus({
       root: backlog, config, id, actor: "agent:worker",
       reason: "1 agent attempt, and the contract did not pass", status: "blocked",
     });
@@ -186,7 +186,7 @@ test("the guard reads `archived_statuses`, not the word `done`", () => {
 
     const file = taskFile(backlog, id);
     writeFileSync(file, readFileSync(file, "utf8").replace(/^status: .*$/m, "status: shipped"), "utf8");
-    const refused = blockTask({
+    const refused = writeStatus({
       root: backlog, config, id, actor: "agent:worker", reason: "1 agent attempt", status: "blocked",
     });
     assert.equal(refused.ok, false);
@@ -196,7 +196,7 @@ test("the guard reads `archived_statuses`, not the word `done`", () => {
 
     // `done` is not archived in THIS backlog, so nothing here may protect it.
     writeFileSync(file, readFileSync(file, "utf8").replace(/^status: .*$/m, "status: done"), "utf8");
-    const written = blockTask({
+    const written = writeStatus({
       root: backlog, config, id, actor: "agent:worker", reason: "1 agent attempt", status: "blocked",
     });
     assert.equal(written.ok, true, "the guard named `done` in the code instead of reading the vocabulary");

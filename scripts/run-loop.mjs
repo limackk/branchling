@@ -29,6 +29,14 @@
  * board after a run says where it stopped and why, which is the promise that has
  * to hold when a local model gets stuck on task 7 of 20.
  *
+ * AN AGENT THAT NEVER STARTED COSTS THE TASK NOTHING (TL-184). "Did the agent
+ * fail" and "did the agent RUN" are different questions, and only the first is a
+ * fact about the task. An attempt that printed nothing on stdout and left the
+ * tree byte-for-byte unchanged is not an attempt: the claim is given back — the
+ * status the take moved it out of, and the reservation — the run STOPS rather
+ * than handing the rest of the queue to a command that cannot start, and it
+ * exits non-zero so that a cron entry does not read it as success.
+ *
  * THE STUCK STATUS IS NEVER WRITTEN OVER AN ARCHIVED ONE (TL-191). The status a
  * task was taken in proves nothing by the time the attempts are over, so the
  * file is re-read at the write: a task that reached `archived_statuses` in the
@@ -39,7 +47,8 @@
  * not data that should travel with a branch, and twenty tasks' worth of agent
  * chatter on the terminal would hide the report.
  *
- * Tests: `node --test scripts/tests/run.test.mjs`
+ * Tests: `node --test scripts/tests/run.test.mjs`, and
+ * `scripts/tests/run-agent-launch.test.mjs` for the agent that never started.
  */
 
 import { spawnSync } from "node:child_process";
@@ -387,15 +396,20 @@ function parseJson(text) {
 }
 
 /**
- * Move a task to the status this project protects, with a stated reason.
+ * Write a status the RUN decided on, with a stated reason.
  *
  * Written here rather than by shelling out because no command sets an arbitrary
  * status — and that is deliberate, not an omission: `take` and `done` exist so
- * that a status is a CONSEQUENCE of an act. This is the third such act, and it
- * writes through the same door as `take` (`setFrontmatterField` + `recordEdit`),
- * never with a regex over the file.
+ * that a status is a CONSEQUENCE of an act. The run performs two such acts and
+ * both come through here: parking a task that spent its attempts in the status
+ * this project protects, and giving a claim back untouched when the agent never
+ * started (TL-184). Both write through the same door as `take`
+ * (`setFrontmatterField` + `recordEdit`), never with a regex over the file.
+ *
+ * The archived-status guard below serves both equally: whichever status the run
+ * arrived at, a task somebody finished in the meantime is not written over.
  */
-export function blockTask(opts) {
+export function writeStatus(opts) {
   const { root, config, id, actor, reason, status } = opts;
   const paths = backlogPaths(root);
   const record = readTaskRecords(paths.tasksDir, config.taskId.file)
@@ -444,6 +458,61 @@ export function blockTask(opts) {
     reason,
   });
   return { ok: true, status, file };
+}
+
+/**
+ * `git status --porcelain` over the repository, as one opaque string.
+ *
+ * `null` means the question COULD NOT BE ASKED — no git, or a tree that is not
+ * a repository — and the one rule for reading it is that null is never "nothing
+ * changed". A caller that treated an unanswerable question as evidence of
+ * inaction would declare an agent dead on the strength of a missing binary.
+ *
+ * The string is never parsed. The only question asked of it is whether it is
+ * the same before and after an attempt, which needs no understanding of the
+ * format and stays right if git changes it.
+ */
+function treeState(cwd) {
+  const r = spawnSync("git", ["status", "--porcelain"], {
+    cwd, encoding: "utf8", maxBuffer: 64 * 1024 * 1024,
+  });
+  if (r.error || r.status !== 0) return null;
+  return String(r.stdout || "");
+}
+
+/**
+ * Did this task's agent ever run? PURE (both readings are taken by the caller).
+ *
+ * THE DISTINCTION IS NOT "DID THE AGENT FAIL" BUT "DID IT RUN" (TL-184). A task
+ * whose contract fails after real work is a fact about the task and belongs in
+ * its file; a task whose agent never started is a fact about the MACHINE and
+ * belongs in the run report, nowhere else. Writing the second into the task file
+ * is the tool telling a lie that survives the session — measured here on
+ * 2026-09-03, when two 57-second attempts printing `Failed to authenticate:
+ * OAuth session expired` parked a task as `blocked` with a reason describing
+ * work nobody had done.
+ *
+ * Deliberately NOT a heuristic over exit codes: every agent uses them
+ * differently, and a tool that is not an agent may not pretend to know which
+ * code means "I could not start". The two signals below need no such knowledge.
+ *
+ *   · it said nothing on STDOUT — an agent that worked reports; the failed
+ *     launch in the measurement wrote its one line to stderr, which is exactly
+ *     where a shell puts `command not found` too, so stderr cannot count as
+ *     having spoken.
+ *   · the tree is byte-for-byte what it was when the task was CLAIMED — the
+ *     baseline spans every attempt, not one of them, because an agent that
+ *     worked once has run whatever a later attempt repeats.
+ *
+ * BOTH are required, and that is the safe direction: a false "never started"
+ * would take a genuinely failing task out of the attempt budget that exists to
+ * stop it looping forever. For the same reason an unknown tree (`null`) is not
+ * an unchanged one.
+ */
+export function neverRan(stdout, before, after) {
+  if (String(stdout || "").trim()) return false;
+  if (before === null || after === null) return false;
+  return before === after;
 }
 
 /**
@@ -497,6 +566,14 @@ function workOne(ctx, task) {
   let failure = "";
   let attempts = 0;
   const started = Date.now();
+  // ONE reading, taken at the CLAIM and never refreshed (TL-184). Comparing an
+  // attempt against the start of that same attempt looked equivalent and is not:
+  // an agent whose second attempt writes the same bytes as its first leaves
+  // `--porcelain` identical across it, and would be declared never started after
+  // demonstrably having run. The question the loop actually needs answering is
+  // whether ANY of this task's attempts moved the tree, so the baseline is where
+  // the task was picked up.
+  const treeAtTake = treeState(ctx.cwd);
 
   for (let attempt = 1; attempt <= ctx.plan.maxAttempts; attempt++) {
     attempts = attempt;
@@ -522,6 +599,21 @@ function workOne(ctx, task) {
       feedbackRan = false;
       failure = feedback;
       continue;
+    }
+
+    // An attempt that changed nothing and said nothing is not an attempt
+    // (TL-184). It is reported with the attempts ACTUALLY made — none, on the
+    // first — because counting it would spend against a budget that exists to
+    // stop a failing task looping, and this task has not been tried yet.
+    if (neverRan(agent.stdout, treeAtTake, treeState(ctx.cwd))) {
+      const said = String(agent.stderr || "").trim().split("\n")[0] || "";
+      appendFileSync(logPath,
+        "\n=== the agent never ran: nothing on stdout and nothing changed in " + ctx.cwd + "\n", "utf8");
+      return {
+        id: task.id, outcome: "agent-never-ran", attempts: attempt - 1,
+        ms: Date.now() - started, log: logPath, command,
+        detail: said || "the agent printed nothing and changed nothing",
+      };
     }
 
     const closing = cli(["done", task.id, "--dir", ctx.root, "--actor", ctx.actor, "--json"]);
@@ -562,13 +654,30 @@ function renderReport(report, plan) {
   for (const r of report.taken) {
     // `closed-elsewhere` reads as an ok: the task IS closed, and the run's only
     // part in it was declining to write over that (TL-191).
-    const mark = r.outcome === "closed" || r.outcome === "closed-elsewhere" ? MARK.ok : MARK.warn;
+    const mark = r.outcome === "closed" || r.outcome === "closed-elsewhere" ? MARK.ok
+      : r.outcome === "agent-never-ran" ? MARK.err : MARK.warn;
     lines.push("  " + mark + " " + r.id + "  " + r.outcome + "  " + r.attempts +
       " attempt" + (r.attempts === 1 ? "" : "s") + "  " + Math.round(r.ms / 1000) + "s");
     lines.push("      " + color.dim(r.log));
     if (r.detail) lines.push("      " + color.dim(String(r.detail).split("\n")[0]));
   }
   if (!report.taken.length) lines.push("  " + color.dim(MARK.bullet + " nothing was taken"));
+  // THE FACT ABOUT THE MACHINE, SAID HERE AND NOWHERE ELSE (TL-184). The task
+  // file carries nothing about this: no attempt was made, so there is nothing
+  // about the task to record. The command is quoted in full because the reader's
+  // next act is to run it themselves.
+  const never = report.neverStarted;
+  if (never) {
+    lines.push("");
+    lines.push("  " + MARK.err + " the agent command never ran — it printed nothing and changed nothing:");
+    lines.push("      " + (never.command || "(no command)"));
+    if (never.detail) lines.push("      " + color.dim(String(never.detail).split("\n")[0]));
+    lines.push("      " + color.dim(
+      never.status
+        ? never.id + " was left in `" + never.status + "`, the status it was taken from"
+        : never.id + " could not be given back — check its status by hand"
+    ));
+  }
   const waitingRoles = Object.keys(report.waiting || {}).sort();
   if (waitingRoles.length) {
     lines.push("");
@@ -781,6 +890,8 @@ export function run(argv) {
   const taken = [];
   const tally = { closed: 0, blocked: 0, closedElsewhere: 0 };
   let stopped = "the queue is empty";
+  // The one result that ends the run without being a fact about a task (TL-184).
+  let neverStarted = null;
   const seen = new Set();
 
   for (;;) {
@@ -821,11 +932,37 @@ export function run(argv) {
     }
     const result = workOne(ctx, { id: task.id, file: task.file, text: task.text || "", command });
     result.role = role;
+    if (result.outcome === "agent-never-ran") {
+      // NOTHING WAS MEASURED, so nothing about the task may change (TL-184). The
+      // claim is given back — the status the take moved it out of, and the
+      // reservation — and the run stops rather than walking the queue: the next
+      // task would meet the same wall, and an unattended loop that kept going
+      // would hand the whole backlog to a command that cannot start.
+      const from = String(task.from || "");
+      if (from) {
+        const given = writeStatus({
+          root, config, id: task.id, actor, status: from,
+          // The WHY of this write, which is a fact about the run and not about
+          // the task: the agent's output stays in the report and the log, where
+          // TL-184 says a fact about the machine belongs.
+          reason: "the agent command never ran — the claim is given back, nothing about the task was measured",
+        });
+        if (given.ok) result.status = from;
+        else console.error(warn(task.id + ": " + given.message));
+      } else {
+        console.error(warn(task.id + ": `" + N + " next` did not say which status it was taken from"));
+      }
+      releaseLock({ root, taskId: task.id, actor });
+      neverStarted = result;
+      taken.push(result);
+      stopped = "the agent command never ran";
+      break;
+    }
     if (result.outcome === "closed") {
       tally.closed++;
     } else {
       const reason = blockedReason(result.attempts, result.detail);
-      const blocked = blockTask({ root, config, id: task.id, actor, reason, status: stuck.status });
+      const blocked = writeStatus({ root, config, id: task.id, actor, reason, status: stuck.status });
       if (blocked.reason === "closed-elsewhere") {
         // NOT a failure of this run and not a task it may park: somebody closed
         // it while the agents were working (TL-191). It is counted apart from
@@ -860,10 +997,19 @@ export function run(argv) {
   const waiting = served.length ? waitingForRole(leftover, config, served) : {};
   const waitingExecutor = waitingForExecutor(leftover, config, callerSpecies(actor));
 
-  const report = { taken, tally, ms: Date.now() - started, stopped, waiting, waitingExecutor };
+  const report = { taken, tally, ms: Date.now() - started, stopped, waiting, waitingExecutor, neverStarted };
   if (plan.json) {
     console.log(JSON.stringify({
-      ok: true, dryRun: false, agent: plan.agent, agentFor: plan.agentFor, stopped,
+      // `ok` is about the RUN, not about the tasks: blocked work is a run that
+      // finished, an agent that could not start is a run that did not (TL-184).
+      ok: !neverStarted, dryRun: false, agent: plan.agent, agentFor: plan.agentFor, stopped,
+      // The whole fact about the machine, in the one place it belongs: which
+      // command was tried, what it said, and which status the task was given
+      // back to. A consumer never has to parse the report's prose for it.
+      agentNeverRan: neverStarted ? {
+        id: neverStarted.id, command: neverStarted.command || null,
+        output: neverStarted.detail || null, restoredTo: neverStarted.status || null,
+      } : null,
       waitingForRole: Object.keys(waiting).sort().map((r) => ({ role: r, count: waiting[r].length, ids: waiting[r] })),
       waitingForExecutor: Object.keys(waitingExecutor).sort()
         .map((e) => ({ executor: e, count: waitingExecutor[e].length, ids: waitingExecutor[e] })),
@@ -872,6 +1018,7 @@ export function run(argv) {
       tasks: taken.map((r) => ({
         id: r.id, outcome: r.outcome, attempts: r.attempts, ms: r.ms, log: r.log,
         role: r.role || "", status: r.status || null, detail: r.detail || null,
+        command: r.command || null,
       })),
     }, null, 2));
   } else {
@@ -880,7 +1027,13 @@ export function run(argv) {
   // A run that blocked something is still a run that finished. The tally says
   // what happened; an exit code that called it a failure would make an unattended
   // loop indistinguishable from a broken invocation.
-  return 0;
+  //
+  // An agent that never started is the opposite case and exits non-zero (TL-184).
+  // The measurement that produced this rule ended `1 blocked` with exit 0, which
+  // in a cron entry reads as success — and an unattended queue is exactly where
+  // nobody is left to read the report. 1 and not 2: the invocation was correct,
+  // it is the machine that could not honour it.
+  return neverStarted ? 1 : 0;
 }
 
 if (process.argv[1] && process.argv[1].endsWith("run-loop.mjs")) {
