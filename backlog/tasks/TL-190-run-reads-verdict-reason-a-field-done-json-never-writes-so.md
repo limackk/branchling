@@ -5,7 +5,7 @@ type: task
 labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
-priority: P2
+priority: P0
 status: pending                    # pending | in_progress | blocked | done | cancelled
 owner: unassigned
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
