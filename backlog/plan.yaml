@@ -63,7 +63,12 @@ waves:
     # stall on a question, and today answering one costs more than it should.
 
   - name: "What the loop says of itself is true"
-    tasks: [TL-206, TL-200, TL-186, TL-193, TL-194, TL-199]
+    tasks: [TL-212, TL-206, TL-200, TL-186, TL-193, TL-194, TL-199]
+    # TL-212 stands first, added 2026-09-03 from a reading of the panel: ten
+    # rows under a heading promising decisions, five of which need none. It is
+    # this wave's thesis one level up — the tool stating something about itself
+    # that is not true — and it is the only one whose fix hands five tasks back
+    # to the fleet.
     # Three things the tool states and cannot back. TL-186: a `--plan` run that
     # stops cannot say whether the plan is finished or merely waiting. TL-193:
     # a task parked because its contract asks a PERSON is recorded as having
