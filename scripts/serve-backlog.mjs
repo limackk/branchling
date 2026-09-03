@@ -744,13 +744,36 @@ async function handle(req, res) {
       return;
     }
     if (refusesForeignWrite(res, url, payload)) return;
-    const { id, reason, resolves, actor } = payload || {};
+    const { id, reason, resolves, actor, choose } = payload || {};
     const who = normalizeActor(actor || ACTOR_UNKNOWN);
     if (!isValidActor(who)) {
       sendJson(res, 400, { error: "The actor `" + who + "` has no valid namespace" });
       return;
     }
-    if (!isValidReason(reason || "")) {
+    // ANSWERING BY MENU ROW (TL-204's `decide --choose <n>`, reached from the
+    // panel by TL-205). The number is validated for SHAPE here and for meaning
+    // by `decideTask`, which owns the menu: it is the only code that has read
+    // the event the question was asked in, and the answer recorded is the option
+    // as WRITTEN there rather than whatever text the page had rendered.
+    const pick = choose === undefined || choose === null || choose === "" ? null : Number(choose);
+    if (pick !== null && !(Number.isInteger(pick) && pick >= 1)) {
+      sendJson(res, 400, { error: "`choose` names a menu row by number, from 1" });
+      return;
+    }
+    // The two are one field's worth of answer, the rule `decide` states: a
+    // remark ABOUT a chosen row is a second decision, not a rider on this one.
+    if (pick !== null && String(reason || "").trim()) {
+      sendJson(res, 400, { error: "`choose` and `reason` both say what was decided — send one" });
+      return;
+    }
+    // WHICH menu is not something to guess, and `decideTask` would dereference a
+    // question it was never given: one task can carry two open questions, and
+    // row 2 of the wrong one records a real answer to a question nobody asked.
+    if (pick !== null && !resolves) {
+      sendJson(res, 400, { error: "`choose` names a row of ONE question — send the `resolves` event id with it" });
+      return;
+    }
+    if (pick === null && !isValidReason(reason || "")) {
       sendJson(res, 400, {
         error: "A decision needs its content — and `unknown` and `proven` are the tool's own words",
       });
@@ -758,7 +781,7 @@ async function handle(req, res) {
     }
     const result = decideTask({
       root: BACKLOG_DIR, config: CONFIG, id, actor: who,
-      reason, resolves: resolves || null,
+      reason: pick === null ? reason : null, resolves: resolves || null, choose: pick,
     });
     if (!result.ok) {
       sendJson(res, result.kind === "not-found" ? 404 : 409, { error: result.message, kind: result.kind });

@@ -1779,38 +1779,110 @@ ${paletteBadgeCss}
     cursor: pointer;
   }
   .dec-filter.is-on { background: var(--accent-soft); border-color: var(--accent); color: var(--fg); }
-  .dec-item {
+  /* TWO KINDS, TWO SHAPES (TL-205). A question is a paragraph somebody has to
+     think about; a task marked for a person has nothing to read and one action.
+     Rendered as the same bordered box they cost the same to scan, so the reader
+     had to open every row to learn which was which. An ELEVATED card carries a
+     question; a FLAT line carries a marked task, and the difference in vertical
+     rhythm (14px against 2px) is visible before a word is read.
+     The ORDER is untouched: both kinds stay in ONE list sorted by what the
+     decision releases (TL-115), because grouping by kind would put a question
+     that frees nothing above a task that frees nine. */
+  .dec-q {
     border: 1px solid var(--border);
-    border-left-width: 3px;
+    border-left: 3px solid var(--accent);
     border-radius: 10px;
     background: var(--bg-card);
-    padding: 12px 14px;
-    margin-bottom: 10px;
+    box-shadow: var(--shadow);
+    padding: 14px 16px;
+    margin: 14px 0;
   }
-  .dec-item.is-question { border-left-color: var(--accent); }
-  .dec-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  /* No border, no card: a marked task is a line on the page. \`--border\` on the
+     left rule keeps the two kinds aligned down a common edge. */
+  .dec-t {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+    border-left: 3px solid var(--border);
+    padding: 6px 14px 6px 13px;
+    margin: 2px 0;
+    border-radius: 0 8px 8px 0;
+  }
+  .dec-t:hover { background: var(--bg-card); border-left-color: var(--fg-muted); }
+  /* The provenance of a question, above it and quieter than it: which task it
+     was asked on is context, the question is the text. */
+  .dec-src { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 11px; }
   .dec-id { font-weight: 600; font-size: 12px; color: var(--accent); text-decoration: none; }
   .dec-id:hover { text-decoration: underline; }
   .dec-title { font-size: 13px; }
-  .dec-kind {
+  .dec-src .dec-title { font-size: 11px; color: var(--fg-muted); }
+  .dec-unblocks { font-size: 11px; color: var(--fg-muted); font-variant-numeric: tabular-nums; }
+  .dec-src .dec-unblocks { margin-left: auto; }
+  /* An EMPTY element doing the pushing, so \`releases N\` lands in the same column
+     on a flat row as on a card while the row's action stays right of it. Two
+     \`margin-left: auto\` siblings would split the free space between them and
+     leave the count stranded in the middle. */
+  .dec-gap { flex: 1 1 0; }
+  /* THE ONLY TEXT ON THE PAGE ANYBODY HAS TO THINK ABOUT, so it gets the size
+     and the measure. No box: a border around it competed with it. */
+  .dec-ask {
+    margin: 8px 0 0;
+    font-size: 15px;
+    line-height: 1.55;
+    max-width: 72ch;
+    color: var(--fg);
+  }
+  /* THE MENU (TL-204). Numbers are the ones \`decide --choose <n>\` takes, so a
+     reader who moves to the terminal types what they read here. */
+  .dec-menu { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-width: 78ch; }
+  .dec-opt {
+    font: inherit;
+    font-size: 13px;
+    line-height: 1.5;
+    display: flex;
+    gap: 9px;
+    width: 100%;
+    text-align: left;
+    padding: 8px 11px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--fg);
+    cursor: pointer;
+  }
+  .dec-opt:hover:not(:disabled) { border-color: var(--accent); }
+  .dec-opt:disabled { cursor: default; }
+  .dec-opt-n { flex: none; color: var(--fg-muted); font-variant-numeric: tabular-nums; font-weight: 600; }
+  /* Marked by a WORD as well as a colour: the recommendation has to survive a
+     monochrome print and a reader who does not see the accent. */
+  .dec-opt.is-rec { border-color: var(--accent); background: var(--accent-soft); }
+  .dec-opt.is-rec .dec-opt-n { color: var(--fg); }
+  /* \`--fg\` and NOT \`--accent\`: the tag sits on \`--accent-soft\`, where the accent
+     reaches about 2.3:1 in the light theme — unreadable at 10px. The colour is
+     already carried by the row's fill and border, so the word does not need to
+     repeat it, and it is the word that has to survive a monochrome print. */
+  .dec-rec {
+    display: inline-block;
+    margin-left: 6px;
     font-size: 10px;
     text-transform: uppercase;
     letter-spacing: .06em;
-    color: var(--fg-muted);
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    padding: 0 7px;
-  }
-  .dec-unblocks { margin-left: auto; font-size: 11px; color: var(--fg-muted); font-variant-numeric: tabular-nums; }
-  .dec-question {
-    margin-top: 8px;
-    padding: 8px 10px;
-    background: var(--bg);
-    border-radius: 8px;
-    font-size: 12px;
+    font-weight: 600;
+    color: var(--fg);
+    white-space: nowrap;
   }
   .dec-meta { margin-top: 6px; font-size: 11px; color: var(--fg-muted); }
+  .dec-q .dec-meta { margin-top: 10px; }
+  /* A marked task keeps the decision box it always had, one click away rather
+     than in the reader's face: the row's own action is to go and DO the task. */
+  .dec-note { margin-left: 12px; }
+  .dec-note > summary { font-size: 11px; color: var(--fg-muted); cursor: pointer; }
+  .dec-note > summary:hover { color: var(--accent); }
+  .dec-note[open] { margin-left: 0; flex-basis: 100%; }
+  .dec-note[open] > summary { margin-bottom: 2px; }
   .dec-actions { margin-top: 10px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .dec-q .dec-actions { max-width: 78ch; }
   .dec-actions input {
     font: inherit;
     font-size: 12px;
@@ -5800,9 +5872,13 @@ function renderDecisions() {
     '" onclick="toggleDecisionsMine()">' +
     (state.decisionsMine ? "only mine: " + escapeHtmlStr(state.actor || "(nobody declared)") : "everything") +
     "</button></div>" +
-    '<p class="dec-lede">Work that cannot move until a person decides: tasks marked for a human, ' +
-    "and questions somebody asked that nothing has answered. Ordered by how many tasks the " +
-    "decision would release, counted through the chain — not by age.</p>";
+    // THE LEDE CARRIES WHAT IS CONSTANT so the rows do not have to (TL-205): a
+    // card is a question to answer, a plain line is a task somebody marked for
+    // a person. Stated once here, it is not repeated eleven times below.
+    '<p class="dec-lede">Work that cannot move until a person decides. A <strong>card</strong> is a question ' +
+    "somebody asked that nothing has answered; a <strong>plain line</strong> is a task marked for a person, " +
+    "with nothing to read and one thing to do. Ordered by how many tasks the decision would release, " +
+    "counted through the chain — not by age.</p>";
 
   if (!rows.length) {
     host.innerHTML = head + '<p class="dec-empty">Nothing is waiting on a person. A task gets here by ' +
@@ -5812,34 +5888,80 @@ function renderDecisions() {
   }
 
   host.innerHTML = head + rows.map(function (r) {
+    // \`releases nothing else\` was printed in the position, and the weight, that
+    // \`releases 1 task\` occupies — the one number on the row that changes the
+    // ordering. Most rows released nothing, so the column read as noise and the
+    // rows that mattered did not stand out (TL-205). Absent now means nothing.
     const unblocks = r.unblocks
       ? '<span class="dec-unblocks">releases ' + r.unblocks + " task" + (r.unblocks === 1 ? "" : "s") + "</span>"
-      : '<span class="dec-unblocks">releases nothing else</span>';
-    const top =
-      '<div class="dec-row">' +
-      '<a class="dec-id" href="#' + escapeHtmlStr(r.id) + '">' + escapeHtmlStr(r.id) + "</a>" +
-      '<span class="dec-title">' + escapeHtmlStr(r.title) + "</span>" +
-      '<span class="dec-kind">' + (r.kind === "question" ? "question" : "for a person") + "</span>" +
-      unblocks + "</div>";
+      : "";
 
     if (r.kind === "question") {
       const age = r.ageDays === null ? "" :
-        " · asked " + (r.ageDays === 0 ? "today" : r.ageDays + " day" + (r.ageDays === 1 ? "" : "s") + " ago");
-      return '<article class="dec-item is-question">' + top +
-        '<div class="dec-question">' + escapeHtmlStr(r.question) + "</div>" +
-        '<div class="dec-meta">' + escapeHtmlStr(r.asker || "somebody") + age + "</div>" +
-        decisionForm(r.id, r.eventId) +
+        ", " + (r.ageDays === 0 ? "today" : r.ageDays + " day" + (r.ageDays === 1 ? "" : "s") + " ago");
+      return '<article class="dec-q">' +
+        '<div class="dec-src">' + srcHead(r) + unblocks + "</div>" +
+        '<p class="dec-ask">' + escapeHtmlStr(r.question) + "</p>" +
+        decisionMenu(r) +
+        '<div class="dec-meta">asked by ' + escapeHtmlStr(r.asker || "somebody") + age + "</div>" +
+        decisionForm(r.id, r.eventId, r.options.length ? "menu" : "question") +
         "</article>";
     }
-    const why = r.why.indexOf("executor") >= 0
-      ? "marked <code>executor: human</code>"
-      : "asks for the role <code>" + escapeHtmlStr(r.role) + "</code>, which no agent here serves";
-    return '<article class="dec-item">' + top +
-      '<div class="dec-meta">' + why + (r.owner ? " · " + escapeHtmlStr(r.owner) : "") + "</div>" +
-      decisionForm(r.id, "") +
-      "</article>";
+    // ONLY THE EXCEPTION IS SPELLED OUT. \`marked executor: human\` was on nearly
+    // every one of these rows; the flat shape and the lede now say it, and the
+    // sentence is kept for the case the shape does NOT imply — a role this
+    // deployment has no agent for. The owner is not shown at all: who holds a
+    // task is a click away on the task, and the common value repeated down the
+    // column is the defect this task was filed about.
+    const role = r.why.indexOf("executor") >= 0
+      ? ""
+      : '<span class="dec-meta">no agent here serves the role <code>' +
+        escapeHtmlStr(r.role) + "</code></span>";
+    return '<div class="dec-t">' + srcHead(r) + role +
+      '<span class="dec-gap"></span>' + unblocks + decisionForm(r.id, "", "task") + "</div>";
   }).join("");
   updateDecisionsCount();
+}
+
+/** Which task a row came from, in both kinds of row: the id links to it and the
+ *  title says what it is. On a card this is PROVENANCE and is set below the
+ *  question in size; on a flat row it is the row. */
+function srcHead(r) {
+  return '<a class="dec-id" href="#' + escapeHtmlStr(r.id) + '">' + escapeHtmlStr(r.id) + "</a>" +
+    '<span class="dec-title">' + escapeHtmlStr(r.title) + "</span>";
+}
+
+/** The menu the question was asked with, or nothing (TL-204, TL-207).
+ *
+ *  NOTHING IS INVENTED. A question asked before options existed, or asked
+ *  without them on purpose, gets no list — an empty \`<ol>\` reading "no options"
+ *  would be a sentence about the tool rather than about the decision.
+ *
+ *  THE NUMBERS ARE THE ONES \`decide --choose <n>\` TAKES, 1-based at every end
+ *  (TL-204), so a reader who moves to the terminal types what they read here.
+ *  Picking a row records the option's TEXT as the reason, exactly as the command
+ *  does — the page does not get its own idea of what an answer is. */
+function decisionMenu(r) {
+  const options = r.options || [];
+  if (!options.length) return "";
+  return '<ol class="dec-menu">' + options.map(function (text, i) {
+    const n = i + 1;
+    const rec = n === r.recommend;
+    const tag = rec ? '<span class="dec-rec">recommended</span>' : "";
+    // An option is worth READING even where it cannot be taken: a question
+    // whose event carries no id (a log written before \`ask\` stamped one) has
+    // nothing for \`resolves\`, and a row that posted without it would answer a
+    // question the server cannot identify.
+    const attrs = CAN_EDIT && r.eventId
+      ? ' data-decision-for="' + escapeHtmlStr(r.id) + '" data-resolves="' + escapeHtmlStr(r.eventId) +
+        '" data-choose="' + n + '"'
+      : " disabled";
+    return "<li>" +
+      '<button type="button" class="dec-opt' + (rec ? " is-rec" : "") + '"' + attrs + ">" +
+      '<span class="dec-opt-n">' + n + ".</span>" +
+      "<span>" + escapeHtmlStr(text) + tag + "</span>" +
+      "</button></li>";
+  }).join("") + "</ol>";
 }
 
 /** The one action the panel offers, and it writes through \`/api/decision\`,
@@ -5849,41 +5971,77 @@ function renderDecisions() {
  *  The handlers are DELEGATED rather than inline: a decision is free text and
  *  would break out of an onclick="…('…')" attribute the first time one carried
  *  an apostrophe — the reason the dashboard binds its own buttons that way. */
-function decisionForm(id, eventId) {
+function decisionForm(id, eventId, kind) {
   if (!CAN_EDIT) {
     const why = SERVER_MODE && FOREIGN_WORKTREE
       ? escapeHtmlStr(readOnlyReason())
       : "Read-only: connect to the folder (or run the server) to record a decision from here.";
+    // A marked task's box is behind a disclosure, so its read-only note would be
+    // a line nobody opens. The card's note stays visible: somebody came here to
+    // answer a question and has to be told why they cannot.
+    if (kind === "task") return "";
     return '<div class="dec-actions"><span class="dec-hint">' + why + "</span></div>";
   }
-  return '<div class="dec-actions">' +
-    '<input type="text" placeholder="What was decided, and why" ' +
+  // THREE PROMPTS FOR THREE SITUATIONS (TL-205). \`What was decided, and why\`
+  // stood on every input in the panel, in the same place and weight, which is
+  // what made a wall of them: a phrase that never changes tells the reader
+  // nothing about the row it is on. Where the row differs, so does the prompt.
+  const prompt = kind === "menu" ? "An answer that is not on the menu" :
+    kind === "question" ? "Your answer, and why" : "What was decided, and why";
+  const label = kind === "question" ? "Answer" : "Record";
+  const form = '<div class="dec-actions">' +
+    '<input type="text" placeholder="' + prompt + '" ' +
     'data-decision-for="' + escapeHtmlStr(id) + '" data-resolves="' + escapeHtmlStr(eventId) + '">' +
-    '<button type="button" class="btn-action primary" data-decision-submit="1">Record</button>' +
+    '<button type="button" class="btn-action primary" data-decision-submit="1">' + label + "</button>" +
     "</div>";
+  // \`<details>\` and not a scripted toggle: it opens over file:// with none of
+  // the page's JavaScript running, and it is keyboard-reachable for free.
+  if (kind !== "task") return form;
+  return '<details class="dec-note"><summary>note a decision</summary>' + form + "</details>";
 }
 
 async function submitDecision(input) {
   const text = String(input.value || "").trim();
   if (!text) { toast("A decision with no content records that something was settled and leaves out what", "error"); return; }
+  await postDecision({
+    id: input.dataset.decisionFor,
+    reason: text,
+    resolves: input.dataset.resolves || null,
+  });
+}
+
+/** Answer by taking a row off the menu (TL-204's \`decide --choose <n>\`).
+ *
+ *  THE NUMBER IS SENT, NOT THE TEXT. The server resolves it against the very
+ *  event the question was asked in, so the answer recorded is the option as it
+ *  was WRITTEN — a page that posted the string it had rendered would be a second
+ *  opinion about what option 2 says, and the one that is wrong after a log is
+ *  edited. It is also what lets \`chose: <n>\` be written beside the answer. */
+async function chooseOption(btn) {
+  await postDecision({
+    id: btn.dataset.decisionFor,
+    resolves: btn.dataset.resolves || null,
+    choose: Number(btn.dataset.choose),
+  });
+}
+
+/** The one write path the panel has, and it reaches \`decideTask\` — the same
+ *  function the \`decide\` command calls. A second path would be a second set of
+ *  rules about what a decision may say. */
+async function postDecision(body) {
   if (!state.actor) { toast("Say who you are first — the actor picker is in the header", "error"); return; }
   try {
     const res = await fetch("api/decision", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        id: input.dataset.decisionFor,
-        reason: text,
-        resolves: input.dataset.resolves || null,
-        actor: state.actor,
-      }),
+      body: JSON.stringify({ ...body, actor: state.actor }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
-    toast(input.dataset.decisionFor + ": decision recorded", "success");
+    toast(body.id + ": decision recorded", "success");
     // The history is what the panel counts from, so it is re-read before the
     // redraw — otherwise the answered question would still be sitting there.
-    await refreshHistory(input.dataset.decisionFor, true);
+    await refreshHistory(body.id, true);
     renderDecisions();
   } catch (e) {
     toast("The decision was not recorded: " + e.message, "error");
@@ -5913,12 +6071,17 @@ function decisionsSyncHash() {
 }
 
 document.getElementById("decisionsView").addEventListener("click", (e) => {
+  const opt = e.target.closest("[data-choose]");
+  if (opt) { chooseOption(opt); return; }
   const btn = e.target.closest("[data-decision-submit]");
   if (btn) submitDecision(btn.previousElementSibling);
 });
 document.getElementById("decisionsView").addEventListener("keydown", (e) => {
   if (e.key !== "Enter") return;
-  const input = e.target.closest("[data-decision-for]");
+  // SCOPED TO THE INPUT. The menu's buttons carry \`data-decision-for\` too, and
+  // Enter on a button already fires its click — an unscoped selector would send
+  // the empty value of a button as a typed answer on top of the chosen row.
+  const input = e.target.closest("input[data-decision-for]");
   if (!input) return;
   e.preventDefault();
   submitDecision(input);

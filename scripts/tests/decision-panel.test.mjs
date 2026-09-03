@@ -13,6 +13,11 @@
  *      TRANSITIVELY and only over tasks this one actually releases — a task
  *      with another open blocker must not be counted, or the panel would
  *      promote a decision that frees nothing.
+ *   4. A MENU THAT WAS NEVER OFFERED. The options a question was asked with
+ *      travel on its row (TL-204) so the panel can render them, and the control
+ *      is a question asked WITHOUT any: it must carry an empty menu, never an
+ *      invented one, because the panel is read by somebody who cannot go and
+ *      check the log.
  *
  * The statuses are the FIXTURE's own: this project's words are not the tool's
  * contract.
@@ -104,6 +109,70 @@ test("an unanswered question is a row; an answered one is gone", () => {
 test("a question on a CLOSED task is not waiting on anybody", () => {
   const history = { "FX-1": [comment("Q1", "2026-02-08T00:00:00Z", "?", "agent:worker")] };
   assert.deepEqual(panel([task({ id: "FX-1", status: "shipped" })], history), []);
+});
+
+// ── The menu a question was asked with (TL-204, rendered by TL-205) ────────
+
+test("a question asked with options carries them, in order, and names the recommended one", () => {
+  const q = comment("Q1", "2026-02-08T00:00:00Z", "split it or take it whole", "agent:worker");
+  q.options = ["split it into four — each design gets its own session", "take it whole in a fresh session"];
+  q.recommend = 2;
+  const rows = panel([task({ id: "FX-1" })], { "FX-1": [q] });
+  assert.equal(rows.length, 1);
+  // The order is the asker's, and the number `decide --choose` takes is the
+  // position in this array plus one — nothing here may reorder it.
+  assert.deepEqual(rows[0].options, q.options);
+  assert.equal(rows[0].recommend, 2);
+});
+
+test("POSITIVE CONTROL: a question asked with NO options invents none", () => {
+  // The three states on disk are different things (TL-204): no `options` key is
+  // an event written before the flag existed, `[]` is a session that offered
+  // none. Neither may become a menu, and neither may become a missing field the
+  // renderer has to test for.
+  const older = comment("Q1", "2026-02-08T00:00:00Z", "written before options existed", "agent:worker");
+  const none = comment("Q2", "2026-02-08T00:00:00Z", "no enumerable answers", "agent:worker");
+  none.options = [];
+  const rows = panel([task({ id: "FX-1" })], { "FX-1": [older, none] });
+  assert.equal(rows.length, 2);
+  for (const r of rows) {
+    assert.deepEqual(r.options, []);
+    assert.equal(r.recommend, null);
+  }
+});
+
+test("the row's options are a COPY: mutating them cannot rewrite the log in memory", () => {
+  const q = comment("Q1", "2026-02-08T00:00:00Z", "?", "agent:worker");
+  q.options = ["one", "two"];
+  q.recommend = 1;
+  const rows = panel([task({ id: "FX-1" })], { "FX-1": [q] });
+  rows[0].options.push("three");
+  assert.deepEqual(q.options, ["one", "two"]);
+});
+
+test("a recommendation that is not a positive whole number is dropped, not passed on", () => {
+  // A hand-edited log is the only way to get here, and a renderer comparing a
+  // row number against `"2"` or `0` would mark the wrong option, or none, with
+  // no sign that anything was wrong.
+  for (const bad of ["2", 0, -1, 1.5, null, undefined, true]) {
+    const q = comment("Q1", "2026-02-08T00:00:00Z", "?", "agent:worker");
+    q.options = ["one", "two"];
+    q.recommend = bad;
+    const rows = panel([task({ id: "FX-1" })], { "FX-1": [q] });
+    assert.equal(rows[0].recommend, null, "recommend: " + String(bad));
+  }
+  // …and the control: a good one survives.
+  const ok = comment("Q1", "2026-02-08T00:00:00Z", "?", "agent:worker");
+  ok.options = ["one", "two"];
+  ok.recommend = 1;
+  assert.equal(panel([task({ id: "FX-1" })], { "FX-1": [ok] })[0].recommend, 1);
+});
+
+test("a task row carries no menu: only a question was ever asked with one", () => {
+  const rows = panel([task({ id: "FX-1", executor: "human" })]);
+  assert.equal(rows[0].kind, "task");
+  assert.equal(rows[0].options, undefined);
+  assert.equal(rows[0].recommend, undefined);
 });
 
 // ── The order ─────────────────────────────────────────────────────────────

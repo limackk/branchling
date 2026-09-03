@@ -12,7 +12,10 @@
  *
  *   a task    open, every `blocked_by` closed, and marked `executor: human`
  *             (TL-113) or asking for a role this deployment has no agent for.
- *   a question a `__comment__` nothing has answered (TL-114's `openQuestions`).
+ *   a question a `__comment__` nothing has answered (TL-114's `openQuestions`),
+ *             carrying the options it was asked with and which one is
+ *             recommended (TL-204), because the panel is where a NON-technical
+ *             reader answers and they cannot go and read the log for the rest.
  *
  * THE ORDER IS THE POINT. Both kinds are sorted by how many tasks the decision
  * would release — counted TRANSITIVELY through `blocks`, because a task that
@@ -139,6 +142,14 @@ export function decisionPanel(tasks, history, opts = {}) {
         asked: q.ts,
         asker: q.actor || "",
         ageDays: q.ts ? Math.max(Math.floor((now - Date.parse(q.ts)) / 86400000), 0) : null,
+        // THE MENU TRAVELS WITH THE QUESTION (TL-204). A reader who opens this
+        // panel has none of the conversation; a menu left behind in the log
+        // makes them redo the analysis the asker already did. Normalised to an
+        // array here so no caller has to distinguish the three states on disk —
+        // absent key, `[]`, a list — but NOTHING is invented: a question asked
+        // without options carries an empty menu and the viewer draws none.
+        options: Array.isArray(q.options) ? q.options.slice() : [],
+        recommend: Number.isInteger(q.recommend) && q.recommend >= 1 ? q.recommend : null,
         unblocks: unblocksCount(task.id, byId, archived),
       });
     }
