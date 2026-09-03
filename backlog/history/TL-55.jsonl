@@ -2,3 +2,4 @@
 {"id":"01M1E69RE2NSKZA4SZ818J7Z2M","ts":"2026-09-01T09:55:10.402Z","task":"TL-55","field":"related_docs","from":[".claude/skills/tasklog-viewer/SKILL.md"],"to":[".claude/skills/worktrail-viewer/SKILL.md"],"actor":"unknown","source":"external"}
 {"id":"01M1GFKZK596FEARH73HZ0DQQ5","ts":"2026-09-02T07:16:31.461Z","task":"TL-55","field":"title","from":"Eksport viewera do jednego pliku do wysłania","to":"Viewer export to a single file for sending","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1K5ZWCH0MPENMQTXN52WFT4","ts":"2026-09-03T08:25:58.929Z","task":"TL-55","field":"related_docs","from":[".claude/skills/worktrail-viewer/SKILL.md"],"to":[".claude/skills/branchling-viewer/SKILL.md"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1K9E9BW89D68Q635E5BK700","ts":"2026-09-03T09:26:16.700Z","task":"TL-55","field":"executor","from":"","to":"human","actor":"unknown","source":"external","reason":"unknown"}

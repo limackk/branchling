@@ -4,3 +4,4 @@
 {"id":"01M1GYW47JDFXK036TGDSFMX1V","ts":"2026-09-02T11:43:06.994Z","task":"TL-159","field":"estimate","from":"2h","to":"30m","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GYW47JSZKYDYAAD2FXB1E7","ts":"2026-09-02T11:43:06.994Z","task":"TL-159","field":"related_docs","from":[],"to":[".claude/skills/worktrail-cli/SKILL.md"],"actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1K5ZWCH4FHW6BTT3ABATYT6","ts":"2026-09-03T08:25:58.929Z","task":"TL-159","field":"related_docs","from":[".claude/skills/worktrail-cli/SKILL.md"],"to":[".claude/skills/branchling-cli/SKILL.md"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1K9E9BWGT79F1AW6G5FTE4A","ts":"2026-09-03T09:26:16.700Z","task":"TL-159","field":"executor","from":"","to":"human","actor":"unknown","source":"external","reason":"unknown"}

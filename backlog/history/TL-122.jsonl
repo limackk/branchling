@@ -2,3 +2,4 @@
 {"id":"01M1EN1J89HY4QWMV0QSDCATY5","ts":"2026-09-01T14:12:50.569Z","task":"TL-122","field":"related_docs","from":[],"to":["docs/worktrail-state-and-sync.md"],"actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK5FGEF6PC7723QJVC0","ts":"2026-09-02T07:16:31.461Z","task":"TL-122","field":"title","from":"Push viewera nie widzi zmiany stanu w innym worktree","to":"The viewer's push does not see a status change in another worktree","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1K5ZWCHA881R0R1ZRVJ8G1H","ts":"2026-09-03T08:25:58.929Z","task":"TL-122","field":"related_docs","from":["docs/worktrail-state-and-sync.md"],"to":["docs/branchling-state-and-sync.md"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1K9E9BWW6GBEE3KG9MA8J3J","ts":"2026-09-03T09:26:16.700Z","task":"TL-122","field":"executor","from":"","to":"human","actor":"unknown","source":"external","reason":"unknown"}

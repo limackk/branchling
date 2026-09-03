@@ -2,3 +2,4 @@
 {"id":"01M1F5BNKG7GAYB91P0FA8S596","ts":"2026-09-01T18:57:58.896Z","task":"TL-103","field":"blocked_by","from":["TL-1512"],"to":["TL-102"],"actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK59VKAJN1VTS0VH1FA","ts":"2026-09-02T07:16:31.461Z","task":"TL-103","field":"title","from":"Materiał launchowy — pomiar 27% jako teza i Show HN","to":"Launch material — the 27% measurement as thesis, and Show HN","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK5TR47GQZJQKGVJEQA","ts":"2026-09-02T07:16:31.461Z","task":"TL-103","field":"epic","from":"Backlog — publikacja open source","to":"Backlog — open source publication","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1K9E9BWEYYDHXMWYV1EQVE7","ts":"2026-09-03T09:26:16.700Z","task":"TL-103","field":"executor","from":"","to":"human","actor":"unknown","source":"external","reason":"unknown"}

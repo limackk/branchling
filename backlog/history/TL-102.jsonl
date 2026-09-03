@@ -6,3 +6,4 @@
 {"id":"01M1F5BNKG07W3AWKV0SH9JFS0","ts":"2026-09-01T18:57:58.896Z","task":"TL-102","field":"blocks","from":["TL-1513"],"to":["TL-103"],"actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK5WSPJR3R615P1JKP3","ts":"2026-09-02T07:16:31.461Z","task":"TL-102","field":"title","from":"Demo pierwszego kontaktu — odmowa worktrail done w 60 sekund","to":"First-contact demo — worktrail done's refusal in 60 seconds","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK59QAHC7JGTJQEQC6C","ts":"2026-09-02T07:16:31.461Z","task":"TL-102","field":"epic","from":"Backlog — publikacja open source","to":"Backlog — open source publication","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1K9E9BWKVX6SC2G2B7K31XP","ts":"2026-09-03T09:26:16.700Z","task":"TL-102","field":"executor","from":"","to":"human","actor":"unknown","source":"external","reason":"unknown"}
