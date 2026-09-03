@@ -1,1 +1,4 @@
 {"id":"01M1KF5Q6DRXD5SF03N4XHY01N","ts":"2026-09-03T11:06:27.405Z","task":"TL-192","field":"__created__","from":"","to":"The run does not check that a task is still its own before parking it","actor":"agent:claude","source":"cli","reason":"unknown"}
+{"id":"01M1KFYQM0F0EKH5J7SRGKTJP5","ts":"2026-09-03T11:20:07.040Z","task":"TL-192","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown","session":"tree-3d81645067d3"}
+{"id":"01M1KFYQM05MDV2MCRD9TCFWY4","ts":"2026-09-03T11:20:07.040Z","task":"TL-192","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown","session":"tree-3d81645067d3"}
+{"id":"01M1KGG3YX6P1ASJZG1W3GCYNS","ts":"2026-09-03T11:29:36.733Z","task":"TL-192","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven","session":"tree-3d81645067d3"}

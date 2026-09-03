@@ -42,6 +42,11 @@
  * file is re-read at the write: a task that reached `archived_statuses` in the
  * meantime is reported as closed elsewhere and left exactly as it is.
  *
+ * NOR OVER A TASK SOMEBODY ELSE NOW HOLDS (TL-192). The same re-read answers a
+ * second question: `owner:`. A task taken over in another worktree, or handed to
+ * a person, is no longer this run's to park — it is reported as held elsewhere,
+ * counted apart from a task somebody closed, and left exactly as it is.
+ *
  * WHERE THE AGENT'S OUTPUT GOES. One log file per task, OUTSIDE the repository,
  * in the same state directory the locks live in (TL-87): it is session state,
  * not data that should travel with a branch, and twenty tasks' worth of agent
@@ -406,8 +411,9 @@ function parseJson(text) {
  * started (TL-184). Both write through the same door as `take`
  * (`setFrontmatterField` + `recordEdit`), never with a regex over the file.
  *
- * The archived-status guard below serves both equally: whichever status the run
- * arrived at, a task somebody finished in the meantime is not written over.
+ * The two guards below serve both acts equally: whichever status the run arrived
+ * at, a task somebody FINISHED in the meantime is not written over (TL-191), and
+ * neither is one somebody else now HOLDS (TL-192).
  */
 export function writeStatus(opts) {
   const { root, config, id, actor, reason, status } = opts;
@@ -432,6 +438,39 @@ export function writeStatus(opts) {
       reason: "closed-elsewhere",
       status: record.status,
       message: id + " reached `status: " + record.status + "` while this run was working on it",
+    };
+  }
+
+  // AND STILL OURS — the second question that same re-read answers (TL-192). The
+  // guard above defends a PROVEN fact; this one defends a CLAIM. `take` writes
+  // `owner:` at the claim and that line is the run's whole title to the task: a
+  // file that now names somebody else — a takeover in another worktree, the work
+  // handed to a person — or names nobody, is a file this run may not write a
+  // status into, least of all with a reason about ITS agents. Nothing proven is
+  // destroyed here and that is why it is a separate refusal, not a wider version
+  // of the one above: the reader of a report has to be able to tell "somebody
+  // finished it" from "somebody took it".
+  //
+  // THE TEST IS `owner:`, NOT THE STATUS THE RUN LEFT. The two were candidates
+  // for the same sentence and they answer different questions: an owner is what
+  // a claim IS, while a status is where the work stands. An agent that moves its
+  // own task between two open statuses has not given it up, and a status test
+  // would refuse to park exactly the task the run is still holding.
+  //
+  // A HANDOFF IS NOT AN EXCEPTION TO THIS RULE, it is its clearest case.
+  // `handoff` deliberately CLEARS `owner:` when it passes work to a role, so an
+  // agent that legitimately handed its task on leaves nobody holding it — and
+  // parking it afterwards would undo the very act the agent was asked to
+  // perform. Nobody is still not us.
+  const owner = String(record.owner || "").trim();
+  if (owner !== String(actor || "").trim()) {
+    return {
+      ok: false,
+      reason: "held-elsewhere",
+      status: record.status,
+      owner,
+      message: id + " is held by " + (owner || "nobody") + ", not by " + actor +
+        " — this run's claim on it is gone",
     };
   }
 
@@ -649,11 +688,14 @@ function renderReport(report, plan) {
   lines.push("  " + report.taken.length + " task(s) taken · " + tally.closed + " closed · " +
     tally.blocked + " blocked · " +
     (tally.closedElsewhere ? tally.closedElsewhere + " closed elsewhere · " : "") +
+    (tally.heldElsewhere ? tally.heldElsewhere + " held elsewhere · " : "") +
     Math.round(report.ms / 1000) + "s");
   lines.push("");
   for (const r of report.taken) {
     // `closed-elsewhere` reads as an ok: the task IS closed, and the run's only
-    // part in it was declining to write over that (TL-191).
+    // part in it was declining to write over that (TL-191). `held-elsewhere`
+    // does NOT (TL-192): nothing was proven, the task is still open, and the
+    // warning mark is what tells the eye those two are different endings.
     const mark = r.outcome === "closed" || r.outcome === "closed-elsewhere" ? MARK.ok
       : r.outcome === "agent-never-ran" ? MARK.err : MARK.warn;
     lines.push("  " + mark + " " + r.id + "  " + r.outcome + "  " + r.attempts +
@@ -888,7 +930,7 @@ export function run(argv) {
 
   const started = Date.now();
   const taken = [];
-  const tally = { closed: 0, blocked: 0, closedElsewhere: 0 };
+  const tally = { closed: 0, blocked: 0, closedElsewhere: 0, heldElsewhere: 0 };
   let stopped = "the queue is empty";
   // The one result that ends the run without being a fact about a task (TL-184).
   let neverStarted = null;
@@ -970,6 +1012,18 @@ export function run(argv) {
         // in prose that the refused write would have been in the tree.
         tally.closedElsewhere++;
         result.outcome = "closed-elsewhere";
+        result.status = blocked.status;
+        result.detail = blocked.message;
+      } else if (blocked.reason === "held-elsewhere") {
+        // A THIRD OUTCOME, and deliberately not the one above (TL-192). Both
+        // refusals leave the tree alone, and there the resemblance ends: one
+        // says the work is finished, this one says the work is still open and
+        // somebody else is doing it. A reader who cannot tell them apart cannot
+        // tell a run that finished its queue from one whose tasks were taken out
+        // from under it. The detail carries WHO holds it, because that is the
+        // reader's next question and the file will not be there to answer it.
+        tally.heldElsewhere++;
+        result.outcome = "held-elsewhere";
         result.status = blocked.status;
         result.detail = blocked.message;
       } else if (!blocked.ok) {

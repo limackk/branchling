@@ -16,6 +16,13 @@
  *
  * THE POSITIVE CONTROL is `writeStatus` on a task that is NOT archived, in the
  * same file: without it a guard that refused every write would pass here.
+ *
+ * AND THE SECOND REFUSAL AT THE SAME WRITE (TL-192). The re-read that answers
+ * "is this closed" also answers "is this still ours": a task whose `owner:` no
+ * longer names the run is not the run's to park either. It is a different
+ * refusal, not a wider one — nothing proven is destroyed, the work is simply
+ * somebody else's now — so the fixture below hands the task on and asserts that
+ * the report says HELD elsewhere rather than closed, and names who holds it.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -59,6 +66,13 @@ function fixture() {
   const env = { BACKLOG_STATE_DIR: join(dir, "state") };
   assert.equal(cli(["init", "--dir", backlog, "--no-example"], env).status, 0);
 
+  // The vocabulary this project uses for people (third law): `handoff` checks
+  // `--to-owner` against it, so a fixture that hands work to somebody has to say
+  // who that somebody is. Nothing in the code knows this value.
+  const cfg = join(backlog, "config.yaml");
+  writeFileSync(cfg, readFileSync(cfg, "utf8")
+    .replace(/^owners:.*$/m, "owners: [unassigned, user:someone]"), "utf8");
+
   const r = cli(["new", "--dir", backlog, "--title", "Task the agent closes itself", "--priority", "P1"], env);
   assert.equal(r.status, 0, r.stderr);
   const id = (r.stdout.match(/([A-Z]+-\d+)/) || [])[1];
@@ -77,6 +91,10 @@ function taskFile(backlog, id) {
 
 function statusOf(backlog, id) {
   return (readFileSync(taskFile(backlog, id), "utf8").match(/^status: ([a-z_]+)/m) || [])[1];
+}
+
+function ownerOf(backlog, id) {
+  return (readFileSync(taskFile(backlog, id), "utf8").match(/^owner: (.*)$/m) || [])[1];
 }
 
 function history(backlog, id) {
@@ -178,6 +196,9 @@ test("the guard reads `archived_statuses`, not the word `done`", () => {
   // that does NOT archive `done` must not be.
   const { dir, backlog, env, id } = fixture();
   try {
+    // Claimed first: this test is about WHICH statuses stop the write, so the
+    // task has to be one the run may write to at all (TL-192).
+    assert.equal(cli(["take", id, "--dir", backlog, "--actor", "agent:worker"], env).status, 0);
     const cfg = join(backlog, "config.yaml");
     writeFileSync(cfg, readFileSync(cfg, "utf8")
       .replace(/^statuses:.*$/m, "statuses: [pending, in_progress, blocked, done, cancelled, shipped]")
@@ -201,6 +222,117 @@ test("the guard reads `archived_statuses`, not the word `done`", () => {
     });
     assert.equal(written.ok, true, "the guard named `done` in the code instead of reading the vocabulary");
     assert.equal(statusOf(backlog, id), "blocked");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("a task handed on while the run worked is NOT parked by that run", () => {
+  const { dir, repo, backlog, env, id } = fixture();
+  try {
+    // The agent does the one thing this test is about: it hands the task to a
+    // person and leaves the contract unsatisfied. That is a LEGITIMATE act — the
+    // agent judged the work needs somebody — and it is exactly the case where
+    // the loop, one line later, would write `blocked` and a reason about its own
+    // agents over work that is now theirs.
+    const agent = agentScript(dir, "hander.sh", [
+      'id=$(grep -m1 "^id: " | sed "s/^id: //")',
+      process.execPath + " " + JSON.stringify(CLI) +
+        ' handoff "$id" --dir ' + JSON.stringify(backlog) +
+        ' --actor agent:worker --to-owner user:someone --reason "a person has to decide this one"',
+    ].join("\n"));
+
+    const r = cli(["run", "--dir", backlog, "--actor", "agent:worker", "--agent", agent,
+      "--max-attempts", "1", "--json"], env, { cwd: repo });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+
+    // THE TREE FIRST, as above: the claim the agent handed over is still theirs.
+    assert.equal(ownerOf(backlog, id), "user:someone",
+      "the run wrote over a task somebody else now holds");
+    assert.notEqual(statusOf(backlog, id), "blocked",
+      "the run parked a task it no longer held");
+
+    // Not "wrote and undid it": the write never happened. `handoff` is the only
+    // source entitled to have moved this task after the take.
+    const written = history(backlog, id).filter((e) => e.source === "run" && e.field === "status");
+    assert.equal(written.length, 0, "the run recorded a status change it must not have made");
+
+    const report = JSON.parse(r.stdout);
+    assert.equal(report.tally.blocked, 0, "the report called somebody else's task blocked");
+    assert.equal(report.tally.closedElsewhere, 0,
+      "the report says the task was finished, when it was only handed on");
+    assert.equal(report.tally.heldElsewhere, 1, "the report does not count the task as held elsewhere");
+    const row = report.tasks.find((t) => t.id === id);
+    assert.equal(row.outcome, "held-elsewhere");
+    assert.match(String(row.detail), /user:someone/, "the report does not say who holds it");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("the terminal report tells `held elsewhere` from `closed elsewhere`", () => {
+  const { dir, repo, backlog, env, id } = fixture();
+  try {
+    const agent = agentScript(dir, "hander.sh", [
+      'id=$(grep -m1 "^id: " | sed "s/^id: //")',
+      process.execPath + " " + JSON.stringify(CLI) +
+        ' handoff "$id" --dir ' + JSON.stringify(backlog) +
+        ' --actor agent:worker --to-owner user:someone --reason "a person has to decide this one"',
+    ].join("\n"));
+
+    const r = cli(["run", "--dir", backlog, "--actor", "agent:worker", "--agent", agent,
+      "--max-attempts", "1"], env, { cwd: repo });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /0 blocked/, "the terminal report counted a blocked task");
+    assert.match(r.stdout, /1 held elsewhere/, "the terminal report is silent about what happened");
+    assert.doesNotMatch(r.stdout, /closed elsewhere/,
+      "the terminal report calls a task that was handed on a task that was closed");
+    assert.match(r.stdout, new RegExp(id + "\\s+held-elsewhere"));
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("the owner guard: nobody holding it is not us either, and archived answers first", () => {
+  const { dir, backlog, env, id } = fixture();
+  try {
+    assert.equal(cli(["take", id, "--dir", backlog, "--actor", "agent:worker"], env).status, 0);
+    const config = loadConfig(backlog);
+    const file = taskFile(backlog, id);
+    const setOwner = (v) => writeFileSync(file, readFileSync(file, "utf8")
+      .replace(/^owner: .*$/m, "owner: " + v), "utf8");
+
+    // Somebody took it over: refused, and the refusal names them, because that
+    // is the reader's next question.
+    setOwner("user:someone");
+    const taken = writeStatus({
+      root: backlog, config, id, actor: "agent:worker", reason: "1 agent attempt", status: "blocked",
+    });
+    assert.equal(taken.ok, false);
+    assert.equal(taken.reason, "held-elsewhere");
+    assert.equal(taken.owner, "user:someone");
+    assert.equal(statusOf(backlog, id), "in_progress");
+
+    // A cleared owner — what `handoff --to-role` leaves behind — is refused by
+    // the same line. Nobody is not us.
+    setOwner('""');
+    const nobody = writeStatus({
+      root: backlog, config, id, actor: "agent:worker", reason: "1 agent attempt", status: "blocked",
+    });
+    assert.equal(nobody.ok, false);
+    assert.equal(nobody.reason, "held-elsewhere");
+    assert.equal(nobody.owner, "");
+
+    // ORDER MATTERS. A task that was taken over AND closed is reported as
+    // closed: "somebody finished it" is the stronger fact of the two, and the
+    // one whose outcome reads as an ok.
+    setOwner("user:someone");
+    writeFileSync(file, readFileSync(file, "utf8").replace(/^status: .*$/m, "status: done"), "utf8");
+    const closed = writeStatus({
+      root: backlog, config, id, actor: "agent:worker", reason: "1 agent attempt", status: "blocked",
+    });
+    assert.equal(closed.ok, false);
+    assert.equal(closed.reason, "closed-elsewhere");
   } finally {
     cleanup(dir);
   }
