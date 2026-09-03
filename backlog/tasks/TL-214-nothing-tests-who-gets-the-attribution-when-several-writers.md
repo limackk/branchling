@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1
-status: pending  # pending | in_progress | blocked | done | cancelled
-owner: ""
+status: in_progress  # pending | in_progress | blocked | done | cancelled
+owner: agent:dev
 role: dev  # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1d
@@ -113,6 +113,58 @@ trusted to fail for the reason it claims.
 
 ## Decisions
 
-Nothing decided. Note the ordering above is deliberate: the test comes before
-the fix because the failure did not reproduce by hand, and a mechanism chosen
-against a defect nobody can trigger is a guess.
+The ordering above was deliberate and it held: the test came first, and it was
+red for the reason it names. Six writers, six tasks, six writes each, and every
+one of the six chains was wrong — three of them missing a change outright:
+
+    TASK-1.estimate by agent:w0
+      written:  ["1h","2h","1h","3h","1h","4h"]
+      recorded: ["1h","3h","1h","4h"]
+    TASK-3.owner by agent:w2
+      written:  ["local:one","local:two","local:one","local:three","local:one","local:four"]
+      recorded: ["local:one","local:two","local:three","local:four"]
+
+Note what the `from` fields said: `{"from":"2h","to":"1h"}` twice in a row, a
+transition out of a value the field no longer held, in an append-only log.
+
+**The mechanism: mutual exclusion around the read-modify-write, on the model of
+`lock.mjs` (candidate 1).** `withMutex()` is new in `scripts/lock.mjs` and
+reuses `createExclusively()` — the same reasoning about `link()` versus
+`open(wx)` applies unchanged, because the failure mode is the same one. It
+wraps `reconcile()` whole and the append-plus-save half of `recordEdit()` in
+`scripts/history.mjs`.
+
+**Keyed by the backlog directory, not by the repository.** `lockScope()` keys a
+task reservation by `--git-common-dir`, because the same task must not go out
+twice across worktrees. The snapshot is the opposite case: every worktree has
+its own, so keying by the repository would make writers in unrelated trees wait
+for one another while both were right.
+
+**Waiting runs out, and running out is loud.** Ten seconds, after which the
+command fails with `EBUSY` and writes nothing. Proceeding unlocked was rejected
+outright: the change stays in the file, so a later reconcile still finds and
+records it, whereas an unlocked write is the one outcome Step 4 forbids — the
+snapshot advanced past a change no entry describes. A holder whose record is
+more than thirty seconds old is taken over; the section is a read-modify-write
+of one file, so anything on that scale is a process that died inside it.
+
+**Rejected — a writer claiming its own diff before any timer sees it
+(candidate 2).** It is aimed at the server, and the server is not the writer
+that loses a change: the test file's own preamble records that adding the
+reconciler as a fourth child made the failure LESS frequent, because it
+re-reads the whole tree and repairs what the writers corrupt. What the timer
+produces is a wrong author on a change that is present, which TL-130 already
+decided about.
+
+**Rejected — a snapshot per writer (candidate 3).** The snapshot is the
+reference point the NEXT diff is taken against, whoever takes it. Per writer,
+each one sees only its own history, so a change made by another writer through
+another route is a difference to this writer's snapshot and gets recorded a
+second time under the wrong name. That is TL-130's defect manufactured on
+purpose.
+
+**Deliberately not done.** `migrate-prefix` and `renumber` also load, change
+and save the snapshot and are still outside the section — filed as TL-228,
+because this test does not exercise them and a fix without a proof is a guess.
+`branchling serve`'s timer is unchanged; the mutex now serialises it against
+the writers, but who it signs a change as is TL-130's question, not this one.

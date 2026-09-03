@@ -270,3 +270,105 @@ export function listLocks(root, opts = {}) {
     .map((f) => readLock(dir, f.slice(0, -".lock".length)))
     .filter(Boolean);
 }
+
+// ──────────────────────────────────────────────────────────────────────────
+// Mutual exclusion around a read-modify-write (TL-214)
+// ──────────────────────────────────────────────────────────────────────────
+//
+// WHY THIS LIVES BESIDE THE TASK LOCK AND NOT IN THE MODULE THAT NEEDS IT. It
+// is the same problem with the same answer — on one machine the filesystem is
+// the single writer, and `createExclusively` above is already the primitive
+// that settles who won. What differs is the scale: a task lock is held for a
+// whole session and names a task, this one is held for the milliseconds of a
+// file's read-modify-write and names the file.
+//
+// WHAT IT IS FOR. `history/.snapshot.json` is ONE file per backlog that every
+// writing route loads, mutates and writes back. Two writers that overlap both
+// compute their new snapshot from the same starting point, and whichever
+// renames last erases the other's advance — after which the log describes
+// transitions nobody made, or misses a change altogether. Measured on
+// 2026-09-03 and reproduced by `scripts/tests/concurrent-attribution.test.mjs`.
+
+/** After this, a mutex file describes a process that died inside the section
+ *  rather than one still working in it. The section is a read-modify-write of
+ *  one file; anything on this scale is a corpse. */
+export const MUTEX_STALE_MS = 30_000;
+
+/** How long a writer waits for its turn before giving up. Giving up is LOUD:
+ *  the change stays in the file, so the next reconcile still sees it and
+ *  records it, whereas proceeding unlocked is the one outcome that loses it. */
+export const MUTEX_WAIT_MS = 10_000;
+
+/** Sections this process is already inside. Reconcile and `recordEdit` are both
+ *  synchronous, so nothing interleaves within one process — but a caller that
+ *  nests them would otherwise wait for a lock it holds itself. */
+const INSIDE = new Set();
+
+/** Block without a timer: the callers are synchronous top to bottom, and an
+ *  `await` in the middle of a critical section would be a different design. */
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+function readRecord(path) {
+  try {
+    const rec = JSON.parse(readFileSync(path, "utf8"));
+    return rec && typeof rec === "object" ? rec : null;
+  } catch {
+    // Unreadable names no holder, exactly as in `readLock`: respecting a byte
+    // nobody can read would block every writer for as long as it sits there.
+    return null;
+  }
+}
+
+/**
+ * Run `fn` with no other process on this machine inside the section `name`.
+ *
+ * @param {string} name  identifies the RESOURCE, not the caller — every writer
+ *        of one file has to compute the same string for any of this to hold.
+ * @param {Function} fn
+ * @param {{env?: object, waitMs?: number, staleMs?: number, now?: () => number}} opts
+ * @returns whatever `fn` returns
+ * @throws {Error} with `code: "EBUSY"` when the wait ran out
+ */
+export function withMutex(name, fn, opts = {}) {
+  if (INSIDE.has(name)) return fn();
+  const now = opts.now || Date.now;
+  const waitMs = opts.waitMs === undefined ? MUTEX_WAIT_MS : opts.waitMs;
+  const staleMs = opts.staleMs === undefined ? MUTEX_STALE_MS : opts.staleMs;
+  const dir = join(stateRoot(opts.env), "mutex");
+  mkdirSync(dir, { recursive: true });
+  const path = join(dir, createHash("sha256").update(name).digest("hex").slice(0, 16) + ".mutex");
+  const record = { section: name, pid: process.pid, host: hostname(), ts: new Date(now()).toISOString() };
+
+  const deadline = now() + Math.max(0, waitMs);
+  for (;;) {
+    if (createExclusively(path, JSON.stringify(record) + "\n")) break;
+    const holder = readRecord(path);
+    const heldSince = holder ? Date.parse(holder.ts || "") : NaN;
+    if (!Number.isFinite(heldSince) || now() - heldSince > staleMs) {
+      // Whoever loses this removal finds the winner's fresh record on the next
+      // pass and waits for it, the same way `acquireLock` settles a stale lock.
+      try { unlinkSync(path); } catch (e) { if (e.code !== "ENOENT") throw e; }
+      continue;
+    }
+    if (now() >= deadline) {
+      const e = new Error("another process is still writing " + name + " (holder: pid " +
+        (holder && holder.pid) + " on " + (holder && holder.host) + ", since " + (holder && holder.ts) +
+        "). Nothing was written; run the command again.");
+      e.code = "EBUSY";
+      throw e;
+    }
+    // Jittered, so that N writers released together do not collide again as a
+    // block on the next attempt.
+    sleepSync(5 + Math.floor(Math.random() * 10));
+  }
+
+  INSIDE.add(name);
+  try {
+    return fn();
+  } finally {
+    INSIDE.delete(name);
+    try { unlinkSync(path); } catch { /* stolen as stale, or already gone */ }
+  }
+}

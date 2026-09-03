@@ -29,10 +29,11 @@
  */
 
 import { randomBytes } from "node:crypto";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 
 import { sessionId } from "./focus.mjs";
+import { withMutex } from "./lock.mjs";
 import { ACTOR_UNKNOWN, FIELD_ATTRIBUTED, FIELD_COMMENT, FIELD_CREATED, FIELD_DECISION, FIELD_DELETED, REASON_UNKNOWN, TRACKED_FIELDS, diffMeta, extractMeta, formatValue, hasStatedReason, normalizeActor as normalizeActorFn, normalizeReason, splitFrontmatter } from "./task-fields.mjs";
 import { ANY_HISTORY_FILE, ANY_TASK_FILE, ANY_TASK_FILE_ID, ANY_TASK_ID, taskIdPatterns } from "./task-id.mjs";
 
@@ -313,6 +314,28 @@ export function lastChangeByField(entries) {
 // ──────────────────────────────────────────────────────────────────────────
 // Snapshot
 // ──────────────────────────────────────────────────────────────────────────
+
+/**
+ * The name of the section every writer of THIS backlog's reference point has to
+ * agree on (TL-214).
+ *
+ * KEYED BY THE BACKLOG, NOT BY THE REPOSITORY. `lockScope` keys a task
+ * reservation by `--git-common-dir`, because the same task must not be handed
+ * out twice across worktrees. The snapshot is the opposite case: every worktree
+ * has its OWN `history/.snapshot.json`, so keying by the repository would make
+ * writers in unrelated trees wait for each other while still being right.
+ * `realpath` is what makes two spellings of one directory the same section.
+ */
+function snapshotSection(backlogDir) {
+  let path = resolve(backlogDir);
+  try {
+    path = realpathSync(path);
+  } catch {
+    // Not yet on disk (a first `init`): the resolved path is still a usable
+    // name, it just cannot be canonicalised.
+  }
+  return "snapshot:" + path;
+}
 
 export function snapshotPath(backlogDir) {
   return join(historyDir(backlogDir), SNAPSHOT_FILE);
@@ -639,11 +662,19 @@ export function recordEdit(backlogDir, opts) {
   // together. Copying it onto every entry of the act is what makes the answer
   // survive reading any one of them alone.
   const entries = changes.map((c) => entry(taskId, c.field, c.from, c.to, actor, source, ts, reason, session, role));
-  appendEntries(backlogDir, taskId, entries);
-  const snap = loadSnapshot(backlogDir) || { version: 1, tasks: {} };
-  snap.tasks[taskId] = pickTracked(after);
-  saveSnapshot(backlogDir, snap);
-  return entries;
+  // The snapshot is one file for the whole backlog and this is a
+  // read-modify-write of it (TL-214): without exclusion a writer that overlaps
+  // with another saves a snapshot computed before the other's advance and
+  // erases it, and the erased reference point is what the NEXT diff is taken
+  // against. The entries are appended inside the section too, so that a reader
+  // never sees a snapshot that has moved past entries nobody has written yet.
+  return withMutex(snapshotSection(backlogDir), () => {
+    appendEntries(backlogDir, taskId, entries);
+    const snap = loadSnapshot(backlogDir) || { version: 1, tasks: {} };
+    snap.tasks[taskId] = pickTracked(after);
+    saveSnapshot(backlogDir, snap);
+    return entries;
+  });
 }
 
 /**
@@ -671,6 +702,16 @@ export function recordEdit(backlogDir, opts) {
  *          alone, for fields the log has never mentioned and cannot vouch for.
  */
 export function reconcile(backlogDir, opts = {}) {
+  // WHY THE WHOLE FUNCTION AND NOT JUST THE SAVE (TL-214). What has to be
+  // indivisible is load → diff → append → save: a snapshot read before another
+  // writer's advance produces a diff against a reference point that no longer
+  // exists, and saving it back erases that writer's advance whether or not the
+  // save itself is atomic. `dryRun` is inside as well — a diagnosis taken
+  // while somebody is halfway through writing describes a tree that never was.
+  return withMutex(snapshotSection(backlogDir), () => reconcileLocked(backlogDir, opts));
+}
+
+function reconcileLocked(backlogDir, opts) {
   const tasksDir = join(backlogDir, "tasks");
   const ts = opts.ts || new Date().toISOString();
   const actor = opts.actor;
