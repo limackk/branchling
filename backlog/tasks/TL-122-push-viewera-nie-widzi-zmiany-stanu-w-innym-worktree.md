@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Backlog viewer"
 priority: P3
-status: pending
-owner: ""
+status: in_progress
+owner: agent:dev
 executor: ""
 role: dev
 estimate: 2h

@@ -231,6 +231,17 @@ export const DEFAULTS = Object.freeze({
   // listing. A branch CHECKED OUT in a worktree is always read whatever its age:
   // somebody is standing in it.
   active_branch_days: 30,
+  // How often the viewer's server REPEATS that scan, in seconds (TL-122), so a
+  // task taken in another worktree reaches an open page without a reload. The
+  // scan shells out to git, so how much a fresh badge is worth is the project's
+  // decision and not a literal in the server.
+  //
+  // ON by default for the same reason `cross_branch_state` is: a push that has
+  // to be switched on leaves every page stale until somebody reads the
+  // documentation — and a stale page that still pushes on LOCAL edits looks
+  // exactly like a live one. `cross_branch_state: false` switches this off with
+  // it: there is no scan left to repeat.
+  cross_branch_poll_seconds: 3,
 });
 
 /** The word the DEFAULT vocabulary uses for work in progress. Not a fact about
@@ -251,6 +262,7 @@ const LIST_KEYS = new Set([
 const MAP_KEYS = new Set(["epic_aliases", "status_colors", "priority_colors", "label_colors", "model_pricing"]);
 const NUMBER_KEYS = new Set([
   "title_max_length", "lock_ttl_minutes", "active_branch_days", "abandoned_after_days",
+  "cross_branch_poll_seconds",
   "idle_gap_minutes", "heartbeat_throttle_seconds", "min_report_n", "activity_retention_days",
   "audit_stale_days", "docs_drift_task_threshold", "docs_drift_min_signals",
 ]);
@@ -662,6 +674,7 @@ export function loadConfig(root, opts = {}) {
     lockTtlMinutes: values.lock_ttl_minutes,
     abandonedAfterDays: values.abandoned_after_days,
     crossBranchState: values.cross_branch_state,
+    crossBranchPollSeconds: values.cross_branch_poll_seconds,
     activeBranchDays: values.active_branch_days,
     dashboard: {
       openStatuses: values.dashboard_open_statuses,
