@@ -168,6 +168,11 @@ export const KINDS = {
     // to draw from, and it cannot parse a sentence to do it.
     passedOver: [], considered: null, searchedStatuses: [], skippedBlocked: null,
     skippedElsewhere: [], skippedExecutor: [], skippedHandedBack: [], scan: null,
+    // Open work an unattended run may not be handed for its SIZE (TL-211).
+    // Declared for the kind, so it is present and empty when the project
+    // stated no threshold: a consumer must not have to tell "no value" from
+    // "a version that did not know the key".
+    skippedSize: [],
     // `--plan` only (TL-183): which wave was followed, and how many open tasks
     // were left alone because the plan does not schedule them. `null` when the
     // flag was not given — a wave number of 0 would say a plan was consulted.

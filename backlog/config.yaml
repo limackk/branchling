@@ -76,6 +76,17 @@ labels_closed: false
 owners: [unassigned]
 estimates: [30m, 2h, 1d, 1w]
 
+# The largest estimate `next` and `run` may hand to an unattended session
+# (TL-211). Above means LATER IN `estimates`, so this gates `1w` and nothing
+# else. `take <ID>` is unaffected: naming a task is the deliberate decision the
+# threshold asks for.
+#
+# `1d` because both tasks that provoked the key are `1w`: TL-137 was handed back
+# twice by the same run, and TL-149 states in its own text that it needs a
+# session of its own. An estimate this list has not got — `4h`, `3h` — has no
+# position in the order and is never gated.
+max_unattended_estimate: 1d
+
 # History actors — the namespace is mandatory:
 #   local:<nick>  declared locally, unverified
 #   agent:<name>  an automated write (a hook, CI)

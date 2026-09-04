@@ -154,6 +154,11 @@ export function parseTaskRecord(raw, file) {
     // has to tell a claim that is being worked from one nobody came back to
     // (TL-104) — and because it is the only evidence of that in the tree.
     updated: str(meta.updated),
+    // How big the task is, in a word from the project's `estimates` vocabulary
+    // (TL-211). Read here because the dispatcher compares it against the
+    // threshold an unattended run may be handed, and a second parse of the same
+    // file would be a second answer to "what does this task say".
+    estimate: str(meta.estimate),
     // What a task says has to be read before it is started. Read here because
     // `docs-drift` asks the inverse question — which tasks name THIS document
     // (TL-100) — and that answer has to come from the same parse as every other

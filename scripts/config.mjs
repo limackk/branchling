@@ -68,6 +68,17 @@ export const DEFAULTS = Object.freeze({
   label_axis_env: [],         // the "Environment" axis; empty removes the facet
   owners: ["unassigned"],
   estimates: ["30m", "2h", "1d", "1w"],
+  // The LARGEST estimate an unattended run may be handed (TL-211). Empty — the
+  // default — means no gate at all: a project that has not stated a threshold
+  // keeps the behaviour it had before this key existed.
+  //
+  // A VALUE FROM `estimates` AND NOTHING ELSE, because "above the threshold"
+  // means LATER IN THAT LIST. The comparison reads the order of a vocabulary
+  // this project wrote; it parses no durations, so a backlog measuring work in
+  // `small`/`large` is gated exactly as well as one measuring it in `1d`/`1w`.
+  // A word outside the list is refused where it is read, rather than silently
+  // gate nothing.
+  max_unattended_estimate: "",
   actors: ["unknown"],   // namespaces: local: / agent: / user: (BL-1404)
   title_max_length: 60,
   epic_aliases: {},
@@ -649,6 +660,9 @@ export function loadConfig(root, opts = {}) {
     labelAxes: { timing: values.label_axis_timing, env: values.label_axis_env },
     owners: values.owners,
     estimates: values.estimates,
+    // Empty reaches the code as `null`, so the one test the dispatcher makes is
+    // "did this project state a threshold" and not "is this string non-empty".
+    maxUnattendedEstimate: values.max_unattended_estimate || null,
     actors: values.actors,
     titleMaxLength: values.title_max_length,
     epicAliases: values.epic_aliases,
