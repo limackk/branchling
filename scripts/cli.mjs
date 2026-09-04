@@ -44,7 +44,7 @@ import { FIELD_SHAPES } from "./task-fields.mjs";
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 const CHECK_USAGE = [
-  `${N} check [--dir <path>] [--id-collisions] [--boards] [--refs] [--criteria] [--reasons] [--log-status] [--vocabulary] [--plan] [--language] [--product-name] [--proofs] [--since <sha>] [task-file.md …]`,
+  `${N} check [--dir <path>] [--id-collisions] [--boards] [--refs] [--criteria] [--reasons] [--log-status] [--task-state] [--vocabulary] [--plan] [--language] [--product-name] [--proofs] [--since <sha>] [task-file.md …]`,
   "",
   "  no selector          every guard; exit code = the WORST of them",
   "  --json               the whole run as one document: which guards ran, which failed,",
@@ -65,6 +65,14 @@ const CHECK_USAGE = [
   "                       sees a task with no history. A backlog nobody has committed",
   "                       yet passes, and outside git the command says so rather than",
   "                       printing a tick it did not earn",
+  "  --task-state         only whether a task's `status:` and `owner:` on disk still agree",
+  "                       with the same file at HEAD. It REPORTS and never fails: an",
+  "                       uncommitted state change is the normal condition of a session",
+  "                       still working, and `take` writes one at the start. It matters when",
+  "                       the CODE was committed and the closing was not — `next` reads the",
+  "                       task file, so the next tree to look sees the task as it was before",
+  "                       the work. A file git has never seen, and a backlog outside git,",
+  "                       report nothing: an absence of a commit is not a disagreement",
   "  --docs               only whether a markdown link or a `related_docs` entry leads",
   "                       to a file that exists. Judges the REPOSITORY holding the backlog",
   "                       — top-level *.md, docs/ and the task files — because that is the",
@@ -1621,7 +1629,7 @@ function captureScript(script, args) {
  * evidential force. The dispatcher supplies the mode so that nobody has to
  * remember it.
  */
-const CHECK_FLAGS = ["--dir", "--json", "--id-collisions", "--boards", "--refs", "--criteria", "--reasons", "--log-status", "--history", "--docs", "--vocabulary", "--plan", "--language", "--product-name", "--foreign-context", "--proofs", "--since"];
+const CHECK_FLAGS = ["--dir", "--json", "--id-collisions", "--boards", "--refs", "--criteria", "--reasons", "--log-status", "--history", "--task-state", "--docs", "--vocabulary", "--plan", "--language", "--product-name", "--foreign-context", "--proofs", "--since"];
 
 /** PURE — resolves `check`'s arguments. Throws on a usage error. */
 export function parseCheckArgs(args) {
@@ -1633,6 +1641,7 @@ export function parseCheckArgs(args) {
   let wantReasons = false;
   let wantLogStatus = false;
   let wantHistory = false;
+  let wantTaskState = false;
   let wantDocs = false;
   let wantVocabulary = false;
   let wantPlan = false;
@@ -1659,6 +1668,7 @@ export function parseCheckArgs(args) {
     if (a === "--reasons") { wantReasons = true; continue; }
     if (a === "--log-status") { wantLogStatus = true; continue; }
     if (a === "--history") { wantHistory = true; continue; }
+    if (a === "--task-state") { wantTaskState = true; continue; }
     if (a === "--docs") { wantDocs = true; continue; }
     if (a === "--vocabulary") { wantVocabulary = true; continue; }
     if (a === "--plan") { wantPlan = true; continue; }
@@ -1693,10 +1703,10 @@ export function parseCheckArgs(args) {
   // (BL-1451): a dangling reference passed `check`, because `check` checked only
   // what somebody had once written into it.
   if (!wantIds && !wantBoards && !wantRefs && !wantCriteria && !wantReasons && !wantLogStatus &&
-      !wantHistory && !wantDocs && !wantVocabulary && !wantPlan && !wantLanguage && !wantProductName &&
-      !wantForeignContext && !wantProofs) {
+      !wantHistory && !wantTaskState && !wantDocs && !wantVocabulary && !wantPlan && !wantLanguage &&
+      !wantProductName && !wantForeignContext && !wantProofs) {
     wantIds = true; wantBoards = true; wantRefs = true; wantCriteria = true; wantReasons = true;
-    wantLogStatus = true; wantHistory = true; wantDocs = true;
+    wantLogStatus = true; wantHistory = true; wantTaskState = true; wantDocs = true;
     wantVocabulary = true; wantPlan = true; wantLanguage = true; wantProductName = true;
     wantForeignContext = true;
   }
@@ -1712,7 +1722,7 @@ export function parseCheckArgs(args) {
         "It narrows which proven closings are re-run; on its own there is nothing for it to narrow."
     );
   }
-  return { dir, json, wantIds, wantBoards, wantRefs, wantCriteria, wantReasons, wantLogStatus, wantHistory, wantDocs, wantVocabulary, wantPlan, wantLanguage, wantProductName, wantForeignContext, wantProofs, since, files };
+  return { dir, json, wantIds, wantBoards, wantRefs, wantCriteria, wantReasons, wantLogStatus, wantHistory, wantTaskState, wantDocs, wantVocabulary, wantPlan, wantLanguage, wantProductName, wantForeignContext, wantProofs, since, files };
 }
 
 /**
@@ -1756,6 +1766,12 @@ export const CHECK_GUARDS = [
   // directory — it asks git — which is why it says so when there is no git.
   { key: "history", want: "wantHistory", name: "history", script: "check-backlog-history-tracked.mjs",
     args: (root) => ["--dir", root] },
+  // The second guard that asks git, and the only one that REPORTS rather than
+  // failing (TL-230): a task file whose state has not been committed yet is the
+  // normal condition of a session still working, so a red exit here would be
+  // red in every tree that is mid-task.
+  { key: "task-state", want: "wantTaskState", name: "task-state",
+    script: "check-backlog-task-state-committed.mjs", args: (root) => ["--dir", root] },
   // Judges the REPOSITORY holding the backlog, not this installation: a
   // `related_docs` entry resolves against the consumer's tree.
   { key: "docs", want: "wantDocs", name: "docs", script: "check-docs-links.mjs",

@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:dev
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-03
-updated: 2026-09-03
+updated: 2026-09-04
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
@@ -97,11 +97,11 @@ session mid-task.
 Each one names the `verification:` entry that PROVES it, and the tool ticks it
 after a green run — a checkbox you tick by hand is a claim, not evidence.
 
-- [ ] `check` names a task whose `status:` on disk differs from its `status:` at
+- [x] `check` names a task whose `status:` on disk differs from its `status:` at
       `HEAD`, and exits 0 while doing so. [proof: the-divergence-is-named]
-- [ ] A task file that git has never seen, and a backlog outside a git
+- [x] A task file that git has never seen, and a backlog outside a git
       repository, produce no report — the absence of a commit is not a
       divergence. [proof: the-divergence-is-named]
-- [ ] The test fails against the current code, established before the fix.
+- [x] The test fails against the current code, established before the fix.
       [proof: the-divergence-is-named]
-- [ ] Nothing else in the suite changed. [proof: suite-green]
+- [x] Nothing else in the suite changed. [proof: suite-green]
