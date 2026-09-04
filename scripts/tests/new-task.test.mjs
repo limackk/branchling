@@ -383,3 +383,122 @@ test("new: the creation is recorded in the history, under the actor that created
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// ── a value that begins with a dash, after `--` (TL-58) ───────────────────
+
+/** The task file `new` has just added to a fixture, whichever number it took. */
+function taskAdded(dir, before) {
+  const added = tasksIn(dir).filter((f) => before.indexOf(f) < 0);
+  assert.equal(added.length, 1, "expected exactly one new task file, got: " + added.join(", "));
+  return readFileSync(join(dir, "tasks", added[0]), "utf8");
+}
+
+test("new: after `--` a value beginning with a dash is a title, not a flag", () => {
+  // MEASURED ON 2026-09-04, before a line of the parser changed:
+  //   $ branchling new --title -- "--json on reading commands"
+  //   branchling new: --title requires a value
+  // `parseArgs()` refuses any value whose first character is a dash, so a task
+  // ABOUT a flag cannot be written by the tool that tracks the flag.
+  const dir = freshBacklog();
+  try {
+    // THE POSITIVE CONTROL, and it runs BEFORE the thesis. Every assertion below
+    // reads "a task with this title exists". In a fixture where `new` writes
+    // nothing at all — a template that drifted, a `--dir` resolved elsewhere —
+    // those assertions fail for a reason that has nothing to do with a dash.
+    assert.equal(run(["new", "--dir", dir, "--title", "An ordinary title"]).status, 0);
+    assert.equal(tasksIn(dir).length, 1,
+      "`new` creates nothing in this fixture — the measurement is broken, not the parser");
+    const before = tasksIn(dir);
+
+    const title = "--json on reading commands";
+    const r = run(["new", "--dir", dir, "--title", "--", title]);
+    assert.equal(r.status, 0, "a title after the separator was refused: " + r.stderr);
+
+    // The title as it was TYPED, not a version the parser found easier to store:
+    // a leading dash is also the YAML character that would make an unquoted
+    // scalar something other than a string.
+    assert.match(taskAdded(dir, before), /^title: "--json on reading commands"$/m);
+
+    // And the rest of the tool accepts the file — the assertion that a written
+    // byte sequence is a TASK. A title only the writer can read is not a fix.
+    assert.equal(run(["check", "--dir", dir]).status, 0, "the created task does not pass the guards");
+    const q = run(["query", "--dir", dir, "--json"]);
+    assert.equal(q.status, 0, q.stderr);
+    const titles = JSON.parse(q.stdout).tasks.map((t) => t.title);
+    assert.ok(titles.indexOf(title) >= 0,
+      "a reading command does not give the title back: " + JSON.stringify(titles));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("new: after `--` even a KNOWN flag is the value, and sets no field", () => {
+  // The half that makes the separator worth having. Allowing a leading dash
+  // would be enough for the title above; the convention a user already knows
+  // from `git` and `rm` says something stronger — after `--` NOTHING is read as
+  // a flag. A parser that only made room for a leading dash would still write a
+  // task whose title is "--priority" AND set the priority from the next word.
+  const dir = freshBacklog();
+  try {
+    // The default is read from the fixture's own template, not retyped here: it
+    // is this project's data, and the assertion is "untouched", not "P1".
+    const untouched = readFileSync(join(dir, "_template.md"), "utf8").match(/^priority: (.+)$/m)[1];
+
+    const before = tasksIn(dir);
+    const r = run(["new", "--dir", dir, "--title", "--", "--priority"]);
+    assert.equal(r.status, 0, "a title that is itself a flag name was refused: " + r.stderr);
+
+    const text = taskAdded(dir, before);
+    assert.match(text, /^title: "--priority"$/m);
+    assert.match(text, new RegExp("^priority: " + untouched + "$", "m"),
+      "the word after the separator was consumed as a flag as well as a value");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("new: WITHOUT the separator `--title --board main` still fails", () => {
+  // The protection TL-58 must not remove. This case is green today and has to
+  // stay green: without a separator a flag name where a value belongs is
+  // overwhelmingly a mistake, and a task titled "--board" is the silent no-op
+  // that heuristic was written against.
+  const dir = freshBacklog();
+  try {
+    const r = run(["new", "--dir", dir, "--title", "--board", "main"]);
+    assert.equal(r.status, 2, "the un-separated form was accepted");
+    assert.match(r.stdout + r.stderr, /--title/);
+    assert.equal(tasksIn(dir).length, 0, "a task was written despite the refusal");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("new: `--title --` with nothing after the separator fails", () => {
+  // The separator is not itself a value. Nothing follows it, so the flag has no
+  // value — and the empty title is what `new` refuses in the first place.
+  const dir = freshBacklog();
+  try {
+    const r = run(["new", "--dir", dir, "--title", "--"]);
+    assert.equal(r.status, 2, "`--` was stored as the title");
+    assert.equal(tasksIn(dir).length, 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("new: after the separator's value, a further argument is still refused", () => {
+  // The separator stops FLAG reading; it does not turn `new` into a command
+  // that takes positional arguments. `--board main` here asked for a board and
+  // will not get one, so it has to fail rather than be dropped on the floor —
+  // an argument accepted and ignored is the silent no-op this tool refuses to
+  // be, and the user would find out at the next `query --board`.
+  const dir = freshBacklog();
+  try {
+    const r = run(["new", "--dir", dir, "--title", "--", "--priority", "--board", "main"]);
+    assert.equal(r.status, 2, "arguments after the value were swallowed in silence");
+    assert.match(r.stdout + r.stderr, /--board/, "the message does not name the argument that was refused");
+    assert.equal(tasksIn(dir).length, 0, "a task was written despite the refusal");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
