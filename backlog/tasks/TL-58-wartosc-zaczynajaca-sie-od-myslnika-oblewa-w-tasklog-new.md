@@ -7,11 +7,12 @@ board: main
 epic: "CLI surface"
 priority: P3
 status: pending
-owner: unassigned
+owner: ""
+role: spec
 estimate: 2h
 confidence: high
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-04
 blocked_by: []
 blocks: []
 related_docs:

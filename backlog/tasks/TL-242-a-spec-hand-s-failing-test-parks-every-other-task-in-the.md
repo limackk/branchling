@@ -97,5 +97,11 @@ neighbour until the second stage lands.
 
 ## Decisions
 
-**Not "run spec and dev per task, alternating".** That is the same collision one
-task at a time; it only shrinks the window, and it doubles the number of runs.
+**"Run spec and dev per task, alternating" was dismissed here too quickly.**
+This task first said it "only shrinks the window". Measured afterwards, it
+closes it: at the moment a dev hand's `done` runs, the only red test in the tree
+is the one that hand has just satisfied, because no other task's spec stage has
+started. It is not a fix — it is a way of working around the defect, it doubles
+the number of runs, and it is what wave 8 was driven with. The fix below still
+needs doing, because the workaround depends on whoever launches the run
+remembering it.
