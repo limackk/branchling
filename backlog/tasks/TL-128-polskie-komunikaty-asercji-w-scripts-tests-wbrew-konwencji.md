@@ -6,7 +6,7 @@ labels: []
 board: main
 epic: "worktrail — the tool"
 priority: P3
-status: in_progress
+status: done
 owner: agent:docs
 role: docs
 estimate: 30m
@@ -83,14 +83,14 @@ that is TL-229, which has to widen a detector rather than delete a word.
 
 ## Acceptance criteria
 
-- [ ] `scripts/tests/` has no Polish in an assertion message or a test
+- [x] `scripts/tests/` has no Polish in an assertion message or a test
       description. [proof: language-green]
-- [ ] The words the translation retires are gone from
+- [x] The words the translation retires are gone from
       `scripts/language-dictionary.txt`, so the guard would fail if one came
       back. [proof: language-green]
-- [ ] Every remaining Polish line is test data and carries a comment saying
+- [x] Every remaining Polish line is test data and carries a comment saying
       so. [proof: language-green]
-- [ ] The suite stays green — the messages changed, not what they assert.
+- [x] The suite stays green — the messages changed, not what they assert.
       [proof: suite-green]
 
 ## Decisions
