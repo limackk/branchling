@@ -81,6 +81,7 @@ import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { repoRootFor } from "./done-task.mjs";
 import { readHistory, recordEdit } from "./history.mjs";
+import { userConfigPath } from "./home.mjs";
 import { lockScope, releaseLock, stateRoot } from "./lock.mjs";
 import { callerSpecies, queueStatuses, selectCandidates, servesExecutor } from "./next-task.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
@@ -489,6 +490,28 @@ export function stuckStatus(config, requested) {
       "It has to be one that is neither archived nor handed out by `next`.",
       "Declare it in `reason_required_statuses` in config.yaml, or name one with `--stuck-status`.",
     ] };
+}
+
+/**
+ * The paths this run depends on that are NOT in the worktree it was given
+ * (TL-202).
+ *
+ * Both are legitimate and the tool cannot work without them — the state
+ * directory holds the locks, the activity log and this run's agent logs, and
+ * the user configuration holds the layer that is about the person rather than
+ * the project. What makes them worth naming in a report is the asymmetry: a
+ * write inside the tree travels with a branch and arrives at the other trees
+ * when somebody merges, while a change to either of these is instant for every
+ * tree on this machine. On 2026-09-03 that difference cost an operator a run:
+ * their tree began failing the moment another session wrote the user
+ * configuration, and nothing in either tree said so.
+ *
+ * COMPUTED FROM THE ENVIRONMENT, never written down. A report that printed the
+ * defaults would be right only on a machine using them, and silent about the
+ * one file the reader is actually looking for.
+ */
+export function sharedStatePaths(env = process.env) {
+  return { userConfig: userConfigPath(env), stateDir: stateRoot(env) };
 }
 
 /** Where one task's agent output is kept — outside the repository, beside the
@@ -915,6 +938,15 @@ function renderReport(report, plan) {
       lines.push("      " + color.dim(ids.join(", ")));
     }
   }
+  // The same two paths the `--json` rendering carries. The operator whose tree
+  // broke on 2026-09-03 was reading a terminal, so a fact only a JSON consumer
+  // could see would not have reached the person who needed it (TL-202).
+  if (report.shared) {
+    lines.push("");
+    lines.push("  " + color.dim("shared with every tree on this machine — a change here is instant, no merge:"));
+    lines.push("      " + color.dim(report.shared.userConfig));
+    lines.push("      " + color.dim(report.shared.stateDir));
+  }
   lines.push("");
   lines.push("  " + color.dim("stopped: " + report.stopped));
   if (plan.dryRun) lines.push("  " + color.dim("`--dry-run`: no agent was run and nothing was claimed"));
@@ -1327,7 +1359,8 @@ export function run(argv) {
   const waiting = served.length ? waitingForRole(leftover, config, served, !!plan.agent) : {};
   const waitingExecutor = waitingForExecutor(leftover, config, callerSpecies(actor));
 
-  const report = { taken, tally, ms: Date.now() - started, stopped, waiting, waitingExecutor, neverStarted };
+  const shared = sharedStatePaths();
+  const report = { taken, tally, ms: Date.now() - started, stopped, waiting, waitingExecutor, neverStarted, shared };
   if (plan.json) {
     console.log(JSON.stringify({
       // `ok` is about the RUN, not about the tasks: blocked work is a run that
@@ -1344,6 +1377,9 @@ export function run(argv) {
       waitingForExecutor: Object.keys(waitingExecutor).sort()
         .map((e) => ({ executor: e, count: waitingExecutor[e].length, ids: waitingExecutor[e] })),
       tally: { ...tally, taken: taken.length },
+      // What this run used outside the tree it was given. A consumer comparing
+      // two runs can see a shared-state change for what it is (TL-202).
+      sharedState: shared,
       ms: report.ms,
       tasks: taken.map((r) => ({
         id: r.id, outcome: r.outcome, attempts: r.attempts, ms: r.ms, log: r.log,

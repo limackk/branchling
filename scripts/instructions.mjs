@@ -45,6 +45,8 @@ import { fileURLToPath } from "node:url";
 
 import { loadConfigOrExit } from "./config.mjs";
 import { CONTEXT_RULE, commandRunner, contextBudget } from "./context-budget.mjs";
+import { HOME_ENV } from "./home.mjs";
+import { STATE_DIR_ENV } from "./lock.mjs";
 import { queueStatuses } from "./next-task.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
@@ -485,6 +487,30 @@ So the boundary is the clone, not the machine and not the branch. Two clones
 will still hand out the same task and will find out when they merge. Merge
 finished work promptly and the window closes; expect no more from a lockfile and
 a set of local refs than they can give.
+
+WHAT A SESSION MAY WRITE OUTSIDE ITS OWN TREE. Two paths, and no other:
+
+  the state directory       \`${STATE_DIR_ENV}\`, or the XDG default under it:
+                            locks, the activity log, and this run's per-task
+                            agent logs. It is outside the repository on purpose
+                            — every worktree carries its own backlog, so a lock
+                            written into one of them would exclude nobody.
+  the user configuration    \`${HOME_ENV}\`, the layer that holds facts about
+                            the person rather than about the project.
+
+Nothing ENFORCES that list. This is composition: the loop does not own your
+agent's filesystem access and never will. What a run owes the other trees
+instead is to SAY SO — \`{{tool}} run\` names both paths in its report, under
+\`--json\` and on the terminal.
+
+THE ASYMMETRY IS WHY IT IS WORTH SAYING. A write INSIDE the tree travels with a
+branch and reaches the other trees when somebody merges. A write to either path
+above is instant for every tree on this machine, and no branch mediates it.
+Measured once already: one session moved a configuration key into the user layer
+and wrote the file, correctly, and every other tree on that machine failed on
+its next command until it merged the code that agreed with the new file. The
+breakage looked like a defect in each of those trees and was not. An operator
+who can read which files a run depended on can tell the two apart in one look.
 
 WHEN A SESSION DIES MID-TASK. Its lock expires after \`lock_ttl_minutes\` — that
 only frees the reservation. The CLAIM in the tree (\`status: {{progress}}\` and

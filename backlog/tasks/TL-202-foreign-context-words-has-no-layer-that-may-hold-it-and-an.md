@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1
-status: pending  # pending | in_progress | blocked | done | cancelled
-owner: ""
+status: in_progress  # pending | in_progress | blocked | done | cancelled
+owner: agent:dev
 role: dev  # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 4h
@@ -113,3 +113,14 @@ under that code. This task was rewritten rather than closed, because the
 breakage it recorded had a second cause that nobody has decided about. The
 title changed with it; the filename did not, following TL-137's rule that a
 task's filename is data, not part of its content.
+
+NOTHING IS ENFORCED, deliberately. The writable list — the state directory
+(`BACKLOG_STATE_DIR`) and the user configuration (`BRANCHLING_HOME`) — is stated
+in `instructions autonomous-loop`, where an unattended agent reads it, and a
+guard was rejected: the loop is composition and does not own the agent's
+filesystem access, so a check here could only inspect paths the tool itself
+writes, which are exactly the two that are allowed. What replaces enforcement is
+disclosure: `run` computes both paths from the environment and names them in
+its report, in `--json` as `sharedState` and on the terminal, so the operator of
+a tree that has just started failing can tell a shared-state change from a
+defect in their own work — the question nobody could answer on 2026-09-03.
