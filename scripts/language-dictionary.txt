@@ -730,6 +730,7 @@ bundle
 bundled
 bundling
 buried
+buries
 burn
 burndown
 burning
@@ -1951,6 +1952,7 @@ eats
 ebusy
 echo
 echoed
+echoes
 echoing
 econnrefused
 economy
@@ -5004,6 +5006,7 @@ reject
 rejected
 rejecting
 rejection
+rejections
 rejects
 rejoin
 rekeyed
@@ -6450,6 +6453,7 @@ triggered
 triggers
 trim
 trimmed
+trimming
 trio
 trip
 triple
