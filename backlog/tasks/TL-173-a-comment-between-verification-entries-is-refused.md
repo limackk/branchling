@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "CLI surface"
 priority: P3
-status: pending
-owner: ""
+status: in_progress
+owner: agent:spec
 role: spec
 executor: ""
 estimate: 2h
