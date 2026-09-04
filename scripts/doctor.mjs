@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * The `doctor` command — one answer to the question "is this set up correctly
- * i co dalej" (TL-62).
+ * and what next" (TL-62).
  *
  * WHY. Adapting the tool to a project means editing `config.yaml`, and until
  * TL-62 there was no way to check whether it had worked: you had to run one of

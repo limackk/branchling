@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P2
-status: pending  # pending | in_progress | blocked | done | cancelled
-owner: ""
+status: in_progress  # pending | in_progress | blocked | done | cancelled
+owner: agent:dev
 role: dev  # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1d
@@ -101,5 +101,37 @@ removed. It is `blocked_by` this task for that reason.
 
 ## Decisions
 
-Nothing decided beyond the direction: dictionary, not heuristic. The choice of
-tool is the first step and belongs here when it is made.
+**The checker is our own code over a vendored word list** —
+`scripts/language-dictionary.txt`, read by `check-public-language.mjs`. No
+dependency, no network, one file.
+
+Rejected: an external spellchecker (`cspell`, `hunspell`) as a dev dependency
+or a CI-only step. A check a contributor cannot run from a clean checkout is a
+check that fails only for them, in public. Rejected too: vendoring a general
+English word list — `web2` is 2.4 MB, it would ship in the tarball for a
+dev-only guard, and 5,320 of the words this tree writes are not in it anyway,
+so the project half would still have to be built.
+
+**The dictionary is a SNAPSHOT of the tree, not a rule derived from one.**
+`--update-dictionary` regenerates it; the check never does. A dictionary that
+rebuilt itself on every run would accept whatever was written last and answer
+with a tick for ever.
+
+**The three blocklists stay, and the dictionary runs after them.** They are
+strictly narrower and would be redundant alone, but they name WHY a line is
+foreign — `diacritics`, `word`, `words`, `shape`, `label` — and that reason
+code is what tells an author whether they wrote the wrong language or
+misspelled the right one. Four regular expressions is a cheap price for it.
+
+**What the snapshot inherited.** It was taken from a tree that still carried
+Polish inside `scripts/tests/`, so those words are in the file. That debt is
+TL-229 and TL-128, and closing either means deleting the words it translated
+from the dictionary in the same commit.
+
+**Step 3 was not done.** Not one of the 71 `language-guard: allow` markers
+could be converted, because converting a marker means deleting the signal it
+excuses, and every one of those signals is asserted by name in
+`scripts/tests/public-language.test.mjs`. Five markers were ADDED instead: the
+generator skips a marked line, so the marker now also keeps a deliberately
+foreign sample out of the vocabulary that would otherwise let the next one
+through.

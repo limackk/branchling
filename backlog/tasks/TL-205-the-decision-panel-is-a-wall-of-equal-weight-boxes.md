@@ -160,7 +160,7 @@ unreadable at 10px. The row's fill and border already carry the colour; the
 word is the half that has to survive a monochrome print, so it takes the
 readable value.
 
-**Surfaced and filed, not fixed here:** TL-208 (the snapshot banner says `Tryb
-snapshot`, and `check --language` walked past it) and TL-209 (`/api/decision`
+**Surfaced and filed, not fixed here:** TL-208 (the snapshot banner said
+`Tryb snapshot`, and `check --language` walked past it) and TL-209 (`/api/decision`
 normalises an unparseable actor to `unknown` and returns 200, so its
 "no valid namespace" branch can never be taken).

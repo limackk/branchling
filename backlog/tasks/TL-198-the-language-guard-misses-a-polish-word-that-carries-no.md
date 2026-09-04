@@ -43,16 +43,18 @@ TL-137's translation of 145 files and every `check` run since, and
 
 Measured on 2026-09-03 with a three-line probe in `scripts/`:
 
-    const x = "Tryb snapshot";     → NOT caught
     # language-guard: allow — the probe's own input; translating it would
-    const y = "Dodaj zadanie";     → caught (word)
+    const x = "Tryb snapshot";     → NOT caught
     # language-guard: allow — falsify the measurement it is evidence of
+    const y = "Dodaj zadanie";     → caught (word)
+    # language-guard: allow — and the same holds for this one
     const z = "Wersja robocza";    → caught (label)
 
 So the two detectors that fired are the word list and the label heuristic, and
 `Tryb` falls between them: four letters, no diacritic, and an ending that is
 unremarkable in English too.
 
+<!-- language-guard: allow — the word is QUOTED as the evidence, not written as prose -->
 **Why this is not just "add Tryb to the list".** A word list is finite and the
 language is not; the next miss will be a different four-letter word. What the
 task has to settle is whether the guard's shape can be improved at all —

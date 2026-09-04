@@ -2599,7 +2599,7 @@ function setBoardScope(slug, opts) {
   const next = slug || BOARD_ALL;
   if (state.board === next) return;
   state.board = next;
-  try { localStorage.setItem(BOARD_STORAGE_KEY, next); } catch { /* prywatne okno */ }
+  try { localStorage.setItem(BOARD_STORAGE_KEY, next); } catch { /* a private window */ }
   applyScope();
   // A selection from another board has no right to survive — it would show the
   // detail of a task that is not in the list beside it.
@@ -2992,7 +2992,7 @@ function updateConnectionBar() {
     btnRefresh.style.display = ""; btnDisconnect.style.display = "";
   } else {
     bar.classList.remove("live"); bar.classList.add("snapshot");
-    status.textContent = "Tryb snapshot";
+    status.textContent = "Snapshot mode";
     if (FS_SUPPORTED) {
       hint.textContent = "Data from the moment of the build. Connect to the folder to work on live files (editing fields — server mode only).";
     } else {
@@ -3054,17 +3054,17 @@ const FILTER_SPECS = [
     options: () => CONFIG.statuses.map(value => ({ value, label: labelTitle(value) })),
   },
   {
-    key: "filterPriority", param: "priority", label: "Priorytet",
+    key: "filterPriority", param: "priority", label: "Priority",
     match: (t, v) => (t.priority || "") === v,
     options: () => CONFIG.priorities.map(value => ({ value, label: value })),
   },
   {
-    key: "filterType", param: "type", label: "Typ",
+    key: "filterType", param: "type", label: "Type",
     match: (t, v) => (t.type || "") === v,
     options: () => (CONFIG.types || []).map(value => ({ value, label: labelTitle(value) })),
   },
   {
-    key: "filterLabel", param: "phase", label: "Faza",
+    key: "filterLabel", param: "phase", label: "Phase",
     match: (t, v) => (t.labels || []).includes(v),
     // The axis values come from config.yaml (label_axis_timing). An axis with no
     // values disappears from the bar by itself — renderFilters drops empty facets.
@@ -3678,7 +3678,7 @@ function loadActor() {
   try {
     const v = localStorage.getItem(ACTOR_STORAGE_KEY);
     if (v && isValidActorSlug(v)) return v;
-  } catch (e) { /* prywatne okno */ }
+  } catch (e) { /* a private window */ }
   return "founder";
 }
 function isValidActorSlug(v) {
@@ -4013,7 +4013,7 @@ async function saveField(taskId, field, value, reason) {
   }
 }
 
-// ─── Render detalu ────────────────────────────────────────────────────
+// ─── Detail render ────────────────────────────────────────────────────
 function valueHtml(t, key) {
   if (key === "status") return '<span class="badge badge-status-' + escape(t.status) + '">' + escape(t.status) + "</span>";
   if (key === "priority") return '<span class="badge badge-priority-' + escape(t.priority) + '">' + escape(t.priority) + "</span>";
@@ -6424,7 +6424,7 @@ for (const btn of document.querySelectorAll(".view-tab")) {
   const p = new URLSearchParams(window.location.search);
   if (p.get("board")) wanted = p.get("board");
   if (!wanted) {
-    try { wanted = localStorage.getItem(BOARD_STORAGE_KEY); } catch { /* prywatne okno */ }
+    try { wanted = localStorage.getItem(BOARD_STORAGE_KEY); } catch { /* a private window */ }
   }
   const valid = wanted === BOARD_ALL || knownBoards().some((b) => b.slug === wanted);
   state.board = valid ? wanted : BOARD_ALL;

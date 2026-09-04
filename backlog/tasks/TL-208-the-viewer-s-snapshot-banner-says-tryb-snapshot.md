@@ -1,6 +1,6 @@
 ---
 id: TL-208
-title: "The viewer's snapshot banner says Tryb snapshot"
+title: "The viewer's snapshot banner says Tryb snapshot"   # language-guard: allow — the shipped label IS the subject
 type: task
 labels: []
 board: main
@@ -35,6 +35,7 @@ Found on 2026-09-03 while looking at the decision panel in a rendered page
 (TL-205). The banner across the top of a `file://` viewer says:
 
     scripts/build-viewer.mjs:2937
+    # language-guard: allow — the shipped label IS the sample
     status.textContent = "Tryb snapshot";
 
 It is the first line a non-technical reader sees on a page that was mailed to
