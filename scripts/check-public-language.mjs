@@ -13,11 +13,12 @@
  * repository, and `backlog/tasks/` clears that bar more strongly than the
  * code does — `LINEAGE.md` names it this tool's real development history.
  * `backlog` and `docs` were added to `PUBLIC_PATHS` once every file under
- * them was translated (TL-137), which is also why `backlog/config.yaml`,
- * `backlog/plan.yaml` and `backlog/boards.yaml` are covered now too, as a
- * side effect of adding the directory rather than only `backlog/tasks/` —
- * they were translated by hand earlier and had never been brought under a
- * guard that would keep them that way. `backlog/history/*.jsonl` stays
+ * them was translated (TL-137). `backlog/config.yaml`, `backlog/plan.yaml` and
+ * `backlog/boards.yaml` are covered too — but NOT as a side effect of adding
+ * the directory, which is what this header claimed for a year while `walk()`
+ * collected three extensions and opened none of them (TL-198). They are named
+ * in `BACKLOG_SOURCE_FILES` below, one by one, because the rest of the YAML
+ * under `backlog/` is generated. `backlog/history/*.jsonl` stays
  * invisible to this guard independent of that: `walk()` below only collects
  * `.mjs`, `.js` and `.md` files, so the append-only log — whose `reason`
  * fields are a person's own sentences, never corrected after the fact — is
@@ -263,6 +264,22 @@ export const PUBLIC_PATHS = ["scripts", "bin", "README.md", "_template.md", "bac
 
 const SKIP_DIRS = new Set(["node_modules", ".git"]);
 
+/**
+ * The SOURCE files under `backlog/` that no extension rule reaches (TL-198).
+ *
+ * WHY THEY ARE NAMED ONE BY ONE AND NOT MATCHED BY EXTENSION. Most of the YAML
+ * under `backlog/` is a COMPUTED view — `NOW.yaml`, `INDEX.yaml`,
+ * `archive/done.yaml`, `boards/` — deletable by law 2 and rebuilt by the next
+ * `build`. A guard that read those would fail on output rather than on a
+ * decision somebody took, and would report a finding from whenever the views
+ * were last generated. These three are the other kind: text a person writes by
+ * hand, and under law 3 `config.yaml` holds this project's VOCABULARY — the
+ * status names, the labels, the board titles a stranger reads before any
+ * comment in `scripts/` does. The header above has claimed them since TL-137;
+ * until this list existed, `walk()` opened none of them.
+ */
+export const BACKLOG_SOURCE_FILES = ["backlog/config.yaml", "backlog/plan.yaml", "backlog/boards.yaml"];
+
 function walk(abs, out) {
   if (statSync(abs).isDirectory()) {
     for (const name of readdirSync(abs).sort()) {
@@ -486,6 +503,14 @@ function publicFiles(root) {
     } catch {
       // A path that is not there is not a violation: this same guard runs
       // against fixtures that carry only some of these files.
+    }
+  }
+  for (const rel of BACKLOG_SOURCE_FILES) {
+    const abs = join(root, rel);
+    try {
+      if (statSync(abs).isFile()) files.push(abs);
+    } catch {
+      // Same reason as above; a tree without a plan is not a violation.
     }
   }
   return files;
