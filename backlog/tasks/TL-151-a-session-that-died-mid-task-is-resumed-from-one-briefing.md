@@ -6,9 +6,9 @@ labels: []
 board: main
 epic: ""
 priority: P3                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: in_progress  # pending | in_progress | blocked | done | cancelled
-owner: agent:fleet
-role: spec
+status: pending  # pending | in_progress | blocked | done | cancelled
+owner: ""
+role: dev
 estimate: 2h                       # 30m | 2h | 1d | 1w | 1mo
 created: 2026-09-02
 updated: 2026-09-04
