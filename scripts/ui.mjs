@@ -79,10 +79,34 @@ function painter(enabled) {
   return paint;
 }
 
+/**
+ * A painter that asks at the moment it PAINTS, not at the moment this module is
+ * imported (TL-238).
+ *
+ * WHY IT MATTERS AND WHERE IT BIT. The decision used to be frozen at import,
+ * which is invisible in a program — the environment does not move between the
+ * first import and the first line printed. It is very visible in a suite: a test
+ * imports the renderer, then declares that it wants plain text, and the
+ * declaration arrives after the decision. Twelve tests were therefore asserting
+ * the OBSERVER's terminal, passing through a pipe and failing at a keyboard.
+ *
+ * The cost is one environment lookup per painted fragment, against a function
+ * whose output is going to a terminal a human reads.
+ */
+function livePainter(stream) {
+  const on = painter(true);
+  const off = painter(false);
+  const now = () => (colorAllowed(stream) ? on : off);
+  const live = {};
+  for (const role of Object.keys(ROLES)) live[role] = (s) => now()[role](s);
+  Object.defineProperty(live, "enabled", { get: () => now().enabled });
+  return live;
+}
+
 /** The painter for stdout — answers. */
-export const color = painter(colorAllowed(process.stdout));
+export const color = livePainter(process.stdout);
 /** The painter for stderr — diagnostics. Decided SEPARATELY, see `colorAllowed`. */
-export const errColor = painter(colorAllowed(process.stderr));
+export const errColor = livePainter(process.stderr);
 /** For tests and for `--json`: a painter that never paints anything. */
 export const plain = painter(false);
 
@@ -167,10 +191,17 @@ export function warn(message) {
  * @param {string[]} details what was expected — specifically, not "invalid"
  * @param {string[]} next commands to paste
  */
-export function failure(command, problem, details, next) {
-  const out = [errColor.err(MARK.err) + " " + errColor.bold(command) + ": " + problem];
+export function failure(command, problem, details, next, opts) {
+  // THE PAINTER IS AN ARGUMENT, as it already is for `line` (TL-238). `errColor`
+  // is decided once, when this module is imported, from the stream and the
+  // environment of THAT moment — which is right for a program and wrong for a
+  // caller that wants to assert the SHAPE of an error. Without this a test of
+  // the anatomy passes through a pipe and fails in a terminal, having asserted
+  // the observer rather than the function.
+  const paint = (opts && opts.color) || errColor;
+  const out = [paint.err(MARK.err) + " " + paint.bold(command) + ": " + problem];
   for (const d of details || []) out.push("  " + d);
-  for (const n of next || []) out.push("  " + errColor.id(MARK.arrow + " " + n));
+  for (const n of next || []) out.push("  " + paint.id(MARK.arrow + " " + n));
   return out.join("\n");
 }
 

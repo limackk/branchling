@@ -24,13 +24,15 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { isolateHome } from "./_repo.mjs";
+import { isolateHome, plainOutput } from "./_repo.mjs";
 
 // THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
 // file in its own process, so one call covers every case in it. Without this a
 // test reads the DEVELOPER's `<config>/config.yaml` — their actor, their model
 // endpoint — and the suite answers differently on different machines.
 isolateHome("next-id-empty-backlog");
+// Assert against plain text, not against the observer's terminal (TL-238).
+plainOutput();
 
 const CLI = join(dirname(fileURLToPath(import.meta.url)), "..", "cli.mjs");
 

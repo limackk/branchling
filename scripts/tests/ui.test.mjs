@@ -24,13 +24,15 @@ import { fileURLToPath } from "node:url";
 
 import { colorAllowed, failure, line, plain, priorityPaint, statusPaint, table } from "../ui.mjs";
 
-import { isolateHome } from "./_repo.mjs";
+import { isolateHome, plainOutput } from "./_repo.mjs";
 
 // THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
 // file in its own process, so one call covers every case in it. Without this a
 // test reads the DEVELOPER's `<config>/config.yaml` — their actor, their model
 // endpoint — and the suite answers differently on different machines.
 isolateHome("ui");
+// Assert against plain text, not against the observer's terminal (TL-238).
+plainOutput();
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPTS = join(HERE, "..");
@@ -151,7 +153,8 @@ test("messages introduce themselves by the COMMAND name, not by a filename", () 
 // ── Shape ─────────────────────────────────────────────────────────────────
 
 test("the anatomy of an error: what happened, what was expected, what to do", () => {
-  const text = failure("branchling query", "unknown flag: --statu", ["available: --status --board"], ["branchling query --help"]);
+  // The painter is stated, so this asserts the SHAPE and not the terminal (TL-238).
+  const text = failure("branchling query", "unknown flag: --statu", ["available: --status --board"], ["branchling query --help"], { color: plain });
   const lines = text.split("\n");
   assert.match(lines[0], /branchling query: unknown flag: --statu/);
   assert.match(lines[1], /available: --status --board/);

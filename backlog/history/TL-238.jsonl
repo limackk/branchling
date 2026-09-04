@@ -1,0 +1,4 @@
+{"id":"01M1NMPG18PZZGQT2QHKNN6M72","ts":"2026-09-04T07:21:28.872Z","task":"TL-238","field":"__created__","from":"","to":"The suite is green only when it is not run in a terminal","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1NMQ6907936SY7XK571GC7V","ts":"2026-09-04T07:21:51.648Z","task":"TL-238","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown","session":"tree-526f61f2043f","role":"dev"}
+{"id":"01M1NMQ690S97W6HNBAJE27AE9","ts":"2026-09-04T07:21:51.648Z","task":"TL-238","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown","session":"tree-526f61f2043f","role":"dev"}
+{"id":"01M1NNAZM144AGQ0CB58WMMDE2","ts":"2026-09-04T07:32:40.193Z","task":"TL-238","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven","session":"tree-526f61f2043f","role":"dev"}

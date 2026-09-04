@@ -81,6 +81,28 @@ export const TASKS_DIR = join(BACKLOG_DIR, "tasks");
  *
  * Call it once, at the top of a test file that touches activity.
  */
+/**
+ * Assert against PLAIN text, whatever terminal the suite is run from (TL-238).
+ *
+ * WHY A DECLARATION AND NOT A STRIP. `colourAllowed()` reads `NO_COLOR`, then
+ * `FORCE_COLOR`, then `isTTY`, and it is right to. A test that asserts on
+ * human-facing output without saying which of those it means inherits the
+ * observer: an agent runs the suite through a pipe and sees green, a person runs
+ * it in a terminal and sees twelve failures. Measured on 2026-09-04, exactly
+ * that way round. Stripping escapes at each assertion would fix the twelve and
+ * leave the thirteenth free to inherit again.
+ *
+ * IT COVERS SUBPROCESSES TOO, and that is why it writes the environment rather
+ * than a module flag: a spawned `cli.mjs` inherits `process.env`, so one call
+ * settles the renderers this process calls AND the commands it starts.
+ *
+ * A test about COLOUR ITSELF must not call this — it has to state its own
+ * expectation per case, which is the same rule seen from the other side.
+ */
+export function plainOutput() {
+  process.env.NO_COLOR = "1";
+}
+
 export function isolateHome(label = "home") {
   const dir = mkdtempSync(join(tmpdir(), "branchling-test-" + label + "-"));
   process.env[HOME_ENV] = dir;
