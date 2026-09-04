@@ -6,7 +6,7 @@ labels: []
 board: main
 epic: ""
 priority: P3
-status: in_progress  # pending | in_progress | blocked | done | cancelled
+status: done  # pending | in_progress | blocked | done | cancelled
 owner: agent:docs
 role: docs
 estimate: 30m                      # 30m | 2h | 1d | 1w | 1mo
@@ -63,5 +63,5 @@ folded into an unrelated migration's commit.
 
 ## Acceptance criteria
 
-- [ ] TL-112 no longer names `docs/licencja-i-kontrybucje.md` anywhere. [proof: no-stale-path]
+- [x] TL-112 no longer names `docs/licencja-i-kontrybucje.md` anywhere. [proof: no-stale-path]
 - [ ] TL-112's `status`, `## Log`, and decision content are unchanged.
