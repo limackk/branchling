@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: ""
+status: in_progress  # pending | in_progress | blocked | done | cancelled
+owner: agent:spec
 role: spec  # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 4h
@@ -23,7 +23,7 @@ verification:                      # HOW to check the task is really done
   - id: guards-green
     bash: "node scripts/cli.mjs check"
   - id: the-boundary-is-stated
-    bash: "node scripts/cli.mjs instructions autonomous-loop | grep -qi 'outside' && echo 'the guide states what a run may write outside its tree — OK'"
+    bash: "node --test scripts/tests/shared-state-boundary.test.mjs"
 ---
 
 ## Goal
