@@ -26,7 +26,7 @@ import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { resolveActor } from "./actor.mjs";
-import { ACTOR_NAMESPACES, REASON_SENTINELS, attributeChanges, isValidActor, isValidReason, reconcile, taskIdFromFile, unattributedChanges } from "./history.mjs";
+import { ACTOR_NAMESPACES, attributeChanges, isValidActor, reasonRefusal, reconcile, taskIdFromFile, unattributedChanges } from "./history.mjs";
 import { resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 
@@ -77,13 +77,14 @@ const quiet = argv.includes("--quiet");
 // has just made a batch of edits by hand speaks for their own batch — one reason
 // for the run, because that is the granularity this route actually has.
 const reasonFlag = arg("--reason", "");
-if (reasonFlag && !isValidReason(reasonFlag)) {
-  console.error(
-    `${N} history: \`--reason\` is empty or reserved (` + REASON_SENTINELS.join(", ") + ").\n" +
-      "  Those are what the tool writes when nobody stated a reason; typing one by hand\n" +
-      "  would dress a machine's answer up as yours."
-  );
-  process.exit(2);
+if (reasonFlag) {
+  // The shared refusal is written unindented, as a thrown message is; this
+  // route prints its own, so the explanation is indented under the headline.
+  const refusal = reasonRefusal(reasonFlag, "--reason");
+  if (refusal) {
+    console.error(`${N} history: ` + refusal.split("\n").join("\n  "));
+    process.exit(2);
+  }
 }
 
 // An actor with no namespace would quietly degrade to `unknown` while the

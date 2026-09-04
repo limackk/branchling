@@ -62,7 +62,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 
 import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { ACTOR_NAMESPACES, appendEntries, currentSession, EVENT_ID_RE, eventId, FIELD_DECISION, isValidActor, isValidReason, normalizeReason, openQuestions, questionIdFromReason, readHistory, recordEdit } from "./history.mjs";
+import { ACTOR_NAMESPACES, appendEntries, currentSession, EVENT_ID_RE, eventId, FIELD_DECISION, isValidActor, isValidReason, normalizeReason, openQuestions, questionIdFromReason, readHistory, reasonRefusal, recordEdit } from "./history.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { todayStamp } from "./take-task.mjs";
@@ -129,12 +129,9 @@ export function parseDecideArgs(args) {
     );
   }
 
-  if (plan.reason !== null && !isValidReason(plan.reason)) {
-    throw new Error(
-      "`--reason " + plan.reason + "` is empty or reserved\n" +
-        "`unknown` and `proven` are what the tool writes when nobody stated a reason;\n" +
-        "typing one by hand would dress a machine's answer up as yours."
-    );
+  if (plan.reason !== null) {
+    const refusal = reasonRefusal(plan.reason, "--reason");
+    if (refusal) throw new Error(refusal);
   }
   // Checked here rather than against the log, because it is wrong whatever the
   // task holds: an id that is not an event id can never match one.

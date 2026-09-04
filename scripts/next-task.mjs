@@ -56,7 +56,7 @@ import { fileURLToPath } from "node:url";
 import { resolveActor } from "./actor.mjs";
 import { crossBranchState, describeDivergence, divergences, scanNote } from "./branch-scan.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { ACTOR_NAMESPACES, FIELD_COMMENT, isValidActor, isValidReason, readHistory } from "./history.mjs";
+import { ACTOR_NAMESPACES, FIELD_COMMENT, isValidActor, readHistory, reasonRefusal } from "./history.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
 import { dispatchWave, loadPlanForDispatch } from "./plan.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
@@ -109,11 +109,9 @@ export function parseNextArgs(args) {
         "nothing for it to narrow."
     );
   }
-  if (plan.reason !== null && !isValidReason(plan.reason)) {
-    throw new Error(
-      "`--reason " + plan.reason + "` is empty or reserved\n" +
-        "`unknown` and `proven` are what the tool writes when nobody stated a reason."
-    );
+  if (plan.reason !== null) {
+    const refusal = reasonRefusal(plan.reason, "--reason");
+    if (refusal) throw new Error(refusal);
   }
   return plan;
 }
