@@ -23,7 +23,7 @@ verification:
   - id: no-regression
     bash: "node --test scripts/tests/*.test.mjs"
   - id: manual-two-trees
-    manual: "With a page open from `worktrail serve` in the main checkout: running `worktrail take <ID>` in a SECOND worktree makes the `<worktree>: in_progress` badge appear on the card without reloading the page"
+    manual: "With a page open from `branchling serve` in the main checkout: running `branchling take <ID>` in a SECOND worktree makes the `<worktree>: in_progress` badge appear on the card without reloading the page"
 ---
 
 ## Goal

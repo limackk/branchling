@@ -19,7 +19,7 @@ related_docs:
   - docs/funkcjonalnosci.md
 verification:
   - bash: "test -f docs/demo/scenario.md && grep -q 'exit' docs/demo/scenario.md"
-  - manual: "A recording (asciinema or GIF) is linked in the README header, runs up to 60 seconds and ends with a RED refusal from `worktrail done`, followed by a fix and a green close"
+  - manual: "A recording (asciinema or GIF) is linked in the README header, runs up to 60 seconds and ends with a RED refusal from `branchling done`, followed by a fix and a green close"
 ---
 
 ## Goal
