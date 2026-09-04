@@ -26,7 +26,7 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -35,6 +35,8 @@ import { resolveActor } from "./actor.mjs";
 import { bucketFor, spanLabel } from "./calibration.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { recordCreation } from "./history.mjs";
+import { parsePlanYaml } from "./plan.mjs";
+import { editPlanText, newPlanErrors } from "./plan-write.mjs";
 import { detectPrefixMismatch, prefixMismatchMessage, taskIdPatterns } from "./task-id.mjs";
 import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { auditVocabulary, extractMeta, splitFrontmatter } from "./task-fields.mjs";
@@ -131,6 +133,9 @@ function nextId(root, tasksDir, numberPattern) {
 const FLAGS = {
   "--title": "title", "--board": "board", "--priority": "priority", "--type": "type",
   "--epic": "epic", "--estimate": "estimate", "--owner": "owner", "--status": "status",
+  // NOT a frontmatter field: it schedules the task in `plan.yaml` (TL-213). The
+  // value is checked against the waves that exist BEFORE anything is written.
+  "--wave": "wave",
 };
 
 function parseArgs(argv) {
@@ -427,6 +432,33 @@ export function main(argv) {
       "the board vocabulary is CLOSED; available: " + boardSlugs.join(" | "));
   }
 
+  // `--wave` IS CHECKED BEFORE A NUMBER IS RESERVED (TL-213). Creating the task
+  // and scheduling it are one act, so the half that can be refused is settled
+  // first: a wave named by a typo must leave a tree that looks exactly like the
+  // one before the command ran, rather than a task scheduled nowhere anybody is
+  // reading. Creating a wave is `plan add --why`, because a wave needs an
+  // argument and this command has nowhere to ask for one.
+  let scheduling = null;
+  if (opts.wave) {
+    if (!existsSync(paths.planPath)) {
+      return fail("`--wave` was given and this backlog has no plan to schedule into",
+        "expected: " + paths.planPath + " — the execution order is an optional decision, and this backlog has not made it");
+    }
+    const text = readFileSync(paths.planPath, "utf8");
+    const read = parsePlanYaml(text);
+    if (read.problems.length) {
+      return fail("the plan cannot be read, so nothing can be scheduled in it",
+        paths.planPath + ": " + read.problems[0]);
+    }
+    const waves = read.plan.waves.map((w) => w.name);
+    if (waves.indexOf(opts.wave) < 0) {
+      return fail("there is no wave `" + opts.wave + "` in " + paths.planPath,
+        (waves.length ? "the waves it has: " + waves.join(" | ") : "the plan has no waves yet") +
+          ` — a wave is created by \`${N} plan add <ID> --wave "…" --why "…"\`, never by a typo here`);
+    }
+    scheduling = { text };
+  }
+
   const pat = taskIdPatterns(config.taskIdPrefix);
 
   // A mismatch between the configuration and the tree MUST stop the WRITING OF A
@@ -491,6 +523,25 @@ export function main(argv) {
     console.error("  NOTE: the creation could not be recorded in the history: " + (e && e.message));
   }
 
+  // THE SECOND HALF OF THE ONE ACT. The wave was verified above and a task born
+  // a moment ago carries no `blocked_by`, so the only way this fails is the disk
+  // — and then it says the task exists and the schedule does not, rather than
+  // reporting success over a half-completion.
+  if (scheduling) {
+    const edit = editPlanText(scheduling.text, { op: "add", id: taskId, wave: opts.wave });
+    const introduced = edit.problems.length
+      ? []
+      : newPlanErrors(scheduling.text, edit.text, readTaskMetas(paths.tasksDir, config), config);
+    if (edit.problems.length || introduced.length) {
+      console.error(`${N} new: the task was written and the plan was NOT`);
+      console.error("  " + full);
+      for (const p of edit.problems.concat(introduced)) console.error("  - " + p);
+      console.error(`  schedule it with \`${N} plan add ${taskId} --wave "${opts.wave}"\` once the plan allows it`);
+      return 1;
+    }
+    writeFileSync(paths.planPath, edit.text, "utf8");
+  }
+
   console.log(`${N} new: ` + full);
   if (source === "local") {
     // A known risk said out loud, not hidden.
@@ -498,6 +549,7 @@ export function main(argv) {
     console.log("  If you work in a repository with several branches, another session may already hold " + taskId + ".");
   }
   console.log("  board: " + board + (opts.board ? "" : " (the registry default)"));
+  if (scheduling) console.log("  wave: " + opts.wave + " — scheduled in " + paths.planPath);
   // WHAT THAT ESTIMATE HAS COST BEFORE (TL-29). Printed HERE and nowhere else,
   // because writing the estimate is the only moment the number can still change
   // a decision — a calibration report read a week later corrects nothing.
