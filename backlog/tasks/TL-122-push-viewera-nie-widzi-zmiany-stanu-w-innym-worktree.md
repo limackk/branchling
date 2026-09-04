@@ -7,11 +7,12 @@ board: main
 epic: "Backlog viewer"
 priority: P3
 status: pending
-owner: unassigned
+owner: ""
 executor: ""
+role: spec
 estimate: 2h
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-04
 blocked_by: []
 blocks: []
 related_docs:
