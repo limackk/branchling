@@ -5,9 +5,9 @@ type: bug
 labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
-priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+priority: P0
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
@@ -74,3 +74,25 @@ make the tool depend on a habit. The scan can answer this from git.
 
 **Ancestry, not name.** A branch called `tl-…` is not evidence of anything; a
 commit reachable from `HEAD` is.
+
+## What raised this to P0
+
+Filed as a viewer nuisance. It is not one: it stops the dispatcher.
+
+On 2026-09-04, with wave 4 holding exactly one open task, a `--plan` run took
+nothing and `next` explained why:
+
+```
+1 candidate(s) are in another state on another branch or worktree
+  · TL-206 skipped — tl-206-plan-queue-agrees: blocked, tl-214-role-pipeline: in_progress
+```
+
+Both of those branches were merged into `main` earlier the same day and both
+worktrees were removed. Their commits are ancestors of `HEAD`; they hold no
+second opinion about anything. The fleet was blocked by its own dead branches,
+and would have been blocked on every later run — the refs only accumulate.
+
+`git for-each-ref --merged HEAD` answers this in one call, for every ref at
+once, which is why the fix belongs in `branch-scan.mjs` and not in each caller.
+A live worktree is a separate source and keeps reporting: what is dropped is a
+merged REF, not a tree somebody is standing in.

@@ -167,6 +167,39 @@ export function localRefs(root) {
  *        definition, and dropping it would hide the one session most likely to
  *        be holding a task.
  */
+/**
+ * The refs fully merged into `into` — branches that hold no second opinion,
+ * because their commits are already reachable from here (TL-235).
+ *
+ * WHY THIS IS NOT TIDINESS. A merged branch whose worktree was removed still
+ * carries the task at the state it had before the merge, and the scan read that
+ * as a disagreement. The consequence is not a noisy badge: `next` refuses to
+ * hand out a candidate that is "in another state on another branch", so on
+ * 2026-09-04 a wave holding one open task produced an empty queue, skipped over
+ * two branches that had been merged that morning. Refs only accumulate, so every
+ * later run would have been worse.
+ *
+ * ONE CALL FOR EVERY REF. `git for-each-ref --merged` answers the whole set at
+ * once; asking `merge-base --is-ancestor` per ref would make the scan's cost
+ * grow with a number that only goes up.
+ *
+ * A MERGED REF IS DROPPED; A WORKTREE IS NOT. Somebody standing in a tree may
+ * have uncommitted work whatever its branch, and that tree is a separate source
+ * in `scanTaskStates` — this touches only the committed state of a ref.
+ *
+ * FULL REF NAMES, matching `refActivity`. The short form is a second spelling
+ * of the same thing, and the filter that reads this set compares `r.ref` —
+ * which is where the first version of this quietly matched nothing at all.
+ *
+ * @returns {Set<string>} full ref names, empty when git cannot answer
+ */
+export function mergedRefs(root, into = "HEAD") {
+  const r = spawnSync("git", ["for-each-ref", "--merged", into, "--format=%(refname)", "refs/heads"],
+    { cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  if (r.error || r.status !== 0) return new Set();
+  return new Set(String(r.stdout || "").split("\n").map((l) => l.trim()).filter(Boolean));
+}
+
 export function activeRefs(root, opts = {}) {
   const all = refActivity(root);
   const days = Number(opts.days) || 0;
@@ -383,8 +416,13 @@ export function scanTaskStates(opts) {
   const selfBranch = selfKey
     ? (all.find((w) => samePathKey(w.path) === selfKey) || {}).branch || null
     : null;
+  // A branch already merged into this HEAD is not a second opinion either
+  // (TL-235), for the same reason the caller's own branch is not: what it holds
+  // is what we hold. Dropping it here rather than at each reader keeps `next`,
+  // `query`, `plan` and the viewer answering the same question.
+  const merged = mergedRefs(repoRoot);
   const refs = activeRefs(repoRoot, { days: opts.days, now: opts.now, pinned }).filter(
-    (r) => r.ref !== selfBranch
+    (r) => r.ref !== selfBranch && !merged.has(r.ref)
   );
 
   // Every blob is read ONCE even when twenty branches share it — which is the
