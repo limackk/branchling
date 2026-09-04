@@ -6,19 +6,19 @@ labels: [post-launch]
 board: main
 epic: "History and attribution"
 priority: P3
-status: pending
-owner: unassigned
+status: cancelled
+owner: agent:fleet
 role: docs
 estimate: 4h
 confidence: low
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-04
 blocked_by: []
 blocks: []
 related_docs:
   - docs/backlog-field-editing-history.md
 verification:
-  - bash: "node --test scripts/tests/task-sections.test.mjs"
+  - bash: "node -e \"const rows=require('fs').readFileSync('backlog/history/TL-80.jsonl','utf8').split(String.fromCharCode(10)).filter(Boolean).map(JSON.parse);const d=rows.filter(e=>e.field==='__decision__');if(!d.length){console.error('no __decision__ is recorded for TL-80');process.exit(1)}if(!d.some(e=>/104 of the 108/.test(e.to||''))){console.error('the decision does not carry the measurement it rests on');process.exit(1)}console.log(d[d.length-1].to)\""   # the deliverable of this task is the recorded finding, not a module
 ---
 
 ## Goal
@@ -29,13 +29,28 @@ execution progress (a note), and a summary for the pull request.
 
 ## Context
 
-Today everything lands in `## Log` (append-only, format `date status — who —
-note`) plus field history in `history/*.jsonl`. `## Log` answers the question
-"what happened to this task", but in doing so mixes three audiences: the
-reviewer ("why this way and not another"), the executor ("where did I leave
-off"), and the PR author ("what do I put in the description"). Backlog.md
-splits this into `comments` with an author, `implementation notes`, and
-`final summary`.
+When this was written, everything landed in `## Log` (append-only, format
+`date status — who — note`) plus field history in `history/*.jsonl`. `## Log`
+answered the question "what happened to this task", but in doing so mixed
+three audiences: the reviewer ("why this way and not another"), the executor
+("where did I leave off"), and the PR author ("what do I put in the
+description"). Backlog.md splits this into `comments` with an author,
+`implementation notes`, and `final summary`.
+
+**That premise is dead.** TL-105 removed `## Log` from `_template.md` and from
+what `branchling done` writes, on exactly the reasoning this task's second
+condition states below: a second copy of what the history already holds will
+drift. No task above TL-117 carries the section — TL-156 is the single
+exception — and of the 108 closed tasks that still carry one, 104 hold a
+single dated line.
+
+The three audiences did each get a place of their own, and none of them is a
+section in the task file. The reviewer's "why" is a `__decision__` event
+(`branchling decide`, TL-114); the executor's "where did I leave off" is
+`branchling handoff` and the activity log; the PR author's summary is
+`branchling pr-summary`. A comment with an author is the `__comment__` event —
+36 are on disk, each with its actor in a namespace, written by `handoff`,
+`ask` and `decide`.
 
 Note, hence `confidence: low`: this is a change to the task's data MODEL, not
 the addition of a command. Before writing anything, decide whether the split
@@ -59,7 +74,8 @@ drift apart.
 ## Steps
 
 1. Review `## Log` in closed tasks and decide whether the split makes sense.
-   If not — close the task as `cancelled` with this finding in the log.
+   If not — close the task as `cancelled`, with this finding recorded as a
+   `__decision__` event in `history/TL-80.jsonl`.
 2. If yes: define the sections and their semantics in `_template.md`.
 3. A callable entry point for each of them (Law 4), with the actor in its
    namespace.
@@ -71,8 +87,8 @@ drift apart.
 
 ## Acceptance criteria
 
-- [ ] The "do it / don't do it" decision is recorded in this task's log along
-      with the data it was based on.
+- [x] The "do it / don't do it" decision is recorded as a `__decision__` event
+      in `history/TL-80.jsonl`, along with the data it was based on.
 - [ ] If doing it: each section has a callable entry point and namespaced
       attribution.
 - [ ] The relationship with `history/*.jsonl` is unambiguous — one source per
