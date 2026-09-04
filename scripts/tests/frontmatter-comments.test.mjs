@@ -31,14 +31,20 @@ import { join } from "node:path";
 
 import { extractMeta, stripComment, unquote } from "../task-fields.mjs";
 import { parseBoardsYaml } from "../config.mjs";
+import { parseVerification } from "../criteria.mjs";
 import { auditRefs } from "../check-backlog-refs.mjs";
-import { isolateHome, SCRIPTS_DIR } from "./_repo.mjs";
+import { isolateHome, plainOutput, SCRIPTS_DIR } from "./_repo.mjs";
 
 // THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
 // file in its own process, so one call covers every case in it. Without this a
 // test reads the DEVELOPER's `<config>/config.yaml` — their actor, their model
 // endpoint — and the suite answers differently on different machines.
 isolateHome("frontmatter-comments");
+
+// The cases below assert on what a person READS when `done` refuses, so this
+// file has to say which observer it means rather than inherit the terminal it
+// happens to be run from (TL-238).
+plainOutput();
 
 
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
@@ -279,4 +285,168 @@ test("migrate-prefix renumbers an id and its references even beside a comment", 
     assert.match(moved, /task_id_prefix/, "the migration ate the comment it was supposed to leave alone");
     assert.match(moved, /MUST be closed first/, "the migration ate the comment it was supposed to leave alone");
   });
+});
+
+// ── A comment BETWEEN two verification entries (TL-173) ───────────────────
+
+/**
+ * `verification:` written the way TL-30 wanted to write it: the sentence that
+ * explains an entry stands on the line above that entry.
+ *
+ * THE FIXTURE HOLDS TWO COMMENTS ON PURPOSE, one ahead of the first entry and
+ * one between the two. The first position is accepted today and the second is
+ * refused, so the only variable between them is POSITION — which is the whole
+ * claim of this bug. Hoisting the lower comment up to join the higher one is
+ * the workaround TL-30 had to take, and the cost it charges is visible here:
+ * the sentence about the second entry ends up nowhere near it.
+ */
+const COMMENTED_VERIFICATION = [
+  "verification:",
+  "  # the fast guard first, so a broken tree is reported in seconds",
+  "  - id: first",
+  '    bash: "node --test scripts/tests/a.test.mjs"',
+  "  # this one starts a server; it runs last because it is slow, not because",
+  "  # it depends on the entry above it",
+  "  - id: second",
+  '    bash: "node --test scripts/tests/b.test.mjs"',
+].join("\n");
+
+test("a `#` line between two verification entries is a comment, and both entries are read", () => {
+  const { entries, problems } = parseVerification(COMMENTED_VERIFICATION);
+
+  // A zero sample proves nothing (CLAUDE.md): if the block were not found at
+  // all, `problems` would be empty for the wrong reason and every assertion
+  // below would be green without evidentiary force.
+  assert.equal(entries.length, 2, "the fixture does not hold two entries: " + JSON.stringify(entries));
+
+  assert.deepEqual(problems, [], "a comment between two entries was reported as an unreadable line");
+  assert.equal(entries[0].id, "first");
+  assert.equal(entries[0].bash, "node --test scripts/tests/a.test.mjs");
+  assert.equal(entries[1].id, "second");
+  assert.equal(entries[1].bash, "node --test scripts/tests/b.test.mjs");
+});
+
+test("positive control: an unreadable line in that SAME position still fails", () => {
+  // The cheap way to make the case above green is to skip every line the parser
+  // cannot read. That would buy the comment at the price of the diagnosis, so
+  // the two shapes a person actually gets wrong are pinned here: a key that
+  // does not exist, and a key with no colon after it. Both sit exactly where the
+  // comment sits, which is what makes this a control on that fixture and not a
+  // separate test about something else.
+  const WRONG_KEY = "bahs"; // language-guard: allow — fixture data: a key written wrong on purpose
+  const unknownKey = parseVerification(
+    ["verification:", "  - id: first", '    bash: "true"', "  - id: second", '    ' + WRONG_KEY + ': "true"'].join("\n")
+  );
+  assert.match(unknownKey.problems.join("\n"), new RegExp(WRONG_KEY), "a key written wrong went through in silence");
+
+  const noColon = parseVerification(
+    ["verification:", "  - id: first", '    bash: "true"', '    bash "node --test a.test.mjs"'].join("\n")
+  );
+  assert.match(noColon.problems.join("\n"), /cannot read/, "a `bash:` with no colon went through in silence");
+});
+
+// ── The diagnosis `done` gives (TL-173) ──────────────────────────────────
+
+function gateTask({ verification, criteria }) {
+  return [
+    "---",
+    "id: TASK-1",
+    'title: "T"',
+    "type: task",
+    "labels: []",
+    "board: main",
+    'epic: ""',
+    "priority: P1",
+    "status: pending",
+    "owner: unassigned",
+    "estimate: 2h",
+    "confidence: high",
+    "created: 2026-09-01",
+    "updated: 2026-09-01",
+    "blocked_by: []",
+    "blocks: []",
+    "verification:",
+    ...verification,
+    "---",
+    "",
+    "## Acceptance criteria",
+    "",
+    ...criteria,
+    "",
+  ].join("\n");
+}
+
+/** A backlog holding exactly one task, closed with `done`. */
+function withGateBacklog(fileText, fn) {
+  const dir = mkdtempSync(join(tmpdir(), "branchling-comments-gate-"));
+  try {
+    mkdirSync(join(dir, "tasks"));
+    writeFileSync(join(dir, "_template.md"), "---\nid: TASK-NNN\n---\n", "utf8");
+    writeFileSync(join(dir, "boards.yaml"), 'default: main\nboards:\n  - slug: main\n    name: "Main"\n', "utf8");
+    writeFileSync(join(dir, "config.yaml"), 'task_id_prefix: "TASK"\n', "utf8");
+    writeFileSync(join(dir, "tasks", "TASK-1-x.md"), fileText, "utf8");
+    return fn(dir);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+function doneOn(fileText) {
+  return withGateBacklog(fileText, (dir) => {
+    const r = spawnSync(process.execPath, [CLI, "done", "TASK-1", "--dir", dir], { encoding: "utf8", input: "" });
+    return {
+      code: r.status,
+      out: (r.stdout || "") + (r.stderr || ""),
+      status: (readFileSync(join(dir, "tasks", "TASK-1-x.md"), "utf8").match(/^status: (.+)$/m) || [])[1],
+    };
+  });
+}
+
+test("done closes a task whose contract carries a comment between its entries", () => {
+  const r = doneOn(
+    gateTask({
+      verification: [
+        "  # the fast guard first, so a broken tree is reported in seconds",
+        "  - id: first",
+        '    bash: "true"',
+        "  # this one is slow; it runs last for that reason and no other",
+        "  - id: second",
+        '    bash: "true"',
+      ],
+      criteria: ["- [ ] A. [proof: first]", "- [ ] B. [proof: second]"],
+    })
+  );
+  assert.equal(r.code, 0, "a contract annotated the way the format annotates everything else was refused:\n" + r.out);
+  assert.equal(r.status, "done");
+});
+
+test("an unreadable contract line and an EMPTY contract are different diagnoses", () => {
+  // "has no closing contract" is the message for a task somebody never finished
+  // writing, and the guide it points at says to go and write one. A reader who
+  // follows it here would rewrite four entries that are already correct. The
+  // wording of the new message is the other hand's to choose; what is pinned is
+  // that it does not send the reader to the wrong repair, and that it names the
+  // line that stopped the parse.
+  const empty = doneOn(gateTask({ verification: [], criteria: ["- [ ] A."] }));
+  const unreadable = doneOn(
+    gateTask({
+      verification: ["  - id: first", '    bash: "true"', '    bash "node --test a.test.mjs"'],
+      criteria: ["- [ ] A. [proof: first]"],
+    })
+  );
+
+  // Both are still refusals — a "difference" bought by letting one of the two
+  // through would be a worse bug than the one being fixed.
+  assert.notEqual(empty.code, 0, "an empty contract closed the task:\n" + empty.out);
+  assert.notEqual(unreadable.code, 0, "an unreadable contract line closed the task:\n" + unreadable.out);
+  assert.equal(empty.status, "pending");
+  assert.equal(unreadable.status, "pending");
+
+  assert.match(empty.out, /no closing contract/, "the empty contract stopped naming itself");
+  assert.doesNotMatch(
+    unreadable.out,
+    /no closing contract/,
+    "an unreadable line is still reported as an absent contract:\n" + unreadable.out
+  );
+  assert.match(unreadable.out, /bash "node --test a\.test\.mjs"/, "the refusal does not say WHICH line it could not read:\n" + unreadable.out);
 });

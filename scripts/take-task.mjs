@@ -35,7 +35,7 @@ import { fileURLToPath } from "node:url";
 
 import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { ACTOR_NAMESPACES, appendEntries, changesRequiringReason, currentSession, eventId, FIELD_ROLE_OVERRIDE, isValidActor, isValidReason, normalizeReason, readHistory, recordEdit } from "./history.mjs";
+import { ACTOR_NAMESPACES, appendEntries, changesRequiringReason, currentSession, eventId, FIELD_ROLE_OVERRIDE, isValidActor, isValidReason, normalizeReason, readHistory, reasonRefusal, recordEdit } from "./history.mjs";
 import { withDecisions } from "./decisions.mjs";
 import { focusQuietly } from "./focus.mjs";
 import { printJson } from "./json-envelope.mjs";
@@ -71,12 +71,9 @@ export function parseTakeArgs(args) {
   if (!plan.id) throw new Error("no task id\nusage: " + N + " take <ID> [--actor <ns:name>]");
   // A reserved reason is a bad ARGUMENT, wrong whatever the task says, so it
   // fails with the other usage errors — the same rule as in `done`.
-  if (plan.reason !== null && !isValidReason(plan.reason)) {
-    throw new Error(
-      "`--reason " + plan.reason + "` is empty or reserved\n" +
-        "`unknown` and `proven` are what the tool writes when nobody stated a reason;\n" +
-        "typing one by hand would dress a machine's answer up as yours."
-    );
+  if (plan.reason !== null) {
+    const refusal = reasonRefusal(plan.reason, "--reason");
+    if (refusal) throw new Error(refusal);
   }
   return plan;
 }

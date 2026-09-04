@@ -19,13 +19,13 @@ related_docs:
 verification:
   # `scripts/…`, not `backlog/scripts/…`: this task predates the extraction,
   # when code and data were co-located, and the contract inherited that layout.
-  # `adapter-is-a-plugin` uses `[[:space:]]` and not `\s`: inside a
-  # double-quoted YAML value a `\s` reaches grep as an escaped backslash and the
-  # pattern then matches nothing — a guard green with no evidentiary force.
   - id: cost-tests
     bash: "node --test scripts/tests/cost-adapter.test.mjs"
   - id: null-not-zero
     bash: "node scripts/cli.mjs time --cost --json | node -e \"let s='';process.stdin.on('data',c=>s+=c).on('end',()=>{const d=JSON.parse(s);if(d.tokens!==null&&!Number.isInteger(d.tokens))throw new Error('a missing adapter must give null, not zero');console.log('tokens:',d.tokens)})\""
+  # `[[:space:]]` and not `\s`: inside a double-quoted YAML value a `\s` reaches
+  # grep as an escaped backslash and the pattern then matches nothing — a guard
+  # green with no evidentiary force.
   - id: adapter-is-a-plugin
     bash: "! grep -rlE '^[[:space:]]*import[^;]*from +.[^\"'\"'\"']*cost-adapter[.]mjs' scripts --include='*.mjs' | grep -v tests"
   - id: pricing-is-data

@@ -83,7 +83,7 @@ import { repoRootFor } from "./done-task.mjs";
 import { readHistory, recordEdit } from "./history.mjs";
 import { userConfigPath } from "./home.mjs";
 import { lockScope, releaseLock, stateRoot } from "./lock.mjs";
-import { callerSpecies, queueStatuses, selectCandidates, servesExecutor } from "./next-task.mjs";
+import { callerSpecies, isOverSized, queueStatuses, selectCandidates, servesExecutor } from "./next-task.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
 import { loadPlanForDispatch, planState, projectionWall } from "./plan.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
@@ -286,6 +286,32 @@ export function waitingForExecutor(records, config, species) {
     if (servesExecutor(t, species)) continue;
     if (archived.has(t.status) || t.status === inProgress) continue;
     (out[String(t.executor).trim()] = out[String(t.executor).trim()] || []).push(t.id);
+  }
+  return out;
+}
+
+/**
+ * Open work this invocation may not be handed because of its SIZE (TL-211).
+ * PURE.
+ *
+ * The same rule as `waitingForExecutor`, keyed by the estimate rather than by
+ * the executor: an over-sized task is not blocked, it is waiting for a session
+ * somebody starts on purpose, and a run that stepped over one without saying so
+ * would leave a week of work looking like an empty queue.
+ *
+ * Only an unattended caller is gated, so only an unattended caller has anything
+ * waiting on this account.
+ */
+export function waitingForSize(records, config, species) {
+  if (species !== "agent") return {};
+  const archived = new Set(config.archivedStatuses || []);
+  const inProgress = config.inProgressStatus || null;
+  const out = {};
+  for (const t of records || []) {
+    if (!isOverSized(t, config)) continue;
+    if (archived.has(t.status) || t.status === inProgress) continue;
+    const estimate = String(t.estimate || "").trim();
+    (out[estimate] = out[estimate] || []).push(t.id);
   }
   return out;
 }
@@ -753,8 +779,9 @@ export function failedEntry(verdict) {
  *
  *   · `manual-needs-person` — the contract asks a PERSON to vouch, and an
  *     unattended loop is exactly the case where there is none.
- *   · `no-contract`, `criteria` — the task file itself is the problem; an agent
- *     told to "fix the cause" would have to edit the contract it is measured by.
+ *   · `no-contract`, `unreadable-contract`, `criteria` — the task file itself is
+ *     the problem; an agent told to "fix the cause" would have to edit the
+ *     contract it is measured by.
  *   · `already-closed` — the task is finished. `closed-elsewhere` rather than
  *     `needs-person` because nobody is needed: it is the outcome TL-191 gave the
  *     same situation found one step later, at the stuck-status write.
@@ -764,6 +791,7 @@ export function failedEntry(verdict) {
 export const TERMINAL_REFUSALS = {
   "manual-needs-person": "needs-person",
   "no-contract": "needs-person",
+  "unreadable-contract": "needs-person",
   "criteria": "needs-person",
   "already-closed": "closed-elsewhere",
 };
@@ -935,6 +963,17 @@ function renderReport(report, plan) {
     for (const kind of waitingExecutors) {
       const ids = report.waitingExecutor[kind];
       lines.push("    " + MARK.warn + " " + ids.length + " task(s) ask for `executor: " + kind + "`");
+      lines.push("      " + color.dim(ids.join(", ")));
+    }
+  }
+  const waitingSizes = Object.keys(report.waitingSize || {}).sort();
+  if (waitingSizes.length) {
+    lines.push("");
+    lines.push("  larger than an unattended run may be handed"
+      + (report.maxUnattendedEstimate ? " (above `" + report.maxUnattendedEstimate + "`)" : "") + ":");
+    for (const estimate of waitingSizes) {
+      const ids = report.waitingSize[estimate];
+      lines.push("    " + MARK.warn + " " + ids.length + " task(s) are `" + estimate + "` — start a session for one deliberately");
       lines.push("      " + color.dim(ids.join(", ")));
     }
   }
@@ -1268,9 +1307,10 @@ export function run(argv) {
       // failed, and the reader who acts on the panel then sees a whole task where
       // thirty seconds of checking is what is actually theirs.
       //
-      // ONLY THIS ONE REFUSAL. `no-contract` and `criteria` share the outcome
-      // `needs-person` and are the opposite case: nothing was verified because
-      // the task FILE is not finished, and there is no work to vouch for.
+      // ONLY THIS ONE REFUSAL. The other `needs-person` kinds — `no-contract`,
+      // `unreadable-contract`, `criteria` — are the opposite case: nothing was
+      // verified because the task FILE is not finished, and there is no work to
+      // vouch for.
       const toVouch = result.refusalKind === "manual-needs-person" && !!vouchStatus;
       if (result.refusalKind === "manual-needs-person" && !vouchStatus) {
         console.error(warn(task.id + ": its contract asks a person to vouch, and this backlog declares no " +
@@ -1358,9 +1398,13 @@ export function run(argv) {
   const leftover = readTaskRecords(backlogPaths(root).tasksDir, config.taskId.file);
   const waiting = served.length ? waitingForRole(leftover, config, served, !!plan.agent) : {};
   const waitingExecutor = waitingForExecutor(leftover, config, callerSpecies(actor));
+  const waitingSize = waitingForSize(leftover, config, callerSpecies(actor));
 
   const shared = sharedStatePaths();
-  const report = { taken, tally, ms: Date.now() - started, stopped, waiting, waitingExecutor, neverStarted, shared };
+  const report = {
+    taken, tally, ms: Date.now() - started, stopped, waiting, waitingExecutor, waitingSize,
+    maxUnattendedEstimate: config.maxUnattendedEstimate, neverStarted, shared,
+  };
   if (plan.json) {
     console.log(JSON.stringify({
       // `ok` is about the RUN, not about the tasks: blocked work is a run that
@@ -1376,6 +1420,8 @@ export function run(argv) {
       waitingForRole: Object.keys(waiting).sort().map((r) => ({ role: r, count: waiting[r].length, ids: waiting[r] })),
       waitingForExecutor: Object.keys(waitingExecutor).sort()
         .map((e) => ({ executor: e, count: waitingExecutor[e].length, ids: waitingExecutor[e] })),
+      waitingForSize: Object.keys(waitingSize).sort()
+        .map((e) => ({ estimate: e, count: waitingSize[e].length, ids: waitingSize[e] })),
       tally: { ...tally, taken: taken.length },
       // What this run used outside the tree it was given. A consumer comparing
       // two runs can see a shared-state change for what it is (TL-202).

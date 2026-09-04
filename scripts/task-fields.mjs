@@ -122,11 +122,66 @@ export const REASON_SENTINELS = [REASON_UNKNOWN, REASON_PROVEN];
  *  change; a treatise belongs in the task body, which has no limit. */
 export const REASON_MAX_LENGTH = 500;
 
+// WHY THE CAUSE IS NAMED AND NOT JUST THE VERDICT (TL-167). A reason is
+// refused for three unrelated things, and a boolean collapses them into one.
+// Six commands used to expand that one `false` back into a sentence about the
+// first two causes, so a 600-character reason was refused as "empty or
+// reserved" — a message naming a rule the value does not break sends the reader
+// looking in the wrong place, which is worse than a bare "invalid". The cause
+// is decided HERE, where the rule lives, and every caller prints what it says.
+const CAUSE_EMPTY = "empty";
+const CAUSE_RESERVED = "reserved";
+const CAUSE_TOO_LONG = "too-long";
+
+/** Which rule a reason breaks, or null when it breaks none. Cheap on purpose:
+ *  `isValidReason` runs once per history entry, so the sentence explaining the
+ *  cause is built only when somebody is about to read it. */
+function reasonCause(reason) {
+  const trimmed = typeof reason === "string" ? reason.trim() : "";
+  if (!trimmed) return CAUSE_EMPTY;
+  if (REASON_SENTINELS.indexOf(trimmed) !== -1) return CAUSE_RESERVED;
+  if (trimmed.length > REASON_MAX_LENGTH) return CAUSE_TOO_LONG;
+  return null;
+}
+
+/** How much of an over-long value is quoted back. Enough to recognise which
+ *  sentence was typed; a value printed in full is most of the refusal, and it
+ *  buries the one number that explains it. */
+const REASON_ECHO_LENGTH = 60;
+
+/**
+ * Why a reason cannot be used, as the refusal a person reads — or null when it
+ * can be used. `flag` names the argument it arrived in, because the same rule
+ * judges `--reason`, `--question` and `--option`.
+ *
+ * The first line is the headline the CLI puts after the command name; the rest
+ * is the explanation under it.
+ */
+export function reasonRefusal(reason, flag) {
+  const name = flag || "--reason";
+  const trimmed = typeof reason === "string" ? reason.trim() : "";
+  switch (reasonCause(reason)) {
+    case CAUSE_EMPTY:
+      return "`" + name + "` is empty\n" +
+        "A change recorded with no sentence beside it is a change nobody can explain\n" +
+        "afterwards, which is the one thing this field exists to prevent.";
+    case CAUSE_RESERVED:
+      return "`" + name + " " + trimmed + "` is reserved for the tool's own use\n" +
+        "`" + REASON_UNKNOWN + "` and `" + REASON_PROVEN + "` are what it writes when nobody stated a\n" +
+        "reason; typing one by hand would dress a machine's answer up as yours.";
+    case CAUSE_TOO_LONG:
+      return "`" + name + "` is " + trimmed.length + " characters long, and at most " +
+          REASON_MAX_LENGTH + " are kept\n" +
+        "It begins `" + trimmed.slice(0, REASON_ECHO_LENGTH) + "`…\n" +
+        "One sentence about one change is the whole of it; an argument that needs more\n" +
+        "belongs in the task body, which has no limit.";
+    default:
+      return null;
+  }
+}
+
 export function isValidReason(reason) {
-  if (typeof reason !== "string") return false;
-  const trimmed = reason.trim();
-  if (REASON_SENTINELS.indexOf(trimmed) !== -1) return false;
-  return trimmed.length > 0 && trimmed.length <= REASON_MAX_LENGTH;
+  return reasonCause(reason) === null;
 }
 
 /** Never invents: anything that is not a usable reason becomes `unknown`. */

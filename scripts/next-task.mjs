@@ -56,7 +56,7 @@ import { fileURLToPath } from "node:url";
 import { resolveActor } from "./actor.mjs";
 import { crossBranchState, describeDivergence, divergences, scanNote } from "./branch-scan.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { ACTOR_NAMESPACES, FIELD_COMMENT, isValidActor, isValidReason, readHistory } from "./history.mjs";
+import { ACTOR_NAMESPACES, FIELD_COMMENT, isValidActor, readHistory, reasonRefusal } from "./history.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
 import { dispatchWave, loadPlanForDispatch } from "./plan.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
@@ -109,11 +109,9 @@ export function parseNextArgs(args) {
         "nothing for it to narrow."
     );
   }
-  if (plan.reason !== null && !isValidReason(plan.reason)) {
-    throw new Error(
-      "`--reason " + plan.reason + "` is empty or reserved\n" +
-        "`unknown` and `proven` are what the tool writes when nobody stated a reason."
-    );
+  if (plan.reason !== null) {
+    const refusal = reasonRefusal(plan.reason, "--reason");
+    if (refusal) throw new Error(refusal);
   }
   return plan;
 }
@@ -183,6 +181,35 @@ export function callerSpecies(actor) {
 export function servesExecutor(task, species) {
   const wanted = String((task && task.executor) || "").trim();
   return !wanted || !species || wanted === species;
+}
+
+/**
+ * Is this task larger than an unattended run may be handed? PURE (TL-211).
+ *
+ * ABOVE MEANS LATER IN `estimates`, and that is the whole design. The
+ * vocabulary is an ORDERED list this project wrote, so the comparison is two
+ * `indexOf` calls and nothing is parsed into hours: a scale this project has
+ * not stated would be invented by the code, and it would break the moment
+ * somebody wrote `2mo` — or measured work in `small` and `large` at all.
+ *
+ * THREE WAYS OUT, ALL OF THEM "NOT GATED". No threshold means the project has
+ * not asked for one. A THRESHOLD outside the vocabulary is refused by `run()`
+ * below before this is ever reached, but the predicate is pure and answers
+ * rather than throwing — a caller holding a broken configuration gets today's
+ * behaviour, not an exception from a filter. An ESTIMATE outside the vocabulary
+ * has no position in the order, and inventing one for it is the very thing this
+ * refuses; withholding such a task would also be the worse failure, because the
+ * gate is not a block and an invisible task reads exactly like an empty queue.
+ */
+export function isOverSized(task, config) {
+  const bar = String((config && config.maxUnattendedEstimate) || "").trim();
+  if (!bar) return false;
+  const order = (config && config.estimates) || [];
+  const limit = order.indexOf(bar);
+  if (limit < 0) return false;
+  const at = order.indexOf(String((task && task.estimate) || "").trim());
+  if (at < 0) return false;
+  return at > limit;
 }
 
 /**
@@ -354,6 +381,20 @@ export function selectCandidates(records, config, filters, now) {
     }
     records = kept;
   }
+  // The SIZE gate (TL-211), applied to the RECORDS for the same reason as the
+  // species one, and only to an unattended caller: a person asking is the
+  // deliberate decision the threshold asks for, exactly as `take <ID>` is.
+  const skippedSize = [];
+  if (species === "agent") {
+    const kept = [];
+    for (const t of records) {
+      if (!isOverSized(t, config)) { kept.push(t); continue; }
+      if (!archived.has(t.status) && t.status !== inProgress) {
+        skippedSize.push({ id: t.id, estimate: String(t.estimate || "").trim() });
+      }
+    }
+    records = kept;
+  }
   // The plan gate (TL-183), applied to the RECORDS for the same reason as the
   // species one: a task the caller's plan does not schedule must be invisible to
   // the reclaim and unblocked pools too, not merely absent from the fresh queue.
@@ -431,7 +472,7 @@ export function selectCandidates(records, config, filters, now) {
   }
   return {
     candidates, reclaimable, unblocked, skippedElsewhere, skippedExecutor, skippedHandedBack,
-    skippedUnplanned,
+    skippedSize, skippedUnplanned,
     // The count is of tasks that MATCHED and were held back by an open blocker;
     // the unblocked ones were never in `matching`, so they must not be
     // subtracted from it.
@@ -501,6 +542,29 @@ export function run(argv) {
     }
   }
 
+  // THE THRESHOLD IS CHECKED WHERE IT IS READ (TL-211). A word `estimates` does
+  // not have has no position in the order, so no task can ever be above it: the
+  // key would gate nothing and look exactly like the absent key that means "no
+  // gate", which is the one outcome this design refuses. It refuses here, in the
+  // command the key is entirely about, rather than at load — a project halfway
+  // through editing its vocabulary must still be able to run `new`, `build` and
+  // `query`, and the dispatcher is the only place where being wrong about this
+  // costs anybody a task. Same exit 2 as the role vocabulary above.
+  const bar = config.maxUnattendedEstimate;
+  if (bar && (config.estimates || []).indexOf(bar) < 0) {
+    console.error(failure(N + " next",
+      "`max_unattended_estimate` = `" + bar + "`, which is not in `estimates`",
+      [
+        (config.estimates || []).length
+          ? "`estimates` in config.yaml holds: " + config.estimates.join(", ")
+          : "This backlog declares no `estimates:` in config.yaml, so no threshold can name a value.",
+        "The threshold is a POSITION in that list — `above` means later in it, and a",
+        "word the list has not got is above nothing at all.",
+      ],
+      [N + " next --help"]));
+    return 2;
+  }
+
   const filters = {
     status: splitList(plan.status),
     priority: splitList(plan.priority),
@@ -556,7 +620,7 @@ export function run(argv) {
     });
     filters.planIds = new Set((wave ? wave.ids : []).map((id) => String(id).toUpperCase()));
   }
-  const { candidates, reclaimable, unblocked, skippedBlocked, skippedElsewhere, skippedExecutor, skippedHandedBack, skippedUnplanned } =
+  const { candidates, reclaimable, unblocked, skippedBlocked, skippedElsewhere, skippedExecutor, skippedHandedBack, skippedSize, skippedUnplanned } =
     selectCandidates(records, config, filters, now);
   const planJson = planned
     ? {
@@ -612,7 +676,7 @@ export function run(argv) {
       if (plan.json) {
         printJson("task-take", {
           ...takeJson(result), passedOver, considered: candidates.length,
-          skippedElsewhere, skippedExecutor, skippedHandedBack, plan: planJson,
+          skippedElsewhere, skippedExecutor, skippedHandedBack, skippedSize, plan: planJson,
           scan: { scanned: scan.scanned, reason: scan.reason },
         });
       } else {
@@ -679,6 +743,17 @@ export function run(argv) {
     );
     for (const s of skippedExecutor) details.push("  " + MARK.bullet + " " + s.id + " → " + s.executor);
   }
+  // A task passed over for its SIZE is still executable — by a person, by
+  // `take`, by a run somebody points at it. Naming it, with the bar it failed,
+  // is what lets a reader choose between a higher threshold and a smaller task;
+  // without the sentence the queue simply reads as empty.
+  if (skippedSize.length) {
+    details.push(
+      skippedSize.length + " open task(s) are larger than an unattended run may be handed" +
+        " (above `" + config.maxUnattendedEstimate + "`)"
+    );
+    for (const s of skippedSize) details.push("  " + MARK.bullet + " " + s.id + " → " + s.estimate);
+  }
   if (handedBackLines.length) {
     details.push(
       handedBackLines.length + " candidate(s) YOU handed back — another actor is still offered them"
@@ -708,7 +783,7 @@ export function run(argv) {
       ok: false, taken: false, refusalKind: "nothing-to-take", refusal: "nothing to take",
       details,
       searchedStatuses: searched, skippedBlocked, passedOver, skippedElsewhere, skippedExecutor,
-      skippedHandedBack, plan: planJson,
+      skippedHandedBack, skippedSize, plan: planJson,
       scan: { scanned: scan.scanned, reason: scan.reason },
     });
   } else {

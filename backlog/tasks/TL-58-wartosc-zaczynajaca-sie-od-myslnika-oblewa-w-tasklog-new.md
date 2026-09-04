@@ -6,9 +6,9 @@ labels: [post-launch]
 board: main
 epic: "CLI surface"
 priority: P3
-status: pending
-owner: ""
-role: spec
+status: done
+owner: agent:dev
+role: dev
 estimate: 2h
 confidence: high
 created: 2026-08-31

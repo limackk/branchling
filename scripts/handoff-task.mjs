@@ -48,7 +48,7 @@ import { fileURLToPath } from "node:url";
 
 import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { ACTOR_NAMESPACES, appendEntries, currentSession, eventId, FIELD_COMMENT, isValidActor, isValidReason, normalizeReason, readHistory, recordEdit } from "./history.mjs";
+import { ACTOR_NAMESPACES, appendEntries, currentSession, eventId, FIELD_COMMENT, isValidActor, normalizeReason, readHistory, reasonRefusal, recordEdit } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { isExpired, lockDir, readLock, releaseLock } from "./lock.mjs";
 import { queueStatuses } from "./next-task.mjs";
@@ -103,13 +103,8 @@ export function parseHandoffArgs(args) {
         "has to be able to answer \"what am I being asked\" from the record alone."
     );
   }
-  if (!isValidReason(plan.reason)) {
-    throw new Error(
-      "`--reason " + plan.reason + "` is empty or reserved\n" +
-        "`unknown` and `proven` are what the tool writes when nobody stated a reason;\n" +
-        "typing one by hand would dress a machine's answer up as yours."
-    );
-  }
+  const refusal = reasonRefusal(plan.reason, "--reason");
+  if (refusal) throw new Error(refusal);
   return plan;
 }
 

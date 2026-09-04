@@ -58,7 +58,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 
 import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { ACTOR_NAMESPACES, appendEntries, currentSession, eventId, FIELD_COMMENT, isValidActor, isValidReason, questionBlockReason, recordEdit } from "./history.mjs";
+import { ACTOR_NAMESPACES, appendEntries, currentSession, eventId, FIELD_COMMENT, isValidActor, questionBlockReason, reasonRefusal, recordEdit } from "./history.mjs";
 import { releaseLock } from "./lock.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
 import { printJson } from "./json-envelope.mjs";
@@ -92,11 +92,11 @@ export function resolveOptions(rawOptions, rawRecommend) {
     // An option becomes the REASON when it is chosen, so it lives under the
     // same rules a reason does — including the two words the tool reserves for
     // itself.
-    if (!isValidReason(o)) {
+    const refusal = reasonRefusal(o, "--option");
+    if (refusal) {
       throw new Error(
-        "`--option " + o + "` is empty, reserved or longer than 500 characters\n" +
-          "A chosen option is recorded as the decision's reason, so it carries a reason's\n" +
-          "rules: `unknown` and `proven` are what the tool writes when nobody stated one."
+        refusal + "\nA chosen option is recorded as the decision's reason, so it is held to a\n" +
+          "reason's rules."
       );
     }
     if (seen.has(o)) {
@@ -186,12 +186,8 @@ export function parseAskArgs(args) {
         "person who finds it has to be able to read what was being asked."
     );
   }
-  if (!isValidReason(plan.question)) {
-    throw new Error(
-      "`--question " + plan.question + "` is empty or reserved\n" +
-        "`unknown` and `proven` are what the tool writes when nobody stated a reason."
-    );
-  }
+  const questionRefusal = reasonRefusal(plan.question, "--question");
+  if (questionRefusal) throw new Error(questionRefusal);
   // THE QUESTION IS CHECKED FIRST on purpose: options with no question they
   // answer are a menu with no subject, so complaining about the menu while the
   // subject is missing would name the second defect and hide the first.

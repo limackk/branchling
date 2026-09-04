@@ -48,7 +48,7 @@ export { FIELD_CREATED, FIELD_DELETED, FIELD_BODY, FIELD_COMMENT, FIELD_VERIFIED
   FIELD_ROLE_OVERRIDE, FIELD_DECISION, FIELD_ATTRIBUTED, openQuestions, outstandingVouches, VOUCH_REFUSALS, VOUCH_SOURCES,
   PSEUDO_FIELDS, isPseudoField,
   ACTOR_NAMESPACES, ACTOR_UNKNOWN, actorParts, isValidActor, normalizeActor,
-  REASON_UNKNOWN, REASON_PROVEN, REASON_SENTINELS, REASON_MAX_LENGTH, hasStatedReason, isValidReason,
+  REASON_UNKNOWN, REASON_PROVEN, REASON_SENTINELS, REASON_MAX_LENGTH, hasStatedReason, isValidReason, reasonRefusal,
   normalizeReason } from "./task-fields.mjs";
 
 // ──────────────────────────────────────────────────────────────────────────

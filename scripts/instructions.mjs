@@ -375,11 +375,14 @@ you open a follow-up task for the gap. Do not edit the file to get past it.
 There is no \`--force\` — editing by hand is the only bypass, and a reviewer can
 see it in the diff.
 
-TWO REFUSALS MEAN SOMETHING OTHER THAN "the work is unfinished":
+THREE REFUSALS MEAN SOMETHING OTHER THAN "the work is unfinished":
 
   no closing contract          \`verification:\` is empty or still holds the
                                template placeholder. The task was never finished
                                being WRITTEN. Write the contract, then close it.
+  a line of the closing        The contract is THERE and one of its lines is
+  contract cannot be read      mistyped. The refusal quotes that line; fix it
+                               rather than rewriting the contract.
   the criteria and the         An acceptance criterion names a proof id that no
   verification do not agree    entry defines. Fix the link; nothing was run.
 

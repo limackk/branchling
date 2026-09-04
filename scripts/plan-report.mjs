@@ -39,9 +39,10 @@ import { loadConfigOrExit } from "./config.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { backlogPaths, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { loadPlan, planState, validatePlan } from "./plan.mjs";
+import { EDIT_SUBCOMMANDS, runPlanEdit } from "./plan-write.mjs";
 import { reportPlanErrors } from "./check-backlog-plan.mjs";
 import { readTaskMetas } from "./task-io.mjs";
-import { MARK, color, heading, statusPaint, table, width } from "./ui.mjs";
+import { MARK, color, failure, heading, statusPaint, table, width } from "./ui.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -158,6 +159,22 @@ export function renderPlan(state, config, opts = {}) {
 }
 
 function main(argv) {
+  // A WORD BEFORE THE FLAGS IS AN EDIT (TL-213). The reading form is untouched:
+  // `plan` and `plan --json` answer exactly as before, and the writing forms are
+  // subcommands rather than flags because `--add TL-1 --wave x` would make one
+  // command mean two things depending on which flags happened to be present.
+  // An unknown word FAILS — a silent no-op looks like it worked.
+  const first = argv[0];
+  if (first !== undefined && !first.startsWith("-")) {
+    if (EDIT_SUBCOMMANDS.indexOf(first) < 0) {
+      console.error(failure(N + " plan", "unknown subcommand: " + first,
+        ["known: " + EDIT_SUBCOMMANDS.join(", ") + ", or no subcommand at all to READ the plan"],
+        [N + " plan --help"]));
+      return 2;
+    }
+    return runPlanEdit(first, argv.slice(1));
+  }
+
   const cli = takeDirFlag(argv);
   for (const a of cli.argv) {
     if (KNOWN_FLAGS.indexOf(a) < 0) {

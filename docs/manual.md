@@ -357,6 +357,19 @@ are the shape of the field and are not in `config.yaml`, because a project that
 could invent a third species would leave the dispatcher nothing to compare
 against.
 
+**Some tasks are too big for one unattended session.** `max_unattended_estimate`
+in `config.yaml` names the largest estimate `next` and `run` may hand to an
+`agent:` actor; without the key there is no gate at all. Above means LATER IN
+`estimates`, which is an ordered list this project wrote — nothing is parsed
+into hours, so a backlog measuring work in `small` and `large` is gated exactly
+as well as one measuring it in `1d` and `1w`, and an estimate the list does not
+contain has no position and is never gated. A threshold naming a word outside
+`estimates` is refused, because it could gate nothing and would read as no gate
+at all. Like `executor:`, it gates the DISPATCHER only: the skipped tasks are
+counted and named (`skippedSize` in `next --json`, `waitingForSize` in `run
+--json`), and `take <ID>` still works — naming a task is the deliberate decision
+the threshold asks for.
+
 **One queue, several hands.** A task may ask for a competence in `role:`, and a
 run can serve more than one of them: `--agent-for <role>=<command>`, repeatable,
 with `--agent` serving the tasks that ask for nobody in particular. A role you
@@ -594,7 +607,7 @@ implementation detail. Every reading command answers in the same envelope:
 | `<command> --help` | `command-help` | `command`, `summary`, `usage`, `configured`, `flags` |
 | `pr-summary` | `pr-summary` | `base`, `scanned`, `reason`, `tasks`, `engaged`, `cost` |
 | `audit` | `audit` | `since`, `dayZero`, `tasks`, `findings`, `closedWithoutTrace`, `skippedBeforeSince`, `reopened`, `rework`, `parked`, `withoutPremise`, `awaitingVouch`, `vouches`, `vouchesByActor` |
-| `take`, `next` | `task-take` | `ok`, `taken`, `id`, `file`, `task`, `from`, `text`, `warnings`, `reclaimed`, `lock`, `refusalKind`, `refusal`, `details`, and — filled in by next — `passedOver`, `considered`, `searchedStatuses`, `skippedBlocked`, `skippedElsewhere`, `skippedExecutor`, `skippedHandedBack`, `scan`, `plan` |
+| `take`, `next` | `task-take` | `ok`, `taken`, `id`, `file`, `task`, `from`, `text`, `warnings`, `reclaimed`, `lock`, `refusalKind`, `refusal`, `details`, and — filled in by next — `passedOver`, `considered`, `searchedStatuses`, `skippedBlocked`, `skippedElsewhere`, `skippedExecutor`, `skippedHandedBack`, `skippedSize`, `scan`, `plan` |
 | `handoff` | `task-handoff` | `ok`, `id`, `file`, `task`, `role`, `owner`, `status` (each a from/to pair), `comment`, `released`, `warnings`, `refusalKind`, `refusal`, `details` |
 | `ask` | `task-ask` | `ok`, `id`, `file`, `question` (its event id, timestamp, text and asker), `changes`, `blockedReason`, `refusalKind`, `refusal`, `details` |
 | `done` | `verification-run` | `ok`, `task`, `dryRun`, `closed`, `entries` (one per `verification:` entry, with its exit code), `status`, `wouldBe`, `ticked`, `refusalKind`, `refusal`, `details` |

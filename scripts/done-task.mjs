@@ -476,6 +476,21 @@ function run(argv) {
   const { entries, problems } = parseVerification(frontmatter);
   const contract = contractProblem(entries, problems);
   if (contract) {
+    // TWO DEFECTS, TWO DIAGNOSES (TL-173). "has no closing contract" is the
+    // message for a task nobody finished WRITING, and the guide it points at
+    // says to go and write one. A contract that exists and is four entries long
+    // but holds one line the parser cannot read sent the reader to that repair,
+    // where they would rewrite something already correct. The headline and the
+    // `refusalKind` both split, because the machine-readable cause is the half a
+    // report is built from and conflating it there is the same wrong answer.
+    if (problems.length) {
+      return refuse(plan, plan.id + ": a line of the closing contract cannot be read",
+        contract.split("\n").concat([
+          "",
+          "The contract is there — this is one line of it, not the whole thing. Fix the",
+          "line above; nothing was run and the file is untouched.",
+        ]), [], "unreadable-contract");
+    }
     return refuse(plan, plan.id + " has no closing contract", contract.split("\n"), [], "no-contract");
   }
 

@@ -32,6 +32,7 @@ import { fileURLToPath } from "node:url";
 import { parseAskArgs, resolveOptions } from "../ask-task.mjs";
 import { parseDecideArgs } from "../decide-task.mjs";
 import { withDecisions } from "../decisions.mjs";
+import { REASON_MAX_LENGTH, REASON_SENTINELS } from "../task-fields.mjs";
 
 import { isolateHome } from "./_repo.mjs";
 
@@ -182,14 +183,46 @@ test("`--recommend` with no options, out of range, or not a number is refused", 
   assert.throws(() => ask("--option", "one", "--recommend", "x"), /is not an option number/);
 });
 
+// `unknown` and `proven` are the tool's own words. A chosen option BECOMES the
+// decision's reason, so admitting one here would launder a machine's word into
+// somebody's answer at `decide` time, where nothing is left to catch it.
+//
+// WHAT IS PINNED HERE, AND WHAT IS NOT (TL-167). That each value is refused AT
+// THIS BOUNDARY — inside `resolveOptions`, before `ask` has written anything —
+// and that the refusal names the cause that fired rather than a rule the value
+// does not break. The SENTENCES belong to `reasonRefusal` and are asserted
+// once, in `change-reason.test.mjs`. This file used to hold a second copy of
+// them, and that copy is how one diagnosis came to be corrected in one place
+// and left wrong in another.
 test("an option that could not be recorded as a reason is refused", () => {
-  // `unknown` and `proven` are the tool's own words. A chosen option BECOMES the
-  // decision's reason, so admitting one here would launder a machine's word into
-  // somebody's answer at `decide` time, where nothing is left to catch it.
-  assert.throws(() => resolveOptions(["unknown"], "1"), /is empty, reserved or longer/);
-  assert.throws(() => resolveOptions(["proven"], "1"), /is empty, reserved or longer/);
-  assert.throws(() => resolveOptions(["   "], "1"), /is empty, reserved or longer/);
-  assert.throws(() => resolveOptions(["x".repeat(501)], "1"), /is empty, reserved or longer/);
+  // The control: an option that breaks none of the rules is ACCEPTED. Without
+  // it every case below is green against a `resolveOptions` that throws at
+  // whatever it is handed.
+  assert.deepEqual(resolveOptions(["one"], "1"), { options: ["one"], recommend: 1 });
+
+  for (const sentinel of REASON_SENTINELS) {
+    assert.throws(() => resolveOptions([sentinel], "1"), (e) => {
+      assert.match(e.message, new RegExp("`--option " + sentinel + "` is reserved"));
+      assert.doesNotMatch(e.message, /is empty/, "a reserved word is not an empty one");
+      return true;
+    });
+  }
+
+  assert.throws(() => resolveOptions(["   "], "1"), (e) => {
+    assert.match(e.message, /`--option` is empty/);
+    assert.doesNotMatch(e.message, /reserved/, "a blank option is not one of the tool's own words");
+    return true;
+  });
+
+  const tooLong = "x".repeat(REASON_MAX_LENGTH + 1);
+  assert.throws(() => resolveOptions([tooLong], "1"), (e) => {
+    // The two numbers that explain the refusal, and not one word about the
+    // rules an over-long option does not break.
+    assert.match(e.message, new RegExp("`--option` is " + tooLong.length + " characters long"));
+    assert.match(e.message, new RegExp("\\b" + REASON_MAX_LENGTH + "\\b"));
+    assert.doesNotMatch(e.message, /is empty|reserved/, "an option of " + tooLong.length + " characters is neither");
+    return true;
+  });
 });
 
 test("the same option twice is refused — choosing between them decides nothing", () => {

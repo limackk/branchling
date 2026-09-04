@@ -6,9 +6,9 @@ labels: []
 board: main
 epic: "CLI surface"
 priority: P3
-status: pending
-owner: ""
-role: spec
+status: done
+owner: agent:dev
+role: dev
 executor: ""
 estimate: 2h
 confidence: medium
@@ -82,11 +82,11 @@ comments that explain a fragile guard get pushed away from the guard.
 
 ## Acceptance criteria
 
-- [ ] A `#` line between two verification entries parses as a comment, and the
+- [x] A `#` line between two verification entries parses as a comment, and the
       entries either side are both read. [proof: comment-between-entries]
-- [ ] A mistyped entry key still fails — the fix does not turn every unreadable
+- [x] A mistyped entry key still fails — the fix does not turn every unreadable
       line into silence. [proof: comment-between-entries]
-- [ ] An unreadable line and an empty contract produce DIFFERENT messages from
+- [x] An unreadable line and an empty contract produce DIFFERENT messages from
       `done`. [proof: comment-between-entries]
 
 ## Decisions
