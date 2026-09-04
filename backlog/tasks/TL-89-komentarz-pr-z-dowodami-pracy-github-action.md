@@ -30,7 +30,7 @@ verification:
   - id: standalone
     bash: "node scripts/cli.mjs pr-summary --base HEAD~1 | head -1 | grep -q 'the backlog on this branch' && echo 'the command works with no GitHub anywhere near it — OK'"
   - id: rendered
-    manual: "The markdown from `worktrail pr-summary` was pasted into a real pull-request comment and renders correctly there — the table has its columns, the transitions read as a list, and nothing shows as raw markup"
+    manual: "The markdown from `branchling pr-summary` was pasted into a real pull-request comment and renders correctly there — the table has its columns, the transitions read as a list, and nothing shows as raw markup"
 ---
 
 ## Goal

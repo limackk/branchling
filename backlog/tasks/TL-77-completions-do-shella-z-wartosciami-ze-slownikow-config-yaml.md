@@ -18,7 +18,7 @@ blocks: []
 related_docs: []
 verification:
   - bash: "node --test scripts/tests/completions.test.mjs"
-  - manual: "In a fresh zsh shell after installation: `worktrail query --status <TAB>` suggests statuses from this backlog's config.yaml, not literals from the code"
+  - manual: "In a fresh zsh shell after installation: `branchling query --status <TAB>` suggests statuses from this backlog's config.yaml, not literals from the code"
 ---
 
 ## Goal
