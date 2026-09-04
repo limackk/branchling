@@ -297,7 +297,7 @@ test("every editable field has a label and a known kind", () => {
     // is the empty one. Which is a field with no value at all unless it also
     // allows empty — so that pairing is what this asserts.
     if (f.kind === "enum" && !f.dynamic && !f.dictionaryRequired) {
-      assert.ok(f.options && f.options.length, f.key + " enum bez opcji");
+      assert.ok(f.options && f.options.length, f.key + " is an enum with no options");
     }
     if (f.dictionaryRequired) {
       assert.equal(f.kind, "enum", f.key + ": only an enum can require a dictionary");

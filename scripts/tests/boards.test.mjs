@@ -110,8 +110,8 @@ test("per-board views are a partition: each task lands in its own board only", (
 
   const mainNow = r.read("boards/main/NOW.yaml");
   const bpNow = r.read("boards/backlog-project/NOW.yaml");
-  assert.ok(mainNow, "boards/main/NOW.yaml nie powstal");
-  assert.ok(bpNow, "boards/backlog-project/NOW.yaml nie powstal");
+  assert.ok(mainNow, "boards/main/NOW.yaml was not written");
+  assert.ok(bpNow, "boards/backlog-project/NOW.yaml was not written");
   assert.match(mainNow, /BL-100/);
   assert.doesNotMatch(mainNow, /BL-101/);
   assert.match(bpNow, /BL-101/);
@@ -276,7 +276,7 @@ function runGuard(args, cwd) {
   // A missing script also exits 1 — an assertion on the code alone would then pass
   // with zero evidential force. A precedent from the same session: the "duplicate
   // slug" case was green before the guard existed at all.
-  assert.doesNotMatch(out, /Cannot find module|MODULE_NOT_FOUND/, "guard nie istnieje:\n" + out);
+  assert.doesNotMatch(out, /Cannot find module|MODULE_NOT_FOUND/, "the board guard script is missing:\n" + out);
   return { code: r.status, out };
 }
 
@@ -579,7 +579,7 @@ const QUERY = join(SCRIPTS, "query.mjs");
 function runQuery(args, dir) {
   const r = spawnSync("node", [QUERY, "--tasks", join(dir, "tasks"), ...args], { encoding: "utf8" });
   const out = `${r.stdout || ""}${r.stderr || ""}`;
-  assert.doesNotMatch(out, /Cannot find module|MODULE_NOT_FOUND/, "query.mjs nie istnieje:\n" + out);
+  assert.doesNotMatch(out, /Cannot find module|MODULE_NOT_FOUND/, "query.mjs is missing:\n" + out);
   return { code: r.status, out };
 }
 

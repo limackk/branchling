@@ -358,9 +358,13 @@ const DICTIONARY_HEADER = [
   "# the same decision taken in bulk, and it accepts the mistakes too.",
   "#",
   "# WHAT IT INHERITED. The snapshot was taken from a tree that still carried",
-  "# Polish inside scripts/tests, so this file holds those words as well. They",
-  "# are the debt TL-229 and TL-128 are open for, and closing either means",
-  "# deleting the words it translated from here in the same commit.",
+  "# Polish inside scripts/tests, so this file holds those words as well. TL-128",
+  "# deleted the three that its translation retired, in the same commit as the",
+  "# assertion messages that used them — which is the rule for every such task.",
+  "# A word left standing here keeps the guard green over the NEXT line to reuse",
+  "# it, so a translation that does not touch this file has bought nothing. What",
+  "# is left belongs to TL-229: the half-translated comment in",
+  "# scripts/tests/new-task.test.mjs.",
   "",
 ].join("\n");
 
