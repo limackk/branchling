@@ -43,6 +43,7 @@ import { loadConfig, loadConfigOrExit } from "./config.mjs";
 import { PLAN_FILENAME, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { loadPlan } from "./plan.mjs";
 import { listWorktrees, resolveWorktree } from "./viewer-worktrees.mjs";
+import { crossBranchState } from "./branch-scan.mjs";
 import { decideTask } from "./decide-task.mjs";
 // The live signal (TL-189). `activity.mjs` is what reaches the raw log, which
 // lives OUTSIDE every repository; `in-flight.mjs` holds the rules and is also
@@ -381,6 +382,88 @@ try {
 }
 
 ensureActivityWatch();
+
+// ──────────────────────────────────────────────────────────────────────────
+// The push for a change made in ANOTHER worktree (TL-122)
+// ──────────────────────────────────────────────────────────────────────────
+//
+// The watches above see THIS tree only. `take` run in a second worktree writes a
+// file in THAT tree's backlog: nothing changes here, no watcher fires, and the
+// page keeps a stale scan while still looking alive, because it goes on pushing
+// for local edits. That is worse than a static page — a stale answer that reads
+// exactly like a fresh one, and the reader has no reason to press F5.
+//
+// POLLED AND NOT WATCHED, deliberately. The set of worktrees changes over a
+// server's lifetime, so a watcher per tree is a descriptor nobody closes; and
+// what the scan reads is partly `git status` in other trees — an uncommitted
+// edit — which is a question, not a directory event.
+//
+// The interval is `cross_branch_poll_seconds` (law III): the scan shells out to
+// git, so its frequency is a cost the project decides.
+let crossBranchSeen = null;
+
+/** One tick ahead, never a repeating interval: a scan slower than the interval
+ *  would otherwise queue behind itself. `unref` so the loop is not what keeps
+ *  the process alive once the server is gone. */
+function scheduleCrossBranchPoll() {
+  setTimeout(pollCrossBranch, CONFIG.crossBranchPollSeconds * 1000).unref();
+}
+
+/**
+ * The scan reduced to the one string that decides whether to push: every task,
+ * with every status seen for it elsewhere and where that was seen. `null` when
+ * the scan did not run — then there is nothing to compare and nothing to watch.
+ */
+function crossBranchFingerprint() {
+  const scan = crossBranchState(BACKLOG_DIR, CONFIG);
+  if (!scan.scanned) return null;
+  const rows = [];
+  for (const [id, observations] of scan.byId) {
+    const seen = (observations || [])
+      .map((o) => [o.status, o.source, o.kind, o.since || ""].join("\u0000"))
+      .sort();
+    rows.push(id + "\u0000" + seen.join("\u0001"));
+  }
+  rows.sort();
+  return rows.join("\u0002");
+}
+
+function pollCrossBranch() {
+  let fingerprint;
+  try {
+    fingerprint = crossBranchFingerprint();
+  } catch (e) {
+    // The loop dies, the server does not: a viewer that stops pushing is worth
+    // less than one that stops answering.
+    console.warn(`${N} serve: the state of the other trees cannot be read — no push for them:`, e.message);
+    return;
+  }
+  if (fingerprint === null) {
+    // `not-a-repository` or `outside-repository`: where the backlog SITS, and
+    // that does not change under a running server. The loop stops instead of
+    // asking git the same question every tick, and it stops WITHOUT a line: the
+    // scan that did not run is already stated to the reader by `scanNote()`
+    // wherever the state is read, and a warning per tick would fill the terminal
+    // of everybody serving a backlog that is not committed yet.
+    return;
+  }
+  // ONLY ON A DIFFERENCE, and the first tick only takes the reference point: a
+  // push on every tick would redraw the page forever and make the signal mean
+  // nothing. The same `tasks-changed` as the plan watch above, for the same
+  // reason — the page answers it by re-reading /api/tasks, which carries the
+  // `elsewhere` badge, so a second event name would be a second name for one
+  // refresh.
+  if (crossBranchSeen !== null && fingerprint !== crossBranchSeen) notifyClients();
+  crossBranchSeen = fingerprint;
+  scheduleCrossBranchPoll();
+}
+
+// The scan switch governs the loop: `cross_branch_state: false` asked for a view
+// from this tree alone, and a push carrying another tree's state would be the
+// tool arguing with that decision.
+if (CONFIG.crossBranchState !== false && CONFIG.crossBranchPollSeconds > 0) {
+  scheduleCrossBranchPoll();
+}
 
 // ──────────────────────────────────────────────────────────────────────────
 // Routes
