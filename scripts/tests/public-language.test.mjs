@@ -402,3 +402,115 @@ test("POSITIVE CONTROL: a Polish path-shaped line that is prose still FAILS in a
   assert.equal(findings.length, 1, "prose sitting next to a path is still prose");
   rmSync(dir, { recursive: true, force: true });
 });
+
+// ── The dictionary contract: an unknown word FAILS (TL-201) ───────────────
+//
+// EVERYTHING ABOVE THIS LINE DESCRIBES THE MECHANISM BEING REPLACED. Those
+// assertions name the signals a blocklist happens to have — `diacritics`,
+// `word`, `words`, `shape`, `label` — and reconciling them with a dictionary is
+// the implementing hand's work, not a widening of this contract. What follows
+// states the RULE instead, so that no arrangement of blocklists can satisfy it:
+// it names no signal and no reason code, only which text has to be reported and
+// which has to stay silent.
+//
+// THE MEASURED FAILURE. `Tryb snapshot` was rendered into the viewer's
+// connection bar — the label beside the status dot, one of the first things a
+// reader of a `file://` page sees. It survived TL-137's translation of 145 files
+// and every `check` run afterwards, while the guard reported 96,307 lines as
+// carrying nothing it looks for (TL-198, measured 2026-09-03). Four letters, no
+// diacritic, no digraph, and an ending that is unremarkable in English: it falls
+// between every signal the guard has.
+//
+// WHY THE FIX IS NOT ONE MORE ENTRY IN A LIST. A blocklist is closed by
+// enumeration and a language is not, so the next miss is simply a different
+// word. That is why the third test below uses a MISSPELLING of an English word:
+// no list of foreign words can ever contain it, and adding `tryb` to one leaves
+// that test red for ever. Only the inverted question — is this word one the
+// project knows? — answers both, and it is the same question that makes the
+// guard a spellchecker.
+
+/** Plant `files` in a throwaway tree, audit it through the real walk, clean up. */
+function auditFixture(files) {
+  const dir = mkdtempSync(join(tmpdir(), "branchling-lang-dict-"));
+  try {
+    for (const [rel, text] of Object.entries(files)) {
+      mkdirSync(join(dir, dirname(rel)), { recursive: true });
+      writeFileSync(join(dir, rel), text, "utf8");
+    }
+    return auditTree(dir);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test("POSITIVE CONTROL: the label that shipped to every reader FAILS over a fixture", () => {
+  // The sample is planted, never read from this repository: a control that read
+  // the real tree would go green the moment somebody fixed the tree, and would
+  // then be proving nothing about the guard.
+  const { findings, filesChecked } = auditFixture({
+    // language-guard: allow — the shipped label IS the sample; translating it would falsify the measurement it is evidence of
+    "scripts/serve-backlog.mjs": 'const status = "Tryb snapshot";\n',
+  });
+  assert.equal(filesChecked, 1, "the fixture tree was not walked — the finding count below would mean nothing");
+  assert.ok(
+    findings.some((f) => f.file.includes("serve-backlog.mjs")),
+    // language-guard: allow — the word under test
+    "the guard reads `Tryb` as English, which is the whole of TL-198"
+  );
+});
+
+test("the class that miss belongs to: an accent-free foreign word is caught wherever it sits", () => {
+  // One word is an anecdote. Each of these carries no diacritic, no digraph and
+  // no inflected ending, which is to say each is invisible to all three signals
+  // for the same reason — the miss is a property of the mechanism, not of `Tryb`.
+  // language-guard: allow — every word in this array is a sample of what must be caught
+  for (const word of ["Tryb", "Wybor", "Kolejno", "Naglowek"]) {
+    const { findings, filesChecked } = auditFixture({ "docs/fixture.md": "# " + word + "\n" });
+    assert.equal(filesChecked, 1, "the fixture tree was not walked");
+    assert.ok(findings.length >= 1, "a foreign word passed the guard: " + word);
+  }
+});
+
+test("a MISSPELLED English word fails too, which no list of foreign words can do", () => {
+  // The property that separates a dictionary from a longer blocklist, and the
+  // reason TL-198 is blocked by TL-201 rather than fixed first: patching the
+  // heuristic satisfies the two tests above and leaves this one red for ever.
+  const { findings, filesChecked } = auditFixture({
+    // language-guard: allow — the misspellings ARE the sample
+    "docs/typos.md": "The task was recieved, and a seperate failure occured twice.\n",
+  });
+  assert.equal(filesChecked, 1, "the fixture tree was not walked");
+  assert.ok(findings.length >= 1, "an unknown word has to fail, however it came to be unknown");
+});
+
+test("SILENT: the vocabulary this project actually writes — the dictionary's real cost", () => {
+  // A dictionary fails an UNKNOWN word, and most of what this repository writes
+  // is unknown to any general word list: identifiers, jargon, and the tool's own
+  // nouns. If the dictionary is not built from the tree, the guard turns red over
+  // the whole repository and gets switched off — and a guard people mute protects
+  // nothing. This is the failure mode the migration has to avoid, stated here so
+  // it is visible before the mechanism is written rather than after.
+  const { findings, filesChecked, linesChecked } = auditFixture({
+    "docs/vocabulary.md":
+      [
+        "The frontmatter of a task file names its epic, its board and its blocked_by ids.",
+        "`branchling renumber` closes gaps in the numbers, and each worktree keeps its own backlog.",
+        "Every write appends a JSONL record under backlog/history, keyed by the task id.",
+      ].join("\n") + "\n",
+    "scripts/sample.mjs": 'const dir = mkdtempSync(join(tmpdir(), "branchling-"));\n',
+  });
+  // A ✓ over an empty sample is green with no evidentiary force (CLAUDE.md).
+  assert.equal(filesChecked, 2, "the fixture tree was not walked");
+  assert.ok(linesChecked > 4, "the walk read only " + linesChecked + " lines — wrong tree?");
+  assert.deepEqual(findings, [], "the guard cries wolf over this project's own words");
+});
+
+test("`check --language` keeps its name, its exit code and the counts it prints", () => {
+  // Step 4 of TL-201: a caller parsing this must not have to change because the
+  // mechanism behind it did. The flag is part of the contract, not an internal.
+  const r = spawnSync(process.execPath, [join(ROOT, "scripts", "cli.mjs"), "check", "--language"], {
+    encoding: "utf8", timeout: 60_000, env: { ...process.env, NO_COLOR: "1" },
+  });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /language: \d+ lines across \d+ public files/, "the counts a caller reads are gone");
+});
