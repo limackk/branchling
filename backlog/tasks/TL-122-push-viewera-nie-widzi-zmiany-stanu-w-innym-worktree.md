@@ -6,7 +6,7 @@ labels: []
 board: main
 epic: "Backlog viewer"
 priority: P3
-status: awaiting_vouch
+status: done
 owner: agent:dev
 executor: ""
 role: dev
@@ -86,12 +86,12 @@ Traps to resolve along the way:
 
 ## Acceptance criteria
 
-- [ ] A task's status change in another worktree triggers pushes to the open
+- [x] A task's status change in another worktree triggers pushes to the open
       page. [proof: suite]
-- [ ] No change triggers no push — the test has a negative and a positive
+- [x] No change triggers no push — the test has a negative and a positive
       control. [proof: suite]
-- [ ] The interval is a project configuration key, and a disabled scan
+- [x] The interval is a project configuration key, and a disabled scan
       disables the loop. [proof: suite]
-- [ ] A server outside a git repository behaves as today and does not log a
+- [x] A server outside a git repository behaves as today and does not log a
       warning in the loop. [proof: suite]
-- [ ] The rest of the tests stay green. [proof: no-regression]
+- [x] The rest of the tests stay green. [proof: no-regression]
