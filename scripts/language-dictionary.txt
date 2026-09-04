@@ -168,6 +168,7 @@ agents
 ages
 aggregate
 aggregates
+aggregating
 aggregation
 aging
 agnostic
@@ -887,6 +888,7 @@ charset
 chart
 charted
 charter
+charters
 charts
 chasing
 chat
@@ -2144,6 +2146,7 @@ evaluates
 evaluating
 evaporate
 even
+evening
 evenly
 event
 events
@@ -2729,6 +2732,7 @@ harm
 harmless
 harmlessly
 harness
+harvest
 harvested
 harvo
 hash
@@ -3448,6 +3452,7 @@ literal
 literally
 literals
 litigate
+litigated
 litigates
 little
 live
@@ -3698,6 +3703,7 @@ milliseconds
 mime
 mind
 mine
+mines
 mini
 minimal
 minimisation
@@ -5165,6 +5171,7 @@ replica
 replicas
 replication
 replied
+reply
 repo
 repoint
 repointed
@@ -6112,6 +6119,7 @@ surfacing
 surgery
 surname
 surprise
+surprised
 surprises
 surprising
 surrounding
