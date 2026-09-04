@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P3                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending  # pending | in_progress | blocked | done | cancelled
-owner: ""
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:dev
 role: dev  # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 30m                      # 30m | 2h | 1d | 1w
@@ -79,10 +79,10 @@ beginning of the value and its length, not the whole of it.
 
 ## Acceptance criteria
 
-- [ ] A reason over the limit is refused with a message naming its length and the limit, and not naming emptiness or the sentinels. [proof: the-message-names-the-length]
-- [ ] An empty reason and a reserved one still say so, each in its own words. [proof: the-message-names-the-length]
-- [ ] The explanation is written in one file. [proof: one-diagnosis-not-six]
-- [ ] Nothing else in the suite changes. [proof: suite]
+- [x] A reason over the limit is refused with a message naming its length and the limit, and not naming emptiness or the sentinels. [proof: the-message-names-the-length]
+- [x] An empty reason and a reserved one still say so, each in its own words. [proof: the-message-names-the-length]
+- [x] The explanation is written in one file. [proof: one-diagnosis-not-six]
+- [x] Nothing else in the suite changes. [proof: suite]
 
 ## Notes
 

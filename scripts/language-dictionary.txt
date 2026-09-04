@@ -60,6 +60,7 @@ accounted
 accounting
 accounts
 accumulate
+accumulated
 accumulates
 accumulating
 accuracy
@@ -2158,6 +2159,7 @@ exceptions
 excessive
 exchange
 exchangeable
+exchanges
 exclude
 excluded
 excludes
