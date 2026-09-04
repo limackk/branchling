@@ -26,25 +26,26 @@ verification:
 
 `backlog/_template.md` and the root `_template.md` share the same SHAPE: the
 same frontmatter keys, a `verification:` entry with `id:`, and an acceptance
-criteria section teaching `[proof: <id>]`. They differ ONLY in the language of
-the prose. A test guards this by DERIVING the field list from the shipping
-template instead of duplicating it.
+criteria section teaching `[proof: <id>]`. They differ ONLY in their prose,
+which addresses two different audiences. A test guards this by DERIVING the
+field list from the shipping template instead of duplicating it.
 
 ## Context
 
 The repository keeps two templates, and that is fine: the root `_template.md`
 ships in the tarball into other people's repositories (English, guarded by
-`check --language`), while `backlog/_template.md` is THIS backlog's template
-and is in Polish. The defect is not that there are two of them — it is that
-they drifted apart along a dimension where they must not drift.
+`check --language`), while `backlog/_template.md` is THIS backlog's own
+template. The defect is not that there are two of them — it is that they
+drifted apart along a dimension where they must not drift.
 
 The boundary runs where CLAUDE.md draws it: **the code knows the SHAPE, the
 data knows the VALUES.** The frontmatter keys and the structure of the
 `verification:` entry are shape — `task-fields.mjs` and `criteria.mjs` read
 them. The `## Acceptance criteria` heading is also shape: `criteria.mjs` has
 it hard-coded in English (`CRITERIA_HEADING`) precisely because it is a
-FORMAT, not project vocabulary. `## Cel`, `## Kontekst`, `## Kroki` and the
-annotation texts are prose — and in Polish.
+FORMAT, not project vocabulary. `## Goal`, `## Context`, `## Steps`
+(`## Cel`, `## Kontekst`, `## Kroki` when this task was written) and the
+annotation texts are prose.
 
 **Measured drift (2026-09-01):**
 
@@ -82,15 +83,16 @@ not be merged.
 `confidence:` field in fourteen of them is not cleanup that belongs to this
 task.
 
-**A premise of this task expired before it was executed.** It was written
-saying `backlog/` is in Polish and that `check --language` does not read it,
-and the acceptance criterion below said the prose must STAY in Polish. TL-137
-has since translated `backlog/` and pointed the guard at it, and CLAUDE.md now
-draws the language boundary around what a stranger reads when they open the
-repository — which includes this file. `backlog/_template.md` was already in
-English when this task was taken, so there was nothing to translate and
-nothing to preserve; the criterion is restated as what is actually checked,
-which is that the guard stays green.
+**A premise of this task expired before it was executed.** It was written on
+the belief that `backlog/` lay outside the language rule, that
+`check --language` did not read it, and the acceptance criterion below
+demanded that the Polish prose be preserved. TL-137 has since translated
+`backlog/` and pointed the guard at it, and CLAUDE.md now draws the language
+boundary around what a stranger reads when they open the repository — which
+includes this file. `backlog/_template.md` was already in English when this
+task was taken, so there was nothing to translate and nothing to preserve;
+the criterion is restated as what is actually checked, which is that the
+guard stays green.
 
 ## Pre-flight reading
 
