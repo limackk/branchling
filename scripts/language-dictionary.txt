@@ -2492,6 +2492,7 @@ formatted
 formatter
 formatting
 formed
+former
 forms
 formula
 forse
