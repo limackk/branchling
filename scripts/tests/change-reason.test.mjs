@@ -33,7 +33,9 @@ import { BACKLOG_DIR, REPO_ROOT, isolateHome } from "./_repo.mjs";
 isolateHome("change-reason");
 
 import {
+  REASON_MAX_LENGTH,
   REASON_PROVEN,
+  REASON_SENTINELS,
   REASON_UNKNOWN,
   hasStatedReason,
   isValidReason,
@@ -412,3 +414,136 @@ test("positive control: the same check CATCHES a template that carries the secti
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// ── A refusal names the cause it actually had (TL-167) ────────────────────
+
+/**
+ * `isValidReason()` answers `false` to three different questions — the value is
+ * empty, it is one of the two reserved sentinels, or it is longer than
+ * `REASON_MAX_LENGTH` — and every command that reads that boolean turns all
+ * three into one sentence about the first two. A 600-character reason is
+ * therefore refused as "empty or reserved", which it is neither of, while the
+ * one number that would explain the refusal — how long it was — is missing and
+ * the whole 600 characters are echoed back in its place.
+ *
+ * A message naming the wrong cause is worse than a bare "invalid": it sends the
+ * reader looking for a rule their input does not break.
+ *
+ * WHAT IS ASSERTED, AND WHAT IS LEFT TO THE IMPLEMENTATION. Each case demands
+ * that the message names ITS cause and no other. The wording is nobody's
+ * business here; the three facts are. A too-long value must be answered with
+ * two numbers — the length it had and the length allowed — and neither of the
+ * other two causes. That is what keeps the test blind to the wording and
+ * strict about which rule the value actually broke.
+ *
+ * THE POSITIVE CONTROL. Almost every assertion below is a NEGATIVE one — the
+ * message must not say X — and a negative assertion is green against a command
+ * that never ran the validator at all, because a typo in the flags would refuse
+ * for its own reasons and satisfy all of them. So each entry in the table is
+ * first put through `reaches the reason validator`, which passes today and must
+ * go on passing: it proves the invocation is well formed and that the refusal
+ * being read really is the one this file is about. Beyond that, every cause
+ * carries a POSITIVE requirement of its own (the length, the sentinel, the
+ * word "empty"), so a run against a command that died earlier fails rather than
+ * passing quietly.
+ */
+
+/** Long enough to be over the limit whatever the limit becomes. */
+const OVER_LIMIT = "x".repeat(REASON_MAX_LENGTH + 100);
+
+/** Whitespace, not "" — the flag parsers refuse a missing value before the
+ *  validator sees it, so a blank string is how the EMPTY cause is reached from
+ *  the terminal at all. */
+const BLANK = "   ";
+
+/**
+ * Every place a person's reason is judged by `isValidReason` and the answer is
+ * printed at them. The validation is done by the argument parsers, before any
+ * config or task is read, so a fixture backlog is enough for all of them.
+ *
+ * `emptyRefusedEarlier` marks the one site that is not part of the EMPTY case:
+ * `ask` demands a question of its own before the shared validator runs, and its
+ * message for a blank one is already specific. That is not this defect.
+ */
+const REASON_SITES = [
+  { name: "take --reason", argv: (v) => ["take", "FX-1", "--actor", "local:me", "--reason", v] },
+  { name: "handoff --reason", argv: (v) => ["handoff", "FX-1", "--to-role", "dev", "--actor", "local:me", "--reason", v] },
+  { name: "next --reason", argv: (v) => ["next", "--actor", "local:me", "--reason", v] },
+  { name: "decide --reason", argv: (v) => ["decide", "FX-1", "--actor", "local:me", "--reason", v] },
+  { name: "history --reason", argv: (v) => ["history", "--actor", "local:me", "--reason", v] },
+  { name: "ask --option", argv: (v) => ["ask", "FX-1", "--actor", "local:me", "--question", "which way?", "--option", v, "--option", "the other way"] },
+  { name: "ask --question", argv: (v) => ["ask", "FX-1", "--actor", "local:me", "--question", v], emptyRefusedEarlier: true },
+];
+
+/** A guard iterating an empty table is green and proves nothing. The count is
+ *  the six call sites TL-167 names plus `--question`, which shares the
+ *  validator and therefore the defect. */
+test("every call site that prints this refusal is in the table", () => {
+  assert.equal(REASON_SITES.length, 7);
+});
+
+/** The refusal, as a person reads it. Exit 2, because a reserved or malformed
+ *  reason is a bad ARGUMENT — wrong whatever the task and the configuration
+ *  say — and that is where the existing sites already put it. */
+function refusalFor(site, value) {
+  const dir = sandbox();
+  try {
+    const r = cli(site.argv(value), dir);
+    assert.equal(r.status, 2, site.name + " did not refuse:\n" + r.stdout + r.stderr);
+    return r.stderr + r.stdout;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/** `\b` around a number so that a limit of 500 is not read out of "1500". */
+function names(n) {
+  return new RegExp("\\b" + n + "\\b");
+}
+
+for (const site of REASON_SITES) {
+  test("positive control: `" + site.name + "` reaches the reason validator", () => {
+    // Passes today and must go on passing. Without it the three tests below are
+    // green against a command that refused for a reason of its own.
+    const text = refusalFor(site, REASON_UNKNOWN);
+    assert.match(
+      text,
+      names(REASON_UNKNOWN),
+      "the refusal does not quote the value it was given, so it is probably not the validator's"
+    );
+  });
+
+  test("`" + site.name + "` too long: the message names the length, not the sentinels", () => {
+    const text = refusalFor(site, OVER_LIMIT);
+    // The two numbers that explain the refusal.
+    assert.match(text, names(OVER_LIMIT.length), "the message does not say how long the value was");
+    assert.match(text, names(REASON_MAX_LENGTH), "the message does not say how long a reason may be");
+    // And not one word about the two rules this value does not break.
+    assert.doesNotMatch(text, /empty/i, "a value of " + OVER_LIMIT.length + " characters is not empty");
+    for (const sentinel of REASON_SENTINELS) {
+      assert.doesNotMatch(text, names(sentinel), "the value is not the reserved word `" + sentinel + "`");
+    }
+    assert.doesNotMatch(text, /reserved/i, "nothing here is reserved");
+    // A reason printed back in full is most of the refusal, and it buries the
+    // one number that explains it.
+    assert.ok(!text.includes(OVER_LIMIT), "the whole value is echoed back at the person who typed it");
+  });
+
+  test("`" + site.name + "` reserved: the message names the word, not a length", () => {
+    const text = refusalFor(site, REASON_UNKNOWN);
+    assert.match(text, names(REASON_UNKNOWN), "the message does not name the word that was refused");
+    assert.doesNotMatch(text, /empty/i, "`" + REASON_UNKNOWN + "` is not empty");
+    assert.doesNotMatch(text, names(REASON_MAX_LENGTH), "the length limit has nothing to do with this refusal");
+  });
+
+  if (!site.emptyRefusedEarlier) {
+    test("`" + site.name + "` empty: the message says so, and says nothing else", () => {
+      const text = refusalFor(site, BLANK);
+      assert.match(text, /empty/i, "the message does not say the value was empty");
+      for (const sentinel of REASON_SENTINELS) {
+        assert.doesNotMatch(text, names(sentinel), "a blank value is not the reserved word `" + sentinel + "`");
+      }
+      assert.doesNotMatch(text, names(REASON_MAX_LENGTH), "the length limit has nothing to do with this refusal");
+    });
+  }
+}
