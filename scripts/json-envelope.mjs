@@ -194,6 +194,18 @@ export const KINDS = {
     ok: null, id: null, file: null, question: null, changes: [], blockedReason: null,
     refusalKind: null, refusal: null, details: [],
   },
+  // `resume --json` (TL-151). The five parts are declared in the ORDER the
+  // briefing fixes them, because the order IS the product: a consumer rendering
+  // it would otherwise have to re-derive a sequence this tool already knows.
+  // `verified` is what keeps an empty `verification` readable — under
+  // `--no-verify` nothing ran, and "the contract was not re-run" must never be
+  // mistaken for "the contract holds no entries".
+  resume: {
+    ok: null, id: null, file: null, actor: null, owner: null,
+    base: null, mergeBase: null, verified: null,
+    decisions: [], goal: null, history: [], diff: null, verification: [],
+    refusalKind: null, refusal: null, details: [],
+  },
   // `done --json`. `entries` carries one row per `verification:` entry with its
   // exit code — the evidence, which is the whole point of the command. `ticked`
   // is the criteria the run granted; `closed` says whether the file actually

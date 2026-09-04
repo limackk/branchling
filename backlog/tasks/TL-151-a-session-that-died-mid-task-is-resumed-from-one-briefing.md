@@ -8,7 +8,7 @@ epic: ""
 priority: P3                       # P0 blocker | P1 critical | P2 nice | P3 backlog
 status: pending  # pending | in_progress | blocked | done | cancelled
 owner: ""
-role: dev
+role: spec
 estimate: 2h                       # 30m | 2h | 1d | 1w | 1mo
 created: 2026-09-02
 updated: 2026-09-04
@@ -66,6 +66,45 @@ briefing; it never prints an old result as if it were current.
 actor resuming an abandoned task is a takeover, and that path already exists
 (`abandoned_after_days`, with the previous owner named); `resume` must not
 become a second, quieter one.
+
+## Where the dev hand stopped (2026-09-04)
+
+The production code is written and `scripts/tests/resume-briefing.test.mjs`
+is green, 10 of 10. The suite as a whole is not, and it cannot be made so
+without one line inside `scripts/tests/json-envelope.test.mjs` — a file the
+dev hand may not touch.
+
+THE COLLISION, precisely. `json-envelope.test.mjs` asserts that
+`Object.keys(READING).concat(Object.keys(WRITING))` equals `Object.keys(KINDS)`:
+every declared envelope kind must have a command registered in one of its two
+tables, so that "a kind declared without a command exercising it fails here
+instead of shipping untested". `resume-briefing.test.mjs` requires `KINDS.resume`
+to exist — it reads the declaration itself to check the key ORDER — so declaring
+the kind is not optional, and declaring it is what makes the other file fail.
+Two tests, both correct, and only an edit to a test file closes the gap.
+
+WHAT IS NEEDED: one entry in the `READING` table, along the lines of
+`resume: ["resume", "TASK-1", "--actor", "agent:test", "--json"]`. `resume` is a
+reading command; it answers with a complete `ok: false` envelope and exit 1 when
+the task is missing or held by somebody else, and never exits 2, so it satisfies
+that table's contract on both the empty and the populated fixture. Which
+arguments and which actor exercise the kind is a decision about the PROOF, which
+is why it comes back here rather than being guessed at.
+
+WHAT IS ALREADY ON DISK: `scripts/resume-task.mjs`; the `resume` entry in the
+`cli.mjs` command table; the `resume` kind in `json-envelope.mjs`; its row in
+`docs/manual.md`; and `briefed` and `claimant` in
+`scripts/language-dictionary.txt`. `check` exits 0. The suite stands at 1881
+pass and 3 fail, and all three failures are the one registry gap above — the
+third is `suite-is-terminal-independent` re-running that same file.
+
+ONE DESIGN POINT DECIDED HERE, because the fixture forced it. Who holds a task
+is NOT `owner:` alone. `ask` clears the owner while the task waits for an answer
+and `decide` does not hand it back, so the task most in need of a briefing is
+exactly the one whose `owner:` is empty — and reading only the field would let
+anybody resume it, which is the takeover this command must not become. The
+field still wins where it has a value; the log is consulted only for the second
+question, "who last took this". See `claimant()` in `scripts/resume-task.mjs`.
 
 ## Steps
 

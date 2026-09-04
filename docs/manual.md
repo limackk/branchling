@@ -611,6 +611,7 @@ implementation detail. Every reading command answers in the same envelope:
 | `handoff` | `task-handoff` | `ok`, `id`, `file`, `task`, `role`, `owner`, `status` (each a from/to pair), `comment`, `released`, `warnings`, `refusalKind`, `refusal`, `details` |
 | `ask` | `task-ask` | `ok`, `id`, `file`, `question` (its event id, timestamp, text and asker), `changes`, `blockedReason`, `refusalKind`, `refusal`, `details` |
 | `done` | `verification-run` | `ok`, `task`, `dryRun`, `closed`, `entries` (one per `verification:` entry, with its exit code), `status`, `wouldBe`, `ticked`, `refusalKind`, `refusal`, `details` |
+| `resume` | `resume` | `ok`, `id`, `file`, `actor`, `owner`, `base`, `mergeBase`, `verified` (false under --no-verify: the contract was not re-run, which is not the same as a contract with no entries), `decisions`, `goal`, `history`, `diff`, `verification` — the five parts in the order the briefing fixes them — `refusalKind`, `refusal`, `details` |
 | `docs-drift` | `docs-drift` | `documents`, `minSignals`, `flagged`, `tooLittle`, `seeded` (absent unless `--seed-tasks` ran) |
 | `sessions` | `sessions` | `correlation`, `total`, `sessions` |
 | `session` | `session` | `correlation`, `session` |

@@ -703,6 +703,7 @@ brevity
 brew
 bridge
 brief
+briefed
 briefing
 briefly
 briefs
@@ -941,6 +942,7 @@ cited
 citizen
 claim
 claimable
+claimant
 claimed
 claiming
 claims
