@@ -52,6 +52,13 @@ sentence written after it, in this session:
 before. The regeneration diff was exactly one line, which is the proof: the
 dictionary is not a vocabulary of English, it is an inventory of this tree.
 
+It has now happened five times in one day, on five different sentences:
+`alternating`, then `accumulated` and `exchanges`, then `bind` and
+`projections`, then `correctable` - the last three while tasks were being
+filed about the guard's own cost. Each regeneration diff was one or two
+lines. Two of those occurrences cost an agent run: the guard fires at
+the end of the work, after the commit is written.
+
 The cost is small per word and unbounded in aggregate: every author meets it,
 the fix is a command they have to know, and the natural response to a guard that
 fires on correct writing is to stop reading its output. That is how a real
@@ -71,6 +78,14 @@ Nothing here argues for removing the guard. It caught a real Polish word in
    licensing has to be checked before anything is vendored.
 3. Whatever is decided, the refusal must name the remedy in the same breath: it
    currently names the word and the file, and not the command that fixes it.
+4. Give the remedy a place on the CLI. `--update-dictionary` lives only on
+   `scripts/check-public-language.mjs`; `branchling check --language
+   --update-dictionary` is refused as an unknown flag and the known-flag list
+   printed beside the refusal does not contain it. The command that fixes a
+   branchling refusal is therefore not a branchling command, so step 3 cannot
+   be satisfied without this: naming `node scripts/check-public-language.mjs`
+   in a CLI message would be the first place the tool sends a user around
+   itself. Measured on 2026-09-04.
 
 ## Decisions
 
