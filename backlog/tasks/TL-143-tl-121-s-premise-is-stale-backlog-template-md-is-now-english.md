@@ -6,7 +6,7 @@ labels: []
 board: main
 epic: "Backlog — open source publication"
 priority: P3
-status: in_progress  # pending | in_progress | blocked | done | cancelled
+status: done  # pending | in_progress | blocked | done | cancelled
 owner: agent:docs
 role: docs
 estimate: 30m                      # 30m | 2h | 1d | 1w | 1mo
@@ -87,10 +87,10 @@ belongs to TL-259, which covers that rename across the whole backlog.
 
 ## Acceptance criteria
 
-- [ ] No sentence in TL-121 asserts that anything is, are or stays in Polish;
+- [x] No sentence in TL-121 asserts that anything is, are or stays in Polish;
       historical statements in the past tense are what remains.
       [proof: tl-121-premise-corrected]
-- [ ] TL-121's technical result — shape parity between the two templates — is
+- [x] TL-121's technical result — shape parity between the two templates — is
       untouched by this edit. [proof: shape-parity-preserved]
 - [ ] `backlog/_template.md` itself is untouched by this task: it was already
       translated, and this task only corrects TL-121's description of it.
