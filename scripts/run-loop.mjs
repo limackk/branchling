@@ -84,7 +84,7 @@ import { readHistory, recordEdit } from "./history.mjs";
 import { lockScope, releaseLock, stateRoot } from "./lock.mjs";
 import { callerSpecies, queueStatuses, selectCandidates, servesExecutor } from "./next-task.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
-import { loadPlanForDispatch, planState } from "./plan.mjs";
+import { loadPlanForDispatch, planState, projectionWall } from "./plan.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { inProgressStatus, rebuildViews, todayStamp } from "./take-task.mjs";
 import { ACTOR_NAMESPACES, buildFieldSpecs, extractMeta, fieldSpec, isValidActor, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
@@ -1052,6 +1052,11 @@ export function run(argv) {
     const records = readTaskRecords(backlogPaths(root).tasksDir, config.taskId.file);
     const base = { ...filters, callerSpecies: callerSpecies(actor) };
     const rows = [];
+    // The wave the projection stopped at, or null when it walked the plan out
+    // (TL-206). It is reported in both renderings below: an operator reading an
+    // order with nothing in it needs a second place to look for the reason, and
+    // a dispatcher deciding whether to keep polling reads `--json`.
+    let wall = null;
     if (planned) {
       // WAVE BY WAVE, FROM THE ACTIVE ONE ON. A single call would show only the
       // wave `next` hands out of right now, which answers "what is next" and not
@@ -1064,8 +1069,17 @@ export function run(argv) {
       const from = state.activeWave === null ? state.waves.length : state.activeWave;
       for (const w of state.waves.slice(from)) {
         const planIds = new Set(w.tasks.map((e) => String(e.id).toUpperCase()));
-        const { candidates } = selectCandidates(records, config, { ...base, planIds }, Date.now());
+        const { candidates, skippedBlocked } =
+          selectCandidates(records, config, { ...base, planIds }, Date.now());
         for (const t of candidates) rows.push({ task: t, wave: w.index + 1, name: w.name });
+        // AND NO FURTHER THAN THE RUN WOULD GET. A task this wave's own members
+        // are blocking is reachable — the run closes the blocker first, which is
+        // what the footnote below has always said — so it counts towards
+        // finishing the wave. Anything else still open is work this run may never
+        // be handed, and `next` will keep answering from THIS wave until somebody
+        // else finishes it.
+        wall = projectionWall(w, candidates.length + skippedBlocked);
+        if (wall) break;
       }
     } else {
       const { candidates } = selectCandidates(records, config, base, Date.now());
@@ -1080,6 +1094,7 @@ export function run(argv) {
           ...(planned ? { wave: r.wave, waveName: r.name } : {}),
         })),
         considered: rows.length,
+        ...(planned ? { stoppedAt: wall } : {}),
       }, null, 2));
     } else {
       console.log("");
@@ -1094,6 +1109,12 @@ export function run(argv) {
           r.task.priority + "  " + r.task.title);
       }
       console.log("");
+      if (wall) {
+        console.log("  " + color.dim(
+          "the projection stops at wave " + wall.wave + " — " + (wall.name || "unnamed") + ": " +
+          wall.left + " of " + wall.open + " open task(s) in it are not this run's to take"
+        ));
+      }
       if (planned) {
         console.log("  " + color.dim(
           "a task whose blockers are still open is not listed — a later wave grows as the earlier ones close"

@@ -494,6 +494,36 @@ export function dispatchWave(plan, tasks, config = {}) {
 }
 
 /**
+ * Where a projection of the plan has to STOP, named. PURE (TL-206).
+ *
+ * `dispatchWave` above is the single definition of what may be handed out, and
+ * it never moves on while the wave it named still holds open work. A projection
+ * that walks the waves is therefore only entitled to reach the next one if this
+ * run would CLOSE the current one: a wave left open is a wave the run is still
+ * standing in when it stops. Measured on 2026-09-03 — `--dry-run` listed the
+ * tasks of later waves while the run took none of them, and neither output said
+ * the other existed. Asked and answered the same day (`backlog/history`,
+ * decision 01M1M8CN8WSWKYG2T7J01YVKSR): the fleet does NOT run ahead, and the
+ * projection names the wave it stopped at instead of skipping past it.
+ *
+ * A TASK ONLY ITS OWN WAVE IS BLOCKING IS NOT A WALL. `validatePlan` refuses a
+ * plan whose blocker sits in a LATER wave, so an open blocker met inside a wave
+ * is work this run is about to close — the wave grows as the run walks it. The
+ * caller counts those as reachable; a wall is work this run may never be handed
+ * at all, which is what a person's task and a claim in another tree are.
+ *
+ * @param {object} wave one entry of `planState().waves`
+ * @param {number} reachable how many of that wave's open tasks this run would take
+ * @returns {{wave: number, name: string, open: number, reachable: number, left: number}|null}
+ *          the wall, in the terms a report needs, or null when the wave is finishable
+ */
+export function projectionWall(wave, reachable) {
+  const left = wave.open - reachable;
+  if (left <= 0) return null;
+  return { wave: wave.index + 1, name: wave.name || "", open: wave.open, reachable, left };
+}
+
+/**
  * Read the plan for a caller that REQUIRES one — `next --plan`, `run --plan`.
  *
  * WHY THE ABSENCE OF A PLAN IS A USAGE ERROR AND NOT AN EMPTY FILTER. A filter
