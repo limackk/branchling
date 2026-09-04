@@ -138,18 +138,47 @@ const FLAGS = {
   "--wave": "wave",
 };
 
+/**
+ * `--` ENDS FLAG READING (TL-58).
+ *
+ * Without a separator a value beginning with a dash is still refused, and that
+ * heuristic stays: `--title --board main` is overwhelmingly a mistake, and a
+ * task titled `--board` is the silent no-op it was written against. The price
+ * was that a title which LEGITIMATELY begins with a dash — every task this tool
+ * writes about a flag — had no way in at all.
+ *
+ * The separator is that way in, in the form a user already knows from `git` and
+ * `rm`: the flag before it takes the next argument WHATEVER it looks like, and
+ * nothing beyond the separator is read as a flag. That second half is why the
+ * fix is not merely a leading dash being tolerated: `new --title -- --priority`
+ * must title the task `--priority`, not also set the priority from the word
+ * after it.
+ *
+ * `new` takes no positional arguments, so anything left over past the value is
+ * refused rather than dropped — an argument accepted and ignored is the no-op
+ * this tool refuses to be.
+ */
 function parseArgs(argv) {
   const values = {};
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
+  const sep = argv.indexOf("--");
+  const flags = sep < 0 ? argv : argv.slice(0, sep);
+  const literal = sep < 0 ? [] : argv.slice(sep + 1);
+  for (let i = 0; i < flags.length; i++) {
+    const a = flags[i];
     if (!a.startsWith("-")) {
-      if (i > 0 && FLAGS[argv[i - 1]]) continue; // the previous flag's value
+      if (i > 0 && FLAGS[flags[i - 1]]) continue; // the previous flag's value
       return { error: "unexpected argument: " + a };
     }
     if (!FLAGS[a]) return { error: "unknown flag: " + a };
-    if (!argv[i + 1] || argv[i + 1].startsWith("-")) return { error: a + " requires a value" };
-    values[FLAGS[a]] = argv[i + 1];
+    // Only the LAST flag before the separator reaches past it, and only that
+    // one is exempt from the dash heuristic.
+    const beyond = i + 1 === flags.length;
+    const value = beyond ? literal[0] : flags[i + 1];
+    if (!value || (!beyond && value.startsWith("-"))) return { error: a + " requires a value" };
+    values[FLAGS[a]] = value;
   }
+  const spent = flags.length > 0 && FLAGS[flags[flags.length - 1]] ? 1 : 0;
+  if (literal.length > spent) return { error: "unexpected argument: " + literal[spent] };
   return { values };
 }
 
