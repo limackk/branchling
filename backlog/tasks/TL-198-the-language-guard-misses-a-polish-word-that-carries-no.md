@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: ""
+status: in_progress  # pending | in_progress | blocked | done | cancelled
+owner: agent:spec
 role: spec  # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
@@ -18,8 +18,12 @@ blocked_by: [TL-201]                     # ids of tasks that MUST be closed befo
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
 verification:                      # HOW to check the task is really done
-  - id: the-name                   # optional; a criterion below points at this id
-    bash: "command to run"
+  - id: reach
+    bash: "node --test scripts/tests/language-guard-reach.test.mjs"
+  - id: guard-green
+    bash: "node scripts/cli.mjs check --language"
+  - id: suite
+    bash: "node --test scripts/tests/*.test.mjs"
 ---
 
 ## Goal
@@ -87,5 +91,54 @@ whether a reader takes it as one.
 
 ## Decisions
 
-Nothing decided yet. The string itself was corrected in TL-188 (the line was
-being edited there anyway); this task is about the guard that let it through.
+The string itself was corrected in TL-188 (the line was being edited there
+anyway); this task is about the guard that let it through.
+
+**The choice offered in Step 2 — widen the detection or narrow the claim — was
+settled for the WORD half by TL-201, which this task was blocked on.** The
+dictionary inverts the question: a word this project has never written is
+unknown, and an unknown word fails. `Tryb` is caught today, and so are `Wybor`,
+`Kolejno` and `Naglowek`; TL-201's own test file carries that positive control.
+Detection was widened, and by construction rather than by one more entry in a
+list, so the claim did not have to be narrowed.
+
+**What TL-201 could not close is the FILE half, and that is what is left of this
+task.** A word is only judged on a line somebody opened. `walk()` in
+`scripts/check-public-language.mjs` collects `.mjs`, `.js` and `.md` and nothing
+else, so `backlog/config.yaml`, `backlog/plan.yaml` and `backlog/boards.yaml`
+are never opened — while the header of that same file states they are covered
+"as a side effect of adding the directory", and CLAUDE.md says the guard reads
+"the whole `backlog/` directory". Measured 2026-09-04: a tree whose only public
+file is a `backlog/config.yaml` carrying a Polish label audits as 0 files, 0
+lines, 0 findings, and 0 findings is what the tick is printed over. That is this
+task's own thesis one layer down — a green line read as a pass over text that IS
+in the wrong language — and `config.yaml` is the worst place for it, because
+under law 3 that file holds the project's vocabulary: the status names, the
+labels, the board titles a stranger reads before any comment in `scripts/`.
+
+**Not "every YAML file under `backlog/`".** `NOW.yaml`, `INDEX.yaml`,
+`archive/done.yaml` and `boards/` are computed views, deletable by law 2. A
+guard that reads generated output fails on output rather than on a decision
+somebody took, and it would report a stale finding from the last `build`. The
+three source files the guard already claims are the perimeter.
+
+**Not TL-229 and not TL-128.** Those are the untranslated Polish standing in
+`scripts/tests/`, which the walk DOES open — a translation debt behind a
+detector that misses it. This is the inverse: text in the right shape for the
+detectors, in a file the walk never reaches.
+
+**The failing test is `scripts/tests/language-guard-reach.test.mjs`.** It asserts
+a Polish label in each of the three files is reported, and that the
+`language-guard: allow` marker still expresses an exception in a file the guard
+has only just started reading — that last one asserts a COUNT of one, because a
+walk that opens nothing answers zero and would satisfy any assertion about
+silence. Two controls stand beside them: a Polish task file in the same
+throwaway root IS caught today (the harness proves something), and an ordinary
+English configuration file must stay silent (the widening may not become a guard
+that flags the file it was pointed at).
+
+**A cost the implementing hand will meet.** `backlog/plan.yaml` is English but
+carries six words the dictionary has never seen — `arranges`, `believable`,
+`tenths`, `thirds`, `poison`, `restarted`. They are added to
+`scripts/language-dictionary.txt` by hand, which is the procedure the guard
+prints for exactly this case.
