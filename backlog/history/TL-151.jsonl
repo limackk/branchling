@@ -1,1 +1,3 @@
 {"id":"01M1GKANEE6CZ3R3QMN75Z2NH9","ts":"2026-09-02T08:21:20.462Z","task":"TL-151","field":"__created__","from":"","to":"A session that died mid-task is resumed from one briefing, not from a search","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1Q2KATR0B0DER1YMNKEAH9Y","ts":"2026-09-04T20:43:39.736Z","task":"TL-151","field":"status","from":"pending","to":"in_progress","actor":"agent:fleet","source":"next","reason":"unknown","session":"tree-1abc8ae97159","role":"spec"}
+{"id":"01M1Q2KATRQXNJ93K662ZADH51","ts":"2026-09-04T20:43:39.736Z","task":"TL-151","field":"owner","from":"unassigned","to":"agent:fleet","actor":"agent:fleet","source":"next","reason":"unknown","session":"tree-1abc8ae97159","role":"spec"}
