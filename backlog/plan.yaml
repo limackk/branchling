@@ -7,7 +7,7 @@
 # is finished and lives in the git history of this file. It built the loop; this
 # one is the first arc RUN BY that loop, and its every task is picked so an
 # unattended session can close it.
-updated: 2026-09-03
+updated: 2026-09-04
 rationale: "The loop is built, so this arc is executed BY it: first make its report and its log believable, then teach the dispatcher to read this file at all, then the record of who did what, then the refusals the writing commands still lack, then the stale premises, then what a dead session leaves behind, then the fleet, and measurement of the run last."
 waves:
   - name: "The loop may be trusted unattended"
@@ -165,7 +165,7 @@ waves:
     # after `abandoned_after_days`; without this the successor starts from zero.
 
   - name: "The fleet owns its branches"
-    tasks: [TL-149]
+    tasks: []
     # `run --workers N`: branch, worktree, merge, build, removal — today a
     # procedure in CLAUDE.md rather than code, which means the fleet is driven
     # by a person. Its own wave: it is the largest task here and every earlier
@@ -176,3 +176,7 @@ waves:
     # Both read the trace the waves above leave: an actor's record computed from
     # the log, and the board replayed through time. They are last because they
     # measure, and there is nothing to measure before the work is done.
+
+  # 1w is above the unattended gate, and wave 12 would stop the plan for waves behind it
+  - name: "Needs a person: too large for the fleet"
+    tasks: [TL-149]

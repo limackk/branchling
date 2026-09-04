@@ -8,6 +8,7 @@ epic: "Agentic differentiators"
 priority: P3
 status: pending
 owner: unassigned
+role: spec
 estimate: 1d
 confidence: low
 created: 2026-08-31
