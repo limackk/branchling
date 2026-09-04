@@ -52,12 +52,29 @@ sentence written after it, in this session:
 before. The regeneration diff was exactly one line, which is the proof: the
 dictionary is not a vocabulary of English, it is an inventory of this tree.
 
-It has now happened five times in one day, on five different sentences:
-`alternating`, then `accumulated` and `exchanges`, then `bind` and
-`projections`, then `correctable` - the last three while tasks were being
-filed about the guard's own cost. Each regeneration diff was one or two
-lines. Two of those occurrences cost an agent run: the guard fires at
-the end of the work, after the commit is written.
+Over a single day of unattended runs - 2026-09-04, waves 8 and 9 - the
+guard fired on twenty ordinary English words across seven separate
+occasions:
+
+    alternating   accumulated  exchanges     bind        projections
+    correctable   retires      harvested     whitelisted retire
+    former        tense        statements    charter     negated
+    decidable     owning       typographically tripping  fabricates
+
+Not one was a misspelling and not one was foreign. `retired` was already in
+the dictionary; `retire` and `retires` were not, which is the proof in one
+line: this file is an inventory of the tree's word FORMS, not a vocabulary.
+
+Three of those occasions cost an agent run outright, because the guard runs
+at the end of the work, after the commit is written. Two were recorded while
+filing tasks about the guard itself, and `occasions` - the twenty-first word
+- was rejected out of the sentence above, which exists only to count the
+first twenty.
+
+The regeneration also REMOVES. `gloss` disappeared when the only sentence
+using it was rewritten, and `bilingual` when another was. Both are correct
+snapshot behaviour and both read, in a diff, as an unexplained deletion
+somebody has to trace before committing.
 
 The cost is small per word and unbounded in aggregate: every author meets it,
 the fix is a command they have to know, and the natural response to a guard that

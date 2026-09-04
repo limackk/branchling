@@ -10,3 +10,4 @@
 {"id":"01M1PN4K49QK6W3PG91WRXSFWF","ts":"2026-09-04T16:48:25.225Z","task":"TL-128","field":"status","from":"pending","to":"in_progress","actor":"agent:docs","source":"next","reason":"unknown","session":"tree-de08f32511a6","role":"docs"}
 {"id":"01M1PN4K49Q4VZR6QDN7BV7TR9","ts":"2026-09-04T16:48:25.225Z","task":"TL-128","field":"owner","from":"unassigned","to":"agent:docs","actor":"agent:docs","source":"next","reason":"unknown","session":"tree-de08f32511a6","role":"docs"}
 {"id":"01M1PP133CXQ82058TGZ5KRABP","ts":"2026-09-04T17:03:59.084Z","task":"TL-128","field":"status","from":"in_progress","to":"done","actor":"agent:docs","source":"done","reason":"proven","session":"tree-de08f32511a6","role":"docs"}
+{"id":"01M1PQ6SWFV7W9FNWNG1EHT1G9","ts":"2026-09-04T17:24:34.831Z","task":"TL-128","field":"role","from":"","to":"docs","actor":"unknown","source":"external","reason":"unknown"}

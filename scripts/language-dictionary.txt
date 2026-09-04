@@ -883,6 +883,7 @@ chars
 charset
 chart
 charted
+charter
 charts
 chasing
 chat
@@ -1479,6 +1480,7 @@ decay
 decayed
 decaying
 december
+decidable
 decide
 decided
 decides
@@ -2277,6 +2279,7 @@ eyeballed
 eyes
 fabricate
 fabricated
+fabricates
 fabricating
 fabrication
 face
@@ -3879,6 +3882,7 @@ needing
 needle
 needles
 needs
+negated
 negates
 negating
 negation
@@ -4065,6 +4069,7 @@ obsidian
 obstacle
 obvious
 obviously
+occasions
 occupies
 occur
 occurred
@@ -4231,6 +4236,7 @@ owned
 owner
 owners
 ownership
+owning
 owns
 pace
 pack
@@ -6490,6 +6496,7 @@ trimming
 trio
 trip
 triple
+tripping
 trips
 trivial
 triviality
@@ -6536,6 +6543,7 @@ typical
 typically
 typing
 typo
+typographically
 typos
 typy
 uall

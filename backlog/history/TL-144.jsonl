@@ -2,3 +2,4 @@
 {"id":"01M1PPTKGPA4P75RG00Z4PJGSH","ts":"2026-09-04T17:17:55.094Z","task":"TL-144","field":"status","from":"pending","to":"in_progress","actor":"agent:docs","source":"next","reason":"unknown","session":"tree-de08f32511a6","role":"docs"}
 {"id":"01M1PPTKGPD2Q5F2K596C8TMHJ","ts":"2026-09-04T17:17:55.094Z","task":"TL-144","field":"owner","from":"unassigned","to":"agent:docs","actor":"agent:docs","source":"next","reason":"unknown","session":"tree-de08f32511a6","role":"docs"}
 {"id":"01M1PQ2DFZHKD6P81JMDNSKVHM","ts":"2026-09-04T17:22:11.071Z","task":"TL-144","field":"status","from":"in_progress","to":"done","actor":"agent:docs","source":"done","reason":"proven","session":"tree-de08f32511a6","role":"docs"}
+{"id":"01M1PQ6SWFR622YRERSH0TEYQQ","ts":"2026-09-04T17:24:34.831Z","task":"TL-144","field":"role","from":"","to":"docs","actor":"unknown","source":"external","reason":"unknown"}
