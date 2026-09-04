@@ -704,6 +704,7 @@ bridge
 brief
 briefing
 briefly
+briefs
 brightest
 brilo
 bring
@@ -3306,6 +3307,7 @@ latest
 latter
 launch
 launched
+launcher
 launches
 launder
 laws
@@ -4942,6 +4944,7 @@ recreating
 rect
 rectangle
 recur
+recurring
 recurses
 recursive
 recursively

@@ -95,10 +95,13 @@ actors: [local:me, agent:claude]
 
 title_max_length: 60
 
-# Who MAY take a task, as opposed to who holds it now (TL-97). This project
-# declares one role, because it has one specialised queue: documentation.
-# `docs-drift --seed-tasks` (TL-100) writes into it, and a dispatcher pointed at
-# `--role docs` is what empties it.
+# Who MAY take a task, as opposed to who holds it now (TL-97). Four roles, for
+# two different reasons. `docs` is a specialised QUEUE: `docs-drift
+# --seed-tasks` (TL-100) writes into it, and a dispatcher pointed at `--role
+# docs` is what empties it. `spec`, `dev` and `review` are a PIPELINE, added by
+# wave 6: a task carrying one of them is handed only to a hand serving that
+# role, and `handoff --to-role` moves it on. What each of them may and may not
+# touch is not stated anywhere in this repository — see TL-264.
 roles: [docs, spec, dev, review]
 
 # ── Documentation drift (TL-100) ──────────────────────────────────────────
