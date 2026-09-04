@@ -6,7 +6,7 @@ labels: []
 board: main
 epic: "Backlog viewer"
 priority: P3
-status: in_progress
+status: awaiting_vouch
 owner: agent:dev
 executor: ""
 role: dev
