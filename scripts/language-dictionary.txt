@@ -491,6 +491,7 @@ backfilled
 backfilling
 backfills
 background
+backgrounded
 backlog
 backlogit
 backlogs
@@ -770,6 +771,7 @@ caching
 cairn
 cairnly
 calc
+calculation
 calendar
 calibrate
 calibrating
@@ -1767,6 +1769,7 @@ discount
 discounted
 discouraged
 discover
+discoverable
 discovered
 discovers
 discovery
@@ -2002,6 +2005,7 @@ elevated
 eleven
 eleventh
 elided
+elides
 eligibility
 eliminate
 ellipsis
@@ -2476,6 +2480,7 @@ forcing
 forecast
 foreclose
 foregone
+foreground
 foreign
 foreseen
 forever
@@ -3006,6 +3011,7 @@ informs
 infra
 infrastructure
 ingestion
+inherent
 inherently
 inherit
 inherited
@@ -3246,6 +3252,7 @@ kids
 kill
 killed
 killer
+killing
 kills
 kind
 kinds
@@ -3309,6 +3316,7 @@ launch
 launched
 launcher
 launches
+launching
 launder
 laws
 layer
@@ -4183,6 +4191,7 @@ outcome
 outcomes
 outdated
 outer
+outlier
 outline
 outlined
 outlive
@@ -4247,6 +4256,7 @@ packaged
 packages
 packaging
 packed
+padded
 padding
 page
 pager
@@ -4302,6 +4312,7 @@ parted
 partial
 partially
 participate
+participates
 particular
 partition
 partitioned
@@ -4414,6 +4425,7 @@ pitfall
 pitfalls
 pixel
 pixels
+pkill
 place
 placed
 placeholder
@@ -4510,6 +4522,7 @@ powers
 powodem
 poza
 pozytywna
+ppid
 practical
 practically
 practice
@@ -5128,6 +5141,7 @@ repair
 repaired
 repairing
 repairs
+reparented
 repeat
 repeatable
 repeated
@@ -5978,6 +5992,7 @@ strength
 strengthen
 strengthened
 stretch
+stretches
 stretching
 strict
 stricter
@@ -6077,6 +6092,7 @@ supabase
 super
 superfluous
 superseded
+supervisor
 supplied
 supplies
 supply
@@ -6682,6 +6698,7 @@ unmet
 unmistakable
 unmodified
 unnamed
+unnarrowed
 unnecessarily
 unnecessary
 unnoticed
@@ -6693,6 +6710,7 @@ unparseable
 unparsed
 unplanned
 unportable
+unpredictably
 unpriced
 unprompted
 unproved
@@ -6785,6 +6803,7 @@ upper
 uppercase
 upset
 upstream
+uptime
 upward
 upwards
 urgency

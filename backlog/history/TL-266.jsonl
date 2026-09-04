@@ -1,0 +1,3 @@
+{"id":"01M1Q1BRN63VMV8A43RV92CQ2E","ts":"2026-09-04T20:22:03.174Z","task":"TL-266","field":"__created__","from":"","to":"serve leaves a backend running after the session that started it is gone","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1Q1EAX4FYZX8FCG9KJZWR7T","ts":"2026-09-04T20:23:27.396Z","task":"TL-266","field":"type","from":"task","to":"bug","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1Q1HGF333240MGPR3JY5QER","ts":"2026-09-04T20:25:11.395Z","task":"TL-266","field":"__attributed__","from":"","to":"type","actor":"agent:claude","source":"manual","reason":"filed while auditing what the tool leaves running","attributes":"01M1Q1EAX4FYZX8FCG9KJZWR7T"}
