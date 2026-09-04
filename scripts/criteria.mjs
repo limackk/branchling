@@ -92,6 +92,22 @@ export function parseVerification(frontmatter) {
   for (let i = start; i < lines.length; i++) {
     const raw = lines[i];
     if (!raw.trim()) continue;
+    // A WHOLE-LINE `#` COMMENT, AT ANY POSITION IN THE LIST (TL-173). A trailing
+    // comment beside a value was already read as one; a comment standing on its
+    // own line was read as an entry key, so the sentence that explains an entry
+    // could only be written ABOVE the list — far from what it explains — and
+    // moving it between two entries made the whole contract unreadable and
+    // `done` report a four-entry contract as absent.
+    //
+    // TESTED BEFORE THE TOP-LEVEL BREAK BELOW, so an unindented comment does not
+    // end the block either: a `#` line carries no key, so it can never BE the
+    // next top-level field, and making a comment's meaning depend on its column
+    // would replace one positional accident with another.
+    //
+    // `stripComment` and not `/^\s*#/`: it is the one implementation of what
+    // counts as a comment in this format (TL-70), and it is what already keeps
+    // the hash inside `bash: "grep '#' file"` out of this decision.
+    if (!stripComment(raw).trim()) continue;
     if (!/^\s/.test(raw)) break;                       // the next top-level key
 
     const item = raw.match(/^\s*-\s*(.*)$/);

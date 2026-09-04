@@ -779,8 +779,9 @@ export function failedEntry(verdict) {
  *
  *   · `manual-needs-person` — the contract asks a PERSON to vouch, and an
  *     unattended loop is exactly the case where there is none.
- *   · `no-contract`, `criteria` — the task file itself is the problem; an agent
- *     told to "fix the cause" would have to edit the contract it is measured by.
+ *   · `no-contract`, `unreadable-contract`, `criteria` — the task file itself is
+ *     the problem; an agent told to "fix the cause" would have to edit the
+ *     contract it is measured by.
  *   · `already-closed` — the task is finished. `closed-elsewhere` rather than
  *     `needs-person` because nobody is needed: it is the outcome TL-191 gave the
  *     same situation found one step later, at the stuck-status write.
@@ -790,6 +791,7 @@ export function failedEntry(verdict) {
 export const TERMINAL_REFUSALS = {
   "manual-needs-person": "needs-person",
   "no-contract": "needs-person",
+  "unreadable-contract": "needs-person",
   "criteria": "needs-person",
   "already-closed": "closed-elsewhere",
 };
@@ -1305,9 +1307,10 @@ export function run(argv) {
       // failed, and the reader who acts on the panel then sees a whole task where
       // thirty seconds of checking is what is actually theirs.
       //
-      // ONLY THIS ONE REFUSAL. `no-contract` and `criteria` share the outcome
-      // `needs-person` and are the opposite case: nothing was verified because
-      // the task FILE is not finished, and there is no work to vouch for.
+      // ONLY THIS ONE REFUSAL. The other `needs-person` kinds — `no-contract`,
+      // `unreadable-contract`, `criteria` — are the opposite case: nothing was
+      // verified because the task FILE is not finished, and there is no work to
+      // vouch for.
       const toVouch = result.refusalKind === "manual-needs-person" && !!vouchStatus;
       if (result.refusalKind === "manual-needs-person" && !vouchStatus) {
         console.error(warn(task.id + ": its contract asks a person to vouch, and this backlog declares no " +
