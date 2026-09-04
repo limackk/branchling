@@ -8,6 +8,7 @@ epic: "worktrail — the tool"
 priority: P3
 status: pending
 owner: unassigned
+role: docs
 estimate: 30m
 confidence: high
 created: 2026-09-01

@@ -8,6 +8,7 @@ epic: "Backlog — open source publication"
 priority: P3
 status: pending                    # pending | in_progress | blocked | done | cancelled
 owner: unassigned
+role: docs
 estimate: 30m                      # 30m | 2h | 1d | 1w | 1mo
 created: 2026-09-02
 updated: 2026-09-02
