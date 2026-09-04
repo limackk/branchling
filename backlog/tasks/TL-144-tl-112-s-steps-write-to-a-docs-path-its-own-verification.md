@@ -6,12 +6,12 @@ labels: []
 board: main
 epic: ""
 priority: P3
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: in_progress  # pending | in_progress | blocked | done | cancelled
+owner: agent:docs
 role: docs
 estimate: 30m                      # 30m | 2h | 1d | 1w | 1mo
 created: 2026-09-02
-updated: 2026-09-02
+updated: 2026-09-04
 blocked_by: []
 blocks: []
 related_docs:

@@ -96,15 +96,14 @@ paid side.
 4. Decide whether we plan **dual licensing** (the same code under MIT and
    under a commercial license). This is possible ONLY with a CLA or with a
    single rights holder.
-5. Record the result in `docs/licencja-i-kontrybucje.md` — in Polish, since
-   `docs/` is documentation of THIS repository — and link it from the README
-   and from `CONTRIBUTING.md` once it exists (TL-53).
+5. Record the result in `docs/license-and-contributions.md` and link it from
+   the README and from `CONTRIBUTING.md` once it exists (TL-53).
 
 ## Acceptance criteria
 
-- [ ] `docs/licencja-i-kontrybucje.md` exists and answers all four questions:
-      contributions yes/no, DCO or CLA, the open/cloud boundary, dual
-      licensing.
+- [ ] `docs/license-and-contributions.md` exists and answers all four
+      questions: contributions yes/no, DCO or CLA, the open/cloud boundary,
+      dual licensing.
 - [ ] Each answer records what it TAKES AWAY — a decision with no cost is a
       note, not a decision.
 - [ ] The open/cloud boundary takes the form of a list that a concrete PR can
