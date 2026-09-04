@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P2                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-03
-updated: 2026-09-03
+updated: 2026-09-04
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
@@ -80,14 +80,34 @@ this project's own conventions send every closing agent down.
 
 ## Acceptance criteria
 
-- [ ] Closing a task whose contract passes does not print the passing entries'
+- [x] Closing a task whose contract passes does not print the passing entries'
       stdout by default, or prints it only when asked — whichever Decisions
       settles on. [proof: quiet-close]
-- [ ] A closing that FAILS still prints the failing entry's output in full.
+- [x] A closing that FAILS still prints the failing entry's output in full.
       [proof: quiet-close]
-- [ ] `done --help` describes whatever flag was added, and an unknown flag
+- [x] `done --help` describes whatever flag was added, and an unknown flag
       still fails. [proof: suite-green]
 
 ## Decisions
 
-Nothing decided.
+**Silent by default; `--verbose` to stream.** The default is what every agent
+following this repository's conventions gets, and an agent has no use for a
+passing transcript — it reads the verdict. A person watching a slow contract is
+the exception, and an exception takes the flag. A `--quiet` flag would have
+left the expensive path as the one that costs nothing to type.
+
+**The verdict line says what was withheld** — `passed (109440 ms, 1698 lines not
+shown)` — so a silent close is distinguishable from a silent command, and a
+contract whose green output is growing stays visible without being printed.
+
+**The failing entry's output is written whole, to stderr, BEFORE the refusal.**
+This was already the `--json` behaviour; it is now every mode's. The order is
+deliberate: the last screen a reader sees is the verdict, and the transcript
+above it is what to scroll into.
+
+**`--json` is untouched.** It already captured; `entries` carries the same rows
+as before and no prose.
+
+**`maxBuffer` raised to 64 MB** in `runBash`, matching `run-loop.mjs`: capture
+is now the default path, and Node's 1 MB default would have turned a long green
+suite into a spurious failure.

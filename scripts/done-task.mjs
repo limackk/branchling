@@ -85,7 +85,7 @@ const CONFIRM_WORD = "confirm";
 // Pure helpers
 // ──────────────────────────────────────────────────────────────────────────
 
-const FLAGS = ["--dir", "--dry-run", "--json", "--actor", "--role", "--status", "--confirm-manual", "--reason"];
+const FLAGS = ["--dir", "--dry-run", "--json", "--actor", "--role", "--status", "--confirm-manual", "--reason", "--verbose"];
 
 /** PURE — resolves `done`'s arguments. Throws on a usage error. */
 export function parseDoneArgs(args) {
@@ -98,6 +98,7 @@ export function parseDoneArgs(args) {
   let confirmManual = false;
   let reason = null;
   let role = null;
+  let verbose = false;
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -109,6 +110,7 @@ export function parseDoneArgs(args) {
     if (a === "--dry-run") { dryRun = true; continue; }
     if (a === "--json") { json = true; continue; }
     if (a === "--confirm-manual") { confirmManual = true; continue; }
+    if (a === "--verbose") { verbose = true; continue; }
     if (a === "--actor") {
       actor = args[++i] || null;
       if (!actor) throw new Error("`--actor` with no name");
@@ -147,7 +149,7 @@ export function parseDoneArgs(args) {
     id = a;
   }
   if (!id) throw new Error("no task id\nusage: " + N + " done <ID> [--dry-run] [--json]");
-  return { id, dir, dryRun, json, actor, role, status, confirmManual, reason };
+  return { id, dir, dryRun, json, actor, role, status, confirmManual, reason, verbose };
 }
 
 /** The task file for an id, or null. */
@@ -203,6 +205,15 @@ export function repoRootFor(backlogRoot) {
   return r.status === 0 && out ? out : backlogRoot;
 }
 
+/** How much a passing entry said, for the verdict line — `, 1698 lines not shown`
+ *  or nothing at all when the command was silent or was streamed (`--verbose`). */
+export function suppressedNote(output) {
+  if (output == null) return "";
+  const lines = output.split("\n").filter((l) => l.length).length;
+  if (!lines) return "";
+  return ", " + lines + " line" + (lines === 1 ? "" : "s") + " not shown";
+}
+
 /** Today, as the frontmatter writes it. */
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -219,6 +230,9 @@ function runBash(command, cwd, capture) {
     cwd,
     encoding: "utf8",
     stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit",
+    // A whole test suite's transcript is captured here by default (TL-221);
+    // Node's 1 MB default would turn a long green run into a spurious failure.
+    maxBuffer: 64 * 1024 * 1024,
   });
   return {
     ok: r.status === 0,
@@ -495,13 +509,23 @@ function run(argv) {
   // two callers is the narration and the question put to a person, so those are
   // the callbacks; the loop, the order and the stop-at-first-failure are not
   // this command's private behaviour any more.
+  //
+  // A PASSING ENTRY'S TRANSCRIPT IS NOT PRINTED (TL-221). The answer `done` owes
+  // is a verdict per entry; the stdout of a command that passed is evidence
+  // nobody reads, and on this repository it ran to 1698 lines of `✔` before the
+  // two lines that mattered — paid for by every session that closes a task. So
+  // the output is captured, its size is reported in the verdict line, and the
+  // FAILING entry's output is written out whole: the refusal is the one place
+  // the transcript is the answer. `--verbose` streams everything as it runs,
+  // for the person watching a slow contract who wants to see it move.
+  const capture = plan.json || !plan.verbose;
   const tagOf = (e, i) => "  " + (i + 1) + "/" + entries.length + "  " + (e.id ? e.id + "  " : "");
   let stop = null;
   const { results, failed } = runContract(entries, cwd, {
-    capture: plan.json,
+    capture,
     before: (e, i) => log(plan.json, tagOf(e, i) + "bash: " + e.bash),
     after: (e, r) => {
-      log(plan.json, "  " + OKM + " passed (" + r.ms + " ms)");
+      log(plan.json, "  " + OKM + " passed (" + r.ms + " ms" + suppressedNote(r.output) + ")");
       log(plan.json, "");
     },
     manual: (e, i) => {
@@ -608,7 +632,9 @@ function run(argv) {
     return finishFailed(plan, results, 1);
   }
   if (failed) {
-    if (plan.json && failed.output) process.stderr.write(failed.output);
+    // Captured output is the failing entry's whole transcript, and it goes to
+    // stderr before the refusal so the last screen a reader sees is the verdict.
+    if (failed.output) process.stderr.write(failed.output + (failed.output.endsWith("\n") ? "" : "\n"));
     console.error("");
     console.error(
       failure(N + " done", plan.id + ": verification failed (exit " + failed.exitCode + ")", [

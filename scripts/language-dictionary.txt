@@ -5952,6 +5952,7 @@ strange
 stranger
 stray
 stream
+streamed
 streams
 strength
 strengthen
@@ -6820,6 +6821,7 @@ vendors
 verb
 verbal
 verbatim
+verbose
 verbs
 verdict
 verdicts
