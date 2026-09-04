@@ -1,1 +1,3 @@
 {"id":"01M1GFKZK5ZG7A9K35VVHJSDXD","ts":"2026-09-02T07:16:31.461Z","task":"TL-143","field":"__created__","from":"","to":"TL-121's premise is stale: backlog/_template.md is now English","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1PP137CPGGH3R6SGADPKQVV","ts":"2026-09-04T17:03:59.212Z","task":"TL-143","field":"status","from":"pending","to":"in_progress","actor":"agent:docs","source":"next","reason":"unknown","session":"tree-de08f32511a6","role":"docs"}
+{"id":"01M1PP137CM3EXRT96EJ2Y1EGS","ts":"2026-09-04T17:03:59.212Z","task":"TL-143","field":"owner","from":"unassigned","to":"agent:docs","actor":"agent:docs","source":"next","reason":"unknown","session":"tree-de08f32511a6","role":"docs"}

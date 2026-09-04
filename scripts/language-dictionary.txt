@@ -2607,7 +2607,6 @@ glance
 glob
 global
 globally
-gloss
 glossed
 glue
 glued
@@ -5896,6 +5895,7 @@ state
 stated
 stateful
 statement
+statements
 states
 static
 stating
@@ -6231,6 +6231,7 @@ temporary
 tempting
 tends
 tens
+tense
 tension
 tentatively
 tenths
