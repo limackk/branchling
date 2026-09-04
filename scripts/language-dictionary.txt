@@ -571,6 +571,7 @@ belonging
 belongs
 below
 belt
+beneath
 benefit
 bent
 beside
@@ -681,6 +682,8 @@ branchtrail
 branchwork
 brand
 breach
+breaches
+breaching
 breadcrumbs
 break
 breakage
@@ -943,6 +946,7 @@ class
 classes
 classic
 classification
+classified
 classify
 claude
 clause
@@ -1287,7 +1291,9 @@ convenience
 convenient
 convention
 conventions
+converged
 conversation
+converse
 conversely
 conversion
 convert
@@ -2794,6 +2800,7 @@ honesty
 honored
 honour
 honoured
+honouring
 honours
 hook
 hooked
@@ -3024,6 +3031,7 @@ inset
 inside
 insists
 inspect
+inspected
 inspecting
 inspection
 inspiration
@@ -3279,6 +3287,7 @@ larger
 largest
 last
 lasted
+lasts
 late
 later
 latest
@@ -3403,6 +3412,7 @@ list
 listbox
 listed
 listen
+listened
 listener
 listeners
 listening
@@ -3673,6 +3683,7 @@ minimization
 minimum
 minmax
 minor
+minority
 mins
 minus
 minute
@@ -4173,6 +4184,7 @@ outside
 outstanding
 outweighs
 over
+overcount
 overflow
 overkill
 overlap
@@ -6904,6 +6916,7 @@ weakened
 weakening
 weakens
 weaker
+weakest
 weakness
 wearing
 wears
