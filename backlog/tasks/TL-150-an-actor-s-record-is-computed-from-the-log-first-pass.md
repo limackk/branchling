@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""
 priority: P3                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending  # pending | in_progress | blocked | done | cancelled
-owner: ""
+status: in_progress  # pending | in_progress | blocked | done | cancelled
+owner: agent:fleet
 role: spec
 estimate: 1d                       # 30m | 2h | 1d | 1w | 1mo
 created: 2026-09-02
@@ -83,30 +83,40 @@ read time. A cache, if ever needed, is deletable.
 - [ ] Positive control: policy on withholds the P0 from the weaker actor; policy off hands it out. [proof: suite-green]
 - [ ] The policy key in the user layer is refused. [proof: guards-green]
 
-## Where the spec hand stopped (2026-09-05)
+## Where the spec hand stopped (2026-09-05, third pass)
 
-`scripts/tests/actor-record.test.mjs` is IN this branch and red. It imports
-`scripts/actors.mjs`, which does not exist, so the file does not load and
-every case in it fails; the rest of the suite is green, which is what makes
-that red this file's own and not the tree's. `branchling check` is green
-too: the language guard reported the words the file introduced, and they
-were reworded rather than added to `scripts/language-dictionary.txt`.
+**Both contract entries pass.** `node --test scripts/tests/*.test.mjs` is
+1952 of 1952 and exits 0; `branchling check` exits 0. Nothing in this task
+is red any more, and this pass wrote no new failing test, because there was
+none left to write: every acceptance criterion above is already carried by a
+case in `scripts/tests/actor-record.test.mjs`, which is 27 of 27.
 
-The decision the previous pass left open is in the log, not here — rework
-stays an `audit` finding. The assertion that `audit` exits 0 over the
-`withRecords` fixture is gone, replaced by the control it was reaching for:
-every finding `audit` has over that tree IS one of the three reopenings,
-with the trace, parked and premise buckets empty.
+**What this pass actually did was one line.** The suite was red in
+`scripts/tests/json-envelope.test.mjs` alone, and for a reason that was
+never about `actors` being wrong: that file's `READING` and `WRITING` tables
+ARE the coverage registry, its positive control asserts they equal
+`Object.keys(KINDS)` in both directions, and `actors` had been added to
+`KINDS` with no row to exercise it. The dev hand could not add the row — it
+lives under `scripts/tests/` — so it handed the task back naming the edit.
+The row is now there, and the kind is exercised end to end on an empty
+backlog and a populated one like every other.
 
-**What the spec hand ran so the dev hand need not.** Over the hand-written
-log, `audit`'s own `reopenedAfterClosing` and `reworkRates` already produce
-the numbers the table asserts — five closings and one reopening for
-`agent:bit`, two and one for `user:anna`, one closing each for `local:anna`,
-the legacy row and `unknown` — so the agreement case is satisfiable and not
-merely intended. `next` also hands the three tasks out in the order the
-drain case expects, which is the control that case rests on. What remains
-unverifiable until the code exists is everything reached through
-`actors.mjs`.
+**The registration is a one-off, not a rule for the repository.** TL-285
+asks where the registry should live at all, and both of its answers stay
+open; nothing here moved the tables or loosened the assertion that pins them
+to `KINDS` in both directions. A kind added to
+`KINDS` with no invocation still fails the suite, which is the property
+TL-285 has to preserve whichever shape it picks.
+
+**Where the fixture's answer is empty, and why that is the answer.** The
+`actors` row runs against a backlog whose three tasks were created and never
+closed, so no actor has a record and `rows` is legitimately `[]` on both
+fixtures. That is the case worth pinning: `minReportN` and `policy` are
+claims about the ANSWER rather than about its rows, and an empty report that
+dropped them would read as a report with no threshold and no policy at all.
+The zero sample is answered elsewhere on purpose — `actor-record.test.mjs`
+carries a hand-written log with five actors of different records, and its
+positive controls run against that.
 
 **Two facts the hands recorded while here**, neither this task's to fix:
 `actors:` in `backlog/config.yaml` is `[local:me, agent:claude]` and does
