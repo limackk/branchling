@@ -564,6 +564,15 @@ Directives, in order of importance:
 
 ---
 
+**Mockups of this section already exist.** [`docs/design/`](design/README.md)
+holds five artboards drawn to §7 — the default state, the focus interaction, the
+empty and unparsable-plan states, the remaining card states, and the light
+theme — together with the sources they are assembled from. They are a proposal,
+not a constraint: a designer disagreeing with a decision in them should say so
+against §7, which is the argument.
+
+---
+
 ## 8. What to hand back
 
 1. **Execution tab** — the commission: default state, the focus interaction, and

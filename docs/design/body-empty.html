@@ -1,0 +1,52 @@
+<!--CHROME-->
+
+<div class="exec">
+  <div class="exec-head">
+    <h2>Execution</h2>
+  </div>
+
+  <p class="gallery-note">State &mdash; no <code>plan.yaml</code>. Not an error: ordering is an optional decision, so the screen says what would put something here.</p>
+  <section class="panel state">
+    <h3>No execution plan yet</h3>
+    <p>This view draws the order the work was decided to be done in. That order is a
+    decision somebody makes &mdash; nothing in the backlog can compute it &mdash; so it lives
+    in one file: <code>backlog/plan.yaml</code>.</p>
+    <p>Create it with the shape below and this tab fills in. The plan is advisory:
+    it changes no task's status and blocks nothing.</p>
+    <pre>updated: 2026-01-01
+rationale: what this order is for, in one sentence
+waves:
+  - name: foundations
+    tasks: [TL-1, TL-2]
+    together: [[TL-1, TL-2]]</pre>
+    <p style="margin:14px 0 0">Meanwhile, the queue is not empty:
+    <b style="color:var(--fg)">69 open tasks</b> are waiting, and
+    <b style="color:var(--fg)">1 is running</b>. The Tasks tab can hand you the next one.</p>
+  </section>
+
+  <p class="gallery-note">State &mdash; the plan file does not parse. The view shows the problems rather than drawing half an order.</p>
+  <section class="panel state">
+    <h3>This plan cannot be drawn</h3>
+    <p><code>backlog/plan.yaml</code> was read, and 3 things in it stop the order from
+    being trusted. Nothing below is a guess: every line is quoted from the file.</p>
+    <div class="problems">
+      <div class="problem">
+        <span class="ln">line 14</span>
+        <span><b>Wave 2 schedules TL-188 before its blocker TL-210, which is in wave 4.</b><br>
+        <span style="color:var(--fg-muted)">A wave may not stand before something it is blocked by. Move one of the two.</span></span>
+      </div>
+      <div class="problem">
+        <span class="ln">line 31</span>
+        <span><b>TL-4711 is not a task in this backlog.</b><br>
+        <span style="color:var(--fg-muted)">Plans travel between branches; an id can go missing. Remove it, or bring the branch that carries it.</span></span>
+      </div>
+      <div class="problem">
+        <span class="ln">line 52</span>
+        <span><b>A wave has no <code>name:</code>.</b><br>
+        <span style="color:var(--fg-muted)">A wave is a thesis, and an unnamed one cannot be read as an order.</span></span>
+      </div>
+    </div>
+    <p style="margin:0">Fix the file and the tab redraws itself. Until then the state of every
+    task is unaffected &mdash; the plan orders work, it does not block it.</p>
+  </section>
+</div>

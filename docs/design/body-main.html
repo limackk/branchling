@@ -1,0 +1,237 @@
+<!--CHROME-->
+
+<div class="exec">
+  <div class="exec-head">
+    <h2>Execution</h2>
+    <span class="stamp num">plan updated 2026-09-04</span>
+  </div>
+
+  <!-- 1 · the summary the tab has never had -->
+  <section class="panel summary">
+    <div class="figures">
+      <div class="fig is-now">
+        <span class="k">Wave</span>
+        <span class="v num">10 <small>of 14</small></span>
+        <span class="s">What a session leaves behind</span>
+      </div>
+      <div class="fig">
+        <span class="k">Planned tasks</span>
+        <span class="v num">36 <small>of 41 done</small></span>
+        <span class="s">88% of the plan</span>
+      </div>
+      <div class="fig is-live">
+        <span class="k">Running</span>
+        <span class="v num">1</span>
+        <span class="s">agent:claude, in this tree</span>
+      </div>
+      <div class="fig">
+        <span class="k">Critical path</span>
+        <span class="v num">~40 h</span>
+        <span class="s">1 task, none unestimated</span>
+      </div>
+    </div>
+    <div class="rail-wrap">
+      <div class="rail">
+        <span class="seg closed"></span><span class="seg closed"></span><span class="seg closed"></span>
+        <span class="seg closed"></span><span class="seg closed"></span><span class="seg closed"></span>
+        <span class="seg closed"></span><span class="seg closed"></span><span class="seg closed"></span>
+        <span class="seg active"></span>
+        <span class="seg"></span><span class="seg"></span><span class="seg"></span><span class="seg"></span>
+      </div>
+      <div class="rail-legend">
+        <span>wave 1</span><span><b>you are here — wave 10</b></span><span>wave 14</span>
+      </div>
+      <div class="why">
+        <span class="eyebrow">Why this order</span>
+        <p>The loop is built, so this arc is executed BY it: first make its report
+        and its log believable, then teach the dispatcher to read this file at all,
+        then the record of who did what, then the refusals the writing commands
+        still lack, then the stale premises, then what a dead session leaves
+        behind, then the fleet, and measurement of the run last.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 · now -->
+  <div class="now-head"><span class="word">Now</span><span class="rule"></span></div>
+  <section class="panel now">
+    <div class="wave-head">
+      <span class="wave-no num">Wave 10</span>
+      <span class="wave-name">What a session leaves behind</span>
+      <span class="tag">active wave</span>
+      <span class="wave-count num">0 / 1 done</span>
+    </div>
+    <div class="live">
+      <div class="live-main">
+        <div class="live-top">
+          <span class="live-id">TL-80</span>
+          <span class="badge b-running">in progress</span>
+          <span class="prio p3">P3</span>
+          <span class="badge" style="background:rgba(148,163,184,.16);color:var(--fg-muted)">role docs</span>
+        </div>
+        <p class="live-title">Separating comments, implementation notes, and the final summary</p>
+        <div class="live-meta"><b>agent:claude</b> &middot; taken 08:27 &middot; History and attribution &middot; no other task in the plan is waiting on this one</div>
+      </div>
+      <div class="clock">
+        <div class="row"><span class="big num">1 h 12 m</span><span class="num">of 4 h</span></div>
+        <div class="bar"><span style="width:30%"></span></div>
+        <div class="foot">30% of the estimate &middot; running in this worktree</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 · the critical path as a chain -->
+  <section class="chain">
+    <span class="lead">Critical path</span>
+    <span class="sum num">~40 h <small>&middot; 1 task &middot; none unestimated</small></span>
+    <span class="nodes">
+      <span class="node">
+        <span class="id">TL-149</span>
+        <span class="t">run --workers N owns the branch lifecycle of a fleet of worktrees</span>
+        <span class="w num">wave 14 &middot; 1w</span>
+      </span>
+    </span>
+  </section>
+
+  <!-- 4 · ahead -->
+  <div class="ahead-head">
+    <h3>Ahead</h3><span>4 waves &middot; 4 open tasks &middot; none started</span>
+  </div>
+
+  <section class="panel wave later">
+    <div class="wave-head">
+      <span class="wave-no num">Wave 11</span>
+      <span class="wave-name">A dead session is resumed, not restarted</span>
+      <span class="wave-count num">0 / 1 done &middot; next up</span>
+    </div>
+    <div class="rows">
+      <div class="row-task">
+        <span class="id">TL-151</span>
+        <span class="t">A session that died mid-task is resumed from one briefing, not from a search</span>
+        <span class="badge b-pending">pending</span>
+        <span class="rel">role spec</span>
+        <span class="est num">2h</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel wave later">
+    <div class="wave-head">
+      <span class="wave-no num">Wave 12</span>
+      <span class="wave-name">The fleet owns its branches</span>
+      <span class="wave-count num">0 / 0 done</span>
+    </div>
+    <div class="empty-wave">No tasks scheduled in this wave yet.</div>
+  </section>
+
+  <section class="panel wave later">
+    <div class="wave-head">
+      <span class="wave-no num">Wave 13</span>
+      <span class="wave-name">Measurement of the run</span>
+      <span class="wave-count num">0 / 2 done</span>
+    </div>
+    <div class="rows">
+      <div class="row-task">
+        <span class="id">TL-150</span>
+        <span class="t">An actor's record is computed from the log: first-pass closings, reopenings, handbacks</span>
+        <span class="badge b-pending">pending</span>
+        <span class="rel">waiting on TL-90 &mdash; not in the plan</span>
+        <span class="est num">1d</span>
+      </div>
+      <div class="row-task">
+        <span class="id">TL-91</span>
+        <span class="t">Board time-lapse replayed from the event log</span>
+        <span class="badge b-pending">pending</span>
+        <span class="rel">role spec</span>
+        <span class="est num">1d</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel wave later">
+    <div class="wave-head">
+      <span class="wave-no num">Wave 14</span>
+      <span class="wave-name">Needs a person: too large for the fleet</span>
+      <span class="wave-count num">0 / 1 done</span>
+    </div>
+    <div class="rows">
+      <div class="row-task crit">
+        <span class="id">TL-149</span>
+        <span class="t">run --workers N owns the branch lifecycle of a fleet of worktrees</span>
+        <span class="badge b-pending">pending</span>
+        <span class="crit-word">critical path</span>
+        <span class="rel">above the unattended gate</span>
+        <span class="est num">1w</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 · behind you -->
+  <section class="panel behind">
+    <div class="behind-head">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      <b>Behind you</b> &mdash; 9 waves closed, 36 tasks. No card is drawn for finished work.
+    </div>
+    <div class="waves-mini">
+      <span class="mini"><span class="n num">1</span><span class="tick"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span class="t">The loop may be trusted unattended</span><span class="c num">5/5</span></span>
+      <span class="mini"><span class="n num">2</span><span class="tick"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span class="t">The run can be watched while it happens</span><span class="c num">4/4</span></span>
+      <span class="mini"><span class="n num">3</span><span class="tick"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span class="t">A question a person can answer in a minute</span><span class="c num">2/2</span></span>
+      <span class="mini"><span class="n num">4</span><span class="tick"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span class="t">What the loop says of itself is true</span><span class="c num">7/7</span></span>
+      <span class="mini"><span class="n num">5</span><span class="tick"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span class="t">The dispatcher can follow a plan</span><span class="c num">1/1</span></span>
+      <span class="mini"><span class="n num">6</span><span class="tick"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span class="t">The record says who did what</span><span class="c num">4/4</span></span>
+      <span class="mini"><span class="n num">7</span><span class="tick"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span class="t">The guards over the public surface hold</span><span class="c num">5/5</span></span>
+      <span class="mini"><span class="n num">8</span><span class="tick"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span class="t">Refusals the writing commands still lack</span><span class="c num">5/5</span></span>
+      <span class="mini"><span class="n num">9</span><span class="tick"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span class="t">Premises that went stale</span><span class="c num">3/3</span></span>
+    </div>
+  </section>
+
+  <!-- 6 · unplanned, as a measurement -->
+  <section class="panel unplanned">
+    <p class="up-stat"><b>64 of 69 open tasks (93%)</b> are outside every wave.</p>
+    <p class="up-sub">The plan schedules 5 open tasks. A plan that orders a minority of the
+    queue is debt, not an order &mdash; and it rots quietly, which is what this number is for.</p>
+    <div class="split"><span class="out" style="width:93%"></span><span class="in" style="width:7%"></span></div>
+    <div class="split-key">
+      <span><i style="background:var(--foreign)"></i>64 outside the plan</span>
+      <span><i style="background:var(--accent)"></i>5 scheduled</span>
+    </div>
+    <div class="seg-ctl">
+      <span class="on">By priority</span><span>By epic</span><span>By age</span><span>By board</span>
+    </div>
+    <div class="up-rows">
+      <div class="up-row">
+        <span class="lab"><span class="prio p0">P0</span>Blocking</span>
+        <span class="track"><span style="width:4%"></span></span>
+        <span class="n num">1 task</span>
+        <span class="go"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+      </div>
+      <div class="up-open">
+        <div class="row-task">
+          <span class="id">TL-242</span>
+          <span class="t">A spec hand's failing test parks every other task in the wave</span>
+          <span class="badge b-pending">pending</span>
+          <span class="rel">open 1 day</span>
+          <span class="est num">&mdash;</span>
+        </div>
+      </div>
+      <div class="up-row">
+        <span class="lab"><span class="prio p1">P1</span>Next</span>
+        <span class="track"><span style="width:100%"></span></span>
+        <span class="n num">24 tasks</span>
+        <span class="go"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
+      </div>
+      <div class="up-row">
+        <span class="lab"><span class="prio p2">P2</span>Later</span>
+        <span class="track"><span style="width:96%"></span></span>
+        <span class="n num">23 tasks</span>
+        <span class="go"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
+      </div>
+      <div class="up-row">
+        <span class="lab"><span class="prio p3">P3</span>Someday</span>
+        <span class="track"><span style="width:67%"></span></span>
+        <span class="n num">16 tasks</span>
+        <span class="go"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
+      </div>
+    </div>
+  </section>
+</div>

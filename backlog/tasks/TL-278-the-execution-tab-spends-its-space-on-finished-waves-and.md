@@ -18,6 +18,7 @@ blocked_by: []                     # ids of tasks that MUST be closed before thi
 blocks: []                         # ids this task will unblock
 related_docs:
   - docs/viewer-redesign-brief.md
+  - docs/design/README.md
 verification:
   - id: summary-first
     bash: "node --test scripts/tests/viewer-plan.test.mjs"
@@ -79,15 +80,18 @@ problems, listed in the same brief; folding them in here would blur both.
 
 1. `docs/viewer-redesign-brief.md` - section 7 states what the tab is for, how
    it fails and what the redesign must preserve.
-2. `scripts/viewer-plan.mjs` - `planViewModel()` (the model, unchanged by this
+2. `docs/design/` - five artboards drawn to that section, and the sources they
+   are built from. Run `node build.mjs` there first; the assembled files are
+   not committed.
+3. `scripts/viewer-plan.mjs` - `planViewModel()` (the model, unchanged by this
    task) and `renderExecution()` / `renderCard()` / `renderWaveCards()` (the
    markup, which this task rewrites).
-3. `scripts/build-viewer.mjs` - the `Execution` CSS block, and
+4. `scripts/build-viewer.mjs` - the `Execution` CSS block, and
    `renderExecution_()` / `drawPlanEdges()` in the page script, which measure
    the cards after layout and fill in the edge geometry.
-4. `scripts/tests/viewer-plan.test.mjs` - the file inlined by source into the
+5. `scripts/tests/viewer-plan.test.mjs` - the file inlined by source into the
    page, so the browser and `node --test` run the same code.
-5. `scripts/plan.mjs` - `planState()`, which owns the arithmetic. The view may
+6. `scripts/plan.mjs` - `planState()`, which owns the arithmetic. The view may
    not compute a second answer to "which wave is active".
 
 ## Steps

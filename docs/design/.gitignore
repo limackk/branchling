@@ -1,0 +1,6 @@
+# The assembled artboards and the seeded canvas are COMPUTED (law 2 in
+# CLAUDE.md): `node build.mjs` writes the first, the design skill writes the
+# second. Neither is a source, and neither is committed.
+*.dc.html
+execution-tab-redesign.html
+preview.log
