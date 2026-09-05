@@ -1,6 +1,6 @@
 ---
 id: TL-283
-title: "An agent that only says it has no quota spends an attempt and parks the task"
+title: "An agent killed by its own quota leaves work uncommitted and blames the contract"
 type: bug
 labels: []
 board: main
@@ -26,13 +26,17 @@ verification:
 
 ## Goal
 
-An agent that never worked the task costs the task nothing. Today an agent
-that starts, says it has no quota left and exits is counted as an attempt,
-and two of them park a task nobody touched.
+When an agent is cut off by its own vendor mid-task, the run says so. Today
+it reports that the contract failed, parks the task on that reason, and
+leaves the agent's uncommitted work in the tree for the next `git add -A`
+to sweep into an unrelated commit.
 
 ## Context
 
-Measured on 2026-09-05, TL-150. The whole of both attempts, from the log:
+Measured on 2026-09-05, TL-150, and CORRECTED the same day — the first
+version of this task said "no commit, no file touched", and that was
+wrong. What the log shows is the agent's stdout, which for `claude -p` is
+its final message only:
 
     === attempt 1: …/hand-spec.sh
     You've hit your session limit · resets 12:10pm (Europe/Warsaw)
@@ -41,49 +45,57 @@ Measured on 2026-09-05, TL-150. The whole of both attempts, from the log:
     You've hit your session limit · resets 12:10pm (Europe/Warsaw)
     === done: exit 1
 
-No commit, no file touched, no work of any kind. The loop ran the whole
-contract twice — the second run of an 80-second suite purely to learn what
-the first had already said — spent both attempts, and parked the task with
-`no verification after 2 agent attempts`, which is true and useless: the
-reader is told the contract failed when the truth is that no agent ran.
+What it does NOT show is that the hand had already written
+`scripts/tests/actor-record.test.mjs` — 
+TL-150's whole spec deliverable, a failing test for a command that does not
+exist yet. It was cut off before it could commit and hand on. So the tree
+DID change, TL-184's guard correctly did not fire, and the two attempts
+were real work rather than nothing.
 
-**TL-184's guard was built for exactly this and does not catch it.** An
-attempt "that printed nothing and left the tree unchanged" is not an
-attempt; this one printed one line, so it counted. The tree test is right
-and the output test is too narrow: the distinguishing fact is that the tree
-did not move, and the printed line was ABOUT the agent rather than about
-the task.
+**Three consequences, all measured.**
 
-**Why not parse the message.** The tool does not know the vendor and must
-not learn one: matching "session limit" would be a literal about somebody
-else's product, and the next vendor phrases it differently. What the loop
-can see without guessing is that the tree is unchanged across the attempt
-AND the agent exited quickly — the second is what separates "worked and
-concluded nothing was needed" from "never started".
+The park blames the wrong thing. TL-150 was left with `no verification
+after 2 agent attempts: suite-green`, which a later reader takes as a
+finding about the work. The truth — the hand ran out of quota with the
+deliverable written and uncommitted — is one line at the end of the log
+and nowhere else.
 
-**The cost is not the two attempts.** It is that the task ends parked with
-a reason blaming its contract, in a status a later reader treats as a
-finding about the work. TL-150 is untouched and now reads as a task that
-failed verification twice.
+The second attempt was pure cost. The contract, an 80-second suite, ran
+twice to learn what the first run had already established, against a hand
+that could not start.
+
+The uncommitted work is a trap for the next commit. It was swept into an
+unrelated commit here by `git add -A` and reached `main` as a red test with
+no implementation, which is exactly the hazard TL-276 records two hands
+warning about.
+
+**What the tool must not do.** Parse the vendor's wording. "Session limit"
+is a literal about somebody else's product and the next vendor phrases it
+differently.
+
+**What it can see without guessing.** That the agent exited far faster than
+its previous attempt on the same task; that the tree changed but nothing
+was committed, while the charter it was given ends in a commit; that two
+attempts produced byte-identical output, which no working agent does.
 
 ## Steps
 
-1. Decide, with `branchling ask`, what widens TL-184's rule. The
-   candidates: an unchanged tree plus an exit faster than some floor; an
-   unchanged tree plus no output on stdout OR a single line; an explicit
-   exit code the caller's wrapper may use to say "I could not start". The
-   third is the only one that needs no heuristic, and it costs the caller a
-   convention.
-2. Whatever is decided, such an attempt must not be counted and the task
-   must be given back the status it was taken from — the path TL-184
-   already built for `agent-never-ran`.
-3. The run should stop, as it does for `agent-never-ran`: the next task
-   would meet the same wall.
+1. Decide, with `branchling ask`, what the loop may conclude. The
+   candidates: two attempts with identical output are one attempt and the
+   run stops; an exit code convention the caller's wrapper uses to say "I
+   could not start"; nothing at all, and the report simply quotes the
+   agent's last line beside the parked reason so a reader is not misled.
+   The third changes no behaviour and removes the false diagnosis.
+2. Whatever is decided, a task parked after an agent could not run must not
+   carry a reason naming its contract.
+3. Say in `run --help` that an agent's uncommitted work is left in the tree
+   and belongs to whoever reads the report, since that is where TL-276's
+   hazard actually bites.
 
 ## Acceptance criteria
 
-- [ ] An agent that leaves the tree unchanged and returns immediately does
-      not spend an attempt and does not park the task, proven by a test
+- [ ] A task parked after two identical, immediate agent refusals carries a
+      reason naming the agent rather than the contract, proven by a test
       that fails against today's loop. [proof: quota-is-not-an-attempt]
 - [ ] An agent that genuinely worked and failed its contract still spends
-      its attempts. [proof: suite-green]
+      its attempts and still names the contract. [proof: suite-green]

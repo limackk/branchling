@@ -363,15 +363,6 @@ arriving
 arrow
 artboard
 artboards
-canvas
-crit
-departures
-heights
-helmet
-lightened
-mockups
-receded
-uppercased
 artefact
 article
 artifact
@@ -815,6 +806,7 @@ candidates
 cannot
 canonical
 canonicalised
+canvas
 capabilities
 capability
 capped
@@ -1434,6 +1426,7 @@ creep
 crew
 cries
 crippled
+crit
 criteri
 criteria
 criterion
@@ -1635,6 +1628,7 @@ departed
 departments
 departs
 departure
+departures
 depend
 depended
 dependence
@@ -2812,7 +2806,9 @@ heartbeats
 heaviest
 heavy
 height
+heights
 held
+helmet
 help
 helper
 helpers
@@ -3460,6 +3456,7 @@ lifted
 lifting
 lifts
 light
+lightened
 lighter
 lighting
 lights
@@ -3822,6 +3819,7 @@ mktemp
 mobile
 mock
 mocked
+mockups
 mocy
 modal
 mode
@@ -4981,6 +4979,7 @@ recalculated
 recall
 recalled
 recede
+receded
 recedes
 receipt
 receive
@@ -6927,6 +6926,7 @@ uphold
 upholds
 upper
 uppercase
+uppercased
 upset
 upstream
 uptime
