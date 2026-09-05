@@ -2390,6 +2390,7 @@ fifteen
 fifth
 fifty
 fight
+fighting
 figurative
 figuratively
 figure
@@ -4395,6 +4396,7 @@ paths
 pathspec
 pattern
 patterns
+pause
 payable
 payer
 paying
@@ -4459,6 +4461,7 @@ picker
 picking
 picks
 picture
+pictures
 piece
 pieces
 pill
@@ -5063,6 +5066,7 @@ refined
 refinement
 reflect
 reflects
+reformatted
 reflex
 refname
 refresh
@@ -5923,6 +5927,7 @@ speculative
 speech
 speed
 speeding
+speeds
 spell
 spellchecker
 spelled
