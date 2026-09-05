@@ -356,6 +356,7 @@ arrangement
 arrangements
 arranges
 array
+arrays
 arrival
 arrive
 arrived
@@ -604,6 +605,7 @@ biggest
 bike
 billed
 billing
+binaries
 binary
 bind
 binding
@@ -798,6 +800,7 @@ callsheet
 came
 camel
 cancel
+cancellation
 cancelled
 cancelling
 cancels
@@ -809,6 +812,7 @@ canonicalised
 canvas
 capabilities
 capability
+capable
 capped
 capterra
 caption
@@ -983,6 +987,7 @@ cleanup
 clear
 clearance
 cleared
+clearer
 clearest
 clearing
 clearly
@@ -1173,6 +1178,7 @@ concatenating
 concatenation
 concedes
 concept
+conceptual
 concern
 concerned
 concerning
@@ -1276,6 +1282,7 @@ consumes
 consuming
 consumption
 contact
+contacting
 contain
 contained
 container
@@ -1639,6 +1646,7 @@ depends
 deploy
 deployer
 deployment
+deployments
 deploys
 deps
 depth
@@ -2022,6 +2030,7 @@ eexist
 effect
 effects
 effort
+efforts
 eight
 eighth
 eighty
@@ -2037,6 +2046,7 @@ eleventh
 elided
 elides
 eligibility
+eligible
 eliminate
 ellipsis
 ellipsised
@@ -2224,6 +2234,7 @@ excuses
 exdev
 exec
 executable
+executables
 execute
 executed
 executes
@@ -2294,6 +2305,7 @@ exposed
 exposes
 express
 expressed
+expressible
 expression
 expressions
 extend
@@ -2773,6 +2785,7 @@ harmed
 harmless
 harmlessly
 harness
+harnesses
 harvest
 harvested
 harvests
@@ -2840,6 +2853,7 @@ hints
 hist
 histogram
 historical
+histories
 history
 hits
 hitting
@@ -3010,6 +3024,7 @@ including
 incoherent
 incoming
 incomparable
+incompatible
 incomplete
 inconsistency
 inconsistent
@@ -3020,6 +3035,7 @@ increase
 increasing
 incremented
 incumbent
+incur
 indefinitely
 indent
 indentation
@@ -3042,6 +3058,7 @@ individually
 indivisible
 induced
 industry
+ineligible
 inequality
 infeasible
 infer
@@ -3145,6 +3162,7 @@ intentions
 inter
 interaction
 interactive
+interactively
 intercept
 intercepts
 interchangeable
@@ -3311,6 +3329,7 @@ killed
 killer
 killing
 kills
+kimi
 kind
 kinds
 kiro
@@ -3526,6 +3545,7 @@ locale
 locales
 localhost
 locally
+locate
 located
 locates
 location
@@ -3984,6 +4004,7 @@ network
 neutral
 neutralise
 neutralises
+neutrality
 neutrally
 never
 nevertheless
@@ -4142,6 +4163,7 @@ observers
 observing
 obsidian
 obstacle
+obtain
 obvious
 obviously
 occasions
@@ -4381,6 +4403,7 @@ partially
 participate
 participates
 particular
+parties
 partition
 partitioned
 partitioning
@@ -4455,6 +4478,7 @@ persistent
 persisting
 persists
 person
+persona
 personal
 personas
 persuade
@@ -4605,6 +4629,7 @@ prawdziwe
 prawdziwego
 prawie
 preamble
+precede
 preceded
 precedence
 precedent
@@ -4639,6 +4664,7 @@ prefers
 prefix
 prefixed
 prefixes
+preflight
 prefs
 prejudged
 preloaded
@@ -4738,6 +4764,7 @@ products
 produkt
 professional
 profile
+profiles
 program
 programmatic
 programmatically
@@ -4803,6 +4830,8 @@ provenance
 proves
 provide
 provided
+provider
+providers
 provides
 proving
 provisional
@@ -4876,6 +4905,7 @@ queuefile
 quick
 quickest
 quickly
+quickstart
 quiet
 quieter
 quietest
@@ -4926,6 +4956,7 @@ reacted
 reacting
 reaction
 read
+readability
 readable
 readdir
 reader
@@ -5005,6 +5036,7 @@ recognizes
 recognizing
 recommend
 recommendation
+recommendations
 recommended
 recommending
 recommends
@@ -5358,6 +5390,8 @@ results
 resume
 resumed
 resuming
+retain
+retains
 retention
 retire
 retired
@@ -5436,6 +5470,7 @@ right
 rightly
 rights
 rigor
+rigorous
 ring
 rise
 rises
@@ -5457,6 +5492,7 @@ robust
 rode
 role
 roled
+roleful
 roleless
 roles
 rollback
@@ -5590,6 +5626,8 @@ seasonal
 second
 secondary
 seconds
+secret
+secrets
 section
 sections
 secure
@@ -5733,6 +5771,7 @@ shorten
 shortened
 shortening
 shorter
+shortest
 shorthand
 shortlist
 shot
@@ -5943,6 +5982,8 @@ specifically
 specification
 specifics
 specified
+specifies
+specify
 specs
 speculation
 speculative
@@ -6478,8 +6519,10 @@ tile
 tiles
 time
 timed
+timeless
 timeline
 timeout
+timeouts
 timer
 times
 timescale
