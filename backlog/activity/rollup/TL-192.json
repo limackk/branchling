@@ -1,7 +1,7 @@
 {
-  "minutes": 12.8,
-  "sessions": 2,
-  "first": "2026-09-03T11:20:13.860Z",
-  "last": "2026-09-03T11:34:01.793Z",
+  "minutes": 0,
+  "sessions": 0,
+  "first": null,
+  "last": null,
   "unknown_ratio": 0
 }
