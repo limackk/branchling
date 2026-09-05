@@ -796,6 +796,36 @@ export const TERMINAL_REFUSALS = {
   "already-closed": "closed-elsewhere",
 };
 
+/** The environment a hand runs in: who the loop claimed the task as, which role
+ *  it is serving it under, the task id and the data directory. Names are derived
+ *  from the product name so a rename moves them; a literal would be a second
+ *  identity to keep in step (TL-117). PURE. */
+export function agentEnvironment(ctx, task) {
+  const prefix = String(N).toUpperCase().replace(/[^A-Z0-9]+/g, "_");
+  const out = {};
+  out[prefix + "_ACTOR"] = String(ctx.actor || "");
+  out[prefix + "_ROLE"] = String(task.role || "");
+  out[prefix + "_TASK"] = String(task.id || "");
+  out[prefix + "_DIR"] = String(ctx.root || "");
+  return out;
+}
+
+/** After an attempt: has the task been handed to a role THIS run serves? Reads
+ *  the file as it is now. Null when the claim is intact, when the task went to
+ *  a role nobody here serves (that stays `held-elsewhere`), or when the file is
+ *  gone. */
+function claimAfterAttempt(ctx, task) {
+  const paths = backlogPaths(ctx.root);
+  const record = readTaskRecords(paths.tasksDir, ctx.config.taskId.file)
+    .find((t) => String(t.id).toUpperCase() === String(task.id).toUpperCase());
+  if (!record) return { ours: true };
+  const owner = String(record.owner || "").trim();
+  if (owner === String(ctx.actor || "").trim()) return { ours: true };
+  const role = String(record.role || "").trim();
+  const served = !owner && role && role !== String(task.role || "").trim() && !!agentFor(ctx.plan, role);
+  return { ours: false, owner, role, toRole: served ? role : null, status: record.status };
+}
+
 function workOne(ctx, task) {
   const logPath = logPathFor(ctx.root, task.id, { logDir: ctx.plan.logDir, env: process.env });
   writeFileSync(logPath, "", "utf8");
@@ -821,6 +851,12 @@ function workOne(ctx, task) {
       shell: true,
       cwd: ctx.cwd,
       encoding: "utf8",
+      // THE HAND IS TOLD WHO IT IS (TL-271). The loop claimed the task under
+      // `actor` and is serving it as `role`; a hand that has to act on the
+      // task — `handoff`, `ask`, `decide` — needs the first, and had to read the
+      // history file to learn it. Both are facts the loop holds and cost nothing
+      // to pass. The names derive from the product name, never a literal.
+      env: { ...process.env, ...agentEnvironment(ctx, task) },
       input: agentInput(task.text, feedback, feedbackRan),
       timeout: ctx.plan.timeout * 1000,
       maxBuffer: 64 * 1024 * 1024,
@@ -851,6 +887,38 @@ function workOne(ctx, task) {
         id: task.id, outcome: "agent-never-ran", attempts: attempt - 1,
         ms: Date.now() - started, log: logPath, command,
         detail: said || "the agent printed nothing and changed nothing",
+      };
+    }
+
+    // A HANDOFF IS THIS ROLE'S SUCCESS, NOT A FAILED ATTEMPT (TL-271). The hand
+    // may have given the task back to the queue for a different role — `owner:`
+    // cleared, `role:` changed — which is the act the pipeline exists for. Running
+    // `done` now would learn, at the cost of the whole contract, only what the
+    // handoff already said; retrying THIS hand would ask it to redo sound work;
+    // and counting the attempt would spend the next role's budget. So the loop
+    // stops here, names the ending, and lets `next` hand the task out again to
+    // the role it now asks for. A role this run does not serve is not followed:
+    // that task is genuinely somebody else's, and stays `held-elsewhere`.
+    const claim = claimAfterAttempt(ctx, task);
+    if (!claim.ours) {
+      if (claim.toRole) {
+        appendFileSync(logPath, "\n=== handed on to role `" + claim.toRole + "` — no `" + N + " done` was run\n", "utf8");
+        return {
+          id: task.id, outcome: "handed-on", attempts, ms: Date.now() - started, log: logPath,
+          toRole: claim.toRole,
+          detail: task.id + " was handed to role `" + claim.toRole + "`, which this run serves — it goes back into the queue",
+        };
+      }
+      // NOT OURS ANY MORE, AND NOT FOLLOWED. The hand gave the task to a person,
+      // or to a role nobody here serves. `done` under this run's actor would be
+      // a write on a claim that is gone (TL-192), so it is not run at all.
+      appendFileSync(logPath, "\n=== the task is now held by " + (claim.owner || "nobody") +
+        (claim.role ? " for role `" + claim.role + "`" : "") + " — no `" + N + " done` was run\n", "utf8");
+      return {
+        id: task.id, outcome: "held-elsewhere", attempts, ms: Date.now() - started, log: logPath,
+        status: claim.status,
+        detail: task.id + " is held by " + (claim.owner || "nobody") + ", not by " + ctx.actor +
+          " — this run's claim on it is gone",
       };
     }
 
@@ -900,6 +968,7 @@ function renderReport(report, plan) {
     (tally.awaitingVouch ? tally.awaitingVouch + " awaiting a vouch · " : "") +
     (tally.closedElsewhere ? tally.closedElsewhere + " closed elsewhere · " : "") +
     (tally.heldElsewhere ? tally.heldElsewhere + " held elsewhere · " : "") +
+    (tally.handedOn ? tally.handedOn + " handed on · " : "") +
     Math.round(report.ms / 1000) + "s");
   lines.push("");
   for (const r of report.taken) {
@@ -915,8 +984,11 @@ function renderReport(report, plan) {
     // this run's agent finished the work. The per-task line keeps the word, so
     // a reader can still see which hand closed it; the summary above does not,
     // because to the summary it is simply one closed task.
+    // `handed-on` is an ok as well (TL-271): the hand did the stage it was
+    // given and passed the task to the next one — the pipeline working, not a
+    // task the run lost.
     const mark = r.outcome === "closed" || r.outcome === "closed-elsewhere" ||
-      r.outcome === "awaiting-vouch" || r.outcome === "closed-by-agent" ? MARK.ok
+      r.outcome === "awaiting-vouch" || r.outcome === "closed-by-agent" || r.outcome === "handed-on" ? MARK.ok
       : r.outcome === "agent-never-ran" ? MARK.err : MARK.warn;
     lines.push("  " + mark + " " + r.id + "  " + r.outcome + "  " + r.attempts +
       " attempt" + (r.attempts === 1 ? "" : "s") + "  " + Math.round(r.ms / 1000) + "s");
@@ -1220,7 +1292,7 @@ export function run(argv) {
   // (TL-200): a task the run's own agent closed is closed, and the summary line
   // says so. It is carried separately only because `--json` must still let a
   // caller tell which hand did it.
-  const tally = { closed: 0, blocked: 0, awaitingVouch: 0, closedByAgent: 0, closedElsewhere: 0, heldElsewhere: 0 };
+  const tally = { closed: 0, blocked: 0, awaitingVouch: 0, closedByAgent: 0, closedElsewhere: 0, heldElsewhere: 0, handedOn: 0 };
   let stopped = "the queue is empty";
   // The one result that ends the run without being a fact about a task (TL-184).
   let neverStarted = null;
@@ -1250,16 +1322,20 @@ export function run(argv) {
       stopped = "`" + N + " next` answered with something this loop cannot read";
       break;
     }
+    const role = String((task.task && task.task.role) || "").trim();
     // A dispatcher that hands out the same id twice has a defect; a loop that
     // does not notice has an endless one. Better to stop and say so than to
-    // spend a night proving it.
-    if (seen.has(task.id)) {
-      stopped = task.id + " was handed out twice — the loop stopped rather than spin";
+    // spend a night proving it. THE KEY IS THE PAIR, not the id (TL-271): a task
+    // that comes back under a DIFFERENT role was handed on, and that is the
+    // pipeline working. The same role twice is still the spin this guards.
+    const turn = task.id + "@" + role;
+    if (seen.has(turn)) {
+      stopped = task.id + " was handed out twice" + (role ? " to role `" + role + "`" : "") +
+        " — the loop stopped rather than spin";
       break;
     }
-    seen.add(task.id);
+    seen.add(turn);
 
-    const role = String((task.task && task.task.role) || "").trim();
     const command = agentFor(plan, role);
     if (!command) {
       // Belt and braces: the selection above already excludes these, so arriving
@@ -1299,6 +1375,12 @@ export function run(argv) {
     }
     if (result.outcome === "closed") {
       tally.closed++;
+    } else if (result.outcome === "handed-on") {
+      // NOTHING TO PARK AND NOTHING TO RELEASE (TL-271): `handoff` cleared the
+      // owner and gave the reservation back itself. The task is `pending` for a
+      // role this run serves, so the next `next` hands it out again — under the
+      // pair key above, which admits a task once per role.
+      tally.handedOn++;
     } else {
       // WORKED, UNVERIFIED IS NOT FAILED (TL-212). A contract that ends in a
       // `manual:` entry is one an agent can satisfy to the last automatic line
@@ -1431,6 +1513,8 @@ export function run(argv) {
         id: r.id, outcome: r.outcome, attempts: r.attempts, ms: r.ms, log: r.log,
         role: r.role || "", status: r.status || null, detail: r.detail || null,
         command: r.command || null,
+        // Which role a handed-on task went to (TL-271); null for every other ending.
+        toRole: r.toRole || null,
       })),
     }, null, 2));
   } else {

@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-05
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
@@ -114,12 +114,12 @@ history entry and is closed.
 
 ## Acceptance criteria
 
-- [ ] A fake `spec` agent that hands off to `dev` in a run serving both is
+- [x] A fake `spec` agent that hands off to `dev` in a run serving both is
       followed by the `dev` command on the same task, with attempt 1,
       proven by a test that fails against today's loop.
       [proof: handoff-followed]
-- [ ] The report names the handoff as its own outcome, not as a failed
+- [x] The report names the handoff as its own outcome, not as a failed
       attempt and not as held elsewhere. [proof: handoff-followed]
-- [ ] The agent's environment carries the actor and the role.
+- [x] The agent's environment carries the actor and the role.
       [proof: handoff-followed]
-- [ ] A single-role run is unchanged. [proof: suite-green]
+- [x] A single-role run is unchanged. [proof: suite-green]
