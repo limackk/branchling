@@ -6,9 +6,9 @@ labels: []
 board: main
 epic: ""
 priority: P3                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: in_progress  # pending | in_progress | blocked | done | cancelled
+status: done  # pending | in_progress | blocked | done | cancelled
 owner: agent:fleet
-role: spec
+role: dev
 estimate: 1d                       # 30m | 2h | 1d | 1w | 1mo
 created: 2026-09-02
 updated: 2026-09-05
@@ -76,12 +76,12 @@ read time. A cache, if ever needed, is deletable.
 
 ## Acceptance criteria
 
-- [ ] `actors` reports per actor: first-pass closings, reopenings, handbacks, each with its count. [proof: suite-green]
-- [ ] `local:` and `user:` of the same nickname are separate rows; `legacy` is its own row. [proof: suite-green]
-- [ ] Below the configured minimum sample no rate is printed, and the count is. [proof: suite-green]
-- [ ] The policy filters eligibility only and never reorders `next`'s candidates. [proof: suite-green]
-- [ ] Positive control: policy on withholds the P0 from the weaker actor; policy off hands it out. [proof: suite-green]
-- [ ] The policy key in the user layer is refused. [proof: guards-green]
+- [x] `actors` reports per actor: first-pass closings, reopenings, handbacks, each with its count. [proof: suite-green]
+- [x] `local:` and `user:` of the same nickname are separate rows; `legacy` is its own row. [proof: suite-green]
+- [x] Below the configured minimum sample no rate is printed, and the count is. [proof: suite-green]
+- [x] The policy filters eligibility only and never reorders `next`'s candidates. [proof: suite-green]
+- [x] Positive control: policy on withholds the P0 from the weaker actor; policy off hands it out. [proof: suite-green]
+- [x] The policy key in the user layer is refused. [proof: guards-green]
 
 ## Where the spec hand stopped (2026-09-05, third pass)
 
