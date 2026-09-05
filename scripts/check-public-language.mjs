@@ -50,31 +50,12 @@
  * text that gets SEARCHED, before either signal runs; the line reported in a
  * finding is still the original, so a real mistake is still visible.
  *
- * WHY THERE IS ALSO A DICTIONARY (TL-201). The three signals above are all
- * BLOCKLISTS: they enumerate what a foreign word looks like, and a language is
- * not closed by enumeration, so every hole in them is simply another word.
- * `Tryb snapshot` shipped in the viewer's connection bar past all three — no
- * diacritic, no digraph, no inflected ending, on neither word list — and was
- * read as English for as long as the guard existed (TL-198). The fourth signal
- * inverts the question: a word this project has never written is UNKNOWN, and
- * an unknown word fails. That is closed by construction rather than by however
- * many patterns somebody thought of, and it catches a misspelling of an English
- * word too, which no list of foreign words can ever do.
- *
- * The vocabulary is `language-dictionary.txt` beside this file — one file, so a
- * reader can see the whole of what this project accepts at once, and no
- * dependency, so `npm test` works from a clean checkout with no network. It is
- * a SNAPSHOT, generated from the tree by `--update-dictionary` and then
- * committed; it is deliberately not rebuilt on every run, because a dictionary
- * that regenerates itself accepts whatever was written last and answers ✓ for
- * ever.
- *
- * WHY THE THREE BLOCKLISTS STAY. They are strictly narrower than the dictionary
- * and would be redundant on their own — but they run FIRST, so a line that is
- * recognisably foreign is still reported as `diacritics`, `word`, `words`,
- * `shape` or `label` rather than as an anonymous unknown word. The reason code
- * is what tells an author whether they wrote the wrong language or misspelled
- * the right one, and that is worth four cheap regular expressions.
+ * WHY THE SIGNALS ARE DELIBERATELY HEURISTIC. They detect evidence of Polish
+ * text; they do not attempt to prove that every other word is English. TL-201
+ * briefly added a snapshot of every word already present in this repository,
+ * but that made ordinary new English fail merely because nobody had written it
+ * here before. TL-243 removed that inventory rather than teaching a language
+ * guard to reject valid prose.
  *
  * WHY THERE IS ALSO AN ALLOW LIST. Some non-English text is not a path and
  * cannot be stripped by shape alone — a transliteration table (its keys ARE
@@ -84,14 +65,10 @@
  * bug, where translating the quote would falsify what was actually observed.
  * Each is marked in the source with `language-guard: allow` on the line or on
  * the line above, so an exception is a decision written down rather than a
- * hole in the pattern. Since TL-201 the marker has a SECOND job: a marked line
- * is skipped when the dictionary is built as well as when it is read, so a
- * deliberately foreign sample never becomes part of the vocabulary that lets
- * the next one through.
+ * hole in the pattern.
  *
  * Usage:
  *   node scripts/check-public-language.mjs
- *   node scripts/check-public-language.mjs --update-dictionary
  *
  * Exit 0 = the public surface is English (and it says how many lines it read —
  * a ✓ over zero lines means "there was nothing to check", not "I checked").
@@ -100,7 +77,7 @@
  * Tests: `node --test scripts/tests/public-language.test.mjs`
  */
 
-import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -293,104 +270,6 @@ function walk(abs, out) {
 }
 
 /**
- * THE FOURTH SIGNAL: a word this project has never written (TL-201).
- *
- * WHAT A WORD IS HERE. A run of letters, after `stripDataSpans()` has removed
- * the spans that are data rather than prose. `camelCase` and `snake_case` are
- * split into their parts, so `mkdtempSync` is `mkdtemp` + `sync` and a new
- * identifier assembled from words the project already writes needs no dictionary
- * entry of its own. A token carrying a DIGIT — `utf8`, `sha256`, a ULID — is
- * skipped whole: it is an identifier or a serial, and letting its letter runs
- * into the vocabulary would fill the dictionary with noise that then accepts
- * anything.
- *
- * WHY FOUR LETTERS. Below that the tokens are overwhelmingly abbreviations and
- * single-letter variables — `tl`, `px`, `fx`, `id` — and the three-letter band
- * is where a foreign word and an identifier are least distinguishable. The
- * stop-word list above already covers the short foreign words that matter
- * (`nie`, `jak`, `bez`), and it covers them with a two-hit threshold that a
- * variable name cannot trip.
- *
- * ONE UNKNOWN WORD IS ENOUGH, unlike the two-hit thresholds above. Those are
- * blocklists, where a single hit is reachable by accident; this is the inverse,
- * and a word the project has never written is already the finding.
- */
-export const MIN_DICTIONARY_WORD = 4;
-
-/** A token that could carry a word: letters first, then anything identifier-ish. */
-const WORD_TOKEN = /[A-Za-z][A-Za-z0-9_]*/g;
-
-/** `camelCase` and `PascalCase` boundaries. */
-const CAMEL_BOUNDARY = /(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])/;
-
-/** The words a line is made of, lowercased. PURE. */
-export function wordsIn(searched) {
-  const out = [];
-  for (const m of String(searched).matchAll(WORD_TOKEN)) {
-    if (/[0-9]/.test(m[0])) continue;
-    for (const part of m[0].split(/_+/)) {
-      for (const word of part.split(CAMEL_BOUNDARY)) {
-        if (word.length >= MIN_DICTIONARY_WORD) out.push(word.toLowerCase());
-      }
-    }
-  }
-  return out;
-}
-
-/** The one file that holds this project's vocabulary. */
-export const DICTIONARY_FILE = join(HERE, "language-dictionary.txt");
-
-/**
- * What a reader of the word list itself needs to know. Written by the generator,
- * ignored by the reader — a `#` line is not a word.
- */
-const DICTIONARY_HEADER = [
-  "# The vocabulary this project accepts, one word per line, lowercase.",
-  "#",
-  "# HOW IT WAS MADE. Generated from the public surface of this repository by",
-  "#   node scripts/check-public-language.mjs --update-dictionary",
-  "# and then committed. It is a SNAPSHOT: the check reads it, never rewrites it.",
-  "# A dictionary that rebuilt itself on every run would accept whatever was",
-  "# written last and answer with a tick for ever.",
-  "#",
-  "# HOW TO ADD A WORD. By hand, on its own line, when the guard reports it and",
-  "# it is English this project had simply not written before. Regenerating is",
-  "# the same decision taken in bulk, and it accepts the mistakes too.",
-  "#",
-  "# WHAT IT INHERITED. The snapshot was taken from a tree that still carried",
-  "# Polish inside scripts/tests, so this file holds those words as well. TL-128",
-  "# deleted the three that its translation retired, in the same commit as the",
-  "# assertion messages that used them — which is the rule for every such task.",
-  "# A word left standing here keeps the guard green over the NEXT line to reuse",
-  "# it, so a translation that does not touch this file has bought nothing. What",
-  "# is left belongs to TL-229: the half-translated comment in",
-  "# scripts/tests/new-task.test.mjs.",
-  "",
-].join("\n");
-
-let DICTIONARY = null;
-
-/** The vocabulary, read once. A `#` comment and a blank line are not words. */
-export function dictionary() {
-  if (DICTIONARY) return DICTIONARY;
-  const text = readFileSync(DICTIONARY_FILE, "utf8");
-  DICTIONARY = new Set();
-  for (const raw of text.split(/\r?\n/)) {
-    const word = raw.replace(/#.*$/, "").trim().toLowerCase();
-    if (word) DICTIONARY.add(word);
-  }
-  return DICTIONARY;
-}
-
-/** The words on this line that the project has never written. PURE-ish. */
-export function unknownWords(searched) {
-  const known = dictionary();
-  const unknown = [];
-  for (const word of new Set(wordsIn(searched))) if (!known.has(word)) unknown.push(word);
-  return unknown;
-}
-
-/**
  * The extensions a bare path may end in. A CLOSED list on purpose: the test for
  * "is this token a path" has to be narrow enough that a Polish word cannot walk
  * through it, and an open rule — anything after a dot — would let
@@ -468,25 +347,11 @@ export function auditText(text) {
       problems.push({ line: number, text: line.trim(), reason: "label" });
       continue;
     }
-    // LAST, so that a recognisably foreign line keeps the reason code that says
-    // WHY it is foreign; only what the blocklists cannot name arrives here.
-    const unknown = unknownWords(searched);
-    if (unknown.length) {
-      problems.push({ line: number, text: line.trim(), reason: "unknown", word: unknown[0] });
-    }
   }
   return problems;
 }
 
-/**
- * The lines of `text` that are actually judged, with the search text for each.
- *
- * SHARED WITH THE GENERATOR ON PURPOSE. A word only enters the dictionary from a
- * line the guard would have read, stripped exactly the way the guard strips it.
- * Two implementations of "which lines count" would drift, and the drift would
- * show up as a dictionary that either misses a word the tree uses (a false
- * alarm) or holds one from a line nobody checks (a hole).
- */
+/** The lines of `text` that are actually judged, with the search text for each. */
 function* judgedLines(text) {
   const lines = String(text || "").split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
@@ -532,29 +397,7 @@ export function auditTree(root = ROOT) {
   return { findings, filesChecked: files.length, linesChecked };
 }
 
-/**
- * Rebuild the vocabulary from the tree — the answer to "how was this file made".
- *
- * IT IS A SNAPSHOT, NOT A RULE. Running this accepts every word the tree
- * currently holds, including any that should not be there, which is why it is a
- * deliberate flag and not something the check does for itself. Regenerating it
- * is the same decision as adding a word by hand, taken in bulk.
- */
-function updateDictionary() {
-  const words = new Set();
-  for (const file of publicFiles(ROOT)) {
-    for (const { searched } of judgedLines(readFileSync(file, "utf8"))) {
-      for (const word of wordsIn(searched)) words.add(word);
-    }
-  }
-  const sorted = [...words].sort();
-  writeFileSync(DICTIONARY_FILE, DICTIONARY_HEADER + sorted.join("\n") + "\n", "utf8");
-  console.log(`${OKM} language: ${sorted.length} words written to ${relative(ROOT, DICTIONARY_FILE)}`);
-  return 0;
-}
-
 function main() {
-  if (process.argv.includes("--update-dictionary")) return updateDictionary();
   const { findings, filesChecked, linesChecked } = auditTree();
 
   if (!findings.length) {
@@ -569,16 +412,14 @@ function main() {
     // as "this is English".
     console.log(
       `${OKM} language: ${linesChecked} lines across ${filesChecked} public files, ` +
-        "none matching the accents, word lists or Polish word shapes this guard looks for, " +
-        `and no word outside ${relative(ROOT, DICTIONARY_FILE)}`
+        "none matching the accents, word lists or Polish word shapes this guard looks for"
     );
     return 0;
   }
 
   console.error(ERRM + " language: the public surface is not English\n");
   for (const f of findings.slice(0, 20)) {
-    const why = f.reason === "unknown" ? `unknown word: ${f.word}` : f.reason;
-    console.error(`  - ${f.file}:${f.line} (${why}): ${f.text.slice(0, 100)}`);
+    console.error(`  - ${f.file}:${f.line} (${f.reason}): ${f.text.slice(0, 100)}`);
   }
   if (findings.length > 20) console.error(`  … and ${findings.length - 20} more`);
   console.error("");
@@ -586,8 +427,6 @@ function main() {
   console.error("  --help, comments, the viewer chrome, README.md, _template.md, the backlog");
   console.error("  and docs/. A markdown link's target and an inline `code span` are not");
   console.error("  searched — a task's filename is not part of this rule (TL-137).");
-  console.error(`  An unknown word is either a misspelling, or English this project has not`);
-  console.error(`  written before — in which case add it to ${relative(ROOT, DICTIONARY_FILE)}.`);
   console.error(`  A deliberate exception: put \`${ALLOW_MARKER}\` on the line or above it.`);
   return 1;
 }
