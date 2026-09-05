@@ -1218,6 +1218,7 @@ confirmation
 confirmed
 confirming
 confirms
+conformance
 conflate
 conflated
 conflates
@@ -2124,6 +2125,7 @@ entirety
 entitled
 entity
 entr
+entrust
 entries
 entry
 enum
@@ -3851,6 +3853,7 @@ modfiles
 modifications
 modified
 modifies
+modifying
 modify
 module
 modules
@@ -4160,6 +4163,7 @@ observe
 observed
 observer
 observers
+observes
 observing
 obsidian
 obstacle
@@ -5899,6 +5903,7 @@ small
 smaller
 smallest
 smith
+smoke
 smoothly
 smuggle
 smuggled
@@ -6745,6 +6750,7 @@ unattributable
 unattributed
 unauthenticated
 unavailable
+unavailability
 unavoidable
 unblock
 unblocked

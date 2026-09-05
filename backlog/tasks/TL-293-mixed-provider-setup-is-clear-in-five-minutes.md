@@ -14,7 +14,7 @@ estimate: 1d
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-05
 updated: 2026-09-05
-blocked_by: [TL-290, TL-291, TL-292, TL-294]
+blocked_by: [TL-290, TL-291, TL-292, TL-294, TL-296]
 blocks: []                         # ids this task will unblock
 related_docs:
   - README.md
