@@ -43,8 +43,7 @@ isolateHome("test-hygiene");
 
 const TESTS_DIR = join(SCRIPTS_DIR, "tests");
 
-/** A deliberate exception, declared beside the reason for it, exactly as the
- *  language and product-name guards take theirs. */
+/** A deliberate exception, declared beside the reason for it. */
 export const ALLOW_MARKER = "home-isolation: allow";
 
 /**

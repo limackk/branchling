@@ -333,7 +333,7 @@ test("positive control: an unreadable line in that SAME position still fails", (
   // does not exist, and a key with no colon after it. Both sit exactly where the
   // comment sits, which is what makes this a control on that fixture and not a
   // separate test about something else.
-  const WRONG_KEY = "bahs"; // language-guard: allow — fixture data: a key written wrong on purpose
+  const WRONG_KEY = "bahs"; // Fixture data: a key written wrong on purpose.
   const unknownKey = parseVerification(
     ["verification:", "  - id: first", '    bash: "true"', "  - id: second", '    ' + WRONG_KEY + ': "true"'].join("\n")
   );

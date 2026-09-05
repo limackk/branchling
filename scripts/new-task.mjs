@@ -48,7 +48,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 
 // The table's keys ARE the accented letters this function exists to fold.
 const DIACRITICS = {
-  ą: "a", ć: "c", ę: "e", ł: "l", ń: "n", ó: "o", ś: "s", ź: "z", ż: "z",   // language-guard: allow
+  ą: "a", ć: "c", ę: "e", ł: "l", ń: "n", ó: "o", ś: "s", ź: "z", ż: "z",
   á: "a", à: "a", ä: "a", â: "a", å: "a", ã: "a", é: "e", è: "e", ë: "e", ê: "e",
   í: "i", ì: "i", ï: "i", î: "i", ò: "o", ö: "o", ô: "o", õ: "o", ø: "o",
   ú: "u", ù: "u", ü: "u", û: "u", ý: "y", ÿ: "y", ç: "c", ñ: "n", ß: "ss",

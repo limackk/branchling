@@ -72,9 +72,8 @@ test("the marker on the line turns one hit into a deliberate exception", () => {
 });
 
 test("the marker does NOT reach the line below it", () => {
-  // Unlike the language guard: there the marker covers the next line, because a
-  // long line has no room for it. Here a hit is one word in an ordinary line, and
-  // a marker reaching downwards would silence more than the author intends.
+  // A hit is one word in an ordinary line, and a marker reaching downwards
+  // would silence more than the author intends.
   const found = auditText(`// ${ALLOW_MARKER}\n// run ${PRODUCT_NAME} build`);
   assert.equal(found.length, 1);
   assert.equal(found[0].line, 2);

@@ -17,8 +17,8 @@
  * task was written to supply.
  *
  * WHAT IT JUDGES, AND WHY IT IS THE REPOSITORY AND NOT THE INSTALLATION. Unlike
- * `--language` and `--product-name`, which read the code of THIS installation,
- * this guard reads the repository that CONTAINS the backlog it was pointed at:
+ * `--product-name`, which reads the code of THIS installation, this guard reads
+ * the repository that CONTAINS the backlog it was pointed at:
  * top-level `*.md`, everything under `docs/`, and every task file. That is the
  * only scope in which the answers are true — a `related_docs` entry resolves
  * against the consumer's tree, not against ours, and a task's link to

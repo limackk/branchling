@@ -253,7 +253,7 @@ test("a refused edit returns the file it was given, byte for byte", () => {
   // Refusal has to be total. A writer that returns a half-applied text and a
   // problem beside it hands the caller the 2026-09-03 defect in a new place.
   for (const spec of [
-    // language-guard: allow — a deliberate typo, which is the whole case
+    // A deliberate typo, which is the whole case.
     { op: "add", id: "TL-5", wave: "Fondation" },
     { op: "add", id: "TL-1", wave: "Consumers" },          // already scheduled
     { op: "move", id: "TL-9", wave: "Consumers" },         // not in the plan at all
@@ -269,9 +269,9 @@ test("a refused edit returns the file it was given, byte for byte", () => {
 test("add: an unknown wave is refused and the existing ones are NAMED", () => {
   // A wave created by a typo is worse than no wave: it schedules the task
   // nowhere anybody is reading, and looks like it worked.
-  const r = edit(PLAN, { op: "add", id: "TL-5", wave: "Fondation", today: "2026-09-04" }); // language-guard: allow
+  const r = edit(PLAN, { op: "add", id: "TL-5", wave: "Fondation", today: "2026-09-04" });
   const said = r.problems.join("\n");
-  assert.match(said, /Fondation/); // language-guard: allow
+  assert.match(said, /Fondation/);
   assert.match(said, /Foundation/);
   assert.match(said, /Consumers/);
 });
@@ -418,10 +418,10 @@ test("an unknown wave is a usage error, the file is untouched, and stdout stays 
     const before = planOf(dir);
     // Exit 2: a wave name is a value out of this file's vocabulary, which is
     // what `new --priority ZZ` already answers 2 to.
-    const r = run(["plan", "add", "TL-5", "--wave", "Consumres", "--dir", dir]); // language-guard: allow
+    const r = run(["plan", "add", "TL-5", "--wave", "Consumres", "--dir", dir]);
     assert.equal(r.code, 2, r.out + r.err);
     assert.equal(r.out, "", "a refusal does not belong on stdout");
-    assert.match(r.err, /Consumres/); // language-guard: allow
+    assert.match(r.err, /Consumres/);
     assert.match(r.err, /Foundation/);
     assert.match(r.err, /Consumers/);
     assert.equal(planOf(dir), before, "a refused command wrote to the file anyway");
@@ -491,9 +491,9 @@ test("`new --wave <typo>` creates NOTHING — not the task, not the wave", () =>
     const beforePlan = planOf(dir);
     const beforeHistory = historyLines(dir);
 
-    const r = run(["new", "--title", "scheduled nowhere", "--wave", "Foundatoin", "--dir", dir]); // language-guard: allow
+    const r = run(["new", "--title", "scheduled nowhere", "--wave", "Foundatoin", "--dir", dir]);
     assert.equal(r.code, 2, r.out + r.err);
-    assert.match(r.err, /Foundatoin/); // language-guard: allow
+    assert.match(r.err, /Foundatoin/);
     assert.match(r.err, /Foundation/, "the waves that exist are named, so the typo is visible");
     assert.deepEqual(taskFiles(dir), beforeFiles, "a task was created for a wave that does not exist");
     assert.equal(planOf(dir), beforePlan);

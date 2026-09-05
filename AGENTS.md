@@ -138,22 +138,12 @@ This covers, without exception: `scripts/`, `bin/`, `README.md`, `_template.md`,
 `backlog/boards.yaml`, this file, the dotfiles, **and the git surface** — commit
 titles and bodies, branch names, worktree names.
 
-Three things are enforced by a guard; the rest is this rule:
-
-- `branchling check --language` reads `scripts/`, `bin/`, `README.md`,
-  `_template.md`, the whole `backlog/` directory, and `docs/` (TL-137). A
-  markdown link's target and an inline `` `code span` `` are not searched — a
-  task's filename is data, not prose (TL-137's Decisions: filenames are never
-  part of a translation, only file CONTENT is).
-  `backlog/history/*.jsonl` stays outside the guard's reach independent of
-  that: the walk only reads `.mjs`, `.js` and `.md` files, so the append-only
-  log is excluded by extension, not by a carve-out in the path list. Any other
-  exception — a transliteration table, test data, a quoted historical CLI
-  transcript that would be falsified by translating it — is marked with a
-  `language-guard: allow` comment beside that ONE line.
-- Nothing checks the git surface, deliberately: history cannot be inspected
-  before it is written or corrected afterwards, so a guard would either run too
-  late to help or demand a rewrite that costs more than it returns.
+No automated guard determines whether prose is English. The former detector
+looked only for Polish-specific characters, words and word shapes, so a green
+result said nothing about any other language and was too narrow to enforce this
+rule honestly. Language is therefore a review responsibility across the whole
+surface, including git history, which cannot be corrected after publication
+without rewriting it.
 
 The commit history no longer carries a Polish exception. It was squashed to a
 single English commit on 2026-09-01, while the repository had no remote and

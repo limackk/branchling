@@ -389,8 +389,7 @@ function backlog(extraConfig = "") {
     .replace(/^reason_required_statuses:.*$/m, "reason_required_statuses: []")
     .replace(/^priorities:.*$/m, "priorities: [urgent, warm, quiet]")
     .replace(/^actors:.*$/m, "actors: [agent:weak, agent:strong]"), "utf8");
-  // Assembled line by line rather than as one literal: a `\n` run into the word
-  // after it reads as a word nobody wrote, and the language guard reports it.
+  // Assembled line by line so the fixture remains readable.
   appendFileSync(p, ["", "in_progress_status: " + OPEN, "min_report_n: 4", extraConfig].join("\n"), "utf8");
   alignTemplate(dir);
   return dir;

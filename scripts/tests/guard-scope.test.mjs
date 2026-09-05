@@ -1,8 +1,8 @@
 /**
  * Whose tree does a guard judge? (TL-163)
  *
- * THE DEFECT, REPRODUCED RATHER THAN INFERRED. `check --language` and
- * `check --product-name` read THIS INSTALLATION's source — they take no `--dir`
+ * THE DEFECT, REPRODUCED RATHER THAN INFERRED. `check --product-name` reads
+ * THIS INSTALLATION's source — it takes no `--dir`
  * and the guard table says why. What was never drawn from that is the
  * consequence: pointed at somebody else's backlog they still ran, so the
  * verdict of `check --dir <anywhere>` depended on what the TOOL's checkout
@@ -66,11 +66,11 @@ test("a backlog inside this checkout belongs to it; one in a temp directory does
 
 // ── the effect ────────────────────────────────────────────────────────────
 
-test("pointed at another backlog, the two installation guards do not run — and say so", () => {
+test("pointed at another backlog, the installation guard does not run — and says so", () => {
   const r = run(["check", "--dir", fixture(), "--json"]);
   assert.equal(r.status, 0, r.stderr);
   const doc = JSON.parse(r.stdout);
-  for (const name of ["language", "product-name"]) {
+  for (const name of ["product-name"]) {
     const guard = doc.guards.find((g) => g.name === name);
     assert.ok(guard, name + " is not in the run at all");
     assert.equal(guard.skipped, true, name + " ran against a backlog it does not judge");
@@ -79,13 +79,13 @@ test("pointed at another backlog, the two installation guards do not run — and
   assert.deepEqual(doc.failed, []);
 });
 
-test("POSITIVE CONTROL: run against its own backlog, both guards really run", () => {
+test("POSITIVE CONTROL: run against its own backlog, the guard really runs", () => {
   // Without this the assertion above would be satisfied by a build in which the
   // two guards never run at all — which is the failure mode it exists to
   // prevent, not a version of passing.
   const r = run(["check", "--dir", join(REPO_ROOT, "backlog"), "--json"]);
   const doc = JSON.parse(r.stdout);
-  for (const name of ["language", "product-name"]) {
+  for (const name of ["product-name"]) {
     const guard = doc.guards.find((g) => g.name === name);
     assert.notEqual(guard.skipped, true, name + " was skipped for this repository's OWN backlog");
     assert.match(guard.output, /lines across/, name + " produced no reading of its own");
@@ -95,7 +95,6 @@ test("POSITIVE CONTROL: run against its own backlog, both guards really run", ()
 test("the skip is visible in the plain output too, not only in the JSON", () => {
   const r = run(["check", "--dir", fixture()]);
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /language: not run/);
   assert.match(r.stdout, /product-name: not run/);
 });
 

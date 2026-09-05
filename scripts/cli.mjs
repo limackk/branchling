@@ -44,7 +44,7 @@ import { FIELD_SHAPES } from "./task-fields.mjs";
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 const CHECK_USAGE = [
-  `${N} check [--dir <path>] [--id-collisions] [--boards] [--refs] [--criteria] [--reasons] [--log-status] [--task-state] [--vocabulary] [--plan] [--language] [--product-name] [--proofs] [--since <sha>] [task-file.md …]`,
+  `${N} check [--dir <path>] [--id-collisions] [--boards] [--refs] [--criteria] [--reasons] [--log-status] [--task-state] [--vocabulary] [--plan] [--product-name] [--proofs] [--since <sha>] [task-file.md …]`,
   "",
   "  no selector          every guard; exit code = the WORST of them",
   "  --json               the whole run as one document: which guards ran, which failed,",
@@ -98,11 +98,6 @@ const CHECK_USAGE = [
   "                       they cannot open. An unverifiable measurement is not evidence for a",
   "                       stranger — replace it with the mechanism or with the command that",
   "                       reproduces it. Reads `docs/`, README, LINEAGE and CONTRIBUTING",
-  "  --language           only whether the public surface is English — a property of the CODE,",
-  "                       so it reads this installation, not the backlog named by --dir.",
-  "                       For that reason it does NOT run when --dir points outside this",
-  "                       checkout: it would answer about the tool and fail a run about",
-  "                       somebody else's tree. The run says when it was skipped",
   "  --product-name       only whether the name is written out in scripts/ or bin/ instead of",
   "                       imported from product.mjs — also a property of the CODE, not the",
   "                       data, and skipped outside this checkout for the same reason",
@@ -1237,7 +1232,7 @@ export const COMMANDS = {
       "check-backlog-refs.mjs", "check-backlog-criteria.mjs",
       "check-backlog-vocabulary.mjs", "check-backlog-plan.mjs",
     ],
-    summary: "backlog guards: id collisions + boards + references + criteria links + vocabularies + the execution plan vs the tree + the language and product name of the source",
+    summary: "backlog guards: id collisions + boards + references + criteria links + vocabularies + the execution plan vs the tree + the product name of the source",
     usage: CHECK_USAGE,
   },
   "migrate-prefix": {
@@ -1750,7 +1745,7 @@ function captureScript(script, args) {
  * evidential force. The dispatcher supplies the mode so that nobody has to
  * remember it.
  */
-const CHECK_FLAGS = ["--dir", "--json", "--id-collisions", "--boards", "--refs", "--criteria", "--reasons", "--log-status", "--history", "--task-state", "--docs", "--vocabulary", "--plan", "--language", "--product-name", "--foreign-context", "--proofs", "--since"];
+const CHECK_FLAGS = ["--dir", "--json", "--id-collisions", "--boards", "--refs", "--criteria", "--reasons", "--log-status", "--history", "--task-state", "--docs", "--vocabulary", "--plan", "--product-name", "--foreign-context", "--proofs", "--since"];
 
 /** PURE — resolves `check`'s arguments. Throws on a usage error. */
 export function parseCheckArgs(args) {
@@ -1766,7 +1761,6 @@ export function parseCheckArgs(args) {
   let wantDocs = false;
   let wantVocabulary = false;
   let wantPlan = false;
-  let wantLanguage = false;
   let wantProductName = false;
   let wantForeignContext = false;
   let wantProofs = false;
@@ -1793,7 +1787,6 @@ export function parseCheckArgs(args) {
     if (a === "--docs") { wantDocs = true; continue; }
     if (a === "--vocabulary") { wantVocabulary = true; continue; }
     if (a === "--plan") { wantPlan = true; continue; }
-    if (a === "--language") { wantLanguage = true; continue; }
     if (a === "--product-name") { wantProductName = true; continue; }
     if (a === "--foreign-context") { wantForeignContext = true; continue; }
     if (a === "--proofs") { wantProofs = true; continue; }
@@ -1824,11 +1817,11 @@ export function parseCheckArgs(args) {
   // (BL-1451): a dangling reference passed `check`, because `check` checked only
   // what somebody had once written into it.
   if (!wantIds && !wantBoards && !wantRefs && !wantCriteria && !wantReasons && !wantLogStatus &&
-      !wantHistory && !wantTaskState && !wantDocs && !wantVocabulary && !wantPlan && !wantLanguage &&
+      !wantHistory && !wantTaskState && !wantDocs && !wantVocabulary && !wantPlan &&
       !wantProductName && !wantForeignContext && !wantProofs) {
     wantIds = true; wantBoards = true; wantRefs = true; wantCriteria = true; wantReasons = true;
     wantLogStatus = true; wantHistory = true; wantTaskState = true; wantDocs = true;
-    wantVocabulary = true; wantPlan = true; wantLanguage = true; wantProductName = true;
+    wantVocabulary = true; wantPlan = true; wantProductName = true;
     wantForeignContext = true;
   }
   // `--proofs` IS NOT IN THAT LIST, and it is the one guard that must never be
@@ -1843,7 +1836,7 @@ export function parseCheckArgs(args) {
         "It narrows which proven closings are re-run; on its own there is nothing for it to narrow."
     );
   }
-  return { dir, json, wantIds, wantBoards, wantRefs, wantCriteria, wantReasons, wantLogStatus, wantHistory, wantTaskState, wantDocs, wantVocabulary, wantPlan, wantLanguage, wantProductName, wantForeignContext, wantProofs, since, files };
+  return { dir, json, wantIds, wantBoards, wantRefs, wantCriteria, wantReasons, wantLogStatus, wantHistory, wantTaskState, wantDocs, wantVocabulary, wantPlan, wantProductName, wantForeignContext, wantProofs, since, files };
 }
 
 /**
@@ -1904,19 +1897,6 @@ export const CHECK_GUARDS = [
   // plan is not a gap.
   { key: "plan", want: "wantPlan", name: "plan", script: "check-backlog-plan.mjs",
     args: (root) => ["--dir", root] },
-  // NO `--dir`, and that is not an oversight: this judges the SOURCE of this
-  // installation. Pointing it at a backlog would have it read somebody's tasks
-  // and report their language as a defect of the tool.
-  //
-  // `installationOnly` draws the consequence that was left undrawn (TL-163): a
-  // guard whose subject is this installation must not run when `check` was
-  // pointed somewhere else, or it answers a question nobody asked and can fail a
-  // run about a tree it never read. Measured: `doctor --dir <a fixture>` exited
-  // 1 because of an unrelated file being edited in this repository's `scripts/`,
-  // which is what made the suite intermittently red — a run during an edit and a
-  // run after it saw two different trees.
-  { key: "language", want: "wantLanguage", name: "language", script: "check-public-language.mjs",
-    installationOnly: true, args: () => [] },
   // No `--dir` either, and for the same reason. A user's task files may name the
   // tool as often as they like — that is their prose, not our literal.
   { key: "product-name", want: "wantProductName", name: "product-name", script: "check-product-name.mjs",

@@ -1,0 +1,4 @@
+{"id":"01M1SJVS4YGBCFPT0Z9TG7GPXZ","ts":"2026-09-05T20:06:22.622Z","task":"TL-298","field":"__created__","from":"","to":"The language guard does not single out one foreign language","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1SJX8A7EDJXVAF0PJ21Q6JC","ts":"2026-09-05T20:07:10.919Z","task":"TL-298","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1SJX8A751GA5PJKP8F05MWE","ts":"2026-09-05T20:07:10.919Z","task":"TL-298","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1SK7NDAJZFQ4MAACKBMXFAN","ts":"2026-09-05T20:12:52.010Z","task":"TL-298","field":"status","from":"in_progress","to":"done","actor":"agent:codex","source":"done","reason":"proven","session":"tree-526f61f2043f"}

@@ -256,9 +256,8 @@ test("the version number lives in exactly one file", () => {
   // anywhere in scripts/ — even for a different document, such as the plan `seed`
   // reads — gives a reader two answers to "which contract is this", which is why
   // that one is called `planVersion` (TL-94).
-  // A deliberate mention — prose explaining why something else is NOT called this
-  // — is marked on its own line, the same way the language and product-name
-  // guards take their exceptions. A marker per line, never per file.
+  // A deliberate mention — prose explaining why something else is NOT called
+  // this — is marked on its own line. A marker per line, never per file.
   const files = readdirSync(SCRIPTS_DIR).filter((f) => f.endsWith(".mjs"));
   // POSITIVE CONTROL: the guard reads real files, and the word is really in the
   // one file that owns it. Without this, a broken listing would report "no

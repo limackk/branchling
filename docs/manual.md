@@ -465,8 +465,8 @@ branchling check     # every guard; exit code = the worst of them
 branchling doctor    # is this backlog set up correctly at all
 ```
 
-`check` answers four questions, and each has its own selector
-(`--id-collisions`, `--boards`, `--refs`, `--language`):
+`check` answers independent questions, each with its own selector. Run
+`branchling check --help` for the current list:
 
 - **One number, one task.** Collisions do not come from carelessness, they come
   from parallelism: each worktree computes "highest + 1" from *its own* view of
@@ -485,13 +485,9 @@ branchling doctor    # is this backlog set up correctly at all
   REJECTED, because the tool has no way to check whether that one is finished,
   so the field would stop answering "can I start this?". Record that kind of
   dependency in prose, in the task's log.
-- **The tool's own public surface is English.** Everything a user of the tool
-  reads — CLI messages, `--help`, the comments in `scripts/`, the viewer chrome,
-  `README.md` and `_template.md`. Two signals, because a grep for accented
-  letters alone passes over every word that has no accent. This guard judges the
-  installed CODE rather than your data, so it ignores `--dir`: what language your
-  own backlog is written in is your business. A deliberate exception is marked in
-  the source, one line at a time.
+- **The tool's own public surface is English.** This is a contribution and
+  review convention, not a `check` selector: a language-specific heuristic
+  cannot establish that arbitrary prose is English.
 
 A clean result reports **how many things it checked**. A checkmark over zero
 means "there was nothing to check", not "I checked and it is fine".

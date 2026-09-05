@@ -142,11 +142,11 @@ export function auditText(text, words = [], { measurements = true } = {}) {
     // a fenced block is the replacement this guard asks for; a company name in
     // one is still the company name.
     //
-    // A MARKDOWN LINK'S TARGET IS NOT SEARCHED, for the reason TL-137 gave the
-    // language guard: a filename is data, and this repository's task files carry
-    // Polish words forever, one of which happens to contain a company's name as
-    // a substring. A guard that flagged those would have to be silenced on every
-    // cross-reference, which is worse than the gap.
+    // A MARKDOWN LINK'S TARGET IS NOT SEARCHED: a filename is data, and this
+    // repository's task files carry Polish words forever, one of which happens
+    // to contain a company's name as a substring. A guard that flagged those
+    // would have to be silenced on every cross-reference, which is worse than
+    // the gap.
     const searched = stripLinkTargets(line);
     for (let w = 0; w < forbidden.length; w++) {
       if (forbidden[w].test(searched)) {

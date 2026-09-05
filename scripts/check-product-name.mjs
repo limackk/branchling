@@ -106,9 +106,9 @@ export function auditText(text, words = names()) {
   const problems = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    // The exception is declared on the line itself, not on the one above: unlike
-    // the language guard, a hit here is a single word inside an ordinary line,
-    // and a marker floating above would silence more than the reader intends.
+    // The exception is declared on the line itself. A hit is a single word
+    // inside an ordinary line, and a marker floating above would silence more
+    // than the reader intends.
     if (line.includes(ALLOW_MARKER)) continue;
     for (const w of words) {
       if (line.toLowerCase().includes(w.toLowerCase())) {

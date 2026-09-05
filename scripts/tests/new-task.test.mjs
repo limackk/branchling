@@ -75,7 +75,6 @@ function tasksIn(dir) {
 
 test("slug: accented letters fold down to ASCII, they do not disappear", () => {
   // The input is deliberately non-ASCII — that is what this feature exists for.
-  // language-guard: allow
   assert.equal(slugify("Zażółć gęślą jaźń"), "zazolc-gesla-jazn");
   assert.equal(slugify("Send the report to the auditor"), "send-the-report-to-the-auditor");
 });
@@ -101,7 +100,7 @@ test("slug: it is trimmed, but not in the middle of a word", () => {
 test("new creates a file with a number, a slug and a filled-in frontmatter", () => {
   const dir = freshBacklog();
   try {
-    // language-guard: allow — accented input is the point of the slug test
+    // Accented input is the point of the slug test.
     const r = run(["new", "--dir", dir, "--title", "Zażółć gęślą jaźń"]);
     assert.equal(r.status, 0, r.stderr);
     const files = tasksIn(dir);
@@ -111,7 +110,6 @@ test("new creates a file with a number, a slug and a filled-in frontmatter", () 
     const text = readFileSync(join(dir, "tasks", files[0]), "utf8");
     const id = files[0].match(PAT.fileId)[1];
     assert.match(text, new RegExp("^id: " + id + "$", "m"), "the id in the file does not match the filename");
-    // language-guard: allow
     assert.match(text, /^title: "Zażółć gęślą jaźń"$/m);
     // FRONTMATTER only. The body may legitimately SHOW a date format in prose, and
     // a whole-file assertion would read that as an unfilled field. The placeholders
