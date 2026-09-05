@@ -56,7 +56,8 @@ import { fileURLToPath } from "node:url";
 import { resolveActor } from "./actor.mjs";
 import { crossBranchState, describeDivergence, divergences, scanNote } from "./branch-scan.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { ACTOR_NAMESPACES, FIELD_COMMENT, isValidActor, readHistory, reasonRefusal } from "./history.mjs";
+import { actorRecords, applyActorPolicy } from "./actors.mjs";
+import { ACTOR_NAMESPACES, FIELD_COMMENT, isValidActor, readAllHistory, readHistory, reasonRefusal } from "./history.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
 import { dispatchWave, loadPlanForDispatch } from "./plan.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
@@ -647,8 +648,22 @@ export function run(argv) {
     });
     filters.planIds = new Set((wave ? wave.ids : []).map((id) => String(id).toUpperCase()));
   }
-  const { candidates, reclaimable, unblocked, skippedBlocked, skippedElsewhere, skippedExecutor, skippedHandedBack, skippedSize, skippedUnplanned } =
+  const { candidates: selected, reclaimable, unblocked, skippedBlocked, skippedElsewhere, skippedExecutor, skippedHandedBack, skippedSize, skippedUnplanned } =
     selectCandidates(records, config, filters, now);
+  // THE ACTOR'S RECORD, LAST OF ALL THE FILTERS (TL-150). It only removes, and
+  // it removes from a queue the dispatcher has already ordered — eligibility and
+  // ordering are different decisions, and the second one is settled above.
+  //
+  // The log is read only where a project actually declared a policy: computing
+  // every actor's record on every `next` would cost a whole history read to
+  // the backlogs that asked for none.
+  const declaredPolicy = config.actorPolicy.priorities.length && config.actorPolicy.minFirstPass > 0;
+  const record = declaredPolicy
+    ? (actorRecords({ history: readAllHistory(root), config }).rows.find((r) => r.actor === actor) || null)
+    : null;
+  const { candidates, withheld: skippedByRecord } = declaredPolicy
+    ? applyActorPolicy(selected, { row: record, policy: config.actorPolicy, minReportN: config.minReportN })
+    : { candidates: selected, withheld: [] };
   const planJson = planned
     ? {
         wave: wave ? wave.index + 1 : null, name: wave ? wave.name : "",
@@ -664,6 +679,7 @@ export function run(argv) {
   const handedBackLines = skippedHandedBack.map(
     (s) => s.id + " skipped — you handed it back yourself" + (s.reason ? ": " + s.reason : "")
   );
+  const recordLines = skippedByRecord.map((s) => s.id + " withheld — " + s.reason);
 
   // Candidates are tried IN ORDER, and a taken one is skipped rather than
   // waited for: that is what makes two parallel calls come back with two
@@ -705,7 +721,8 @@ export function run(argv) {
       if (plan.json) {
         printJson("task-take", {
           ...takeJson(result, root), passedOver, considered: candidates.length,
-          skippedElsewhere, skippedExecutor, skippedHandedBack, skippedSize, plan: planJson,
+          skippedElsewhere, skippedExecutor, skippedHandedBack, skippedSize, skippedByRecord,
+          plan: planJson,
           scan: { scanned: scan.scanned, reason: scan.reason },
         });
       } else {
@@ -715,6 +732,7 @@ export function run(argv) {
           ));
         }
         for (const line of handedBackLines) console.log(color.dim(MARK.bullet + " " + line));
+        for (const line of recordLines) console.log(color.dim(MARK.bullet + " " + line));
         for (const line of elsewhereLines) console.log(color.dim(MARK.bullet + " " + line));
         for (const p of passedOver) {
           console.log(color.dim(MARK.bullet + " " + p.id + " passed over: " + p.why));
@@ -789,6 +807,13 @@ export function run(argv) {
     );
     for (const line of handedBackLines) details.push("  " + MARK.bullet + " " + line);
   }
+  // A candidate withheld by this project's actor policy is still executable —
+  // by a person, by `take`, by another actor. Without the sentence, a queue this
+  // caller may not draw from reads exactly like an empty one.
+  if (recordLines.length) {
+    details.push(recordLines.length + " candidate(s) withheld by this project's actor policy");
+    for (const line of recordLines) details.push("  " + MARK.bullet + " " + line);
+  }
   if (elsewhereLines.length) {
     details.push(elsewhereLines.length + " candidate(s) are in another state on another branch or worktree");
     for (const line of elsewhereLines) details.push("  " + MARK.bullet + " " + line);
@@ -812,7 +837,7 @@ export function run(argv) {
       ok: false, taken: false, refusalKind: "nothing-to-take", refusal: "nothing to take",
       details,
       searchedStatuses: searched, skippedBlocked, passedOver, skippedElsewhere, skippedExecutor,
-      skippedHandedBack, skippedSize, plan: planJson,
+      skippedHandedBack, skippedSize, skippedByRecord, plan: planJson,
       scan: { scanned: scan.scanned, reason: scan.reason },
     });
   } else {

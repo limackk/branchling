@@ -108,6 +108,16 @@ const READING = {
   // find, and the envelope still has to carry every key rather than dropping
   // the sections that came back empty.
   audit: ["audit", "--json"],
+  // The same backlog with no history, one aggregation further up (TL-150). The
+  // fixture's three tasks were CREATED and never closed, so no actor has a
+  // record yet and `rows` is legitimately empty — which is the answer worth
+  // pinning here, because it is the one where a key is most easily dropped:
+  // `minReportN` states the denominator below which no rate is printed and
+  // `policy` states whether anything is being withheld, and both are claims
+  // about the ANSWER rather than about its rows. An empty report that omits
+  // them reads as a report with no threshold and no policy, which is a
+  // different and stronger statement than the tool is entitled to make.
+  actors: ["actors", "--json"],
   // A repository with no `docs/` at all (TL-100): zero documents still has to be
   // a complete envelope. `flagged` and `tooLittle` come back as empty LISTS, and
   // `seeded` as null — the command wrote nothing, which is a different answer

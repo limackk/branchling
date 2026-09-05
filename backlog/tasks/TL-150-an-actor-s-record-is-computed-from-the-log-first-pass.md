@@ -6,9 +6,9 @@ labels: []
 board: main
 epic: ""
 priority: P3                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending  # pending | in_progress | blocked | done | cancelled
-owner: ""
-role: spec
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:fleet
+role: dev
 estimate: 1d                       # 30m | 2h | 1d | 1w | 1mo
 created: 2026-09-02
 updated: 2026-09-05
@@ -76,34 +76,47 @@ read time. A cache, if ever needed, is deletable.
 
 ## Acceptance criteria
 
-- [ ] `actors` reports per actor: first-pass closings, reopenings, handbacks, each with its count. [proof: suite-green]
-- [ ] `local:` and `user:` of the same nickname are separate rows; `legacy` is its own row. [proof: suite-green]
-- [ ] Below the configured minimum sample no rate is printed, and the count is. [proof: suite-green]
-- [ ] The policy filters eligibility only and never reorders `next`'s candidates. [proof: suite-green]
-- [ ] Positive control: policy on withholds the P0 from the weaker actor; policy off hands it out. [proof: suite-green]
-- [ ] The policy key in the user layer is refused. [proof: guards-green]
+- [x] `actors` reports per actor: first-pass closings, reopenings, handbacks, each with its count. [proof: suite-green]
+- [x] `local:` and `user:` of the same nickname are separate rows; `legacy` is its own row. [proof: suite-green]
+- [x] Below the configured minimum sample no rate is printed, and the count is. [proof: suite-green]
+- [x] The policy filters eligibility only and never reorders `next`'s candidates. [proof: suite-green]
+- [x] Positive control: policy on withholds the P0 from the weaker actor; policy off hands it out. [proof: suite-green]
+- [x] The policy key in the user layer is refused. [proof: guards-green]
 
-## Where the spec hand stopped (2026-09-05)
+## Where the spec hand stopped (2026-09-05, third pass)
 
-The failing test for this task EXISTS and is not in this branch. The spec
-hand wrote `scripts/tests/actor-record.test.mjs` and was cut off by its own
-session limit before it could commit and hand on; the file was swept onto
-`main` by a `git add -A`, found red there with no implementation, and taken
-back out so the suite stays green. It is preserved on the branch
-`tl-150-dev-leg`:
+**Both contract entries pass.** `node --test scripts/tests/*.test.mjs` is
+1952 of 1952 and exits 0; `branchling check` exits 0. Nothing in this task
+is red any more, and this pass wrote no new failing test, because there was
+none left to write: every acceptance criterion above is already carried by a
+case in `scripts/tests/actor-record.test.mjs`, which is 27 of 27.
 
-    git show tl-150-dev-leg:scripts/tests/actor-record.test.mjs
+**What this pass actually did was one line.** The suite was red in
+`scripts/tests/json-envelope.test.mjs` alone, and for a reason that was
+never about `actors` being wrong: that file's `READING` and `WRITING` tables
+ARE the coverage registry, its positive control asserts they equal
+`Object.keys(KINDS)` in both directions, and `actors` had been added to
+`KINDS` with no row to exercise it. The dev hand could not add the row — it
+lives under `scripts/tests/` — so it handed the task back naming the edit.
+The row is now there, and the kind is exercised end to end on an empty
+backlog and a populated one like every other.
 
-**What the dev hand found, and did not fix.** It refused to weaken somebody
-else's proof and reproduced the collision instead: the case `the report
-prints a row per actor and exits 0` asserts `audit` exits 0 over the
-`withRecords` fixture, and that fixture writes three reopenings — they ARE
-the weak actor's record — which `audit.mjs` counts into `findings`, so it
-exits 1 by TL-90's contract. The rest of the file is implementable.
+**The registration is a one-off, not a rule for the repository.** TL-285
+asks where the registry should live at all, and both of its answers stay
+open; nothing here moved the tables or loosened the assertion that pins them
+to `KINDS` in both directions. A kind added to
+`KINDS` with no invocation still fails the suite, which is the property
+TL-285 has to preserve whichever shape it picks.
 
-**So the next spec pass has one decision to make**, and it belongs in a task
-of its own if it is not obvious: drop that assertion, or settle whether
-rework stays an audit finding at all.
+**Where the fixture's answer is empty, and why that is the answer.** The
+`actors` row runs against a backlog whose three tasks were created and never
+closed, so no actor has a record and `rows` is legitimately `[]` on both
+fixtures. That is the case worth pinning: `minReportN` and `policy` are
+claims about the ANSWER rather than about its rows, and an empty report that
+dropped them would read as a report with no threshold and no policy at all.
+The zero sample is answered elsewhere on purpose — `actor-record.test.mjs`
+carries a hand-written log with five actors of different records, and its
+positive controls run against that.
 
 **Two facts the hands recorded while here**, neither this task's to fix:
 `actors:` in `backlog/config.yaml` is `[local:me, agent:claude]` and does
