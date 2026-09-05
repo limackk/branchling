@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""
 priority: P3                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending  # pending | in_progress | blocked | done | cancelled
-owner: ""
+status: in_progress  # pending | in_progress | blocked | done | cancelled
+owner: agent:fleet
 role: spec
 estimate: 1d                       # 30m | 2h | 1d | 1w | 1mo
 created: 2026-09-02
@@ -85,25 +85,28 @@ read time. A cache, if ever needed, is deletable.
 
 ## Where the spec hand stopped (2026-09-05)
 
-The failing test for this task EXISTS and is not in this branch. The spec
-hand wrote `scripts/tests/actor-record.test.mjs` and was cut off by its own
-session limit before it could commit and hand on; the file was swept onto
-`main` by a `git add -A`, found red there with no implementation, and taken
-back out so the suite stays green. It is preserved on the branch
-`tl-150-dev-leg`:
+`scripts/tests/actor-record.test.mjs` is IN this branch and red. It imports
+`scripts/actors.mjs`, which does not exist, so the file does not load and
+every case in it fails; the rest of the suite is green, which is what makes
+that red this file's own and not the tree's. `branchling check` is green
+too: the language guard reported the words the file introduced, and they
+were reworded rather than added to `scripts/language-dictionary.txt`.
 
-    git show tl-150-dev-leg:scripts/tests/actor-record.test.mjs
+The decision the previous pass left open is in the log, not here — rework
+stays an `audit` finding. The assertion that `audit` exits 0 over the
+`withRecords` fixture is gone, replaced by the control it was reaching for:
+every finding `audit` has over that tree IS one of the three reopenings,
+with the trace, parked and premise buckets empty.
 
-**What the dev hand found, and did not fix.** It refused to weaken somebody
-else's proof and reproduced the collision instead: the case `the report
-prints a row per actor and exits 0` asserts `audit` exits 0 over the
-`withRecords` fixture, and that fixture writes three reopenings — they ARE
-the weak actor's record — which `audit.mjs` counts into `findings`, so it
-exits 1 by TL-90's contract. The rest of the file is implementable.
-
-**So the next spec pass has one decision to make**, and it belongs in a task
-of its own if it is not obvious: drop that assertion, or settle whether
-rework stays an audit finding at all.
+**What the spec hand ran so the dev hand need not.** Over the hand-written
+log, `audit`'s own `reopenedAfterClosing` and `reworkRates` already produce
+the numbers the table asserts — five closings and one reopening for
+`agent:bit`, two and one for `user:anna`, one closing each for `local:anna`,
+the legacy row and `unknown` — so the agreement case is satisfiable and not
+merely intended. `next` also hands the three tasks out in the order the
+drain case expects, which is the control that case rests on. What remains
+unverifiable until the code exists is everything reached through
+`actors.mjs`.
 
 **Two facts the hands recorded while here**, neither this task's to fix:
 `actors:` in `backlog/config.yaml` is `[local:me, agent:claude]` and does

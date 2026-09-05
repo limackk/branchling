@@ -21,16 +21,16 @@
  *      `user:anna` is an authentication; folding them is precisely the lie the
  *      namespace rule exists to prevent. Two rows, and no row keyed `anna`.
  *      Neither may `unknown` — a change the tool observed but did not make —
- *      be poured into the `legacy` row: "nobody had namespaces yet" and "we do
+ *      be swept into the `legacy` row: "nobody had namespaces yet" and "we do
  *      not know who did this" are different claims.
- *   3. A RATE WITH NO STATED DENOMINATOR. Four fifths over five closings and
- *      over five hundred are different claims that print identically. Below
+ *   3. A RATE WITH NO STATED DENOMINATOR. Four out of five over five closings
+ *      and over five hundred are different claims that print identically. Below
  *      `min_report_n` the row carries its count and NO rate — `null`, not `0`
  *      and not `1`, because "too few to say" is not an answer about quality.
  *   4. A ROUTING COUNTED AS A REFUSAL. `handoff` writes the same block whether
  *      an actor said "this does not fit a session of mine" or "this fits, and
  *      the next stage is another hand's" — the difference is whether the role
- *      changed (TL-271). Counting the second as a handback reports a working
+ *      changed (TL-271). Counting the second one as a refusal reports a working
  *      two-hand pipeline as an actor who keeps giving work back.
  *   5. A POLICY THAT REORDERS. Eligibility and ordering are different
  *      decisions; the order is `next`'s and is tested elsewhere. A filter that
@@ -39,8 +39,8 @@
  *      removes": what comes back equals the full queue with the withheld
  *      entries filtered out, same objects, same order.
  *
- * THE VOCABULARY IS THE FIXTURE'S. `icebox`, `surveying`, `charted`, `blazing`,
- * `warm`, `cool` are this fixture's own words. Asserting this project's
+ * THE VOCABULARY IS THE FIXTURE'S. `icebox`, `surveying`, `charted`, `urgent`,
+ * `warm`, `quiet` are this fixture's own words. Asserting this project's
  * statuses or priorities would be asserting somebody else's data (CLAUDE.md,
  * "do not assert another project's values"), and a literal left in the code
  * would pass against them and fail here.
@@ -85,7 +85,7 @@ const CLI = join(HERE, "..", "cli.mjs");
 // Written out rather than produced by running the tool, so a change to the
 // WRITING path cannot make the READING path pass by accident.
 //
-//   agent:bit   five closings, one of which came back; one handback and one
+//   agent:bit   five closings, one of which came back; one refusal and one
 //               handoff that changed the role — a routing, not a refusal.
 //   user:anna   two closings, one of which came back. She also REOPENED one of
 //               bit's, and must not be charged for it.
@@ -111,7 +111,7 @@ const HISTORY = {
   "FX-3": [close("agent:bit", "2026-06-03T09:00:00.000Z")],
   "FX-4": [close("agent:bit", "2026-06-04T09:00:00.000Z")],
   // The interesting one: bit closes, anna reopens it — anna is charged nothing
-  // for that — anna closes, and bit reopens hers.
+  // for that — anna closes, and bit reopens that one.
   "FX-5": [
     close("agent:bit", "2026-06-05T09:00:00.000Z"),
     reopen("user:anna", "2026-06-06T09:00:00.000Z"),
@@ -154,7 +154,9 @@ test("FINDS: every actor in the log, with closings, first-pass, reopenings and h
     rows.map((r) => ({ actor: r.actor, closings: r.closings, firstPass: r.firstPass, reopened: r.reopened, handbacks: r.handbacks })),
     [
       // Sorted by closings, then by actor — a table whose order depends on the
-      // order of readdir() is a table two machines disagree about.
+      // order of readdir() is a table two machines disagree about. The three
+      // one-closing rows are therefore in the order the tie-break puts them:
+      // `legacy` before `local:anna` before `unknown`.
       { actor: "agent:bit", closings: 5, firstPass: 4, reopened: 1, handbacks: 1 },
       { actor: "user:anna", closings: 2, firstPass: 1, reopened: 1, handbacks: 0 },
       { actor: LEGACY_ACTOR, closings: 1, firstPass: 1, reopened: 0, handbacks: 0 },
@@ -191,14 +193,14 @@ test("`local:` and `user:` of one nickname are two rows, and there is no third",
   assert.equal(row(rows, "anna"), null, "the two namespaces were folded into a nickname");
 });
 
-test("an actor with no namespace is `legacy`, and `unknown` is NOT poured into it", () => {
+test("an actor with no namespace is `legacy`, and `unknown` is NOT swept into it", () => {
   const { rows } = actorRecords({ history: HISTORY, config: CONFIG });
   assert.equal(row(rows, LEGACY_ACTOR).closings, 1, "the pre-namespace entry lost its row");
   assert.equal(row(rows, "unknown").closings, 1,
     "`unknown` is a stated absence of attribution, not an old entry — it keeps its own row");
 });
 
-test("a handoff that CHANGED THE ROLE is a routing and is not counted as a handback", () => {
+test("a handoff that CHANGED THE ROLE is a routing and is not counted among the handbacks", () => {
   const { rows } = actorRecords({ history: HISTORY, config: CONFIG });
   // Two handoffs by bit in the log, one of each shape; only the refusal counts.
   assert.equal(row(rows, "agent:bit").handbacks, 1);
@@ -225,10 +227,10 @@ test("it does not re-derive rework: the numbers are `audit`'s, entry by entry", 
     assert.equal(mine.closings, a.closings, a.actor + ": the denominators disagree");
     assert.equal(mine.reopened, a.reopens, a.actor + ": the reopenings disagree");
     assert.equal(mine.enough, a.enough, a.actor + ": the two reports disagree about the sample");
-    // The two rates are COMPLEMENTS: `audit` reports the share that came back,
-    // this reports the share that stuck. Printing them with the same polarity
-    // would be the easiest possible misreading of a table about people.
-    if (a.enough) assert.equal(Math.round((mine.rate + a.rate) * 1000) / 1000, 1, a.actor + ": the rate is not the complement of the rework rate");
+    // The two rates ADD UP TO ONE: `audit` reports the share that came back,
+    // this reports the share that stuck. Printing them the same way round would
+    // be the easiest way there is to misread a table about people.
+    if (a.enough) assert.equal(Math.round((mine.rate + a.rate) * 1000) / 1000, 1, a.actor + ": the two rates do not add up to one");
   }
 });
 
@@ -269,7 +271,7 @@ test("`since` narrows what is counted, and says so in the answer", () => {
   const bit = row(window.rows, "agent:bit");
   assert.equal(bit.closings, 2);
   assert.equal(bit.rate, null);
-  // The handback is inside the window; the routing is too, and still uncounted.
+  // The refusal is inside the window; the routing is too, and still uncounted.
   assert.equal(bit.handbacks, 1);
 });
 
@@ -282,9 +284,9 @@ test("an actor whose every event is outside the window has no row at all", () =>
 
 // ── The policy: eligibility only, and opt-in ──────────────────────────────
 
-const POLICY = { priorities: ["blazing"], minFirstPass: 0.8 };
+const POLICY = { priorities: ["urgent"], minFirstPass: 0.8 };
 const task = (id, priority) => ({ id, priority });
-const QUEUE = [task("FX-21", "blazing"), task("FX-22", "warm"), task("FX-23", "cool")];
+const QUEUE = [task("FX-21", "urgent"), task("FX-22", "warm"), task("FX-23", "quiet")];
 
 test("with no policy declared nothing is withheld — `actors` is a report", () => {
   const weak = { actor: "agent:weak", closings: 5, firstPass: 2, reopened: 3, rate: 0.4, enough: true, handbacks: 0 };
@@ -321,8 +323,8 @@ test("SILENT: a record too small to print a rate for is too small to act on", ()
 
 test("SILENT: an actor the log has never seen is not held back", () => {
   // Silence is not evidence of a bad record. Withholding here would make the
-  // policy about seniority rather than about a record, and no first task above
-  // the priority would ever be handed out.
+  // policy about how long an actor has been here rather than about its record,
+  // and no first task above the priority would ever be handed out.
   assert.deepEqual(applyActorPolicy(QUEUE, { row: null, policy: POLICY, minReportN: 4 }).withheld, []);
 });
 
@@ -345,8 +347,8 @@ test("the policy is read from the project layer, and is off by default", () => {
   assert.deepEqual(loadConfig(plain).actorPolicy, { priorities: [], minFirstPass: 0 },
     "a project that declared nothing has a policy — the default must be no policy at all");
 
-  const declared = backlog("actor_policy_priorities: [blazing]\nactor_policy_min_first_pass: 0.8\n");
-  assert.deepEqual(loadConfig(declared).actorPolicy, { priorities: ["blazing"], minFirstPass: 0.8 });
+  const declared = backlog("actor_policy_priorities: [urgent]\nactor_policy_min_first_pass: 0.8\n");
+  assert.deepEqual(loadConfig(declared).actorPolicy, { priorities: ["urgent"], minFirstPass: 0.8 });
 });
 
 test("the policy key in the USER layer is refused, and says which file it belongs in", () => {
@@ -385,9 +387,11 @@ function backlog(extraConfig = "") {
     .replace(/^archived_statuses:.*$/m, "archived_statuses: [" + CLOSED + "]")
     .replace(/^dashboard_open_statuses:.*$/m, "dashboard_open_statuses: [icebox, " + OPEN + "]")
     .replace(/^reason_required_statuses:.*$/m, "reason_required_statuses: []")
-    .replace(/^priorities:.*$/m, "priorities: [blazing, warm, cool]")
+    .replace(/^priorities:.*$/m, "priorities: [urgent, warm, quiet]")
     .replace(/^actors:.*$/m, "actors: [agent:weak, agent:strong]"), "utf8");
-  appendFileSync(p, "\nin_progress_status: " + OPEN + "\nmin_report_n: 4\n" + extraConfig, "utf8");
+  // Assembled line by line rather than as one literal: a `\n` run into the word
+  // after it reads as a word nobody wrote, and the language guard reports it.
+  appendFileSync(p, ["", "in_progress_status: " + OPEN, "min_report_n: 4", extraConfig].join("\n"), "utf8");
   alignTemplate(dir);
   return dir;
 }
@@ -401,7 +405,7 @@ function log(dir, id, entries) {
     entries.map((e) => JSON.stringify({ task: id, ...e })).join("\n") + "\n", "utf8");
 }
 
-/** The two records the policy cases are about: one that sticks, one that does not. */
+/** The two records the policy cases are about: one that holds, one that does not. */
 function withRecords(dir) {
   for (let i = 0; i < 5; i++) {
     log(dir, "TASK-90" + i, [close("agent:strong", "2026-06-0" + (i + 1) + "T09:00:00.000Z")]);
@@ -418,9 +422,21 @@ test("the report prints a row per actor and exits 0 — it is a report, not a ga
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /agent:weak/);
   assert.match(r.stdout, /agent:strong/);
-  // `audit` exits 1 on a finding because it is asking whether declarations are
-  // trustworthy. A poor record is not a finding: nothing here is inconsistent.
-  assert.equal(run(["audit", "--dir", dir]).status, 0, "the fixture was meant to be structurally clean");
+  // FIXTURE CONTROL, and deliberately NOT `audit`'s exit code. Rework is a
+  // finding by TL-90's contract, so `audit` exits 1 over this fixture and is
+  // meant to — that decision belongs to `audit`, and a task that aggregates its
+  // findings may not re-take it from underneath it (TL-150's Context). What has
+  // to hold instead is that the rework is the ONLY thing `audit` has to say
+  // here: no closing without a trace, nothing parked, no premise missing. The
+  // weak record the policy cases rest on is a record, not a malformed log.
+  const audited = JSON.parse(run(["audit", "--dir", dir, "--json"]).stdout);
+  assert.deepEqual(
+    { trace: audited.closedWithoutTrace, parked: audited.parked, premise: audited.withoutPremise },
+    { trace: [], parked: [], premise: [] },
+    "the fixture is malformed in some other way, so nothing it proves is about a record"
+  );
+  assert.equal(audited.findings, audited.reopened.length, "`audit` found something here that is not the rework");
+  assert.equal(audited.reopened.length, 3, "the three reopenings ARE the weak actor's record — the fixture lost them");
 });
 
 test("a row below the minimum sample shows its count and no percentage", () => {
@@ -462,13 +478,13 @@ test("--json answers in the envelope, and an unknown flag fails", () => {
 
 // ── The policy, where it is actually applied ──────────────────────────────
 
-const POLICY_YAML = "actor_policy_priorities: [blazing]\nactor_policy_min_first_pass: 0.8\n";
+const POLICY_YAML = "actor_policy_priorities: [urgent]\nactor_policy_min_first_pass: 0.8\n";
 
 /** Three tasks, one of each priority, in a tree that already knows both records. */
 function queue(extraConfig) {
   const dir = withRecords(backlog(extraConfig));
   const env = { ...process.env, NO_COLOR: "1", BACKLOG_STATE_DIR: join(dir, ".state") };
-  const ids = [["blazing", "The urgent one"], ["warm", "The middling one"], ["cool", "The quiet one"]]
+  const ids = [["urgent", "The urgent one"], ["warm", "The middle one"], ["quiet", "The quiet one"]]
     .map(([priority, title]) => {
       const r = run(["new", "--dir", dir, "--title", title, "--priority", priority], env);
       assert.equal(r.status, 0, r.stderr);
