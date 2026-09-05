@@ -1,1 +1,4 @@
 {"id":"01M1NW55137P0A4ZDKC4YATT3T","ts":"2026-09-04T09:31:49.155Z","task":"TL-243","field":"__created__","from":"","to":"The dictionary is a snapshot of words already used, so new English fails","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-27c72d9231bb"}
+{"id":"01M1SHVN9260JZQ4S60KRGWTQK","ts":"2026-09-05T19:48:50.082Z","task":"TL-243","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-4074b8a6601b"}
+{"id":"01M1SHVN92V5972TVF3S0JN7VZ","ts":"2026-09-05T19:48:50.082Z","task":"TL-243","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-4074b8a6601b"}
+{"id":"01M1SJHR7H3GFACZ4J1HE4R052","ts":"2026-09-05T20:00:54.001Z","task":"TL-243","field":"status","from":"in_progress","to":"done","actor":"agent:codex","source":"done","reason":"proven","session":"tree-4074b8a6601b"}

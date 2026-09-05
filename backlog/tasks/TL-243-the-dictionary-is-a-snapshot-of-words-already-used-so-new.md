@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-05
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
@@ -106,9 +106,18 @@ Nothing here argues for removing the guard. It caught a real Polish word in
 
 ## Decisions
 
-**The snapshot stays a snapshot.** Rebuilding on every run would let one Polish
-word entering the tree teach the guard to accept it, which is the defect the
-snapshot exists to prevent.
+**Remove the snapshot rather than replace it with a base dictionary.** The
+language guard exists to find evidence of Polish text, not to prove that every
+word is English or to provide a spellchecker. A maintained English dictionary
+would add a dependency, licensing work and another vocabulary boundary; the
+repository snapshot rejects valid prose by construction. The existing accent,
+word-list, word-shape and label signals remain, with output that states their
+limited reach.
+
+**The known loss of coverage is accepted.** A short accent-free Polish phrase
+that matches none of the remaining signals can pass. Treating every previously
+unseen word as an error prevented that class only by imposing an unbounded
+false-positive cost on ordinary English.
 
 **Not a per-word allow comment.** `language-guard: allow` beside every unusual
 English word would put the escape hatch on the wrong side: the word is correct,

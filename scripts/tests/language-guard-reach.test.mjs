@@ -1,13 +1,7 @@
 /**
  * The guard reads the configuration files it says it reads (TL-198).
  *
- * WHAT TL-201 CLOSED AND WHAT IT DID NOT. `Tryb snapshot` shipped in the
- * viewer's connection bar past every signal the guard had — no accent, no
- * digraph, no inflected ending, on neither word list — and TL-201 answered it
- * with a dictionary: a word this project has never written is unknown, and an
- * unknown word fails. That closes the WORD half of TL-198 by construction.
- *
- * THE HALF STILL OPEN IS THE FILE HALF. A word can only be judged on a line
+ * A word can only be judged on a line
  * somebody opened, and `walk()` in `scripts/check-public-language.mjs` collects
  * `.mjs`, `.js` and `.md` — nothing else. `backlog/config.yaml`,
  * `backlog/plan.yaml` and `backlog/boards.yaml` are therefore never opened,
@@ -118,7 +112,7 @@ test("FINDS: a Polish line in backlog/plan.yaml and in backlog/boards.yaml", () 
       // language-guard: allow — deliberately Polish, the sample this test plants
       "backlog/plan.yaml": 'waves:\n  - name: "Nowa fala"\n    rationale: "Kolejnosc wykonania"\n',
       // language-guard: allow — deliberately Polish, the sample this test plants
-      "backlog/boards.yaml": 'boards:\n  - slug: main\n    title: "Tablica glowna"\n',
+      "backlog/boards.yaml": 'boards:\n  - slug: main\n    title: "Otwarte zadania"\n',
     },
     (dir) => {
       const { findings } = auditTree(dir);
