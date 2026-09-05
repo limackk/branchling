@@ -211,6 +211,7 @@ along
 alongside
 aloud
 alpha
+alphabet
 alphabetical
 already
 also
@@ -1002,6 +1003,7 @@ closures
 clothes
 cloud
 cloudflare
+clue
 cluster
 clusterer
 clustering
@@ -1417,6 +1419,7 @@ crossed
 crosses
 crosshair
 crossing
+crossings
 crowd
 crowded
 crumbtrail
@@ -1939,6 +1942,7 @@ duller
 dumb
 dummy
 dump
+dumped
 dumps
 dupcreated
 duplicate
@@ -3570,6 +3574,7 @@ mandate
 mandatory
 mangled
 manifest
+manoeuvre
 manual
 manually
 manufacture
@@ -3837,6 +3842,7 @@ mutilated
 mutual
 mutually
 myproject
+myself
 nactor
 nactors
 naive
@@ -4904,6 +4910,7 @@ receive
 received
 receiver
 receives
+receiving
 recent
 recently
 recipient
@@ -5036,6 +5043,7 @@ regex
 regexes
 regexp
 region
+regions
 register
 registered
 registering
@@ -5477,6 +5485,7 @@ scoping
 score
 scored
 scratch
+scratchpad
 screen
 screenshot
 scribe
@@ -5925,6 +5934,8 @@ starts
 startswith
 startup
 starve
+stash
+stashes
 stat
 state
 stated
@@ -6053,6 +6064,7 @@ subscription
 subsequent
 subset
 substance
+substantive
 substantively
 substitute
 substituted
@@ -6113,6 +6125,7 @@ supposed
 suppress
 suppressed
 suppresses
+suppression
 sure
 surface
 surfaced
@@ -6966,6 +6979,7 @@ waylog
 waymark
 ways
 weak
+weaken
 weakened
 weakening
 weakens
