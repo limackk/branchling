@@ -126,6 +126,19 @@ const READING = {
   // fixture's own first task is quoted, because the id has to exist — a missing
   // task exits 1 and would exercise the refusal instead.
   quote: ["quote", "TL-1", "--json"],
+  // `resume` composes reads and writes nothing (TL-151), so it belongs in THIS
+  // table and not beside `seed`: asking it twice of one tree is safe, and
+  // `scripts/tests/resume-briefing.test.mjs` proves the tree is byte-identical
+  // afterwards. The id EXISTS on the populated fixture and not on the empty
+  // one, so the row exercises a briefing on one and the "no such task" refusal
+  // on the other. Each is a complete envelope, with a non-zero exit
+  // reserved for the refusal, and neither of which is a usage error.
+  // (The literal id here is the defect TL-273 covers for the whole table; it is
+  // written the way its neighbours are so that one fix covers all of them.)
+  // `--no-verify` because this file asks about the ENVELOPE. Left out, the row
+  // would run the fixture task's `verification:` command, and the shape of the
+  // answer would start depending on the observer's shell.
+  resume: ["resume", "TASK-1", "--actor", "agent:test", "--no-verify", "--json"],
 };
 
 /**

@@ -148,6 +148,22 @@ function fixture() {
   text = text.replace(/## Goal\n\n[^\n]*/, "## Goal\n\n" + GOAL_MARKER + ".");
   text = text.replace(/- \[ \] Verifiable.*/, "- [ ] It parses. [proof: the-flip]");
   writeFileSync(file, text, "utf8");
+
+  // A SECOND task, created by the tool and never taken by anybody. `new` writes
+  // a WORD into `owner:` for "nobody" rather than leaving the field empty, and
+  // that word is the fixture's, taken from the file the tool just wrote — this
+  // repository's vocabulary is not asserted here.
+  //
+  // It sits on `main`, in the same commit as the first, so it is behind the
+  // merge base and no assertion about the branch diff can see it.
+  const second = cli(root, state, ["new", "--dir", ".", "--title", "Nobody has taken this one"]);
+  assert.equal(second.code, 0, second.all);
+  const unclaimedId = (second.all.match(/[A-Z]+-\d+/) || [])[0];
+  assert.ok(unclaimedId, "the id of the second task is not in the output: " + second.all);
+  assert.notEqual(unclaimedId, id, "the fixture made one task twice");
+  const unclaimedFile = join(root, "tasks", readdirSync(join(root, "tasks")).find((f) => f.startsWith(unclaimedId)));
+  const nobody = (readFileSync(unclaimedFile, "utf8").match(/^owner:\s*(\S+)\s*$/m) || [])[1] || "";
+
   commit(root, "the backlog, before anybody took anything");
 
   assert.equal(git(root, ["checkout", "-q", "-b", "tl-1-work"]).code, 0);
@@ -184,7 +200,7 @@ function fixture() {
   commit(root, "somebody else's commit, on main, after the session died");
   assert.equal(git(root, ["checkout", "-q", "tl-1-work"]).code, 0);
 
-  return { root, state, id, file };
+  return { root, state, id, file, unclaimedId, unclaimedFile, nobody };
 }
 
 function withFixture(fn) {
@@ -374,6 +390,92 @@ test("a different actor is refused and pointed at the takeover path", () => {
     // loud one is.
     assert.match(r.all, /abandoned_after_days/, "the refusal does not point at the takeover path");
     assert.deepEqual(treeSnapshot(f.root), before, "a refused resume still wrote to the tree");
+  });
+});
+
+/**
+ * WHO COUNTS AS NOBODY (TL-151).
+ *
+ * `resume` refuses a stranger because a briefing must not become a second,
+ * quieter takeover path. That refusal is only correct while it can tell a task
+ * SOMEBODY holds from a task NOBODY holds, and `owner:` does not answer that
+ * with a presence check: the tool writes a WORD for "unassigned" into the field
+ * rather than leaving it empty, so the field is never blank and every unclaimed
+ * task looks held.
+ *
+ * The three tests below are one argument. The control establishes that the
+ * fixture carries both states and that the tool's OTHER commands read the word
+ * as nobody; the second asks `resume` the same question; the third asks whether
+ * the way out a refusal offers is one the tool would accept.
+ */
+test("POSITIVE CONTROL: the fixture holds a task nobody took, beside one somebody does", () => {
+  withFixture((f) => {
+    // TWO DIFFERENT WORDS, and neither is invented here — both are read back
+    // out of files the tool itself wrote. The worked-on task's field was
+    // CLEARED by `ask`, which is exactly why its claimant has to be recovered
+    // from the log; the unclaimed one's carries the word `new` puts there.
+    const parked = (readFileSync(f.file, "utf8").match(/^owner:\s*(.*)$/m) || [])[1].replace(/"/g, "").trim();
+    assert.equal(parked, "",
+      "the fixture's worked-on task still names an owner in its file, so `owner:` answers the " +
+      "question directly and the pair below measures nothing");
+    assert.ok(f.nobody, "the fixture's unclaimed task has an empty `owner:` too, so nothing below is measured");
+
+    // AND THE WORD IS NOT A CLAIM, by the tool's own reading of it: `take`
+    // hands the unclaimed task to a stranger without an argument. Without this
+    // line the test below would be asserting a preference; with it, it is
+    // asserting that two commands disagree about one field.
+    const taken = cli(f.root, f.state, ["take", f.unclaimedId, "--dir", ".", "--actor", STRANGER]);
+    assert.equal(taken.code, 0,
+      "`owner: " + f.nobody + "` blocked a take, so it IS a claim and there is no defect to prove:\n" + taken.all);
+
+    // AND THE REFUSAL REALLY FIRES where there is a claim: the worked-on task
+    // turns a stranger away. Without this line the next test would be green
+    // against a `resume` that had simply stopped refusing anybody.
+    const refused = cli(f.root, f.state, ["resume", f.id, "--dir", ".", "--actor", STRANGER, "--no-verify"]);
+    assert.equal(refused.code, 1, "the held task did not refuse a stranger, so refusals are not being measured:\n" + refused.all);
+  });
+});
+
+test("a task nobody holds is briefed, not refused", () => {
+  withFixture((f) => {
+    // `--no-verify` because the contract is not what this asks about: the
+    // unclaimed task still carries the template's placeholder command, and
+    // running it would make the assertion depend on the observer's shell.
+    const r = cli(f.root, f.state, ["resume", f.unclaimedId, "--dir", ".", "--actor", STRANGER, "--no-verify"]);
+
+    assert.equal(r.code, 0,
+      "a task with `owner: " + f.nobody + "` was refused to " + STRANGER + ". Nobody holds it, " +
+      "so there is no claim to take over and no one to ask:\n" + r.all);
+    for (const heading of HEADINGS) {
+      assert.notEqual(headingAt(r.stdout, heading), -1,
+        "the answer is not a briefing — `" + heading + "` is missing:\n" + r.stdout);
+    }
+  });
+});
+
+test("a refusal never names an actor the tool itself would reject", () => {
+  withFixture((f) => {
+    const routes = [];
+    for (const target of [f.id, f.unclaimedId]) {
+      const r = cli(f.root, f.state,
+        ["resume", target, "--dir", ".", "--actor", STRANGER, "--no-verify", "--json"]);
+      if (r.code === 0) continue;
+
+      const answer = JSON.parse(r.stdout);
+      assert.equal(answer.refusalKind, "other-owner", target + ": refused for another reason:\n" + r.stdout);
+      const remedy = (answer.details.join(" ").match(/`--actor ([^`]+)`/) || [])[1];
+      assert.ok(remedy, target + ": the refusal points at no actor at all:\n" + r.stdout);
+      routes.push(remedy);
+
+      // THE WAY OUT HAS TO BE A WAY OUT. A refusal that hands back a word the
+      // next invocation rejects as a usage error leaves the successor with
+      // nothing to do, which is worse than the refusal saying less.
+      const retry = cli(f.root, f.state, ["resume", target, "--dir", ".", "--actor", remedy, "--no-verify"]);
+      assert.notEqual(retry.code, 2,
+        target + ": the refusal's own remedy `--actor " + remedy + "` is not an actor:\n" + retry.all);
+    }
+    // POSITIVE CONTROL: a run that refused nothing checked nothing.
+    assert.ok(routes.length > 0, "no resume was refused, so no remedy was examined");
   });
 });
 
