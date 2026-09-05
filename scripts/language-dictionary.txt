@@ -2344,6 +2344,7 @@ feeds
 feel
 feeling
 feels
+feet
 fell
 fellow
 felt
@@ -3151,6 +3152,7 @@ inverts
 investigate
 invisible
 invite
+invited
 invites
 invocation
 invocations
