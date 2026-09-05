@@ -168,6 +168,7 @@ agents
 ages
 aggregate
 aggregates
+aggregating
 aggregation
 aging
 agnostic
@@ -210,6 +211,7 @@ along
 alongside
 aloud
 alpha
+alphabet
 alphabetical
 already
 also
@@ -246,6 +248,7 @@ anecdote
 anew
 angle
 animal
+animate
 animated
 animates
 animating
@@ -352,6 +355,7 @@ arrangement
 arrangements
 arranges
 array
+arrival
 arrive
 arrived
 arrives
@@ -411,6 +415,7 @@ atomowy
 attach
 attached
 attaches
+attachment
 attachments
 attempt
 attempted
@@ -802,6 +807,7 @@ capabilities
 capability
 capped
 capterra
+caption
 capture
 captured
 captures
@@ -856,6 +862,7 @@ cent
 center
 central
 centrally
+centred
 ceremony
 certain
 certainly
@@ -888,6 +895,7 @@ charset
 chart
 charted
 charter
+charters
 charts
 chasing
 chat
@@ -984,6 +992,7 @@ client
 clients
 clip
 clipboard
+clipped
 clock
 clocks
 clone
@@ -1002,6 +1011,7 @@ closures
 clothes
 cloud
 cloudflare
+clue
 cluster
 clusterer
 clustering
@@ -1079,6 +1089,7 @@ commented
 comments
 commercial
 commercially
+commission
 commit
 commitment
 commitments
@@ -1105,6 +1116,7 @@ comparison
 comparisons
 compatibility
 compatible
+compensated
 competed
 competence
 competes
@@ -1221,6 +1233,7 @@ consensus
 consent
 consequence
 consequences
+consequential
 conserve
 consider
 consideration
@@ -1286,6 +1299,7 @@ contradiction
 contradictory
 contradicts
 contrast
+contrasts
 contribute
 contributed
 contributes
@@ -1417,6 +1431,7 @@ crossed
 crosses
 crosshair
 crossing
+crossings
 crowd
 crowded
 crumbtrail
@@ -1645,6 +1660,7 @@ deserved
 deserves
 design
 designed
+designer
 designing
 designs
 desired
@@ -1730,6 +1746,7 @@ direct
 direction
 directional
 directions
+directives
 directly
 director
 directories
@@ -1867,6 +1884,7 @@ dollars
 domain
 domainrenter
 domains
+dominant
 dominate
 dominated
 dominates
@@ -1939,6 +1957,8 @@ duller
 dumb
 dummy
 dump
+dumped
+dumping
 dumps
 dupcreated
 duplicate
@@ -2011,6 +2031,7 @@ elides
 eligibility
 eliminate
 ellipsis
+ellipsised
 else
 elses
 elsewhere
@@ -2063,6 +2084,7 @@ engaged
 engagement
 engaging
 engine
+engineer
 engineering
 engines
 english
@@ -2146,6 +2168,7 @@ evaluates
 evaluating
 evaporate
 even
+evening
 evenly
 event
 events
@@ -2225,6 +2248,8 @@ exotic
 expand
 expandable
 expanded
+expander
+expands
 expect
 expectation
 expectations
@@ -2343,6 +2368,7 @@ feeds
 feel
 feeling
 feels
+feet
 fell
 fellow
 felt
@@ -2382,6 +2408,7 @@ filling
 fills
 film
 filter
+filterable
 filtered
 filtering
 filters
@@ -2467,6 +2494,7 @@ followed
 following
 follows
 font
+fonts
 fooled
 foot
 footer
@@ -2657,6 +2685,7 @@ greps
 grew
 grey
 grid
+ground
 grounds
 group
 grouped
@@ -2708,6 +2737,7 @@ handling
 handoff
 handoffs
 handover
+handovers
 hands
 handshake
 hang
@@ -2728,9 +2758,11 @@ hardening
 harder
 hardest
 harm
+harmed
 harmless
 harmlessly
 harness
+harvest
 harvested
 harvo
 hash
@@ -2751,6 +2783,7 @@ headline
 heads
 heal
 heals
+health
 healthy
 heard
 hearing
@@ -2847,6 +2880,7 @@ href
 html
 http
 https
+hues
 huge
 human
 humans
@@ -2869,6 +2903,8 @@ hypothesis
 hypothetical
 hypothetically
 icebox
+icon
+icons
 idea
 ideally
 ideas
@@ -2904,6 +2940,7 @@ illustrates
 illustrating
 illustrative
 image
+images
 imagined
 immediate
 immediately
@@ -2927,6 +2964,7 @@ implies
 imply
 implying
 import
+importance
 important
 imported
 importer
@@ -3149,12 +3187,14 @@ inverts
 investigate
 invisible
 invite
+invited
 invites
 invocation
 invocations
 invoke
 invoked
 invokes
+invoking
 involved
 involvement
 involves
@@ -3450,6 +3490,7 @@ literal
 literally
 literals
 litigate
+litigated
 litigates
 little
 live
@@ -3565,6 +3606,7 @@ mandate
 mandatory
 mangled
 manifest
+manoeuvre
 manual
 manually
 manufacture
@@ -3700,6 +3742,7 @@ milliseconds
 mime
 mind
 mine
+mines
 mini
 minimal
 minimisation
@@ -3831,6 +3874,7 @@ mutilated
 mutual
 mutually
 myproject
+myself
 nactor
 nactors
 naive
@@ -4055,6 +4099,7 @@ number
 numbered
 numbering
 numbers
+numerals
 numeric
 nums
 nusage
@@ -4263,6 +4308,7 @@ padding
 page
 pager
 pages
+paginated
 pagination
 paid
 pain
@@ -4278,6 +4324,7 @@ pairs
 palette
 pane
 panel
+panels
 paper
 papered
 paperwork
@@ -4400,6 +4447,7 @@ phases
 philosophy
 phone
 photogenic
+photograph
 phrase
 phrased
 phrases
@@ -4413,6 +4461,8 @@ picks
 picture
 piece
 pieces
+pill
+pills
 ping
 pinned
 pinning
@@ -4432,6 +4482,7 @@ place
 placed
 placeholder
 placeholders
+placement
 places
 plain
 plainest
@@ -4451,6 +4502,7 @@ plausibly
 play
 player
 playful
+playhead
 plays
 plea
 plug
@@ -4484,6 +4536,7 @@ polls
 polluted
 polygon
 polyline
+pong
 ponownie
 pool
 pools
@@ -4640,6 +4693,7 @@ privileged
 proba
 probably
 probe
+probed
 probes
 probing
 problem
@@ -4670,6 +4724,7 @@ programmatically
 programmer
 programs
 progress
+progressing
 prohibition
 proj
 project
@@ -4678,6 +4733,7 @@ projection
 projections
 projects
 projektu
+prominently
 promise
 promised
 promises
@@ -4706,6 +4762,7 @@ proportional
 proportionally
 proposal
 proposals
+propose
 proposed
 proposing
 proprietor
@@ -4814,6 +4871,7 @@ race
 racing
 radii
 radius
+rail
 railway
 raise
 raised
@@ -4892,12 +4950,14 @@ rebuilt
 recalculated
 recall
 recalled
+recede
 recedes
 receipt
 receive
 received
 receiver
 receives
+receiving
 recent
 recently
 recipient
@@ -5030,6 +5090,7 @@ regex
 regexes
 regexp
 region
+regions
 register
 registered
 registering
@@ -5072,6 +5133,7 @@ released
 releases
 releasing
 relevance
+relevant
 reliability
 reliable
 reliance
@@ -5167,6 +5229,7 @@ replica
 replicas
 replication
 replied
+reply
 repo
 repoint
 repointed
@@ -5262,6 +5325,7 @@ restrict
 restriction
 restricts
 rests
+restyling
 result
 resulting
 results
@@ -5277,6 +5341,7 @@ retraction
 retried
 retries
 retroactively
+retrospective
 retrospectives
 retry
 retryable
@@ -5337,6 +5402,7 @@ rezygnacja
 rgba
 rhythm
 rich
+richer
 ride
 rider
 rides
@@ -5469,7 +5535,9 @@ scopes
 scoping
 score
 scored
+scout
 scratch
+scratchpad
 screen
 screenshot
 scribe
@@ -5485,6 +5553,7 @@ scrollbars
 scrolling
 scrolls
 scrubbed
+scrubs
 seam
 search
 searchable
@@ -5531,6 +5600,7 @@ sells
 semantic
 semantically
 semantics
+semibold
 send
 sender
 sending
@@ -5804,6 +5874,7 @@ sonnet
 soon
 sooner
 sort
+sortable
 sorted
 sorters
 sorting
@@ -5918,6 +5989,8 @@ starts
 startswith
 startup
 starve
+stash
+stashes
 stat
 state
 stated
@@ -6046,6 +6119,8 @@ subscription
 subsequent
 subset
 substance
+substantial
+substantive
 substantively
 substitute
 substituted
@@ -6106,6 +6181,7 @@ supposed
 suppress
 suppressed
 suppresses
+suppression
 sure
 surface
 surfaced
@@ -6114,6 +6190,7 @@ surfacing
 surgery
 surname
 surprise
+surprised
 surprises
 surprising
 surrounding
@@ -6141,6 +6218,7 @@ swap
 swappable
 swapped
 swapping
+swaps
 sweep
 sweeping
 swept
@@ -6275,6 +6353,7 @@ terminator
 terminology
 terms
 ternary
+terracotta
 territory
 test
 testability
@@ -6300,6 +6379,7 @@ theirs
 them
 theme
 themed
+themes
 themselves
 then
 theoretical
@@ -6309,6 +6389,7 @@ these
 theses
 thesis
 they
+thick
 thicker
 thickness
 thin
@@ -6363,6 +6444,8 @@ tied
 ties
 tight
 tightening
+tile
+tiles
 time
 timed
 timeline
@@ -6394,6 +6477,7 @@ today
 todo
 together
 toggle
+toggles
 toggling
 token
 tokenizer
@@ -6499,6 +6583,7 @@ treated
 treating
 treatise
 treatment
+treatments
 treats
 tree
 trees
@@ -6564,7 +6649,9 @@ typical
 typically
 typing
 typo
+typographic
 typographically
+typography
 typos
 typy
 uall
@@ -6633,6 +6720,7 @@ understate
 understood
 underweighted
 undid
+undifferentiated
 undo
 undocumented
 undoes
@@ -6880,6 +6968,7 @@ versioning
 versions
 versus
 vertical
+vertically
 very
 vestige
 vibes
@@ -6888,6 +6977,7 @@ view
 viewable
 viewer
 viewers
+viewing
 viewport
 views
 violable
@@ -6931,8 +7021,10 @@ wall
 walls
 want
 wanted
+wanting
 wants
 warehouse
+warm
 warn
 warned
 warning
@@ -6958,6 +7050,7 @@ waylog
 waymark
 ways
 weak
+weaken
 weakened
 weakening
 weakens

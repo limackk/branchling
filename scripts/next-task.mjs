@@ -61,6 +61,7 @@ import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
 import { dispatchWave, loadPlanForDispatch } from "./plan.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { printJson } from "./json-envelope.mjs";
+import { probeTask } from "./done-task.mjs";
 import { inProgressStatus, rebuildViews, refusalCode, refusalPayload, renderTake, takeJson, takeTask } from "./take-task.mjs";
 import { filterTasks, readTaskRecords, sortTasks, splitList, unknownFilterValues } from "./task-select.mjs";
 import { MARK, color, failure, warn } from "./ui.mjs";
@@ -69,7 +70,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export const NEXT_FLAGS = [
   "--dir", "--actor", "--reason", "--json", "--plan",
-  "--board", "--label", "--priority", "--epic", "--status", "--role",
+  "--board", "--label", "--priority", "--epic", "--status", "--role", "--probe",
 ];
 
 /** No candidate is not an error — see the header. */
@@ -79,12 +80,13 @@ export const EXIT_NOTHING_TO_TAKE = 3;
 export function parseNextArgs(args) {
   const plan = { dir: null, actor: null, reason: null, json: false, usePlan: false,
     board: null, label: null, priority: null, epic: null, status: null,
-    role: null, roleStrict: false };
+    role: null, roleStrict: false, probe: false };
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === "--json") { plan.json = true; continue; }
     if (a === "--plan") { plan.usePlan = true; continue; }
     if (a === "--role-strict") { plan.roleStrict = true; continue; }
+    if (a === "--probe") { plan.probe = true; continue; }
     if (NEXT_FLAGS.indexOf(a) >= 0) {
       const value = args[++i] || null;
       if (!value) throw new Error("`" + a + "` with no value");
@@ -350,13 +352,30 @@ export function heldElsewhere(task, handedOut) {
  * @returns {{actor: string, reason: string}|null}
  */
 export function lastHandoff(entries) {
+  // The trailing block of one handoff: its field changes and its comment are
+  // written together under `source: "handoff"`. Whether it CHANGED THE ROLE is
+  // read off that same block (TL-271), because that is the difference between
+  // "this does not fit a session of mine" and "this is the next hand's".
+  // The comment is the LAST entry of the block and the field changes come
+  // before it, so the scan keeps going past the comment until the block ends.
+  let found = null;
+  let toRole = null;
   for (let i = (entries || []).length - 1; i >= 0; i--) {
     const e = entries[i];
     if (!e || typeof e !== "object") continue;
-    if (e.source !== "handoff") return null;
-    if (e.field === FIELD_COMMENT) return { actor: String(e.actor || ""), reason: String(e.to || e.reason || "") };
+    if (e.source !== "handoff") break;
+    if (!found && e.field !== FIELD_COMMENT) return null;
+    if (e.field === FIELD_COMMENT && !found) {
+      found = { actor: String(e.actor || ""), reason: String(e.to || e.reason || "") };
+      continue;
+    }
+    if (e.field === "role" && String(e.from || "") !== String(e.to || "")) toRole = String(e.to || "");
   }
-  return null;
+  if (!found) return null;
+  // The key is present only when the handoff changed the role, so a reader of
+  // the plain shape — and the tests that pin it — see nothing new otherwise.
+  if (toRole) found.toRole = toRole;
+  return found;
 }
 
 export function selectCandidates(records, config, filters, now) {
@@ -442,6 +461,14 @@ export function selectCandidates(records, config, filters, now) {
   const notHandedBack = (t) => {
     const back = t.handedBack || null;
     if (!back || !filters.actor || back.actor !== filters.actor) return true;
+    // A HANDOFF THAT CHANGED THE ROLE IS A ROUTING, NOT A REFUSAL (TL-271). The
+    // judgement TL-141 guards against is "this does not fit a session of mine";
+    // a hand that passed the task to ANOTHER role said the opposite — it fits,
+    // and the next stage is somebody else's. One actor may run several hands
+    // (`run --agent-for`), so the same actor asking again, now for the role the
+    // task was handed TO, is that next hand arriving and not the old one
+    // returning. The same role twice is still held back.
+    if (back.toRole && back.toRole === String(t.role || "").trim()) return true;
     skippedHandedBack.push({ id: t.id, actor: back.actor, reason: back.reason });
     return false;
   };
@@ -670,12 +697,14 @@ export function run(argv) {
       source: reclaim ? "reclaim" : "next", reclaim, unblocked: cleared, now,
     });
     if (result.ok) {
+      // The contract's live state, when asked for (TL-268) — see `take`.
+      if (plan.probe) result.probe = probeTask(root, result.file);
       if (!rebuildViews(root)) {
         console.error(warn("the views were not rebuilt — run `" + N + " build` yourself"));
       }
       if (plan.json) {
         printJson("task-take", {
-          ...takeJson(result), passedOver, considered: candidates.length,
+          ...takeJson(result, root), passedOver, considered: candidates.length,
           skippedElsewhere, skippedExecutor, skippedHandedBack, skippedSize, plan: planJson,
           scan: { scanned: scan.scanned, reason: scan.reason },
         });

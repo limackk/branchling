@@ -288,6 +288,56 @@ export function runContract(entries, cwd, opts = {}) {
   return { results, failed: null };
 }
 
+/**
+ * PROBE A CONTRACT: run every entry and report each one, stopping at nothing
+ * (TL-268). `runContract` stops at the first failure because a closing is a
+ * verdict and one red line decides it. A probe is the opposite question — what
+ * is red NOW, before any work — and a hand about to start needs every line,
+ * because the second failing entry is as much its target as the first.
+ *
+ * `manual` entries are not run and not judged: they ask a person, and a probe
+ * has nobody to ask. They are listed so the hand knows the contract ends in a
+ * signature it cannot produce.
+ *
+ * @param {Array<object>} entries parsed `verification:` entries
+ * @param {string} cwd where the commands run — the repository root
+ * @returns {{rows: Array<object>, ran: number, failed: number, allPassed: boolean}}
+ */
+export function probeContract(entries, cwd) {
+  const rows = [];
+  let ran = 0;
+  let failed = 0;
+  for (const e of entries || []) {
+    if (e.manual) {
+      rows.push({ id: e.id || null, kind: "manual", command: e.manual, ok: null, exitCode: null, ms: 0, output: null });
+      continue;
+    }
+    const r = runBash(e.bash, cwd, true);
+    ran++;
+    if (!r.ok) failed++;
+    rows.push({ id: e.id || null, kind: "bash", command: e.bash, ok: r.ok, exitCode: r.exitCode, ms: r.ms, output: r.output });
+  }
+  return { rows, ran, failed, allPassed: ran > 0 && failed === 0 };
+}
+
+/**
+ * Probe one task's contract as it stands on disk (TL-268). Reads the file,
+ * parses `verification:`, runs the probe from the repository root — the same
+ * root `done` would use. A task whose contract cannot be parsed is reported
+ * with the problems and no rows, not thrown: the probe is advice, and a
+ * handover must not fail because the advice could not be produced.
+ *
+ * @returns {{rows: Array<object>, ran: number, failed: number, allPassed: boolean, problems: string[]}}
+ */
+export function probeTask(root, taskFile) {
+  const raw = readFileSync(taskFile, "utf8");
+  const { frontmatter } = splitFrontmatter(raw);
+  const { entries, problems } = parseVerification(frontmatter);
+  if (problems && problems.length) return { rows: [], ran: 0, failed: 0, allPassed: false, problems };
+  const probe = probeContract(entries, repoRootFor(root));
+  return { ...probe, problems: [] };
+}
+
 /** Read one line from the terminal. Returns null when there is no terminal.
  *
  *  It reads `/dev/tty`, not stdin: the command is meant to be usable in a pipe

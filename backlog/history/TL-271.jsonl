@@ -1,0 +1,4 @@
+{"id":"01M1Q3QQNJA9DR1FRNJP7V6XAG","ts":"2026-09-04T21:03:32.530Z","task":"TL-271","field":"__created__","from":"","to":"run does not follow a handoff between two roles it serves","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1R44CGYZVB9JVW67DMATZN7","ts":"2026-09-05T06:29:41.534Z","task":"TL-271","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown","session":"tree-a5c56cf5a07c"}
+{"id":"01M1R44CGY25ZW10MBX8EVYY8H","ts":"2026-09-05T06:29:41.534Z","task":"TL-271","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown","session":"tree-a5c56cf5a07c"}
+{"id":"01M1R51CK7BCDVYW8KFK62MDVB","ts":"2026-09-05T06:45:31.879Z","task":"TL-271","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven","session":"tree-a5c56cf5a07c"}

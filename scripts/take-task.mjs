@@ -35,8 +35,10 @@ import { fileURLToPath } from "node:url";
 
 import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
+import { probeTask } from "./done-task.mjs";
+import { withProbe } from "./probe.mjs";
 import { ACTOR_NAMESPACES, appendEntries, changesRequiringReason, currentSession, eventId, FIELD_ROLE_OVERRIDE, isValidActor, isValidReason, normalizeReason, readHistory, reasonRefusal, recordEdit } from "./history.mjs";
-import { withDecisions } from "./decisions.mjs";
+import { decisionsOf, withDecisions } from "./decisions.mjs";
 import { focusQuietly } from "./focus.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { acquireLock, releaseLock } from "./lock.mjs";
@@ -48,14 +50,15 @@ import { MARK, color, failure, warn } from "./ui.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-export const TAKE_FLAGS = ["--dir", "--actor", "--role", "--reason", "--json"];
+export const TAKE_FLAGS = ["--dir", "--actor", "--role", "--reason", "--json", "--probe"];
 
 /** PURE — resolves `take`'s arguments. Throws on a usage error. */
 export function parseTakeArgs(args) {
-  const plan = { id: null, dir: null, actor: null, role: null, reason: null, json: false };
+  const plan = { id: null, dir: null, actor: null, role: null, reason: null, json: false, probe: false };
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === "--json") { plan.json = true; continue; }
+    if (a === "--probe") { plan.probe = true; continue; }
     if (a === "--dir" || a === "--actor" || a === "--role" || a === "--reason") {
       const value = args[++i] || null;
       if (!value) throw new Error("`" + a + "` with no value");
@@ -377,7 +380,7 @@ export function renderTake(result, root, opts = {}) {
   // The answers a person has already given, placed where the reader starts
   // (TL-148). Print time only: nothing of this reaches the file on disk.
   const entries = opts.entries || (root ? readHistory(root, result.id) : []);
-  out.push(withDecisions(result.text, entries).replace(/\n+$/, ""));
+  out.push(withProbe(withDecisions(result.text, entries), result.probe || null).replace(/\n+$/, ""));
   return out.join("\n");
 }
 
@@ -396,7 +399,14 @@ export function rebuildViews(root) {
   return build.status === 0;
 }
 
-export function takeJson(result) {
+export function takeJson(result, root) {
+  // THE JSON HANDOVER CARRIES THE DECISIONS TOO (TL-270). The human render has
+  // printed them since TL-148; the JSON `text` was the raw file, and `run` feeds
+  // its agents from the JSON — so every hand in a fleet got the task without
+  // the answers a person had already given it, and the charters told them to
+  // go and read the history file instead. Same text on both paths now, and the
+  // list beside it for a caller that wants the facts rather than the prose.
+  const entries = root ? readHistory(root, result.id) : [];
   return {
     ok: true,
     taken: !result.alreadyOwned,
@@ -411,7 +421,11 @@ export function takeJson(result) {
     // Equal to the in-progress status when the task was already the caller's,
     // which makes the undo the no-op it should be.
     from: (result.before && result.before.status) || null,
-    text: result.text,
+    text: withProbe(withDecisions(result.text, entries), result.probe || null),
+    decisions: decisionsOf(entries),
+    // The contract as it stood at the handover, when `--probe` asked for it
+    // (TL-268); null otherwise, so nothing ran.
+    probe: result.probe || null,
     warnings: result.warnings || [],
     // Who held it before, when this take was a takeover of an abandoned claim
     // (TL-104) — `null` otherwise. A loop that reclaims work has to be able to
@@ -492,6 +506,10 @@ export function run(argv) {
   }
 
   const result = takeTask({ root, config, id: plan.id, actor, role: plan.role, reason: plan.reason });
+  // THE CONTRACT'S LIVE STATE TRAVELS WITH THE HANDOVER when asked (TL-268).
+  // Opt-in: a contract may cost the whole suite, and a loop wanting the task
+  // in a second is not made to wait for it.
+  if (result.ok && plan.probe) result.probe = probeTask(root, result.file);
   if (!result.ok) {
     if (plan.json) {
       printJson("task-take", refusalPayload(result, plan.id));
@@ -504,7 +522,7 @@ export function run(argv) {
   if (!result.alreadyOwned && !rebuildViews(root)) {
     console.error(warn("the views were not rebuilt — run `" + N + " build` yourself"));
   }
-  if (plan.json) printJson("task-take", takeJson(result));
+  if (plan.json) printJson("task-take", takeJson(result, root));
   else console.log(renderTake(result, root));
   return 0;
 }

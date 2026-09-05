@@ -25,6 +25,41 @@ import { FIELD_COMMENT, FIELD_DECISION, openQuestions } from "./task-fields.mjs"
  * @param {string} text the task file
  * @param {object[]} entries its history
  */
+/**
+ * The same pairs as a LIST, for `--json` (TL-270). One record per question this
+ * task was asked, answered or not; an answered one carries who chose what and,
+ * when the answer was picked off the menu, which option. PURE.
+ *
+ * @returns {Array<{id: string, question: string, askedBy: string, askedAt: string,
+ *   options: string[], recommend: number|null, answered: boolean,
+ *   answer: string|null, decidedBy: string|null, decidedAt: string|null, chose: number|null}>}
+ */
+export function decisionsOf(entries) {
+  const answered = new Map();
+  for (const e of entries || []) {
+    if (e && e.field === FIELD_DECISION && typeof e.resolves === "string" && e.resolves) answered.set(e.resolves, e);
+  }
+  const out = [];
+  for (const q of entries || []) {
+    if (!q || q.field !== FIELD_COMMENT || q.source !== "ask") continue;
+    const a = answered.get(q.id) || null;
+    out.push({
+      id: String(q.id || ""),
+      question: String(q.to || ""),
+      askedBy: String(q.actor || ""),
+      askedAt: String(q.ts || ""),
+      options: Array.isArray(q.options) ? q.options.map(String) : [],
+      recommend: Number.isInteger(q.recommend) ? q.recommend : null,
+      answered: !!a,
+      answer: a ? String(a.to || "") : null,
+      decidedBy: a ? String(a.actor || "") : null,
+      decidedAt: a ? String(a.ts || "") : null,
+      chose: a && Number.isInteger(a.chose) ? a.chose : null,
+    });
+  }
+  return out;
+}
+
 export function withDecisions(text, entries) {
   const answered = new Map();
   for (const e of entries || []) {
