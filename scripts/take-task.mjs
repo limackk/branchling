@@ -36,7 +36,7 @@ import { fileURLToPath } from "node:url";
 import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { ACTOR_NAMESPACES, appendEntries, changesRequiringReason, currentSession, eventId, FIELD_ROLE_OVERRIDE, isValidActor, isValidReason, normalizeReason, readHistory, reasonRefusal, recordEdit } from "./history.mjs";
-import { withDecisions } from "./decisions.mjs";
+import { decisionsOf, withDecisions } from "./decisions.mjs";
 import { focusQuietly } from "./focus.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { acquireLock, releaseLock } from "./lock.mjs";
@@ -396,7 +396,14 @@ export function rebuildViews(root) {
   return build.status === 0;
 }
 
-export function takeJson(result) {
+export function takeJson(result, root) {
+  // THE JSON HANDOVER CARRIES THE DECISIONS TOO (TL-270). The human render has
+  // printed them since TL-148; the JSON `text` was the raw file, and `run` feeds
+  // its agents from the JSON — so every hand in a fleet got the task without
+  // the answers a person had already given it, and the charters told them to
+  // go and read the history file instead. Same text on both paths now, and the
+  // list beside it for a caller that wants the facts rather than the prose.
+  const entries = root ? readHistory(root, result.id) : [];
   return {
     ok: true,
     taken: !result.alreadyOwned,
@@ -411,7 +418,8 @@ export function takeJson(result) {
     // Equal to the in-progress status when the task was already the caller's,
     // which makes the undo the no-op it should be.
     from: (result.before && result.before.status) || null,
-    text: result.text,
+    text: withDecisions(result.text, entries),
+    decisions: decisionsOf(entries),
     warnings: result.warnings || [],
     // Who held it before, when this take was a takeover of an abandoned claim
     // (TL-104) — `null` otherwise. A loop that reclaims work has to be able to
@@ -504,7 +512,7 @@ export function run(argv) {
   if (!result.alreadyOwned && !rebuildViews(root)) {
     console.error(warn("the views were not rebuilt — run `" + N + " build` yourself"));
   }
-  if (plan.json) printJson("task-take", takeJson(result));
+  if (plan.json) printJson("task-take", takeJson(result, root));
   else console.log(renderTake(result, root));
   return 0;
 }

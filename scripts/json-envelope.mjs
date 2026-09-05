@@ -157,6 +157,9 @@ export const KINDS = {
   // doing it by hand.
   "task-take": {
     ok: null, taken: null, id: null, file: null, task: null, text: null,
+    // Every question this task was asked, with its answer when it has one
+    // (TL-270). `text` carries the same as a rendered block; this is the list.
+    decisions: [],
     // The status the take moved the task out of (TL-184). `task` is the state
     // after the write, so a caller that has to give a claim back — `run` when
     // its agent never started — has nowhere else to read it.

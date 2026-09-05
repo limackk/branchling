@@ -1,1 +1,4 @@
 {"id":"01M1Q26JBB8KMK16SMCS5BTX8X","ts":"2026-09-04T20:36:41.451Z","task":"TL-270","field":"__created__","from":"","to":"A decision recorded in the history is invisible to the hand that gets the task","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1R52EPP93XA43F2CWG6RXAE","ts":"2026-09-05T06:46:06.806Z","task":"TL-270","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown","session":"tree-b33411c81f9b"}
+{"id":"01M1R52EPP875W8YE00GZPXCAZ","ts":"2026-09-05T06:46:06.806Z","task":"TL-270","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown","session":"tree-b33411c81f9b"}
+{"id":"01M1R5CYH5Y1G9D1XDPTE46E4M","ts":"2026-09-05T06:51:50.693Z","task":"TL-270","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven","session":"tree-b33411c81f9b"}

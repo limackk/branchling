@@ -700,7 +700,7 @@ export function run(argv) {
       }
       if (plan.json) {
         printJson("task-take", {
-          ...takeJson(result), passedOver, considered: candidates.length,
+          ...takeJson(result, root), passedOver, considered: candidates.length,
           skippedElsewhere, skippedExecutor, skippedHandedBack, skippedSize, plan: planJson,
           scan: { scanned: scan.scanned, reason: scan.reason },
         });

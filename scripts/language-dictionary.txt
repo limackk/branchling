@@ -1114,6 +1114,7 @@ comparison
 comparisons
 compatibility
 compatible
+compensated
 competed
 competence
 competes
@@ -2734,6 +2735,7 @@ handling
 handoff
 handoffs
 handover
+handovers
 hands
 handshake
 hang
@@ -5397,6 +5399,7 @@ rezygnacja
 rgba
 rhythm
 rich
+richer
 ride
 rider
 rides
