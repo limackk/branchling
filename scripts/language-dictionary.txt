@@ -421,6 +421,7 @@ attached
 attaches
 attachment
 attachments
+attacking
 attempt
 attempted
 attempts
@@ -648,6 +649,7 @@ blok
 blow
 blur
 blurred
+blurring
 blurs
 bnext
 board
@@ -1310,6 +1312,7 @@ contradict
 contradicted
 contradicting
 contradiction
+contradictions
 contradictory
 contradicts
 contrast
@@ -1694,6 +1697,7 @@ detach
 detached
 detaching
 detail
+detailed
 details
 detect
 detectable
@@ -1807,6 +1811,7 @@ discouraged
 discover
 discoverable
 discovered
+discoveries
 discovers
 discovery
 discrepancy
@@ -2272,6 +2277,7 @@ expandable
 expanded
 expander
 expands
+expansion
 expect
 expectation
 expectations
@@ -2487,6 +2493,7 @@ flattening
 flaw
 flawed
 fleet
+fleets
 flex
 flight
 flip
@@ -4474,6 +4481,7 @@ permanently
 permission
 permissions
 permissive
+permits
 permitted
 persist
 persisted
@@ -4708,6 +4716,7 @@ prettier
 pretty
 prev
 prevent
+prevented
 preventing
 prevents
 preview
@@ -4784,6 +4793,7 @@ projection
 projections
 projects
 projektu
+prominent
 prominently
 promise
 promised
@@ -5604,6 +5614,7 @@ scored
 scout
 scratch
 scratchpad
+scrape
 screen
 screenshot
 scribe
@@ -5746,6 +5757,7 @@ shares
 sharing
 sharp
 sharpen
+sharpening
 sharper
 sharpest
 shas
@@ -6140,6 +6152,7 @@ streams
 strength
 strengthen
 strengthened
+strengths
 stretch
 stretches
 stretching
@@ -6178,6 +6191,7 @@ styles
 stylistic
 stylistically
 subagent
+subagents
 subcommand
 subcommands
 subdir
@@ -6485,6 +6499,7 @@ thoroughly
 those
 though
 thought
+thoughts
 thousand
 thousands
 thread

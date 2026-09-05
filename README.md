@@ -1,8 +1,20 @@
 # branchling
 
-**A queue your agents draw from, and a tool that does not take their word for
-it.** Tasks are markdown files in your repository. What makes this different
-from every other file-based backlog is what sits on top of them:
+**A Git-native engineering loop for work done by people and coding agents.**
+An agent harness knows how to edit code. branchling owns what must survive the
+agent, its context window and even the provider: what work is ready, who claimed
+it, why the plan changed and what evidence permits the work to close.
+
+Tasks are markdown files in the repository, so the loop travels with the code:
+
+`plan → claim → execute → capture discoveries → verify → review`
+
+What makes this different from a readable task list is that each transition has
+a concrete rule:
+
+- **An executable plan.** `plan.yaml` orders work in dependency-aware waves.
+  The queue offers only the active wave when the caller asks it to follow the
+  plan; work whose blockers are still open cannot start early.
 
 - **A queue.** `branchling next` chooses a task and reserves it in the same
   act, so two sessions asking at the same moment get two different tasks. It
@@ -16,18 +28,23 @@ from every other file-based backlog is what sits on top of them:
 - **A ledger.** Every change records who made it, through what, and why —
   and the statuses you list in `reason_required_statuses` cannot be entered
   without a stated reason at all.
+- **A feedback loop.** The shipped agent instructions say that substantial work
+  discovered mid-task becomes its own self-contained task. It is not hidden in
+  a final message, left as a `TODO`, or folded into work whose contract never
+  covered it.
 
 ```bash
 branchling run --agent "claude -p @{task_file}" --max-attempts 2
 ```
 
 That is the loop: `next` → your agent → `done`, until the queue is empty.
-branchling never starts an agent and never will — `--agent` is *your* command
-template, run through *your* shell. A task that fails its contract twice is
-parked with the reason, never closed: a run that could not verify a task may
-not say it is done. Add `--agent-for <role>=<command>` and one queue feeds
-several different hands, with the roles nobody has a command for left waiting
-rather than handed out.
+branchling does not contain an agent or choose one: `run` starts exactly the
+command template you supply, through your shell. A task that fails its contract
+twice is parked with the reason, never closed: a run that could not verify a
+task may not say it is done. Add `--agent-for <role>=<command>` and the same
+contract scales to several hands, with the roles nobody has a command for left
+waiting rather than handed out. Review and merge remain ordinary Git; the task
+state and its evidence enter that review beside the code.
 
 Everything that aggregates tasks — the index, the "what now" view, the
 archive, the browser page — is **computed** from the files and is not
@@ -617,6 +634,18 @@ different words from a verification that ran and failed.
 Every task is **self-contained**: the agent reads one file and knows everything,
 because the context, the files to read first and the way to verify the result are
 all in it rather than in somebody's head.
+
+**When work discovers more work, the plan grows without blurring the task in
+progress.** The rule is one question: does doing it now fit the current task's
+thesis? A neighbouring typo does. A separate design decision, missing guard or
+refactor does not, so the agent creates a new task whose goal, context and
+verification stand on their own. A later session can receive it through
+`branchling next` without access to the conversation that found it.
+
+This rule is part of the workflow printed by the tool. branchling does not try
+to classify an agent's thoughts or scrape its final response; the instruction
+makes the write explicit, and the new task then becomes ordinary repository
+state with the same history, dependencies and review path as every other task.
 
 The protocol around the task — when to open one at all, how to claim it, what to
 do before closing it — is printed by the tool:

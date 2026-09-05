@@ -15,6 +15,7 @@ hardest to notice — still specific, still confident, no longer true.
 
 ## Contents
 
+- [The closed engineering loop](#the-closed-engineering-loop)
 - [Statuses](#statuses)
 - [Configuration: the code knows the SHAPE, the config knows the VALUES](#configuration-the-code-knows-the-shape-the-config-knows-the-values)
 - [The execution order (`plan.yaml`)](#the-execution-order-planyaml)
@@ -24,6 +25,28 @@ hardest to notice — still specific, still confident, no longer true.
 - [Viewer](#viewer)
 - [What is computed may be deleted](#what-is-computed-may-be-deleted)
 - [The `--json` contract](#the---json-contract)
+
+---
+
+## The closed engineering loop
+
+branchling supplies the durable control plane around an agent or a person; it
+does not supply the intelligence that edits the code. The stages compose, but
+their boundaries stay explicit:
+
+| Stage | What branchling guarantees | What remains outside |
+|---|---|---|
+| Plan | Dependencies and waves are validated; `--plan` exposes only the active wave | Choosing the product direction |
+| Claim | Selection and reservation are one atomic operation across the clone | Coordination between separate clones |
+| Execute | `run` invokes the command the user supplied and routes declared roles only to commands that serve them | The provider, model, tools and prompt used by that command |
+| Discover | The shipped workflow tells a session to create a separate, self-contained task for substantial work outside the current thesis | Deciding that a thought is substantial; branchling does not inspect an agent's reasoning |
+| Verify | `done` executes the task contract and refuses an empty or failing one | Writing a contract that measures the intended outcome |
+| Review | Task state, evidence and reasons travel through Git beside the code | Review, merge and remote synchronization remain Git operations |
+
+The distinction matters when a context window ends or a provider changes. The
+execution session may disappear; the ready work, decisions, rejected closure
+and newly discovered tasks remain in the repository. A single agent uses the
+same loop as a role-based run, without needing to learn the role machinery.
 
 ---
 
@@ -53,8 +76,8 @@ it down, you close it, and it leaves on its own.
 command runs its `verification:` first.** Every entry is printed before it runs
 and executed from the repository root; the first failure ends the run, exits
 non-zero and leaves the task file untouched. A green run sets the status, ticks
-the acceptance criteria its entries prove, appends a line to `## Log` and
-rebuilds the views.
+the acceptance criteria its entries prove, records the field changes in the
+task's append-only history and rebuilds the views.
 
 ```bash
 branchling done TASK-42 --dry-run    # run the whole contract, change nothing

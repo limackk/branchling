@@ -1,7 +1,7 @@
 # branchling as a global tool — home directory, project registry, extensibility
 
-**Status:** PROJECT (2026-08-30) — none of this is implemented
-**Concerns:** `backlog/` as the `branchling` tool ([TL-20](../backlog/tasks/TL-20-domknij-nazwe-narzedzia-przed-publikacja.md) — working name)
+**Status:** IMPLEMENTED ARCHITECTURE — publication remains a separate release decision
+**Concerns:** `backlog/` as the `branchling` tool ([TL-20](../backlog/tasks/TL-20-domknij-nazwe-narzedzia-przed-publikacja.md))
 **Predecessors:** [backlog-config-and-portability.md](backlog-config-and-portability.md) (the data directory as an argument), [branchling-state-and-sync.md](branchling-state-and-sync.md) (where the truth lives), [backlog-time-tracking.md](backlog-time-tracking.md) (time tracking — its log's location is about to change)
 **Tasks:** [TL-33](../backlog/tasks/TL-33-packaging-instalacja-globalna-i-npx.md) · [TL-34](../backlog/tasks/TL-34-katalog-domowy-preferencje-i-rejestr-projektow.md) · [TL-35](../backlog/tasks/TL-35-surowy-log-aktywnosci-do-katalogu-domowego.md) · [TL-36](../backlog/tasks/TL-36-widok-przekrojowy-nad-wieloma-projektami.md)
 
@@ -18,7 +18,7 @@ repositories.** This document records the boundary between the two, the laws
 that guard it, and the extension points through which the tool is meant to
 grow without breaking compatibility.
 
-## 2. Existing state — most of this work is already done
+## 2. Existing state — the boundary is implemented
 
 | Capability | State | Where |
 |---|---|---|
@@ -26,11 +26,12 @@ grow without breaking compatibility.
 | Detection requires a **marker**, not `tasks/` alone | ✅ done | `looksLikeBacklogDir()` — a foreign repo with a `tasks/` directory is more common than it seems |
 | Code knows the SHAPE, configuration knows the VALUES | ✅ done (TL-19) | `config.yaml`, an unknown key FAILS |
 | `init` into a foreign directory, with no guessing and no overwriting | ✅ done (TL-23) | `init --dir` mandatory, an existing file skipped and reported |
-| **Installation** — `package.json`, `bin/`, `npx branchling` | ❌ **MISSING** | the documentation promises `npx branchling`, but the module is not installable |
-| A user home directory, a project registry | ❌ missing | not a single `homedir()` or `XDG_` anywhere in the module |
+| **Installation** — `package.json`, `bin/`, `npx branchling` | ✅ done (TL-33) | the package and binary work locally; publishing them to npm is a separate irreversible action |
+| A user home directory, a project registry | ✅ done (TL-34) | XDG-aware preferences and computed pointers to registered repositories |
 
-> Conclusion: "making this a global tool" is 80% **packaging what already
-> works**, not a rebuild. The one hard gap on this path is packaging.
+> Conclusion: the program is global and the project truth remains local to each
+> repository. Installation does not move task data into the user layer, and
+> publishing the existing package does not change that boundary.
 
 ## 3. Four laws
 
