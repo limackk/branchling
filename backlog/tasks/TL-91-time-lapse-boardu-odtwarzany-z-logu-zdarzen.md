@@ -6,9 +6,9 @@ labels: []
 board: main
 epic: "Agentic differentiators"
 priority: P3
-status: in_progress
+status: done
 owner: agent:fleet
-role: spec
+role: dev
 estimate: 1d
 confidence: low
 created: 2026-08-31
