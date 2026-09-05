@@ -72,6 +72,14 @@ hand may edit, which is a decision about what `scripts/tests/` actually
 contains: `json-envelope.test.mjs`'s `READING` table is a REGISTRY that
 happens to live in a test file.
 
+**Measured a second time, 2026-09-05, TL-150.** The dev hand implemented
+the `actors` command in full — the spec test went 27 of 27 — and handed the
+task back to spec for one reason: `json-envelope.test.mjs`'s READING table
+needs a row for the new kind, and its positive control asserts the tables
+equal `Object.keys(KINDS)`. Same file, same table, same boundary as TL-151;
+the dev hand filed it as TL-285. Two tasks, one registry that lives in a
+test file, two full agent runs spent crossing it.
+
 **Not TL-271.** That is the loop failing to dispatch after a handoff, and
 would have made these four runs one. It would have made this cheaper and
 not made it terminate.

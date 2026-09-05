@@ -245,6 +245,7 @@ anchored
 anchoring
 ands
 anecdote
+anecdotes
 anew
 angle
 animal
@@ -1146,6 +1147,7 @@ completions
 compliance
 compliant
 component
+composable
 compose
 composed
 composes
@@ -1242,6 +1244,7 @@ consider
 consideration
 considered
 considering
+consisted
 consistency
 consistent
 consists
@@ -2671,6 +2674,7 @@ governing
 governs
 gpgsign
 grace
+grade
 gradual
 gradually
 grained
@@ -2771,6 +2775,7 @@ harmlessly
 harness
 harvest
 harvested
+harvests
 harvo
 hash
 hashchange
@@ -2988,6 +2993,7 @@ improved
 improvement
 improvements
 improves
+improving
 improvisation
 impure
 imul
@@ -3428,6 +3434,7 @@ level
 levels
 levenshtein
 lever
+leverage
 lexicographic
 lexicographically
 liability
@@ -5036,7 +5043,9 @@ recreating
 rect
 rectangle
 recur
+recurrence
 recurring
+recurs
 recurses
 recursive
 recursively
@@ -5787,6 +5796,7 @@ simultaneously
 since
 single
 singles
+singly
 singular
 sink
 site
@@ -6362,6 +6372,7 @@ tens
 tense
 tension
 tentatively
+tenth
 tenths
 term
 terminal
