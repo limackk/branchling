@@ -81,6 +81,10 @@ export const KINDS = {
   // log through a newer tool needs to be able to see which join it got.
   sessions: { correlation: null, total: null, sessions: [] },
   session: { correlation: null, session: null },
+  // `actors --json` (TL-150). `minReportN` is what makes a `rate: null` readable
+  // — it is the denominator the project asked for, not an absence of data — and
+  // `policy` says whether any of these rows is acted on at all.
+  actors: { since: null, minReportN: null, rows: [], policy: null },
   audit: {
     since: null, dayZero: null, tasks: null, findings: null,
     closedWithoutTrace: [], skippedBeforeSince: null, reopened: [], rework: [],
@@ -178,6 +182,11 @@ export const KINDS = {
     // stated no threshold: a consumer must not have to tell "no value" from
     // "a version that did not know the key".
     skippedSize: [],
+    // Candidates this actor's RECORD withheld from them (TL-150), each with the
+    // sentence that says why. Declared for the kind, so it is present and empty
+    // where no project declared an `actor_policy_*`: a loop must be able to tell
+    // an empty queue from a queue it was not allowed to draw from.
+    skippedByRecord: [],
     // `--plan` only (TL-183): which wave was followed, and how many open tasks
     // were left alone because the plan does not schedule them. `null` when the
     // flag was not given — a wave number of 0 would say a plan was consulted.

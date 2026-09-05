@@ -180,6 +180,25 @@ export const DEFAULTS = Object.freeze({
   // a week off without accusing anybody. A project that works in shorter cycles
   // lowers it; the code knows the shape, this line knows the value.
   audit_stale_days: 7,
+  // ── An actor's record as a policy (TL-150) ──────────────────────────────
+  // `actors` is a REPORT and these two keys are what makes it act. Together
+  // they say: work at one of these priorities is not handed to an actor whose
+  // first-pass rate is below this threshold. Both empty by default, because a
+  // dispatcher that starts withholding work the day the mechanism ships is a
+  // dispatcher nobody asked for.
+  //
+  // It is an ELIGIBILITY filter and nothing else — `next` removes the withheld
+  // candidates and never reorders the survivors, because the ordering policy is
+  // the dispatcher's and is tested there.
+  //
+  // Values from `priorities`. A word that vocabulary has not got would gate
+  // nothing and look exactly like the empty list that means "no policy", so it
+  // FAILS instead.
+  actor_policy_priorities: [],
+  // The share of an actor's closings that has to have stuck, between 0 and 1. A
+  // record below `min_report_n` closings is never acted on: a rate the report
+  // refuses to state may not be the ground for taking work away from somebody.
+  actor_policy_min_first_pass: 0,
   // ── Documentation drift (TL-100) ────────────────────────────────────────
   // `docs-drift` detects that a document is going stale; it never writes one.
   // Every value below is a PROJECT's, because every one of them encodes a
@@ -268,7 +287,7 @@ const LIST_KEYS = new Set([
   "statuses", "archived_statuses", "priorities", "types", "confidence",
   "labels", "label_axis_timing", "label_axis_env", "owners", "estimates", "actors", "roles",
   "dashboard_open_statuses", "status_strikethrough", "reason_required_statuses",
-  "docs_status_pending_patterns",
+  "docs_status_pending_patterns", "actor_policy_priorities",
 ]);
 const MAP_KEYS = new Set(["epic_aliases", "status_colors", "priority_colors", "label_colors", "model_pricing"]);
 const NUMBER_KEYS = new Set([
@@ -276,6 +295,7 @@ const NUMBER_KEYS = new Set([
   "cross_branch_poll_seconds",
   "idle_gap_minutes", "heartbeat_throttle_seconds", "min_report_n", "activity_retention_days",
   "audit_stale_days", "docs_drift_task_threshold", "docs_drift_min_signals",
+  "actor_policy_min_first_pass",
 ]);
 const BOOL_KEYS = new Set(["labels_closed", "cross_branch_state"]);
 
@@ -643,6 +663,14 @@ export function loadConfig(root, opts = {}) {
     heartbeatThrottleSeconds: values.heartbeat_throttle_seconds,
     minReportN: values.min_report_n,
     auditStaleDays: values.audit_stale_days,
+    // An actor's record as a policy (TL-150). Grouped, because the two keys are
+    // one decision: which work is withheld, and from whom. Both at their
+    // defaults means no policy at all, which is what `actors` being a report
+    // rests on.
+    actorPolicy: {
+      priorities: values.actor_policy_priorities,
+      minFirstPass: values.actor_policy_min_first_pass,
+    },
     // Documentation drift (TL-100). Grouped, because the four keys are one
     // policy: what counts as a signal, how much of it is enough to speak, and
     // who gets handed the result.
@@ -743,6 +771,20 @@ export function validateConfig(config) {
     if (config.statuses.indexOf(s) < 0) {
       problems.push(`\`dashboard_open_statuses\` contains \`${s}\`, which is not in \`statuses\``);
     }
+  }
+  // An actor policy that names a priority nobody uses would hold nothing back and
+  // read exactly like the empty list that means "no policy" (TL-150), and a
+  // threshold outside 0..1 is not a share of anything.
+  for (const p of config.actorPolicy.priorities) {
+    if (config.priorities.indexOf(p) < 0) {
+      problems.push(`\`actor_policy_priorities\` contains \`${p}\`, which is not in \`priorities\``);
+    }
+  }
+  if (!(config.actorPolicy.minFirstPass >= 0 && config.actorPolicy.minFirstPass <= 1)) {
+    problems.push(
+      "`actor_policy_min_first_pass` = `" + config.actorPolicy.minFirstPass +
+        "` — expecting a share between 0 and 1"
+    );
   }
   if (config.inProgressStatus && config.statuses.indexOf(config.inProgressStatus) < 0) {
     problems.push(
