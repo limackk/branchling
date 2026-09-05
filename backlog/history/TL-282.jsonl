@@ -1,0 +1,1 @@
+{"id":"01M1RGXPB04EFZYFWTXK6BHHJX","ts":"2026-09-05T10:13:13.696Z","task":"TL-282","field":"__created__","from":"","to":"A parked task is unparked by the next call, so the stuck status is a no-op","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-841ff9c4a8c2"}
