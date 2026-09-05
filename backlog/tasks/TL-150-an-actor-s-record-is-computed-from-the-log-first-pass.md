@@ -82,3 +82,33 @@ read time. A cache, if ever needed, is deletable.
 - [ ] The policy filters eligibility only and never reorders `next`'s candidates. [proof: suite-green]
 - [ ] Positive control: policy on withholds the P0 from the weaker actor; policy off hands it out. [proof: suite-green]
 - [ ] The policy key in the user layer is refused. [proof: guards-green]
+
+## Where the spec hand stopped (2026-09-05)
+
+The failing test for this task EXISTS and is not in this branch. The spec
+hand wrote `scripts/tests/actor-record.test.mjs` and was cut off by its own
+session limit before it could commit and hand on; the file was swept onto
+`main` by a `git add -A`, found red there with no implementation, and taken
+back out so the suite stays green. It is preserved on the branch
+`tl-150-dev-leg`:
+
+    git show tl-150-dev-leg:scripts/tests/actor-record.test.mjs
+
+**What the dev hand found, and did not fix.** It refused to weaken somebody
+else's proof and reproduced the collision instead: the case `the report
+prints a row per actor and exits 0` asserts `audit` exits 0 over the
+`withRecords` fixture, and that fixture writes three reopenings — they ARE
+the weak actor's record — which `audit.mjs` counts into `findings`, so it
+exits 1 by TL-90's contract. The rest of the file is implementable.
+
+**So the next spec pass has one decision to make**, and it belongs in a task
+of its own if it is not obvious: drop that assertion, or settle whether
+rework stays an audit finding at all.
+
+**Two facts the hands recorded while here**, neither this task's to fix:
+`actors:` in `backlog/config.yaml` is `[local:me, agent:claude]` and does
+not include `agent:fleet`, which has written a dozen entries to this task's
+log — a dead vocabulary that a per-actor report will make matter. And
+`handoff` refuses the actor a charter names when the loop claimed the task
+under a different one (TL-271 exports it now; the charter had not caught
+up).
