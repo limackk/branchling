@@ -61,6 +61,7 @@ import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
 import { dispatchWave, loadPlanForDispatch } from "./plan.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { printJson } from "./json-envelope.mjs";
+import { probeTask } from "./done-task.mjs";
 import { inProgressStatus, rebuildViews, refusalCode, refusalPayload, renderTake, takeJson, takeTask } from "./take-task.mjs";
 import { filterTasks, readTaskRecords, sortTasks, splitList, unknownFilterValues } from "./task-select.mjs";
 import { MARK, color, failure, warn } from "./ui.mjs";
@@ -69,7 +70,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export const NEXT_FLAGS = [
   "--dir", "--actor", "--reason", "--json", "--plan",
-  "--board", "--label", "--priority", "--epic", "--status", "--role",
+  "--board", "--label", "--priority", "--epic", "--status", "--role", "--probe",
 ];
 
 /** No candidate is not an error — see the header. */
@@ -79,12 +80,13 @@ export const EXIT_NOTHING_TO_TAKE = 3;
 export function parseNextArgs(args) {
   const plan = { dir: null, actor: null, reason: null, json: false, usePlan: false,
     board: null, label: null, priority: null, epic: null, status: null,
-    role: null, roleStrict: false };
+    role: null, roleStrict: false, probe: false };
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === "--json") { plan.json = true; continue; }
     if (a === "--plan") { plan.usePlan = true; continue; }
     if (a === "--role-strict") { plan.roleStrict = true; continue; }
+    if (a === "--probe") { plan.probe = true; continue; }
     if (NEXT_FLAGS.indexOf(a) >= 0) {
       const value = args[++i] || null;
       if (!value) throw new Error("`" + a + "` with no value");
@@ -695,6 +697,8 @@ export function run(argv) {
       source: reclaim ? "reclaim" : "next", reclaim, unblocked: cleared, now,
     });
     if (result.ok) {
+      // The contract's live state, when asked for (TL-268) — see `take`.
+      if (plan.probe) result.probe = probeTask(root, result.file);
       if (!rebuildViews(root)) {
         console.error(warn("the views were not rebuilt — run `" + N + " build` yourself"));
       }

@@ -112,7 +112,7 @@ export const AGENT_ENV = "BACKLOG_AGENT_COMMAND";
 
 export const RUN_FLAGS = [
   "--dir", "--actor", "--agent", "--agent-for", "--max-attempts", "--max-tasks", "--timeout",
-  "--log-dir", "--stuck-status", "--json", "--dry-run", "--plan",
+  "--log-dir", "--stuck-status", "--json", "--dry-run", "--plan", "--probe",
   "--board", "--label", "--priority", "--epic",
 ];
 
@@ -123,7 +123,7 @@ const DEFAULT_TIMEOUT_SECONDS = 900;
 export function parseRunArgs(args) {
   const plan = {
     dir: null, actor: null, agent: null, agentFor: {}, json: false, dryRun: false, usePlan: false,
-    maxAttempts: DEFAULT_MAX_ATTEMPTS, maxTasks: 0, timeout: DEFAULT_TIMEOUT_SECONDS,
+    maxAttempts: DEFAULT_MAX_ATTEMPTS, maxTasks: 0, timeout: DEFAULT_TIMEOUT_SECONDS, probe: false,
     logDir: null, stuckStatus: null, board: null, label: null, priority: null, epic: null,
   };
   const numbers = { "--max-attempts": "maxAttempts", "--max-tasks": "maxTasks", "--timeout": "timeout" };
@@ -131,6 +131,7 @@ export function parseRunArgs(args) {
     const a = args[i];
     if (a === "--json") { plan.json = true; continue; }
     if (a === "--dry-run") { plan.dryRun = true; continue; }
+    if (a === "--probe") { plan.probe = true; continue; }
     if (a === "--plan") { plan.usePlan = true; continue; }
     if (RUN_FLAGS.indexOf(a) >= 0) {
       const value = args[++i] || null;
@@ -1169,6 +1170,10 @@ export function run(argv) {
   // just closed is left behind at once. A wave computed here would be the one
   // that was active when the run started.
   if (planned) passthrough.push("--plan");
+  // THE HAND GETS ITS TARGET (TL-268): with `--probe`, `next` hands the task
+  // over with the contract's live result appended to the text the agent reads,
+  // in the place a refused `done` arrives from the second attempt on.
+  if (plan.probe) passthrough.push("--probe");
   // The roles are pushed into the SELECTION rather than filtered after it. A
   // task claimed and then skipped would be left `in_progress` under this run's
   // actor with nobody working on it — the dispatcher must not hand out what this

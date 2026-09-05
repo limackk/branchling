@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-05
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
@@ -83,10 +83,10 @@ thing.
 
 ## Acceptance criteria
 
-- [ ] `next --probe` prints each verification entry with its exit code and
+- [x] `next --probe` prints each verification entry with its exit code and
       output, proven by a test whose fixture has one failing and one passing
       entry. [proof: probe-prints-contract-state]
-- [ ] A contract that passes in full before any work is named in one line.
+- [x] A contract that passes in full before any work is named in one line.
       [proof: probe-prints-contract-state]
-- [ ] Without `--probe`, `next` is unchanged and runs nothing.
+- [x] Without `--probe`, `next` is unchanged and runs nothing.
       [proof: suite-green]

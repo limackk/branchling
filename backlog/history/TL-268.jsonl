@@ -1,1 +1,4 @@
 {"id":"01M1Q26HR515AWD3W35J63JJGE","ts":"2026-09-04T20:36:40.837Z","task":"TL-268","field":"__created__","from":"","to":"next hands over a task without saying what its contract says right now","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1R66Z0Y65WM6NMF9V8E9EPB","ts":"2026-09-05T07:06:03.166Z","task":"TL-268","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown","session":"tree-a75c28265fcb"}
+{"id":"01M1R66Z0YAM6BHDMJFB36CET7","ts":"2026-09-05T07:06:03.166Z","task":"TL-268","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown","session":"tree-a75c28265fcb"}
+{"id":"01M1R6H78JE5EH8QSD4VZVDHND","ts":"2026-09-05T07:11:39.282Z","task":"TL-268","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven","session":"tree-a75c28265fcb"}

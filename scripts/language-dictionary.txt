@@ -4691,6 +4691,7 @@ privileged
 proba
 probably
 probe
+probed
 probes
 probing
 problem
@@ -5532,6 +5533,7 @@ scopes
 scoping
 score
 scored
+scout
 scratch
 scratchpad
 screen
@@ -7017,6 +7019,7 @@ wall
 walls
 want
 wanted
+wanting
 wants
 warehouse
 warm
