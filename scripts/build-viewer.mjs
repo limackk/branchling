@@ -424,6 +424,9 @@ export function buildHtml(
   // The decision panel reads `openQuestions` from task-fields.mjs, pasted above.
   const decisionPanelModuleSrc = readModuleSource("decision-panel.mjs");
   const taskGraphModuleSrc = readModuleSource("task-graph.mjs");
+  // The board time-lapse (TL-91). AFTER task-graph.mjs, which it folds the log
+  // with: the paste order is the module graph, written out by hand.
+  const boardReplayModuleSrc = readModuleSource("board-replay.mjs");
   const historyJson = JSON.stringify(history).replace(/</g, "\\u003c");
 
   return `<!DOCTYPE html>
@@ -2307,6 +2310,80 @@ ${paletteBadgeCss}
     color: var(--fg-muted);
     font-size: 11px;
   }
+
+  /* ─── Replay (the board at a moment, TL-91) ─────────────────────── */
+  .replay-view { display: none; }
+  body.view-replay main.app-main { display: none; }
+  body.view-replay .filters-bar,
+  body.view-replay .stats { display: none; }
+  body.view-replay .replay-view {
+    display: block;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 20px 24px 64px;
+  }
+  .replay-head-bar h2 { margin: 0 0 2px; font-size: 16px; }
+  /* The left edge of the slider is where the DATA starts, not where the backlog
+     did. Said in words, above the control, because a reader who is not told will
+     read the first day as the day the project began. */
+  .replay-since { margin: 0 0 12px; color: var(--fg-muted); font-size: 12px; max-width: 78ch; }
+  .replay-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .replay-controls input[type="range"] { flex: 1; min-width: 220px; }
+  .replay-counter { font-size: 12px; color: var(--fg-muted); font-variant-numeric: tabular-nums; }
+  .replay-legend {
+    margin: 8px 0 16px;
+    font-size: 11px;
+    color: var(--fg-muted);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .replay-legend .actor-agent { color: var(--accent); }
+  .replay-legend .actor-user { color: var(--ok, #4c9a6a); }
+  .replay-head {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin: 0 0 10px;
+    font-size: 12px;
+    color: var(--fg-muted);
+  }
+  .replay-when { font-weight: 700; color: var(--fg); font-variant-numeric: tabular-nums; }
+  .replay-cols { display: flex; gap: 12px; align-items: flex-start; overflow-x: auto; padding-bottom: 8px; }
+  .replay-col {
+    flex: 0 0 220px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+  }
+  .replay-col h3 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  .replay-count { color: var(--fg-muted); font-weight: 400; }
+  .replay-col ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .replay-card {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    font-size: 12px;
+    padding: 5px 7px;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--fg-muted);
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  /* The glyph is the fact and the colour is emphasis (TL-52). The two classes
+     that mean "the log does not say who" look alike on purpose. */
+  .replay-card.actor-agent { border-left-color: var(--accent); }
+  .replay-card.actor-local, .replay-card.actor-user { border-left-color: var(--ok, #4c9a6a); }
+  .replay-card.actor-unknown, .replay-card.actor-legacy { border-left-style: dashed; }
+  .replay-glyph { color: var(--fg-muted); }
+  .replay-card.actor-agent .replay-glyph { color: var(--accent); }
+  .replay-card.actor-local .replay-glyph, .replay-card.actor-user .replay-glyph { color: var(--ok, #4c9a6a); }
+  .replay-id { font-weight: 600; }
+  .replay-actor { margin-left: auto; color: var(--fg-muted); font-size: 11px; }
+  .replay-unknown, .replay-empty { color: var(--fg-muted); font-size: 13px; max-width: 70ch; }
+  .replay-empty h2 { color: var(--fg); font-size: 16px; margin: 0 0 6px; }
 </style>
 </head>
 <body>
@@ -2319,6 +2396,7 @@ ${paletteBadgeCss}
       <button type="button" class="view-tab is-active" data-view="tasks">Tasks</button>
       <button type="button" class="view-tab" data-view="dashboard">Dashboard</button>
       <button type="button" class="view-tab" data-view="execution">Execution</button>
+      <button type="button" class="view-tab" data-view="replay">Replay</button>
       <button type="button" class="view-tab" data-view="decisions" id="tabDecisions">Waiting on you</button>
       <button type="button" class="copy-link-btn" id="btnCopyLink"
               title="Copies the address of this view — filters, search, sort, board and the selected task">⧉ Copy link</button>
@@ -2361,6 +2439,7 @@ ${paletteBadgeCss}
 
 <section class="dashboard-view" id="dashboardView"></section>
 <section class="execution-view" id="executionView"></section>
+<section class="replay-view" id="replayView"></section>
 <section class="decisions-view" id="decisionsView"></section>
 <div class="chart-tip" id="chartTip" hidden></div>
 
@@ -2434,6 +2513,13 @@ ${decisionPanelModuleSrc}
 ${taskGraphModuleSrc}
 // ─── end of the pasted module ─────────────────────────────────────────
 
+// ─── Pasted source of scripts/board-replay.mjs (TL-91) ───────────────
+// The board at a moment in time, folded from the same history with the same
+// stateAt() the graph above uses. Tested by
+// node --test scripts/tests/board-replay.test.mjs.
+${boardReplayModuleSrc}
+// ─── end of the pasted module ─────────────────────────────────────────
+
 // TASKS / STATS are mutable — live mode replaces them after reading from disk.
 // ALL_TASKS is the full set; TASKS is its narrowing to the selected board.
 // The split is here rather than at every place that reads TASKS, because a board
@@ -2505,6 +2591,12 @@ const state = {
   view: "tasks",          // "tasks" | "dashboard" | "execution" | "decisions"
   // The panel's own filter: "" = everything, "mine" = rows naming this actor.
   decisionsMine: false,
+  // The moment the replay is showing (TL-91): an ISO instant, or null for the
+  // last one the log covers. A moment and not a day — everything within one day
+  // would otherwise encode to the same address.
+  replayAt: null,
+  replayTimer: null,
+  replaySpeed: 600,
   // Dashboard date range — flow metrics only, see computeDashboard().
   dashRange: { preset: "all", from: null, to: null },
   // Day pinned by clicking a chart point: { day, source } — source names which
@@ -6180,17 +6272,205 @@ document.getElementById("decisionsView").addEventListener("keydown", (e) => {
 
 window.toggleDecisionsMine = toggleDecisionsMine;
 
+// ─── Replay view (TL-91) ──────────────────────────────────────────────
+// The board as it stood at a moment, folded out of HISTORY on every frame.
+// Nothing is stored and nothing is asked for over the network: the page carries
+// the log it was built with, which is exactly why the replay works on a file
+// somebody was mailed.
+//
+// THE WHOLE BACKLOG, NEVER ONE BOARD. The scope travels in the link because the
+// rest of the page is scoped by it, but a FRAME is not narrowed by it: the log
+// records a board only when somebody CHANGED one, so scoping a frame would drop
+// every task that has always sat where it sits — and the missing cards would
+// look exactly like a quiet week.
+
+/** How fast the animation steps, in milliseconds per day. */
+const REPLAY_SPEEDS = [[1200, "slow"], [600, "normal"], [220, "fast"]];
+
+/**
+ * The positions the slider can stand on.
+ *
+ * The first one is the START of the first day, which is EARLIER than the first
+ * entry — and that is the point of it: the reader can drag to the boundary and
+ * be told the log does not reach that far, instead of being shown an empty
+ * board. Every other position is the END of a day, so a day the log wrote to
+ * shows what it looked like once it was over.
+ */
+function replayPositions() {
+  const line = replayTimeline(HISTORY);
+  if (!line.days.length) return { line: line, moments: [] };
+  const moments = [line.days[0] + "T00:00:00.000Z"];
+  for (const d of line.days) moments.push(d + "T23:59:59.999Z");
+  return { line: line, moments: moments };
+}
+
+/** The moment being shown. null means the last one the log covers — the default
+ *  a link with no "at" in it has to reproduce. */
+function replayMoment(moments) {
+  if (!moments.length) return null;
+  return state.replayAt || moments[moments.length - 1];
+}
+
+/** Where the thumb sits for a moment that may have come from a link and need not
+ *  be one of the positions at all. */
+function replayIndexOf(at, moments) {
+  const t = Date.parse(at);
+  let idx = 0;
+  for (let i = 0; i < moments.length; i++) if (Date.parse(moments[i]) <= t) idx = i;
+  return idx;
+}
+
+function replayCounterText(p, at) {
+  const i = replayIndexOf(at, p.moments);
+  if (i === 0) return "before the log — day 0 of " + p.line.days.length;
+  return "day " + i + " of " + p.line.days.length + " — " + p.line.days[i - 1];
+}
+
+function replayEncodeHash() {
+  return encodeReplayHash({ at: state.replayAt, board: state.board === BOARD_ALL ? null : state.board });
+}
+
+function replayApplyHash(query) {
+  const v = parseReplayHash(query);
+  state.replayAt = v.at;
+  // The board is the reader's SCOPE for the rest of the page, not a filter on the
+  // frame — see the note at the top of this section.
+  if (v.board && v.board !== state.board) setBoardScope(v.board, { quiet: true });
+}
+
+function replaySyncHash() {
+  if (state.view !== REPLAY_HASH_ROUTE) return;
+  const next = "#" + replayEncodeHash();
+  if (window.location.hash === next) return;
+  // replaceState, not an assignment to the hash: an assignment fires hashchange,
+  // which would redraw the frame the slider has just drawn — during an animation
+  // that is a second full redraw per day.
+  history.replaceState(null, "", window.location.pathname + window.location.search + next);
+}
+
+function replayDrawFrame() {
+  const host = document.getElementById("replayFrame");
+  if (!host) return;
+  const p = replayPositions();
+  const at = replayMoment(p.moments);
+  host.innerHTML = renderReplayBoard(boardAt(HISTORY, at), { day: histDay, statuses: CONFIG.statuses });
+  const counter = document.getElementById("replayCounter");
+  if (counter) counter.textContent = replayCounterText(p, at);
+  const slider = document.getElementById("replaySlider");
+  // Never while the reader is dragging it: writing the value back would fight
+  // the thumb under their finger.
+  if (slider && document.activeElement !== slider) slider.value = String(replayIndexOf(at, p.moments));
+}
+
+function replayMoveTo(at) {
+  state.replayAt = at;
+  replayDrawFrame();
+  replaySyncHash();
+}
+
+function replayStop() {
+  if (state.replayTimer) { clearInterval(state.replayTimer); state.replayTimer = null; }
+  const btn = document.getElementById("replayPlay");
+  if (btn) btn.textContent = "Play";
+}
+
+function replayToggle() {
+  if (state.replayTimer) { replayStop(); return; }
+  const p = replayPositions();
+  if (!p.moments.length) return;
+  // Pressing play at the end would animate nothing; it starts over instead.
+  if (replayIndexOf(replayMoment(p.moments), p.moments) >= p.moments.length - 1) replayMoveTo(p.moments[0]);
+  const btn = document.getElementById("replayPlay");
+  if (btn) btn.textContent = "Pause";
+  state.replayTimer = setInterval(() => {
+    const pos = replayPositions();
+    const i = replayIndexOf(replayMoment(pos.moments), pos.moments) + 1;
+    if (i >= pos.moments.length) { replayStop(); return; }
+    replayMoveTo(pos.moments[i]);
+  }, state.replaySpeed);
+}
+
+function renderReplay_() {
+  const host = document.getElementById("replayView");
+  const p = replayPositions();
+  if (!p.moments.length) {
+    // A slider over invented days is worse than no slider: it would let the
+    // reader move through a calendar the log never covered.
+    host.innerHTML = '<div class="replay-empty"><h2>Nothing has been recorded yet</h2>' +
+      "<p>The replay is a fold of the change log, and this backlog has no entries in it. " +
+      "There is no calendar to run along until the first change is written.</p></div>";
+    return;
+  }
+  const at = replayMoment(p.moments);
+  const speeds = REPLAY_SPEEDS.map((sp) =>
+    '<option value="' + sp[0] + '"' + (sp[0] === state.replaySpeed ? " selected" : "") + ">" +
+    sp[1] + "</option>").join("");
+  host.innerHTML =
+    '<div class="replay-head-bar"><h2>Replay</h2>' +
+    '<p class="replay-since">history since ' + escapeHtmlStr(histDay(p.line.firstKnown)) +
+    " — the backlog is older than its log, so a moment before that day is marked as no data, " +
+    "not drawn as an empty board. Anything earlier is in git.</p>" +
+    '<div class="replay-controls">' +
+    '<button type="button" class="btn-action" id="replayPlay">Play</button>' +
+    '<input type="range" id="replaySlider" min="0" max="' + (p.moments.length - 1) +
+    '" step="1" value="' + replayIndexOf(at, p.moments) + '" aria-label="The moment being replayed">' +
+    '<select id="replaySpeed" aria-label="Speed of the animation">' + speeds + "</select>" +
+    '<span class="replay-counter" id="replayCounter"></span></div>' +
+    '<p class="replay-legend"><span class="actor-agent">' + ACTOR_GLYPH.agent + " an agent</span>" +
+    '<span class="actor-user">' + ACTOR_GLYPH.user + " a person</span>" +
+    '<span class="actor-unknown">' + ACTOR_GLYPH.unknown + " not recorded</span>" +
+    "<span>the whole backlog — a frame is not narrowed to a board</span></p></div>" +
+    '<div class="replay-frame" id="replayFrame"></div>';
+  replayDrawFrame();
+}
+
+document.getElementById("replayView").addEventListener("input", (e) => {
+  if (e.target.id !== "replaySlider") return;
+  const p = replayPositions();
+  // Dragging is a decision to look at one moment; the animation stops rather
+  // than fighting the reader for the thumb.
+  replayStop();
+  replayMoveTo(p.moments[Number(e.target.value)] || p.moments[0]);
+});
+
+document.getElementById("replayView").addEventListener("change", (e) => {
+  if (e.target.id !== "replaySpeed") return;
+  state.replaySpeed = Number(e.target.value) || state.replaySpeed;
+  if (state.replayTimer) { replayStop(); replayToggle(); }
+});
+
+document.getElementById("replayView").addEventListener("click", (e) => {
+  if (e.target.closest("#replayPlay")) { replayToggle(); return; }
+  const card = e.target.closest("[data-replay-task]");
+  if (!card) return;
+  const id = card.dataset.replayTask;
+  // A card in a frame is a task as it WAS. One that has since been deleted has
+  // no detail to open, and opening nothing would read as a broken link.
+  if (!ALL_TASKS.some((t) => t.id === id)) {
+    toast(id + " is not in the backlog any more — the replay is showing a moment when it was", "error");
+    return;
+  }
+  setView("tasks");
+  render();
+  selectTask(id);
+});
+
 function setView(view) {
   state.view = view;
   document.body.classList.toggle("view-dashboard", view === "dashboard");
   document.body.classList.toggle("view-execution", view === "execution");
   document.body.classList.toggle("view-decisions", view === "decisions");
+  document.body.classList.toggle("view-replay", view === REPLAY_HASH_ROUTE);
+  // An animation left running in a hidden view would keep rewriting the address
+  // of a page the reader is no longer looking at.
+  if (view !== REPLAY_HASH_ROUTE) replayStop();
   for (const btn of document.querySelectorAll(".view-tab")) {
     btn.classList.toggle("is-active", btn.dataset.view === view);
   }
   if (view === "dashboard") renderDashboard();
   if (view === "execution") renderExecution_();
   if (view === "decisions") renderDecisions();
+  if (view === REPLAY_HASH_ROUTE) renderReplay_();
 }
 
 function dashFilterTo(key, value) {
@@ -6316,6 +6596,12 @@ function handleHash() {
     else renderExecution_();
     return;
   }
+  if (id === REPLAY_HASH_ROUTE) {
+    replayApplyHash(qi < 0 ? "" : raw.slice(qi + 1));
+    if (state.view !== REPLAY_HASH_ROUTE) setView(REPLAY_HASH_ROUTE);
+    else renderReplay_();
+    return;
+  }
   if (isTasksHash(id)) {
     tasksApplyHash(qi < 0 ? "" : raw.slice(qi + 1));
     if (state.view !== "tasks") setView("tasks");
@@ -6410,6 +6696,7 @@ for (const btn of document.querySelectorAll(".view-tab")) {
     setView(v);
     if (v === "dashboard") window.location.hash = dashEncodeHash();
     else if (v === "execution") window.location.hash = "execution";
+    else if (v === REPLAY_HASH_ROUTE) window.location.hash = replayEncodeHash();
     else if (v === "decisions") window.location.hash = "decisions" + (state.decisionsMine ? "?mine=1" : "");
     else tasksSyncHash();
   });

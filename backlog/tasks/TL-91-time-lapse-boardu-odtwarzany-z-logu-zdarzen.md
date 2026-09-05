@@ -6,13 +6,13 @@ labels: []
 board: main
 epic: "Agentic differentiators"
 priority: P3
-status: pending
-owner: unassigned
-role: spec
+status: done
+owner: agent:fleet
+role: dev
 estimate: 1d
 confidence: low
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-05
 blocked_by: []
 blocks: []
 related_docs:

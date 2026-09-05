@@ -69,8 +69,13 @@ export function actorClass(actor) {
 }
 
 /** Oldest first, and stable: two entries sharing a timestamp keep the order the
- *  log wrote them in, which is the order they happened in. */
-function chronological(entries) {
+ *  log wrote them in, which is the order they happened in.
+ *
+ *  Exported for the same reason `stateAt()` is: the board time-lapse (TL-91)
+ *  needs the last entry before a moment, and a second ordering of its own would
+ *  be free to disagree about which of two entries sharing a millisecond came
+ *  last — the case `new` writes on every task it creates. */
+export function chronological(entries) {
   return (entries || [])
     .filter((e) => e && typeof e.ts === "string")
     .map((e, i) => ({ e, i }))

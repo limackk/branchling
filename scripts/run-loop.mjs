@@ -542,11 +542,21 @@ export function sharedStatePaths(env = process.env) {
 }
 
 /** Where one task's agent output is kept — outside the repository, beside the
- *  locks, keyed the same way so two backlogs cannot share a file. */
+ *  locks, keyed the same way so two backlogs cannot share a file.
+ *
+ *  KEYED ON THE LEG, NOT ONLY THE TASK (TL-281). Since TL-271 a run may hand one
+ *  task to two roles, and both legs opening `<id>.log` meant the second erased
+ *  the first — including the friction section that is the only record of what
+ *  the tool did to that hand. The FIRST leg keeps the bare name, so a run with
+ *  one hand per task is unchanged, path included; later legs carry their number
+ *  and the role that worked them. */
 export function logPathFor(root, id, opts = {}) {
   const dir = opts.logDir || join(stateRoot(opts.env || process.env), "runs", lockScope(root).key);
   mkdirSync(dir, { recursive: true });
-  return join(dir, id + ".log");
+  const leg = Number(opts.leg) || 1;
+  if (leg <= 1) return join(dir, id + ".log");
+  const role = String(opts.role || "").trim().replace(/[^A-Za-z0-9_-]+/g, "-");
+  return join(dir, id + "." + leg + (role ? "-" + role : "") + ".log");
 }
 
 function cli(args, opts = {}) {
@@ -828,7 +838,8 @@ function claimAfterAttempt(ctx, task) {
 }
 
 function workOne(ctx, task) {
-  const logPath = logPathFor(ctx.root, task.id, { logDir: ctx.plan.logDir, env: process.env });
+  const logPath = logPathFor(ctx.root, task.id,
+    { logDir: ctx.plan.logDir, env: process.env, leg: task.leg, role: task.role });
   writeFileSync(logPath, "", "utf8");
   let feedback = "";
   let feedbackRan = false;
@@ -1302,6 +1313,9 @@ export function run(argv) {
   // The one result that ends the run without being a fact about a task (TL-184).
   let neverStarted = null;
   const seen = new Set();
+  // How many hands have worked each task in this run — the leg number its log
+  // is keyed on (TL-281).
+  const legs = new Map();
 
   for (;;) {
     if (plan.maxTasks && taken.length >= plan.maxTasks) {
@@ -1350,7 +1364,11 @@ export function run(argv) {
       stopped = task.id + " asks for role `" + role + "`, which no `--agent-for` serves";
       break;
     }
-    const result = workOne(ctx, { id: task.id, file: task.file, text: task.text || "", command, role });
+    // Which turn this is for THIS task, so the two legs of a followed handoff do
+    // not write to one file (TL-281).
+    const leg = (legs.get(task.id) || 0) + 1;
+    legs.set(task.id, leg);
+    const result = workOne(ctx, { id: task.id, file: task.file, text: task.text || "", command, role, leg });
     result.role = role;
     if (result.outcome === "agent-never-ran") {
       // NOTHING WAS MEASURED, so nothing about the task may change (TL-184). The
