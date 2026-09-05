@@ -4,7 +4,7 @@ title: "A role is declared but never defined, so every fleet invents its own bri
 type: task
 labels: []
 board: main
-epic: ""                           # free text — the group this task counts towards
+epic: "Provider-neutral agent execution"
 priority: P1
 status: pending                    # pending | in_progress | blocked | done | cancelled
 owner: unassigned
@@ -15,7 +15,7 @@ confidence: medium                 # how much you trust the estimate
 created: 2026-09-04
 updated: 2026-09-04
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
-blocks: []                         # ids this task will unblock
+blocks: [TL-291]
 related_docs: []                   # paths relative to the repository root
 verification:
   - id: roles-carry-a-brief
