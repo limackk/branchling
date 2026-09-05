@@ -1,0 +1,2 @@
+{"id":"01M1RAC6H0CHSYHZWXCJ2B98ER","ts":"2026-09-05T08:18:48.992Z","task":"TL-281","field":"__created__","from":"","to":"A second hand's log erases the first, so half a task's transcript is lost","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-841ff9c4a8c2"}
+{"id":"01M1RAN1B2C7VZT7ATDTQT7SAS","ts":"2026-09-05T08:23:38.594Z","task":"TL-281","field":"status","from":"pending","to":"done","actor":"agent:claude","source":"done","reason":"proven","session":"tree-841ff9c4a8c2"}

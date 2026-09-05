@@ -4912,8 +4912,8 @@ readable
 readdir
 reader
 readers
-readiness
 readily
+readiness
 reading
 readings
 readline
@@ -5066,9 +5066,9 @@ refined
 refinement
 reflect
 reflects
-reformatted
 reflex
 refname
+reformatted
 refresh
 refreshable
 refreshed
@@ -6176,6 +6176,7 @@ super
 superfluous
 superseded
 supervisor
+supplement
 supplied
 supplies
 supply

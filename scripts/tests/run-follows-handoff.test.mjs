@@ -165,6 +165,17 @@ test("a handoff to a role this run serves is followed: the second hand closes th
     assert.equal(report.tally.closed, 1);
     assert.equal(report.tally.heldElsewhere || 0, 0, "a followed handoff is not `held elsewhere`");
     assert.ok(existsSync(witness), "the second hand never ran");
+    // BOTH TRANSCRIPTS SURVIVE (TL-281). The first leg keeps the bare name and
+    // the second carries its number and role, so neither erases the other.
+    assert.notEqual(legs[0].log, legs[1].log, "both legs wrote to one file — the second erased the first");
+    assert.match(legs[0].log, new RegExp(id + "\\.log$"), "a first leg must keep the plain name: " + legs[0].log);
+    assert.match(legs[1].log, new RegExp(id + "\\.2-" + SECOND + "\\.log$"), legs[1].log);
+    for (const leg of legs) {
+      assert.ok(existsSync(leg.log), "the report names a log that is not there: " + leg.log);
+      assert.ok(readFileSync(leg.log, "utf8").trim().length > 0, "an empty transcript: " + leg.log);
+    }
+    assert.match(readFileSync(legs[0].log, "utf8"), /stage one is done/,
+      "the first hand's output was overwritten by the second");
     assert.match(readFileSync(witness, "utf8"), new RegExp("actor=agent:fleet role=" + SECOND + " task=" + id),
       "the loop did not tell the hand who it is");
   } finally {
