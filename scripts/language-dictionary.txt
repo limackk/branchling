@@ -2753,6 +2753,7 @@ hardening
 harder
 hardest
 harm
+harmed
 harmless
 harmlessly
 harness
@@ -3188,6 +3189,7 @@ invocations
 invoke
 invoked
 invokes
+invoking
 involved
 involvement
 involves
