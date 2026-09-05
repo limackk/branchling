@@ -359,6 +359,17 @@ arrived
 arrives
 arriving
 arrow
+artboard
+artboards
+canvas
+crit
+departures
+heights
+helmet
+lightened
+mockups
+receded
+uppercased
 artefact
 article
 artifact

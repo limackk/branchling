@@ -1,0 +1,169 @@
+<!--CHROME-->
+
+<div class="exec">
+  <div class="exec-head">
+    <h2>Execution</h2>
+    <span class="stamp">the remaining states, on one sheet</span>
+  </div>
+
+  <p class="gallery-note">State &mdash; every wave closed. There is no active wave, so there is no &ldquo;now&rdquo; marker: the summary has to say the plan is finished rather than hide the answer.</p>
+  <section class="panel summary" style="margin-bottom:22px">
+    <div class="figures">
+      <div class="fig is-now">
+        <span class="k">Plan</span>
+        <span class="v">Finished</span>
+        <span class="s">14 of 14 waves closed</span>
+      </div>
+      <div class="fig">
+        <span class="k">Planned tasks</span>
+        <span class="v num">41 <small>of 41 done</small></span>
+        <span class="s">last closed 2026-09-05</span>
+      </div>
+      <div class="fig is-live">
+        <span class="k">Running</span>
+        <span class="v num">0</span>
+        <span class="s">nothing in flight</span>
+      </div>
+      <div class="fig">
+        <span class="k">Critical path</span>
+        <span class="v">&mdash;</span>
+        <span class="s">nothing left to sequence</span>
+      </div>
+    </div>
+    <div class="rail-wrap">
+      <div class="rail">
+        <span class="seg closed"></span><span class="seg closed"></span><span class="seg closed"></span>
+        <span class="seg closed"></span><span class="seg closed"></span><span class="seg closed"></span>
+        <span class="seg closed"></span><span class="seg closed"></span><span class="seg closed"></span>
+        <span class="seg closed"></span><span class="seg closed"></span><span class="seg closed"></span>
+        <span class="seg closed"></span><span class="seg closed"></span>
+      </div>
+      <div class="rail-legend"><span>wave 1</span><span><b>every wave closed</b></span><span>wave 14</span></div>
+      <div class="why">
+        <span class="eyebrow">What now</span>
+        <p>The order this plan carried is spent. 64 open tasks are outside it &mdash; write
+        the next arc into <code style="font-size:11px">plan.yaml</code>, or work the queue by priority
+        until somebody does.</p>
+      </div>
+    </div>
+  </section>
+
+  <p class="gallery-note">State &mdash; a <code>together</code> group: work that has to be closed as one. Two cards inside a shared frame, and a word rather than only a frame.</p>
+  <section class="panel wave" style="margin-bottom:22px">
+    <div class="wave-head">
+      <span class="wave-no num">Wave 8</span>
+      <span class="wave-name">Refusals the writing commands still lack</span>
+      <span class="wave-count num">3 / 5 done</span>
+    </div>
+    <div class="cards">
+      <div class="together">
+        <span class="lab">done as one</span>
+        <article class="card">
+          <div class="head"><span class="id">TL-211</span><span class="badge b-pending">pending</span></div>
+          <p class="title">next does not hand an over-sized task to an unattended run</p>
+          <div class="meta">agent:dev &middot; 4h</div>
+        </article>
+        <article class="card">
+          <div class="head"><span class="id">TL-213</span><span class="badge b-pending">pending</span></div>
+          <p class="title">plan.yaml is the only data file with no writing command</p>
+          <div class="meta">agent:dev &middot; 1d</div>
+        </article>
+      </div>
+      <article class="card">
+        <div class="head"><span class="id">TL-167</span><span class="badge b-pending">pending</span></div>
+        <p class="title">A reason that is too long is refused as empty or reserved</p>
+        <div class="meta">agent:dev &middot; 30m</div>
+      </article>
+    </div>
+  </section>
+
+  <p class="gallery-note">Card states &mdash; each one carries a word as well as a colour, so it survives a printout and a reader who does not separate two hues.</p>
+  <section class="panel wave" style="margin-bottom:22px">
+    <div class="cards">
+      <article class="card away">
+        <div class="head">
+          <span class="id">TL-149</span>
+          <span class="badge b-running">in progress</span>
+        </div>
+        <p class="title">run --workers N owns the branch lifecycle of a fleet of worktrees</p>
+        <div class="meta" style="margin-bottom:8px">
+          <span class="where">running in tl-149-fleet-branches</span>
+        </div>
+        <div class="clock away" style="width:auto">
+          <div class="row"><span class="big num" style="font-size:15px">3 h 40 m</span><span class="num">of 1w</span></div>
+          <div class="bar"><span style="width:9%"></span></div>
+          <div class="foot">measured from that tree's log, not from ours</div>
+        </div>
+      </article>
+
+      <article class="card away">
+        <div class="head">
+          <span class="id">TL-89</span>
+          <span class="badge b-running">in progress</span>
+        </div>
+        <p class="title">PR comment with proof of work: GitHub Action</p>
+        <div class="meta" style="margin-bottom:8px">
+          <span class="where">running in tl-89-pr-proof</span>
+        </div>
+        <div class="meta">That tree's log could not be read, so there is no elapsed
+        time here. The card still says it is running, and where.</div>
+      </article>
+
+      <article class="card unknown">
+        <div class="head">
+          <span class="id">TL-1546</span>
+          <span class="badge b-missing">not in this backlog</span>
+        </div>
+        <p class="title" style="color:var(--fg-muted)">This id is in the plan and has no task file in this tree.</p>
+        <div class="meta">Plans travel between branches. Bring the branch that
+        carries it, or take the id out of the plan.</div>
+      </article>
+
+      <article class="card">
+        <div class="head"><span class="id">TL-150</span><span class="badge b-pending">pending</span></div>
+        <p class="title">An actor's record is computed from the log: first-pass closings, reopenings, handbacks</p>
+        <div class="meta">agent:spec &middot; 1d<br>
+        <span style="color:var(--foreign)">waiting on TL-90 &mdash; a blocker the plan does not schedule</span></div>
+      </article>
+
+      <article class="card crit">
+        <div class="head">
+          <span class="id">TL-149</span>
+          <span class="badge b-pending">pending</span>
+          <span class="crit-word">critical path</span>
+        </div>
+        <p class="title">run --workers N owns the branch lifecycle of a fleet of worktrees</p>
+        <div class="meta">1w &middot; above the unattended gate &middot; needs a person</div>
+      </article>
+
+      <article class="card" style="border-color:var(--in-flight);background:var(--in-flight-bg)">
+        <div class="head">
+          <span class="id">TL-80</span>
+          <span class="badge b-running">in progress</span>
+          <span class="badge" style="background:rgba(52,211,153,.18);color:var(--in-flight)">just moved</span>
+        </div>
+        <p class="title">Separating comments, implementation notes, and the final summary</p>
+        <div class="meta">A card that has just changed state pulses once, and only
+        when a change actually happened. Off under reduced motion.</div>
+      </article>
+    </div>
+  </section>
+
+  <p class="gallery-note">State &mdash; snapshot mode. The page is a photograph: no duration is advancing, and the screen says so instead of showing a stale clock.</p>
+  <section class="panel wave">
+    <div class="connbar" style="margin:0 0 12px">
+      <span class="dot" style="background:var(--fg-muted)"></span>
+      <span class="connlabel">Snapshot mode</span>
+      <span class="connhint">Data from the moment of the build &mdash; 2026-09-05 07:39. Connect to the folder to work on live files and edit statuses.</span>
+      <span class="connctl"><span class="field" style="border-color:var(--accent);color:var(--accent)">Connect to the backlog folder</span></span>
+    </div>
+    <div class="cards">
+      <article class="card">
+        <div class="head"><span class="id">TL-80</span><span class="badge b-running">in progress</span></div>
+        <p class="title">Separating comments, implementation notes, and the final summary</p>
+        <div class="meta">agent:claude &middot; taken 08:27 &middot; 4h estimate<br>
+        <span style="color:var(--foreign)">elapsed time is not shown in a snapshot &mdash; it would be a clock that stopped.</span></div>
+      </article>
+    </div>
+  </section>
+</div>

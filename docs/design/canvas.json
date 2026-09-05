@@ -1,0 +1,77 @@
+{
+  "artboards": [
+    {
+      "file": "Main.dc.html",
+      "title": "1 \u00b7 Default state",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 1830
+    },
+    {
+      "file": "Focus.dc.html",
+      "title": "2 \u00b7 Focus on a chain",
+      "x": 1560,
+      "y": 0,
+      "w": 1440,
+      "h": 1420
+    },
+    {
+      "file": "Empty.dc.html",
+      "title": "3 \u00b7 No plan / broken plan",
+      "x": 0,
+      "y": 1970,
+      "w": 1440,
+      "h": 1210
+    },
+    {
+      "file": "States.dc.html",
+      "title": "4 \u00b7 The remaining states",
+      "x": 1560,
+      "y": 1970,
+      "w": 1440,
+      "h": 1460
+    },
+    {
+      "file": "Light.dc.html",
+      "title": "5 \u00b7 Default state, light",
+      "x": 0,
+      "y": 3570,
+      "w": 1440,
+      "h": 1830
+    }
+  ],
+  "annotations": [
+    {
+      "id": "move-1",
+      "x": -430,
+      "y": 40,
+      "w": 380,
+      "text": "The move.\n\nToday the tab opens on nine closed waves and the active one sits at ~65% of the scroll height.\n\nHere the order is: what the plan is (summary + rail), what is running now, the longest road left, what is ahead, and history LAST \u2014 collapsed to one row per wave, no cards drawn."
+    },
+    {
+      "id": "move-2",
+      "x": -430,
+      "y": 480,
+      "w": 380,
+      "text": "Unplanned work is a measurement, not a list.\n\n64 of 69 open tasks (93%) sit outside every wave. That figure is the health of the plan, so it leads; the tasks are reachable underneath, grouped and expandable, instead of 64 ellipsised chips."
+    },
+    {
+      "id": "move-3",
+      "x": -430,
+      "y": 860,
+      "w": 380,
+      "text": "Dependency edges: dropped, not redrawn.\n\nThe old SVG spaghetti ran behind opaque cards across a wrapping flex row and could not be followed. The relation now lives on the card (\"waiting on TL-90\", \"unblocks TL-198\") and the critical path is an explicit chain strip.\n\nSee artboard 2 for the focus interaction that replaces tracing a line by eye."
+    },
+    {
+      "id": "data",
+      "x": 3120,
+      "y": 40,
+      "w": 340,
+      "text": "Every figure is real: taken from this repository's own backlog on 2026-09-05 with `branchling plan` and `branchling stats`. 14 waves, 41 planned tasks, 36 closed, wave 10 active, 69 open, 64 unplanned."
+    }
+  ],
+  "launch": {
+    "view": "canvas"
+  }
+}
