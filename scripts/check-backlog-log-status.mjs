@@ -13,7 +13,7 @@
  * WHY IT ONLY READS `## Log` AND NOT THE HISTORY. Since TL-105 the tool writes
  * the "why" of a change into `history/<ID>.jsonl` and writes NO `## Log` at
  * all. So this guard is entirely about LEGACY prose — sections written by hand
- * in tasks that predate that change and, by the rule in AGENTS.md, are kept
+ * in tasks that predate that change and, by the rule in CLAUDE.md, are kept
  * rather than tidied away. That fact decides everything below.
  *
  * WHAT COUNTS AS A STATUS CLAIM. The declared shape is `YYYY-MM-DD status —

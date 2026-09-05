@@ -3,7 +3,7 @@
  *
  * THE DEFECT THIS GUARDS. `query`, `stats` and the viewer have consulted the
  * branch and worktree scan since TL-73; `next` did not, so the ONE command that
- * writes had the narrowest view of the backlog. AGENTS.md records what that
+ * writes had the narrowest view of the backlog. CLAUDE.md records what that
  * costs: TL-74 was closed at 13:41 on one branch and handed out again at 13:43,
  * because in the second session's tree it was still untouched.
  *
@@ -187,7 +187,7 @@ test("an UNCOMMITTED claim in another worktree counts too", () => {
 });
 
 test("a task CLOSED on another branch is not reopened as fresh work", () => {
-  // The 13:41/13:43 collision from AGENTS.md, in one call: `done` on a branch
+  // The 13:41/13:43 collision from CLAUDE.md, in one call: `done` on a branch
   // that has not been merged yet is still `pending` here.
   const { dir, repoRoot, backlog, env, ids } = twoBranches();
   try {

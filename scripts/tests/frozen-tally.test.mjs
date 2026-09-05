@@ -1,5 +1,5 @@
 /**
- * `AGENTS.md` states no count of this tree that nothing keeps current (TL-172).
+ * `CLAUDE.md` states no count of this tree that nothing keeps current (TL-172).
  *
  * WHY A GUARD AND NOT JUST A CORRECTION. The file said `693/693, green` while
  * the suite stood at 1440 — wrong by roughly a factor of two, for long enough
@@ -18,7 +18,7 @@
  * distinction is not stylistic — a claim about a past act stays true forever,
  * and a claim about the tree is falsified by the next commit.
  *
- * THE POSITIVE CONTROL IS THE POINT (AGENTS.md). A guard that only ever reads
+ * THE POSITIVE CONTROL IS THE POINT (CLAUDE.md). A guard that only ever reads
  * the corrected file is green with no evidentiary force, so the detection is a
  * pure function and it is fed the exact sentence that was there.
  */
@@ -64,8 +64,8 @@ test("SILENT: a count of a FINISHED act is not a claim about the tree", () => {
   assert.deepEqual(frozenTallies("TL-137 translated both (145 files) and is why the guard covers them"), []);
 });
 
-test("AGENTS.md states no tally that nothing keeps current", () => {
-  const text = readFileSync(join(REPO_ROOT, "AGENTS.md"), "utf8");
+test("CLAUDE.md states no tally that nothing keeps current", () => {
+  const text = readFileSync(join(REPO_ROOT, "CLAUDE.md"), "utf8");
   assert.ok(text.length > 0, "a positive control: an unreadable file must not pass this");
   assert.deepEqual(
     frozenTallies(text),

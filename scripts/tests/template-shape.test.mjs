@@ -14,7 +14,7 @@
  * `## Pre-flight reading` existed in 89 tasks as a convention the template had
  * never heard of.
  *
- * WHERE THE BOUNDARY RUNS, and it is AGENTS.md's: the code knows the SHAPE, the
+ * WHERE THE BOUNDARY RUNS, and it is CLAUDE.md's: the code knows the SHAPE, the
  * data knows the VALUES. The frontmatter KEYS and the structure of a
  * `verification:` entry are shape — `task-fields.mjs` and `criteria.mjs` read
  * them. `## Acceptance criteria` is shape too: `criteria.mjs` hard-codes it in

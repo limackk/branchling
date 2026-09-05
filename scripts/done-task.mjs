@@ -169,7 +169,7 @@ export function findTaskFile(tasksDir, config, id) {
  * Separated from the run on purpose: "this task has no closing contract" is not
  * the same defect as "the verification failed", it is discovered without
  * executing anything, and it deserves its own message. A guard that is green on
- * an empty sample is green with no evidential force (AGENTS.md), and an empty
+ * an empty sample is green with no evidential force (CLAUDE.md), and an empty
  * `verification:` is exactly that sample.
  */
 export function contractProblem(entries, problems) {

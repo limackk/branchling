@@ -641,9 +641,8 @@ writes one short pointer to that command into `CLAUDE.md` or `AGENTS.md`.
 branchling skills install     # or `branchling init --skills` while creating a backlog
 ```
 
-It writes `.agents/skills/backlog-workflow/SKILL.md` into your repository and
-links `.claude/skills/backlog-workflow` to that shared source. It **never
-overwrites** either location — the file may be your own edit of it. The skill itself
+It writes `.claude/skills/backlog-workflow/SKILL.md` into your repository and
+**never overwrites** — the file may be your own edit of it. The skill itself
 holds no procedure and no vocabulary; it exists so that an editor loading skills
 by description knows a backlog is here and knows to run `branchling instructions
 overview`, which is rendered with *your* `config.yaml`. A skill that listed

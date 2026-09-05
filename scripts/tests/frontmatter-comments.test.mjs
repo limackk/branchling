@@ -314,7 +314,7 @@ const COMMENTED_VERIFICATION = [
 test("a `#` line between two verification entries is a comment, and both entries are read", () => {
   const { entries, problems } = parseVerification(COMMENTED_VERIFICATION);
 
-  // A zero sample proves nothing (AGENTS.md): if the block were not found at
+  // A zero sample proves nothing (CLAUDE.md): if the block were not found at
   // all, `problems` would be empty for the wrong reason and every assertion
   // below would be green without evidentiary force.
   assert.equal(entries.length, 2, "the fixture does not hold two entries: " + JSON.stringify(entries));

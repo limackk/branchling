@@ -41,7 +41,7 @@
  *
  * THE VOCABULARY IS THE FIXTURE'S. `icebox`, `surveying`, `charted`, `urgent`,
  * `warm`, `quiet` are this fixture's own words. Asserting this project's
- * statuses or priorities would be asserting somebody else's data (AGENTS.md,
+ * statuses or priorities would be asserting somebody else's data (CLAUDE.md,
  * "do not assert another project's values"), and a literal left in the code
  * would pass against them and fail here.
  *

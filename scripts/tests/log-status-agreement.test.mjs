@@ -74,7 +74,7 @@ function backlogWith({ status, log }) {
 
 // The vocabulary the pure functions are judged against — declared here rather
 // than borrowed from this project, because a test asserting another project's
-// values is asserting data (AGENTS.md).
+// values is asserting data (CLAUDE.md).
 const CONFIG = { statuses: ["pending", "in_progress", "blocked", "done"], archivedStatuses: ["done"] };
 
 // ── Reading one file ──────────────────────────────────────────────────────
@@ -230,7 +230,7 @@ test("this repository's own tree has no log running ahead of a field", () => {
   // Not a tautology restated: the tests above prove the guard CAN fail, so a
   // green answer here is a statement about the tree rather than about the guard.
   // The directory comes from _repo.mjs, which settles both layouts — counting
-  // upwards from this file would be co-location disguised as a rule (AGENTS.md).
+  // upwards from this file would be co-location disguised as a rule (CLAUDE.md).
   const config = loadConfig(BACKLOG_DIR);
   const { ahead, logged } = auditLogStatus(
     readdirSync(TASKS_DIR).filter((f) => f.endsWith(".md"))

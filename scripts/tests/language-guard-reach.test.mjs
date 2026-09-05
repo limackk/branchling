@@ -12,7 +12,7 @@
  * `.mjs`, `.js` and `.md` — nothing else. `backlog/config.yaml`,
  * `backlog/plan.yaml` and `backlog/boards.yaml` are therefore never opened,
  * while the header of that same file states they are covered "as a side effect
- * of adding the directory", and AGENTS.md says the guard reads "the whole
+ * of adding the directory", and CLAUDE.md says the guard reads "the whole
  * `backlog/` directory". Measured on 2026-09-04: a tree whose only public file
  * is a `backlog/config.yaml` carrying a Polish label is audited as 0 files,
  * 0 lines, 0 findings — and 0 findings is what the tick is printed over.

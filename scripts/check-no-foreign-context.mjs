@@ -60,7 +60,7 @@
  * and a task's dated `## Log` does not argue, it records what was true on a
  * date. Applying it there produced 124 findings against this repository's own
  * history — "337 tasks", "158 files", "1375 references rewritten" — every one
- * of them the kind of entry AGENTS.md asks for. A guard that flags the practice
+ * of them the kind of entry CLAUDE.md asks for. A guard that flags the practice
  * it is supposed to protect gets silenced, so the measurement rule stops at the
  * backlog's edge. What a number about ANOTHER repository leaks is caught by the
  * name and the cross-repository reference instead.

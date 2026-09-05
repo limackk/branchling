@@ -9,7 +9,7 @@
  * contract asked a person to run a command that answers `command not found`.
  * The only way through was to guess the translation.
  *
- * WHY THIS IS NOT THE PROSE RULE. AGENTS.md keeps the backlog deliberately
+ * WHY THIS IS NOT THE PROSE RULE. CLAUDE.md keeps the backlog deliberately
  * outside `check --product-name`: a task's narrative saying what the tool was
  * called at the time is history, and rewriting history is a falsification. An
  * instruction is a different kind of sentence — its correctness is a question

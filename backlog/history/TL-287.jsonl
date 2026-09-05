@@ -1,0 +1,4 @@
+{"id":"01M1SCHDSJ9BQ452FVSN8CQYQ9","ts":"2026-09-05T18:15:51.858Z","task":"TL-287","field":"__created__","from":"","to":"Agent setup remains repository-local","actor":"agent:codex","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1SCJPGR0RZ461HA2XDH1S2A","ts":"2026-09-05T18:16:33.560Z","task":"TL-287","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1SCJPGR80MSKVHE85APYGD3","ts":"2026-09-05T18:16:33.560Z","task":"TL-287","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1SD13QJKVX7KPKPTDYJEZQ2","ts":"2026-09-05T18:24:25.842Z","task":"TL-287","field":"status","from":"in_progress","to":"done","actor":"agent:codex","source":"done","reason":"proven","session":"tree-526f61f2043f"}

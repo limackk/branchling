@@ -98,9 +98,6 @@ const CHECK_USAGE = [
   "                       they cannot open. An unverifiable measurement is not evidence for a",
   "                       stranger — replace it with the mechanism or with the command that",
   "                       reproduces it. Reads `docs/`, README, LINEAGE and CONTRIBUTING",
-  "  --agent-files        only whether AGENTS.md and .agents/skills are the shared sources",
-  "                       Claude reaches through its import and skill symlinks, and whether",
-  "                       both hook adapters invoke the same repository scripts",
   "  --language           only whether the public surface is English — a property of the CODE,",
   "                       so it reads this installation, not the backlog named by --dir.",
   "                       For that reason it does NOT run when --dir points outside this",
@@ -972,13 +969,13 @@ export const COMMANDS = {
   },
   skills: {
     script: "install-skills.mjs",
-    summary: "install shared agent skills and link them into Claude",
+    summary: "install the agent instructions into this repository's .claude/skills/",
     usage: [
       `${N} skills install [--dry-run] [--json] [--dir <path>]`,
       "",
-      "  Copies the packaged `backlog-workflow` skill into `.agents/skills/` of the",
-      "  repository holding your backlog, then links it from `.claude/skills/`, so",
-      "  Codex and Claude read one shared source.",
+      "  Copies the packaged `backlog-workflow` skill into `.claude/skills/` of the",
+      "  repository holding your backlog, so an agent in YOUR repository knows how to",
+      "  run this tool without you writing the instructions yourself.",
       "",
       "  It never overwrites. The file may be your own edit of it, and replacing that",
       "  silently would take back a decision you made in your own repository — so an",
@@ -1753,7 +1750,7 @@ function captureScript(script, args) {
  * evidential force. The dispatcher supplies the mode so that nobody has to
  * remember it.
  */
-const CHECK_FLAGS = ["--dir", "--json", "--id-collisions", "--boards", "--refs", "--criteria", "--reasons", "--log-status", "--history", "--task-state", "--docs", "--vocabulary", "--plan", "--language", "--product-name", "--foreign-context", "--agent-files", "--proofs", "--since"];
+const CHECK_FLAGS = ["--dir", "--json", "--id-collisions", "--boards", "--refs", "--criteria", "--reasons", "--log-status", "--history", "--task-state", "--docs", "--vocabulary", "--plan", "--language", "--product-name", "--foreign-context", "--proofs", "--since"];
 
 /** PURE — resolves `check`'s arguments. Throws on a usage error. */
 export function parseCheckArgs(args) {
@@ -1772,7 +1769,6 @@ export function parseCheckArgs(args) {
   let wantLanguage = false;
   let wantProductName = false;
   let wantForeignContext = false;
-  let wantAgentFiles = false;
   let wantProofs = false;
   let since = null;
   let json = false;
@@ -1800,7 +1796,6 @@ export function parseCheckArgs(args) {
     if (a === "--language") { wantLanguage = true; continue; }
     if (a === "--product-name") { wantProductName = true; continue; }
     if (a === "--foreign-context") { wantForeignContext = true; continue; }
-    if (a === "--agent-files") { wantAgentFiles = true; continue; }
     if (a === "--proofs") { wantProofs = true; continue; }
     if (a === "--since") {
       since = args[++i] || null;
@@ -1830,7 +1825,7 @@ export function parseCheckArgs(args) {
   // what somebody had once written into it.
   if (!wantIds && !wantBoards && !wantRefs && !wantCriteria && !wantReasons && !wantLogStatus &&
       !wantHistory && !wantTaskState && !wantDocs && !wantVocabulary && !wantPlan && !wantLanguage &&
-      !wantProductName && !wantForeignContext && !wantAgentFiles && !wantProofs) {
+      !wantProductName && !wantForeignContext && !wantProofs) {
     wantIds = true; wantBoards = true; wantRefs = true; wantCriteria = true; wantReasons = true;
     wantLogStatus = true; wantHistory = true; wantTaskState = true; wantDocs = true;
     wantVocabulary = true; wantPlan = true; wantLanguage = true; wantProductName = true;
@@ -1848,7 +1843,7 @@ export function parseCheckArgs(args) {
         "It narrows which proven closings are re-run; on its own there is nothing for it to narrow."
     );
   }
-  return { dir, json, wantIds, wantBoards, wantRefs, wantCriteria, wantReasons, wantLogStatus, wantHistory, wantTaskState, wantDocs, wantVocabulary, wantPlan, wantLanguage, wantProductName, wantForeignContext, wantAgentFiles, wantProofs, since, files };
+  return { dir, json, wantIds, wantBoards, wantRefs, wantCriteria, wantReasons, wantLogStatus, wantHistory, wantTaskState, wantDocs, wantVocabulary, wantPlan, wantLanguage, wantProductName, wantForeignContext, wantProofs, since, files };
 }
 
 /**
@@ -1931,11 +1926,6 @@ export const CHECK_GUARDS = [
   // company they like — it is their repository, and their decision.
   { key: "foreign-context", want: "wantForeignContext", name: "foreign-context",
     script: "check-no-foreign-context.mjs", installationOnly: true, args: () => [] },
-  // OPT-IN ONLY. The npm package deliberately ships just the user-facing skill,
-  // not this repository's Claude adapter or development skills, so a source-tree
-  // parity check cannot be part of the package's bare `check` command.
-  { key: "agent-files", want: "wantAgentFiles", name: "agent-files",
-    script: "check-agent-files.mjs", installationOnly: true, optIn: true, args: () => [] },
   // OPT-IN ONLY — see `parseCheckArgs`. It re-runs the contracts of tasks that
   // are already closed, so it costs what those test suites cost.
   { key: "proofs", want: "wantProofs", name: "proofs", script: "check-backlog-proofs.mjs",
@@ -1949,7 +1939,7 @@ export const CHECK_GUARDS = [
  * Is this backlog part of the checkout the tool is running FROM?
  *
  * The comparison is between resolved paths, and it accepts the installation
- * root itself — a co-located backlog IS the root (AGENTS.md: the tool supports
+ * root itself — a co-located backlog IS the root (CLAUDE.md: the tool supports
  * both layouts, and a rule that only knew the nested one would switch the two
  * guards off for every co-located consumer of this repository).
  */

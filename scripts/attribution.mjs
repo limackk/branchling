@@ -27,7 +27,7 @@
  * remembering is the failure that disqualified the off-the-shelf tools (§4).
  *
  * WHY THE BRANCH LEG IGNORES CASE. This repository names branches
- * `tl-<number>-<slug>` — lowercase, by the rule in AGENTS.md — while the
+ * `tl-<number>-<slug>` — lowercase, by the rule in CLAUDE.md — while the
  * configured prefix is `TL`. A case-sensitive match makes leg 4 dead in exactly
  * the repository that wrote it, which §8.1 recorded as an observation about
  * branch naming rather than as a defect. It is a defect: an id is an id

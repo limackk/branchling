@@ -11,7 +11,7 @@
  *   2. **`--dry-run` writes nothing.** An empty directory is empty whatever the
  *      command does, including nothing at all, so the assertion is paired with a
  *      real import into the SAME directory afterwards: without that positive
- *      control it is green with no evidential force (AGENTS.md).
+ *      control it is green with no evidential force (CLAUDE.md).
  *   3. **A re-import duplicates nothing.** Proved by counting files after two
  *      runs, and controlled by a third run over a FOURTH issue that does appear
  *      — otherwise "creates nothing" would also pass for a command that has

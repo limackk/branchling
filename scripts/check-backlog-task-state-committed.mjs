@@ -11,7 +11,7 @@
  * nothing to do. The task file said `pending`, and the task file is the only
  * thing `next` reads.
  *
- * WHY AGENTS.md's ANSWER DOES NOT REACH IT. "After the commit: merge into
+ * WHY CLAUDE.md's ANSWER DOES NOT REACH IT. "After the commit: merge into
  * `main` and close the worktree" covers the same failure ACROSS branches. Here
  * the divergence is between the working tree and `HEAD` of the SAME branch, so
  * there is nothing to merge yet and no worktree to remove. The work was

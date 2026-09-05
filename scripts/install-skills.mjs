@@ -22,19 +22,18 @@
  * Both failures are the same shape: still specific, still confident, no longer
  * true.
  *
- * WRITING IS EXPLICIT AND NEVER OVERWRITES. `.agents/skills/` is the shared
- * source, while `.claude/skills/` contains only links that let Claude discover
- * that source. Both locations belong to the user's repository. Writing there
+ * WRITING IS EXPLICIT AND NEVER OVERWRITES. `.claude/` is the user's own
+ * directory and may already hold their version of this file. Writing there
  * unasked is a surprise; writing OVER something is worse than a surprise. So it
- * takes a flag, skips what exists, and says what it skipped — the same contract
- * `init` holds to for every file it creates.
+ * takes a flag, it skips what exists, and it says what it skipped — the same
+ * contract `init` holds to for every file it creates.
  *
  * Exit: 0 installed or nothing to do · 1 the source is missing · 2 a usage error.
  *
  * Tests: `node --test scripts/tests/skills-install.test.mjs`
  */
 
-import { copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, statSync, symlinkSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -44,30 +43,21 @@ import { MARK, color, failure } from "./ui.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
-/** Where every repository skill lives. Claude reaches the same directories
- *  through links under `.claude/skills/`; no host gets a private copy. */
+/** Where the packaged skills live inside the installation. One directory, and
+ *  it is the SAME one this repository's own `.claude/skills/` points at through
+ *  a symlink — two copies of one skill is the defect this project has been
+ *  paying for since the vocabularies were split out. */
 export const PACKAGED_SKILLS = join(HERE, "..", ".agents", "skills");
 
 /** Which skills a USER gets. A closed list rather than "everything in the
  *  directory": the others are about developing this tool. */
 export const USER_SKILLS = ["backlog-workflow"];
 
-/** The shared source in somebody else's repository. The repository ROOT is the
- *  anchor because a skill is a fact about the repository, not the backlog. */
+/** Where they go in somebody else's repository. `.claude/skills/<name>/` is the
+ *  convention the editor reads; the repository ROOT is the anchor, because a
+ *  skill is a fact about the repository and not about the backlog inside it. */
 export function skillsTarget(repoRoot) {
-  return join(repoRoot, ".agents", "skills");
-}
-
-/** Claude's discovery adapter. It owns links, never another skill copy. */
-export function claudeSkillsTarget(repoRoot) {
   return join(repoRoot, ".claude", "skills");
-}
-
-function pathExists(path) {
-  try { lstatSync(path); return true; } catch (e) {
-    if (e && e.code === "ENOENT") return false;
-    throw e;
-  }
 }
 
 function filesUnder(dir, base = dir, out = []) {
@@ -87,33 +77,28 @@ function filesUnder(dir, base = dir, out = []) {
  *
  * @param {string} repoRoot  the repository the skills are for
  * @param {{source?: string, skills?: string[], dryRun?: boolean}} opts
- * @returns {{ok: boolean, created: string[], skipped: string[], linked: string[], linkSkipped: string[], target: string, claudeTarget: string}}
+ * @returns {{ok: boolean, created: string[], skipped: string[], target: string}}
  */
 export function installSkills(repoRoot, opts = {}) {
   const source = opts.source || PACKAGED_SKILLS;
   const wanted = opts.skills || USER_SKILLS;
   const target = skillsTarget(repoRoot);
-  const claudeTarget = claudeSkillsTarget(repoRoot);
 
   if (!existsSync(source)) {
     return {
-      ok: false, kind: "no-source", target, claudeTarget,
-      created: [], skipped: [], linked: [], linkSkipped: [],
+      ok: false, kind: "no-source", target, created: [], skipped: [],
       message: "the packaged skills are not in this installation: " + source,
-      details: ["A tarball built without `.agents/skills/` in `files` produces exactly this."],
+      details: ["A tarball built without `skills/` in `files` produces exactly this."],
     };
   }
 
   const created = [];
   const skipped = [];
-  const linked = [];
-  const linkSkipped = [];
   for (const name of wanted) {
     const from = join(source, name);
     if (!existsSync(from)) {
       return {
-        ok: false, kind: "no-skill", target, claudeTarget,
-        created, skipped, linked, linkSkipped,
+        ok: false, kind: "no-skill", target, created, skipped,
         message: "no packaged skill called `" + name + "` in " + source,
       };
     }
@@ -129,22 +114,8 @@ export function installSkills(repoRoot, opts = {}) {
       }
       created.push(join(name, file));
     }
-
-    const link = join(claudeTarget, name);
-    if (pathExists(link)) {
-      linkSkipped.push(name);
-    } else {
-      if (!opts.dryRun) {
-        mkdirSync(dirname(link), { recursive: true });
-        symlinkSync(relative(dirname(link), join(target, name)), link, "dir");
-      }
-      linked.push(name);
-    }
   }
-  return {
-    ok: true, created, skipped, linked, linkSkipped, target, claudeTarget,
-    dryRun: Boolean(opts.dryRun),
-  };
+  return { ok: true, created, skipped, target, dryRun: Boolean(opts.dryRun) };
 }
 
 /** The lines `init` prints when it installs them, so the two commands say the
@@ -159,13 +130,7 @@ export function renderInstall(result, opts = {}) {
   if (result.skipped.length) {
     out.push(paint.dim(MARK.bullet + " skipped (already there, left alone): " + result.skipped.join(", ")));
   }
-  if (result.linked.length) {
-    out.push(paint.ok(MARK.ok) + " Claude links: " + result.linked.join(", ") + " → " + result.claudeTarget);
-  }
-  if (result.linkSkipped.length) {
-    out.push(paint.dim(MARK.bullet + " Claude links skipped (already there, left alone): " + result.linkSkipped.join(", ")));
-  }
-  if (!result.created.length && !result.skipped.length && !result.linked.length && !result.linkSkipped.length) {
+  if (!result.created.length && !result.skipped.length) {
     out.push(paint.dim(MARK.bullet + " skills: nothing to install"));
   }
   if (result.created.length) {

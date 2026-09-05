@@ -143,7 +143,7 @@ test("leg 3 — a task file names its task; a file merely mentioning one does no
 // ── leg 4: the branch or worktree ─────────────────────────────────────────
 
 test("leg 4 — the branch leg reads a lowercase branch and answers in the canonical case", () => {
-  // The rule in AGENTS.md names branches `tl-<number>-<slug>` while the prefix
+  // The rule in CLAUDE.md names branches `tl-<number>-<slug>` while the prefix
   // is `TL`. A case-sensitive match made this leg dead in the repository that
   // wrote it, which §8.1 recorded as an observation rather than as the defect
   // it is.

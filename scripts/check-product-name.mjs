@@ -8,7 +8,7 @@
  * `package.json` — which is what `product.mjs` has claimed since BL-1439.
  *
  * WHY A GUARD AND NOT A ONE-OFF SWEEP. The claim was already written down, in
- * AGENTS.md and in `product.mjs` itself, and it was false: the rename carried
+ * CLAUDE.md and in `product.mjs` itself, and it was false: the rename carried
  * out on 2026-09-01 touched 158 files, 26 of them under `scripts/`.
  * A rule that only lives in prose is obeyed until the first hurried message. The
  * sweep is worth doing only together with something that fails when it comes
@@ -27,7 +27,7 @@
  *
  * WHY THERE IS AN ALLOW LIST. Some occurrences are not the product name at all
  * but part of a path that exists on disk — a document under `docs/`, a skill
- * directory under `.agents/skills/`. Renaming those is a different decision
+ * directory under `.claude/skills/`. Renaming those is a different decision
  * from renaming the product, so they are marked in the source with
  * `product-name: allow` and the exception is written down instead of the pattern
  * having a hole.

@@ -43,7 +43,7 @@
  * handed out. So each refusal is paired with the same fixture answering the
  * other way — the threshold removed, or a human actor asking — and the task
  * that was refused is then taken. A guard that passes on a zero sample has no
- * evidentiary force (AGENTS.md).
+ * evidentiary force (CLAUDE.md).
  *
  * THE VOCABULARY IS THE FIXTURE'S OWN, deliberately. `estimates` here is
  * `[tiny, small, large, huge]` and never `[30m, 2h, 1d, 1w]`: asserting

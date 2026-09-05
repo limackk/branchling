@@ -167,7 +167,7 @@ waves:
   - name: "The fleet owns its branches"
     tasks: []
     # `run --workers N`: branch, worktree, merge, build, removal — today a
-    # procedure in AGENTS.md rather than code, which means the fleet is driven
+    # procedure in CLAUDE.md rather than code, which means the fleet is driven
     # by a person. Its own wave: it is the largest task here and every earlier
     # wave is a rehearsal for handing it to the loop.
 

@@ -92,7 +92,7 @@ opinions live rather than its code:
   rules everything else follows from. Data in the repository and pointers
   globally; what is computed may be deleted; configuration layers are disjoint
   rather than ranked; extension by composition and not a plugin API.
-- [`AGENTS.md`](AGENTS.md) — written for an agent working in this repository,
+- [`CLAUDE.md`](CLAUDE.md) — written for an agent working in this repository,
   and just as true for a person: how the data directory is resolved, why the id
   prefix is never a literal, and why session state lives outside the tree.
 

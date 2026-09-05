@@ -17,7 +17,7 @@
  *
  * THE FIXTURE DECLARES ITS OWN VOCABULARY. `awaiting_vouch` is not a fact about
  * this tool and must not be read out of the repository's own config.yaml — the
- * rule AGENTS.md states for every test that needs a specific value.
+ * rule CLAUDE.md states for every test that needs a specific value.
  *
  * THE POSITIVE CONTROLS are the last two tests: the same fixture with the key
  * REMOVED still parks in the stuck status (so a green run here is not a run that

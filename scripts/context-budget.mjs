@@ -30,7 +30,7 @@
  * in the same column. The comparison is what carries: a path costing fifty times
  * another is fifty times more expensive under any tokenizer.
  *
- * ONE SOURCE FOR THE RULE. `CONTEXT_RULE` below is the text; `AGENTS.md`, the
+ * ONE SOURCE FOR THE RULE. `CONTEXT_RULE` below is the text; `CLAUDE.md`, the
  * `context-budget` topic of `instructions` and the skill all draw on it rather
  * than restating it. Two documents saying the same thing are not redundancy,
  * they are two documents that will disagree.

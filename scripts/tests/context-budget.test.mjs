@@ -11,7 +11,7 @@
  *   2. **Asking is an order of magnitude cheaper than reading.** `--count`
  *      against the whole tree, on a fixture big enough for the ratio to be a
  *      fact rather than a rounding artefact.
- *   3. **The rule is in `AGENTS.md`, and it is the SAME rule.** Compared line by
+ *   3. **The rule is in `CLAUDE.md`, and it is the SAME rule.** Compared line by
  *      line against `CONTEXT_RULE`, so a copy that falls behind fails here
  *      rather than teaching two different things in two places.
  *   4. **Nothing in the measurement writes.** The budget is taken twice and the

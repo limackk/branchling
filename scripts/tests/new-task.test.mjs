@@ -343,7 +343,7 @@ test("new: a template whose values drift from the vocabulary is still REFUSED", 
 test("new: the creation is recorded in the history, under the actor that created it", () => {
   // TL-182 named this defect and was closed without a line of code changing,
   // because its contract was two suites that pass whether or not `new` records
-  // anything — the zero-sample guard AGENTS.md warns about. This is the
+  // anything — the zero-sample guard CLAUDE.md warns about. This is the
   // assertion that could not have been green then.
   const dir = freshBacklog();
   try {
