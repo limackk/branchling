@@ -6,7 +6,7 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1
-status: blocked  # pending | in_progress | blocked | done | cancelled
+status: pending  # pending | in_progress | blocked | done | cancelled
 owner: ""
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
