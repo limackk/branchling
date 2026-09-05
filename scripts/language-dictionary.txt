@@ -247,6 +247,7 @@ anecdote
 anew
 angle
 animal
+animate
 animated
 animates
 animating
@@ -412,6 +413,7 @@ atomowy
 attach
 attached
 attaches
+attachment
 attachments
 attempt
 attempted
@@ -802,6 +804,7 @@ capabilities
 capability
 capped
 capterra
+caption
 capture
 captured
 captures
@@ -856,6 +859,7 @@ cent
 center
 central
 centrally
+centred
 ceremony
 certain
 certainly
@@ -984,6 +988,7 @@ client
 clients
 clip
 clipboard
+clipped
 clock
 clocks
 clone
@@ -1079,6 +1084,7 @@ commented
 comments
 commercial
 commercially
+commission
 commit
 commitment
 commitments
@@ -1221,6 +1227,7 @@ consensus
 consent
 consequence
 consequences
+consequential
 conserve
 consider
 consideration
@@ -1286,6 +1293,7 @@ contradiction
 contradictory
 contradicts
 contrast
+contrasts
 contribute
 contributed
 contributes
@@ -1645,6 +1653,7 @@ deserved
 deserves
 design
 designed
+designer
 designing
 designs
 desired
@@ -1730,6 +1739,7 @@ direct
 direction
 directional
 directions
+directives
 directly
 director
 directories
@@ -1867,6 +1877,7 @@ dollars
 domain
 domainrenter
 domains
+dominant
 dominate
 dominated
 dominates
@@ -1939,6 +1950,7 @@ duller
 dumb
 dummy
 dump
+dumping
 dumps
 dupcreated
 duplicate
@@ -2011,6 +2023,7 @@ elides
 eligibility
 eliminate
 ellipsis
+ellipsised
 else
 elses
 elsewhere
@@ -2063,6 +2076,7 @@ engaged
 engagement
 engaging
 engine
+engineer
 engineering
 engines
 english
@@ -2226,6 +2240,8 @@ exotic
 expand
 expandable
 expanded
+expander
+expands
 expect
 expectation
 expectations
@@ -2384,6 +2400,7 @@ filling
 fills
 film
 filter
+filterable
 filtered
 filtering
 filters
@@ -2469,6 +2486,7 @@ followed
 following
 follows
 font
+fonts
 fooled
 foot
 footer
@@ -2659,6 +2677,7 @@ greps
 grew
 grey
 grid
+ground
 grounds
 group
 grouped
@@ -2754,6 +2773,7 @@ headline
 heads
 heal
 heals
+health
 healthy
 heard
 hearing
@@ -2850,6 +2870,7 @@ href
 html
 http
 https
+hues
 huge
 human
 humans
@@ -2872,6 +2893,8 @@ hypothesis
 hypothetical
 hypothetically
 icebox
+icon
+icons
 idea
 ideally
 ideas
@@ -2907,6 +2930,7 @@ illustrates
 illustrating
 illustrative
 image
+images
 imagined
 immediate
 immediately
@@ -2930,6 +2954,7 @@ implies
 imply
 implying
 import
+importance
 important
 imported
 importer
@@ -4061,6 +4086,7 @@ number
 numbered
 numbering
 numbers
+numerals
 numeric
 nums
 nusage
@@ -4269,6 +4295,7 @@ padding
 page
 pager
 pages
+paginated
 pagination
 paid
 pain
@@ -4284,6 +4311,7 @@ pairs
 palette
 pane
 panel
+panels
 paper
 papered
 paperwork
@@ -4406,6 +4434,7 @@ phases
 philosophy
 phone
 photogenic
+photograph
 phrase
 phrased
 phrases
@@ -4419,6 +4448,8 @@ picks
 picture
 piece
 pieces
+pill
+pills
 ping
 pinned
 pinning
@@ -4438,6 +4469,7 @@ place
 placed
 placeholder
 placeholders
+placement
 places
 plain
 plainest
@@ -4457,6 +4489,7 @@ plausibly
 play
 player
 playful
+playhead
 plays
 plea
 plug
@@ -4676,6 +4709,7 @@ programmatically
 programmer
 programs
 progress
+progressing
 prohibition
 proj
 project
@@ -4684,6 +4718,7 @@ projection
 projections
 projects
 projektu
+prominently
 promise
 promised
 promises
@@ -4712,6 +4747,7 @@ proportional
 proportionally
 proposal
 proposals
+propose
 proposed
 proposing
 proprietor
@@ -4820,6 +4856,7 @@ race
 racing
 radii
 radius
+rail
 railway
 raise
 raised
@@ -4898,6 +4935,7 @@ rebuilt
 recalculated
 recall
 recalled
+recede
 recedes
 receipt
 receive
@@ -5078,6 +5116,7 @@ released
 releases
 releasing
 relevance
+relevant
 reliability
 reliable
 reliance
@@ -5269,6 +5308,7 @@ restrict
 restriction
 restricts
 rests
+restyling
 result
 resulting
 results
@@ -5284,6 +5324,7 @@ retraction
 retried
 retries
 retroactively
+retrospective
 retrospectives
 retry
 retryable
@@ -5492,6 +5533,7 @@ scrollbars
 scrolling
 scrolls
 scrubbed
+scrubs
 seam
 search
 searchable
@@ -5538,6 +5580,7 @@ sells
 semantic
 semantically
 semantics
+semibold
 send
 sender
 sending
@@ -5811,6 +5854,7 @@ sonnet
 soon
 sooner
 sort
+sortable
 sorted
 sorters
 sorting
@@ -6053,6 +6097,7 @@ subscription
 subsequent
 subset
 substance
+substantial
 substantively
 substitute
 substituted
@@ -6149,6 +6194,7 @@ swap
 swappable
 swapped
 swapping
+swaps
 sweep
 sweeping
 swept
@@ -6283,6 +6329,7 @@ terminator
 terminology
 terms
 ternary
+terracotta
 territory
 test
 testability
@@ -6308,6 +6355,7 @@ theirs
 them
 theme
 themed
+themes
 themselves
 then
 theoretical
@@ -6317,6 +6365,7 @@ these
 theses
 thesis
 they
+thick
 thicker
 thickness
 thin
@@ -6371,6 +6420,8 @@ tied
 ties
 tight
 tightening
+tile
+tiles
 time
 timed
 timeline
@@ -6402,6 +6453,7 @@ today
 todo
 together
 toggle
+toggles
 toggling
 token
 tokenizer
@@ -6507,6 +6559,7 @@ treated
 treating
 treatise
 treatment
+treatments
 treats
 tree
 trees
@@ -6572,7 +6625,9 @@ typical
 typically
 typing
 typo
+typographic
 typographically
+typography
 typos
 typy
 uall
@@ -6641,6 +6696,7 @@ understate
 understood
 underweighted
 undid
+undifferentiated
 undo
 undocumented
 undoes
@@ -6888,6 +6944,7 @@ versioning
 versions
 versus
 vertical
+vertically
 very
 vestige
 vibes
@@ -6896,6 +6953,7 @@ view
 viewable
 viewer
 viewers
+viewing
 viewport
 views
 violable
@@ -6941,6 +6999,7 @@ want
 wanted
 wants
 warehouse
+warm
 warn
 warned
 warning
