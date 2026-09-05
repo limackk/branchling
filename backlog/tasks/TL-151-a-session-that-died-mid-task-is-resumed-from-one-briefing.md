@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""
 priority: P3                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending  # pending | in_progress | blocked | done | cancelled
-owner: ""
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:fleet
 role: dev
 estimate: 2h                       # 30m | 2h | 1d | 1w | 1mo
 created: 2026-09-02
@@ -119,9 +119,9 @@ question, "who last took this". See `claimant()` in `scripts/resume-task.mjs`.
 
 ## Acceptance criteria
 
-- [ ] `resume` prints the briefing in the fixed order and nothing is written to disk. [proof: suite-green]
-- [ ] The diff is against the merge base, not `main`'s tip. [proof: suite-green]
-- [ ] The contract result is from a fresh run; `--no-verify` states the omission first. [proof: suite-green]
-- [ ] A different actor is refused and pointed at the takeover path. [proof: suite-green]
-- [ ] Positive control: the failing entry is shown, and shows green once fixed. [proof: suite-green]
-- [ ] `--json` answers in the envelope. [proof: guards-green]
+- [x] `resume` prints the briefing in the fixed order and nothing is written to disk. [proof: suite-green]
+- [x] The diff is against the merge base, not `main`'s tip. [proof: suite-green]
+- [x] The contract result is from a fresh run; `--no-verify` states the omission first. [proof: suite-green]
+- [x] A different actor is refused and pointed at the takeover path. [proof: suite-green]
+- [x] Positive control: the failing entry is shown, and shows green once fixed. [proof: suite-green]
+- [x] `--json` answers in the envelope. [proof: guards-green]
