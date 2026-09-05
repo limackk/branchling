@@ -164,6 +164,27 @@ export function goalOf(body) {
 }
 
 /**
+ * A NAME IN `owner:` THAT SOMEBODY COULD BE ASKED FOR. PURE.
+ *
+ * A PRESENCE CHECK IS NOT ENOUGH, because the field is never empty on an
+ * untouched task: the template writes a word for "nobody" into it, so every task
+ * the tool ever created would look held. Which word that is belongs to the
+ * project's vocabulary (`owners:` in config.yaml) and is not something this file
+ * may name — but its SHAPE is the tool's own, and the tool already draws that
+ * line for `--actor`: a claim is held by an ACTOR, in a namespace, and anything
+ * else is a placeholder however the project spells it.
+ *
+ * The boundary is the same one the refusal has to live inside. Turning a
+ * successor away is only useful when it can say WHO to ask, and it says so by
+ * handing back `--actor <them>`; a word that this predicate would let through
+ * but `isValidActor` would not is a remedy the next invocation rejects as a
+ * usage error, which leaves the successor with nothing to do at all.
+ */
+function isClaim(owner) {
+  return isValidActor(String(owner || ""));
+}
+
+/**
  * WHOSE SESSION LEFT THIS BEHIND. PURE.
  *
  * NOT `owner:` ALONE, and the reason is the case this command exists for. A
@@ -173,17 +194,19 @@ export function goalOf(body) {
  * whose `owner:` is empty, and reading only the field would let anybody resume
  * it — a takeover in all but name.
  *
- * The field still WINS where it has a value: it is the durable claim and it
+ * The field still WINS where it carries a claim: it is the durable one and it
  * travels with the branch. The log is consulted only for the second question,
- * "who last took this", which is what a parked task has instead of an owner.
+ * "who last took this", which is what a parked task has instead of an owner —
+ * and it is read through the same predicate, since a reconciled hand-edit can
+ * put the placeholder into a recorded `owner` change as readily as into a file.
  *
  * @returns {{actor: string, held: boolean}|null} `null` when nobody ever claimed it
  */
 export function claimant(entries, owner) {
-  if (owner) return { actor: owner, held: true };
+  if (isClaim(owner)) return { actor: owner, held: true };
   for (let i = (entries || []).length - 1; i >= 0; i--) {
     const e = entries[i];
-    if (e && e.field === "owner" && String(e.to || "")) return { actor: String(e.to), held: false };
+    if (e && e.field === "owner" && isClaim(e.to)) return { actor: String(e.to), held: false };
   }
   return null;
 }
