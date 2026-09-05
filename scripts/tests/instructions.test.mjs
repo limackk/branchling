@@ -371,7 +371,7 @@ test("the editor skill POINTS at the command instead of repeating it", () => {
   // Two documents saying the same thing are two documents that will disagree.
   // The skill keeps its trigger description — that is what makes an editor load
   // it — and hands the procedure over to the command.
-  const path = join(REPO_ROOT, ".claude", "skills", "backlog-workflow", "SKILL.md");
+  const path = join(REPO_ROOT, ".agents", "skills", "backlog-workflow", "SKILL.md");
   assert.ok(existsSync(path), "the skill is gone — if that was deliberate, this test goes with it");
   const text = readFileSync(path, "utf8");
   const body = text.slice(text.indexOf("---", 3) + 3);

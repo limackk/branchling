@@ -168,13 +168,16 @@ test("the guard table is the one source both modes read", () => {
     }
     assert.equal(plan[guard.want], true, "`" + guard.name + "` is not in the default run");
   }
-  // The exception is ONE guard, named here on purpose (TL-147): a bare `check`
-  // that re-ran other tasks' contracts would take minutes instead of a second,
-  // and — since a contract in this backlog runs `check` — would call itself. A
-  // second opt-in guard is a decision somebody has to come here to make.
-  assert.deepEqual(CHECK_GUARDS.filter((g) => g.optIn).map((g) => g.name), ["proofs"]);
-  // …and it is still reachable, which is what makes the exception an exception
-  // rather than a guard wired to nothing.
+  // Both exceptions are named here on purpose. `agent-files` judges this source
+  // checkout and is absent from the published installation; `proofs` re-runs
+  // task contracts and could recursively invoke `check` itself.
+  assert.deepEqual(
+    CHECK_GUARDS.filter((g) => g.optIn).map((g) => g.name),
+    ["agent-files", "proofs"]
+  );
+  // …and both are still reachable, which is what makes them exceptions rather
+  // than guards wired to nothing.
+  assert.equal(parseCheckArgs(["--agent-files"]).wantAgentFiles, true);
   assert.equal(parseCheckArgs(["--proofs"]).wantProofs, true);
   assert.equal(parseCheckArgs(["--proofs"]).wantIds, false, "asking for one guard ran them all");
 

@@ -663,8 +663,8 @@ export const NUDGE_VERSION = 1;
 export const NUDGE_OPEN_PREFIX = `<!-- >>> ${MARKER}:instructions`;
 export const NUDGE_CLOSE = `<!-- <<< ${MARKER}:instructions -->`;
 
-/** The agent files a nudge is written into, most specific first. */
-export const AGENT_FILES = ["CLAUDE.md", "AGENTS.md"];
+/** The shared file first; a pre-existing host-specific file remains supported. */
+export const AGENT_FILES = ["AGENTS.md", "CLAUDE.md"];
 
 /** Matches a block this tool wrote, whatever its version. */
 function nudgeBlockRe() {
@@ -730,7 +730,7 @@ export function ensureNudge(root, opts = {}) {
   const present = AGENT_FILES.filter((f) => existsSync(join(base, f)));
   // Nothing to append to: create the neutral one rather than guessing which
   // editor the reader uses.
-  const targets = present.length ? present : [AGENT_FILES[AGENT_FILES.length - 1]];
+  const targets = present.length ? present : [AGENT_FILES[0]];
   const out = [];
 
   for (const name of targets) {

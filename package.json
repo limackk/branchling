@@ -29,7 +29,7 @@
   "files": [
     "bin/",
     "scripts/",
-    "skills/",
+    ".agents/skills/backlog-workflow/",
     "!scripts/tests/",
     "!scripts/check-publish-metadata.mjs",
     "templates/",

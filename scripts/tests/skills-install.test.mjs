@@ -5,11 +5,11 @@
  * each of which is easy to break silently:
  *
  *   1. THE SKILL IS IN THE TARBALL. It works in this repository whether or not
- *      `files` carries `skills/`, so nothing here would notice its absence — and
+ *      `files` carries `.agents/skills/`, so nothing here would notice its absence — and
  *      the failure is invisible until somebody installs the package and the one
  *      argument the tool has over a hosted tracker turns out not to ship.
- *   2. NOTHING IS OVERWRITTEN. `.claude/` is the user's own directory and the
- *      file may be their edit of this very skill. Replacing it silently takes
+ *   2. NOTHING IS OVERWRITTEN. `.agents/` and `.claude/` are the user's own
+ *      directories and the file may be their edit of this very skill. Replacing it silently takes
  *      back a decision they made in their own repository, and no error says so.
  *   3. THE SKILL CARRIES NO VOCABULARY. A skill listing statuses is a second
  *      truth about a vocabulary that belongs to `config.yaml` (Law 3), and it is
@@ -18,7 +18,7 @@
  *      the FILE rather than trusted, because it is a promise about content.
  *
  * AND ONE COPY IN THE TREE, NOT TWO. This repository's own `.claude/skills/`
- * points at the packaged directory through a symlink. Two copies of one skill
+ * points at the canonical `.agents/skills/` directory through a symlink. Two copies of one skill
  * is the defect this project has been paying for since its vocabularies were
  * split out of the code, and it would be worse here: the divergence would be
  * between what this repository's agent reads and what a user's agent reads.
@@ -26,7 +26,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -75,7 +75,7 @@ test("the skill is in the tarball", () => {
   });
   assert.equal(packed.status, 0, packed.stderr);
   const files = JSON.parse(packed.stdout)[0].files.map((f) => f.path);
-  assert.ok(files.includes("skills/backlog-workflow/SKILL.md"),
+  assert.ok(files.includes(".agents/skills/backlog-workflow/SKILL.md"),
     "the packaged skill is not in `files`:\n  " + files.filter((f) => f.includes("skill")).join("\n  "));
 });
 
@@ -88,23 +88,22 @@ test("only the user-facing skill ships — not the ones about developing the too
     cwd: REPO_ROOT, encoding: "utf8", timeout: 120_000,
   });
   const shipped = JSON.parse(packed.stdout)[0].files
-    .map((f) => f.path).filter((f) => f.startsWith("skills/"));
+    .map((f) => f.path).filter((f) => f.startsWith(".agents/skills/"));
   for (const path of shipped) {
-    assert.ok(USER_SKILLS.some((name) => path.startsWith("skills/" + name + "/")),
+    assert.ok(USER_SKILLS.some((name) => path.startsWith(".agents/skills/" + name + "/")),
       "a skill about developing this tool is in the tarball: " + path);
   }
 });
 
 // ── one copy in the tree ──────────────────────────────────────────────────
 
-test("this repository reads the SAME file it ships, through a symlink", () => {
+test("Codex owns the shipped skill and Claude reads that SAME directory through a symlink", () => {
+  const source = join(REPO_ROOT, ".agents", "skills", "backlog-workflow");
   const linked = join(REPO_ROOT, ".claude", "skills", "backlog-workflow");
   assert.equal(lstatSync(linked).isSymbolicLink(), true,
-    "`.claude/skills/backlog-workflow` is a real directory — that is a second copy");
-  assert.equal(
-    readFileSync(join(linked, "SKILL.md"), "utf8"),
-    readFileSync(join(PACKAGED_SKILLS, "backlog-workflow", "SKILL.md"), "utf8")
-  );
+    "`.claude/skills/backlog-workflow` is a real directory — that is a second source");
+  assert.equal(realpathSync(linked), realpathSync(source));
+  assert.equal(realpathSync(source), realpathSync(join(PACKAGED_SKILLS, "backlog-workflow")));
 });
 
 // ── installing ────────────────────────────────────────────────────────────
@@ -114,7 +113,9 @@ test("install creates the file in the target repository", () => {
   const result = installSkills(fx.dir);
   assert.equal(result.ok, true);
   assert.deepEqual(result.created, [SKILL]);
-  assert.equal(existsSync(join(fx.dir, ".claude", "skills", SKILL)), true);
+  assert.deepEqual(result.linked, ["backlog-workflow"]);
+  assert.equal(existsSync(join(fx.dir, ".agents", "skills", SKILL)), true);
+  assert.equal(lstatSync(join(fx.dir, ".claude", "skills", "backlog-workflow")).isSymbolicLink(), true);
   assert.equal(result.target, skillsTarget(fx.dir));
 });
 
@@ -123,12 +124,13 @@ test("a second install overwrites nothing and SAYS so", () => {
   installSkills(fx.dir);
 
   // The file is now the user's: they edited it.
-  const path = join(fx.dir, ".claude", "skills", SKILL);
+  const path = join(fx.dir, ".agents", "skills", SKILL);
   writeFileSync(path, "# my own version\n", "utf8");
 
   const again = installSkills(fx.dir);
   assert.deepEqual(again.created, []);
   assert.deepEqual(again.skipped, [SKILL]);
+  assert.deepEqual(again.linkSkipped, ["backlog-workflow"]);
   assert.equal(readFileSync(path, "utf8"), "# my own version\n",
     "the user's own edit was replaced — silently taking back a decision they made");
 });
@@ -137,6 +139,9 @@ test("--dry-run reports what it would write and writes nothing", () => {
   const fx = fixture();
   const result = installSkills(fx.dir, { dryRun: true });
   assert.deepEqual(result.created, [SKILL]);
+  assert.deepEqual(result.linked, ["backlog-workflow"]);
+  assert.equal(existsSync(join(fx.dir, ".agents")), false,
+    "a dry run created a shared skills directory in somebody else's repository");
   assert.equal(existsSync(join(fx.dir, ".claude")), false,
     "a dry run created a directory in somebody else's repository");
 });
@@ -163,7 +168,8 @@ test("`init --skills` installs it, and plain `init` does not", () => {
   const asked = fixture();
   const r = run(["init", "--dir", asked.backlog, "--no-example", "--skills"], asked.dir, asked.env);
   assert.equal(r.status, 0, r.stderr);
-  assert.equal(existsSync(join(asked.dir, ".claude", "skills", SKILL)), true);
+  assert.equal(existsSync(join(asked.dir, ".agents", "skills", SKILL)), true);
+  assert.equal(lstatSync(join(asked.dir, ".claude", "skills", "backlog-workflow")).isSymbolicLink(), true);
   assert.match(r.stdout, /skills:/);
 });
 
@@ -173,7 +179,8 @@ test("`skills install` works in a repository whose backlog already exists", () =
 
   const r = run(["skills", "install", "--dir", fx.backlog], fx.dir, fx.env);
   assert.equal(r.status, 0, r.stderr);
-  assert.equal(existsSync(join(fx.dir, ".claude", "skills", SKILL)), true);
+  assert.equal(existsSync(join(fx.dir, ".agents", "skills", SKILL)), true);
+  assert.equal(lstatSync(join(fx.dir, ".claude", "skills", "backlog-workflow")).isSymbolicLink(), true);
 
   const again = run(["skills", "install", "--dir", fx.backlog], fx.dir, fx.env);
   assert.equal(again.status, 0);
@@ -181,15 +188,17 @@ test("`skills install` works in a repository whose backlog already exists", () =
 });
 
 test("it lands at the REPOSITORY root, not inside the backlog", () => {
-  // A skill is a fact about the repository; an editor looks for `.claude/` at
-  // the top, and one buried in `backlog/` would be read by nothing.
+  // A skill is a fact about the repository; agents look for their discovery
+  // directories at the top, and one buried in `backlog/` would be read by nothing.
   const fx = fixture();
   assert.equal(spawnSync("git", ["init", "-q", "-b", "main"], { cwd: fx.dir }).status, 0);
   const nested = join(fx.dir, "deep", "nest", "backlog");
   mkdirSync(dirname(nested), { recursive: true });
   assert.equal(run(["init", "--dir", nested, "--no-example", "--skills"], fx.dir, fx.env).status, 0);
 
-  assert.equal(existsSync(join(fx.dir, ".claude", "skills", SKILL)), true, "not at the repository root");
+  assert.equal(existsSync(join(fx.dir, ".agents", "skills", SKILL)), true, "not at the repository root");
+  assert.equal(lstatSync(join(fx.dir, ".claude", "skills", "backlog-workflow")).isSymbolicLink(), true);
+  assert.equal(existsSync(join(nested, ".agents")), false, "an .agents/ inside the backlog is read by nothing");
   assert.equal(existsSync(join(nested, ".claude")), false, "a .claude/ inside the backlog is read by nothing");
 });
 

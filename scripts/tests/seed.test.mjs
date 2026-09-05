@@ -7,7 +7,7 @@
  *      command does, including nothing at all — so every "nothing was written"
  *      test seeds a GOOD plan into the same directory afterwards and asserts the
  *      files appear. Without that, the assertion is green with no evidential
- *      force (CLAUDE.md).
+ *      force (AGENTS.md).
  *   2. The refusal is caused by the DEFECT under test. Each bad plan differs from
  *      a known-good one in exactly one way, so a message about something else is
  *      a failure of the test rather than a pass.

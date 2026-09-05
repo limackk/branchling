@@ -61,7 +61,7 @@
  * What the writers do to each other here is lose the change altogether, and
  * TL-214's Steps say that is the one outcome nothing can recover.
  *
- * THE POSITIVE CONTROL IS THE POINT (CLAUDE.md). The identical fixture, the
+ * THE POSITIVE CONTROL IS THE POINT (AGENTS.md). The identical fixture, the
  * identical writes and the identical assertion, performed one writer after
  * another, must be green. Without it a red race would not distinguish "the
  * writers collide" from "the assertion was unsatisfiable" or "the fixture was

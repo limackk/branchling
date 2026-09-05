@@ -311,7 +311,7 @@ test("the filters narrow the choice, and they are query's filters", () => {
 
 test("statuses a project protects with a reason are not dispatched", () => {
   const { backlog, env, ids } = fixture(["P0", "P1"]);
-  // Stated by the FIXTURE, not assumed of a fresh `init` (CLAUDE.md): which
+  // Stated by the FIXTURE, not assumed of a fresh `init` (AGENTS.md): which
   // statuses a project protects is that project's data, not this tool's
   // contract, and a test that assumed a value would be asserting somebody
   // else's configuration.

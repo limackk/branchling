@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
@@ -94,12 +94,13 @@ the copy lost.
 
 ## Acceptance criteria
 
-- [ ] Editing the binding instructions in one place changes what BOTH
+- [x] Editing the binding instructions in one place changes what BOTH
       agents read, proven by a test that fails when the two disagree
       outside the substitution table. [proof: agent-files-agree]
-- [ ] A Codex session is offered the same skills a Claude session is,
+- [x] A Codex session is offered the same skills a Claude session is,
       `backlog-workflow` included. [proof: agent-files-agree]
-- [ ] `check` names the drift rather than reporting it in prose.
+- [x] `check` names the drift rather than reporting it in prose.
       [proof: guards-green]
-- [ ] The choice of shape is a `__decision__` event in
+- [x] The choice of shape is a `__decision__` event in
       `backlog/history/TL-274.jsonl`, not argued in this file.
+      [proof: agent-files-agree]

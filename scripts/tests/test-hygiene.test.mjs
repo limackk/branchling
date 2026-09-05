@@ -25,7 +25,7 @@
  * every case in it, and no case can be forgotten individually.
  *
  * THE POSITIVE CONTROL IS THE POINT. A guard that only ever sees a clean tree is
- * green with no evidentiary force (CLAUDE.md), so the detection is a pure
+ * green with no evidentiary force (AGENTS.md), so the detection is a pure
  * function fed a file that does not isolate.
  */
 import { test } from "node:test";

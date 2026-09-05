@@ -162,7 +162,7 @@ test("Polish prose is still caught even on a line that also has a code span", ()
 
 test("a Polish task file under backlog/tasks/ in the real PUBLIC_PATHS shape is caught", () => {
   // A guard that passes on an empty sample is green with no evidentiary
-  // force (CLAUDE.md). This plants a fixture in a throwaway root that has
+  // force (AGENTS.md). This plants a fixture in a throwaway root that has
   // the same shape auditTree() walks — a `backlog/tasks/*.md` file — and
   // asserts the walk actually finds and flags it.
   const dir = mkdtempSync(join(tmpdir(), "branchling-lang-guard-"));
@@ -499,7 +499,7 @@ test("SILENT: the vocabulary this project actually writes — the dictionary's r
       ].join("\n") + "\n",
     "scripts/sample.mjs": 'const dir = mkdtempSync(join(tmpdir(), "branchling-"));\n',
   });
-  // A ✓ over an empty sample is green with no evidentiary force (CLAUDE.md).
+  // A ✓ over an empty sample is green with no evidentiary force (AGENTS.md).
   assert.equal(filesChecked, 2, "the fixture tree was not walked");
   assert.ok(linesChecked > 4, "the walk read only " + linesChecked + " lines — wrong tree?");
   assert.deepEqual(findings, [], "the guard cries wolf over this project's own words");

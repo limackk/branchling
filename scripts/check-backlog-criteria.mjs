@@ -40,7 +40,7 @@ import { auditTask } from "./criteria.mjs";
 import { listTaskFileNames } from "./task-io.mjs";
 import { extractMeta, splitFrontmatter } from "./task-fields.mjs";
 import { MARK, color, errColor } from "./ui.mjs";
-// The product name comes from the manifest, never from a literal (CLAUDE.md) —
+// The product name comes from the manifest, never from a literal (AGENTS.md) —
 // it is still provisional, so renaming it has to stay a single edit.
 import { PRODUCT_NAME } from "./product.mjs";
 

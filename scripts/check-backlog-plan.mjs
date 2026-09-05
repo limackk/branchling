@@ -15,7 +15,7 @@
  * would read as "the plan is fine".
  *
  * WHY THE ✓ COUNTS THINGS. A guard that passes over an empty sample is green
- * with no evidential force (CLAUDE.md). The success line names how many tasks
+ * with no evidential force (AGENTS.md). The success line names how many tasks
  * across how many waves were judged, so "checked nothing" cannot be mistaken for
  * "checked and clean" — and the tests carry a positive control for the same
  * reason.
@@ -39,7 +39,7 @@ import { loadPlan, validatePlan } from "./plan.mjs";
 import { listTaskFileNames } from "./task-io.mjs";
 import { extractMeta, splitFrontmatter } from "./task-fields.mjs";
 import { MARK, color, errColor } from "./ui.mjs";
-// The product name comes from the manifest, never from a literal (CLAUDE.md).
+// The product name comes from the manifest, never from a literal (AGENTS.md).
 import { PRODUCT_NAME as N } from "./product.mjs";
 
 const OKM = color.ok(MARK.ok);

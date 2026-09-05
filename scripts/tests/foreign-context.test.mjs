@@ -144,7 +144,7 @@ test("POSITIVE CONTROL: the backlog is inside the perimeter", () => {
 
 test("a dated record is not an argument: the measurement rule stops at the backlog", () => {
   // A task's `## Log` says what was true on a date. Auditing it as if it were
-  // prose meant to persuade produced 124 findings against entries CLAUDE.md
+  // prose meant to persuade produced 124 findings against entries AGENTS.md
   // asks for — "337 tasks", "1375 references rewritten". A guard that flags the
   // practice it protects gets silenced, so the rule is scoped instead.
   assert.ok(HISTORICAL_RECORD.includes("backlog"));

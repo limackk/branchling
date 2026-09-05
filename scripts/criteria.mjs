@@ -268,7 +268,7 @@ export function auditTask({ frontmatter, body, policy = "warn" }) {
   const severity = policy === "require" ? errors : warnings;
 
   // A guard that is green on an empty sample is green with no evidential force
-  // (CLAUDE.md). A task with no criteria would sail through every rule below,
+  // (AGENTS.md). A task with no criteria would sail through every rule below,
   // so its absence is judged first and by itself.
   if (!present) {
     severity.push("no `## Acceptance criteria` section — there is nothing for the verification to prove");

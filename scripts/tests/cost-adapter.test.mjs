@@ -21,7 +21,7 @@
  *      IMPORT check rather than a grep for the word, so a comment naming the
  *      file does not fail it and an import hidden behind an alias does.
  *
- * ON FIXTURES, NEVER ON THIS PROJECT'S DATA (CLAUDE.md): a synthetic transcript
+ * ON FIXTURES, NEVER ON THIS PROJECT'S DATA (AGENTS.md): a synthetic transcript
  * and a synthetic log, so the suite answers the same on an empty tree and on a
  * measured one.
  */

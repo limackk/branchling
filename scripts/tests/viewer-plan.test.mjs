@@ -9,7 +9,7 @@
  * estimate — is established by the fixture and never taken from this
  * repository's backlog. A test that asserted `TL-107 is in wave 1` would be
  * asserting a decision somebody may reverse tomorrow, and its failure would say
- * nothing about the code (the rule in CLAUDE.md).
+ * nothing about the code (the rule in AGENTS.md).
  *
  * WHY THE HTML IS ASSERTED THROUGH DATA ATTRIBUTES and not through its text: the
  * text is wording and is meant to be edited. `data-plan-card`, `data-edge-from`

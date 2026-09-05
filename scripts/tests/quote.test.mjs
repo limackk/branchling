@@ -17,7 +17,7 @@
  *   5. MODELS AVERAGED TOGETHER. Two models are two cells; one thin cell says
  *      so instead of borrowing the other's samples.
  *
- * ON FIXTURES (CLAUDE.md): every sample here is built by hand, so the suite
+ * ON FIXTURES (AGENTS.md): every sample here is built by hand, so the suite
  * answers the same on this backlog today and in a year.
  */
 import { test } from "node:test";

@@ -29,7 +29,7 @@
  * THE FIXTURES ARE OWN-MADE. Nothing here reads this repository's backlog: the
  * ids, the vocabulary and the snapshot state are all established below, because
  * a test that took them from the tree would be asserting another project's data
- * (CLAUDE.md, "Tests").
+ * (AGENTS.md, "Tests").
  */
 
 import { test } from "node:test";
@@ -143,7 +143,7 @@ test("and specifically: no `__created__` for it, whoever it names", () => {
 // ── The positive controls ─────────────────────────────────────────────────
 //
 // A guard that passes on a zero sample is green with no evidentiary force
-// (CLAUDE.md). Both tests above would pass against a `reconcile` that recorded
+// (AGENTS.md). Both tests above would pass against a `reconcile` that recorded
 // NOTHING AT ALL, and against a fixture whose files never reached the function.
 // These two say what must still happen.
 

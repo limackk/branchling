@@ -4,7 +4,7 @@
  *
  * WHAT THE FILE IS. An ORDER of execution: which tasks come first, which are
  * worth doing together, and one sentence saying why. That is a decision somebody
- * made, and nothing in the tree can recompute it — so under law 1 of CLAUDE.md
+ * made, and nothing in the tree can recompute it — so under law 1 of AGENTS.md
  * it is DATA: it lives in the repository, travels with a branch and goes through
  * review. Only its VALIDATION is computed, and that is what this module is.
  *

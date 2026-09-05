@@ -6,7 +6,7 @@
  * none of them in `query --help`. They worked; nobody reading the help could
  * know they existed. That matters most for `--text` and `--limit`, the two
  * flags that make `query` answerable inside a context budget — which is what
- * `CLAUDE.md` and `instructions context-budget` tell every session to do.
+ * `AGENTS.md` and `instructions context-budget` tell every session to do.
  *
  * WHERE THE TWO LISTS COME FROM, so that neither is hand-written here:
  *

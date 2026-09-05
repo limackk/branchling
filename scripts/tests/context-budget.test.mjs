@@ -11,7 +11,7 @@
  *   2. **Asking is an order of magnitude cheaper than reading.** `--count`
  *      against the whole tree, on a fixture big enough for the ratio to be a
  *      fact rather than a rounding artefact.
- *   3. **The rule is in `CLAUDE.md`, and it is the SAME rule.** Compared line by
+ *   3. **The rule is in `AGENTS.md`, and it is the SAME rule.** Compared line by
  *      line against `CONTEXT_RULE`, so a copy that falls behind fails here
  *      rather than teaching two different things in two places.
  *   4. **Nothing in the measurement writes.** The budget is taken twice and the
@@ -169,12 +169,12 @@ test("doctor reports the cost of asking, and says which window the share is of",
 
 // ── One source for the rule ───────────────────────────────────────────────
 
-test("CLAUDE.md carries the rule, line for line, from the module", () => {
-  const claude = readFileSync(join(REPO_ROOT, "CLAUDE.md"), "utf8");
+test("AGENTS.md carries the rule, line for line, from the module", () => {
+  const agents = readFileSync(join(REPO_ROOT, "AGENTS.md"), "utf8");
   for (const line of CONTEXT_RULE) {
     if (!line.trim()) continue;
-    assert.ok(claude.includes(line),
-      "CLAUDE.md has fallen behind `CONTEXT_RULE`; the missing line is:\n  " + line);
+    assert.ok(agents.includes(line),
+      "AGENTS.md has fallen behind `CONTEXT_RULE`; the missing line is:\n  " + line);
   }
 });
 

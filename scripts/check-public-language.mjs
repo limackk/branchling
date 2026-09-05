@@ -406,7 +406,7 @@ const PATH_EXTENSIONS = "md|mjs|cjs|js|json|jsonl|ya?ml|html|css|txt|sh|svg|png|
  * WHY IT NEEDED ADDING. TL-137 stripped the two carriers that existed when it
  * was written, and a path written plainly inside a YAML scalar — a
  * `verification:` command that greps the very task it belongs to — is a third
- * one nobody had produced yet. CLAUDE.md already settles the principle: a
+ * one nobody had produced yet. AGENTS.md already settles the principle: a
  * task's filename is data, not prose, and 145 files in this repository will
  * carry a Polish word in their names forever because TL-137 deliberately did
  * not rename them. Without this the only ways past the guard were an allow
@@ -582,7 +582,7 @@ function main() {
   }
   if (findings.length > 20) console.error(`  … and ${findings.length - 20} more`);
   console.error("");
-  console.error("  Everything in this repository is English (CLAUDE.md): CLI messages,");
+  console.error("  Everything in this repository is English (AGENTS.md): CLI messages,");
   console.error("  --help, comments, the viewer chrome, README.md, _template.md, the backlog");
   console.error("  and docs/. A markdown link's target and an inline `code span` are not");
   console.error("  searched — a task's filename is not part of this rule (TL-137).");

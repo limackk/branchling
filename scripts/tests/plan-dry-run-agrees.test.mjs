@@ -47,7 +47,7 @@
  *
  * EVERY CASE RUNS ON A FIXTURE TREE, never on this repository's own plan — that
  * plan changes with the work, and a test reading it would assert somebody else's
- * values (CLAUDE.md: do not assert another project's values).
+ * values (AGENTS.md: do not assert another project's values).
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";

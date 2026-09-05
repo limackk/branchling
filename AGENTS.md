@@ -290,5 +290,6 @@ to do it a second time.
   hyphenated. Take the slug from the task's thesis rather than its whole title —
   three or four words is enough. A branch name appears in `git log` at the merge
   and in every `git branch -a`, so it falls under the language rule above. A
-  branch named automatically by tooling (`Codex/…`) is the one exception and is
-  not renamed — renaming breaks its link to the session that created it.
+  branch named automatically by agent tooling (`claude/…`, `Codex/…`) is the one
+  exception and is not renamed — renaming breaks its link to the session that
+  created it.

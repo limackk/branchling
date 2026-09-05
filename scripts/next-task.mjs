@@ -318,7 +318,7 @@ export function heldElsewhere(task, handedOut) {
  *            and taking it over may be a rescue; here the evidence is another
  *            tree's live state, and a candidate at the end of the queue is still
  *            handed out the moment nothing else is left — which is exactly the
- *            13:41/13:43 collision in CLAUDE.md, delayed rather than removed.
+ *            13:41/13:43 collision in AGENTS.md, delayed rather than removed.
  *   adds     nothing. `filterTasks` matches a task on the statuses seen ANYWHERE
  *            (that is what `query --status in_progress` from `main` is for), but
  *            `next` WRITES: a task whose only evidence of being startable comes
