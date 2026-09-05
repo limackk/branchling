@@ -2965,7 +2965,6 @@ impact
 imperative
 impl
 implement
-implementable
 implementation
 implementations
 implemented

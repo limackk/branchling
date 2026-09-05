@@ -69,6 +69,16 @@ unrelated commit here by `git add -A` and reached `main` as a red test with
 no implementation, which is exactly the hazard TL-276 records two hands
 warning about.
 
+**Measured again the same afternoon, from the other side.** TL-150's
+closing run: the spec hand added the last registry row and handed on; the
+dev leg's entire output was `You've hit your session limit · resets
+5:10pm`; the loop then ran `done`, the contract passed — the work was
+already complete — and the task closed, credited in the history to the
+`dev` role with 204 seconds against it. The closing is sound, because
+`done` proved it. The attribution is not: a hand that printed one line
+and touched nothing is on the record as the one that finished the task.
+Same cause, opposite outcome, and only the second is visible in a report.
+
 **What the tool must not do.** Parse the vendor's wording. "Session limit"
 is a literal about somebody else's product and the next vendor phrases it
 differently.
