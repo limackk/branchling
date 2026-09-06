@@ -7,8 +7,8 @@
 # is finished and lives in the git history of this file. It built the loop; this
 # one is the first arc RUN BY that loop, and its every task is picked so an
 # unattended session can close it.
-updated: 2026-09-04
-rationale: "The loop is built, so this arc is executed BY it: first make its report and its log believable, then teach the dispatcher to read this file at all, then the record of who did what, then the refusals the writing commands still lack, then the stale premises, then what a dead session leaves behind, then the fleet, and measurement of the run last."
+updated: 2026-09-06
+rationale: "The unattended loop is proven. The next arc makes agent execution provider-neutral: repair control-plane writes first, separate project roles from user profiles, freeze one safe adapter contract, implement independent execution paths, preflight them, ship conformance-tested references and onboarding, then let managed fleets consume the stable surface."
 waves:
   - name: "The loop may be trusted unattended"
     tasks: [TL-191, TL-190, TL-184, TL-185, TL-192]
@@ -164,19 +164,44 @@ waves:
     # diff and a fresh `done --dry-run`. The loop already hands a claim back
     # after `abandoned_after_days`; without this the successor starts from zero.
 
-  - name: "The fleet owns its branches"
-    tasks: []
-    # `run --workers N`: branch, worktree, merge, build, removal — today a
-    # procedure in CLAUDE.md rather than code, which means the fleet is driven
-    # by a person. Its own wave: it is the largest task here and every earlier
-    # wave is a rehearsal for handing it to the loop.
-
   - name: "Measurement of the run"
     tasks: [TL-150, TL-91]
     # Both read the trace the waves above leave: an actor's record computed from
     # the log, and the board replayed through time. They are last because they
     # measure, and there is nothing to measure before the work is done.
 
-  # 1w is above the unattended gate, and wave 12 would stop the plan for waves behind it
-  - name: "Needs a person: too large for the fleet"
+  # Before provider-neutral execution expands, the plan is explicit and concurrent task creation or attribution cannot silently corrupt its durable record.
+  - name: "Control-plane writes are safe before execution scales"
+    tasks: [TL-299, TL-295, TL-302]
+
+  # Project-owned role briefs and user-owned provider profiles define the two configuration layers independently before they meet.
+  - name: "Roles and profiles have distinct owners"
+    tasks: [TL-264, TL-288]
+
+  # A stable executable contract is the seam every CLI, API harness and local model implements without provider branches in core.
+  - name: "One contract serves every provider"
+    tasks: [TL-289]
+
+  # Trust, secret handling and shell boundaries are fixed before multiple run modes and third-party adapters depend on them.
+  - name: "The execution boundary is safe before it is convenient"
+    tasks: [TL-300]
+
+  # API harnesses, role routing, a single generalist and the conformance kit can proceed independently once the shared contract and trust boundary exist.
+  - name: "Every execution path implements the same contract"
+    tasks: [TL-290, TL-291, TL-292, TL-296]
+
+  # Preflight is meaningful only after both generalist and role-based profile selection exist, and it must fail before either path claims work.
+  - name: "Profiles fail before tasks do"
+    tasks: [TL-294]
+
+  # Copyable CLI and API adapters are published only after conformance, preflight and the execution modes can test them as ordinary third-party executables.
+  - name: "Reference adapters prove the extension path"
+    tasks: [TL-301]
+
+  # Onboarding is the integration gate: it documents only profiles, adapters, checks and routes already proven by earlier waves.
+  - name: "A mixed-provider setup works in five minutes"
+    tasks: [TL-293]
+
+  # Parallel worktree lifecycle follows the provider-neutral single-agent loop and its onboarding instead of defining those contracts inside fleet machinery.
+  - name: "Managed fleets consume the stable execution surface"
     tasks: [TL-149]

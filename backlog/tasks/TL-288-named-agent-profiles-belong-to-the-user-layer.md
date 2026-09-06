@@ -15,7 +15,7 @@ confidence: medium                 # how much you trust the estimate
 created: 2026-09-05
 updated: 2026-09-05
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
-blocks: [TL-289, TL-291, TL-292, TL-294]
+blocks: [TL-289, TL-291, TL-292, TL-294, TL-300]
 related_docs:
   - docs/backlog-config-and-portability.md
 verification:

@@ -15,7 +15,7 @@ confidence: medium                 # how much you trust the estimate
 created: 2026-09-05
 updated: 2026-09-05
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
-blocks: []                         # ids this task will unblock
+blocks: [TL-149]
 related_docs:
   - docs/branchling-state-and-sync.md
 verification:

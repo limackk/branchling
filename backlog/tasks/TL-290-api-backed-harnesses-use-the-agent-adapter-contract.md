@@ -14,8 +14,8 @@ estimate: 1d
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-05
 updated: 2026-09-05
-blocked_by: [TL-289]
-blocks: [TL-293]
+blocked_by: [TL-289, TL-300]
+blocks: [TL-293, TL-301]
 related_docs:
   - docs/branchling-global-tool.md
 verification:
