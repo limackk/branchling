@@ -999,6 +999,7 @@ export const COMMANDS = {
     summary: "the workflow, printed by the tool — the guide to read before touching a task",
     usage: [
       `${N} instructions [topic] [--json] [--dir <path>]`,
+      `${N} instructions role <name> [--json] [--dir <path>]`,
       `${N} instructions --update-nudge [--dir <path>]`,
       "",
       "  no topic           the topics, with what each one is for",
@@ -1008,6 +1009,8 @@ export const COMMANDS = {
       "  task-execution     before starting work on one",
       "  task-finalization  before calling one finished",
       "  autonomous-loop    running the backlog as a queue, with nobody watching",
+      "  role <name>        print the reviewed brief for one declared role; suitable for",
+      "                     passing unchanged to an agent launcher",
       "  --update-nudge     write (or refresh) the pointer to this command in the",
       "                     repository's agent file, keeping everything else in it",
       "",

@@ -122,7 +122,7 @@ export const KINDS = {
   // was asked for: a consumer that has to make a second call to learn what else
   // exists is one that will hard-code the list instead. `version` is the version
   // of the POINTER a repository carries, not of the guides.
-  instructions: { topics: [], topic: null, text: null, version: null },
+  instructions: { topics: [], topic: null, role: null, text: null, version: null },
   "next-id": { nextId: null, id: null, prefix: null, max: null, source: null, trees: null, branches: null, known: null },
   // `seed --json`. The first WRITING command in the envelope, because it is the
   // first one written after the envelope existed — the older three answer with a

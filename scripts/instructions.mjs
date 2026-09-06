@@ -53,6 +53,7 @@ import { resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths
 import { BLOCK_MARKER_NAME as MARKER, PRODUCT_NAME as N } from "./product.mjs";
 import { inProgressStatus } from "./take-task.mjs";
 import { failure } from "./ui.mjs";
+import { writeOut } from "./stdout.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -612,6 +613,21 @@ export const TOPICS = {
 
 export const TOPIC_NAMES = Object.keys(TOPICS);
 
+/**
+ * The prompt a launcher receives for a configured role. Roles stay a flat
+ * vocabulary in config.yaml; long, reviewed text belongs in a file that git
+ * can review with the branch. The result names both expected refusals so the
+ * command can keep an unknown argument distinct from a missing optional brief.
+ */
+export function roleBrief(role, config) {
+  if ((config.roles || []).indexOf(role) < 0) {
+    return { ok: false, kind: "unknown-role" };
+  }
+  const path = join(config.paths.rolesDir, role + ".md");
+  if (!existsSync(path)) return { ok: false, kind: "missing-brief", path };
+  return { ok: true, role, path, text: readFileSync(path, "utf8") };
+}
+
 /** One topic, rendered against a backlog's configuration. Throws on an unknown
  *  topic — the caller turns that into a usage error with the list. */
 export function topicText(name, config) {
@@ -769,6 +785,7 @@ export const INSTRUCTIONS_FLAGS = ["--json", "--update-nudge"];
 /** PURE — resolves the arguments. Throws on a usage error. */
 export function parseInstructionsArgs(args) {
   let topic = null;
+  let role = null;
   let json = false;
   let updateNudge = false;
 
@@ -778,16 +795,27 @@ export function parseInstructionsArgs(args) {
     if (a.startsWith("-")) {
       throw new Error("unknown flag: " + a + "\nknown flags: " + INSTRUCTIONS_FLAGS.join(" ") + " --dir <path>");
     }
+    if (topic === "role" && role === null) {
+      role = a;
+      continue;
+    }
     if (topic) throw new Error("one topic at a time: " + topic + ", " + a);
+    if (a === "role") {
+      topic = a;
+      continue;
+    }
     if (!Object.prototype.hasOwnProperty.call(TOPICS, a)) {
-      throw new Error("unknown topic: " + a + "\ntopics: " + TOPIC_NAMES.join(" "));
+      throw new Error("unknown topic: " + a + "\ntopics: " + TOPIC_NAMES.join(" ") + " role <name>");
     }
     topic = a;
+  }
+  if (topic === "role" && role === null) {
+    throw new Error("role requires a declared role name\nusage: " + N + " instructions role <name>");
   }
   if (updateNudge && topic) {
     throw new Error("`--update-nudge` writes the pointer; it does not print a topic");
   }
-  return { topic, json, updateNudge };
+  return { topic, role, json, updateNudge };
 }
 
 export function run(argv) {
@@ -812,17 +840,42 @@ export function run(argv) {
     return 0;
   }
 
+  let text = plan.topic && plan.topic !== "role" ? topicText(plan.topic, config) : null;
+  if (plan.role !== null) {
+    const brief = roleBrief(plan.role, config);
+    if (!brief.ok) {
+      if (brief.kind === "unknown-role") {
+        console.error(failure(N + " instructions", "unknown role `" + plan.role + "`",
+          (config.roles || []).length
+            ? ["`roles` in config.yaml holds: " + (config.roles || []).join(", ")]
+            : ["This backlog declares no `roles:` in config.yaml, so no brief is available."],
+          [N + " instructions --help"]));
+        return 2;
+      }
+      console.error(failure(N + " instructions", "role `" + plan.role + "` has no brief",
+        ["add `roles/" + plan.role + ".md` beside this backlog's config.yaml"],
+        [N + " instructions role " + plan.role]));
+      return 1;
+    }
+    text = brief.text;
+  }
+
   if (plan.json) {
     printJson("instructions", {
       topics: TOPIC_NAMES.map((name) => ({ name, summary: TOPICS[name].summary })),
       topic: plan.topic,
-      text: plan.topic ? topicText(plan.topic, config) : null,
+      role: plan.role,
+      text,
       version: NUDGE_VERSION,
     });
     return 0;
   }
 
-  console.log(plan.topic ? topicText(plan.topic, config) : topicList(config));
+  if (plan.role !== null) {
+    writeOut(text + (text.endsWith("\n") ? "" : "\n"));
+  } else {
+    console.log(plan.topic ? text : topicList(config));
+  }
   return 0;
 }
 

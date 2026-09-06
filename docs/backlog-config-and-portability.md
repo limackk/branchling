@@ -96,6 +96,19 @@ field that cannot be set to anything is not an enum. For `role`, free text is
 exactly the hole the field is meant to close, so it stays an enum whose only
 legal value is empty (`dictionaryRequired` in `FIELD_SHAPES`).
 
+### Role briefs
+
+`roles` remains a compact list of stable slugs. A declared role may carry a
+reviewed, versioned prompt in `roles/<slug>.md`, relative to the backlog
+directory. Read it with `branchling instructions role <slug>`: ordinary output
+is exactly the file contents, so a shell launcher may pass it unchanged to an
+agent. `--json` carries the same text in the `instructions` envelope.
+
+A brief is optional. Existing backlogs that use `roles:` only keep their
+behaviour; requesting a missing brief refuses with the path to add. A brief for
+an undeclared slug is never selected, because the command first checks the
+project's `roles:` vocabulary.
+
 **An unknown key FAILS.** A typo in a vocabulary is indistinguishable from
 "this project just works that way" — the same rule as an unknown flag in
 `query.mjs`.

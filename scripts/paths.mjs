@@ -43,6 +43,8 @@ export const TEMPLATE_FILENAME = "_template.md";
 /** The execution order (TL-107) — DATA, versioned, and optional. */
 export const PLAN_FILENAME = "plan.yaml";
 export const TASKS_DIRNAME = "tasks";
+/** Reviewed prompts for roles declared in config.yaml (TL-264). */
+export const ROLES_DIRNAME = "roles";
 
 /** Every path inside the backlog directory — one place that knows these names. */
 export function backlogPaths(root) {
@@ -57,6 +59,7 @@ export function backlogPaths(root) {
     rollupDir: join(root, "activity", "rollup"),
     archiveDir: join(root, "archive"),
     boardsDir: join(root, "boards"),
+    rolesDir: join(root, ROLES_DIRNAME),
     configPath: join(root, CONFIG_FILENAME),
     boardsPath: join(root, BOARDS_FILENAME),
     templatePath: join(root, TEMPLATE_FILENAME),

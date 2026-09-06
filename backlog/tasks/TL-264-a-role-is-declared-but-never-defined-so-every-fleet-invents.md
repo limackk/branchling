@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: "Provider-neutral agent execution"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-06
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: [TL-291]
 related_docs: []                   # paths relative to the repository root
@@ -83,10 +83,10 @@ is TL-263.
 
 ## Acceptance criteria
 
-- [ ] A role declared in `config.yaml` can carry a description, and a
+- [x] A role declared in `config.yaml` can carry a description, and a
       launcher can read it without opening the file, proven by a test that
       fails against today's code. [proof: roles-carry-a-brief]
-- [ ] A project that declares roles with no descriptions still works
+- [x] A project that declares roles with no descriptions still works
       unchanged. [proof: suite-green]
 - [ ] The choice of shape is a `__decision__` event in
       `backlog/history/TL-264.jsonl`, not prose in this file.
