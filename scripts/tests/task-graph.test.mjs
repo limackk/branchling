@@ -54,7 +54,9 @@ const entry = (over = {}) => ({
 test("every node kind is produced by the entry that means it", () => {
   assert.equal(nodeKind({ field: "__created__" }), "created");
   assert.equal(nodeKind({ field: "__deleted__" }), "deleted");
-  assert.equal(nodeKind({ field: "__comment__" }), "question");
+  assert.equal(nodeKind({ field: "__comment__", source: "ask" }), "question");
+  assert.equal(nodeKind({ field: "__comment__", source: "handoff" }), "message");
+  assert.equal(nodeKind({ field: "__comment__", source: "release" }), "message");
   assert.equal(nodeKind({ field: "__decision__" }), "decision");
   assert.equal(nodeKind({ field: "status" }), "status");
   assert.equal(nodeKind({ field: "owner" }), "handoff");
@@ -119,7 +121,7 @@ test("an empty history is an empty graph, not a crash", () => {
 // ── Questions and their answers ───────────────────────────────────────────
 
 test("a question with an answer is JOINED to it and is not open", () => {
-  const q = entry({ id: "Q1", ts: at(1), field: "__comment__", from: "", to: "Which way?" });
+  const q = entry({ id: "Q1", ts: at(1), field: "__comment__", source: "ask", from: "", to: "Which way?" });
   const d = entry({ id: "D1", ts: at(2), field: "__decision__", from: "", to: "That way.", resolves: "Q1" });
   const g = taskGraph([q, d]);
   assert.equal(g.nodes[0].open, false);
@@ -127,7 +129,7 @@ test("a question with an answer is JOINED to it and is not open", () => {
 });
 
 test("a question nothing has answered is OPEN — the state somebody must act on", () => {
-  const g = taskGraph([entry({ id: "Q1", field: "__comment__", from: "", to: "Which way?" })]);
+  const g = taskGraph([entry({ id: "Q1", field: "__comment__", source: "ask", from: "", to: "Which way?" })]);
   assert.equal(g.nodes[0].open, true);
   assert.match(nodeLabel(g.nodes[0]), /open/);
   assert.match(renderTaskGraph(g), /is-open/);
@@ -138,9 +140,21 @@ test("an answer recorded BEFORE the reader meets the question still closes it", 
   // wrong answer that only appears in logs written out of order.
   const g = taskGraph([
     entry({ id: "D1", ts: at(2), field: "__decision__", from: "", to: "That way.", resolves: "Q1" }),
-    entry({ id: "Q1", ts: at(1), field: "__comment__", from: "", to: "Which way?" }),
+    entry({ id: "Q1", ts: at(1), field: "__comment__", source: "ask", from: "", to: "Which way?" }),
   ]);
   assert.equal(g.nodes.find((n) => n.id === "Q1").open, false);
+});
+
+test("operational comments stay visible as messages and never acquire question links", () => {
+  const comment = entry({ id: "H1", ts: at(1), field: "__comment__", source: "handoff", from: "", to: "the reviewer has the release context" });
+  const decision = entry({ id: "D1", ts: at(2), field: "__decision__", from: "", to: "recorded separately", resolves: "H1" });
+  const g = taskGraph([comment, decision]);
+  assert.equal(g.nodes[0].kind, "message");
+  assert.equal(g.nodes[0].open, false);
+  assert.match(nodeLabel(g.nodes[0]), /^message:/);
+  assert.deepEqual(g.links, [], "an operational comment must not become an answerable question");
+  assert.match(renderTaskGraph(g), /is-message/);
+  assert.doesNotMatch(renderTaskGraph(g), /question · open/);
 });
 
 test("a decision pointing at an id this log does not have draws NO arrow", () => {

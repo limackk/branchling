@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Execution observability"
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
@@ -60,7 +60,7 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] An `ask` event remains a question node and links to its decision.
+- [x] An `ask` event remains a question node and links to its decision.
   [proof: graph-comment-kinds]
-- [ ] Operational comments remain visible but cannot be labelled or linked as
+- [x] Operational comments remain visible but cannot be labelled or linked as
   open questions. [proof: graph-comment-kinds]

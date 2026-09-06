@@ -47,7 +47,7 @@
  * Tests: `node --test scripts/tests/task-graph.test.mjs`
  */
 
-import { FIELD_COMMENT, FIELD_CREATED, FIELD_DECISION, FIELD_DELETED, actorParts } from "./task-fields.mjs";
+import { FIELD_COMMENT, FIELD_CREATED, FIELD_DECISION, FIELD_DELETED, actorParts, isQuestion } from "./task-fields.mjs";
 
 /**
  * The fields whose change is a node of its own.
@@ -88,7 +88,7 @@ export function nodeKind(entry) {
   const field = entry && entry.field;
   if (field === FIELD_CREATED) return "created";
   if (field === FIELD_DELETED) return "deleted";
-  if (field === FIELD_COMMENT) return "question";
+  if (field === FIELD_COMMENT) return isQuestion(entry) ? "question" : "message";
   if (field === FIELD_DECISION) return "decision";
   if (field === "status") return "status";
   if (field === "owner" || field === "role") return "handoff";
@@ -111,9 +111,10 @@ export function taskGraph(entries) {
   // Which questions have an answer. Computed over the WHOLE log first: a
   // decision may be recorded before the reader scrolls to the question, and a
   // one-pass fold would mark an answered question open until it met the answer.
+  const questionIds = new Set(ordered.filter(isQuestion).map((e) => e.id).filter(Boolean));
   const answeredBy = new Map();
   for (const e of ordered) {
-    if (e.field === FIELD_DECISION && typeof e.resolves === "string" && e.resolves) {
+    if (e.field === FIELD_DECISION && typeof e.resolves === "string" && questionIds.has(e.resolves)) {
       answeredBy.set(e.resolves, e.id || null);
     }
   }
@@ -154,7 +155,7 @@ export function taskGraph(entries) {
     };
     flushInto(node);
     nodes.push(node);
-    if (node.resolves) links.push({ from: node.resolves, to: node.id, kind: "answers" });
+    if (node.resolves && questionIds.has(node.resolves)) links.push({ from: node.resolves, to: node.id, kind: "answers" });
   }
 
   // A run of collapsed changes AFTER the last node has nothing following it, so
@@ -253,6 +254,7 @@ export function nodeLabel(node) {
   if (node.kind === "created") return "created: " + gist(node.to);
   if (node.kind === "deleted") return "deleted";
   if (node.kind === "question") return (node.open ? "question · open" : "question") + ": " + gist(node.to);
+  if (node.kind === "message") return "message: " + gist(node.to);
   if (node.kind === "decision") return "decision: " + gist(node.to);
   if (node.kind === "handoff") return (node.field === "role" ? "role" : "owner") + " → " + (node.to || "nobody");
   return (node.from || "—") + " → " + (node.to || "—");
