@@ -155,6 +155,29 @@ and network authority, and its prompt receives repository text as untrusted
 data. `--agent` remains the compatibility path for an existing shell command;
 it intentionally retains the shell and environment that its owner supplied.
 
+### API-backed harnesses
+
+An API completion is not a coding agent. An adapter that calls a model endpoint
+owns the endpoint URL, authentication scheme, request and response shapes, its
+tool loop, and any provider-specific retries. It receives the same stdin and
+environment contract as an adapter that launches a local or subscription CLI;
+after it performs work, `branchling run` remains responsible for task claiming,
+verification, closure and the run report.
+
+Keep API credentials in a credential store or in variables named by the local
+profile's `secret_env`. The profile contains the variable *name*, never its
+value. Branchling passes only declared variables to the adapter and redacts
+their values from its stored adapter output, but an adapter should still avoid
+printing credentials or raw provider diagnostics.
+
+There is deliberately no provider registry or standard HTTP schema here. An
+adapter may use an OpenAI-compatible endpoint, a differently shaped service, or
+a local model runner. Third parties publish one ordinary executable and its
+documentation: install it, create a profile that names it and its credential
+variables, then run `branchling conformance` offline before using it on a real
+queue. Adding a provider therefore changes user configuration or the adapter,
+not Branchling core.
+
 **An unknown key FAILS.** A typo in a vocabulary is indistinguishable from
 "this project just works that way" — the same rule as an unknown flag in
 `query.mjs`.

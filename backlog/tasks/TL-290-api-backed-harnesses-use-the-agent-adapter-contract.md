@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Provider-neutral agent execution"
 priority: P1
-status: pending  # pending | in_progress | blocked | done | cancelled
-owner: ""
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1d
@@ -69,9 +69,9 @@ APIs share one schema.
 
 ## Acceptance criteria
 
-- [ ] A mock API-backed harness completes a task through the normal adapter
+- [x] A mock API-backed harness completes a task through the normal adapter
       contract, including verification and closure. [proof: api-harness]
-- [ ] Credential values are absent from stdout, stderr, task input and stored
+- [x] Credential values are absent from stdout, stderr, task input and stored
       run logs. [proof: api-harness]
-- [ ] Two incompatible mock API shapes work without provider names or branches
+- [x] Two incompatible mock API shapes work without provider names or branches
       in branchling core. [proof: no-provider-lock-in]
