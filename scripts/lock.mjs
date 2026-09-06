@@ -339,7 +339,14 @@ export function withMutex(name, fn, opts = {}) {
   const dir = join(stateRoot(opts.env), "mutex");
   mkdirSync(dir, { recursive: true });
   const path = join(dir, createHash("sha256").update(name).digest("hex").slice(0, 16) + ".mutex");
-  const record = { section: name, pid: process.pid, host: hostname(), ts: new Date(now()).toISOString() };
+  // The token distinguishes two successive owners in the same process as well
+  // as two different processes. PID alone is not ownership: a section may be
+  // judged stale and taken over while its original process is still alive.
+  const token = randomBytes(16).toString("hex");
+  const record = {
+    section: name, token, pid: process.pid, host: hostname(),
+    ts: new Date(now()).toISOString(),
+  };
 
   const deadline = now() + Math.max(0, waitMs);
   for (;;) {
@@ -369,6 +376,23 @@ export function withMutex(name, fn, opts = {}) {
     return fn();
   } finally {
     INSIDE.delete(name);
-    try { unlinkSync(path); } catch { /* stolen as stale, or already gone */ }
+    // A stale section can be taken over. The old owner finishing afterwards
+    // must not unlink the new owner's mutex, or two later writers may enter at
+    // once. Read-back makes release conditional on the unguessable token this
+    // invocation wrote.
+    const held = readRecord(path);
+    if (held && held.token === token) {
+      try { unlinkSync(path); } catch { /* already gone */ }
+    }
   }
+}
+
+/**
+ * Run one repository-scoped critical section across all of its worktrees.
+ * `lockScope()` resolves to git's common directory, so callers cannot
+ * accidentally key the same resource by their checkout-specific backlog path.
+ */
+export function withBacklogMutex(root, resource, fn, opts = {}) {
+  const scope = opts.scope || lockScope(root, opts);
+  return withMutex(scope.origin + "\0" + resource, fn, opts);
 }

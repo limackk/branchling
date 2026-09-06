@@ -35,6 +35,7 @@ import { resolveActor } from "./actor.mjs";
 import { bucketFor, spanLabel } from "./calibration.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { recordCreation } from "./history.mjs";
+import { withBacklogMutex } from "./lock.mjs";
 import { parsePlanYaml } from "./plan.mjs";
 import { editPlanText, newPlanErrors } from "./plan-write.mjs";
 import { detectPrefixMismatch, prefixMismatchMessage, taskIdPatterns } from "./task-id.mjs";
@@ -332,7 +333,7 @@ export function stripTemplateBanner(text) {
   return [lines[0]].concat(lines.slice(i)).join("\n");
 }
 
-export function createTask({ root, config, board, slug, fields, body }) {
+function createTaskUnlocked({ root, config, board, slug, fields, body }) {
   const paths = backlogPaths(root);
   const pat = taskIdPatterns(config.taskIdPrefix);
   const { id, source } = nextId(root, paths.tasksDir, pat.fileNumber);
@@ -425,6 +426,16 @@ export function createTask({ root, config, board, slug, fields, body }) {
     throw e;
   }
   return { path: full, taskId, source };
+}
+
+/**
+ * Selecting a number and reserving it on disk are one operation across every
+ * worktree of the repository. The file's `wx` remains the final guard against
+ * a collision from outside this machine; the mutex closes the local scan/write
+ * window that `wx` alone cannot protect when slugs differ.
+ */
+export function createTask(args) {
+  return withBacklogMutex(args.root, "new-task-id", () => createTaskUnlocked(args));
 }
 
 export function main(argv) {

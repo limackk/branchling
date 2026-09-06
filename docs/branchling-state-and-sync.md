@@ -293,6 +293,12 @@ things measured along the way, both real:
    in each of them and would exclude nobody. The key is
    `git rev-parse --git-common-dir` — the same path from every worktree of
    one repository.
+3. **Task-number allocation uses the same boundary.** `new` holds a short
+   repository-scoped mutex from the branch-and-worktree scan through the
+   exclusive task-file write. Sequential numbering was already repository-wide;
+   this makes concurrent numbering on one machine atomic as well. The mutex is
+   released only when its ownership token still matches, so a stale owner cannot
+   delete the reservation of the process that took its place.
 
 The boundary is stated in `take --help` and in the README, not only here: the
 guarantee covers one machine and one user account.

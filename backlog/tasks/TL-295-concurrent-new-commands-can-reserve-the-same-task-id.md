@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-05
-updated: 2026-09-05
+updated: 2026-09-06
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: [TL-149]
 related_docs:
@@ -68,9 +68,9 @@ number from `max + 1` outside the locked section.
 
 ## Acceptance criteria
 
-- [ ] At least six concurrent `new` processes create six unique task ids and
+- [x] At least six concurrent `new` processes create six unique task ids and
       matching filenames and history logs. [proof: concurrent-reservation]
-- [ ] A process that fails during creation does not leave numbering permanently
+- [x] A process that fails during creation does not leave numbering permanently
       locked. [proof: concurrent-reservation]
-- [ ] Existing branch, worktree and layout numbering behavior remains green.
+- [x] Existing branch, worktree and layout numbering behavior remains green.
       [proof: suite-green]
