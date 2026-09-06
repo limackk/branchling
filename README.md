@@ -296,6 +296,7 @@ not exist yet.
 ```bash
 branchling profile create developer --adapter "$PWD/bin/developer-agent" \
   --model opus --effort high --prompt "Implement the task with evidence."
+branchling profile check developer          # local: executable, prompt and named credentials
 branchling run --profile developer --max-attempts 2
 ```
 
@@ -303,6 +304,13 @@ The profile is user data, not repository configuration, so contributors can
 choose different providers without changing the project. Raw `--agent` commands
 remain available for existing scripts. With no `--profile-for` mapping, that one
 profile is the generalist: it serves both roleless work and every declared role.
+
+`profile check` is read-only and local by default: it does not start the
+adapter, send a prompt or contact a provider. `run` performs the same
+deterministic checks before it claims a task. Use `profile check --live` only
+when you explicitly want the wrapper to probe authentication or reachability;
+it may use provider credentials or quota and reports an outcome separately from
+task work.
 
 Before publishing a wrapper, its author can prove the provider-neutral boundary
 without credentials, network access or a real task:

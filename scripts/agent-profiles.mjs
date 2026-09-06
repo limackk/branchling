@@ -10,9 +10,11 @@
  * every new CLI a release of this tool.
  */
 
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { accessSync, constants, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 
+import { ADAPTER_PROTOCOL_VERSION, PROFILE_PROBE_ENV, PROFILE_PROBE_OUTCOMES, PROFILE_PROTOCOL_VERSION_ENV } from "./agent-contract.mjs";
 import { agentProfilesPath, ensureHome } from "./home.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
@@ -20,7 +22,7 @@ import { stripComment, unquote } from "./task-fields.mjs";
 import { failure, heading, table } from "./ui.mjs";
 
 export const PROFILE_NAME_SHAPE = /^[a-z0-9][a-z0-9._-]{0,62}$/;
-export const PROFILE_FIELDS = ["name", "adapter", "model", "effort", "prompt", "prompt_file", "secret_env"];
+export const PROFILE_FIELDS = ["name", "adapter", "model", "effort", "prompt", "prompt_file", "secret_env", "protocol_version"];
 
 /** A credential may be REFERENCED through $NAME, but never copied as a value. */
 export function credentialProblem(value) {
@@ -70,6 +72,9 @@ function profileProblems(profile, path) {
     if (!/^[A-Z_][A-Z0-9_]*$/.test(name)) {
       problems.push("profile `" + profile.name + "` secret_env `" + name + "` is not an environment variable name");
     }
+  }
+  if (profile.protocol_version && Number(profile.protocol_version) !== ADAPTER_PROTOCOL_VERSION) {
+    problems.push("profile `" + profile.name + "` protocol_version must be " + ADAPTER_PROTOCOL_VERSION);
   }
   return problems;
 }
@@ -145,7 +150,7 @@ export function serializeAgentProfiles(profiles) {
   for (const profile of profiles) {
     out.push("  - name: " + profile.name);
     out.push("    adapter: " + quote(profile.adapter));
-    for (const key of ["model", "effort", "prompt", "prompt_file", "secret_env"]) {
+    for (const key of ["model", "effort", "prompt", "prompt_file", "secret_env", "protocol_version"]) {
       if (profile[key]) out.push("    " + key + ": " + quote(profile[key]));
     }
   }
@@ -176,19 +181,66 @@ export function resolveAgentProfile(name, env = process.env) {
   if (store.problems.length) return { ok: false, kind: "invalid-store", store };
   const profile = store.profiles.find((p) => p.name === name);
   if (!profile) return { ok: false, kind: "missing-profile", store };
-  return { ok: true, profile: { ...profile, prompt: profilePrompt(profile, store.path) }, store };
+  return { ok: true, profile: { ...profile, protocol_version: String(profile.protocol_version || ADAPTER_PROTOCOL_VERSION), prompt: profilePrompt(profile, store.path) }, store };
 }
 
-const SUBCOMMANDS = ["create", "list", "show", "update", "remove"];
-const FLAGS = ["--adapter", "--model", "--effort", "--prompt", "--prompt-file", "--secret-env", "--json"];
+/** Resolve an adapter from an absolute/relative path or PATH without running it. */
+export function adapterPath(adapter, env = process.env) {
+  const value = String(adapter || "").trim();
+  const candidates = value.includes("/") ? [resolve(value)] : String(env.PATH || "").split(":").filter(Boolean).map((d) => resolve(d, value));
+  for (const path of candidates) {
+    try { accessSync(path, constants.X_OK); return path; } catch { /* try the next path */ }
+  }
+  return null;
+}
+
+/** Deterministic profile validation; it never starts an adapter or contacts a provider. */
+export function checkAgentProfiles(names = [], env = process.env) {
+  const store = readAgentProfiles(env);
+  const wanted = names.length ? [...new Set(names)] : store.profiles.map((p) => p.name);
+  if (store.problems.length) return { ok: false, path: store.path, profiles: [], results: [{ name: null, state: "invalid-configuration", problems: store.problems }] };
+  const profiles = [];
+  const results = wanted.map((name) => {
+    const found = store.profiles.find((p) => p.name === name);
+    if (!found) return { name, state: "invalid-configuration", problems: ["no profile `" + name + "`"] };
+    const resolved = { ...found, protocol_version: String(found.protocol_version || ADAPTER_PROTOCOL_VERSION), prompt: profilePrompt(found, store.path) };
+    profiles.push(resolved);
+    const problems = [];
+    const executable = adapterPath(resolved.adapter, env);
+    if (!executable) problems.push("adapter is unavailable: `" + resolved.adapter + "` is not executable on PATH");
+    const missingSecrets = secretEnvironmentNames(resolved).filter((key) => !String(env[key] || ""));
+    if (missingSecrets.length) problems.push("missing credential environment variable" + (missingSecrets.length === 1 ? "" : "s") + ": " + missingSecrets.join(", "));
+    return { name, state: problems.length ? (executable ? "invalid-configuration" : "adapter-unavailable") : "ready", adapter: resolved.adapter, executable, protocolVersion: Number(resolved.protocol_version), problems };
+  });
+  return { ok: results.every((r) => !r.problems.length), path: store.path, profiles, results };
+}
+
+/** Explicitly opt-in provider probe. Its raw output is never displayed. */
+export function liveProbe(profile, env = process.env) {
+  const executable = adapterPath(profile.adapter, env);
+  if (!executable) return { ok: false, state: "adapter-unavailable", outcome: "unavailable" };
+  const probeEnv = { PATH: env.PATH || "", [PROFILE_PROBE_ENV]: "1", [PROFILE_PROTOCOL_VERSION_ENV]: String(ADAPTER_PROTOCOL_VERSION) };
+  for (const key of secretEnvironmentNames(profile)) if (Object.prototype.hasOwnProperty.call(env, key)) probeEnv[key] = env[key];
+  const child = spawnSync(executable, [], { shell: false, encoding: "utf8", env: probeEnv, timeout: 15_000, maxBuffer: 64 * 1024 });
+  if (child.error || child.status !== 0) return { ok: false, state: "probe-failed", outcome: "unavailable" };
+  try {
+    const response = JSON.parse(String(child.stdout || "").trim());
+    if (response.version !== ADAPTER_PROTOCOL_VERSION || PROFILE_PROBE_OUTCOMES.indexOf(response.outcome) < 0) throw new Error("invalid response");
+    return { ok: response.outcome === "ready", state: response.outcome === "ready" ? "ready" : "probe-failed", outcome: response.outcome };
+  } catch { return { ok: false, state: "probe-failed", outcome: null }; }
+}
+
+const SUBCOMMANDS = ["create", "list", "show", "update", "remove", "check"];
+const FLAGS = ["--adapter", "--model", "--effort", "--prompt", "--prompt-file", "--secret-env", "--protocol-version", "--live", "--json"];
 
 export function parseAgentProfilesArgs(args) {
   const subcommand = args[0];
   if (SUBCOMMANDS.indexOf(subcommand) < 0) throw new Error(subcommand ? "unknown subcommand: " + subcommand : "no subcommand");
-  const plan = { subcommand, name: null, json: false, fields: {} };
+  const plan = { subcommand, name: null, json: false, live: false, fields: {} };
   for (let i = 1; i < args.length; i++) {
     const arg = args[i];
     if (arg === "--json") { plan.json = true; continue; }
+    if (arg === "--live") { plan.live = true; continue; }
     if (FLAGS.indexOf(arg) >= 0) {
       const value = args[++i];
       if (value === undefined) throw new Error("`" + arg + "` with no value");
@@ -203,6 +255,7 @@ export function parseAgentProfilesArgs(args) {
     throw new Error(subcommand + " needs a profile name");
   }
   if (subcommand === "list" && plan.name) throw new Error("list takes no profile name");
+  if (subcommand !== "check" && plan.live) throw new Error("`--live` is only valid with `check`");
   if (subcommand === "create" && !plan.fields.adapter) throw new Error("create needs `--adapter <command>`");
   if (["create", "update"].indexOf(subcommand) >= 0 &&
       (Object.prototype.hasOwnProperty.call(plan.fields, "prompt") === Object.prototype.hasOwnProperty.call(plan.fields, "prompt_file")) &&
@@ -231,6 +284,23 @@ function answer(plan, store, profile = null) {
   return 0;
 }
 
+function checkAnswer(plan, checked, env) {
+  const results = checked.results.map((row) => {
+    const profile = checked.profiles.find((p) => p.name === row.name);
+    return plan.live && profile && !row.problems.length ? { ...row, live: liveProbe(profile, env) } : { ...row, live: null };
+  });
+  const ok = checked.ok && results.every((row) => !row.live || row.live.ok);
+  if (plan.json) { printJson("profile-check", { ok, path: checked.path, live: plan.live, results }); return ok ? 0 : 1; }
+  for (const row of results) {
+    const problems = row.problems || [];
+    const live = row.live;
+    console.log((!problems.length && (!live || live.ok) ? "✓" : "✗") + " " + (row.name || "profiles") + "  " + (live ? live.state : row.state));
+    for (const problem of problems) console.log("  " + problem);
+    if (live && !live.ok) console.log("  live probe: " + (live.outcome || "invalid response"));
+  }
+  return ok ? 0 : 1;
+}
+
 export function run(argv, env = process.env) {
   let plan;
   try { plan = parseAgentProfilesArgs(argv); }
@@ -239,6 +309,7 @@ export function run(argv, env = process.env) {
     return 2;
   }
   const store = readAgentProfiles(env);
+  if (plan.subcommand === "check") return checkAnswer(plan, checkAgentProfiles(plan.name ? [plan.name] : [], env), env);
   if (store.problems.length) {
     console.error(failure(N + " profile", "cannot read local agent profiles", [store.path, ...store.problems], [N + " profile list"]));
     return 1;

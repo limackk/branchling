@@ -78,7 +78,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { resolveActor } from "./actor.mjs";
-import { resolveAgentProfile, secretEnvironmentNames } from "./agent-profiles.mjs";
+import { checkAgentProfiles, resolveAgentProfile, secretEnvironmentNames } from "./agent-profiles.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { repoRootFor } from "./done-task.mjs";
 import { readHistory, recordEdit } from "./history.mjs";
@@ -1218,6 +1218,12 @@ export function run(argv) {
       return 1;
     }
     plan.profiles[name] = resolved.profile;
+  }
+  const profileCheck = checkAgentProfiles(profileNames);
+  if (!profileCheck.ok) {
+    const details = profileCheck.results.flatMap((row) => (row.problems || []).map((problem) => (row.name ? row.name + ": " : "") + problem));
+    console.error(failure(N + " run", "selected profile setup is not ready", details, [N + " profile check"]));
+    return 1;
   }
 
   // The plan is read BEFORE the loop starts, for the same reason as the roles

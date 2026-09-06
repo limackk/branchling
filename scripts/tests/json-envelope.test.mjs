@@ -162,6 +162,9 @@ const READING = {
   // executable makes the adapter response malformed on purpose, which proves
   // the JSON refusal shape without needing a provider or fixture wrapper.
   "adapter-conformance": { args: ["conformance", "--adapter", process.execPath, "--json"], noDir: true, refuses: true },
+  // Profile checks read only the isolated user configuration, never the fixture
+  // backlog. The empty answer is still an envelope a setup tool can consume.
+  "profile-check": { args: ["profile", "check", "--json"], noDir: true },
 };
 
 /**
