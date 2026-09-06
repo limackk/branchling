@@ -109,6 +109,20 @@ behaviour; requesting a missing brief refuses with the path to add. A brief for
 an undeclared slug is never selected, because the command first checks the
 project's `roles:` vocabulary.
 
+### Local agent profiles
+
+An agent profile is not project configuration. It belongs to one person's
+machine, in `agent-profiles.yaml` beside their user `config.yaml`, because two
+contributors may correctly run the same backlog through different providers.
+Use `branchling profile create`, `list`, `show`, `update` and `remove`; every
+write has flags, so no editor session is required.
+
+Each profile has a slug, an opaque `adapter` command, optional `model` and
+`effort`, and exactly one prompt (`prompt` or `prompt_file`). The command does
+not recognise provider names: Claude, Codex, Kimi, GLM and a future CLI are all
+just adapter values. Credentials are refused in profile values; refer to an
+environment variable or provider configuration instead.
+
 **An unknown key FAILS.** A typo in a vocabulary is indistinguishable from
 "this project just works that way" — the same rule as an unknown flag in
 `query.mjs`.

@@ -34,7 +34,7 @@ import { fileURLToPath } from "node:url";
 
 import { ACTOR_ENV, DEFAULT_ACTOR, resolveActor } from "../actor.mjs";
 import {
-  CONFIG_FILENAME, HOME_ENV, USER_DEFAULTS, USER_KEYS, homePaths, loadUserConfig, parseUserConfig,
+  CONFIG_FILENAME, HOME_ENV, USER_DEFAULTS, USER_KEYS, agentProfilesPath, homePaths, loadUserConfig, parseUserConfig,
   registryPath, userConfigPath,
 } from "../home.mjs";
 import { COMMANDS } from "../cli.mjs";
@@ -317,6 +317,8 @@ test("the preferences file the tool would read is named in `where`", () => {
   const { home, env } = fixture();
   const report = JSON.parse(run(["where", "--json"], env).stdout);
   assert.equal(report.preferences.path, join(home, "config", "config.yaml"));
+  assert.equal(report.agentProfiles.path, agentProfilesPath(env));
+  assert.equal(report.agentProfiles.exists, false);
   assert.equal(readFileSync(CLI, "utf8").includes("--project"), false,
     "the dispatcher itself must not learn about a --project flag either");
 });

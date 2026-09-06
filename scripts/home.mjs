@@ -61,6 +61,8 @@ export const HOME_ENV = "BRANCHLING_HOME";  // product-name: allow
 
 export const CONFIG_FILENAME = "config.yaml";
 export const REGISTRY_FILENAME = "projects.yaml";
+/** Local execution profiles. This is a user-owned file, never project data. */
+export const AGENT_PROFILES_FILENAME = "agent-profiles.yaml";
 
 /**
  * Where the home directory is, without touching the disk. PURE.
@@ -125,6 +127,11 @@ export function userConfigPath(env = process.env) {
 
 export function registryPath(env = process.env) {
   return join(homePaths(env).config, REGISTRY_FILENAME);
+}
+
+/** The provider-neutral profiles a person keeps on this machine. */
+export function agentProfilesPath(env = process.env) {
+  return join(homePaths(env).config, AGENT_PROFILES_FILENAME);
 }
 
 /** Create the config directory on demand. Only the two commands that WRITE

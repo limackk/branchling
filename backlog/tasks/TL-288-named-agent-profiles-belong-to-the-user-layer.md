@@ -6,21 +6,21 @@ labels: []
 board: main
 epic: "Provider-neutral agent execution"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1d
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-05
-updated: 2026-09-05
+updated: 2026-09-06
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: [TL-289, TL-291, TL-292, TL-294, TL-300]
 related_docs:
   - docs/backlog-config-and-portability.md
 verification:
   - id: profile-store
-    bash: "node --test scripts/tests/agent-profiles.test.mjs scripts/tests/user-config.test.mjs"
+    bash: "node --test scripts/tests/agent-profiles.test.mjs scripts/tests/home.test.mjs"
   - id: suite-green
     bash: "node --test scripts/tests/*.test.mjs"
 ---
@@ -73,10 +73,10 @@ task deliberately specifies the contract rather than guessing the syntax.
 
 ## Acceptance criteria
 
-- [ ] Two isolated users can define profiles with the same name and different
+- [x] Two isolated users can define profiles with the same name and different
       adapters, models, efforts and prompts without changing the repository.
       [proof: profile-store]
-- [ ] Unknown fields, duplicate names, unreadable prompt files and credential
+- [x] Unknown fields, duplicate names, unreadable prompt files and credential
       values in forbidden fields fail with actionable errors. [proof: profile-store]
-- [ ] Existing user configuration and raw `run` commands remain valid.
+- [x] Existing user configuration and raw `run` commands remain valid.
       [proof: suite-green]

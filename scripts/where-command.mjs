@@ -23,11 +23,12 @@
  * Tests: `node --test scripts/tests/home.test.mjs`
  */
 
+import { existsSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { activityDir } from "./activity.mjs";
-import { homePaths, loadUserConfig, registryPath, userConfigPath } from "./home.mjs";
+import { agentProfilesPath, homePaths, loadUserConfig, registryPath, userConfigPath } from "./home.mjs";
 import { projectFor, readRegistry } from "./registry.mjs";
 import { resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
@@ -76,6 +77,7 @@ export function whereReport(opts = {}) {
     config: home.config,
     data: home.data,
     preferences: { path: userConfigPath(env), exists: user.exists },
+    agentProfiles: { path: agentProfilesPath(env), exists: existsSync(agentProfilesPath(env)) },
     registry: {
       path: registryPath(env),
       exists: registry.exists,
@@ -114,6 +116,7 @@ export function renderWhere(report, opts = {}) {
     ["    config", report.config],
     ["    data", report.data],
     ["    preferences", report.preferences.path + "  (exists: " + yesNo(report.preferences.exists) + ")"],
+    ["    agent profiles", report.agentProfiles.path + "  (exists: " + yesNo(report.agentProfiles.exists) + ")"],
     ["    registry", report.registry.path + "  (exists: " + yesNo(report.registry.exists) + ")"],
     ["    projects known", String(report.registry.projects)],
   ]));

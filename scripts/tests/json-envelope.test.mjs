@@ -89,6 +89,10 @@ const READING = {
   // A topic is named on purpose: without one the payload carries the listing and
   // no `text`, and the key that matters most would go unexercised.
   instructions: ["instructions", "overview", "--json"],
+  // Profiles are machine-local user data, not a question about the fixture
+  // backlog. The generic harness normally appends `--dir`; this one must prove
+  // the opposite boundary and therefore runs with no project directory.
+  "agent-profiles": { args: ["profile", "list", "--json"], noDir: true },
   // The fixtures carry no `plan.yaml`, so this exercises the answer a backlog
   // without an execution order gives — which is the one that has to stay a
   // complete envelope rather than an error.
@@ -189,8 +193,9 @@ const WRITING = {
 };
 
 function ask(kind, dir) {
-  const spec = READING[kind] ? { args: READING[kind] } : WRITING[kind];
-  const r = run(spec.args.concat(["--dir", dir]), undefined, spec.input);
+  const reading = READING[kind];
+  const spec = reading ? (Array.isArray(reading) ? { args: reading } : reading) : WRITING[kind];
+  const r = run(spec.noDir ? spec.args : spec.args.concat(["--dir", dir]), undefined, spec.input);
   // A REFUSAL still has to be an envelope, so a non-zero exit is not a failure
   // here — only a usage error is, and only for the kinds that are not testing a
   // refusal on purpose.
@@ -274,7 +279,7 @@ test("the version number lives in exactly one file", () => {
 });
 
 test("no reading command builds an envelope of its own", () => {
-  for (const file of ["query.mjs", "stats-report.mjs", "doctor.mjs", "suggest-board.mjs", "next-backlog-id.mjs", "instructions.mjs"]) {
+  for (const file of ["query.mjs", "stats-report.mjs", "doctor.mjs", "suggest-board.mjs", "next-backlog-id.mjs", "instructions.mjs", "agent-profiles.mjs"]) {
     const src = readFileSync(join(SCRIPTS_DIR, file), "utf8");
     assert.match(src, /json-envelope\.mjs/, file + ": emits --json without the shared envelope");
   }
