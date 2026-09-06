@@ -3,6 +3,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { adapterEnvironment, redactSecrets } from "../run-loop.mjs";
+import { isolateHome } from "./_repo.mjs";
+
+isolateHome("agent-adapter-security");
 
 const ctx = { root: "/work/repo/backlog", cwd: "/work/repo", actor: "agent:runner" };
 const task = {

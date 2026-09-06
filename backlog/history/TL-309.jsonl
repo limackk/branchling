@@ -1,1 +1,4 @@
 {"id":"01M1VMAMGDXHMS3F9NSYT2HS1D","ts":"2026-09-06T15:10:26.829Z","task":"TL-309","field":"__created__","from":"","to":"Every test isolates the user profile","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1VMHG9K4RGHCJ806HPB63XD","ts":"2026-09-06T15:14:11.891Z","task":"TL-309","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1VMHG9KPJ62MF3EHMSZ4XXJ","ts":"2026-09-06T15:14:11.891Z","task":"TL-309","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1VMJ91EDWF6NMBBZPMENQGH","ts":"2026-09-06T15:14:37.230Z","task":"TL-309","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven","session":"tree-526f61f2043f"}

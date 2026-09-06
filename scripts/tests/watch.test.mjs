@@ -2,6 +2,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseWatchArgs, render, run } from "../watch.mjs";
+import { isolateHome } from "./_repo.mjs";
+
+isolateHome("watch");
 
 test("the watch arguments make looping explicit and automation one-shot", () => {
   assert.deepEqual(parseWatchArgs([]), { dir: null, interval: 2, once: false, json: false });
