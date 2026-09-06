@@ -304,6 +304,29 @@ choose different providers without changing the project. Raw `--agent` commands
 remain available for existing scripts. With no `--profile-for` mapping, that one
 profile is the generalist: it serves both roleless work and every declared role.
 
+Before publishing a wrapper, its author can prove the provider-neutral boundary
+without credentials, network access or a real task:
+
+```bash
+branchling conformance --adapter "$PWD/bin/developer-agent"
+branchling conformance --adapter "$PWD/bin/developer-agent" --json
+```
+
+The command builds a disposable repository and asks the adapter for a
+test-only JSON response for success, failure, availability, authentication,
+quota, cancellation and timeout. This handshake is enabled only by
+`BRANCHLING_CONFORMANCE=1`; ordinary `branchling run` keeps its stdin,
+environment and exit-code contract unchanged. The adapter guide is therefore
+one small executable boundary rather than a provider registry or plugin API.
+
+For each requested `BRANCHLING_CONFORMANCE_SCENARIO`, the adapter writes one
+JSON object to stdout: `{"version":1,"scenario":"…","outcome":"…"}`.
+The scenario must be echoed and the outcome must match it. The `cancelled`
+scenario additionally returns `childPid` for a child it has already terminated;
+the harness verifies that the process is gone. Adapter stderr is deliberately
+not replayed, so a provider diagnostic cannot leak a credential into the
+conformance report.
+
 **One queue, several hands.** A task may ask for a competence in `role:`, and
 `--agent-for <role>=<command>` or `--profile-for <role>=<name>` is repeatable,
 with `--agent` or `--profile` serving the tasks that ask for nobody in

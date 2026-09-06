@@ -124,6 +124,10 @@ export const KINDS = {
   // of the POINTER a repository carries, not of the guides.
   instructions: { topics: [], topic: null, role: null, text: null, version: null },
   "agent-profiles": { path: null, exists: null, profiles: [], profile: null },
+  // `conformance --json` proves an adapter against a disposable, offline
+  // contract. Results name the requested scenario rather than exposing the
+  // adapter's raw output, which may contain provider diagnostics or a secret.
+  "adapter-conformance": { ok: null, version: null, adapter: null, results: [], failures: [] },
   "next-id": { nextId: null, id: null, prefix: null, max: null, source: null, trees: null, branches: null, known: null },
   // `seed --json`. The first WRITING command in the envelope, because it is the
   // first one written after the envelope existed — the older three answer with a

@@ -1046,6 +1046,19 @@ export const COMMANDS = {
       "  exit: 0 read or written · 1 invalid profile or missing name · 2 usage error",
     ].join("\n"),
   },
+  conformance: {
+    script: "adapter-conformance.mjs",
+    summary: "prove one profile adapter offline against the public process contract",
+    usage: [
+      `${N} conformance --adapter <executable> [--timeout <seconds>] [--json]`,
+      "",
+      "  Runs a disposable, offline adapter contract. It never reads a local profile,",
+      "  contacts a provider, claims a real task or writes a run log. The adapter receives",
+      "  the normal profile stdin/environment plus a test-only JSON handshake.",
+      "",
+      "  exit: 0 every scenario passed · 1 adapter contract failed · 2 usage error",
+    ].join("\n"),
+  },
   doctor: {
     script: "doctor.mjs",
     summary: "is the backlog set up correctly — configuration, tree, git, guards",

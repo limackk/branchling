@@ -620,6 +620,7 @@ implementation detail. Every reading command answers in the same envelope:
 | `next-id` | `next-id` | `nextId`, `id`, `prefix`, `max`, `source`, `trees`, `branches`, `known` |
 | `instructions` | `instructions` | `topics`, `topic`, `role`, `text`, `version` |
 | `profile list/show` | `agent-profiles` | `path`, `exists`, `profiles`, `profile` |
+| `conformance` | `adapter-conformance` | `ok`, `version`, `adapter`, `results`, `failures` |
 | `plan` | `plan` | `root`, `exists`, `updated`, `rationale`, `waves`, `activeWave`, `nextUp`, `inProgress`, `unplanned`, `stale`, `inProgressStatus` |
 | `time` | `time` | `root`, `closed`, `completed`, `unstamped` (ids, not a count), `leadTimeDays`, `throughput`, `perWeekMean`, `engaged`, `unknown_ratio`, `tokens` (null when no adapter has written any — never 0), `cost` (the per-model breakdown and why an amount is missing) |
 | `seed` | `seed` | `ok`, `root`, `dryRun`, `created`, `errors` |

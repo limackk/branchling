@@ -158,6 +158,10 @@ const READING = {
   // `wave: null` means no execution order was declared, not that the command
   // failed to inspect the backlog.
   watch: ["watch", "--json"],
+  // Conformance creates its own disposable repository. Giving it a Node
+  // executable makes the adapter response malformed on purpose, which proves
+  // the JSON refusal shape without needing a provider or fixture wrapper.
+  "adapter-conformance": { args: ["conformance", "--adapter", process.execPath, "--json"], noDir: true, refuses: true },
 };
 
 /**
