@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { readHistory } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
-import { resolveBacklogDir } from "./paths.mjs";
+import { BacklogNotFoundError, resolveBacklogDir } from "./paths.mjs";
 import { failure, terminal } from "./ui.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -23,14 +23,14 @@ export function parseWatchArgs(args) {
   return plan;
 }
 function call(args) { const r = spawnSync(process.execPath, [CLI].concat(args), { encoding: "utf8", env: { ...process.env, NO_COLOR: "1" } }); return { ok: r.status === 0, text: r.stdout || r.stderr || "" }; }
-export function frame(plan) {
+export function frame(plan, resolvedRoot = null) {
   const dir = plan.dir ? ["--dir", plan.dir] : [];
   const active = call(["query", "--status", "in_progress", "--json"].concat(dir));
   const wave = call(["plan", "--json"].concat(dir));
   const tasks = active.ok ? JSON.parse(active.text).tasks : [];
   const planState = wave.ok ? JSON.parse(wave.text) : null;
   const activeWave = planState && planState.waves.find((w) => w.active);
-  const root = resolveBacklogDir({ dir: plan.dir || undefined }).root;
+  const root = resolvedRoot || resolveBacklogDir({ dir: plan.dir || undefined }).root;
   const details = new Map(tasks.map((t) => [t.id, t]));
   const waveTasks = activeWave ? activeWave.tasks.map((t) => {
     const events = readHistory(root, t.id);
@@ -54,8 +54,16 @@ export function render(frame) {
 }
 export function run(argv, deps = {}) {
   let plan; try { plan = parseWatchArgs(argv); } catch (e) { console.error(failure(N + " watch", e.message, [], [N + " watch --help"])); return 2; }
+  let root;
+  try {
+    root = resolveBacklogDir({ dir: plan.dir || undefined }).root;
+  } catch (error) {
+    if (!(error instanceof BacklogNotFoundError)) throw error;
+    console.error(failure(N + " watch", error.message, error.details, [N + " init --dir ./backlog"]));
+    return 1;
+  }
   const make = deps.frame || frame; const write = deps.write || ((s) => process.stdout.write(s)); const controls = deps.terminal || terminal;
-  const one = () => { const value = make(plan); if (plan.json) printJson("watch", value); else write(render(value)); };
+  const one = () => { const value = make(plan, root); if (plan.json) printJson("watch", value); else write(render(value)); };
   if (plan.once || !process.stdout.isTTY) { one(); return 0; }
   const refresh = () => { write(controls.refreshLive()); one(); write(controls.eraseBelow()); };
   write(controls.openLive()); refresh(); const timer = setInterval(refresh, plan.interval * 1000); process.on("SIGINT", () => { clearInterval(timer); write(controls.closeLive()); process.exit(0); }); return 0;
