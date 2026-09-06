@@ -78,6 +78,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { resolveActor } from "./actor.mjs";
+import { resolveAgentProfile } from "./agent-profiles.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { repoRootFor } from "./done-task.mjs";
 import { readHistory, recordEdit } from "./history.mjs";
@@ -111,7 +112,7 @@ const CLI = join(__dirname, "cli.mjs");
 export const AGENT_ENV = "BACKLOG_AGENT_COMMAND";
 
 export const RUN_FLAGS = [
-  "--dir", "--actor", "--agent", "--agent-for", "--max-attempts", "--max-tasks", "--timeout",
+  "--dir", "--actor", "--agent", "--agent-for", "--profile", "--profile-for", "--max-attempts", "--max-tasks", "--timeout",
   "--log-dir", "--stuck-status", "--json", "--dry-run", "--plan", "--probe",
   "--board", "--label", "--priority", "--epic",
 ];
@@ -122,7 +123,7 @@ const DEFAULT_TIMEOUT_SECONDS = 900;
 /** PURE — resolves `run`'s arguments. Throws on a usage error. */
 export function parseRunArgs(args) {
   const plan = {
-    dir: null, actor: null, agent: null, agentFor: {}, json: false, dryRun: false, usePlan: false,
+    dir: null, actor: null, agent: null, profile: null, agentFor: {}, profileFor: {}, json: false, dryRun: false, usePlan: false,
     maxAttempts: DEFAULT_MAX_ATTEMPTS, maxTasks: 0, timeout: DEFAULT_TIMEOUT_SECONDS, probe: false,
     logDir: null, stuckStatus: null, board: null, label: null, priority: null, epic: null,
   };
@@ -164,6 +165,16 @@ export function parseRunArgs(args) {
         plan.agentFor[role] = command;
         continue;
       }
+      if (a === "--profile-for") {
+        const at = value.indexOf("=");
+        if (at <= 0) throw new Error("`--profile-for " + value + "` is not `<role>=<profile>`");
+        const role = value.slice(0, at).trim();
+        const profile = value.slice(at + 1).trim();
+        if (!profile) throw new Error("`--profile-for " + role + "=` with no profile");
+        if (plan.profileFor[role] || plan.agentFor[role]) throw new Error("two hands named for role `" + role + "`");
+        plan.profileFor[role] = profile;
+        continue;
+      }
       const key = { "--log-dir": "logDir", "--stuck-status": "stuckStatus" }[a] || a.slice(2);
       plan[key] = value;
       continue;
@@ -177,6 +188,7 @@ export function parseRunArgs(args) {
         "told which task to run is a queue with the choosing put back in."
     );
   }
+  if (plan.agent && plan.profile) throw new Error("`--agent` and `--profile` are alternatives — name one generalist");
   return plan;
 }
 
@@ -211,11 +223,25 @@ export function agentFor(plan, role) {
   return plan.agentFor[wanted] || null;
 }
 
+/** The selected hand, preserving the raw shell command compatibility path. */
+export function handFor(plan, role) {
+  const wanted = String(role || "").trim();
+  if (!wanted) {
+    if (plan.agent) return { kind: "raw", command: plan.agent };
+    return plan.profile ? { kind: "profile", name: plan.profile } : null;
+  }
+  if (plan.agentFor[wanted]) return { kind: "raw", command: plan.agentFor[wanted] };
+  if (plan.profileFor[wanted]) return { kind: "profile", name: plan.profileFor[wanted] };
+  if (Object.keys(plan.agentFor || {}).length || Object.keys(plan.profileFor || {}).length) return null;
+  if (plan.agent) return { kind: "raw", command: plan.agent };
+  return plan.profile ? { kind: "profile", name: plan.profile } : null;
+}
+
 /** The roles this invocation serves, for `next --role`. Empty when the caller
  *  named none — and then no role filter is passed at all, so the queue behaves
  *  exactly as it did. PURE. */
 export function servedRoles(plan) {
-  return Object.keys(plan.agentFor || {}).sort();
+  return [...new Set(Object.keys(plan.agentFor || {}).concat(Object.keys(plan.profileFor || {})))].sort();
 }
 
 /**
@@ -818,6 +844,13 @@ export function agentEnvironment(ctx, task) {
   out[prefix + "_ROLE"] = String(task.role || "");
   out[prefix + "_TASK"] = String(task.id || "");
   out[prefix + "_DIR"] = String(ctx.root || "");
+  out[prefix + "_REPOSITORY"] = String(ctx.cwd || "");
+  // Empty optional values are deliberate: an adapter reads one stable contract
+  // instead of distinguishing absent fields from an older launcher.
+  out[prefix + "_PROFILE"] = String((task.profile && task.profile.name) || "");
+  out[prefix + "_PROMPT"] = String((task.profile && task.profile.prompt) || "");
+  out[prefix + "_MODEL"] = String((task.profile && task.profile.model) || "");
+  out[prefix + "_EFFORT"] = String((task.profile && task.profile.effort) || "");
   return out;
 }
 
@@ -833,7 +866,7 @@ function claimAfterAttempt(ctx, task) {
   const owner = String(record.owner || "").trim();
   if (owner === String(ctx.actor || "").trim()) return { ours: true };
   const role = String(record.role || "").trim();
-  const served = !owner && role && role !== String(task.role || "").trim() && !!agentFor(ctx.plan, role);
+  const served = !owner && role && role !== String(task.role || "").trim() && !!handFor(ctx.plan, role);
   return { ours: false, owner, role, toRole: served ? role : null, status: record.status };
 }
 
@@ -857,9 +890,11 @@ function workOne(ctx, task) {
 
   for (let attempt = 1; attempt <= ctx.plan.maxAttempts; attempt++) {
     attempts = attempt;
-    const command = renderAgentCommand(task.command, task);
+    const command = task.hand.kind === "raw"
+      ? renderAgentCommand(task.hand.command, task)
+      : task.hand.profile.adapter;
     appendFileSync(logPath, "=== attempt " + attempt + ": " + command + "\n", "utf8");
-    const agent = spawnSync(command, {
+    const agent = task.hand.kind === "raw" ? spawnSync(command, {
       shell: true,
       cwd: ctx.cwd,
       encoding: "utf8",
@@ -868,6 +903,14 @@ function workOne(ctx, task) {
       // task — `handoff`, `ask`, `decide` — needs the first, and had to read the
       // history file to learn it. Both are facts the loop holds and cost nothing
       // to pass. The names derive from the product name, never a literal.
+      env: { ...process.env, ...agentEnvironment(ctx, task) },
+      input: agentInput(task.text, feedback, feedbackRan),
+      timeout: ctx.plan.timeout * 1000,
+      maxBuffer: 64 * 1024 * 1024,
+    }) : spawnSync(command, [], {
+      shell: false,
+      cwd: ctx.cwd,
+      encoding: "utf8",
       env: { ...process.env, ...agentEnvironment(ctx, task) },
       input: agentInput(task.text, feedback, feedbackRan),
       timeout: ctx.plan.timeout * 1000,
@@ -1035,8 +1078,8 @@ function renderReport(report, plan) {
       // particular — rather than as a role called "", which no reader would
       // recognise and no `--agent-for` could ever answer.
       lines.push("    " + MARK.warn + " " + ids.length + " task(s) " + (role
-        ? "ask for `" + role + "` — no `--agent-for " + role + "=…` was given"
-        : "ask for no role in particular — no `--agent` was given"));
+        ? "ask for `" + role + "` — no `--agent-for " + role + "=…` or `--profile-for " + role + "=…` was given"
+        : "ask for no role in particular — no `--agent` or `--profile` was given"));
       lines.push("      " + color.dim(ids.join(", ")));
     }
   }
@@ -1109,12 +1152,28 @@ export function run(argv) {
   // is the project's, and the consistency between them is checked at the seam).
   const unknownRoles = servedRoles(plan).filter((r) => (config.roles || []).indexOf(r) < 0);
   if (unknownRoles.length) {
-    console.error(failure(N + " run", "`--agent-for` names role(s) this backlog does not declare: " + unknownRoles.join(", "),
+    console.error(failure(N + " run", "`--agent-for` or `--profile-for` names role(s) this backlog does not declare: " + unknownRoles.join(", "),
       (config.roles || []).length
         ? ["`roles` in config.yaml holds: " + config.roles.join(", ")]
         : ["This backlog declares no `roles:` in config.yaml, so no task can ask for one."],
       [N + " run --help"]));
     return 2;
+  }
+
+  // Profiles are resolved before the first claim. A missing wrapper or an
+  // invalid local store is a machine configuration error, not a task failure.
+  const profileNames = [...new Set([plan.profile].concat(Object.values(plan.profileFor || {})).filter(Boolean))];
+  plan.profiles = {};
+  for (const name of profileNames) {
+    const resolved = resolveAgentProfile(name);
+    if (!resolved.ok) {
+      const details = resolved.kind === "invalid-store"
+        ? [resolved.store.path, ...(resolved.store.problems || [])]
+        : ["Run `" + N + " profile list` to see local names."];
+      console.error(failure(N + " run", "cannot use profile `" + name + "`", details, [N + " profile show " + name]));
+      return 1;
+    }
+    plan.profiles[name] = resolved.profile;
   }
 
   // The plan is read BEFORE the loop starts, for the same reason as the roles
@@ -1131,15 +1190,17 @@ export function run(argv) {
     planned = loaded.plan;
   }
 
-  plan.agent = plan.agent || process.env[AGENT_ENV] || null;
+  // An explicit profile is a complete choice of generalist. The legacy shell
+  // default remains available only when neither kind of generalist was named.
+  if (!plan.agent && !plan.profile) plan.agent = process.env[AGENT_ENV] || null;
   // A RUN OF SPECIALISTS IS A RUN (TL-223). `--agent` is the hand for tasks that
   // ask for no role, and a queue where every task asks for one needs no such
   // hand. Requiring it anyway made the arrangement `--agent-for` exists for the
   // one arrangement that could not be invoked. What is refused is a run with no
   // command of ANY kind, which is still what this message is about.
-  if (!plan.agent && !Object.keys(plan.agentFor || {}).length && !plan.dryRun) {
+  if (!plan.agent && !plan.profile && !Object.keys(plan.agentFor || {}).length && !Object.keys(plan.profileFor || {}).length && !plan.dryRun) {
     console.error(failure(N + " run", "no agent command — this tool does not have one of its own", [
-      "Pass `--agent \"<command>\"` or set " + AGENT_ENV + ".",
+      "Pass `--agent \"<command>\"`, `--profile <name>`, or set " + AGENT_ENV + ".",
       "`{task_file}` and `{id}` are substituted; the task, and the last refusal,",
       "arrive on stdin. Examples of the SHAPE, not a recommendation:",
       "  " + MARK.bullet + " \"claude -p @{task_file}\"",
@@ -1197,7 +1258,7 @@ export function run(argv) {
   // invocation cannot serve — the thing the comment above forbids — so the
   // filter is narrowed to the roles themselves, with the flag `next` already
   // has for it.
-  const generalist = !!plan.agent;
+  const generalist = !!(plan.agent || plan.profile);
   if (served.length) {
     passthrough.push("--role", served.join(","));
     if (!generalist) passthrough.push("--role-strict");
@@ -1247,7 +1308,8 @@ export function run(argv) {
     const shown = plan.maxTasks ? rows.slice(0, plan.maxTasks) : rows;
     if (plan.json) {
       console.log(JSON.stringify({
-        ok: true, dryRun: true, agent: plan.agent, plan: planned ? true : false,
+        ok: true, dryRun: true, agent: plan.agent, profile: plan.profile,
+        agentFor: plan.agentFor, profileFor: plan.profileFor, plan: planned ? true : false,
         order: shown.map((r) => ({
           id: r.task.id, priority: r.task.priority, status: r.task.status, file: r.task.file,
           ...(planned ? { wave: r.wave, waveName: r.name } : {}),
@@ -1355,20 +1417,21 @@ export function run(argv) {
     }
     seen.add(turn);
 
-    const command = agentFor(plan, role);
-    if (!command) {
+    const hand = handFor(plan, role);
+    if (!hand) {
       // Belt and braces: the selection above already excludes these, so arriving
       // here means the dispatcher and this loop disagree — and a task claimed
       // with nobody to work it must not be left claimed.
       releaseLock({ root, taskId: task.id, actor });
-      stopped = task.id + " asks for role `" + role + "`, which no `--agent-for` serves";
+      stopped = task.id + " asks for role `" + role + "`, which no `--agent-for` or `--profile-for` serves";
       break;
     }
     // Which turn this is for THIS task, so the two legs of a followed handoff do
     // not write to one file (TL-281).
     const leg = (legs.get(task.id) || 0) + 1;
     legs.set(task.id, leg);
-    const result = workOne(ctx, { id: task.id, file: task.file, text: task.text || "", command, role, leg });
+    if (hand.kind === "profile") hand.profile = plan.profiles[hand.name];
+    const result = workOne(ctx, { id: task.id, file: task.file, text: task.text || "", hand, profile: hand.profile || null, role, leg });
     result.role = role;
     if (result.outcome === "agent-never-ran") {
       // NOTHING WAS MEASURED, so nothing about the task may change (TL-184). The
@@ -1514,7 +1577,8 @@ export function run(argv) {
     console.log(JSON.stringify({
       // `ok` is about the RUN, not about the tasks: blocked work is a run that
       // finished, an agent that could not start is a run that did not (TL-184).
-      ok: !neverStarted, dryRun: false, agent: plan.agent, agentFor: plan.agentFor, stopped,
+      ok: !neverStarted, dryRun: false, agent: plan.agent, profile: plan.profile,
+      agentFor: plan.agentFor, profileFor: plan.profileFor, stopped,
       // The whole fact about the machine, in the one place it belongs: which
       // command was tried, what it said, and which status the task was given
       // back to. A consumer never has to parse the report's prose for it.

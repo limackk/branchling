@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: "Provider-neutral agent execution"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1d
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-05
-updated: 2026-09-05
+updated: 2026-09-06
 blocked_by: [TL-288]
 blocks: [TL-290, TL-291, TL-292, TL-294, TL-296, TL-300]
 related_docs:
@@ -74,9 +74,9 @@ executable produce clearer errors and remove accidental quoting behavior.
 
 ## Acceptance criteria
 
-- [ ] One stable contract carries prompt, model and effort without knowing how
+- [x] One stable contract carries prompt, model and effort without knowing how
       a provider spells its CLI or API options. [proof: adapter-contract]
-- [ ] A fixture provider not named in production code can edit a task and pass
+- [x] A fixture provider not named in production code can edit a task and pass
       its verification through the normal loop. [proof: adapter-contract]
-- [ ] Timeouts, retries, logs and raw command invocations behave as before.
+- [x] Timeouts, retries, logs and raw command invocations behave as before.
       [proof: suite-green]

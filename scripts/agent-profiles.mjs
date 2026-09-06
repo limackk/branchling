@@ -5,8 +5,9 @@
  * A profile is deliberately not a project configuration value. It says which
  * executable, model and prompt ONE person wants to use on THEIR machine; a
  * repository can be correct while each contributor uses a different provider.
- * The adapter stays an opaque command string. Naming providers in this module
- * would make every new CLI a release of this tool.
+ * The adapter is one executable. A user-owned wrapper translates its stable
+ * inputs to provider flags or an API call, so naming providers here would make
+ * every new CLI a release of this tool.
  */
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -38,7 +39,9 @@ function profileProblems(profile, path) {
   if (!PROFILE_NAME_SHAPE.test(profile.name || "")) {
     problems.push("profile name `" + (profile.name || "") + "` must be a lowercase slug");
   }
-  if (!String(profile.adapter || "").trim()) problems.push("profile `" + profile.name + "` needs an `adapter`");
+  const adapter = String(profile.adapter || "").trim();
+  if (!adapter) problems.push("profile `" + profile.name + "` needs an `adapter`");
+  else if (/\s/.test(adapter)) problems.push("profile `" + profile.name + "` adapter must name one executable — put provider flags in its wrapper");
   const inline = String(profile.prompt || "").trim();
   const file = String(profile.prompt_file || "").trim();
   if ((inline ? 1 : 0) + (file ? 1 : 0) !== 1) {
@@ -119,7 +122,7 @@ export function serializeAgentProfiles(profiles) {
   const out = [
     "# Agent profiles for this person and this machine.",
     "# Keep credentials outside this file: refer to environment variables or provider configuration.",
-    "# The adapter is an opaque command, so any present or future provider may be used.",
+    "# The adapter is one executable; its wrapper may serve any present or future provider.",
     "profiles:",
   ];
   for (const profile of profiles) {
@@ -146,8 +149,17 @@ function writeAgentProfiles(profiles, env) {
   return { path, config };
 }
 
-function profilePrompt(profile, path) {
+export function profilePrompt(profile, path) {
   return profile.prompt || readFileSync(resolve(dirname(path), profile.prompt_file), "utf8");
+}
+
+/** Resolve one profile into the values a process launcher consumes. */
+export function resolveAgentProfile(name, env = process.env) {
+  const store = readAgentProfiles(env);
+  if (store.problems.length) return { ok: false, kind: "invalid-store", store };
+  const profile = store.profiles.find((p) => p.name === name);
+  if (!profile) return { ok: false, kind: "missing-profile", store };
+  return { ok: true, profile: { ...profile, prompt: profilePrompt(profile, store.path) }, store };
 }
 
 const SUBCOMMANDS = ["create", "list", "show", "update", "remove"];

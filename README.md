@@ -275,12 +275,29 @@ branchling run --agent "claude -p @{task_file}" --max-attempts 2
 branchling run --dry-run          # the order it would work in; claims nothing
 ```
 
+**Profiles make the provider boundary explicit.** Store a local profile with
+one wrapper executable, a prompt and optional model and effort, then run it by
+name. The wrapper receives those values through a stable environment contract;
+it can call a CLI or an API for Claude, Codex, Kimi, GLM or a provider that does
+not exist yet.
+
+```bash
+branchling profile create developer --adapter "$PWD/bin/developer-agent" \
+  --model opus --effort high --prompt "Implement the task with evidence."
+branchling run --profile developer --max-attempts 2
+```
+
+The profile is user data, not repository configuration, so contributors can
+choose different providers without changing the project. Raw `--agent` commands
+remain available for existing scripts.
+
 **One queue, several hands.** A task may ask for a competence in `role:`, and
-`--agent-for <role>=<command>` is repeatable, with `--agent` serving the tasks
-that ask for nobody in particular. A role you gave no command for is *not*
-handed out and *not* failed over — it waits for a hand this deployment does
-not have, usually a person, and the report counts those tasks by role. That is
-the whole escalation mechanism: an absent entry, not a workflow engine.
+`--agent-for <role>=<command>` or `--profile-for <role>=<name>` is repeatable,
+with `--agent` or `--profile` serving the tasks that ask for nobody in
+particular. A role you gave no command for is *not* handed out and *not* failed
+over — it waits for a hand this deployment does not have, usually a person, and
+the report counts those tasks by role. That is the whole escalation mechanism:
+an absent entry, not a workflow engine.
 
 `executor: human` on a task keeps the dispatcher off it entirely — the product
 decision an analyst-agent could phrase but must not settle — while

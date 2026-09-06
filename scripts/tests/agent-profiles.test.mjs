@@ -31,8 +31,8 @@ function run(args, env) {
 test("two users keep same-named profiles with distinct provider details outside a repository", () => {
   const first = fixture();
   const second = fixture();
-  const a = run(["profile", "create", "developer", "--adapter", "claude -p", "--model", "opus", "--effort", "high", "--prompt", "Implement the task."], first.env);
-  const b = run(["profile", "create", "developer", "--adapter", "codex exec", "--model", "gpt-5", "--effort", "medium", "--prompt", "Review the task."], second.env);
+  const a = run(["profile", "create", "developer", "--adapter", "/opt/claude-wrapper", "--model", "opus", "--effort", "high", "--prompt", "Implement the task."], first.env);
+  const b = run(["profile", "create", "developer", "--adapter", "/opt/codex-wrapper", "--model", "gpt-5", "--effort", "medium", "--prompt", "Review the task."], second.env);
   assert.equal(a.status, 0, a.stderr);
   assert.equal(b.status, 0, b.stderr);
   assert.notEqual(agentProfilesPath(first.env), agentProfilesPath(second.env));
@@ -42,11 +42,11 @@ test("two users keep same-named profiles with distinct provider details outside 
   assert.equal(shown.status, 0, shown.stderr);
   const json = JSON.parse(shown.stdout);
   assert.equal(json.kind, "agent-profiles");
-  assert.equal(json.profile.adapter, "claude -p");
+  assert.equal(json.profile.adapter, "/opt/claude-wrapper");
   assert.equal(json.profile.model, "opus");
   assert.equal(json.profile.effort, "high");
   assert.equal(json.profile.prompt, "Implement the task.");
-  assert.equal(run(["profile", "show", "developer"], second.env).stdout.includes("codex exec"), true);
+  assert.equal(run(["profile", "show", "developer"], second.env).stdout.includes("/opt/codex-wrapper"), true);
 });
 
 test("create, list, update and remove are non-interactive, and do not edit user preferences", () => {
@@ -56,7 +56,7 @@ test("create, list, update and remove are non-interactive, and do not edit user 
   writeFileSync(config, "actor: local:me\n", "utf8");
   const before = readFileSync(config, "utf8");
 
-  assert.equal(run(["profile", "create", "review", "--adapter", "codex exec", "--prompt", "Check evidence."], fx.env).status, 0);
+  assert.equal(run(["profile", "create", "review", "--adapter", "/opt/review-wrapper", "--prompt", "Check evidence."], fx.env).status, 0);
   const listed = run(["profile", "list"], fx.env);
   assert.equal(listed.status, 0, listed.stderr);
   assert.match(listed.stdout, /review/);
@@ -95,7 +95,10 @@ test("unknown fields, duplicate names, bad prompt files and copied credentials a
   assert.equal(secret.status, 1);
   assert.match(secret.stderr, /credential value/);
   assert.match(secret.stderr, /environment-variable reference/);
-  assert.equal(run(["profile", "create", "safe", "--adapter", "runner --api_key=$PROVIDER_KEY", "--prompt", "Do work."], fx.env).status, 0);
+  assert.equal(run(["profile", "create", "safe", "--adapter", "/opt/safe-wrapper", "--prompt", "Do work."], fx.env).status, 0);
+  const compound = run(["profile", "create", "compound", "--adapter", "runner --provider future", "--prompt", "Do work."], fx.env);
+  assert.equal(compound.status, 1);
+  assert.match(compound.stderr, /one executable/);
 });
 
 test("a prompt file is read, while a missing one is refused before the profile is written", () => {

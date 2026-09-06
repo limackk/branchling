@@ -117,11 +117,24 @@ contributors may correctly run the same backlog through different providers.
 Use `branchling profile create`, `list`, `show`, `update` and `remove`; every
 write has flags, so no editor session is required.
 
-Each profile has a slug, an opaque `adapter` command, optional `model` and
-`effort`, and exactly one prompt (`prompt` or `prompt_file`). The command does
-not recognise provider names: Claude, Codex, Kimi, GLM and a future CLI are all
-just adapter values. Credentials are refused in profile values; refer to an
-environment variable or provider configuration instead.
+Each profile has a slug, one `adapter` executable, optional `model` and
+`effort`, and exactly one prompt (`prompt` or `prompt_file`). The executable is
+a user-owned wrapper: it translates these neutral inputs into a provider CLI
+invocation or API request. branchling has no provider list, so Claude, Codex,
+Kimi, GLM and a future harness work without a branchling release. Credentials
+are refused in profile values; refer to an environment variable or provider
+configuration instead.
+
+`branchling run --profile <name>` starts that executable directly, never by
+assembling profile values into a shell command. It runs at the repository root,
+receives the task (and any retry feedback) unchanged on standard input, and
+keeps the ordinary timeout, retry, log and verification lifecycle. Its stable
+environment contract is `<PRODUCT>_PROFILE`, `_PROMPT`, `_MODEL`, `_EFFORT`,
+`_ACTOR`, `_ROLE`, `_TASK`, `_DIR` (the backlog) and `_REPOSITORY`. Optional
+profile values are present as empty strings. A wrapper can therefore use one
+contract for every provider, while `--agent` and `--agent-for` preserve the raw
+shell-command path for existing automation. Use
+`--profile-for <role>=<name>` to select profiles per role.
 
 **An unknown key FAILS.** A typo in a vocabulary is indistinguishable from
 "this project just works that way" — the same rule as an unknown flag in
