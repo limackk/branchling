@@ -335,6 +335,15 @@ the harness verifies that the process is gone. Adapter stderr is deliberately
 not replayed, so a provider diagnostic cannot leak a credential into the
 conformance report.
 
+**Copyable reference adapters ship with the package.**
+[`examples/agent-adapters/`](examples/agent-adapters/) contains one adapter for
+an authenticated coding-agent CLI and one for an API-backed coding harness.
+They pass model and effort from the profile, keep provider arguments and
+credentials outside the core, and document how to copy the pattern for Kimi,
+GLM, a local model or another future provider. They intentionally name no
+timeless recommended model: inspect the current harness documentation before
+choosing one.
+
 **One queue, several hands.** A task may ask for a competence in `role:`, and
 `--agent-for <role>=<command>` or `--profile-for <role>=<name>` is repeatable,
 with `--agent` or `--profile` serving the tasks that ask for nobody in

@@ -30,6 +30,7 @@
     "bin/",
     "scripts/",
     ".agents/skills/backlog-workflow/",
+    "examples/agent-adapters/",
     "!scripts/tests/",
     "!scripts/check-publish-metadata.mjs",
     "templates/",
