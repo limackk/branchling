@@ -29,3 +29,14 @@ test("release refuses another actor and a closed task", () => {
   assert.equal(run(dir, ["release", id, "--actor", "agent:second", "--reason", "Not mine."]).status, 1);
   assert.equal(run(dir, ["done", id, "--actor", "agent:first"]).status, 1);
 });
+
+test("a JSON refusal keeps the release envelope and names the cause", () => {
+  const { dir, id } = fixture();
+  assert.equal(run(dir, ["take", id, "--actor", "agent:first"]).status, 0);
+  const refused = run(dir, ["release", id, "--actor", "agent:other", "--reason", "Not mine.", "--json"]);
+  assert.equal(refused.status, 1);
+  const body = JSON.parse(refused.stdout);
+  assert.equal(body.kind, "task-release");
+  assert.equal(body.ok, false);
+  assert.match(body.refusal, /owner: agent:first/);
+});

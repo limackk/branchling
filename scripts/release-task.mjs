@@ -33,19 +33,25 @@ export function parseReleaseArgs(args) {
 
 export function run(argv) {
   let plan;
+  const wantsJson = argv.includes("--json");
+  const refuse = (message, details = [], code = 1, refusalKind = "refused") => {
+    if (wantsJson) printJson("task-release", { ok: false, refusalKind, refusal: message, details });
+    else console.error(failure(N + " release", message, details, [N + " release --help"]));
+    return code;
+  };
   try { plan = parseReleaseArgs(argv); }
-  catch (e) { console.error(failure(N + " release", e.message, [], [N + " release --help"])); return 2; }
+  catch (e) { return refuse(e.message, [], 2, "usage"); }
   const actor = resolveActor(plan.actor);
-  if (!isValidActor(actor)) { console.error(failure(N + " release", "the actor `" + actor + "` has no valid namespace", ["Use one of: " + ACTOR_NAMESPACES.map((n) => n + ":<name>").join(" | ")])); return 2; }
+  if (!isValidActor(actor)) return refuse("the actor `" + actor + "` has no valid namespace", ["Use one of: " + ACTOR_NAMESPACES.map((n) => n + ":<name>").join(" | ")], 2, "usage");
   let root;
   try { root = resolveBacklogDir({ dir: plan.dir || undefined }).root; }
-  catch (e) { console.error(failure(N + " release", e.message, [])); return 2; }
+  catch (e) { return refuse(e.message, [], 2, "usage"); }
   const config = loadConfigOrExit(root);
   if (plan.status && (config.statuses.indexOf(plan.status) < 0 || config.archivedStatuses.indexOf(plan.status) >= 0)) {
-    console.error(failure(N + " release", "`--status` must name an open status in this backlog", [])); return 2;
+    return refuse("`--status` must name an open status in this backlog", [], 2, "usage");
   }
   const result = handoffTask({ root, config, id: plan.id, actor, reason: plan.reason, status: plan.status });
-  if (!result.ok) { console.error(failure(N + " release", result.message, result.details || [])); return result.kind === "not-found" ? 2 : 1; }
+  if (!result.ok) return refuse(result.message, result.details || [], result.kind === "not-found" ? 2 : 1, result.kind || "refused");
   rebuildViews(root);
   if (plan.json) printJson("task-release", { ok: true, id: result.id, status: result.after.status, owner: result.after.owner, released: result.released, comment: result.comment.id });
   else console.log("✓ " + result.id + " released — " + result.before.status + " → " + result.after.status + "; owner cleared");

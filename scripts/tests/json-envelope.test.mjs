@@ -185,6 +185,7 @@ const WRITING = {
     args: ["handoff", "TASK-404", "--to-owner", "unassigned", "--reason", "a fixture", "--actor", "agent:test", "--json"],
     refuses: true,
   },
+  "task-release": { args: ["release", "TASK-404", "--actor", "agent:test", "--reason", "a fixture", "--json"], refuses: true },
   // A task that is not there: same reason as above — the refusal path.
   "verification-run": { args: ["done", "TASK-404", "--json"], refuses: true },
   // A question about a task that is not there (TL-148): the refusal path again,
