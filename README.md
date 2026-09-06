@@ -295,6 +295,21 @@ not exist yet.
 
 ### Quick start: one generalist
 
+For a guided first-run flow in a terminal, use:
+
+```bash
+branchling profile setup
+```
+
+It asks for a local adapter, model, effort and prompt, shows the exact profile
+before writing it, then recommends `profile check` and a no-claim dry run. You
+may point it at any executable you control, or copy a versioned reference
+adapter that ships with the package. The guide never downloads code, starts an
+adapter, probes a provider or asks for a credential value.
+
+The flag form remains the right path for scripts, CI and users who already know
+their configuration:
+
 Copy an adapter you control, then create one local profile. The model name is a
 fact about the installed provider, so obtain it from that provider's current
 documentation rather than copying a stale recommendation.

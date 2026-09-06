@@ -10,10 +10,11 @@
  * every new CLI a release of this tool.
  */
 
-import { accessSync, constants, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { accessSync, chmodSync, constants, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
+import { fileURLToPath } from "node:url";
 
 import { ADAPTER_PROTOCOL_VERSION, PROFILE_PROBE_ENV, PROFILE_PROBE_OUTCOMES, PROFILE_PROTOCOL_VERSION_ENV } from "./agent-contract.mjs";
 import { agentProfilesPath, ensureHome } from "./home.mjs";
@@ -21,6 +22,8 @@ import { printJson } from "./json-envelope.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { stripComment, unquote } from "./task-fields.mjs";
 import { failure, heading, table } from "./ui.mjs";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
 
 export const PROFILE_NAME_SHAPE = /^[a-z0-9][a-z0-9._-]{0,62}$/;
 export const PROFILE_FIELDS = ["name", "adapter", "model", "effort", "prompt", "prompt_file", "secret_env", "protocol_version"];
@@ -173,16 +176,43 @@ function writeAgentProfiles(profiles, env) {
 }
 
 /** One creation operation for both flags and the guided terminal flow. */
-export function createAgentProfile(name, fields, env = process.env) {
+export function validateAgentProfileCreation(name, fields, env = process.env) {
   const store = readAgentProfiles(env);
   if (store.problems.length) return { ok: false, kind: "invalid-store", store };
   if (store.profiles.some((p) => p.name === name)) return { ok: false, kind: "duplicate", store };
   const candidate = { name, ...fields };
   const problems = profileProblems(candidate, store.path);
   if (problems.length) return { ok: false, kind: "invalid-profile", store, problems };
+  return { ok: true, store, profile: candidate };
+}
+
+export function createAgentProfile(name, fields, env = process.env) {
+  const checked = validateAgentProfileCreation(name, fields, env);
+  if (!checked.ok) return checked;
+  const { store, profile: candidate } = checked;
   const profiles = store.profiles.concat(candidate);
   const written = writeAgentProfiles(profiles, env);
   return { ok: true, path: written.path, profiles, profile: candidate };
+}
+
+/** Examples shipped with this package, not a registry of supported providers. */
+export function referenceAdapterTemplates() {
+  return [
+    { id: "claude-code", label: "Claude Code CLI", source: resolve(HERE, "..", "examples", "agent-adapters", "claude-code.mjs") },
+    { id: "aider-api", label: "Aider API harness", source: resolve(HERE, "..", "examples", "agent-adapters", "aider-api.mjs") },
+  ];
+}
+
+/** Copy a versioned local example without downloading or running it. */
+export function copyReferenceAdapter(template, destination) {
+  const source = template && template.source;
+  const target = resolve(destination || "");
+  if (!source || !existsSync(source)) throw new Error("reference adapter is unavailable in this installation");
+  if (!destination || existsSync(target)) throw new Error("adapter destination already exists: " + target);
+  mkdirSync(dirname(target), { recursive: true });
+  copyFileSync(source, target);
+  chmodSync(target, 0o755);
+  return target;
 }
 
 export function profilePrompt(profile, path) {
@@ -312,10 +342,10 @@ function setupAnswer(value, fallback = "") {
  * The setup state machine is terminal-independent so its cancellation and write
  * boundary can be tested without a pseudo-terminal.
  */
-export async function setupProfileConversation(io, env = process.env) {
+export async function setupProfileConversation(io, env = process.env, actions = {}) {
+  const copyAdapter = actions.copyReferenceAdapter || copyReferenceAdapter;
   const fields = [
     { key: "name", label: "Profile name (lowercase slug)", required: true },
-    { key: "adapter", label: "Adapter executable", required: true },
     { key: "prompt", label: "Local prompt", required: true },
     { key: "model", label: "Model (optional)", required: false },
     { key: "effort", label: "Effort (optional)", required: false },
@@ -324,7 +354,7 @@ export async function setupProfileConversation(io, env = process.env) {
   const state = {};
   io.write("Create an agent profile. Type back or cancel at any prompt.\n");
   let index = 0;
-  while (index < fields.length) {
+  while (index < 1) {
     const field = fields[index];
     const current = state[field.key] || "";
     const suffix = current ? ` [${current}]` : "";
@@ -335,10 +365,46 @@ export async function setupProfileConversation(io, env = process.env) {
     state[field.key] = answer;
     index++;
   }
+  io.write("\nAdapter source:\n1) Existing executable I control\n2) Copy a shipped reference adapter\n");
+  const sourceChoice = setupAnswer(await io.ask("Choice [1/2]: "));
+  if (sourceChoice === CANCEL) return { ok: false, kind: "cancelled" };
+  if (sourceChoice === BACK) return { ok: false, kind: "cancelled" };
+  let reference = null;
+  if (sourceChoice === "1") {
+    const adapter = setupAnswer(await io.ask("Adapter executable: "));
+    if (adapter === CANCEL || adapter === BACK || !adapter) return { ok: false, kind: "cancelled" };
+    state.adapter = adapter;
+  } else if (sourceChoice === "2") {
+    const templates = referenceAdapterTemplates();
+    io.write(templates.map((t, i) => (i + 1) + ") " + t.label).join("\n") + "\n");
+    const selected = setupAnswer(await io.ask("Reference adapter: "));
+    if (selected === CANCEL || selected === BACK || !templates[Number(selected) - 1]) return { ok: false, kind: "cancelled" };
+    const template = templates[Number(selected) - 1];
+    const destination = setupAnswer(await io.ask("Copy destination: "));
+    if (destination === CANCEL || destination === BACK || !destination) return { ok: false, kind: "cancelled" };
+    reference = { template, destination };
+    state.adapter = resolve(destination);
+  } else {
+    io.write("Choose 1 or 2. Nothing was written.\n");
+    return { ok: false, kind: "cancelled" };
+  }
+  index = 1;
+  while (index < fields.length) {
+    const field = fields[index];
+    const current = state[field.key] || "";
+    const suffix = current ? ` [${current}]` : "";
+    const answer = setupAnswer(await io.ask(field.label + suffix + ": "), current);
+    if (answer === CANCEL) return { ok: false, kind: "cancelled" };
+    if (answer === BACK) { if (index > 1) index--; continue; }
+    if (field.required && !answer) { io.write(field.label + " is required.\n"); continue; }
+    state[field.key] = answer;
+    index++;
+  }
   const secret = state.secret_env ? "\n  credential variables: " + state.secret_env : "";
+  const source = reference ? "reference " + reference.template.label + " -> " + state.adapter : "custom executable";
   io.write("\nProfile summary:\n  name: " + state.name + "\n  adapter: " + state.adapter
     + "\n  model: " + (state.model || "(none)") + "\n  effort: " + (state.effort || "(none)")
-    + secret + "\n\n1) Create profile\n2) Back\n3) Cancel\n");
+    + secret + "\n  source: " + source + "\n\n1) Create profile\n2) Back\n3) Cancel\n");
   const confirmation = setupAnswer(await io.ask("Choice [1/2/3]: "));
   if (confirmation === CANCEL || confirmation === "3") return { ok: false, kind: "cancelled" };
   if (confirmation === BACK || confirmation === "2") {
@@ -360,7 +426,16 @@ export async function setupProfileConversation(io, env = process.env) {
     return { ok: false, kind: "cancelled" };
   }
   const { name, ...profile } = state;
-  return createAgentProfile(name, profile, env);
+  const checked = validateAgentProfileCreation(name, profile, env);
+  if (!checked.ok) return checked;
+  let copied = null;
+  try {
+    if (reference) copied = copyAdapter(reference.template, reference.destination);
+    return createAgentProfile(name, profile, env);
+  } catch (error) {
+    if (copied) rmSync(copied, { force: true });
+    return { ok: false, kind: "copy-failed", problems: [error.message] };
+  }
 }
 
 async function runSetup(env = process.env, input = process.stdin, output = process.stdout) {

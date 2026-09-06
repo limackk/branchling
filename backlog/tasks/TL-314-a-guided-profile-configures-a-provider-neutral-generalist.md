@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Guided agent setup"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1d
@@ -83,9 +83,9 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] A first-time user can create and dry-run one generalist through the
+- [x] A first-time user can create and dry-run one generalist through the
   guided path without typing a raw profile command. [proof: focused-tests]
-- [ ] The wizard preserves a provider-neutral custom-adapter path and does not
+- [x] The wizard preserves a provider-neutral custom-adapter path and does not
   download, launch or credential-test a provider. [proof: focused-tests]
-- [ ] Generated profiles remain compatible with normal validation and secret
+- [x] Generated profiles remain compatible with normal validation and secret
   preflight. [proof: profile-contract]

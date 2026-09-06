@@ -31,7 +31,7 @@ function transcript(answers) {
 
 test("a confirmed guided transcript writes one ordinary profile only at its final confirmation", async () => {
   const fx = fixture();
-  const t = transcript(["generalist", "/opt/agent", "Work from evidence.", "model-x", "high", "TOKEN", "1"]);
+  const t = transcript(["generalist", "1", "/opt/agent", "Work from evidence.", "model-x", "high", "TOKEN", "1"]);
   const result = await setupProfileConversation(t.io, fx.env);
   assert.equal(result.ok, true, JSON.stringify(result));
   const text = readFileSync(agentProfilesPath(fx.env), "utf8");
@@ -51,8 +51,8 @@ test("cancel, EOF and invalid values leave the store byte-for-byte unchanged", a
   const before = readFileSync(path, "utf8");
   for (const answers of [
     ["cancel"],
-    ["generalist", "/opt/agent", "Work", "", "", "", "3"],
-    ["Not A Slug", "/opt/agent", "Work", "", "", "", "1"],
+    ["generalist", "1", "/opt/agent", "Work", "", "", "", "3"],
+    ["Not A Slug", "1", "/opt/agent", "Work", "", "", "", "1"],
     [],
   ]) {
     const result = await setupProfileConversation(transcript(answers).io, fx.env);
@@ -63,10 +63,21 @@ test("cancel, EOF and invalid values leave the store byte-for-byte unchanged", a
 
 test("back revisits a field before the one shared write", async () => {
   const fx = fixture();
-  const t = transcript(["generalist", "/opt/old", "back", "/opt/new", "Work", "", "", "", "1"]);
+  const t = transcript(["generalist", "1", "/opt/agent", "Work", "model-old", "back", "model-new", "", "", "1"]);
   const result = await setupProfileConversation(t.io, fx.env);
   assert.equal(result.ok, true, JSON.stringify(result));
-  assert.ok(readFileSync(agentProfilesPath(fx.env), "utf8").includes('adapter: "/opt/new"'));
+  assert.ok(readFileSync(agentProfilesPath(fx.env), "utf8").includes('model: "model-new"'));
+});
+
+test("a shipped reference is copied locally without downloading or launching it", async () => {
+  const fx = fixture();
+  const destination = join(fx.root, "adapters", "claude.mjs");
+  const t = transcript(["generalist", "2", "1", destination, "Work", "", "", "", "1"]);
+  const result = await setupProfileConversation(t.io, fx.env);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(existsSync(destination), true);
+  assert.match(readFileSync(destination, "utf8"), /Claude Code/);
+  assert.match(readFileSync(agentProfilesPath(fx.env), "utf8"), new RegExp(destination.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 });
 
 test("the process refuses interactive setup in a pipe and refuses JSON", () => {
