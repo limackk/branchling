@@ -1025,10 +1025,10 @@ export const COMMANDS = {
     summary: "maintain this machine's provider-neutral agent profiles",
     usage: [
       `${N} profile create <name> --adapter <executable> (--prompt <text>|--prompt-file <path>)`,
-      `                     [--model <name>] [--effort <value>]`,
+      `                     [--model <name>] [--effort <value>] [--secret-env <NAME,…>]`,
       `${N} profile list [--json]`,
       `${N} profile show <name> [--json]`,
-      `${N} profile update <name> [--adapter <executable>] [--model <name>] [--effort <value>]`,
+      `${N} profile update <name> [--adapter <executable>] [--model <name>] [--effort <value>] [--secret-env <NAME,…>]`,
       `                     [--prompt <text>|--prompt-file <path>]`,
       `${N} profile remove <name> [--json]`,
       "",

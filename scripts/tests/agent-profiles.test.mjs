@@ -99,6 +99,9 @@ test("unknown fields, duplicate names, bad prompt files and copied credentials a
   const compound = run(["profile", "create", "compound", "--adapter", "runner --provider future", "--prompt", "Do work."], fx.env);
   assert.equal(compound.status, 1);
   assert.match(compound.stderr, /one executable/);
+  const secretName = run(["profile", "create", "bad-secret-name", "--adapter", "/opt/wrapper", "--secret-env", "token=actual-secret", "--prompt", "Do work."], fx.env);
+  assert.equal(secretName.status, 1);
+  assert.match(secretName.stderr, /not an environment variable name/);
 });
 
 test("a prompt file is read, while a missing one is refused before the profile is written", () => {

@@ -20,7 +20,7 @@ import { stripComment, unquote } from "./task-fields.mjs";
 import { failure, heading, table } from "./ui.mjs";
 
 export const PROFILE_NAME_SHAPE = /^[a-z0-9][a-z0-9._-]{0,62}$/;
-export const PROFILE_FIELDS = ["name", "adapter", "model", "effort", "prompt", "prompt_file"];
+export const PROFILE_FIELDS = ["name", "adapter", "model", "effort", "prompt", "prompt_file", "secret_env"];
 
 /** A credential may be REFERENCED through $NAME, but never copied as a value. */
 export function credentialProblem(value) {
@@ -59,7 +59,24 @@ function profileProblems(profile, path) {
       if (issue) problems.push("profile `" + profile.name + "` prompt_file " + issue + " — use an environment-variable reference instead");
     }
   }
+  const secretNames = secretEnvironmentNames(profile);
+  if (String(profile.secret_env || "").trim() && !secretNames.length) {
+    problems.push("profile `" + profile.name + "` secret_env needs one or more environment variable names");
+  }
+  if (secretNames.length !== new Set(secretNames).size) {
+    problems.push("profile `" + profile.name + "` secret_env names a variable more than once");
+  }
+  for (const name of secretNames) {
+    if (!/^[A-Z_][A-Z0-9_]*$/.test(name)) {
+      problems.push("profile `" + profile.name + "` secret_env `" + name + "` is not an environment variable name");
+    }
+  }
   return problems;
+}
+
+/** Names, not values: profile data can opt in to a secret's delivery. */
+export function secretEnvironmentNames(profile) {
+  return String(profile && profile.secret_env || "").split(",").map((s) => s.trim()).filter(Boolean);
 }
 
 /** Parse the narrow `profiles:` list format. */
@@ -128,7 +145,7 @@ export function serializeAgentProfiles(profiles) {
   for (const profile of profiles) {
     out.push("  - name: " + profile.name);
     out.push("    adapter: " + quote(profile.adapter));
-    for (const key of ["model", "effort", "prompt", "prompt_file"]) {
+    for (const key of ["model", "effort", "prompt", "prompt_file", "secret_env"]) {
       if (profile[key]) out.push("    " + key + ": " + quote(profile[key]));
     }
   }
@@ -163,7 +180,7 @@ export function resolveAgentProfile(name, env = process.env) {
 }
 
 const SUBCOMMANDS = ["create", "list", "show", "update", "remove"];
-const FLAGS = ["--adapter", "--model", "--effort", "--prompt", "--prompt-file", "--json"];
+const FLAGS = ["--adapter", "--model", "--effort", "--prompt", "--prompt-file", "--secret-env", "--json"];
 
 export function parseAgentProfilesArgs(args) {
   const subcommand = args[0];

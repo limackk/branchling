@@ -78,7 +78,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { resolveActor } from "./actor.mjs";
-import { resolveAgentProfile } from "./agent-profiles.mjs";
+import { resolveAgentProfile, secretEnvironmentNames } from "./agent-profiles.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { repoRootFor } from "./done-task.mjs";
 import { readHistory, recordEdit } from "./history.mjs";
@@ -854,6 +854,29 @@ export function agentEnvironment(ctx, task) {
   return out;
 }
 
+/** A profile opts in to each credential by NAME. Its value never enters a task,
+ * report or command string, and the adapter receives no ambient environment. */
+export function adapterEnvironment(ctx, task, env = process.env) {
+  const out = agentEnvironment(ctx, task);
+  // PATH is not application data or a credential; preserving it lets a local
+  // profile name an installed executable while every other ambient variable is
+  // deliberately withheld.
+  if (env.PATH) out.PATH = env.PATH;
+  for (const name of secretEnvironmentNames(task.profile)) {
+    if (Object.prototype.hasOwnProperty.call(env, name)) out[name] = env[name];
+  }
+  return out;
+}
+
+export function redactSecrets(text, profile, env = process.env) {
+  let out = String(text || "");
+  for (const name of secretEnvironmentNames(profile)) {
+    const value = String(env[name] || "");
+    if (value) out = out.split(value).join("[redacted " + name + "]");
+  }
+  return out;
+}
+
 /** After an attempt: has the task been handed to a role THIS run serves? Reads
  *  the file as it is now. Null when the claim is intact, when the task went to
  *  a role nobody here serves (that stays `held-elsewhere`), or when the file is
@@ -911,12 +934,15 @@ function workOne(ctx, task) {
       shell: false,
       cwd: ctx.cwd,
       encoding: "utf8",
-      env: { ...process.env, ...agentEnvironment(ctx, task) },
+      env: adapterEnvironment(ctx, task),
       input: agentInput(task.text, feedback, feedbackRan),
       timeout: ctx.plan.timeout * 1000,
       maxBuffer: 64 * 1024 * 1024,
     });
-    appendFileSync(logPath, (agent.stdout || "") + (agent.stderr || ""), "utf8");
+    const output = task.hand.kind === "profile"
+      ? redactSecrets((agent.stdout || "") + (agent.stderr || ""), task.profile)
+      : (agent.stdout || "") + (agent.stderr || "");
+    appendFileSync(logPath, output, "utf8");
 
     // A killed process is not a failed one: `spawnSync` reports the timeout as a
     // signal, and calling that "the agent said no" would send the gate looking
@@ -935,7 +961,9 @@ function workOne(ctx, task) {
     // first — because counting it would spend against a budget that exists to
     // stop a failing task looping, and this task has not been tried yet.
     if (neverRan(agent.stdout, treeAtTake, treeState(ctx.cwd))) {
-      const said = String(agent.stderr || "").trim().split("\n")[0] || "";
+      const said = (task.hand.kind === "profile"
+        ? redactSecrets(agent.stderr || "", task.profile)
+        : String(agent.stderr || "")).trim().split("\n")[0] || "";
       appendFileSync(logPath,
         "\n=== the agent never ran: nothing on stdout and nothing changed in " + ctx.cwd + "\n", "utf8");
       return {

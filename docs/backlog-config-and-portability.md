@@ -136,6 +136,21 @@ contract for every provider, while `--agent` and `--agent-for` preserve the raw
 shell-command path for existing automation. Use
 `--profile-for <role>=<name>` to select profiles per role.
 
+### Adapter trust boundary
+
+Profiles are selected only by the person invoking `run`; repository data can
+name roles and task text but cannot select a local profile, executable or
+credential. A profile adapter starts without the caller's ambient environment.
+It receives the documented contract above, `PATH` to resolve its executable,
+and only the credential variables it explicitly names with
+`--secret-env NAME,…`; values are redacted from adapter logs and reports. The
+names live in the local profile, never the repository.
+
+This is not a sandbox. A wrapper chosen by the user runs with that user's file
+and network authority, and its prompt receives repository text as untrusted
+data. `--agent` remains the compatibility path for an existing shell command;
+it intentionally retains the shell and environment that its owner supplied.
+
 **An unknown key FAILS.** A typo in a vocabulary is indistinguishable from
 "this project just works that way" — the same rule as an unknown flag in
 `query.mjs`.

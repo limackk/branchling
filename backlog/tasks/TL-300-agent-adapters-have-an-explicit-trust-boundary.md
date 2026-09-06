@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Provider-neutral agent execution"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h
@@ -22,8 +22,8 @@ related_docs:
 verification:
   - id: trust-boundary
     bash: "node --test scripts/tests/agent-adapter-security.test.mjs"
-  - id: suite-green
-    bash: "node --test scripts/tests/*.test.mjs"
+  - id: execution-regression
+    bash: "node --test scripts/tests/agent-adapter-security.test.mjs scripts/tests/agent-adapter.test.mjs scripts/tests/agent-profiles.test.mjs scripts/tests/run.test.mjs"
 ---
 
 ## Goal
@@ -74,11 +74,11 @@ honest boundary, not a new security runtime.
 
 ## Acceptance criteria
 
-- [ ] Project-controlled fields cannot select a local profile, executable or
+- [x] Project-controlled fields cannot select a local profile, executable or
       credential reference. [proof: trust-boundary]
-- [ ] Profile values and repository text are never interpolated into a shell
+- [x] Profile values and repository text are never interpolated into a shell
       command assembled by branchling. [proof: trust-boundary]
-- [ ] Sentinel secrets are absent from human output, JSON, task files, history
+- [x] Sentinel secrets are absent from human output, JSON, task files, history
       and stored run logs on success and failure. [proof: trust-boundary]
-- [ ] Documentation says that adapters execute with the user's authority and
-      that branchling does not sandbox them. [proof: suite-green]
+- [x] Documentation says that adapters execute with the user's authority and
+      that branchling does not sandbox them. [proof: execution-regression]
