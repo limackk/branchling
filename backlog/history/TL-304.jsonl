@@ -1,0 +1,7 @@
+{"id":"01M1V1KW7GTSTHR5WBN2B3TEFT","ts":"2026-09-06T09:43:26.704Z","task":"TL-304","field":"__created__","from":"","to":"A claimed task can be released back to the queue","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1V1MM9ZQY8088JQT2GXP8WQ","ts":"2026-09-06T09:43:51.359Z","task":"TL-304","field":"epic","from":"","to":"Provider-neutral agent execution","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1V1MM9Z573KWA4503HGGGTE","ts":"2026-09-06T09:43:51.359Z","task":"TL-304","field":"blocks","from":[],"to":["TL-290"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1V1MM9ZD69ADV1MEG509SPC","ts":"2026-09-06T09:43:51.359Z","task":"TL-304","field":"related_docs","from":[],"to":["docs/branchling-global-tool.md"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1V1MPGEYMJ4DSF2TJWJWCS7","ts":"2026-09-06T09:43:53.614Z","task":"TL-304","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1V1MPGEQYE4MCZNM5GAS8M5","ts":"2026-09-06T09:43:53.614Z","task":"TL-304","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1V1VM1FSMGFSD5VTW7E0K1F","ts":"2026-09-06T09:47:40.463Z","task":"TL-304","field":"status","from":"in_progress","to":"done","actor":"agent:codex","source":"done","reason":"proven","session":"tree-526f61f2043f"}

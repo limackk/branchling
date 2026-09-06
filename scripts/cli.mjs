@@ -331,6 +331,11 @@ export const COMMANDS = {
       "  exit: 0 handed off · 1 refused (held, closed, somebody else's) · 2 usage error",
     ].join("\n"),
   },
+  release: {
+    script: "release-task.mjs",
+    summary: "return your claimed task to the queue, with a reason",
+    usage: `${N} release <ID> --reason "…" [--status <s>] [--actor <ns:name>] [--json] [--dir <path>]\n\n  Clears the owner and this actor's reservation through the handoff write path.\n  A release has no receiver; use handoff when work is assigned to one.\n\n  exit: 0 released · 1 refused · 2 usage error`,
+  },
   resume: {
     script: "resume-task.mjs",
     summary: "brief a successor on a task a dead session left behind — one document, in order",
