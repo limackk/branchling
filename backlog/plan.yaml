@@ -214,3 +214,19 @@ waves:
   # Parallel worktree lifecycle follows the provider-neutral single-agent loop and its onboarding instead of defining those contracts inside fleet machinery.
   - name: "Managed fleets consume the stable execution surface"
     tasks: [TL-149]
+
+  # A guided flow must be safe to cancel and must preserve the existing scriptable profile API before it can write user configuration.
+  - name: "Interactive setup has a safe boundary"
+    tasks: [TL-313]
+
+  # The first useful path is one local generalist built on a custom or audited reference adapter, never a provider registry.
+  - name: "A generalist is configured without provider lock-in"
+    tasks: [TL-314]
+
+  # Role-to-profile routing becomes a named local composition only after the generalist setup contract is proven.
+  - name: "A specialist fleet is a reusable local launch"
+    tasks: [TL-315]
+
+  # Documentation and final in-terminal guidance integrate only the configuration, safety boundaries and launch paths that the prior waves have proven.
+  - name: "Setup explains the choices it made"
+    tasks: [TL-316]
