@@ -301,7 +301,8 @@ branchling run --profile developer --max-attempts 2
 
 The profile is user data, not repository configuration, so contributors can
 choose different providers without changing the project. Raw `--agent` commands
-remain available for existing scripts.
+remain available for existing scripts. With no `--profile-for` mapping, that one
+profile is the generalist: it serves both roleless work and every declared role.
 
 **One queue, several hands.** A task may ask for a competence in `role:`, and
 `--agent-for <role>=<command>` or `--profile-for <role>=<name>` is repeatable,
