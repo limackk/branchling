@@ -238,8 +238,11 @@ append-only and is never rewritten.
 Widening the window would still be a bet, only a bigger one. Making
 reconciliation read-only would trade away the property that a change leaves a
 trace even when nobody speaks for it. So the entry stays and is **claimed
-beside it**: `branchling history --attribute --actor <ns:name> --reason "…"`
-appends an `__attributed__` event carrying the id of the change it claims.
+beside it**. `branchling history --file <task.md>` prints each candidate's event
+id. With one candidate, `branchling history --file <task.md> --attribute --actor
+<ns:name> --reason "…"` keeps the short path. With several, the command writes
+nothing until one is named with `--event <id>`. The resulting `__attributed__`
+event carries the id of exactly the change it claims.
 
 Three properties this keeps that a correction would not:
 

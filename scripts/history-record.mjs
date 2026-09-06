@@ -48,8 +48,8 @@ const arg = (name, fallback) => {
 // appended history entries in a real session. It is the same class of defect
 // BL-1411 fixed in the server: a silent no-op with a side effect is worse than an
 // error, because it looks like the tool working.
-const KNOWN_FLAGS = ["--file", "--actor", "--source", "--quiet", "--reason", "--attribute"];
-const FLAGS_WITH_VALUE = ["--file", "--actor", "--source", "--reason"];
+const KNOWN_FLAGS = ["--file", "--actor", "--source", "--quiet", "--reason", "--attribute", "--event"];
+const FLAGS_WITH_VALUE = ["--file", "--actor", "--source", "--reason", "--event"];
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
   if (!a.startsWith("-")) {
@@ -112,6 +112,15 @@ if (file) {
 }
 
 const attribute = argv.includes("--attribute");
+const eventFlag = arg("--event", "");
+if (argv.includes("--event") && !eventFlag) {
+  console.error(`${N} history: \`--event\` requires an event id.`);
+  process.exit(2);
+}
+if (eventFlag && !attribute) {
+  console.error(`${N} history: \`--event\` selects a claim and requires \`--attribute\`.`);
+  process.exit(2);
+}
 if (attribute && !reasonFlag) {
   console.error(
     `${N} history: \`--attribute\` needs \`--reason "…"\`.\n` +
@@ -121,6 +130,36 @@ if (attribute && !reasonFlag) {
   process.exit(2);
 }
 
+const candidateLabel = ({ task, entry }) =>
+  "  " + task + " · " + entry.field + " · " + String(entry.ts).slice(0, 19) +
+  " · " + (entry.id || "no event id");
+
+function selectClaim(changes) {
+  if (eventFlag) {
+    const selected = changes.filter(({ entry }) => entry.id === eventFlag);
+    if (selected.length === 1) return selected;
+    console.error(
+      `${N} history: event \`` + eventFlag + "` is not an unclaimed change in this scope.\n" +
+      "  Read the candidates with the same `--file` scope and choose an id it prints."
+    );
+    process.exit(1);
+  }
+  if (changes.length <= 1) return changes;
+  console.error(
+    `${N} history: ` + changes.length + " recorded changes carry no author in this scope.\n" +
+    "  Nothing was attributed: choosing one on your behalf would invent authorship.\n" +
+    "  Name the change you made with `--event <id>`:"
+  );
+  for (const change of changes.slice(0, 20)) console.error(candidateLabel(change));
+  if (changes.length > 20) console.error("  … and " + (changes.length - 20) + " more");
+  process.exit(1);
+}
+
+// Refuse a known ambiguity BEFORE reconciliation can append anything. The
+// candidates are read again below because another process may reconcile while
+// this command is running; that second check protects the claim itself.
+if (attribute) selectClaim(unattributedChanges(BACKLOG_DIR, { only }));
+
 const { entries, seeded, adopted, seeds } = reconcile(BACKLOG_DIR, { actor, source, only, reason: reasonFlag || undefined });
 
 // WHAT RECONCILE COULD NOT SEE (TL-130). A change already written by somebody
@@ -128,8 +167,9 @@ const { entries, seeded, adopted, seeds } = reconcile(BACKLOG_DIR, { actor, sour
 // in the tree, so the run above finds nothing and used to say "no changes to
 // record". It is not nothing: it is a change standing in the log with no author.
 const unclaimed = seeded ? [] : unattributedChanges(BACKLOG_DIR, { only });
-const claimed = attribute && unclaimed.length
-  ? attributeChanges(BACKLOG_DIR, unclaimed, { actor, reason: reasonFlag, source })
+const selected = attribute ? selectClaim(unclaimed) : [];
+const claimed = selected.length
+  ? attributeChanges(BACKLOG_DIR, selected, { actor, reason: reasonFlag, source })
   : [];
 
 if (quiet) process.exit(0);
@@ -198,10 +238,14 @@ if (claimed.length) {
       "reconcile\n  (a running `" + N + " serve`, a `git pull`) got to them first:"
   );
   for (const u of unclaimed.slice(0, 20)) {
-    console.log("  " + u.task + " · " + u.entry.field + " · " + String(u.entry.ts).slice(0, 19));
+    console.log(candidateLabel(u));
   }
   if (unclaimed.length > 20) console.log("  … and " + (unclaimed.length - 20) + " more");
   console.log("  If they are yours, say so:");
-  console.log("    " + N + ' history --attribute --actor ' + actor + ' --reason "…"');
+  console.log(
+    "    " + N + " history --attribute" +
+    (unclaimed.length > 1 ? " --event " + (unclaimed[0].entry.id || "<id>") : "") +
+    " --actor " + actor + ' --reason "…"'
+  );
   console.log("  The tool cannot work out whose they are, and guessing would invent attribution.");
 }

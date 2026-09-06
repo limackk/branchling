@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h
@@ -63,11 +63,11 @@ concurrent reconciliation can append more than one legitimate candidate.
 
 ## Acceptance criteria
 
-- [ ] A user can attribute one named reconciled event without attributing an
+- [x] A user can attribute one named reconciled event without attributing an
       older unowned event in the same file. [proof: targeted-attribution]
-- [ ] More than one candidate without an event selector is refused before any
+- [x] More than one candidate without an event selector is refused before any
       history line is appended. [proof: targeted-attribution]
-- [ ] A file with exactly one candidate retains its current short workflow.
+- [x] A file with exactly one candidate retains its current short workflow.
       [proof: targeted-attribution]
-- [ ] Existing history reconciliation and attribution tests remain green.
+- [x] Existing history reconciliation and attribution tests remain green.
       [proof: suite-green]
