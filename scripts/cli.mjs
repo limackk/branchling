@@ -1032,6 +1032,7 @@ export const COMMANDS = {
     usage: [
       `${N} profile create <name> --adapter <executable> (--prompt <text>|--prompt-file <path>)`,
       `                     [--model <name>] [--effort <value>] [--secret-env <NAME,…>]`,
+      `${N} profile setup`,
       `${N} profile list [--json]`,
       `${N} profile show <name> [--json]`,
       `${N} profile check [name] [--live] [--json]`,
@@ -1045,6 +1046,8 @@ export const COMMANDS = {
       "  are refused here; refer to environment variables or provider configuration instead.",
       "  `check` is local by default and starts no adapter. `--live` is an explicit provider",
       "  probe; it may use credentials and provider quota, and its result is not a task outcome.",
+      "  `setup` creates one local agent profile through an optional terminal guide. It writes the same profile format only after",
+      "  confirmation; scripts and other clients continue to use the flag commands above.",
       "",
       "  exit: 0 read or written · 1 invalid profile or missing name · 2 usage error",
     ].join("\n"),

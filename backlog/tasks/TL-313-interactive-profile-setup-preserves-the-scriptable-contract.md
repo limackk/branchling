@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Guided agent setup"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1d
@@ -84,9 +84,9 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] `profile setup` is a documented interactive command and existing profile
+- [x] `profile setup` is a documented interactive command and existing profile
   commands retain their non-interactive, flag-based contract. [proof: contract-tests]
-- [ ] Invalid input, cancellation, EOF and a non-TTY invocation leave
+- [x] Invalid input, cancellation, EOF and a non-TTY invocation leave
   `agent-profiles.yaml` byte-for-byte unchanged. [proof: focused-tests]
-- [ ] A confirmed transcript produces a profile accepted by the existing parser,
+- [x] A confirmed transcript produces a profile accepted by the existing parser,
   rather than a wizard-only data shape. [proof: focused-tests]

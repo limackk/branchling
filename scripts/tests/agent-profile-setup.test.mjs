@@ -1,0 +1,88 @@
+/** Guided setup remains a terminal convenience over the ordinary profile store (TL-313). */
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { spawnSync } from "node:child_process";
+
+import { agentProfilesPath, HOME_ENV } from "../home.mjs";
+import { parseAgentProfiles, setupProfileConversation } from "../agent-profiles.mjs";
+import { SCRIPTS_DIR } from "./_repo.mjs";
+
+const CLI = join(SCRIPTS_DIR, "cli.mjs");
+let sequence = 0;
+
+function fixture() {
+  const root = mkdtempSync(join(tmpdir(), "branchling-profile-setup-" + sequence++ + "-"));
+  return { root, env: { ...process.env, NO_COLOR: "1", [HOME_ENV]: join(root, "home") } };
+}
+
+function transcript(answers) {
+  const out = [];
+  return {
+    out,
+    io: {
+      ask: async () => answers.length ? answers.shift() : null,
+      write: (text) => out.push(text),
+    },
+  };
+}
+
+test("a confirmed guided transcript writes one ordinary profile only at its final confirmation", async () => {
+  const fx = fixture();
+  const t = transcript(["generalist", "/opt/agent", "Work from evidence.", "model-x", "high", "TOKEN", "1"]);
+  const result = await setupProfileConversation(t.io, fx.env);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  const text = readFileSync(agentProfilesPath(fx.env), "utf8");
+  assert.deepEqual(parseAgentProfiles(text, agentProfilesPath(fx.env)).problems, []);
+  assert.match(text, /name: generalist/);
+  assert.match(text, /secret_env: "TOKEN"/);
+  assert.match(t.out.join(""), /Profile summary/);
+});
+
+test("cancel, EOF and invalid values leave the store byte-for-byte unchanged", async () => {
+  const fx = fixture();
+  const path = agentProfilesPath(fx.env);
+  // The directory is intentionally made by this fixture rather than by a read.
+  const { mkdirSync } = await import("node:fs");
+  mkdirSync(join(fx.root, "home", "config"), { recursive: true });
+  writeFileSync(path, "profiles:\n", "utf8");
+  const before = readFileSync(path, "utf8");
+  for (const answers of [
+    ["cancel"],
+    ["generalist", "/opt/agent", "Work", "", "", "", "3"],
+    ["Not A Slug", "/opt/agent", "Work", "", "", "", "1"],
+    [],
+  ]) {
+    const result = await setupProfileConversation(transcript(answers).io, fx.env);
+    assert.equal(result.ok, false);
+    assert.equal(readFileSync(path, "utf8"), before);
+  }
+});
+
+test("back revisits a field before the one shared write", async () => {
+  const fx = fixture();
+  const t = transcript(["generalist", "/opt/old", "back", "/opt/new", "Work", "", "", "", "1"]);
+  const result = await setupProfileConversation(t.io, fx.env);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.ok(readFileSync(agentProfilesPath(fx.env), "utf8").includes('adapter: "/opt/new"'));
+});
+
+test("the process refuses interactive setup in a pipe and refuses JSON", () => {
+  const fx = fixture();
+  const piped = spawnSync(process.execPath, [CLI, "profile", "setup"], { encoding: "utf8", env: fx.env });
+  assert.equal(piped.status, 2);
+  assert.match(piped.stderr, /needs a terminal/);
+  assert.equal(existsSync(agentProfilesPath(fx.env)), false);
+  const json = spawnSync(process.execPath, [CLI, "profile", "setup", "--json"], { encoding: "utf8", env: fx.env });
+  assert.equal(json.status, 2);
+  assert.match(json.stderr, /interactive and takes no names or flags/);
+});
+
+test("guided setup help is readable without opening an interactive session", () => {
+  const fx = fixture();
+  const help = spawnSync(process.execPath, [CLI, "profile", "setup", "--help"], { encoding: "utf8", env: fx.env });
+  assert.equal(help.status, 0, help.stderr);
+  assert.match(help.stdout, /creates one local agent profile/);
+});

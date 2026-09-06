@@ -13,6 +13,7 @@
 import { accessSync, constants, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
+import { createInterface } from "node:readline/promises";
 
 import { ADAPTER_PROTOCOL_VERSION, PROFILE_PROBE_ENV, PROFILE_PROBE_OUTCOMES, PROFILE_PROTOCOL_VERSION_ENV } from "./agent-contract.mjs";
 import { agentProfilesPath, ensureHome } from "./home.mjs";
@@ -171,6 +172,19 @@ function writeAgentProfiles(profiles, env) {
   return { path, config };
 }
 
+/** One creation operation for both flags and the guided terminal flow. */
+export function createAgentProfile(name, fields, env = process.env) {
+  const store = readAgentProfiles(env);
+  if (store.problems.length) return { ok: false, kind: "invalid-store", store };
+  if (store.profiles.some((p) => p.name === name)) return { ok: false, kind: "duplicate", store };
+  const candidate = { name, ...fields };
+  const problems = profileProblems(candidate, store.path);
+  if (problems.length) return { ok: false, kind: "invalid-profile", store, problems };
+  const profiles = store.profiles.concat(candidate);
+  const written = writeAgentProfiles(profiles, env);
+  return { ok: true, path: written.path, profiles, profile: candidate };
+}
+
 export function profilePrompt(profile, path) {
   return profile.prompt || readFileSync(resolve(dirname(path), profile.prompt_file), "utf8");
 }
@@ -230,7 +244,7 @@ export function liveProbe(profile, env = process.env) {
   } catch { return { ok: false, state: "probe-failed", outcome: null }; }
 }
 
-const SUBCOMMANDS = ["create", "list", "show", "update", "remove", "check"];
+const SUBCOMMANDS = ["create", "list", "show", "update", "remove", "check", "setup"];
 const FLAGS = ["--adapter", "--model", "--effort", "--prompt", "--prompt-file", "--secret-env", "--protocol-version", "--live", "--json"];
 
 export function parseAgentProfilesArgs(args) {
@@ -255,6 +269,9 @@ export function parseAgentProfilesArgs(args) {
     throw new Error(subcommand + " needs a profile name");
   }
   if (subcommand === "list" && plan.name) throw new Error("list takes no profile name");
+  if (subcommand === "setup" && (plan.name || Object.keys(plan.fields).length || plan.json || plan.live)) {
+    throw new Error("setup is interactive and takes no names or flags");
+  }
   if (subcommand !== "check" && plan.live) throw new Error("`--live` is only valid with `check`");
   if (subcommand === "create" && !plan.fields.adapter) throw new Error("create needs `--adapter <command>`");
   if (["create", "update"].indexOf(subcommand) >= 0 &&
@@ -267,6 +284,102 @@ export function parseAgentProfilesArgs(args) {
     throw new Error("`--prompt` and `--prompt-file` are alternatives, not two prompts");
   }
   return plan;
+}
+
+export const SETUP_USAGE = [
+  `${N} profile setup`,
+  "",
+  "  Create one local agent profile through a guided terminal conversation.",
+  "  It requires an interactive terminal and writes only after a final confirmation.",
+  "  Use `profile create` when a script or another client supplies the values.",
+  "",
+  "  During input: `back` revisits the previous field; `cancel` leaves no change.",
+  "  The setup never starts an adapter, contacts a provider or asks for a secret value.",
+].join("\n");
+
+const BACK = Symbol("back");
+const CANCEL = Symbol("cancel");
+
+function setupAnswer(value, fallback = "") {
+  if (value === null || value === undefined) return CANCEL;
+  const text = String(value).trim();
+  if (/^(cancel|quit|q)$/i.test(text)) return CANCEL;
+  if (/^(back|b)$/i.test(text)) return BACK;
+  return text || fallback;
+}
+
+/**
+ * The setup state machine is terminal-independent so its cancellation and write
+ * boundary can be tested without a pseudo-terminal.
+ */
+export async function setupProfileConversation(io, env = process.env) {
+  const fields = [
+    { key: "name", label: "Profile name (lowercase slug)", required: true },
+    { key: "adapter", label: "Adapter executable", required: true },
+    { key: "prompt", label: "Local prompt", required: true },
+    { key: "model", label: "Model (optional)", required: false },
+    { key: "effort", label: "Effort (optional)", required: false },
+    { key: "secret_env", label: "Credential variable names, comma-separated (optional)", required: false },
+  ];
+  const state = {};
+  io.write("Create an agent profile. Type back or cancel at any prompt.\n");
+  let index = 0;
+  while (index < fields.length) {
+    const field = fields[index];
+    const current = state[field.key] || "";
+    const suffix = current ? ` [${current}]` : "";
+    const answer = setupAnswer(await io.ask(field.label + suffix + ": "), current);
+    if (answer === CANCEL) return { ok: false, kind: "cancelled" };
+    if (answer === BACK) { if (index) index--; continue; }
+    if (field.required && !answer) { io.write(field.label + " is required.\n"); continue; }
+    state[field.key] = answer;
+    index++;
+  }
+  const secret = state.secret_env ? "\n  credential variables: " + state.secret_env : "";
+  io.write("\nProfile summary:\n  name: " + state.name + "\n  adapter: " + state.adapter
+    + "\n  model: " + (state.model || "(none)") + "\n  effort: " + (state.effort || "(none)")
+    + secret + "\n\n1) Create profile\n2) Back\n3) Cancel\n");
+  const confirmation = setupAnswer(await io.ask("Choice [1/2/3]: "));
+  if (confirmation === CANCEL || confirmation === "3") return { ok: false, kind: "cancelled" };
+  if (confirmation === BACK || confirmation === "2") {
+    index = fields.length - 1;
+    while (index < fields.length) {
+      const field = fields[index];
+      const answer = setupAnswer(await io.ask(field.label + " [" + (state[field.key] || "") + "]: "), state[field.key] || "");
+      if (answer === CANCEL) return { ok: false, kind: "cancelled" };
+      if (answer === BACK) { if (index) index--; continue; }
+      if (field.required && !answer) { io.write(field.label + " is required.\n"); continue; }
+      state[field.key] = answer;
+      index++;
+    }
+    io.write("\nProfile summary confirmed after edits.\n");
+    const retry = setupAnswer(await io.ask("Create profile? [1=create, 3=cancel]: "));
+    if (retry === CANCEL || retry === "3" || retry !== "1") return { ok: false, kind: "cancelled" };
+  } else if (confirmation !== "1") {
+    io.write("Choose 1, 2 or 3. Nothing was written.\n");
+    return { ok: false, kind: "cancelled" };
+  }
+  const { name, ...profile } = state;
+  return createAgentProfile(name, profile, env);
+}
+
+async function runSetup(env = process.env, input = process.stdin, output = process.stdout) {
+  if (!input.isTTY || !output.isTTY) {
+    console.error(failure(N + " profile setup", "interactive setup needs a terminal", ["Use `" + N + " profile create <name> …` from a script or pipe."]));
+    return 2;
+  }
+  const terminal = createInterface({ input, output, terminal: true });
+  const io = { ask: (question) => terminal.question(question), write: (text) => output.write(text) };
+  try {
+    const result = await setupProfileConversation(io, env);
+    if (!result.ok) { output.write("No profile was created.\n"); return result.kind === "cancelled" ? 0 : 1; }
+    output.write("✓ profile `" + result.profile.name + "` created — " + result.path + "\n");
+    output.write("Next: `" + N + " profile check " + result.profile.name + "`, then `" + N + " run --profile " + result.profile.name + " --dry-run`.\n");
+    return 0;
+  } catch (error) {
+    console.error(failure(N + " profile setup", "setup stopped before writing", [error.message]));
+    return 1;
+  } finally { terminal.close(); }
 }
 
 function answer(plan, store, profile = null) {
@@ -301,7 +414,8 @@ function checkAnswer(plan, checked, env) {
   return ok ? 0 : 1;
 }
 
-export function run(argv, env = process.env) {
+export async function run(argv, env = process.env) {
+  if (argv[0] === "setup" && argv[1] === "--help" && argv.length === 2) { console.log(SETUP_USAGE); return 0; }
   let plan;
   try { plan = parseAgentProfilesArgs(argv); }
   catch (e) {
@@ -309,6 +423,7 @@ export function run(argv, env = process.env) {
     return 2;
   }
   const store = readAgentProfiles(env);
+  if (plan.subcommand === "setup") return runSetup(env);
   if (plan.subcommand === "check") return checkAnswer(plan, checkAgentProfiles(plan.name ? [plan.name] : [], env), env);
   if (store.problems.length) {
     console.error(failure(N + " profile", "cannot read local agent profiles", [store.path, ...store.problems], [N + " profile list"]));
@@ -328,15 +443,25 @@ export function run(argv, env = process.env) {
     console.error(failure(N + " profile " + plan.subcommand, "no profile `" + plan.name + "`", ["Nothing was changed."]));
     return 1;
   }
+  if (plan.subcommand === "create") {
+    const created = createAgentProfile(plan.name, plan.fields, env);
+    if (!created.ok) {
+      console.error(failure(N + " profile create", created.kind === "invalid-profile" ? "profile is invalid" : "cannot create profile", created.problems || []));
+      return 1;
+    }
+    if (plan.json) { printJson("agent-profiles", { path: created.path, exists: true, profiles: created.profiles, profile: created.profile }); return 0; }
+    console.log("✓ profile `" + plan.name + "` created — " + created.path);
+    return 0;
+  }
   let profiles;
   if (plan.subcommand === "remove") profiles = store.profiles.filter((p) => p.name !== plan.name);
   else {
-    const candidate = plan.subcommand === "create" ? { name: plan.name, ...plan.fields } : { ...found, ...plan.fields };
+    const candidate = { ...found, ...plan.fields };
     if (Object.prototype.hasOwnProperty.call(plan.fields, "prompt")) delete candidate.prompt_file;
     if (Object.prototype.hasOwnProperty.call(plan.fields, "prompt_file")) delete candidate.prompt;
     const problems = profileProblems(candidate, store.path);
     if (problems.length) { console.error(failure(N + " profile " + plan.subcommand, "profile is invalid", problems)); return 1; }
-    profiles = plan.subcommand === "create" ? store.profiles.concat(candidate) : store.profiles.map((p) => p.name === plan.name ? candidate : p);
+    profiles = store.profiles.map((p) => p.name === plan.name ? candidate : p);
   }
   const written = writeAgentProfiles(profiles, env);
   const result = { path: written.path, exists: true, profiles, problems: [] };
@@ -345,4 +470,4 @@ export function run(argv, env = process.env) {
   return 0;
 }
 
-if (process.argv[1] && process.argv[1].endsWith("agent-profiles.mjs")) process.exit(run(process.argv.slice(2)));
+if (process.argv[1] && process.argv[1].endsWith("agent-profiles.mjs")) process.exit(await run(process.argv.slice(2)));
