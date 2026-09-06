@@ -6,7 +6,7 @@ labels: []
 board: main
 epic: "Provider-neutral agent execution"
 priority: P1
-status: in_progress  # pending | in_progress | blocked | done | cancelled
+status: done  # pending | in_progress | blocked | done | cancelled
 owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
@@ -65,11 +65,11 @@ but it must be visibly opt-in and report that it can incur provider usage.
 
 ## Acceptance criteria
 
-- [ ] Local checks find missing executables, prompt files and secret-variable
+- [x] Local checks find missing executables, prompt files and secret-variable
       names without network access or credential disclosure. [proof: profile-check]
-- [ ] `run` refuses an invalid selected profile before any task is claimed.
+- [x] `run` refuses an invalid selected profile before any task is claimed.
       [proof: profile-check]
-- [ ] JSON distinguishes invalid configuration, unavailable adapter and failed
+- [x] JSON distinguishes invalid configuration, unavailable adapter and failed
       optional live probes. [proof: profile-check]
-- [ ] Existing never-ran and task-failure accounting remains unchanged.
+- [x] Existing never-ran and task-failure accounting remains unchanged.
       [proof: suite-green]
