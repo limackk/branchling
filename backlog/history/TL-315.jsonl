@@ -1,0 +1,3 @@
+{"id":"01M1W0PKRDJRJWEZD4087BDGBA","ts":"2026-09-06T18:46:42.189Z","task":"TL-315","field":"__created__","from":"","to":"A named local launch makes a specialist fleet repeatable","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1W0SG3CATEYN47QWMX0SRJG","ts":"2026-09-06T18:48:16.748Z","task":"TL-315","field":"blocked_by","from":[],"to":["TL-314"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1W0SG3CZ0ARJ0VKQ3ZSE4EK","ts":"2026-09-06T18:48:16.748Z","task":"TL-315","field":"related_docs","from":[],"to":["scripts/run-loop.mjs","scripts/agent-profiles.mjs","docs/backlog-config-and-portability.md"],"actor":"unknown","source":"external","reason":"unknown"}
