@@ -8,7 +8,7 @@
 # one is the first arc RUN BY that loop, and its every task is picked so an
 # unattended session can close it.
 updated: 2026-09-06
-rationale: "The unattended loop is proven. The next arc makes agent execution provider-neutral: repair control-plane writes first, separate project roles from user profiles, freeze one safe adapter contract, implement independent execution paths, preflight them, ship conformance-tested references and onboarding, then let managed fleets consume the stable surface."
+rationale: "The unattended loop is proven. The next arc makes agent execution provider-neutral: repair control-plane writes first, separate project roles from user profiles, freeze one safe adapter contract, implement local execution paths and preflight without provider use, then add API harnesses, copyable references and onboarding before managed fleets consume the stable surface."
 waves:
   - name: "The loop may be trusted unattended"
     tasks: [TL-191, TL-190, TL-184, TL-185, TL-192]
@@ -186,13 +186,22 @@ waves:
   - name: "The execution boundary is safe before it is convenient"
     tasks: [TL-300]
 
-  # API harnesses, role routing, a single generalist and the conformance kit can proceed independently once the shared contract and trust boundary exist.
-  - name: "Every execution path implements the same contract"
-    tasks: [TL-290, TL-291, TL-292, TL-296]
+  # Role routing, a single generalist and the offline conformance kit establish
+  # every local path before either profile validation or a provider is involved.
+  - name: "Local execution paths implement the same contract"
+    tasks: [TL-291, TL-292, TL-296]
 
-  # Preflight is meaningful only after both generalist and role-based profile selection exist, and it must fail before either path claims work.
-  - name: "Profiles fail before tasks do"
-    tasks: [TL-294]
+  # Both checks are local: profile validation prevents a claim that cannot run,
+  # while release refusals retain the machine-readable contract. They must not
+  # wait for paid or credential-bearing API harnesses.
+  - name: "Local setup fails before provider work begins"
+    tasks: [TL-294, TL-306]
+
+  # This is deliberately after the local lane. It is the only remaining task
+  # that needs a real provider account and may therefore be deferred without
+  # parking deterministic work behind it.
+  - name: "API harnesses implement the shared contract"
+    tasks: [TL-290]
 
   # Copyable CLI and API adapters are published only after conformance, preflight and the execution modes can test them as ordinary third-party executables.
   - name: "Reference adapters prove the extension path"
