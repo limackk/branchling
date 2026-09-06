@@ -56,6 +56,23 @@ const SGR = {
   cyan: ESC + "36m",
 };
 
+// Terminal control belongs here for the same reason as colour: a live command
+// must not make every caller carry an untestable promise about escape sequences.
+const CSI = {
+  enterAlternate: ESC + "?1049h",
+  leaveAlternate: ESC + "?1049l",
+  home: ESC + "H",
+  eraseBelow: ESC + "J",
+};
+
+/** The small control surface for a live, non-scrolling terminal frame. */
+export const terminal = {
+  openLive: () => CSI.enterAlternate + CSI.home,
+  refreshLive: () => CSI.home,
+  eraseBelow: () => CSI.eraseBelow,
+  closeLive: () => CSI.leaveAlternate,
+};
+
 /**
  * Six roles, no more. A seventh would mean the output carries more distinctions
  * than a reader is able to hold in their head.

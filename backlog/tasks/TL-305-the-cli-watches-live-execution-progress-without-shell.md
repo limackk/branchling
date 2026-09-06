@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Execution observability"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 4h
@@ -65,9 +65,9 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] `branchling watch` shows the active wave and live in-progress task owners
+- [x] `branchling watch` shows the active wave and live in-progress task owners
       without a shell helper or generated-view staleness. [proof: watch-cli]
-- [ ] Interval, one-shot and JSON modes are explicit, testable and safe for
+- [x] Interval, one-shot and JSON modes are explicit, testable and safe for
       automation. [proof: watch-cli]
-- [ ] The command is documented in `--help` and respects the shared CLI/JSON
+- [x] The command is documented in `--help` and respects the shared CLI/JSON
       contracts. [proof: command-contract]

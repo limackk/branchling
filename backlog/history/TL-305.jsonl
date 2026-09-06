@@ -1,3 +1,6 @@
 {"id":"01M1V2C3ETZWCAT96XWV8MEESM","ts":"2026-09-06T09:56:40.538Z","task":"TL-305","field":"__created__","from":"","to":"The CLI watches live execution progress without shell helpers","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
 {"id":"01M1V2CQTT5QMR6DV1GJ5TNCKT","ts":"2026-09-06T09:57:01.402Z","task":"TL-305","field":"epic","from":"","to":"Execution observability","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1V2CQTTZ1KJTX3XSTFSHSNZ","ts":"2026-09-06T09:57:01.402Z","task":"TL-305","field":"related_docs","from":[],"to":["README.md"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1V2TJC94WP9GKXVDFGY8K3D","ts":"2026-09-06T10:04:34.569Z","task":"TL-305","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1V2TJC9JBQG8N2P3P49AWGA","ts":"2026-09-06T10:04:34.569Z","task":"TL-305","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1V3W0GE7RYFPJ25TH4J08C9","ts":"2026-09-06T10:22:50.382Z","task":"TL-305","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven","session":"tree-526f61f2043f"}

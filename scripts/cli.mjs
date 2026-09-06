@@ -336,6 +336,7 @@ export const COMMANDS = {
     summary: "return your claimed task to the queue, with a reason",
     usage: `${N} release <ID> --reason "…" [--status <s>] [--actor <ns:name>] [--json] [--dir <path>]\n\n  Clears the owner and this actor's reservation through the handoff write path.\n  A release has no receiver; use handoff when work is assigned to one.\n\n  exit: 0 released · 1 refused · 2 usage error`,
   },
+  watch: { script: "watch.mjs", summary: "live execution progress in one quiet terminal frame", usage: `${N} watch [--interval <seconds>] [--once] [--json] [--dir <path>]\n\n  Refreshes the current terminal frame without shell helpers or screen flicker.\n  --once and --json print one frame and exit, for automation.\n\n  exit: 0 displayed · 2 usage error` },
   resume: {
     script: "resume-task.mjs",
     summary: "brief a successor on a task a dead session left behind — one document, in order",

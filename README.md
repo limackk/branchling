@@ -46,6 +46,18 @@ contract scales to several hands, with the roles nobody has a command for left
 waiting rather than handed out. Review and merge remain ordinary Git; the task
 state and its evidence enter that review beside the code.
 
+Watch a running wave in the terminal without a shell loop:
+
+```bash
+branchling watch                 # refreshes in place; Ctrl-C returns to the shell
+branchling watch --interval 5    # a slower refresh
+branchling watch --once          # one readable snapshot
+branchling watch --json          # one machine-readable snapshot
+```
+
+The view shows every task in the active wave, its current status, the current
+task marker, owner and last recorded modification, followed by all claimed work.
+
 Everything that aggregates tasks — the index, the "what now" view, the
 archive, the browser page — is **computed** from the files and is not
 committed.

@@ -202,7 +202,7 @@ export const KINDS = {
     warnings: [],
     refusalKind: null, refusal: null, details: [],
   },
-  "task-release": { ok: null, id: null, status: null, owner: null, released: null, comment: null },
+  watch: { wave: null, tasks: [] },
   // `ask --json` (TL-148). The question's EVENT ID is the payload that matters:
   // it is what a later `decide --resolves` has to name, and the reason the task
   // now carries names it too — so a consumer never has to parse a sentence.

@@ -153,6 +153,11 @@ const READING = {
   // would run the fixture task's `verification:` command, and the shape of the
   // answer would start depending on the observer's shell.
   resume: ["resume", "TASK-1", "--actor", "agent:test", "--no-verify", "--json"],
+  // The live terminal view becomes one complete snapshot under `--json`, which
+  // is deliberately one-shot. A fixture without a plan still has a valid answer:
+  // `wave: null` means no execution order was declared, not that the command
+  // failed to inspect the backlog.
+  watch: ["watch", "--json"],
 };
 
 /**
