@@ -293,12 +293,63 @@ name. The wrapper receives those values through a stable environment contract;
 it can call a CLI or an API for Claude, Codex, Kimi, GLM or a provider that does
 not exist yet.
 
+### Quick start: one generalist
+
+Copy an adapter you control, then create one local profile. The model name is a
+fact about the installed provider, so obtain it from that provider's current
+documentation rather than copying a stale recommendation.
+
 ```bash
-branchling profile create developer --adapter "$PWD/bin/developer-agent" \
-  --model opus --effort high --prompt "Implement the task with evidence."
-branchling profile check developer          # local: executable, prompt and named credentials
-branchling run --profile developer --max-attempts 2
+cp examples/agent-adapters/claude-code.mjs ./branchling-agent.mjs
+chmod +x ./branchling-agent.mjs
+
+branchling profile create generalist --adapter "$PWD/branchling-agent.mjs" \
+  --model "<current model alias>" --effort high \
+  --prompt "Implement the task with evidence."
+branchling profile check generalist
+branchling run --profile generalist --dry-run
 ```
+
+`--dry-run` lists the queue without starting an adapter or claiming work. When
+it looks right, remove that flag to run the queue. One `--profile` is the
+generalist path: it serves roleless work and every declared role that has no
+more specific profile mapping.
+
+### Fleet: one profile per role
+
+The repository owns the role names and optional reviewed briefs; each person
+owns which local profile serves them. This example sends development to a
+subscription-backed CLI and review to an API-backed coding harness:
+
+```bash
+branchling profile create developer --adapter "$PWD/claude-code.mjs" \
+  --model "<current Claude model alias>" --effort high \
+  --prompt "Implement from evidence."
+branchling profile create reviewer --adapter "$PWD/aider-api.mjs" \
+  --model "<model specification accepted by Aider>" --effort medium \
+  --prompt "Review from evidence." --secret-env OPENAI_API_KEY
+
+branchling profile check developer
+branchling profile check reviewer
+branchling run --profile developer --profile-for review=reviewer --dry-run
+```
+
+For a role with a reviewed brief, adapter stdin is composed in this order: the
+repository role brief, the local profile prompt, then the task. The adapter also
+receives model, effort, actor, task and repository paths in the stable
+environment contract. `--profile-for review=reviewer` overrides the generalist
+only for `review`; every other eligible task remains with `developer`.
+
+Kimi, GLM, a local runner such as Ollama, or another API service use the same
+shape: provide an executable adapter and a local profile. The adapter owns the
+provider request format, authentication and tool loop. Name required credential
+variables with `--secret-env`; never put their values in profiles or task files.
+
+If `profile check` reports an unavailable adapter or a missing named credential,
+`run` refuses before it claims a task. `profile check --live` is an explicit
+reachability/authentication probe and may consume quota. Timeouts and failed
+verification stay visible in the run report and its local log; they do not
+silently close a task.
 
 The profile is user data, not repository configuration, so contributors can
 choose different providers without changing the project. Raw `--agent` commands

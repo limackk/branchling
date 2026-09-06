@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: "Provider-neutral agent execution"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1d
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-05
-updated: 2026-09-05
+updated: 2026-09-06
 blocked_by: [TL-290, TL-291, TL-292, TL-294, TL-296, TL-300, TL-301]
 blocks: [TL-149]
 related_docs:
@@ -23,7 +23,7 @@ verification:
   - id: onboarding
     bash: "node --test scripts/tests/agent-onboarding.test.mjs"
   - id: public-surface
-    bash: "node scripts/cli.mjs check --language && node scripts/cli.mjs check --product-name"
+    bash: "node scripts/cli.mjs check --foreign-context && node scripts/cli.mjs check --product-name"
 ---
 
 ## Goal
@@ -71,9 +71,9 @@ instructions.
 
 ## Acceptance criteria
 
-- [ ] The README path from no profile to a successful generalist dry run is
+- [x] The README path from no profile to a successful generalist dry run is
       executable in an isolated home. [proof: onboarding]
-- [ ] The mixed-provider example visibly routes development and review to
+- [x] The mixed-provider example visibly routes development and review to
       different profile names. [proof: onboarding]
-- [ ] CLI, local-model and API-backed adapter paths share one conceptual model,
+- [x] CLI, local-model and API-backed adapter paths share one conceptual model,
       and provider examples introduce no production defaults. [proof: public-surface]
