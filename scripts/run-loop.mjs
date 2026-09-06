@@ -82,6 +82,7 @@ import { resolveAgentProfile, secretEnvironmentNames } from "./agent-profiles.mj
 import { loadConfigOrExit } from "./config.mjs";
 import { repoRootFor } from "./done-task.mjs";
 import { readHistory, recordEdit } from "./history.mjs";
+import { roleBrief } from "./instructions.mjs";
 import { userConfigPath } from "./home.mjs";
 import { lockScope, releaseLock, stateRoot } from "./lock.mjs";
 import { callerSpecies, isOverSized, queueStatuses, selectCandidates, servesExecutor } from "./next-task.mjs";
@@ -402,6 +403,21 @@ export function agentInput(taskText, feedback, ran) {
     "Fix the cause, not the contract.",
     "",
   ].join("\n");
+}
+
+/**
+ * The input for a named profile. A role brief is reviewed repository context;
+ * the profile prompt is private machine context; the task is the work itself.
+ * Labels make that boundary visible to an adapter without asking it to infer
+ * authority from where a sentence happened to appear. Raw agent commands keep
+ * `agentInput()` exactly, preserving their established input byte for byte.
+ */
+export function profileInput(taskText, brief, prompt, feedback, ran) {
+  const sections = [];
+  if (brief) sections.push("## Role brief (repository)\n\n" + String(brief).trim());
+  if (prompt) sections.push("## Profile prompt (local)\n\n" + String(prompt).trim());
+  sections.push("## Task\n\n" + String(taskText).trim());
+  return agentInput(sections.join("\n\n---\n\n") + "\n", feedback, ran);
 }
 
 /**
@@ -935,7 +951,7 @@ function workOne(ctx, task) {
       cwd: ctx.cwd,
       encoding: "utf8",
       env: adapterEnvironment(ctx, task),
-      input: agentInput(task.text, feedback, feedbackRan),
+      input: profileInput(task.text, task.roleBrief, task.profile && task.profile.prompt, feedback, feedbackRan),
       timeout: ctx.plan.timeout * 1000,
       maxBuffer: 64 * 1024 * 1024,
     });
@@ -1459,7 +1475,14 @@ export function run(argv) {
     const leg = (legs.get(task.id) || 0) + 1;
     legs.set(task.id, leg);
     if (hand.kind === "profile") hand.profile = plan.profiles[hand.name];
-    const result = workOne(ctx, { id: task.id, file: task.file, text: task.text || "", hand, profile: hand.profile || null, role, leg });
+    const brief = role ? roleBrief(role, config) : null;
+    const result = workOne(ctx, {
+      id: task.id, file: task.file, text: task.text || "", hand,
+      profile: hand.profile || null, role, leg,
+      // A declared role may deliberately have no brief yet; the role vocabulary
+      // remains valid and the profile still receives the task, as TL-264 states.
+      roleBrief: brief && brief.ok ? brief.text : null,
+    });
     result.role = role;
     if (result.outcome === "agent-never-ran") {
       // NOTHING WAS MEASURED, so nothing about the task may change (TL-184). The

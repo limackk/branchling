@@ -134,7 +134,11 @@ environment contract is `<PRODUCT>_PROFILE`, `_PROMPT`, `_MODEL`, `_EFFORT`,
 profile values are present as empty strings. A wrapper can therefore use one
 contract for every provider, while `--agent` and `--agent-for` preserve the raw
 shell-command path for existing automation. Use
-`--profile-for <role>=<name>` to select profiles per role.
+`--profile-for <role>=<name>` to select profiles per role. For a profile serving
+a role with a reviewed brief, stdin carries three labelled sections in order:
+the repository's role brief, the local profile prompt, then the task. The same
+prompt, model and effort remain available in the environment contract. Raw
+`--agent` commands retain their existing task-only stdin input.
 
 ### Adapter trust boundary
 
