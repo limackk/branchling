@@ -44,7 +44,7 @@ const task = (over) => ({
 const panel = (tasks, history, opts) =>
   decisionPanel(tasks, history || {}, { archivedStatuses: ARCHIVED, now: Date.parse("2026-02-10T00:00:00Z"), ...(opts || {}) });
 
-const comment = (id, ts, text, actor) => ({ id, ts, field: FIELD_COMMENT, from: "", to: text, actor });
+const comment = (id, ts, text, actor) => ({ id, ts, field: FIELD_COMMENT, source: "ask", from: "", to: text, actor });
 const decision = (id, ts, text, resolves) => ({ id, ts, field: FIELD_DECISION, from: "", to: text, resolves, actor: "local:k" });
 
 // ── Tasks marked for a person ─────────────────────────────────────────────

@@ -1,0 +1,5 @@
+{"id":"01M1VNS7D2XX8AXE0A45AS7P0E","ts":"2026-09-06T15:35:53.506Z","task":"TL-312","field":"__created__","from":"","to":"Decision panel fixtures identify ask events explicitly","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1VNSZ7RK0V12B3MNJT1NMAS","ts":"2026-09-06T15:36:17.912Z","task":"TL-312","field":"epic","from":"","to":"Execution observability","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1VNT5RW1YBD25AGSPB0ZJ6P","ts":"2026-09-06T15:36:24.604Z","task":"TL-312","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1VNT5RWYDH7MRNDHV7HYWCF","ts":"2026-09-06T15:36:24.604Z","task":"TL-312","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1VNTD744NPKVF3HT1TAD5AJ","ts":"2026-09-06T15:36:32.228Z","task":"TL-312","field":"status","from":"in_progress","to":"done","actor":"agent:codex","source":"done","reason":"proven","session":"tree-526f61f2043f"}

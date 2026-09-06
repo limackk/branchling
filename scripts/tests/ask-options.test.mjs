@@ -367,7 +367,7 @@ test("`--choose` on a question asked without options is refused", () => {
 
 test("the printed task file carries the menu, with the recommended row marked", () => {
   const entries = [
-    { id: "01ARZ3NDEKTSV4RRFFQ69G5FAV", field: "__comment__", actor: "agent:worker",
+    { id: "01ARZ3NDEKTSV4RRFFQ69G5FAV", field: "__comment__", source: "ask", actor: "agent:worker",
       to: "take it whole, or split it?", options: [SOLID, QUICK], recommend: 1 },
   ];
   const out = withDecisions("---\nid: T-1\n---\nbody\n", entries);
@@ -377,7 +377,7 @@ test("the printed task file carries the menu, with the recommended row marked", 
 
   // POSITIVE CONTROL: a question with no menu still renders, and invents none.
   const bare = withDecisions("---\nid: T-1\n---\nbody\n",
-    [{ id: "01ARZ3NDEKTSV4RRFFQ69G5FAW", field: "__comment__", actor: "agent:worker", to: "no menu here", options: [] }]);
+    [{ id: "01ARZ3NDEKTSV4RRFFQ69G5FAW", field: "__comment__", source: "ask", actor: "agent:worker", to: "no menu here", options: [] }]);
   assert.match(bare, /no menu here/);
   assert.doesNotMatch(bare, /recommended/);
 });
