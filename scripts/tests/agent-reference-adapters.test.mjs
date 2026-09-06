@@ -80,3 +80,13 @@ test("reference adapters pass conformance and route generalist and review profil
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("reference documentation keeps model choice and credentials with the user", () => {
+  const guide = readFileSync(join(REPO_ROOT, "examples", "agent-adapters", "README.md"), "utf8");
+  const readme = readFileSync(join(REPO_ROOT, "README.md"), "utf8");
+  assert.match(guide, /<a current Claude model alias>/);
+  assert.match(guide, /<a model specification accepted by Aider>/);
+  assert.match(guide, /--secret-env OPENAI_API_KEY/);
+  assert.doesNotMatch(guide, /sk-[A-Za-z0-9_-]{16,}/);
+  assert.match(readme, /Copyable reference adapters ship with the package/);
+});

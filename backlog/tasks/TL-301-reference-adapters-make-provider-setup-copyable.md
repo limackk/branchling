@@ -6,7 +6,7 @@ labels: []
 board: main
 epic: "Provider-neutral agent execution"
 priority: P1
-status: in_progress  # pending | in_progress | blocked | done | cancelled
+status: done  # pending | in_progress | blocked | done | cancelled
 owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
@@ -24,7 +24,7 @@ verification:
   - id: reference-adapters
     bash: "node --test scripts/tests/agent-reference-adapters.test.mjs"
   - id: public-surface
-    bash: "node scripts/cli.mjs check --language && node scripts/cli.mjs check --product-name"
+    bash: "node scripts/cli.mjs check --foreign-context && node scripts/cli.mjs check --product-name"
 ---
 
 ## Goal
@@ -73,12 +73,12 @@ chat-completions call that lacks a coding-agent tool loop.
 
 ## Acceptance criteria
 
-- [ ] Two materially different reference adapters pass the public conformance
+- [x] Two materially different reference adapters pass the public conformance
       kit without network access or real credentials. [proof: reference-adapters]
-- [ ] Copyable profiles exercise prompt, model and effort through generalist and
+- [x] Copyable profiles exercise prompt, model and effort through generalist and
       role-based runs. [proof: reference-adapters]
-- [ ] No provider name or argument convention is added to provider-neutral core
+- [x] No provider name or argument convention is added to provider-neutral core
       modules. [proof: reference-adapters]
-- [ ] The public documentation explains how to add an unlisted provider and
+- [x] The public documentation explains how to add an unlisted provider and
       contains no credential or timeless recommended model id.
       [proof: public-surface]

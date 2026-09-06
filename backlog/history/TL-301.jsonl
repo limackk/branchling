@@ -7,3 +7,4 @@
 {"id":"01M1TT1BSDE7YS10X5MGZ0MY33","ts":"2026-09-06T07:31:00.013Z","task":"TL-301","field":"__attributed__","from":"","to":"related_docs","actor":"agent:codex","source":"hook","reason":"Make provider-neutral execution dependencies match the wave boundaries","attributes":"01M1TSZ8P6GMMSZPX5E2MPXSRT"}
 {"id":"01M1VTS673FRBCQYT5VF8HWTAR","ts":"2026-09-06T17:03:15.171Z","task":"TL-301","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
 {"id":"01M1VTS673ZY8T66TPN3MRDNRE","ts":"2026-09-06T17:03:15.171Z","task":"TL-301","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1VXWK3WB9NFJR7RE855S2Z7","ts":"2026-09-06T17:57:32.412Z","task":"TL-301","field":"status","from":"in_progress","to":"done","actor":"agent:codex","source":"done","reason":"proven","session":"tree-526f61f2043f"}
