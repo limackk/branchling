@@ -2,7 +2,7 @@
 /**
  * `decide <ID> --reason "…"` — a decision recorded as an event (TL-114).
  *
- * WHAT IT IS FOR. `handoff` (TL-99) leaves the QUESTION in a task's history as a
+ * WHAT IT IS FOR. `ask` leaves the QUESTION in a task's history as a
  * `__comment__` with an id of its own. This command writes the other half: the
  * answer, as a `__decision__` event that may point back at the question it
  * settles. From here "waiting for a decision" is machine-readable —

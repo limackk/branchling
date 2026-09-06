@@ -373,11 +373,11 @@ export function isPseudoField(key) {
  * (TL-115) and the graph (TL-116) both read this function rather than each
  * writing the rule out again.
  *
- * WHAT COUNTS AS A QUESTION: a `__comment__`. The tool cannot tell a question
- * from a remark — both are somebody's sentence — and the honest reading of that
- * is the generous one: every comment is answerable, and one nobody answered is
- * open. Guessing at question marks would quietly drop the handoff that ends
- * "decide which of the two we do", which is the case this exists for.
+ * WHAT COUNTS AS A QUESTION: an `ask` event carrying a `__comment__`. A handoff
+ * and a release also preserve their reason as a comment, but they are operational
+ * messages, not a request that stops a task. The event source is the fact the
+ * writer already knows; guessing from punctuation would make the same history
+ * mean different things to different readers.
  *
  * PURE, and it takes entries rather than a directory: the callers that matter
  * (the panel, the graph) already hold the history and must not re-read it per
@@ -390,8 +390,12 @@ export function isPseudoField(key) {
  * `history.mjs` re-exports it, so every existing caller is unchanged.
  *
  * @param {object[]} entries one task's history
- * @returns {object[]} the unanswered comment entries, in the order they arrived
+ * @returns {object[]} the unanswered ask entries, in the order they arrived
  */
+export function isQuestion(entry) {
+  return !!entry && entry.field === FIELD_COMMENT && entry.source === "ask";
+}
+
 export function openQuestions(entries) {
   const answered = new Set();
   for (const e of entries || []) {
@@ -400,7 +404,7 @@ export function openQuestions(entries) {
     }
   }
   return (entries || []).filter(
-    (e) => e && e.field === FIELD_COMMENT && !(typeof e.id === "string" && answered.has(e.id))
+    (e) => isQuestion(e) && !(typeof e.id === "string" && answered.has(e.id))
   );
 }
 

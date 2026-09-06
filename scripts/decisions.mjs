@@ -7,7 +7,7 @@
  * chain. Putting this in either of them would close a cycle between the two.
  * It imports nothing but the field names.
  */
-import { FIELD_COMMENT, FIELD_DECISION, openQuestions } from "./task-fields.mjs";
+import { FIELD_DECISION, isQuestion, openQuestions } from "./task-fields.mjs";
 
 /**
  * The decisions and open questions, rendered INTO the printed task file, right
@@ -41,7 +41,7 @@ export function decisionsOf(entries) {
   }
   const out = [];
   for (const q of entries || []) {
-    if (!q || q.field !== FIELD_COMMENT || q.source !== "ask") continue;
+    if (!isQuestion(q)) continue;
     const a = answered.get(q.id) || null;
     out.push({
       id: String(q.id || ""),
@@ -66,7 +66,7 @@ export function withDecisions(text, entries) {
     if (e && e.field === FIELD_DECISION && typeof e.resolves === "string" && e.resolves) answered.set(e.resolves, e);
   }
   const open = openQuestions(entries);
-  const pairs = (entries || []).filter((e) => e && e.field === FIELD_COMMENT && answered.has(e.id));
+  const pairs = (entries || []).filter((e) => isQuestion(e) && answered.has(e.id));
   if (!pairs.length && !open.length) return text;
 
   const block = ["", "## Decisions and open questions", ""];

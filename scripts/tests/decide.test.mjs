@@ -76,23 +76,22 @@ function history(dir, id) {
 
 const decisions = (dir, id) => history(dir, id).filter((e) => e.field === FIELD_DECISION);
 
-/** A question in the log, put there the way it really arrives: a handoff. */
-function askViaHandoff(dir, id, question) {
-  assert.equal(run(dir, ["take", id, "--dir", ".", "--actor", "agent:worker"]).status, 0);
-  const r = run(dir, ["handoff", id, "--dir", ".", "--to-role", "archivist", "--reason", question, "--actor", "agent:worker"]);
+/** A question in the log, put there by the command that creates question state. */
+function askQuestion(dir, id, question) {
+  const r = run(dir, ["ask", id, "--dir", ".", "--question", question, "--actor", "agent:worker"]);
   assert.equal(r.status, 0, r.stderr);
-  const comment = history(dir, id).find((e) => e.field === FIELD_COMMENT && e.to === question);
-  assert.ok(comment, "the handoff left no comment to answer");
+  const comment = history(dir, id).find((e) => e.field === FIELD_COMMENT && e.source === "ask" && e.to === question);
+  assert.ok(comment, "the ask left no question to answer");
   return comment;
 }
 
 // ── The pair: a question asked, then answered ─────────────────────────────
 
-test("a handoff's question is answered by a decision that points at it", () => {
+test("an ask question is answered by a decision that points at it", () => {
   const dir = repo();
   const id = newTask(dir, "Which of the two shapes do we build");
   const question = "two shapes are possible here and the choice is a product one";
-  const comment = askViaHandoff(dir, id, question);
+  const comment = askQuestion(dir, id, question);
 
   assert.equal(openQuestions(history(dir, id)).length, 1);
 
@@ -114,13 +113,20 @@ test("a handoff's question is answered by a decision that points at it", () => {
 test("positive control: an unanswered question stays open in the same log", () => {
   const dir = repo();
   const id = newTask(dir, "Two questions, one answer");
-  const first = askViaHandoff(dir, id, "question one, which gets an answer");
-  const second = askViaHandoff(dir, id, "question two, which does not");
+  const first = askQuestion(dir, id, "question one, which gets an answer");
+  const second = askQuestion(dir, id, "question two, which does not");
 
   assert.equal(run(dir, ["decide", id, "--dir", ".", "--reason", "answering the first", "--resolves", first.id, "--actor", "local:kamil"]).status, 0);
 
   const open = openQuestions(history(dir, id));
   assert.deepEqual(open.map((e) => e.id), [second.id]);
+});
+
+test("a handoff comment remains a message beside an unanswered ask", () => {
+  const comment = { id: "H1", field: FIELD_COMMENT, source: "handoff", to: "the reviewer needs the context" };
+  const question = { id: "Q1", field: FIELD_COMMENT, source: "ask", to: "which release channel?" };
+  assert.deepEqual(openQuestions([comment, question]).map((e) => e.id), ["Q1"],
+    "an operational comment became a task-stopping question");
 });
 
 test("a decision may stand on its own — nobody has to have asked", () => {
@@ -178,7 +184,7 @@ test("--resolves naming an event from ANOTHER task fails: the pair is per task",
   const dir = repo();
   const asked = newTask(dir, "The task that was asked");
   const other = newTask(dir, "The task that was not");
-  const comment = askViaHandoff(dir, asked, "the question belongs to this one");
+  const comment = askQuestion(dir, asked, "the question belongs to this one");
 
   const r = run(dir, ["decide", other, "--dir", ".", "--reason", "answering somebody else's question", "--resolves", comment.id, "--actor", "local:kamil"]);
   assert.equal(r.status, 1);
@@ -229,8 +235,8 @@ test("a decision reads as a message, so the viewer prints its content", () => {
 test("--json carries the decision and what is still unanswered", () => {
   const dir = repo();
   const id = newTask(dir, "For a program");
-  askViaHandoff(dir, id, "the one that stays open");
-  const answered = askViaHandoff(dir, id, "the one that gets answered");
+  askQuestion(dir, id, "the one that stays open");
+  const answered = askQuestion(dir, id, "the one that gets answered");
   const r = run(dir, ["decide", id, "--dir", ".", "--reason", "answered", "--resolves", answered.id, "--actor", "agent:worker", "--json"]);
   assert.equal(r.status, 0, r.stderr);
   const out = JSON.parse(r.stdout);
@@ -258,7 +264,7 @@ test("a closed task still takes a decision — the record is why, not what is ne
 test("the viewer's history axis carries the decision and names the pair", () => {
   const dir = repo();
   const id = newTask(dir, "Read on the page");
-  const comment = askViaHandoff(dir, id, "the question the page has to show");
+  const comment = askQuestion(dir, id, "the question the page has to show");
   assert.equal(run(dir, ["decide", id, "--dir", ".", "--reason", "the answer the page has to show", "--resolves", comment.id, "--actor", "local:kamil"]).status, 0);
   assert.equal(run(dir, ["viewer", "--dir", "."]).status, 0);
   const html = readFileSync(join(dir, "viewer.html"), "utf8");

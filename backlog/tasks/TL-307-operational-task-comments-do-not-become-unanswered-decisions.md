@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Execution observability"
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
@@ -60,7 +60,7 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] A resolved question no longer blocks the task when unrelated operational
+- [x] A resolved question no longer blocks the task when unrelated operational
   comments exist in its history. [proof: decision-classification]
-- [ ] An actual unanswered `ask` event still remains visible and blocks its
+- [x] An actual unanswered `ask` event still remains visible and blocks its
   task. [proof: decision-classification]

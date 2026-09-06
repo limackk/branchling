@@ -289,7 +289,7 @@ test("withDecisions places the block under the frontmatter and writes nothing wi
   const file = "---\nid: T-1\nstatus: pending\n---\n\n## Goal\n\nx\n";
   assert.equal(withDecisions(file, []), file, "a task with no history grew a section anyway");
 
-  const q = { id: "Q1", field: "__comment__", to: "which one?", actor: "agent:w" };
+  const q = { id: "Q1", field: "__comment__", source: "ask", to: "which one?", actor: "agent:w" };
   const a = { id: "D1", field: "__decision__", to: "the second", actor: "user:k", resolves: "Q1" };
   const out = withDecisions(file, [q, a]);
   assert.ok(out.indexOf("## Decisions and open questions") < out.indexOf("## Goal"));

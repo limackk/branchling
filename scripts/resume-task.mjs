@@ -58,7 +58,7 @@ import { printJson } from "./json-envelope.mjs";
 import { backlogPaths, resolveBacklogDirOrExit } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import {
-  FIELD_COMMENT, FIELD_DECISION, extractMeta, historyEntryKind, openQuestions, splitFrontmatter,
+  FIELD_COMMENT, FIELD_DECISION, extractMeta, historyEntryKind, isQuestion, openQuestions, splitFrontmatter,
 } from "./task-fields.mjs";
 import { MARK, failure } from "./ui.mjs";
 
@@ -250,13 +250,14 @@ export function describeEntry(e) {
  * a decision to honour, an unanswered one is work that must not start. PURE.
  */
 export function decisionsOf(entries) {
+  const questions = new Set((entries || []).filter(isQuestion).map((e) => e.id));
   const answered = new Map();
   for (const e of entries || []) {
-    if (e && e.field === FIELD_DECISION && typeof e.resolves === "string" && e.resolves) answered.set(e.resolves, e);
+    if (e && e.field === FIELD_DECISION && typeof e.resolves === "string" && questions.has(e.resolves)) answered.set(e.resolves, e);
   }
   const out = [];
   for (const q of entries || []) {
-    if (!q || q.field !== FIELD_COMMENT || !answered.has(q.id)) continue;
+    if (!isQuestion(q) || !answered.has(q.id)) continue;
     const a = answered.get(q.id);
     out.push({ open: false, id: q.id, question: q.to, askedBy: q.actor, answer: a.to, answeredBy: a.actor });
   }
@@ -270,7 +271,7 @@ export function decisionsOf(entries) {
   // successor is bound by, and it has nowhere else in this section to appear.
   for (const e of entries || []) {
     if (!e || e.field !== FIELD_DECISION) continue;
-    if (typeof e.resolves === "string" && e.resolves && answered.get(e.resolves)) continue;
+    if (typeof e.resolves === "string" && e.resolves && answered.has(e.resolves)) continue;
     out.push({ open: false, id: e.id, question: null, askedBy: null, answer: e.to, answeredBy: e.actor });
   }
   return out;
