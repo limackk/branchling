@@ -63,8 +63,19 @@ test("create, list, update and remove are non-interactive, and do not edit user 
   assert.equal(run(["profile", "update", "review", "--model", "gpt-5.2", "--effort", "high"], fx.env).status, 0);
   const updated = run(["profile", "show", "review", "--json"], fx.env);
   assert.equal(JSON.parse(updated.stdout).profile.model, "gpt-5.2");
+  assert.equal(run(["profile", "update", "review", "--delegation-control", "enforced"], fx.env).status, 0);
+  const controlled = JSON.parse(run(["profile", "show", "review", "--json"], fx.env).stdout);
+  assert.equal(controlled.profile.delegation_control, "enforced");
   assert.equal(run(["profile", "remove", "review"], fx.env).status, 0);
   assert.equal(readFileSync(config, "utf8"), before, "profiles rewrote the existing user preferences");
+});
+
+test("profiles refuse an unknown delegation-control declaration", () => {
+  const fx = fixture();
+  const result = run(["profile", "create", "unclear", "--adapter", "/opt/wrapper",
+    "--prompt", "Work.", "--delegation-control", "maybe"], fx.env);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /delegation_control must be one of: enforced, requested, unsupported/);
 });
 
 test("unknown fields, duplicate names, bad prompt files and copied credentials are refused with a remedy", () => {

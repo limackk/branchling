@@ -159,6 +159,59 @@ test("bad profile routing fails before it can claim a task", () => {
   }
 });
 
+function delegationFixture(control) {
+  const root = mkdtempSync(join(tmpdir(), "branchling-delegation-"));
+  const repo = join(root, "repo");
+  const backlog = join(repo, "backlog");
+  const env = { ...process.env, NO_COLOR: "1", [HOME_ENV]: join(root, "home"), BACKLOG_STATE_DIR: join(root, "state") };
+  mkdirSync(repo, { recursive: true });
+  execFileSync("git", ["init", "-q", "-b", "main", "."], { cwd: repo });
+  assert.equal(cli(["init", "--dir", backlog, "--no-example"], env, repo).status, 0);
+  const config = join(backlog, "config.yaml");
+  writeFileSync(config, readFileSync(config, "utf8") + "\nroles: [dev]\n", "utf8");
+  const created = cli(["new", "--dir", backlog, "--title", "Delegated work"], env, repo);
+  assert.equal(created.status, 0, created.stderr);
+  const id = created.stdout.match(/[A-Z]+-\d+/)[0];
+  const file = taskFile(backlog, id);
+  writeFileSync(file, readFileSync(file, "utf8")
+    .replace(/^role: .*$/m, "role: dev")
+    .replace(/verification:[\s\S]*?\n---/, 'verification:\n  - id: it-runs\n    bash: "true"\n---')
+    .replace(/\[proof:[^\]]*\]/g, "[proof: it-runs]"), "utf8");
+  const adapter = join(root, "adapter.sh");
+  writeFileSync(adapter, "#!/bin/sh\ncat >/dev/null\nprintf '%s|%s\\n' \"$BRANCHLING_DELEGATION\" \"$BRANCHLING_DELEGATION_ENFORCEMENT\"\n", "utf8");
+  chmodSync(adapter, 0o755);
+  const args = ["profile", "create", "developer", "--adapter", adapter, "--prompt", "Work."];
+  if (control) args.push("--delegation-control", control);
+  const profile = cli(args, env, repo);
+  assert.equal(profile.status, 0, profile.stderr);
+  assert.equal(cli(["build", "--dir", backlog], env, repo).status, 0);
+  return { root, repo, backlog, env, id };
+}
+
+test("an unmanaged profile fleet is refused before a Branchling claim", () => {
+  const fx = delegationFixture(null);
+  try {
+    const result = cli(["run", "--dir", fx.backlog, "--actor", "agent:fleet", "--max-attempts", "1",
+      "--delegation", "branchling", "--profile-for", "dev=developer"], fx.env, fx.repo);
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    assert.match(result.stderr, /needs a controlled profile adapter/);
+    assert.match(result.stderr, /unsupported: developer/);
+    assert.equal(status(fx.backlog, fx.id), "pending");
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
+test("a controlled fleet records its Branchling delegation policy", () => {
+  const fx = delegationFixture("enforced");
+  try {
+    const result = cli(["run", "--dir", fx.backlog, "--actor", "agent:fleet", "--max-attempts", "1", "--json",
+      "--delegation", "branchling", "--profile-for", "dev=developer"], fx.env, fx.repo);
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.equal(status(fx.backlog, fx.id), "done");
+    const receipt = JSON.parse(result.stdout).tasks[0].provenance[0];
+    assert.deepEqual(receipt.delegation, { requested: "branchling", enforcement: "enforced" });
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
 function stderrEvidenceFixture(name, adapterBody) {
   const root = mkdtempSync(join(tmpdir(), "branchling-profile-evidence-"));
   const repo = join(root, "repo");
