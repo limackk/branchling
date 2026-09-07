@@ -1,7 +1,7 @@
 /** The terminal monitor is one quiet frame, not a shell loop (TL-305). */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseWatchArgs, render, run, watchTaskLine } from "../watch.mjs";
+import { executionState, parseWatchArgs, render, run, watchTaskLine } from "../watch.mjs";
 import { plain } from "../ui.mjs";
 import { isolateHome } from "./_repo.mjs";
 
@@ -32,4 +32,10 @@ test("a non-TTY invocation prints one frame and never schedules a loop", () => {
   const out = [];
   assert.equal(run([], { frame: () => ({ wave: null, tasks: [] }), write: (s) => out.push(s) }), 0);
   assert.match(out.join(""), /no active plan wave/);
+});
+
+test("a silent live attempt is quiet, while a dead attempt is stalled", () => {
+  const old = new Date(Date.now() - 180_000).toISOString();
+  assert.equal(executionState({ phase: "running", pid: process.pid, lastOutputAt: old }), "quiet");
+  assert.equal(executionState({ phase: "running", pid: 999999, lastOutputAt: old }), "stalled");
 });

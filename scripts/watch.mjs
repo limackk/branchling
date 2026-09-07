@@ -43,7 +43,20 @@ export function frame(plan, resolvedRoot = null) {
   }) : [];
   return { wave: activeWave ? { index: activeWave.index + 1, name: activeWave.name, open: activeWave.open, tasks: waveTasks } : null, tasks: tasks.map((t) => ({ ...t, execution: attemptFor(t.id) })) };
 }
-function executionState(execution) { if (!execution) return "—"; if (execution.phase === "verifying") return "verifying"; if (execution.phase === "finished" || execution.phase === "cancelled") return execution.phase; const evidence = Date.parse(execution.lastProgressAt || execution.lastOutputAt || ""); const age = Number.isFinite(evidence) ? Date.now() - evidence : Infinity; return age < 30_000 ? "active" : age < 120_000 ? "quiet" : "stalled"; }
+function attemptAlive(execution) {
+  const pid = execution && execution.pid;
+  if (!Number.isInteger(pid) || pid < 1) return false;
+  return spawnSync("ps", ["-p", String(pid), "-o", "pid="], { encoding: "utf8" }).status === 0;
+}
+export function executionState(execution) {
+  if (!execution) return "—";
+  if (execution.phase === "verifying") return "verifying";
+  if (["finished", "cancelled", "interrupted"].includes(execution.phase)) return execution.phase;
+  const evidence = Date.parse(execution.lastProgressAt || execution.lastOutputAt || "");
+  const age = Number.isFinite(evidence) ? Date.now() - evidence : Infinity;
+  if (attemptAlive(execution)) return age < 30_000 ? "active" : "quiet";
+  return "stalled";
+}
 function watchStatus(status, paint) {
   if (status === "in_progress") return paint.ok(status);
   if (status === "blocked") return paint.err(status);

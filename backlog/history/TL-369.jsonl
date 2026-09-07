@@ -1,1 +1,4 @@
 {"id":"01M1YGC4JZPDS62YJPXXXJJEVZ","ts":"2026-09-07T17:59:05.055Z","task":"TL-369","field":"__created__","from":"","to":"Watch separates a silent live attempt from a stalled attempt","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1YHASRE2Z0RANE6T5XMDNKY","ts":"2026-09-07T18:15:49.774Z","task":"TL-369","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1YHASRE23KEQ867BGYJK2SG","ts":"2026-09-07T18:15:49.774Z","task":"TL-369","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1YHBYAJ0ACV0VV2Q6CN7F3M","ts":"2026-09-07T18:16:27.218Z","task":"TL-369","field":"status","from":"in_progress","to":"done","actor":"agent:codex","source":"done","reason":"proven","session":"tree-526f61f2043f"}
