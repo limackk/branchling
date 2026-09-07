@@ -79,6 +79,7 @@ import { fileURLToPath } from "node:url";
 
 import { resolveActor } from "./actor.mjs";
 import { checkAgentProfiles, resolveAgentProfile, secretEnvironmentNames } from "./agent-profiles.mjs";
+import { resolveAgentLaunch } from "./agent-launches.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { repoRootFor } from "./done-task.mjs";
 import { readHistory, recordEdit } from "./history.mjs";
@@ -113,7 +114,7 @@ const CLI = join(__dirname, "cli.mjs");
 export const AGENT_ENV = "BACKLOG_AGENT_COMMAND";
 
 export const RUN_FLAGS = [
-  "--dir", "--actor", "--agent", "--agent-for", "--profile", "--profile-for", "--max-attempts", "--max-tasks", "--timeout",
+  "--dir", "--actor", "--agent", "--agent-for", "--profile", "--profile-for", "--launch", "--max-attempts", "--max-tasks", "--timeout",
   "--log-dir", "--stuck-status", "--json", "--dry-run", "--plan", "--probe",
   "--board", "--label", "--priority", "--epic",
 ];
@@ -124,7 +125,7 @@ const DEFAULT_TIMEOUT_SECONDS = 900;
 /** PURE — resolves `run`'s arguments. Throws on a usage error. */
 export function parseRunArgs(args) {
   const plan = {
-    dir: null, actor: null, agent: null, profile: null, agentFor: {}, profileFor: {}, json: false, dryRun: false, usePlan: false,
+    dir: null, actor: null, agent: null, profile: null, launch: null, agentFor: {}, profileFor: {}, json: false, dryRun: false, usePlan: false,
     maxAttempts: DEFAULT_MAX_ATTEMPTS, maxTasks: 0, timeout: DEFAULT_TIMEOUT_SECONDS, probe: false,
     logDir: null, stuckStatus: null, board: null, label: null, priority: null, epic: null,
   };
@@ -1189,6 +1190,21 @@ export function run(argv) {
     return 2;
   }
   const config = loadConfigOrExit(root);
+
+  if (plan.launch) {
+    if (plan.agent || plan.profile || Object.keys(plan.agentFor).length || Object.keys(plan.profileFor).length) {
+      console.error(failure(N + " run", "`--launch` is a complete routing choice", ["Do not combine it with --agent, --profile, --agent-for or --profile-for."]));
+      return 2;
+    }
+    const launch = resolveAgentLaunch(plan.launch);
+    if (!launch.ok) {
+      const detail = launch.kind === "missing-profile" ? ["launch references missing profile(s): " + launch.missing.join(", ")] : ["Run `" + N + " launch list` to see local names."];
+      console.error(failure(N + " run", "cannot use launch `" + plan.launch + "`", detail));
+      return 1;
+    }
+    plan.profile = launch.launch.profile;
+    plan.profileFor = launch.launch.profileFor;
+  }
 
   // A role in the map that the project does not declare is a typo, and it fails
   // BEFORE the loop starts: found in the middle of a run it would have wasted

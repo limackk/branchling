@@ -63,6 +63,8 @@ export const CONFIG_FILENAME = "config.yaml";
 export const REGISTRY_FILENAME = "projects.yaml";
 /** Local execution profiles. This is a user-owned file, never project data. */
 export const AGENT_PROFILES_FILENAME = "agent-profiles.yaml";
+/** Named local compositions of existing profiles, never repository data. */
+export const AGENT_LAUNCHES_FILENAME = "agent-launches.yaml";
 
 /**
  * Where the home directory is, without touching the disk. PURE.
@@ -132,6 +134,10 @@ export function registryPath(env = process.env) {
 /** The provider-neutral profiles a person keeps on this machine. */
 export function agentProfilesPath(env = process.env) {
   return join(homePaths(env).config, AGENT_PROFILES_FILENAME);
+}
+
+export function agentLaunchesPath(env = process.env) {
+  return join(homePaths(env).config, AGENT_LAUNCHES_FILENAME);
 }
 
 /** Create the config directory on demand. Only the two commands that WRITE

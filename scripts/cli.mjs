@@ -1052,6 +1052,11 @@ export const COMMANDS = {
       "  exit: 0 read or written · 1 invalid profile or missing name · 2 usage error",
     ].join("\n"),
   },
+  launch: {
+    script: "agent-launches.mjs",
+    summary: "maintain this machine's named local profile routing",
+    usage: `${N} launch <list|show|create|update|remove> [name] [--profile <name>] [--profile-for <role=profile>] [--json]`,
+  },
   conformance: {
     script: "adapter-conformance.mjs",
     summary: "prove one profile adapter offline against the public process contract",
