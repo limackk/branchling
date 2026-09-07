@@ -254,3 +254,15 @@ waves:
   # Verify visual changes do not affect plain text, automation or accessibility.
   - name: "Polish remains optional"
     tasks: [TL-326]
+
+  # Migrate the user-facing wizard before deciding the fate of the custom renderer or auditing its non-interactive boundary.
+  - name: "Profile setup gains Clack"
+    tasks: [TL-327]
+
+  # Remove ambiguity after the Clack setup path is proven.
+  - name: "One renderer owns guided prompts"
+    tasks: [TL-328]
+
+  # Finish with the API and non-interactive compatibility gate.
+  - name: "Clack remains optional for automation"
+    tasks: [TL-329]
