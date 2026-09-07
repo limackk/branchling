@@ -73,8 +73,8 @@ test("reference adapters pass conformance and route generalist and review profil
     fakeHarness(join(bin, "aider"), apiSeen);
     fakeHarness(join(bin, "codex"), join(root, "codex-arguments.txt"));
     fakeHarness(join(bin, "ollama"), join(root, "ollama-arguments.txt"));
-    assert.equal(cli(["profile", "create", "developer", "--adapter", CLAUDE, "--model", "subscription-model", "--effort", "high", "--prompt", "Implement from evidence."], env, repo).status, 0);
-    assert.equal(cli(["profile", "create", "reviewer", "--adapter", AIDER, "--model", "api-model", "--effort", "medium", "--prompt", "Review from evidence.", "--secret-env", "OPENAI_API_KEY"], env, repo).status, 0);
+    assert.equal(cli(["profile", "create", "developer", "--adapter", CLAUDE, "--model", "subscription-model", "--effort", "high", "--prompt", "Implement from evidence.", "--delegation-control", "requested"], env, repo).status, 0);
+    assert.equal(cli(["profile", "create", "reviewer", "--adapter", AIDER, "--model", "api-model", "--effort", "medium", "--prompt", "Review from evidence.", "--secret-env", "OPENAI_API_KEY", "--delegation-control", "enforced"], env, repo).status, 0);
 
     const result = cli(["run", "--dir", backlog, "--actor", "agent:references", "--profile", "developer", "--profile-for", "review=reviewer"], env, repo);
     assert.equal(result.status, 0, result.stdout + result.stderr);

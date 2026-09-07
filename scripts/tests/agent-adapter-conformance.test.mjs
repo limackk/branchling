@@ -42,9 +42,9 @@ function compatibleAdapter(root, witness) {
     "  sleep 30 & child=$!",
     "  kill \"$child\"",
     "  wait \"$child\" 2>/dev/null",
-    "  printf '{\"version\":1,\"scenario\":\"%s\",\"outcome\":\"%s\",\"childPid\":%s}' \"$" + CONFORMANCE_SCENARIO_ENV + "\" \"$" + CONFORMANCE_SCENARIO_ENV + "\" \"$child\"",
+    "  printf '{\"version\":1,\"scenario\":\"%s\",\"outcome\":\"%s\",\"childPid\":%s,\"delegation\":{\"policy\":\"%s\",\"control\":\"requested\",\"evidence\":\"prompt-directive\"}}' \"$" + CONFORMANCE_SCENARIO_ENV + "\" \"$" + CONFORMANCE_SCENARIO_ENV + "\" \"$child\" \"$" + PREFIX + "_DELEGATION\"",
     "else",
-    "  printf '{\"version\":1,\"scenario\":\"%s\",\"outcome\":\"%s\"}' \"$" + CONFORMANCE_SCENARIO_ENV + "\" \"$" + CONFORMANCE_SCENARIO_ENV + "\"",
+    "  printf '{\"version\":1,\"scenario\":\"%s\",\"outcome\":\"%s\",\"delegation\":{\"policy\":\"%s\",\"control\":\"requested\",\"evidence\":\"prompt-directive\"}}' \"$" + CONFORMANCE_SCENARIO_ENV + "\" \"$" + CONFORMANCE_SCENARIO_ENV + "\" \"$" + PREFIX + "_DELEGATION\"",
     "fi",
   ].join("\n"), "#!/bin/sh");
 }
@@ -61,7 +61,7 @@ test("a compatible adapter passes every offline outcome in human and JSON modes 
     const human = cli(["conformance", "--adapter", executable]);
     assert.equal(human.status, 0, human.stdout + human.stderr);
     assert.match(human.stdout, /adapter conformance passed/);
-    for (const scenario of CONFORMANCE_SCENARIOS) assert.match(human.stdout, new RegExp("✓ " + scenario.id + "  " + scenario.outcome));
+    for (const scenario of CONFORMANCE_SCENARIOS) assert.match(human.stdout, new RegExp("✓ " + scenario.id + " \\[provider\\]  " + scenario.outcome));
     assert.equal(human.stdout.includes(CONFORMANCE_SENTINEL), false, "a secret reached human output");
     assert.equal(human.stderr.includes(CONFORMANCE_SENTINEL), false, "a secret reached diagnostics");
 
@@ -71,14 +71,15 @@ test("a compatible adapter passes every offline outcome in human and JSON modes 
     assert.equal(out.kind, "adapter-conformance");
     assert.equal(out.ok, true);
     assert.equal(out.version, CONFORMANCE_VERSION);
-    assert.deepEqual(out.results.map((row) => [row.scenario, row.outcome, row.ok]),
-      CONFORMANCE_SCENARIOS.map((scenario) => [scenario.id, scenario.outcome, true]));
+    assert.equal(out.results.length, CONFORMANCE_SCENARIOS.length * 3);
+    assert.ok(out.results.every((row) => ["provider", "branchling", "hybrid"].includes(row.delegation)));
+    assert.ok(out.results.every((row) => row.outcome && row.ok));
     assert.deepEqual(out.failures, []);
     assert.equal(json.stdout.includes(CONFORMANCE_SENTINEL), false, "a secret reached JSON");
     assert.equal(json.stderr.includes(CONFORMANCE_SENTINEL), false, "a secret reached JSON diagnostics");
 
     const seen = readFileSync(witness, "utf8").trim().split("\n").map((line) => line.split("\t"));
-    assert.equal(seen.length, CONFORMANCE_SCENARIOS.length * 2, "one invocation per scenario in each output mode");
+    assert.equal(seen.length, CONFORMANCE_SCENARIOS.length * 2 * 3, "one invocation per policy and scenario in each output mode");
     const sample = seen[0];
     assert.equal(sample[1], "1");
     assert.equal(sample[2], String(CONFORMANCE_VERSION));
@@ -102,6 +103,20 @@ test("a compatible adapter passes every offline outcome in human and JSON modes 
   }
 });
 
+test("an adapter cannot call an instruction an enforced delegation guarantee", () => {
+  const root = mkdtempSync(join(tmpdir(), "branchling-conformance-delegation-"));
+  try {
+    const executable = adapter(root, "false-enforced.sh", [
+      "cat >/dev/null",
+      "printf '{\"version\":1,\"scenario\":\"%s\",\"outcome\":\"%s\",\"delegation\":{\"policy\":\"%s\",\"control\":\"enforced\",\"evidence\":\"prompt-directive\"}}' \"$" + CONFORMANCE_SCENARIO_ENV + "\" \"$" + CONFORMANCE_SCENARIO_ENV + "\" \"$" + PREFIX + "_DELEGATION\"",
+    ].join("\n"), "#!/bin/sh");
+    const result = cli(["conformance", "--adapter", executable, "--json"]);
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    const report = JSON.parse(result.stdout);
+    assert.ok(report.failures.every((row) => row.problem === "enforced delegation has no enforceable adapter evidence"));
+  } finally { cleanup(root); }
+});
+
 test("malformed and unavailable adapters fail deterministically without exposing their output", () => {
   const root = mkdtempSync(join(tmpdir(), "branchling-conformance-negative-"));
   try {
@@ -110,7 +125,7 @@ test("malformed and unavailable adapters fail deterministically without exposing
     assert.equal(bad.status, 1, bad.stdout + bad.stderr);
     const badOut = JSON.parse(bad.stdout);
     assert.equal(badOut.ok, false);
-    assert.equal(badOut.failures.length, CONFORMANCE_SCENARIOS.length);
+    assert.equal(badOut.failures.length, CONFORMANCE_SCENARIOS.length * 3);
     assert.ok(badOut.failures.every((row) => row.problem === "adapter did not return one JSON response"));
     assert.equal(readdirSync(root).sort().join(","), "malformed-adapter.mjs", "a failed probe changed the adapter directory");
 

@@ -29,6 +29,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { adapterEnvironment, profileInput } from "./run-loop.mjs";
+import { DELEGATION_ENFORCEMENT, DELEGATION_POLICIES } from "./agent-contract.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { failure } from "./ui.mjs";
@@ -50,6 +51,7 @@ export const CONFORMANCE_VERSION_ENV = PREFIX + "_CONFORMANCE_VERSION";
 export const CONFORMANCE_SCENARIO_ENV = PREFIX + "_CONFORMANCE_SCENARIO";
 export const CONFORMANCE_SECRET_ENV = PREFIX + "_CONFORMANCE_SECRET";
 export const CONFORMANCE_SENTINEL = "conformance-secret-must-not-leak";
+export const CONFORMANCE_DELEGATION_POLICIES = DELEGATION_POLICIES;
 export const CONFORMANCE_FLAGS = ["--adapter", "--timeout", "--json", "--help"];
 
 const TASK_ID = "TL-CONFORMANCE-1";
@@ -107,11 +109,24 @@ function disposableContext() {
   return { root, repository, backlog };
 }
 
-function responseProblem(response, scenario) {
+function responseProblem(response, scenario, delegation) {
   if (!response || Array.isArray(response) || typeof response !== "object") return "response is not a JSON object";
   if (response.version !== CONFORMANCE_VERSION) return "response version is not " + CONFORMANCE_VERSION;
   if (response.scenario !== scenario.id) return "response scenario does not echo `" + scenario.id + "`";
   if (response.outcome !== scenario.outcome) return "response outcome is not `" + scenario.outcome + "`";
+  const declared = response.delegation;
+  if (!declared || typeof declared !== "object") return "response has no delegation declaration";
+  if (declared.policy !== delegation) return "response delegation policy does not echo `" + delegation + "`";
+  if (!DELEGATION_ENFORCEMENT.includes(declared.control)) return "response delegation control is not declared";
+  if (declared.control === "enforced" && !["native-flag", "no-agent-tree"].includes(declared.evidence)) {
+    return "enforced delegation has no enforceable adapter evidence";
+  }
+  if (declared.control === "requested" && declared.evidence !== "prompt-directive") {
+    return "requested delegation must report a prompt directive";
+  }
+  if (declared.control === "unsupported" && declared.evidence !== "none") {
+    return "unsupported delegation must report no enforcement evidence";
+  }
   if (scenario.id === "cancelled") {
     if (!Number.isInteger(response.childPid) || response.childPid < 1) {
       return "cancelled response has no positive integer `childPid`";
@@ -127,14 +142,14 @@ function responseProblem(response, scenario) {
   return null;
 }
 
-function runScenario(plan, context, scenario) {
+function runScenario(plan, context, scenario, delegation) {
   const profile = {
     name: "conformance", adapter: plan.adapter, model: "conformance-model",
     effort: "careful", prompt: PROMPT, secret_env: CONFORMANCE_SECRET_ENV,
   };
-  const task = { id: TASK_ID, role: ROLE, profile };
+  const task = { id: TASK_ID, role: ROLE, profile, delegation, delegationEnforcement: "unsupported" };
   const env = {
-    ...adapterEnvironment({ actor: "agent:conformance", root: context.backlog, cwd: context.repository }, task, {
+    ...adapterEnvironment({ actor: "agent:conformance", root: context.backlog, cwd: context.repository, plan: { delegation } }, task, {
       PATH: process.env.PATH || "", [CONFORMANCE_SECRET_ENV]: CONFORMANCE_SENTINEL,
     }),
     [CONFORMANCE_ENV]: "1",
@@ -154,14 +169,15 @@ function runScenario(plan, context, scenario) {
   } catch {
     return { scenario: scenario.id, outcome: null, ok: false, problem: "adapter did not return one JSON response" };
   }
-  const problem = responseProblem(response, scenario);
-  return { scenario: scenario.id, outcome: response.outcome || null, ok: !problem, problem: problem || null };
+  const problem = responseProblem(response, scenario, delegation);
+  return { scenario: scenario.id, delegation, outcome: response.outcome || null, ok: !problem, problem: problem || null };
 }
 
 export function runConformance(plan) {
   const context = disposableContext();
   try {
-    const results = CONFORMANCE_SCENARIOS.map((scenario) => runScenario(plan, context, scenario));
+    const results = CONFORMANCE_DELEGATION_POLICIES.flatMap((delegation) =>
+      CONFORMANCE_SCENARIOS.map((scenario) => runScenario(plan, context, scenario, delegation)));
     return { ok: results.every((result) => result.ok), version: CONFORMANCE_VERSION, adapter: plan.adapter, results,
       failures: results.filter((result) => !result.ok) };
   } finally {
@@ -170,7 +186,7 @@ export function runConformance(plan) {
 }
 
 function humanReport(result) {
-  const rows = result.results.map((row) => "  " + (row.ok ? "✓" : "✗") + " " + row.scenario + "  " + (row.ok ? row.outcome : row.problem));
+  const rows = result.results.map((row) => "  " + (row.ok ? "✓" : "✗") + " " + row.scenario + " [" + row.delegation + "]  " + (row.ok ? row.outcome : row.problem));
   return [
     result.ok ? "✓ adapter conformance passed — protocol v" + result.version : "✗ adapter conformance failed — protocol v" + result.version,
     "  adapter: " + result.adapter,

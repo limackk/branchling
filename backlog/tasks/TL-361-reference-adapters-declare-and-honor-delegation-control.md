@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Controlled and observable agent execution"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1d
@@ -19,7 +19,7 @@ blocks: [TL-362]                   # ids this task will unblock
 related_docs: [examples/agent-adapters/README.md, examples/agent-adapters/codex-cli.mjs, scripts/adapter-conformance.mjs]
 verification:                      # HOW to check the task is really done
   - id: adapter-delegation
-    bash: "node --test scripts/tests/agent-adapter-conformance.test.mjs scripts/tests/agent-adapters.test.mjs scripts/tests/run-agent-profiles.test.mjs"
+    bash: "node --test scripts/tests/agent-adapter-conformance.test.mjs scripts/tests/agent-reference-adapters.test.mjs scripts/tests/run-agent-profiles.test.mjs"
 ---
 
 ## Goal
@@ -63,11 +63,11 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] Every shipped adapter declares delegation control through the common
+- [x] Every shipped adapter declares delegation control through the common
       contract and passes offline conformance. [proof: adapter-delegation]
-- [ ] Codex and Claude mappings do not leak provider conditionals into core.
+- [x] Codex and Claude mappings do not leak provider conditionals into core.
       [proof: adapter-delegation]
-- [ ] Ollama and API examples have an explicit truthful result even when they
+- [x] Ollama and API examples have an explicit truthful result even when they
       have no internal subagent feature. [proof: adapter-delegation]
-- [ ] A false enforcement claim is rejected by the conformance positive
+- [x] A false enforcement claim is rejected by the conformance positive
       control. [proof: adapter-delegation]

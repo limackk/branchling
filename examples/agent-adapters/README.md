@@ -22,6 +22,30 @@ It supports the profile model through `codex exec --model`. Its optional
 accepted. Leave it blank to preserve the Codex CLI default; any other value
 fails before Codex starts, rather than changing a global Codex configuration.
 
+## Delegation control
+
+Each adapter declares the strength with which it can apply a run's
+`--delegation provider|branchling|hybrid` policy. Put that declaration in the
+local profile, not in repository configuration. The shipped Codex and Claude
+wrappers use a clear prompt directive, so configure them as `requested`.
+The Ollama and Aider examples expose no internal subagent tree and therefore
+declare `enforced` with the `no-agent-tree` capability result. A copied adapter
+must use `unsupported` when it cannot make either truthful claim; a
+Branchling-managed fleet will then require its explicit override.
+
+```bash
+branchling profile create codex-developer \
+  --adapter "$PWD/codex-cli.mjs" \
+  --model "<a current Codex model alias>" \
+  --prompt "Implement from evidence." \
+  --delegation-control requested
+```
+
+`branchling conformance` exercises provider, Branchling and hybrid policies
+offline. An adapter answers its policy, control (`enforced`, `requested`, or
+`unsupported`) and evidence. `enforced` is valid only for a native control flag
+or an adapter with no agent tree; a prompt instruction must report `requested`.
+
 `ollama.mjs` delegates to a local Ollama model. Pull the model first, for
 example `ollama pull qwen2.5-coder:7b`, then set that exact name as the profile
 model. It forwards effort to Ollama's `--think` flag when set.
@@ -64,6 +88,9 @@ standard input; read model, effort and paths from the `BRANCHLING_*`
 environment variables; keep provider requests, credentials and tool use inside
 the adapter; and exit with the harness result. Use the provider's own required
 credential-variable name in `--secret-env`. The task remains untrusted input.
+Report delegation truthfully in conformance rather than adding a provider name
+to Branchling core. This is the extension point for Kimi, GLM and future
+wrappers.
 
 Before assigning a copied adapter real work, prove its process behavior without
 credentials or network access:

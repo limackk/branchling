@@ -5,9 +5,10 @@ import { spawn, spawnSync } from "node:child_process";
 const PREFIX = "BRANCHLING_";
 const env = process.env;
 const scenario = env[PREFIX + "CONFORMANCE_SCENARIO"];
+function delegation() { return { policy: env[PREFIX + "DELEGATION"] || "provider", control: "enforced", evidence: "no-agent-tree" }; }
 function conformance() {
-  if (scenario === "cancelled") { const child = spawn(process.execPath, ["-e", "setTimeout(() => {}, 30000)"]); child.kill(); child.on("exit", () => console.log(JSON.stringify({ version: 1, scenario, outcome: scenario, childPid: child.pid }))); return true; }
-  if (env[PREFIX + "CONFORMANCE"] === "1") { console.log(JSON.stringify({ version: 1, scenario, outcome: scenario })); return true; }
+  if (scenario === "cancelled") { const child = spawn(process.execPath, ["-e", "setTimeout(() => {}, 30000)"]); child.kill(); child.on("exit", () => console.log(JSON.stringify({ version: 1, scenario, outcome: scenario, childPid: child.pid, delegation: delegation() }))); return true; }
+  if (env[PREFIX + "CONFORMANCE"] === "1") { console.log(JSON.stringify({ version: 1, scenario, outcome: scenario, delegation: delegation() })); return true; }
   return false;
 }
 if (conformance()) process.exitCode = 0;
