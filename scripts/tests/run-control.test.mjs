@@ -16,7 +16,7 @@ test("local run controls expose identity, bounded wait and refuse stale supervis
     assert.equal(cli(["init", "--dir", backlog, "--no-example"], env, root).status, 0); const run = startRunRecord({ root: backlog, actor: "agent:test", delegation: "provider", env });
     updateRunRecord(backlog, run, { supervisor: { pid: 999999, script: "run-loop.mjs" } }, env);
     const list = cli(["runs", "list", "--dir", backlog, "--json"], env, root); assert.equal(list.status, 0, list.stdout + list.stderr); assert.equal(JSON.parse(list.stdout).runs[0].id, run.id);
-    const show = cli(["runs", "show", run.id, "--dir", backlog, "--json"], env, root); assert.equal(show.status, 0); assert.equal(JSON.parse(show.stdout).run.id, run.id);
+    const show = cli(["runs", "show", run.id, "--dir", backlog, "--json"], env, root); assert.equal(show.status, 0); const shown = JSON.parse(show.stdout).run; assert.equal(shown.id, run.id); assert.equal(shown.phase, "interrupted"); assert.equal(shown.outcome, "supervisor-exited"); assert.match(shown.finishedAt, /^\d{4}-\d{2}-\d{2}T/);
     const cancel = cli(["runs", "cancel", run.id, "--dir", backlog, "--json"], env, root); assert.equal(cancel.status, 0); assert.equal(JSON.parse(cancel.stdout).run.phase, "interrupted");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

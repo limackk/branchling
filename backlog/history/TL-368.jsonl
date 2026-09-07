@@ -1,1 +1,4 @@
 {"id":"01M1YGC4AA1YY3QMQZ36DAYMNV","ts":"2026-09-07T17:59:04.778Z","task":"TL-368","field":"__created__","from":"","to":"Exited detached runs leave a terminal lifecycle state","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1YH82XZDDW0F3J55VRCATKE","ts":"2026-09-07T18:14:20.863Z","task":"TL-368","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1YH82XZFZZE9F23WNQGM7Q8","ts":"2026-09-07T18:14:20.863Z","task":"TL-368","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1YH9QCGFNBSZ16N6WE6ZSWF","ts":"2026-09-07T18:15:14.576Z","task":"TL-368","field":"status","from":"in_progress","to":"done","actor":"agent:codex","source":"done","reason":"proven","session":"tree-526f61f2043f"}
