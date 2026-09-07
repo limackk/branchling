@@ -6,8 +6,8 @@ labels: [agents, routing]
 board: main
 epic: "Controlled and observable agent execution"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h
@@ -47,7 +47,6 @@ explicit in a regression test.
 2. `scripts/tests/run-agent-profiles.test.mjs` — extend the profile execution
    contract without weakening the silent-agent positive control.
 
-1. `path/to/file` — what to look at there
 
 ## Steps
 
@@ -64,7 +63,7 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] A profile adapter that writes only meaningful stderr is counted as an
+- [x] A profile adapter that writes only meaningful stderr is counted as an
       attempted execution, not released as `agent-never-ran`. [proof: profile-output-counts]
-- [ ] A silent profile adapter that leaves the tree unchanged is still released
+- [x] A silent profile adapter that leaves the tree unchanged is still released
       without spending an attempt. [proof: profile-output-counts]

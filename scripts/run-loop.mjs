@@ -791,10 +791,10 @@ function treeState(cwd) {
  * differently, and a tool that is not an agent may not pretend to know which
  * code means "I could not start". The two signals below need no such knowledge.
  *
- *   · it said nothing on STDOUT — an agent that worked reports; the failed
- *     launch in the measurement wrote its one line to stderr, which is exactly
- *     where a shell puts `command not found` too, so stderr cannot count as
- *     having spoken.
+ *   · it produced no execution evidence — a raw shell command has to speak on
+ *     stdout, because a shell reports `command not found` on stderr. A profile
+ *     adapter is a controlled executable boundary: its stderr is its transcript
+ *     just as often as stdout, so both streams count there (TL-353).
  *   · the tree is byte-for-byte what it was when the task was CLAIMED — the
  *     baseline spans every attempt, not one of them, because an agent that
  *     worked once has run whatever a later attempt repeats.
@@ -804,8 +804,8 @@ function treeState(cwd) {
  * stop it looping forever. For the same reason an unknown tree (`null`) is not
  * an unchanged one.
  */
-export function neverRan(stdout, before, after) {
-  if (String(stdout || "").trim()) return false;
+export function neverRan(evidence, before, after) {
+  if (String(evidence || "").trim()) return false;
   if (before === null || after === null) return false;
   return before === after;
 }
@@ -1044,12 +1044,15 @@ function workOne(ctx, task) {
     // (TL-184). It is reported with the attempts ACTUALLY made — none, on the
     // first — because counting it would spend against a budget that exists to
     // stop a failing task looping, and this task has not been tried yet.
-    if (neverRan(agent.stdout, treeAtTake, treeState(ctx.cwd))) {
+    const evidence = task.hand.kind === "profile"
+      ? output
+      : agent.stdout;
+    if (neverRan(evidence, treeAtTake, treeState(ctx.cwd))) {
       const said = (task.hand.kind === "profile"
         ? redactSecrets(agent.stderr || "", task.profile)
         : String(agent.stderr || "")).trim().split("\n")[0] || "";
       appendFileSync(logPath,
-        "\n=== the agent never ran: nothing on stdout and nothing changed in " + ctx.cwd + "\n", "utf8");
+        "\n=== the agent never ran: no execution output and nothing changed in " + ctx.cwd + "\n", "utf8");
       return result({
         id: task.id, outcome: "agent-never-ran", attempts: attempt - 1,
         ms: Date.now() - started, log: logPath, command,

@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -157,4 +157,47 @@ test("bad profile routing fails before it can claim a task", () => {
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+function stderrEvidenceFixture(name, adapterBody) {
+  const root = mkdtempSync(join(tmpdir(), "branchling-profile-evidence-"));
+  const repo = join(root, "repo");
+  const backlog = join(repo, "backlog");
+  const env = { ...process.env, NO_COLOR: "1", [HOME_ENV]: join(root, "home"), BACKLOG_STATE_DIR: join(root, "state") };
+  mkdirSync(repo, { recursive: true });
+  execFileSync("git", ["init", "-q", "-b", "main", "."], { cwd: repo });
+  assert.equal(cli(["init", "--dir", backlog, "--no-example"], env, repo).status, 0);
+  const created = cli(["new", "--dir", backlog, "--title", name], env, repo);
+  assert.equal(created.status, 0, created.stderr);
+  const id = created.stdout.match(/[A-Z]+-\d+/)[0];
+  const file = taskFile(backlog, id);
+  writeFileSync(file, readFileSync(file, "utf8")
+    .replace(/verification:[\s\S]*?\n---/, 'verification:\n  - id: deliberate-red\n    bash: "false"\n---')
+    .replace(/\[proof:[^\]]*\]/g, "[proof: deliberate-red]"), "utf8");
+  const adapter = join(root, "adapter.sh");
+  writeFileSync(adapter, "#!/bin/sh\ncat >/dev/null\n" + adapterBody + "\n", "utf8");
+  chmodSync(adapter, 0o755);
+  const profile = cli(["profile", "create", "evidence", "--adapter", adapter, "--prompt", "Work."], env, repo);
+  assert.equal(profile.status, 0, profile.stderr);
+  return { root, repo, backlog, env, id };
+}
+
+test("a profile adapter's stderr transcript proves its attempt ran", () => {
+  const fx = stderrEvidenceFixture("stderr evidence", "printf 'adapter transcript\\n' >&2");
+  try {
+    const result = cli(["run", "--dir", fx.backlog, "--actor", "agent:profile", "--profile", "evidence", "--max-attempts", "1", "--json"], fx.env, fx.repo);
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.equal(status(fx.backlog, fx.id), "blocked", "stderr-only profile work was released as never started");
+    assert.equal(JSON.parse(result.stdout).tasks[0].outcome, "exhausted");
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
+test("a silent unchanged profile adapter is still released as never started", () => {
+  const fx = stderrEvidenceFixture("silent profile", "true");
+  try {
+    const result = cli(["run", "--dir", fx.backlog, "--actor", "agent:profile", "--profile", "evidence", "--max-attempts", "1", "--json"], fx.env, fx.repo);
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    assert.equal(status(fx.backlog, fx.id), "pending");
+    assert.equal(JSON.parse(result.stdout).tasks[0].outcome, "agent-never-ran");
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
 });
