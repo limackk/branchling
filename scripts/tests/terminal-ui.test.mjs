@@ -2,7 +2,8 @@ import { EventEmitter } from "node:events";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { interactiveAllowed, keyFromChunk, moveSelection, numberedPrompt, renderChoices, selectChoice } from "../terminal-ui.mjs";
+import { interactiveAllowed, keyFromChunk, moveSelection, numberedPrompt, renderChoices, renderPrompt, selectChoice } from "../terminal-ui.mjs";
+import { plain } from "../ui.mjs";
 
 test("keyboard parsing and selection wrap without terminal state", () => {
   assert.equal(keyFromChunk("\u001b[A"), "up");
@@ -11,7 +12,8 @@ test("keyboard parsing and selection wrap without terminal state", () => {
   assert.equal(keyFromChunk("\u001b"), "cancel");
   assert.equal(moveSelection(0, 3, "up"), 2);
   assert.equal(moveSelection(2, 3, "down"), 0);
-  assert.deepEqual(renderChoices([{ label: "Generalist" }, { label: "Fleet" }], 1), ["  1) Generalist", "› 2) Fleet"]);
+  assert.deepEqual(renderChoices([{ label: "Generalist" }, { label: "Fleet" }], 1), ["  Generalist  1)", "› Fleet  2)"]);
+  assert.deepEqual(renderPrompt("Mode", [{ label: "Generalist" }, { label: "Fleet" }], 0, plain), ["Mode", "", "› Generalist  1)", "  Fleet  2)", "", "↑/↓ move  ·  Enter select  ·  Esc cancel"]);
   assert.equal(numberedPrompt("Mode", [{ label: "Generalist" }, { label: "Fleet" }]), "Mode [1-2]: ");
 });
 

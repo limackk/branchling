@@ -7,7 +7,7 @@
  * mode guard is intentionally stricter than colour: a user who asked for
  * NO_COLOR or has TERM=dumb gets no control sequences or raw input either.
  */
-import { terminal } from "./ui.mjs";
+import { color, plain, terminal } from "./ui.mjs";
 
 export function interactiveAllowed(input, output, env = process.env) {
   return !!(input && input.isTTY && output && output.isTTY
@@ -38,9 +38,17 @@ function choices(options) {
   });
 }
 
-export function renderChoices(options, selected = 0) {
+export function renderChoices(options, selected = 0, paint = plain) {
   const list = choices(options);
-  return list.map((option, index) => (index === selected ? "› " : "  ") + (index + 1) + ") " + option.label);
+  return list.map((option, index) => {
+    const number = paint.id((index + 1) + ")");
+    return index === selected ? "› " + paint.bold(option.label) + "  " + number : "  " + option.label + "  " + paint.dim(number);
+  });
+}
+
+export function renderPrompt(question, options, selected = 0, paint = plain) {
+  return [paint.bold(String(question)), ""]
+    .concat(renderChoices(options, selected, paint), "", paint.dim("↑/↓ move  ·  Enter select  ·  Esc cancel"));
 }
 
 export function numberedPrompt(question, options) {
@@ -74,7 +82,7 @@ export async function selectChoice(question, options, settings = {}) {
     let selected = initial;
     let rows = 0;
     const draw = () => {
-      const lines = [String(question)].concat(renderChoices(list, selected), "  ↑/↓ move · Enter select · Esc cancel");
+      const lines = renderPrompt(question, list, selected, color);
       output.write(terminal.replaceLines(lines, rows));
       rows = lines.length;
     };
