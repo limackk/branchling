@@ -1048,7 +1048,7 @@ export const COMMANDS = {
       "  `check` is local by default and starts no adapter. `--live` is an explicit provider",
       "  probe; it may use credentials and provider quota, and its result is not a task outcome.",
       "  `models` is an explicit adapter catalogue operation. It may inspect local provider state or",
-      "  report that account-specific model aliases cannot be verified; it never runs during setup.",
+      "  report that account-specific model aliases cannot be verified; setup offers it only after your confirmation.",
       "  `setup` creates one local agent profile through an optional terminal guide. Arrow keys and Enter choose finite options;",
       "  numbered text is the equivalent accessible path. It writes the same profile format only after confirmation; scripts and",
       "  other clients continue to use the flag commands above.",
