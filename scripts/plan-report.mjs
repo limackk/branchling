@@ -39,6 +39,7 @@ import { loadConfigOrExit } from "./config.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { backlogPaths, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { loadPlan, planState, validatePlan } from "./plan.mjs";
+import { readHistory } from "./history.mjs";
 import { EDIT_SUBCOMMANDS, runPlanEdit } from "./plan-write.mjs";
 import { reportPlanErrors } from "./check-backlog-plan.mjs";
 import { readTaskMetas } from "./task-io.mjs";
@@ -210,6 +211,7 @@ function main(argv) {
   }
 
   const tasks = readTaskMetas(backlogPaths(root).tasksDir, config);
+  for (const task of tasks) task.history = readHistory(root, task.id);
   const audit = validatePlan(loaded.plan, tasks, config);
   if (audit.errors.length) {
     reportPlanErrors(audit.errors);

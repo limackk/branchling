@@ -120,6 +120,22 @@ test("a task waiting on an open blocker is not next up; a closed blocker does no
   assert.deepEqual(cleared.nextUp.map((e) => e.ids[0]), ["TL-2", "TL-3"]);
 });
 
+test("an unanswered decision is not executable plan work after dependencies close", () => {
+  const plan = ["waves:", '  - name: "A"', "    tasks: [TL-2, TL-3]", ""].join("\n");
+  const question = { id: "Q-1", field: "__comment__", source: "ask", to: "which shape?" };
+  const waiting = state(plan, [
+    { ...t("TL-2", "blocked", ["TL-9"]), history: [question] },
+    t("TL-3"), t("TL-9", "done"),
+  ]);
+  assert.deepEqual(waiting.nextUp, [{ together: false, ids: ["TL-3"], executors: [], waitsOnHuman: false }]);
+
+  const answered = state(plan, [
+    { ...t("TL-2", "blocked", ["TL-9"]), history: [question, { id: "D-1", field: "__decision__", resolves: "Q-1" }] },
+    t("TL-3"), t("TL-9", "done"),
+  ]);
+  assert.deepEqual(answered.nextUp.map((entry) => entry.ids[0]), ["TL-2", "TL-3"]);
+});
+
 test("in progress is counted in ANY wave, and uses the PROJECT's word for it", () => {
   const tasks = [t("TL-1", "done"), t("TL-2", "in_progress"), t("TL-3"), t("TL-4", "in_progress")];
   const s = state(THREE_WAVES, tasks);

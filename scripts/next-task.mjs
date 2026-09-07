@@ -57,7 +57,7 @@ import { resolveActor } from "./actor.mjs";
 import { crossBranchState, describeDivergence, divergences, scanNote } from "./branch-scan.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { actorRecords, applyActorPolicy } from "./actors.mjs";
-import { ACTOR_NAMESPACES, FIELD_COMMENT, isValidActor, readAllHistory, readHistory, reasonRefusal } from "./history.mjs";
+import { ACTOR_NAMESPACES, FIELD_COMMENT, isValidActor, openQuestions, readAllHistory, readHistory, reasonRefusal } from "./history.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
 import { dispatchWave, loadPlanForDispatch } from "./plan.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
@@ -154,6 +154,10 @@ export function queueStatuses(config) {
  * here would let a typo dispatch work somebody had deliberately gated.
  */
 export function isExecutable(task, byId, archived) {
+  // An ask is a deliberate stop recorded in history, rather than a dependency
+  // the task can name in `blocked_by`. A closed dependency therefore cannot
+  // discharge it; only the decision event `openQuestions` recognises can.
+  if (openQuestions(task.history || []).length) return false;
   return (task.blocked_by || []).every((id) => {
     const blocker = byId.get(String(id).toUpperCase());
     return blocker && archived.has(blocker.status);
@@ -635,7 +639,8 @@ export function run(argv) {
   // this costs a read per task that could actually be handed out, not per task.
   for (const t of records) {
     if (config.archivedStatuses.indexOf(t.status) >= 0) continue;
-    t.handedBack = lastHandoff(readHistory(root, t.id));
+    t.history = readHistory(root, t.id);
+    t.handedBack = lastHandoff(t.history);
   }
   // The wave is resolved from the RECORDS just read, never from a generated
   // view: a view answers from the last `build`, and a wave whose last task

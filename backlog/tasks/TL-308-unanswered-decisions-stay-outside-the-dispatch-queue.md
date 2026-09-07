@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: "Execution observability"
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-06
-updated: 2026-09-06
+updated: 2026-09-07
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: [scripts/next-task.mjs, scripts/plan.mjs]
@@ -64,9 +64,9 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] `next` does not claim a task with an unanswered question solely because
+- [x] `next` does not claim a task with an unanswered question solely because
   its `blocked_by` entries have closed. [proof: question-protection]
-- [ ] An executable plan omits that task until the question is answered, while
+- [x] An executable plan omits that task until the question is answered, while
   an ordinary dependency-unblocked task remains eligible. [proof: question-protection]
-- [ ] Deciding the recorded question restores the task to normal queue
+- [x] Deciding the recorded question restores the task to normal queue
   eligibility. [proof: question-protection]

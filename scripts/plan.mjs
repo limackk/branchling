@@ -30,7 +30,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 
-import { stripComment, unquote } from "./task-fields.mjs";
+import { openQuestions, stripComment, unquote } from "./task-fields.mjs";
 
 /** The only keys the file may carry. An unknown key FAILS — same rule as
  *  config.yaml: this is a fixed shape, so a new word is a typo, not a feature. */
@@ -409,6 +409,7 @@ export function planState(plan, tasks, config = {}) {
   // An unknown blocker does not block: `check --refs` owns that defect, and
   // treating it as blocking here would hide every ready task behind a typo.
   const cleared = (t) =>
+    !openQuestions((t && t.history) || []).length &&
     (t.blocked_by || []).every((b) => !byId.has(b) || archived.has(byId.get(b).status));
 
   const nextUp = [];

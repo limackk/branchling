@@ -524,6 +524,26 @@ test("selectCandidates is pure: no disk, and it says what it skipped", () => {
   assert.equal(skippedBlocked, 1);
 });
 
+test("a closed dependency does not reopen an unanswered decision", () => {
+  const config = { activeStatuses: ["pending", "in_progress"], archivedStatuses: ["done"],
+    reasonRequiredStatuses: ["blocked"], inProgressStatus: "in_progress",
+    priorities: ["P0", "P1"], taskIdPrefix: "T" };
+  const question = { id: "Q-1", field: "__comment__", source: "ask", to: "which shape?" };
+  const records = [
+    { id: "T-1", status: "blocked", priority: "P0", labels: [], blocked_by: ["T-3"], history: [question], board: "main", epic: "", owner: "", type: "task", title: "" },
+    { id: "T-2", status: "blocked", priority: "P1", labels: [], blocked_by: ["T-3"], history: [], board: "main", epic: "", owner: "", type: "task", title: "" },
+    { id: "T-3", status: "done", priority: "P1", labels: [], blocked_by: [], history: [], board: "main", epic: "", owner: "", type: "task", title: "" },
+  ];
+  const selected = selectCandidates(records, config, {});
+  assert.deepEqual(selected.candidates.map((t) => t.id), ["T-2"],
+    "a question block was treated like an ordinary dependency block");
+
+  records[0].history.push({ id: "D-1", field: "__decision__", resolves: "Q-1", to: "use the stable shape" });
+  const answered = selectCandidates(records, config, {});
+  assert.deepEqual(answered.candidates.map((t) => t.id), ["T-1", "T-2"],
+    "answering the recorded question did not restore queue eligibility");
+});
+
 // ── Roles in the dispatcher (TL-98) ───────────────────────────────────────
 //
 // The roles are the FIXTURE's own. `roles:` is a project's vocabulary, and a
