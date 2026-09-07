@@ -41,7 +41,8 @@ test("a confirmed guided transcript writes one ordinary profile only at its fina
   assert.match(t.out.join(""), /Profile summary/);
   assert.match(t.out.join(""), /reusable local recipe/);
   assert.match(t.out.join(""), /Choose how Branchling will start this agent/);
-  assert.match(t.out.join(""), /Use an executable already installed/);
+  assert.match(t.out.join(""), /Use my own Branchling adapter/);
+  assert.match(t.out.join(""), /This is not `claude` and not a model name/);
 });
 
 test("cancel, EOF and invalid values leave the store byte-for-byte unchanged", async () => {

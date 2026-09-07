@@ -381,14 +381,15 @@ export async function setupProfileConversation(io, env = process.env, actions = 
   }
   io.write("\nChoose how Branchling will start this agent. The adapter translates this profile to a provider CLI or API wrapper.\n");
   const sourceChoice = await setupChoice(io, "How should Branchling start this agent?", [
-    { label: "Use an executable already installed on this computer", hint: "Provide its command or wrapper path.", value: "1" },
-    { label: "Copy a shipped reference adapter", hint: "Start from a local example you can inspect and adapt.", value: "2" },
+    { label: "Use my own Branchling adapter", hint: "Advanced: only if you already created an adapter wrapper.", value: "1" },
+    { label: "Copy a shipped reference adapter", hint: "Recommended: start from a local example you can inspect and adapt.", value: "2" },
   ]);
   if (sourceChoice === CANCEL) return { ok: false, kind: "cancelled" };
   if (sourceChoice === BACK) return { ok: false, kind: "cancelled" };
   let reference = null;
   if (sourceChoice === "1") {
-    const adapter = setupAnswer(await io.ask("Adapter executable: "));
+    io.write("Enter the path to your executable Branchling adapter wrapper. This is not `claude` and not a model name. Example: /Users/you/bin/my-agent-adapter.mjs\n");
+    const adapter = setupAnswer(await io.ask("Path to your adapter executable: "));
     if (adapter === CANCEL || adapter === BACK || !adapter) return { ok: false, kind: "cancelled" };
     state.adapter = adapter;
   } else if (sourceChoice === "2") {

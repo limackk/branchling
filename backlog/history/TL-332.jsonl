@@ -1,0 +1,4 @@
+{"id":"01M1XGRC0XXTQZ7P3DASYMDXWR","ts":"2026-09-07T08:46:31.453Z","task":"TL-332","field":"__created__","from":"","to":"Setup explains when an adapter path is required","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XGRC2T6PMGBZNCCRYAF26P","ts":"2026-09-07T08:46:31.514Z","task":"TL-332","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XGRC2TBR2KS3AGCH9GGFVR","ts":"2026-09-07T08:46:31.514Z","task":"TL-332","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XGT5BGHRAY560QGRH4JEZ8","ts":"2026-09-07T08:47:30.160Z","task":"TL-332","field":"status","from":"in_progress","to":"done","actor":"agent:codex","source":"done","reason":"proven","session":"tree-526f61f2043f"}
