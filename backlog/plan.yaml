@@ -266,3 +266,7 @@ waves:
   # Finish with the API and non-interactive compatibility gate.
   - name: "Clack remains optional for automation"
     tasks: [TL-329]
+
+  # A provider-neutral adapter contract only becomes approachable when common local and subscription paths are copyable and testable offline.
+  - name: "Reference adapters reach local and subscription users"
+    tasks: [TL-335]
