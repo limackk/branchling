@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Controlled and observable agent execution"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 30m
@@ -57,7 +57,7 @@ record.
 
 ## Acceptance criteria
 
-- [ ] A timed-out JSON wait reports an explicit timeout outcome and the current
+- [x] A timed-out JSON wait reports an explicit timeout outcome and the current
       run record. [proof: wait-timeout-result]
-- [ ] A wait timeout does not alter the phase of a still-live run.
+- [x] A wait timeout does not alter the phase of a still-live run.
       [proof: wait-timeout-result]
