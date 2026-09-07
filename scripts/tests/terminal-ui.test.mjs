@@ -2,7 +2,7 @@ import { EventEmitter } from "node:events";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { interactiveAllowed, keyFromChunk, moveSelection, numberedPrompt, renderChoices, renderPrompt, selectChoice } from "../terminal-ui.mjs";
+import { interactiveAllowed, keyFromChunk, moveSelection, numberedPrompt, renderChoices, renderPrompt, renderPromptResult, selectChoice } from "../terminal-ui.mjs";
 import { plain } from "../ui.mjs";
 
 test("keyboard parsing and selection wrap without terminal state", () => {
@@ -14,6 +14,8 @@ test("keyboard parsing and selection wrap without terminal state", () => {
   assert.equal(moveSelection(2, 3, "down"), 0);
   assert.deepEqual(renderChoices([{ label: "Generalist" }, { label: "Fleet" }], 1), ["  Generalist  1)", "› Fleet  2)"]);
   assert.deepEqual(renderPrompt("Mode", [{ label: "Generalist" }, { label: "Fleet" }], 0, plain), ["Mode", "", "› Generalist  1)", "  Fleet  2)", "", "↑/↓ move  ·  Enter select  ·  Esc cancel"]);
+  assert.equal(renderPromptResult("Mode", { label: "Fleet" }, true, plain), "✓ Mode: Fleet");
+  assert.equal(renderPromptResult("Mode", null, false, plain), "! Mode: cancelled");
   assert.equal(numberedPrompt("Mode", [{ label: "Generalist" }, { label: "Fleet" }]), "Mode [1-2]: ");
 });
 
@@ -58,4 +60,5 @@ test("raw mode is restored after selection and cancellation", async () => {
   assert.deepEqual(input.raw, [true, false]);
   assert.equal(input.paused, true);
   assert.ok(writes.length >= 2);
+  assert.match(writes.at(-1), /✓ Mode: Fleet/);
 });

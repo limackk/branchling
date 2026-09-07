@@ -51,6 +51,12 @@ export function renderPrompt(question, options, selected = 0, paint = plain) {
     .concat(renderChoices(options, selected, paint), "", paint.dim("↑/↓ move  ·  Enter select  ·  Esc cancel"));
 }
 
+export function renderPromptResult(question, option, ok = true, paint = plain) {
+  const mark = ok ? paint.ok("✓") : paint.warn("!");
+  const outcome = ok ? option.label : "cancelled";
+  return mark + " " + paint.bold(String(question)) + ": " + outcome;
+}
+
 export function numberedPrompt(question, options) {
   return String(question || "Choice") + " [1-" + choices(options).length + "]: ";
 }
@@ -91,7 +97,12 @@ export async function selectChoice(question, options, settings = {}) {
       if (typeof input.setRawMode === "function") input.setRawMode(false);
       input.pause();
     };
-    const finish = (result) => { restore(); resolve(result); };
+    const finish = (result) => {
+      const option = result.ok ? list[result.index] : null;
+      output.write(terminal.replaceLines([renderPromptResult(question, option, result.ok, color)], rows));
+      restore();
+      resolve(result);
+    };
     const onData = (chunk) => {
       const key = keyFromChunk(chunk);
       if (key === "enter") return finish({ ok: true, value: list[selected].value, index: selected, mode: "keys" });
