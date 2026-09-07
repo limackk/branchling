@@ -633,6 +633,8 @@ implementation detail. Every reading command answers in the same envelope:
 | `audit` | `audit` | `since`, `dayZero`, `tasks`, `findings`, `closedWithoutTrace`, `skippedBeforeSince`, `reopened`, `rework`, `parked`, `withoutPremise`, `awaitingVouch`, `vouches`, `vouchesByActor` |
 | `actors` | `actors` | `since`, `minReportN` (the denominator below which a row states a count and no rate at all), `rows`, `policy` |
 | `watch` | `watch` | `wave` (the active wave, including every task's status, owner and last recorded modification), `tasks` (all work currently in progress) |
+| `runs list` | `runs` | `runs` (local detached execution records) |
+| `runs show/wait/cancel` | `run` | `run`, `alive` |
 | `take`, `next` | `task-take` | `ok`, `taken`, `id`, `file`, `task`, `from`, `text`, `decisions`, `probe`, `warnings`, `reclaimed`, `lock`, `refusalKind`, `refusal`, `details`, and — filled in by next — `passedOver`, `considered`, `searchedStatuses`, `skippedBlocked`, `skippedElsewhere`, `skippedExecutor`, `skippedHandedBack`, `skippedSize`, `skippedByRecord`, `scan`, `plan` |
 | `handoff` | `task-handoff` | `ok`, `id`, `file`, `task`, `role`, `owner`, `status` (each a from/to pair), `comment`, `released`, `warnings`, `refusalKind`, `refusal`, `details` |
 | `release` | `task-release` | `ok`, `id`, `status`, `owner`, `released`, `comment`, `refusalKind`, `refusal`, `details` |

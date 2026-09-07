@@ -82,7 +82,7 @@ import { resolveActor } from "./actor.mjs";
 import { checkAgentProfiles, resolveAgentProfile, secretEnvironmentNames } from "./agent-profiles.mjs";
 import { DELEGATION_ENFORCEMENT, DELEGATION_POLICIES, executionReceipt } from "./agent-contract.mjs";
 import { createWorkerScope, releaseWorkerScope, WORKER_SCOPE_ENV } from "./worker-scope.mjs";
-import { startAttemptRecord, startRunRecord, updateAttemptRecord, updateRunRecord } from "./execution-records.mjs";
+import { startAttemptRecord, startRunRecord, readExecutionRecord, updateAttemptRecord, updateRunRecord } from "./execution-records.mjs";
 import { appendActivity } from "./activity.mjs";
 import { resolveAgentLaunch } from "./agent-launches.mjs";
 import { loadConfigOrExit } from "./config.mjs";
@@ -123,7 +123,7 @@ export const AGENT_ENV = "BACKLOG_AGENT_COMMAND";
 export const RUN_FLAGS = [
   "--dir", "--actor", "--agent", "--agent-for", "--profile", "--profile-for", "--launch", "--max-attempts", "--max-tasks", "--timeout",
   "--log-dir", "--stuck-status", "--delegation", "--allow-uncontrolled-delegation", "--json", "--dry-run", "--plan", "--probe",
-  "--board", "--label", "--priority", "--epic",
+  "--board", "--label", "--priority", "--epic", "--detach", "--run-id",
 ];
 
 const DEFAULT_MAX_ATTEMPTS = 2;
@@ -133,7 +133,7 @@ const DEFAULT_TIMEOUT_SECONDS = 900;
 export function parseRunArgs(args) {
   const plan = {
     dir: null, actor: null, agent: null, profile: null, launch: null, agentFor: {}, profileFor: {}, json: false, dryRun: false, usePlan: false,
-    maxAttempts: DEFAULT_MAX_ATTEMPTS, maxTasks: 0, timeout: DEFAULT_TIMEOUT_SECONDS, probe: false, delegation: "provider", allowUncontrolledDelegation: false,
+    maxAttempts: DEFAULT_MAX_ATTEMPTS, maxTasks: 0, timeout: DEFAULT_TIMEOUT_SECONDS, probe: false, delegation: "provider", allowUncontrolledDelegation: false, detach: false, runId: null,
     logDir: null, stuckStatus: null, board: null, label: null, priority: null, epic: null,
   };
   const numbers = { "--max-attempts": "maxAttempts", "--max-tasks": "maxTasks", "--timeout": "timeout" };
@@ -142,6 +142,7 @@ export function parseRunArgs(args) {
     if (a === "--json") { plan.json = true; continue; }
     if (a === "--dry-run") { plan.dryRun = true; continue; }
     if (a === "--probe") { plan.probe = true; continue; }
+    if (a === "--detach") { plan.detach = true; continue; }
     if (a === "--allow-uncontrolled-delegation") { plan.allowUncontrolledDelegation = true; continue; }
     if (a === "--plan") { plan.usePlan = true; continue; }
     if (RUN_FLAGS.indexOf(a) >= 0) {
@@ -185,7 +186,7 @@ export function parseRunArgs(args) {
         plan.profileFor[role] = profile;
         continue;
       }
-      const key = { "--log-dir": "logDir", "--stuck-status": "stuckStatus" }[a] || a.slice(2);
+      const key = { "--log-dir": "logDir", "--stuck-status": "stuckStatus", "--run-id": "runId" }[a] || a.slice(2);
       plan[key] = value;
       continue;
     }
@@ -1328,6 +1329,18 @@ export async function run(argv) {
     return 2;
   }
   const config = loadConfigOrExit(root);
+  if (plan.detach) {
+    const record = startRunRecord({ root, actor, delegation: plan.delegation });
+    const childArgs = argv.filter((arg) => arg !== "--detach").concat(["--run-id", record.id]);
+    const child = spawn(process.execPath, [fileURLToPath(import.meta.url)].concat(childArgs), {
+      detached: process.platform !== "win32", stdio: "ignore", env: process.env,
+    });
+    child.unref();
+    updateRunRecord(root, record, { phase: "starting", supervisor: { pid: child.pid || null, script: fileURLToPath(import.meta.url) } });
+    if (plan.json) console.log(JSON.stringify({ kind: "run", run: record.id, phase: "starting" }));
+    else console.log("✓ detached run " + record.id + " started");
+    return 0;
+  }
 
   if (plan.launch) {
     if (plan.agent || plan.profile || Object.keys(plan.agentFor).length || Object.keys(plan.profileFor).length) {
@@ -1573,7 +1586,8 @@ export async function run(argv) {
   // directory is this repository" would show up as an agent writing its result
   // where the verification does not look.
   const cwd = repoRootFor(root);
-  const ctx = { root, config, actor, cwd, plan, execution: startRunRecord({ root, actor, delegation: plan.delegation }) };
+  const existing = plan.runId ? readExecutionRecord(root, plan.runId) : null;
+  const ctx = { root, config, actor, cwd, plan, execution: existing || startRunRecord({ root, actor, delegation: plan.delegation, id: plan.runId }) };
 
   // Where a task whose contract ends in a `manual:` entry is parked (TL-212).
   // Null when this backlog has not declared one, and then nothing changes: such

@@ -1,6 +1,6 @@
 /** Replaceable local control-plane records for agent runs (TL-357). */
 import { randomBytes } from "node:crypto";
-import { mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { lockScope, stateRoot } from "./lock.mjs";
@@ -27,11 +27,15 @@ export function readExecutionRecord(root, recordId, env = process.env) {
     return record && record.version === EXECUTION_RECORD_VERSION && typeof record.id === "string" ? record : null;
   } catch { return null; }
 }
+export function listExecutionRecords(root, env = process.env) {
+  try { return readdirSync(directory(root, env)).filter((f) => f.endsWith(".json")).map((f) => readExecutionRecord(root, f.slice(0, -5), env)).filter(Boolean); } catch { return []; }
+}
 
-export function startRunRecord({ root, actor, delegation, env = process.env }) {
+export function startRunRecord({ root, actor, delegation, id: recordId = null, supervisor = null, env = process.env }) {
   const ts = now();
-  const record = { version: EXECUTION_RECORD_VERSION, id: "run-" + id(), kind: "run", actor,
+  const record = { version: EXECUTION_RECORD_VERSION, id: recordId || "run-" + id(), kind: "run", actor,
     delegation, phase: "starting", startedAt: ts, updatedAt: ts, attempts: [] };
+  if (supervisor) record.supervisor = supervisor;
   writeExecutionRecord(root, record, env); return record;
 }
 

@@ -81,6 +81,8 @@ export const KINDS = {
   // log through a newer tool needs to be able to see which join it got.
   sessions: { correlation: null, total: null, sessions: [] },
   session: { correlation: null, session: null },
+  runs: { runs: [] },
+  run: { run: null, alive: null },
   // `actors --json` (TL-150). `minReportN` is what makes a `rate: null` readable
   // — it is the denominator the project asked for, not an absence of data — and
   // `policy` says whether any of these rows is acted on at all.

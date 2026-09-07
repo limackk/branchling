@@ -1269,6 +1269,7 @@ export const COMMANDS = {
       "        2 usage error",
     ].join("\n"),
   },
+  runs: { script: "run-control.mjs", summary: "inspect, wait for or cancel local detached runs", usage: `${N} runs <list|show|wait|cancel> [run-id] [--timeout <seconds>] [--json] [--dir <path>]` },
   done: {
     script: "done-task.mjs",
     summary: "close a task by RUNNING its verification — the only command that runs it",

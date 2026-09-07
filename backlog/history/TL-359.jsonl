@@ -1,1 +1,4 @@
 {"id":"01M1Y4R3QVJZ96J7X8EPGS7MFA","ts":"2026-09-07T14:35:54.491Z","task":"TL-359","field":"__created__","from":"","to":"Detached runs can be inspected waited for and cancelled","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1YBM5TWCPABKVBRAG6F34SA","ts":"2026-09-07T16:36:05.596Z","task":"TL-359","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1YBM5TWHYTZ04BX9ZQ9ACCW","ts":"2026-09-07T16:36:05.596Z","task":"TL-359","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1YBXSR33ZWPTDNM0B4RRQS4","ts":"2026-09-07T16:41:20.899Z","task":"TL-359","field":"status","from":"in_progress","to":"done","actor":"agent:codex","source":"done","reason":"proven","session":"tree-526f61f2043f"}

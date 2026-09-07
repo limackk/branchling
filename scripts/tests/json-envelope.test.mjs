@@ -97,6 +97,8 @@ const READING = {
   // share profiles' user configuration boundary, so this request also runs
   // outside a fixture backlog.
   "agent-launches": { args: ["launch", "list", "--json"], noDir: true },
+  runs: ["runs", "list", "--json"],
+  run: { args: ["runs", "show", "missing-run", "--json"], refuses: true },
   // The fixtures carry no `plan.yaml`, so this exercises the answer a backlog
   // without an execution order gives — which is the one that has to stay a
   // complete envelope rather than an error.

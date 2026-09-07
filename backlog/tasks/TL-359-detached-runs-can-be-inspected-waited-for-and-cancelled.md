@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Controlled and observable agent execution"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1d
@@ -63,12 +63,12 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] Detached start returns only after a readable run record exists.
+- [x] Detached start returns only after a readable run record exists.
       [proof: run-control]
-- [ ] List, show and bounded wait expose the same run identity and terminal
+- [x] List, show and bounded wait expose the same run identity and terminal
       result in text and JSON. [proof: run-control]
-- [ ] Cancel terminates the owned adapter descendants and records `cancelled`
+- [x] Cancel terminates the owned adapter descendants and records `cancelled`
       without closing the task. [proof: run-control]
-- [ ] A stale record or reused PID cannot signal an unrelated process.
+- [x] A stale record or reused PID cannot signal an unrelated process.
       [proof: run-control]
-- [ ] Foreground `run` preserves its current contract. [proof: run-control]
+- [x] Foreground `run` preserves its current contract. [proof: run-control]
