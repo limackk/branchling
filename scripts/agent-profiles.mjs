@@ -490,6 +490,21 @@ export async function setupFleetConversation(io, env = process.env, actions = {}
   return createAgentLaunch(name, generalist, profileFor, env);
 }
 
+/** Translate a typed setup failure into the next action a person can take. */
+export function setupFailureMessage(result) {
+  const problem = (result && result.problems || []).join(" ");
+  if (result && result.kind === "no-roles") {
+    return { problem: problem || "This backlog declares no roles.", next: "Add `roles: [developer, reviewer]` to backlog/config.yaml, then run setup again." };
+  }
+  if (result && result.kind === "no-profiles") {
+    return { problem: problem || "No local agent profiles exist yet.", next: "Run `" + N + " profile setup` and choose one agent for general work first." };
+  }
+  if (result && result.kind === "missing-profile") {
+    return { problem: problem || "A selected local profile is missing.", next: "Run `" + N + " profile list` to choose an existing profile or create one." };
+  }
+  return { problem: problem || "Setup could not be completed.", next: "Nothing was written. Review the message above and try again." };
+}
+
 async function runSetup(env = process.env, input = process.stdin, output = process.stdout) {
   if (!input.isTTY || !output.isTTY) {
     console.error(failure(N + " profile setup", "interactive setup needs a terminal", ["Use `" + N + " profile create <name> …` from a script or pipe."]));
@@ -514,7 +529,13 @@ async function runSetup(env = process.env, input = process.stdin, output = proce
     ]);
     if (mode === CANCEL) { clack.cancel("No configuration was created."); return 0; }
     const result = mode === "2" ? await setupFleetConversation(io, env) : mode === "1" ? await setupProfileConversation(io, env) : { ok: false, kind: "cancelled" };
-    if (!result.ok) { clack.cancel("No profile was created."); return result.kind === "cancelled" ? 0 : 1; }
+    if (!result.ok) {
+      if (result.kind === "cancelled") { clack.cancel("No profile was created."); return 0; }
+      const message = setupFailureMessage(result);
+      clack.log.error(message.problem);
+      clack.outro(message.next);
+      return 1;
+    }
     if (mode === "2") clack.outro("Launch `" + result.launch.name + "` created. Next: `" + N + " run --launch " + result.launch.name + " --dry-run`.");
     else clack.outro("Profile `" + result.profile.name + "` created. Next: `" + N + " profile check " + result.profile.name + "`.");
     return 0;

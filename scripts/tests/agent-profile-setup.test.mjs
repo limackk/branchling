@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { agentProfilesPath, HOME_ENV } from "../home.mjs";
-import { parseAgentProfiles, setupFleetConversation, setupProfileConversation } from "../agent-profiles.mjs";
+import { parseAgentProfiles, setupFailureMessage, setupFleetConversation, setupProfileConversation } from "../agent-profiles.mjs";
 import { SCRIPTS_DIR } from "./_repo.mjs";
 
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
@@ -117,4 +117,13 @@ test("guided setup help is readable without opening an interactive session", () 
   assert.equal(help.status, 0, help.stderr);
   assert.match(help.stdout, /creates one local agent profile/);
   assert.match(help.stdout, /Arrow keys and Enter/);
+});
+
+test("fleet prerequisites name the missing thing and the next command", () => {
+  const roles = setupFailureMessage({ kind: "no-roles", problems: ["this backlog declares no roles"] });
+  assert.match(roles.problem, /no roles/);
+  assert.match(roles.next, /roles:/);
+  const profiles = setupFailureMessage({ kind: "no-profiles", problems: ["create one profile first"] });
+  assert.match(profiles.problem, /profile/i);
+  assert.match(profiles.next, /profile setup/);
 });
