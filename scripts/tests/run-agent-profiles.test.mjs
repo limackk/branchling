@@ -8,6 +8,7 @@ import { join } from "node:path";
 
 import { HOME_ENV } from "../home.mjs";
 import { activityEntry } from "../activity.mjs";
+import { listExecutionRecords } from "../execution-records.mjs";
 import { isolateHome, SCRIPTS_DIR } from "./_repo.mjs";
 
 isolateHome("run-agent-profiles");
@@ -22,6 +23,52 @@ function taskFile(backlog, id) {
 function status(backlog, id) {
   return (readFileSync(taskFile(backlog, id), "utf8").match(/^status: (\w+)/m) || [])[1];
 }
+
+function profileAttributionFixture() {
+  const root = mkdtempSync(join(tmpdir(), "branchling-profile-attribution-"));
+  const repo = join(root, "repo");
+  const backlog = join(repo, "backlog");
+  const env = { ...process.env, NO_COLOR: "1", [HOME_ENV]: join(root, "home"), BACKLOG_STATE_DIR: join(root, "state") };
+  mkdirSync(repo, { recursive: true });
+  assert.equal(cli(["init", "--dir", backlog, "--no-example"], env, repo).status, 0);
+  const created = cli(["new", "--dir", backlog, "--title", "Profile attribution"], env, repo);
+  assert.equal(created.status, 0, created.stderr);
+  const id = created.stdout.match(/[A-Z]+-\d+/)[0];
+  const file = taskFile(backlog, id);
+  writeFileSync(file, readFileSync(file, "utf8")
+    .replace(/verification:[\s\S]*?\n---/, 'verification:\n  - id: it-runs\n    bash: "true"\n---')
+    .replace(/\[proof:[^\]]*\]/g, "[proof: it-runs]"), "utf8");
+  const adapter = join(root, "codex-adapter.sh");
+  writeFileSync(adapter, "#!/bin/sh\ncat >/dev/null\nprintf 'worked\\n'\n", "utf8");
+  chmodSync(adapter, 0o755);
+  const profile = cli(["profile", "create", "codex-dev-terra", "--adapter", adapter,
+    "--model", "gpt-5.6-terra", "--prompt", "Implement from evidence."], env, repo);
+  assert.equal(profile.status, 0, profile.stderr);
+  assert.equal(cli(["build", "--dir", backlog], env, repo).status, 0);
+  return { root, repo, backlog, env, id };
+}
+
+test("a profile run defaults attribution to its selected profile, while an explicit actor wins", () => {
+  const first = profileAttributionFixture();
+  try {
+    const result = cli(["run", "--dir", first.backlog, "--profile", "codex-dev-terra", "--max-attempts", "1", "--json"], first.env, first.repo);
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.equal(status(first.backlog, first.id), "done");
+    const records = listExecutionRecords(first.backlog, first.env);
+    assert.deepEqual(records.filter((record) => record.kind === "run").map((record) => record.actor), ["agent:codex-dev-terra"]);
+    assert.deepEqual(records.filter((record) => record.kind === "attempt").map((record) => record.actor), ["agent:codex-dev-terra"]);
+    assert.match(readFileSync(join(first.backlog, "history", first.id + ".jsonl"), "utf8"), /"actor":"agent:codex-dev-terra"/);
+  } finally { rmSync(first.root, { recursive: true, force: true }); }
+
+  const second = profileAttributionFixture();
+  try {
+    const result = cli(["run", "--dir", second.backlog, "--profile", "codex-dev-terra", "--actor", "agent:operator", "--max-attempts", "1", "--json"], second.env, second.repo);
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    const records = listExecutionRecords(second.backlog, second.env);
+    assert.deepEqual(records.filter((record) => record.kind === "run").map((record) => record.actor), ["agent:operator"]);
+    assert.deepEqual(records.filter((record) => record.kind === "attempt").map((record) => record.actor), ["agent:operator"]);
+  } finally { rmSync(second.root, { recursive: true, force: true }); }
+});
 
 test("profile-for routes each role through its named local profile and labelled context", () => {
   const root = mkdtempSync(join(tmpdir(), "branchling-profile-routing-"));

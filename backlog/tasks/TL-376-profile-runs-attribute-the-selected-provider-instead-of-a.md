@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Controlled and observable agent execution"
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h
@@ -74,7 +74,7 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] A Codex profile run without `--actor` records a Codex actor in both the
+- [x] A Codex profile run without `--actor` records a Codex actor in both the
   run and its execution receipt. [proof: profile-attribution]
-- [ ] An explicit `--actor` remains unchanged by profile defaulting.
+- [x] An explicit `--actor` remains unchanged by profile defaulting.
   [proof: profile-attribution]

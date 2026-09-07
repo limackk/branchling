@@ -1,1 +1,4 @@
 {"id":"01M1YMJJ5KGMRN6TK614GFHQTN","ts":"2026-09-07T19:12:29.875Z","task":"TL-376","field":"__created__","from":"","to":"Profile runs attribute the selected provider instead of a stale default actor","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1YMQXHFZZCNF7PJ00YASVB2","ts":"2026-09-07T19:15:25.359Z","task":"TL-376","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1YMQXHFHFRGSSTD42Z7YS72","ts":"2026-09-07T19:15:25.359Z","task":"TL-376","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1YN4ZA5K3F8JNJFHHH5NR97","ts":"2026-09-07T19:22:33.157Z","task":"TL-376","field":"status","from":"in_progress","to":"done","actor":"agent:codex","source":"done","reason":"proven","session":"tree-526f61f2043f"}

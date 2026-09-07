@@ -1327,14 +1327,6 @@ export async function run(argv) {
     return 2;
   }
 
-  const actor = resolveActor(plan.actor);
-  if (!isValidActor(actor)) {
-    console.error(failure(N + " run", "the actor `" + actor + "` has no valid namespace", [
-      "Use one of: " + ACTOR_NAMESPACES.map((n) => n + ":<name>").join(" | "),
-    ], [N + " run --help"]));
-    return 2;
-  }
-
   let root;
   try {
     root = resolveBacklogDir({ dir: plan.dir || undefined, moduleDir: __dirname }).root;
@@ -1343,22 +1335,6 @@ export async function run(argv) {
     return 2;
   }
   const config = loadConfigOrExit(root);
-  if (plan.detach) {
-    const record = startRunRecord({ root, actor, delegation: plan.delegation });
-    const childArgs = argv.filter((arg) => arg !== "--detach").concat(["--run-id", record.id]);
-    const child = spawn(process.execPath, [fileURLToPath(import.meta.url)].concat(childArgs), {
-      detached: process.platform !== "win32", stdio: "ignore", env: process.env,
-    });
-    child.unref();
-    updateRunRecord(root, record, { phase: "starting", supervisor: { pid: child.pid || null, script: fileURLToPath(import.meta.url) } });
-    if (plan.json) printJson("run", {
-      run: { ...record, phase: "starting", supervisor: { pid: child.pid || null, script: fileURLToPath(import.meta.url) } },
-      alive: true,
-    });
-    else console.log("✓ detached run " + record.id + " started");
-    return 0;
-  }
-
   if (plan.launch) {
     if (plan.agent || plan.profile || Object.keys(plan.agentFor).length || Object.keys(plan.profileFor).length) {
       console.error(failure(N + " run", "`--launch` is a complete routing choice", ["Do not combine it with --agent, --profile, --agent-for or --profile-for."]));
@@ -1420,6 +1396,37 @@ export async function run(argv) {
       "Set `delegation_control` to `enforced` or `requested`, or pass `--allow-uncontrolled-delegation` to record an explicit exception.",
     ], [N + " run --help"]));
     return 1;
+  }
+
+  // `--actor`, the shell and user preferences are deliberate attribution and
+  // therefore outrank a local profile. Only an otherwise unstated profile run
+  // receives the profile's provider-neutral agent identity. Several distinct
+  // profiles are one fleet, never a fabricated claim that one provider ran all
+  // of it.
+  const statedActor = resolveActor(plan.actor, { fallback: "" });
+  const profileActors = [...new Set(profileNames.map((name) => plan.profiles[name].actor).filter(Boolean))];
+  const actor = statedActor || (profileActors.length === 1 ? profileActors[0] : profileActors.length ? "agent:fleet" : resolveActor(plan.actor));
+  if (!isValidActor(actor)) {
+    console.error(failure(N + " run", "the actor `" + actor + "` has no valid namespace", [
+      "Use one of: " + ACTOR_NAMESPACES.map((n) => n + ":<name>").join(" | "),
+    ], [N + " run --help"]));
+    return 2;
+  }
+
+  if (plan.detach) {
+    const record = startRunRecord({ root, actor, delegation: plan.delegation });
+    const childArgs = argv.filter((arg) => arg !== "--detach").concat(["--run-id", record.id]);
+    const child = spawn(process.execPath, [fileURLToPath(import.meta.url)].concat(childArgs), {
+      detached: process.platform !== "win32", stdio: "ignore", env: process.env,
+    });
+    child.unref();
+    updateRunRecord(root, record, { phase: "starting", supervisor: { pid: child.pid || null, script: fileURLToPath(import.meta.url) } });
+    if (plan.json) printJson("run", {
+      run: { ...record, phase: "starting", supervisor: { pid: child.pid || null, script: fileURLToPath(import.meta.url) } },
+      alive: true,
+    });
+    else console.log("✓ detached run " + record.id + " started");
+    return 0;
   }
 
   // The plan is read BEFORE the loop starts, for the same reason as the roles

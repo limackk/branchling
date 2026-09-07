@@ -46,6 +46,7 @@ test("two users keep same-named profiles with distinct provider details outside 
   assert.equal(json.profile.model, "opus");
   assert.equal(json.profile.effort, "high");
   assert.equal(json.profile.prompt, "Implement the task.");
+  assert.equal(json.profile.actor, "agent:developer");
   assert.equal(run(["profile", "show", "developer"], second.env).stdout.includes("/opt/codex-wrapper"), true);
 });
 
@@ -76,6 +77,17 @@ test("profiles refuse an unknown delegation-control declaration", () => {
     "--prompt", "Work.", "--delegation-control", "maybe"], fx.env);
   assert.equal(result.status, 1);
   assert.match(result.stderr, /delegation_control must be one of: enforced, requested, unsupported/);
+});
+
+test("a profile actor is an agent identity and can be declared explicitly", () => {
+  const fx = fixture();
+  const invalid = run(["profile", "create", "wrong", "--adapter", "/opt/wrapper", "--prompt", "Work.", "--actor", "local:person"], fx.env);
+  assert.equal(invalid.status, 1);
+  assert.match(invalid.stderr, /actor must be an `agent:<name>` identity/);
+  const created = run(["profile", "create", "codex", "--adapter", "/opt/wrapper", "--prompt", "Work.", "--actor", "agent:openai-codex"], fx.env);
+  assert.equal(created.status, 0, created.stderr);
+  const shown = JSON.parse(run(["profile", "show", "codex", "--json"], fx.env).stdout);
+  assert.equal(shown.profile.actor, "agent:openai-codex");
 });
 
 test("unknown fields, duplicate names, bad prompt files and copied credentials are refused with a remedy", () => {

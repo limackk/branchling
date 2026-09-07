@@ -120,7 +120,12 @@ is an optional terminal guide over the same data: it can be cancelled without a
 write and asks only for credential variable names, never values.
 
 Each profile has a slug, one `adapter` executable, optional `model` and
-`effort`, and exactly one prompt (`prompt` or `prompt_file`). The executable is
+`effort`, an `actor` identity, and exactly one prompt (`prompt` or
+`prompt_file`). When `actor` is omitted, branchling records
+`agent:<profile-name>`; pass `--actor agent:<provider-or-harness>` to
+`branchling profile create` or `update` when a stable provider identity matters.
+An invocation-level `branchling run --actor …` always takes precedence. The
+executable is
 a user-owned wrapper: it translates these neutral inputs into a provider CLI
 invocation or API request. branchling has no provider list, so Claude, Codex,
 Kimi, GLM and a future harness work without a branchling release. Credentials

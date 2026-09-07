@@ -21,7 +21,7 @@ import { agentProfilesPath, ensureHome, homePaths } from "./home.mjs";
 import { lockScope } from "./lock.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
-import { stripComment, unquote } from "./task-fields.mjs";
+import { isValidActor, stripComment, unquote } from "./task-fields.mjs";
 import { failure, heading, table } from "./ui.mjs";
 import { createAgentLaunch } from "./agent-launches.mjs";
 import { loadConfig } from "./config.mjs";
@@ -30,7 +30,13 @@ import { resolveBacklogDir } from "./paths.mjs";
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 export const PROFILE_NAME_SHAPE = /^[a-z0-9][a-z0-9._-]{0,62}$/;
-export const PROFILE_FIELDS = ["name", "adapter", "model", "effort", "prompt", "prompt_file", "secret_env", "protocol_version", "delegation_control"];
+export const PROFILE_FIELDS = ["name", "adapter", "model", "effort", "prompt", "prompt_file", "secret_env", "protocol_version", "delegation_control", "actor"];
+
+/** Profile names are user-owned identities, so a missing declaration becomes a
+ * truthful profile-scoped agent identity rather than a guessed provider. */
+export function profileActor(profile) {
+  return String(profile && profile.actor || "").trim() || "agent:" + String(profile && profile.name || "").trim();
+}
 
 /** A credential may be REFERENCED through $NAME, but never copied as a value. */
 export function credentialProblem(value) {
@@ -86,6 +92,9 @@ function profileProblems(profile, path) {
   }
   if (profile.delegation_control && !DELEGATION_ENFORCEMENT.includes(profile.delegation_control)) {
     problems.push("profile `" + profile.name + "` delegation_control must be one of: " + DELEGATION_ENFORCEMENT.join(", "));
+  }
+  if (profile.actor && (!isValidActor(profile.actor) || !String(profile.actor).startsWith("agent:"))) {
+    problems.push("profile `" + profile.name + "` actor must be an `agent:<name>` identity");
   }
   return problems;
 }
@@ -161,7 +170,7 @@ export function serializeAgentProfiles(profiles) {
   for (const profile of profiles) {
     out.push("  - name: " + profile.name);
     out.push("    adapter: " + quote(profile.adapter));
-    for (const key of ["model", "effort", "prompt", "prompt_file", "secret_env", "protocol_version", "delegation_control"]) {
+    for (const key of ["model", "effort", "prompt", "prompt_file", "secret_env", "protocol_version", "delegation_control", "actor"]) {
       if (profile[key]) out.push("    " + key + ": " + quote(profile[key]));
     }
   }
@@ -216,6 +225,7 @@ export function validateAgentProfileCreation(name, fields, env = process.env, ro
   if (store.problems.length) return { ok: false, kind: "invalid-store", store };
   if (store.profiles.some((p) => p.name === name)) return { ok: false, kind: "duplicate", store };
   const candidate = { name, ...fields };
+  if (!candidate.actor) candidate.actor = profileActor(candidate);
   const target = root ? readAgentProfiles(env, root) : store;
   const problems = profileProblems(candidate, target.path);
   if (problems.length) return { ok: false, kind: "invalid-profile", store, problems };
@@ -272,7 +282,7 @@ export function resolveAgentProfile(name, env = process.env, root = null) {
   if (store.problems.length) return { ok: false, kind: "invalid-store", store };
   const profile = store.profiles.find((p) => p.name === name);
   if (!profile) return { ok: false, kind: "missing-profile", store };
-  return { ok: true, profile: { ...profile, protocol_version: String(profile.protocol_version || ADAPTER_PROTOCOL_VERSION), prompt: profilePrompt(profile, profilePathInStore(store, name)) }, store };
+  return { ok: true, profile: { ...profile, actor: profileActor(profile), protocol_version: String(profile.protocol_version || ADAPTER_PROTOCOL_VERSION), prompt: profilePrompt(profile, profilePathInStore(store, name)) }, store };
 }
 
 /** Resolve an adapter from an absolute/relative path or PATH without running it. */
@@ -294,7 +304,7 @@ export function checkAgentProfiles(names = [], env = process.env, root = null) {
   const results = wanted.map((name) => {
     const found = store.profiles.find((p) => p.name === name);
     if (!found) return { name, state: "invalid-configuration", problems: ["no profile `" + name + "`"] };
-    const resolved = { ...found, protocol_version: String(found.protocol_version || ADAPTER_PROTOCOL_VERSION), prompt: profilePrompt(found, profilePathInStore(store, name)) };
+    const resolved = { ...found, actor: profileActor(found), protocol_version: String(found.protocol_version || ADAPTER_PROTOCOL_VERSION), prompt: profilePrompt(found, profilePathInStore(store, name)) };
     profiles.push(resolved);
     const problems = [];
     const executable = adapterPath(resolved.adapter, env);
@@ -344,7 +354,7 @@ export function modelCatalog(profile, env = process.env) {
 }
 
 const SUBCOMMANDS = ["create", "list", "show", "update", "remove", "check", "models", "setup"];
-const FLAGS = ["--adapter", "--model", "--effort", "--prompt", "--prompt-file", "--secret-env", "--protocol-version", "--delegation-control", "--live", "--json"];
+const FLAGS = ["--adapter", "--model", "--effort", "--prompt", "--prompt-file", "--secret-env", "--protocol-version", "--delegation-control", "--actor", "--live", "--json"];
 
 export function parseAgentProfilesArgs(args) {
   const subcommand = args[0];
