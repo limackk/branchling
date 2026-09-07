@@ -9,6 +9,9 @@ import { spawnSync } from "node:child_process";
 import { HOME_ENV, agentProfilesPath } from "../home.mjs";
 import { createAgentProfile, projectAgentProfilesPath, readAvailableAgentProfiles, resolveAgentProfile, setupProfileConversation } from "../agent-profiles.mjs";
 import { createAgentLaunch, resolveAgentLaunch } from "../agent-launches.mjs";
+import { isolateHome } from "./_repo.mjs";
+
+isolateHome("agent-project-scope");
 
 let sequence = 0;
 function fixture() {

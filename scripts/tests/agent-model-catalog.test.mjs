@@ -8,7 +8,9 @@ import { spawnSync } from "node:child_process";
 
 import { HOME_ENV, agentProfilesPath } from "../home.mjs";
 import { modelCatalog, setupProfileConversation } from "../agent-profiles.mjs";
-import { REPO_ROOT, SCRIPTS_DIR } from "./_repo.mjs";
+import { REPO_ROOT, SCRIPTS_DIR, isolateHome } from "./_repo.mjs";
+
+isolateHome("agent-model-catalog");
 
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
 const OLLAMA = join(REPO_ROOT, "examples", "agent-adapters", "ollama.mjs");

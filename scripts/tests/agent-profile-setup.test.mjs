@@ -10,7 +10,9 @@ import { agentProfilesPath, HOME_ENV, homePaths } from "../home.mjs";
 import { clackTextAnswer, parseAgentProfiles, setupFailureMessage, setupFleetConversation, setupModes, setupProfileConversation, setupTextOptions } from "../agent-profiles.mjs";
 import { projectAgentLaunchesPath } from "../agent-launches.mjs";
 import { PRODUCT_NAME as N } from "../product.mjs";
-import { SCRIPTS_DIR } from "./_repo.mjs";
+import { SCRIPTS_DIR, isolateHome } from "./_repo.mjs";
+
+isolateHome("agent-profile-setup");
 
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
 let sequence = 0;

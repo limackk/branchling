@@ -7,7 +7,9 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { HOME_ENV, agentLaunchesPath } from "../home.mjs";
 import { resolveAgentLaunch } from "../agent-launches.mjs";
-import { SCRIPTS_DIR } from "./_repo.mjs";
+import { SCRIPTS_DIR, isolateHome } from "./_repo.mjs";
+
+isolateHome("agent-launches");
 
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
 function cli(args, env, cwd) { return spawnSync(process.execPath, [CLI, ...args], { cwd, env, encoding: "utf8", timeout: 30_000 }); }
