@@ -15,6 +15,8 @@ isolateHome("agent-reference-adapters");
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
 const CLAUDE = join(REPO_ROOT, "examples", "agent-adapters", "claude-code.mjs");
 const AIDER = join(REPO_ROOT, "examples", "agent-adapters", "aider-api.mjs");
+const CODEX = join(REPO_ROOT, "examples", "agent-adapters", "codex-cli.mjs");
+const OLLAMA = join(REPO_ROOT, "examples", "agent-adapters", "ollama.mjs");
 
 function cli(args, env, cwd) {
   return spawnSync(process.execPath, [CLI, ...args], { cwd, encoding: "utf8", timeout: 120_000, env });
@@ -52,6 +54,8 @@ test("reference adapters pass conformance and route generalist and review profil
     assert.equal(subscription.status, 0, subscription.stdout + subscription.stderr);
     const api = cli(["conformance", "--adapter", AIDER], env, root);
     assert.equal(api.status, 0, api.stdout + api.stderr);
+    assert.equal(cli(["conformance", "--adapter", CODEX], env, root).status, 0);
+    assert.equal(cli(["conformance", "--adapter", OLLAMA], env, root).status, 0);
 
     assert.equal(cli(["init", "--dir", backlog, "--no-example"], env, root).status, 0);
     writeFileSync(join(backlog, "config.yaml"), readFileSync(join(backlog, "config.yaml"), "utf8") + "\nroles: [review]\n", "utf8");
@@ -67,6 +71,8 @@ test("reference adapters pass conformance and route generalist and review profil
     mkdirSync(bin);
     fakeHarness(join(bin, "claude"), subscriptionSeen);
     fakeHarness(join(bin, "aider"), apiSeen);
+    fakeHarness(join(bin, "codex"), join(root, "codex-arguments.txt"));
+    fakeHarness(join(bin, "ollama"), join(root, "ollama-arguments.txt"));
     assert.equal(cli(["profile", "create", "developer", "--adapter", CLAUDE, "--model", "subscription-model", "--effort", "high", "--prompt", "Implement from evidence."], env, repo).status, 0);
     assert.equal(cli(["profile", "create", "reviewer", "--adapter", AIDER, "--model", "api-model", "--effort", "medium", "--prompt", "Review from evidence.", "--secret-env", "OPENAI_API_KEY"], env, repo).status, 0);
 
@@ -87,6 +93,8 @@ test("reference documentation keeps model choice and credentials with the user",
   assert.match(guide, /<a current Claude model alias>/);
   assert.match(guide, /<a model specification accepted by Aider>/);
   assert.match(guide, /--secret-env OPENAI_API_KEY/);
+  assert.match(guide, /Codex CLI/);
+  assert.match(guide, /Ollama/);
   assert.doesNotMatch(guide, /sk-[A-Za-z0-9_-]{16,}/);
   assert.match(readme, /Copyable reference adapters ship with the package/);
 });

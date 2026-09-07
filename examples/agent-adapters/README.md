@@ -1,6 +1,6 @@
 # Reference agent adapters
 
-These two files are small, ordinary executables. Copy one into a directory you
+These files are small, ordinary executables. Copy one into a directory you
 control, make it executable, and point a local Branchling profile at it. They
 are examples of the public process contract, not built-in providers and not a
 registry. The `examples/agent-adapters/` directory ships in the npm package.
@@ -15,12 +15,20 @@ authentication, tool loop and edits. It passes model and reasoning effort to
 Aider. Install Aider and use `aider --list-models` or its current documentation
 to choose a model specification supported by your endpoint.
 
+`codex-cli.mjs` delegates to an already authenticated Codex CLI subscription.
+It supports the profile model through `codex exec --model`; Codex effort is
+configured by Codex itself, so an `effort` value is refused rather than ignored.
+
+`ollama.mjs` delegates to a local Ollama model. Pull the model first, for
+example `ollama pull qwen2.5-coder:7b`, then set that exact name as the profile
+model. It forwards effort to Ollama's `--think` flag when set.
+
 Neither adapter contains credentials. Declare only the environment-variable
 name that its harness needs; the value remains in your shell or credential
 store. For example, after copying the files:
 
 ```bash
-chmod +x claude-code.mjs aider-api.mjs
+chmod +x claude-code.mjs aider-api.mjs codex-cli.mjs ollama.mjs
 
 branchling profile create developer \
   --adapter "$PWD/claude-code.mjs" \
@@ -34,6 +42,17 @@ branchling profile create api-reviewer \
   --effort high \
   --prompt "Review from evidence." \
   --secret-env OPENAI_API_KEY
+
+branchling profile create codex-developer \
+  --adapter "$PWD/codex-cli.mjs" \
+  --model "<a current Codex model alias>" \
+  --prompt "Implement from evidence."
+
+branchling profile create local-developer \
+  --adapter "$PWD/ollama.mjs" \
+  --model "qwen2.5-coder:7b" \
+  --effort high \
+  --prompt "Implement from evidence."
 ```
 
 For another API provider, retain the adapter contract: read task input from

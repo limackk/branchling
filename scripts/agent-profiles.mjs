@@ -203,6 +203,8 @@ export function referenceAdapterTemplates() {
   return [
     { id: "claude-code", label: "Claude Code CLI", source: resolve(HERE, "..", "examples", "agent-adapters", "claude-code.mjs") },
     { id: "aider-api", label: "Aider API harness", source: resolve(HERE, "..", "examples", "agent-adapters", "aider-api.mjs") },
+    { id: "codex-cli", label: "Codex CLI", source: resolve(HERE, "..", "examples", "agent-adapters", "codex-cli.mjs") },
+    { id: "ollama", label: "Ollama local model", source: resolve(HERE, "..", "examples", "agent-adapters", "ollama.mjs") },
   ];
 }
 

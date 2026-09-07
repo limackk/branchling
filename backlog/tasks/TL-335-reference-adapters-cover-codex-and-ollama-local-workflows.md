@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Provider-neutral agent execution" # free text — the group this task counts towards
 priority: P1                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1d                       # 30m | 2h | 1d | 1w
@@ -85,12 +85,12 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] Guided setup offers separate, accurately labelled Codex CLI and Ollama
+- [x] Guided setup offers separate, accurately labelled Codex CLI and Ollama
   references beside the existing references. [proof: reference-adapter-contract]
-- [ ] Both new references pass every offline conformance scenario without a
+- [x] Both new references pass every offline conformance scenario without a
   provider executable, credential or network access. [proof: offline-conformance]
-- [ ] Each adapter reads untrusted task input only through stdin and invokes no
+- [x] Each adapter reads untrusted task input only through stdin and invokes no
   shell; its probe checks availability only. [proof: reference-adapter-contract]
-- [ ] Public instructions state how to copy each adapter, which local executable
+- [x] Public instructions state how to copy each adapter, which local executable
   and model preparation it requires, and how to prove it before real work.
   [proof: reference-adapter-contract]
