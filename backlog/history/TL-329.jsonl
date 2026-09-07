@@ -1,0 +1,6 @@
+{"id":"01M1XE53HNSCZ3BA313K5BR1VH","ts":"2026-09-07T08:01:03.029Z","task":"TL-329","field":"__created__","from":"","to":"Clack setup keeps Branchling's automation contract","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XE63YQD5WTXFCY85492883","ts":"2026-09-07T08:01:36.215Z","task":"TL-329","field":"epic","from":"","to":"Clack guided setup","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1XE63YQXZSG3T4RPPS6NZXN","ts":"2026-09-07T08:01:36.215Z","task":"TL-329","field":"blocked_by","from":[],"to":["TL-327"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1XF65EQ934D5GXCJPJPMBQY","ts":"2026-09-07T08:19:06.327Z","task":"TL-329","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XF65EQ00NRG8NCGX0SBGJJ","ts":"2026-09-07T08:19:06.327Z","task":"TL-329","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XF6WCN409025NB9XXG3270","ts":"2026-09-07T08:19:29.813Z","task":"TL-329","field":"status","from":"in_progress","to":"done","actor":"agent:codex","source":"done","reason":"proven","session":"tree-526f61f2043f"}
