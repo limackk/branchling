@@ -330,6 +330,10 @@ it looks right, remove that flag to run the queue. One `--profile` is the
 generalist path: it serves roleless work and every declared role that has no
 more specific profile mapping.
 
+To correct or remove a local choice, use `branchling profile update <name> …`
+or `branchling profile remove <name>`. These change only your local profile
+store; they never edit the backlog.
+
 ### Fleet: one profile per role
 
 The repository owns the role names and optional reviewed briefs; each person
@@ -354,6 +358,20 @@ repository role brief, the local profile prompt, then the task. The adapter also
 receives model, effort, actor, task and repository paths in the stable
 environment contract. `--profile-for review=reviewer` overrides the generalist
 only for `review`; every other eligible task remains with `developer`.
+
+For a fleet you use repeatedly, save just its local profile routing, then keep
+execution policy explicit:
+
+```bash
+branchling launch create team --profile developer --profile-for review=reviewer
+branchling run --launch team --dry-run
+```
+
+`team` stores no secret, worker count, timeout, retry policy or repository
+setting. `run` validates the launch and every selected profile before claiming
+work. Use `branchling launch show team`, `update` or `remove` to inspect or
+change it; direct `run --profile` and `--profile-for` remain supported for
+scripts.
 
 Kimi, GLM, a local runner such as Ollama, or another API service use the same
 shape: provide an executable adapter and a local profile. The adapter owns the
