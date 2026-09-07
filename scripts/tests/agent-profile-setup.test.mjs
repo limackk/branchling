@@ -73,6 +73,14 @@ test("back revisits a field before the one shared write", async () => {
   assert.ok(readFileSync(agentProfilesPath(fx.env), "utf8").includes('model: "model-new"'));
 });
 
+test("back from adapter source revisits the profile identity before writing", async () => {
+  const fx = fixture();
+  const t = transcript(["first", "3", "second", "1", "/opt/agent", "Work", "", "", "", "1"]);
+  const result = await setupProfileConversation(t.io, fx.env);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.match(readFileSync(agentProfilesPath(fx.env), "utf8"), /name: second/);
+});
+
 test("a shipped reference is copied locally without downloading or launching it", async () => {
   const fx = fixture();
   const destination = join(fx.root, "adapters", "claude.mjs");

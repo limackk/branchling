@@ -343,13 +343,18 @@ function setupAnswer(value, fallback = "") {
 }
 
 /** A choice may be enhanced by raw keys, but test transcripts remain text. */
-async function setupChoice(io, question, options) {
+async function setupChoice(io, question, options, allowBack = false) {
+  const presented = allowBack ? options.concat({ label: "← Back", hint: "Return to the previous step without saving.", value: "__back__" }) : options;
   if (typeof io.choose === "function") {
-    const result = await io.choose(question, options);
-    return result.ok ? setupAnswer(result.value) : CANCEL;
+    const result = await io.choose(question, presented);
+    if (!result.ok) return CANCEL;
+    return result.value === "__back__" ? BACK : setupAnswer(result.value);
   }
-  io.write(options.map((option, index) => (index + 1) + ") " + option.label).join("\n") + "\n");
-  return setupAnswer(await io.ask(question + " [1-" + options.length + "]: "));
+  io.write(presented.map((option, index) => (index + 1) + ") " + option.label).join("\n") + "\n");
+  const answer = setupAnswer(await io.ask(question + " [1-" + presented.length + "]: "));
+  if (answer === BACK || answer === CANCEL) return answer;
+  const selected = presented[Number(answer) - 1];
+  return selected ? (selected.value === "__back__" ? BACK : setupAnswer(selected.value)) : answer;
 }
 
 /**
@@ -380,12 +385,21 @@ export async function setupProfileConversation(io, env = process.env, actions = 
     index++;
   }
   io.write("\nChoose how Branchling will start this agent. The adapter translates this profile to a provider CLI or API wrapper.\n");
-  const sourceChoice = await setupChoice(io, "How should Branchling start this agent?", [
+  let sourceChoice = await setupChoice(io, "How should Branchling start this agent?", [
     { label: "Use my own Branchling adapter", hint: "Advanced: only if you already created an adapter wrapper.", value: "1" },
     { label: "Copy a shipped reference adapter", hint: "Recommended: start from a local example you can inspect and adapt.", value: "2" },
-  ]);
+  ], true);
   if (sourceChoice === CANCEL) return { ok: false, kind: "cancelled" };
-  if (sourceChoice === BACK) return { ok: false, kind: "cancelled" };
+  if (sourceChoice === BACK) {
+    const answer = setupAnswer(await io.ask(fields[0].label + " [" + state.name + "]: "), state.name);
+    if (answer === CANCEL || answer === BACK || !answer) return { ok: false, kind: "cancelled" };
+    state.name = answer;
+    sourceChoice = await setupChoice(io, "How should Branchling start this agent?", [
+      { label: "Use my own Branchling adapter", hint: "Advanced: only if you already created an adapter wrapper.", value: "1" },
+      { label: "Copy a shipped reference adapter", hint: "Recommended: start from a local example you can inspect and adapt.", value: "2" },
+    ], true);
+  }
+  if (sourceChoice === CANCEL || sourceChoice === BACK) return { ok: false, kind: "cancelled" };
   let reference = null;
   if (sourceChoice === "1") {
     io.write("Enter the path to your executable Branchling adapter wrapper. This is not `claude` and not a model name. Example: /Users/you/bin/my-agent-adapter.mjs\n");
