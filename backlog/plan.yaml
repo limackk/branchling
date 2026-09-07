@@ -242,3 +242,15 @@ waves:
   # Verify the combined experience retains every non-interactive and accessible path.
   - name: "Automation remains the contract"
     tasks: [TL-323]
+
+  # Make the shared prompt frame elegant before changing its completion behavior or auditing the fallback contract.
+  - name: "Prompts gain visual hierarchy"
+    tasks: [TL-324]
+
+  # A completed selection should leave a useful transcript rather than a stale menu.
+  - name: "Completed choices stay concise"
+    tasks: [TL-325]
+
+  # Verify visual changes do not affect plain text, automation or accessibility.
+  - name: "Polish remains optional"
+    tasks: [TL-326]
