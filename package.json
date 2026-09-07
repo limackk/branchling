@@ -44,5 +44,8 @@
   "scripts": {
     "test": "node --test scripts/tests/*.test.mjs",
     "prepublishOnly": "node scripts/check-publish-metadata.mjs"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.10.0"
   }
 }

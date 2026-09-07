@@ -1,0 +1,6 @@
+{"id":"01M1XE5313PWZSN0BESN3TH3BX","ts":"2026-09-07T08:01:02.499Z","task":"TL-327","field":"__created__","from":"","to":"Profile setup uses the Clack guided-prompt renderer","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XE63YQ6VXWS3VGPZHSY5FP","ts":"2026-09-07T08:01:36.215Z","task":"TL-327","field":"epic","from":"","to":"Clack guided setup","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1XE63YQ0YQ7DW78QE7HFGQJ","ts":"2026-09-07T08:01:36.215Z","task":"TL-327","field":"blocks","from":[],"to":["TL-328","TL-329"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1XE6WVKFDMPA2Z39X7W5ZSN","ts":"2026-09-07T08:02:01.715Z","task":"TL-327","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XE6WVKNGF1DSVHWRN7HMWK","ts":"2026-09-07T08:02:01.715Z","task":"TL-327","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XE9PKBF4WQACH9QCPHWSSZ","ts":"2026-09-07T08:03:33.611Z","task":"TL-327","field":"status","from":"in_progress","to":"done","actor":"agent:codex","source":"done","reason":"proven","session":"tree-526f61f2043f"}

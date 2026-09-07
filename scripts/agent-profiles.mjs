@@ -13,8 +13,8 @@
 import { accessSync, chmodSync, constants, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
-import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
+import * as clack from "@clack/prompts";
 
 import { ADAPTER_PROTOCOL_VERSION, PROFILE_PROBE_ENV, PROFILE_PROBE_OUTCOMES, PROFILE_PROTOCOL_VERSION_ENV } from "./agent-contract.mjs";
 import { agentProfilesPath, ensureHome } from "./home.mjs";
@@ -22,7 +22,6 @@ import { printJson } from "./json-envelope.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { stripComment, unquote } from "./task-fields.mjs";
 import { failure, heading, table } from "./ui.mjs";
-import { selectChoice } from "./terminal-ui.mjs";
 import { createAgentLaunch } from "./agent-launches.mjs";
 import { loadConfig } from "./config.mjs";
 import { resolveBacklogDir } from "./paths.mjs";
@@ -496,31 +495,32 @@ async function runSetup(env = process.env, input = process.stdin, output = proce
     console.error(failure(N + " profile setup", "interactive setup needs a terminal", ["Use `" + N + " profile create <name> …` from a script or pipe."]));
     return 2;
   }
-  const terminal = createInterface({ input, output, terminal: true });
   const io = {
-    ask: (question) => terminal.question(question),
-    write: (text) => output.write(text),
+    ask: async (question) => {
+      const answer = await clack.text({ message: String(question).replace(/:\s*$/, "") });
+      return clack.isCancel(answer) ? null : answer;
+    },
+    write: (text) => clack.log.message(String(text).trim()),
     choose: async (question, options) => {
-      terminal.pause();
-      try { return await selectChoice(question, options, { input, output, env }); }
-      finally { terminal.resume(); }
+      const answer = await clack.select({ message: question, options });
+      return clack.isCancel(answer) ? { ok: false } : { ok: true, value: answer };
     },
   };
   try {
-    output.write("Configure:\n");
+    clack.intro("Configure " + N);
     const mode = await setupChoice(io, "Configuration", [
       { label: "One generalist profile", value: "1" }, { label: "A specialist fleet", value: "2" },
     ]);
-    if (mode === CANCEL) { output.write("No configuration was created.\n"); return 0; }
+    if (mode === CANCEL) { clack.cancel("No configuration was created."); return 0; }
     const result = mode === "2" ? await setupFleetConversation(io, env) : mode === "1" ? await setupProfileConversation(io, env) : { ok: false, kind: "cancelled" };
-    if (!result.ok) { output.write("No profile was created.\n"); return result.kind === "cancelled" ? 0 : 1; }
-    if (mode === "2") { output.write("✓ launch `" + result.launch.name + "` created — " + result.path + "\n"); output.write("Next: `" + N + " run --launch " + result.launch.name + " --dry-run`.\n"); }
-    else { output.write("✓ profile `" + result.profile.name + "` created — " + result.path + "\n"); output.write("Next: `" + N + " profile check " + result.profile.name + "`, then `" + N + " run --profile " + result.profile.name + " --dry-run`.\n"); }
+    if (!result.ok) { clack.cancel("No profile was created."); return result.kind === "cancelled" ? 0 : 1; }
+    if (mode === "2") clack.outro("Launch `" + result.launch.name + "` created. Next: `" + N + " run --launch " + result.launch.name + " --dry-run`.");
+    else clack.outro("Profile `" + result.profile.name + "` created. Next: `" + N + " profile check " + result.profile.name + "`.");
     return 0;
   } catch (error) {
     console.error(failure(N + " profile setup", "setup stopped before writing", [error.message]));
     return 1;
-  } finally { terminal.close(); }
+  } finally {}
 }
 
 function answer(plan, store, profile = null) {
