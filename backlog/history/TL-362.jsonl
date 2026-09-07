@@ -1,1 +1,4 @@
 {"id":"01M1Y4RN3Y0X2FXHTJB7WZZGWD","ts":"2026-09-07T14:36:12.286Z","task":"TL-362","field":"__created__","from":"","to":"Setup explains orchestration and live run control","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1YCAXY79FFHD0W2040H6M4A","ts":"2026-09-07T16:48:31.175Z","task":"TL-362","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1YCAXY79D0JQGE7QM0K78TV","ts":"2026-09-07T16:48:31.175Z","task":"TL-362","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1YCCJHQYQPWTYE5EBBXVEKX","ts":"2026-09-07T16:49:25.047Z","task":"TL-362","field":"status","from":"in_progress","to":"done","actor":"agent:codex","source":"done","reason":"proven","session":"tree-526f61f2043f"}

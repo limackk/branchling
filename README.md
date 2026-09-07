@@ -309,6 +309,16 @@ agent run, probes a provider or asks for a credential value. Local model
 discovery is the one explicit exception: choosing it for an Ollama profile runs
 only `ollama list`.
 
+Choose execution authority per run, never by guessing from a provider name:
+`--delegation provider` is the normal mode for one generalist and permits its
+harness to use bounded helpers; `--delegation branchling` is the recommended
+mode for a specialist fleet, where Branchling alone claims backlog tasks; and
+`hybrid` is an explicit advanced exception. An adapter's local
+`delegation_control` states whether that boundary is enforced, instruction-only
+or unsupported. Start unattended work with `run --detach`, use `watch` to see
+the active wave and `runs list`, `runs wait <run-id>` or `runs cancel <run-id>`
+to supervise it without keeping an agent session blocked.
+
 During setup, choose whether the agent is available on this machine everywhere
 or only in the current Git project. A project-only choice keeps its adapter,
 model, effort, prompt, credential-variable names and fleet routing in your

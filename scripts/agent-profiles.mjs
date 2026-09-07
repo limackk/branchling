@@ -745,15 +745,15 @@ async function runSetup(env = process.env, input = process.stdin, output = proce
       clack.outro(message.next);
       return 1;
     }
-    if (mode === "2") clack.outro("Launch `" + result.launch.name + "` created. Next: `" + N + " run --launch " + result.launch.name + " --dry-run`.");
+    if (mode === "2") clack.outro("Launch `" + result.launch.name + "` created. Branchling should own specialist task dispatch: `" + N + " run --launch " + result.launch.name + " --delegation branchling --dry-run`; start it detached with the same command plus `--detach`, observe with `" + N + " watch`, then use `" + N + " runs list` and `" + N + " runs cancel <run-id>` if needed.");
     else if (firstProfile && fleetRolesAvailable()) {
       const addFleet = await clack.confirm({ message: "Your general agent is ready. Configure specialist fleet routing now?", initialValue: false });
       if (addFleet === true) {
         const fleet = await setupFleetConversation(io, env, { defaultGeneralist: result.profile.name });
         if (fleet.ok) clack.outro("Profile and launch `" + fleet.launch.name + "` created.");
         else clack.outro("Profile `" + result.profile.name + "` created. Fleet routing was not created.");
-      } else clack.outro("Profile `" + result.profile.name + "` created. Next: `" + N + " profile check " + result.profile.name + "`.");
-    } else clack.outro("Profile `" + result.profile.name + "` created. Next: `" + N + " profile check " + result.profile.name + "`.");
+      } else clack.outro("Profile `" + result.profile.name + "` created. Provider helpers may be used only inside this one generalist: `" + N + " run --profile " + result.profile.name + " --delegation provider --dry-run`; add `--detach` to start, `" + N + " watch` to observe and `" + N + " runs cancel <run-id>` to stop.");
+    } else clack.outro("Profile `" + result.profile.name + "` created. Provider helpers may be used only inside this one generalist: `" + N + " run --profile " + result.profile.name + " --delegation provider --dry-run`; add `--detach` to start, `" + N + " watch` to observe and `" + N + " runs cancel <run-id>` to stop.");
     return 0;
   } catch (error) {
     console.error(failure(N + " profile setup", "setup stopped before writing", [error.message]));

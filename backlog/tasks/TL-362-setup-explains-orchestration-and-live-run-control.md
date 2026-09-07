@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Controlled and observable agent execution"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h
@@ -62,13 +62,13 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] Every delegation choice states who may claim backlog tasks and what
+- [x] Every delegation choice states who may claim backlog tasks and what
       provider subagents may do. [proof: guided-control]
-- [ ] A specialist fleet defaults to Branchling-managed orchestration; one
+- [x] A specialist fleet defaults to Branchling-managed orchestration; one
       generalist can choose provider-managed helpers. [proof: guided-control]
-- [ ] Unsupported enforcement is visible before configuration is accepted.
+- [x] Unsupported enforcement is visible before configuration is accepted.
       [proof: guided-control]
-- [ ] Completion prints working dry-run, detached execution, watch and cancel
+- [x] Completion prints working dry-run, detached execution, watch and cancel
       commands in TTY and plain-text paths. [proof: guided-control]
-- [ ] Setup performs no provider call and stores no credential value.
+- [x] Setup performs no provider call and stores no credential value.
       [proof: guided-control]
