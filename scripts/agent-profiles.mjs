@@ -386,6 +386,12 @@ function setupAnswer(value, fallback = "") {
   return text || fallback;
 }
 
+/** Clack represents an accepted blank text entry as undefined; setup reserves
+ * undefined for EOF, so normalise at the UI boundary before state handling. */
+export function clackTextAnswer(answer, isCancelled = clack.isCancel) {
+  return isCancelled(answer) ? null : answer === undefined ? "" : answer;
+}
+
 /** A choice may be enhanced by raw keys, but test transcripts remain text. */
 async function setupChoice(io, question, options, allowBack = false) {
   const presented = allowBack ? options.concat({ label: "← Back", hint: "Return to the previous step without saving.", value: "__back__" }) : options;
@@ -629,7 +635,7 @@ async function runSetup(env = process.env, input = process.stdin, output = proce
   const io = {
     ask: async (question) => {
       const answer = await clack.text({ message: String(question).replace(/:\s*$/, "") });
-      return clack.isCancel(answer) ? null : answer;
+      return clackTextAnswer(answer);
     },
     write: (text) => clack.log.message(String(text).trim()),
     choose: async (question, options) => {
