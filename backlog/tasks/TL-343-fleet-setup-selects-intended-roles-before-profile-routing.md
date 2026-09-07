@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "CLI onboarding"              # free text — the group this task counts towards
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1d
@@ -84,12 +84,12 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] A fleet setup with four configured roles can select only `dev` and
+- [x] A fleet setup with four configured roles can select only `dev` and
   `review`, and the interview asks for no other role mappings. [proof: fleet-role-selection]
-- [ ] The fleet summary and persisted launch make the general fallback and the
+- [x] The fleet summary and persisted launch make the general fallback and the
   selected role overrides unambiguous. [proof: fleet-role-selection]
-- [ ] The interactive selector uses arrow keys, Space and Enter; the
+- [x] The interactive selector uses arrow keys, Space and Enter; the
   terminal-independent path accepts a documented numeric multiple selection.
   [proof: fleet-role-selection]
-- [ ] Cancelled or invalid selections write no launch, and existing launch
+- [x] Cancelled or invalid selections write no launch, and existing launch
   resolution still routes selected roles correctly. [proof: fleet-role-selection]

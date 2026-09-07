@@ -430,6 +430,24 @@ async function setupChoice(io, question, options, allowBack = false) {
   return selected ? (selected.value === "__back__" ? BACK : setupAnswer(selected.value)) : answer;
 }
 
+/** Select a subset without giving the setup state machine any terminal details. */
+async function setupRoleSet(io, question, roles) {
+  const options = roles.map((role) => ({ label: role, hint: "Route this repository role to a specialist profile.", value: role }));
+  if (typeof io.chooseMany === "function") {
+    const result = await io.chooseMany(question, options);
+    if (!result.ok) return CANCEL;
+    const selected = Array.isArray(result.values) ? result.values : [];
+    return selected.length && selected.every((role) => roles.includes(role)) ? [...new Set(selected)] : null;
+  }
+  io.write("Select one or more roles by their numbers, separated with commas (for example: 1,3).\n");
+  const answer = setupAnswer(await io.ask(question + " [1-" + roles.length + ", comma-separated]: "));
+  if (answer === CANCEL || answer === BACK) return answer;
+  const indices = String(answer).split(",").map((part) => part.trim());
+  if (!indices.length || indices.some((part) => !/^\d+$/.test(part))) return null;
+  const selected = indices.map((part) => roles[Number(part) - 1]);
+  return selected.every(Boolean) ? [...new Set(selected)] : null;
+}
+
 /**
  * The setup state machine is terminal-independent so its cancellation and write
  * boundary can be tested without a pseudo-terminal.
@@ -621,21 +639,32 @@ export async function setupFleetConversation(io, env = process.env, actions = {}
   ]);
   if (scope === CANCEL) return { ok: false, kind: "cancelled" };
   const scopeRoot = scope === "project" ? root : null;
-  const profileFor = {};
-  const choices = (unassigned) => [
-    { label: unassigned, hint: "Leave this routing intentionally unset.", value: "" },
-    ...profiles.profiles.map((profile) => ({ label: profile.name, hint: profile.model ? "Model: " + profile.model : "No model identifier set.", value: profile.name })),
-  ];
-  for (const role of roles) {
-    const selected = await setupChoice(io, "Which profile should handle repository role `" + role + "`?", choices("Leave `" + role + "` unassigned"));
-    if (selected === CANCEL || selected === BACK) return { ok: false, kind: "cancelled" };
-    if (selected && !profiles.profiles.some((p) => p.name === selected)) return { ok: false, kind: "missing-profile", problems: ["no local profile `" + selected + "`"] };
-    if (selected) profileFor[role] = selected;
+  const profileNames = profiles.profiles.map((profile) => profile.name);
+  let generalist = String(actions.defaultGeneralist || "");
+  if (generalist && !profileNames.includes(generalist)) return { ok: false, kind: "missing-profile", problems: ["no local profile `" + generalist + "`"] };
+  const choices = () => profiles.profiles.map((profile) => ({ label: profile.name, hint: profile.model ? "Model: " + profile.model : "No model identifier set.", value: profile.name }));
+  if (generalist) {
+    io.write("All repository roles not selected below will use general profile `" + generalist + "`.\n");
+  } else {
+    generalist = await setupChoice(io, "Which profile should handle all other work?", choices());
+    if (generalist === CANCEL || generalist === BACK) return { ok: false, kind: "cancelled" };
+    if (!profileNames.includes(generalist)) return { ok: false, kind: "missing-profile", problems: ["no local profile `" + generalist + "`"] };
   }
-  const generalist = await setupChoice(io, "Which profile should handle tasks with no matching role?", choices("Leave general work unassigned"));
-  if (generalist === CANCEL || generalist === BACK) return { ok: false, kind: "cancelled" };
-  if (generalist && !profiles.profiles.some((p) => p.name === generalist)) return { ok: false, kind: "missing-profile", problems: ["no local profile `" + generalist + "`"] };
-  io.write("\nFleet summary:\n  name: " + name + "\n  scope: " + (scopeRoot ? "this Git project" : "every project on this machine") + "\n  generalist: " + (generalist || "(none)") + "\n  roles: " + Object.entries(profileFor).map(([r, p]) => r + "=" + p).join(", ") + "\n");
+  let selectedRoles = null;
+  while (!selectedRoles) {
+    const selected = await setupRoleSet(io, "Which repository roles should this fleet override?", roles);
+    if (selected === CANCEL || selected === BACK) return { ok: false, kind: "cancelled" };
+    if (!selected) { io.write("Choose one or more repository roles. Nothing has been written.\n"); continue; }
+    selectedRoles = selected;
+  }
+  const profileFor = {};
+  for (const role of selectedRoles) {
+    const selected = await setupChoice(io, "Which profile should handle repository role `" + role + "`?", choices());
+    if (selected === CANCEL || selected === BACK) return { ok: false, kind: "cancelled" };
+    if (!profileNames.includes(selected)) return { ok: false, kind: "missing-profile", problems: ["no local profile `" + selected + "`"] };
+    profileFor[role] = selected;
+  }
+  io.write("\nFleet summary:\n  name: " + name + "\n  scope: " + (scopeRoot ? "this Git project" : "every project on this machine") + "\n  all other work: " + generalist + "\n  role overrides: " + Object.entries(profileFor).map(([r, p]) => r + "=" + p).join(", ") + "\n");
   const confirm = await setupChoice(io, "Create this launch", [
     { label: "Create launch", value: "1" }, { label: "Cancel", value: "3" },
   ]);
@@ -685,6 +714,10 @@ async function runSetup(env = process.env, input = process.stdin, output = proce
       const answer = await clack.select({ message: question, options });
       return clack.isCancel(answer) ? { ok: false } : { ok: true, value: answer };
     },
+    chooseMany: async (question, options) => {
+      const answer = await clack.multiselect({ message: question, options, required: true });
+      return clack.isCancel(answer) ? { ok: false } : { ok: true, values: answer };
+    },
   };
   try {
     let projectRoot = null;
@@ -707,7 +740,7 @@ async function runSetup(env = process.env, input = process.stdin, output = proce
     else if (firstProfile && fleetRolesAvailable()) {
       const addFleet = await clack.confirm({ message: "Your general agent is ready. Configure specialist fleet routing now?", initialValue: false });
       if (addFleet === true) {
-        const fleet = await setupFleetConversation(io, env);
+        const fleet = await setupFleetConversation(io, env, { defaultGeneralist: result.profile.name });
         if (fleet.ok) clack.outro("Profile and launch `" + fleet.launch.name + "` created.");
         else clack.outro("Profile `" + result.profile.name + "` created. Fleet routing was not created.");
       } else clack.outro("Profile `" + result.profile.name + "` created. Next: `" + N + " profile check " + result.profile.name + "`.");

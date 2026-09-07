@@ -160,24 +160,72 @@ test("a fleet interview writes one ordinary local launch and cancellation writes
   const cancelled = await setupFleetConversation(transcript(["cancel"]).io, fx.env, { resolveBacklog: () => ({ root: backlog }) });
   assert.equal(cancelled.ok, false);
   assert.equal(readFileSync(agentProfilesPath(fx.env), "utf8"), beforeProfiles);
-  const fleet = transcript(["team", "1", "2", "1", "1"]);
+  const fleet = transcript(["team", "1", "1", "1", "1", "1"]);
   const created = await setupFleetConversation(fleet.io, fx.env, { resolveBacklog: () => ({ root: backlog }) });
   assert.equal(created.ok, true, JSON.stringify(created));
+  assert.equal(created.launch.profile, "developer");
   assert.equal(created.launch.profile_for, "dev=developer");
   assert.match(fleet.out.join(""), /scope: this Git project/);
-  assert.match(fleet.out.join(""), /Leave `dev` unassigned[\s\S]*developer/);
+  assert.match(fleet.out.join(""), /Select one or more roles by their numbers/);
+  assert.match(fleet.out.join(""), /all other work: developer/);
 });
 
-test("an invalid typed fleet profile fails before its project launch is written", async () => {
+test("an invalid typed fleet role selection fails before its project launch is written", async () => {
   const fx = fixture();
   const adapter = join(fx.root, "adapter"); writeFileSync(adapter, "#!/bin/sh\nexit 0\n", "utf8");
   assert.equal((await setupProfileConversation(transcript(["developer", "2", adapter, "Work", "", "", "", "1"]).io, fx.env)).ok, true);
   const backlog = join(fx.root, "backlog");
   assert.equal(spawnSync(process.execPath, [CLI, "init", "--dir", backlog, "--no-example"], { encoding: "utf8", env: fx.env }).status, 0);
   const config = join(backlog, "config.yaml"); writeFileSync(config, readFileSync(config, "utf8") + "\nroles: [dev]\n", "utf8");
-  const result = await setupFleetConversation(transcript(["bad-team", "1", "missing"]).io, fx.env, { resolveBacklog: () => ({ root: backlog }) });
+  const result = await setupFleetConversation(transcript(["bad-team", "1", "1", "missing", "cancel"]).io, fx.env, { resolveBacklog: () => ({ root: backlog }) });
   assert.equal(result.ok, false);
   assert.equal(existsSync(projectAgentLaunchesPath(backlog, fx.env)), false);
+});
+
+test("a fleet selects only intended roles through the typed multiple-choice fallback", async () => {
+  const fx = fixture();
+  const adapter = join(fx.root, "adapter"); writeFileSync(adapter, "#!/bin/sh\nexit 0\n", "utf8");
+  for (const name of ["generalist", "developer", "reviewer"]) {
+    assert.equal((await setupProfileConversation(transcript([name, "2", adapter, "Work", "", "", "", "1"]).io, fx.env)).ok, true);
+  }
+  const backlog = join(fx.root, "backlog");
+  assert.equal(spawnSync(process.execPath, [CLI, "init", "--dir", backlog, "--no-example"], { encoding: "utf8", env: fx.env }).status, 0);
+  const config = join(backlog, "config.yaml"); writeFileSync(config, readFileSync(config, "utf8") + "\nroles: [docs, spec, dev, review]\n", "utf8");
+  const fleet = transcript(["delivery-team", "1", "1", "3,4", "2", "3", "1"]);
+  const created = await setupFleetConversation(fleet.io, fx.env, { resolveBacklog: () => ({ root: backlog }) });
+  assert.equal(created.ok, true, JSON.stringify(created));
+  assert.equal(created.launch.profile, "generalist");
+  assert.equal(created.launch.profile_for, "dev=developer,review=reviewer");
+  const output = fleet.out.join("");
+  assert.doesNotMatch(output, /repository role `docs`/);
+  assert.doesNotMatch(output, /repository role `spec`/);
+  assert.match(output, /all other work: generalist/);
+  assert.match(output, /role overrides: dev=developer, review=reviewer/);
+});
+
+test("a first general profile becomes the visible fleet fallback and Clack receives a role set", async () => {
+  const fx = fixture();
+  const adapter = join(fx.root, "adapter"); writeFileSync(adapter, "#!/bin/sh\nexit 0\n", "utf8");
+  for (const name of ["generalist", "developer"]) {
+    assert.equal((await setupProfileConversation(transcript([name, "2", adapter, "Work", "", "", "", "1"]).io, fx.env)).ok, true);
+  }
+  const backlog = join(fx.root, "backlog");
+  assert.equal(spawnSync(process.execPath, [CLI, "init", "--dir", backlog, "--no-example"], { encoding: "utf8", env: fx.env }).status, 0);
+  const config = join(backlog, "config.yaml"); writeFileSync(config, readFileSync(config, "utf8") + "\nroles: [docs, dev]\n", "utf8");
+  const fleet = transcript(["delivery-team", "1", "2", "1"]);
+  let roleOptions = null;
+  fleet.io.chooseMany = async (question, options) => {
+    assert.match(question, /Which repository roles should this fleet override/);
+    roleOptions = options;
+    return { ok: true, values: ["dev"] };
+  };
+  const created = await setupFleetConversation(fleet.io, fx.env, { resolveBacklog: () => ({ root: backlog }), defaultGeneralist: "generalist" });
+  assert.equal(created.ok, true, JSON.stringify(created));
+  assert.deepEqual(roleOptions.map((option) => option.value), ["docs", "dev"]);
+  assert.equal(created.launch.profile, "generalist");
+  assert.equal(created.launch.profile_for, "dev=developer");
+  assert.match(fleet.out.join(""), /not selected below will use general profile `generalist`/);
+  assert.doesNotMatch(fleet.out.join(""), /Which profile should handle all other work/);
 });
 
 test("the process refuses interactive setup in a pipe and refuses JSON", () => {

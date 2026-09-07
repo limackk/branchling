@@ -305,7 +305,9 @@ It asks for a local adapter, model, effort and prompt, shows the exact profile
 before writing it, then recommends `profile check` and a no-claim dry run. You
 may point it at any executable you control, or copy a versioned reference
 adapter that ships with the package. The guide never downloads code, starts an
-adapter, probes a provider or asks for a credential value.
+agent run, probes a provider or asks for a credential value. Local model
+discovery is the one explicit exception: choosing it for an Ollama profile runs
+only `ollama list`.
 
 During setup, choose whether the agent is available on this machine everywhere
 or only in the current Git project. A project-only choice keeps its adapter,
@@ -332,6 +334,12 @@ For Ollama, this lists the models pulled on this machine and fails if the
 profile's selected model is absent. Codex reports that account-specific aliases
 cannot be listed; leaving its model blank uses the Codex CLI default, while an
 override is passed through without being labelled verified.
+
+After the first general agent, setup can optionally create a specialist fleet.
+The general agent remains the fallback for every role; select only the roles to
+override with specialists. In a terminal use Arrow keys to move, Space to toggle
+roles, and Enter to continue; setup then asks for a profile only for the roles
+you selected.
 
 The flag form remains the right path for scripts, CI and users who already know
 their configuration:
