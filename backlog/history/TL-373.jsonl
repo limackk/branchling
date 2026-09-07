@@ -1,0 +1,4 @@
+{"id":"01M1YJ67GM1Q4BR71ZHGT6QNWY","ts":"2026-09-07T18:30:48.596Z","task":"TL-373","field":"__created__","from":"","to":"Profile environment tests declare delegation metadata","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1YJ74JANJDR13HA4WS3NBMJ","ts":"2026-09-07T18:31:18.346Z","task":"TL-373","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1YJ74JACQ7J33MZFTB75M23","ts":"2026-09-07T18:31:18.346Z","task":"TL-373","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1YJ7S0D38GF566DGGYYRNE4","ts":"2026-09-07T18:31:39.277Z","task":"TL-373","field":"status","from":"in_progress","to":"done","actor":"agent:codex","source":"done","reason":"proven","session":"tree-526f61f2043f"}
