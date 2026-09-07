@@ -45,7 +45,8 @@ export function colorAllowed(stream, env = process.env) {
   return !!(stream && stream.isTTY);
 }
 
-const ESC = "\u001b[";
+const CONTROL = "\u001b";
+const ESC = CONTROL + "[";
 const SGR = {
   reset: ESC + "0m",
   bold: ESC + "1m",
@@ -63,6 +64,7 @@ const CSI = {
   leaveAlternate: ESC + "?1049l",
   home: ESC + "H",
   eraseBelow: ESC + "J",
+  eraseLine: ESC + "2K",
 };
 
 /** The small control surface for a live, non-scrolling terminal frame. */
@@ -71,6 +73,13 @@ export const terminal = {
   refreshLive: () => CSI.home,
   eraseBelow: () => CSI.eraseBelow,
   closeLive: () => CSI.leaveAlternate,
+  /** Replace a small inline frame without making the terminal scroll. */
+  replaceLines: (lines, previousLines = 0) => {
+    const rows = Array.isArray(lines) ? lines : [String(lines)];
+    const up = previousLines ? ESC + previousLines + "A" : "";
+    return up + rows.map((row) => "\r" + CSI.eraseLine + String(row) + "\n").join("");
+  },
+  keys: { up: ESC + "A", down: ESC + "B", enter: "\r", newline: "\n", interrupt: "\u0003", escape: CONTROL },
 };
 
 /**
