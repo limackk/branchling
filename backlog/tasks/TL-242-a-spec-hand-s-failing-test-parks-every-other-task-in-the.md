@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P0
-status: pending  # pending | in_progress | blocked | done | cancelled
-owner: ""
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: dev  # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
@@ -81,17 +81,17 @@ neighbour until the second stage lands.
 
 ## Acceptance criteria
 
-- [ ] A suite failure already present when the task is claimed is classified apart
+- [x] A suite failure already present when the task is claimed is classified apart
   from a failure introduced by that task. [proof: a-neighbours-red-does-not-park-me]
-- [ ] When the task's own entry passes and only the baseline failure remains, the
+- [x] When the task's own entry passes and only the baseline failure remains, the
   run reports that fact, makes no second attempt, and leaves the task claimed
   rather than parking or releasing it. [proof: a-neighbours-red-does-not-park-me]
-- [ ] When the hand introduces a failure in the task's own entry, the run still
+- [x] When the hand introduces a failure in the task's own entry, the run still
   exhausts the configured attempts and parks the task with a reason naming that
   entry. [proof: a-neighbours-red-does-not-park-me]
-- [ ] The complete automated test suite remains green after the implementation.
+- [x] The complete automated test suite remains green after the implementation.
   [proof: suite-green]
-- [ ] The repository consistency guards remain green after the implementation.
+- [x] The repository consistency guards remain green after the implementation.
   [proof: guards-green]
 
 ## Open question
