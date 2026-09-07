@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Controlled and observable agent execution"
 priority: P0
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 30m
@@ -56,6 +56,6 @@ timeouts and explicit cancellation intact.
 
 ## Acceptance criteria
 
-- [ ] An adapter process exiting causes the detached loop to resolve without a
+- [x] An adapter process exiting causes the detached loop to resolve without a
       manual cancellation. [proof: adapter-exit-finishes-run]
-- [ ] The final run and attempt records have terminal phases. [proof: adapter-exit-finishes-run]
+- [x] The final run and attempt records have terminal phases. [proof: adapter-exit-finishes-run]

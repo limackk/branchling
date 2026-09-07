@@ -983,7 +983,7 @@ export function attemptProvenance(task, attempt) {
 /** Run one worker without making the supervisor blind until its process exits. */
 export function superviseAgent(command, opts) {
   return new Promise((resolve) => {
-    let stdout = ""; let stderr = ""; let bytes = 0; let timedOut = false; let overflow = false;
+    let stdout = ""; let stderr = ""; let bytes = 0; let timedOut = false; let overflow = false; let settled = false;
     const child = opts.raw ? spawn(command, { shell: true, cwd: opts.cwd, env: opts.env, detached: process.platform !== "win32", stdio: ["pipe", "pipe", "pipe"] })
       : spawn(command, [], { shell: false, cwd: opts.cwd, env: opts.env, detached: process.platform !== "win32", stdio: ["pipe", "pipe", "pipe"] });
     const touch = (patch) => updateAttemptRecord(opts.root, opts.record, patch, opts.recordEnv || process.env);
@@ -1006,13 +1006,26 @@ export function superviseAgent(command, opts) {
     };
     child.stdout.on("data", (chunk) => receive("stdout", chunk));
     child.stderr.on("data", (chunk) => receive("stderr", chunk));
+    // A provider that exits before reading stdin closes this pipe first. Its
+    // exit status still decides the attempt; an unhandled EPIPE must not crash
+    // the supervisor before it can record that result.
+    child.stdin.once("error", () => {});
     child.stdin.end(opts.input);
     const stop = () => {
       try { if (process.platform !== "win32" && child.pid) process.kill(-child.pid, "SIGTERM"); else child.kill("SIGTERM"); } catch { child.kill("SIGTERM"); }
     };
     const timeout = setTimeout(() => { timedOut = true; stop(); }, opts.timeout * 1000);
-    child.on("error", (error) => { clearTimeout(timeout); clearInterval(liveness); resolve({ stdout, stderr, error, timedOut, overflow, status: null }); });
-    child.on("close", (status) => { clearTimeout(timeout); clearInterval(liveness); resolve({ stdout, stderr, timedOut, overflow, status }); });
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout); clearInterval(liveness);
+      resolve({ stdout, stderr, timedOut, overflow, ...result });
+    };
+    child.once("error", (error) => finish({ error, status: null }));
+    // `close` waits for every inherited stdio descriptor. A provider wrapper can
+    // exit while a descendant still holds one, which used to strand the run
+    // supervisor forever. `exit` is the process lifecycle boundary we own.
+    child.once("exit", (status) => finish({ status }));
   });
 }
 

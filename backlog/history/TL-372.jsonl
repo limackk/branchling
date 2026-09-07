@@ -1,1 +1,4 @@
 {"id":"01M1YGZN299WKNJDY2QZ99CC76","ts":"2026-09-07T18:09:44.521Z","task":"TL-372","field":"__created__","from":"","to":"A finished adapter cannot leave its supervisor running","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1YHPS4RY3YK1R3EZSQGCFX4","ts":"2026-09-07T18:22:22.360Z","task":"TL-372","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1YHPS4RKPF2AM5WFNYPHVC4","ts":"2026-09-07T18:22:22.360Z","task":"TL-372","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1YHSDC3TPBRFR5ADV700Y20","ts":"2026-09-07T18:23:48.611Z","task":"TL-372","field":"status","from":"in_progress","to":"done","actor":"agent:codex","source":"done","reason":"proven","session":"tree-526f61f2043f"}
