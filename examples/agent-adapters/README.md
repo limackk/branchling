@@ -16,8 +16,11 @@ Aider. Install Aider and use `aider --list-models` or its current documentation
 to choose a model specification supported by your endpoint.
 
 `codex-cli.mjs` delegates to an already authenticated Codex CLI subscription.
-It supports the profile model through `codex exec --model`; Codex effort is
-configured by Codex itself, so an `effort` value is refused rather than ignored.
+It supports the profile model through `codex exec --model`. Its optional
+`effort` is scoped to that one invocation with
+`-c model_reasoning_effort="…"`: `low`, `medium`, `high` and `xhigh` are
+accepted. Leave it blank to preserve the Codex CLI default; any other value
+fails before Codex starts, rather than changing a global Codex configuration.
 
 `ollama.mjs` delegates to a local Ollama model. Pull the model first, for
 example `ollama pull qwen2.5-coder:7b`, then set that exact name as the profile
@@ -46,6 +49,7 @@ branchling profile create api-reviewer \
 branchling profile create codex-developer \
   --adapter "$PWD/codex-cli.mjs" \
   --model "<a current Codex model alias>" \
+  --effort medium \
   --prompt "Implement from evidence."
 
 branchling profile create local-developer \

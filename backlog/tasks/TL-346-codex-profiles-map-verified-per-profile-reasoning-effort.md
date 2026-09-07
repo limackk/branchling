@@ -6,8 +6,8 @@ labels: [agents, codex]
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h
@@ -78,9 +78,9 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] A supported Codex effort is invocation-scoped and can differ between two
+- [x] A supported Codex effort is invocation-scoped and can differ between two
   local Branchling profiles. [proof: adapter-tests]
-- [ ] Unsupported effort is refused before task work starts; it is never
+- [x] Unsupported effort is refused before task work starts; it is never
   silently delegated to global Codex configuration. [proof: adapter-tests]
-- [ ] An empty Codex effort remains a valid profile and preserves Codex's own
+- [x] An empty Codex effort remains a valid profile and preserves Codex's own
   default. [proof: adapter-tests]

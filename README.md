@@ -335,6 +335,11 @@ profile's selected model is absent. Codex reports that account-specific aliases
 cannot be listed; leaving its model blank uses the Codex CLI default, while an
 override is passed through without being labelled verified.
 
+The shipped Codex adapter also maps a profile's optional reasoning effort to
+one invocation only. It accepts `low`, `medium`, `high` and `xhigh`; leave the
+field blank to use the Codex CLI default. An unsupported value fails before the
+agent starts, so a profile never silently depends on a global Codex setting.
+
 After the first general agent, setup can optionally create a specialist fleet.
 The general agent remains the fallback for every role; select only the roles to
 override with specialists. In a terminal use Arrow keys to move, Space to toggle

@@ -87,6 +87,43 @@ test("reference adapters pass conformance and route generalist and review profil
   }
 });
 
+test("Codex adapter scopes supported effort to one invocation", () => {
+  const root = mkdtempSync(join(tmpdir(), "branchling-codex-effort-"));
+  const bin = join(root, "bin");
+  const witness = join(root, "codex-arguments.txt");
+  const env = {
+    ...process.env,
+    PATH: bin + ":" + process.env.PATH,
+    BRANCHLING_REPOSITORY: root,
+    BRANCHLING_MODEL: "test-model",
+  };
+  try {
+    mkdirSync(bin);
+    fakeHarness(join(bin, "codex"), witness);
+
+    const supported = spawnSync(process.execPath, [CODEX], {
+      cwd: root, encoding: "utf8", env: { ...env, BRANCHLING_EFFORT: "medium" }, input: "work",
+    });
+    assert.equal(supported.status, 0, supported.stderr);
+    assert.match(readFileSync(witness, "utf8"), /-c model_reasoning_effort="medium" --model test-model/);
+
+    const empty = spawnSync(process.execPath, [CODEX], { cwd: root, encoding: "utf8", env, input: "work" });
+    assert.equal(empty.status, 0, empty.stderr);
+    const calls = readFileSync(witness, "utf8").trim().split("\n");
+    assert.doesNotMatch(calls.at(-1), /model_reasoning_effort/);
+
+    const before = readFileSync(witness, "utf8");
+    const unsupported = spawnSync(process.execPath, [CODEX], {
+      cwd: root, encoding: "utf8", env: { ...env, BRANCHLING_EFFORT: "turbo" }, input: "work",
+    });
+    assert.equal(unsupported.status, 2);
+    assert.match(unsupported.stderr, /low, medium, high, xhigh/);
+    assert.equal(readFileSync(witness, "utf8"), before);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("reference documentation keeps model choice and credentials with the user", () => {
   const guide = readFileSync(join(REPO_ROOT, "examples", "agent-adapters", "README.md"), "utf8");
   const readme = readFileSync(join(REPO_ROOT, "README.md"), "utf8");
@@ -94,6 +131,7 @@ test("reference documentation keeps model choice and credentials with the user",
   assert.match(guide, /<a model specification accepted by Aider>/);
   assert.match(guide, /--secret-env OPENAI_API_KEY/);
   assert.match(guide, /Codex CLI/);
+  assert.match(guide, /model_reasoning_effort/);
   assert.match(guide, /Ollama/);
   assert.doesNotMatch(guide, /sk-[A-Za-z0-9_-]{16,}/);
   assert.match(readme, /Copyable reference adapters ship with the package/);
