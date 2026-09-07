@@ -6,7 +6,7 @@ labels: []
 board: main
 epic: "Controlled and observable agent execution"
 priority: P1
-status: in_progress  # pending | in_progress | blocked | done | cancelled
+status: done  # pending | in_progress | blocked | done | cancelled
 owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
@@ -19,7 +19,7 @@ blocks: [TL-359, TL-360]           # ids this task will unblock
 related_docs: [scripts/run-loop.mjs, scripts/activity.mjs, docs/backlog-time-tracking.md]
 verification:                      # HOW to check the task is really done
   - id: live-supervision
-    bash: "node --test scripts/tests/run.test.mjs scripts/tests/run-agent-profiles.test.mjs scripts/tests/run-stuck-status.test.mjs"
+    bash: "node --test scripts/tests/run.test.mjs scripts/tests/run-agent-profiles.test.mjs scripts/tests/run-stuck-status.test.mjs scripts/tests/run-live-supervision.test.mjs"
 ---
 
 ## Goal
@@ -65,13 +65,13 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] Output is visible in the run log before the adapter exits.
+- [x] Output is visible in the run log before the adapter exits.
       [proof: live-supervision]
-- [ ] Liveness, last output and last structured progress are separate fields.
+- [x] Liveness, last output and last structured progress are separate fields.
       [proof: live-supervision]
-- [ ] A silent live process is reported as alive and quiet, never as confirmed
+- [x] A silent live process is reported as alive and quiet, never as confirmed
       productive work. [proof: live-supervision]
-- [ ] Timeout terminates descendants and leaves one explicit terminal outcome.
+- [x] Timeout terminates descendants and leaves one explicit terminal outcome.
       [proof: live-supervision]
-- [ ] Existing raw-command and profile contracts remain compatible.
+- [x] Existing raw-command and profile contracts remain compatible.
       [proof: live-supervision]
