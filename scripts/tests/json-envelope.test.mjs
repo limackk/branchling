@@ -93,6 +93,10 @@ const READING = {
   // backlog. The generic harness normally appends `--dir`; this one must prove
   // the opposite boundary and therefore runs with no project directory.
   "agent-profiles": { args: ["profile", "list", "--json"], noDir: true },
+  // Launches are the local reusable map from repository role to profile. They
+  // share profiles' user configuration boundary, so this request also runs
+  // outside a fixture backlog.
+  "agent-launches": { args: ["launch", "list", "--json"], noDir: true },
   // The fixtures carry no `plan.yaml`, so this exercises the answer a backlog
   // without an execution order gives — which is the one that has to stay a
   // complete envelope rather than an error.

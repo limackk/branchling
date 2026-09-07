@@ -1,1 +1,4 @@
 {"id":"01M1Y86JJNJWDGENX0D8N5HV8W","ts":"2026-09-07T15:36:14.165Z","task":"TL-364","field":"__created__","from":"","to":"The JSON envelope reference covers every emitted kind","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1Y8D1YYH5WTZVW6AJXX5P3J","ts":"2026-09-07T15:39:46.526Z","task":"TL-364","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1Y8D1YYRT0RY7RAF1RYGGYX","ts":"2026-09-07T15:39:46.526Z","task":"TL-364","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1Y8F6TA6DZQTWFZS20832XC","ts":"2026-09-07T15:40:57.034Z","task":"TL-364","field":"status","from":"in_progress","to":"done","actor":"agent:codex","source":"done","reason":"proven","session":"tree-526f61f2043f"}
