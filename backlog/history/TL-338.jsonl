@@ -1,0 +1,4 @@
+{"id":"01M1XN8K1NCMRZ5C2SHC6KDTA2","ts":"2026-09-07T10:05:17.237Z","task":"TL-338","field":"__created__","from":"","to":"Guided profile setup defaults to the shortest safe path","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XN8VD2MQVARKNGATG0X9XS","ts":"2026-09-07T10:05:25.794Z","task":"TL-338","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XN8VD2GRPE7Q6HQQ09DKE3","ts":"2026-09-07T10:05:25.794Z","task":"TL-338","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XNHBBR2FGX0TJGY4PXF9PD","ts":"2026-09-07T10:10:04.280Z","task":"TL-338","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven","session":"tree-526f61f2043f"}

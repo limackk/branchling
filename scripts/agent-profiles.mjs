@@ -235,7 +235,7 @@ export function referenceAdapterTemplates() {
     { id: "claude-code", label: "Claude Code CLI", source: resolve(HERE, "..", "examples", "agent-adapters", "claude-code.mjs") },
     { id: "aider-api", label: "Aider API harness", source: resolve(HERE, "..", "examples", "agent-adapters", "aider-api.mjs") },
     { id: "codex-cli", label: "Codex CLI", source: resolve(HERE, "..", "examples", "agent-adapters", "codex-cli.mjs") },
-    { id: "ollama", label: "Ollama local model", source: resolve(HERE, "..", "examples", "agent-adapters", "ollama.mjs") },
+    { id: "ollama", label: "Ollama local model", source: resolve(HERE, "..", "examples", "agent-adapters", "ollama.mjs"), model: { required: true, hint: "Ollama needs a pulled model name, for example qwen2.5-coder:7b." } },
   ];
 }
 
@@ -368,12 +368,15 @@ export const SETUP_USAGE = [
   "  Use `profile create` when a script or another client supplies the values.",
   "",
   "  Choices use arrows and Enter in a capable terminal; numbered text works everywhere else.",
+  "  In a Git project, the first choices keep the profile local and copy an inspectable reference adapter.",
+  "  Enter accepts the shown adapter destination and the general implementation prompt; it never guesses a model or credential.",
   "  During input: `back` revisits the previous field; `cancel` leaves no change.",
   "  The setup never starts an adapter, contacts a provider or asks for a secret value.",
 ].join("\n");
 
 const BACK = Symbol("back");
 const CANCEL = Symbol("cancel");
+const DEFAULT_GENERALIST_PROMPT = "Implement the task with evidence.";
 
 function setupAnswer(value, fallback = "") {
   if (value === null || value === undefined) return CANCEL;
@@ -407,7 +410,7 @@ export async function setupProfileConversation(io, env = process.env, actions = 
   const projectRoot = actions.projectRoot || null;
   const fields = [
     { key: "name", label: "Name this reusable profile (lowercase slug, e.g. codex-reviewer)", required: true },
-    { key: "prompt", label: "What should this agent be responsible for? (e.g. Review changes and report evidence)", required: true },
+    { key: "prompt", label: "What should this agent be responsible for? (Enter for a general implementation prompt)", required: true },
     { key: "model", label: "Model identifier (optional; passed to the adapter, e.g. claude-sonnet)", required: false },
     { key: "effort", label: "Reasoning effort (optional; passed to the adapter, e.g. high)", required: false },
     { key: "secret_env", label: "Credential variable names (optional; names only, e.g. ANTHROPIC_API_KEY)", required: false },
@@ -429,16 +432,16 @@ export async function setupProfileConversation(io, env = process.env, actions = 
   let scopeRoot = null;
   if (projectRoot) {
     const scope = await setupChoice(io, "Where should this agent be available?", [
-      { label: "Every project on this machine", hint: "Recommended for a reusable personal agent.", value: "global" },
-      { label: "Only this Git project", hint: "Keeps its adapter, model, prompt and routing private to this repository.", value: "project" },
+      { label: "Only this Git project", hint: "Recommended: keeps its adapter, model, prompt and routing private here.", value: "project" },
+      { label: "Every project on this machine", hint: "Choose this for a deliberately reusable personal agent.", value: "global" },
     ]);
     if (scope === CANCEL) return { ok: false, kind: "cancelled" };
     scopeRoot = scope === "project" ? projectRoot : null;
   }
   io.write("\nChoose how Branchling will start this agent. The adapter translates this profile to a provider CLI or API wrapper.\n");
   let sourceChoice = await setupChoice(io, "How should Branchling start this agent?", [
-    { label: "Use my own Branchling adapter", hint: "Advanced: only if you already created an adapter wrapper.", value: "1" },
-    { label: "Copy a shipped reference adapter", hint: "Recommended: start from a local example you can inspect and adapt.", value: "2" },
+    { label: "Copy a shipped reference adapter", hint: "Recommended: start from a local example you can inspect and adapt.", value: "reference" },
+    { label: "Use my own Branchling adapter", hint: "Advanced: only if you already created an adapter wrapper.", value: "custom" },
   ], true);
   if (sourceChoice === CANCEL) return { ok: false, kind: "cancelled" };
   if (sourceChoice === BACK) {
@@ -446,28 +449,45 @@ export async function setupProfileConversation(io, env = process.env, actions = 
     if (answer === CANCEL || answer === BACK || !answer) return { ok: false, kind: "cancelled" };
     state.name = answer;
     sourceChoice = await setupChoice(io, "How should Branchling start this agent?", [
-      { label: "Use my own Branchling adapter", hint: "Advanced: only if you already created an adapter wrapper.", value: "1" },
-      { label: "Copy a shipped reference adapter", hint: "Recommended: start from a local example you can inspect and adapt.", value: "2" },
+      { label: "Copy a shipped reference adapter", hint: "Recommended: start from a local example you can inspect and adapt.", value: "reference" },
+      { label: "Use my own Branchling adapter", hint: "Advanced: only if you already created an adapter wrapper.", value: "custom" },
     ], true);
   }
   if (sourceChoice === CANCEL || sourceChoice === BACK) return { ok: false, kind: "cancelled" };
   let reference = null;
-  if (sourceChoice === "1") {
+  if (sourceChoice === "custom") {
     io.write("Enter the path to your executable Branchling adapter wrapper. This is not `claude` and not a model name. Example: /Users/you/bin/my-agent-adapter.mjs\n");
     const adapter = setupAnswer(await io.ask("Path to your adapter executable: "));
     if (adapter === CANCEL || adapter === BACK || !adapter) return { ok: false, kind: "cancelled" };
     state.adapter = adapter;
-  } else if (sourceChoice === "2") {
+  } else if (sourceChoice === "reference") {
     const templates = referenceAdapterTemplates();
-    const selected = await setupChoice(io, "Which reference adapter should be copied?", templates.map((template, index) => ({ label: template.label, hint: "Copied locally; it does not contact the provider now.", value: String(index + 1) })));
-    if (selected === CANCEL || selected === BACK || !templates[Number(selected) - 1]) return { ok: false, kind: "cancelled" };
-    const template = templates[Number(selected) - 1];
-    const suggestedDestination = suggestedReferenceAdapterDestination(template, env, scopeRoot);
-    io.write("Recommended: " + suggestedDestination + " keeps this editable adapter with " + (scopeRoot ? "this project's local configuration" : "your local profiles") + ". Press Enter to use it, or provide another path.\n");
-    const destination = setupAnswer(await io.ask("Copy destination [" + suggestedDestination + "]: "), suggestedDestination);
-    if (destination === CANCEL || destination === BACK || !destination) return { ok: false, kind: "cancelled" };
-    reference = { template, destination };
-    state.adapter = resolve(destination);
+    while (!reference) {
+      const selected = await setupChoice(io, "Which reference adapter should be copied?", templates.map((template, index) => ({ label: template.label, hint: "Copied locally; it does not contact the provider now.", value: String(index + 1) })), true);
+      if (selected === CANCEL) return { ok: false, kind: "cancelled" };
+      if (selected === BACK) {
+        const alternative = await setupChoice(io, "How should Branchling start this agent?", [
+          { label: "Copy a shipped reference adapter", hint: "Recommended: start from a local example you can inspect and adapt.", value: "reference" },
+          { label: "Use my own Branchling adapter", hint: "Advanced: only if you already created an adapter wrapper.", value: "custom" },
+        ], true);
+        if (alternative === CANCEL || alternative === BACK) return { ok: false, kind: "cancelled" };
+        if (alternative === "reference") continue;
+        io.write("Enter the path to your executable Branchling adapter wrapper. This is not `claude` and not a model name. Example: /Users/you/bin/my-agent-adapter.mjs\n");
+        const adapter = setupAnswer(await io.ask("Path to your adapter executable: "));
+        if (adapter === CANCEL || adapter === BACK || !adapter) return { ok: false, kind: "cancelled" };
+        state.adapter = adapter;
+        break;
+      }
+      const template = templates[Number(selected) - 1];
+      if (!template) { io.write("Choose one of the listed reference adapters. Nothing was written.\n"); continue; }
+      const suggestedDestination = suggestedReferenceAdapterDestination(template, env, scopeRoot);
+      io.write("Recommended: " + suggestedDestination + " keeps this editable adapter with " + (scopeRoot ? "this project's local configuration" : "your local profiles") + ". Press Enter to use it, or provide another path.\n");
+      const destination = setupAnswer(await io.ask("Copy destination [" + suggestedDestination + "]: "), suggestedDestination);
+      if (destination === CANCEL) return { ok: false, kind: "cancelled" };
+      if (destination === BACK) continue;
+      reference = { template, destination };
+      state.adapter = resolve(destination);
+    }
   } else {
     io.write("Choose 1 or 2. Nothing was written.\n");
     return { ok: false, kind: "cancelled" };
@@ -476,19 +496,23 @@ export async function setupProfileConversation(io, env = process.env, actions = 
   while (index < fields.length) {
     const field = fields[index];
     const current = state[field.key] || "";
-    const suffix = current ? ` [${current}]` : "";
-    const answer = setupAnswer(await io.ask(field.label + suffix + ": "), current);
+    const modelRequirement = field.key === "model" && reference && reference.template.model;
+    const fallback = field.key === "prompt" ? (current || DEFAULT_GENERALIST_PROMPT) : current;
+    const suffix = current ? ` [${current}]` : field.key === "prompt" ? ` [${DEFAULT_GENERALIST_PROMPT}]` : "";
+    if (modelRequirement) io.write(modelRequirement.hint + "\n");
+    const answer = setupAnswer(await io.ask((modelRequirement ? "Model identifier (required for this adapter)" : field.label) + suffix + ": "), fallback);
     if (answer === CANCEL) return { ok: false, kind: "cancelled" };
     if (answer === BACK) { if (index > 1) index--; continue; }
-    if (field.required && !answer) { io.write(field.label + " is required.\n"); continue; }
+    if ((field.required || modelRequirement) && !answer) { io.write((modelRequirement ? "A model identifier" : field.label) + " is required.\n"); continue; }
     state[field.key] = answer;
     index++;
   }
   const secret = state.secret_env ? "\n  credential variables: " + state.secret_env : "";
   const source = reference ? "reference " + reference.template.label + " -> " + state.adapter : "custom executable";
+  const scope = scopeRoot ? "this Git project" : "every project on this machine";
   io.write("\nProfile summary:\n  name: " + state.name + "\n  adapter: " + state.adapter
     + "\n  model: " + (state.model || "(none)") + "\n  effort: " + (state.effort || "(none)")
-    + secret + "\n  source: " + source + "\n\n");
+    + secret + "\n  scope: " + scope + "\n  source: " + source + "\n\n");
   const confirmation = await setupChoice(io, "Create this profile", [
     { label: "Create profile", value: "1" }, { label: "Back", value: "2" }, { label: "Cancel", value: "3" },
   ]);
@@ -497,10 +521,12 @@ export async function setupProfileConversation(io, env = process.env, actions = 
     index = fields.length - 1;
     while (index < fields.length) {
       const field = fields[index];
-      const answer = setupAnswer(await io.ask(field.label + " [" + (state[field.key] || "") + "]: "), state[field.key] || "");
+      const modelRequirement = field.key === "model" && reference && reference.template.model;
+      const fallback = field.key === "prompt" ? (state[field.key] || DEFAULT_GENERALIST_PROMPT) : state[field.key] || "";
+      const answer = setupAnswer(await io.ask((modelRequirement ? "Model identifier (required for this adapter)" : field.label) + " [" + fallback + "]: "), fallback);
       if (answer === CANCEL) return { ok: false, kind: "cancelled" };
       if (answer === BACK) { if (index) index--; continue; }
-      if (field.required && !answer) { io.write(field.label + " is required.\n"); continue; }
+      if ((field.required || modelRequirement) && !answer) { io.write((modelRequirement ? "A model identifier" : field.label) + " is required.\n"); continue; }
       state[field.key] = answer;
       index++;
     }

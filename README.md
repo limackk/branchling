@@ -315,6 +315,13 @@ repository's linked worktrees, unavailable in other repositories, and never
 written into `backlog/` or committed. A duplicate global and project profile or
 launch name is refused rather than silently selecting one configuration layer.
 
+Inside a Git project the first choice is project-only and the first adapter
+choice is a copied reference you can inspect. Enter accepts its displayed local
+destination and the starter prompt `Implement the task with evidence.` Model,
+reasoning effort and credential-variable names remain intentionally blank until
+you provide them; the Ollama reference explicitly requires the name of a model
+you have pulled locally.
+
 The flag form remains the right path for scripts, CI and users who already know
 their configuration:
 

@@ -31,7 +31,7 @@ function transcript(answers) {
 
 test("a confirmed guided transcript writes one ordinary profile only at its final confirmation", async () => {
   const fx = fixture();
-  const t = transcript(["generalist", "1", "/opt/agent", "Work from evidence.", "model-x", "high", "TOKEN", "1"]);
+  const t = transcript(["generalist", "2", "/opt/agent", "Work from evidence.", "model-x", "high", "TOKEN", "1"]);
   const result = await setupProfileConversation(t.io, fx.env);
   assert.equal(result.ok, true, JSON.stringify(result));
   const text = readFileSync(agentProfilesPath(fx.env), "utf8");
@@ -55,8 +55,8 @@ test("cancel, EOF and invalid values leave the store byte-for-byte unchanged", a
   const before = readFileSync(path, "utf8");
   for (const answers of [
     ["cancel"],
-    ["generalist", "1", "/opt/agent", "Work", "", "", "", "3"],
-    ["Not A Slug", "1", "/opt/agent", "Work", "", "", "", "1"],
+    ["generalist", "2", "/opt/agent", "Work", "", "", "", "3"],
+    ["Not A Slug", "2", "/opt/agent", "Work", "", "", "", "1"],
     [],
   ]) {
     const result = await setupProfileConversation(transcript(answers).io, fx.env);
@@ -67,7 +67,7 @@ test("cancel, EOF and invalid values leave the store byte-for-byte unchanged", a
 
 test("back revisits a field before the one shared write", async () => {
   const fx = fixture();
-  const t = transcript(["generalist", "1", "/opt/agent", "Work", "model-old", "back", "model-new", "", "", "1"]);
+  const t = transcript(["generalist", "2", "/opt/agent", "Work", "model-old", "back", "model-new", "", "", "1"]);
   const result = await setupProfileConversation(t.io, fx.env);
   assert.equal(result.ok, true, JSON.stringify(result));
   assert.ok(readFileSync(agentProfilesPath(fx.env), "utf8").includes('model: "model-new"'));
@@ -75,7 +75,7 @@ test("back revisits a field before the one shared write", async () => {
 
 test("back from adapter source revisits the profile identity before writing", async () => {
   const fx = fixture();
-  const t = transcript(["first", "3", "second", "1", "/opt/agent", "Work", "", "", "", "1"]);
+  const t = transcript(["first", "3", "second", "2", "/opt/agent", "Work", "", "", "", "1"]);
   const result = await setupProfileConversation(t.io, fx.env);
   assert.equal(result.ok, true, JSON.stringify(result));
   assert.match(readFileSync(agentProfilesPath(fx.env), "utf8"), /name: second/);
@@ -84,7 +84,7 @@ test("back from adapter source revisits the profile identity before writing", as
 test("a shipped reference accepts its user-owned recommended destination without downloading or launching it", async () => {
   const fx = fixture();
   const destination = join(homePaths(fx.env).config, "adapters", "claude-code.mjs");
-  const t = transcript(["generalist", "2", "1", "", "Work", "", "", "", "1"]);
+  const t = transcript(["generalist", "1", "1", "", "Work", "", "", "", "1"]);
   const result = await setupProfileConversation(t.io, fx.env);
   assert.equal(result.ok, true, JSON.stringify(result));
   assert.equal(existsSync(destination), true);
@@ -97,17 +97,53 @@ test("a shipped reference accepts its user-owned recommended destination without
 test("a supplied adapter destination overrides the recommendation", async () => {
   const fx = fixture();
   const destination = join(fx.root, "adapters", "claude.mjs");
-  const t = transcript(["generalist", "2", "1", destination, "Work", "", "", "", "1"]);
+  const t = transcript(["generalist", "1", "1", destination, "Work", "", "", "", "1"]);
   const result = await setupProfileConversation(t.io, fx.env);
   assert.equal(result.ok, true, JSON.stringify(result));
   assert.equal(existsSync(destination), true);
   assert.equal(existsSync(join(homePaths(fx.env).config, "adapters", "claude-code.mjs")), false);
 });
 
+test("the recommended copied path and generalist prompt both accept Enter", async () => {
+  const fx = fixture();
+  const t = transcript(["generalist", "1", "1", "", "", "", "", "", "1"]);
+  const result = await setupProfileConversation(t.io, fx.env);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  const text = readFileSync(agentProfilesPath(fx.env), "utf8");
+  assert.match(text, /prompt: "Implement the task with evidence\."/);
+  assert.match(t.out.join(""), /Copy a shipped reference adapter[\s\S]*Use my own Branchling adapter/);
+});
+
+test("an Ollama reference names and requires its local model", async () => {
+  const fx = fixture();
+  const t = transcript(["local", "1", "4", "", "", "", "qwen2.5-coder:7b", "", "", "1"]);
+  const result = await setupProfileConversation(t.io, fx.env);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.match(readFileSync(agentProfilesPath(fx.env), "utf8"), /model: "qwen2\.5-coder:7b"/);
+  assert.match(t.out.join(""), /Ollama needs a pulled model name/);
+  assert.match(t.out.join(""), /A model identifier is required/);
+});
+
+test("back returns from a reference destination to the adapter list without writing", async () => {
+  const fx = fixture();
+  const t = transcript(["agent", "1", "1", "back", "2", "", "Work", "", "", "", "1"]);
+  const result = await setupProfileConversation(t.io, fx.env);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.match(readFileSync(agentProfilesPath(fx.env), "utf8"), /aider-api\.mjs/);
+});
+
+test("back from the reference list permits choosing a custom adapter", async () => {
+  const fx = fixture();
+  const t = transcript(["agent", "1", "back", "2", "/opt/custom-adapter", "Work", "", "", "", "1"]);
+  const result = await setupProfileConversation(t.io, fx.env);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.match(readFileSync(agentProfilesPath(fx.env), "utf8"), /custom-adapter/);
+});
+
 test("a fleet interview writes one ordinary local launch and cancellation writes neither store", async () => {
   const fx = fixture();
   const adapter = join(fx.root, "adapter"); writeFileSync(adapter, "#!/bin/sh\nexit 0\n", "utf8");
-  const profile = await setupProfileConversation(transcript(["developer", "1", adapter, "Work", "", "", "", "1"]).io, fx.env);
+  const profile = await setupProfileConversation(transcript(["developer", "2", adapter, "Work", "", "", "", "1"]).io, fx.env);
   assert.equal(profile.ok, true);
   const backlog = join(fx.root, "backlog");
   assert.equal(spawnSync(process.execPath, [CLI, "init", "--dir", backlog, "--no-example"], { encoding: "utf8", env: fx.env }).status, 0);

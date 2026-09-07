@@ -37,7 +37,7 @@ test("a project profile keeps every provider setting out of the repository and a
 
 test("guided project setup copies its adapter beside the project profile store", async () => {
   const fx = fixture();
-  const t = transcript(["project-agent", "project", "2", "1", "", "Project work.", "", "", "", "1"]);
+  const t = transcript(["project-agent", "project", "1", "1", "", "Project work.", "", "", "", "1"]);
   const result = await setupProfileConversation(t.io, fx.env, { projectRoot: fx.first });
   assert.equal(result.ok, true, JSON.stringify(result));
   const path = projectAgentProfilesPath(fx.first, fx.env);
