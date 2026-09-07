@@ -6,8 +6,8 @@ labels: [agents, routing]
 board: main
 epic: "Controlled and observable agent execution"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h
@@ -45,7 +45,6 @@ atomic; do not clear an owner when another actor has legitimately taken over.
    semantics.
 3. `scripts/tests/run.test.mjs` — extend the silent-agent regression coverage.
 
-1. `path/to/file` — what to look at there
 
 ## Steps
 
@@ -62,7 +61,7 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] A silent, unchanged agent returns a task with `status: pending` and no
+- [x] A silent, unchanged agent returns a task with `status: pending` and no
       owner. [proof: unmeasured-claim-is-clear]
-- [ ] A claim taken by another actor is never cleared by the stale run.
+- [x] A claim taken by another actor is never cleared by the stale run.
       [proof: unmeasured-claim-is-clear]

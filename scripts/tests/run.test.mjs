@@ -27,7 +27,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -124,6 +124,11 @@ function agentScript(dir, name, body) {
 function statusOf(backlog, id) {
   const file = join(backlog, "tasks", readdirSync(join(backlog, "tasks")).find((f) => f.startsWith(id + "-")));
   return (readFileSync(file, "utf8").match(/^status: ([a-z_]+)/m) || [])[1];
+}
+
+function ownerOf(backlog, id) {
+  const file = join(backlog, "tasks", readdirSync(join(backlog, "tasks")).find((f) => f.startsWith(id + "-")));
+  return (readFileSync(file, "utf8").match(/^owner:\s*(.*)$/m) || [])[1].trim().replace(/^"|"$/g, "");
 }
 
 function history(backlog, id) {
@@ -270,6 +275,25 @@ test("the reservation is given back, so the next run is not locked out", () => {
     cli(["run", "--dir", backlog, "--actor", "agent:worker", "--agent", agent, "--max-attempts", "1"], env, { cwd: repo });
     const held = cli(["take", ids[0], "--dir", backlog, "--actor", "agent:someone-else", "--reason", "looking at why it stuck"], env, { cwd: repo });
     assert.equal(held.status, 0, "the blocked task is still reserved by the run that gave up: " + held.stderr);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("a silent unchanged agent restores both the queue status and the owner", () => {
+  const { dir, repo, backlog, env, ids } = fixture(1);
+  try {
+    // `neverRan` only draws this conclusion when Git can prove the tree stayed
+    // unchanged. A non-repository is deliberately unknown, never evidence.
+    execFileSync("git", ["init", "-q", "-b", "main", "."], { cwd: repo });
+    const agent = agentScript(dir, "silent.sh", "cat > /dev/null");
+    const result = cli(["run", "--dir", backlog, "--actor", "agent:worker", "--agent", agent, "--max-attempts", "1", "--json"], env, { cwd: repo });
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    assert.equal(JSON.parse(result.stdout).tasks[0].outcome, "agent-never-ran");
+    assert.equal(statusOf(backlog, ids[0]), "pending");
+    assert.equal(ownerOf(backlog, ids[0]), "");
+    const taken = cli(["take", ids[0], "--dir", backlog, "--actor", "agent:someone-else", "--reason", "continue work"], env, { cwd: repo });
+    assert.equal(taken.status, 0, taken.stderr);
   } finally {
     cleanup(dir);
   }

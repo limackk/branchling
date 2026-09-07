@@ -732,6 +732,7 @@ export function writeStatus(opts) {
   const now = opts.now || Date.now();
   let text = raw;
   try {
+    if (opts.releaseOwner) text = setFrontmatterField(text, "owner", "", fieldSpec("owner", specs));
     text = setFrontmatterField(text, "status", status, fieldSpec("status", specs));
     text = setFrontmatterField(text, "updated", todayStamp(now));
   } catch (e) {
@@ -1604,7 +1605,7 @@ export function run(argv) {
       const from = String(task.from || "");
       if (from) {
         const given = writeStatus({
-          root, config, id: task.id, actor, status: from, role,
+          root, config, id: task.id, actor, status: from, role, releaseOwner: true,
           // The WHY of this write, which is a fact about the run and not about
           // the task: the agent's output stays in the report and the log, where
           // TL-184 says a fact about the machine belongs.

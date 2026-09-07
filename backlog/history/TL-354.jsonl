@@ -1,1 +1,4 @@
 {"id":"01M1Y3DG5EJ2Z2509HHSGZ0QG4","ts":"2026-09-07T14:12:38.190Z","task":"TL-354","field":"__created__","from":"","to":"An unmeasured run releases its task owner","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1Y8WV1S8CMZP7PSM0QFKKRZ","ts":"2026-09-07T15:48:23.737Z","task":"TL-354","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1Y8WV1SVZ9JRBG0V4CA8APZ","ts":"2026-09-07T15:48:23.737Z","task":"TL-354","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1Y934T6TTV0DKS5NV48ZZ5W","ts":"2026-09-07T15:51:50.342Z","task":"TL-354","field":"status","from":"in_progress","to":"done","actor":"agent:codex","source":"done","reason":"proven","session":"tree-526f61f2043f"}
