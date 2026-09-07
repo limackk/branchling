@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Guided agent setup"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1d
@@ -67,7 +67,7 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] A confirmed fleet interview creates only ordinary profiles and a normal
+- [x] A confirmed fleet interview creates only ordinary profiles and a normal
   local launch, which `run --launch` can consume. [proof: focused-tests]
-- [ ] Cancellation and an invalid role selection leave both local stores
+- [x] Cancellation and an invalid role selection leave both local stores
   unchanged. [proof: focused-tests]

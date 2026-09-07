@@ -22,6 +22,9 @@ import { printJson } from "./json-envelope.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { stripComment, unquote } from "./task-fields.mjs";
 import { failure, heading, table } from "./ui.mjs";
+import { createAgentLaunch } from "./agent-launches.mjs";
+import { loadConfig } from "./config.mjs";
+import { resolveBacklogDir } from "./paths.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -438,6 +441,36 @@ export async function setupProfileConversation(io, env = process.env, actions = 
   }
 }
 
+export async function setupFleetConversation(io, env = process.env, actions = {}) {
+  const resolveBacklog = actions.resolveBacklog || (() => resolveBacklogDir({ moduleDir: HERE }));
+  let root;
+  try { root = resolveBacklog().root; } catch { return { ok: false, kind: "no-backlog", problems: ["fleet setup needs a backlog in the current directory"] }; }
+  let config;
+  try { config = loadConfig(root); } catch (error) { return { ok: false, kind: "invalid-backlog", problems: [error.message] }; }
+  const roles = config.roles || [];
+  const profiles = readAgentProfiles(env);
+  if (!roles.length) return { ok: false, kind: "no-roles", problems: ["this backlog declares no roles"] };
+  if (profiles.problems.length) return { ok: false, kind: "invalid-store", problems: profiles.problems };
+  if (!profiles.profiles.length) return { ok: false, kind: "no-profiles", problems: ["create one profile first with `profile setup`"] };
+  io.write("Create a named specialist fleet. Existing local profiles: " + profiles.profiles.map((p) => p.name).join(", ") + "\n");
+  const name = setupAnswer(await io.ask("Launch name (lowercase slug): "));
+  if (name === CANCEL || name === BACK) return { ok: false, kind: "cancelled" };
+  const profileFor = {};
+  for (const role of roles) {
+    const selected = setupAnswer(await io.ask("Profile for role `" + role + "` (blank skips it): "));
+    if (selected === CANCEL || selected === BACK) return { ok: false, kind: "cancelled" };
+    if (selected && !profiles.profiles.some((p) => p.name === selected)) return { ok: false, kind: "missing-profile", problems: ["no local profile `" + selected + "`"] };
+    if (selected) profileFor[role] = selected;
+  }
+  const generalist = setupAnswer(await io.ask("Generalist profile (blank for none): "));
+  if (generalist === CANCEL || generalist === BACK) return { ok: false, kind: "cancelled" };
+  if (generalist && !profiles.profiles.some((p) => p.name === generalist)) return { ok: false, kind: "missing-profile", problems: ["no local profile `" + generalist + "`"] };
+  io.write("\nFleet summary:\n  name: " + name + "\n  generalist: " + (generalist || "(none)") + "\n  roles: " + Object.entries(profileFor).map(([r, p]) => r + "=" + p).join(", ") + "\n");
+  const confirm = setupAnswer(await io.ask("Create launch? [1=create, 3=cancel]: "));
+  if (confirm === CANCEL || confirm === "3" || confirm !== "1") return { ok: false, kind: "cancelled" };
+  return createAgentLaunch(name, generalist, profileFor, env);
+}
+
 async function runSetup(env = process.env, input = process.stdin, output = process.stdout) {
   if (!input.isTTY || !output.isTTY) {
     console.error(failure(N + " profile setup", "interactive setup needs a terminal", ["Use `" + N + " profile create <name> …` from a script or pipe."]));
@@ -446,10 +479,13 @@ async function runSetup(env = process.env, input = process.stdin, output = proce
   const terminal = createInterface({ input, output, terminal: true });
   const io = { ask: (question) => terminal.question(question), write: (text) => output.write(text) };
   try {
-    const result = await setupProfileConversation(io, env);
+    output.write("Configure: 1) one generalist profile  2) a specialist fleet\n");
+    const mode = setupAnswer(await io.ask("Choice [1/2]: "));
+    if (mode === CANCEL) { output.write("No configuration was created.\n"); return 0; }
+    const result = mode === "2" ? await setupFleetConversation(io, env) : mode === "1" ? await setupProfileConversation(io, env) : { ok: false, kind: "cancelled" };
     if (!result.ok) { output.write("No profile was created.\n"); return result.kind === "cancelled" ? 0 : 1; }
-    output.write("✓ profile `" + result.profile.name + "` created — " + result.path + "\n");
-    output.write("Next: `" + N + " profile check " + result.profile.name + "`, then `" + N + " run --profile " + result.profile.name + " --dry-run`.\n");
+    if (mode === "2") { output.write("✓ launch `" + result.launch.name + "` created — " + result.path + "\n"); output.write("Next: `" + N + " run --launch " + result.launch.name + " --dry-run`.\n"); }
+    else { output.write("✓ profile `" + result.profile.name + "` created — " + result.path + "\n"); output.write("Next: `" + N + " profile check " + result.profile.name + "`, then `" + N + " run --profile " + result.profile.name + " --dry-run`.\n"); }
     return 0;
   } catch (error) {
     console.error(failure(N + " profile setup", "setup stopped before writing", [error.message]));

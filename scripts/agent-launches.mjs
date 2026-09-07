@@ -2,12 +2,13 @@
 /** Local named compositions of provider-neutral profiles (TL-315). */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { agentLaunchesPath, ensureHome } from "./home.mjs";
-import { PROFILE_NAME_SHAPE, readAgentProfiles } from "./agent-profiles.mjs";
+import { readAgentProfiles } from "./agent-profiles.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { failure, heading, table } from "./ui.mjs";
 
 export const LAUNCH_FIELDS = ["name", "profile", "profile_for"];
+const LAUNCH_NAME_SHAPE = /^[a-z0-9][a-z0-9._-]{0,62}$/;
 export function parseAgentLaunches(text) {
   const launches = []; let current = null; const problems = []; const seen = new Set();
   for (const [i, raw] of String(text || "").split(/\r?\n/).entries()) {
@@ -21,7 +22,7 @@ export function parseAgentLaunches(text) {
   }
   if (current) launches.push(current);
   for (const launch of launches) {
-    if (!PROFILE_NAME_SHAPE.test(launch.name || "")) problems.push("launch name must be a lowercase slug");
+    if (!LAUNCH_NAME_SHAPE.test(launch.name || "")) problems.push("launch name must be a lowercase slug");
     if (seen.has(launch.name)) problems.push("duplicate launch `" + launch.name + "`");
     seen.add(launch.name);
     for (const pair of String(launch.profile_for || "").split(",").filter(Boolean)) if (!/^[a-z0-9._-]+=[a-z0-9._-]+$/.test(pair)) problems.push("launch `" + launch.name + "` profile_for must be role=profile pairs");
@@ -41,6 +42,16 @@ export function resolveAgentLaunch(name, env = process.env) {
   const missing = names.filter((name) => !profiles.profiles.some((p) => p.name === name));
   if (missing.length) return { ok: false, kind: "missing-profile", store, missing };
   return { ok: true, launch: { name, profile: launch.profile || null, profileFor }, store };
+}
+export function createAgentLaunch(name, profile, profileFor, env = process.env) {
+  const store = readAgentLaunches(env);
+  if (store.problems.length) return { ok: false, kind: "invalid-store", store };
+  if (store.launches.some((l) => l.name === name)) return { ok: false, kind: "duplicate", store };
+  const launch = { name, profile: profile || "", profile_for: Object.entries(profileFor || {}).map(([role, selected]) => role + "=" + selected).join(",") };
+  const parsed = parseAgentLaunches(serializeAgentLaunches(store.launches.concat(launch)));
+  if (parsed.problems.length) return { ok: false, kind: "invalid-launch", problems: parsed.problems };
+  ensureHome(env); writeFileSync(store.path, serializeAgentLaunches(parsed.launches), "utf8");
+  return { ok: true, path: store.path, launch };
 }
 const USAGE = `${N} launch <list|show|create|update|remove> [name] [--profile <name>] [--profile-for <role=profile>] [--json]`;
 export function run(argv, env = process.env) {
