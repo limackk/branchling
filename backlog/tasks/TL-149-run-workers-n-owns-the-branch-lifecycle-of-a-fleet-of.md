@@ -11,7 +11,7 @@ owner: unassigned
 estimate: 1w                       # 30m | 2h | 1d | 1w | 1mo
 created: 2026-09-02
 updated: 2026-09-02
-blocked_by: [TL-293, TL-295]
+blocked_by: [TL-293, TL-295, TL-362]
 blocks: []
 related_docs: ["docs/branchling-state-and-sync.md"]
 verification:                      # HOW to check that the task is really done

@@ -8,7 +8,7 @@
 # one is the first arc RUN BY that loop, and its every task is picked so an
 # unattended session can close it.
 updated: 2026-09-07
-rationale: "The unattended loop is proven. The next arc makes agent execution provider-neutral: repair control-plane writes first, separate project roles from user profiles, freeze one safe adapter contract, implement local execution paths and preflight without provider use, then add API harnesses, copyable references and onboarding before managed fleets consume the stable surface."
+rationale: "Provider-neutral routes now exist. Before managed fleet parallelism, repair the execution gaps found by a real routed run, declare one orchestration authority, constrain workers to their assigned task, supervise every process asynchronously, expose detached control and honest live status, then teach that boundary in setup. TL-149 consumes the proven surface instead of defining it inside fleet machinery."
 waves:
   - name: "The loop may be trusted unattended"
     tasks: [TL-191, TL-190, TL-184, TL-185, TL-192]
@@ -210,6 +210,47 @@ waves:
   # Onboarding is the integration gate: it documents only profiles, adapters, checks and routes already proven by earlier waves.
   - name: "A mixed-provider setup works in five minutes"
     tasks: [TL-293]
+
+  # These are measured failures from the first real role-routed run. Fixing
+  # them before the supervisor changes the process boundary keeps new state
+  # machinery from preserving classifications already known to be wrong.
+  - name: "The current loop returns claims honestly"
+    tasks: [TL-242, TL-352, TL-353, TL-354]
+
+  # The execution contract first names which layer may delegate. Every scope,
+  # adapter capability and receipt below depends on this vocabulary.
+  - name: "One run names the orchestration authority"
+    tasks: [TL-355]
+
+  # Task scope and provider mappings enforce the same authority independently:
+  # one protects Branchling's queue, the other reports what the harness can do.
+  - name: "Workers and adapters honor the boundary"
+    tasks: [TL-356, TL-361]
+
+  # Operational state is local and replaceable, but it must exist before an
+  # asynchronous process has anywhere safe to publish its phase.
+  - name: "Each attempt leaves a local execution record"
+    tasks: [TL-357]
+
+  # Replace the blocking process boundary only after its durable state and
+  # terminal meanings are fixed.
+  - name: "The supervisor observes work while it runs"
+    tasks: [TL-358]
+
+  # A detached process is useful only when the caller can inspect, wait and
+  # cancel it through one stable run identity.
+  - name: "A caller keeps control of detached work"
+    tasks: [TL-359]
+
+  # Human-readable live status consumes supervisor facts; it never guesses
+  # productivity from a task timestamp or a PID.
+  - name: "Watch tells liveness from progress"
+    tasks: [TL-360]
+
+  # The guided and scripted paths are documented last, against behavior the
+  # earlier waves have already proved.
+  - name: "Setup teaches the safe orchestration path"
+    tasks: [TL-362]
 
   # Parallel worktree lifecycle follows the provider-neutral single-agent loop and its onboarding instead of defining those contracts inside fleet machinery.
   - name: "Managed fleets consume the stable execution surface"

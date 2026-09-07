@@ -4,7 +4,7 @@ title: "Profile adapter stderr proves an agent ran"
 type: bug
 labels: [agents, routing]
 board: main
-epic: ""                           # free text — the group this task counts towards
+epic: "Controlled and observable agent execution"
 priority: P1
 status: pending                    # pending | in_progress | blocked | done | cancelled
 owner: unassigned
@@ -15,7 +15,7 @@ confidence: medium                 # how much you trust the estimate
 created: 2026-09-07
 updated: 2026-09-07
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
-blocks: []                         # ids this task will unblock
+blocks: [TL-355]                   # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
 verification:                      # HOW to check the task is really done
   - id: profile-output-counts
