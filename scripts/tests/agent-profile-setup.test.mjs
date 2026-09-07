@@ -113,4 +113,5 @@ test("guided setup help is readable without opening an interactive session", () 
   const help = spawnSync(process.execPath, [CLI, "profile", "setup", "--help"], { encoding: "utf8", env: fx.env });
   assert.equal(help.status, 0, help.stderr);
   assert.match(help.stdout, /creates one local agent profile/);
+  assert.match(help.stdout, /Arrow keys and Enter/);
 });

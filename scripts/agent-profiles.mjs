@@ -327,6 +327,7 @@ export const SETUP_USAGE = [
   "  It requires an interactive terminal and writes only after a final confirmation.",
   "  Use `profile create` when a script or another client supplies the values.",
   "",
+  "  Choices use arrows and Enter in a capable terminal; numbered text works everywhere else.",
   "  During input: `back` revisits the previous field; `cancel` leaves no change.",
   "  The setup never starts an adapter, contacts a provider or asks for a secret value.",
 ].join("\n");

@@ -26,6 +26,20 @@ test("text fallback preserves numbered input and never enables raw mode", async 
   assert.equal(interactiveAllowed({ isTTY: true }, { isTTY: true }, { TERM: "dumb" }), false);
 });
 
+test("cancel and invalid text remain explicit results for accessible callers", async () => {
+  const options = [{ label: "Create profile", value: "1" }, { label: "Cancel", value: "3" }];
+  const cancelled = await selectChoice("Create", options, {
+    input: { isTTY: false }, output: { isTTY: false }, env: {}, ask: async () => "cancel",
+  });
+  assert.deepEqual(cancelled, { ok: false, value: "cancel", mode: "text" });
+  const input = { isTTY: true, calls: [], setRawMode(value) { this.calls.push(value); } };
+  const noColor = await selectChoice("Create", options, {
+    input, output: { isTTY: true }, env: { NO_COLOR: "1" }, ask: async () => "1",
+  });
+  assert.equal(noColor.mode, "text");
+  assert.deepEqual(input.calls, []);
+});
+
 test("raw mode is restored after selection and cancellation", async () => {
   class Input extends EventEmitter {
     constructor() { super(); this.isTTY = true; this.raw = []; this.paused = false; }

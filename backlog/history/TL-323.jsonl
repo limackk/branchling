@@ -1,0 +1,5 @@
+{"id":"01M1X9S6WM7QJQD3833MKCGZ2P","ts":"2026-09-07T06:44:38.932Z","task":"TL-323","field":"__created__","from":"","to":"Terminal interaction preserves automation and accessibility","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XAEN58GGXTSAMNWBEX8SK7","ts":"2026-09-07T06:56:21.672Z","task":"TL-323","field":"blocked_by","from":[],"to":["TL-321","TL-322"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1XAQ401Z6P524FJ836W9H4F","ts":"2026-09-07T07:00:59.009Z","task":"TL-323","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XAQ4011VXZG7ZCK6B09029","ts":"2026-09-07T07:00:59.009Z","task":"TL-323","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XATCHXPD635T6B5RVT2XRG","ts":"2026-09-07T07:02:46.077Z","task":"TL-323","field":"status","from":"in_progress","to":"done","actor":"agent:codex","source":"done","reason":"proven","session":"tree-526f61f2043f"}
