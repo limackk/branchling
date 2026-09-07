@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Controlled and observable agent execution"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1d
@@ -19,7 +19,7 @@ blocks: [TL-358]                   # ids this task will unblock
 related_docs: [scripts/activity.mjs, scripts/lock.mjs, scripts/run-loop.mjs]
 verification:                      # HOW to check the task is really done
   - id: execution-record
-    bash: "node --test scripts/tests/run.test.mjs scripts/tests/run-agent-profiles.test.mjs scripts/tests/session-report.test.mjs"
+    bash: "node --test scripts/tests/run.test.mjs scripts/tests/run-agent-profiles.test.mjs scripts/tests/session-report.test.mjs scripts/tests/execution-records.test.mjs"
 ---
 
 ## Goal
@@ -61,11 +61,11 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] A reader can observe each run leg and attempt before it finishes and after
+- [x] A reader can observe each run leg and attempt before it finishes and after
       it exits. [proof: execution-record]
-- [ ] Retries and role handoffs have distinct records and stable parent run
+- [x] Retries and role handoffs have distinct records and stable parent run
       identity. [proof: execution-record]
-- [ ] Records live outside the repository and contain no prompt, secret or
+- [x] Records live outside the repository and contain no prompt, secret or
       personal adapter path. [proof: execution-record]
-- [ ] An interrupted write never produces a plausible partial record.
+- [x] An interrupted write never produces a plausible partial record.
       [proof: execution-record]

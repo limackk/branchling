@@ -82,6 +82,7 @@ import { resolveActor } from "./actor.mjs";
 import { checkAgentProfiles, resolveAgentProfile, secretEnvironmentNames } from "./agent-profiles.mjs";
 import { DELEGATION_ENFORCEMENT, DELEGATION_POLICIES, executionReceipt } from "./agent-contract.mjs";
 import { createWorkerScope, releaseWorkerScope, WORKER_SCOPE_ENV } from "./worker-scope.mjs";
+import { startAttemptRecord, startRunRecord, updateAttemptRecord, updateRunRecord } from "./execution-records.mjs";
 import { appendActivity } from "./activity.mjs";
 import { resolveAgentLaunch } from "./agent-launches.mjs";
 import { loadConfigOrExit } from "./config.mjs";
@@ -986,7 +987,11 @@ function workOne(ctx, task) {
   let failure = "";
   let attempts = 0;
   const provenance = [];
-  const result = (fields) => ({ ...fields, provenance });
+  let executionAttempt = null;
+  const result = (fields) => {
+    if (executionAttempt) updateAttemptRecord(ctx.root, executionAttempt, { phase: "finished", outcome: fields.outcome });
+    return { ...fields, provenance };
+  };
   const started = Date.now();
   // Take the contract's state before the hand starts. `done` stops at its first
   // red entry, while a probe records every entry so a later suite red can be
@@ -1009,6 +1014,8 @@ function workOne(ctx, task) {
       : task.hand.profile.adapter;
     const receipt = attemptProvenance(task, attempt);
     provenance.push(receipt);
+    executionAttempt = startAttemptRecord({ root: ctx.root, run: ctx.execution, task, attempt });
+    updateAttemptRecord(ctx.root, executionAttempt, { phase: "running" });
     appendFileSync(logPath, "=== attempt " + attempt + ": " + command + "\n", "utf8");
     appendFileSync(logPath, "=== provenance: " + JSON.stringify(receipt) + "\n", "utf8");
     const workerScope = createWorkerScope({ root: ctx.root, taskId: task.id, actor: ctx.actor,
@@ -1052,6 +1059,7 @@ function workOne(ctx, task) {
       feedback = "the agent was killed after " + ctx.plan.timeout + "s (`--timeout`)";
       feedbackRan = false;
       failure = feedback;
+      updateAttemptRecord(ctx.root, executionAttempt, { phase: "retrying", outcome: "timeout" });
       continue;
     }
 
@@ -1120,6 +1128,7 @@ function workOne(ctx, task) {
     // The closing entry names the stage, not just the hand (TL-222). Only when
     // the task asked for a role: passing "" would be a role nobody declared.
     if (task.role) doneArgs.push("--role", task.role);
+    updateAttemptRecord(ctx.root, executionAttempt, { phase: "verifying" });
     const closing = cli(doneArgs);
     appendFileSync(logPath, "\n=== done: exit " + closing.status + "\n" + (closing.stderr || ""), "utf8");
     if (closing.status === 0) {
@@ -1539,7 +1548,7 @@ export function run(argv) {
   // directory is this repository" would show up as an agent writing its result
   // where the verification does not look.
   const cwd = repoRootFor(root);
-  const ctx = { root, config, actor, cwd, plan };
+  const ctx = { root, config, actor, cwd, plan, execution: startRunRecord({ root, actor, delegation: plan.delegation }) };
 
   // Where a task whose contract ends in a `manual:` entry is parked (TL-212).
   // Null when this backlog has not declared one, and then nothing changes: such
@@ -1767,6 +1776,7 @@ export function run(argv) {
   const waitingSize = waitingForSize(leftover, config, callerSpecies(actor));
 
   const shared = sharedStatePaths();
+  updateRunRecord(root, ctx.execution, { phase: "finished", outcome: neverStarted ? "agent-never-ran" : "finished" });
   const report = {
     taken, tally, ms: Date.now() - started, stopped, waiting, waitingExecutor, waitingSize,
     maxUnattendedEstimate: config.maxUnattendedEstimate, neverStarted, shared,
