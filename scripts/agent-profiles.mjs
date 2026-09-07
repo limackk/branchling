@@ -506,6 +506,18 @@ export function setupFailureMessage(result) {
   return { problem: problem || "Setup could not be completed.", next: "Nothing was written. Review the message above and try again." };
 }
 
+/** Fleet routing is meaningful only after at least one local profile exists. */
+export function setupModes(profiles) {
+  const modes = [{ label: "One agent for general work", hint: "Recommended first setup. Use it for any task.", value: "1" }];
+  if (profiles && profiles.length) modes.push({ label: "A specialist fleet", hint: "Advanced: route repository roles to different profiles.", value: "2" });
+  return modes;
+}
+
+function fleetRolesAvailable() {
+  try { return (loadConfig(resolveBacklogDir({ moduleDir: HERE }).root).roles || []).length > 0; }
+  catch { return false; }
+}
+
 async function runSetup(env = process.env, input = process.stdin, output = process.stdout) {
   if (!input.isTTY || !output.isTTY) {
     console.error(failure(N + " profile setup", "interactive setup needs a terminal", ["Use `" + N + " profile create <name> …` from a script or pipe."]));
@@ -524,10 +536,10 @@ async function runSetup(env = process.env, input = process.stdin, output = proce
   };
   try {
     clack.intro("Configure " + N);
-    const mode = await setupChoice(io, "What do you want to configure?", [
-      { label: "One agent for general work", hint: "Recommended first setup. Use it for any task.", value: "1" },
-      { label: "A specialist fleet", hint: "Advanced: route repository roles to different profiles.", value: "2" },
-    ]);
+    const modes = setupModes(readAgentProfiles(env).profiles);
+    const firstProfile = modes.length === 1;
+    if (modes.length === 1) clack.note("Specialist fleets become available after you create at least one local agent profile.", "First setup");
+    const mode = await setupChoice(io, "What do you want to configure?", modes);
     if (mode === CANCEL) { clack.cancel("No configuration was created."); return 0; }
     const result = mode === "2" ? await setupFleetConversation(io, env) : mode === "1" ? await setupProfileConversation(io, env) : { ok: false, kind: "cancelled" };
     if (!result.ok) {
@@ -538,7 +550,14 @@ async function runSetup(env = process.env, input = process.stdin, output = proce
       return 1;
     }
     if (mode === "2") clack.outro("Launch `" + result.launch.name + "` created. Next: `" + N + " run --launch " + result.launch.name + " --dry-run`.");
-    else clack.outro("Profile `" + result.profile.name + "` created. Next: `" + N + " profile check " + result.profile.name + "`.");
+    else if (firstProfile && fleetRolesAvailable()) {
+      const addFleet = await clack.confirm({ message: "Your general agent is ready. Configure specialist fleet routing now?", initialValue: false });
+      if (addFleet === true) {
+        const fleet = await setupFleetConversation(io, env);
+        if (fleet.ok) clack.outro("Profile and launch `" + fleet.launch.name + "` created.");
+        else clack.outro("Profile `" + result.profile.name + "` created. Fleet routing was not created.");
+      } else clack.outro("Profile `" + result.profile.name + "` created. Next: `" + N + " profile check " + result.profile.name + "`.");
+    } else clack.outro("Profile `" + result.profile.name + "` created. Next: `" + N + " profile check " + result.profile.name + "`.");
     return 0;
   } catch (error) {
     console.error(failure(N + " profile setup", "setup stopped before writing", [error.message]));

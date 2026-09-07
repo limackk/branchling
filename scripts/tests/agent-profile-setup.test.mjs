@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { agentProfilesPath, HOME_ENV } from "../home.mjs";
-import { parseAgentProfiles, setupFailureMessage, setupFleetConversation, setupProfileConversation } from "../agent-profiles.mjs";
+import { parseAgentProfiles, setupFailureMessage, setupFleetConversation, setupModes, setupProfileConversation } from "../agent-profiles.mjs";
 import { SCRIPTS_DIR } from "./_repo.mjs";
 
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
@@ -127,4 +127,9 @@ test("fleet prerequisites name the missing thing and the next command", () => {
   const profiles = setupFailureMessage({ kind: "no-profiles", problems: ["create one profile first"] });
   assert.match(profiles.problem, /profile/i);
   assert.match(profiles.next, /profile setup/);
+});
+
+test("first setup offers general work before specialist fleet routing", () => {
+  assert.deepEqual(setupModes([]).map((mode) => mode.value), ["1"]);
+  assert.deepEqual(setupModes([{ name: "generalist" }]).map((mode) => mode.value), ["1", "2"]);
 });
