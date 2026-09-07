@@ -91,7 +91,7 @@ test("a shipped reference accepts its user-owned recommended destination without
   assert.match(readFileSync(destination, "utf8"), /Claude Code/);
   assert.match(readFileSync(agentProfilesPath(fx.env), "utf8"), new RegExp(destination.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.match(t.out.join(""), /Recommended:/);
-  assert.match(t.out.join(""), /project-specific path/);
+  assert.match(t.out.join(""), /provide another path/);
 });
 
 test("a supplied adapter destination overrides the recommendation", async () => {
@@ -116,7 +116,7 @@ test("a fleet interview writes one ordinary local launch and cancellation writes
   const cancelled = await setupFleetConversation(transcript(["cancel"]).io, fx.env, { resolveBacklog: () => ({ root: backlog }) });
   assert.equal(cancelled.ok, false);
   assert.equal(readFileSync(agentProfilesPath(fx.env), "utf8"), beforeProfiles);
-  const created = await setupFleetConversation(transcript(["team", "developer", "", "1"]).io, fx.env, { resolveBacklog: () => ({ root: backlog }) });
+  const created = await setupFleetConversation(transcript(["team", "project", "developer", "", "1"]).io, fx.env, { resolveBacklog: () => ({ root: backlog }) });
   assert.equal(created.ok, true, JSON.stringify(created));
   assert.equal(created.launch.profile_for, "dev=developer");
 });

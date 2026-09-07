@@ -1196,7 +1196,7 @@ export function run(argv) {
       console.error(failure(N + " run", "`--launch` is a complete routing choice", ["Do not combine it with --agent, --profile, --agent-for or --profile-for."]));
       return 2;
     }
-    const launch = resolveAgentLaunch(plan.launch);
+    const launch = resolveAgentLaunch(plan.launch, process.env, root);
     if (!launch.ok) {
       const detail = launch.kind === "missing-profile" ? ["launch references missing profile(s): " + launch.missing.join(", ")] : ["Run `" + N + " launch list` to see local names."];
       console.error(failure(N + " run", "cannot use launch `" + plan.launch + "`", detail));
@@ -1225,7 +1225,7 @@ export function run(argv) {
   const profileNames = [...new Set([plan.profile].concat(Object.values(plan.profileFor || {})).filter(Boolean))];
   plan.profiles = {};
   for (const name of profileNames) {
-    const resolved = resolveAgentProfile(name);
+    const resolved = resolveAgentProfile(name, process.env, root);
     if (!resolved.ok) {
       const details = resolved.kind === "invalid-store"
         ? [resolved.store.path, ...(resolved.store.problems || [])]
@@ -1235,7 +1235,7 @@ export function run(argv) {
     }
     plan.profiles[name] = resolved.profile;
   }
-  const profileCheck = checkAgentProfiles(profileNames);
+  const profileCheck = checkAgentProfiles(profileNames, process.env, root);
   if (!profileCheck.ok) {
     const details = profileCheck.results.flatMap((row) => (row.problems || []).map((problem) => (row.name ? row.name + ": " : "") + problem));
     console.error(failure(N + " run", "selected profile setup is not ready", details, [N + " profile check"]));

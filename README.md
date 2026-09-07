@@ -307,6 +307,14 @@ may point it at any executable you control, or copy a versioned reference
 adapter that ships with the package. The guide never downloads code, starts an
 adapter, probes a provider or asks for a credential value.
 
+During setup, choose whether the agent is available on this machine everywhere
+or only in the current Git project. A project-only choice keeps its adapter,
+model, effort, prompt, credential-variable names and fleet routing in your
+local user configuration, keyed by Git's common directory. It is shared by that
+repository's linked worktrees, unavailable in other repositories, and never
+written into `backlog/` or committed. A duplicate global and project profile or
+launch name is refused rather than silently selecting one configuration layer.
+
 The flag form remains the right path for scripts, CI and users who already know
 their configuration:
 

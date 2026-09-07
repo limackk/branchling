@@ -1,0 +1,4 @@
+{"id":"01M1XMP0DTRST6XC28F1FP3ZK3","ts":"2026-09-07T09:55:08.346Z","task":"TL-337","field":"__created__","from":"","to":"Project-scoped agent profiles stay local to one repository","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XMPXANM2ZT8MF0V3PHTA13","ts":"2026-09-07T09:55:37.941Z","task":"TL-337","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XMPXANZ4N5A2BKYC5V1M1X","ts":"2026-09-07T09:55:37.941Z","task":"TL-337","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XN2B4DRQEJZSZDJXCHBRXD","ts":"2026-09-07T10:01:52.525Z","task":"TL-337","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven","session":"tree-526f61f2043f"}

@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 /** Local named compositions of provider-neutral profiles (TL-315). */
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { agentLaunchesPath, ensureHome } from "./home.mjs";
-import { readAgentProfiles } from "./agent-profiles.mjs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { agentLaunchesPath, ensureHome, homePaths } from "./home.mjs";
+import { readAvailableAgentProfiles, readAgentProfiles } from "./agent-profiles.mjs";
+import { lockScope } from "./lock.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { failure, heading, table } from "./ui.mjs";
@@ -32,26 +34,34 @@ export function parseAgentLaunches(text) {
 export function serializeAgentLaunches(launches) {
   return ["# Named local profile routing. Keep provider configuration in profiles and adapters.", "launches:", ...launches.flatMap((l) => ["  - name: " + JSON.stringify(l.name), ...(l.profile ? ["    profile: " + JSON.stringify(l.profile)] : []), ...(l.profile_for ? ["    profile_for: " + JSON.stringify(l.profile_for)] : [])])].join("\n") + "\n";
 }
-export function readAgentLaunches(env = process.env) { const path = agentLaunchesPath(env); if (!existsSync(path)) return { path, exists: false, launches: [], problems: [] }; return { path, exists: true, ...parseAgentLaunches(readFileSync(path, "utf8")) }; }
-export function resolveAgentLaunch(name, env = process.env) {
-  const store = readAgentLaunches(env); if (store.problems.length) return { ok: false, kind: "invalid-store", store };
+export function projectAgentLaunchesPath(root, env = process.env) { return join(homePaths(env).config, "projects", lockScope(root, { env }).key, "agent-launches.yaml"); }
+export function readAgentLaunches(env = process.env, root = null) { const path = root ? projectAgentLaunchesPath(root, env) : agentLaunchesPath(env); if (!existsSync(path)) return { path, exists: false, launches: [], problems: [] }; return { path, exists: true, ...parseAgentLaunches(readFileSync(path, "utf8")) }; }
+export function readAvailableAgentLaunches(root, env = process.env) {
+  const global = readAgentLaunches(env); const project = root ? readAgentLaunches(env, root) : { path: null, exists: false, launches: [], problems: [] };
+  const names = new Set(); const duplicates = [];
+  for (const launch of global.launches.concat(project.launches)) { if (names.has(launch.name)) duplicates.push("launch `" + launch.name + "` exists in both global and this-project configuration"); names.add(launch.name); }
+  return { path: project.path || global.path, exists: global.exists || project.exists, launches: global.launches.concat(project.launches), problems: global.problems.concat(project.problems, duplicates), global, project };
+}
+export function resolveAgentLaunch(name, env = process.env, root = null) {
+  const store = root ? readAvailableAgentLaunches(root, env) : readAgentLaunches(env); if (store.problems.length) return { ok: false, kind: "invalid-store", store };
   const launch = store.launches.find((l) => l.name === name); if (!launch) return { ok: false, kind: "missing-launch", store };
-  const profiles = readAgentProfiles(env); if (profiles.problems.length) return { ok: false, kind: "invalid-profiles", store, profiles };
+  const profiles = root ? readAvailableAgentProfiles(root, env) : readAgentProfiles(env); if (profiles.problems.length) return { ok: false, kind: "invalid-profiles", store, profiles };
   const profileFor = Object.fromEntries(String(launch.profile_for || "").split(",").filter(Boolean).map((p) => p.split("=")));
   const names = [launch.profile, ...Object.values(profileFor)].filter(Boolean);
   const missing = names.filter((name) => !profiles.profiles.some((p) => p.name === name));
   if (missing.length) return { ok: false, kind: "missing-profile", store, missing };
   return { ok: true, launch: { name, profile: launch.profile || null, profileFor }, store };
 }
-export function createAgentLaunch(name, profile, profileFor, env = process.env) {
-  const store = readAgentLaunches(env);
+export function createAgentLaunch(name, profile, profileFor, env = process.env, root = null) {
+  const store = root ? readAvailableAgentLaunches(root, env) : readAgentLaunches(env);
   if (store.problems.length) return { ok: false, kind: "invalid-store", store };
   if (store.launches.some((l) => l.name === name)) return { ok: false, kind: "duplicate", store };
   const launch = { name, profile: profile || "", profile_for: Object.entries(profileFor || {}).map(([role, selected]) => role + "=" + selected).join(",") };
-  const parsed = parseAgentLaunches(serializeAgentLaunches(store.launches.concat(launch)));
+  const target = root ? readAgentLaunches(env, root) : store;
+  const parsed = parseAgentLaunches(serializeAgentLaunches(target.launches.concat(launch)));
   if (parsed.problems.length) return { ok: false, kind: "invalid-launch", problems: parsed.problems };
-  ensureHome(env); writeFileSync(store.path, serializeAgentLaunches(parsed.launches), "utf8");
-  return { ok: true, path: store.path, launch };
+  ensureHome(env); const path = root ? projectAgentLaunchesPath(root, env) : store.path; mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, serializeAgentLaunches(parsed.launches), "utf8");
+  return { ok: true, path, launch };
 }
 const USAGE = `${N} launch <list|show|create|update|remove> [name] [--profile <name>] [--profile-for <role=profile>] [--json]`;
 export function run(argv, env = process.env) {

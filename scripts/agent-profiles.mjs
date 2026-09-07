@@ -18,6 +18,7 @@ import * as clack from "@clack/prompts";
 
 import { ADAPTER_PROTOCOL_VERSION, PROFILE_PROBE_ENV, PROFILE_PROBE_OUTCOMES, PROFILE_PROTOCOL_VERSION_ENV } from "./agent-contract.mjs";
 import { agentProfilesPath, ensureHome, homePaths } from "./home.mjs";
+import { lockScope } from "./lock.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { stripComment, unquote } from "./task-fields.mjs";
@@ -164,37 +165,67 @@ export function serializeAgentProfiles(profiles) {
   return out.join("\n") + "\n";
 }
 
-export function readAgentProfiles(env = process.env) {
-  const path = agentProfilesPath(env);
+/** Project configuration is personal data keyed by Git's common directory: it
+ * follows linked worktrees without being committed or tied to one checkout. */
+export function projectAgentProfilesPath(root, env = process.env) {
+  const scope = lockScope(root, { env });
+  return join(homePaths(env).config, "projects", scope.key, "agent-profiles.yaml");
+}
+
+export function readAgentProfiles(env = process.env, root = null) {
+  const path = root ? projectAgentProfilesPath(root, env) : agentProfilesPath(env);
   if (!existsSync(path)) return { path, exists: false, profiles: [], problems: [] };
   const parsed = parseAgentProfiles(readFileSync(path, "utf8"), path);
   return { path, exists: true, ...parsed };
 }
 
-function writeAgentProfiles(profiles, env) {
+function writeAgentProfiles(profiles, env, root = null) {
   const { config } = ensureHome(env);
-  const path = agentProfilesPath(env);
+  const path = root ? projectAgentProfilesPath(root, env) : agentProfilesPath(env);
+  mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, serializeAgentProfiles(profiles), "utf8");
   return { path, config };
 }
 
+/** The two scopes are deliberately disjoint: a duplicate is ambiguous, not an
+ * override. Callers operating in a repository use this combined read. */
+export function readAvailableAgentProfiles(root, env = process.env) {
+  const global = readAgentProfiles(env);
+  const project = root ? readAgentProfiles(env, root) : { path: null, exists: false, profiles: [], problems: [] };
+  const names = new Set();
+  const duplicate = [];
+  for (const profile of global.profiles.concat(project.profiles)) {
+    if (names.has(profile.name)) duplicate.push("profile `" + profile.name + "` exists in both global and this-project configuration");
+    names.add(profile.name);
+  }
+  return { path: project.path || global.path, exists: global.exists || project.exists, profiles: global.profiles.concat(project.profiles), problems: global.problems.concat(project.problems, duplicate), global, project };
+}
+
+function profilePathInStore(store, name) {
+  if (store.project && store.project.profiles.some((profile) => profile.name === name)) return store.project.path;
+  if (store.global && store.global.profiles.some((profile) => profile.name === name)) return store.global.path;
+  return store.path;
+}
+
 /** One creation operation for both flags and the guided terminal flow. */
-export function validateAgentProfileCreation(name, fields, env = process.env) {
-  const store = readAgentProfiles(env);
+export function validateAgentProfileCreation(name, fields, env = process.env, root = null) {
+  const store = root ? readAvailableAgentProfiles(root, env) : readAgentProfiles(env);
   if (store.problems.length) return { ok: false, kind: "invalid-store", store };
   if (store.profiles.some((p) => p.name === name)) return { ok: false, kind: "duplicate", store };
   const candidate = { name, ...fields };
-  const problems = profileProblems(candidate, store.path);
+  const target = root ? readAgentProfiles(env, root) : store;
+  const problems = profileProblems(candidate, target.path);
   if (problems.length) return { ok: false, kind: "invalid-profile", store, problems };
   return { ok: true, store, profile: candidate };
 }
 
-export function createAgentProfile(name, fields, env = process.env) {
-  const checked = validateAgentProfileCreation(name, fields, env);
+export function createAgentProfile(name, fields, env = process.env, root = null) {
+  const checked = validateAgentProfileCreation(name, fields, env, root);
   if (!checked.ok) return checked;
-  const { store, profile: candidate } = checked;
+  const { profile: candidate } = checked;
+  const store = root ? readAgentProfiles(env, root) : checked.store;
   const profiles = store.profiles.concat(candidate);
-  const written = writeAgentProfiles(profiles, env);
+  const written = writeAgentProfiles(profiles, env, root);
   return { ok: true, path: written.path, profiles, profile: candidate };
 }
 
@@ -211,8 +242,9 @@ export function referenceAdapterTemplates() {
 /** User profiles are portable across repositories, so their copied adapters
  * live beside that user-owned configuration rather than in whichever project
  * happened to be current during setup. */
-export function suggestedReferenceAdapterDestination(template, env = process.env) {
-  return join(homePaths(env).config, "adapters", template.id + ".mjs");
+export function suggestedReferenceAdapterDestination(template, env = process.env, root = null) {
+  const base = root ? dirname(projectAgentProfilesPath(root, env)) : homePaths(env).config;
+  return join(base, "adapters", template.id + ".mjs");
 }
 
 /** Copy a versioned local example without downloading or running it. */
@@ -232,12 +264,12 @@ export function profilePrompt(profile, path) {
 }
 
 /** Resolve one profile into the values a process launcher consumes. */
-export function resolveAgentProfile(name, env = process.env) {
-  const store = readAgentProfiles(env);
+export function resolveAgentProfile(name, env = process.env, root = null) {
+  const store = root ? readAvailableAgentProfiles(root, env) : readAgentProfiles(env);
   if (store.problems.length) return { ok: false, kind: "invalid-store", store };
   const profile = store.profiles.find((p) => p.name === name);
   if (!profile) return { ok: false, kind: "missing-profile", store };
-  return { ok: true, profile: { ...profile, protocol_version: String(profile.protocol_version || ADAPTER_PROTOCOL_VERSION), prompt: profilePrompt(profile, store.path) }, store };
+  return { ok: true, profile: { ...profile, protocol_version: String(profile.protocol_version || ADAPTER_PROTOCOL_VERSION), prompt: profilePrompt(profile, profilePathInStore(store, name)) }, store };
 }
 
 /** Resolve an adapter from an absolute/relative path or PATH without running it. */
@@ -251,15 +283,15 @@ export function adapterPath(adapter, env = process.env) {
 }
 
 /** Deterministic profile validation; it never starts an adapter or contacts a provider. */
-export function checkAgentProfiles(names = [], env = process.env) {
-  const store = readAgentProfiles(env);
+export function checkAgentProfiles(names = [], env = process.env, root = null) {
+  const store = root ? readAvailableAgentProfiles(root, env) : readAgentProfiles(env);
   const wanted = names.length ? [...new Set(names)] : store.profiles.map((p) => p.name);
   if (store.problems.length) return { ok: false, path: store.path, profiles: [], results: [{ name: null, state: "invalid-configuration", problems: store.problems }] };
   const profiles = [];
   const results = wanted.map((name) => {
     const found = store.profiles.find((p) => p.name === name);
     if (!found) return { name, state: "invalid-configuration", problems: ["no profile `" + name + "`"] };
-    const resolved = { ...found, protocol_version: String(found.protocol_version || ADAPTER_PROTOCOL_VERSION), prompt: profilePrompt(found, store.path) };
+    const resolved = { ...found, protocol_version: String(found.protocol_version || ADAPTER_PROTOCOL_VERSION), prompt: profilePrompt(found, profilePathInStore(store, name)) };
     profiles.push(resolved);
     const problems = [];
     const executable = adapterPath(resolved.adapter, env);
@@ -372,6 +404,7 @@ async function setupChoice(io, question, options, allowBack = false) {
  */
 export async function setupProfileConversation(io, env = process.env, actions = {}) {
   const copyAdapter = actions.copyReferenceAdapter || copyReferenceAdapter;
+  const projectRoot = actions.projectRoot || null;
   const fields = [
     { key: "name", label: "Name this reusable profile (lowercase slug, e.g. codex-reviewer)", required: true },
     { key: "prompt", label: "What should this agent be responsible for? (e.g. Review changes and report evidence)", required: true },
@@ -392,6 +425,15 @@ export async function setupProfileConversation(io, env = process.env, actions = 
     if (field.required && !answer) { io.write(field.label + " is required.\n"); continue; }
     state[field.key] = answer;
     index++;
+  }
+  let scopeRoot = null;
+  if (projectRoot) {
+    const scope = await setupChoice(io, "Where should this agent be available?", [
+      { label: "Every project on this machine", hint: "Recommended for a reusable personal agent.", value: "global" },
+      { label: "Only this Git project", hint: "Keeps its adapter, model, prompt and routing private to this repository.", value: "project" },
+    ]);
+    if (scope === CANCEL) return { ok: false, kind: "cancelled" };
+    scopeRoot = scope === "project" ? projectRoot : null;
   }
   io.write("\nChoose how Branchling will start this agent. The adapter translates this profile to a provider CLI or API wrapper.\n");
   let sourceChoice = await setupChoice(io, "How should Branchling start this agent?", [
@@ -420,8 +462,8 @@ export async function setupProfileConversation(io, env = process.env, actions = 
     const selected = await setupChoice(io, "Which reference adapter should be copied?", templates.map((template, index) => ({ label: template.label, hint: "Copied locally; it does not contact the provider now.", value: String(index + 1) })));
     if (selected === CANCEL || selected === BACK || !templates[Number(selected) - 1]) return { ok: false, kind: "cancelled" };
     const template = templates[Number(selected) - 1];
-    const suggestedDestination = suggestedReferenceAdapterDestination(template, env);
-    io.write("Recommended: " + suggestedDestination + " keeps this editable adapter with your local profiles. Press Enter to use it, or provide a project-specific path.\n");
+    const suggestedDestination = suggestedReferenceAdapterDestination(template, env, scopeRoot);
+    io.write("Recommended: " + suggestedDestination + " keeps this editable adapter with " + (scopeRoot ? "this project's local configuration" : "your local profiles") + ". Press Enter to use it, or provide another path.\n");
     const destination = setupAnswer(await io.ask("Copy destination [" + suggestedDestination + "]: "), suggestedDestination);
     if (destination === CANCEL || destination === BACK || !destination) return { ok: false, kind: "cancelled" };
     reference = { template, destination };
@@ -472,12 +514,12 @@ export async function setupProfileConversation(io, env = process.env, actions = 
     return { ok: false, kind: "cancelled" };
   }
   const { name, ...profile } = state;
-  const checked = validateAgentProfileCreation(name, profile, env);
+  const checked = validateAgentProfileCreation(name, profile, env, scopeRoot);
   if (!checked.ok) return checked;
   let copied = null;
   try {
     if (reference) copied = copyAdapter(reference.template, reference.destination);
-    return createAgentProfile(name, profile, env);
+    return createAgentProfile(name, profile, env, scopeRoot);
   } catch (error) {
     if (copied) rmSync(copied, { force: true });
     return { ok: false, kind: "copy-failed", problems: [error.message] };
@@ -491,13 +533,19 @@ export async function setupFleetConversation(io, env = process.env, actions = {}
   let config;
   try { config = loadConfig(root); } catch (error) { return { ok: false, kind: "invalid-backlog", problems: [error.message] }; }
   const roles = config.roles || [];
-  const profiles = readAgentProfiles(env);
+  const profiles = readAvailableAgentProfiles(root, env);
   if (!roles.length) return { ok: false, kind: "no-roles", problems: ["this backlog declares no roles"] };
   if (profiles.problems.length) return { ok: false, kind: "invalid-store", problems: profiles.problems };
   if (!profiles.profiles.length) return { ok: false, kind: "no-profiles", problems: ["create one profile first with `profile setup`"] };
   io.write("A specialist fleet routes repository roles to existing local profiles. Existing profiles: " + profiles.profiles.map((p) => p.name).join(", ") + "\n");
   const name = setupAnswer(await io.ask("Name this reusable routing map (lowercase slug, e.g. delivery-team): "));
-  if (name === CANCEL || name === BACK) return { ok: false, kind: "cancelled" };
+  if (name === CANCEL || name === BACK || !name) return { ok: false, kind: "cancelled" };
+  const scope = await setupChoice(io, "Where should this fleet routing be available?", [
+    { label: "Every project on this machine", hint: "Use a reusable role-to-profile arrangement.", value: "global" },
+    { label: "Only this Git project", hint: "Keep this repository's role routing private here.", value: "project" },
+  ]);
+  if (scope === CANCEL) return { ok: false, kind: "cancelled" };
+  const scopeRoot = scope === "project" ? root : null;
   const profileFor = {};
   for (const role of roles) {
     const selected = setupAnswer(await io.ask("Which profile should handle repository role `" + role + "`? (blank leaves it unassigned): "));
@@ -513,7 +561,7 @@ export async function setupFleetConversation(io, env = process.env, actions = {}
     { label: "Create launch", value: "1" }, { label: "Cancel", value: "3" },
   ]);
   if (confirm === CANCEL || confirm === "3" || confirm !== "1") return { ok: false, kind: "cancelled" };
-  return createAgentLaunch(name, generalist, profileFor, env);
+  return createAgentLaunch(name, generalist, profileFor, env, scopeRoot);
 }
 
 /** Translate a typed setup failure into the next action a person can take. */
@@ -560,13 +608,15 @@ async function runSetup(env = process.env, input = process.stdin, output = proce
     },
   };
   try {
+    let projectRoot = null;
+    try { projectRoot = resolveBacklogDir({ moduleDir: HERE }).root; } catch { /* Global setup remains available outside a backlog. */ }
     clack.intro("Configure " + N);
-    const modes = setupModes(readAgentProfiles(env).profiles);
+    const modes = setupModes((projectRoot ? readAvailableAgentProfiles(projectRoot, env) : readAgentProfiles(env)).profiles);
     const firstProfile = modes.length === 1;
     if (modes.length === 1) clack.note("Specialist fleets become available after you create at least one local agent profile.", "First setup");
     const mode = await setupChoice(io, "What do you want to configure?", modes);
     if (mode === CANCEL) { clack.cancel("No configuration was created."); return 0; }
-    const result = mode === "2" ? await setupFleetConversation(io, env) : mode === "1" ? await setupProfileConversation(io, env) : { ok: false, kind: "cancelled" };
+    const result = mode === "2" ? await setupFleetConversation(io, env) : mode === "1" ? await setupProfileConversation(io, env, { projectRoot }) : { ok: false, kind: "cancelled" };
     if (!result.ok) {
       if (result.kind === "cancelled") { clack.cancel("No profile was created."); return 0; }
       const message = setupFailureMessage(result);
@@ -630,9 +680,11 @@ export async function run(argv, env = process.env) {
     console.error(failure(N + " profile", e.message, ["known: " + SUBCOMMANDS.join(", ")], [N + " profile --help"]));
     return 2;
   }
-  const store = readAgentProfiles(env);
+  let projectRoot = null;
+  try { projectRoot = resolveBacklogDir({ moduleDir: HERE }).root; } catch { /* A global profile command is valid outside a backlog. */ }
+  const store = projectRoot ? readAvailableAgentProfiles(projectRoot, env) : readAgentProfiles(env);
   if (plan.subcommand === "setup") return runSetup(env);
-  if (plan.subcommand === "check") return checkAnswer(plan, checkAgentProfiles(plan.name ? [plan.name] : [], env), env);
+  if (plan.subcommand === "check") return checkAnswer(plan, checkAgentProfiles(plan.name ? [plan.name] : [], env, projectRoot), env);
   if (store.problems.length) {
     console.error(failure(N + " profile", "cannot read local agent profiles", [store.path, ...store.problems], [N + " profile list"]));
     return 1;
@@ -641,7 +693,7 @@ export async function run(argv, env = process.env) {
   if (plan.subcommand === "list") return answer(plan, store);
   if (plan.subcommand === "show") {
     if (!found) { console.error(failure(N + " profile show", "no profile `" + plan.name + "`", ["Run `" + N + " profile list` to see local names."])); return 1; }
-    return answer(plan, store, { ...found, prompt: profilePrompt(found, store.path) });
+    return answer(plan, store, resolveAgentProfile(plan.name, env, projectRoot).profile);
   }
   if (plan.subcommand === "create" && found) {
     console.error(failure(N + " profile create", "profile `" + plan.name + "` already exists", ["Use `" + N + " profile update " + plan.name + " …` instead."]));
@@ -661,17 +713,19 @@ export async function run(argv, env = process.env) {
     console.log("✓ profile `" + plan.name + "` created — " + created.path);
     return 0;
   }
+  const targetRoot = projectRoot && store.project.profiles.some((p) => p.name === plan.name) ? projectRoot : null;
+  const targetStore = targetRoot ? store.project : store.global || store;
   let profiles;
-  if (plan.subcommand === "remove") profiles = store.profiles.filter((p) => p.name !== plan.name);
+  if (plan.subcommand === "remove") profiles = targetStore.profiles.filter((p) => p.name !== plan.name);
   else {
     const candidate = { ...found, ...plan.fields };
     if (Object.prototype.hasOwnProperty.call(plan.fields, "prompt")) delete candidate.prompt_file;
     if (Object.prototype.hasOwnProperty.call(plan.fields, "prompt_file")) delete candidate.prompt;
-    const problems = profileProblems(candidate, store.path);
+    const problems = profileProblems(candidate, targetStore.path);
     if (problems.length) { console.error(failure(N + " profile " + plan.subcommand, "profile is invalid", problems)); return 1; }
-    profiles = store.profiles.map((p) => p.name === plan.name ? candidate : p);
+    profiles = targetStore.profiles.map((p) => p.name === plan.name ? candidate : p);
   }
-  const written = writeAgentProfiles(profiles, env);
+  const written = writeAgentProfiles(profiles, env, targetRoot);
   const result = { path: written.path, exists: true, profiles, problems: [] };
   if (plan.json) { printJson("agent-profiles", { path: written.path, exists: true, profiles, profile: plan.subcommand === "remove" ? null : profiles.find((p) => p.name === plan.name) || null }); return 0; }
   console.log("✓ profile `" + plan.name + "` " + (plan.subcommand === "remove" ? "removed" : plan.subcommand + "d") + " — " + written.path);
