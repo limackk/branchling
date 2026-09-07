@@ -8,6 +8,7 @@ import { readHistory } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { BacklogNotFoundError, resolveBacklogDir } from "./paths.mjs";
 import { color, failure, heading, terminal } from "./ui.mjs";
+import { listExecutionRecords } from "./execution-records.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CLI = join(HERE, "cli.mjs");
@@ -31,15 +32,18 @@ export function frame(plan, resolvedRoot = null) {
   const planState = wave.ok ? JSON.parse(wave.text) : null;
   const activeWave = planState && planState.waves.find((w) => w.active);
   const root = resolvedRoot || resolveBacklogDir({ dir: plan.dir || undefined }).root;
+  const attempts = listExecutionRecords(root).filter((r) => r.kind === "attempt");
+  const attemptFor = (id) => attempts.filter((r) => r.task === id).sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))[0] || null;
   const details = new Map(tasks.map((t) => [t.id, t]));
   const waveTasks = activeWave ? activeWave.tasks.map((t) => {
     const events = readHistory(root, t.id);
     const last = events.reduce((latest, e) => !latest || String(e.ts) > String(latest) ? e.ts : latest, null);
     const detail = details.get(t.id) || {};
-    return { id: t.id, status: t.status, owner: detail.owner || "", title: detail.title || "", modified: last || detail.updated || null };
+    return { id: t.id, status: t.status, owner: detail.owner || "", title: detail.title || "", modified: last || detail.updated || null, execution: attemptFor(t.id) };
   }) : [];
-  return { wave: activeWave ? { index: activeWave.index + 1, name: activeWave.name, open: activeWave.open, tasks: waveTasks } : null, tasks };
+  return { wave: activeWave ? { index: activeWave.index + 1, name: activeWave.name, open: activeWave.open, tasks: waveTasks } : null, tasks: tasks.map((t) => ({ ...t, execution: attemptFor(t.id) })) };
 }
+function executionState(execution) { if (!execution) return "—"; if (execution.phase === "verifying") return "verifying"; if (execution.phase === "finished" || execution.phase === "cancelled") return execution.phase; const evidence = Date.parse(execution.lastProgressAt || execution.lastOutputAt || ""); const age = Number.isFinite(evidence) ? Date.now() - evidence : Infinity; return age < 30_000 ? "active" : age < 120_000 ? "quiet" : "stalled"; }
 function watchStatus(status, paint) {
   if (status === "in_progress") return paint.ok(status);
   if (status === "blocked") return paint.err(status);
@@ -51,7 +55,9 @@ export function watchTaskLine(task, paint = color) {
   const owner = task.owner ? paint.id(task.owner) : paint.dim("unassigned");
   const modified = task.modified ? paint.dim("updated " + task.modified) : paint.dim("updated —");
   const title = task.title ? "  " + task.title : "";
-  return current + " " + paint.id(task.id) + "  " + watchStatus(task.status, paint).padEnd(14) + "  " + owner + "  " + modified + title;
+  const execution = task.execution; const requested = execution && execution.requested ? [execution.requested.model, execution.requested.effort].filter(Boolean).join("/") : "";
+  const live = execution ? executionState(execution) + (requested ? " " + requested : "") : "";
+  return current + " " + paint.id(task.id) + "  " + watchStatus(task.status, paint).padEnd(14) + "  " + owner + "  " + modified + (live ? "  " + live : "") + title;
 }
 
 export function render(frame, paint = color) {

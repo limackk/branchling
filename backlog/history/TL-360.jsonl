@@ -1,1 +1,4 @@
 {"id":"01M1Y4RA0J25H54A9STM6G4AYB","ts":"2026-09-07T14:36:00.914Z","task":"TL-360","field":"__created__","from":"","to":"Watch distinguishes liveness progress and stalls","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1YBYHCB42N6ZXT9SCZCRB11","ts":"2026-09-07T16:41:45.099Z","task":"TL-360","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1YBYHCBMXN4BBV38F6QPYHV","ts":"2026-09-07T16:41:45.099Z","task":"TL-360","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1YC09P8GAG129QRTPEJ7PCQ","ts":"2026-09-07T16:42:42.760Z","task":"TL-360","field":"status","from":"in_progress","to":"done","actor":"agent:codex","source":"done","reason":"proven","session":"tree-526f61f2043f"}

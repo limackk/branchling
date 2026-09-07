@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Controlled and observable agent execution"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h
@@ -63,11 +63,11 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] One frame shows every task in the active wave and identifies its current
+- [x] One frame shows every task in the active wave and identifies its current
       run when one exists. [proof: observable-watch]
-- [ ] Alive, active, quiet, stalled, verifying and terminal phases cannot be
+- [x] Alive, active, quiet, stalled, verifying and terminal phases cannot be
       confused in text or JSON. [proof: observable-watch]
-- [ ] The displayed model and effort are requested values, never provider
+- [x] The displayed model and effort are requested values, never provider
       confirmation unless the receipt contains proof. [proof: observable-watch]
-- [ ] TTY redraw does not flicker and non-TTY, `NO_COLOR`, `--once` and `--json`
+- [x] TTY redraw does not flicker and non-TTY, `NO_COLOR`, `--once` and `--json`
       remain deterministic. [proof: observable-watch]
