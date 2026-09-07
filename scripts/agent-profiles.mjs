@@ -415,6 +415,12 @@ export function clackTextAnswer(answer, isCancelled = clack.isCancel) {
   return isCancelled(answer) ? null : answer === undefined ? "" : answer;
 }
 
+/** Clack renders an absent submitted default as `undefined`; an empty
+ * placeholder is presentation-only and preserves the empty setup value. */
+export function setupTextOptions(question) {
+  return { message: String(question).replace(/:\s*$/, ""), placeholder: "" };
+}
+
 /** A choice may be enhanced by raw keys, but test transcripts remain text. */
 async function setupChoice(io, question, options, allowBack = false) {
   const presented = allowBack ? options.concat({ label: "← Back", hint: "Return to the previous step without saving.", value: "__back__" }) : options;
@@ -706,7 +712,7 @@ async function runSetup(env = process.env, input = process.stdin, output = proce
   }
   const io = {
     ask: async (question) => {
-      const answer = await clack.text({ message: String(question).replace(/:\s*$/, "") });
+      const answer = await clack.text(setupTextOptions(question));
       return clackTextAnswer(answer);
     },
     write: (text) => clack.log.message(String(text).trim()),

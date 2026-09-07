@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { agentProfilesPath, HOME_ENV, homePaths } from "../home.mjs";
-import { clackTextAnswer, parseAgentProfiles, setupFailureMessage, setupFleetConversation, setupModes, setupProfileConversation } from "../agent-profiles.mjs";
+import { clackTextAnswer, parseAgentProfiles, setupFailureMessage, setupFleetConversation, setupModes, setupProfileConversation, setupTextOptions } from "../agent-profiles.mjs";
 import { projectAgentLaunchesPath } from "../agent-launches.mjs";
 import { PRODUCT_NAME as N } from "../product.mjs";
 import { SCRIPTS_DIR } from "./_repo.mjs";
@@ -35,6 +35,13 @@ test("an accepted empty Clack text result reaches setup as a defaultable value",
   assert.equal(clackTextAnswer(undefined), "");
   assert.equal(clackTextAnswer("chosen"), "chosen");
   assert.equal(clackTextAnswer("cancelled", (value) => value === "cancelled"), null);
+});
+
+test("guided text questions render an accepted blank as empty, not undefined", () => {
+  assert.deepEqual(setupTextOptions("Reasoning effort: "), {
+    message: "Reasoning effort",
+    placeholder: "",
+  });
 });
 
 test("a confirmed guided transcript writes one ordinary profile only at its final confirmation", async () => {
