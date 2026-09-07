@@ -7,7 +7,7 @@
 # is finished and lives in the git history of this file. It built the loop; this
 # one is the first arc RUN BY that loop, and its every task is picked so an
 # unattended session can close it.
-updated: 2026-09-06
+updated: 2026-09-07
 rationale: "The unattended loop is proven. The next arc makes agent execution provider-neutral: repair control-plane writes first, separate project roles from user profiles, freeze one safe adapter contract, implement local execution paths and preflight without provider use, then add API harnesses, copyable references and onboarding before managed fleets consume the stable surface."
 waves:
   - name: "The loop may be trusted unattended"
@@ -230,3 +230,15 @@ waves:
   # Documentation and final in-terminal guidance integrate only the configuration, safety boundaries and launch paths that the prior waves have proven.
   - name: "Setup explains the choices it made"
     tasks: [TL-316]
+
+  # Build and prove the reusable terminal boundary before applying it to configuration or progress reports.
+  - name: "Terminal choices are safe by construction"
+    tasks: [TL-320]
+
+  # Apply the proven boundary independently to the guided setup and execution-progress report.
+  - name: "Keyboard-first setup and reporting"
+    tasks: [TL-321, TL-322]
+
+  # Verify the combined experience retains every non-interactive and accessible path.
+  - name: "Automation remains the contract"
+    tasks: [TL-323]
