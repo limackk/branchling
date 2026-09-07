@@ -613,7 +613,7 @@ implementation detail. Every reading command answers in the same envelope:
 |---|---|---|
 | `query` | `task-list` | `tasks`, `total` (matches BEFORE `--limit`), `limit`, `scan`, `modifiedFile`, `elsewhereOnly` (the tasks only another branch has), `unavailable` (registered projects the cross-project pass could not read), `projects` (how many were registered and how many answered; null without `--all-projects`) |
 | `quote` | `quote` | `root`, `quote` (the forecast: the bucket used, whether it degraded, the sample count, the time range, the per-model token cells and the share of unattributed minutes behind it) |
-| `stats` | `stats` | `root`, `stats` (the tallies), `scan`, `divergent` (one row per task another branch disagrees with), `elsewhereOnly` (the tasks only another branch has), `calibration` (null unless `--calibration` or `--correlation-only`: the step-0 gate, the buckets, and what never reached one) |
+| `stats` | `stats` | `root`, `stats` (the tallies), `scan`, `divergent` (one row per task another branch disagrees with), `elsewhereOnly` (the tasks only another branch has), `calibration` (null unless `--calibration` or `--correlation-only`: the step-0 gate, the buckets, and what never reached one), `context` (null unless `--context`: the measured cost rows) |
 | `doctor` | `doctor` | `ok`, `root`, `next`, `checks` |
 | `check` | `check` | `ok`, `root`, `failed` (the guards that failed), `guards` |
 | `board` | `board` | `board`, `rule`, `matched`, `isDefault`, `reason` |
@@ -634,7 +634,7 @@ implementation detail. Every reading command answers in the same envelope:
 | `actors` | `actors` | `since`, `minReportN` (the denominator below which a row states a count and no rate at all), `rows`, `policy` |
 | `watch` | `watch` | `wave` (the active wave, including every task's status, owner and last recorded modification), `tasks` (all work currently in progress) |
 | `runs list` | `runs` | `runs` (local detached execution records) |
-| `runs show/wait/cancel` | `run` | `run`, `alive` |
+| `runs show/wait/cancel` | `run` | `run`, `alive`, `timedOut` (null except wait, where it says whether the caller's timeout elapsed) |
 | `take`, `next` | `task-take` | `ok`, `taken`, `id`, `file`, `task`, `from`, `text`, `decisions`, `probe`, `warnings`, `reclaimed`, `lock`, `refusalKind`, `refusal`, `details`, and — filled in by next — `passedOver`, `considered`, `searchedStatuses`, `skippedBlocked`, `skippedElsewhere`, `skippedExecutor`, `skippedHandedBack`, `skippedSize`, `skippedByRecord`, `scan`, `plan` |
 | `handoff` | `task-handoff` | `ok`, `id`, `file`, `task`, `role`, `owner`, `status` (each a from/to pair), `comment`, `released`, `warnings`, `refusalKind`, `refusal`, `details` |
 | `release` | `task-release` | `ok`, `id`, `status`, `owner`, `released`, `comment`, `refusalKind`, `refusal`, `details` |

@@ -8,6 +8,9 @@ import { mkdtempSync } from "node:fs";
 
 import { readExecutionRecord, startAttemptRecord, startRunRecord, updateAttemptRecord, updateRunRecord } from "../execution-records.mjs";
 import { lockScope, stateRoot } from "../lock.mjs";
+import { isolateHome } from "./_repo.mjs";
+
+isolateHome("execution-records");
 
 test("a run and distinct attempts remain readable outside the backlog", () => {
   const root = mkdtempSync(join(tmpdir(), "branchling-execution-records-"));

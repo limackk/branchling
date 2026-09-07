@@ -7,6 +7,9 @@ import { join } from "node:path";
 
 import { startAttemptRecord, startRunRecord, readExecutionRecord } from "../execution-records.mjs";
 import { superviseAgent } from "../run-loop.mjs";
+import { isolateHome } from "./_repo.mjs";
+
+isolateHome("run-live-supervision");
 
 test("output and liveness are observable while a worker is still alive", async () => {
   const root = mkdtempSync(join(tmpdir(), "branchling-live-supervision-"));

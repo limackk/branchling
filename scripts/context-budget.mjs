@@ -39,12 +39,13 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import { queueStatuses } from "./next-task.mjs";
 import { backlogPaths } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
+import { extractMeta, splitFrontmatter } from "./task-fields.mjs";
 import { MARK, color, heading, table } from "./ui.mjs";
 
 /**
@@ -134,6 +135,24 @@ export function taskFileSizes(tasksDir, taskFilePattern) {
     .map((f) => statSync(join(tasksDir, f)).size);
 }
 
+/** The newest task already closed in this tree, or null. `done --dry-run` is
+ * safe to run on it: it reruns the contract but does not change its task file
+ * or history. The most recently updated task is the closest available example
+ * of the contract a closer will encounter, rather than a historical command
+ * whose dependencies may no longer exist. */
+function newestClosedTask(tasksDir, config) {
+  if (!existsSync(tasksDir)) return null;
+  const archived = config.archivedStatuses || [];
+  return readdirSync(tasksDir)
+    .filter((file) => config.taskId.file.test(file))
+    .map((file) => {
+      const meta = extractMeta(splitFrontmatter(readFileSync(join(tasksDir, file), "utf8")).frontmatter);
+      return { id: meta.id, status: meta.status, updated: meta.updated || "", file };
+    })
+    .filter((task) => archived.indexOf(task.status) >= 0)
+    .sort((a, b) => b.updated.localeCompare(a.updated) || b.id.localeCompare(a.id))[0] || null;
+}
+
 /**
  * The cost table for THIS tree. Every row is measured; nothing is assumed.
  *
@@ -161,6 +180,14 @@ export function contextBudget({ root, config, run }) {
     "a number instead of hundreds of lines");
   add("stats", `${N} stats`, run(["stats"]).length,
     "the whole backlog on one screen");
+  const closed = newestClosedTask(paths.tasksDir, config);
+  if (closed) {
+    const output = run(["done", closed.id, "--dry-run", "--verbose"]);
+    add("done", `${N} done --dry-run --verbose`, output.length,
+      "the full green contract a session pays to watch; measured without changing " + closed.id);
+  }
+  add("check", `${N} check`, run(["check"]).length,
+    "what a session pays to learn the guards are green");
   add("task", "one task file (median)", median(sizes),
     "what `" + N + " next` hands over, whatever the backlog's size — the only cost here that does not grow");
   add("list", `${N} query` + (queue.length ? " --status " + queue.join(",") : ""),
@@ -174,6 +201,7 @@ export function contextBudget({ root, config, run }) {
   add("tree", "every task file, read in bulk", sizes.reduce((a, b) => a + b, 0),
     "the naive path: a broad grep or a directory read costs this");
 
+  rows.sort((a, b) => a.tokens - b.tokens || a.id.localeCompare(b.id));
   const listTokens = (rows.find((r) => r.id === "list") || {}).tokens || 0;
   return {
     tasks: sizes.length,

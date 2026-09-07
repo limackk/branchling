@@ -82,7 +82,7 @@ export const KINDS = {
   sessions: { correlation: null, total: null, sessions: [] },
   session: { correlation: null, session: null },
   runs: { runs: [] },
-  run: { run: null, alive: null, timedOut: false },
+  run: { run: null, alive: null, timedOut: null },
   // `actors --json` (TL-150). `minReportN` is what makes a `rate: null` readable
   // — it is the denominator the project asked for, not an absence of data — and
   // `policy` says whether any of these rows is acted on at all.
@@ -102,7 +102,7 @@ export const KINDS = {
   // `--calibration` / `--correlation-only` (TL-29): it answers a question about
   // CLOSED work, from `activity/rollup/`, while every other key here describes
   // the queue.
-  stats: { root: null, stats: null, scan: null, divergent: [], elsewhereOnly: [], calibration: null },
+  stats: { root: null, stats: null, scan: null, divergent: [], elsewhereOnly: [], calibration: null, context: null },
   // `check --json` (TL-57). `ok` is what CI reads, `failed` is what it acts on —
   // a consumer must not have to filter `guards` to learn which one to look at.
   // `output` beside each guard is text written for a PERSON and may be reworded;

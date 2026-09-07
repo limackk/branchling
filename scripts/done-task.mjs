@@ -522,12 +522,18 @@ function run(argv) {
   const { frontmatter, body } = splitFrontmatter(raw);
   const before = extractMeta(frontmatter);
 
-  if ((config.archivedStatuses || []).indexOf(before.status) >= 0) {
+  if ((config.archivedStatuses || []).indexOf(before.status) >= 0 && !plan.dryRun) {
     return refuse(plan, plan.id + " is already closed (`status: " + before.status + "`)", [
       "Nothing was run. Re-running a contract against a tree that has moved on",
       "would answer a different question than the one that closed this task.",
     ], [], "already-closed");
   }
+
+  // A dry run is the one exception: it promises to run the whole contract and
+  // leave no trace. That makes it the callable, side-effect-free way for the
+  // context budget to price a green closing without changing a closed task.
+  // An actual `done` keeps refusing here — a moved tree must not be closed a
+  // second time merely because its old contract still happens to pass.
 
   const { entries, problems } = parseVerification(frontmatter);
   const contract = contractProblem(entries, problems);

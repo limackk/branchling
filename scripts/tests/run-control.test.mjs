@@ -5,7 +5,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { startRunRecord, updateRunRecord } from "../execution-records.mjs";
-import { SCRIPTS_DIR } from "./_repo.mjs";
+import { isolateHome, SCRIPTS_DIR } from "./_repo.mjs";
+
+isolateHome("run-control");
 
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
 function cli(args, env, cwd) { return spawnSync(process.execPath, [CLI].concat(args), { cwd, encoding: "utf8", env }); }

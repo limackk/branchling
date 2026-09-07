@@ -5,7 +5,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
-import { SCRIPTS_DIR } from "./_repo.mjs";
+import { isolateHome, SCRIPTS_DIR } from "./_repo.mjs";
+
+isolateHome("run-detach");
 
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
 

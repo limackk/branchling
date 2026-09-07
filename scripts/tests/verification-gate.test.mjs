@@ -195,19 +195,27 @@ test("the first failure STOPS the run — later entries are not executed", () =>
   );
 });
 
-test("an already closed task is refused, and nothing is run", () => {
+test("an already closed task is refused, unless a dry run only rehearses its contract", () => {
   withBacklog(
     {
       "TASK-1-x.md": task({
         status: "done",
         verification: ["  - id: marker", '    bash: "echo RAN-ANYWAY"'],
+        criteria: ["- [ ] A. [proof: marker]"],
       }),
     },
     (dir) => {
+      const file = join(dir, "tasks", "TASK-1-x.md");
+      const before = readFileSync(file, "utf8");
       const r = done(dir, ["TASK-1"]);
       assert.notEqual(r.code, 0);
       assert.doesNotMatch(r.out, /RAN-ANYWAY/, "a closed task's commands were run");
       assert.match(r.out, /already closed/);
+
+      const rehearsal = done(dir, ["TASK-1", "--dry-run"]);
+      assert.equal(rehearsal.code, 0, rehearsal.out);
+      assert.match(rehearsal.out, /RAN-ANYWAY/, "the dry-run contract was not run");
+      assert.equal(readFileSync(file, "utf8"), before, "a closed-task dry run wrote to the backlog");
     }
   );
 });

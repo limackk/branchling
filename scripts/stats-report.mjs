@@ -73,6 +73,10 @@ if (argv.includes("--context")) {
   const budget = contextBudget({
     root: ROOT, config: CONFIG, run: commandRunner(join(__dirname, "cli.mjs"), ROOT),
   });
+  if (argv.includes("--json")) {
+    printJson("stats", { root: ROOT, context: budget });
+    process.exit(0);
+  }
   console.log(renderBudget(budget));
   process.exit(0);
 }
