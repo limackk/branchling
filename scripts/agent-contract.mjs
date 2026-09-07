@@ -8,6 +8,8 @@ export const ADAPTER_PROTOCOL_VERSION = 1;
  * may only be filled by a future core parser of provider-produced evidence.
  */
 export const EXECUTION_RECEIPT_VERSION = 1;
+export const DELEGATION_POLICIES = ["provider", "branchling", "hybrid"];
+export const DELEGATION_ENFORCEMENT = ["enforced", "requested", "unsupported"];
 
 const receiptValue = (value) => {
   const text = String(value || "").trim();
@@ -15,7 +17,7 @@ const receiptValue = (value) => {
 };
 
 /** Build the stable, credential-free shape persisted in local activity data. */
-export function executionReceipt({ profile, adapterFingerprint, task, role, attempt, model, effort }) {
+export function executionReceipt({ profile, adapterFingerprint, task, role, attempt, model, effort, delegation = "provider", delegationEnforcement = "requested" }) {
   return {
     version: EXECUTION_RECEIPT_VERSION,
     provider: null,
@@ -25,6 +27,7 @@ export function executionReceipt({ profile, adapterFingerprint, task, role, atte
     role: receiptValue(role) || "",
     attempt: Number(attempt),
     requested: { model: receiptValue(model), effort: receiptValue(effort) },
+    delegation: { requested: delegation, enforcement: delegationEnforcement },
     // Distinct from `requested`: null means no provider-produced evidence was
     // available, never that the requested value was accepted.
     confirmed: { model: null, effort: null },

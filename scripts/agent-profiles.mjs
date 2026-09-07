@@ -16,7 +16,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as clack from "@clack/prompts";
 
-import { ADAPTER_PROTOCOL_VERSION, MODEL_CATALOG_ENV, MODEL_CATALOG_OUTCOMES, PROFILE_PROBE_ENV, PROFILE_PROBE_OUTCOMES, PROFILE_PROTOCOL_VERSION_ENV } from "./agent-contract.mjs";
+import { ADAPTER_PROTOCOL_VERSION, DELEGATION_ENFORCEMENT, MODEL_CATALOG_ENV, MODEL_CATALOG_OUTCOMES, PROFILE_PROBE_ENV, PROFILE_PROBE_OUTCOMES, PROFILE_PROTOCOL_VERSION_ENV } from "./agent-contract.mjs";
 import { agentProfilesPath, ensureHome, homePaths } from "./home.mjs";
 import { lockScope } from "./lock.mjs";
 import { printJson } from "./json-envelope.mjs";
@@ -30,7 +30,7 @@ import { resolveBacklogDir } from "./paths.mjs";
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 export const PROFILE_NAME_SHAPE = /^[a-z0-9][a-z0-9._-]{0,62}$/;
-export const PROFILE_FIELDS = ["name", "adapter", "model", "effort", "prompt", "prompt_file", "secret_env", "protocol_version"];
+export const PROFILE_FIELDS = ["name", "adapter", "model", "effort", "prompt", "prompt_file", "secret_env", "protocol_version", "delegation_control"];
 
 /** A credential may be REFERENCED through $NAME, but never copied as a value. */
 export function credentialProblem(value) {
@@ -83,6 +83,9 @@ function profileProblems(profile, path) {
   }
   if (profile.protocol_version && Number(profile.protocol_version) !== ADAPTER_PROTOCOL_VERSION) {
     problems.push("profile `" + profile.name + "` protocol_version must be " + ADAPTER_PROTOCOL_VERSION);
+  }
+  if (profile.delegation_control && !DELEGATION_ENFORCEMENT.includes(profile.delegation_control)) {
+    problems.push("profile `" + profile.name + "` delegation_control must be one of: " + DELEGATION_ENFORCEMENT.join(", "));
   }
   return problems;
 }
@@ -158,7 +161,7 @@ export function serializeAgentProfiles(profiles) {
   for (const profile of profiles) {
     out.push("  - name: " + profile.name);
     out.push("    adapter: " + quote(profile.adapter));
-    for (const key of ["model", "effort", "prompt", "prompt_file", "secret_env", "protocol_version"]) {
+    for (const key of ["model", "effort", "prompt", "prompt_file", "secret_env", "protocol_version", "delegation_control"]) {
       if (profile[key]) out.push("    " + key + ": " + quote(profile[key]));
     }
   }
@@ -341,7 +344,7 @@ export function modelCatalog(profile, env = process.env) {
 }
 
 const SUBCOMMANDS = ["create", "list", "show", "update", "remove", "check", "models", "setup"];
-const FLAGS = ["--adapter", "--model", "--effort", "--prompt", "--prompt-file", "--secret-env", "--protocol-version", "--live", "--json"];
+const FLAGS = ["--adapter", "--model", "--effort", "--prompt", "--prompt-file", "--secret-env", "--protocol-version", "--delegation-control", "--live", "--json"];
 
 export function parseAgentProfilesArgs(args) {
   const subcommand = args[0];

@@ -80,7 +80,7 @@ import { fileURLToPath } from "node:url";
 
 import { resolveActor } from "./actor.mjs";
 import { checkAgentProfiles, resolveAgentProfile, secretEnvironmentNames } from "./agent-profiles.mjs";
-import { executionReceipt } from "./agent-contract.mjs";
+import { DELEGATION_ENFORCEMENT, DELEGATION_POLICIES, executionReceipt } from "./agent-contract.mjs";
 import { appendActivity } from "./activity.mjs";
 import { resolveAgentLaunch } from "./agent-launches.mjs";
 import { loadConfigOrExit } from "./config.mjs";
@@ -120,7 +120,7 @@ export const AGENT_ENV = "BACKLOG_AGENT_COMMAND";
 
 export const RUN_FLAGS = [
   "--dir", "--actor", "--agent", "--agent-for", "--profile", "--profile-for", "--launch", "--max-attempts", "--max-tasks", "--timeout",
-  "--log-dir", "--stuck-status", "--json", "--dry-run", "--plan", "--probe",
+  "--log-dir", "--stuck-status", "--delegation", "--allow-uncontrolled-delegation", "--json", "--dry-run", "--plan", "--probe",
   "--board", "--label", "--priority", "--epic",
 ];
 
@@ -131,7 +131,7 @@ const DEFAULT_TIMEOUT_SECONDS = 900;
 export function parseRunArgs(args) {
   const plan = {
     dir: null, actor: null, agent: null, profile: null, launch: null, agentFor: {}, profileFor: {}, json: false, dryRun: false, usePlan: false,
-    maxAttempts: DEFAULT_MAX_ATTEMPTS, maxTasks: 0, timeout: DEFAULT_TIMEOUT_SECONDS, probe: false,
+    maxAttempts: DEFAULT_MAX_ATTEMPTS, maxTasks: 0, timeout: DEFAULT_TIMEOUT_SECONDS, probe: false, delegation: "provider", allowUncontrolledDelegation: false,
     logDir: null, stuckStatus: null, board: null, label: null, priority: null, epic: null,
   };
   const numbers = { "--max-attempts": "maxAttempts", "--max-tasks": "maxTasks", "--timeout": "timeout" };
@@ -140,6 +140,7 @@ export function parseRunArgs(args) {
     if (a === "--json") { plan.json = true; continue; }
     if (a === "--dry-run") { plan.dryRun = true; continue; }
     if (a === "--probe") { plan.probe = true; continue; }
+    if (a === "--allow-uncontrolled-delegation") { plan.allowUncontrolledDelegation = true; continue; }
     if (a === "--plan") { plan.usePlan = true; continue; }
     if (RUN_FLAGS.indexOf(a) >= 0) {
       const value = args[++i] || null;
@@ -196,6 +197,7 @@ export function parseRunArgs(args) {
     );
   }
   if (plan.agent && plan.profile) throw new Error("`--agent` and `--profile` are alternatives — name one generalist");
+  if (!DELEGATION_POLICIES.includes(plan.delegation)) throw new Error("`--delegation` must be one of: " + DELEGATION_POLICIES.join(", "));
   return plan;
 }
 
@@ -902,6 +904,7 @@ export function agentEnvironment(ctx, task) {
   out[prefix + "_PROMPT"] = String((task.profile && task.profile.prompt) || "");
   out[prefix + "_MODEL"] = String((task.profile && task.profile.model) || "");
   out[prefix + "_EFFORT"] = String((task.profile && task.profile.effort) || "");
+  out[prefix + "_DELEGATION"] = String((ctx.plan && ctx.plan.delegation) || "provider");
   return out;
 }
 
@@ -909,6 +912,8 @@ export function agentEnvironment(ctx, task) {
  * report or command string, and the adapter receives no ambient environment. */
 export function adapterEnvironment(ctx, task, env = process.env) {
   const out = agentEnvironment(ctx, task);
+  const prefix = String(N).toUpperCase().replace(/[^A-Z0-9]+/g, "_");
+  out[prefix + "_DELEGATION_ENFORCEMENT"] = String(task.delegationEnforcement || "unsupported");
   // PATH is not application data or a credential; preserving it lets a local
   // profile name an installed executable while every other ambient variable is
   // deliberately withheld.
@@ -965,6 +970,8 @@ export function attemptProvenance(task, attempt) {
     attempt,
     model: profile && profile.model,
     effort: profile && profile.effort,
+    delegation: task.delegation,
+    delegationEnforcement: task.delegationEnforcement,
   });
 }
 
@@ -1331,6 +1338,18 @@ export function run(argv) {
     console.error(failure(N + " run", "selected profile setup is not ready", details, [N + " profile check"]));
     return 1;
   }
+  // A fleet that asks Branchling to own delegation must not silently hand that
+  // promise to an adapter which declared no control. A raw command is an
+  // operator-owned escape hatch and is recorded as a request, not enforcement.
+  const managedProfiles = Object.values(plan.profileFor || {}).map((name) => plan.profiles[name]).filter(Boolean);
+  const uncontrolled = managedProfiles.filter((profile) => (profile.delegation_control || "unsupported") === "unsupported");
+  if (plan.delegation === "branchling" && uncontrolled.length && !plan.allowUncontrolledDelegation) {
+    console.error(failure(N + " run", "Branchling-managed delegation needs a controlled profile adapter", [
+      "unsupported: " + uncontrolled.map((profile) => profile.name).join(", "),
+      "Set `delegation_control` to `enforced` or `requested`, or pass `--allow-uncontrolled-delegation` to record an explicit exception.",
+    ], [N + " run --help"]));
+    return 1;
+  }
 
   // The plan is read BEFORE the loop starts, for the same reason as the roles
   // above: a missing plan found at the first `next` would have cost a claim, a
@@ -1465,7 +1484,8 @@ export function run(argv) {
     if (plan.json) {
       console.log(JSON.stringify({
         ok: true, dryRun: true, agent: plan.agent, profile: plan.profile,
-        agentFor: plan.agentFor, profileFor: plan.profileFor, plan: planned ? true : false,
+        agentFor: plan.agentFor, profileFor: plan.profileFor, delegation: plan.delegation,
+        allowUncontrolledDelegation: plan.allowUncontrolledDelegation, plan: planned ? true : false,
         order: shown.map((r) => ({
           id: r.task.id, priority: r.task.priority, status: r.task.status, file: r.task.file,
           ...(planned ? { wave: r.wave, waveName: r.name } : {}),
@@ -1587,10 +1607,13 @@ export function run(argv) {
     const leg = (legs.get(task.id) || 0) + 1;
     legs.set(task.id, leg);
     if (hand.kind === "profile") hand.profile = plan.profiles[hand.name];
+    const delegationEnforcement = hand.kind === "profile"
+      ? (hand.profile.delegation_control || "unsupported")
+      : "requested";
     const brief = role ? roleBrief(role, config) : null;
     const result = workOne(ctx, {
       id: task.id, file: task.file, text: task.text || "", hand,
-      profile: hand.profile || null, role, leg,
+      profile: hand.profile || null, role, leg, delegation: plan.delegation, delegationEnforcement,
       // A declared role may deliberately have no brief yet; the role vocabulary
       // remains valid and the profile still receives the task, as TL-264 states.
       roleBrief: brief && brief.ok ? brief.text : null,

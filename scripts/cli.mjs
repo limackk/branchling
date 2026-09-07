@@ -1186,6 +1186,7 @@ export const COMMANDS = {
     usage: [
       `${N} run --agent "<command>" [--max-attempts N] [--max-tasks N] [--timeout <s>]`,
       `${N} run --profile <name> [--max-attempts N] [--max-tasks N] [--timeout <s>]`,
+      `${N} run [--delegation provider|branchling|hybrid] [--allow-uncontrolled-delegation]`,
       `${N} run [--dry-run] [--plan] [--json] [--actor <ns:name>] [--stuck-status <s>] [--dir <path>]`,
       `${N} run [--board b] [--label l] [--priority p] [--epic e] [--log-dir <path>]`,
       `${N} run --agent "<command>" --agent-for <role>=<command> [--agent-for …]`,
@@ -1198,6 +1199,10 @@ export const COMMANDS = {
       "  stdin. BACKLOG_AGENT_COMMAND is read when the flag is absent.",
       "  `--profile` starts its one local wrapper executable directly, with its prompt,",
       "  model and effort in the stable environment contract; it is not a provider list.",
+      "  `--delegation` declares who may delegate helpers: `provider` (default),",
+      "  `branchling`, or `hybrid`. A Branchling-managed profile fleet refuses an",
+      "  adapter that declares no control unless `--allow-uncontrolled-delegation`",
+      "  explicitly records that exception.",
       "",
       "  A task that fails its contract `--max-attempts` times is moved to the open",
       "  status this project protects with a reason, WITH the reason. It is never",

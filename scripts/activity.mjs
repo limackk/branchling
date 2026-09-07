@@ -266,8 +266,9 @@ export function activityEntry(row) {
     }
     const requested = provenance.requested;
     const confirmed = provenance.confirmed;
-    if (!requested || typeof requested !== "object" || !confirmed || typeof confirmed !== "object") {
-      throw new Error("an execution receipt needs `requested` and `confirmed` objects");
+    const delegation = provenance.delegation || { requested: "provider", enforcement: "requested" };
+    if (!requested || typeof requested !== "object" || !confirmed || typeof confirmed !== "object" || typeof delegation !== "object") {
+      throw new Error("an execution receipt needs `requested`, `delegation` and `confirmed` objects");
     }
     // Core version 1 has no parser for provider-produced confirmation. Refuse
     // an adapter-shaped claim rather than preserving a forged confirmation.
@@ -285,6 +286,10 @@ export function activityEntry(row) {
       requested: {
         model: requested.model === null ? null : String(requested.model || "").trim() || null,
         effort: requested.effort === null ? null : String(requested.effort || "").trim() || null,
+      },
+      delegation: {
+        requested: ["provider", "branchling", "hybrid"].includes(delegation.requested) ? delegation.requested : null,
+        enforcement: ["enforced", "requested", "unsupported"].includes(delegation.enforcement) ? delegation.enforcement : null,
       },
       confirmed: { model: null, effort: null },
     };
