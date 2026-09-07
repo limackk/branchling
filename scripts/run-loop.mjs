@@ -72,7 +72,7 @@
  * `scripts/tests/run-agent-launch.test.mjs` for the agent that never started.
  */
 
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -978,7 +978,43 @@ export function attemptProvenance(task, attempt) {
   });
 }
 
-function workOne(ctx, task) {
+/** Run one worker without making the supervisor blind until its process exits. */
+export function superviseAgent(command, opts) {
+  return new Promise((resolve) => {
+    let stdout = ""; let stderr = ""; let bytes = 0; let timedOut = false; let overflow = false;
+    const child = opts.raw ? spawn(command, { shell: true, cwd: opts.cwd, env: opts.env, detached: process.platform !== "win32", stdio: ["pipe", "pipe", "pipe"] })
+      : spawn(command, [], { shell: false, cwd: opts.cwd, env: opts.env, detached: process.platform !== "win32", stdio: ["pipe", "pipe", "pipe"] });
+    const touch = (patch) => updateAttemptRecord(opts.root, opts.record, patch, opts.recordEnv || process.env);
+    touch({ phase: "running", pid: child.pid || null, lastLivenessAt: new Date().toISOString() });
+    const liveness = setInterval(() => touch({ phase: "running", lastLivenessAt: new Date().toISOString() }), 1000);
+    const receive = (key, chunk) => {
+      const text = String(chunk); bytes += Buffer.byteLength(text);
+      const safe = opts.profile ? redactSecrets(text, opts.profile) : text;
+      if (key === "stdout") stdout += text; else stderr += text;
+      appendFileSync(opts.logPath, safe, "utf8");
+      const progress = text.split(/\r?\n/).map((line) => line.match(/^BRANCHLING_PROGRESS (\{.*\})$/)).find(Boolean);
+      if (progress) {
+        try {
+          const event = JSON.parse(progress[1]);
+          if (event && event.version === 1) touch({ lastProgressAt: new Date().toISOString(), progress: { id: String(event.id || ""), message: String(event.message || "") } });
+        } catch { /* ordinary output is not a malformed progress failure */ }
+      }
+      touch({ phase: "running", lastOutputAt: new Date().toISOString() });
+      if (bytes > 64 * 1024 * 1024 && !overflow) { overflow = true; stop(); }
+    };
+    child.stdout.on("data", (chunk) => receive("stdout", chunk));
+    child.stderr.on("data", (chunk) => receive("stderr", chunk));
+    child.stdin.end(opts.input);
+    const stop = () => {
+      try { if (process.platform !== "win32" && child.pid) process.kill(-child.pid, "SIGTERM"); else child.kill("SIGTERM"); } catch { child.kill("SIGTERM"); }
+    };
+    const timeout = setTimeout(() => { timedOut = true; stop(); }, opts.timeout * 1000);
+    child.on("error", (error) => { clearTimeout(timeout); clearInterval(liveness); resolve({ stdout, stderr, error, timedOut, overflow, status: null }); });
+    child.on("close", (status) => { clearTimeout(timeout); clearInterval(liveness); resolve({ stdout, stderr, timedOut, overflow, status }); });
+  });
+}
+
+async function workOne(ctx, task) {
   const logPath = logPathFor(ctx.root, task.id,
     { logDir: ctx.plan.logDir, env: process.env, leg: task.leg, role: task.role });
   writeFileSync(logPath, "", "utf8");
@@ -1021,39 +1057,28 @@ function workOne(ctx, task) {
     const workerScope = createWorkerScope({ root: ctx.root, taskId: task.id, actor: ctx.actor,
       runId: sessionId({ root: ctx.root }) });
     task.workerScope = workerScope;
-    const agent = task.hand.kind === "raw" ? spawnSync(command, {
-      shell: true,
-      cwd: ctx.cwd,
-      encoding: "utf8",
+    const agent = await superviseAgent(command, {
+      raw: task.hand.kind === "raw", cwd: ctx.cwd, root: ctx.root, record: executionAttempt,
       // THE HAND IS TOLD WHO IT IS (TL-271). The loop claimed the task under
       // `actor` and is serving it as `role`; a hand that has to act on the
       // task — `handoff`, `ask`, `decide` — needs the first, and had to read the
       // history file to learn it. Both are facts the loop holds and cost nothing
       // to pass. The names derive from the product name, never a literal.
-      env: { ...process.env, ...agentEnvironment(ctx, task) },
-      input: agentInput(task.text, feedback, feedbackRan),
-      timeout: ctx.plan.timeout * 1000,
-      maxBuffer: 64 * 1024 * 1024,
-    }) : spawnSync(command, [], {
-      shell: false,
-      cwd: ctx.cwd,
-      encoding: "utf8",
-      env: adapterEnvironment(ctx, task),
-      input: profileInput(task.text, task.roleBrief, task.profile && task.profile.prompt, feedback, feedbackRan),
-      timeout: ctx.plan.timeout * 1000,
-      maxBuffer: 64 * 1024 * 1024,
+      env: task.hand.kind === "raw" ? { ...process.env, ...agentEnvironment(ctx, task) } : adapterEnvironment(ctx, task),
+      input: task.hand.kind === "raw" ? agentInput(task.text, feedback, feedbackRan)
+        : profileInput(task.text, task.roleBrief, task.profile && task.profile.prompt, feedback, feedbackRan),
+      timeout: ctx.plan.timeout, logPath, profile: task.hand.kind === "profile" ? task.profile : null, recordEnv: process.env,
     });
     releaseWorkerScope(workerScope);
     delete task.workerScope;
     const output = task.hand.kind === "profile"
       ? redactSecrets((agent.stdout || "") + (agent.stderr || ""), task.profile)
       : (agent.stdout || "") + (agent.stderr || "");
-    appendFileSync(logPath, output, "utf8");
 
     // A killed process is not a failed one: `spawnSync` reports the timeout as a
     // signal, and calling that "the agent said no" would send the gate looking
     // for work nobody did.
-    const timedOut = agent.error && agent.error.code === "ETIMEDOUT";
+    const timedOut = agent.timedOut;
     if (timedOut) {
       appendFileSync(logPath, "\n=== the agent was killed after " + ctx.plan.timeout + "s\n", "utf8");
       feedback = "the agent was killed after " + ctx.plan.timeout + "s (`--timeout`)";
@@ -1277,7 +1302,7 @@ function renderReport(report, plan) {
   return lines.join("\n");
 }
 
-export function run(argv) {
+export async function run(argv) {
   let plan;
   try {
     plan = parseRunArgs(argv);
@@ -1627,7 +1652,7 @@ export function run(argv) {
       ? (hand.profile.delegation_control || "unsupported")
       : "requested";
     const brief = role ? roleBrief(role, config) : null;
-    const result = workOne(ctx, {
+    const result = await workOne(ctx, {
       id: task.id, file: task.file, text: task.text || "", hand,
       profile: hand.profile || null, role, leg, delegation: plan.delegation, delegationEnforcement,
       // A declared role may deliberately have no brief yet; the role vocabulary
@@ -1829,5 +1854,5 @@ export function run(argv) {
 }
 
 if (process.argv[1] && process.argv[1].endsWith("run-loop.mjs")) {
-  process.exit(run(process.argv.slice(2)));
+  run(process.argv.slice(2)).then((code) => process.exit(code));
 }
