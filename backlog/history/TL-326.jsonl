@@ -1,0 +1,6 @@
+{"id":"01M1XC27CGF7N6FNCSN89BZ006","ts":"2026-09-07T07:24:31.504Z","task":"TL-326","field":"__created__","from":"","to":"Polished prompts preserve plain terminal contracts","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XC4NMAVGHJKNW9WGD255AY","ts":"2026-09-07T07:25:51.626Z","task":"TL-326","field":"epic","from":"","to":"Polished terminal prompts","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1XC4NMA7SYDW2NBV3YC39R0","ts":"2026-09-07T07:25:51.626Z","task":"TL-326","field":"blocked_by","from":[],"to":["TL-324","TL-325"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1XC9TZXRMXQVVAEZTY9C13Z","ts":"2026-09-07T07:28:40.957Z","task":"TL-326","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XC9TZXJJ8EFJ2KSYZCYHMV","ts":"2026-09-07T07:28:40.957Z","task":"TL-326","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XCAFXZSF385928T2YKCVGH","ts":"2026-09-07T07:29:02.399Z","task":"TL-326","field":"status","from":"in_progress","to":"done","actor":"agent:codex","source":"done","reason":"proven","session":"tree-526f61f2043f"}
