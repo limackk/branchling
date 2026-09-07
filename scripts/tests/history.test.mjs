@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
 import { sessionId } from "../focus.mjs";
-import { actorParts, appendEntries, attributeChanges, currentSession, FIELD_ATTRIBUTED, FIELD_BODY, FIELD_COMMENT, FIELD_CREATED, FIELD_DELETED, hasSnapshot, historyPath, isUnattributed, isValidActor, lastChangeByField, metaFromText, normalizeActor, PSEUDO_FIELDS, readAllHistory, readHistory, reconcile, recordEdit, unattributedChanges } from "../history.mjs";
+import { actorParts, appendEntries, attributeChanges, currentSession, FIELD_ATTRIBUTED, FIELD_BODY, FIELD_COMMENT, FIELD_CREATED, FIELD_DELETED, hasSnapshot, historyPath, isUnattributed, isValidActor, lastChangeByField, loadSnapshot, metaFromText, normalizeActor, PSEUDO_FIELDS, readAllHistory, readHistory, reconcile, recordEdit, unattributedChanges } from "../history.mjs";
 import { diffMeta } from "../task-fields.mjs";
 import { isolateHome } from "./_repo.mjs";
 
@@ -485,6 +485,9 @@ function runHook(file) {
   return spawnSync(process.execPath, [CLI, "regen-hook"], {
     encoding: "utf8",
     input: JSON.stringify({ tool_input: { file_path: file } }),
+    // This fixture claims a specific actor, so it must not inherit one from the
+    // test runner. The hook itself resolves the actor from this normal input.
+    env: Object.assign({}, process.env, { BACKLOG_ACTOR: "agent:claude" }),
   });
 }
 
@@ -512,6 +515,11 @@ test("a hook records the next status change after it establishes its reference p
     assert.deepEqual(status.map((e) => [e.from, e.to, e.actor, e.source]), [
       ["blocked", "done", "agent:claude", "hook"],
     ], "the snapshot may move to `done` only with the matching history entry");
+    assert.equal(
+      loadSnapshot(dir).tasks["BL-900"].status,
+      "done",
+      "the recorded transition and its snapshot advance together"
+    );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

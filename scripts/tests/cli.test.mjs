@@ -278,6 +278,28 @@ test("`regen-hook` rebuilds the views from the hook JSON on stdin", () => {
   }
 });
 
+test("`regen-hook` fails loudly when history recording fails after rebuilding", () => {
+  const dir = sandbox();
+  const stateFile = join(dir, "state-file");
+  try {
+    const file = join(dir, "tasks", "BL-900-zrob-rzecz.md");
+    // history-record creates its cross-worktree mutex below BACKLOG_STATE_DIR.
+    // A file at that path makes that operation fail while build remains able to
+    // regenerate the repository-local views.
+    writeFileSync(stateFile, "not a directory", "utf8");
+    const r = run(["regen-hook"], {
+      input: JSON.stringify({ tool_input: { file_path: file } }),
+      env: Object.assign({}, process.env, { BACKLOG_STATE_DIR: stateFile }),
+    });
+    assert.notEqual(r.status, 0, "a missing history record must fail the hook");
+    assert.ok(existsSync(join(dir, "INDEX.yaml")), "the views were not rebuilt first");
+    assert.match(r.stderr, /history could not be recorded/i);
+    assert.match(r.stderr, /history-record/i, "the failing child was not named");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("`regen-hook` on a file outside tasks/ is SILENT and exits zero", () => {
   const dir = sandbox();
   try {

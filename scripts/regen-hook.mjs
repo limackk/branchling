@@ -35,6 +35,7 @@ import { fileURLToPath } from "node:url";
 import { resolveActor } from "./actor.mjs";
 import { backlogForTaskPath } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
+import { failure } from "./ui.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -126,8 +127,10 @@ export async function main() {
     console.log("↻ backlog: rebuilt NOW/INDEX/archive from the edited task");
   }
 
-  // History is best-effort: a task edited before its history file exists must
-  // not fail the edit that created it.
+  // A first sighting is a valid history result: history-record creates its
+  // reference point without an entry. An actual recorder failure is different:
+  // the rebuild has made the edit visible, so reporting success while discarding
+  // the missing audit trail would leave the two views disagreeing silently.
   //
   // `--dir` for the same reason `build` gets one (TL-195): the root is already
   // known from the file, and a spawn that withholds it sends the child back to
@@ -135,7 +138,7 @@ export async function main() {
   // only by coincidence — a session standing in another worktree, or a stray
   // export, and the reconcile diffs a DIFFERENT directory, advances ITS snapshot
   // and loses the change from both trees. `stdio: ignore` makes that silent.
-  spawnSync(
+  const history = spawnSync(
     process.execPath,
     [
       join(HERE, "history-record.mjs"),
@@ -144,8 +147,25 @@ export async function main() {
       "--actor", resolveActor(""),
       "--source", "hook",
     ],
-    { stdio: ["ignore", "ignore", "ignore"] }
+    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }
   );
+  if (history.error || history.status !== 0) {
+    const diagnostic = String(
+      history.stderr || history.stdout || history.error?.message ||
+      "history-record ended without an exit status"
+    ).trim();
+    const details = diagnostic
+      ? diagnostic.split("\n").filter(Boolean).map((line) => "history-record: " + line)
+      : [];
+    console.error(failure(
+      `${N} regen-hook`,
+      "history could not be recorded after rebuilding",
+      details,
+      ["fix the history error, then save the task again"],
+      1
+    ));
+    return 1;
+  }
 
   return 0;
 }

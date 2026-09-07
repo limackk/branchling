@@ -1,0 +1,4 @@
+{"id":"01M1XZAPE2YST7KG3HDF95B500","ts":"2026-09-07T13:01:12.002Z","task":"TL-350","field":"__created__","from":"","to":"Regen hook names a history-record failure after rebuilding","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XZBRGWA6RAW2AP3WWW771B","ts":"2026-09-07T13:01:46.908Z","task":"TL-350","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XZBRGW1CCDP6M1BBHJ1RPR","ts":"2026-09-07T13:01:46.908Z","task":"TL-350","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XZMCH2BE6CJH34NZS0V52E","ts":"2026-09-07T13:06:29.538Z","task":"TL-350","field":"status","from":"in_progress","to":"done","actor":"agent:codex","source":"done","reason":"proven","session":"tree-526f61f2043f"}
