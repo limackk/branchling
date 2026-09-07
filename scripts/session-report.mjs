@@ -49,7 +49,7 @@
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { readAllActivity } from "./activity.mjs";
+import { HEARTBEAT_KINDS, readAllActivity } from "./activity.mjs";
 import { clusterHeartbeats, unionMinutes } from "./cluster.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { readAllHistory } from "./history.mjs";
@@ -174,22 +174,41 @@ export function tokensByModel(rows) {
 export function collectSessions(rowsByTask, history, opts = {}) {
   const sessions = new Map();
 
+  const ensureSession = (key, stamp) => {
+    if (!sessions.has(key)) {
+      sessions.set(key, {
+        session: key, names: new Set([key]), actors: new Set(), tasks: new Map(),
+        from: stamp, to: stamp, minutes: 0, singles: 0, clusters: 0, spans: [], executions: [],
+      });
+    }
+    return sessions.get(key);
+  };
+  const ensureTask = (session, taskId) => {
+    if (!session.tasks.has(taskId)) session.tasks.set(taskId, { task: taskId, minutes: 0, clusters: [], executions: [] });
+    return session.tasks.get(taskId);
+  };
+
   for (const [taskId, rows] of Object.entries(rowsByTask || {})) {
-    for (const cluster of clusterHeartbeats(rows, opts)) {
+    // An execution receipt is not a heartbeat: it proves a dispatch but must
+    // not create fictional minutes. It can nevertheless be the only local
+    // evidence of a short agent run, so it creates a session row of its own.
+    for (const row of rows || []) {
+      if (!row || row.kind !== "execution" || !row.provenance) continue;
+      const key = String(row.session || "") || UNSESSIONED;
+      const s = ensureSession(key, row.ts);
+      const t = ensureTask(s, taskId);
+      const execution = { task: taskId, ts: row.ts, actor: row.actor || "", provenance: row.provenance };
+      s.executions.push(execution);
+      t.executions.push(execution);
+      if (row.actor) s.actors.add(row.actor);
+      if (row.derived) s.names.add(String(row.derived));
+      if (row.ts < s.from) s.from = row.ts;
+      if (row.ts > s.to) s.to = row.ts;
+    }
+    for (const cluster of clusterHeartbeats((rows || []).filter((row) => HEARTBEAT_KINDS.includes(row && row.kind)), opts)) {
       const key = cluster.session || UNSESSIONED;
-      if (!sessions.has(key)) {
-        sessions.set(key, {
-          // EVERY NAME THIS SESSION ANSWERS TO (TL-168). The host's id is the
-          // one the row is keyed by; `derived` is what a process that never saw
-          // the hook payload calls the same session, and it is what the history
-          // log stamps. Without the set, the join is exact and empty.
-          session: key, names: new Set([key]), actors: new Set(), tasks: new Map(),
-          from: cluster.from, to: cluster.to, minutes: 0, singles: 0, clusters: 0, spans: [],
-        });
-      }
-      const s = sessions.get(key);
-      if (!s.tasks.has(taskId)) s.tasks.set(taskId, { task: taskId, minutes: 0, clusters: [] });
-      const t = s.tasks.get(taskId);
+      const s = ensureSession(key, cluster.from);
+      const t = ensureTask(s, taskId);
       t.minutes = round(t.minutes + cluster.minutes);
       t.clusters.push(cluster);
       s.minutes = round(s.minutes + cluster.minutes);
@@ -249,6 +268,7 @@ export function collectSessions(rowsByTask, history, opts = {}) {
       // never heard of is a different fact from a change naming none.
       unknownSessionChanges: correlated.unknownSession,
       tokens: tokensByModel(rows),
+      executions: s.executions.slice().sort((a, b) => String(a.ts).localeCompare(String(b.ts))),
     });
   }
   return out.sort((a, b) => String(b.from).localeCompare(String(a.from)));
@@ -406,6 +426,22 @@ export function renderOne(s) {
     out.push(heading("  tokens, per model"));
     out.push(table(s.tokens.map((t) => ["   ", t.model, String(t.tokens)])));
     out.push("  " + color.dim("never a single total: the same number means different things per model."));
+  }
+  if (s.executions.length) {
+    out.push("");
+    out.push(heading("  agent executions"));
+    out.push(table(s.executions.map((e) => {
+      const p = e.provenance || {};
+      const requested = p.requested || {};
+      const confirmed = p.confirmed || {};
+      return [
+        "   ", stamp(e.ts).slice(-5), e.task, p.profile || "(raw command)",
+        "requested " + (requested.model || "(default model)") +
+          (requested.effort ? " / " + requested.effort : ""),
+        confirmed.model ? "confirmed " + confirmed.model : "not confirmed",
+      ];
+    })));
+    out.push("  " + color.dim("Requested profile settings and provider confirmation are distinct; no confirmation is treated as success."));
   }
   // No token section at all when nothing recorded any. An absent column and a
   // column of zeros are different claims, and only the first is true here.

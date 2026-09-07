@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { HOME_ENV } from "../home.mjs";
+import { activityEntry } from "../activity.mjs";
 import { isolateHome, SCRIPTS_DIR } from "./_repo.mjs";
 
 isolateHome("run-agent-profiles");
@@ -26,7 +27,7 @@ test("profile-for routes each role through its named local profile and labelled 
   const root = mkdtempSync(join(tmpdir(), "branchling-profile-routing-"));
   const repo = join(root, "repo");
   const backlog = join(repo, "backlog");
-  const env = { ...process.env, NO_COLOR: "1", [HOME_ENV]: join(root, "home"), BACKLOG_STATE_DIR: join(root, "state") };
+  const env = { ...process.env, NO_COLOR: "1", [HOME_ENV]: join(root, "home"), BACKLOG_STATE_DIR: join(root, "state"), BACKLOG_SESSION: "profile-run" };
   try {
     assert.equal(cli(["init", "--dir", backlog, "--no-example"], env, root).status, 0);
     const config = join(backlog, "config.yaml");
@@ -73,6 +74,7 @@ test("profile-for routes each role through its named local profile and labelled 
     const result = cli(["run", "--dir", backlog, "--actor", "agent:fleet", "--max-attempts", "1", "--json",
       "--profile-for", "dev=developer", "--profile-for", "review=reviewer"], env, repo);
     assert.equal(result.status, 0, result.stdout + result.stderr);
+    const report = JSON.parse(result.stdout);
     assert.equal(status(backlog, dev), "done");
     assert.equal(status(backlog, review), "done");
     assert.match(readFileSync(devInput, "utf8"), /## Role brief \(repository\)[\s\S]*Implement only/);
@@ -80,9 +82,47 @@ test("profile-for routes each role through its named local profile and labelled 
     assert.match(readFileSync(devInput, "utf8"), /## Task/);
     assert.match(readFileSync(devInput, "utf8"), /developer\|model-dev\|high\|dev/);
     assert.match(readFileSync(reviewInput, "utf8"), /reviewer\|model-review\|careful\|review/);
+
+    const receipts = report.tasks.flatMap((task) => task.provenance);
+    assert.equal(receipts.length, 2);
+    assert.deepEqual(receipts.map((receipt) => [receipt.profile, receipt.requested.model, receipt.requested.effort]).sort(), [
+      ["developer", "model-dev", "high"],
+      ["reviewer", "model-review", "careful"],
+    ]);
+    for (const receipt of receipts) {
+      assert.equal(receipt.version, 1);
+      assert.match(receipt.adapter.fingerprint, /^sha256:/);
+      assert.equal(receipt.confirmed.model, null);
+      assert.equal(receipt.confirmed.effort, null);
+    }
+
+    const session = cli(["session", "profile-run", "--dir", backlog, "--json"], env, repo);
+    assert.equal(session.status, 0, session.stderr);
+    const localTrace = JSON.parse(session.stdout).session.executions;
+    assert.equal(localTrace.length, 2);
+    const traceText = JSON.stringify(localTrace);
+    assert.doesNotMatch(traceText, /Write maintainable changes|Review from evidence|test-only-secret/);
+    assert.doesNotMatch(readFileSync(taskFile(backlog, dev), "utf8"), /model-dev|developer/,
+      "local profile choice must not become task frontmatter");
+    const rendered = cli(["session", "profile-run", "--dir", backlog], env, repo);
+    assert.equal(rendered.status, 0, rendered.stderr);
+    assert.match(rendered.stdout, /agent executions/);
+    assert.match(rendered.stdout, /not confirmed/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("execution receipts reject a claimed provider confirmation", () => {
+  assert.throws(() => activityEntry({
+    task: "TL-1", kind: "execution", actor: "agent:fleet", session: "s-1", attribution: "declared",
+    provenance: {
+      version: 1, provider: "untrusted-adapter", profile: "developer", adapter: { fingerprint: null },
+      task: "TL-1", role: "dev", attempt: 1,
+      requested: { model: "model-dev", effort: "medium" },
+      confirmed: { model: "model-dev", effort: null },
+    },
+  }), /cannot claim provider confirmation/);
 });
 
 test("bad profile routing fails before it can claim a task", () => {

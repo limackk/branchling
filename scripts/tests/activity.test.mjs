@@ -139,7 +139,14 @@ test("an unknown `kind` is refused and nothing is written", () => {
     // nothing — so the control supplies them rather than skipping the kind,
     // which would leave one sixth of the set unproven.
     for (const kind of ACTIVITY_KINDS) {
-      const extra = kind === "reassign" ? { to: ids[0] + "0", session: "s1" } : {};
+      const extra = kind === "reassign" ? { to: ids[0] + "0", session: "s1" }
+        : kind === "execution" ? {
+          provenance: {
+            version: 1, provider: null, profile: "test", adapter: { fingerprint: null },
+            task: ids[0], role: "", attempt: 1,
+            requested: { model: null, effort: null }, confirmed: { model: null, effort: null },
+          },
+        } : {};
       assert.equal(activityEntry({ task: ids[0], kind, actor: "agent:a", ...extra }).kind, kind);
     }
     assert.throws(() => activityEntry({ task: ids[0], kind: "reassign", actor: "agent:a", session: "s1" }),

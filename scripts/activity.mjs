@@ -43,7 +43,7 @@ import { eventId, isValidActor } from "./history.mjs";
  * consumer has to know the whole set to weigh it. A project inventing a sixth
  * would produce rows nothing knows how to read.
  */
-export const ACTIVITY_KINDS = ["tool", "prompt", "commit", "edit", "reassign", "session"];
+export const ACTIVITY_KINDS = ["tool", "prompt", "commit", "edit", "reassign", "session", "execution"];
 
 /**
  * Which of those kinds are evidence that somebody was AT THE KEYBOARD.
@@ -249,6 +249,47 @@ export function activityEntry(row) {
       "tokens with no `model` — the number is unusable without it\n" +
         "Tokens of different models are different units of effort; a report cannot mix them."
     );
+  }
+
+  // An execution receipt is a compact, local answer to "which profile was
+  // asked, and what did the provider actually confirm?" It has no prompt,
+  // command line, environment or credential fields by construction.
+  const provenance = row && row.provenance;
+  if (kind === "execution") {
+    if (!provenance || typeof provenance !== "object" || Array.isArray(provenance)) {
+      throw new Error("an `execution` row needs a provenance receipt");
+    }
+    if (Number(provenance.version) !== 1) throw new Error("an execution receipt needs version 1");
+    if (String(provenance.task || "") !== task) throw new Error("an execution receipt must name its activity task");
+    if (!Number.isInteger(provenance.attempt) || provenance.attempt < 1) {
+      throw new Error("an execution receipt needs a positive whole `attempt`");
+    }
+    const requested = provenance.requested;
+    const confirmed = provenance.confirmed;
+    if (!requested || typeof requested !== "object" || !confirmed || typeof confirmed !== "object") {
+      throw new Error("an execution receipt needs `requested` and `confirmed` objects");
+    }
+    // Core version 1 has no parser for provider-produced confirmation. Refuse
+    // an adapter-shaped claim rather than preserving a forged confirmation.
+    if (confirmed.model !== null || confirmed.effort !== null) {
+      throw new Error("execution receipt version 1 cannot claim provider confirmation");
+    }
+    entry.provenance = {
+      version: 1,
+      provider: provenance.provider === null ? null : String(provenance.provider || "").trim() || null,
+      profile: provenance.profile === null ? null : String(provenance.profile || "").trim() || null,
+      adapter: { fingerprint: String(provenance.adapter && provenance.adapter.fingerprint || "").trim() || null },
+      task,
+      role: String(provenance.role || "").trim(),
+      attempt: provenance.attempt,
+      requested: {
+        model: requested.model === null ? null : String(requested.model || "").trim() || null,
+        effort: requested.effort === null ? null : String(requested.effort || "").trim() || null,
+      },
+      confirmed: { model: null, effort: null },
+    };
+  } else if (provenance !== undefined) {
+    throw new Error("`provenance` belongs to an `execution` row, not to a `" + kind + "`");
   }
 
   // A CORRECTION CARRIES TWO EXTRA FIELDS AND NOTHING ELSE DOES (TL-31). The

@@ -73,17 +73,21 @@
  */
 
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { resolveActor } from "./actor.mjs";
 import { checkAgentProfiles, resolveAgentProfile, secretEnvironmentNames } from "./agent-profiles.mjs";
+import { executionReceipt } from "./agent-contract.mjs";
+import { appendActivity } from "./activity.mjs";
 import { resolveAgentLaunch } from "./agent-launches.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { repoRootFor } from "./done-task.mjs";
 import { readHistory, recordEdit } from "./history.mjs";
 import { roleBrief } from "./instructions.mjs";
+import { sessionId } from "./focus.mjs";
 import { userConfigPath } from "./home.mjs";
 import { lockScope, releaseLock, stateRoot } from "./lock.mjs";
 import { callerSpecies, isOverSized, queueStatuses, selectCandidates, servesExecutor } from "./next-task.mjs";
@@ -910,6 +914,30 @@ function claimAfterAttempt(ctx, task) {
   return { ours: false, owner, role, toRole: served ? role : null, status: record.status };
 }
 
+/** A local adapter path may identify a person, so execution receipts retain
+ * only a content fingerprint. Failure to read it is explicit rather than a
+ * fabricated hash. */
+export function adapterFingerprint(profile) {
+  const path = String(profile && profile.adapter || "").trim();
+  if (!path) return null;
+  try { return "sha256:" + createHash("sha256").update(readFileSync(path)).digest("hex"); } catch { return null; }
+}
+
+/** Core-owned provenance; adapters cannot turn their own requested values into
+ * provider confirmation through stdout, stderr or their environment. */
+export function attemptProvenance(task, attempt) {
+  const profile = task.hand && task.hand.kind === "profile" ? task.profile : null;
+  return executionReceipt({
+    profile: profile && profile.name,
+    adapterFingerprint: adapterFingerprint(profile),
+    task: task.id,
+    role: task.role,
+    attempt,
+    model: profile && profile.model,
+    effort: profile && profile.effort,
+  });
+}
+
 function workOne(ctx, task) {
   const logPath = logPathFor(ctx.root, task.id,
     { logDir: ctx.plan.logDir, env: process.env, leg: task.leg, role: task.role });
@@ -918,6 +946,8 @@ function workOne(ctx, task) {
   let feedbackRan = false;
   let failure = "";
   let attempts = 0;
+  const provenance = [];
+  const result = (fields) => ({ ...fields, provenance });
   const started = Date.now();
   // ONE reading, taken at the CLAIM and never refreshed (TL-184). Comparing an
   // attempt against the start of that same attempt looked equivalent and is not:
@@ -933,7 +963,10 @@ function workOne(ctx, task) {
     const command = task.hand.kind === "raw"
       ? renderAgentCommand(task.hand.command, task)
       : task.hand.profile.adapter;
+    const receipt = attemptProvenance(task, attempt);
+    provenance.push(receipt);
     appendFileSync(logPath, "=== attempt " + attempt + ": " + command + "\n", "utf8");
+    appendFileSync(logPath, "=== provenance: " + JSON.stringify(receipt) + "\n", "utf8");
     const agent = task.hand.kind === "raw" ? spawnSync(command, {
       shell: true,
       cwd: ctx.cwd,
@@ -983,11 +1016,20 @@ function workOne(ctx, task) {
         : String(agent.stderr || "")).trim().split("\n")[0] || "";
       appendFileSync(logPath,
         "\n=== the agent never ran: nothing on stdout and nothing changed in " + ctx.cwd + "\n", "utf8");
-      return {
+      return result({
         id: task.id, outcome: "agent-never-ran", attempts: attempt - 1,
         ms: Date.now() - started, log: logPath, command,
         detail: said || "the agent printed nothing and changed nothing",
-      };
+      });
+    }
+
+    try {
+      appendActivity(ctx.root, task.id, [{
+        kind: "execution", actor: ctx.actor, source: "run",
+        session: sessionId({ root: ctx.root }), attribution: "unknown", provenance: receipt,
+      }]);
+    } catch (error) {
+      appendFileSync(logPath, "\n=== execution provenance was not persisted: " + error.message + "\n", "utf8");
     }
 
     // A HANDOFF IS THIS ROLE'S SUCCESS, NOT A FAILED ATTEMPT (TL-271). The hand
@@ -1003,23 +1045,23 @@ function workOne(ctx, task) {
     if (!claim.ours) {
       if (claim.toRole) {
         appendFileSync(logPath, "\n=== handed on to role `" + claim.toRole + "` — no `" + N + " done` was run\n", "utf8");
-        return {
+        return result({
           id: task.id, outcome: "handed-on", attempts, ms: Date.now() - started, log: logPath,
           toRole: claim.toRole,
           detail: task.id + " was handed to role `" + claim.toRole + "`, which this run serves — it goes back into the queue",
-        };
+        });
       }
       // NOT OURS ANY MORE, AND NOT FOLLOWED. The hand gave the task to a person,
       // or to a role nobody here serves. `done` under this run's actor would be
       // a write on a claim that is gone (TL-192), so it is not run at all.
       appendFileSync(logPath, "\n=== the task is now held by " + (claim.owner || "nobody") +
         (claim.role ? " for role `" + claim.role + "`" : "") + " — no `" + N + " done` was run\n", "utf8");
-      return {
+      return result({
         id: task.id, outcome: "held-elsewhere", attempts, ms: Date.now() - started, log: logPath,
         status: claim.status,
         detail: task.id + " is held by " + (claim.owner || "nobody") + ", not by " + ctx.actor +
           " — this run's claim on it is gone",
-      };
+      });
     }
 
     const doneArgs = ["done", task.id, "--dir", ctx.root, "--actor", ctx.actor, "--json"];
@@ -1029,12 +1071,12 @@ function workOne(ctx, task) {
     const closing = cli(doneArgs);
     appendFileSync(logPath, "\n=== done: exit " + closing.status + "\n" + (closing.stderr || ""), "utf8");
     if (closing.status === 0) {
-      return { id: task.id, outcome: "closed", attempts, ms: Date.now() - started, log: logPath };
+      return result({ id: task.id, outcome: "closed", attempts, ms: Date.now() - started, log: logPath });
     }
     const verdict = parseJson(closing.stdout) || {};
     const kind = String(verdict.refusalKind || "");
     if (TERMINAL_REFUSALS[kind]) {
-      return {
+      return result({
         id: task.id, outcome: TERMINAL_REFUSALS[kind], attempts, ms: Date.now() - started, log: logPath,
         // THE KIND TRAVELS WITH THE RESULT, not only the outcome it maps to
         // (TL-212). Three refusals share the outcome `needs-person` and they do
@@ -1044,7 +1086,7 @@ function workOne(ctx, task) {
         // in two different places and cannot tell them apart from the outcome.
         refusalKind: kind,
         detail: verdict.refusal || "`" + N + " done` refused: " + kind,
-      };
+      });
     }
     // Whether the agent gets told the contract ran is read off the envelope, not
     // guessed from the refusal: every shape of it carries `entries`, and an empty
@@ -1056,7 +1098,7 @@ function workOne(ctx, task) {
     // they are looking at a blocked task. The agent still gets the whole output.
     failure = failedEntry(verdict) || String(feedback).split("\n")[0];
   }
-  return { id: task.id, outcome: "exhausted", attempts, ms: Date.now() - started, log: logPath, detail: failure };
+  return result({ id: task.id, outcome: "exhausted", attempts, ms: Date.now() - started, log: logPath, detail: failure });
 }
 
 function renderReport(report, plan) {
@@ -1675,6 +1717,7 @@ export function run(argv) {
         command: r.command || null,
         // Which role a handed-on task went to (TL-271); null for every other ending.
         toRole: r.toRole || null,
+        provenance: r.provenance || [],
       })),
     }, null, 2));
   } else {

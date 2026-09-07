@@ -6,8 +6,8 @@ labels: [agents, observability]
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1d
@@ -19,7 +19,7 @@ blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
 verification:                      # HOW to check the task is really done
   - id: provenance-tests
-    bash: "node --test scripts/tests/run-agent-profiles.test.mjs scripts/tests/session-report.test.mjs"
+    bash: "node --test scripts/tests/run-agent-profiles.test.mjs scripts/tests/session-report.test.mjs scripts/tests/activity.test.mjs"
 ---
 
 ## Goal
@@ -84,11 +84,11 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] A `run --json` attempt identifies its profile, requested model and effort,
+- [x] A `run --json` attempt identifies its profile, requested model and effort,
   role and adapter provenance. [proof: provenance-tests]
-- [ ] A provider-confirmed model is visibly distinct from a requested model;
+- [x] A provider-confirmed model is visibly distinct from a requested model;
   missing confirmation is not displayed as success. [proof: provenance-tests]
-- [ ] Two contributors can execute the same task with different local profiles
+- [x] Two contributors can execute the same task with different local profiles
   without mutating shared task frontmatter. [proof: provenance-tests]
-- [ ] Session and task-facing execution reports expose the local trace without
+- [x] Session and task-facing execution reports expose the local trace without
   recording credentials, raw prompts or account identifiers. [proof: provenance-tests]

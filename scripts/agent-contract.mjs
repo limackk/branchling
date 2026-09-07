@@ -2,6 +2,35 @@
 import { PRODUCT_NAME as N } from "./product.mjs";
 
 export const ADAPTER_PROTOCOL_VERSION = 1;
+/**
+ * A local, core-authored record of one adapter attempt. Providers are never
+ * trusted to mark their own request as confirmed: `confirmed` starts null and
+ * may only be filled by a future core parser of provider-produced evidence.
+ */
+export const EXECUTION_RECEIPT_VERSION = 1;
+
+const receiptValue = (value) => {
+  const text = String(value || "").trim();
+  return text || null;
+};
+
+/** Build the stable, credential-free shape persisted in local activity data. */
+export function executionReceipt({ profile, adapterFingerprint, task, role, attempt, model, effort }) {
+  return {
+    version: EXECUTION_RECEIPT_VERSION,
+    provider: null,
+    profile: receiptValue(profile),
+    adapter: { fingerprint: receiptValue(adapterFingerprint) },
+    task: receiptValue(task),
+    role: receiptValue(role) || "",
+    attempt: Number(attempt),
+    requested: { model: receiptValue(model), effort: receiptValue(effort) },
+    // Distinct from `requested`: null means no provider-produced evidence was
+    // available, never that the requested value was accepted.
+    confirmed: { model: null, effort: null },
+  };
+}
+
 const PREFIX = String(N).toUpperCase().replace(/[^A-Z0-9]+/g, "_");
 export const PROFILE_PROBE_ENV = PREFIX + "_PROFILE_PROBE";
 export const PROFILE_PROTOCOL_VERSION_ENV = PREFIX + "_PROFILE_PROTOCOL_VERSION";

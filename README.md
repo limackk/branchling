@@ -398,6 +398,15 @@ receives model, effort, actor, task and repository paths in the stable
 environment contract. `--profile-for review=reviewer` overrides the generalist
 only for `review`; every other eligible task remains with `developer`.
 
+Each profile attempt also leaves a local execution receipt. `branchling run
+--json` exposes the profile, role, requested model and effort, and a content
+fingerprint of its adapter. `branchling session <id> --json` (or `sessions
+--task <ID>`) reads the same local trace later. Requested settings and provider
+confirmation are deliberately separate: without provider-produced evidence,
+`confirmed.model` is `null`, never a claim that an alias was used. Receipts are
+outside the repository and contain no prompt, credential, account identifier or
+local adapter path.
+
 For a fleet you use repeatedly, save just its local profile routing, then keep
 execution policy explicit:
 

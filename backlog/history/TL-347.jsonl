@@ -1,1 +1,4 @@
 {"id":"01M1XW416DTV75HCSPGP2FGWDW","ts":"2026-09-07T12:05:07.917Z","task":"TL-347","field":"__created__","from":"","to":"Agent runs expose requested and confirmed model provenance","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XWNMCEGDB1GN2YM56W16TC","ts":"2026-09-07T12:14:44.622Z","task":"TL-347","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XWNMCEZZS7YDKZ8DAKRBP0","ts":"2026-09-07T12:14:44.622Z","task":"TL-347","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XX4J262VVDRYNMWTJAN0YS","ts":"2026-09-07T12:22:53.766Z","task":"TL-347","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven","session":"tree-526f61f2043f"}
