@@ -6,8 +6,8 @@ labels: [agents, routing]
 board: main
 epic: "Controlled and observable agent execution"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
@@ -63,9 +63,9 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] A specialists-only run does not claim, mutate, or lock a roleless task.
+- [x] A specialists-only run does not claim, mutate, or lock a roleless task.
   [proof: role-routing]
-- [ ] A task with a role served by the same run is still dispatched to its
+- [x] A task with a role served by the same run is still dispatched to its
   mapped profile or command. [proof: role-routing]
-- [ ] Direct `next --role dev` retains its documented inclusive behavior; the
+- [x] Direct `next --role dev` retains its documented inclusive behavior; the
   stricter selection is confined to the specialist dispatcher. [proof: role-routing]

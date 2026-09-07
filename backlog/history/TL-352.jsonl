@@ -1,1 +1,4 @@
 {"id":"01M1Y12Y8H2A58EHAMXNE5SR4P","ts":"2026-09-07T13:31:55.025Z","task":"TL-352","field":"__created__","from":"","to":"Specialist runs do not claim roleless work","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1Y8QXWXD52TKQ5BW62CNM2F","ts":"2026-09-07T15:45:42.813Z","task":"TL-352","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1Y8QXWXAK07KNZVRXAA08NX","ts":"2026-09-07T15:45:42.813Z","task":"TL-352","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1Y8RP8NGY9BK33CAJ40DPWN","ts":"2026-09-07T15:46:07.765Z","task":"TL-352","field":"status","from":"in_progress","to":"done","actor":"agent:codex","source":"done","reason":"proven","session":"tree-526f61f2043f"}
