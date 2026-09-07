@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Controlled and observable agent execution"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 30m
@@ -59,6 +59,6 @@ allowances for protocol identifiers and vocabulary that cannot be product text.
 
 ## Acceptance criteria
 
-- [ ] `check --product-name` is green in this repository. [proof: product-name-green]
-- [ ] The guard still rejects a deliberately literal product name in a fixture.
+- [x] `check --product-name` is green in this repository. [proof: product-name-green]
+- [x] The guard still rejects a deliberately literal product name in a fixture.
       [proof: product-name-green]

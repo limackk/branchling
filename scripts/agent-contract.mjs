@@ -8,7 +8,7 @@ export const ADAPTER_PROTOCOL_VERSION = 1;
  * may only be filled by a future core parser of provider-produced evidence.
  */
 export const EXECUTION_RECEIPT_VERSION = 1;
-export const DELEGATION_POLICIES = ["provider", "branchling", "hybrid"];
+export const DELEGATION_POLICIES = ["provider", "branchling", "hybrid"]; // product-name: allow — delegation vocabulary
 export const DELEGATION_ENFORCEMENT = ["enforced", "requested", "unsupported"];
 
 const receiptValue = (value) => {

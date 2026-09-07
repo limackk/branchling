@@ -745,7 +745,7 @@ async function runSetup(env = process.env, input = process.stdin, output = proce
       clack.outro(message.next);
       return 1;
     }
-    if (mode === "2") clack.outro("Launch `" + result.launch.name + "` created. Branchling should own specialist task dispatch: `" + N + " run --launch " + result.launch.name + " --delegation branchling --dry-run`; start it detached with the same command plus `--detach`, observe with `" + N + " watch`, then use `" + N + " runs list` and `" + N + " runs cancel <run-id>` if needed.");
+    if (mode === "2") clack.outro("Launch `" + result.launch.name + "` created. " + N + " should own specialist task dispatch: `" + N + " run --launch " + result.launch.name + " --delegation branchling --dry-run`; start it detached with the same command plus `--detach`, observe with `" + N + " watch`, then use `" + N + " runs list` and `" + N + " runs cancel <run-id>` if needed."); // product-name: allow — delegation vocabulary
     else if (firstProfile && fleetRolesAvailable()) {
       const addFleet = await clack.confirm({ message: "Your general agent is ready. Configure specialist fleet routing now?", initialValue: false });
       if (addFleet === true) {

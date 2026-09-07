@@ -288,7 +288,7 @@ export function activityEntry(row) {
         effort: requested.effort === null ? null : String(requested.effort || "").trim() || null,
       },
       delegation: {
-        requested: ["provider", "branchling", "hybrid"].includes(delegation.requested) ? delegation.requested : null,
+    requested: ["provider", "branchling", "hybrid"].includes(delegation.requested) ? delegation.requested : null, // product-name: allow — delegation vocabulary
         enforcement: ["enforced", "requested", "unsupported"].includes(delegation.enforcement) ? delegation.enforcement : null,
       },
       confirmed: { model: null, effort: null },

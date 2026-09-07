@@ -994,7 +994,7 @@ export function superviseAgent(command, opts) {
       const safe = opts.profile ? redactSecrets(text, opts.profile) : text;
       if (key === "stdout") stdout += text; else stderr += text;
       appendFileSync(opts.logPath, safe, "utf8");
-      const progress = text.split(/\r?\n/).map((line) => line.match(/^BRANCHLING_PROGRESS (\{.*\})$/)).find(Boolean);
+      const progress = text.split(/\r?\n/).map((line) => line.match(/^BRANCHLING_PROGRESS (\{.*\})$/)).find(Boolean); // product-name: allow — protocol identifier
       if (progress) {
         try {
           const event = JSON.parse(progress[1]);
@@ -1396,13 +1396,13 @@ export async function run(argv) {
     console.error(failure(N + " run", "selected profile setup is not ready", details, [N + " profile check"]));
     return 1;
   }
-  // A fleet that asks Branchling to own delegation must not silently hand that
+  // A fleet that asks the dispatcher to own delegation must not silently hand that
   // promise to an adapter which declared no control. A raw command is an
   // operator-owned escape hatch and is recorded as a request, not enforcement.
   const managedProfiles = Object.values(plan.profileFor || {}).map((name) => plan.profiles[name]).filter(Boolean);
   const uncontrolled = managedProfiles.filter((profile) => (profile.delegation_control || "unsupported") === "unsupported");
-  if (plan.delegation === "branchling" && uncontrolled.length && !plan.allowUncontrolledDelegation) {
-    console.error(failure(N + " run", "Branchling-managed delegation needs a controlled profile adapter", [
+  if (plan.delegation === "branchling" && uncontrolled.length && !plan.allowUncontrolledDelegation) { // product-name: allow — delegation vocabulary
+    console.error(failure(N + " run", N + "-managed delegation needs a controlled profile adapter", [
       "unsupported: " + uncontrolled.map((profile) => profile.name).join(", "),
       "Set `delegation_control` to `enforced` or `requested`, or pass `--allow-uncontrolled-delegation` to record an explicit exception.",
     ], [N + " run --help"]));
