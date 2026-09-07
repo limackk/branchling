@@ -1,7 +1,8 @@
 /** The terminal monitor is one quiet frame, not a shell loop (TL-305). */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseWatchArgs, render, run } from "../watch.mjs";
+import { parseWatchArgs, render, run, watchTaskLine } from "../watch.mjs";
+import { plain } from "../ui.mjs";
 import { isolateHome } from "./_repo.mjs";
 
 isolateHome("watch");
@@ -18,11 +19,13 @@ test("one frame carries the active wave, every wave task, current work and modif
     { id: "TASK-1", status: "in_progress", owner: "agent:one", modified: "2026-09-06T10:00:00Z" },
     { id: "TASK-2", status: "pending", owner: "", modified: "2026-09-06T09:00:00Z" },
   ] }, tasks: [] };
-  const text = render(value);
+  const text = render(value, plain);
   assert.match(text, /WAVE 17  Execution/);
   assert.match(text, /▶ TASK-1  in_progress/);
   assert.match(text, /TASK-2  pending/);
   assert.match(text, /2026-09-06T10:00:00Z/);
+  assert.match(text, /updated 2026-09-06T10:00:00Z/);
+  assert.match(watchTaskLine(value.wave.tasks[0], plain), /agent:one/);
 });
 
 test("a non-TTY invocation prints one frame and never schedules a loop", () => {

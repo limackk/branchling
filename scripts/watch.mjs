@@ -7,7 +7,7 @@ import { PRODUCT_NAME as N } from "./product.mjs";
 import { readHistory } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { BacklogNotFoundError, resolveBacklogDir } from "./paths.mjs";
-import { failure, terminal } from "./ui.mjs";
+import { color, failure, heading, terminal } from "./ui.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CLI = join(HERE, "cli.mjs");
@@ -40,16 +40,29 @@ export function frame(plan, resolvedRoot = null) {
   }) : [];
   return { wave: activeWave ? { index: activeWave.index + 1, name: activeWave.name, open: activeWave.open, tasks: waveTasks } : null, tasks };
 }
-export function render(frame) {
+function watchStatus(status, paint) {
+  if (status === "in_progress") return paint.ok(status);
+  if (status === "blocked") return paint.err(status);
+  return paint.dim(status || "unknown");
+}
+
+export function watchTaskLine(task, paint = color) {
+  const current = task.status === "in_progress" ? "▶" : " ";
+  const owner = task.owner ? paint.id(task.owner) : paint.dim("unassigned");
+  const modified = task.modified ? paint.dim("updated " + task.modified) : paint.dim("updated —");
+  const title = task.title ? "  " + task.title : "";
+  return current + " " + paint.id(task.id) + "  " + watchStatus(task.status, paint).padEnd(14) + "  " + owner + "  " + modified + title;
+}
+
+export function render(frame, paint = color) {
   const wave = frame.wave ? "WAVE " + frame.wave.index + "  " + frame.wave.name + "  ·  " + frame.wave.open + " open" : "WAVE  no active plan wave";
-  const lines = [N + " watch  ·  live task files  ·  Ctrl-C to stop", "", wave, "", "THIS WAVE"];
+  const lines = [heading(N + " watch", { color: paint }) + paint.dim("  ·  live task files  ·  Ctrl-C to stop"), "", heading(wave, { color: paint }), "", paint.bold("THIS WAVE")];
   for (const t of (frame.wave ? frame.wave.tasks : [])) {
-    const current = t.status === "in_progress" ? "▶" : " ";
-    lines.push(current + " " + t.id + "  " + t.status.padEnd(14) + "  " + (t.owner || "—") + "  " + (t.modified || "—"));
+    lines.push(watchTaskLine(t, paint));
   }
-  lines.push("", "IN PROGRESS");
+  lines.push("", paint.bold("IN PROGRESS"));
   if (!frame.tasks.length) lines.push("  no tasks in progress");
-  for (const t of frame.tasks) lines.push("  " + t.id + "  " + (t.owner || "unassigned") + "  " + t.title);
+  for (const t of frame.tasks) lines.push(watchTaskLine(t, paint));
   return lines.join("\n") + "\n";
 }
 export function run(argv, deps = {}) {
