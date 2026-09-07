@@ -16,7 +16,7 @@ created: 2026-09-07
 updated: 2026-09-07
 blocked_by: [TL-356, TL-359, TL-360, TL-361] # ids of tasks that MUST be closed before this one starts
 blocks: [TL-149]                   # ids this task will unblock
-related_docs: [README.md, docs/backlog-config-and-portability.md, scripts/agent-profile-setup.mjs]
+related_docs: [README.md, docs/backlog-config-and-portability.md, scripts/agent-profiles.mjs]
 verification:                      # HOW to check the task is really done
   - id: guided-control
     bash: "node --test scripts/tests/agent-profile-setup.test.mjs scripts/tests/run-control.test.mjs scripts/tests/watch.test.mjs"
@@ -39,7 +39,7 @@ exact dry-run, detached start and watch commands for the configuration created.
 
 ## Pre-flight reading
 
-1. `scripts/agent-profile-setup.mjs` — integrate the choice into the existing
+1. `scripts/agent-profiles.mjs` — integrate the choice into the existing
    Clack flow without duplicating configuration logic.
 2. `README.md` — keep the five-minute path and operator model consistent.
 3. `docs/backlog-config-and-portability.md` — explain which choices are local

@@ -1,0 +1,4 @@
+{"id":"01M1Y86JA45QPTDYXC1CTGGCKG","ts":"2026-09-07T15:36:13.892Z","task":"TL-363","field":"__created__","from":"","to":"Every related documentation path resolves","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1Y89Y7YZZXWT41G6B8S6T7Q","ts":"2026-09-07T15:38:04.414Z","task":"TL-363","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1Y89Y7YERNJCN71MHCKWQQA","ts":"2026-09-07T15:38:04.414Z","task":"TL-363","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1Y8AXEK0WP3HVB53WWR0VGP","ts":"2026-09-07T15:38:36.371Z","task":"TL-363","field":"status","from":"in_progress","to":"done","actor":"agent:codex","source":"done","reason":"proven","session":"tree-526f61f2043f"}

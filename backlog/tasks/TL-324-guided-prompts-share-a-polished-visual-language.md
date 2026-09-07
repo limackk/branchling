@@ -16,7 +16,7 @@ created: 2026-09-07
 updated: 2026-09-07
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: [TL-325, TL-326]           # ids this task will unblock
-related_docs: [scripts/terminal-ui.mjs, scripts/ui.mjs]
+related_docs: [scripts/agent-profiles.mjs, scripts/ui.mjs]
 verification:                      # HOW to check the task is really done
   - id: prompt-style
     bash: "node --test scripts/tests/terminal-ui.test.mjs scripts/tests/ui.test.mjs"
