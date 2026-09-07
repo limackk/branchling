@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: ""
 priority: P1
-status: pending
-owner: unassigned
+status: done
+owner: agent:codex
 role: ""
 executor: ""
 estimate: 2h
 confidence: medium
 created: 2026-09-03
-updated: 2026-09-03
+updated: 2026-09-07
 blocked_by: []
 blocks: []
 related_docs: []
@@ -91,7 +91,7 @@ a question rather than an answer so nobody inherits a guess as a finding.
 
 ## Acceptance criteria
 
-- [ ] A status change on the `--file` route reaches the log, or the run names
+- [x] A status change on the `--file` route reaches the log, or the run names
       what it could not record. [proof: history-suite]
-- [ ] The snapshot never advances past a change that reached no log without the
+- [x] The snapshot never advances past a change that reached no log without the
       run saying so. [proof: history-suite]

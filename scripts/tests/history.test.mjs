@@ -468,6 +468,7 @@ test("pseudo-fields: a frontmatter diff NEVER produces them", () => {
 // ── CLI history-record: the output must not lie about the author ──────────
 
 const RECORDER = join(dirname(fileURLToPath(import.meta.url)), "..", "history-record.mjs");
+const CLI = join(dirname(fileURLToPath(import.meta.url)), "..", "cli.mjs");
 
 /** The CLI resolves the directory through resolveBacklogDir, which needs a MARKER. */
 function cliSandbox() {
@@ -479,6 +480,42 @@ function cliSandbox() {
 function runRecorder(dir, file, args) {
   return spawnSync(process.execPath, [RECORDER, "--dir", dir, "--file", file].concat(args || []), { encoding: "utf8" });
 }
+
+function runHook(file) {
+  return spawnSync(process.execPath, [CLI, "regen-hook"], {
+    encoding: "utf8",
+    input: JSON.stringify({ tool_input: { file_path: file } }),
+  });
+}
+
+test("a hook records the next status change after it establishes its reference point", () => {
+  // This is the route reported in TL-225. `build` runs before history-record in
+  // the hook, so the fixture carries the same board marker that lets the CLI
+  // fixture build successfully. The first edit has no prior reference point;
+  // the second must therefore write the status before advancing the snapshot.
+  const dir = cliSandbox();
+  const file = join(dir, "tasks", "BL-900-zrob-rzecz.md");
+  writeFileSync(join(dir, "boards.yaml"), "default: main\nboards:\n  - slug: main\n    name: \"Main\"\n", "utf8");
+  writeFileSync(file, taskFile({ status: "blocked" }), "utf8");
+  try {
+    const first = runHook(file);
+    assert.equal(first.status, 0, first.stderr);
+    assert.match(first.stdout, /rebuilt/);
+    assert.equal(existsSync(historyPath(dir, "BL-900")), false,
+      "a first sighting is a reference point, not an invented history entry");
+
+    writeFileSync(file, taskFile({ status: "done" }), "utf8");
+    const second = runHook(file);
+    assert.equal(second.status, 0, second.stderr);
+
+    const status = readHistory(dir, "BL-900").filter((e) => e.field === "status");
+    assert.deepEqual(status.map((e) => [e.from, e.to, e.actor, e.source]), [
+      ["blocked", "done", "agent:claude", "hook"],
+    ], "the snapshot may move to `done` only with the matching history entry");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 test("CLI: a bare --actor is rejected LOUDLY, not quietly degraded", () => {
   const dir = cliSandbox();

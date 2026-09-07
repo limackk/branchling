@@ -1,1 +1,4 @@
 {"id":"01M1MBPMZ7JVS37469MQ43XTR2","ts":"2026-09-03T19:25:02.311Z","task":"TL-225","field":"__created__","from":"","to":"history-record says no changes for a status that did change, and the snapshot advances anyway","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1XY6GW7HM0NN4XY7WGM75RQ","ts":"2026-09-07T12:41:26.663Z","task":"TL-225","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"next","reason":"unknown","session":"real-wave-tl225"}
+{"id":"01M1XY6GW74SCW6NRWAMR7JSKE","ts":"2026-09-07T12:41:26.663Z","task":"TL-225","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"next","reason":"unknown","session":"real-wave-tl225"}
+{"id":"01M1XYE7WZKRJ7HF3QSMVPKF1S","ts":"2026-09-07T12:45:39.615Z","task":"TL-225","field":"status","from":"in_progress","to":"done","actor":"agent:codex","source":"done","reason":"proven","session":"tree-526f61f2043f"}
