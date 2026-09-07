@@ -40,6 +40,7 @@ import { printJson } from "./json-envelope.mjs";
 import { failure } from "./ui.mjs";
 import { resolveBacklogDir, resolveBacklogDirOrExit } from "./paths.mjs";
 import { FIELD_SHAPES } from "./task-fields.mjs";
+import { workerScopeRefusal } from "./worker-scope.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -2151,6 +2152,20 @@ export function main(argv) {
   }
 
   if (resolved.name === "check") return runCheck(folded.argv);
+  // This is deliberately at the one public command boundary. A worker may use
+  // the normal task commands for its assigned task, but cannot turn an inherited
+  // environment into a second queue owner (TL-356).
+  const dirFlag = folded.argv.indexOf("--dir");
+  try {
+    const root = resolveBacklogDir({ dir: dirFlag >= 0 ? folded.argv[dirFlag + 1] : undefined, moduleDir: HERE }).root;
+    const refused = workerScopeRefusal(resolved.name, folded.argv, root);
+    if (refused) {
+      console.error(failure(N + " " + resolved.name, refused, [], [N + " " + resolved.name + " --help"]));
+      return 1;
+    }
+  } catch {
+    // The target script gives the authoritative configuration/path error.
+  }
   return runScript(resolved.spec.script, folded.argv, tinted.force);
 }
 

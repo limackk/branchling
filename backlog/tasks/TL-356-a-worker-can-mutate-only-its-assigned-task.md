@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Controlled and observable agent execution"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1d
@@ -19,7 +19,7 @@ blocks: [TL-362]                   # ids this task will unblock
 related_docs: [scripts/cli.mjs, scripts/next-task.mjs, scripts/run-loop.mjs]
 verification:                      # HOW to check the task is really done
   - id: task-scope
-    bash: "node --test scripts/tests/run-roles.test.mjs scripts/tests/run-follows-handoff.test.mjs scripts/tests/agent-check.test.mjs"
+    bash: "node --test scripts/tests/run-roles.test.mjs scripts/tests/run-follows-handoff.test.mjs scripts/tests/agent-check.test.mjs scripts/tests/worker-scope.test.mjs"
 ---
 
 ## Goal
@@ -64,11 +64,11 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] A worker or inherited child cannot claim another task or start a nested
+- [x] A worker or inherited child cannot claim another task or start a nested
       Branchling run. [proof: task-scope]
-- [ ] The assigned task can still be handed off, questioned and closed through
+- [x] The assigned task can still be handed off, questioned and closed through
       the normal commands. [proof: task-scope]
-- [ ] A terminal command outside worker scope behaves exactly as before.
+- [x] A terminal command outside worker scope behaves exactly as before.
       [proof: task-scope]
-- [ ] A forged task ID without matching local run scope grants no authority.
+- [x] A forged task ID without matching local run scope grants no authority.
       [proof: task-scope]

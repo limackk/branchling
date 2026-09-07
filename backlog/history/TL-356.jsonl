@@ -1,1 +1,4 @@
 {"id":"01M1Y4QK4J9JYTBAAG1VRR2TTP","ts":"2026-09-07T14:35:37.490Z","task":"TL-356","field":"__created__","from":"","to":"A worker can mutate only its assigned task","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1YA5M480E1KTHY042538170","ts":"2026-09-07T16:10:40.136Z","task":"TL-356","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1YA5M48DKRJNZHC7EJW6FE7","ts":"2026-09-07T16:10:40.136Z","task":"TL-356","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1YAD7M3YF8YGMX5CX3JZ8DB","ts":"2026-09-07T16:14:49.475Z","task":"TL-356","field":"status","from":"in_progress","to":"done","actor":"agent:codex","source":"done","reason":"proven","session":"tree-526f61f2043f"}

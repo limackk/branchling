@@ -81,6 +81,7 @@ import { fileURLToPath } from "node:url";
 import { resolveActor } from "./actor.mjs";
 import { checkAgentProfiles, resolveAgentProfile, secretEnvironmentNames } from "./agent-profiles.mjs";
 import { DELEGATION_ENFORCEMENT, DELEGATION_POLICIES, executionReceipt } from "./agent-contract.mjs";
+import { createWorkerScope, releaseWorkerScope, WORKER_SCOPE_ENV } from "./worker-scope.mjs";
 import { appendActivity } from "./activity.mjs";
 import { resolveAgentLaunch } from "./agent-launches.mjs";
 import { loadConfigOrExit } from "./config.mjs";
@@ -905,6 +906,7 @@ export function agentEnvironment(ctx, task) {
   out[prefix + "_MODEL"] = String((task.profile && task.profile.model) || "");
   out[prefix + "_EFFORT"] = String((task.profile && task.profile.effort) || "");
   out[prefix + "_DELEGATION"] = String((ctx.plan && ctx.plan.delegation) || "provider");
+  if (task.workerScope) out[WORKER_SCOPE_ENV] = task.workerScope;
   return out;
 }
 
@@ -1009,6 +1011,9 @@ function workOne(ctx, task) {
     provenance.push(receipt);
     appendFileSync(logPath, "=== attempt " + attempt + ": " + command + "\n", "utf8");
     appendFileSync(logPath, "=== provenance: " + JSON.stringify(receipt) + "\n", "utf8");
+    const workerScope = createWorkerScope({ root: ctx.root, taskId: task.id, actor: ctx.actor,
+      runId: sessionId({ root: ctx.root }) });
+    task.workerScope = workerScope;
     const agent = task.hand.kind === "raw" ? spawnSync(command, {
       shell: true,
       cwd: ctx.cwd,
@@ -1031,6 +1036,8 @@ function workOne(ctx, task) {
       timeout: ctx.plan.timeout * 1000,
       maxBuffer: 64 * 1024 * 1024,
     });
+    releaseWorkerScope(workerScope);
+    delete task.workerScope;
     const output = task.hand.kind === "profile"
       ? redactSecrets((agent.stdout || "") + (agent.stderr || ""), task.profile)
       : (agent.stdout || "") + (agent.stderr || "");
