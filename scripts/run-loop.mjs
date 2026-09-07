@@ -84,14 +84,15 @@ import { executionReceipt } from "./agent-contract.mjs";
 import { appendActivity } from "./activity.mjs";
 import { resolveAgentLaunch } from "./agent-launches.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { repoRootFor } from "./done-task.mjs";
+import { probeContract, repoRootFor } from "./done-task.mjs";
+import { parseVerification } from "./criteria.mjs";
 import { readHistory, recordEdit } from "./history.mjs";
 import { roleBrief } from "./instructions.mjs";
 import { sessionId } from "./focus.mjs";
 import { userConfigPath } from "./home.mjs";
 import { lockScope, releaseLock, stateRoot } from "./lock.mjs";
 import { callerSpecies, isOverSized, queueStatuses, selectCandidates, servesExecutor } from "./next-task.mjs";
-import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
+import { backlogPaths, repositoryRoot, resolveBacklogDir } from "./paths.mjs";
 import { loadPlanForDispatch, planState, projectionWall } from "./plan.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { inProgressStatus, rebuildViews, todayStamp } from "./take-task.mjs";
@@ -823,6 +824,34 @@ export function failedEntry(verdict) {
 }
 
 /**
+ * Did the entry which just refused already refuse when this task was claimed?
+ *
+ * A suite is often a shared proof. A red it inherited cannot be repaired by
+ * retrying this hand, and treating it as the hand's failure parks otherwise
+ * finished work. The comparison is deliberately by the entry's id and command:
+ * that is the stable contract identity `done` publishes, unlike its transcript,
+ * which test runners are free to format differently between runs.
+ */
+export function baselineFailure(baseline, current) {
+  const failed = ((current && current.rows) || []).filter((row) => row && row.ok === false);
+  if (!failed.length) return null;
+  const before = (baseline && baseline.rows) || [];
+  // A contract with no green entry has not proved any part of this hand's work.
+  // Its red may still be foreign, but there is no measurable basis for saying
+  // so rather than leaving the agent its normal chance to repair the contract.
+  if (!before.some((row) => row && row.kind === "bash" && row.ok === true)) return null;
+  const introduced = failed.find((row) => !before.some((previous) => previous && previous.ok === false &&
+    previous.id === row.id && previous.kind === row.kind && previous.command === row.command));
+  return introduced ? null : failed[0];
+}
+
+function contractProbe(file, cwd) {
+  const { frontmatter } = splitFrontmatter(readFileSync(file, "utf8"));
+  const { entries, problems } = parseVerification(frontmatter);
+  return problems.length ? { rows: [] } : probeContract(entries, cwd);
+}
+
+/**
  * The refusals from `done` that no further attempt can turn into a closure, and
  * the outcome each of them ends the task with.
  *
@@ -949,6 +978,11 @@ function workOne(ctx, task) {
   const provenance = [];
   const result = (fields) => ({ ...fields, provenance });
   const started = Date.now();
+  // Take the contract's state before the hand starts. `done` stops at its first
+  // red entry, while a probe records every entry so a later suite red can be
+  // recognised as belonging to the tree the task inherited (TL-242).
+  const contractCwd = repositoryRoot(ctx.root);
+  const contractAtTake = contractProbe(task.file, contractCwd);
   // ONE reading, taken at the CLAIM and never refreshed (TL-184). Comparing an
   // attempt against the start of that same attempt looked equivalent and is not:
   // an agent whose second attempt writes the same bytes as its first leaves
@@ -1088,6 +1122,15 @@ function workOne(ctx, task) {
         detail: verdict.refusal || "`" + N + " done` refused: " + kind,
       });
     }
+    const inherited = baselineFailure(contractAtTake, contractProbe(task.file, contractCwd));
+    if (inherited) {
+      const entry = failedEntry(verdict) || "an unnamed verification entry";
+      appendFileSync(logPath, "\n=== inherited baseline red: " + entry + "\n", "utf8");
+      return result({
+        id: task.id, outcome: "foreign-baseline", attempts, ms: Date.now() - started, log: logPath,
+        detail: entry + " was already red when " + task.id + " was claimed; it is foreign to this hand",
+      });
+    }
     // Whether the agent gets told the contract ran is read off the envelope, not
     // guessed from the refusal: every shape of it carries `entries`, and an empty
     // one is the gate saying it stopped before executing anything.
@@ -1108,6 +1151,7 @@ function renderReport(report, plan) {
   lines.push("  " + report.taken.length + " task(s) taken · " + tally.closed + " closed · " +
     tally.blocked + " blocked · " +
     (tally.awaitingVouch ? tally.awaitingVouch + " awaiting a vouch · " : "") +
+    (tally.foreignBaseline ? tally.foreignBaseline + " foreign baseline red · " : "") +
     (tally.closedElsewhere ? tally.closedElsewhere + " closed elsewhere · " : "") +
     (tally.heldElsewhere ? tally.heldElsewhere + " held elsewhere · " : "") +
     (tally.handedOn ? tally.handedOn + " handed on · " : "") +
@@ -1478,7 +1522,7 @@ export function run(argv) {
   // (TL-200): a task the run's own agent closed is closed, and the summary line
   // says so. It is carried separately only because `--json` must still let a
   // caller tell which hand did it.
-  const tally = { closed: 0, blocked: 0, awaitingVouch: 0, closedByAgent: 0, closedElsewhere: 0, heldElsewhere: 0, handedOn: 0 };
+  const tally = { closed: 0, blocked: 0, awaitingVouch: 0, closedByAgent: 0, closedElsewhere: 0, heldElsewhere: 0, handedOn: 0, foreignBaseline: 0 };
   let stopped = "the queue is empty";
   // The one result that ends the run without being a fact about a task (TL-184).
   let neverStarted = null;
@@ -1582,6 +1626,11 @@ export function run(argv) {
       // role this run serves, so the next `next` hands it out again — under the
       // pair key above, which admits a task once per role.
       tally.handedOn++;
+    } else if (result.outcome === "foreign-baseline") {
+      // The claim stays where the hand left it. Releasing it would say the work
+      // is available again; parking it would say this hand failed. Neither fact
+      // follows from a suite red that was present at the claim.
+      tally.foreignBaseline++;
     } else {
       // WORKED, UNVERIFIED IS NOT FAILED (TL-212). A contract that ends in a
       // `manual:` entry is one an agent can satisfy to the last automatic line

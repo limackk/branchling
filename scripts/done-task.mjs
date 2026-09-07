@@ -225,10 +225,16 @@ function today() {
 
 function runBash(command, cwd, capture) {
   const started = Date.now();
+  const env = { ...process.env };
+  // A contract is a child process, not a subtest of the test that happens to
+  // exercise `done`. Letting Node inherit this private runner marker makes
+  // `node --test` silently skip the very proof the contract asked for.
+  delete env.NODE_TEST_CONTEXT;
   const r = spawnSync(command, {
     shell: true,
     cwd,
     encoding: "utf8",
+    env,
     stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit",
     // A whole test suite's transcript is captured here by default (TL-221);
     // Node's 1 MB default would turn a long green run into a spurious failure.
