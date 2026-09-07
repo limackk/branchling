@@ -785,14 +785,20 @@ function run(argv) {
   writeFileSync(file, text, "utf8");
 
   const after = extractMeta(splitFrontmatter(text).frontmatter);
-  recordEdit(root, {
+  try { recordEdit(root, {
     taskId: before.id, before, after, actor, source: "done",
     // Which hand closed it, when the closer said (TL-222). A run serving several
     // roles from one queue passes the role it dispatched on, so the closing entry
     // names the stage rather than leaving it to be guessed from the actor.
     role: plan.role,
     reason: statedReason || REASON_PROVEN,
-  });
+  }); } catch (error) {
+    // A closed file without its append-only explanation is a false close. The
+    // history route can fail (for example a local state directory is unwritable)
+    // after the task write, so restore the exact pre-contract text before returning.
+    writeFileSync(file, raw, "utf8");
+    return refuse(plan, plan.id + ": history could not be recorded; the task was restored", [error.message], results, "history-unwritable");
+  }
 
   // The vouching is an EVENT, not a field change, so it does not come out of
   // diffMeta and has to be written on purpose. Without it a `manual:` entry would

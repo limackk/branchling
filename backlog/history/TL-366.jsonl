@@ -1,1 +1,4 @@
 {"id":"01M1YA2Q0T2GSV5RTFXWWJ8N9X","ts":"2026-09-07T16:09:04.794Z","task":"TL-366","field":"__created__","from":"","to":"A failed history write cannot close a task","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1YFRJEG6WNDD8DJGEAMMDKY","ts":"2026-09-07T17:48:23.888Z","task":"TL-366","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1YFRJEG2KBB0184MH95SB7F","ts":"2026-09-07T17:48:23.888Z","task":"TL-366","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1YFSN6FQV1XCZ7C63HTXV1Z","ts":"2026-09-07T17:48:59.471Z","task":"TL-366","field":"status","from":"in_progress","to":"done","actor":"agent:codex","source":"done","reason":"proven","session":"tree-526f61f2043f"}

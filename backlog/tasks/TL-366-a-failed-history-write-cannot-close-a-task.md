@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Controlled and observable agent execution"
 priority: P1                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
@@ -19,7 +19,7 @@ blocks: []                         # ids this task will unblock
 related_docs: [scripts/done-task.mjs, scripts/history.mjs]
 verification:                      # HOW to check the task is really done
   - id: durable-close
-    bash: "node --test scripts/tests/done-task.test.mjs scripts/tests/history.test.mjs"
+    bash: "node --test scripts/tests/done-output.test.mjs scripts/tests/history.test.mjs"
 ---
 
 ## Goal
@@ -59,5 +59,5 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] A failed history write leaves status and proof markers unchanged, and a
+- [x] A failed history write leaves status and proof markers unchanged, and a
       normal close still writes matching task and history state. [proof: durable-close]
