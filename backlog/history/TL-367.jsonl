@@ -1,1 +1,4 @@
 {"id":"01M1YG9CDF74ES4S1KD9RK74M7","ts":"2026-09-07T17:57:34.767Z","task":"TL-367","field":"__created__","from":"","to":"Detached run JSON follows the public envelope","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1YH2WYE0GMX91G59AT2DNDY","ts":"2026-09-07T18:11:30.894Z","task":"TL-367","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1YH2WYEHKY42W8S9BHJZHTN","ts":"2026-09-07T18:11:30.894Z","task":"TL-367","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1YH78T9YZ3QANZXT56WS9GC","ts":"2026-09-07T18:13:54.121Z","task":"TL-367","field":"status","from":"in_progress","to":"done","actor":"agent:codex","source":"done","reason":"proven","session":"tree-526f61f2043f"}

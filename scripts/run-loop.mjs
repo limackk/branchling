@@ -100,6 +100,7 @@ import { PRODUCT_NAME as N } from "./product.mjs";
 import { inProgressStatus, rebuildViews, todayStamp } from "./take-task.mjs";
 import { ACTOR_NAMESPACES, buildFieldSpecs, extractMeta, fieldSpec, isValidActor, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
 import { readTaskRecords, splitList, unknownFilterValues } from "./task-select.mjs";
+import { printJson } from "./json-envelope.mjs";
 import { MARK, color, failure, warn } from "./ui.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -1337,7 +1338,10 @@ export async function run(argv) {
     });
     child.unref();
     updateRunRecord(root, record, { phase: "starting", supervisor: { pid: child.pid || null, script: fileURLToPath(import.meta.url) } });
-    if (plan.json) console.log(JSON.stringify({ kind: "run", run: record.id, phase: "starting" }));
+    if (plan.json) printJson("run", {
+      run: { ...record, phase: "starting", supervisor: { pid: child.pid || null, script: fileURLToPath(import.meta.url) } },
+      alive: true,
+    });
     else console.log("✓ detached run " + record.id + " started");
     return 0;
   }

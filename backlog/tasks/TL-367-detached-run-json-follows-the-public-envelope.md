@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Controlled and observable agent execution"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 30m
@@ -60,7 +60,7 @@ process and a regression test for it.
 
 ## Acceptance criteria
 
-- [ ] The detached JSON response includes `schemaVersion`, `ok`, `kind`, run
+- [x] The detached JSON response includes `schemaVersion`, `ok`, `kind`, run
       identifier, and initial phase. [proof: detached-json-envelope]
-- [ ] The detached response remains machine-readable JSON and does not change
+- [x] The detached response remains machine-readable JSON and does not change
       the child process lifecycle. [proof: detached-json-envelope]
