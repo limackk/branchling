@@ -359,14 +359,14 @@ async function setupChoice(io, question, options) {
 export async function setupProfileConversation(io, env = process.env, actions = {}) {
   const copyAdapter = actions.copyReferenceAdapter || copyReferenceAdapter;
   const fields = [
-    { key: "name", label: "Profile name (lowercase slug)", required: true },
-    { key: "prompt", label: "Local prompt", required: true },
-    { key: "model", label: "Model (optional)", required: false },
-    { key: "effort", label: "Effort (optional)", required: false },
-    { key: "secret_env", label: "Credential variable names, comma-separated (optional)", required: false },
+    { key: "name", label: "Name this reusable profile (lowercase slug, e.g. codex-reviewer)", required: true },
+    { key: "prompt", label: "What should this agent be responsible for? (e.g. Review changes and report evidence)", required: true },
+    { key: "model", label: "Model identifier (optional; passed to the adapter, e.g. claude-sonnet)", required: false },
+    { key: "effort", label: "Reasoning effort (optional; passed to the adapter, e.g. high)", required: false },
+    { key: "secret_env", label: "Credential variable names (optional; names only, e.g. ANTHROPIC_API_KEY)", required: false },
   ];
   const state = {};
-  io.write("Create an agent profile. Type back or cancel at any prompt.\n");
+  io.write("A profile is a reusable local recipe for starting one agent. It stores no secret values. Type back or cancel at any prompt.\n");
   let index = 0;
   while (index < 1) {
     const field = fields[index];
@@ -379,10 +379,10 @@ export async function setupProfileConversation(io, env = process.env, actions = 
     state[field.key] = answer;
     index++;
   }
-  io.write("\nAdapter source:\n");
-  const sourceChoice = await setupChoice(io, "Adapter source", [
-    { label: "Existing executable I control", value: "1" },
-    { label: "Copy a shipped reference adapter", value: "2" },
+  io.write("\nChoose how Branchling will start this agent. The adapter translates this profile to a provider CLI or API wrapper.\n");
+  const sourceChoice = await setupChoice(io, "How should Branchling start this agent?", [
+    { label: "Use an executable already installed on this computer", hint: "Provide its command or wrapper path.", value: "1" },
+    { label: "Copy a shipped reference adapter", hint: "Start from a local example you can inspect and adapt.", value: "2" },
   ]);
   if (sourceChoice === CANCEL) return { ok: false, kind: "cancelled" };
   if (sourceChoice === BACK) return { ok: false, kind: "cancelled" };
@@ -393,7 +393,7 @@ export async function setupProfileConversation(io, env = process.env, actions = 
     state.adapter = adapter;
   } else if (sourceChoice === "2") {
     const templates = referenceAdapterTemplates();
-    const selected = await setupChoice(io, "Reference adapter", templates.map((template, index) => ({ label: template.label, value: String(index + 1) })));
+    const selected = await setupChoice(io, "Which reference adapter should be copied?", templates.map((template, index) => ({ label: template.label, hint: "Copied locally; it does not contact the provider now.", value: String(index + 1) })));
     if (selected === CANCEL || selected === BACK || !templates[Number(selected) - 1]) return { ok: false, kind: "cancelled" };
     const template = templates[Number(selected) - 1];
     const destination = setupAnswer(await io.ask("Copy destination: "));
@@ -469,17 +469,17 @@ export async function setupFleetConversation(io, env = process.env, actions = {}
   if (!roles.length) return { ok: false, kind: "no-roles", problems: ["this backlog declares no roles"] };
   if (profiles.problems.length) return { ok: false, kind: "invalid-store", problems: profiles.problems };
   if (!profiles.profiles.length) return { ok: false, kind: "no-profiles", problems: ["create one profile first with `profile setup`"] };
-  io.write("Create a named specialist fleet. Existing local profiles: " + profiles.profiles.map((p) => p.name).join(", ") + "\n");
-  const name = setupAnswer(await io.ask("Launch name (lowercase slug): "));
+  io.write("A specialist fleet routes repository roles to existing local profiles. Existing profiles: " + profiles.profiles.map((p) => p.name).join(", ") + "\n");
+  const name = setupAnswer(await io.ask("Name this reusable routing map (lowercase slug, e.g. delivery-team): "));
   if (name === CANCEL || name === BACK) return { ok: false, kind: "cancelled" };
   const profileFor = {};
   for (const role of roles) {
-    const selected = setupAnswer(await io.ask("Profile for role `" + role + "` (blank skips it): "));
+    const selected = setupAnswer(await io.ask("Which profile should handle repository role `" + role + "`? (blank leaves it unassigned): "));
     if (selected === CANCEL || selected === BACK) return { ok: false, kind: "cancelled" };
     if (selected && !profiles.profiles.some((p) => p.name === selected)) return { ok: false, kind: "missing-profile", problems: ["no local profile `" + selected + "`"] };
     if (selected) profileFor[role] = selected;
   }
-  const generalist = setupAnswer(await io.ask("Generalist profile (blank for none): "));
+  const generalist = setupAnswer(await io.ask("Which profile should handle tasks with no matching role? (blank for none): "));
   if (generalist === CANCEL || generalist === BACK) return { ok: false, kind: "cancelled" };
   if (generalist && !profiles.profiles.some((p) => p.name === generalist)) return { ok: false, kind: "missing-profile", problems: ["no local profile `" + generalist + "`"] };
   io.write("\nFleet summary:\n  name: " + name + "\n  generalist: " + (generalist || "(none)") + "\n  roles: " + Object.entries(profileFor).map(([r, p]) => r + "=" + p).join(", ") + "\n");
@@ -508,8 +508,9 @@ async function runSetup(env = process.env, input = process.stdin, output = proce
   };
   try {
     clack.intro("Configure " + N);
-    const mode = await setupChoice(io, "Configuration", [
-      { label: "One generalist profile", value: "1" }, { label: "A specialist fleet", value: "2" },
+    const mode = await setupChoice(io, "What do you want to configure?", [
+      { label: "One agent for general work", hint: "Recommended first setup. Use it for any task.", value: "1" },
+      { label: "A specialist fleet", hint: "Advanced: route repository roles to different profiles.", value: "2" },
     ]);
     if (mode === CANCEL) { clack.cancel("No configuration was created."); return 0; }
     const result = mode === "2" ? await setupFleetConversation(io, env) : mode === "1" ? await setupProfileConversation(io, env) : { ok: false, kind: "cancelled" };

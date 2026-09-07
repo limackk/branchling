@@ -1,0 +1,5 @@
+{"id":"01M1XFCCFDPAGH739G74BZQ2N4","ts":"2026-09-07T08:22:30.125Z","task":"TL-330","field":"__created__","from":"","to":"Profile setup explains every decision before asking for it","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XFJA58BCVSV7X6RKWYZ006","ts":"2026-09-07T08:25:44.360Z","task":"TL-330","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XFJA58X471VZHC16TQP62Q","ts":"2026-09-07T08:25:44.360Z","task":"TL-330","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XFKKK0CK667F8QRAAM0SJP","ts":"2026-09-07T08:26:26.784Z","task":"TL-330","field":"epic","from":"","to":"Guided setup clarity","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M1XFMT5JG773FPR48Y2CDRQK","ts":"2026-09-07T08:27:06.290Z","task":"TL-330","field":"status","from":"in_progress","to":"done","actor":"agent:codex","source":"done","reason":"proven","session":"tree-526f61f2043f"}
