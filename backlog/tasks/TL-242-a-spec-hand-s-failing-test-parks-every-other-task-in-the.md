@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P0
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
-role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
+status: pending  # pending | in_progress | blocked | done | cancelled
+owner: ""
+role: dev  # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-07
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
@@ -79,6 +79,21 @@ neighbour until the second stage lands.
    parked while a foreign test is red. The positive control is a task whose OWN
    entry fails, which must still be parked.
 
+## Acceptance criteria
+
+- [ ] A suite failure already present when the task is claimed is classified apart
+  from a failure introduced by that task. [proof: a-neighbours-red-does-not-park-me]
+- [ ] When the task's own entry passes and only the baseline failure remains, the
+  run reports that fact, makes no second attempt, and leaves the task claimed
+  rather than parking or releasing it. [proof: a-neighbours-red-does-not-park-me]
+- [ ] When the hand introduces a failure in the task's own entry, the run still
+  exhausts the configured attempts and parks the task with a reason naming that
+  entry. [proof: a-neighbours-red-does-not-park-me]
+- [ ] The complete automated test suite remains green after the implementation.
+  [proof: suite-green]
+- [ ] The repository consistency guards remain green after the implementation.
+  [proof: guards-green]
+
 ## Open question
 
 **What does a run do when a contract's suite entry is red for a foreign reason?**
@@ -96,6 +111,14 @@ neighbour until the second stage lands.
    point of the split.
 
 ## Decisions
+
+**The run compares a red contract entry with its state at claim time.** A
+failure already present before the agent starts is foreign to this task: it is
+reported as such and must not consume the task's failure budget or park it.
+This preserves whole-suite contracts without adding a task-specific vocabulary;
+the loop can measure the distinction from its own baseline. A newly introduced
+or still-present failure that was not in that baseline remains this task's
+failure and is parked after the configured attempts.
 
 **"Run spec and dev per task, alternating" was dismissed here too quickly.**
 This task first said it "only shrinks the window". Measured afterwards, it
