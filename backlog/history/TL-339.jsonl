@@ -1,0 +1,4 @@
+{"id":"01M1XNK8970TNJ6EEFR1Y84A7J","ts":"2026-09-07T10:11:06.663Z","task":"TL-339","field":"__created__","from":"","to":"Guided fleet setup selects project-local routing without typed names","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XNKHP7GCK8M49DY53EY565","ts":"2026-09-07T10:11:16.295Z","task":"TL-339","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XNKHP7B5YA9DGYVQD89P3V","ts":"2026-09-07T10:11:16.295Z","task":"TL-339","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XNPA7PTZKDWQBYB72H4VGV","ts":"2026-09-07T10:12:46.966Z","task":"TL-339","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven","session":"tree-526f61f2043f"}

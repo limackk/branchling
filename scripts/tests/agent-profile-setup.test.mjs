@@ -8,6 +8,7 @@ import { spawnSync } from "node:child_process";
 
 import { agentProfilesPath, HOME_ENV, homePaths } from "../home.mjs";
 import { parseAgentProfiles, setupFailureMessage, setupFleetConversation, setupModes, setupProfileConversation } from "../agent-profiles.mjs";
+import { projectAgentLaunchesPath } from "../agent-launches.mjs";
 import { SCRIPTS_DIR } from "./_repo.mjs";
 
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
@@ -152,9 +153,24 @@ test("a fleet interview writes one ordinary local launch and cancellation writes
   const cancelled = await setupFleetConversation(transcript(["cancel"]).io, fx.env, { resolveBacklog: () => ({ root: backlog }) });
   assert.equal(cancelled.ok, false);
   assert.equal(readFileSync(agentProfilesPath(fx.env), "utf8"), beforeProfiles);
-  const created = await setupFleetConversation(transcript(["team", "project", "developer", "", "1"]).io, fx.env, { resolveBacklog: () => ({ root: backlog }) });
+  const fleet = transcript(["team", "1", "2", "1", "1"]);
+  const created = await setupFleetConversation(fleet.io, fx.env, { resolveBacklog: () => ({ root: backlog }) });
   assert.equal(created.ok, true, JSON.stringify(created));
   assert.equal(created.launch.profile_for, "dev=developer");
+  assert.match(fleet.out.join(""), /scope: this Git project/);
+  assert.match(fleet.out.join(""), /Leave `dev` unassigned[\s\S]*developer/);
+});
+
+test("an invalid typed fleet profile fails before its project launch is written", async () => {
+  const fx = fixture();
+  const adapter = join(fx.root, "adapter"); writeFileSync(adapter, "#!/bin/sh\nexit 0\n", "utf8");
+  assert.equal((await setupProfileConversation(transcript(["developer", "2", adapter, "Work", "", "", "", "1"]).io, fx.env)).ok, true);
+  const backlog = join(fx.root, "backlog");
+  assert.equal(spawnSync(process.execPath, [CLI, "init", "--dir", backlog, "--no-example"], { encoding: "utf8", env: fx.env }).status, 0);
+  const config = join(backlog, "config.yaml"); writeFileSync(config, readFileSync(config, "utf8") + "\nroles: [dev]\n", "utf8");
+  const result = await setupFleetConversation(transcript(["bad-team", "1", "missing"]).io, fx.env, { resolveBacklog: () => ({ root: backlog }) });
+  assert.equal(result.ok, false);
+  assert.equal(existsSync(projectAgentLaunchesPath(backlog, fx.env)), false);
 });
 
 test("the process refuses interactive setup in a pipe and refuses JSON", () => {

@@ -567,22 +567,26 @@ export async function setupFleetConversation(io, env = process.env, actions = {}
   const name = setupAnswer(await io.ask("Name this reusable routing map (lowercase slug, e.g. delivery-team): "));
   if (name === CANCEL || name === BACK || !name) return { ok: false, kind: "cancelled" };
   const scope = await setupChoice(io, "Where should this fleet routing be available?", [
-    { label: "Every project on this machine", hint: "Use a reusable role-to-profile arrangement.", value: "global" },
-    { label: "Only this Git project", hint: "Keep this repository's role routing private here.", value: "project" },
+    { label: "Only this Git project", hint: "Recommended: keep this repository's role routing private here.", value: "project" },
+    { label: "Every project on this machine", hint: "Choose this for a deliberately reusable role-to-profile arrangement.", value: "global" },
   ]);
   if (scope === CANCEL) return { ok: false, kind: "cancelled" };
   const scopeRoot = scope === "project" ? root : null;
   const profileFor = {};
+  const choices = (unassigned) => [
+    { label: unassigned, hint: "Leave this routing intentionally unset.", value: "" },
+    ...profiles.profiles.map((profile) => ({ label: profile.name, hint: profile.model ? "Model: " + profile.model : "No model identifier set.", value: profile.name })),
+  ];
   for (const role of roles) {
-    const selected = setupAnswer(await io.ask("Which profile should handle repository role `" + role + "`? (blank leaves it unassigned): "));
+    const selected = await setupChoice(io, "Which profile should handle repository role `" + role + "`?", choices("Leave `" + role + "` unassigned"));
     if (selected === CANCEL || selected === BACK) return { ok: false, kind: "cancelled" };
     if (selected && !profiles.profiles.some((p) => p.name === selected)) return { ok: false, kind: "missing-profile", problems: ["no local profile `" + selected + "`"] };
     if (selected) profileFor[role] = selected;
   }
-  const generalist = setupAnswer(await io.ask("Which profile should handle tasks with no matching role? (blank for none): "));
+  const generalist = await setupChoice(io, "Which profile should handle tasks with no matching role?", choices("Leave general work unassigned"));
   if (generalist === CANCEL || generalist === BACK) return { ok: false, kind: "cancelled" };
   if (generalist && !profiles.profiles.some((p) => p.name === generalist)) return { ok: false, kind: "missing-profile", problems: ["no local profile `" + generalist + "`"] };
-  io.write("\nFleet summary:\n  name: " + name + "\n  generalist: " + (generalist || "(none)") + "\n  roles: " + Object.entries(profileFor).map(([r, p]) => r + "=" + p).join(", ") + "\n");
+  io.write("\nFleet summary:\n  name: " + name + "\n  scope: " + (scopeRoot ? "this Git project" : "every project on this machine") + "\n  generalist: " + (generalist || "(none)") + "\n  roles: " + Object.entries(profileFor).map(([r, p]) => r + "=" + p).join(", ") + "\n");
   const confirm = await setupChoice(io, "Create this launch", [
     { label: "Create launch", value: "1" }, { label: "Cancel", value: "3" },
   ]);
