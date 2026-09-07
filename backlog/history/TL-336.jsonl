@@ -1,0 +1,4 @@
+{"id":"01M1XM20NQ6Y6WNJQ0WEZG3MKP","ts":"2026-09-07T09:44:13.239Z","task":"TL-336","field":"__created__","from":"","to":"Guided setup suggests a safe adapter copy destination","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XM30R0B1S77SNGQSHZNTYF","ts":"2026-09-07T09:44:46.080Z","task":"TL-336","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XM30R0WVWZQ4E0RWBAXRR4","ts":"2026-09-07T09:44:46.080Z","task":"TL-336","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1XM5716Y68NKD9K3YMY7YXG","ts":"2026-09-07T09:45:58.054Z","task":"TL-336","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven","session":"tree-526f61f2043f"}

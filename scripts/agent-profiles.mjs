@@ -12,12 +12,12 @@
 
 import { accessSync, chmodSync, constants, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as clack from "@clack/prompts";
 
 import { ADAPTER_PROTOCOL_VERSION, PROFILE_PROBE_ENV, PROFILE_PROBE_OUTCOMES, PROFILE_PROTOCOL_VERSION_ENV } from "./agent-contract.mjs";
-import { agentProfilesPath, ensureHome } from "./home.mjs";
+import { agentProfilesPath, ensureHome, homePaths } from "./home.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { stripComment, unquote } from "./task-fields.mjs";
@@ -206,6 +206,13 @@ export function referenceAdapterTemplates() {
     { id: "codex-cli", label: "Codex CLI", source: resolve(HERE, "..", "examples", "agent-adapters", "codex-cli.mjs") },
     { id: "ollama", label: "Ollama local model", source: resolve(HERE, "..", "examples", "agent-adapters", "ollama.mjs") },
   ];
+}
+
+/** User profiles are portable across repositories, so their copied adapters
+ * live beside that user-owned configuration rather than in whichever project
+ * happened to be current during setup. */
+export function suggestedReferenceAdapterDestination(template, env = process.env) {
+  return join(homePaths(env).config, "adapters", template.id + ".mjs");
 }
 
 /** Copy a versioned local example without downloading or running it. */
@@ -413,7 +420,9 @@ export async function setupProfileConversation(io, env = process.env, actions = 
     const selected = await setupChoice(io, "Which reference adapter should be copied?", templates.map((template, index) => ({ label: template.label, hint: "Copied locally; it does not contact the provider now.", value: String(index + 1) })));
     if (selected === CANCEL || selected === BACK || !templates[Number(selected) - 1]) return { ok: false, kind: "cancelled" };
     const template = templates[Number(selected) - 1];
-    const destination = setupAnswer(await io.ask("Copy destination: "));
+    const suggestedDestination = suggestedReferenceAdapterDestination(template, env);
+    io.write("Recommended: " + suggestedDestination + " keeps this editable adapter with your local profiles. Press Enter to use it, or provide a project-specific path.\n");
+    const destination = setupAnswer(await io.ask("Copy destination [" + suggestedDestination + "]: "), suggestedDestination);
     if (destination === CANCEL || destination === BACK || !destination) return { ok: false, kind: "cancelled" };
     reference = { template, destination };
     state.adapter = resolve(destination);

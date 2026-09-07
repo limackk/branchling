@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
-import { agentProfilesPath, HOME_ENV } from "../home.mjs";
+import { agentProfilesPath, HOME_ENV, homePaths } from "../home.mjs";
 import { parseAgentProfiles, setupFailureMessage, setupFleetConversation, setupModes, setupProfileConversation } from "../agent-profiles.mjs";
 import { SCRIPTS_DIR } from "./_repo.mjs";
 
@@ -81,15 +81,27 @@ test("back from adapter source revisits the profile identity before writing", as
   assert.match(readFileSync(agentProfilesPath(fx.env), "utf8"), /name: second/);
 });
 
-test("a shipped reference is copied locally without downloading or launching it", async () => {
+test("a shipped reference accepts its user-owned recommended destination without downloading or launching it", async () => {
+  const fx = fixture();
+  const destination = join(homePaths(fx.env).config, "adapters", "claude-code.mjs");
+  const t = transcript(["generalist", "2", "1", "", "Work", "", "", "", "1"]);
+  const result = await setupProfileConversation(t.io, fx.env);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(existsSync(destination), true);
+  assert.match(readFileSync(destination, "utf8"), /Claude Code/);
+  assert.match(readFileSync(agentProfilesPath(fx.env), "utf8"), new RegExp(destination.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(t.out.join(""), /Recommended:/);
+  assert.match(t.out.join(""), /project-specific path/);
+});
+
+test("a supplied adapter destination overrides the recommendation", async () => {
   const fx = fixture();
   const destination = join(fx.root, "adapters", "claude.mjs");
   const t = transcript(["generalist", "2", "1", destination, "Work", "", "", "", "1"]);
   const result = await setupProfileConversation(t.io, fx.env);
   assert.equal(result.ok, true, JSON.stringify(result));
   assert.equal(existsSync(destination), true);
-  assert.match(readFileSync(destination, "utf8"), /Claude Code/);
-  assert.match(readFileSync(agentProfilesPath(fx.env), "utf8"), new RegExp(destination.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.equal(existsSync(join(homePaths(fx.env).config, "adapters", "claude-code.mjs")), false);
 });
 
 test("a fleet interview writes one ordinary local launch and cancellation writes neither store", async () => {
