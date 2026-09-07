@@ -22,6 +22,7 @@ import { printJson } from "./json-envelope.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { stripComment, unquote } from "./task-fields.mjs";
 import { failure, heading, table } from "./ui.mjs";
+import { selectChoice } from "./terminal-ui.mjs";
 import { createAgentLaunch } from "./agent-launches.mjs";
 import { loadConfig } from "./config.mjs";
 import { resolveBacklogDir } from "./paths.mjs";
@@ -341,6 +342,16 @@ function setupAnswer(value, fallback = "") {
   return text || fallback;
 }
 
+/** A choice may be enhanced by raw keys, but test transcripts remain text. */
+async function setupChoice(io, question, options) {
+  if (typeof io.choose === "function") {
+    const result = await io.choose(question, options);
+    return result.ok ? setupAnswer(result.value) : CANCEL;
+  }
+  io.write(options.map((option, index) => (index + 1) + ") " + option.label).join("\n") + "\n");
+  return setupAnswer(await io.ask(question + " [1-" + options.length + "]: "));
+}
+
 /**
  * The setup state machine is terminal-independent so its cancellation and write
  * boundary can be tested without a pseudo-terminal.
@@ -368,8 +379,11 @@ export async function setupProfileConversation(io, env = process.env, actions = 
     state[field.key] = answer;
     index++;
   }
-  io.write("\nAdapter source:\n1) Existing executable I control\n2) Copy a shipped reference adapter\n");
-  const sourceChoice = setupAnswer(await io.ask("Choice [1/2]: "));
+  io.write("\nAdapter source:\n");
+  const sourceChoice = await setupChoice(io, "Adapter source", [
+    { label: "Existing executable I control", value: "1" },
+    { label: "Copy a shipped reference adapter", value: "2" },
+  ]);
   if (sourceChoice === CANCEL) return { ok: false, kind: "cancelled" };
   if (sourceChoice === BACK) return { ok: false, kind: "cancelled" };
   let reference = null;
@@ -379,8 +393,7 @@ export async function setupProfileConversation(io, env = process.env, actions = 
     state.adapter = adapter;
   } else if (sourceChoice === "2") {
     const templates = referenceAdapterTemplates();
-    io.write(templates.map((t, i) => (i + 1) + ") " + t.label).join("\n") + "\n");
-    const selected = setupAnswer(await io.ask("Reference adapter: "));
+    const selected = await setupChoice(io, "Reference adapter", templates.map((template, index) => ({ label: template.label, value: String(index + 1) })));
     if (selected === CANCEL || selected === BACK || !templates[Number(selected) - 1]) return { ok: false, kind: "cancelled" };
     const template = templates[Number(selected) - 1];
     const destination = setupAnswer(await io.ask("Copy destination: "));
@@ -407,8 +420,10 @@ export async function setupProfileConversation(io, env = process.env, actions = 
   const source = reference ? "reference " + reference.template.label + " -> " + state.adapter : "custom executable";
   io.write("\nProfile summary:\n  name: " + state.name + "\n  adapter: " + state.adapter
     + "\n  model: " + (state.model || "(none)") + "\n  effort: " + (state.effort || "(none)")
-    + secret + "\n  source: " + source + "\n\n1) Create profile\n2) Back\n3) Cancel\n");
-  const confirmation = setupAnswer(await io.ask("Choice [1/2/3]: "));
+    + secret + "\n  source: " + source + "\n\n");
+  const confirmation = await setupChoice(io, "Create this profile", [
+    { label: "Create profile", value: "1" }, { label: "Back", value: "2" }, { label: "Cancel", value: "3" },
+  ]);
   if (confirmation === CANCEL || confirmation === "3") return { ok: false, kind: "cancelled" };
   if (confirmation === BACK || confirmation === "2") {
     index = fields.length - 1;
@@ -422,7 +437,9 @@ export async function setupProfileConversation(io, env = process.env, actions = 
       index++;
     }
     io.write("\nProfile summary confirmed after edits.\n");
-    const retry = setupAnswer(await io.ask("Create profile? [1=create, 3=cancel]: "));
+    const retry = await setupChoice(io, "Create this profile", [
+      { label: "Create profile", value: "1" }, { label: "Cancel", value: "3" },
+    ]);
     if (retry === CANCEL || retry === "3" || retry !== "1") return { ok: false, kind: "cancelled" };
   } else if (confirmation !== "1") {
     io.write("Choose 1, 2 or 3. Nothing was written.\n");
@@ -466,7 +483,9 @@ export async function setupFleetConversation(io, env = process.env, actions = {}
   if (generalist === CANCEL || generalist === BACK) return { ok: false, kind: "cancelled" };
   if (generalist && !profiles.profiles.some((p) => p.name === generalist)) return { ok: false, kind: "missing-profile", problems: ["no local profile `" + generalist + "`"] };
   io.write("\nFleet summary:\n  name: " + name + "\n  generalist: " + (generalist || "(none)") + "\n  roles: " + Object.entries(profileFor).map(([r, p]) => r + "=" + p).join(", ") + "\n");
-  const confirm = setupAnswer(await io.ask("Create launch? [1=create, 3=cancel]: "));
+  const confirm = await setupChoice(io, "Create this launch", [
+    { label: "Create launch", value: "1" }, { label: "Cancel", value: "3" },
+  ]);
   if (confirm === CANCEL || confirm === "3" || confirm !== "1") return { ok: false, kind: "cancelled" };
   return createAgentLaunch(name, generalist, profileFor, env);
 }
@@ -477,10 +496,20 @@ async function runSetup(env = process.env, input = process.stdin, output = proce
     return 2;
   }
   const terminal = createInterface({ input, output, terminal: true });
-  const io = { ask: (question) => terminal.question(question), write: (text) => output.write(text) };
+  const io = {
+    ask: (question) => terminal.question(question),
+    write: (text) => output.write(text),
+    choose: async (question, options) => {
+      terminal.pause();
+      try { return await selectChoice(question, options, { input, output, env }); }
+      finally { terminal.resume(); }
+    },
+  };
   try {
-    output.write("Configure: 1) one generalist profile  2) a specialist fleet\n");
-    const mode = setupAnswer(await io.ask("Choice [1/2]: "));
+    output.write("Configure:\n");
+    const mode = await setupChoice(io, "Configuration", [
+      { label: "One generalist profile", value: "1" }, { label: "A specialist fleet", value: "2" },
+    ]);
     if (mode === CANCEL) { output.write("No configuration was created.\n"); return 0; }
     const result = mode === "2" ? await setupFleetConversation(io, env) : mode === "1" ? await setupProfileConversation(io, env) : { ok: false, kind: "cancelled" };
     if (!result.ok) { output.write("No profile was created.\n"); return result.kind === "cancelled" ? 0 : 1; }
