@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Provider-neutral agent execution"
 priority: P1                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1d
@@ -16,7 +16,7 @@ created: 2026-09-07
 updated: 2026-09-07
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
-related_docs: [scripts/agent-contract.mjs, scripts/agent-profiles.mjs, scripts/agent-adapter-conformance.mjs, examples/agent-adapters/ollama.mjs, examples/agent-adapters/codex-cli.mjs] # paths relative to the repository root
+related_docs: [scripts/agent-contract.mjs, scripts/agent-profiles.mjs, scripts/tests/agent-adapter-conformance.test.mjs, examples/agent-adapters/ollama.mjs, examples/agent-adapters/codex-cli.mjs] # paths relative to the repository root
 verification:                      # HOW to check the task is really done
   - id: catalog-contract
     bash: "node --test scripts/tests/agent-model-catalog.test.mjs scripts/tests/agent-adapter-conformance.test.mjs"
@@ -69,9 +69,9 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] A local Ollama catalogue lists only locally installed model names and an
+- [x] A local Ollama catalogue lists only locally installed model names and an
   absent requested name fails before a run. [proof: catalog-contract]
-- [ ] A provider that cannot list account-specific aliases reports that limit;
+- [x] A provider that cannot list account-specific aliases reports that limit;
   Branchling never labels an arbitrary override as verified. [proof: catalog-contract]
-- [ ] Catalog discovery is an explicit opt-in and no credential value appears
+- [x] Catalog discovery is an explicit opt-in and no credential value appears
   in its human or JSON output. [proof: catalog-contract]

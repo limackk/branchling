@@ -16,7 +16,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as clack from "@clack/prompts";
 
-import { ADAPTER_PROTOCOL_VERSION, PROFILE_PROBE_ENV, PROFILE_PROBE_OUTCOMES, PROFILE_PROTOCOL_VERSION_ENV } from "./agent-contract.mjs";
+import { ADAPTER_PROTOCOL_VERSION, MODEL_CATALOG_ENV, MODEL_CATALOG_OUTCOMES, PROFILE_PROBE_ENV, PROFILE_PROBE_OUTCOMES, PROFILE_PROTOCOL_VERSION_ENV } from "./agent-contract.mjs";
 import { agentProfilesPath, ensureHome, homePaths } from "./home.mjs";
 import { lockScope } from "./lock.mjs";
 import { printJson } from "./json-envelope.mjs";
@@ -318,7 +318,29 @@ export function liveProbe(profile, env = process.env) {
   } catch { return { ok: false, state: "probe-failed", outcome: null }; }
 }
 
-const SUBCOMMANDS = ["create", "list", "show", "update", "remove", "check", "setup"];
+/** An opt-in adapter operation. Its bounded JSON result is the only provider
+ * output that reaches the terminal, so diagnostics cannot expose a secret. */
+export function modelCatalog(profile, env = process.env) {
+  const executable = adapterPath(profile.adapter, env);
+  if (!executable) return { ok: false, state: "adapter-unavailable", outcome: "unavailable", models: [] };
+  const catalogEnv = { PATH: env.PATH || "", [MODEL_CATALOG_ENV]: "1", [PROFILE_PROTOCOL_VERSION_ENV]: String(ADAPTER_PROTOCOL_VERSION) };
+  if (profile.model) catalogEnv[String(N).toUpperCase().replace(/[^A-Z0-9]+/g, "_") + "_MODEL"] = profile.model;
+  for (const key of secretEnvironmentNames(profile)) if (Object.prototype.hasOwnProperty.call(env, key)) catalogEnv[key] = env[key];
+  const child = spawnSync(executable, [], { shell: false, encoding: "utf8", env: catalogEnv, timeout: 15_000, maxBuffer: 64 * 1024 });
+  if (child.error || child.status !== 0) return { ok: false, state: "catalog-unavailable", outcome: "unavailable", models: [] };
+  try {
+    const response = JSON.parse(String(child.stdout || "").trim());
+    if (response.version !== ADAPTER_PROTOCOL_VERSION || !MODEL_CATALOG_OUTCOMES.includes(response.outcome)) throw new Error("invalid response");
+    if (response.outcome === "not-verifiable") return { ok: true, state: "not-verifiable", outcome: response.outcome, models: [], detail: String(response.detail || "Model aliases cannot be listed by this adapter.") };
+    if (response.outcome !== "listed" || !Array.isArray(response.models) || response.models.some((model) => typeof model !== "string")) throw new Error("invalid models");
+    const models = [...new Set(response.models)].sort();
+    const selected = String(profile.model || "");
+    if (selected && !models.includes(selected)) return { ok: false, state: "selected-model-missing", outcome: "listed", models, selected };
+    return { ok: true, state: "listed", outcome: "listed", models, selected: selected || null };
+  } catch { return { ok: false, state: "catalog-invalid", outcome: "unavailable", models: [] }; }
+}
+
+const SUBCOMMANDS = ["create", "list", "show", "update", "remove", "check", "models", "setup"];
 const FLAGS = ["--adapter", "--model", "--effort", "--prompt", "--prompt-file", "--secret-env", "--protocol-version", "--live", "--json"];
 
 export function parseAgentProfilesArgs(args) {
@@ -339,10 +361,11 @@ export function parseAgentProfilesArgs(args) {
     if (plan.name !== null) throw new Error("two profile names: " + plan.name + ", " + arg);
     plan.name = arg;
   }
-  if (["create", "show", "update", "remove"].indexOf(subcommand) >= 0 && !plan.name) {
+  if (["create", "show", "update", "remove", "models"].indexOf(subcommand) >= 0 && !plan.name) {
     throw new Error(subcommand + " needs a profile name");
   }
   if (subcommand === "list" && plan.name) throw new Error("list takes no profile name");
+  if (subcommand === "models" && Object.keys(plan.fields).length) throw new Error("models takes a profile name and optional `--json`");
   if (subcommand === "setup" && (plan.name || Object.keys(plan.fields).length || plan.json || plan.live)) {
     throw new Error("setup is interactive and takes no names or flags");
   }
@@ -444,25 +467,25 @@ export async function setupProfileConversation(io, env = process.env, actions = 
     if (scope === CANCEL) return { ok: false, kind: "cancelled" };
     scopeRoot = scope === "project" ? projectRoot : null;
   }
-  io.write("\nChoose how Branchling will start this agent. The adapter translates this profile to a provider CLI or API wrapper.\n");
-  let sourceChoice = await setupChoice(io, "How should Branchling start this agent?", [
+  io.write("\nChoose how " + N + " will start this agent. The adapter translates this profile to a provider CLI or API wrapper.\n");
+  let sourceChoice = await setupChoice(io, "How should " + N + " start this agent?", [
     { label: "Copy a shipped reference adapter", hint: "Recommended: start from a local example you can inspect and adapt.", value: "reference" },
-    { label: "Use my own Branchling adapter", hint: "Advanced: only if you already created an adapter wrapper.", value: "custom" },
+    { label: "Use my own " + N + " adapter", hint: "Advanced: only if you already created an adapter wrapper.", value: "custom" },
   ], true);
   if (sourceChoice === CANCEL) return { ok: false, kind: "cancelled" };
   if (sourceChoice === BACK) {
     const answer = setupAnswer(await io.ask(fields[0].label + " [" + state.name + "]: "), state.name);
     if (answer === CANCEL || answer === BACK || !answer) return { ok: false, kind: "cancelled" };
     state.name = answer;
-    sourceChoice = await setupChoice(io, "How should Branchling start this agent?", [
+    sourceChoice = await setupChoice(io, "How should " + N + " start this agent?", [
       { label: "Copy a shipped reference adapter", hint: "Recommended: start from a local example you can inspect and adapt.", value: "reference" },
-      { label: "Use my own Branchling adapter", hint: "Advanced: only if you already created an adapter wrapper.", value: "custom" },
+      { label: "Use my own " + N + " adapter", hint: "Advanced: only if you already created an adapter wrapper.", value: "custom" },
     ], true);
   }
   if (sourceChoice === CANCEL || sourceChoice === BACK) return { ok: false, kind: "cancelled" };
   let reference = null;
   if (sourceChoice === "custom") {
-    io.write("Enter the path to your executable Branchling adapter wrapper. This is not `claude` and not a model name. Example: /Users/you/bin/my-agent-adapter.mjs\n");
+    io.write("Enter the path to your executable " + N + " adapter wrapper. This is not `claude` and not a model name. Example: /Users/you/bin/my-agent-adapter.mjs\n");
     const adapter = setupAnswer(await io.ask("Path to your adapter executable: "));
     if (adapter === CANCEL || adapter === BACK || !adapter) return { ok: false, kind: "cancelled" };
     state.adapter = adapter;
@@ -472,13 +495,13 @@ export async function setupProfileConversation(io, env = process.env, actions = 
       const selected = await setupChoice(io, "Which reference adapter should be copied?", templates.map((template, index) => ({ label: template.label, hint: "Copied locally; it does not contact the provider now.", value: String(index + 1) })), true);
       if (selected === CANCEL) return { ok: false, kind: "cancelled" };
       if (selected === BACK) {
-        const alternative = await setupChoice(io, "How should Branchling start this agent?", [
+        const alternative = await setupChoice(io, "How should " + N + " start this agent?", [
           { label: "Copy a shipped reference adapter", hint: "Recommended: start from a local example you can inspect and adapt.", value: "reference" },
-          { label: "Use my own Branchling adapter", hint: "Advanced: only if you already created an adapter wrapper.", value: "custom" },
+          { label: "Use my own " + N + " adapter", hint: "Advanced: only if you already created an adapter wrapper.", value: "custom" },
         ], true);
         if (alternative === CANCEL || alternative === BACK) return { ok: false, kind: "cancelled" };
         if (alternative === "reference") continue;
-        io.write("Enter the path to your executable Branchling adapter wrapper. This is not `claude` and not a model name. Example: /Users/you/bin/my-agent-adapter.mjs\n");
+        io.write("Enter the path to your executable " + N + " adapter wrapper. This is not `claude` and not a model name. Example: /Users/you/bin/my-agent-adapter.mjs\n");
         const adapter = setupAnswer(await io.ask("Path to your adapter executable: "));
         if (adapter === CANCEL || adapter === BACK || !adapter) return { ok: false, kind: "cancelled" };
         state.adapter = adapter;
@@ -499,10 +522,30 @@ export async function setupProfileConversation(io, env = process.env, actions = 
     return { ok: false, kind: "cancelled" };
   }
   index = 1;
+  let modelSourceAsked = false;
   while (index < fields.length) {
     const field = fields[index];
     const current = state[field.key] || "";
     const modelRequirement = field.key === "model" && reference && reference.template.model;
+    if (modelRequirement && !current && !modelSourceAsked) {
+      modelSourceAsked = true;
+      const source = await setupChoice(io, "How should you choose the required Ollama model?", [
+        { label: "Enter a model name", hint: "Use a name from `ollama list`.", value: "manual" },
+        { label: "Discover locally installed models now", hint: "Explicitly runs only `ollama list`; it does not start a model.", value: "discover" },
+      ]);
+      if (source === CANCEL || source === BACK) return { ok: false, kind: "cancelled" };
+      if (source === "discover") {
+        const catalogue = modelCatalog({ adapter: reference.template.source }, env);
+        if (catalogue.state === "listed" && catalogue.models.length) {
+          const selected = await setupChoice(io, "Choose a locally installed Ollama model", catalogue.models.map((model) => ({ label: model, value: model })));
+          if (selected === CANCEL || selected === BACK) return { ok: false, kind: "cancelled" };
+          state.model = selected;
+          index++;
+          continue;
+        }
+        io.write("Local model discovery was unavailable. Enter a name from `ollama list` instead.\n");
+      }
+    }
     const fallback = field.key === "prompt" ? (current || DEFAULT_GENERALIST_PROMPT) : current;
     const suffix = current ? ` [${current}]` : field.key === "prompt" ? ` [${DEFAULT_GENERALIST_PROMPT}]` : "";
     if (modelRequirement) io.write(modelRequirement.hint + "\n");
@@ -708,6 +751,24 @@ function checkAnswer(plan, checked, env) {
   return ok ? 0 : 1;
 }
 
+function catalogAnswer(plan, result) {
+  if (plan.json) { printJson("profile-models", result); return result.ok ? 0 : 1; }
+  if (result.state === "not-verifiable") {
+    console.log("? model aliases not verifiable\n  " + result.detail);
+    return 0;
+  }
+  if (result.state === "listed") {
+    console.log(heading("available models") + "\n" + (result.models.length ? "\n" + table(result.models.map((model) => [model, model === result.selected ? "selected" : ""])) : "\n  no local models found"));
+    return 0;
+  }
+  if (result.state === "selected-model-missing") {
+    console.error(failure(N + " profile models", "selected model `" + result.selected + "` is not installed locally", ["Run `ollama pull " + result.selected + "`, then run this command again."]));
+    return 1;
+  }
+  console.error(failure(N + " profile models", "model catalogue is unavailable", ["The adapter did not return a valid local model catalogue."]));
+  return 1;
+}
+
 export async function run(argv, env = process.env) {
   if (argv[0] === "setup" && argv[1] === "--help" && argv.length === 2) { console.log(SETUP_USAGE); return 0; }
   let plan;
@@ -726,6 +787,10 @@ export async function run(argv, env = process.env) {
     return 1;
   }
   const found = plan.name ? store.profiles.find((p) => p.name === plan.name) : null;
+  if (plan.subcommand === "models") {
+    if (!found) return catalogAnswer(plan, { ok: false, state: "missing-profile", outcome: "unavailable", models: [], detail: "No profile `" + plan.name + "`." });
+    return catalogAnswer(plan, modelCatalog(resolveAgentProfile(plan.name, env, projectRoot).profile, env));
+  }
   if (plan.subcommand === "list") return answer(plan, store);
   if (plan.subcommand === "show") {
     if (!found) { console.error(failure(N + " profile show", "no profile `" + plan.name + "`", ["Run `" + N + " profile list` to see local names."])); return 1; }

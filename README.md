@@ -322,6 +322,17 @@ reasoning effort and credential-variable names remain intentionally blank until
 you provide them; the Ollama reference explicitly requires the name of a model
 you have pulled locally.
 
+Use an explicit catalogue check when an adapter supports it:
+
+```bash
+branchling profile models local-developer
+```
+
+For Ollama, this lists the models pulled on this machine and fails if the
+profile's selected model is absent. Codex reports that account-specific aliases
+cannot be listed; leaving its model blank uses the Codex CLI default, while an
+override is passed through without being labelled verified.
+
 The flag form remains the right path for scripts, CI and users who already know
 their configuration:
 

@@ -20,6 +20,8 @@ if (conformance()) process.exitCode = 0;
 else if (env[PREFIX + "PROFILE_PROBE"] === "1") {
   const found = spawnSync("codex", ["--version"], { shell: false, encoding: "utf8", env });
   console.log(JSON.stringify({ version: 1, outcome: found.status === 0 ? "ready" : "unavailable" }));
+} else if (env[PREFIX + "MODEL_CATALOG"] === "1") {
+  console.log(JSON.stringify({ version: 1, outcome: "not-verifiable", detail: env[PREFIX + "MODEL"] ? "Codex accepted the override but cannot list account-specific model aliases." : "No override: Codex will use its configured default model." }));
 } else if (env[PREFIX + "EFFORT"]) {
   console.error("Codex CLI adapter cannot map BRANCHLING_EFFORT; remove effort from this profile or configure it in Codex.");
   process.exitCode = 2;

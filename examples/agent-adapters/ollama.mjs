@@ -14,6 +14,15 @@ if (conformance()) process.exitCode = 0;
 else if (env[PREFIX + "PROFILE_PROBE"] === "1") {
   const found = spawnSync("ollama", ["--version"], { shell: false, encoding: "utf8", env });
   console.log(JSON.stringify({ version: 1, outcome: found.status === 0 ? "ready" : "unavailable" }));
+} else if (env[PREFIX + "MODEL_CATALOG"] === "1") {
+  const listed = spawnSync("ollama", ["list", "--format", "json"], { shell: false, encoding: "utf8", env });
+  if (listed.status !== 0) console.log(JSON.stringify({ version: 1, outcome: "unavailable" }));
+  else {
+    try {
+      const models = String(listed.stdout || "").split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line).name).filter((name) => typeof name === "string");
+      console.log(JSON.stringify({ version: 1, outcome: "listed", models }));
+    } catch { console.log(JSON.stringify({ version: 1, outcome: "unavailable" })); }
+  }
 } else if (!env[PREFIX + "MODEL"]) {
   console.error("Ollama adapter needs BRANCHLING_MODEL; pull a model and set this profile's model, for example `ollama pull qwen2.5-coder:7b`."); process.exitCode = 2;
 } else {

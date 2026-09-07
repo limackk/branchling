@@ -9,6 +9,7 @@ import { spawnSync } from "node:child_process";
 import { agentProfilesPath, HOME_ENV, homePaths } from "../home.mjs";
 import { clackTextAnswer, parseAgentProfiles, setupFailureMessage, setupFleetConversation, setupModes, setupProfileConversation } from "../agent-profiles.mjs";
 import { projectAgentLaunchesPath } from "../agent-launches.mjs";
+import { PRODUCT_NAME as N } from "../product.mjs";
 import { SCRIPTS_DIR } from "./_repo.mjs";
 
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
@@ -47,8 +48,8 @@ test("a confirmed guided transcript writes one ordinary profile only at its fina
   assert.match(text, /secret_env: "TOKEN"/);
   assert.match(t.out.join(""), /Profile summary/);
   assert.match(t.out.join(""), /reusable local recipe/);
-  assert.match(t.out.join(""), /Choose how Branchling will start this agent/);
-  assert.match(t.out.join(""), /Use my own Branchling adapter/);
+  assert.ok(t.out.join("").includes("Choose how " + N + " will start this agent"));
+  assert.ok(t.out.join("").includes("Use my own " + N + " adapter"));
   assert.match(t.out.join(""), /This is not `claude` and not a model name/);
 });
 
@@ -118,12 +119,12 @@ test("the recommended copied path and generalist prompt both accept Enter", asyn
   assert.equal(result.ok, true, JSON.stringify(result));
   const text = readFileSync(agentProfilesPath(fx.env), "utf8");
   assert.match(text, /prompt: "Implement the task with evidence\."/);
-  assert.match(t.out.join(""), /Copy a shipped reference adapter[\s\S]*Use my own Branchling adapter/);
+  assert.match(t.out.join(""), new RegExp("Copy a shipped reference adapter[\\s\\S]*Use my own " + N + " adapter"));
 });
 
 test("an Ollama reference names and requires its local model", async () => {
   const fx = fixture();
-  const t = transcript(["local", "1", "4", "", "", "", "qwen2.5-coder:7b", "", "", "1"]);
+  const t = transcript(["local", "1", "4", "", "", "1", "", "qwen2.5-coder:7b", "", "", "1"]);
   const result = await setupProfileConversation(t.io, fx.env);
   assert.equal(result.ok, true, JSON.stringify(result));
   assert.match(readFileSync(agentProfilesPath(fx.env), "utf8"), /model: "qwen2\.5-coder:7b"/);

@@ -165,6 +165,7 @@ const READING = {
   // Profile checks read only the isolated user configuration, never the fixture
   // backlog. The empty answer is still an envelope a setup tool can consume.
   "profile-check": { args: ["profile", "check", "--json"], noDir: true },
+  "profile-models": { args: ["profile", "models", "missing", "--json"], noDir: true, refuses: true },
 };
 
 /**
