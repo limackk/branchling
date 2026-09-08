@@ -16,7 +16,7 @@ created: 2026-09-07
 updated: 2026-09-07
 blocked_by: [TL-357]               # ids of tasks that MUST be closed before this one starts
 blocks: [TL-359, TL-360]           # ids this task will unblock
-related_docs: [scripts/run-loop.mjs, scripts/activity.mjs, docs/backlog-time-tracking.md]
+related_docs: [scripts/run-loop.mjs, docs/backlog-time-tracking.md]
 verification:                      # HOW to check the task is really done
   - id: live-supervision
     bash: "node --test scripts/tests/run.test.mjs scripts/tests/run-agent-profiles.test.mjs scripts/tests/run-stuck-status.test.mjs scripts/tests/run-live-supervision.test.mjs"

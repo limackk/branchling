@@ -18,8 +18,6 @@ blocked_by: []                     # ids of tasks that MUST be closed before thi
 blocks: []                         # ids this task will unblock
 related_docs:
   - scripts/watch.mjs
-  - scripts/activity-command.mjs
-  - scripts/session-report.mjs
 verification:                      # HOW to check the task is really done
   - id: focused-tests
     bash: "node --test scripts/tests/task-heartbeat.test.mjs scripts/tests/watch.test.mjs"

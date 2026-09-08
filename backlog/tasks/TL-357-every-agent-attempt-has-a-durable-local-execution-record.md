@@ -16,7 +16,7 @@ created: 2026-09-07
 updated: 2026-09-07
 blocked_by: [TL-355]               # ids of tasks that MUST be closed before this one starts
 blocks: [TL-358]                   # ids this task will unblock
-related_docs: [scripts/activity.mjs, scripts/lock.mjs, scripts/run-loop.mjs]
+related_docs: [scripts/lock.mjs, scripts/run-loop.mjs]
 verification:                      # HOW to check the task is really done
   - id: execution-record
     bash: "node --test scripts/tests/run.test.mjs scripts/tests/run-agent-profiles.test.mjs scripts/tests/session-report.test.mjs scripts/tests/execution-records.test.mjs"
