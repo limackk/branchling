@@ -1,1 +1,2 @@
 {"id":"01M1NM7VFRY4RWDS5N0SHNWND8","ts":"2026-09-04T07:13:29.080Z","task":"TL-236","field":"__created__","from":"","to":"check has become a wall of warnings nobody is expected to fix","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M20039Y85QKY7GJB5H2HTE88","ts":"2026-09-08T07:53:07.272Z","task":"TL-236","field":"status","from":"pending","to":"cancelled","actor":"agent:claude","source":"manual","reason":"Cancelled: its warning summary is superseded by TL-383, which removes non-actionable default checks."}

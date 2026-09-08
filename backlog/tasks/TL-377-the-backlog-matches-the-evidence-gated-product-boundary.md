@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Evidence-gated product focus"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h
@@ -81,9 +81,9 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] Every named superseded task is cancelled with a non-reserved reason in
+- [x] Every named superseded task is cancelled with a non-reserved reason in
       its history. [proof: boundary-plan]
-- [ ] No cancelled task remains in `plan.yaml`. [proof: boundary-plan]
-- [ ] The reduction tasks precede the onboarding validation task and the plan
+- [x] No cancelled task remains in `plan.yaml`. [proof: boundary-plan]
+- [x] The reduction tasks precede the onboarding validation task and the plan
       contains no managed-fleet wave. [proof: boundary-plan]
-- [ ] The resulting execution plan is structurally executable. [proof: plan-green]
+- [x] The resulting execution plan is structurally executable. [proof: plan-green]

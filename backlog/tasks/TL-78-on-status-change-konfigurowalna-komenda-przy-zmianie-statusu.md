@@ -6,12 +6,12 @@ labels: [post-launch]
 board: main
 epic: "Configurability"
 priority: P3
-status: pending
+status: cancelled
 owner: unassigned
 estimate: 3h
 confidence: medium
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-08
 blocked_by: []
 blocks: []
 related_docs:

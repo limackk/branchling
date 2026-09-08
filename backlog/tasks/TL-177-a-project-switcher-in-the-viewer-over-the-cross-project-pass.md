@@ -6,14 +6,14 @@ labels: [post-launch]
 board: main
 epic: "Backlog viewer"
 priority: P3
-status: pending
+status: cancelled
 owner: unassigned
 role: ""
 executor: ""
 estimate: 1d
 confidence: low
 created: 2026-09-03
-updated: 2026-09-03
+updated: 2026-09-08
 blocked_by: [TL-176]
 blocks: []
 related_docs:

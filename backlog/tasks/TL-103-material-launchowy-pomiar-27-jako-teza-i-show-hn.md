@@ -6,13 +6,13 @@ labels: [pre-launch]
 board: main
 epic: "Backlog — open source publication"
 priority: P1
-status: pending
+status: cancelled
 owner: unassigned
 executor: "human"
 estimate: 4h
 confidence: low
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-08
 blocked_by: [TL-102]
 blocks: []
 related_docs:

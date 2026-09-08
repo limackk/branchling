@@ -6,13 +6,13 @@ labels: [post-launch]
 board: main
 epic: "CLI surface"
 priority: P3
-status: pending
+status: cancelled
 owner: unassigned
 executor: ""
 estimate: 4h
 confidence: medium
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-08
 blocked_by: []
 blocks: []
 related_docs: []

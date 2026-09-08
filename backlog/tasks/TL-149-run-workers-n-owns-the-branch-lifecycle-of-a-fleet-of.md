@@ -6,11 +6,11 @@ labels: []
 board: main
 epic: ""
 priority: P2                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending  # pending | in_progress | blocked | done | cancelled
+status: cancelled  # pending | in_progress | blocked | done | cancelled
 owner: unassigned
 estimate: 1w                       # 30m | 2h | 1d | 1w | 1mo
 created: 2026-09-02
-updated: 2026-09-02
+updated: 2026-09-08
 blocked_by: [TL-293, TL-295, TL-362]
 blocks: []
 related_docs: ["docs/branchling-state-and-sync.md"]

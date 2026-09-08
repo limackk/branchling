@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: "Backlog viewer"
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
+status: cancelled                  # pending | in_progress | blocked | done | cancelled
 owner: unassigned
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1d
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-05
-updated: 2026-09-05
+updated: 2026-09-08
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs:

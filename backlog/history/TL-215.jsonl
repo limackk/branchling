@@ -2,3 +2,4 @@
 {"id":"01M1M3541181HZX9XQXHSTN5GC","ts":"2026-09-03T16:55:39.297Z","task":"TL-215","field":"priority","from":"P1","to":"P2","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1M35411XQZDQHHE7CGKK2Y0","ts":"2026-09-03T16:55:39.297Z","task":"TL-215","field":"labels","from":[],"to":["hygiene"],"actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1M35411EPX8CJRNS8STG8VZ","ts":"2026-09-03T16:55:39.297Z","task":"TL-215","field":"related_docs","from":[],"to":["scripts/check-backlog-history-tracked.mjs","scripts/git-rules.mjs"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M200398H2496N97VKN5C2SV1","ts":"2026-09-08T07:53:06.577Z","task":"TL-215","field":"status","from":"pending","to":"cancelled","actor":"agent:claude","source":"manual","reason":"Cancelled: calibration rollups are telemetry outside the core; TL-378 removes that subsystem."}
