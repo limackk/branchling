@@ -1395,6 +1395,14 @@ export const COMMANDS = {
   },
 };
 
+// Activity collection and productivity reporting are not part of the product
+// boundary. Keep the removal list beside the dispatcher so the terminal, MCP
+// server and `--help` all lose the same commands in one operation; every one
+// derives its public surface from `COMMANDS`.
+for (const name of ["activity", "focus", "time", "sessions", "session", "actors", "quote", "backfill-completions"]) {
+  delete COMMANDS[name];
+}
+
 const HELP_FLAGS = ["--help", "-h", "help"];
 /** Inside a COMMAND's arguments the bare word `help` is a value, not a request
  *  for help: `query --text help` is meant to search for the word "help". A bare
