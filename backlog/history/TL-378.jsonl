@@ -1,0 +1,2 @@
+{"id":"01M1ZYRA1MJA15WH3MQRYX8MZ0","ts":"2026-09-08T07:29:38.356Z","task":"TL-378","field":"__created__","from":"","to":"Activity telemetry no longer ships in the core product","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1ZZ846C5CT8XGSNDAHFX1H0","ts":"2026-09-08T07:38:16.652Z","task":"TL-378","field":"related_docs","from":[],"to":["docs/backlog-time-tracking.md","README.md"],"actor":"local:me","source":"manual","reason":"Linked the task contract to its public implementation context"}
