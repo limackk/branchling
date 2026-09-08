@@ -54,7 +54,7 @@ import { printLine } from "./stdout.mjs";
 import { explain as explainIndex, modifiedFiles, repoRoot, touches } from "./modified-files.mjs";
 import { backlogPaths, resolveBacklogDir, resolveBacklogDirOrExit } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
-import { collectAllProjects, collectProject, unknownEverywhere } from "./cross-project.mjs";
+import { collectProject } from "./cross-project.mjs";
 import { SORT_KEYS, filterTasks, readTaskRecords, sortTasks, splitList, unknownFilterValues } from "./task-select.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -64,7 +64,7 @@ const VALUE_FLAGS = new Set([
   "--role", "--executor", "--blocked-by", "--text", "--limit", "--sort", "--tasks", "--dir",
   "--modified-file",
 ]);
-const BOOL_FLAGS = new Set(["--json", "--files", "--count", "--all-projects", "--help", "-h"]);
+const BOOL_FLAGS = new Set(["--json", "--files", "--count", "--help", "-h"]);
 
 // An unknown flag MUST fail. Zero results caused by a typo are indistinguishable
 // from "there is no such thing" — and they read like an answer.
@@ -109,36 +109,16 @@ if (opts.help || opts.h) {
   process.exit(0);
 }
 
-// ACROSS EVERY REGISTERED BACKLOG (TL-36). It is a VIEW: the pass reads N
-// directories and assembles the answer in memory. Deleting the registry takes
-// this flag away and nothing else — every command inside a repository is found
-// by walking upwards, and that answer must never be contradicted by a file.
-const ALL_PROJECTS = Boolean(opts["all-projects"]);
-if (ALL_PROJECTS && (opts.tasks || opts.dir)) {
-  // Both name ONE backlog, so the combination has two answers and no way to
-  // pick between them. Refused rather than silently letting one win.
-  console.error("✗ --all-projects cannot be combined with " + (opts.tasks ? "--tasks" : "--dir"));
-  console.error("  those name one backlog; --all-projects asks every registered one");
-  process.exit(2);
-}
-
 // The data directory: --tasks (pointing straight at tasks/), otherwise the same
 // backlog directory resolution as in every other script (BL-1399).
-const ROOT = opts.tasks || ALL_PROJECTS ? null : resolveBacklogDirOrExit({ dir: opts.dir, moduleDir: __dirname }, N + " query").root;
+const ROOT = opts.tasks ? null : resolveBacklogDirOrExit({ dir: opts.dir, moduleDir: __dirname }, N + " query").root;
 const TASKS_DIR = opts.tasks || (ROOT ? backlogPaths(ROOT).tasksDir : null);
 
-// WHERE THE ANSWER COMES FROM. One project, or every registered one — and the
-// per-project pipeline is the SAME function either way (`collectProject`), so
-// asking five projects gives exactly the five answers asking each of them
-// separately would. Two pipelines would be two definitions of what a row is.
-//
 // `--tasks <dir>` is the third case and stays apart: it points straight at a
 // tasks directory, so there is no configuration to read and no branch scan to
 // run. It is the only path where the vocabularies are unknown.
 const FILE_QUERY = opts["modified-file"];
 let COLLECTED = [];
-let UNAVAILABLE = [];
-let REGISTERED = 0;
 
 if (opts.tasks) {
   if (FILE_QUERY !== undefined) {
@@ -161,11 +141,6 @@ if (opts.tasks) {
     scan: { scanned: false, reason: "no-configuration", byId: new Map(), branches: [], trees: [] },
     elsewhereOnly: [], index: null, error: null,
   }];
-} else if (ALL_PROJECTS) {
-  const pass = collectAllProjects({ modifiedFile: FILE_QUERY });
-  COLLECTED = pass.collected;
-  UNAVAILABLE = pass.unavailable;
-  REGISTERED = pass.registered;
 } else {
   // STRICT (TL-60/TL-64): the configuration is loaded by the function that
   // refuses with the right message and the right exit code, and handed to the
@@ -208,9 +183,7 @@ const f = {
 };
 
 const withConfig = COLLECTED.filter((c) => c.config);
-const unknownValues = ALL_PROJECTS
-  ? unknownEverywhere(withConfig, f, unknownFilterValues)
-  : unknownFilterValues(f, withConfig.length ? withConfig[0].config : null);
+const unknownValues = unknownFilterValues(f, withConfig.length ? withConfig[0].config : null);
 if (unknownValues.length) {
   for (const p of unknownValues) {
     console.error("✗ `" + p.value + "` is not an allowed value for the field `" + p.axis + "`");
@@ -243,10 +216,7 @@ for (const one of COLLECTED) {
   hits = hits.concat(some);
 }
 
-// The first project that answered decides the vocabularies the OUTPUT is shaped
-// by — the scan note, the sort order and the JSON's `scan` key. Across projects
-// those are per project and are reported per row; this is the single-project
-// answer's shape kept intact.
+// The resolved backlog decides the vocabularies the output is shaped by.
 const PRIMARY = COLLECTED[0] || { config: null, scan: { scanned: false, reason: "no-configuration", branches: [], trees: [] }, index: null };
 const CFG = PRIMARY.config;
 const SCAN = PRIMARY.scan;
@@ -256,11 +226,6 @@ const elsewhereOnlyLines = ELSEWHERE_ONLY.map(
   (t) => (t.project ? t.project + "/" : "") + t.id +
     " is not in this tree — elsewhere: [" + t.elsewhere.map(describeDivergence).join(", ") + "]"
 );
-const unavailableLines = UNAVAILABLE.map(
-  (p) => "project " + p.project + " did not answer: " + p.why + " (" + p.root + ")"
-).concat(ALL_PROJECTS && !COLLECTED.length
-  ? ["no registered project could be read — `" + "project list" + "` shows what is registered"]
-  : []);
 
 // APPLIED AFTER the shared filters, and deliberately not inside `filterTasks`:
 // that module is the one `next` also uses to choose work, and a criterion that
@@ -295,7 +260,6 @@ if (opts.count) {
   // On stderr, so a count stays a number for a script. Silence would make a
   // backlog with work on an unmerged branch indistinguishable from one without.
   for (const line of elsewhereOnlyLines) console.error("# " + line);
-  for (const line of unavailableLines) console.error("# " + line);
   process.exit(0);
 }
 if (opts.json) {
@@ -323,8 +287,6 @@ if (opts.json) {
     // incomplete set as complete, and "you moved the repository" would arrive
     // as "that project has no tasks". Always present, `[]` when everything
     // answered — the envelope's rule is that a declared key never goes missing.
-    unavailable: UNAVAILABLE,
-    projects: ALL_PROJECTS ? { registered: REGISTERED, answered: COLLECTED.length } : null,
   });
   process.exit(0);
 }
@@ -339,7 +301,6 @@ if (opts.files) {
   }
   // On stderr, so a path list stays a path list for `xargs`.
   for (const line of elsewhereOnlyLines) console.error("# " + line);
-  for (const line of unavailableLines) console.error("# " + line);
   const note = scanNote(SCAN.reason);
   if (note) console.error("# " + note);
   if (INDEX) {
@@ -382,11 +343,6 @@ if (limit && total > shown.length) {
 // The tasks that exist only somewhere else, named one per line and kept out of
 // the list above — they are not rows of this tree (TL-145).
 for (const line of elsewhereOnlyLines) console.log("# " + line);
-
-// AND THE PROJECTS THAT DID NOT ANSWER (TL-36). Never silent: a registry entry
-// whose directory moved would otherwise turn into "that project has no tasks",
-// and the answer would look complete.
-for (const line of unavailableLines) console.log("# " + line);
 
 // A scan that could not run has to SAY so. Silence here is indistinguishable
 // from "every branch agrees", and that is the answer this whole mechanism exists

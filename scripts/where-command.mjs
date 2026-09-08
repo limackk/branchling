@@ -27,8 +27,7 @@ import { existsSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { agentProfilesPath, homePaths, loadUserConfig, registryPath, userConfigPath } from "./home.mjs";
-import { projectFor, readRegistry } from "./registry.mjs";
+import { agentProfilesPath, homePaths, loadUserConfig, userConfigPath } from "./home.mjs";
 import { resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { MARK, color, failure, heading, table } from "./ui.mjs";
@@ -48,7 +47,6 @@ export function whereReport(opts = {}) {
   const env = opts.env || process.env;
   const home = homePaths(env);
   const user = loadUserConfig(env);
-  const registry = readRegistry(env);
 
   let backlog = null;
   let error = null;
@@ -59,7 +57,6 @@ export function whereReport(opts = {}) {
     backlog = {
       root: resolved.root,
       source: resolved.source,
-      registeredAs: (projectFor(resolved.root, env) || {}).name || null,
     };
   } catch (e) {
     error = e.message;
@@ -72,12 +69,6 @@ export function whereReport(opts = {}) {
     data: home.data,
     preferences: { path: userConfigPath(env), exists: user.exists },
     agentProfiles: { path: agentProfilesPath(env), exists: existsSync(agentProfilesPath(env)) },
-    registry: {
-      path: registryPath(env),
-      exists: registry.exists,
-      projects: registry.projects.length,
-      missing: registry.missing.map((p) => p.name + " → " + p.path),
-    },
     backlog,
     error,
   };
@@ -96,7 +87,6 @@ export function renderWhere(report, opts = {}) {
     out.push(table([
       ["    directory", report.backlog.root],
       ["    found by", report.backlog.source],
-      ["    registered as", report.backlog.registeredAs || "—"],
     ]));
   } else {
     out.push("  " + paint.warn(MARK.warn) + " none found — " + report.error);
@@ -110,19 +100,8 @@ export function renderWhere(report, opts = {}) {
     ["    data", report.data],
     ["    preferences", report.preferences.path + "  (exists: " + yesNo(report.preferences.exists) + ")"],
     ["    agent profiles", report.agentProfiles.path + "  (exists: " + yesNo(report.agentProfiles.exists) + ")"],
-    ["    registry", report.registry.path + "  (exists: " + yesNo(report.registry.exists) + ")"],
-    ["    projects known", String(report.registry.projects)],
   ]));
-  if (report.registry.missing.length) {
-    out.push("");
-    out.push("  " + paint.warn(MARK.warn) + " registered but not on disk any more:");
-    out.push(table(report.registry.missing.map((m) => ["    " + m, ""])));
-    out.push("  " + paint.dim("Reported rather than skipped: a silent skip would turn `you moved it`"));
-    out.push("  " + paint.dim("into `that project has no tasks`."));
-  }
   out.push("");
-  out.push("  " + paint.dim("The registry is an INDEX. Deleting it costs the cross-project view and"));
-  out.push("  " + paint.dim("nothing else — every command in a repository finds its backlog by itself."));
   return out.join("\n");
 }
 

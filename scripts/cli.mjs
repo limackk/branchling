@@ -1384,7 +1384,7 @@ export const COMMANDS = {
 // boundary. Keep the removal list beside the dispatcher so the terminal, MCP
 // server and `--help` all lose the same commands in one operation; every one
 // derives its public surface from `COMMANDS`.
-for (const name of ["activity", "focus", "time", "sessions", "session", "actors", "quote", "backfill-completions"]) {
+for (const name of ["activity", "focus", "time", "sessions", "session", "actors", "quote", "backfill-completions", "project"]) {
   delete COMMANDS[name];
 }
 

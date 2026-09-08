@@ -251,10 +251,10 @@ test("where says where this machine's own directories are, and whether they exis
   assert.equal(report.homeSource, "env");
   assert.notEqual(report.config, report.data);
   assert.equal(report.preferences.exists, false);
-  assert.equal(typeof report.registry.exists, "boolean");
+  assert.equal(typeof report.agentProfiles.exists, "boolean");
 });
 
-test("the text answer names both halves and does not pretend the registry is authoritative", () => {
+test("the text answer separates the selected backlog from machine-local facts", () => {
   const report = whereReport({
     env: { [HOME_ENV]: "/h" },
     dir: undefined,
@@ -263,7 +263,7 @@ test("the text answer names both halves and does not pretend the registry is aut
   });
   const text = renderWhere(report, { color: plain });
   assert.match(text, /this machine/);
-  assert.match(text, /INDEX/, "the text has to say the registry is not a source of truth");
+  assert.match(text, /backlog this run would use/);
 });
 
 test("`where` outside any backlog answers instead of failing", () => {

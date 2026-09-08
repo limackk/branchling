@@ -55,11 +55,7 @@ export const KINDS = {
   // `modifiedFile` is `null` unless `--modified-file` was asked for, and then it
   // says whether the git index could be computed at all (TL-75): zero matches
   // and an unscanned repository are otherwise the same empty `tasks`.
-  // `unavailable` and `projects` belong to the cross-project pass (TL-36) and
-  // are declared unconditionally: a consumer must be able to tell "every
-  // project answered" from "nobody looked", and a key that appears only under
-  // `--all-projects` is a contract discovered by trying both.
-  "task-list": { tasks: [], total: null, limit: null, scan: null, modifiedFile: null, elsewhereOnly: [], unavailable: [], projects: null },
+  "task-list": { tasks: [], total: null, limit: null, scan: null, modifiedFile: null, elsewhereOnly: [] },
   // `<command> --help --json` (TL-83). `flags` describes the input surface, and
   // a flag drawing on a vocabulary carries THIS project's values in `values` —
   // so an agent narrows its input instead of guessing and retrying. `configured`
