@@ -73,24 +73,12 @@ export const KINDS = {
   // `audit --json` (TL-90). `since` and `dayZero` are what makes an empty
   // `closedWithoutTrace` readable: the log has a first day, and everything
   // before it left no trace for a reason that is nobody's fault.
-  // `sessions --json` and `session <id> --json` (TL-92). `correlation` is on
-  // both because it says HOW the answer was reached, not what one field holds:
-  // since TL-164 it reads `session`, because history entries carry the session
-  // they were written in and the join is exact. It stays in the envelope rather
-  // than being dropped as a now-constant field — a consumer reading an older
-  // log through a newer tool needs to be able to see which join it got.
-  sessions: { correlation: null, total: null, sessions: [] },
-  session: { correlation: null, session: null },
   runs: { runs: [] },
   run: { run: null, alive: null, timedOut: null },
-  // `actors --json` (TL-150). `minReportN` is what makes a `rate: null` readable
-  // — it is the denominator the project asked for, not an absence of data — and
-  // `policy` says whether any of these rows is acted on at all.
-  actors: { since: null, minReportN: null, rows: [], policy: null },
   audit: {
     since: null, dayZero: null, tasks: null, findings: null,
-    closedWithoutTrace: [], skippedBeforeSince: null, reopened: [], rework: [],
-    parked: [], withoutPremise: [], awaitingVouch: [], vouches: [], vouchesByActor: [],
+    closedWithoutTrace: [], skippedBeforeSince: null, reopened: [],
+    parked: [], withoutPremise: [], awaitingVouch: [], vouches: [],
   },
   // `stats --json`. The tallies stay nested under `stats` instead of being
   // spread across the root: a future tally called `kind` would otherwise
@@ -98,20 +86,12 @@ export const KINDS = {
   // broke.
   // `divergent` is the list behind the `divergent` tally inside `stats`: the
   // tasks another branch disagrees with, each naming both statuses (TL-73).
-  // `calibration` is absent from the ordinary summary and present only under
-  // `--calibration` / `--correlation-only` (TL-29): it answers a question about
-  // CLOSED work, from `activity/rollup/`, while every other key here describes
-  // the queue.
-  stats: { root: null, stats: null, scan: null, divergent: [], elsewhereOnly: [], calibration: null, context: null },
+  stats: { root: null, stats: null, scan: null, divergent: [], elsewhereOnly: [], context: null },
   // `check --json` (TL-57). `ok` is what CI reads, `failed` is what it acts on —
   // a consumer must not have to filter `guards` to learn which one to look at.
   // `output` beside each guard is text written for a PERSON and may be reworded;
   // `name`, `ok` and `exit` are the contract.
   check: { ok: null, root: null, failed: [], guards: [] },
-  // `quote --json` (TL-88). One key, because the forecast is one object and
-  // spreading it across the root would put `n` and `bucket` next to the
-  // envelope's own fields — where a future key called `task` would collide.
-  quote: { root: null, quote: null },
   // `doctor --json`. `ok` is the answer CI reads; `checks` is why.
   doctor: { ok: null, root: null, next: null, checks: [] },
   // `board --json`. `rule` and `matched` are null exactly when `isDefault` is
@@ -251,31 +231,6 @@ export const KINDS = {
   // absent unless `--seed-tasks` ran — an empty object would say a write
   // happened and found nothing to do.
   "docs-drift": { documents: null, minSignals: null, flagged: [], tooLittle: [], seeded: null },
-  // `unstamped` is a LIST and not a count, for the reason `unplanned` is: the
-  // tasks outside a measurement are the thing a reader has to be able to go and
-  // look at, and a number cannot be acted on (TL-27).
-  // `engaged` and `unknown_ratio` are TL-28's: measured time at the keyboard,
-  // beside the calendar time the stamps give. `unknown_ratio` sits at the ROOT
-  // rather than inside `engaged` because §8.2 of docs/backlog-time-tracking.md
-  // makes it a first-class number of every report — a consumer must not have to
-  // walk into a nested object to find out whether the sum beside it can be
-  // trusted, and one that forgot to look would be reading a pretty sum.
-  //
-  // IT IS THE ONE SNAKE_CASE KEY IN THIS FILE, deliberately. It is the name the
-  // design document and the task's own contract give the statistic, the way
-  // `p80` is a name rather than a field; renaming it for house style would put
-  // the tool's only honesty signal under a word nothing else in the project
-  // uses.
-  time: {
-    root: null, closed: null, completed: null, unstamped: [],
-    leadTimeDays: null, throughput: [], perWeekMean: null,
-    engaged: null, unknown_ratio: null,
-    // The cost axis (TL-30). `tokens` sits at the ROOT and is `null` — never 0 —
-    // when no adapter has written any: that distinction IS the contract, and a
-    // consumer must be able to read it without walking into `cost`, which
-    // carries the per-model breakdown and the reason an amount is missing.
-    tokens: null, cost: null,
-  },
 };
 
 /** The envelope's own keys — a payload may never carry them. */

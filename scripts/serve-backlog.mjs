@@ -292,8 +292,6 @@ try {
   console.warn(`${N} serve: fs.watch unavailable — live push disabled:`, e.message);
 }
 
-ensureActivityWatch();
-
 // ──────────────────────────────────────────────────────────────────────────
 // The push for a change made in ANOTHER worktree (TL-122)
 // ──────────────────────────────────────────────────────────────────────────

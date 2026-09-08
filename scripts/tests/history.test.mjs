@@ -277,15 +277,8 @@ test("the history lives in backlog/history/<ID>.jsonl — one task, one file", (
   // `reason` joined the record in TL-105 and is on EVERY entry: a field present
   // on some rows only would make "no reason given" and "none needed" one shape.
   //
-  // `session` (TL-164) is the deliberate opposite, and the asymmetry is the
-  // point. A reason is something a writer either gave or did not, and both
-  // states belong on every row. A session is something a write either HAS or
-  // genuinely has not — every line predating the field, and every change the
-  // tool merely observed — so an empty string would be a third state meaning
-  // the same as absence. `recordEdit` is a command writing its own change, so
-  // it is present here.
   assert.deepEqual(Object.keys(JSON.parse(raw[0])).sort(),
-    ["actor", "field", "from", "id", "reason", "session", "source", "task", "to", "ts"]);
+    ["actor", "field", "from", "id", "reason", "source", "task", "to", "ts"]);
   rmSync(dir, { recursive: true, force: true });
 });
 

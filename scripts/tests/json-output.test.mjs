@@ -92,7 +92,6 @@ test("every reading command answers with JSON and nothing else, empty or populat
       ["doctor", "--json", "--dir", fx.backlog],
       ["next-id", "--json", "--dir", fx.backlog],
       ["plan", "--json", "--dir", fx.backlog],
-      ["time", "--json", "--dir", fx.backlog],
       ["check", "--json", "--dir", fx.backlog],
       ["instructions", "overview", "--json"],
     ];

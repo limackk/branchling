@@ -103,9 +103,6 @@ const READING = {
   // without an execution order gives — which is the one that has to stay a
   // complete envelope rather than an error.
   plan: ["plan", "--json"],
-  // A backlog with no `activity/` at all: the answer has to stay a complete
-  // envelope, with zero counted rather than a section missing (TL-27).
-  time: ["time", "--json"],
   // The input surface of ONE command, for a program to read before it calls it
   // (TL-83). `new` is the one whose flags draw on the most vocabularies, so a
   // fixture answering it exercises the part that varies per project.
@@ -118,34 +115,11 @@ const READING = {
   // find, and the envelope still has to carry every key rather than dropping
   // the sections that came back empty.
   audit: ["audit", "--json"],
-  // The same backlog with no history, one aggregation further up (TL-150). The
-  // fixture's three tasks were CREATED and never closed, so no actor has a
-  // record yet and `rows` is legitimately empty — which is the answer worth
-  // pinning here, because it is the one where a key is most easily dropped:
-  // `minReportN` states the denominator below which no rate is printed and
-  // `policy` states whether anything is being withheld, and both are claims
-  // about the ANSWER rather than about its rows. An empty report that omits
-  // them reads as a report with no threshold and no policy, which is a
-  // different and stronger statement than the tool is entitled to make.
-  actors: ["actors", "--json"],
   // A repository with no `docs/` at all (TL-100): zero documents still has to be
   // a complete envelope. `flagged` and `tooLittle` come back as empty LISTS, and
   // `seeded` as null — the command wrote nothing, which is a different answer
   // from having written nothing useful.
   "docs-drift": ["docs-drift", "--json"],
-  // A backlog with no heartbeats (TL-92): zero sessions still has to be a
-  // complete envelope, `correlation` included — that key states a limit of the
-  // ANSWER, so dropping it when the list is empty would drop the caveat with it.
-  sessions: ["sessions", "--json"],
-  // Asking about a session the fixture does not have: "not found" is an ANSWER
-  // and still an envelope, with `session: null` and a non-zero exit. A consumer
-  // must not have to parse stderr to learn that.
-  session: ["session", "no-such-session", "--json"],
-  // A forecast on a backlog whose bucket is empty (TL-88): "not enough data" is
-  // an ANSWER and still a complete envelope with `insufficient: true`. The
-  // fixture's own first task is quoted, because the id has to exist — a missing
-  // task exits 1 and would exercise the refusal instead.
-  quote: ["quote", "TL-1", "--json"],
   // `resume` composes reads and writes nothing (TL-151), so it belongs in THIS
   // table and not beside `seed`: asking it twice of one tree is safe, and
   // `scripts/tests/resume-briefing.test.mjs` proves the tree is byte-identical

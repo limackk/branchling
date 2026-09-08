@@ -612,8 +612,7 @@ implementation detail. Every reading command answers in the same envelope:
 | Command | `kind` | Payload |
 |---|---|---|
 | `query` | `task-list` | `tasks`, `total` (matches BEFORE `--limit`), `limit`, `scan`, `modifiedFile`, `elsewhereOnly` (the tasks only another branch has), `unavailable` (registered projects the cross-project pass could not read), `projects` (how many were registered and how many answered; null without `--all-projects`) |
-| `quote` | `quote` | `root`, `quote` (the forecast: the bucket used, whether it degraded, the sample count, the time range, the per-model token cells and the share of unattributed minutes behind it) |
-| `stats` | `stats` | `root`, `stats` (the tallies), `scan`, `divergent` (one row per task another branch disagrees with), `elsewhereOnly` (the tasks only another branch has), `calibration` (null unless `--calibration` or `--correlation-only`: the step-0 gate, the buckets, and what never reached one), `context` (null unless `--context`: the measured cost rows) |
+| `stats` | `stats` | `root`, `stats` (the tallies), `scan`, `divergent` (one row per task another branch disagrees with), `elsewhereOnly` (the tasks only another branch has), `context` (null unless `--context`: the measured cost rows) |
 | `doctor` | `doctor` | `ok`, `root`, `next`, `checks` |
 | `check` | `check` | `ok`, `root`, `failed` (the guards that failed), `guards` |
 | `board` | `board` | `board`, `rule`, `matched`, `isDefault`, `reason` |
@@ -630,8 +629,7 @@ implementation detail. Every reading command answers in the same envelope:
 | `import` | `import` | `ok`, `root`, `dryRun`, `created`, `skipped`, `droppedLabels`, `withoutVerification`, `errors` |
 | `<command> --help` | `command-help` | `command`, `summary`, `usage`, `configured`, `flags` |
 | `pr-summary` | `pr-summary` | `base`, `scanned`, `reason`, `tasks`, `engaged`, `cost` |
-| `audit` | `audit` | `since`, `dayZero`, `tasks`, `findings`, `closedWithoutTrace`, `skippedBeforeSince`, `reopened`, `rework`, `parked`, `withoutPremise`, `awaitingVouch`, `vouches`, `vouchesByActor` |
-| `actors` | `actors` | `since`, `minReportN` (the denominator below which a row states a count and no rate at all), `rows`, `policy` |
+| `audit` | `audit` | `since`, `dayZero`, `tasks`, `findings`, `closedWithoutTrace`, `skippedBeforeSince`, `reopened`, `parked`, `withoutPremise`, `awaitingVouch`, `vouches` |
 | `watch` | `watch` | `wave` (the active wave, including every task's status, owner and last recorded modification), `tasks` (all work currently in progress) |
 | `runs list` | `runs` | `runs` (local detached execution records) |
 | `runs show/wait/cancel` | `run` | `run`, `alive`, `timedOut` (null except wait, where it says whether the caller's timeout elapsed) |
