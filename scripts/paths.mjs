@@ -52,11 +52,6 @@ export function backlogPaths(root) {
     root,
     tasksDir: join(root, TASKS_DIRNAME),
     historyDir: join(root, "history"),
-    // Evidence of activity (TL-27). The raw log is gitignored by default and the
-    // per-task rollup is versioned — §9 of docs/backlog-time-tracking.md
-    // (a real path — product-name: allow).
-    activityDir: join(root, "activity"),
-    rollupDir: join(root, "activity", "rollup"),
     archiveDir: join(root, "archive"),
     boardsDir: join(root, "boards"),
     rolesDir: join(root, ROLES_DIRNAME),

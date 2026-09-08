@@ -45,12 +45,6 @@ import { loadPlan } from "./plan.mjs";
 import { listWorktrees, resolveWorktree } from "./viewer-worktrees.mjs";
 import { crossBranchState } from "./branch-scan.mjs";
 import { decideTask } from "./decide-task.mjs";
-// The live signal (TL-189). `activity.mjs` is what reaches the raw log, which
-// lives OUTSIDE every repository; `in-flight.mjs` holds the rules and is also
-// pasted into the page, so the server and the browser cannot word one signal two
-// ways.
-import { activityDir, readAllActivity } from "./activity.mjs";
-import { inFlightSignal, takeTimestamp } from "./in-flight.mjs";
 import { ANY_TASK_ID } from "./task-id.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import {
@@ -278,89 +272,6 @@ function scheduleReconcile() {
       console.warn(`${N} serve: history reconciliation did not pass:`, e.message);
     }
   }, RECONCILE_DELAY_MS);
-}
-
-// ──────────────────────────────────────────────────────────────────────────
-// The live signal — what happens BETWEEN the two writes (TL-189)
-// ──────────────────────────────────────────────────────────────────────────
-//
-// A heartbeat changes nothing in the repository, so `tasks-changed` never fires
-// for one: the whole point of this signal is that it moves while the task file
-// stands still. Hence its own event, and its own watch below on a directory that
-// is not in any tree.
-let activityTimer = null;
-
-function notifyActivity() {
-  clearTimeout(activityTimer);
-  activityTimer = setTimeout(() => {
-    for (const res of sseClients) {
-      try { res.write("event: activity-changed\ndata: {}\n\n"); } catch { sseClients.delete(res); }
-    }
-  }, 150);
-}
-
-/**
- * The signal for every task the subject tree's log knows about.
- *
- * READ FRESH ON EVERY REQUEST AND NEVER CACHED ON HEAD, unlike the file index:
- * the answer's whole value is its age, and a cached one would report a session
- * as alive for as long as the cache held.
- *
- * `now` TRAVELS WITH THE PAYLOAD because the page computes the age from it. A
- * browser with a clock five minutes off would otherwise call a live session
- * stale, or a stale one live, and would do it silently.
- */
-/**
- * Attach the watch on ONE backlog's raw log, if there is one yet. Idempotent.
- *
- * KEYED BY DIRECTORY, because the log follows the backlog: every worktree has
- * its own, and the switcher (TL-188) lets a reader look at a tree that is not
- * this process's own. A watch on this server's log alone would push for the tree
- * nobody is looking at and stay silent for the one they are.
- *
- * TRIED AGAIN ON EVERY REQUEST FOR THE SIGNAL, not only at boot, because the
- * directory is created by the FIRST heartbeat a backlog ever records — which for
- * a fresh clone is after the server started. A watch attached once at boot would
- * then never exist, and the feature would fail in the way this codebase likes
- * least: silently, looking exactly like a backlog nobody is working in.
- *
- * A SEPARATE `try` FROM THE TASK AND PLAN WATCHES, and not out of tidiness: a
- * failure here must not take down the two watches that already work.
- *
- * The event it raises carries no subject, so a tab reading tree A refetches when
- * tree B's log moves. That is one extra request against a route scoped by the
- * tab's own subject — cheaper than a fan-out that would have to track which
- * client is looking at what, and wrong in no direction.
- */
-const activityWatched = new Set();
-function ensureActivityWatch(root = BACKLOG_DIR) {
-  if (activityWatched.has(root)) return;
-  try {
-    const dir = activityDir(root);
-    if (!existsSync(dir)) return;
-    watch(dir, { persistent: false }, (_event, filename) => {
-      if (filename && !/\.jsonl$/.test(filename)) return;
-      notifyActivity();
-    });
-    activityWatched.add(root);
-  } catch (e) {
-    // Recorded as attached so the warning is printed once rather than per request.
-    activityWatched.add(root);
-    console.warn(`${N} serve: the heartbeat log in ` + root + ` cannot be watched — the live signal will not push:`, e.message);
-  }
-}
-
-function inFlightPayload(subject) {
-  ensureActivityWatch(subject.dir);
-  const rowsByTask = readAllActivity(subject.dir);
-  const history = readAllHistory(subject.dir);
-  const status = subject.config.inProgressStatus;
-  const tasks = {};
-  for (const [id, rows] of Object.entries(rowsByTask)) {
-    const signal = inFlightSignal(rows, { since: takeTimestamp(history[id], status) });
-    if (signal) tasks[id] = signal;
-  }
-  return { now: new Date().toISOString(), idleGapMinutes: subject.config.idleGapMinutes, tasks };
 }
 
 try {
@@ -736,20 +647,6 @@ async function handle(req, res) {
     return;
   }
 
-  // WHY THIS IS A ROUTE AND NOT PART OF THE PAGE (TL-189). `buildHtml` also
-  // writes `backlog/viewer.html`, a file that gets mailed around and opened over
-  // file://. Baking the log's answer into it would put a record of what hour
-  // somebody worked into a document that leaves the machine — the exact thing
-  // keeping the raw log outside every repository exists to prevent. Over HTTP the
-  // data never leaves the machine that holds it, and a page with no server simply
-  // renders no signal.
-  if (path === "/api/in-flight") {
-    const subject = subjectOrFail(res, url);
-    if (!subject) return;
-    sendJson(res, 200, inFlightPayload(subject));
-    return;
-  }
-
   if (path === "/api/events") {
     res.writeHead(200, {
       "Content-Type": "text/event-stream",
@@ -1035,25 +932,5 @@ const COEXISTS_WITH = probe.state === "other"
 // absence of files. Outside listen(), because that recurses through further
 // ports: we build ONCE.
 const VIEWS_BUILT = await regenerateViews();
-
-// RETENTION RUNS HERE FOR THE REASON THE BUILD DOES (TL-31). Raw heartbeats are
-// a record of what hour a particular person worked, and a retention window
-// somebody has to remember to apply is not a retention window — it is a
-// paragraph in a document. So it runs where the tool is already doing periodic
-// housekeeping, on the same two triggers as the views.
-//
-// SILENT AND BEST EFFORT. The aggregates are recomputed from the full log before
-// anything is deleted, so a failure here loses nothing; and a viewer that
-// refused to start because a directory was read-only would be trading the
-// user's whole session for a tidy-up.
-try {
-  const { prune } = await import("./activity-retention.mjs");
-  const { loadConfig } = await import("./config.mjs");
-  prune(BACKLOG_DIR, loadConfig(BACKLOG_DIR));
-} catch {
-  // Nothing measured yet, an unreadable state directory, a configuration the
-  // server has already complained about elsewhere — none of them is this
-  // process's problem to report twice.
-}
 
 listen(COEXISTS_WITH ? DEFAULT_PORT + 1 : DEFAULT_PORT, 10);

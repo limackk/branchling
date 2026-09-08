@@ -217,12 +217,6 @@ ${IGNORE_RULES.slice(0, 6).join("\n")}
 
 # The local reference point for reconciliation — NOT a source of truth.
 ${IGNORE_RULES[6]}
-
-# The raw evidence of activity: somebody's working calendar. One \`git add -A\`
-# in a repository this tool was dropped into would put it in a public history
-# irreversibly. The per-task AGGREGATE under activity/rollup/ is NOT matched
-# here and stays versioned — it is what a report is built from.
-${IGNORE_RULES[7]}
 `;
 
 const GITATTRIBUTES = `# The history log merges by the UNION OF LINES, not by a three-way comparison.
