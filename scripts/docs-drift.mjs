@@ -32,7 +32,8 @@
  *      a verdict with no evidence cannot be argued with and so is not acted on.
  *   2. **Below `docs_drift_min_signals` a document is NOT reported** — it is
  *      named in the "too little signal" section, the same rule the time reports
- *      follow with `min_report_n`. One dead link is a typo, not drift.
+ *      needs before it reports a document as stale. One dead link is a typo,
+ *      not drift.
  *   3. **A detector that CANNOT run says so** rather than staying quiet: a
  *      document git has never seen, a project with no status-heading
  *      convention. Silence that means "nothing found" and silence that means

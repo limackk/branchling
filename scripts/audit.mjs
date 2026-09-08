@@ -21,14 +21,8 @@
  *      Everything closed before then left no trace for a reason that is
  *      nobody's fault. Those are filtered out by date rather than reported in
  *      bulk as anomalies, and the report says how many it dropped.
- *   2. **A bucket below `min_report_n` says "not enough", never a rate.** A
- *      percentage over three closings reads exactly like one over three
- *      hundred. That rule is not invented here — it is the one the time
- *      reports already follow.
- *   3. **This is a tool for backlog hygiene, not for judging people.** The
- *      per-actor table exists to find a process that keeps producing rework,
- *      and the sentence appears in `--help` because a number about a named
- *      actor will be read as a number about a person unless it says otherwise.
+ *   2. **This is a tool for backlog hygiene, not for judging people.** It
+ *      reports task evidence and never aggregates a person's record.
  *
  * WHERE THE VOCABULARY COMES FROM. Nothing here names a status. "Closed" is
  * `archived_statuses`, "in progress" is `in_progress_status`, and "blocked" is
@@ -66,7 +60,7 @@ export const USAGE = [
   "",
   "    closed with no trace   a task in a closed status that no recorded",
   "                           transition ever put there",
-  "    reopened after closing rework — counted per the actor who closed it",
+  "    reopened after closing a closed task became open again",
   "    parked                 in progress, with no recorded change for",
   "                           `audit_stale_days` days",
   "    no premise             a status you may not enter without saying why,",
@@ -74,20 +68,14 @@ export const USAGE = [
   "    awaiting a vouch       open, with a closing run stopped at a `manual:`",
   "                           entry nobody has vouched for",
   "",
-  "  It also TABLES, without calling them findings, the `manual:` entries that WERE",
-  "  vouched for — per actor, and split by whether somebody typed the confirmation",
-  "  or passed `--confirm-manual`. Neither is wrong; a backlog where every human",
-  "  check is answered by the flag has manual entries in name only.",
-  "",
   "  --since <date>  the earliest closing date to judge. Defaults to the day the",
   "                  log first recorded a status transition: a task closed before",
   "                  that left no trace for a reason that is nobody's fault, and",
   "                  reporting those in bulk would bury the real ones",
   "  --json          the same findings for a program",
   "",
-  "  THIS IS A TOOL FOR BACKLOG HYGIENE, NOT FOR JUDGING PEOPLE. The per-actor",
-  "  table is there to find a process that keeps producing rework. A bucket with",
-  "  fewer than `min_report_n` closings reports `not enough`, never a rate.",
+  "  THIS IS A TOOL FOR BACKLOG HYGIENE, NOT FOR JUDGING PEOPLE. It reports",
+  "  evidence attached to tasks and does not score or rank actors.",
   "",
   "  It is not `check`: that one judges structure and fails a commit, this one",
   "  judges declarations and is read by a person. exit: 0 clean · 1 findings · 2 usage.",
@@ -183,7 +171,6 @@ export function closedWithoutTrace(tasks, history, { archived, since }) {
 export function reopenedAfterClosing(history, { archived }) {
   const closed = new Set(archived);
   const found = [];
-  const byActor = new Map();
 
   for (const id of Object.keys(history || {}).sort()) {
     const entries = (history[id] || [])
@@ -194,38 +181,15 @@ export function reopenedAfterClosing(history, { archived }) {
     for (const e of entries) {
       if (closed.has(e.to)) {
         closer = e.actor || "unknown";
-        bump(byActor, closer, "closings");
         continue;
       }
       if (closer && closed.has(e.from)) {
         found.push({ task: id, from: e.from, to: e.to, closedBy: closer, reopenedBy: e.actor || "unknown", ts: e.ts });
-        bump(byActor, closer, "reopens");
         closer = null;
       }
     }
   }
-  return { found, byActor };
-}
-
-function bump(map, key, field) {
-  if (!map.has(key)) map.set(key, { actor: key, closings: 0, reopens: 0 });
-  map.get(key)[field]++;
-}
-
-/**
- * The rework table, with the rule that keeps it honest: below `min_report_n`
- * closings a bucket says how many it has, and no rate at all.
- */
-export function reworkRates(byActor, minN) {
-  return [...byActor.values()]
-    .sort((a, b) => b.closings - a.closings)
-    .map((row) => ({
-      ...row,
-      // `null`, not `0`: "too few to say" and "never comes back" are different
-      // answers, and a zero would be read as the second.
-      rate: row.closings >= minN ? Math.round((row.reopens / row.closings) * 1000) / 1000 : null,
-      enough: row.closings >= minN,
-    }));
+  return { found };
 }
 
 /** In progress, with nothing recorded for `audit_stale_days`. */
@@ -306,27 +270,10 @@ export function awaitingVouch(tasks, history, { archived }) {
 }
 
 /**
- * Who stood behind the `manual:` entries this backlog closed, and how (TL-171).
- *
- * WHY THIS IS A TABLE AND NOT A FINDING. One agent vouching for one manual
- * entry is not a defect; it is what `--confirm-manual` is FOR, and an
- * unattended queue has nothing else. What is worth seeing is the pattern across
- * many — a backlog where every human check is answered by the flag has manual
- * entries in name only. So this reports and never changes the exit code, the
- * same way the rework table does.
- *
- * `typed` and `flag` are counted apart because that is the whole question. An
- * entry from before the distinction was recorded counts as `unrecorded` and is
- * never assigned to either: the log is append-only, and a guess about who
- * pressed what a month ago would be exactly the invented attribution the rest
- * of this file refuses.
- *
- * The rate is the share answered by the flag, and it obeys `min_report_n` for
- * the reason the rework table does — a percentage over three vouches reads like
- * one over three hundred.
+ * The `manual:` entries that were vouched for. These are individual task
+ * records, not a scorecard grouped by actor.
  */
-export function vouches(history, { minN }) {
-  const byActor = new Map();
+export function vouches(history) {
   const found = [];
   for (const id of Object.keys(history || {}).sort()) {
     for (const e of history[id] || []) {
@@ -334,26 +281,9 @@ export function vouches(history, { minN }) {
       const actor = e.actor || "unknown";
       const how = e.vouch === "typed" || e.vouch === "flag" ? e.vouch : "unrecorded";
       found.push({ task: id, actor, how, when: day(e.ts), manual: e.to || "" });
-      if (!byActor.has(actor)) byActor.set(actor, { actor, vouches: 0, typed: 0, flag: 0, unrecorded: 0 });
-      const row = byActor.get(actor);
-      row.vouches++;
-      row[how]++;
     }
   }
-  const table = [...byActor.values()]
-    .sort((a, b) => b.vouches - a.vouches)
-    .map((row) => {
-      // Only the entries that SAY how they were given can carry a rate. A
-      // denominator that quietly included the unrecorded ones would report a
-      // backlog as more careful than anything here can know it to be.
-      const known = row.typed + row.flag;
-      return {
-        ...row,
-        rate: known >= minN ? Math.round((row.flag / known) * 1000) / 1000 : null,
-        enough: known >= minN,
-      };
-    });
-  return { found, table };
+  return { found };
 }
 
 /** Every detector, over one read. PURE. */
@@ -369,7 +299,7 @@ export function auditBacklog({ tasks, history, config, since, today }) {
   });
   const premise = withoutPremise(tasks, { reasonRequired: config.reasonRequiredStatuses, archived });
   const vouch = awaitingVouch(tasks, history, { archived });
-  const given = vouches(history, { minN: config.minReportN });
+  const given = vouches(history);
 
   const findings = trace.found.length + reopen.found.length + stale.found.length +
     premise.found.length + vouch.found.length;
@@ -379,7 +309,7 @@ export function auditBacklog({ tasks, history, config, since, today }) {
     tasks: tasks.length,
     findings,
     closedWithoutTrace: trace,
-    reopened: { found: reopen.found, rework: reworkRates(reopen.byActor, config.minReportN) },
+    reopened: reopen,
     parked: stale,
     withoutPremise: premise,
     awaitingVouch: vouch,
@@ -418,15 +348,6 @@ export function render(report, config) {
     "reopened after closing",
     report.reopened.found.map((f) => [f.task, f.from + " → " + f.to, "closed by " + f.closedBy, "reopened by " + f.reopenedBy]));
 
-  if (report.reopened.rework.length) {
-    out.push("");
-    out.push("  " + color.dim("rework, by the actor who CLOSED the task — a property of the process, not of a person:"));
-    out.push(table(report.reopened.rework.map((r) => [
-      "   ", r.actor, r.closings + " closed", r.reopens + " came back",
-      r.enough ? (r.rate * 100).toFixed(0) + "%" : color.dim("not enough (needs " + config.minReportN + ")"),
-    ])));
-  }
-
   section(out,
     "parked",
     report.parked.found.map((f) => [f.task, f.owner || "(nobody)", f.days + "d since " + f.lastChange, f.title]),
@@ -450,13 +371,9 @@ export function render(report, config) {
     // file exists because the two were being confused.
     out.push("  " + color.dim("no `manual:` entry in this backlog has been vouched for — nothing to report, not nothing to see"));
   } else {
-    out.push("  " + color.dim("who stood behind a check no command could run, and how they said so:"));
-    out.push(table(report.vouches.table.map((r) => [
-      "   ", r.actor, r.vouches + " vouched", r.typed + " typed", r.flag + " by flag",
-      r.unrecorded ? r.unrecorded + " unrecorded" : "",
-      r.enough ? (r.rate * 100).toFixed(0) + "% by flag" : color.dim("not enough (needs " + config.minReportN + ")"),
+    out.push(table(report.vouches.found.map((v) => [
+      "   ", v.task, v.when || "—", v.manual || "—", v.how,
     ])));
-    out.push("  " + color.dim("`--confirm-manual` is legitimate and is what an unattended run has. This is a REPORT: a backlog where every human check is answered by the flag has manual entries in name only, and that is worth seeing, not punishing."));
   }
 
   out.push("");
@@ -503,12 +420,10 @@ export function main(argv, today = new Date().toISOString().slice(0, 10)) {
       closedWithoutTrace: report.closedWithoutTrace.found,
       skippedBeforeSince: report.closedWithoutTrace.skipped,
       reopened: report.reopened.found,
-      rework: report.reopened.rework,
       parked: report.parked.found,
       withoutPremise: report.withoutPremise.found,
       awaitingVouch: report.awaitingVouch.found,
       vouches: report.vouches.found,
-      vouchesByActor: report.vouches.table,
     });
     return report.findings ? 1 : 0;
   }

@@ -11,9 +11,6 @@
  *
  *   - a task closed BEFORE the log first recorded a status transition is not
  *     accused, and the number dropped is stated rather than hidden;
- *   - a rework bucket below `min_report_n` reports how many it has and NO rate,
- *     because a percentage over three closings reads like one over three
- *     hundred;
  *   - every status comes from the configuration. The fixtures use a vocabulary
  *     sharing nothing with the defaults, so a literal in the code fails here.
  */
@@ -27,14 +24,14 @@ import { fileURLToPath } from "node:url";
 
 import {
   auditBacklog, closedWithoutTrace, historyDayZero, parked, parseAuditArgs,
-  reopenedAfterClosing, reworkRates, withoutPremise,
+  reopenedAfterClosing, withoutPremise,
 } from "../audit.mjs";
 import { alignTemplate, isolateHome } from "./_repo.mjs";
 
 // THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
 // file in its own process, so one call covers every case in it. Without this a
-// test reads the DEVELOPER's `<config>/config.yaml` — their actor, their model
-// endpoint — and the suite answers differently on different machines.
+// test reads the developer's `<config>/config.yaml` and the suite answers
+// differently on different machines.
 isolateHome("audit");
 
 
@@ -145,27 +142,11 @@ test("FINDS: a transition out of a closed status, blamed on whoever CLOSED it", 
 test("SILENT: a task closed once and left alone", () => {
   const r = reopenedAfterClosing({ "T-1": [entry("T-1")] }, { archived: CONFIG.archivedStatuses });
   assert.deepEqual(r.found, []);
-  assert.equal(r.byActor.get("agent:x").closings, 1);
 });
 
 test("SILENT: moving between two OPEN statuses is not a reopening", () => {
   const history = { "T-1": [entry("T-1", { from: "icebox", to: "surveying" })] };
   assert.deepEqual(reopenedAfterClosing(history, { archived: CONFIG.archivedStatuses }).found, []);
-});
-
-test("a bucket below min_report_n reports its count and NO rate", () => {
-  const byActor = new Map([
-    ["agent:busy", { actor: "agent:busy", closings: 10, reopens: 2 }],
-    ["local:rare", { actor: "local:rare", closings: 3, reopens: 3 }],
-  ]);
-  const rows = reworkRates(byActor, 8);
-  assert.equal(rows[0].rate, 0.2);
-  assert.equal(rows[0].enough, true);
-  // `null`, not `0`: "too few to say" and "never comes back" are different
-  // answers, and a zero would be read as the second — here it would libel
-  // somebody with a 100% rate as if they had none.
-  assert.equal(rows[1].rate, null);
-  assert.equal(rows[1].enough, false);
 });
 
 // ── Parked ────────────────────────────────────────────────────────────────
