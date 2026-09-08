@@ -35,7 +35,7 @@ import { fileURLToPath } from "node:url";
 import { ACTOR_ENV, DEFAULT_ACTOR, resolveActor } from "../actor.mjs";
 import {
   CONFIG_FILENAME, HOME_ENV, USER_DEFAULTS, USER_KEYS, agentProfilesPath, homePaths, loadUserConfig, parseUserConfig,
-  registryPath, userConfigPath,
+  userConfigPath,
 } from "../home.mjs";
 import { COMMANDS } from "../cli.mjs";
 import { DEFAULTS } from "../config.mjs";
@@ -154,7 +154,6 @@ test("reading where a directory would be does not create it", () => {
   const env = { [HOME_ENV]: join(dir, "home") };
   homePaths(env);
   userConfigPath(env);
-  registryPath(env);
   loadUserConfig(env);
   assert.equal(existsSync(join(dir, "home")), false,
     "the first `where` on a machine must not change the answer to the second");

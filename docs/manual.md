@@ -611,7 +611,7 @@ implementation detail. Every reading command answers in the same envelope:
 
 | Command | `kind` | Payload |
 |---|---|---|
-| `query` | `task-list` | `tasks`, `total` (matches BEFORE `--limit`), `limit`, `scan`, `modifiedFile`, `elsewhereOnly` (the tasks only another branch has), `unavailable` (registered projects the cross-project pass could not read), `projects` (how many were registered and how many answered; null without `--all-projects`) |
+| `query` | `task-list` | `tasks`, `total` (matches BEFORE `--limit`), `limit`, `scan`, `modifiedFile`, `elsewhereOnly` (the tasks only another branch has) |
 | `stats` | `stats` | `root`, `stats` (the tallies), `scan`, `divergent` (one row per task another branch disagrees with), `elsewhereOnly` (the tasks only another branch has), `context` (null unless `--context`: the measured cost rows) |
 | `doctor` | `doctor` | `ok`, `root`, `next`, `checks` |
 | `check` | `check` | `ok`, `root`, `failed` (the guards that failed), `guards` |

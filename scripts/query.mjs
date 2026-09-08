@@ -54,10 +54,21 @@ import { printLine } from "./stdout.mjs";
 import { explain as explainIndex, modifiedFiles, repoRoot, touches } from "./modified-files.mjs";
 import { backlogPaths, resolveBacklogDir, resolveBacklogDirOrExit } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
-import { collectProject } from "./cross-project.mjs";
 import { SORT_KEYS, filterTasks, readTaskRecords, sortTasks, splitList, unknownFilterValues } from "./task-select.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+function collectBacklog(root, opts = {}) {
+  const config = opts.config;
+  const tasks = readTaskRecords(backlogPaths(root).tasksDir, config.taskId.file);
+  const scan = crossBranchState(root, config);
+  for (const task of tasks) task.elsewhere = divergences(task.status, scan.byId.get(task.id));
+  const elsewhereOnly = absentHere(scan.byId, tasks.map((task) => task.id));
+  const index = opts.modifiedFile === undefined
+    ? null
+    : modifiedFiles({ root: repoRoot(root), prefix: config.taskIdPrefix });
+  return { root, config, tasks, scan, elsewhereOnly, index };
+}
 
 const VALUE_FLAGS = new Set([
   "--status", "--priority", "--board", "--label", "--epic", "--owner", "--type",
@@ -146,11 +157,7 @@ if (opts.tasks) {
   // refuses with the right message and the right exit code, and handed to the
   // pass. A typo in `archived_statuses` changes what "closed" means, so slipping
   // through quietly would change the ANSWER, not the appearance.
-  const one = collectProject(ROOT, { modifiedFile: FILE_QUERY, config: loadConfigOrExit(ROOT) });
-  if (one.error) {
-    console.error(`✗ ${ROOT}: ${one.error}`);
-    process.exit(2);
-  }
+  const one = collectBacklog(ROOT, { modifiedFile: FILE_QUERY, config: loadConfigOrExit(ROOT) });
   COLLECTED = [one];
 }
 

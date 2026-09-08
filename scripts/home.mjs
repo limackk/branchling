@@ -60,7 +60,6 @@ const HOME_DIRNAME = BLOCK_MARKER_NAME;
 export const HOME_ENV = "BRANCHLING_HOME";  // product-name: allow
 
 export const CONFIG_FILENAME = "config.yaml";
-export const REGISTRY_FILENAME = "projects.yaml";
 /** Local execution profiles. This is a user-owned file, never project data. */
 export const AGENT_PROFILES_FILENAME = "agent-profiles.yaml";
 /** Named local compositions of existing profiles, never repository data. */
@@ -122,14 +121,11 @@ export function homePaths(env = process.env, platform = process.platform) {
   return { home: config, config, data, source: "default" };
 }
 
-/** The preferences file and the registry, by path. Neither has to exist. */
+/** The preferences file by path. It does not have to exist. */
 export function userConfigPath(env = process.env) {
   return join(homePaths(env).config, CONFIG_FILENAME);
 }
 
-export function registryPath(env = process.env) {
-  return join(homePaths(env).config, REGISTRY_FILENAME);
-}
 
 /** The provider-neutral profiles a person keeps on this machine. */
 export function agentProfilesPath(env = process.env) {
@@ -284,7 +280,7 @@ export function parseUserConfig(text, projectKeys = []) {
  * The preferences on this machine, or the defaults. Reads the disk.
  *
  * A MISSING FILE IS THE NORMAL CASE and is not an error: nobody has to create
- * anything for the tool to work, which is the same promise the registry makes.
+ * anything for the tool to work.
  * A file that exists and is WRONG is a different matter and throws — a
  * preference silently ignored is indistinguishable from one that had no effect.
  *
