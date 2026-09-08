@@ -16,7 +16,7 @@ created: 2026-09-07
 updated: 2026-09-07
 blocked_by: [TL-320]               # ids of tasks that MUST be closed before this one starts
 blocks: [TL-323]                   # ids this task will unblock
-related_docs: [scripts/ui.mjs, scripts/watch.mjs]
+related_docs: [scripts/ui.mjs]
 verification:                      # HOW to check the task is really done
   - id: report-presentation
     bash: "node --test scripts/tests/ui.test.mjs scripts/tests/watch.test.mjs"

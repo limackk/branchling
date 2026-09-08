@@ -69,8 +69,12 @@ export const KINDS = {
   // `audit --json` (TL-90). `since` and `dayZero` are what makes an empty
   // `closedWithoutTrace` readable: the log has a first day, and everything
   // before it left no trace for a reason that is nobody's fault.
-  runs: { runs: [] },
-  run: { run: null, alive: null, timedOut: null },
+  run: {
+    ok: null, dryRun: null, agent: null, profile: null, agentFor: null, profileFor: null,
+    delegation: null, allowUncontrolledDelegation: null, plan: null, order: [], considered: null,
+    stoppedAt: null, stopped: null, agentNeverRan: null, waitingForRole: [],
+    waitingForExecutor: [], waitingForSize: [], tally: null, sharedState: null, ms: null, tasks: [],
+  },
   audit: {
     since: null, dayZero: null, tasks: null, findings: null,
     closedWithoutTrace: [], skippedBeforeSince: null, reopened: [],
@@ -191,7 +195,6 @@ export const KINDS = {
     ok: null, id: null, status: null, owner: null, released: null, comment: null,
     refusalKind: null, refusal: null, details: [],
   },
-  watch: { wave: null, tasks: [] },
   // `ask --json` (TL-148). The question's EVENT ID is the payload that matters:
   // it is what a later `decide --resolves` has to name, and the reason the task
   // now carries names it too — so a consumer never has to parse a sentence.

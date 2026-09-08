@@ -16,7 +16,7 @@ created: 2026-09-07
 updated: 2026-09-07
 blocked_by: [TL-321, TL-322]       # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
-related_docs: [scripts/agent-profiles.mjs, scripts/watch.mjs]
+related_docs: [scripts/agent-profiles.mjs]
 verification:                      # HOW to check the task is really done
   - id: terminal-contract
     bash: "node --test scripts/tests/terminal-ui.test.mjs scripts/tests/agent-profile-setup.test.mjs scripts/tests/ui.test.mjs scripts/tests/watch.test.mjs"

@@ -97,8 +97,6 @@ const READING = {
   // share profiles' user configuration boundary, so this request also runs
   // outside a fixture backlog.
   "agent-launches": { args: ["launch", "list", "--json"], noDir: true },
-  runs: ["runs", "list", "--json"],
-  run: { args: ["runs", "show", "missing-run", "--json"], refuses: true },
   // The fixtures carry no `plan.yaml`, so this exercises the answer a backlog
   // without an execution order gives — which is the one that has to stay a
   // complete envelope rather than an error.
@@ -133,11 +131,11 @@ const READING = {
   // would run the fixture task's `verification:` command, and the shape of the
   // answer would start depending on the observer's shell.
   resume: ["resume", "TASK-1", "--actor", "agent:test", "--no-verify", "--json"],
+  run: ["run", "--dry-run", "--json"],
   // The live terminal view becomes one complete snapshot under `--json`, which
   // is deliberately one-shot. A fixture without a plan still has a valid answer:
   // `wave: null` means no execution order was declared, not that the command
   // failed to inspect the backlog.
-  watch: ["watch", "--json"],
   // Conformance creates its own disposable repository. Giving it a Node
   // executable makes the adapter response malformed on purpose, which proves
   // the JSON refusal shape without needing a provider or fixture wrapper.

@@ -16,7 +16,7 @@ created: 2026-09-07
 updated: 2026-09-07
 blocked_by: [TL-358, TL-359]       # ids of tasks that MUST be closed before this one starts
 blocks: [TL-362]                   # ids this task will unblock
-related_docs: [scripts/watch.mjs, scripts/ui.mjs, scripts/run-loop.mjs]
+related_docs: [scripts/ui.mjs, scripts/run-loop.mjs]
 verification:                      # HOW to check the task is really done
   - id: observable-watch
     bash: "node --test scripts/tests/watch.test.mjs scripts/tests/run-control.test.mjs"

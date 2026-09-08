@@ -81,8 +81,6 @@ import { fileURLToPath } from "node:url";
 import { resolveActor } from "./actor.mjs";
 import { checkAgentProfiles, resolveAgentProfile, secretEnvironmentNames } from "./agent-profiles.mjs";
 import { DELEGATION_ENFORCEMENT, DELEGATION_POLICIES, executionReceipt } from "./agent-contract.mjs";
-import { createWorkerScope, releaseWorkerScope, WORKER_SCOPE_ENV } from "./worker-scope.mjs";
-import { startAttemptRecord, startRunRecord, readExecutionRecord, updateAttemptRecord, updateRunRecord } from "./execution-records.mjs";
 import { resolveAgentLaunch } from "./agent-launches.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { probeContract, repoRootFor } from "./done-task.mjs";
@@ -122,7 +120,7 @@ export const AGENT_ENV = "BACKLOG_AGENT_COMMAND";
 export const RUN_FLAGS = [
   "--dir", "--actor", "--agent", "--agent-for", "--profile", "--profile-for", "--launch", "--max-attempts", "--max-tasks", "--timeout",
   "--log-dir", "--stuck-status", "--delegation", "--allow-uncontrolled-delegation", "--json", "--dry-run", "--plan", "--probe",
-  "--board", "--label", "--priority", "--epic", "--detach", "--run-id",
+  "--board", "--label", "--priority", "--epic",
 ];
 
 const DEFAULT_MAX_ATTEMPTS = 2;
@@ -132,7 +130,7 @@ const DEFAULT_TIMEOUT_SECONDS = 900;
 export function parseRunArgs(args) {
   const plan = {
     dir: null, actor: null, agent: null, profile: null, launch: null, agentFor: {}, profileFor: {}, json: false, dryRun: false, usePlan: false,
-    maxAttempts: DEFAULT_MAX_ATTEMPTS, maxTasks: 0, timeout: DEFAULT_TIMEOUT_SECONDS, probe: false, delegation: "provider", allowUncontrolledDelegation: false, detach: false, runId: null,
+    maxAttempts: DEFAULT_MAX_ATTEMPTS, maxTasks: 0, timeout: DEFAULT_TIMEOUT_SECONDS, probe: false, delegation: "provider", allowUncontrolledDelegation: false,
     logDir: null, stuckStatus: null, board: null, label: null, priority: null, epic: null,
   };
   const numbers = { "--max-attempts": "maxAttempts", "--max-tasks": "maxTasks", "--timeout": "timeout" };
@@ -141,7 +139,6 @@ export function parseRunArgs(args) {
     if (a === "--json") { plan.json = true; continue; }
     if (a === "--dry-run") { plan.dryRun = true; continue; }
     if (a === "--probe") { plan.probe = true; continue; }
-    if (a === "--detach") { plan.detach = true; continue; }
     if (a === "--allow-uncontrolled-delegation") { plan.allowUncontrolledDelegation = true; continue; }
     if (a === "--plan") { plan.usePlan = true; continue; }
     if (RUN_FLAGS.indexOf(a) >= 0) {
@@ -185,7 +182,7 @@ export function parseRunArgs(args) {
         plan.profileFor[role] = profile;
         continue;
       }
-      const key = { "--log-dir": "logDir", "--stuck-status": "stuckStatus", "--run-id": "runId" }[a] || a.slice(2);
+      const key = { "--log-dir": "logDir", "--stuck-status": "stuckStatus" }[a] || a.slice(2);
       plan[key] = value;
       continue;
     }
@@ -907,7 +904,6 @@ export function agentEnvironment(ctx, task) {
   out[prefix + "_MODEL"] = String((task.profile && task.profile.model) || "");
   out[prefix + "_EFFORT"] = String((task.profile && task.profile.effort) || "");
   out[prefix + "_DELEGATION"] = String((ctx.plan && ctx.plan.delegation) || "provider");
-  if (task.workerScope) out[WORKER_SCOPE_ENV] = task.workerScope;
   return out;
 }
 
@@ -978,15 +974,12 @@ export function attemptProvenance(task, attempt) {
   });
 }
 
-/** Run one worker without making the supervisor blind until its process exits. */
+/** Run one foreground agent and retain only its bounded process result. */
 export function superviseAgent(command, opts) {
   return new Promise((resolve) => {
     let stdout = ""; let stderr = ""; let bytes = 0; let timedOut = false; let overflow = false; let settled = false;
-    const child = opts.raw ? spawn(command, { shell: true, cwd: opts.cwd, env: opts.env, detached: process.platform !== "win32", stdio: ["pipe", "pipe", "pipe"] })
-      : spawn(command, [], { shell: false, cwd: opts.cwd, env: opts.env, detached: process.platform !== "win32", stdio: ["pipe", "pipe", "pipe"] });
-    const touch = (patch) => updateAttemptRecord(opts.root, opts.record, patch, opts.recordEnv || process.env);
-    touch({ phase: "running", pid: child.pid || null, lastLivenessAt: new Date().toISOString() });
-    const liveness = setInterval(() => touch({ phase: "running", lastLivenessAt: new Date().toISOString() }), 1000);
+    const child = opts.raw ? spawn(command, { shell: true, cwd: opts.cwd, env: opts.env, stdio: ["pipe", "pipe", "pipe"] })
+      : spawn(command, [], { shell: false, cwd: opts.cwd, env: opts.env, stdio: ["pipe", "pipe", "pipe"] });
     const receive = (key, chunk) => {
       const text = String(chunk); bytes += Buffer.byteLength(text);
       const safe = opts.profile ? redactSecrets(text, opts.profile) : text;
@@ -996,10 +989,9 @@ export function superviseAgent(command, opts) {
       if (progress) {
         try {
           const event = JSON.parse(progress[1]);
-          if (event && event.version === 1) touch({ lastProgressAt: new Date().toISOString(), progress: { id: String(event.id || ""), message: String(event.message || "") } });
+          if (event && event.version === 1) { /* progress belongs to the caller's agent output */ }
         } catch { /* ordinary output is not a malformed progress failure */ }
       }
-      touch({ phase: "running", lastOutputAt: new Date().toISOString() });
       if (bytes > 64 * 1024 * 1024 && !overflow) { overflow = true; stop(); }
     };
     child.stdout.on("data", (chunk) => receive("stdout", chunk));
@@ -1016,7 +1008,7 @@ export function superviseAgent(command, opts) {
     const finish = (result) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timeout); clearInterval(liveness);
+      clearTimeout(timeout);
       resolve({ stdout, stderr, timedOut, overflow, ...result });
     };
     child.once("error", (error) => finish({ error, status: null }));
@@ -1036,11 +1028,7 @@ async function workOne(ctx, task) {
   let failure = "";
   let attempts = 0;
   const provenance = [];
-  let executionAttempt = null;
-  const result = (fields) => {
-    if (executionAttempt) updateAttemptRecord(ctx.root, executionAttempt, { phase: "finished", outcome: fields.outcome });
-    return { ...fields, provenance };
-  };
+  const result = (fields) => ({ ...fields, provenance });
   const started = Date.now();
   // Take the contract's state before the hand starts. `done` stops at its first
   // red entry, while a probe records every entry so a later suite red can be
@@ -1063,15 +1051,10 @@ async function workOne(ctx, task) {
       : task.hand.profile.adapter;
     const receipt = attemptProvenance(task, attempt);
     provenance.push(receipt);
-    executionAttempt = startAttemptRecord({ root: ctx.root, run: ctx.execution, task, attempt });
-    updateAttemptRecord(ctx.root, executionAttempt, { phase: "running" });
     appendFileSync(logPath, "=== attempt " + attempt + ": " + command + "\n", "utf8");
     appendFileSync(logPath, "=== provenance: " + JSON.stringify(receipt) + "\n", "utf8");
-    const workerScope = createWorkerScope({ root: ctx.root, taskId: task.id, actor: ctx.actor,
-      runId: ctx.execution.id });
-    task.workerScope = workerScope;
     const agent = await superviseAgent(command, {
-      raw: task.hand.kind === "raw", cwd: ctx.cwd, root: ctx.root, record: executionAttempt,
+      raw: task.hand.kind === "raw", cwd: ctx.cwd,
       // THE HAND IS TOLD WHO IT IS (TL-271). The loop claimed the task under
       // `actor` and is serving it as `role`; a hand that has to act on the
       // task — `handoff`, `ask`, `decide` — needs the first, and had to read the
@@ -1080,10 +1063,8 @@ async function workOne(ctx, task) {
       env: task.hand.kind === "raw" ? { ...process.env, ...agentEnvironment(ctx, task) } : adapterEnvironment(ctx, task),
       input: task.hand.kind === "raw" ? agentInput(task.text, feedback, feedbackRan)
         : profileInput(task.text, task.roleBrief, task.profile && task.profile.prompt, feedback, feedbackRan),
-      timeout: ctx.plan.timeout, logPath, profile: task.hand.kind === "profile" ? task.profile : null, recordEnv: process.env,
+      timeout: ctx.plan.timeout, logPath, profile: task.hand.kind === "profile" ? task.profile : null,
     });
-    releaseWorkerScope(workerScope);
-    delete task.workerScope;
     const output = task.hand.kind === "profile"
       ? redactSecrets((agent.stdout || "") + (agent.stderr || ""), task.profile)
       : (agent.stdout || "") + (agent.stderr || "");
@@ -1097,7 +1078,6 @@ async function workOne(ctx, task) {
       feedback = "the agent was killed after " + ctx.plan.timeout + "s (`--timeout`)";
       feedbackRan = false;
       failure = feedback;
-      updateAttemptRecord(ctx.root, executionAttempt, { phase: "retrying", outcome: "timeout" });
       continue;
     }
 
@@ -1157,7 +1137,6 @@ async function workOne(ctx, task) {
     // The closing entry names the stage, not just the hand (TL-222). Only when
     // the task asked for a role: passing "" would be a role nobody declared.
     if (task.role) doneArgs.push("--role", task.role);
-    updateAttemptRecord(ctx.root, executionAttempt, { phase: "verifying" });
     const closing = cli(doneArgs);
     appendFileSync(logPath, "\n=== done: exit " + closing.status + "\n" + (closing.stderr || ""), "utf8");
     if (closing.status === 0) {
@@ -1402,22 +1381,6 @@ export async function run(argv) {
     return 2;
   }
 
-  if (plan.detach) {
-    const record = startRunRecord({ root, actor, delegation: plan.delegation });
-    const childArgs = argv.filter((arg) => arg !== "--detach").concat(["--run-id", record.id]);
-    const child = spawn(process.execPath, [fileURLToPath(import.meta.url)].concat(childArgs), {
-      detached: process.platform !== "win32", stdio: "ignore", env: process.env,
-    });
-    child.unref();
-    updateRunRecord(root, record, { phase: "starting", supervisor: { pid: child.pid || null, script: fileURLToPath(import.meta.url) } });
-    if (plan.json) printJson("run", {
-      run: { ...record, phase: "starting", supervisor: { pid: child.pid || null, script: fileURLToPath(import.meta.url) } },
-      alive: true,
-    });
-    else console.log("✓ detached run " + record.id + " started");
-    return 0;
-  }
-
   // The plan is read BEFORE the loop starts, for the same reason as the roles
   // above: a missing plan found at the first `next` would have cost a claim, a
   // spawned agent and a log file before anybody was told the order was never
@@ -1549,7 +1512,7 @@ export async function run(argv) {
     }
     const shown = plan.maxTasks ? rows.slice(0, plan.maxTasks) : rows;
     if (plan.json) {
-      console.log(JSON.stringify({
+      printJson("run", {
         ok: true, dryRun: true, agent: plan.agent, profile: plan.profile,
         agentFor: plan.agentFor, profileFor: plan.profileFor, delegation: plan.delegation,
         allowUncontrolledDelegation: plan.allowUncontrolledDelegation, plan: planned ? true : false,
@@ -1559,7 +1522,7 @@ export async function run(argv) {
         })),
         considered: rows.length,
         ...(planned ? { stoppedAt: wall } : {}),
-      }, null, 2));
+      });
     } else {
       console.log("");
       console.log("  " + shown.length + " task(s) would run, in this order:");
@@ -1599,8 +1562,7 @@ export async function run(argv) {
   // directory is this repository" would show up as an agent writing its result
   // where the verification does not look.
   const cwd = repoRootFor(root);
-  const existing = plan.runId ? readExecutionRecord(root, plan.runId) : null;
-  const ctx = { root, config, actor, cwd, plan, execution: existing || startRunRecord({ root, actor, delegation: plan.delegation, id: plan.runId }) };
+  const ctx = { root, config, actor, cwd, plan };
 
   // Where a task whose contract ends in a `manual:` entry is parked (TL-212).
   // Null when this backlog has not declared one, and then nothing changes: such
@@ -1828,13 +1790,12 @@ export async function run(argv) {
   const waitingSize = waitingForSize(leftover, config, callerSpecies(actor));
 
   const shared = sharedStatePaths();
-  updateRunRecord(root, ctx.execution, { phase: "finished", outcome: neverStarted ? "agent-never-ran" : "finished" });
   const report = {
     taken, tally, ms: Date.now() - started, stopped, waiting, waitingExecutor, waitingSize,
     maxUnattendedEstimate: config.maxUnattendedEstimate, neverStarted, shared,
   };
   if (plan.json) {
-    console.log(JSON.stringify({
+    printJson("run", {
       // `ok` is about the RUN, not about the tasks: blocked work is a run that
       // finished, an agent that could not start is a run that did not (TL-184).
       ok: !neverStarted, dryRun: false, agent: plan.agent, profile: plan.profile,
@@ -1864,7 +1825,7 @@ export async function run(argv) {
         toRole: r.toRole || null,
         provenance: r.provenance || [],
       })),
-    }, null, 2));
+    });
   } else {
     console.log(renderReport(report, plan));
   }

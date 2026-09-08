@@ -16,7 +16,7 @@ created: 2026-09-07
 updated: 2026-09-07
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
-related_docs: [scripts/tests/execution-records.test.mjs, scripts/tests/run-control.test.mjs, scripts/tests/run-detach.test.mjs, scripts/tests/run-live-supervision.test.mjs] # paths relative to the repository root
+related_docs: [] # execution records no longer ship
 verification:                      # HOW to check the task is really done
   - id: isolated-execution-tests
     bash: "node --test scripts/tests/execution-records.test.mjs scripts/tests/run-control.test.mjs scripts/tests/run-detach.test.mjs scripts/tests/run-live-supervision.test.mjs"

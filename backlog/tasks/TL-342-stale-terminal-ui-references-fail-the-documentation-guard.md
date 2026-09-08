@@ -16,7 +16,7 @@ created: 2026-09-07
 updated: 2026-09-07
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
-related_docs: [scripts/agent-profiles.mjs, scripts/ui.mjs, scripts/watch.mjs] # paths relative to the repository root
+related_docs: [scripts/agent-profiles.mjs, scripts/ui.mjs] # paths relative to the repository root
 verification:                      # HOW to check the task is really done
   - id: documentation-links
     bash: "node scripts/cli.mjs check"

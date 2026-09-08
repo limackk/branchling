@@ -16,7 +16,7 @@ created: 2026-09-07
 updated: 2026-09-07
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
-related_docs: [scripts/json-envelope.mjs, docs/manual.md, scripts/tests/run-control.test.mjs] # paths relative to the repository root
+related_docs: [scripts/json-envelope.mjs, docs/manual.md] # paths relative to the repository root
 verification:                      # HOW to check the task is really done
   - id: timeout-envelope
     bash: "node --test scripts/tests/run-control.test.mjs scripts/tests/run-detach.test.mjs"

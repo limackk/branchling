@@ -40,7 +40,6 @@ import { printJson } from "./json-envelope.mjs";
 import { failure } from "./ui.mjs";
 import { resolveBacklogDir, resolveBacklogDirOrExit } from "./paths.mjs";
 import { FIELD_SHAPES } from "./task-fields.mjs";
-import { workerScopeRefusal } from "./worker-scope.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -313,7 +312,6 @@ export const COMMANDS = {
     summary: "return your claimed task to the queue, with a reason",
     usage: `${N} release <ID> --reason "…" [--status <s>] [--actor <ns:name>] [--json] [--dir <path>]\n\n  Clears the owner and this actor's reservation through the handoff write path.\n  A release has no receiver; use handoff when work is assigned to one.\n\n  exit: 0 released · 1 refused · 2 usage error`,
   },
-  watch: { script: "watch.mjs", summary: "live execution progress in one quiet terminal frame", usage: `${N} watch [--interval <seconds>] [--once] [--json] [--dir <path>]\n\n  Refreshes the current terminal frame without shell helpers or screen flicker.\n  --once and --json print one frame and exit, for automation.\n\n  exit: 0 displayed · 2 usage error` },
   resume: {
     script: "resume-task.mjs",
     summary: "brief a successor on a task a dead session left behind — one document, in order",
@@ -1106,27 +1104,20 @@ export const COMMANDS = {
   },
   run: {
     script: "run-loop.mjs",
-    summary: "drive the queue to empty: take a task, hand it to your agent, close it",
+    summary: "run one foreground agent through eligible tasks in this working tree",
     usage: [
       `${N} run --agent "<command>" [--max-attempts N] [--max-tasks N] [--timeout <s>]`,
       `${N} run --profile <name> [--max-attempts N] [--max-tasks N] [--timeout <s>]`,
-      `${N} run [--delegation provider|branchling|hybrid] [--allow-uncontrolled-delegation]`, // product-name: allow — delegation vocabulary
       `${N} run [--dry-run] [--plan] [--json] [--actor <ns:name>] [--stuck-status <s>] [--dir <path>]`,
       `${N} run [--board b] [--label l] [--priority p] [--epic e] [--log-dir <path>]`,
-      `${N} run --agent "<command>" --agent-for <role>=<command> [--agent-for …]`,
-      `${N} run --profile <name> --profile-for <role>=<name> [--profile-for …]`,
       "",
       "  The loop is `next` → your agent → `done`, repeated until the queue is empty.",
       "  It is NOT an agent and never will be: `--agent` is a command template of",
       "  yours, with `{task_file}` and `{id}` substituted, run through your shell.",
       "  The task — and, from the second attempt, what `done` refused — arrive on",
       "  stdin. BACKLOG_AGENT_COMMAND is read when the flag is absent.",
-      "  `--profile` starts its one local wrapper executable directly, with its prompt,",
+      "  `--profile` starts one local wrapper executable directly, with its prompt,",
       "  model and effort in the stable environment contract; it is not a provider list.",
-      "  `--delegation` declares who may delegate helpers: `provider` (default),",
-      "  `branchling`, or `hybrid`. A " + N + "-managed profile fleet refuses an", // product-name: allow — delegation vocabulary
-      "  adapter that declares no control unless `--allow-uncontrolled-delegation`",
-      "  explicitly records that exception.",
       "",
       "  A task that fails its contract `--max-attempts` times is moved to the open",
       "  status this project protects with a reason, WITH the reason. It is never",
@@ -1138,9 +1129,8 @@ export const COMMANDS = {
       "  actor this run handed the task to counts as CLOSED — your agent closing its",
       "  own task is the success path — anybody else is reported as closed elsewhere.",
       "",
-      "  The same re-read asks whether the task is still this run's. One taken over",
-      "  in another worktree, or handed on to a person, is reported as held elsewhere",
-      "  — with who holds it — and left exactly as it is.",
+      "  The caller owns branches, worktrees, merging and cleanup. This command uses",
+      "  the existing working tree and never creates, switches, merges or removes Git topology.",
       "",
       "  An agent that never STARTED costs the task nothing. An attempt that printed",
       "  nothing and left the tree unchanged is not an attempt: the task is given back",
@@ -1192,7 +1182,6 @@ export const COMMANDS = {
       "        2 usage error",
     ].join("\n"),
   },
-  runs: { script: "run-control.mjs", summary: "inspect, wait for or cancel local detached runs", usage: `${N} runs <list|show|wait|cancel> [run-id] [--timeout <seconds>] [--json] [--dir <path>]` },
   done: {
     script: "done-task.mjs",
     summary: "close a task by RUNNING its verification — the only command that runs it",
@@ -2084,20 +2073,6 @@ export function main(argv) {
   }
 
   if (resolved.name === "check") return runCheck(folded.argv);
-  // This is deliberately at the one public command boundary. A worker may use
-  // the normal task commands for its assigned task, but cannot turn an inherited
-  // environment into a second queue owner (TL-356).
-  const dirFlag = folded.argv.indexOf("--dir");
-  try {
-    const root = resolveBacklogDir({ dir: dirFlag >= 0 ? folded.argv[dirFlag + 1] : undefined, moduleDir: HERE }).root;
-    const refused = workerScopeRefusal(resolved.name, folded.argv, root);
-    if (refused) {
-      console.error(failure(N + " " + resolved.name, refused, [], [N + " " + resolved.name + " --help"]));
-      return 1;
-    }
-  } catch {
-    // The target script gives the authoritative configuration/path error.
-  }
   return runScript(resolved.spec.script, folded.argv, tinted.force);
 }
 

@@ -49,10 +49,6 @@ state and its evidence enter that review beside the code.
 Watch a running wave in the terminal without a shell loop:
 
 ```bash
-branchling watch                 # refreshes in place; Ctrl-C returns to the shell
-branchling watch --interval 5    # a slower refresh
-branchling watch --once          # one readable snapshot
-branchling watch --json          # one machine-readable snapshot
 ```
 
 The view shows every task in the active wave, its current status, the current
@@ -315,9 +311,8 @@ harness to use bounded helpers; `--delegation branchling` is the recommended
 mode for a specialist fleet, where Branchling alone claims backlog tasks; and
 `hybrid` is an explicit advanced exception. An adapter's local
 `delegation_control` states whether that boundary is enforced, instruction-only
-or unsupported. Start unattended work with `run --detach`, use `watch` to see
-the active wave and `runs list`, `runs wait <run-id>` or `runs cancel <run-id>`
-to supervise it without keeping an agent session blocked.
+or unsupported. Run the agent in the foreground in a working tree you prepared;
+your shell or orchestrator owns detached execution, supervision and cancellation.
 
 During setup, choose whether the agent is available on this machine everywhere
 or only in the current Git project. A project-only choice keeps its adapter,
