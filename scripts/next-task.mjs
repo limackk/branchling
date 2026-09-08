@@ -56,7 +56,6 @@ import { fileURLToPath } from "node:url";
 import { resolveActor } from "./actor.mjs";
 import { crossBranchState, describeDivergence, divergences, scanNote } from "./branch-scan.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { actorRecords, applyActorPolicy } from "./actors.mjs";
 import { ACTOR_NAMESPACES, FIELD_COMMENT, isValidActor, openQuestions, readAllHistory, readHistory, reasonRefusal } from "./history.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
 import { dispatchWave, loadPlanForDispatch } from "./plan.mjs";
@@ -662,13 +661,11 @@ export function run(argv) {
   // The log is read only where a project actually declared a policy: computing
   // every actor's record on every `next` would cost a whole history read to
   // the backlogs that asked for none.
-  const declaredPolicy = config.actorPolicy.priorities.length && config.actorPolicy.minFirstPass > 0;
-  const record = declaredPolicy
-    ? (actorRecords({ history: readAllHistory(root), config }).rows.find((r) => r.actor === actor) || null)
-    : null;
-  const { candidates, withheld: skippedByRecord } = declaredPolicy
-    ? applyActorPolicy(selected, { row: record, policy: config.actorPolicy, minReportN: config.minReportN })
-    : { candidates: selected, withheld: [] };
+  // A task is selected by its own declaration, priority and dependencies. The
+  // caller's past close rate is not an eligibility signal: that would turn the
+  // durable ledger into an actor scorecard rather than evidence about the task.
+  const candidates = selected;
+  const skippedByRecord = [];
   const planJson = planned
     ? {
         wave: wave ? wave.index + 1 : null, name: wave ? wave.name : "",
