@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { BACKLOG_DIR, TASKS_DIR } from "./_repo.mjs";
+import { BACKLOG_DIR, TASKS_DIR, isolateHome } from "./_repo.mjs";
 import { parsePlanYaml } from "../plan.mjs";
 import { readTaskRecords } from "../task-select.mjs";
 import { loadConfig } from "../config.mjs";
@@ -19,6 +19,8 @@ const CANCELLED = [
   "TL-209", "TL-215", "TL-226", "TL-229", "TL-236", "TL-245", "TL-250", "TL-252",
   "TL-267", "TL-269", "TL-278", "TL-279", "TL-286", "TL-317", "TL-344", "TL-348",
 ];
+
+isolateHome("product-boundary-plan");
 
 function historyEntries(id) {
   return readFileSync(join(BACKLOG_DIR, "history", id + ".jsonl"), "utf8")

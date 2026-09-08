@@ -4,8 +4,9 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 
 import { COMMANDS, resolveCommand } from "../cli.mjs";
-import { SCRIPTS_DIR, plainOutput } from "./_repo.mjs";
+import { SCRIPTS_DIR, isolateHome, plainOutput } from "./_repo.mjs";
 
+isolateHome("no-activity-product-surface");
 plainOutput();
 
 const REMOVED = ["activity", "focus", "time", "sessions", "session", "actors", "quote", "backfill-completions"];
