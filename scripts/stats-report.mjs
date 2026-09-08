@@ -16,9 +16,7 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { calibrationSamples } from "./activity.mjs";
 import { absentHere, crossBranchState, describeDivergence, divergences, scanNote } from "./branch-scan.mjs";
-import { breakdown, calibrate, correlate, spanLabel } from "./calibration.mjs";
 import { commandRunner, contextBudget, renderBudget } from "./context-budget.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { backlogPaths, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
@@ -78,48 +76,6 @@ if (argv.includes("--context")) {
     process.exit(0);
   }
   console.log(renderBudget(budget));
-  process.exit(0);
-}
-
-// ESTIMATE CALIBRATION (TL-29). A separate report for the same reason
-// `--context` is one: it reads `activity/rollup/`, which the ordinary summary
-// has no business touching, and it answers a question about CLOSED work while
-// every row above is about the queue.
-if (argv.includes("--calibration") || argv.includes("--correlation-only")) {
-  const rows = calibrationSamples(ROOT, tasks, CONFIG);
-  const opts = { minN: CONFIG.minReportN };
-  const gate = correlate(rows, opts);
-
-  // STEP 0 FIRST, ALWAYS, AND IT CAN BE ASKED ALONE. The gate decides whether a
-  // table of medians is a measurement or a formatted picture of noise (§14
-  // point 1 of docs/backlog-time-tracking.md — a real path, product-name:
-  // allow), so printing the table above it would be answering after acting.
-  if (argv.includes("--correlation-only")) {
-    if (argv.includes("--json")) {
-      printJson("stats", { root: ROOT, calibration: { gate, samples: rows.length } });
-      process.exit(0);
-    }
-    console.log(renderGate(gate));
-    // EXIT 0 ON EVERY VERDICT, including `uncorrelated`. A negative measurement
-    // is a result; making it a non-zero exit would turn the honest answer into
-    // something a pipeline treats as a broken command.
-    process.exit(0);
-  }
-
-  const cal = calibrate(rows, opts);
-  if (argv.includes("--json")) {
-    printJson("stats", {
-      root: ROOT,
-      calibration: {
-        gate, ...cal,
-        byBoard: breakdown(rows, "board", opts),
-        byType: breakdown(rows, "type", opts),
-        byOwner: breakdown(rows, "owner", opts),
-      },
-    });
-    process.exit(0);
-  }
-  console.log(renderCalibration(cal, gate, rows, opts));
   process.exit(0);
 }
 
@@ -217,80 +173,3 @@ if (note) {
 }
 
 console.log(out.join("\n"));
-
-
-// ──────────────────────────────────────────────────────────────────────────
-// Calibration (TL-29)
-// ──────────────────────────────────────────────────────────────────────────
-
-/** A function and not a `const` map: this file is a SCRIPT, its top level runs
- *  before the declarations below it, and a const read from there is in its
- *  temporal dead zone. A function declaration is hoisted, which is why every
- *  helper here is one. */
-function verdictNote(verdict) {
-  if (verdict === "insufficient") return "not answered yet";
-  if (verdict === "correlated") return "time is a usable axis";
-  if (verdict === "uncorrelated") return "calibrating on time is not worth a report";
-  return "";
-}
-
-function renderGate(gate) {
-  const out = [heading("estimate calibration — step 0, the correlation gate")];
-  out.push("");
-  out.push(line("verdict", gate.verdict, verdictNote(gate.verdict)));
-  out.push(line("measured samples", gate.samples));
-  out.push(line("buckets at n>=" + gate.minN, gate.buckets));
-  if (gate.ratio != null) {
-    out.push(line("spread within a bucket", spanLabel(gate.within), "mean p20-p80"));
-    out.push(line("difference between buckets", spanLabel(gate.between), "median to median"));
-    out.push(line("ratio", (Math.round(gate.ratio * 100) / 100) + "x", gate.ratio >= 1 ? "between > within" : "within > between"));
-    out.push(line("medians rise with the estimate", gate.monotonic ? "yes" : "no"));
-  }
-  out.push("");
-  out.push("  " + gate.reason);
-  return out.join("\n");
-}
-
-function renderCalibration(cal, gate, rows, opts) {
-  const out = [renderGate(gate), ""];
-
-  if (gate.verdict === "uncorrelated") {
-    // THE TABLE IS STILL PRINTED, with the verdict standing above it. Hiding it
-    // would leave nothing for a reader to check the verdict against, and the
-    // gate is a judgement about the data, not a permission to see it.
-    out.push("  the table below is printed for inspection, not for planning:");
-    out.push("");
-  }
-
-  out.push(heading("per estimate bucket"));
-  out.push("");
-  const body = cal.buckets.map((b) => b.insufficient
-    ? ["  " + b.label, String(b.n), "not enough data", "", ""]
-    : ["  " + b.label, String(b.n), spanLabel(b.median),
-       spanLabel(b.p20) + " - " + spanLabel(b.p80),
-       "x" + (Math.round(b.bias * 10) / 10)]);
-  if (body.length) out.push(table([["  estimate", "n", "median", "p20-p80", "bias"], ...body]));
-  else out.push("  no closed task carries both an estimate and measured time");
-
-  out.push("");
-  out.push(line("closed and measured", cal.measured));
-  // ALWAYS PRINTED, ZERO INCLUDED. A calibration built from 9 of 141 closed
-  // tasks and one built from 130 look identical once the medians are on screen.
-  out.push(line("closed, never measured", cal.unmeasured));
-  out.push(line("closed with no countable estimate", cal.unestimated));
-  out.push(line("threshold", "n>=" + cal.minN, "min_report_n in config.yaml"));
-
-  for (const [key, label] of [["board", "board"], ["type", "type"], ["owner", "owner"]]) {
-    const rowsFor = breakdown(rows, key, opts);
-    if (!rowsFor) continue;
-    out.push("");
-    out.push("by " + label + ":");
-    for (const r of rowsFor) {
-      for (const b of r.buckets) {
-        out.push(line("  " + r.value + " / " + b.label, spanLabel(b.median),
-          spanLabel(b.p20) + " - " + spanLabel(b.p80) + ", n=" + b.n));
-      }
-    }
-  }
-  return out.join("\n");
-}
