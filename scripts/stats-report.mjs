@@ -34,7 +34,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const cli = takeDirFlag(process.argv.slice(2));
 const argv = cli.argv;
 
-const KNOWN_FLAGS = ["--json", "--context", "--calibration", "--correlation-only"];
+const KNOWN_FLAGS = ["--json", "--context"];
 for (const a of argv) {
   if (KNOWN_FLAGS.indexOf(a) < 0) {
     console.error(`${N} stats: unknown flag: ` + a);
