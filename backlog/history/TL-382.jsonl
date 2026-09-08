@@ -1,0 +1,2 @@
+{"id":"01M1ZYRE37Y0MBPFRY2QGR9378","ts":"2026-09-08T07:29:42.503Z","task":"TL-382","field":"__created__","from":"","to":"Provider execution uses one thin user-owned adapter path","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1ZZ851JK0QEC8QX8A0ZCA44","ts":"2026-09-08T07:38:17.522Z","task":"TL-382","field":"related_docs","from":[],"to":["docs/backlog-config-and-portability.md","README.md"],"actor":"local:me","source":"manual","reason":"Linked the task contract to its public implementation context"}
