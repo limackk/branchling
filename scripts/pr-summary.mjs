@@ -42,8 +42,6 @@ import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { readAllActivity } from "./activity.mjs";
-import { engagedReport } from "./cluster.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { repoRoot } from "./modified-files.mjs";
@@ -217,14 +215,7 @@ export function summarizeTask(id, entries, task, change = "changed") {
  * answers, and a zero in a pull request comment reads as the second.
  */
 export function engagedFor(root, ids, env = process.env) {
-  let rows;
-  try { rows = readAllActivity(root, env); } catch { return null; }
-  const wanted = {};
-  for (const id of ids) if (rows[id] && rows[id].length) wanted[id] = rows[id];
-  if (!Object.keys(wanted).length) return null;
-  const report = engagedReport(wanted);
-  if (!report.tasks.length) return null;
-  return report;
+  return null;
 }
 
 // ──────────────────────────────────────────────────────────────────────────

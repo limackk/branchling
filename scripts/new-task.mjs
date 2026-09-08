@@ -30,9 +30,7 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { calibrationSamples } from "./activity.mjs";
 import { resolveActor } from "./actor.mjs";
-import { bucketFor, spanLabel } from "./calibration.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { recordCreation } from "./history.mjs";
 import { withBacklogMutex } from "./lock.mjs";
@@ -590,22 +588,6 @@ export function main(argv) {
   }
   console.log("  board: " + board + (opts.board ? "" : " (the registry default)"));
   if (scheduling) console.log("  wave: " + opts.wave + " — scheduled in " + paths.planPath);
-  // WHAT THAT ESTIMATE HAS COST BEFORE (TL-29). Printed HERE and nowhere else,
-  // because writing the estimate is the only moment the number can still change
-  // a decision — a calibration report read a week later corrects nothing.
-  //
-  // SILENT BELOW THE THRESHOLD, deliberately: a hint drawn from three closed
-  // tasks would be a guess wearing the authority of a measurement, and the cost
-  // of that is paid by whoever believes it.
-  if (opts.estimate) {
-    const hint = bucketFor(calibrationSamples(root, readTaskMetas(paths.tasksDir, config), config), opts.estimate,
-      { minN: config.minReportN });
-    if (hint) {
-      console.log("  calibration: closed `" + hint.label + "` tasks took " +
-        spanLabel(hint.p20) + " - " + spanLabel(hint.p80) + ", median " + spanLabel(hint.median) +
-        " (n=" + hint.n + ")");
-    }
-  }
   console.log(`  next: fill in ## Goal and ## Context, then \`${N} build\``);
   return 0;
 }
