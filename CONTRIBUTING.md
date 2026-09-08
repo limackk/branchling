@@ -70,9 +70,10 @@ Four things, and each of them is a rule this project has paid for:
    plan fails` rather than `add plan guard` — because that is the difference
    between a `git log` that answers questions and one that lists files.
 
-Everything in the repository is written in English, including the backlog and
-the commit messages. `check --language` enforces it over the source and the
-documents.
+Everything in the repository is written in English, including the backlog,
+filenames and commit messages. Task files use lowercase English slugs after
+their immutable ids. `check --language` enforces the source and documents;
+TL-385 migrates the remaining historical task filenames.
 
 ---
 

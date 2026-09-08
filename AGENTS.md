@@ -136,7 +136,7 @@ reasoning is in a language they do not read.
 This covers, without exception: `scripts/`, `bin/`, `README.md`, `_template.md`,
 `docs/`, `backlog/tasks/`, `backlog/config.yaml`, `backlog/plan.yaml`,
 `backlog/boards.yaml`, this file, the dotfiles, **and the git surface** — commit
-titles and bodies, branch names, worktree names.
+titles and bodies, branch names, worktree names, and filenames.
 
 No automated guard determines whether prose is English. The former detector
 looked only for Polish-specific characters, words and word shapes, so a green
@@ -176,13 +176,13 @@ owes this paragraph another entry.
   was not ours to publish.
 
 `backlog/tasks/` and `docs/` were the last two directories carrying this
-exception; TL-137 translated both (145 files) and is why the guard above now
-covers them. That migration deliberately did **not** rename any file —
-translating a task's title would change its slug, hence its filename, and a
-rename is a narrowly scoped, separate concern from a content migration (see
-TL-137's Decisions for the full reasoning). A task's filename may therefore
-still carry a Polish word forever; that is not an exception to this rule,
-because a filename is not something the rule about *content* governs.
+exception; TL-137 translated both (145 files). That migration did **not**
+rename task files, because a filename migration is a separate, narrowly scoped
+change: it must preserve ids and update every path reference. That separation
+does not make non-English slugs acceptable indefinitely. **Every new filename,
+and every filename touched by a rename, uses a lowercase English slug.**
+Existing task filenames with Polish slugs are migrated by TL-385; history log
+filenames remain id-based and therefore need no language conversion.
 
 Other conventions:
 
