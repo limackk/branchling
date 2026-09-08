@@ -39,7 +39,6 @@ import { probeTask } from "./done-task.mjs";
 import { withProbe } from "./probe.mjs";
 import { ACTOR_NAMESPACES, appendEntries, changesRequiringReason, currentSession, eventId, FIELD_ROLE_OVERRIDE, isValidActor, isValidReason, normalizeReason, readHistory, reasonRefusal, recordEdit } from "./history.mjs";
 import { decisionsOf, withDecisions } from "./decisions.mjs";
-import { focusQuietly } from "./focus.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { acquireLock, releaseLock } from "./lock.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
@@ -279,23 +278,6 @@ export function takeTask(opts) {
       (reclaim ? reclaimReason(before.owner, before.updated, reclaim.afterDays) : "") ||
       (cleared ? unblockedReason(before.status, cleared.blockers) : ""),
   });
-
-  // AUTO-FOCUS (TL-28, §8.1). The agent has just DECLARED what it is working on
-  // — that is what `status: in_progress` plus `owner:` means — so the strongest
-  // signal the attribution chain has is already in hand and free. Asking anybody
-  // to also run the `focus` command would make the measurement depend on somebody
-  // remembering, which is the failure that disqualified the off-the-shelf tools.
-  //
-  // SCOPED TO THE SESSION, NEVER GLOBAL. "Which task is in progress" has no
-  // single answer across a repository — this backlog has had dozens at once —
-  // and the same number that makes cycle time meaningless would make attribution
-  // wrong rather than merely coarse. It has an unambiguous answer inside one
-  // session, because one session takes one task.
-  //
-  // BEST EFFORT, ALWAYS. A state directory that cannot be written must not turn
-  // a successful claim into a failure: what is lost is one leg of the chain, and
-  // the answer to that is an honest `unknown`, not a refused take.
-  focusQuietly(root, { task: id, actor, origin: "session-state", ts }, { env: opts.env });
 
   // Taken by somebody other than the role the task asks for. NOT a refusal: a
   // person naming a task outranks the field, and the gate belongs to the

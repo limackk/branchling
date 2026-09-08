@@ -83,14 +83,12 @@ import { checkAgentProfiles, resolveAgentProfile, secretEnvironmentNames } from 
 import { DELEGATION_ENFORCEMENT, DELEGATION_POLICIES, executionReceipt } from "./agent-contract.mjs";
 import { createWorkerScope, releaseWorkerScope, WORKER_SCOPE_ENV } from "./worker-scope.mjs";
 import { startAttemptRecord, startRunRecord, readExecutionRecord, updateAttemptRecord, updateRunRecord } from "./execution-records.mjs";
-import { appendActivity } from "./activity.mjs";
 import { resolveAgentLaunch } from "./agent-launches.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { probeContract, repoRootFor } from "./done-task.mjs";
 import { parseVerification } from "./criteria.mjs";
 import { readHistory, recordEdit } from "./history.mjs";
 import { roleBrief } from "./instructions.mjs";
-import { sessionId } from "./focus.mjs";
 import { userConfigPath } from "./home.mjs";
 import { lockScope, releaseLock, stateRoot } from "./lock.mjs";
 import { callerSpecies, isOverSized, queueStatuses, selectCandidates, servesExecutor } from "./next-task.mjs";
@@ -1070,7 +1068,7 @@ async function workOne(ctx, task) {
     appendFileSync(logPath, "=== attempt " + attempt + ": " + command + "\n", "utf8");
     appendFileSync(logPath, "=== provenance: " + JSON.stringify(receipt) + "\n", "utf8");
     const workerScope = createWorkerScope({ root: ctx.root, taskId: task.id, actor: ctx.actor,
-      runId: sessionId({ root: ctx.root }) });
+      runId: ctx.execution.id });
     task.workerScope = workerScope;
     const agent = await superviseAgent(command, {
       raw: task.hand.kind === "raw", cwd: ctx.cwd, root: ctx.root, record: executionAttempt,
@@ -1121,15 +1119,6 @@ async function workOne(ctx, task) {
         ms: Date.now() - started, log: logPath, command,
         detail: said || "the agent printed nothing and changed nothing",
       });
-    }
-
-    try {
-      appendActivity(ctx.root, task.id, [{
-        kind: "execution", actor: ctx.actor, source: "run",
-        session: sessionId({ root: ctx.root }), attribution: "unknown", provenance: receipt,
-      }]);
-    } catch (error) {
-      appendFileSync(logPath, "\n=== execution provenance was not persisted: " + error.message + "\n", "utf8");
     }
 
     // A HANDOFF IS THIS ROLE'S SUCCESS, NOT A FAILED ATTEMPT (TL-271). The hand

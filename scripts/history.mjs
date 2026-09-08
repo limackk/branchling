@@ -32,7 +32,6 @@ import { randomBytes } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { sessionId } from "./focus.mjs";
 import { withMutex } from "./lock.mjs";
 import { ACTOR_UNKNOWN, FIELD_ATTRIBUTED, FIELD_COMMENT, FIELD_CREATED, FIELD_DECISION, FIELD_DELETED, REASON_UNKNOWN, TRACKED_FIELDS, diffMeta, extractMeta, formatValue, hasStatedReason, normalizeActor as normalizeActorFn, normalizeReason, splitFrontmatter } from "./task-fields.mjs";
 import { ANY_HISTORY_FILE, ANY_TASK_FILE, ANY_TASK_FILE_ID, ANY_TASK_ID, taskIdPatterns } from "./task-id.mjs";
@@ -602,11 +601,7 @@ function entry(taskId, field, from, to, actor, source, ts, reason, session, role
  * it is why `reconcile()` passes no session at all.
  */
 export function currentSession(backlogDir, env = process.env) {
-  try {
-    return sessionId({ env, root: backlogDir });
-  } catch {
-    return "";
-  }
+  return "";
 }
 
 /** The same shape the activity log accepts, so the two sides of the join cannot

@@ -15,7 +15,6 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
-import { sessionId } from "../focus.mjs";
 import { actorParts, appendEntries, attributeChanges, currentSession, FIELD_ATTRIBUTED, FIELD_BODY, FIELD_COMMENT, FIELD_CREATED, FIELD_DELETED, hasSnapshot, historyPath, isUnattributed, isValidActor, lastChangeByField, loadSnapshot, metaFromText, normalizeActor, PSEUDO_FIELDS, readAllHistory, readHistory, reconcile, recordEdit, unattributedChanges } from "../history.mjs";
 import { diffMeta } from "../task-fields.mjs";
 import { isolateHome } from "./_repo.mjs";
@@ -733,11 +732,4 @@ test("a caller may state that there is no session, and nothing is written", () =
   assert.equal("session" in entry, false);
   assert.equal(readFileSync(join(dir, "history", "BL-901.jsonl"), "utf8").includes("session"), false);
   rmSync(dir, { recursive: true, force: true });
-});
-
-test("the session id is the activity log's own, not a second derivation of it", () => {
-  // The join in `session <id>` reads both logs. Two derivations of "which
-  // session is this" would disagree in exactly the cases the report exists for.
-  const env = { BACKLOG_SESSION: "s-from-the-host" };
-  assert.equal(currentSession("/anywhere", env), sessionId({ env, root: "/anywhere" }));
 });
