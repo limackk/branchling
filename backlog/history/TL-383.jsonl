@@ -1,0 +1,2 @@
+{"id":"01M1ZYRESEVW73YCWBX6E9ZB1E","ts":"2026-09-08T07:29:43.214Z","task":"TL-383","field":"__created__","from":"","to":"The default check reports only actionable release gates","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M1ZZ858FJC6B2FYRV1V1WJ1D","ts":"2026-09-08T07:38:17.743Z","task":"TL-383","field":"related_docs","from":[],"to":["README.md","scripts/cli.mjs","scripts/audit.mjs"],"actor":"local:me","source":"manual","reason":"Linked the task contract to its public implementation context"}
