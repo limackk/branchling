@@ -3819,33 +3819,14 @@ async function refreshHistory(id, force) {
 // The server holds the raw log; this side holds only the reduced signal and the
 // rules for reading it, which come from the pasted in-flight.mjs above.
 async function refreshInFlight() {
-  if (!SERVER_MODE) return;
-  try {
-    const res = await fetch(apiUrl("api/in-flight"), { cache: "no-store" });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    const data = await res.json();
-    IN_FLIGHT = data.tasks || {};
-    const serverNow = Date.parse(data.now || "");
-    IN_FLIGHT_SKEW_MS = isNaN(serverNow) ? 0 : serverNow - Date.now();
-    paintInFlight();
-  } catch (e) {
-    // A server that stopped answering is not a reason to shout: the last answer
-    // stays on screen and its ages keep advancing, so the cards go stale by
-    // themselves rather than freezing on a number that was true once.
-    console.warn("live signal unavailable:", e.message);
-  }
+  // Retained temporarily as a no-op while the read-only viewer is simplified.
 }
 
 /** The server's clock, kept advancing between fetches. */
 function inFlightNow() { return Date.now() + IN_FLIGHT_SKEW_MS; }
 
 function inFlightFor(id) {
-  const signal = IN_FLIGHT[id];
-  if (!signal) return null;
-  const st = inFlightState(signal, { now: inFlightNow(), idleGapMinutes: CONFIG.idleGapMinutes });
-  const task = ALL_TASKS.find(function (t) { return t.id === id; });
-  if (!inFlightVisible(task || {}, st, { inProgressStatus: CONFIG.inProgressStatus })) return null;
-  return { signal: signal, state: st };
+  return null;
 }
 
 /** The badge on a card: the age, and the whole sentence in the title. */
