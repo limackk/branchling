@@ -6,7 +6,7 @@
  * synchronous when it is a file or a TTY. Every command here ends
  * `console.log(...)` then `process.exit(0)`, and `process.exit` does not wait
  * for the pipe buffer to drain — so on a pipe everything past roughly one buffer
- * is lost. Measured on 2026-09-03: `query --all-projects --json` produced 108993
+ * is lost. Measured on 2026-09-03: a broad JSON query produced 108993
  * valid bytes into a file and 65520 truncated ones through a pipe, where the
  * consumer saw `Unterminated string` instead of an answer.
  *
