@@ -48,7 +48,7 @@ const arg = (name, fallback) => {
 // appended history entries in a real session. It is the same class of defect
 // BL-1411 fixed in the server: a silent no-op with a side effect is worse than an
 // error, because it looks like the tool working.
-const KNOWN_FLAGS = ["--file", "--actor", "--source", "--quiet", "--reason", "--attribute", "--event"];
+const KNOWN_FLAGS = ["--file", "--actor", "--source", "--quiet", "--reason", "--attribute", "--event", "--all"];
 const FLAGS_WITH_VALUE = ["--file", "--actor", "--source", "--reason", "--event"];
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
@@ -112,6 +112,7 @@ if (file) {
 }
 
 const attribute = argv.includes("--attribute");
+const all = argv.includes("--all");
 const eventFlag = arg("--event", "");
 if (argv.includes("--event") && !eventFlag) {
   console.error(`${N} history: \`--event\` requires an event id.`);
@@ -119,6 +120,18 @@ if (argv.includes("--event") && !eventFlag) {
 }
 if (eventFlag && !attribute) {
   console.error(`${N} history: \`--event\` selects a claim and requires \`--attribute\`.`);
+  process.exit(2);
+}
+if (all && !attribute) {
+  console.error(`${N} history: \`--all\` selects an attribution scope and requires \`--attribute\`.`);
+  process.exit(2);
+}
+if (all && file) {
+  console.error(`${N} history: choose one attribution scope: \`--file\` or \`--all\`, not both.`);
+  process.exit(2);
+}
+if (all && eventFlag) {
+  console.error(`${N} history: \`--all\` claims every unowned change, so it cannot be combined with \`--event\`.`);
   process.exit(2);
 }
 if (attribute && !reasonFlag) {
@@ -129,12 +142,22 @@ if (attribute && !reasonFlag) {
   );
   process.exit(2);
 }
+if (attribute && !file && !all) {
+  console.error(
+    `${N} history: \`--attribute\` requires \`--file <task.md>\` or the explicit \`--all\` opt-in.\n` +
+      "  Attribution is append-only: an unscoped claim could assign somebody else's\n" +
+      "  recorded changes to you. Use `--file` for one task, or type `--all` for every\n" +
+      "  unowned change in the backlog."
+  );
+  process.exit(2);
+}
 
 const candidateLabel = ({ task, entry }) =>
   "  " + task + " · " + entry.field + " · " + String(entry.ts).slice(0, 19) +
   " · " + (entry.id || "no event id");
 
 function selectClaim(changes) {
+  if (all) return changes;
   if (eventFlag) {
     const selected = changes.filter(({ entry }) => entry.id === eventFlag);
     if (selected.length === 1) return selected;
@@ -158,7 +181,11 @@ function selectClaim(changes) {
 // Refuse a known ambiguity BEFORE reconciliation can append anything. The
 // candidates are read again below because another process may reconcile while
 // this command is running; that second check protects the claim itself.
-if (attribute) selectClaim(unattributedChanges(BACKLOG_DIR, { only }));
+const preflight = attribute ? unattributedChanges(BACKLOG_DIR, { only }) : [];
+if (attribute) selectClaim(preflight);
+if (attribute && all && !quiet) {
+  console.log(`${N} history: --all will claim ${preflight.length} recorded change(s) with no author.`);
+}
 
 const { entries, seeded, adopted, seeds } = reconcile(BACKLOG_DIR, { actor, source, only, reason: reasonFlag || undefined });
 

@@ -6,19 +6,23 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: ""
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-09
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
-related_docs: []                   # paths relative to the repository root
+related_docs:
+  - scripts/history-record.mjs
+  - scripts/tests/history-attribute-scope.test.mjs
 verification:
   - id: unscoped-attribute-refused
+    bash: "node --test scripts/tests/history-attribute-scope.test.mjs"
+  - id: decision-recorded
     bash: "node --test scripts/tests/history-attribute-scope.test.mjs"
   - id: suite-green
     bash: "node --test scripts/tests/*.test.mjs"
@@ -93,9 +97,10 @@ lands, in full, and the problem is that it lands on everything.
 
 ## Acceptance criteria
 
-- [ ] `history --attribute` with no file and no explicit opt-in writes
+- [x] `history --attribute` with no file and no explicit opt-in writes
       nothing and exits non-zero, proven by a test that fails against
       today's code. [proof: unscoped-attribute-refused]
-- [ ] The scoped form still works unchanged. [proof: suite-green]
-- [ ] The decision between requiring a scope and requiring `--all` is a
+- [x] The scoped form still works unchanged. [proof: suite-green]
+- [x] The decision between requiring a scope and requiring `--all` is a
       `__decision__` event in `backlog/history/TL-258.jsonl`, not prose here.
+      [proof: decision-recorded]
