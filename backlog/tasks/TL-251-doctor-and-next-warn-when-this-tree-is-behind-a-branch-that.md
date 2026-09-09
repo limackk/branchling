@@ -6,22 +6,24 @@ labels: []
 board: main
 epic: "Harness"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-09
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
-related_docs: []                   # paths relative to the repository root
+related_docs: [scripts/branch-scan.mjs, scripts/doctor.mjs, scripts/next-task.mjs, scripts/tests/cross-branch-state.test.mjs] # paths relative to the repository root
 verification:
   - id: behind-warning
-    bash: "node --test scripts/tests/behind-branch-warning.test.mjs"
+    bash: "node --test scripts/tests/cross-branch-state.test.mjs"
   - id: suite-green
     bash: "node --test scripts/tests/*.test.mjs"
+  - id: guards-green
+    bash: "node scripts/cli.mjs check"
 
 ---
 
@@ -83,11 +85,12 @@ whether it is theirs.
 
 ## Acceptance criteria
 
-- [ ] `doctor` warns, naming the branch and count, when a task open here is
+- [x] `doctor` warns, naming the branch and count, when a task open here is
       archived elsewhere; a converged tree gets no warning. [proof: behind-warning]
-- [ ] `next` prints the same diagnosis when it skipped such a task, and
+- [x] `next` prints the same diagnosis when it skipped such a task, and
       `next --json` carries it. [proof: behind-warning]
-- [ ] Neither command refuses; exit codes are unchanged. [proof: suite-green]
+- [x] Neither command refuses; exit codes are unchanged. [proof: suite-green]
+- [x] All project guards are green. [proof: guards-green]
 
 ## Decisions
 

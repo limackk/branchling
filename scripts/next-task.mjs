@@ -54,7 +54,7 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { resolveActor } from "./actor.mjs";
-import { crossBranchState, describeDivergence, divergences, scanNote } from "./branch-scan.mjs";
+import { archivedElsewhereBySource, crossBranchState, describeDivergence, divergences, scanNote } from "./branch-scan.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { ACTOR_NAMESPACES, FIELD_COMMENT, isValidActor, openQuestions, readAllHistory, readHistory, reasonRefusal } from "./history.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
@@ -678,6 +678,9 @@ export function run(argv) {
   const elsewhereLines = skippedElsewhere.map(
     (s) => s.id + " skipped — " + s.elsewhere.map(describeDivergence).join(", ")
   );
+  const closedElsewhere = archivedElsewhereBySource(skippedElsewhere, config.archivedStatuses);
+  const closedElsewhereLines = closedElsewhere.map((group) =>
+    group.ids.length + " task(s) closed on " + group.source + " are still open here — merge or rebase before taking work");
   const handedBackLines = skippedHandedBack.map(
     (s) => s.id + " skipped — you handed it back yourself" + (s.reason ? ": " + s.reason : "")
   );
@@ -724,6 +727,7 @@ export function run(argv) {
         printJson("task-take", {
           ...takeJson(result, root), passedOver, considered: candidates.length,
           skippedElsewhere, skippedExecutor, skippedHandedBack, skippedSize, skippedByRecord,
+          closedElsewhere,
           plan: planJson,
           scan: { scanned: scan.scanned, reason: scan.reason },
         });
@@ -736,6 +740,7 @@ export function run(argv) {
         for (const line of handedBackLines) console.log(color.dim(MARK.bullet + " " + line));
         for (const line of recordLines) console.log(color.dim(MARK.bullet + " " + line));
         for (const line of elsewhereLines) console.log(color.dim(MARK.bullet + " " + line));
+        for (const line of closedElsewhereLines) console.log(color.dim(MARK.bullet + " " + line));
         for (const p of passedOver) {
           console.log(color.dim(MARK.bullet + " " + p.id + " passed over: " + p.why));
         }
@@ -819,6 +824,7 @@ export function run(argv) {
   if (elsewhereLines.length) {
     details.push(elsewhereLines.length + " candidate(s) are in another state on another branch or worktree");
     for (const line of elsewhereLines) details.push("  " + MARK.bullet + " " + line);
+    for (const line of closedElsewhereLines) details.push("  " + MARK.bullet + " " + line);
   }
   const note = scanNote(scan.reason);
   if (note) details.push(note);
@@ -839,6 +845,7 @@ export function run(argv) {
       ok: false, taken: false, refusalKind: "nothing-to-take", refusal: "nothing to take",
       details,
       searchedStatuses: searched, skippedBlocked, passedOver, skippedElsewhere, skippedExecutor,
+      closedElsewhere,
       skippedHandedBack, skippedSize, skippedByRecord, plan: planJson,
       scan: { scanned: scan.scanned, reason: scan.reason },
     });

@@ -502,6 +502,30 @@ export function divergences(localStatus, observations) {
   return collapse((observations || []).filter((o) => String(o.status || "") !== String(localStatus || "")));
 }
 
+/**
+ * Open local tasks that another source reports as archived, grouped by source.
+ *
+ * The caller supplies archived vocabulary: `done` is project data, never a
+ * literal this module gets to guess. One task observed from a branch and its
+ * checkout remains one fact per source.
+ */
+export function archivedElsewhereBySource(tasks, archivedStatuses) {
+  const archived = new Set(archivedStatuses || []);
+  const groups = new Map();
+  for (const task of tasks || []) {
+    for (const observation of task.elsewhere || []) {
+      if (!archived.has(observation.status)) continue;
+      const key = observation.kind + "\u0000" + observation.source;
+      const group = groups.get(key) || { source: observation.source, kind: observation.kind, ids: new Set() };
+      group.ids.add(task.id);
+      groups.set(key, group);
+    }
+  }
+  return [...groups.values()]
+    .map((group) => ({ ...group, ids: [...group.ids].sort() }))
+    .sort((a, b) => String(a.source).localeCompare(String(b.source)));
+}
+
 /** Twelve branches all saying `pending` is one fact, not twelve. */
 function collapse(observations) {
   const out = [];

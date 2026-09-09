@@ -164,7 +164,7 @@ export const KINDS = {
     // a loop must be able to tell an empty queue from a queue it was not allowed
     // to draw from, and it cannot parse a sentence to do it.
     passedOver: [], considered: null, searchedStatuses: [], skippedBlocked: null,
-    skippedElsewhere: [], skippedExecutor: [], skippedHandedBack: [], scan: null,
+    skippedElsewhere: [], closedElsewhere: [], skippedExecutor: [], skippedHandedBack: [], scan: null,
     // Open work an unattended run may not be handed for its SIZE (TL-211).
     // Declared for the kind, so it is present and empty when the project
     // stated no threshold: a consumer must not have to tell "no value" from

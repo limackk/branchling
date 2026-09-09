@@ -33,6 +33,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { auditLogStatus, readTaskTexts } from "./check-backlog-log-status.mjs";
+import { archivedElsewhereBySource, crossBranchState, divergences } from "./branch-scan.mjs";
 import { ConfigError, formatConfigError, loadConfig } from "./config.mjs";
 import { commandRunner, contextBudget } from "./context-budget.mjs";
 import { ATTRIBUTE_RULES, IGNORE_RULES, hasUnionMerge, insideGitRepo, trackedViews, unignoredViews } from "./git-rules.mjs";
@@ -370,6 +371,18 @@ function checkVolume(metas, config) {
     s.total + " (" + s.active + " active, " + s.archived + " archived)");
 }
 
+function checkClosedElsewhere(root, config, metas) {
+  const scan = crossBranchState(root, config);
+  if (!scan.scanned) return [];
+  const tasks = metas
+    .filter((task) => !config.archivedStatuses.includes(task.status))
+    .map((task) => ({ ...task, elsewhere: divergences(task.status, scan.byId.get(task.id)) }));
+  return archivedElsewhereBySource(tasks, config.archivedStatuses).map((group) =>
+    check("closed-elsewhere-" + group.source, "closed elsewhere", WARN,
+      group.ids.length + " task(s) closed on " + group.source + " are still open here",
+      "merge or rebase before taking work"));
+}
+
 // ──────────────────────────────────────────────────────────────────────────
 // The run
 // ──────────────────────────────────────────────────────────────────────────
@@ -398,6 +411,7 @@ export function diagnose(root) {
   rows.push(checkLogStatus(root, config));
   rows.push(...checkGitIgnore(root));
   rows.push(checkGuards(root));
+  rows.push(...checkClosedElsewhere(root, config, metas));
   rows.push(checkVolume(metas, config));
   rows.push(checkContextBudget(root, config));
   return rows;

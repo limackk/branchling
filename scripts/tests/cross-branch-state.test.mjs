@@ -127,6 +127,16 @@ function twoBranchesDisagreeing(opts = {}) {
   return { repoRoot, backlogDir, taskPath };
 }
 
+/** The local task is open while the same committed file is archived on feature. */
+function twoBranchesWithClosedElsewhere() {
+  const fx = twoBranchesDisagreeing();
+  vcs(fx.repoRoot, ["checkout", "-q", "feature"]);
+  writeFileSync(fx.taskPath, taskText(ID, "done"), "utf8");
+  commit(fx.repoRoot, "close the task");
+  vcs(fx.repoRoot, ["checkout", "-q", "main"]);
+  return fx;
+}
+
 function cleanup(...dirs) {
   for (const d of dirs) rmSync(d, { recursive: true, force: true });
 }
@@ -203,6 +213,37 @@ test("`stats` names the branch too, and counts the divergence", () => {
     assert.equal(out.divergent[0].id, ID);
     assert.equal(out.divergent[0].status, "pending");
     assert.equal(out.divergent[0].elsewhere[0].source, "feature");
+  } finally {
+    cleanup(repoRoot);
+  }
+});
+
+test("doctor and next diagnose work closed on another branch without refusing", () => {
+  const { repoRoot, backlogDir } = twoBranchesWithClosedElsewhere();
+  try {
+    const doctor = cli(["doctor", "--dir", backlogDir, "--json"], { cwd: repoRoot });
+    assert.equal(doctor.status, 0, doctor.stderr);
+    const rows = JSON.parse(doctor.stdout).checks;
+    const warning = rows.find((row) => row.id === "closed-elsewhere-feature");
+    assert.equal(warning.status, "warn");
+    assert.match(warning.detail, /1 task\(s\) closed on feature are still open here/);
+
+    const next = cli(["next", "--dir", backlogDir, "--actor", "agent:test", "--json"], { cwd: repoRoot });
+    assert.equal(next.status, 3, next.stderr);
+    const out = JSON.parse(next.stdout);
+    assert.deepEqual(out.closedElsewhere, [{ source: "feature", kind: "branch", ids: [ID] }]);
+    assert.ok(out.details.some((line) => /closed on feature are still open here/.test(line)));
+  } finally {
+    cleanup(repoRoot);
+  }
+});
+
+test("POSITIVE CONTROL: doctor is silent about closed elsewhere in a converged tree", () => {
+  const { repoRoot, backlogDir } = twoBranchesDisagreeing();
+  try {
+    const doctor = cli(["doctor", "--dir", backlogDir, "--json"], { cwd: repoRoot });
+    assert.equal(doctor.status, 0, doctor.stderr);
+    assert.equal(JSON.parse(doctor.stdout).checks.some((row) => row.id.startsWith("closed-elsewhere-")), false);
   } finally {
     cleanup(repoRoot);
   }
