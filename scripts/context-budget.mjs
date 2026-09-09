@@ -160,7 +160,7 @@ function newestClosedTask(tasksDir, config) {
  * argument: the reader sees the answer they should be reaching for before the
  * one they should not.
  */
-export function contextBudget({ root, config, run }) {
+export function contextBudget({ root, config, run, measureDone = true }) {
   const paths = backlogPaths(root);
   const sizes = taskFileSizes(paths.tasksDir, config.taskId.file);
   const queue = queueStatuses(config);
@@ -180,7 +180,7 @@ export function contextBudget({ root, config, run }) {
     "a number instead of hundreds of lines");
   add("stats", `${N} stats`, run(["stats"]).length,
     "the whole backlog on one screen");
-  const closed = newestClosedTask(paths.tasksDir, config);
+  const closed = measureDone ? newestClosedTask(paths.tasksDir, config) : null;
   if (closed) {
     const output = run(["done", closed.id, "--dry-run", "--verbose"]);
     add("done", `${N} done --dry-run --verbose`, output.length,

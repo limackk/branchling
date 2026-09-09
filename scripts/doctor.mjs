@@ -349,7 +349,10 @@ function checkGuards(root) {
  */
 function checkContextBudget(root, config) {
   const budget = contextBudget({
-    root, config, run: commandRunner(join(HERE, "cli.mjs"), root),
+    // A diagnosis must not rerun a task's whole closing contract just to
+    // measure its terminal output. That run can itself contain the full suite;
+    // on a large tree it makes `doctor --json` time out before it can answer.
+    root, config, run: commandRunner(join(HERE, "cli.mjs"), root), measureDone: false,
   });
   const share = (budget.listTokens / budget.window) * 100;
   const detail = "the full list costs ~" + budget.listTokens + " tok (" + share.toFixed(1) +
