@@ -6,20 +6,20 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1
-status: pending  # pending | in_progress | blocked | done | cancelled
-owner: ""
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-04
-updated: 2026-09-07
+updated: 2026-09-09
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
-related_docs: []                   # paths relative to the repository root
+related_docs: [scripts/handoff-task.mjs, scripts/next-task.mjs, scripts/tests/handoff.test.mjs] # paths relative to the repository root
 verification:                      # HOW to check the task is really done
-  - id: back-in-the-queue
-    bash: "node --test scripts/tests/handoff-status.test.mjs"
+  - id: handoff-contract
+    bash: "node --test scripts/tests/handoff.test.mjs"
   - id: suite-green
     bash: "node --test scripts/tests/*.test.mjs"
   - id: guards-green
@@ -81,3 +81,14 @@ uncommon one's ceremony. The default has to be right.
 **`blocked` is not a synonym for `waiting`.** A blocked task is one whose
 `blocked_by` has not cleared; a handed-off task is waiting for a hand. Writing
 one as the other also puts a WHO sentence in the field that answers WHY.
+
+## Acceptance criteria
+
+- [x] A handoff from `in_progress` returns the task to a status `next` can
+  select and clears the former owner's claim. [proof: handoff-contract]
+- [x] A handoff never overwrites a protected status such as `blocked` merely
+  because its role changes. [proof: handoff-contract]
+- [x] A backlog with no unambiguous queue status refuses before writing rather
+  than parking a task where no dispatcher can find it. [proof: handoff-contract]
+- [x] The full suite is green. [proof: suite-green]
+- [x] All project guards are green. [proof: guards-green]
