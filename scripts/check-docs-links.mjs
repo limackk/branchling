@@ -32,10 +32,11 @@
  *      backlog already uses (`other-repo#qa/…`). Skipped DELIBERATELY, by a
  *      rule that recognises the shape, not by accident because the resolution
  *      happened to fail.
- *   3. An anchor. `docs/manual.md#the-contract` is a link to a file that exists;
- *      whether the heading exists is a different question, and answering it
- *      would mean parsing every document's headings for a much weaker finding.
- *   4. A bare `#section` — a link inside the same document, with no path in it.
+ *   3. An external fragment. Its target is outside this repository, so its
+ *      heading cannot be checked without making a network request.
+ *
+ * Local fragments are checked against Markdown headings. A bare `#section`
+ * means the current document; `docs/manual.md#the-contract` means that file.
  *
  * Usage:
  *   node scripts/check-docs-links.mjs [--dir <backlog>]
@@ -94,11 +95,50 @@ export function classifyTarget(raw) {
     }
   }
 
-  // The anchor is dropped and the path is kept: whether the heading exists is a
-  // different question, and a weaker one.
+  // The anchor is dropped for path resolution and compared with the target's
+  // headings separately in `auditLinks`.
   const path = (hash >= 0 ? target.slice(0, hash) : target).split("?")[0];
   if (!path) return { skip: "anchor-in-page" };
   return { path: decodeURIComponent(path) };
+}
+
+/** The URL fragment of a local target, decoded once for comparison to a heading.
+ * `#` is meaningful before a query string in Markdown URLs, so the query is
+ * removed only from the path by `classifyTarget`, not from the fragment. */
+export function fragmentIn(raw) {
+  const hash = String(raw || "").indexOf("#");
+  return hash < 0 ? "" : decodeURIComponent(String(raw).slice(hash + 1));
+}
+
+/** GitHub-compatible enough for repository Markdown: headings become lowercase
+ * words joined with hyphens; punctuation and inline formatting do not survive
+ * in an anchor. Repeated headings receive the same numeric suffix GitHub uses. */
+export function headingSlug(heading) {
+  return String(heading || "")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/<[^>]+>/g, "")
+    .replace(/[\\`*_~]/g, "")
+    .normalize("NFKD")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s_-]/gu, "")
+    .trim()
+    .replace(/\s+/g, "-");
+}
+
+/** Every Markdown heading anchor a reader can follow in one document. PURE. */
+export function anchorsIn(text) {
+  const anchors = new Set();
+  const duplicates = new Map();
+  for (const line of String(text || "").split(/\r?\n/)) {
+    const match = line.match(/^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$/);
+    if (!match) continue;
+    const base = headingSlug(match[1]);
+    if (!base) continue;
+    const count = duplicates.get(base) || 0;
+    duplicates.set(base, count + 1);
+    anchors.add(count ? base + "-" + count : base);
+  }
+  return anchors;
 }
 
 /** Every link target a document carries, with the line it sits on. PURE. */
@@ -185,11 +225,13 @@ export function documentsToCheck(root, tasksDir) {
  * @param {Array<{file: string, text: string}>} documents
  * @param {(p: string) => boolean} exists
  * @param {string} root  what an absolute-looking target is resolved against
+ * @param {(p: string) => string} read  reads a resolved local document
  */
-export function auditLinks(documents, exists, root) {
+export function auditLinks(documents, exists, root, read = () => "") {
   const dead = [];
   const skipped = { empty: 0, "anchor-in-page": 0, external: 0, "other-repository": 0 };
   let checked = 0;
+  let anchorsChecked = 0;
 
   for (const doc of documents) {
     const { frontmatter, body } = splitFrontmatter(doc.text);
@@ -198,6 +240,15 @@ export function auditLinks(documents, exists, root) {
 
     for (const entry of targets) {
       const verdict = { ...classifyTarget(entry.target), kind: entry.kind };
+      const fragment = fragmentIn(entry.target);
+      if (verdict.skip === "anchor-in-page") {
+        checked++;
+        anchorsChecked++;
+        if (!anchorsIn(doc.text).has(fragment)) {
+          dead.push({ file: doc.file, line: entry.line, target: entry.target, kind: "anchor" });
+        }
+        continue;
+      }
       if (verdict.skip) {
         skipped[verdict.skip] = (skipped[verdict.skip] || 0) + 1;
         continue;
@@ -215,10 +266,18 @@ export function auditLinks(documents, exists, root) {
       const resolved = resolve(base, verdict.path.replace(/^\//, ""));
       if (!exists(resolved)) {
         dead.push({ file: doc.file, line: entry.line, target: entry.target, kind: entry.kind || "link" });
+        continue;
+      }
+      if (fragment) {
+        anchorsChecked++;
+        const targetText = resolved === doc.file ? doc.text : read(resolved);
+        if (!anchorsIn(targetText).has(fragment)) {
+          dead.push({ file: doc.file, line: entry.line, target: entry.target, kind: "anchor" });
+        }
       }
     }
   }
-  return { dead, skipped, checked, documents: documents.length };
+  return { dead, skipped, checked, anchorsChecked, documents: documents.length };
 }
 
 export function main(argv) {
@@ -236,15 +295,15 @@ export function main(argv) {
   const documents = documentsToCheck(root, paths.tasksDir).map((file) => ({
     file, text: readFileSync(file, "utf8"),
   }));
-  const result = auditLinks(documents, (p) => existsSync(p), root);
+  const result = auditLinks(documents, (p) => existsSync(p), root, (p) => readFileSync(p, "utf8"));
 
   const rel = (p) => relative(root, p) || p;
   if (!result.dead.length) {
     // The counts are the positive control: "0 dead" over 0 links read is a guard
     // that found nothing to judge, and it must not look like one that passed.
     console.log(
-      `${OKM} docs: ${result.checked} link(s) and related_docs entr(ies) across ` +
-        `${result.documents} document(s), each one leading to a file that exists`
+      `${OKM} docs: ${result.checked} link(s) and related_docs entr(ies), including ` +
+        `${result.anchorsChecked} anchor(s), across ${result.documents} document(s), each one resolving locally`
     );
     if (result.skipped["other-repository"]) {
       console.log(
@@ -255,9 +314,10 @@ export function main(argv) {
     return 0;
   }
 
-  console.log(`${ERRM} docs: ${result.dead.length} of ${result.checked} target(s) lead nowhere`);
+  console.log(`${ERRM} docs: ${result.dead.length} of ${result.checked} target(s) lead nowhere or to a missing section`);
   for (const d of result.dead.slice(0, 25)) {
-    console.log(`  - ${rel(d.file)}:${d.line} → ${d.target}` + (d.kind === "related_docs" ? "  (related_docs)" : ""));
+    console.log(`  - ${rel(d.file)}:${d.line} → ${d.target}` +
+      (d.kind === "related_docs" ? "  (related_docs)" : d.kind === "anchor" ? "  (missing anchor)" : ""));
   }
   if (result.dead.length > 25) console.log(`  … and ${result.dead.length - 25} more`);
   console.log("");

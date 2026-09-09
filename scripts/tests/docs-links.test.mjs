@@ -27,7 +27,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  auditLinks, classifyTarget, documentsToCheck, linksIn, relatedDocsIn,
+  anchorsIn, auditLinks, classifyTarget, documentsToCheck, headingSlug, linksIn, relatedDocsIn,
 } from "../check-docs-links.mjs";
 import { repositoryRoot } from "../paths.mjs";
 
@@ -101,11 +101,17 @@ test("a bare `#section` is a link inside the page, not a path", () => {
   assert.deepEqual(classifyTarget(""), { skip: "empty" });
 });
 
-test("an anchor does not break path validation", () => {
+test("an anchor resolves against the target document after path validation", () => {
   const docs = [{ file: "/r/docs/a.md", text: "[x](b.md#heading) and [y](b.md)" }];
-  const audit = auditLinks(docs, (p) => p === "/r/docs/b.md", "/r");
+  const audit = auditLinks(docs, (p) => p === "/r/docs/b.md", "/r", () => "# Heading\n");
   assert.deepEqual(audit.dead, [], "the anchor was carried into the path and broke it");
-  assert.equal(audit.checked, 2);
+  assert.equal(audit.checked, 2, "the path and anchor are both local targets");
+  assert.equal(audit.anchorsChecked, 1, "only the anchored link reads a heading");
+});
+
+test("heading anchors use the reader-facing slug, including duplicate headings", () => {
+  assert.equal(headingSlug("The `--json` contract"), "the---json-contract");
+  assert.deepEqual([...anchorsIn("# One\n## One\n### Two!\n")], ["one", "one-1", "two"]);
 });
 
 // ── the two resolution rules ──────────────────────────────────────────────
@@ -179,7 +185,7 @@ test("…and the SAME repository passes once the file exists", () => {
   writeFileSync(join(fx.dir, "docs", "missing.md"), "# Now it is here\n", "utf8");
   const r = check(fx);
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.match(r.stdout, /leading to a file that exists/);
+  assert.match(r.stdout, /each one resolving locally/);
 });
 
 test("a dead related_docs entry FAILS and is labelled as one", () => {
@@ -213,7 +219,22 @@ test("the green line says how much was looked at", () => {
   writeFileSync(join(fx.dir, "docs", "ok.md"), "[a](real.md)\n", "utf8");
   const r = check(fx);
   assert.equal(r.status, 0);
-  assert.match(r.stdout, /\d+ link\(s\) and related_docs entr\(ies\) across \d+ document\(s\)/);
+  assert.match(r.stdout, /\d+ link\(s\) and related_docs entr\(ies\), including \d+ anchor\(s\), across \d+ document\(s\)/);
+});
+
+test("a missing local anchor FAILS, then the same document passes once the heading exists", () => {
+  const fx = fixture();
+  const path = join(fx.dir, "docs", "anchors.md");
+  writeFileSync(path, "# Present\n\n[missing](#absent)\n", "utf8");
+  const red = check(fx);
+  assert.equal(red.status, 1, red.stdout + red.stderr);
+  assert.match(red.stdout, /anchors\.md:3/);
+  assert.match(red.stdout, /missing anchor/);
+
+  writeFileSync(path, "# Present\n\n[present](#present)\n", "utf8");
+  const green = check(fx);
+  assert.equal(green.status, 0, green.stdout + green.stderr);
+  assert.match(green.stdout, /including 1 anchor/);
 });
 
 // ── what it looks at ──────────────────────────────────────────────────────

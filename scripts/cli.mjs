@@ -77,7 +77,7 @@ const CHECK_USAGE = [
   "                       to a file that exists. Judges the REPOSITORY holding the backlog",
   "                       — top-level *.md, docs/ and the task files — because that is the",
   "                       tree those paths resolve against. External URLs are not fetched,",
-  "                       an anchor does not break a path, and a `<repo>#<path>` reference",
+  "                       every local target and anchor resolves; a `<repo>#<path>` reference",
   "                       to another repository is skipped by a rule, not by accident",
   "  --reasons            only which recorded transitions into a status named by",
   "                       `reason_required_statuses` carry no reason. It REPORTS and never",
