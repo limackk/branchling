@@ -106,9 +106,7 @@ export const KINDS = {
   // of the POINTER a repository carries, not of the guides.
   instructions: { topics: [], topic: null, role: null, text: null, version: null },
   "agent-profiles": { path: null, exists: null, profiles: [], profile: null },
-  "agent-launches": { path: null, launches: [], launch: null },
   "profile-check": { ok: null, path: null, live: null, results: [] },
-  "profile-models": { ok: null, state: null, outcome: null, models: [], selected: null, detail: null },
   // `conformance --json` proves an adapter against a disposable, offline
   // contract. Results name the requested scenario rather than exposing the
   // adapter's raw output, which may contain provider diagnostics or a secret.

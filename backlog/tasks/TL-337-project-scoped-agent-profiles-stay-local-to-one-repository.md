@@ -16,7 +16,7 @@ created: 2026-09-07
 updated: 2026-09-07
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
-related_docs: [scripts/agent-profiles.mjs, scripts/agent-launches.mjs, scripts/home.mjs, scripts/lock.mjs, scripts/run-loop.mjs] # paths relative to the repository root
+related_docs: [scripts/agent-profiles.mjs, scripts/home.mjs, scripts/lock.mjs, scripts/run-loop.mjs] # paths relative to the repository root
 verification:                      # HOW to check the task is really done
   - id: project-scope
     bash: "node --test scripts/tests/agent-project-scope.test.mjs scripts/tests/agent-profile-setup.test.mjs scripts/tests/agent-launches.test.mjs"

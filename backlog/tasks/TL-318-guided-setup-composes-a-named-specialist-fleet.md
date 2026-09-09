@@ -18,7 +18,6 @@ blocked_by: []                     # ids of tasks that MUST be closed before thi
 blocks: []                         # ids this task will unblock
 related_docs:
   - scripts/agent-profiles.mjs
-  - scripts/agent-launches.mjs
   - scripts/run-loop.mjs
 verification:                      # HOW to check the task is really done
   - id: focused-tests

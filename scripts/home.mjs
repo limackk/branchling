@@ -63,7 +63,6 @@ export const CONFIG_FILENAME = "config.yaml";
 /** Local execution profiles. This is a user-owned file, never project data. */
 export const AGENT_PROFILES_FILENAME = "agent-profiles.yaml";
 /** Named local compositions of existing profiles, never repository data. */
-export const AGENT_LAUNCHES_FILENAME = "agent-launches.yaml";
 
 /**
  * Where the home directory is, without touching the disk. PURE.

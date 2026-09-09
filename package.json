@@ -30,7 +30,6 @@
     "bin/",
     "scripts/",
     ".agents/skills/backlog-workflow/",
-    "examples/agent-adapters/",
     "!scripts/tests/",
     "!scripts/check-publish-metadata.mjs",
     "templates/",
@@ -44,8 +43,5 @@
   "scripts": {
     "test": "node --test scripts/tests/*.test.mjs",
     "prepublishOnly": "node scripts/check-publish-metadata.mjs"
-  },
-  "dependencies": {
-    "@clack/prompts": "^0.10.0"
   }
 }

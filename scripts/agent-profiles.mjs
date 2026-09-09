@@ -10,21 +10,18 @@
  * every new CLI a release of this tool.
  */
 
-import { accessSync, chmodSync, constants, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { accessSync, constants, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import * as clack from "@clack/prompts";
 
-import { ADAPTER_PROTOCOL_VERSION, DELEGATION_ENFORCEMENT, MODEL_CATALOG_ENV, MODEL_CATALOG_OUTCOMES, PROFILE_PROBE_ENV, PROFILE_PROBE_OUTCOMES, PROFILE_PROTOCOL_VERSION_ENV } from "./agent-contract.mjs";
+import { ADAPTER_PROTOCOL_VERSION, DELEGATION_ENFORCEMENT, PROFILE_PROBE_ENV, PROFILE_PROBE_OUTCOMES, PROFILE_PROTOCOL_VERSION_ENV } from "./agent-contract.mjs";
 import { agentProfilesPath, ensureHome, homePaths } from "./home.mjs";
 import { lockScope } from "./lock.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { isValidActor, stripComment, unquote } from "./task-fields.mjs";
 import { failure, heading, table } from "./ui.mjs";
-import { createAgentLaunch } from "./agent-launches.mjs";
-import { loadConfig } from "./config.mjs";
 import { resolveBacklogDir } from "./paths.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -242,36 +239,6 @@ export function createAgentProfile(name, fields, env = process.env, root = null)
   return { ok: true, path: written.path, profiles, profile: candidate };
 }
 
-/** Examples shipped with this package, not a registry of supported providers. */
-export function referenceAdapterTemplates() {
-  return [
-    { id: "claude-code", label: "Claude Code CLI", source: resolve(HERE, "..", "examples", "agent-adapters", "claude-code.mjs") },
-    { id: "aider-api", label: "Aider API harness", source: resolve(HERE, "..", "examples", "agent-adapters", "aider-api.mjs") },
-    { id: "codex-cli", label: "Codex CLI", source: resolve(HERE, "..", "examples", "agent-adapters", "codex-cli.mjs") },
-    { id: "ollama", label: "Ollama local model", source: resolve(HERE, "..", "examples", "agent-adapters", "ollama.mjs"), model: { required: true, hint: "Ollama needs a pulled model name, for example qwen2.5-coder:7b." } },
-  ];
-}
-
-/** User profiles are portable across repositories, so their copied adapters
- * live beside that user-owned configuration rather than in whichever project
- * happened to be current during setup. */
-export function suggestedReferenceAdapterDestination(template, env = process.env, root = null) {
-  const base = root ? dirname(projectAgentProfilesPath(root, env)) : homePaths(env).config;
-  return join(base, "adapters", template.id + ".mjs");
-}
-
-/** Copy a versioned local example without downloading or running it. */
-export function copyReferenceAdapter(template, destination) {
-  const source = template && template.source;
-  const target = resolve(destination || "");
-  if (!source || !existsSync(source)) throw new Error("reference adapter is unavailable in this installation");
-  if (!destination || existsSync(target)) throw new Error("adapter destination already exists: " + target);
-  mkdirSync(dirname(target), { recursive: true });
-  copyFileSync(source, target);
-  chmodSync(target, 0o755);
-  return target;
-}
-
 export function profilePrompt(profile, path) {
   return profile.prompt || readFileSync(resolve(dirname(path), profile.prompt_file), "utf8");
 }
@@ -331,29 +298,7 @@ export function liveProbe(profile, env = process.env) {
   } catch { return { ok: false, state: "probe-failed", outcome: null }; }
 }
 
-/** An opt-in adapter operation. Its bounded JSON result is the only provider
- * output that reaches the terminal, so diagnostics cannot expose a secret. */
-export function modelCatalog(profile, env = process.env) {
-  const executable = adapterPath(profile.adapter, env);
-  if (!executable) return { ok: false, state: "adapter-unavailable", outcome: "unavailable", models: [] };
-  const catalogEnv = { PATH: env.PATH || "", [MODEL_CATALOG_ENV]: "1", [PROFILE_PROTOCOL_VERSION_ENV]: String(ADAPTER_PROTOCOL_VERSION) };
-  if (profile.model) catalogEnv[String(N).toUpperCase().replace(/[^A-Z0-9]+/g, "_") + "_MODEL"] = profile.model;
-  for (const key of secretEnvironmentNames(profile)) if (Object.prototype.hasOwnProperty.call(env, key)) catalogEnv[key] = env[key];
-  const child = spawnSync(executable, [], { shell: false, encoding: "utf8", env: catalogEnv, timeout: 15_000, maxBuffer: 64 * 1024 });
-  if (child.error || child.status !== 0) return { ok: false, state: "catalog-unavailable", outcome: "unavailable", models: [] };
-  try {
-    const response = JSON.parse(String(child.stdout || "").trim());
-    if (response.version !== ADAPTER_PROTOCOL_VERSION || !MODEL_CATALOG_OUTCOMES.includes(response.outcome)) throw new Error("invalid response");
-    if (response.outcome === "not-verifiable") return { ok: true, state: "not-verifiable", outcome: response.outcome, models: [], detail: String(response.detail || "Model aliases cannot be listed by this adapter.") };
-    if (response.outcome !== "listed" || !Array.isArray(response.models) || response.models.some((model) => typeof model !== "string")) throw new Error("invalid models");
-    const models = [...new Set(response.models)].sort();
-    const selected = String(profile.model || "");
-    if (selected && !models.includes(selected)) return { ok: false, state: "selected-model-missing", outcome: "listed", models, selected };
-    return { ok: true, state: "listed", outcome: "listed", models, selected: selected || null };
-  } catch { return { ok: false, state: "catalog-invalid", outcome: "unavailable", models: [] }; }
-}
-
-const SUBCOMMANDS = ["create", "list", "show", "update", "remove", "check", "models", "setup"];
+const SUBCOMMANDS = ["create", "list", "show", "update", "remove", "check"];
 const FLAGS = ["--adapter", "--model", "--effort", "--prompt", "--prompt-file", "--secret-env", "--protocol-version", "--delegation-control", "--actor", "--live", "--json"];
 
 export function parseAgentProfilesArgs(args) {
@@ -374,14 +319,10 @@ export function parseAgentProfilesArgs(args) {
     if (plan.name !== null) throw new Error("two profile names: " + plan.name + ", " + arg);
     plan.name = arg;
   }
-  if (["create", "show", "update", "remove", "models"].indexOf(subcommand) >= 0 && !plan.name) {
+  if (["create", "show", "update", "remove"].indexOf(subcommand) >= 0 && !plan.name) {
     throw new Error(subcommand + " needs a profile name");
   }
   if (subcommand === "list" && plan.name) throw new Error("list takes no profile name");
-  if (subcommand === "models" && Object.keys(plan.fields).length) throw new Error("models takes a profile name and optional `--json`");
-  if (subcommand === "setup" && (plan.name || Object.keys(plan.fields).length || plan.json || plan.live)) {
-    throw new Error("setup is interactive and takes no names or flags");
-  }
   if (subcommand !== "check" && plan.live) throw new Error("`--live` is only valid with `check`");
   if (subcommand === "create" && !plan.fields.adapter) throw new Error("create needs `--adapter <command>`");
   if (["create", "update"].indexOf(subcommand) >= 0 &&
@@ -394,381 +335,6 @@ export function parseAgentProfilesArgs(args) {
     throw new Error("`--prompt` and `--prompt-file` are alternatives, not two prompts");
   }
   return plan;
-}
-
-export const SETUP_USAGE = [
-  `${N} profile setup`,
-  "",
-  "  Create one local agent profile through a guided terminal conversation.",
-  "  It requires an interactive terminal and writes only after a final confirmation.",
-  "  Use `profile create` when a script or another client supplies the values.",
-  "",
-  "  Choices use arrows and Enter in a capable terminal; numbered text works everywhere else.",
-  "  In a Git project, the first choices keep the profile local and copy an inspectable reference adapter.",
-  "  Enter accepts the shown adapter destination and the general implementation prompt; it never guesses a model or credential.",
-  "  During input: `back` revisits the previous field; `cancel` leaves no change.",
-  "  The setup never starts an adapter, contacts a provider or asks for a secret value.",
-].join("\n");
-
-const BACK = Symbol("back");
-const CANCEL = Symbol("cancel");
-const DEFAULT_GENERALIST_PROMPT = "Implement the task with evidence.";
-
-function setupAnswer(value, fallback = "") {
-  if (value === null || value === undefined) return CANCEL;
-  const text = String(value).trim();
-  if (/^(cancel|quit|q)$/i.test(text)) return CANCEL;
-  if (/^(back|b)$/i.test(text)) return BACK;
-  return text || fallback;
-}
-
-/** Clack represents an accepted blank text entry as undefined; setup reserves
- * undefined for EOF, so normalise at the UI boundary before state handling. */
-export function clackTextAnswer(answer, isCancelled = clack.isCancel) {
-  return isCancelled(answer) ? null : answer === undefined ? "" : answer;
-}
-
-/** Clack renders an absent submitted default as `undefined`; an empty
- * placeholder is presentation-only and preserves the empty setup value. */
-export function setupTextOptions(question) {
-  return { message: String(question).replace(/:\s*$/, ""), placeholder: "" };
-}
-
-/** A choice may be enhanced by raw keys, but test transcripts remain text. */
-async function setupChoice(io, question, options, allowBack = false) {
-  const presented = allowBack ? options.concat({ label: "← Back", hint: "Return to the previous step without saving.", value: "__back__" }) : options;
-  if (typeof io.choose === "function") {
-    const result = await io.choose(question, presented);
-    if (!result.ok) return CANCEL;
-    return result.value === "__back__" ? BACK : setupAnswer(result.value);
-  }
-  io.write(presented.map((option, index) => (index + 1) + ") " + option.label).join("\n") + "\n");
-  const answer = setupAnswer(await io.ask(question + " [1-" + presented.length + "]: "));
-  if (answer === BACK || answer === CANCEL) return answer;
-  const selected = presented[Number(answer) - 1];
-  return selected ? (selected.value === "__back__" ? BACK : setupAnswer(selected.value)) : answer;
-}
-
-/** Select a subset without giving the setup state machine any terminal details. */
-async function setupRoleSet(io, question, roles) {
-  const options = roles.map((role) => ({ label: role, hint: "Route this repository role to a specialist profile.", value: role }));
-  if (typeof io.chooseMany === "function") {
-    const result = await io.chooseMany(question, options);
-    if (!result.ok) return CANCEL;
-    const selected = Array.isArray(result.values) ? result.values : [];
-    return selected.length && selected.every((role) => roles.includes(role)) ? [...new Set(selected)] : null;
-  }
-  io.write("Select one or more roles by their numbers, separated with commas (for example: 1,3).\n");
-  const answer = setupAnswer(await io.ask(question + " [1-" + roles.length + ", comma-separated]: "));
-  if (answer === CANCEL || answer === BACK) return answer;
-  const indices = String(answer).split(",").map((part) => part.trim());
-  if (!indices.length || indices.some((part) => !/^\d+$/.test(part))) return null;
-  const selected = indices.map((part) => roles[Number(part) - 1]);
-  return selected.every(Boolean) ? [...new Set(selected)] : null;
-}
-
-/**
- * The setup state machine is terminal-independent so its cancellation and write
- * boundary can be tested without a pseudo-terminal.
- */
-export async function setupProfileConversation(io, env = process.env, actions = {}) {
-  const copyAdapter = actions.copyReferenceAdapter || copyReferenceAdapter;
-  const projectRoot = actions.projectRoot || null;
-  const fields = [
-    { key: "name", label: "Name this reusable profile (lowercase slug, e.g. codex-reviewer)", required: true },
-    { key: "prompt", label: "What should this agent be responsible for? (Enter for a general implementation prompt)", required: true },
-    { key: "model", label: "Model identifier (optional; passed to the adapter, e.g. claude-sonnet)", required: false },
-    { key: "effort", label: "Reasoning effort (optional; passed to the adapter, e.g. high)", required: false },
-    { key: "secret_env", label: "Credential variable names (optional; names only, e.g. ANTHROPIC_API_KEY)", required: false },
-  ];
-  const state = {};
-  io.write("A profile is a reusable local recipe for starting one agent. It stores no secret values. Type back or cancel at any prompt.\n");
-  let index = 0;
-  while (index < 1) {
-    const field = fields[index];
-    const current = state[field.key] || "";
-    const suffix = current ? ` [${current}]` : "";
-    const answer = setupAnswer(await io.ask(field.label + suffix + ": "), current);
-    if (answer === CANCEL) return { ok: false, kind: "cancelled" };
-    if (answer === BACK) { if (index) index--; continue; }
-    if (field.required && !answer) { io.write(field.label + " is required.\n"); continue; }
-    state[field.key] = answer;
-    index++;
-  }
-  let scopeRoot = null;
-  if (projectRoot) {
-    const scope = await setupChoice(io, "Where should this agent be available?", [
-      { label: "Only this Git project", hint: "Recommended: keeps its adapter, model, prompt and routing private here.", value: "project" },
-      { label: "Every project on this machine", hint: "Choose this for a deliberately reusable personal agent.", value: "global" },
-    ]);
-    if (scope === CANCEL) return { ok: false, kind: "cancelled" };
-    scopeRoot = scope === "project" ? projectRoot : null;
-  }
-  io.write("\nChoose how " + N + " will start this agent. The adapter translates this profile to a provider CLI or API wrapper.\n");
-  let sourceChoice = await setupChoice(io, "How should " + N + " start this agent?", [
-    { label: "Copy a shipped reference adapter", hint: "Recommended: start from a local example you can inspect and adapt.", value: "reference" },
-    { label: "Use my own " + N + " adapter", hint: "Advanced: only if you already created an adapter wrapper.", value: "custom" },
-  ], true);
-  if (sourceChoice === CANCEL) return { ok: false, kind: "cancelled" };
-  if (sourceChoice === BACK) {
-    const answer = setupAnswer(await io.ask(fields[0].label + " [" + state.name + "]: "), state.name);
-    if (answer === CANCEL || answer === BACK || !answer) return { ok: false, kind: "cancelled" };
-    state.name = answer;
-    sourceChoice = await setupChoice(io, "How should " + N + " start this agent?", [
-      { label: "Copy a shipped reference adapter", hint: "Recommended: start from a local example you can inspect and adapt.", value: "reference" },
-      { label: "Use my own " + N + " adapter", hint: "Advanced: only if you already created an adapter wrapper.", value: "custom" },
-    ], true);
-  }
-  if (sourceChoice === CANCEL || sourceChoice === BACK) return { ok: false, kind: "cancelled" };
-  let reference = null;
-  if (sourceChoice === "custom") {
-    io.write("Enter the path to your executable " + N + " adapter wrapper. This is not `claude` and not a model name. Example: /Users/you/bin/my-agent-adapter.mjs\n");
-    const adapter = setupAnswer(await io.ask("Path to your adapter executable: "));
-    if (adapter === CANCEL || adapter === BACK || !adapter) return { ok: false, kind: "cancelled" };
-    state.adapter = adapter;
-  } else if (sourceChoice === "reference") {
-    const templates = referenceAdapterTemplates();
-    while (!reference) {
-      const selected = await setupChoice(io, "Which reference adapter should be copied?", templates.map((template, index) => ({ label: template.label, hint: "Copied locally; it does not contact the provider now.", value: String(index + 1) })), true);
-      if (selected === CANCEL) return { ok: false, kind: "cancelled" };
-      if (selected === BACK) {
-        const alternative = await setupChoice(io, "How should " + N + " start this agent?", [
-          { label: "Copy a shipped reference adapter", hint: "Recommended: start from a local example you can inspect and adapt.", value: "reference" },
-          { label: "Use my own " + N + " adapter", hint: "Advanced: only if you already created an adapter wrapper.", value: "custom" },
-        ], true);
-        if (alternative === CANCEL || alternative === BACK) return { ok: false, kind: "cancelled" };
-        if (alternative === "reference") continue;
-        io.write("Enter the path to your executable " + N + " adapter wrapper. This is not `claude` and not a model name. Example: /Users/you/bin/my-agent-adapter.mjs\n");
-        const adapter = setupAnswer(await io.ask("Path to your adapter executable: "));
-        if (adapter === CANCEL || adapter === BACK || !adapter) return { ok: false, kind: "cancelled" };
-        state.adapter = adapter;
-        break;
-      }
-      const template = templates[Number(selected) - 1];
-      if (!template) { io.write("Choose one of the listed reference adapters. Nothing was written.\n"); continue; }
-      const suggestedDestination = suggestedReferenceAdapterDestination(template, env, scopeRoot);
-      io.write("Recommended: " + suggestedDestination + " keeps this editable adapter with " + (scopeRoot ? "this project's local configuration" : "your local profiles") + ". Press Enter to use it, or provide another path.\n");
-      const destination = setupAnswer(await io.ask("Copy destination [" + suggestedDestination + "]: "), suggestedDestination);
-      if (destination === CANCEL) return { ok: false, kind: "cancelled" };
-      if (destination === BACK) continue;
-      reference = { template, destination };
-      state.adapter = resolve(destination);
-    }
-  } else {
-    io.write("Choose 1 or 2. Nothing was written.\n");
-    return { ok: false, kind: "cancelled" };
-  }
-  index = 1;
-  let modelSourceAsked = false;
-  while (index < fields.length) {
-    const field = fields[index];
-    const current = state[field.key] || "";
-    const modelRequirement = field.key === "model" && reference && reference.template.model;
-    if (modelRequirement && !current && !modelSourceAsked) {
-      modelSourceAsked = true;
-      const source = await setupChoice(io, "How should you choose the required Ollama model?", [
-        { label: "Enter a model name", hint: "Use a name from `ollama list`.", value: "manual" },
-        { label: "Discover locally installed models now", hint: "Explicitly runs only `ollama list`; it does not start a model.", value: "discover" },
-      ]);
-      if (source === CANCEL || source === BACK) return { ok: false, kind: "cancelled" };
-      if (source === "discover") {
-        const catalogue = modelCatalog({ adapter: reference.template.source }, env);
-        if (catalogue.state === "listed" && catalogue.models.length) {
-          const selected = await setupChoice(io, "Choose a locally installed Ollama model", catalogue.models.map((model) => ({ label: model, value: model })));
-          if (selected === CANCEL || selected === BACK) return { ok: false, kind: "cancelled" };
-          state.model = selected;
-          index++;
-          continue;
-        }
-        io.write("Local model discovery was unavailable. Enter a name from `ollama list` instead.\n");
-      }
-    }
-    const fallback = field.key === "prompt" ? (current || DEFAULT_GENERALIST_PROMPT) : current;
-    const suffix = current ? ` [${current}]` : field.key === "prompt" ? ` [${DEFAULT_GENERALIST_PROMPT}]` : "";
-    if (modelRequirement) io.write(modelRequirement.hint + "\n");
-    const answer = setupAnswer(await io.ask((modelRequirement ? "Model identifier (required for this adapter)" : field.label) + suffix + ": "), fallback);
-    if (answer === CANCEL) return { ok: false, kind: "cancelled" };
-    if (answer === BACK) { if (index > 1) index--; continue; }
-    if ((field.required || modelRequirement) && !answer) { io.write((modelRequirement ? "A model identifier" : field.label) + " is required.\n"); continue; }
-    state[field.key] = answer;
-    index++;
-  }
-  const secret = state.secret_env ? "\n  credential variables: " + state.secret_env : "";
-  const source = reference ? "reference " + reference.template.label + " -> " + state.adapter : "custom executable";
-  const scope = scopeRoot ? "this Git project" : "every project on this machine";
-  io.write("\nProfile summary:\n  name: " + state.name + "\n  adapter: " + state.adapter
-    + "\n  model: " + (state.model || "(none)") + "\n  effort: " + (state.effort || "(none)")
-    + secret + "\n  scope: " + scope + "\n  source: " + source + "\n\n");
-  const confirmation = await setupChoice(io, "Create this profile", [
-    { label: "Create profile", value: "1" }, { label: "Back", value: "2" }, { label: "Cancel", value: "3" },
-  ]);
-  if (confirmation === CANCEL || confirmation === "3") return { ok: false, kind: "cancelled" };
-  if (confirmation === BACK || confirmation === "2") {
-    index = fields.length - 1;
-    while (index < fields.length) {
-      const field = fields[index];
-      const modelRequirement = field.key === "model" && reference && reference.template.model;
-      const fallback = field.key === "prompt" ? (state[field.key] || DEFAULT_GENERALIST_PROMPT) : state[field.key] || "";
-      const answer = setupAnswer(await io.ask((modelRequirement ? "Model identifier (required for this adapter)" : field.label) + " [" + fallback + "]: "), fallback);
-      if (answer === CANCEL) return { ok: false, kind: "cancelled" };
-      if (answer === BACK) { if (index) index--; continue; }
-      if ((field.required || modelRequirement) && !answer) { io.write((modelRequirement ? "A model identifier" : field.label) + " is required.\n"); continue; }
-      state[field.key] = answer;
-      index++;
-    }
-    io.write("\nProfile summary confirmed after edits.\n");
-    const retry = await setupChoice(io, "Create this profile", [
-      { label: "Create profile", value: "1" }, { label: "Cancel", value: "3" },
-    ]);
-    if (retry === CANCEL || retry === "3" || retry !== "1") return { ok: false, kind: "cancelled" };
-  } else if (confirmation !== "1") {
-    io.write("Choose 1, 2 or 3. Nothing was written.\n");
-    return { ok: false, kind: "cancelled" };
-  }
-  const { name, ...profile } = state;
-  const checked = validateAgentProfileCreation(name, profile, env, scopeRoot);
-  if (!checked.ok) return checked;
-  let copied = null;
-  try {
-    if (reference) copied = copyAdapter(reference.template, reference.destination);
-    return createAgentProfile(name, profile, env, scopeRoot);
-  } catch (error) {
-    if (copied) rmSync(copied, { force: true });
-    return { ok: false, kind: "copy-failed", problems: [error.message] };
-  }
-}
-
-export async function setupFleetConversation(io, env = process.env, actions = {}) {
-  const resolveBacklog = actions.resolveBacklog || (() => resolveBacklogDir({ moduleDir: HERE }));
-  let root;
-  try { root = resolveBacklog().root; } catch { return { ok: false, kind: "no-backlog", problems: ["fleet setup needs a backlog in the current directory"] }; }
-  let config;
-  try { config = loadConfig(root); } catch (error) { return { ok: false, kind: "invalid-backlog", problems: [error.message] }; }
-  const roles = config.roles || [];
-  const profiles = readAvailableAgentProfiles(root, env);
-  if (!roles.length) return { ok: false, kind: "no-roles", problems: ["this backlog declares no roles"] };
-  if (profiles.problems.length) return { ok: false, kind: "invalid-store", problems: profiles.problems };
-  if (!profiles.profiles.length) return { ok: false, kind: "no-profiles", problems: ["create one profile first with `profile setup`"] };
-  io.write("A specialist fleet routes repository roles to existing local profiles. Existing profiles: " + profiles.profiles.map((p) => p.name).join(", ") + "\n");
-  const name = setupAnswer(await io.ask("Name this reusable routing map (lowercase slug, e.g. delivery-team): "));
-  if (name === CANCEL || name === BACK || !name) return { ok: false, kind: "cancelled" };
-  const scope = await setupChoice(io, "Where should this fleet routing be available?", [
-    { label: "Only this Git project", hint: "Recommended: keep this repository's role routing private here.", value: "project" },
-    { label: "Every project on this machine", hint: "Choose this for a deliberately reusable role-to-profile arrangement.", value: "global" },
-  ]);
-  if (scope === CANCEL) return { ok: false, kind: "cancelled" };
-  const scopeRoot = scope === "project" ? root : null;
-  const profileNames = profiles.profiles.map((profile) => profile.name);
-  let generalist = String(actions.defaultGeneralist || "");
-  if (generalist && !profileNames.includes(generalist)) return { ok: false, kind: "missing-profile", problems: ["no local profile `" + generalist + "`"] };
-  const choices = () => profiles.profiles.map((profile) => ({ label: profile.name, hint: profile.model ? "Model: " + profile.model : "No model identifier set.", value: profile.name }));
-  if (generalist) {
-    io.write("All repository roles not selected below will use general profile `" + generalist + "`.\n");
-  } else {
-    generalist = await setupChoice(io, "Which profile should handle all other work?", choices());
-    if (generalist === CANCEL || generalist === BACK) return { ok: false, kind: "cancelled" };
-    if (!profileNames.includes(generalist)) return { ok: false, kind: "missing-profile", problems: ["no local profile `" + generalist + "`"] };
-  }
-  let selectedRoles = null;
-  while (!selectedRoles) {
-    const selected = await setupRoleSet(io, "Which repository roles should this fleet override?", roles);
-    if (selected === CANCEL || selected === BACK) return { ok: false, kind: "cancelled" };
-    if (!selected) { io.write("Choose one or more repository roles. Nothing has been written.\n"); continue; }
-    selectedRoles = selected;
-  }
-  const profileFor = {};
-  for (const role of selectedRoles) {
-    const selected = await setupChoice(io, "Which profile should handle repository role `" + role + "`?", choices());
-    if (selected === CANCEL || selected === BACK) return { ok: false, kind: "cancelled" };
-    if (!profileNames.includes(selected)) return { ok: false, kind: "missing-profile", problems: ["no local profile `" + selected + "`"] };
-    profileFor[role] = selected;
-  }
-  io.write("\nFleet summary:\n  name: " + name + "\n  scope: " + (scopeRoot ? "this Git project" : "every project on this machine") + "\n  all other work: " + generalist + "\n  role overrides: " + Object.entries(profileFor).map(([r, p]) => r + "=" + p).join(", ") + "\n");
-  const confirm = await setupChoice(io, "Create this launch", [
-    { label: "Create launch", value: "1" }, { label: "Cancel", value: "3" },
-  ]);
-  if (confirm === CANCEL || confirm === "3" || confirm !== "1") return { ok: false, kind: "cancelled" };
-  return createAgentLaunch(name, generalist, profileFor, env, scopeRoot);
-}
-
-/** Translate a typed setup failure into the next action a person can take. */
-export function setupFailureMessage(result) {
-  const problem = (result && result.problems || []).join(" ");
-  if (result && result.kind === "no-roles") {
-    return { problem: problem || "This backlog declares no roles.", next: "Add `roles: [developer, reviewer]` to backlog/config.yaml, then run setup again." };
-  }
-  if (result && result.kind === "no-profiles") {
-    return { problem: problem || "No local agent profiles exist yet.", next: "Run `" + N + " profile setup` and choose one agent for general work first." };
-  }
-  if (result && result.kind === "missing-profile") {
-    return { problem: problem || "A selected local profile is missing.", next: "Run `" + N + " profile list` to choose an existing profile or create one." };
-  }
-  return { problem: problem || "Setup could not be completed.", next: "Nothing was written. Review the message above and try again." };
-}
-
-/** Fleet routing is meaningful only after at least one local profile exists. */
-export function setupModes(profiles) {
-  const modes = [{ label: "One agent for general work", hint: "Recommended first setup. Use it for any task.", value: "1" }];
-  if (profiles && profiles.length) modes.push({ label: "A specialist fleet", hint: "Advanced: route repository roles to different profiles.", value: "2" });
-  return modes;
-}
-
-function fleetRolesAvailable() {
-  try { return (loadConfig(resolveBacklogDir({ moduleDir: HERE }).root).roles || []).length > 0; }
-  catch { return false; }
-}
-
-async function runSetup(env = process.env, input = process.stdin, output = process.stdout) {
-  if (!input.isTTY || !output.isTTY) {
-    console.error(failure(N + " profile setup", "interactive setup needs a terminal", ["Use `" + N + " profile create <name> …` from a script or pipe."]));
-    return 2;
-  }
-  const io = {
-    ask: async (question) => {
-      const answer = await clack.text(setupTextOptions(question));
-      return clackTextAnswer(answer);
-    },
-    write: (text) => clack.log.message(String(text).trim()),
-    choose: async (question, options) => {
-      const answer = await clack.select({ message: question, options });
-      return clack.isCancel(answer) ? { ok: false } : { ok: true, value: answer };
-    },
-    chooseMany: async (question, options) => {
-      const answer = await clack.multiselect({ message: question, options, required: true });
-      return clack.isCancel(answer) ? { ok: false } : { ok: true, values: answer };
-    },
-  };
-  try {
-    let projectRoot = null;
-    try { projectRoot = resolveBacklogDir({ moduleDir: HERE }).root; } catch { /* Global setup remains available outside a backlog. */ }
-    clack.intro("Configure " + N);
-    const modes = setupModes((projectRoot ? readAvailableAgentProfiles(projectRoot, env) : readAgentProfiles(env)).profiles);
-    const firstProfile = modes.length === 1;
-    if (modes.length === 1) clack.note("Specialist fleets become available after you create at least one local agent profile.", "First setup");
-    const mode = await setupChoice(io, "What do you want to configure?", modes);
-    if (mode === CANCEL) { clack.cancel("No configuration was created."); return 0; }
-    const result = mode === "2" ? await setupFleetConversation(io, env) : mode === "1" ? await setupProfileConversation(io, env, { projectRoot }) : { ok: false, kind: "cancelled" };
-    if (!result.ok) {
-      if (result.kind === "cancelled") { clack.cancel("No profile was created."); return 0; }
-      const message = setupFailureMessage(result);
-      clack.log.error(message.problem);
-      clack.outro(message.next);
-      return 1;
-    }
-    if (mode === "2") clack.outro("Launch `" + result.launch.name + "` created. Preview its eligible work with `" + N + " run --launch " + result.launch.name + " --dry-run`; your shell or orchestrator owns background execution and supervision.");
-    else if (firstProfile && fleetRolesAvailable()) {
-      const addFleet = await clack.confirm({ message: "Your general agent is ready. Configure specialist fleet routing now?", initialValue: false });
-      if (addFleet === true) {
-        const fleet = await setupFleetConversation(io, env, { defaultGeneralist: result.profile.name });
-        if (fleet.ok) clack.outro("Profile and launch `" + fleet.launch.name + "` created.");
-        else clack.outro("Profile `" + result.profile.name + "` created. Fleet routing was not created.");
-      } else clack.outro("Profile `" + result.profile.name + "` created. Preview work with `" + N + " run --profile " + result.profile.name + " --dry-run`; run it from a working tree you own.");
-    } else clack.outro("Profile `" + result.profile.name + "` created. Preview work with `" + N + " run --profile " + result.profile.name + " --dry-run`; run it from a working tree you own.");
-    return 0;
-  } catch (error) {
-    console.error(failure(N + " profile setup", "setup stopped before writing", [error.message]));
-    return 1;
-  } finally {}
 }
 
 function answer(plan, store, profile = null) {
@@ -803,26 +369,7 @@ function checkAnswer(plan, checked, env) {
   return ok ? 0 : 1;
 }
 
-function catalogAnswer(plan, result) {
-  if (plan.json) { printJson("profile-models", result); return result.ok ? 0 : 1; }
-  if (result.state === "not-verifiable") {
-    console.log("? model aliases not verifiable\n  " + result.detail);
-    return 0;
-  }
-  if (result.state === "listed") {
-    console.log(heading("available models") + "\n" + (result.models.length ? "\n" + table(result.models.map((model) => [model, model === result.selected ? "selected" : ""])) : "\n  no local models found"));
-    return 0;
-  }
-  if (result.state === "selected-model-missing") {
-    console.error(failure(N + " profile models", "selected model `" + result.selected + "` is not installed locally", ["Run `ollama pull " + result.selected + "`, then run this command again."]));
-    return 1;
-  }
-  console.error(failure(N + " profile models", "model catalogue is unavailable", ["The adapter did not return a valid local model catalogue."]));
-  return 1;
-}
-
 export async function run(argv, env = process.env) {
-  if (argv[0] === "setup" && argv[1] === "--help" && argv.length === 2) { console.log(SETUP_USAGE); return 0; }
   let plan;
   try { plan = parseAgentProfilesArgs(argv); }
   catch (e) {
@@ -832,17 +379,12 @@ export async function run(argv, env = process.env) {
   let projectRoot = null;
   try { projectRoot = resolveBacklogDir({ moduleDir: HERE }).root; } catch { /* A global profile command is valid outside a backlog. */ }
   const store = projectRoot ? readAvailableAgentProfiles(projectRoot, env) : readAgentProfiles(env);
-  if (plan.subcommand === "setup") return runSetup(env);
   if (plan.subcommand === "check") return checkAnswer(plan, checkAgentProfiles(plan.name ? [plan.name] : [], env, projectRoot), env);
   if (store.problems.length) {
     console.error(failure(N + " profile", "cannot read local agent profiles", [store.path, ...store.problems], [N + " profile list"]));
     return 1;
   }
   const found = plan.name ? store.profiles.find((p) => p.name === plan.name) : null;
-  if (plan.subcommand === "models") {
-    if (!found) return catalogAnswer(plan, { ok: false, state: "missing-profile", outcome: "unavailable", models: [], detail: "No profile `" + plan.name + "`." });
-    return catalogAnswer(plan, modelCatalog(resolveAgentProfile(plan.name, env, projectRoot).profile, env));
-  }
   if (plan.subcommand === "list") return answer(plan, store);
   if (plan.subcommand === "show") {
     if (!found) { console.error(failure(N + " profile show", "no profile `" + plan.name + "`", ["Run `" + N + " profile list` to see local names."])); return 1; }
