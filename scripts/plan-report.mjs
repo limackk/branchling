@@ -145,7 +145,15 @@ export function renderPlan(state, config, opts = {}) {
   }
   out.push("");
 
-  out.push("unplanned open tasks: " + (state.unplanned.length || paint.dim("none")));
+  const coverage = state.coverage || {
+    open: state.unplanned.length,
+    planned: 0,
+    unplanned: state.unplanned.length,
+    share: state.unplanned.length ? 100 : 0,
+  };
+  out.push("unplanned open tasks: " + (coverage.unplanned
+    ? coverage.unplanned + " of " + coverage.open + " (" + coverage.share + "%)"
+    : paint.dim("none")));
   if (state.unplanned.length) {
     out.push(...wrapIds(state.unplanned.map((t) => t.id), "  ", columns));
   }

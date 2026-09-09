@@ -1,1 +1,4 @@
 {"id":"01M1P92MGESWJD4DN9MB2AYPX7","ts":"2026-09-04T13:17:38.190Z","task":"TL-253","field":"__created__","from":"","to":"plan reports the open work outside every wave as a share, not a list of ids","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-6bbd9af44e85"}
+{"id":"01M22KD5P777X30F139XDNWN03","ts":"2026-09-09T08:09:02.407Z","task":"TL-253","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"next","reason":"unknown"}
+{"id":"01M22KD5P7G6Q6RN2TGH345RSQ","ts":"2026-09-09T08:09:02.407Z","task":"TL-253","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"next","reason":"unknown"}
+{"id":"01M22KTATSPCQ12H7XC8463KE8","ts":"2026-09-09T08:16:13.657Z","task":"TL-253","field":"status","from":"in_progress","to":"done","actor":"agent:codex","source":"done","reason":"proven"}

@@ -154,6 +154,7 @@ test("unplanned lists the OPEN tasks the plan does not schedule, by id", () => {
     t("TL-1", "done"), t("TL-2"), t("TL-3"), t("TL-4"), t("TL-7"), t("TL-8", "done"),
   ]);
   assert.deepEqual(s.unplanned.map((x) => x.id), ["TL-7"]);
+  assert.deepEqual(s.coverage, { open: 4, planned: 3, unplanned: 1, share: 25 });
 });
 
 test("stale = a plan task already closed in a wave AFTER the active one", () => {
@@ -184,6 +185,7 @@ test("every section is printed even when empty, with the word `none`", () => {
   assert.match(text, /together: TL-2, TL-3/);
   assert.match(text, /in progress:\n {2}none/);
   assert.match(text, /unplanned open tasks: none/);
+  assert.deepEqual(s.coverage, { open: 3, planned: 3, unplanned: 0, share: 0 });
   assert.match(text, /stale — closed in a wave after the active one: none/);
 });
 
@@ -284,7 +286,7 @@ test("POSITIVE CONTROL: a real plan reports a wave, a next-up group and the unpl
       assert.match(r.out, /next up \(wave 2 — Consumers\)/);
       assert.match(r.out, /together: TL-2, TL-3/);
       assert.match(r.out, /TL-2\s+in_progress\s+wave 2/);
-      assert.match(r.out, /unplanned open tasks: 1/);
+      assert.match(r.out, /unplanned open tasks: 1 of 3 \(33%\)/);
       assert.match(r.out, /TL-9/);
 
       const answer = JSON.parse(run(["--dir", dir, "--json"]).out);
@@ -293,6 +295,7 @@ test("POSITIVE CONTROL: a real plan reports a wave, a next-up group and the unpl
       assert.deepEqual(answer.nextUp,
         [{ together: true, ids: ["TL-2", "TL-3"], executors: [], waitsOnHuman: false }]);
       assert.deepEqual(answer.unplanned, [{ id: "TL-9", status: "pending" }]);
+      assert.deepEqual(answer.coverage, { open: 3, planned: 2, unplanned: 1, share: 33 });
       assert.deepEqual(answer.inProgress, [{ id: "TL-2", wave: 1, status: "in_progress" }]);
       // The text and the JSON are the SAME computation, not two readings of it.
       assert.equal(answer.waves.length, 2);

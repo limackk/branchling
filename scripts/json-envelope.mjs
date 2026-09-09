@@ -127,7 +127,7 @@ export const KINDS = {
   // by accumulating work nobody scheduled, and a number cannot be acted on.
   plan: {
     root: null, exists: null, updated: null, rationale: null, waves: [],
-    activeWave: null, nextUp: [], inProgress: [], unplanned: [], stale: [],
+    activeWave: null, nextUp: [], inProgress: [], unplanned: [], coverage: null, stale: [],
     inProgressStatus: null,
   },
   // ── The WRITING commands (TL-119) ──────────────────────────────────────

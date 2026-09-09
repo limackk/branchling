@@ -621,7 +621,7 @@ implementation detail. Every reading command answers in the same envelope:
 | `profile list/show` | `agent-profiles` | `path`, `exists`, `profiles`, `profile` |
 | `profile check` | `profile-check` | `ok`, `path`, `live`, `results` |
 | `conformance` | `adapter-conformance` | `ok`, `version`, `adapter`, `results`, `failures` |
-| `plan` | `plan` | `root`, `exists`, `updated`, `rationale`, `waves`, `activeWave`, `nextUp`, `inProgress`, `unplanned`, `stale`, `inProgressStatus` |
+| `plan` | `plan` | `root`, `exists`, `updated`, `rationale`, `waves`, `activeWave`, `nextUp`, `inProgress`, `unplanned`, `coverage`, `stale`, `inProgressStatus` |
 | `time` | `time` | `root`, `closed`, `completed`, `unstamped` (ids, not a count), `leadTimeDays`, `throughput`, `perWeekMean`, `engaged`, `unknown_ratio`, `tokens` (null when no adapter has written any — never 0), `cost` (the per-model breakdown and why an amount is missing) |
 | `seed` | `seed` | `ok`, `root`, `dryRun`, `created`, `errors` |
 | `import` | `import` | `ok`, `root`, `dryRun`, `created`, `skipped`, `droppedLabels`, `withoutVerification`, `errors` |

@@ -456,6 +456,14 @@ export function planState(plan, tasks, config = {}) {
   const unplanned = tasks
     .filter((t) => isOpen(t) && !waveOf.has(t.id))
     .map((t) => ({ id: t.id, status: t.status }));
+  const open = tasks.filter(isOpen).length;
+  const planned = open - unplanned.length;
+  const coverage = {
+    open,
+    planned,
+    unplanned: unplanned.length,
+    share: open ? Math.round((unplanned.length / open) * 100) : 0,
+  };
 
   return {
     updated: (plan && plan.updated) || "",
@@ -465,6 +473,7 @@ export function planState(plan, tasks, config = {}) {
     nextUp,
     inProgress,
     unplanned,
+    coverage,
     stale,
     inProgressStatus,
   };
