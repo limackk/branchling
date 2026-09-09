@@ -293,19 +293,17 @@ not exist yet.
 
 ### Quick start: one generalist
 
-For a guided first-run flow in a terminal, use:
+Write or install an adapter you control, then name that executable in one local
+profile. Branchling does not copy, update or discover provider adapters; the
+adapter owner chooses its provider invocation, model catalogue and credentials.
 
 ```bash
-branchling profile setup
+branchling profile create generalist --adapter "$PWD/branchling-agent.mjs" \
+  --model "<provider model alias>" --effort high \
+  --prompt "Implement the task with evidence."
+branchling profile check generalist
+branchling run --profile generalist --dry-run
 ```
-
-It asks for a local adapter, model, effort and prompt, shows the exact profile
-before writing it, then recommends `profile check` and a no-claim dry run. You
-may point it at any executable you control, or copy a versioned reference
-adapter that ships with the package. The guide never downloads code, starts an
-agent run, probes a provider or asks for a credential value. Local model
-discovery is the one explicit exception: choosing it for an Ollama profile runs
-only `ollama list`.
 
 Choose execution authority per run, never by guessing from a provider name:
 `--delegation provider` is the normal mode for one generalist and permits its
@@ -315,61 +313,6 @@ mode for a specialist fleet, where Branchling alone claims backlog tasks; and
 `delegation_control` states whether that boundary is enforced, instruction-only
 or unsupported. Run the agent in the foreground in a working tree you prepared;
 your shell or orchestrator owns detached execution, supervision and cancellation.
-
-During setup, choose whether the agent is available on this machine everywhere
-or only in the current Git project. A project-only choice keeps its adapter,
-model, effort, prompt, credential-variable names and fleet routing in your
-local user configuration, keyed by Git's common directory. It is shared by that
-repository's linked worktrees, unavailable in other repositories, and never
-written into `backlog/` or committed. A duplicate global and project profile or
-launch name is refused rather than silently selecting one configuration layer.
-
-Inside a Git project the first choice is project-only and the first adapter
-choice is a copied reference you can inspect. Enter accepts its displayed local
-destination and the starter prompt `Implement the task with evidence.` Model,
-reasoning effort and credential-variable names remain intentionally blank until
-you provide them; the Ollama reference explicitly requires the name of a model
-you have pulled locally.
-
-Use an explicit catalogue check when an adapter supports it:
-
-```bash
-branchling profile models local-developer
-```
-
-For Ollama, this lists the models pulled on this machine and fails if the
-profile's selected model is absent. Codex reports that account-specific aliases
-cannot be listed; leaving its model blank uses the Codex CLI default, while an
-override is passed through without being labelled verified.
-
-The shipped Codex adapter also maps a profile's optional reasoning effort to
-one invocation only. It accepts `low`, `medium`, `high` and `xhigh`; leave the
-field blank to use the Codex CLI default. An unsupported value fails before the
-agent starts, so a profile never silently depends on a global Codex setting.
-
-After the first general agent, setup can optionally create a specialist fleet.
-The general agent remains the fallback for every role; select only the roles to
-override with specialists. In a terminal use Arrow keys to move, Space to toggle
-roles, and Enter to continue; setup then asks for a profile only for the roles
-you selected.
-
-The flag form remains the right path for scripts, CI and users who already know
-their configuration:
-
-Copy an adapter you control, then create one local profile. The model name is a
-fact about the installed provider, so obtain it from that provider's current
-documentation rather than copying a stale recommendation.
-
-```bash
-cp examples/agent-adapters/claude-code.mjs ./branchling-agent.mjs
-chmod +x ./branchling-agent.mjs
-
-branchling profile create generalist --adapter "$PWD/branchling-agent.mjs" \
-  --model "<current model alias>" --effort high \
-  --prompt "Implement the task with evidence."
-branchling profile check generalist
-branchling run --profile generalist --dry-run
-```
 
 `--dry-run` lists the queue without starting an adapter or claiming work. When
 it looks right, remove that flag to run the queue. One `--profile` is the
@@ -413,20 +356,6 @@ confirmation are deliberately separate: without provider-produced evidence,
 `confirmed.model` is `null`, never a claim that an alias was used. Receipts are
 outside the repository and contain no prompt, credential, account identifier or
 local adapter path.
-
-For a fleet you use repeatedly, save just its local profile routing, then keep
-execution policy explicit:
-
-```bash
-branchling launch create team --profile developer --profile-for review=reviewer
-branchling run --launch team --dry-run
-```
-
-`team` stores no secret, worker count, timeout, retry policy or repository
-setting. `run` validates the launch and every selected profile before claiming
-work. Use `branchling launch show team`, `update` or `remove` to inspect or
-change it; direct `run --profile` and `--profile-for` remain supported for
-scripts.
 
 Kimi, GLM, a local runner such as Ollama, or another API service use the same
 shape: provide an executable adapter and a local profile. The adapter owns the
@@ -474,14 +403,11 @@ the harness verifies that the process is gone. Adapter stderr is deliberately
 not replayed, so a provider diagnostic cannot leak a credential into the
 conformance report.
 
-**Copyable reference adapters ship with the package.**
-[`examples/agent-adapters/`](examples/agent-adapters/) contains one adapter for
-an authenticated coding-agent CLI and one for an API-backed coding harness.
-They pass model and effort from the profile, keep provider arguments and
-credentials outside the core, and document how to copy the pattern for Kimi,
-GLM, a local model or another future provider. They intentionally name no
-timeless recommended model: inspect the current harness documentation before
-choosing one.
+**Branchling ships no provider adapters.** The executable named by a profile is
+user-owned. It receives the documented neutral contract, while its provider
+arguments, model selection and credentials remain outside Branchling core. Run
+`branchling conformance --adapter <path>` before giving a new adapter a real
+queue.
 
 **One queue, several hands.** A task may ask for a competence in `role:`, and
 `--agent-for <role>=<command>` or `--profile-for <role>=<name>` is repeatable,

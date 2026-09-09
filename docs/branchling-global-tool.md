@@ -14,7 +14,7 @@ or fails; it never falls back to an index of other projects.
 ## Machine-local preferences
 
 Some facts belong to the person running the command rather than to a project:
-the local preferences file, agent profiles and local launch mappings. They live
+the local preferences file and agent profiles. They live
 under the user configuration directory and contain no project vocabulary.
 Deleting those files only removes that user's preferences. It cannot change a
 task, status, plan, history record or proof in a repository.

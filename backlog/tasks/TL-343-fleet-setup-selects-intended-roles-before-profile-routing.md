@@ -16,7 +16,7 @@ created: 2026-09-07
 updated: 2026-09-07
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
-related_docs: [scripts/agent-profiles.mjs, scripts/agent-launches.mjs, scripts/tests/agent-profile-setup.test.mjs, node_modules/@clack/prompts/README.md] # paths relative to the repository root
+related_docs: [scripts/agent-profiles.mjs, backlog/tasks/TL-382-provider-execution-uses-one-thin-user-owned-adapter-path.md, node_modules/@clack/prompts/README.md] # paths relative to the repository root
 verification:                      # HOW to check the task is really done
   - id: fleet-role-selection
     bash: "node --test scripts/tests/agent-profile-setup.test.mjs scripts/tests/agent-launches.test.mjs"

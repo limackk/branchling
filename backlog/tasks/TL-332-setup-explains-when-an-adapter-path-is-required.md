@@ -16,7 +16,7 @@ created: 2026-09-07
 updated: 2026-09-07
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
-related_docs: [scripts/agent-profiles.mjs, scripts/tests/agent-profile-setup.test.mjs]
+related_docs: [scripts/agent-profiles.mjs, backlog/tasks/TL-382-provider-execution-uses-one-thin-user-owned-adapter-path.md]
 verification:                      # HOW to check the task is really done
   - id: adapter-guidance
     bash: "node --test scripts/tests/agent-profile-setup.test.mjs"

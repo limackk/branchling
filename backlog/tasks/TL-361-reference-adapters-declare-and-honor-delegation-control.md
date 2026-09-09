@@ -16,7 +16,7 @@ created: 2026-09-07
 updated: 2026-09-07
 blocked_by: [TL-355]               # ids of tasks that MUST be closed before this one starts
 blocks: [TL-362]                   # ids this task will unblock
-related_docs: [examples/agent-adapters/README.md, examples/agent-adapters/codex-cli.mjs, scripts/adapter-conformance.mjs]
+related_docs: [backlog/tasks/TL-382-provider-execution-uses-one-thin-user-owned-adapter-path.md, scripts/adapter-conformance.mjs]
 verification:                      # HOW to check the task is really done
   - id: adapter-delegation
     bash: "node --test scripts/tests/agent-adapter-conformance.test.mjs scripts/tests/agent-reference-adapters.test.mjs scripts/tests/run-agent-profiles.test.mjs"

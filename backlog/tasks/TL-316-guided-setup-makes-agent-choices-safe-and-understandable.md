@@ -20,7 +20,7 @@ related_docs:
   - README.md
   - docs/manual.md
   - docs/backlog-config-and-portability.md
-  - examples/agent-adapters/README.md
+  - backlog/tasks/TL-382-provider-execution-uses-one-thin-user-owned-adapter-path.md
 verification:                      # HOW to check the task is really done
   - id: documentation-tests
     bash: "node --test scripts/tests/docs-drift.test.mjs scripts/tests/agent-profile-setup.test.mjs"

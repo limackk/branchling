@@ -17,9 +17,7 @@ updated: 2026-09-06
 blocked_by: [TL-313]               # ids of tasks that MUST be closed before this one starts
 blocks: [TL-315]                   # ids this task will unblock
 related_docs:
-  - examples/agent-adapters/README.md
-  - examples/agent-adapters/claude-code.mjs
-  - examples/agent-adapters/aider-api.mjs
+  - backlog/tasks/TL-382-provider-execution-uses-one-thin-user-owned-adapter-path.md
   - README.md
 verification:                      # HOW to check the task is really done
   - id: focused-tests

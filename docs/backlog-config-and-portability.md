@@ -115,9 +115,7 @@ An agent profile is not project configuration. It belongs to one person's
 machine, in `agent-profiles.yaml` beside their user `config.yaml`, because two
 contributors may correctly run the same backlog through different providers.
 Use `branchling profile create`, `list`, `show`, `update` and `remove`; every
-write has flags, so no editor session is required. `branchling profile setup`
-is an optional terminal guide over the same data: it can be cancelled without a
-write and asks only for credential variable names, never values.
+write has flags, so no editor session is required.
 
 Each profile has a slug, one `adapter` executable, optional `model` and
 `effort`, an `actor` identity, and exactly one prompt (`prompt` or
@@ -156,19 +154,6 @@ It receives the documented contract above, `PATH` to resolve its executable,
 and only the credential variables it explicitly names with
 `--secret-env NAME,…`; values are redacted from adapter logs and reports. The
 names live in the local profile, never the repository.
-
-### Local agent launches
-
-A launch is a short, named local composition of profiles: an optional
-generalist plus `role=profile` mappings. It lives beside `agent-profiles.yaml`,
-not in the repository, because provider choices remain personal machine data.
-Use `branchling launch create`, `list`, `show`, `update` and `remove`; then
-`branchling run --launch <name> --dry-run` proves routing without claiming work.
-
-A launch does not save retries, workers, timeout, queue filters or credentials.
-Those are execution decisions and remain explicit `run` inputs. `run` resolves
-the launch, its profiles and the repository's role vocabulary before its first
-claim; a missing profile or invalid role therefore changes no task.
 
 This is not a sandbox. A wrapper chosen by the user runs with that user's file
 and network authority, and its prompt receives repository text as untrusted
