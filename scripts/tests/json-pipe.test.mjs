@@ -106,5 +106,5 @@ test("the fix keeps the exit codes: a refusal is still non-zero", () => {
   assert.equal(run(["query", "--dir", dir, "--nonsense"]).status, 2);
   assert.equal(run(["query", "--dir", dir, "--status", "in-progress"]).status, 2);
   assert.equal(run(["query", "--dir", dir, "--json"]).status, 0);
-  assert.equal(run(["quote", "TL-9999", "--dir", dir, "--json"]).status, 1);
+  assert.equal(run(["profile", "check", "does-not-exist", "--json"]).status, 1);
 });

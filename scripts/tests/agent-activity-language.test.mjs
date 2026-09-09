@@ -3,7 +3,9 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 
-import { REPO_ROOT } from "./_repo.mjs";
+import { isolateHome, REPO_ROOT } from "./_repo.mjs";
+
+isolateHome("agent-activity-language");
 
 const PATHS = {
   agents: join(REPO_ROOT, "AGENTS.md"),

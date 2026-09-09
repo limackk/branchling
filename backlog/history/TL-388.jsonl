@@ -1,0 +1,4 @@
+{"id":"01M22GB0FCPTVBFT6ZW28EYW5W","ts":"2026-09-09T07:15:25.804Z","task":"TL-388","field":"__created__","from":"","to":"Full suite uses a supported refusal and isolated home","actor":"agent:claude","source":"new","reason":"unknown"}
+{"id":"01M22GC46SNM1ZSZR7Q75GCT13","ts":"2026-09-09T07:16:02.393Z","task":"TL-388","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown"}
+{"id":"01M22GC46SGGG73RSAAXT5MF5Z","ts":"2026-09-09T07:16:02.393Z","task":"TL-388","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown"}
+{"id":"01M22GSCGJC7A9QASVBT1HJQYJ","ts":"2026-09-09T07:23:16.882Z","task":"TL-388","field":"status","from":"in_progress","to":"done","actor":"agent:codex","source":"done","reason":"proven"}
