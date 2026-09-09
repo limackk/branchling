@@ -6,20 +6,24 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-09
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
-related_docs: []                   # paths relative to the repository root
+related_docs: [scripts/task-fields.mjs, scripts/tests/change-reason.test.mjs, scripts/tests/ask-options.test.mjs] # paths relative to the repository root
 verification:                      # HOW to check the task is really done
-  - id: the-name                   # optional; a criterion below points at this id
-    bash: "command to run"
+  - id: reason-causes
+    bash: "node --test scripts/tests/change-reason.test.mjs scripts/tests/ask-options.test.mjs"
+  - id: suite-green
+    bash: "node --test scripts/tests/*.test.mjs"
+  - id: guards-green
+    bash: "node scripts/cli.mjs check"
 ---
 
 ## Goal
@@ -65,10 +69,12 @@ reason back, which for a long one buries the diagnosis.
    echoing a long reason back in full.
 3. One test per rule, so that the three cases cannot collapse back into one.
 
-## Acceptance
+## Acceptance criteria
 
-- [ ] A reason over the limit is refused with a message that says so and names
-      both the actual length and the limit.
-- [ ] A sentinel reason still gets the sentinel explanation, unchanged.
-- [ ] An empty reason still gets the empty explanation.
-- [ ] `node --test scripts/tests/*.test.mjs` and `branchling check` are green.
+- [x] A reason over the limit is refused with a message that says so and names
+      both the actual length and the limit. [proof: reason-causes]
+- [x] A sentinel reason still gets the sentinel explanation, unchanged.
+      [proof: reason-causes]
+- [x] An empty reason still gets the empty explanation. [proof: reason-causes]
+- [x] The full suite is green. [proof: suite-green]
+- [x] All project guards are green. [proof: guards-green]

@@ -1,1 +1,4 @@
 {"id":"01M1NVFTSP3RV72XKXH0WP5A7D","ts":"2026-09-04T09:20:10.550Z","task":"TL-241","field":"__created__","from":"","to":"A too-long reason is refused as \"empty or reserved\"","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-27c72d9231bb"}
+{"id":"01M22JF9748M9TTR0HDQBGKTHQ","ts":"2026-09-09T07:52:42.980Z","task":"TL-241","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"next","reason":"unknown"}
+{"id":"01M22JF97434NAKQ0070NWRR9Z","ts":"2026-09-09T07:52:42.980Z","task":"TL-241","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"next","reason":"unknown"}
+{"id":"01M22JQ9Y45TKWSBJ5NB7D16BJ","ts":"2026-09-09T07:57:05.860Z","task":"TL-241","field":"status","from":"in_progress","to":"done","actor":"agent:codex","source":"done","reason":"proven"}
