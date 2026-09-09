@@ -216,6 +216,29 @@ only place `branchling next` can ever hand it out from.
   commit if it was created in the same tree — but never as a pretext for a code
   change the current task does not cover.
 
+## Activity claims require live evidence
+
+Use three different words for three observably different states:
+
+- **Claimed** means the task file records an owner and the project's in-progress
+  status. It proves responsibility in that tree, not that a process is alive.
+- **Live** means a runtime is executing now and the reporter can name a handle
+  that can be polled now: a running process or child agent, Goal mode, a cloud
+  task, a scheduled task, or an external orchestrator run.
+- **Checkpointed** means the changes and evidence reached the repository, but no
+  execution continues after the response.
+
+A task claim is not proof of live execution. Never infer liveness from
+`status: in_progress`, `owner:`, a history timestamp, changed files, or stated
+intent. Say that work is continuing only after polling the named runtime handle;
+if the handle cannot be polled, the work is not provably live.
+
+Every progress report names completed evidence — a changed path, command result,
+test result, or commit — and the time of that observation with its time zone.
+Future intent is a plan, not progress. At the end of an interactive turn, name
+any runtime that remains live and its last polled state. If there is none, say:
+"Execution is checkpointed; no background process remains active."
+
 ## A commit for every finished task
 
 **Every finished task ends in a commit — do not ask for permission.** A task's

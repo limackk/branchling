@@ -1,0 +1,4 @@
+{"id":"01M22BKYEMSRSYP9RSA20W1906","ts":"2026-09-09T05:52:55.764Z","task":"TL-386","field":"__created__","from":"","to":"Agent activity claims require live evidence","actor":"agent:claude","source":"new","reason":"unknown"}
+{"id":"01M22CTBPZF77MVDWBANRZTTAN","ts":"2026-09-09T06:13:54.527Z","task":"TL-386","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown"}
+{"id":"01M22CTBPZEYEQYYYDV15Z5MYS","ts":"2026-09-09T06:13:54.527Z","task":"TL-386","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown"}
+{"id":"01M22D28P70F5FJWNTA4ZF59BR","ts":"2026-09-09T06:18:13.575Z","task":"TL-386","field":"status","from":"in_progress","to":"done","actor":"agent:codex","source":"done","reason":"proven"}

@@ -281,7 +281,9 @@ TAKING IT. Do not edit the status by hand to claim it.
 Both RESERVE the task before handing it over, so two sessions asking at the same
 moment get two different tasks — selection and reservation are one act on
 purpose. \`next\` hands out {{queue_statuses}} and skips anything whose
-\`blocked_by\` is not closed. Taking sets the status to \`{{progress}}\`.
+\`blocked_by\` is not closed. Taking sets the status to \`{{progress}}\`. That is
+a durable claim of responsibility, not evidence that an agent or process is
+executing now.
 
 Actors are namespaced on purpose: \`local:\` declared and unverified, \`agent:\`
 automated, \`user:\` authenticated. An actor without a namespace is refused.
@@ -292,6 +294,18 @@ Ask \`{{tool}} query --blocked-by <ID>\` as well: if something is waiting on thi
 task, that changes how much you can safely defer.
 
 WHILE YOU WORK.
+
+  Reporting activity  Use three states precisely. CLAIMED means the task records
+                      an owner and \`{{progress}}\`; it proves no process is live.
+                      LIVE means you can name and poll a runtime handle now.
+                      CHECKPOINTED means evidence was saved but execution will
+                      not continue after the response. Every progress report
+                      names completed evidence — a changed path, command result,
+                      test result or commit — and the observation time with its
+                      time zone. Future intent is a plan, not progress. End an
+                      interactive turn by naming and polling the live runtime,
+                      or say exactly: "Execution is checkpointed; no background
+                      process remains active."
 
   The scope grows      Open a NEW task instead of inflating this one, and record
                        the link in \`blocks:\` here and \`blocked_by:\` there. You
@@ -472,6 +486,11 @@ procedure. Wire it to whatever your vendor calls a pre-compaction hook, and wire
 
 WHAT THE CLAIM GUARANTEES, AND WHERE IT STOPS. Two mechanisms answer two
 different questions, and the boundary is where the SECOND one stops.
+
+The claim records ownership. It never proves runtime liveness: neither
+\`status: {{progress}}\`, \`owner:\`, a timestamp nor a changed file says that an
+agent is executing now. Only a named runtime handle that can be polled now makes
+that claim observable. Without one, report saved work as checkpointed.
 
   the lock       Selection and reservation are one act, so two sessions asking
                  at the same moment get two different tasks. It is a file

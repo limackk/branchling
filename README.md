@@ -258,7 +258,9 @@ branchling next --actor agent:claude --json    # "what should I do", answered an
 Both do the same thing to the task — reserve it, set it to the status your
 project calls *in progress*, set `owner:`, record the change in the history and
 print the whole task file, so whoever runs it has what the task was written to
-say. `next` only adds the choice: the highest-priority task whose `blocked_by`
+say. That state means the work is claimed; it does not prove that an agent or
+process is currently running. `next` only adds the choice: the highest-priority
+task whose `blocked_by`
 is closed, filtered by the same axes `query` uses. Because that choice and the
 reservation are one act, six sessions asking at once get six different tasks,
 and the backlog empties itself with no dispatcher process, no server and no
@@ -495,7 +497,7 @@ decision an analyst-agent could phrase but must not settle — while
 human decision the field asks for.
 
 **Where the guarantee ends, said plainly.** The reservation excludes sessions
-running at the same moment in every worktree of one clone, and `next` also
+that ask at the same moment in every worktree of one clone, and `next` also
 reads every branch and worktree of that clone (local refs only, never a
 `git fetch`), naming the branch it defers to rather than skipping silently:
 
@@ -509,6 +511,8 @@ Both statuses stand and the branch is named; picking one would be the
 one-checkout answer again, only harder to notice. **The boundary is the
 clone:** two clones connected only by git can still both take one task and
 find out when they merge. That is a property of git, not something this hides.
+An `in_progress` value, owner or modification time is durable task state, not a
+liveness probe. Current execution requires a separately pollable runtime handle.
 
 The whole pattern — one task per session, the exit codes, the hooks, dead
 sessions, and the statuses never handed out unattended — is a guide the tool
