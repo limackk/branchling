@@ -2,3 +2,4 @@
 {"id":"01M1ZZ84TV57X164DMYMH34WW9","ts":"2026-09-08T07:38:17.307Z","task":"TL-381","field":"related_docs","from":[],"to":["README.md","scripts/run-loop.mjs"],"actor":"local:me","source":"manual","reason":"Linked the task contract to its public implementation context"}
 {"id":"01M20VP38GQ15351JE5PNESRY3","ts":"2026-09-08T15:55:14.576Z","task":"TL-381","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown"}
 {"id":"01M20VP38G4RDARR5N2RMWVBK5","ts":"2026-09-08T15:55:14.576Z","task":"TL-381","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown"}
+{"id":"01M22HWXX435FEZ6K46N46YZF0","ts":"2026-09-09T07:42:41.572Z","task":"TL-381","field":"status","from":"in_progress","to":"done","actor":"agent:codex","source":"done","reason":"proven"}

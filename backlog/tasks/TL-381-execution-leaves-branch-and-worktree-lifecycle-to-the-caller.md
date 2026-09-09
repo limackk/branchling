@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: "Evidence-gated product focus"
 priority: P1
-status: in_progress  # pending | in_progress | blocked | done | cancelled
+status: done  # pending | in_progress | blocked | done | cancelled
 owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-08
-updated: 2026-09-08
+updated: 2026-09-09
 blocked_by: [TL-377]
 blocks: []                         # ids this task will unblock
 related_docs:
@@ -73,12 +73,12 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] One foreground agent can receive a task, fail verification, retry and
+- [x] One foreground agent can receive a task, fail verification, retry and
       close only after evidence succeeds. [proof: execution-boundary]
-- [ ] No shipped command manages parallel workers or detached runs.
+- [x] No shipped command manages parallel workers or detached runs.
       [proof: execution-boundary]
-- [ ] Execution never creates, merges, switches or removes a branch or worktree.
+- [x] Execution never creates, merges, switches or removes a branch or worktree.
       [proof: execution-boundary]
-- [ ] Plan-aware execution and direct `next` use the same eligibility rules.
+- [x] Plan-aware execution and direct `next` use the same eligibility rules.
       [proof: execution-boundary]
-- [ ] The complete remaining suite passes. [proof: suite-green]
+- [x] The complete remaining suite passes. [proof: suite-green]

@@ -13,7 +13,6 @@ import { join } from "node:path";
 
 import { loadConfig } from "../config.mjs";
 import { contextBudget, tokensFromChars } from "../context-budget.mjs";
-import { WORKER_SCOPE_ENV } from "../worker-scope.mjs";
 import { isolateHome, REPO_ROOT } from "./_repo.mjs";
 
 isolateHome("context-budget-green-cost");
@@ -26,7 +25,7 @@ function fixture(lines) {
   execFileSync("git", ["init", "-q", "-b", "main", "."], { cwd: repo, stdio: "ignore" });
   const dir = join(repo, "backlog");
   const init = spawnSync(process.execPath, [CLI, "init", "--dir", dir, "--no-example"], {
-    encoding: "utf8", env: { ...process.env, [WORKER_SCOPE_ENV]: "" },
+    encoding: "utf8", env: process.env,
   });
   assert.equal(init.status, 0, init.stderr);
   const config = loadConfig(dir);
@@ -66,7 +65,7 @@ function runner(dir) {
   return (args) => {
     const r = spawnSync(process.execPath, [CLI, ...args, "--dir", dir], {
       encoding: "utf8", timeout: 120_000,
-      env: { ...process.env, NO_COLOR: "1", [WORKER_SCOPE_ENV]: "" },
+      env: { ...process.env, NO_COLOR: "1" },
     });
     assert.equal(r.status, 0, (r.stdout || "") + (r.stderr || ""));
     return String(r.stdout || "");
@@ -110,7 +109,7 @@ test("stats --context --json carries the measured green rows", () => {
   try {
     const r = spawnSync(process.execPath, [CLI, "stats", "--context", "--json", "--dir", fx.dir], {
       encoding: "utf8", timeout: 120_000,
-      env: { ...process.env, NO_COLOR: "1", [WORKER_SCOPE_ENV]: "" },
+      env: { ...process.env, NO_COLOR: "1" },
     });
     assert.equal(r.status, 0, r.stderr);
     const out = JSON.parse(r.stdout);
