@@ -1640,7 +1640,7 @@ export function parseCheckArgs(args) {
       // --help` works (TL-51), the error's job is to name the flag and point
       // the way, not to reprint the whole help — a message longer than the help
       // stops being a message.
-      throw new Error("unknown flag: " + a + "\nknown flags: " + CHECK_FLAGS.join(" "));
+      throw new Error("unknown flag: " + a + "\navailable: " + CHECK_FLAGS.join(" "));
     }
     files.push(a);
   }

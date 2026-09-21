@@ -26,7 +26,7 @@ import { loadConfigOrExit } from "./config.mjs";
 import { detectPrefixMismatch, prefixMismatchMessage } from "./task-id.mjs";
 import { resolveBacklogDirOrExit } from "./paths.mjs";
 import { buildFieldSpecs, extractMeta as sharedExtractMeta, normalizeValue, stripComment } from "./task-fields.mjs";
-import { MARK, color, errColor } from "./ui.mjs";
+import { MARK, color, errColor, refusal } from "./ui.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 
 
@@ -68,13 +68,11 @@ const BACKLOG_DIR = resolveBacklogDirOrExit({
     const a = argv[i];
     if (!a.startsWith("-")) {
       if (i > 0 && KNOWN.has(argv[i - 1])) continue; // the value of --root/--dir
-      console.error(`${N} build: unexpected argument: ` + a);
-      console.error("  available: --root <path> | --dir <path>");
+      console.error(refusal(N + " build", "unexpected argument: " + a, "--root <path> --dir <path>"));
       process.exit(2);
     }
     if (!KNOWN.has(a)) {
-      console.error(`${N} build: unknown flag: ` + a);
-      console.error("  available: --root <path> | --dir <path>");
+      console.error(refusal(N + " build", "unknown flag: " + a, "--root <path> --dir <path>"));
       process.exit(2);
     }
   }

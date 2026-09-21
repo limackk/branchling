@@ -174,7 +174,7 @@ export function parseAskArgs(args) {
       plan[key[a]] = value;
       continue;
     }
-    if (a.startsWith("-")) throw new Error("unknown flag: " + a + "\nknown flags: " + ASK_FLAGS.join(" "));
+    if (a.startsWith("-")) throw new Error("unknown flag: " + a + "\navailable: " + ASK_FLAGS.join(" "));
     if (plan.id) throw new Error("more than one task id: " + plan.id + " and " + a);
     plan.id = a;
   }

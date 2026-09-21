@@ -92,7 +92,7 @@ export function parsePrSummaryArgs(args) {
       if (!base) throw new Error("`--base` with no ref");
       continue;
     }
-    if (a.startsWith("-")) throw new Error("unknown flag: " + a + "\nknown flags: " + FLAGS.join(" "));
+    if (a.startsWith("-")) throw new Error("unknown flag: " + a + "\navailable: " + FLAGS.join(" "));
     throw new Error("unexpected argument: " + a + "\nthe branch is the one you are on; `--base` says what to compare it against");
   }
   return { base, cost, json };

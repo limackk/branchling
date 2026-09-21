@@ -74,7 +74,7 @@ export function parseTakeArgs(args) {
       continue;
     }
     if (a.startsWith("-")) {
-      throw new Error("unknown flag: " + a + "\nknown flags: " + TAKE_FLAGS.join(" "));
+      throw new Error("unknown flag: " + a + "\navailable: " + TAKE_FLAGS.join(" "));
     }
     if (plan.id) throw new Error("two task ids given: " + plan.id + " and " + a + " — take one task at a time");
     plan.id = a;

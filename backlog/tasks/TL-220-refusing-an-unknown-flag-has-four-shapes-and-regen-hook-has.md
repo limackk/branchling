@@ -6,24 +6,32 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P2                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude-opus-5
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1d                       # 30m | 2h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-03
-updated: 2026-09-03
+updated: 2026-09-21
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
+# REWRITTEN BEFORE THE WORK BEGAN (TL-260's finding about this block). The old
+# second entry, help-covers-flags, PASSED against the unchanged tree and proved
+# nothing about this task: that guard SKIPS every command whose refusal it
+# cannot parse, so the thirty-one commands that name no flags left it green.
+# The old first entry did fail, but it was an inline check of ONE command, and
+# the task's thesis is the SHAPE shared by forty. `refusal-shape.test.mjs` is
+# the entry that fails today: it asks every command in the table for its
+# refusal and asserts one anatomy, and `regen-hook` answers exit 0 in silence.
 verification:                      # HOW to check the task is really done
-  - id: regen-hook-refuses
-    bash: 'node scripts/cli.mjs regen-hook --zzz-not-a-flag </dev/null; test $? -eq 2'
-  - id: every-command-lists-its-flags
-    bash: "node --test scripts/tests/help-covers-flags.test.mjs"
+  - id: one-refusal-shape
+    bash: "node --test scripts/tests/refusal-shape.test.mjs"
   - id: suite-green
     bash: "node --test scripts/tests/*.test.mjs"
+  - id: every-command-lists-its-flags
+    bash: "node --test scripts/tests/help-covers-flags.test.mjs"
 ---
 
 ## Goal
@@ -107,8 +115,13 @@ turns that guard from a spot check into a rule.
 
 ## Acceptance criteria
 
-- [ ] `regen-hook` with an unknown flag exits 2 and writes nothing.
-      [proof: regen-hook-refuses]
-- [ ] Every command in the table names the flags it accepts when it refuses one,
-      in one wording. [proof: every-command-lists-its-flags]
-- [ ] The suite stays green. [proof: suite-green]
+- [x] `regen-hook` with an unknown flag exits 2 and writes nothing.
+      [proof: one-refusal-shape]
+- [x] Every command in the table answers an unknown argument in ONE anatomy —
+      the failure mark, the command as the user typed it, the sentence naming
+      which event it was, `available:` introducing the list, and the `--help`
+      that prints more. [proof: one-refusal-shape]
+- [x] `help-covers-flags.test.mjs` reaches every command in the table instead of
+      the eleven it reached, and says so in a positive control.
+      [proof: every-command-lists-its-flags]
+- [x] The suite stays green. [proof: suite-green]

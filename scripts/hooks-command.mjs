@@ -262,7 +262,7 @@ export function main(argv) {
   const sub = argv[0];
   if (SUBCOMMANDS.indexOf(sub) < 0) {
     console.error(failure(N + " hooks", sub ? "unknown subcommand: " + sub : "no subcommand",
-      ["known: " + SUBCOMMANDS.join(", ")], [N + " hooks --help"]));
+      ["available: " + SUBCOMMANDS.join(", ")], [N + " hooks --help"]));
     return 2;
   }
   const cli = takeDirFlag(argv.slice(1));
@@ -270,7 +270,7 @@ export function main(argv) {
   for (const a of cli.argv) {
     if (a === "--json") { plan.json = true; continue; }
     console.error(failure(N + " hooks " + sub, "unknown flag: " + a,
-      ["known flags: " + FLAGS.join(" ")], [N + " hooks --help"]));
+      ["available: " + FLAGS.join(" ")], [N + " hooks --help"]));
     return 2;
   }
   const root = cli.dir ? resolve(cli.dir) : process.cwd();

@@ -45,6 +45,7 @@ import { loadPlan } from "./plan.mjs";
 import { crossBranchState } from "./branch-scan.mjs";
 import { ANY_TASK_ID } from "./task-id.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
+import { refusal } from "./ui.mjs";
 import {
   listTaskFiles,
   reconcile,
@@ -118,15 +119,13 @@ for (let i = 0; i < argv.length; i++) {
   if (!a.startsWith("-")) {
     // The preceding flag's value, not a separate argument.
     if (i > 0 && FLAGS_WITH_VALUE.indexOf(argv[i - 1]) >= 0) continue;
-    console.error(`${N} serve: unexpected argument: ` + a);
-    console.error("  the server accepts: " + KNOWN_FLAGS.join(" ") + " --dir <path>");
-    console.error(`  looking for a different command? \`${N} --help\``);
+    console.error(refusal(N + " serve", "unexpected argument: " + a,
+      KNOWN_FLAGS.join(" ") + " --dir <path>"));
     process.exit(2);
   }
   if (KNOWN_FLAGS.indexOf(a) < 0) {
-    console.error(`${N} serve: unknown flag: ` + a);
-    console.error("  available: " + KNOWN_FLAGS.join(" ") + " --dir <path>");
-    console.error(`  looking for a different command? \`${N} --help\``);
+    console.error(refusal(N + " serve", "unknown flag: " + a,
+      KNOWN_FLAGS.join(" ") + " --dir <path>"));
     process.exit(2);
   }
 }

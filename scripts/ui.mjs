@@ -229,6 +229,32 @@ export function fail(command, problem, details, next, code = 2) {
   return code;
 }
 
+/**
+ * ONE SHAPE for refusing an argument a command does not accept (TL-220).
+ *
+ * WHY A FUNCTION AND NOT A CONVENTION. The convention existed — it is written
+ * out in the output-style reference, three lines: what happened, what was
+ * expected, what to paste next. Written as a convention it produced FOUR
+ * shapes, because every command assembled it by hand: `available:` in eleven,
+ * `known flags:` in sixteen, `known:` in three, a bare `usage:` in five, and in
+ * `regen-hook` nothing at all. The wording is what a machine reads the accepted
+ * set out of (`scripts/tests/help-covers-flags.test.mjs`), so four wordings
+ * meant three quarters of the table could not be asked what it accepts.
+ *
+ * THE SENTENCE NAMES THE EVENT, the anatomy does not vary. `unknown flag:` for
+ * something beginning with `-`, `unknown subcommand:` where a subcommand was
+ * expected, `unexpected argument:` where nothing was. Those are three different
+ * mistakes and collapsing them would cost the reader the one word that says
+ * which one they made; `available:` introduces the alternatives in all three.
+ *
+ * @param {string} command the command AS THE USER TYPED IT, e.g. "<product> take"
+ * @param {string} problem the sentence naming the event, e.g. "unknown flag: --zzz"
+ * @param {string} available the alternatives, already spelled as the user types them
+ */
+export function refusal(command, problem, available, opts) {
+  return failure(command, problem, ["available: " + available], [command + " --help"], opts);
+}
+
 // ──────────────────────────────────────────────────────────────────────────
 // Colour of vocabulary values
 // ──────────────────────────────────────────────────────────────────────────

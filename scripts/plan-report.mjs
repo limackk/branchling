@@ -43,7 +43,7 @@ import { readHistory } from "./history.mjs";
 import { EDIT_SUBCOMMANDS, runPlanEdit } from "./plan-write.mjs";
 import { reportPlanErrors } from "./check-backlog-plan.mjs";
 import { readTaskMetas } from "./task-io.mjs";
-import { MARK, color, failure, heading, statusPaint, table, width } from "./ui.mjs";
+import { MARK, color, failure, heading, refusal, statusPaint, table, width } from "./ui.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -177,7 +177,7 @@ function main(argv) {
   if (first !== undefined && !first.startsWith("-")) {
     if (EDIT_SUBCOMMANDS.indexOf(first) < 0) {
       console.error(failure(N + " plan", "unknown subcommand: " + first,
-        ["known: " + EDIT_SUBCOMMANDS.join(", ") + ", or no subcommand at all to READ the plan"],
+        ["available: " + EDIT_SUBCOMMANDS.join(", ") + ", or no subcommand at all to READ the plan"],
         [N + " plan --help"]));
       return 2;
     }
@@ -187,8 +187,8 @@ function main(argv) {
   const cli = takeDirFlag(argv);
   for (const a of cli.argv) {
     if (KNOWN_FLAGS.indexOf(a) < 0) {
-      console.error(`${N} plan: unknown flag: ` + a);
-      console.error("  available: " + KNOWN_FLAGS.join(" ") + " --dir <path>");
+      console.error(refusal(N + " plan", "unknown flag: " + a,
+        KNOWN_FLAGS.join(" ") + " --dir <path>"));
       return 2;
     }
   }

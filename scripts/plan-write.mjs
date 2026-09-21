@@ -557,7 +557,7 @@ if (process.argv[1] && process.argv[1].endsWith("plan-write.mjs")) {
   const sub = process.argv[2];
   if (EDIT_SUBCOMMANDS.indexOf(sub) < 0) {
     console.error(failure(N + " plan", sub ? "unknown subcommand: " + sub : "no subcommand",
-      ["known: " + EDIT_SUBCOMMANDS.join(", ")], [N + " plan --help"]));
+      ["available: " + EDIT_SUBCOMMANDS.join(", ")], [N + " plan --help"]));
     process.exit(2);
   }
   process.exit(runPlanEdit(sub, process.argv.slice(3)));

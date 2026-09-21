@@ -40,7 +40,7 @@ import { ATTRIBUTE_RULES, IGNORE_RULES, hasUnionMerge, insideGitRepo, trackedVie
 import { SNAPSHOT_FILE, loadSnapshot, readMigrations, reconcile } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
-import { MARK as UI_MARK, color, errColor, heading } from "./ui.mjs";
+import { MARK as UI_MARK, color, errColor, heading, refusal } from "./ui.mjs";
 import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { summarize } from "./stats.mjs";
 import { vocabularyUsage } from "./task-fields.mjs";
@@ -454,8 +454,8 @@ export function main(argv) {
   const cli = takeDirFlag(argv);
   for (const a of cli.argv) {
     if (KNOWN_FLAGS.indexOf(a) < 0) {
-      console.error(N + " doctor: unknown flag: " + a);
-      console.error("  available: " + KNOWN_FLAGS.join(" ") + " --dir <path>");
+      console.error(refusal(N + " doctor", "unknown flag: " + a,
+        KNOWN_FLAGS.join(" ") + " --dir <path>"));
       return 2;
     }
   }

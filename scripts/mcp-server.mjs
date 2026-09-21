@@ -44,6 +44,7 @@ import { fileURLToPath } from "node:url";
 import { COMMANDS, describeFlags } from "./cli.mjs";
 import { TOPIC_NAMES } from "./instructions.mjs";
 import { PRODUCT_NAME as N, PRODUCT_VERSION } from "./product.mjs";
+import { refusal } from "./ui.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CLI = join(HERE, "cli.mjs");
@@ -281,8 +282,9 @@ export function main(argv) {
   if (rest.length) {
     // The same rule as everywhere else: an unknown argument FAILS. A server that
     // started anyway would be serving a backlog nobody chose.
-    console.error(`${N} mcp: unknown argument: ` + rest.join(" "));
-    console.error("  usage: " + USAGE.split("\n")[0]);
+    console.error(refusal(N + " mcp",
+      (rest[0].startsWith("-") ? "unknown flag: " : "unexpected argument: ") + rest.join(" "),
+      "--dir <path>"));
     return 2;
   }
   return listen({ dir });

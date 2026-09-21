@@ -84,7 +84,7 @@ export function parseConformanceArgs(args) {
       continue;
     }
     if (arg.startsWith("-")) throw new Error("unknown flag: " + arg + "\navailable: " + CONFORMANCE_FLAGS.join(" "));
-    throw new Error("unexpected argument: " + arg + "\nusage: " + N + " conformance --adapter <executable>");
+    throw new Error("unexpected argument: " + arg + "\navailable: " + CONFORMANCE_FLAGS.join(" "));
   }
   if (plan.help) return plan;
   if (!plan.adapter) throw new Error("`--adapter <executable>` is required");
@@ -199,7 +199,8 @@ export function run(argv) {
   try {
     plan = parseConformanceArgs(argv);
   } catch (error) {
-    console.error(failure(N + " conformance", error.message, [], [N + " conformance --help"]));
+    const [head, ...rest] = error.message.split("\n");
+    console.error(failure(N + " conformance", head, rest, [N + " conformance --help"]));
     return 2;
   }
   if (plan.help) {

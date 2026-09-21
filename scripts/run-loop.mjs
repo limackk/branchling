@@ -186,7 +186,7 @@ export function parseRunArgs(args) {
       continue;
     }
     if (a.startsWith("-")) {
-      throw new Error("unknown flag: " + a + "\nknown flags: " + RUN_FLAGS.join(" "));
+      throw new Error("unknown flag: " + a + "\navailable: " + RUN_FLAGS.join(" "));
     }
     throw new Error(
       "unexpected argument: " + a + "\n" +

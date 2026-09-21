@@ -27,6 +27,7 @@ import { taskIdPatterns } from "./task-id.mjs";
 import { backlogPaths, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { loadPlan } from "./plan.mjs";
 import { PRODUCT_NAME as N, STORAGE_KEY_PREFIX } from "./product.mjs";
+import { refusal } from "./ui.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -3779,13 +3780,11 @@ if (invokedDirectly) {
       const a = argv[i];
       if (!a.startsWith("-")) {
         if (i > 0 && argv[i - 1] === "--dir") continue; // the value of --dir
-        console.error(`${N} viewer: unexpected argument: ` + a);
-        console.error("  available: --dir <path>");
+        console.error(refusal(N + " viewer", "unexpected argument: " + a, "--dir <path>"));
         process.exit(2);
       }
       if (!KNOWN.has(a)) {
-        console.error(`${N} viewer: unknown flag: ` + a);
-        console.error("  available: --dir <path>");
+        console.error(refusal(N + " viewer", "unknown flag: " + a, "--dir <path>"));
         process.exit(2);
       }
     }

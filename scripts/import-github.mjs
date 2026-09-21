@@ -170,7 +170,7 @@ export function parseImportArgs(args) {
       }
       continue;
     }
-    if (a.startsWith("-")) throw new Error("unknown flag: " + a + "\nknown flags: " + FLAGS.join(" "));
+    if (a.startsWith("-")) throw new Error("unknown flag: " + a + "\navailable: " + FLAGS.join(" "));
     throw new Error(
       "unexpected argument: " + a + "\nthe issues come in on stdin: `gh issue list --json … | " + N + " import --from github`"
     );

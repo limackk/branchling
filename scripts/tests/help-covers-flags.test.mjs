@@ -23,9 +23,16 @@
  * the main help, as working on every command. The exclusion is not assumed: the
  * test below fails if the main help stops saying so.
  *
- * THE EXEMPTIONS ARE NAMED, not silent. Four other commands carry the same
- * defect; they are listed with the task that will settle them, so a fifth
- * cannot appear without this guard failing.
+ * THE EXEMPTIONS ARE NAMED, not silent. Six commands carry the same defect;
+ * they are listed with the task that will settle them, so a seventh cannot
+ * appear without this guard failing.
+ *
+ * ITS REACH IS NOW THE WHOLE TABLE (TL-220). Until every command refused in one
+ * shape this guard could only ask the eleven that printed `available:`, and it
+ * SKIPPED the rest — which is to say it was green while thirty-one commands
+ * could not be asked what they accept at all. The positive control below fails
+ * if a single command stops answering, because a command dropping out of reach
+ * looks from here exactly like a command with nothing to hide.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -52,20 +59,27 @@ const GLOBAL_FLAGS = new Set(["--dir", "--help", "-h"]);
  * Flags accepted but not yet declared, per command, each awaiting TL-217.
  * TL-194 documented `query`; documenting the rest is a separate change with its
  * own prose to write, and inflating this one would have blurred both.
+ *
+ * `plan-from` and `run` are TL-220's finding: they were outside this guard's
+ * reach for as long as their refusal said `known flags:`, so the defect TL-194
+ * measured in four commands was in six.
  */
 const UNDOCUMENTED = {
   build: ["--root"],
   board: ["--paths", "--registry"],
   history: ["--quiet"],
   init: ["--no-gitignore", "--no-example", "--no-nudge", "--skills"],
+  "plan-from": ["--from", "--json"],
+  run: ["--agent-for", "--profile-for", "--delegation", "--allow-uncontrolled-delegation"],
 };
 
 /**
  * The flags a command accepts, taken from its own refusal — or `null` when the
- * command does not answer an unknown flag with a list. Refusing IS required of
- * every command and is proved elsewhere (`flag-validation.test.mjs`); printing
- * the available set alongside the refusal is not, so a command that only says
- * "unknown flag" is out of this guard's reach rather than a failure of it.
+ * command does not answer with a list, which since TL-220 is a DEFECT rather
+ * than a gap in this guard's reach: every command in the table names its
+ * accepted set in one wording, and `refusal-shape.test.mjs` holds that. The
+ * positive control below turns a `null` into a failure here too, so a command
+ * cannot leave this comparison by changing its own error message.
  */
 function accepted(name) {
   const r = spawnSync(process.execPath, [CLI, name, "--zzz-not-a-flag"], {
@@ -86,14 +100,17 @@ function declared(name) {
 
 // ── Positive controls, first ──────────────────────────────────────────────
 
-test("positive control: commands really do answer an unknown flag with a list", () => {
-  // Every loop below skips a command that answers `null`. If the refusal format
+test("positive control: EVERY command answers an unknown flag with a list", () => {
+  // The loop below skips a command that answers `null`. If the refusal format
   // changed, or the parse broke, this whole file would iterate over nothing and
-  // pass while proving nothing.
-  const listing = NAMES.filter((n) => accepted(n) !== null);
-  assert.ok(listing.length >= 8,
-    "expecting several commands to list their flags on a refusal, got " + listing.length);
-  assert.ok(listing.includes("query"), "query no longer lists its flags on a refusal");
+  // pass while proving nothing — and before TL-220 it iterated over a quarter of
+  // the table for exactly that reason. Silent, because a skipped command and a
+  // clean command are indistinguishable from inside the loop.
+  const silent = NAMES.filter((n) => accepted(n) === null);
+  assert.deepEqual(silent, [],
+    "commands out of this guard's reach — their refusal names no available set:\n  " +
+    silent.join("\n  "));
+  assert.ok(NAMES.length >= 20, "expecting a table of commands, got " + NAMES.length);
 });
 
 test("positive control: a flag removed from the help is CAUGHT", () => {

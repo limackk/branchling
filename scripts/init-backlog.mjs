@@ -35,7 +35,7 @@ import { loadConfig } from "./config.mjs";
 import { TEMPLATE_FILENAME, backlogPaths, repositoryRoot } from "./paths.mjs";
 import { installSkills, renderInstall } from "./install-skills.mjs";
 import { PRODUCT_NAME as N, BLOCK_MARKER_NAME as BLOCK_LABEL } from "./product.mjs";
-import { failure } from "./ui.mjs";
+import { failure, refusal } from "./ui.mjs";
 import { createTask, slugify } from "./new-task.mjs";
 import { ensureNudge } from "./instructions.mjs";
 import { spawnSync } from "node:child_process";
@@ -450,9 +450,8 @@ export function main(argv) {
     (a, i) => a.startsWith("-") && a !== "--dir" && BOOL_FLAGS.indexOf(a) < 0 && argv[i - 1] !== "--dir"
   );
   if (unknown.length) {
-    console.error(`${N} init: unknown flag: ` + unknown[0]);
-    console.error(`  usage: ${N} init --dir <path> [--no-gitignore] [--no-example] [--no-nudge] [--skills]`);
-    console.error("  available: --dir <path> " + BOOL_FLAGS.join(" "));
+    console.error(refusal(N + " init", "unknown flag: " + unknown[0],
+      "--dir <path> " + BOOL_FLAGS.join(" ")));
     return 2;
   }
 

@@ -62,7 +62,7 @@ import { modifiedFilesCached, repoRoot } from "./modified-files.mjs";
 import { resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { taskIdScanner } from "./task-id.mjs";
-import { MARK, color, failure, heading, table } from "./ui.mjs";
+import { MARK, color, failure, refusal, heading, table } from "./ui.mjs";
 
 const KNOWN_FLAGS = ["--json", "--dir"];
 const VALUE_FLAGS = ["--command", "--report", "--mine"];
@@ -295,8 +295,13 @@ export function main(argv, io = {}) {
     unknown.push(arg);
   }
   if (unknown.length) {
-    console.error(failure(N + " red", "unexpected argument: " + unknown.join(" "),
-      ["available: " + KNOWN_FLAGS.concat(VALUE_FLAGS).join(" ")], [N + " red --help"]));
+    // The sentence names WHICH mistake was made (TL-220): a word beginning with
+    // `-` is a flag this command does not have, anything else is an argument it
+    // does not take at all. Calling both "unexpected argument" sent a reader
+    // looking for a positional this command has never accepted.
+    console.error(refusal(N + " red",
+      (unknown[0].startsWith("-") ? "unknown flag: " : "unexpected argument: ") + unknown.join(" "),
+      KNOWN_FLAGS.concat(VALUE_FLAGS).join(" ")));
     return 2;
   }
   if (command !== null && reportPath !== null) {

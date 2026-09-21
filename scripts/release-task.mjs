@@ -22,7 +22,7 @@ export function parseReleaseArgs(args) {
       plan[arg.slice(2)] = value;
       continue;
     }
-    if (arg.startsWith("-")) throw new Error("unknown flag: " + arg + "\nknown flags: " + RELEASE_FLAGS.join(" "));
+    if (arg.startsWith("-")) throw new Error("unknown flag: " + arg + "\navailable: " + RELEASE_FLAGS.join(" "));
     if (plan.id) throw new Error("two task ids: " + plan.id + ", " + arg);
     plan.id = arg;
   }
@@ -40,7 +40,13 @@ export function run(argv) {
     return code;
   };
   try { plan = parseReleaseArgs(argv); }
-  catch (e) { return refuse(e.message, [], 2, "usage"); }
+  catch (e) {
+    // The message's SECOND line is the available set, and it belongs in the
+    // details where `failure` indents it (TL-220) — handed over whole it printed
+    // flush left and stopped looking like the other thirty-nine refusals.
+    const [head, ...rest] = e.message.split("\n");
+    return refuse(head, rest, 2, "usage");
+  }
   const actor = resolveActor(plan.actor);
   if (!isValidActor(actor)) return refuse("the actor `" + actor + "` has no valid namespace", ["Use one of: " + ACTOR_NAMESPACES.map((n) => n + ":<name>").join(" | ")], 2, "usage");
   let root;

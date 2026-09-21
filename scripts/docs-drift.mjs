@@ -130,7 +130,7 @@ export function parseDriftArgs(args) {
       signals.push(name);
       continue;
     }
-    if (a.startsWith("-")) throw new Error("unknown flag: " + a + "\nknown flags: " + FLAGS.join(" "));
+    if (a.startsWith("-")) throw new Error("unknown flag: " + a + "\navailable: " + FLAGS.join(" "));
     throw new Error("unexpected argument: " + a + "\nthe document is `--document <path>`");
   }
   return { document, signals: signals.length ? [...new Set(signals)] : DETECTORS.slice(), seed, json };

@@ -102,7 +102,7 @@ export function parseAdapterArgs(args) {
       if (!prompt) throw new Error("`--prompt` with no file");
       continue;
     }
-    if (a.startsWith("-")) throw new Error("unknown flag: " + a + "\nknown flags: " + FLAGS.join(" "));
+    if (a.startsWith("-")) throw new Error("unknown flag: " + a + "\navailable: " + FLAGS.join(" "));
     if (spec) throw new Error("more than one description: " + spec + " and " + a);
     spec = a;
   }
