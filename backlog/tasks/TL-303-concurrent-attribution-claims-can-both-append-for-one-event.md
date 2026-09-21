@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P2                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-06
-updated: 2026-09-06
+updated: 2026-09-21
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs:
@@ -64,9 +64,9 @@ be refused before its line is appended.
 
 ## Acceptance criteria
 
-- [ ] Several concurrent claims for one event append exactly one attribution
+- [x] Several concurrent claims for one event append exactly one attribution
       entry. [proof: concurrent-claim]
-- [ ] Every losing process is refused and the original event remains unchanged.
+- [x] Every losing process is refused and the original event remains unchanged.
       [proof: concurrent-claim]
-- [ ] Existing attribution and history behavior remains green.
+- [x] Existing attribution and history behavior remains green.
       [proof: suite-green]
