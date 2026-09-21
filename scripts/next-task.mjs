@@ -329,10 +329,14 @@ export function heldElsewhere(task, handedOut) {
  *            claiming it here would manufacture the divergence. So the local
  *            status has to be one of this call's own.
  *
- * THE PLAN NARROWS IT AND NEVER REORDERS IT (TL-183). `filters.planIds` keeps
- * only the tasks of the wave the caller resolved; INSIDE the wave the policy
- * above still decides, because a wave is a batch and the plan makes no claim
- * about the order of its members.
+ * THE PLAN NARROWS IT AND THEN ORDERS WHAT IS LEFT (TL-257, superseding the
+ * half of TL-183 that said a wave makes no claim about the order of its
+ * members). `filters.planIds` keeps only the tasks of the wave the caller
+ * resolved, IN THE ORDER THE WAVE LISTS THEM, and that order ranks the
+ * candidates: a wave is an order, and inside one it is the only place an author
+ * can say that B reads A's correction — `priority:` is a property of a task and
+ * not of its position in a sequence. The policy above still ranks everything
+ * the plan does not schedule, which is every call without `--plan`.
  *
  * TWO QUANTITIES, TWO NAMES (TL-219). What the wave gate steps over is counted
  * twice, because a reader asks two different questions about it:
@@ -483,6 +487,13 @@ export function selectCandidates(records, config, filters, now) {
   // correctly leaves nothing: falling through to unplanned work would answer a
   // question the caller did not ask.
   //
+  // ITS ITERATION ORDER IS PART OF THE ARGUMENT, NOT AN ACCIDENT (TL-257): the
+  // caller builds the set from the wave's own list, so the insertion order of a
+  // `Set` is the order its author wrote. That is what ranks the candidates
+  // below. A caller that built the set from anything else would be handing this
+  // function a wave it had reordered, which is a defect in the caller — there
+  // is no second field to keep in step, and no order to lose.
+  //
   // BOTH COUNTS ARE TAKEN HERE, past the two gates above (TL-219). That order
   // is deliberate and unchanged: a task this caller may never be handed is not
   // work the plan stepped over, and subtracting one count from the other stays
@@ -521,6 +532,21 @@ export function selectCandidates(records, config, filters, now) {
     }
   }
   sortTasks(fresh, "priority", config);
+  // AND THEN THE WAVE'S OWN ORDER, WHICH OUTRANKS THE PRIORITY (TL-257). It is
+  // applied AFTER the priority sort rather than instead of it, so a wave that
+  // lists a task the tree does not hold, and a `fresh` pool built from two
+  // pools, still come out deterministically ranked. `plan` prints this order and
+  // the dispatcher now follows it; before this, the first task of a wave was one
+  // id to the reader and another to the run.
+  if (filters.planIds) {
+    const rank = new Map();
+    for (const id of filters.planIds) rank.set(id, rank.size);
+    const at = (t) => {
+      const i = rank.get(String(t.id).toUpperCase());
+      return i === undefined ? rank.size : i;
+    };
+    fresh.sort((a, b) => at(a) - at(b));
+  }
 
   // A judgement this same actor already made about this same task. It is a
   // fact READ FROM THE TREE, not a rule a caller keeps to itself: selection

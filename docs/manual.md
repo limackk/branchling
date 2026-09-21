@@ -260,9 +260,12 @@ next up (wave 2 — Consumers):
 
 **Asking the dispatcher to follow it** is `--plan`, on `next` and on `run`. The
 queue then holds only what the plan schedules, and only the earliest wave still
-holding an open task; inside that wave priority and id decide as they always
-did, because a wave is a batch and the plan makes no claim about the order of
-its members. `run --plan --dry-run` prints the order under its wave names.
+holding an open task; inside that wave the tasks are handed out IN THE ORDER THE
+WAVE LISTS THEM, which outranks priority and id. A wave is an order, and the
+sequence its author wrote is the only place they can say that one member reads
+another's correction — `priority:` is a property of a task, not of its position.
+Priority still ranks every queue the plan is not being followed for.
+`run --plan --dry-run` prints the order under its wave names.
 
 ```
 $ branchling run --plan --dry-run

@@ -234,7 +234,16 @@ test("the wave moves on by itself once its tasks are closed", () => {
   assert.equal(taken(cli(["next", "--dir", f.backlog, "--plan", "--json"], f.env)), f.ids.late);
 });
 
-test("inside one wave the existing policy still decides", () => {
+test("inside one wave the AUTHORED order decides, and it outranks the priority", () => {
+  // TL-257 REVERSED THIS CASE, by a decision recorded in
+  // `backlog/history/TL-257.jsonl` rather than by a patch. It used to assert
+  // that the plan left the priority policy alone inside a wave — which is what
+  // made `plan` and `run --plan` name two different first tasks for one wave.
+  // A wave is an order; the sequence its author wrote is the only place a
+  // dependency that is not a `blocked_by` can be stated, and `priority:` is a
+  // property of a task and not of its position. The case is kept here, inverted,
+  // so the reversal is visible to anybody reading the file rather than silently
+  // deleted.
   const f = fixture([
     { key: "low", title: "Low priority member of the wave", priority: "P3" },
     { key: "high", title: "High priority member of the wave", priority: "P1" },
@@ -243,9 +252,13 @@ test("inside one wave the existing policy still decides", () => {
   writePlan(f.backlog, [["Batch", [f.ids.low, f.ids.high]], ["Later", [f.ids.outside]]]);
   assert.equal(
     taken(cli(["next", "--dir", f.backlog, "--plan", "--json"], f.env)),
-    f.ids.high,
-    "the plan re-ranked the members of one wave instead of leaving the policy alone",
+    f.ids.low,
+    "the wave was re-ranked by priority, so its first task is not the one `plan` prints first",
   );
+  // POSITIVE CONTROL: priority still ranks the same tree asked without a plan,
+  // so what changed is the plan's authority over its own members and nothing
+  // wider. `outside` is the P0 and is in no wave the queue is following here.
+  assert.equal(taken(cli(["next", "--dir", f.backlog, "--json"], f.env)), f.ids.outside);
 });
 
 test("an open task the plan does not schedule is never handed out, and is counted", () => {
