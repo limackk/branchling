@@ -878,7 +878,10 @@ function contractProbe(file, cwd) {
  *     contract it is measured by.
  *   · `already-closed` — the task is finished. `closed-elsewhere` rather than
  *     `needs-person` because nobody is needed: it is the outcome TL-191 gave the
- *     same situation found one step later, at the stuck-status write.
+ *     same situation found one step later, at the stuck-status write. This one
+ *     is ANSWERED BEFORE THE MAP IS CONSULTED (TL-349), because its ending
+ *     depends on WHO closed the task and the map cannot ask; the entry stays so
+ *     that this remains one complete statement of which refusals are terminal.
  *
  * Everything else stays retryable, including a contract that genuinely failed.
  */
@@ -951,6 +954,40 @@ function claimAfterAttempt(ctx, task) {
   const role = String(record.role || "").trim();
   const served = !owner && role && role !== String(task.role || "").trim() && !!handFor(ctx.plan, role);
   return { ours: false, owner, role, toRole: served ? role : null, status: record.status };
+}
+
+/**
+ * THE ACTORS THIS RUN HANDED THE TASK TO — plural, and that is the whole point
+ * (TL-349).
+ *
+ * The loop claims a task under ONE actor, its own, and for a scalar `--agent`
+ * that is also the identity the hand closes under, because the hand is a
+ * command running as the run. A PROFILE is not: it publishes its own
+ * `agent:<name>` actor, which is what its agent passes to `done`, and which is
+ * deliberately different from the loop's. Comparing the closing actor against
+ * `ctx.actor` alone therefore filed every profile's own success as somebody
+ * else's closure — measured on the TL-225 profile run of 2026-09-07.
+ *
+ * The set stays SMALL on purpose: the run's actor and the actor of the hand
+ * that worked THIS task, and nothing else. Widening it to "any `agent:`" would
+ * turn the collision TL-191 protects into a closure this run takes credit for.
+ */
+function handedTo(ctx, hand) {
+  const profile = hand && hand.kind === "profile" ? hand.profile : null;
+  return [String(ctx.actor || "").trim(), String(profile && profile.actor || "").trim()].filter(Boolean);
+}
+
+/** The archived status a task carries NOW and who is recorded as having put it
+ *  there — read from the file and the append-only log, writing nothing. Null
+ *  when the task is not archived, which is the case where there is no closure
+ *  to account for at all. */
+function archivedNow(root, config, id) {
+  const archived = new Set(config.archivedStatuses || []);
+  const paths = backlogPaths(root);
+  const record = readTaskRecords(paths.tasksDir, config.taskId.file)
+    .find((t) => String(t.id).toUpperCase() === String(id).toUpperCase());
+  if (!record || !archived.has(record.status)) return null;
+  return { status: record.status, closedBy: archivedBy(root, record.id, archived) };
 }
 
 /** A local adapter path may identify a person, so execution receipts retain
@@ -1149,6 +1186,30 @@ async function workOne(ctx, task) {
     }
     const verdict = parseJson(closing.stdout) || {};
     const kind = String(verdict.refusalKind || "");
+    // THE ENDING IS DECIDED HERE, WHERE THE HAND IS KNOWN (TL-349). This refusal
+    // says the task is already finished, and the only remaining question is WHO
+    // finished it — a question the outer accounting used to answer from
+    // `ctx.actor` alone, which cannot recognise a profile's own actor. Nothing
+    // is written: the closure is a proven fact and the run reads it, exactly as
+    // TL-191 requires. Deciding it here also means the loop never reaches the
+    // stuck-status write for this task, so the contract is not paid for twice.
+    if (kind === "already-closed") {
+      const seen = archivedNow(ctx.root, ctx.config, task.id);
+      const ours = seen && seen.closedBy && handedTo(ctx, task.hand).includes(seen.closedBy);
+      appendFileSync(logPath, "\n=== already closed by " +
+        ((seen && seen.closedBy) || "nobody the log names") + "\n", "utf8");
+      return result({
+        id: task.id, outcome: ours ? "closed-by-agent" : "closed-elsewhere",
+        attempts, ms: Date.now() - started, log: logPath, refusalKind: kind,
+        status: seen ? seen.status : undefined,
+        closedBy: (seen && seen.closedBy) || undefined,
+        detail: ours
+          ? task.id + " was closed by " + seen.closedBy + ", a hand this run handed it to — `" +
+            N + " done` had nothing left to do"
+          : task.id + " reached `status: " + ((seen && seen.status) || "an archived status") +
+            "` while this run was working on it",
+      });
+    }
     if (TERMINAL_REFUSALS[kind]) {
       return result({
         id: task.id, outcome: TERMINAL_REFUSALS[kind], attempts, ms: Date.now() - started, log: logPath,
@@ -1686,6 +1747,20 @@ export async function run(argv) {
     }
     if (result.outcome === "closed") {
       tally.closed++;
+    } else if (result.outcome === "closed-by-agent" || result.outcome === "closed-elsewhere") {
+      // THE HAND ALREADY CLOSED IT, and `workOne` has read WHO from the log
+      // (TL-349). Nothing is parked and nothing is written: the status in the
+      // file is a proven fact this run declined to touch (TL-191). Only the
+      // reservation goes back — `done` releases the one its own closure took,
+      // but a closure made by a hand under a DIFFERENT actor leaves this run's
+      // claim reserved until its TTL, invisible to the very next run.
+      if (result.outcome === "closed-by-agent") {
+        tally.closed++;
+        tally.closedByAgent++;
+      } else {
+        tally.closedElsewhere++;
+      }
+      releaseLock({ root, taskId: task.id, actor });
     } else if (result.outcome === "handed-on") {
       // NOTHING TO PARK AND NOTHING TO RELEASE (TL-271): `handoff` cleared the
       // owner and gave the reservation back itself. The task is `pending` for a
@@ -1734,7 +1809,12 @@ export async function run(argv) {
         // itself does not change: the run still writes nothing over a proven
         // fact, and it is only the accounting that learns to tell the two
         // endings apart.
-        if (blocked.closedBy && blocked.closedBy === actor) {
+        // THE SAME QUESTION AND THEREFORE THE SAME ANSWER as the already-closed
+        // refusal above (TL-349): the hand this run gave the task to may publish
+        // its own actor, so the comparison is against the set, not the loop's
+        // actor alone. A run that exhausted its attempts and only then met a
+        // closure made by its own profile was reading the other result here.
+        if (blocked.closedBy && handedTo(ctx, hand).includes(blocked.closedBy)) {
           tally.closed++;
           tally.closedByAgent++;
           result.outcome = "closed-by-agent";

@@ -1,1 +1,4 @@
 {"id":"01M1XYJT3TRKYA1YW4WKHYK26B","ts":"2026-09-07T12:48:09.338Z","task":"TL-349","field":"__created__","from":"","to":"Run recognises a profile agent that closes its own task","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M32H8Z0PYT3BENZVH1ARJS9Z","ts":"2026-09-21T17:47:29.174Z","task":"TL-349","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M32H8Z0P49RFWCXJ8Z2HP9ZN","ts":"2026-09-21T17:47:29.174Z","task":"TL-349","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M32HT2TM0FCP4434J982JGBC","ts":"2026-09-21T17:56:50.132Z","task":"TL-349","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

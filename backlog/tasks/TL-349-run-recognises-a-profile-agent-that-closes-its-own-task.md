@@ -6,20 +6,29 @@ labels: [run, agents, observability]
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-07
-updated: 2026-09-07
+updated: 2026-09-21
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
 verification:                      # HOW to check the task is really done
+  # REWRITTEN BEFORE THE WORK STARTED. The first block named
+  # `scripts/tests/run-agent-profiles.test.mjs`, a path that does not exist —
+  # `node --test` ignores a missing file silently, so the entry passed green
+  # against an unchanged tree and proved nothing about this defect. The entry
+  # below names the file that reproduces it: it fails on today's code with
+  # `tally.closed 0 !== 1`, because a profile publishes its own actor and the
+  # accounting compared the closing actor against the loop's alone.
+  - id: profile-closes-own-task
+    bash: "node --test scripts/tests/run-profile-closes-own-task.test.mjs"
   - id: run-suite
-    bash: "node --test scripts/tests/run.test.mjs scripts/tests/run-agent-profiles.test.mjs"
+    bash: "node --test scripts/tests/run.test.mjs scripts/tests/run-closed-by-agent.test.mjs scripts/tests/run-terminal-refusal.test.mjs scripts/tests/run-stuck-status.test.mjs scripts/tests/run-generalist-profile.test.mjs"
 ---
 
 ## Goal
@@ -68,9 +77,11 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] A profile agent that closes its own task is reported as
-  `closed-by-agent` and counted as closed. [proof: run-suite]
-- [ ] A task closed by another actor remains `closed-elsewhere` and is never
-  overwritten. [proof: run-suite]
-- [ ] The run does not invoke task verification a second time after observing
-  the agent-owned archived status. [proof: run-suite]
+- [x] A profile agent that closes its own task is reported as
+  `closed-by-agent` and counted as closed. [proof: profile-closes-own-task]
+- [x] A task closed by another actor remains `closed-elsewhere` and is never
+  overwritten. [proof: profile-closes-own-task]
+- [x] The run does not invoke task verification a second time after observing
+  the agent-owned archived status. [proof: profile-closes-own-task]
+- [x] The scalar hand, the stuck-status write and the terminal-refusal map
+  still end their tasks where they did. [proof: run-suite]
