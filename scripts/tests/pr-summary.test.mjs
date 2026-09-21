@@ -298,16 +298,10 @@ test("outside git it answers with a complete envelope, not a crash", () => {
   assert.match(doc.reason, /not a git repository/);
 });
 
-// ── The transport ─────────────────────────────────────────────────────────
-
-test("the example workflow is checkout, run, comment — and keeps the full history", () => {
-  const yml = readFileSync(join(HERE, "..", "..", "examples", "pr-summary.yml"), "utf8");
-  assert.match(yml, /fetch-depth: 0/, "a shallow checkout has no base to compare against");
-  assert.match(yml, /pr-summary/);
-  assert.match(yml, /branchling-pr-summary/, "no marker means a new comment on every push");
-  // Only what the job RUNS counts — the file explains `--cost` in a comment on
-  // purpose, and a test that could not tell the two apart would forbid
-  // documenting the flag at all.
-  const commands = yml.split("\n").filter((l) => !l.trim().startsWith("#"));
-  assert.ok(!commands.join("\n").includes("--cost"), "cost information must not be on by default in a public place");
-});
+// ── The transport ───────────────────────────────────────────────────────────
+//
+// The workflow files are proved in `pr-summary-workflow.test.mjs`, which runs
+// their invocation through this module's own flag parser and EXECUTES their
+// posting step against a fake API. The text matches that used to live here
+// could not tell a renamed flag or an appending comment step from a working
+// one (TL-89).

@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Agentic differentiators"
 priority: P2
-status: pending
-owner: ""
+status: done
+owner: agent:claude
 executor: ""
 estimate: 1d
 confidence: medium
@@ -18,19 +18,40 @@ blocks: []
 related_docs:
   - docs/branchling-state-and-sync.md
   - docs/backlog-time-tracking.md
-verification:
-  - id: suite
-    bash: "node --test scripts/tests/pr-summary.test.mjs"
+verification:                      # HOW to check the task is really done
+  # REWRITTEN 2026-09-21, for two defects in the old block.
+  #
+  # (1) TL-260. `no-zeros` grepped the comment rendered from THIS backlog for
+  # `token|$|model` and failed — because two task TITLES contain those words
+  # (`TL-30 Token and session cost adapter`, `TL-112 Contribution model …`).
+  # The entry judged the project's data instead of the tool's contract, so it
+  # would have gone on failing however correct the code was. The question is
+  # now asked structurally of `--json`: cost is absent unless `--cost`, and
+  # under `--cost` nothing is invented.
+  #
+  # (2) TL-424. `rendered` was a manual vouch that ONLY a real pull request
+  # could discharge, which makes closing the task depend on a push. The
+  # behaviour it was guessing at — one comment, updated in place, rendering as
+  # a table — is now executed locally: the posting script is lifted out of the
+  # workflow and run twice against a fake API, and the markdown is checked for
+  # GFM table well-formedness. What stays GitHub's half of the contract (that
+  # `checkout`, `setup-node` and `github-script` behave on a runner as
+  # documented) is stated in the workflow, not vouched for by anybody.
+  #
+  # Every range below is `<root commit>...HEAD`, not `HEAD~1`: a range that
+  # happens to contain no task change would make the entries pass on nothing.
+  - id: transport
+    bash: "for f in scripts/tests/pr-summary-workflow.test.mjs scripts/tests/pr-summary.test.mjs examples/pr-summary.yml .github/workflows/pr-summary.yml; do test -f \"$f\" || { echo \"missing: $f\"; exit 1; }; done; node --test scripts/tests/pr-summary-workflow.test.mjs scripts/tests/pr-summary.test.mjs"
   - id: from-git
-    bash: "node scripts/cli.mjs pr-summary --base HEAD~1 --json | node -e \"let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const r=JSON.parse(s);if(r.kind!=='pr-summary'||r.scanned!==true)process.exit(1);console.log('the range is read from git — OK')})\""
-  - id: no-zeros
-    bash: "node scripts/cli.mjs pr-summary --base HEAD~1 | grep -qi 'token\\|\\$\\|model' && { echo 'cost information leaked into a comment that did not ask for it'; exit 1; }; echo 'no tokens, amounts or model names without --cost — OK'"
+    bash: "root=$(git rev-list --max-parents=0 HEAD | head -1); node scripts/cli.mjs pr-summary --base \"$root\" --json | node -e \"let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const r=JSON.parse(s);if(r.kind!=='pr-summary'||r.scanned!==true){console.error('the range was not read from git');process.exit(1)}if(!r.tasks.length){console.error('positive control failed: the whole history contains no task change');process.exit(1)}console.log(r.tasks.length+' task(s) read from the git range — OK')})\""
+  - id: cost-is-opt-in
+    bash: "root=$(git rev-list --max-parents=0 HEAD | head -1); PLAIN=$(node scripts/cli.mjs pr-summary --base \"$root\" --json) COSTED=$(node scripts/cli.mjs pr-summary --base \"$root\" --cost --json) MD=$(node scripts/cli.mjs pr-summary --base \"$root\") node -e \"const p=JSON.parse(process.env.PLAIN),c=JSON.parse(process.env.COSTED);if(!p.tasks.length){console.error('positive control failed: nothing was summarised');process.exit(1)}if(p.cost!==null){console.error('cost information without --cost');process.exit(1)}if(/### Cost/.test(process.env.MD)){console.error('a cost section in the default comment');process.exit(1)}if(!c.cost||!c.cost.reason){console.error('--cost said nothing at all');process.exit(1)}for(const k of ['tokens','amount','model'])if(c.cost[k]!==null){console.error('--cost invented a '+k+' nothing recorded');process.exit(1)}console.log('cost is opt-in, and opting in invents nothing — OK')\""
   - id: no-tasks
     bash: "node scripts/cli.mjs pr-summary --base HEAD | grep -q 'No task changed' && echo 'a range with no tasks says so rather than going quiet — OK'"
   - id: standalone
-    bash: "node scripts/cli.mjs pr-summary --base HEAD~1 | head -1 | grep -q 'the backlog on this branch' && echo 'the command works with no GitHub anywhere near it — OK'"
-  - id: rendered
-    manual: "The markdown from `branchling pr-summary` was pasted into a real pull-request comment and renders correctly there — the table has its columns, the transitions read as a list, and nothing shows as raw markup"
+    bash: "root=$(git rev-list --max-parents=0 HEAD | head -1); node scripts/cli.mjs pr-summary --base \"$root\" | head -1 | grep -q 'the backlog on this branch' && echo 'the command works with no GitHub anywhere near it — OK'"
+  - id: suite-green
+    bash: "node --test scripts/tests/*.test.mjs"
 ---
 
 ## Goal
@@ -103,11 +124,12 @@ dollar figures where none exist.
 
 ## Acceptance criteria
 
-- [ ] Task detection via git diff, not via any computed view. [proof: from-git]
-- [ ] The time/token sections disappear entirely when there is no data — no zeros. [proof: suite]
-- [ ] Without `--cost`, the output contains no tokens, amounts or model names. [proof: no-zeros]
-- [ ] The markdown output renders correctly as a GitHub comment (checked on a real PR before closing). [proof: rendered]
-- [ ] The command works without GitHub (stdout) — the Action is only the transport. [proof: standalone]
+- [x] Task detection via git diff, not via any computed view. [proof: from-git]
+- [x] The time/token sections disappear entirely when there is no data — no zeros. [proof: transport]
+- [x] Without `--cost`, the output contains no tokens, amounts or model names. [proof: cost-is-opt-in]
+- [x] The comment is posted once and updated in place on the next push, and its markdown is a well-formed GFM table. [proof: transport]
+- [x] The workflow invokes a command line this CLI still accepts — a renamed flag fails here, not in somebody else's CI. [proof: transport]
+- [x] The command works without GitHub (stdout) — the Action is only the transport. [proof: standalone]
 
 ## Log
 

@@ -705,9 +705,15 @@ branchling pr-summary --base main        # markdown on stdout
 
 Copy [`examples/pr-summary.yml`](examples/pr-summary.yml) into
 `.github/workflows/` and that markdown becomes one pull-request comment,
-updated in place. The job is checkout, run, comment: every decision is in the
-command, so the same invocation works unchanged in GitLab CI, in a git hook, or
-typed into a terminal.
+updated in place. This repository runs the same job on its own pull requests
+([`.github/workflows/pr-summary.yml`](.github/workflows/pr-summary.yml), which
+calls the checkout instead of the published package), and neither file is taken
+on trust: the test suite parses their invocation with the command's own flag
+parser and executes their posting step against a fake GitHub API, so a renamed
+flag, or a step that appends a comment on every push instead of updating one,
+fails here rather than in your CI. The job is checkout, run, comment: every
+decision is in the command, so the same invocation works unchanged in GitLab
+CI, in a git hook, or typed into a terminal.
 
 Both sources are git — `git diff --name-status` over the task files says *which*
 tasks, and the lines added to `history/*.jsonl` in the same range say *what

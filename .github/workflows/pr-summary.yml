@@ -1,0 +1,77 @@
+# The backlog diff, on this repository's own pull requests.
+#
+# WHY A SECOND COPY OF `examples/pr-summary.yml`. That file is the template a
+# consumer copies; this one is the tool used on itself. They differ in ONE
+# line and the difference is the point: the example runs `npx --yes
+# branchling`, because a consumer installs the published package, while this
+# repository runs the checkout it is testing. A repository that shipped a
+# workflow it never ran would be recommending something nobody had tried.
+#
+# WHAT IS ALREADY PROVED WITHOUT A RUNNER. The invocation below is parsed by
+# the command's own flag parser, and the posting script is lifted out of this
+# file and executed against a fake API, in
+# `scripts/tests/pr-summary-workflow.test.mjs`. What only a real pull request
+# adds is GitHub's half of the contract: that these three actions behave on a
+# runner as they are documented to.
+#
+# `fetch-depth: 0` IS LOAD-BEARING: the summary is a range, `<base>...HEAD`, and
+# a shallow clone has no base commit to compare against.
+
+name: backlog summary
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+# The token writes one comment and nothing else.
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  summary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # The checkout under test, not the published package: this repository is
+      # the one place where the two could differ and the difference matters.
+      - name: Summarise the backlog
+        run: |
+          node scripts/cli.mjs pr-summary \
+            --base "origin/${{ github.event.pull_request.base.ref }}" \
+            > summary.md
+          cat summary.md
+
+      # One comment, updated in place. A new comment on every push turns a busy
+      # pull request into a wall of near-identical summaries.
+      - name: Post it
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require("node:fs");
+            const body = fs.readFileSync("summary.md", "utf8");
+            const marker = "<!-- branchling-pr-summary -->";
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+
+            const existing = await github.paginate(
+              github.rest.issues.listComments, { owner, repo, issue_number }
+            );
+            const mine = existing.find((c) => c.body && c.body.includes(marker));
+
+            if (mine) {
+              await github.rest.issues.updateComment({
+                owner, repo, comment_id: mine.id, body: marker + "\n" + body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number, body: marker + "\n" + body,
+              });
+            }
