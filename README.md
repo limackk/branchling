@@ -46,17 +46,39 @@ contract scales to several hands, with the roles nobody has a command for left
 waiting rather than handed out. Review and merge remain ordinary Git; the task
 state and its evidence enter that review beside the code.
 
-Watch a running wave in the terminal without a shell loop:
-
-```bash
-```
-
-The view shows every task in the active wave, its current status, the current
-task marker, owner and last recorded modification, followed by all claimed work.
-
 Everything that aggregates tasks — the index, the "what now" view, the
 archive, the browser page — is **computed** from the files and is not
 committed.
+
+## What it is not
+
+Two things a reader arrives expecting, pulling in opposite directions. It is
+neither, and saying so is cheaper for both of us than finding out in week three.
+
+**It is not a tracker for people outside the repository.** There is no hosted
+board, no login, no notification, no status roll-up for somebody who will never
+clone this. Tasks are files on a branch and go through review like code; a
+stakeholder who needs a weekly summary needs a different tool, and pointing one
+at this backlog is a reporting job you would be writing yourself. The browser
+page is a read-only window onto the files — it shows current work and cannot
+change any of it.
+
+**It is not a managed agent factory.** It does not contain an agent, choose one,
+host one, or run your agents for you. `run` starts exactly the command template
+you hand it, through your shell, and stops. There is no scheduler, no worker
+pool, no queue service and no dashboard of who is busy — and nothing here
+measures how fast anybody works. Review, branches and merges stay ordinary Git.
+
+What is left after both denials is the part that has to be in the repository
+anyway: what is ready, who holds it, why the plan changed, and what evidence
+permits a task to close.
+
+If you want the parts it refuses — scheduling, retries across machines, a pool
+of workers, a board somebody outside the repository can read — bring your own.
+`branchling next --json` and `branchling done` are a queue and a gate that any
+orchestrator, CI job or shell loop can drive, and every reading command answers
+in JSON for exactly that reason. This tool holds the evidence; what drives it is
+your decision and stays yours.
 
 Requirements: Node 18+. Zero npm dependencies.
 
@@ -155,6 +177,83 @@ and it is not that answer.
 
 **6. Open the viewer.** `branchling` with no arguments serves it on
 `127.0.0.1:4321` and opens your browser. `Ctrl-C` stops it.
+
+---
+
+## Three things worth seeing before you commit to it
+
+Each runs offline, in a throwaway directory, with no account and no network. Any
+prefix works — these use the default `TASK`. They are the three failures this
+tool exists to prevent, shown happening.
+
+```bash
+mkdir /tmp/try && cd /tmp/try && git init .
+branchling init --dir backlog --no-example
+branchling new --dir backlog --title "Work that outlives its session"
+```
+
+`git init` first because the tool is Git-native, and says so: outside a
+repository `new` warns that it is numbering from the local directory alone,
+since it cannot see the tasks on anybody else's branch.
+
+### 1. One agent stops, another continues from the repository
+
+The first hand claims the work, then its process is gone — a crash, a quota, a
+closed laptop. Nothing was written down anywhere except the repository.
+
+```bash
+branchling take TASK-1 --dir backlog --actor agent:first
+```
+
+A passer-by cannot tidy the claim away. The refusal is the feature: the claim
+says who is responsible, and clearing it silently would lose that.
+
+```bash
+branchling release TASK-1 --dir backlog --actor agent:second --reason "not mine"
+# ✗ TASK-1 is in_progress, owner: agent:first
+```
+
+The successor is a different process filling the same slot, and is briefed from
+the files alone — no transcript, no memory of the session that died.
+
+```bash
+branchling resume TASK-1 --dir backlog --actor agent:first
+branchling release TASK-1 --dir backlog --actor agent:first --reason "the session that held it ended"
+branchling next --dir backlog --actor agent:second
+```
+
+### 2. Two agents ask at once, and get different work
+
+Selection and reservation are one act, so there is no window between "choose"
+and "claim" for a second caller to fall into.
+
+```bash
+branchling next --dir backlog --actor agent:a   # TASK-1
+branchling next --dir backlog --actor agent:b   # TASK-2, never TASK-1
+```
+
+With a `plan.yaml`, `--plan` makes the wave a boundary rather than a suggestion:
+work scheduled later cannot be started early, however idle the asker is.
+
+```bash
+branchling next --dir backlog --plan --actor agent:c
+```
+
+### 3. A finished task that is not finished is refused
+
+`done` RUNS the task's `verification:` commands. There is no `--force`.
+
+```bash
+branchling done TASK-1 --dir backlog
+# ✗ the verification failed — the task file was not touched
+```
+
+The file is byte-for-byte unchanged, which is the point: a run that could not
+verify a task may not record that it did. Fix the work, run the same command
+again, and the criterion is ticked from the run rather than by hand.
+
+The full script for the third one, with the output as it is recorded, is
+[`docs/demo/scenario.md`](docs/demo/scenario.md).
 
 ---
 
@@ -350,8 +449,9 @@ only for `review`; every other eligible task remains with `developer`.
 
 Each profile attempt also leaves a local execution receipt. `branchling run
 --json` exposes the profile, role, requested model and effort, and a content
-fingerprint of its adapter. `branchling session <id> --json` (or `sessions
---task <ID>`) reads the same local trace later. Requested settings and provider
+fingerprint of its adapter — read it there, at the moment of the run, because
+nothing reads it back for you afterwards: the commands that did were removed
+with the rest of the session reporting. Requested settings and provider
 confirmation are deliberately separate: without provider-produced evidence,
 `confirmed.model` is `null`, never a claim that an alias was used. Receipts are
 outside the repository and contain no prompt, credential, account identifier or
@@ -527,30 +627,6 @@ times. After that the plan and the complaints are printed and the command
 fails. Of the three things a tool could do here — retry, fail, or quietly patch
 the JSON — only the last is dangerous: it produces a plan nobody wrote and
 nobody can trace.
-
----
-
-### The morning after a fleet of agents worked
-
-```bash
-branchling sessions --since 2026-09-02     # who worked, on what, for how long
-branchling session <id>                    # one session's narrative
-```
-
-**A session that moved nothing is listed, marked `nothing moved`.** That is the
-finding — it worked and closed nothing — and a report that quietly dropped those
-would be one you could not trust to be complete.
-
-Both commands only read: the heartbeats and the field changes are already
-recorded, and the minutes come from the same clustering every other report uses.
-Field changes are matched to a session by task and **time window**, because the
-history log carries no session id yet; every answer says so rather than implying
-a certainty it does not have.
-
-Tokens, when something records them, are reported **per model** and never as one
-total: `280k tokens` means three different things for a frontier model over an
-API, an agent on a subscription, and a local model on a laptop. Nothing here
-records them yet — and an absent section is not a zero.
 
 ---
 

@@ -1,2 +1,5 @@
 {"id":"01M1ZYRHM9QQ0TKR5F1VP9PGJ9","ts":"2026-09-08T07:29:46.121Z","task":"TL-384","field":"__created__","from":"","to":"Onboarding demonstrates evidence-gated agent delivery","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
 {"id":"01M1ZZ85F6Z4DS8Z9QAPWN6WK3","ts":"2026-09-08T07:38:17.958Z","task":"TL-384","field":"related_docs","from":[],"to":["README.md","docs/demo/scenario.md"],"actor":"local:me","source":"manual","reason":"Linked the task contract to its public implementation context"}
+{"id":"01M31SERCQVDME9YZ38RTR59GE","ts":"2026-09-21T10:51:13.175Z","task":"TL-384","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M31SERCQAAPVZGJ6W01RD095","ts":"2026-09-21T10:51:13.175Z","task":"TL-384","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M31T9100249XQAV728D1CN61","ts":"2026-09-21T11:05:33.952Z","task":"TL-384","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

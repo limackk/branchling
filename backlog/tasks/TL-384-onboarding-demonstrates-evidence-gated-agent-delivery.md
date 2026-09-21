@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: "Evidence-gated product focus"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1d
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-08
-updated: 2026-09-08
+updated: 2026-09-21
 blocked_by: [TL-377, TL-378, TL-379, TL-380, TL-381, TL-382, TL-383]
 blocks: []                         # ids this task will unblock
 related_docs:
@@ -23,7 +23,7 @@ verification:
   - id: runnable-demonstrations
     bash: "node --test scripts/tests/demo-scenario.test.mjs scripts/tests/onboarding-evidence-loop.test.mjs"
   - id: package-gate
-    bash: "npm pack --dry-run --json"
+    bash: "node --test scripts/tests/publish-gate.test.mjs && npm pack --dry-run --json"
 ---
 
 ## Goal
@@ -78,11 +78,11 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] A fresh user can complete the core one-agent loop from the README without
+- [x] A fresh user can complete the core one-agent loop from the README without
       encountering a removed concept. [proof: runnable-demonstrations]
-- [ ] Provider replacement, safe claiming and rejected completion each have an
+- [x] Provider replacement, safe claiming and rejected completion each have an
       offline, command-by-command demonstration. [proof: runnable-demonstrations]
-- [ ] The README distinguishes Branchling from both a task tracker and a managed
+- [x] The README distinguishes Branchling from both a task tracker and a managed
       multi-agent factory in its opening section. [proof: runnable-demonstrations]
-- [ ] Every documented command exists and the package contains every referenced
+- [x] Every documented command exists and the package contains every referenced
       shipped file. [proof: package-gate]
