@@ -6,13 +6,13 @@ labels: [pre-launch]
 board: main
 epic: "Backlog — open source publication"
 priority: P1
-status: in_progress
-owner: agent:claude
+status: pending
+owner: ""
 executor: "human"
 estimate: 3h
 confidence: medium
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-21
 blocked_by: [TL-82, TL-49]
 blocks: [TL-103]
 related_docs:
