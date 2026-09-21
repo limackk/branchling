@@ -101,7 +101,12 @@ export const PLAN_ID_RE = /^[a-z0-9][a-z0-9_-]*$/;
 // Arguments
 // ──────────────────────────────────────────────────────────────────────────
 
-const FLAGS = ["--dir", "--dry-run", "--json", "--actor", "--reason"];
+// `--from` belongs in this list because the refusal is where a reader — and
+// `scripts/tests/docs-terminal-surface.test.mjs` — takes this command's
+// accepted set from (TL-342). It was accepted here and declared in `--help`
+// while `available:` left it out, so the terminal contradicted itself and
+// `seed --from spec.md` in README.md read as a flag the tool denies.
+const FLAGS = ["--dir", "--from", "--dry-run", "--json", "--actor", "--reason"];
 
 /** PURE — resolves `seed`'s arguments. Throws on a usage error. */
 export function parseSeedArgs(args) {

@@ -91,13 +91,14 @@ and have their own dedup rule on read:
 - `source` — which route the change arrived by: `viewer` | `hook` |
   `external` | `boot` | `cli`. This is metadata about how much `actor` is
   worth, not decoration (§4).
-- `session` — which session wrote it (TL-164). **The same identifier the
-  activity log records**, from `sessionId()` in `focus.mjs`, because
-  `branchling session <id>` joins the two logs and a second derivation of
-  "which session is this" would break the join in exactly the cases it exists
-  for. Before this field the report correlated by task and time window and
-  said so on every answer; two agents working one task at overlapping times
-  could not be told apart at all.
+- `session` — which session wrote it (TL-164). The identifier comes from
+  `currentSession()` in `history.mjs`, and it is derived in ONE place because a
+  second derivation of "which session is this" would disagree with the first in
+  exactly the cases the field exists for. It was introduced to join this log to
+  the activity log; that log and the report that joined them were removed with
+  the telemetry (TL-378), so the field now stands on its own — it is what tells
+  two agents working one task at overlapping times apart, which no correlation
+  by task and time window could do.
 
   **Only a write that MADE the change may carry it.** Reconciliation records
   changes it merely SAW — an editor, git, another session — so stamping the
@@ -107,8 +108,9 @@ and have their own dedup rule on read:
 
   **Absent, never empty.** An empty string would be a third state beside
   "absent" and "present" meaning the same as the first. An entry with no
-  session belongs to no session; `branchling session` counts such changes
-  apart instead of listing them under whichever session was running.
+  session belongs to no session, and anything grouping by this field counts
+  such changes apart instead of listing them under whichever session was
+  running.
 
 ### Why JSONL per task, not one file / SQLite / git
 
