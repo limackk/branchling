@@ -6,13 +6,13 @@ labels: []
 board: main
 epic: "Agentic differentiators"
 priority: P2
-status: in_progress
-owner: agent:claude
+status: pending
+owner: ""
 executor: ""
 estimate: 1d
 confidence: medium
 created: 2026-08-31
-updated: 2026-09-02
+updated: 2026-09-21
 blocked_by: []
 blocks: []
 related_docs:
