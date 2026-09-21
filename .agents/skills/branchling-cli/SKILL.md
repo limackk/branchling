@@ -29,16 +29,28 @@ separate piece of work with its own test surface.
 2. Register it in `COMMANDS` with a `summary` (one line, lowercase, says what it
    does — this is what `branchling --help` prints) and a `usage` string built from
    the `PRODUCT_NAME` import, never a `"branchling"` literal.
-3. Validate flags against an explicit allow-list and exit 2 on anything unknown,
-   naming the available flags. Copy the shape used in `query.mjs`.
+3. Validate flags against an explicit allow-list and exit 2 on anything unknown.
+   Print the refusal with `refusal()` from `ui.mjs`, never assembled by hand:
+   since TL-220 that is the ONE anatomy the whole table shares, and its wording
+   is an interface — `scripts/tests/help-covers-flags.test.mjs` reads the
+   accepted set out of the `available:` line, so a command with a private
+   wording is a command that guard can ask nothing of.
 4. Accept `--dir` via `takeDirFlag()` from `paths.mjs`, and resolve the data
    directory with `resolveBacklogDir()`. Never compute it with your own
    `join(__dirname, "..")` — that is co-location pretending to be a rule, and it
-   breaks the moment the tool is installed globally.
-5. Handle `--help` yourself, printing the same `usage` text the table carries.
+   breaks the moment the tool is installed globally. After `--`, `--dir` is a
+   VALUE and not a flag (TL-247); the separator is settled once, in `cli.mjs`.
+5. Handle `--help` yourself, printing the same `usage` text the table carries,
+   and declare in it every flag you accept. The two lists are compared — what
+   the command refuses, against what `describeFlags()` derives from the usage —
+   and the exemption list in that guard has been EMPTY since TL-217. Only
+   `--dir`, `--help` and `-h` are excluded, because the main help documents them
+   once as working everywhere.
 6. If the command reads, give it `--json`. If it writes, make every input
-   reachable from flags. That is the whole extensibility model — there is no
-   plugin API.
+   reachable without a keyboard: flags, and — where the input is a whole
+   document — stdin or `--body-file`, the way `new` takes one since TL-237
+   (`scripts/tests/write-input-surface.test.mjs`). That is the whole
+   extensibility model — there is no plugin API.
 7. Add a test under `scripts/tests/`. Take the backlog directory from
    `tests/_repo.mjs`, never by walking up from the test file.
 8. Update the command table row and any usage line in `README.md`.
@@ -62,20 +74,29 @@ Run `node --test scripts/tests/*.test.mjs` before you call it done.
 failure will retry forever, and a person reading `exit 2` will look for a typo
 that isn't there.
 
-## Known gaps in the current implementation
+## Where the gaps are written down — not here
 
-Measured on the tree, worth fixing before publication rather than after:
+This section used to be a list of four measured gaps. All four were closed, and
+for months afterwards it went on sending sessions to fix a `--help` that already
+worked, and telling them the tool had no colour from a file sitting beside
+`scripts/ui.mjs` (TL-159).
 
-- **`branchling <command> --help` fails for most commands.** The top-level help
-  promises it; `build`, `viewer`, `next-id`, `board`, `history`, `new`, `init`
-  and `stats` answer with "unknown flag" and exit 2. Only `query`, `check` and
-  `migrate-prefix` honour it.
-- **`query --help` prints the module's source comment**, shebang line included.
-  It reads as an internal note, because it is one.
-- **Error prefixes leak internal script names**: `[build-backlog]`,
-  `[backlog-viewer]`, `next-backlog-id:`, `[backlog-history]`. A user who typed
-  `branchling build` should be told `branchling build:`.
-- **There is no color anywhere**, and therefore no `NO_COLOR` handling either.
+**A skill is read BEFORE the code, so it is believed.** A snapshot of the
+tree's defects is the one kind of content a skill cannot carry honestly: it has
+no owner, nothing fails when it goes stale, and a reader has no way to date it.
+The backlog is where a gap belongs — there it has an id, a verification
+contract, and `branchling next` can hand it to somebody. So this file states
+what is REQUIRED of the surface, and the tree answers what is missing:
+
+```
+branchling query --text cli --status pending     # open work on the command surface
+branchling query --text output --status pending
+branchling check                                 # the release gate's verdict today
+```
+
+The same rule holds for anything else here that a command can be asked
+directly. A flag list copied into this file is stale the week after; ask
+`branchling <command> --help`, or `--help --json` for the derived flag table.
 
 ## Output style
 
@@ -97,8 +118,16 @@ sequence, `NO_COLOR` becomes a per-file promise nobody can verify. Put it in
 
 ## Language
 
-Code and comments are English. User-facing strings are still Polish across most
-commands and are scheduled to become English before publication — when you touch
-a message, write the new one in English rather than adding to the debt, and keep
-the reasoning that the Polish comments carry. Those `PO CO` / `DLACZEGO` blocks
-hold measured justifications that will not survive being summarized.
+Everything in this repository is English: code, comments, help text, every
+string a user reads, and the git surface. The translation is finished (TL-32,
+TL-137) — nothing in `scripts/` is waiting for it, so there is no debt here to
+weigh a new message against.
+
+**No automated guard decides whether prose is English**, and `AGENTS.md` says
+why: the former detector recognised only Polish, so its green said nothing
+about any other language. Language is a review responsibility across the whole
+surface. Do not write a message in the expectation that a gate will catch it.
+
+The one thing that IS enforced here is the name: `PRODUCT_NAME` from
+`scripts/product.mjs`, never a `"branchling"` literal in `scripts/` or `bin/`
+(`branchling check --product-name`).
