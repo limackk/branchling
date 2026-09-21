@@ -38,11 +38,15 @@
  *   4. **THE START OF THE DATA IS NOT THE START OF THE TASK.** The first node
  *      carries `firstKnown`, and the caller labels the axis "history since …".
  *      A graph whose left edge silently means "the day we started logging"
- *      tells the reader the task was born then.
+ *      tells the reader the task was born then. TL-280 pushes on this rule
+ *      from the other side: the log's first entry for a field carries the value
+ *      BEFORE it, so what is known reaches back to the start of the data —
+ *      still never before it. See `stateAt()`.
  *
- * SHARED WITH TL-91. `stateAt()` is the same fold a board time-lapse replays;
- * it is exported here so the two cannot drift into two definitions of what a
- * task looked like on a given day.
+ * ONE FOLD FOR EVERY REPLAY. `stateAt()` is exported so that no reader of the
+ * history grows a second definition of what a task looked like on a given day.
+ * It was written for the board time-lapse (TL-91), which TL-379 removed with
+ * the rest of the viewer's second backlog; the fold and its rules outlived it.
  *
  * Tests: `node --test scripts/tests/task-graph.test.mjs`
  */
@@ -71,10 +75,10 @@ export function actorClass(actor) {
 /** Oldest first, and stable: two entries sharing a timestamp keep the order the
  *  log wrote them in, which is the order they happened in.
  *
- *  Exported for the same reason `stateAt()` is: the board time-lapse (TL-91)
- *  needs the last entry before a moment, and a second ordering of its own would
- *  be free to disagree about which of two entries sharing a millisecond came
- *  last — the case `new` writes on every task it creates. */
+ *  Exported for the same reason `stateAt()` is: a replay needs the last entry
+ *  before a moment, and a second ordering of its own would be free to disagree
+ *  about which of two entries sharing a millisecond came last — the case `new`
+ *  writes on every task it creates. */
 export function chronological(entries) {
   return (entries || [])
     .filter((e) => e && typeof e.ts === "string")
@@ -182,37 +186,97 @@ export function taskGraph(entries) {
   };
 }
 
+/** Whether an entry's `from` carries a value at all. An empty string and an
+ *  empty list are NOT values here: "the field was blank" and "nothing about it
+ *  was recorded" are indistinguishable in that byte, and the fold's whole
+ *  contract is that it never confuses the two (TL-280). */
+function recordsValue(v) {
+  return Array.isArray(v) ? v.length > 0 : typeof v === "string" && v !== "";
+}
+
 /**
  * What the task's fields looked like at a moment in time.
  *
- * SHARED WITH THE BOARD TIME-LAPSE (TL-91) on purpose. Two folds would
- * eventually disagree about what a task's status was on a given day, and the
- * disagreement would surface as a chart and a graph telling different stories
- * about the same week.
+ * ONE FOLD, SHARED. Any reader that replays the log — the graph beside it, and
+ * the board time-lapse this was written with (TL-91, since removed by TL-379) —
+ * answers from here. Two folds would eventually disagree about what a task's
+ * status was on a given day, and the disagreement would surface as two pictures
+ * telling different stories about the same week.
  *
  * A field the log never mentions is ABSENT from the answer rather than empty:
  * "the history does not say" and "it was blank" are different facts, and only
  * the first is true of a backlog whose log begins after the task did.
  *
+ * WHAT MAY SEED THE FOLD, decided in TL-280 and recorded in that task's
+ * history. The log records CHANGES, so a field is silent until it first moves —
+ * and the fold used to shrug for every moment before that. It need not: the
+ * EARLIEST entry for a field carries `from`, the value the field held before
+ * that change. That is a recorded fact, so it holds backwards from the change
+ * to the first entry the task's log has, and NO FURTHER — the log cannot speak
+ * about a moment it does not cover, and `exists` is already `null` there.
+ *
+ * TWO SEEDS WERE REFUSED, and the refusal is the point of the task:
+ *
+ *   - **Today's frontmatter, walked backwards.** Today's `status: done` says
+ *     nothing about the day the log begins; carrying it back states as fact
+ *     something nobody recorded — the defect TL-91 exists to rule out, moved
+ *     one layer down.
+ *   - **The template's default status at `__created__`.** That default is read
+ *     from TODAY's configuration and template, not from what `new` wrote then,
+ *     so it is the same invention wearing a different hat.
+ *     `docs/backlog-field-editing-history.md` §6 refused a git backfill on the
+ *     same ground.
+ *
+ * WHAT THE SEED DELIBERATELY DOES NOT FIX. A task that existed before its log
+ * began and was never touched since has no recorded past at all, and still
+ * folds to nothing. The seed narrows that case; removing it would mean
+ * inventing the answer, and "the log does not say" is the true one.
+ *
  * @param {Array<object>} entries
  * @param {string|number} at  an ISO timestamp or epoch ms; entries after it are ignored
+ * @returns {{exists: boolean|null, fields: object, seeded: string[]}}
+ *          `seeded` names the fields whose value came from a later entry's
+ *          `from` rather than from a change replayed up to `at` — a reader that
+ *          wants to say "before the first recorded change" needs to be able to
+ *          tell the two apart.
  */
 export function stateAt(entries, at) {
   const cutoff = typeof at === "number" ? at : Date.parse(at);
+  const ordered = chronological(entries);
   const state = {};
+  const seeded = new Set();
+
+  // The seed, laid down before the replay so that any change up to `at`
+  // overwrites it. Only the FIRST entry of each field is consulted: a later
+  // `from` describes a moment the replay already covers.
+  const beginsAt = ordered.length ? Date.parse(ordered[0].ts) : null;
+  if (beginsAt !== null && cutoff >= beginsAt) {
+    const firstSeen = new Set();
+    for (const e of ordered) {
+      const field = String(e.field);
+      if (field.startsWith("__") || firstSeen.has(field)) continue;
+      firstSeen.add(field);
+      if (Date.parse(e.ts) <= cutoff) continue;
+      if (!recordsValue(e.from)) continue;
+      state[field] = e.from;
+      seeded.add(field);
+    }
+  }
+
   // `null` until the log says anything at all: a task whose history begins after
   // it was created has no `__created__` entry, and answering `false` there would
   // report a task that plainly exists as one that does not.
   let exists = null;
-  for (const e of chronological(entries)) {
+  for (const e of ordered) {
     if (Date.parse(e.ts) > cutoff) break;
     if (exists === null) exists = true;
     if (e.field === FIELD_CREATED) { exists = true; continue; }
     if (e.field === FIELD_DELETED) { exists = false; continue; }
     if (String(e.field).startsWith("__")) continue;
     state[e.field] = e.to || "";
+    seeded.delete(e.field);
   }
-  return { exists, fields: state };
+  return { exists, fields: state, seeded: [...seeded] };
 }
 
 // ──────────────────────────────────────────────────────────────────────────
