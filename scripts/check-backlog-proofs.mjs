@@ -32,13 +32,31 @@
  * narrowed and by what rule — a narrowing nobody can see is a narrowing nobody
  * can trust.
  *
+ * THE DEFAULT SCOPE STAYS UNNARROWED, AND THE COST IS MADE VISIBLE INSTEAD
+ * (TL-265). Defaulting to a range would make a green report mean "the proofs
+ * this range touches still hold" while it READS as "the proofs still hold", and
+ * the reader has no way to tell the two apart — the same objection that makes
+ * `--since` announce what it narrowed. Refusing above some number of closings
+ * was rejected for a second reason as well: the threshold would be a number in
+ * the code, which is where this project's third law says the vocabulary of a
+ * particular backlog must not live. So the whole archive remains the default,
+ * and what changes is that the run SAYS what it is about to cost before the
+ * first command, says where it has got to as it goes, and stops on one signal.
+ *
+ * WHAT IT PRINTS WHILE IT RUNS goes to stderr, because stdout carries the
+ * report. `--quiet` suppresses it, and `check --json` passes it: there the
+ * guard's output is captured into a document, and a commentary meant for a
+ * waiting operator has no reader inside it.
+ *
  * Usage:
- *   node scripts/check-backlog-proofs.mjs [--dir <backlog>] [--since <sha>]
+ *   node scripts/check-backlog-proofs.mjs [--dir <backlog>] [--since <sha>] [--quiet]
  *
  * Exit 0 = every proof still holds (and it says how many it ran).
  * Exit 1 = at least one proof no longer holds.
+ * Exit 130 = interrupted; it says how far it got and proved nothing beyond that.
  *
- * Tests: `node --test scripts/tests/proofs.test.mjs`
+ * Tests: `node --test scripts/tests/proofs.test.mjs`,
+ *        `node --test scripts/tests/proofs-progress.test.mjs`
  */
 
 import { spawnSync } from "node:child_process";
@@ -103,17 +121,19 @@ export function touchedByRange(task, entries, changed, touchedFiles) {
   return false;
 }
 
-function main(argv) {
+async function main(argv) {
   const { dir, argv: afterDir } = takeDirFlag(argv);
   let since = null;
+  let quiet = false;
   const rest = [];
   for (let i = 0; i < afterDir.length; i++) {
     if (afterDir[i] === "--since") { since = afterDir[++i] || null; continue; }
+    if (afterDir[i] === "--quiet") { quiet = true; continue; }
     rest.push(afterDir[i]);
   }
   if (rest.length) {
     console.error(`${N} check: unknown argument: ` + rest.join(" "));
-    console.error("  usage: check-backlog-proofs.mjs [--dir <backlog>] [--since <sha>]");
+    console.error("  usage: check-backlog-proofs.mjs [--dir <backlog>] [--since <sha>] [--quiet]");
     return 2;
   }
   if (since === null && afterDir.includes("--since")) {
@@ -154,12 +174,66 @@ function main(argv) {
       "— a task is kept when the range touched a file it changed, or a path its contract names";
   }
 
+  // PROGRESS GOES TO STDERR (TL-265). stdout carries the report, and a consumer
+  // reading it must not have to sift a running commentary out of the verdict.
+  const progress = quiet ? null : (text) => process.stderr.write(text + "\n");
+
+  // ONE INTERRUPT ENDS THE AUDIT (TL-265). Without a handler the audit died on
+  // the first signal and left the contract it had in flight — a whole `node
+  // --test` run spawning into temporary trees — with no parent to stop it, so
+  // stopping the command took three kills and the tree went on growing between
+  // them. The handler records the signal and the loop stops at the next
+  // boundary; the command already running is allowed to FINISH, because
+  // `runContract` is synchronous and a process that has no way to interrupt its
+  // child has no way to clean up after killing itself either. Finishing is what
+  // buys the guarantee: when this returns, nothing of its own is left running.
+  let stopped = null;
+  const onSignal = (sig) => { stopped = sig; };
+  process.on("SIGINT", onSignal);
+  process.on("SIGTERM", onSignal);
+
+  const commandsTotal = selected.reduce((n, c) => n + c.entries.length, 0);
+  if (progress) {
+    // THE COST, BEFORE THE FIRST COMMAND. Each of these is somebody's contract
+    // and some of them are whole test suites; an operator who learns the size
+    // of the run at minute 68 learns it too late to decide anything.
+    progress(
+      `${MARK.bullet} proofs: re-running ${commandsTotal} verification command(s) from ` +
+        `${selected.length} proven closing(s)`
+    );
+    progress(`  in ${repoRoot} — narrow the run with \`--since <sha>\`, stop it with one interrupt`);
+  }
+
   const started = Date.now();
   const broken = [];
   const vouched = [];
   let ran = 0;
+  let walked = 0;
+  let commandsLeft = commandsTotal;
   for (const c of selected) {
-    const { results, failed } = runContract(c.entries, repoRoot, { capture: true });
+    // A TURN OF THE EVENT LOOP IS WHAT MAKES THE SIGNAL ARRIVE. `runContract` is
+    // synchronous, so a handler registered above cannot run while a contract is
+    // in flight and a wholly synchronous walk would deliver every queued signal
+    // only after the last one had finished — that is, exactly as if there were
+    // no handler at all. Yielding here is what turns "stops eventually" into
+    // "stops at the next boundary".
+    await new Promise((resolve) => setImmediate(resolve));
+    if (stopped) break;
+    walked++;
+    if (progress) {
+      progress(
+        `  [${walked}/${selected.length}] ${c.id}: ${c.entries.length} entr(ies), ` +
+          `${commandsLeft} command(s) left`
+      );
+    }
+    const { results, failed } = runContract(c.entries, repoRoot, {
+      capture: true,
+      // Named BEFORE it runs, not after: the line an operator needs while the
+      // command hangs is the one that says which command is hanging.
+      before: progress ? (e) => progress(`      ${MARK.arrow} ${e.bash}`) : undefined,
+      after: progress ? (e, r) => progress(`      ${MARK.ok} ${(r.ms / 1000).toFixed(1)}s`) : undefined,
+    });
+    commandsLeft -= c.entries.length;
     for (const r of results) {
       if (r.kind === "manual") vouched.push({ id: c.id, entry: r.id || r.command });
       else ran++;
@@ -167,6 +241,15 @@ function main(argv) {
     if (failed) broken.push({ ...c, failed });
   }
   const seconds = ((Date.now() - started) / 1000).toFixed(1);
+  process.removeListener("SIGINT", onSignal);
+  process.removeListener("SIGTERM", onSignal);
+
+  if (stopped) {
+    console.error(
+      `${WARNM} proofs: stopped by ${stopped} after ${walked} of ${selected.length} proven closing(s) ` +
+        "— the command in flight was allowed to finish, so nothing was left running"
+    );
+  }
 
   const lines = [];
   if (narrowedNote) lines.push("  " + narrowedNote);
@@ -183,7 +266,9 @@ function main(argv) {
         `each still passing (${seconds}s)`
     );
     for (const l of lines) console.log(l);
-    return 0;
+    // An interrupted run proved nothing about what it never reached, so it must
+    // not exit 0 — that is the code a complete green run owns.
+    return stopped ? 130 : 0;
   }
 
   console.error(`${ERRM} proofs: ${broken.length} closed task(s) whose proof no longer holds`);
@@ -208,7 +293,7 @@ function main(argv) {
 }
 
 if (process.argv[1] && process.argv[1].endsWith("check-backlog-proofs.mjs")) {
-  process.exit(main(process.argv.slice(2)));
+  main(process.argv.slice(2)).then((code) => process.exit(code));
 }
 
 export { main };
