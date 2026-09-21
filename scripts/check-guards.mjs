@@ -51,6 +51,13 @@ export const CHECK_GUARDS = [
     // a second place to make it.
     advisoryWhen: (config) => config.criteriaLinks !== "require",
     args: (root) => ["--dir", root] },
+  // The second guard that judges an open task's contract, and the one that reads
+  // it as an INSTRUCTION rather than as a link (TL-234). It takes `--dir` and
+  // judges the backlog it is pointed at — unlike `product-name`, which judges
+  // this installation's SOURCE: a task's contract is executed wherever the
+  // backlog lives, so the question belongs to the data and not to the checkout.
+  { key: "contracts", severity: "gate", want: "wantContracts", name: "contracts", script: "check-backlog-contracts.mjs",
+    args: (root) => ["--dir", root] },
   // Reads the whole history; the configuration says which statuses require a reason.
   { key: "reasons", severity: "advisory", want: "wantReasons", name: "reasons", script: "check-backlog-reasons.mjs",
     args: (root) => ["--dir", root] },

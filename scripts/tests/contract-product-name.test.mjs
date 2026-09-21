@@ -1,150 +1,36 @@
 /**
- * A contract names a command a person can actually run (TL-233).
+ * The contract audit, as a rule and as a claim about THIS tree (TL-233).
  *
- * THE DEFECT, MEASURED. A `verification:` entry is the one place in a task that
- * is an INSTRUCTION rather than a description: `bash:` is executed by the tool,
- * `manual:` is executed by a person. Eleven `manual:` entries in this backlog
- * named a binary this product has not been called since 2026-09-03, four of
- * them in tasks still open — including TL-122, waiting for a vouch, whose
- * contract asked a person to run a command that answers `command not found`.
- * The only way through was to guess the translation.
- *
- * WHY THIS IS NOT THE PROSE RULE. CLAUDE.md keeps the backlog deliberately
- * outside `check --product-name`: a task's narrative saying what the tool was
- * called at the time is history, and rewriting history is a falsification. An
- * instruction is a different kind of sentence — its correctness is a question
- * about TODAY, and it is the same question a `bash:` line answers.
- *
- * WHY ONLY OPEN TASKS. A closed task's contract records what was actually run,
- * against the tool as it was then named. Rewriting it would put a command in
- * the record that nobody executed — the same reasoning `renumber: allow` rests
- * on, and the reason the audit below stops at the archived statuses.
- *
- * HOW THE NAME IS DERIVED. From `product.mjs`, which reads `package.json`, and
- * the subcommands from the CLI's own table. A guard holding a literal of either
- * would be the defect it checks for.
- *
- * THE SIGNAL IS `<word> <subcommand>` IN COMMAND POSITION, not the word alone.
- * A `manual:` entry is prose with commands embedded in it, so "the tool is
- * asked to build" must not read as an invocation; only the first token of a
- * backticked span, or of a shell segment, counts — and only when the token
- * after it is one of this tool's own subcommands. That leaves a bare mention
- * with no subcommand (`run <name> — everything rebuilds`) uncaught, which is
- * accepted: a name with no verb after it cannot be told from prose without
- * knowing every word the product has ever been called.
+ * The audit itself is `scripts/check-backlog-contracts.mjs` — since TL-234 it is
+ * a guard `check` runs, not an assertion, and the reasoning for every line of it
+ * lives in that module's header. This file is its second caller: the fixtures
+ * below pin the RULE, and the two cases at the bottom pin its EFFECT on this
+ * repository, which no fixture can state.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { COMMANDS } from "../cli.mjs";
+import {
+  auditOpenContracts,
+  foreignInvocations,
+  subcommands,
+} from "../check-backlog-contracts.mjs";
 import { loadConfig } from "../config.mjs";
 import { parseVerification } from "../criteria.mjs";
 import { PRODUCT_NAME } from "../product.mjs";
 import { readTaskRecords } from "../task-select.mjs";
-import { BACKLOG_DIR, TASKS_DIR, isolateHome } from "./_repo.mjs";
+import { CHECK_GUARDS, parseCheckArgs } from "../cli.mjs";
+import { BACKLOG_DIR, SCRIPTS_DIR, TASKS_DIR, isolateHome } from "./_repo.mjs";
 
 // THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
 // file in its own process, so one call covers every case in it. Without this a
 // test reads the DEVELOPER's `<config>/config.yaml` — their actor, their model
 // endpoint — and the suite answers differently on different machines.
 isolateHome("contract-product-name");
-
-/** This tool's own verbs, from the command table — never a list of literals. */
-export const subcommands = () => new Set(Object.keys(COMMANDS));
-
-/**
- * Programs that own a subcommand vocabulary overlapping this one.
- *
- * WHY A LIST AT ALL. `git init`, `npm run build` and `gh run` put one of this
- * tool's verbs after a name that is not this tool — and they are correct. The
- * alternative was to ask the machine whether the word resolves on `PATH`, which
- * makes the verdict depend on what happens to be installed: a machine without
- * `git` would then fail the suite for a task file nobody touched.
- *
- * It is short because it only has to cover the overlap, not every program a
- * contract may call. A name added here is a claim that the word is somebody
- * else's binary, which is a sentence, not a hole in the pattern.
- */
-export const FOREIGN_PROGRAMS = new Set([
-  "git", "npm", "npx", "pnpm", "yarn", "cargo", "docker", "gh", "go", "pip", "brew", "make",
-]);
-
-/** A word that could be a command name on a `PATH`: no slash, no extension. */
-const BARE_NAME = /^[A-Za-z][A-Za-z0-9_-]*$/;
-/** A subcommand as it is written — unquoted, so `echo 'query …'` is a string. */
-const BARE_WORD = /^[a-z][a-z0-9-]*$/;
-
-/** The pieces of one entry that are shell, not prose. PURE. */
-function commandSegments(entry) {
-  const spans = [];
-  if (entry.bash) spans.push(String(entry.bash));
-  // In prose only a backticked span is a command; everything else is a sentence.
-  if (entry.manual) {
-    const re = /`([^`]+)`/g;
-    let m;
-    while ((m = re.exec(String(entry.manual)))) spans.push(m[1]);
-  }
-  const out = [];
-  for (const span of spans) out.push(...span.split(/\n|;|&&|\|\||\|/));
-  return out;
-}
-
-/**
- * Every `<name> <subcommand>` invocation in one entry. PURE.
- *
- * @returns {Array<{name: string, sub: string}>}
- */
-export function invocations(entry, verbs = subcommands()) {
-  const found = [];
-  for (const segment of commandSegments(entry)) {
-    const tokens = segment.trim().split(/\s+/).filter(Boolean);
-    // A leading `!`, a `(` and `FOO=bar` prefixes are shell, not the command.
-    while (tokens.length && /^(!|\(|[A-Za-z_][A-Za-z0-9_]*=)/.test(tokens[0])) tokens.shift();
-    if (tokens.length < 2) continue;
-    const name = tokens[0].split("/").pop();
-    const sub = tokens[1];
-    if (!BARE_NAME.test(name) || !BARE_WORD.test(sub)) continue;
-    if (!verbs.has(sub)) continue;
-    found.push({ name, sub });
-  }
-  return found;
-}
-
-/**
- * The invocations of this tool under a name that is not this tool's. PURE.
- */
-export function foreignInvocations(entry, product = PRODUCT_NAME, verbs = subcommands()) {
-  return invocations(entry, verbs).filter(
-    (i) => i.name !== product && !FOREIGN_PROGRAMS.has(i.name)
-  );
-}
-
-/** Every open task's contract, audited. Returns findings AND what it read — a
- *  count of zero entries would be a pass with no evidentiary force. */
-export function auditOpenContracts(backlogDir = BACKLOG_DIR, tasksDir = TASKS_DIR) {
-  const config = loadConfig(backlogDir);
-  const archived = new Set(config.archivedStatuses || []);
-  const verbs = subcommands();
-  const findings = [];
-  let entriesChecked = 0;
-  let tasksChecked = 0;
-  for (const record of readTaskRecords(tasksDir, config.taskId.file)) {
-    if (archived.has(record.status)) continue;
-    tasksChecked++;
-    const file = join(tasksDir, String(record.file).replace(/^tasks\//, ""));
-    const raw = readFileSync(file, "utf8");
-    const frontmatter = (raw.match(/^---\r?\n([\s\S]*?)\r?\n---/) || [])[1] || "";
-    for (const entry of parseVerification(frontmatter).entries) {
-      entriesChecked++;
-      for (const bad of foreignInvocations(entry, PRODUCT_NAME, verbs)) {
-        findings.push({ task: record.id, kind: entry.bash ? "bash" : "manual", ...bad });
-      }
-    }
-  }
-  return { findings, entriesChecked, tasksChecked };
-}
 
 // ── the rule, on fixtures ─────────────────────────────────────────────────
 
@@ -184,7 +70,7 @@ test("prose is not an invocation, and neither is another program's verb", () => 
 // ── the effect, on this repository ────────────────────────────────────────
 
 test("no OPEN task asks anybody to run a command that is not this tool", () => {
-  const { findings, entriesChecked, tasksChecked } = auditOpenContracts();
+  const { findings, entriesChecked, tasksChecked } = auditOpenContracts(BACKLOG_DIR, TASKS_DIR);
   assert.deepEqual(
     findings,
     [],
@@ -215,4 +101,80 @@ test("a CLOSED task's contract is left alone, and this is deliberate", () => {
     }
   }
   assert.ok(inArchive > 0, "the archive holds no such contract — the scope of the audit is untested");
+});
+
+// ── the guard, as `check` runs it (TL-234) ────────────────────────────────
+
+/** A backlog of this tool's own making, holding one task to judge. */
+function fixture(label) {
+  const root = mkdtempSync(join(tmpdir(), "branchling-" + label + "-"));
+  const backlog = join(root, "backlog");
+  const made = spawnSync(process.execPath, [join(SCRIPTS_DIR, "cli.mjs"), "init", "--dir", backlog, "--no-example"],
+    { cwd: root, encoding: "utf8", env: { ...process.env, NO_COLOR: "1" } });
+  assert.equal(made.status, 0, made.stdout + made.stderr);
+  return { root, backlog };
+}
+
+const guard = (backlog) =>
+  spawnSync(process.execPath, [join(SCRIPTS_DIR, "check-backlog-contracts.mjs"), "--dir", backlog],
+    { encoding: "utf8", env: { ...process.env, NO_COLOR: "1" } });
+
+/** One task, with the contract the caller wants judged. */
+function withContract(backlog, entry) {
+  const made = spawnSync(process.execPath, [join(SCRIPTS_DIR, "cli.mjs"), "new", "--dir", backlog, "--title", "A judged contract"],
+    { encoding: "utf8", env: { ...process.env, NO_COLOR: "1" } });
+  assert.equal(made.status, 0, made.stdout + made.stderr);
+  const id = made.stdout.match(/[A-Z]+-\d+/)[0];
+  const name = readdirSync(join(backlog, "tasks")).find((f) => f.startsWith(id + "-"));
+  const file = join(backlog, "tasks", name);
+  const raw = readFileSync(file, "utf8");
+  writeFileSync(file, raw.replace(/^verification:.*$/m, "verification:\n  - id: judged\n    " + entry), "utf8");
+  return id;
+}
+
+test("POSITIVE CONTROL: the GUARD exits 1 on a contract naming a foreign command", () => {
+  // The audit's own positive control is a pure call; this one is the guard as a
+  // person meets it. Without it, registering the wrong script in the table — or
+  // one that can no longer fail — would leave every case above green.
+  const fx = fixture("contracts-red");
+  const id = withContract(fx.backlog, 'manual: "Run `oldname take <ID>` and see the claim"');
+  const r = guard(fx.backlog);
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  assert.match(r.stderr, new RegExp(id + " \\(manual\\): `oldname take`"));
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+test("the guard says how many entries it read, and says when it read none", () => {
+  // A ✓ over zero entries and a ✓ over ninety are the same line unless the guard
+  // states its sample — the rule CLAUDE.md puts on any guard that can pass over
+  // an empty tree.
+  const fx = fixture("contracts-green");
+  const empty = guard(fx.backlog);
+  assert.equal(empty.status, 0, empty.stdout + empty.stderr);
+  assert.match(empty.stdout, /nothing was examined/);
+
+  withContract(fx.backlog, 'bash: "' + PRODUCT_NAME + ' check --refs"');
+  const one = guard(fx.backlog);
+  assert.equal(one.status, 0, one.stdout + one.stderr);
+  const counted = one.stdout.match(/(\d+) verification entr\(ies\) across 1 open task\(s\)/);
+  assert.ok(counted, one.stdout);
+  // The NUMBER is the template's business, not this test's; what has to hold is
+  // that the count is the guard's own sample and is no longer zero.
+  assert.ok(Number(counted[1]) >= 1, one.stdout);
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+test("the guard is registered, so a bare `check` runs it and names it", () => {
+  // The whole point of TL-234: the audit answers when a person asks whether the
+  // backlog is sound, not only when a developer runs the suite.
+  const plan = parseCheckArgs([]);
+  const contracts = CHECK_GUARDS.find((g) => g.name === "contracts");
+  assert.ok(contracts, "no `contracts` guard in the table");
+  assert.equal(plan[contracts.want], true, "`contracts` is not in the default run");
+  assert.equal(contracts.severity, "gate");
+  // It judges the backlog it is POINTED AT, not this installation's source.
+  assert.equal(contracts.installationOnly, undefined);
+  assert.deepEqual(contracts.args("/somewhere"), ["--dir", "/somewhere"]);
+  assert.equal(parseCheckArgs(["--contracts"]).wantContracts, true);
+  assert.equal(parseCheckArgs(["--contracts"]).wantIds, false, "asking for one guard ran them all");
 });
