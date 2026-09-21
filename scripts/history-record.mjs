@@ -26,7 +26,7 @@ import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { resolveActor } from "./actor.mjs";
-import { ACTOR_NAMESPACES, FIELD_ATTRIBUTED, attributeChanges, isValidActor, readHistory, reasonRefusal, reconcile, taskIdFromFile, unattributedChanges } from "./history.mjs";
+import { ACTOR_NAMESPACES, FIELD_ADOPTED, FIELD_ATTRIBUTED, attributeChanges, isValidActor, readHistory, reasonRefusal, reconcile, taskIdFromFile, unattributedChanges } from "./history.mjs";
 import { resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 
@@ -226,18 +226,30 @@ if (refused.length) {
   process.exit(1);
 }
 
+// AN ADOPTION IS REPORTED AS AN ADOPTION, NOT AS A CHANGE (TL-387). The
+// `__adopted__` entries travel in `entries` because that is what gets appended
+// under the run's lock and withheld by `--dry-run`; printing them here as
+// "recorded N change(s) · — → title, board, related_docs" would say the fields
+// changed, which is the one thing an adoption does not know. They are reported
+// below, beside the tasks they belong to.
+const adoptedFields = new Map();
+for (const e of entries) {
+  if (e.field === FIELD_ADOPTED) adoptedFields.set(e.task, Array.isArray(e.to) ? e.to : [e.to]);
+}
+const recorded = entries.filter((e) => e.field !== FIELD_ADOPTED);
+
 if (quiet) process.exit(0);
 if (seeded) {
   console.log(`${N} history: reference point (snapshot) created — no history entries written`);
-} else if (!entries.length) {
+} else if (!recorded.length) {
   if (!unclaimed.length && !adopted.length && !seeds.length) console.log(`${N} history: no changes to record`);
 } else {
-  console.log(`${N} history: recorded ` + entries.length + " change(s) (" + actor + "):");
-  for (const e of entries.slice(0, 20)) {
+  console.log(`${N} history: recorded ` + recorded.length + " change(s) (" + actor + "):");
+  for (const e of recorded.slice(0, 20)) {
     const fmt = (v) => (Array.isArray(v) ? v.join(", ") : String(v == null ? "" : v)) || "—";
     console.log("  " + e.task + " · " + e.field + ": " + fmt(e.from) + " → " + fmt(e.to));
   }
-  if (entries.length > 20) console.log("  … and " + (entries.length - 20) + " more");
+  if (recorded.length > 20) console.log("  … and " + (recorded.length - 20) + " more");
 }
 
 // TAKEN AS A REFERENCE POINT, WITH NOTHING TO GO ON (TL-180). These tasks were
@@ -270,11 +282,22 @@ if (adopted.length) {
     `${N} history: ` + adopted.length + " task(s) had no reference point and were adopted " +
       "from the log:"
   );
-  for (const id of adopted.slice(0, 20)) console.log("  " + id);
+  for (const id of adopted.slice(0, 20)) {
+    // NAMED FIELD BY FIELD (TL-387). A caller who has just edited `related_docs`
+    // by hand needs to read whether THAT field was absorbed; the task id alone
+    // leaves them to work it out from a log they were about to trust.
+    const fields = adoptedFields.get(id);
+    console.log("  " + id + (fields && fields.length ? " · " + fields.join(", ") : ""));
+  }
   if (adopted.length > 20) console.log("  … and " + (adopted.length - 20) + " more");
   console.log("  Fields the log has never recorded have no earlier value to compare against,");
   console.log("  so a change to one of them before now cannot be recovered. Expected after a");
   console.log("  `git pull` or a merge, which bring a task and its log together.");
+  if (adoptedFields.size) {
+    console.log("  The fields named above were absorbed as they stand and recorded as an");
+    console.log("  adoption (`" + FIELD_ADOPTED + "`) signed by " + actor + ": the entry states that");
+    console.log("  they entered the snapshot without a reference point, and claims no transition.");
+  }
 }
 
 if (claimed.length) {

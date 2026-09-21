@@ -2925,6 +2925,9 @@ const HISTORY_FIELD_LABELS = {
   // TL-130: somebody claiming a change the log had recorded as nobody's. The
   // earlier row still says "unknown", and this one stands beside it.
   __attributed__: "claimed as their own change",
+  // TL-387: the fields a reconciliation absorbed with no reference point to
+  // compare them against. The entry's "to" is the list of those fields.
+  __adopted__: "adopted with no reference point",
   __role_override__: "taken outside its role",
   updated: "Updated",
   created: "Created",

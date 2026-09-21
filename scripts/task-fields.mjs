@@ -357,8 +357,27 @@ export const FIELD_DECISION = "__decision__";
 // attribution, which is worse than the gap it fills.
 export const FIELD_ATTRIBUTED = "__attributed__";
 
+// A field that entered the snapshot with nothing to compare it against
+// (TL-387). `to` is the LIST OF FIELD NAMES the run took on trust, and `from` is
+// empty — not because those fields had no previous value, but because this log
+// never saw one and inventing `from: ""` for each of them would put a fabricated
+// change in a file nobody may rewrite.
+//
+// WHEN IT IS WRITTEN. A task absent from the local snapshot while its shared log
+// exists — it arrived by a pull or a merge, or the snapshot was written by a
+// single hook run in a fresh worktree. Fields the log CAN vouch for are diffed
+// against it and produce ordinary transitions; the rest are absorbed, and this
+// entry is what makes the absorption a fact in the repository instead of a
+// sentence printed once in somebody's terminal.
+//
+// WHY IT IS NOT A TRANSITION. An adoption asserts one thing only: at this
+// moment, with this actor and this reason, these fields were accepted as they
+// stood. It never claims the value CHANGED — the evidence for that does not
+// exist, which is the whole reason the field is being adopted.
+export const FIELD_ADOPTED = "__adopted__";
+
 export const PSEUDO_FIELDS = [FIELD_CREATED, FIELD_DELETED, FIELD_BODY, FIELD_COMMENT, FIELD_VERIFIED,
-  FIELD_UNVERIFIED, FIELD_ROLE_OVERRIDE, FIELD_DECISION, FIELD_ATTRIBUTED];
+  FIELD_UNVERIFIED, FIELD_ROLE_OVERRIDE, FIELD_DECISION, FIELD_ATTRIBUTED, FIELD_ADOPTED];
 
 export function isPseudoField(key) {
   return PSEUDO_FIELDS.indexOf(key) !== -1;

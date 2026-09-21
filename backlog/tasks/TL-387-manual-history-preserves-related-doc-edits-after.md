@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: "Evidence-gated product focus"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-09
-updated: 2026-09-09
+updated: 2026-09-21
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs:
@@ -21,9 +21,17 @@ related_docs:
   - scripts/history-record.mjs
   - scripts/tests/history-manual.test.mjs
   - scripts/tests/history-whole-directory.test.mjs
+  - scripts/tests/history-adoption.test.mjs
 verification:                      # HOW to check the task is really done
+  # THE OLD CONTRACT PASSED BEFORE ANY WORK (TL-260). It named
+  # `history-manual.test.mjs` and `history-whole-directory.test.mjs`, both green
+  # on an unchanged tree, so closing on it would have proved nothing. The new
+  # entry names the regression file written for this task, which fails against
+  # the code as it stood: the adoption reached the terminal and never the log.
   - id: related-doc-history
-    bash: "node --test scripts/tests/history-manual.test.mjs scripts/tests/history-whole-directory.test.mjs"
+    bash: "node --test scripts/tests/history-adoption.test.mjs"
+  - id: history-unchanged
+    bash: "node --test scripts/tests/history-manual.test.mjs scripts/tests/history-whole-directory.test.mjs scripts/tests/history.test.mjs"
 ---
 
 ## Goal
@@ -72,7 +80,9 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] A manual `related_docs` edit cannot be accepted silently into a snapshot.
+- [x] A manual `related_docs` edit cannot be accepted silently into a snapshot.
       [proof: related-doc-history]
-- [ ] The terminal result distinguishes a recorded edit from an explicit
+- [x] The terminal result distinguishes a recorded edit from an explicit
       adoption, without rewriting prior history. [proof: related-doc-history]
+- [x] The recording paths this one sits beside are unchanged.
+      [proof: history-unchanged]
