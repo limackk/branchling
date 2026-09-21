@@ -6,18 +6,28 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-21
 blocked_by: [TL-151]               # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
+# REWRITTEN UNDER TL-260. The contract this task was filed with was one
+# suite-wide entry, and the suite was green before a line of this task was
+# written — a contract that cannot fail is not a contract, it is a formality the
+# closing run performs. The FIRST entry now names the file whose new tests fail
+# against today's `resume` (they assert an uncommitted edit and an untracked
+# file reach the briefing, which today's code never collects); the suite-wide
+# entry stays SECOND, because a change to what one command prints is still able
+# to break another command's test.
 verification:                      # HOW to check the task is really done
+  - id: resume-briefing
+    bash: "node --test scripts/tests/resume-briefing.test.mjs"
   - id: suite-green
     bash: "node --test scripts/tests/*.test.mjs"
 ---
@@ -74,12 +84,18 @@ committed" after it, under a heading that says both are there.
 
 ## Acceptance criteria
 
-- [ ] An edit to a tracked file that was never committed appears in the briefing.
-      [proof: suite-green]
-- [ ] A file the session created and never added appears in the briefing.
-      [proof: suite-green]
-- [ ] Positive control: over a clean tree the briefing reports neither, so the
+- [x] An edit to a tracked file that was never committed appears in the briefing.
+      [proof: resume-briefing]
+- [x] A file the session created and never added appears in the briefing, named
+      as untracked rather than as a modification. [proof: resume-briefing]
+- [x] Positive control: over a clean tree the briefing reports neither, so the
       assertions above are not satisfied by a section that prints everything.
-      [proof: suite-green]
-- [ ] The committed and the uncommitted work are told apart in the output — a
-      successor must know which of the two a line came from. [proof: suite-green]
+      [proof: resume-briefing]
+- [x] Positive control: a tree that is clean because everything was committed
+      and a tree that is clean because nothing was ever written produce
+      DIFFERENT text. [proof: resume-briefing]
+- [x] The committed and the uncommitted work are told apart in the output — a
+      successor must know which of the two a line came from, and the committed
+      half is still the merge-base range TL-151 built. [proof: resume-briefing]
+- [x] Nothing else in the tool broke, including the envelope registry the new
+      key is declared in. [proof: suite-green]

@@ -1,1 +1,4 @@
 {"id":"01M1Q4JWYYKN0QVVRZ4P7WRADK","ts":"2026-09-04T21:18:22.686Z","task":"TL-272","field":"__created__","from":"","to":"The resume briefing shows uncommitted work, not only what was committed","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-1abc8ae97159"}
+{"id":"01M32FD1HGCPPJ7PDJWNP565X5","ts":"2026-09-21T17:14:45.680Z","task":"TL-272","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M32FD1HGNX0AG0DJPJQSM9AQ","ts":"2026-09-21T17:14:45.680Z","task":"TL-272","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M32GMKTJ8WMXW03Q273VJGB4","ts":"2026-09-21T17:36:22.354Z","task":"TL-272","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"the briefing reports the working tree as a second, labelled half; contract run green"}

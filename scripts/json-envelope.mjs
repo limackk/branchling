@@ -213,16 +213,21 @@ export const KINDS = {
     ok: null, id: null, file: null, question: null, changes: [], blockedReason: null,
     refusalKind: null, refusal: null, details: [],
   },
-  // `resume --json` (TL-151). The five parts are declared in the ORDER the
+  // `resume --json` (TL-151). The parts are declared in the ORDER the
   // briefing fixes them, because the order IS the product: a consumer rendering
   // it would otherwise have to re-derive a sequence this tool already knows.
   // `verified` is what keeps an empty `verification` readable — under
   // `--no-verify` nothing ran, and "the contract was not re-run" must never be
   // mistaken for "the contract holds no entries".
+  // `uncommitted` is the SECOND half of the branch's work (TL-272): what the
+  // killed session left on disk and in no commit. It is a key of its own rather
+  // than lines appended to `diff`, because a consumer that could not tell a
+  // committed hunk from an uncommitted one would be wrong in the expensive
+  // direction — a `git checkout` destroys one and not the other.
   resume: {
     ok: null, id: null, file: null, actor: null, owner: null,
     base: null, mergeBase: null, verified: null,
-    decisions: [], goal: null, history: [], diff: null, verification: [],
+    decisions: [], goal: null, history: [], diff: null, uncommitted: null, verification: [],
     refusalKind: null, refusal: null, details: [],
   },
   // `done --json`. `entries` carries one row per `verification:` entry with its

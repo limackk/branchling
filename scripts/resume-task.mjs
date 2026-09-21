@@ -16,7 +16,7 @@
  * that starts work on a task still waiting for an answer has wasted the whole
  * session; (2) the Goal, which says what "done" means; (3) what changed since
  * the take, WITH ACTORS, so an answer that must be honoured can be told from a
- * change that may be undone; (4) the branch diff, which is the code; (5) the
+ * change that may be undone; (4) the branch's work, which is the code; (5) the
  * contract, which says how far it got. A briefing carrying every part in the
  * wrong order is a wrong briefing.
  *
@@ -30,6 +30,23 @@
  * while the session was dead; a two-dot diff would report somebody else's
  * commits as this session's work, which is the one thing the diff is read to
  * find out.
+ *
+ * AND THE WORKING TREE IS THE SECOND HALF OF THAT SECTION (TL-272). The session
+ * being resumed DID NOT CHOOSE THE MOMENT IT STOPPED — it was killed — so the
+ * most recent thing it wrote is exactly the thing least likely to be in a
+ * commit. Reporting only the committed range answered `No commit on this branch
+ * since the merge base.` to a tree holding an hour of edits, and the successor
+ * believed it was starting from nothing. The committed range is NOT replaced:
+ * it remains the right answer to "what has this branch done that the base has
+ * not", it is printed FIRST, and the uncommitted half is labelled so that an
+ * edit which a `git checkout` would destroy is never read as landed work.
+ *
+ * FOUR STATES, NOT TWO. Committed work; a tracked file edited and never
+ * committed; a file created and never added, which no `git diff` reports at
+ * all; and a clean tree — which is itself two different facts, clean because
+ * everything landed and clean because nothing was ever written. One sentence
+ * for the last two would tell a successor with an hour of landed work behind it
+ * the same thing it tells one starting from scratch.
  *
  * THE CONTRACT IS RE-RUN, NOT RECALLED. The last recorded result is stale by
  * definition — the tree has moved on — and a stale verdict printed as if it were
@@ -79,7 +96,10 @@ export const SECTIONS = [
   "## Open questions and decisions",
   "## Goal",
   "## Since the take",
-  "## Diff against the merge base",
+  // ONE heading for BOTH halves, and it names both (TL-272). Three ranges under
+  // three headings would be a section the reader has to reconcile; a heading
+  // saying only "diff" would hide that half of what is under it is in no commit.
+  "## The branch's work — committed, and not yet committed",
   "## Verification",
 ];
 
@@ -144,6 +164,49 @@ export function branchDiff(cwd, base, run = git) {
     return out;
   }
   out.patch = patch.stdout;
+  return out;
+}
+
+/**
+ * WHAT IS ON DISK AND IN NO COMMIT (TL-272). Two collections, because they are
+ * two states a successor has to act on differently.
+ *
+ * `patch` is `git diff HEAD` — every tracked file that differs from the last
+ * commit, STAGED OR NOT. The index is deliberately not a third range: a dead
+ * session's `git add` says nothing about whether the work is finished, and a
+ * successor asking "what is not in a commit" is not asking "what did it intend
+ * to commit".
+ *
+ * `untracked` is a list of PATHS, and only paths. Showing their contents would
+ * mean `git add --intent-to-add`, and this command writes nothing — not even
+ * to the index (law 2). Naming them is also the honest limit of what git knows
+ * about them: git has never seen these files, so it cannot say what changed in
+ * one, only that it exists. The successor reads them with the editor it already
+ * has.
+ *
+ * `null` for either collection means it could not be computed, and `reason`
+ * says why. An empty tree and a tree nobody could read are opposite facts.
+ *
+ * @returns {{patch: string|null, untracked: string[]|null, reason: string|null}}
+ */
+export function workingTree(cwd, run = git) {
+  const out = { patch: null, untracked: null, reason: null };
+  const patch = run(cwd, ["diff", "HEAD"]);
+  if (!patch.ok) {
+    out.reason = (patch.stderr || "`git diff HEAD` failed").trim();
+    return out;
+  }
+  out.patch = patch.stdout;
+  // `ls-files --others --exclude-standard` is the untracked set `status
+  // --porcelain` reports, without the directory collapsing: a session that
+  // created `src/parser/` with four files in it must have all four named, or
+  // the briefing hides three of them behind a trailing slash.
+  const others = run(cwd, ["ls-files", "--others", "--exclude-standard"]);
+  if (!others.ok) {
+    out.reason = (others.stderr || "`git ls-files --others` failed").trim();
+    return out;
+  }
+  out.untracked = others.stdout.split("\n").map((l) => l.trim()).filter(Boolean);
   return out;
 }
 
@@ -349,15 +412,98 @@ export function renderBriefing(model) {
   out.push("");
   out.push(SECTIONS[3]);
   out.push("");
-  if (model.diff.patch === null) out.push("  " + MARK.warn + " " + model.diff.reason);
-  else if (!model.diff.patch.trim()) out.push("  No commit on this branch since the merge base.");
-  else out.push(model.diff.patch.replace(/\n$/, ""));
+  out.push(...renderWork(model));
 
   out.push("");
   out.push(SECTIONS[4]);
   out.push("");
   out.push(...renderVerification(model));
   return out.join("\n");
+}
+
+/** One file, or n files. Spelled once, because two call sites got it wrong. */
+function files(n) {
+  return n + (n === 1 ? " file" : " files");
+}
+
+/**
+ * THE FOURTH SECTION: what this branch has done, in TWO HALVES (TL-272).
+ *
+ * THE COMMITTED HALF COMES FIRST AND IS UNCHANGED — the merge-base range
+ * TL-151 built, which is the right answer to "what has this branch done that
+ * the base has not" and is not being replaced by anything here.
+ *
+ * THE LABELS ARE THE PRODUCT OF THE SECOND HALF. A successor that mistook an
+ * uncommitted edit for a landed one would be wrong in the expensive direction:
+ * the first is destroyed by a `git checkout` and the second is not. So each
+ * half opens with a bulleted label, at the prose indent the rest of the
+ * briefing uses, and the patches stay flush left where a patch belongs — an
+ * indented diff is no longer a diff anybody can pipe into `git apply`.
+ *
+ * A CLEAN TREE IS TWO DIFFERENT FACTS and gets two different sentences. Clean
+ * because everything landed in a commit is a successor's starting point; clean
+ * because nothing was ever written is a different session entirely. One
+ * sentence for both would be the same silence this task was filed to remove.
+ */
+function renderWork(model) {
+  const out = [];
+  const d = model.diff;
+  const w = model.working || { patch: null, untracked: null, reason: null };
+  const committed = Boolean(d.patch && d.patch.trim());
+  const dirty = Boolean(w.patch && w.patch.trim());
+  const untracked = Array.isArray(w.untracked) ? w.untracked : [];
+  const readable = d.patch !== null && w.patch !== null && w.untracked !== null;
+
+  if (readable && !committed && !dirty && !untracked.length) {
+    out.push("  " + MARK.bullet + " Nothing, in either sense: no commit on this branch since the merge");
+    out.push("    base, and nothing on disk that git does not already have. This branch");
+    out.push("    has not been written on — you are not resuming work, you are starting it.");
+    return out;
+  }
+
+  if (d.patch === null) {
+    out.push("  " + MARK.warn + " " + d.reason);
+  } else if (!committed) {
+    out.push("  " + MARK.bullet + " Committed since the merge base: nothing. No commit on this branch.");
+  } else {
+    out.push("  " + MARK.bullet + " Committed since the merge base — this is what would land in " +
+      d.base + ":");
+    out.push("");
+    out.push(d.patch.replace(/\n$/, ""));
+    out.push("");
+  }
+
+  if (w.patch === null || w.untracked === null) {
+    out.push("  " + MARK.warn + " the working tree could not be read: " + (w.reason || "unknown"));
+    return out;
+  }
+
+  if (!dirty && !untracked.length) {
+    out.push("  " + MARK.bullet + " Not yet committed: nothing. Everything this branch wrote is in the");
+    out.push("    commit range above, and a fresh clone of the branch would hold all of it.");
+    return out;
+  }
+
+  if (dirty) {
+    out.push("  " + MARK.bullet + " Not yet committed — tracked files that differ from HEAD, staged or not.");
+    out.push("    No commit carries these lines; a `git checkout` would destroy them:");
+    out.push("");
+    out.push(w.patch.replace(/\n$/, ""));
+    out.push("");
+  } else {
+    out.push("  " + MARK.bullet + " Not yet committed: no tracked file differs from HEAD.");
+  }
+
+  if (untracked.length) {
+    const it = untracked.length === 1 ? "it" : "them";
+    out.push("  " + MARK.bullet + " Untracked — " + files(untracked.length) + " git has never seen, so no diff");
+    out.push("    can describe " + it + ". Named and not quoted: showing the content would");
+    out.push("    mean `git add -N`, and this command writes nothing, not even the index:");
+    for (const f of untracked) out.push("      " + f);
+  } else {
+    out.push("  " + MARK.bullet + " Untracked: none. Every file on disk is one git already tracks.");
+  }
+  return out;
 }
 
 /** The last section, and the last thing on the page. Kept separate because
@@ -460,6 +606,7 @@ export function run(argv) {
     take: take ? { ts: take.ts, actor: take.actor } : null,
     history: since.map((e) => ({ ts: e.ts, actor: e.actor, field: e.field, text: describeEntry(e) })),
     diff: branchDiff(cwd, plan.base),
+    working: workingTree(cwd),
     verification: [],
     contractProblem: null,
     failedOutput: null,
@@ -480,6 +627,15 @@ export function run(argv) {
       goal: model.goal,
       history: model.history,
       diff: model.diff.patch,
+      // The second half, as its own key rather than concatenated into `diff`
+      // (TL-272): a consumer that could not tell a committed hunk from an
+      // uncommitted one would reintroduce in JSON exactly the confusion the
+      // text output was changed to remove.
+      uncommitted: {
+        patch: model.working.patch,
+        untracked: model.working.untracked,
+        reason: model.working.reason,
+      },
       verification: model.verification,
     });
     return 0;
