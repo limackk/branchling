@@ -556,9 +556,9 @@ test("the plan guard agrees with the writer about what it just wrote", () =>
 //   $ branchling plan add TL-2 --wave "Flags" --why -- "--json is not free"
 //   branchling plan add: --why requires a value
 //
-// `--dir` is passed BEFORE the separator throughout: `takeDirFlag()` strips it
-// from anywhere on the line, separator or not, which is TL-247's subject and
-// not this one.
+// `--dir` is passed BEFORE the separator throughout, and TL-247 has since made
+// that a rule rather than a workaround: `takeDirFlag()` stops at `--` too, so a
+// `--dir` past the separator is a VALUE and would not move this write at all.
 
 /** The wave of that name, or undefined — asserted on rather than an index, so a
  *  case that appended in the wrong place says so instead of reading a neighbour. */

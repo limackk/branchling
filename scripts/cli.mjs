@@ -39,7 +39,7 @@ import { ConfigError, formatConfigError, loadConfig } from "./config.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { MARK, color, failure } from "./ui.mjs";
 import { CHECK_GUARDS, effectiveSeverity, guardsForRun } from "./check-guards.mjs";
-import { resolveBacklogDir, resolveBacklogDirOrExit } from "./paths.mjs";
+import { resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { FIELD_SHAPES, REASON_MAX_LENGTH } from "./task-fields.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -1494,11 +1494,18 @@ export function foldAppendFlags(argv, accepts = () => true) {
  * change for the next global flag. The dispatcher takes them off the arguments
  * and passes the decision to the child through the ENVIRONMENT, which `ui.mjs`
  * listens to anyway. That leaves flag validation in the commands untouched.
+ *
+ * THE SCAN STOPS AT `--`, for the reason set out on `takeDirFlag` in
+ * `paths.mjs` (TL-247): a global flag past the separator is a VALUE, and the
+ * dispatcher may not read the line by a grammar the command below does not
+ * share. `--no-color -- --color` stays on `--no-color`; the second word is text.
  */
 export function takeColorFlags(argv) {
   const rest = [];
   let force = null;
-  for (const a of argv) {
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === "--") { rest.push(...argv.slice(i)); break; }
     if (a === "--no-color") { force = false; continue; }
     if (a === "--color") { force = true; continue; }
     rest.push(a);
@@ -1866,9 +1873,12 @@ export function main(argv) {
       // types before they have a backlog.
       let config = null;
       try {
-        const dirFlag = resolved.args.indexOf("--dir");
+        // THE SAME READER AS EVERY COMMAND USES (TL-247): a hand-rolled
+        // `indexOf("--dir")` here would find the flag past the separator and in
+        // the `--dir=` spelling would find it not at all — two answers to one
+        // question, in the one place that describes the interface.
         config = loadConfig(resolveBacklogDir({
-          dir: dirFlag >= 0 ? resolved.args[dirFlag + 1] : undefined, moduleDir: HERE,
+          dir: takeDirFlag(resolved.args).dir || undefined, moduleDir: HERE,
         }).root);
       } catch {
         // No backlog here, or one that will not load. Neither stops the answer.
