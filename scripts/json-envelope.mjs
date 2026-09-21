@@ -82,7 +82,7 @@ export const KINDS = {
   audit: {
     since: null, dayZero: null, tasks: null, findings: null,
     closedWithoutTrace: [], skippedBeforeSince: null, reopened: [],
-    parked: [], withoutPremise: [], awaitingVouch: [], vouches: [],
+    parked: [], withoutPremise: [], awaitingVouch: [], handedBack: [], vouches: [],
     advisories: [],
   },
   // `stats --json`. The tallies stay nested under `stats` instead of being

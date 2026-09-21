@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-05
-updated: 2026-09-05
+updated: 2026-09-21
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
@@ -84,6 +84,48 @@ test file, two full agent runs spent crossing it.
 would have made these four runs one. It would have made this cheaper and
 not made it terminate.
 
+## The decision, and what was built on it
+
+**A registration table is not a proof** (recorded as `__decision__` on
+2026-09-21). A row that only NAMES a kind, a command or the invocation that
+exercises it asserts nothing on its own; it registers. A boundary between two
+hands exists to stop a hand satisfying a test by editing it, and a registry
+cannot be satisfied — so it may not be what the boundary protects. Registration
+belongs beside the thing registered, in production code. `scripts/tests/` keeps
+what ASSERTS.
+
+**The worked example in `## Context` is already gone.** TL-285 moved the
+kind-to-invocation tables out of `scripts/tests/json-envelope.test.mjs` and into
+`KINDS` and `KIND_EXERCISE` in `scripts/json-envelope.mjs`, and `docs/manual.md`
+now states outright that nothing under `scripts/tests/` has to be touched to
+register a kind. This task's own change adds a key to the `audit` envelope, and
+it needed no edit under `scripts/tests/` except the new test itself. A survey of
+the other tables under `scripts/tests/` found no second registry with the same
+property — a correct production change that cannot make the suite green without
+a test edit. The nearest miss is `SERVERS` in `no-backlog-message.test.mjs`, an
+exemption list for commands that do not return.
+
+**No shared editable region inside `scripts/tests/` is declared, and that is
+deliberate.** A named exception would be a second, weaker boundary to keep in
+step; moving the registry removes the crossing instead of licensing it.
+
+**What the charter gained** (`backlog/roles/dev.md`, `backlog/roles/spec.md`):
+a hand is never handed a task back for a registration row — the registry moves —
+and a task crosses the same boundary only ONCE. A second return means the change
+needs both charters, and then the thing to change is the boundary or the task.
+
+**What makes the second crossing observable.** `branchling audit` reports an
+OPEN task handed both ways across the same pair of roles, naming the pair, the
+number of crossings and what each hand said when it let go. The queue could only
+ever say `held elsewhere`, which is also what it says about a role nobody
+serves.
+
+**Deliberately NOT done here.** Counting crossings inside `run` and refusing a
+third (TL-417) and `handoff --with <files>` (TL-418) are separate changes in
+files this task does not own; both are filed. Refusing inside the dispatcher is
+also the weaker half: a refusal stops a run, while the report survives it and is
+readable by the person who has to make the decision.
+
 ## Steps
 
 1. Count handoffs per task in the run and report a task that has crossed
@@ -97,9 +139,11 @@ not made it terminate.
 
 ## Acceptance criteria
 
-- [ ] A task handed across the same boundary twice is reported as a
-      deadlock rather than as held elsewhere, proven by a test that fails
-      against today's loop. [proof: boundary-has-an-exit]
-- [ ] A normal one-way handoff is unaffected. [proof: suite-green]
-- [ ] Whether a registration table counts as a proof is a `__decision__`
+- [x] A task handed across the same boundary twice is named as a deadlock —
+      the pair of roles, the number of crossings and both hands' reasons —
+      where before nothing in the tool said anything at all.
+      [proof: boundary-has-an-exit]
+- [x] A normal one-way handoff is unaffected, and is not a finding.
+      [proof: suite-green]
+- [x] Whether a registration table counts as a proof is a `__decision__`
       event in `backlog/history/TL-277.jsonl`.
