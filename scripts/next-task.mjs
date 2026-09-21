@@ -58,7 +58,7 @@ import { archivedElsewhereBySource, crossBranchState, describeDivergence, diverg
 import { loadConfigOrExit } from "./config.mjs";
 import { ACTOR_NAMESPACES, FIELD_COMMENT, isValidActor, openQuestions, readAllHistory, readHistory, reasonRefusal } from "./history.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
-import { dispatchWave, loadPlanForDispatch } from "./plan.mjs";
+import { dispatchWave, loadPlanForDispatch, scheduledIds } from "./plan.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { probeTask } from "./done-task.mjs";
@@ -334,8 +334,17 @@ export function heldElsewhere(task, handedOut) {
  * above still decides, because a wave is a batch and the plan makes no claim
  * about the order of its members.
  *
+ * TWO QUANTITIES, TWO NAMES (TL-219). What the wave gate steps over is counted
+ * twice, because a reader asks two different questions about it:
+ * `skippedOutsideWave` is every open task the active wave does not hold — the
+ * figure an operator wants, since it is the work this call declined — and
+ * `skippedUnplanned` is the open tasks the plan schedules in NO wave, which is
+ * `planState().unplanned` asked of the records this call can see. The second
+ * needs `filters.plannedIds`, every id of every wave; without it there is no
+ * way to tell "later" from "never" and the field is `null` rather than a guess.
+ *
  * @returns {{candidates: object[], reclaimable: Set<string>, skippedBlocked: number,
- *            skippedUnplanned: number,
+ *            skippedOutsideWave: number, skippedUnplanned: number|null,
  *            skippedElsewhere: Array<{id: string, elsewhere: object[]}>}}
  */
 /**
@@ -426,12 +435,21 @@ export function selectCandidates(records, config, filters, now) {
   // read the disk. An EMPTY set is a plan whose every task is closed, and it
   // correctly leaves nothing: falling through to unplanned work would answer a
   // question the caller did not ask.
-  let skippedUnplanned = 0;
+  //
+  // BOTH COUNTS ARE TAKEN HERE, past the two gates above (TL-219). That order
+  // is deliberate and unchanged: a task this caller may never be handed is not
+  // work the plan stepped over, and subtracting one count from the other stays
+  // meaningful only while both were taken through the same sieve.
+  let skippedOutsideWave = 0;
+  let skippedUnplanned = filters.plannedIds ? 0 : null;
   if (filters.planIds) {
     const kept = [];
     for (const t of records) {
-      if (filters.planIds.has(String(t.id).toUpperCase())) { kept.push(t); continue; }
-      if (!archived.has(t.status) && t.status !== inProgress) skippedUnplanned++;
+      const id = String(t.id).toUpperCase();
+      if (filters.planIds.has(id)) { kept.push(t); continue; }
+      if (archived.has(t.status) || t.status === inProgress) continue;
+      skippedOutsideWave++;
+      if (filters.plannedIds && !filters.plannedIds.has(id)) skippedUnplanned++;
     }
     records = kept;
   }
@@ -503,7 +521,7 @@ export function selectCandidates(records, config, filters, now) {
   }
   return {
     candidates, reclaimable, unblocked, skippedElsewhere, skippedExecutor, skippedHandedBack,
-    skippedSize, skippedUnplanned,
+    skippedSize, skippedOutsideWave, skippedUnplanned,
     // The count is of tasks that MATCHED and were held back by an open blocker;
     // the unblocked ones were never in `matching`, so they must not be
     // subtracted from it.
@@ -651,8 +669,12 @@ export function run(argv) {
       inProgressStatus: inProgressStatus(config),
     });
     filters.planIds = new Set((wave ? wave.ids : []).map((id) => String(id).toUpperCase()));
+    // The whole order, not just the wave being dispatched (TL-219): without it
+    // the counter below cannot tell a task scheduled LATER from one scheduled
+    // nowhere, and it reported the first as the second.
+    filters.plannedIds = scheduledIds(planned);
   }
-  const { candidates: selected, reclaimable, unblocked, skippedBlocked, skippedElsewhere, skippedExecutor, skippedHandedBack, skippedSize, skippedUnplanned } =
+  const { candidates: selected, reclaimable, unblocked, skippedBlocked, skippedElsewhere, skippedExecutor, skippedHandedBack, skippedSize, skippedOutsideWave, skippedUnplanned } =
     selectCandidates(records, config, filters, now);
   // THE ACTOR'S RECORD, LAST OF ALL THE FILTERS (TL-150). It only removes, and
   // it removes from a queue the dispatcher has already ordered — eligibility and
@@ -669,7 +691,15 @@ export function run(argv) {
   const planJson = planned
     ? {
         wave: wave ? wave.index + 1 : null, name: wave ? wave.name : "",
-        scheduled: wave ? wave.ids.length : 0, open: wave ? wave.open : 0, skippedUnplanned,
+        scheduled: wave ? wave.ids.length : 0, open: wave ? wave.open : 0,
+        // TWO KEYS, BECAUSE THEY ARE TWO ANSWERS (TL-219). `skippedUnplanned`
+        // now means what it says — the open tasks no wave holds, `plan`'s own
+        // definition — and `skippedOutsideWave` carries the number this key
+        // used to hold, which is the one a fleet operator reads: all the open
+        // work this call declined. A consumer reading the old key gets the
+        // quantity its name always promised; the other one did not vanish, it
+        // acquired an honest name.
+        skippedOutsideWave, skippedUnplanned,
       }
     : null;
   // Named, never silent: a candidate that disappears without a word is
@@ -772,9 +802,21 @@ export function run(argv) {
       ? "plan wave " + (wave.index + 1) + " (" + (wave.name || "unnamed") + ") — " +
           wave.ids.length + " task(s) scheduled, " + wave.open + " still open"
       : "the plan schedules nothing that is still open — every wave of it is finished");
+    // TWO SENTENCES FOR TWO QUANTITIES (TL-219). One line saying "N open
+    // task(s) the plan does not schedule" was printing the count of everything
+    // outside the active wave, so work scheduled in wave 7 was reported as work
+    // nobody had scheduled — 34 here against `plan`'s 16 on 2026-09-03. Waiting
+    // for its turn and never having been given one are different states of a
+    // backlog, and only the second one is rot.
+    const laterWaves = skippedUnplanned === null ? 0 : skippedOutsideWave - skippedUnplanned;
+    if (laterWaves) {
+      details.push(
+        laterWaves + " open task(s) scheduled in a LATER wave — this wave is handed out first"
+      );
+    }
     if (skippedUnplanned) {
       details.push(
-        skippedUnplanned + " open task(s) the plan does not schedule — `--plan` never hands those out"
+        skippedUnplanned + " open task(s) no wave schedules at all — `--plan` never hands those out"
       );
     }
   }

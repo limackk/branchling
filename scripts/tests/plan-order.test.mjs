@@ -264,6 +264,47 @@ test("an open task the plan does not schedule is never handed out, and is counte
   assert.equal(statusOf(f.backlog, f.ids.unplanned), "pending");
 });
 
+// ── The two numbers the plan gate steps over (TL-219) ─────────────────────
+//
+// THE SINGLE-WAVE CASE ABOVE IS A POSITIVE CONTROL AND NOTHING MORE. With one
+// wave, "outside the active wave" and "in no wave at all" are the same set, so
+// it stayed green through the whole defect: `next --plan` answered 34 where
+// `plan` answered 16 in the tool's own backlog on 2026-09-03. Only a plan with
+// a LATER wave holding open work can tell the two definitions apart.
+
+test("work scheduled in a later wave is not reported as work nobody scheduled", () => {
+  const f = fixture([
+    { key: "first", title: "The task of the active wave", priority: "P3" },
+    { key: "later", title: "A task scheduled in the second wave", priority: "P2" },
+    { key: "unplanned", title: "A task nobody put in the plan", priority: "P0" },
+  ]);
+  writePlan(f.backlog, [["Foundations", [f.ids.first]], ["On top", [f.ids.later]]]);
+  assert.equal(taken(cli(["next", "--dir", f.backlog, "--plan", "--json"], f.env)), f.ids.first);
+
+  const second = cli(["next", "--dir", f.backlog, "--plan", "--json"], f.env);
+  assert.equal(second.code, 3, second.err);
+  const answer = JSON.parse(second.out);
+  assert.equal(answer.plan.wave, 1);
+  assert.equal(answer.plan.skippedOutsideWave, 2, "the open work this call declined is two tasks");
+  assert.equal(
+    answer.plan.skippedUnplanned, 1,
+    "a task scheduled in wave 2 was counted as one the plan does not schedule",
+  );
+
+  // THE OTHER COMMAND, SAME TREE, SAME QUESTION: `plan` is the definition this
+  // field's name promises, and the two now answer the same number.
+  const state = JSON.parse(cli(["plan", "--dir", f.backlog, "--json"], f.env).out);
+  assert.deepEqual(state.unplanned.map((u) => u.id), [f.ids.unplanned]);
+  assert.equal(state.coverage.unplanned, answer.plan.skippedUnplanned);
+
+  // And the sentences say WHICH of the two each number is.
+  const text = cli(["next", "--dir", f.backlog, "--plan"], f.env).out;
+  assert.match(text, /1 open task\(s\) scheduled in a LATER wave/);
+  assert.match(text, /1 open task\(s\) no wave schedules at all/);
+  assert.equal(statusOf(f.backlog, f.ids.later), "pending");
+  assert.equal(statusOf(f.backlog, f.ids.unplanned), "pending");
+});
+
 test("a plan with nothing open left says so, and does not fall back to the rest", () => {
   const f = fixture([
     { key: "planned", title: "The only planned task", priority: "P3" },
@@ -381,7 +422,7 @@ test("a run that stops on a wave somebody else holds names the wave", () => {
   assert.doesNotMatch(stopped, /the queue is empty/);
   // The wave 2 task is open and this run stepped over it. It is NOT unscheduled
   // — the plan schedules it later — so the sentence must not say it is (TL-219).
-  assert.match(stopped, /1 open task\(s\) outside that wave were left alone/);
+  assert.match(stopped, /1 open task\(s\) in later waves are not reached yet/);
   assert.doesNotMatch(stopped, /does not schedule/);
 
   // POSITIVE CONTROL: the backlog is not empty and the plan is what stopped the

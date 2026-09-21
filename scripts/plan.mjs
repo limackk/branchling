@@ -504,6 +504,35 @@ export function dispatchWave(plan, tasks, config = {}) {
 }
 
 /**
+ * EVERY ID THE PLAN SCHEDULES, IN ANY WAVE. PURE (TL-219).
+ *
+ * `dispatchWave` above answers "which wave may be handed out of now", and a
+ * caller that counts what it stepped over needs the other question too: whether
+ * a task the plan does not hand out today is scheduled in a LATER wave or is
+ * scheduled nowhere at all. Those are two quantities, and `next --plan` was
+ * reporting the larger of them under the name of the smaller — 34 against
+ * `plan`'s 16 in this repository on 2026-09-03.
+ *
+ * The ids are UPPERCASED, because the dispatcher compares them against task
+ * records exactly as it compares `filters.planIds`; a plan is written by hand
+ * and its case is not guaranteed to match the tree's.
+ *
+ * It does NOT take the tasks: membership of a wave is a property of the plan
+ * alone. Whether a task is OPEN is not, which is why the counting belongs to
+ * the caller holding the records.
+ *
+ * @param {object|null} plan a parsed plan, as `parsePlanYaml` returns it
+ * @returns {Set<string>} every scheduled id, uppercased; empty for no plan
+ */
+export function scheduledIds(plan) {
+  const ids = new Set();
+  for (const w of (plan && plan.waves) || []) {
+    for (const id of w.tasks || []) ids.add(String(id).toUpperCase());
+  }
+  return ids;
+}
+
+/**
  * Where a projection of the plan has to STOP, named. PURE (TL-206).
  *
  * `dispatchWave` above is the single definition of what may be handed out, and
