@@ -51,9 +51,33 @@ function run(args, cwd, input) {
 }
 
 /**
+ * THE FIXTURE OWNS ITS IDS (TL-273). A row that types an id has to guess the
+ * prefix the fixture was built with, and `init` takes that prefix from the
+ * SHIPPED template, not from this repository. An id from the wrong vocabulary
+ * is not a failure — it is a "no such task" refusal in a complete envelope, so
+ * every shape assertion passes while the row measures the path its own comment
+ * says it avoids. The ids therefore come back from the fixture, and the rows
+ * name them through the two sentinels below.
+ */
+const FIRST_TASK = "<first-task>";
+/** An id the fixture deliberately does NOT have — the refusal rows' subject. */
+const ABSENT_TASK = "<absent-task>";
+
+/** The fixture's own prefix, read from the configuration `init` wrote. */
+function prefixOf(dir) {
+  const line = readFileSync(join(dir, "config.yaml"), "utf8")
+    .split("\n").find((l) => l.startsWith("task_id_prefix:"));
+  assert.ok(line, "the fixture's config.yaml declares no task_id_prefix");
+  return line.split(":")[1].trim();
+}
+
+/**
  * A backlog inside a real git repository — `next-id` scans branches and
  * worktrees, and outside a repository it takes a narrower path with a warning.
  * The point here is the ordinary path.
+ *
+ * It answers with the ids it really created — asked of the tool rather than
+ * assembled here, so the fixture cannot disagree with the tree it built.
  */
 function backlog({ tasks = 0, rule = false } = {}) {
   const repo = mkdtempSync(join(tmpdir(), "branchling-envelope-" + counter++ + "-"));
@@ -64,6 +88,13 @@ function backlog({ tasks = 0, rule = false } = {}) {
     const r = run(["new", "--dir", dir, "--title", "Task number " + (i + 1), "--priority", "P1"]);
     assert.equal(r.status, 0, r.stderr);
   }
+  const listed = JSON.parse(run(["query", "--dir", dir, "--json"]).stdout);
+  const ids = listed.tasks.map((t) => t.id);
+  assert.equal(ids.length, tasks, "the fixture does not hold the tasks it created");
+  // 404 is out of reach of any fixture: none of them creates more than a
+  // handful of tasks, and `next-id` hands them out from 1 upwards.
+  const absentId = prefixOf(dir) + "-404";
+  assert.ok(!ids.includes(absentId), "the id reserved for the refusal rows exists");
   if (rule) {
     // A second board WITH a paths rule, so `board` has something to match. The
     // template ships only the default board, and against that one every answer
@@ -72,7 +103,7 @@ function backlog({ tasks = 0, rule = false } = {}) {
     writeFileSync(boards, readFileSync(boards, "utf8") +
       '\n  - slug: docs\n    name: "Docs"\n    paths:\n      - "docs/**"\n', "utf8");
   }
-  return { repo, dir };
+  return { repo, dir, ids, absentId };
 }
 
 /** The reading commands, one per declared kind. */
@@ -121,12 +152,10 @@ const READING = {
   // one, so the row exercises a briefing on one and the "no such task" refusal
   // on the other. Each is a complete envelope, with a non-zero exit
   // reserved for the refusal, and neither of which is a usage error.
-  // (The literal id here is the defect TL-273 covers for the whole table; it is
-  // written the way its neighbours are so that one fix covers all of them.)
   // `--no-verify` because this file asks about the ENVELOPE. Left out, the row
   // would run the fixture task's `verification:` command, and the shape of the
   // answer would start depending on the observer's shell.
-  resume: ["resume", "TASK-1", "--actor", "agent:test", "--no-verify", "--json"],
+  resume: ["resume", FIRST_TASK, "--actor", "agent:test", "--no-verify", "--json"],
   run: ["run", "--dry-run", "--json"],
   // The live terminal view becomes one complete snapshot under `--json`, which
   // is deliberately one-shot. A fixture without a plan still has a valid answer:
@@ -156,16 +185,16 @@ const WRITING = {
   // easily left without an envelope. `--reason` is required before the refusal
   // is even reached, so it is given.
   "task-handoff": {
-    args: ["handoff", "TASK-404", "--to-owner", "unassigned", "--reason", "a fixture", "--actor", "agent:test", "--json"],
+    args: ["handoff", ABSENT_TASK, "--to-owner", "unassigned", "--reason", "a fixture", "--actor", "agent:test", "--json"],
     refuses: true,
   },
-  "task-release": { args: ["release", "TASK-404", "--actor", "agent:test", "--reason", "a fixture", "--json"], refuses: true },
+  "task-release": { args: ["release", ABSENT_TASK, "--actor", "agent:test", "--reason", "a fixture", "--json"], refuses: true },
   // A task that is not there: same reason as above — the refusal path.
-  "verification-run": { args: ["done", "TASK-404", "--json"], refuses: true },
+  "verification-run": { args: ["done", ABSENT_TASK, "--json"], refuses: true },
   // A question about a task that is not there (TL-148): the refusal path again,
   // and `--question` is required before the refusal is reached, so it is given.
   "task-ask": {
-    args: ["ask", "TASK-404", "--question", "which of the two?", "--actor", "agent:test", "--json"],
+    args: ["ask", ABSENT_TASK, "--question", "which of the two?", "--actor", "agent:test", "--json"],
     refuses: true,
   },
   seed: {
@@ -179,10 +208,28 @@ const WRITING = {
   },
 };
 
-function ask(kind, dir) {
+/** The shape of a task id, whatever prefix a project chose for it. */
+const ID_SHAPE = /^[A-Za-z][A-Za-z0-9]*-\d+$/;
+
+/**
+ * The row as the fixture makes it answerable: every sentinel becomes an id THIS
+ * fixture reported. `FIRST_TASK` on an empty fixture has no first task, so it
+ * becomes the absent id — which is the refusal the `resume` row documents, not
+ * an accident of a foreign prefix.
+ */
+function resolveArgs(args, fx) {
+  return args.map((arg) => {
+    if (arg === FIRST_TASK) return fx.ids.length ? fx.ids[0] : fx.absentId;
+    if (arg === ABSENT_TASK) return fx.absentId;
+    return arg;
+  });
+}
+
+function ask(kind, fx) {
   const reading = READING[kind];
   const spec = reading ? (Array.isArray(reading) ? { args: reading } : reading) : WRITING[kind];
-  const r = run(spec.noDir ? spec.args : spec.args.concat(["--dir", dir]), undefined, spec.input);
+  const args = resolveArgs(spec.args, fx);
+  const r = run(spec.noDir ? args : args.concat(["--dir", fx.dir]), undefined, spec.input);
   // A REFUSAL still has to be an envelope, so a non-zero exit is not a failure
   // here — only a usage error is, and only for the kinds that are not testing a
   // refusal on purpose.
@@ -203,6 +250,56 @@ test("positive control: there are kinds to check, and a command for each", () =>
     "a kind with no command exercising it, or a command with no kind");
   assert.deepEqual(Object.keys(READING).filter((k) => k in WRITING), [],
     "a kind claimed by both tables — one command, one route");
+});
+
+test("no row TYPES a task id — the fixture is the only source of one (TL-273)", () => {
+  // The defect this closes cannot be seen by reading the row: a typed id from
+  // the wrong vocabulary produces a refusal in a complete envelope, and every
+  // assertion in this file is satisfied by it. Only the shape of the row shows
+  // it, so the shape is what is checked.
+  const typed = [];
+  for (const [kind, spec] of Object.entries({ ...READING, ...WRITING })) {
+    const args = Array.isArray(spec) ? spec : spec.args;
+    for (const arg of args) {
+      if (typeof arg === "string" && ID_SHAPE.test(arg)) typed.push(kind + ": `" + arg + "`");
+    }
+  }
+  assert.deepEqual(typed, [],
+    "a row naming an id itself; use FIRST_TASK or ABSENT_TASK, which the fixture resolves");
+
+  // POSITIVE CONTROL: the scan above reads real rows, and the detector really
+  // rejects the shape it is looking for. Without this a regex that matched
+  // nothing would report "no offenders" with nothing measured.
+  assert.ok(Object.keys(READING).length + Object.keys(WRITING).length > 5, "the tables are empty");
+  assert.ok(ID_SHAPE.test("TL-1") && ID_SHAPE.test("TASK-404"), "the detector passes an id over");
+  assert.ok(!ID_SHAPE.test("--json") && !ID_SHAPE.test("agent:test"), "the detector reads flags as ids");
+});
+
+test("a sentinel becomes an id THIS fixture has, and a wrong one cannot pass (TL-273)", () => {
+  const full = backlog({ tasks: 3 });
+  const empty = backlog({ tasks: 0 });
+
+  assert.equal(resolveArgs([FIRST_TASK], full)[0], full.ids[0]);
+  assert.ok(full.ids[0].startsWith(prefixOf(full.dir) + "-"), "the fixture's id is not its own prefix");
+  assert.equal(resolveArgs([ABSENT_TASK], full)[0], full.absentId);
+  assert.ok(!full.ids.includes(full.absentId));
+  // An empty fixture has no first task, so the sentinel resolves to the id it
+  // does not have — the refusal the `resume` row documents for that half.
+  assert.equal(resolveArgs([FIRST_TASK], empty)[0], empty.absentId);
+
+  // THE MEASUREMENT THAT WAS MISSING: the row that claims to read a real task
+  // has to come back having read one. `ok` is the only key that tells the
+  // briefing apart from the refusal — the envelope is complete either way.
+  const read = ask("resume", full);
+  assert.equal(read.ok, true, "the `resume` row did not reach a task: " + read.refusal);
+  assert.equal(read.id, full.ids[0]);
+
+  // And the reverse: an id from another project's vocabulary — the defect as it
+  // was written — is a refusal, which is what made the wrong row look green.
+  const foreign = JSON.parse(run(["resume", "TL-1", "--actor", "agent:test", // renumber: allow
+    "--no-verify", "--json", "--dir", full.dir]).stdout);
+  assert.equal(foreign.ok, false, "an id the fixture never had was accepted");
+  assert.equal(foreign.refusalKind, "no-such-task");
 });
 
 test("the envelope always carries the version and the kind", () => {
@@ -368,8 +465,8 @@ test("every command with a kind answers in the envelope — on an empty backlog 
     for (const [label, fx] of [["empty", empty], ["populated", full]]) {
       // A writing kind gets a tree of its own: asked twice of the shared fixture,
       // the second answer would be about what the first call wrote.
-      const dir = WRITING[kind] ? backlog({ tasks: label === "empty" ? 0 : 3, rule: true }).dir : fx.dir;
-      const answer = ask(kind, dir);
+      const on = WRITING[kind] ? backlog({ tasks: label === "empty" ? 0 : 3, rule: true }) : fx;
+      const answer = ask(kind, on);
       const where = kind + " (" + label + " backlog)";
       assert.equal(answer.schemaVersion, SCHEMA_VERSION, where + ": no schemaVersion");
       assert.equal(answer.kind, kind, where + ": the wrong kind");
@@ -386,29 +483,30 @@ test("the answers DIFFER between an empty backlog and a populated one", () => {
   const empty = backlog({ tasks: 0, rule: true });
   const full = backlog({ tasks: 3, rule: true });
 
-  const emptyList = ask("task-list", empty.dir);
-  const fullList = ask("task-list", full.dir);
+  const emptyList = ask("task-list", empty);
+  const fullList = ask("task-list", full);
   assert.deepEqual(emptyList.tasks, []);
   assert.equal(emptyList.total, 0);
   assert.equal(fullList.tasks.length, 3, "the populated fixture did not produce tasks");
   assert.equal(fullList.total, 3);
 
-  assert.equal(ask("stats", empty.dir).stats.total, 0);
-  assert.equal(ask("stats", full.dir).stats.total, 3);
+  assert.equal(ask("stats", empty).stats.total, 0);
+  assert.equal(ask("stats", full).stats.total, 3);
 
-  assert.equal(ask("next-id", empty.dir).nextId, 1);
-  assert.equal(ask("next-id", empty.dir).max, null, "an empty union must report null, not a number");
-  assert.equal(ask("next-id", full.dir).nextId, 4);
-  assert.equal(ask("next-id", full.dir).known, 3);
+  assert.equal(ask("next-id", empty).nextId, 1);
+  assert.equal(ask("next-id", empty).max, null, "an empty union must report null, not a number");
+  assert.equal(ask("next-id", full).nextId, 4);
+  assert.equal(ask("next-id", full).known, 3);
 
-  assert.ok(ask("doctor", full.dir).checks.length > 0, "a diagnosis with no rows proves nothing");
+  assert.ok(ask("doctor", full).checks.length > 0, "a diagnosis with no rows proves nothing");
 });
 
 test("query --json says how many matched, not just how many it shows", () => {
   // A slice with no `total` reads exactly like a complete answer — the same
   // defect a silent cap in a report is.
-  const { dir } = backlog({ tasks: 3 });
-  const answer = ask("task-list", dir);
+  const fx = backlog({ tasks: 3 });
+  const { dir } = fx;
+  const answer = ask("task-list", fx);
   assert.equal(answer.limit, null, "no --limit means null, not a missing key");
 
   const limited = JSON.parse(run(["query", "--dir", dir, "--json", "--limit", "1"]).stdout);
@@ -448,9 +546,12 @@ test("the text output of the single-value commands is unchanged", () => {
 // `done` were in until this task.
 
 test("a refusal is an envelope too, with the reason in `refusalKind`", () => {
-  const { dir } = backlog({ tasks: 0, rule: true });
+  // The absent id comes from the fixture's own prefix (TL-273): an id from a
+  // foreign vocabulary would prove only that the prefix was wrong, and the two
+  // refusals are indistinguishable in the answer.
+  const { dir, absentId } = backlog({ tasks: 0, rule: true });
 
-  const take = run(["take", "NOPE-1", "--actor", "agent:test", "--json", "--dir", dir]);
+  const take = run(["take", absentId, "--actor", "agent:test", "--json", "--dir", dir]);
   const takeOut = JSON.parse(take.stdout);
   assert.equal(takeOut.schemaVersion, 1);
   assert.equal(takeOut.kind, "task-take", "a refusal keeps the kind of the question it answers");
@@ -463,7 +564,7 @@ test("a refusal is an envelope too, with the reason in `refusalKind`", () => {
     assert.ok(key in takeOut, "missing key on a refusal: " + key);
   }
 
-  const done_ = run(["done", "NOPE-1", "--json", "--dir", dir]);
+  const done_ = run(["done", absentId, "--json", "--dir", dir]);
   const doneOut = JSON.parse(done_.stdout);
   assert.equal(doneOut.kind, "verification-run");
   assert.equal(doneOut.ok, false);
