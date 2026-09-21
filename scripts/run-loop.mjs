@@ -88,7 +88,7 @@ import { readHistory, recordEdit } from "./history.mjs";
 import { roleBrief } from "./instructions.mjs";
 import { userConfigPath } from "./home.mjs";
 import { lockScope, releaseLock, stateRoot } from "./lock.mjs";
-import { callerSpecies, isOverSized, queueStatuses, readDispatchRecords, selectCandidates, servesExecutor } from "./next-task.mjs";
+import { callerSpecies, isOverSized, parkedByRun, queueStatuses, readDispatchRecords, selectCandidates, servesExecutor } from "./next-task.mjs";
 import { backlogPaths, repositoryRoot, resolveBacklogDir } from "./paths.mjs";
 import { loadPlanForDispatch, planState, projectionWall } from "./plan.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
@@ -778,6 +778,10 @@ export function writeStatus(opts) {
     // hand by exactly this value — and a parked task whose entry does not say
     // which hand tried is a record that cannot be read back into a stage.
     role: opts.role,
+    // Only the PARK carries the marker (TL-282). The other write this function
+    // performs — giving a claim back untouched — restores the status the task
+    // was taken from and decides nothing about it.
+    park: !!opts.park,
     reason,
   });
   return { ok: true, status, file };
@@ -1610,7 +1614,13 @@ export async function run(argv) {
     // here for the reason it is one in `next`: a task this actor handed back is
     // not handed to it again (TL-141), and a projection that leaves the actor
     // out is projecting somebody else's queue.
-    const base = { ...filters, callerSpecies: callerSpecies(actor), actor };
+    // AND THE PARK, WHICH THE PROJECTION MUST HONOUR TOO (TL-282): a dry run
+    // that offered a task the real run leaves parked would be projecting a queue
+    // nobody is going to be handed.
+    const base = {
+      ...filters, callerSpecies: callerSpecies(actor), actor,
+      parkedByRun: parkedByRun(root, records, config),
+    };
     const rows = [];
     // Named, never silent: what the projection declined for THIS actor's own
     // earlier judgement is reported under the order, the way `next` reports it.
@@ -1763,8 +1773,28 @@ export async function run(argv) {
     // pipeline working. The same role twice is still the spin this guards.
     const turn = task.id + "@" + role;
     if (seen.has(turn)) {
+      // THE GUARD IS ASKED AFTER `next` HAS ALREADY CLAIMED, and that is not a
+      // detail to fix by reordering (TL-282): selection and reservation are ONE
+      // act on purpose, so the loop cannot ask the dispatcher what it would hand
+      // out without it being handed out. What it can do is put back what it was
+      // given. Without this the loop stopped leaving the task `in_progress`, an
+      // owner on it, and a reservation naming a process that had exited — a
+      // state nobody chose, from a turn nobody wanted.
+      const from = String(task.from || "");
+      if (from) {
+        const given = writeStatus({
+          root, config, id: task.id, actor, status: from, role, releaseOwner: true,
+          reason: "handed out twice in one run — the claim is given back, nothing about the task was measured",
+        });
+        if (!given.ok && given.reason !== "closed-elsewhere" && given.reason !== "held-elsewhere") {
+          console.error(warn(task.id + ": " + given.message));
+        }
+      } else {
+        console.error(warn(task.id + ": `" + N + " next` did not say which status it was taken from"));
+      }
+      releaseLock({ root, taskId: task.id, actor });
       stopped = task.id + " was handed out twice" + (role ? " to role `" + role + "`" : "") +
-        " — the loop stopped rather than spin";
+        " — the loop stopped rather than spin, and gave the claim back";
       break;
     }
     seen.add(turn);
@@ -1880,6 +1910,10 @@ export async function run(argv) {
         : repeatedSuffix(blockedReason(result.attempts, result.detail, result.outcome), result);
       const blocked = writeStatus({
         root, config, id: task.id, actor, reason, role, status: toVouch ? vouchStatus : stuck.status,
+        // This write is the run DECLARING it could not verify the task, and the
+        // log has to keep that apart from a task waiting on its blockers
+        // (TL-282) — in this project both are the word `blocked`.
+        park: true,
       });
       if (blocked.reason === "closed-elsewhere") {
         // NOT a failure of this run and not a task it may park: somebody closed
