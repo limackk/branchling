@@ -74,6 +74,10 @@ export const KINDS = {
     delegation: null, allowUncontrolledDelegation: null, plan: null, order: [], considered: null,
     stoppedAt: null, stopped: null, agentNeverRan: null, waitingForRole: [],
     waitingForExecutor: [], waitingForSize: [], tally: null, sharedState: null, ms: null, tasks: [],
+    // What `--dry-run` declined because THIS actor handed it back (TL-239),
+    // under the name `next --json` already gives the same list: the two paths
+    // answer about one queue, so a consumer reads one key for one fact.
+    skippedHandedBack: [],
   },
   // `advisories` are the findings `check` stopped reporting when it became a
   // release gate (TL-383): each `{ name, output }`, where `name` is the same

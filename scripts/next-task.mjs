@@ -391,6 +391,53 @@ export function lastHandoff(entries) {
   return found;
 }
 
+/**
+ * THE RECORDS `selectCandidates` IS ENTITLED TO DECIDE ON — read once, here.
+ *
+ * `selectCandidates` is pure and reads no disk, so every fact about a task that
+ * lives outside its file has to be ATTACHED before the call: what the rest of
+ * this clone says about it (`elsewhere`), the log it was judged in (`history`)
+ * and the judgement itself (`handedBack`). A caller that reads the task files
+ * alone passes the same function a thinner tree and gets a different queue out
+ * of it — which is exactly what `run --dry-run` did until TL-239: it projected
+ * a task its own live loop would never be handed, because the handoff that
+ * excluded the task was in a log the projection never opened.
+ *
+ * SO THERE IS ONE LOADER AND BOTH PATHS CALL IT. The alternative — repeating
+ * the three attachments in the dispatcher's other caller — closes today's
+ * divergence and reopens it at the next fact added to selection, in a place
+ * nobody will think to look. The caller still owns its FILTERS, because those
+ * are the question being asked; this owns the tree the question is asked about.
+ *
+ * THE SCAN COMES BACK WITH THEM because its own summary is part of the answer:
+ * `next` prints WHY it could see no other branch, and a caller that had to run
+ * `crossBranchState` a second time to say so would be reading the tree twice to
+ * report on one reading of it.
+ *
+ * @param {string} root the repository root
+ * @param {object} config the loaded configuration
+ * @returns {{records: object[], scan: object}} the task records, with
+ *          `elsewhere`, `history` and `handedBack` attached, and the scan they
+ *          were attached from
+ */
+export function readDispatchRecords(root, config) {
+  const records = readTaskRecords(backlogPaths(root).tasksDir, config.taskId.file);
+  // What the REST of this clone says (TL-133). Attached exactly as `query`
+  // attaches it, from the same module, so the dispatcher and the listing cannot
+  // disagree about the tree they are both looking at.
+  const scan = crossBranchState(root, config);
+  for (const t of records) t.elsewhere = divergences(t.status, scan.byId.get(t.id));
+  // Read for the OPEN tasks only. A closed one can never be a candidate, and in
+  // a backlog that has been running a while most of the tree is closed — so
+  // this costs a read per task that could actually be handed out, not per task.
+  for (const t of records) {
+    if (config.archivedStatuses.indexOf(t.status) >= 0) continue;
+    t.history = readHistory(root, t.id);
+    t.handedBack = lastHandoff(t.history);
+  }
+  return { records, scan };
+}
+
 export function selectCandidates(records, config, filters, now) {
   const archived = new Set(config.archivedStatuses);
   // The species gate is applied to the RECORDS, before any selection: a task
@@ -645,20 +692,7 @@ export function run(argv) {
   }
 
   const now = Date.now();
-  const records = readTaskRecords(backlogPaths(root).tasksDir, config.taskId.file);
-  // What the REST of this clone says (TL-133). Attached exactly as `query`
-  // attaches it, from the same module, so the dispatcher and the listing cannot
-  // disagree about the tree they are both looking at.
-  const scan = crossBranchState(root, config);
-  for (const t of records) t.elsewhere = divergences(t.status, scan.byId.get(t.id));
-  // Read for the OPEN tasks only. A closed one can never be a candidate, and in
-  // a backlog that has been running a while most of the tree is closed — so
-  // this costs a read per task that could actually be handed out, not per task.
-  for (const t of records) {
-    if (config.archivedStatuses.indexOf(t.status) >= 0) continue;
-    t.history = readHistory(root, t.id);
-    t.handedBack = lastHandoff(t.history);
-  }
+  const { records, scan } = readDispatchRecords(root, config);
   // The wave is resolved from the RECORDS just read, never from a generated
   // view: a view answers from the last `build`, and a wave whose last task
   // closed a minute ago would still be the one this hands work out of.
