@@ -1,0 +1,2 @@
+{"id":"01M32NMX9VRCTJRM4NSRR5AE2P","ts":"2026-09-21T19:03:54.939Z","task":"TL-430","field":"__created__","from":"","to":"backlog/config.yaml points a reader at a flag the tool refuses","actor":"agent:claude","source":"new","reason":"unknown"}
+{"id":"01M32P4BA1ZQEJ6F3PAQS3DASY","ts":"2026-09-21T19:12:20.801Z","task":"TL-430","field":"__adopted__","from":"","to":["title","status","priority","type","owner","estimate","confidence","board","created"],"actor":"agent:claude","source":"manual","reason":"TL-430: the contract was written into the task after `new` created it"}
