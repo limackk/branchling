@@ -54,6 +54,7 @@ import { fileURLToPath } from "node:url";
 import { loadConfigOrExit } from "./config.mjs";
 import { ACTOR_NAMESPACES, MIGRATIONS_FILE, appendRenumberMigration, applyIdMigrations, isValidActor, loadSnapshot, saveSnapshot } from "./history.mjs";
 import { backlogPaths, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
+import { withSnapshotMutex } from "./snapshot-mutex.mjs";
 import { taskIdPatterns, taskIdScanner } from "./task-id.mjs";
 import { MARK, color, errColor } from "./ui.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
@@ -357,11 +358,16 @@ export function applyRenumber(root, plan, opts = {}) {
 
   // After the renames, because the rekeying reads the TREE to decide — the same
   // function every other clone will run from the log we just wrote.
-  const snapshot = loadSnapshot(root);
-  if (snapshot) {
+  // INSIDE THE SNAPSHOT SECTION (TL-228) — the same defect as in
+  // `migrate-prefix`, and the same answer: a writer overlapping with this
+  // read-modify-write otherwise saves a snapshot keyed by the ids this
+  // migration has just left behind.
+  withSnapshotMutex(root, () => {
+    const snapshot = loadSnapshot(root);
+    if (!snapshot) return;
     const present = new Set(plan.renames.filter((r) => r.kind === "task").map((r) => r.newId));
     if (applyIdMigrations(snapshot, [record], present)) saveSnapshot(root, snapshot);
-  }
+  });
 
   return report;
 }
