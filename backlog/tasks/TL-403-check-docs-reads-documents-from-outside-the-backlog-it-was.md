@@ -43,3 +43,31 @@ The root is resolved for a non-git backlog by walking up from the backlog direct
 ## Acceptance criteria
 
 - [ ] The guard-scope suite stays green with a stray markdown file sitting in TMPDIR. [proof: check-1]
+
+## Measured again, and the mechanism is settled (2026-09-21)
+
+A second session reported that overriding `TMPDIR` "produces 17 spurious
+failures" across the cli, doctor, init, migrate-prefix and new fixtures, and
+concluded the override itself was the cause. That conclusion is wrong, and the
+correction is the useful part of this record.
+
+What was actually measured, in the main checkout at `f923a90`:
+
+    $ TMPDIR=<that session's own scratch dir> node --test scripts/tests/doctor.test.mjs
+      tests 14, pass 13, fail 1
+    $ TMPDIR=<a directory created empty> node --test scripts/tests/doctor.test.mjs
+      tests 14, pass 14, fail 0
+
+The two runs differ only in what already lay in the directory. That session had
+written its own working files there — `probe.mjs`, `regress.mjs`,
+`old-manual.md`, `new-manual.md`, `old-hist.md`, `new-hist.md` — and a fixture
+backlog created BELOW that directory is then within reach of the document scan.
+Its own scratch files were read as if they belonged to the fixture.
+
+So the defect is the one this task already names, and the override is its
+remedy rather than its cause: `TMPDIR` pointed at a private directory isolates
+a run from OTHER sessions, and is exactly what stopped the first instance. What
+it cannot do is isolate a run from the session's own leftovers in that same
+directory. Any fix here has to make the scan's reach independent of what lies
+above the backlog, rather than relying on the directory being clean — because
+"clean" is a property nobody can maintain while working.
