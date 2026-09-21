@@ -248,6 +248,174 @@ export const KINDS = {
   },
 };
 
+/**
+ * WHERE A KIND IS REGISTERED (TL-285).
+ *
+ * A kind is not proved by being declared. The suite runs one invocation per
+ * kind against two fixtures — an empty backlog and a populated one — and a kind
+ * with no invocation to run is the whole gap between the envelope's contract and
+ * a typo that ships. That rule stays. What moved is WHERE the invocation is
+ * written down.
+ *
+ * It used to live in two tables inside `scripts/tests/json-envelope.test.mjs`,
+ * which made every new `--json` command an edit under `scripts/tests/` — a
+ * directory a hand allowed to write production code is deliberately kept out
+ * of, so that it cannot weaken the proof. Naming the invocation is not a
+ * weakening, it is a REGISTRATION, and registration belongs beside the thing
+ * being registered. The declaration of a kind and the proof that something
+ * exercises it are now one edit in one file.
+ *
+ * SO: A NEW COMMAND ANSWERING `--json` ADDS TWO ROWS HERE — its keys to `KINDS`
+ * and the invocation that exercises it to `KIND_EXERCISE` — plus its row in the
+ * `--json` contract table of `docs/manual.md`. Nothing under `scripts/tests/`.
+ *
+ * The cost accepted: this table ships in the tarball although only the suite
+ * reads it. It is data about the tool — the canonical call behind each kind —
+ * rather than data about the test, and it is worth less in a file the author of
+ * an emitter cannot reach.
+ *
+ * Each row: `{ args, noDir?, refuses?, writes?, input? }`.
+ *   - `args`   the command line, WITHOUT `--dir`, which the harness appends
+ *   - `noDir`  the command answers about the machine, not about a backlog, so
+ *              no project directory is given
+ *   - `refuses` a non-zero exit is the point of the row — a refusal is an
+ *              envelope too, and it is the path most easily left without one
+ *   - `writes` the row CHANGES the tree, so it needs a fixture of its own:
+ *              asked twice of one backlog, the second answer would be about
+ *              what the first call wrote
+ *   - `input`  stdin for a command that takes a callable input
+ *
+ * IDS ARE NAMED BY SENTINEL, NEVER TYPED (TL-273). A row that types an id has to
+ * guess the prefix the fixture was built with, and an id from the wrong
+ * vocabulary is not a failure but a "no such task" refusal in a complete
+ * envelope — every shape assertion passes while the row measures the path its
+ * own comment says it avoids. The fixture resolves these two.
+ */
+/** The first task the fixture really created; on an empty fixture, the absent id. */
+export const FIRST_TASK = "<first-task>";
+/** An id the fixture deliberately does NOT have — the refusal rows' subject. */
+export const ABSENT_TASK = "<absent-task>";
+
+export const KIND_EXERCISE = {
+  "task-list": { args: ["query", "--json"] },
+  stats: { args: ["stats", "--json"] },
+  doctor: { args: ["doctor", "--json"] },
+  // The guards, as one document (TL-57). A NARROW selector on purpose: the
+  // default run reads this installation's whole source, which is a second of
+  // wall clock per fixture and answers nothing the envelope suite asks.
+  check: { args: ["check", "--json", "--refs"] },
+  board: { args: ["board", "--json", "--paths", "docs/guide.md"] },
+  "next-id": { args: ["next-id", "--json"] },
+  // A topic is named on purpose: without one the payload carries the listing and
+  // no `text`, and the key that matters most would go unexercised.
+  instructions: { args: ["instructions", "overview", "--json"] },
+  // Profiles are machine-local user data, not a question about the fixture
+  // backlog. The generic harness normally appends `--dir`; this one must prove
+  // the opposite boundary and therefore runs with no project directory.
+  "agent-profiles": { args: ["profile", "list", "--json"], noDir: true },
+  // Profile checks read only the isolated user configuration, never the fixture
+  // backlog. The empty answer is still an envelope a setup tool can consume.
+  "profile-check": { args: ["profile", "check", "--json"], noDir: true },
+  // Conformance creates its own disposable repository. Giving it a Node
+  // executable makes the adapter response malformed on purpose, which proves
+  // the JSON refusal shape without needing a provider or fixture wrapper.
+  "adapter-conformance": { args: ["conformance", "--adapter", process.execPath, "--json"], noDir: true, refuses: true },
+  // The fixtures carry no `plan.yaml`, so this exercises the answer a backlog
+  // without an execution order gives — which is the one that has to stay a
+  // complete envelope rather than an error.
+  plan: { args: ["plan", "--json"] },
+  // The input surface of ONE command, for a program to read before it calls it
+  // (TL-83). `new` is the one whose flags draw on the most vocabularies, so a
+  // fixture answering it exercises the part that varies per project.
+  "command-help": { args: ["new", "--help", "--json"] },
+  // The fixtures are not git repositories, so this exercises the answer a
+  // command with no range to read gives (TL-89) — which has to stay a complete
+  // envelope saying `scanned: false`, not an error and not an empty list.
+  "pr-summary": { args: ["pr-summary", "--json"] },
+  // A backlog with no history at all (TL-90): every detector has nothing to
+  // find, and the envelope still has to carry every key rather than dropping
+  // the sections that came back empty.
+  audit: { args: ["audit", "--json"] },
+  // A repository with no `docs/` at all (TL-100): zero documents still has to be
+  // a complete envelope. `flagged` and `tooLittle` come back as empty LISTS, and
+  // `seeded` as null — the command wrote nothing, which is a different answer
+  // from having written nothing useful.
+  "docs-drift": { args: ["docs-drift", "--json"] },
+  // `red` with no report is a complete answer, not a usage error (TL-276): an
+  // empty `files` means "nothing failed in what I was shown", and `ran` with
+  // `reason` is what tells a consumer whether it was shown anything at all. No
+  // `--command` is given, so no suite runs inside the suite.
+  "red-owners": { args: ["red", "--json"] },
+  // `resume` composes reads and writes nothing (TL-151), so it is NOT a
+  // `writes` row: asking it twice of one tree is safe, and
+  // `scripts/tests/resume-briefing.test.mjs` proves the tree is byte-identical
+  // afterwards. The id EXISTS on the populated fixture and not on the empty
+  // one, so the row exercises a briefing on one and the "no such task" refusal
+  // on the other — each a complete envelope, and neither a usage error.
+  // `--no-verify` because this row asks about the ENVELOPE. Left out, it would
+  // run the fixture task's `verification:` command, and the shape of the answer
+  // would start depending on the observer's shell.
+  resume: { args: ["resume", FIRST_TASK, "--actor", "agent:test", "--no-verify", "--json"] },
+  run: { args: ["run", "--dry-run", "--json"] },
+  // ── The rows that WRITE (TL-119) ─────────────────────────────────────────
+  //
+  // `take` and `next` share ONE kind, because they answer the same question.
+  // The registry names it once and exercises it with `next`; the refusal case
+  // in the suite covers `take`.
+  "task-take": { args: ["next", "--actor", "agent:test", "--json"], writes: true },
+  // A handoff of a task nobody holds: a REFUSAL, and refusals are the path most
+  // easily left without an envelope. `--reason` is required before the refusal
+  // is even reached, so it is given.
+  "task-handoff": {
+    args: ["handoff", ABSENT_TASK, "--to-owner", "unassigned", "--reason", "a fixture", "--actor", "agent:test", "--json"],
+    refuses: true, writes: true,
+  },
+  "task-release": {
+    args: ["release", ABSENT_TASK, "--actor", "agent:test", "--reason", "a fixture", "--json"],
+    refuses: true, writes: true,
+  },
+  // A task that is not there: same reason as above — the refusal path.
+  "verification-run": { args: ["done", ABSENT_TASK, "--json"], refuses: true, writes: true },
+  // A question about a task that is not there (TL-148): the refusal path again,
+  // and `--question` is required before the refusal is reached, so it is given.
+  "task-ask": {
+    args: ["ask", ABSENT_TASK, "--question", "which of the two?", "--actor", "agent:test", "--json"],
+    refuses: true, writes: true,
+  },
+  seed: {
+    args: ["seed", "--json"],
+    writes: true,
+    input: JSON.stringify({
+      tasks: [{
+        plan_id: "first", title: "A seeded task", goal: "Something is true afterwards.",
+        verification: [{ id: "it-runs", bash: "true", proves: "The check runs." }],
+      }],
+    }),
+  },
+};
+
+/**
+ * The kinds nothing exercises, and the rows naming a kind that does not exist.
+ * PURE, so the suite can run it against a deliberately broken pair and prove the
+ * check really detects the gap rather than reporting an empty list.
+ *
+ * @param {object} kinds  a KINDS-shaped map
+ * @param {object} exercise  a KIND_EXERCISE-shaped map
+ */
+export function registrationGaps(kinds = KINDS, exercise = KIND_EXERCISE) {
+  const gaps = [];
+  for (const kind of Object.keys(kinds)) {
+    if (!exercise[kind]) gaps.push("the kind `" + kind + "` is declared but nothing exercises it");
+  }
+  for (const kind of Object.keys(exercise)) {
+    if (!kinds[kind]) gaps.push("`" + kind + "` is exercised but is not a declared kind");
+    else if (!Array.isArray(exercise[kind].args) || !exercise[kind].args.length) {
+      gaps.push("the kind `" + kind + "` is registered with no command line");
+    }
+  }
+  return gaps;
+}
+
 /** The envelope's own keys — a payload may never carry them. */
 const RESERVED = ["schemaVersion", "kind"];
 
