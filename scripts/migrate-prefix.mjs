@@ -45,6 +45,7 @@ import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { ACTOR_NAMESPACES, MIGRATIONS_FILE, SNAPSHOT_FILE, appendMigration, applyIdMigrations, isValidActor, loadSnapshot, saveSnapshot } from "./history.mjs";
 import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { withSnapshotMutex } from "./snapshot-mutex.mjs";
 import { PREFIX_SHAPE, taskIdPatterns } from "./task-id.mjs";
 import { MARK, color, errColor } from "./ui.mjs";
 import { stripComment, unquote } from "./task-fields.mjs";
@@ -206,11 +207,20 @@ export function applyMigration(root, plan, opts = {}) {
   // function every other clone runs from the log, given the record we just
   // wrote. One implementation, so the migrating clone cannot end up somewhere
   // the others never reach.
-  const snapshot = loadSnapshot(root);
-  if (snapshot) {
+  // INSIDE THE SNAPSHOT SECTION (TL-228). These three calls are a
+  // read-modify-write of one file that every writing route also performs, and
+  // performed unguarded they lose to whichever writer saves last: a snapshot
+  // keyed by the OLD ids lands on top of the repointed one and the next
+  // reconcile reads the whole backlog as deleted and created again (TL-111).
+  // The section covers the SNAPSHOT and not the renames above it — see
+  // `withSnapshotMutex` for why a section held for a whole-tree rewrite would
+  // outlive `MUTEX_STALE_MS` and stop excluding anybody.
+  withSnapshotMutex(root, () => {
+    const snapshot = loadSnapshot(root);
+    if (!snapshot) return;
     const present = new Set(plan.renames.filter((r) => r.kind === "task").map((r) => r.newId));
     if (applyIdMigrations(snapshot, [record], present)) saveSnapshot(root, snapshot);
-  }
+  });
 
   const configPath = backlogPaths(root).configPath;
   if (existsSync(configPath)) {
