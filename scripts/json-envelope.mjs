@@ -246,6 +246,20 @@ export const KINDS = {
   "red-owners": {
     command: null, ran: null, reason: null, exitCode: null, files: [], mine: null, tally: null,
   },
+  // `log --json` (TL-256). `records` is the number of RAW entries the log holds
+  // and `total` the number of EXCHANGES they fold into; both are here because
+  // the ratio between them IS the answer to "was this worth folding", and a
+  // consumer counting the rows it was handed could not recover `records` at
+  // all. `total` is also what keeps `--limit` readable — the list is then a
+  // slice, and a slice that reads like a complete answer is the defect
+  // `task-list` carries its own `total` for. `path` names the log this came
+  // from, so a reader who does want the raw file is told where it is instead of
+  // guessing the layout.
+  "task-log": {
+    ok: null, id: null, title: null, file: null, path: null,
+    records: null, total: null, limit: null, exchanges: [],
+    refusalKind: null, refusal: null, details: [],
+  },
 };
 
 /**
@@ -346,6 +360,12 @@ export const KIND_EXERCISE = {
   // `reason` is what tells a consumer whether it was shown anything at all. No
   // `--command` is given, so no suite runs inside the suite.
   "red-owners": { args: ["red", "--json"] },
+  // A task's own log, read back (TL-256). It writes nothing, so one fixture
+  // answers it twice over: on the populated fixture the task EXISTS and the row
+  // exercises a real fold, and on the empty one the same call is the "no such
+  // task" refusal — each a complete envelope, and neither a usage error. The id
+  // is the sentinel, never typed.
+  "task-log": { args: ["log", FIRST_TASK, "--json"] },
   // `resume` composes reads and writes nothing (TL-151), so it is NOT a
   // `writes` row: asking it twice of one tree is safe, and
   // `scripts/tests/resume-briefing.test.mjs` proves the tree is byte-identical

@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending  # pending | in_progress | blocked | done | cancelled
-owner: ""
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
@@ -18,8 +18,26 @@ blocked_by: []                     # ids of tasks that MUST be closed before thi
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
 verification:                      # HOW to check the task is really done
-  - id: the-name                   # optional; a criterion below points at this id
-    bash: "command to run"
+  # The fold, the refusals, the empty log and the proof that a read writes
+  # nothing — each with a control that fails if the fixture stops reproducing
+  # the defect.
+  - id: log-read
+    bash: "node --test scripts/tests/log-read.test.mjs"
+  # `task-log` is registered beside KINDS, exercised on both fixtures, and its
+  # keys match the manual's row in both directions.
+  - id: envelope-green
+    bash: "node --test scripts/tests/json-envelope.test.mjs scripts/tests/json-kind-registry.test.mjs"
+  # The command answers `--help`, refuses an unknown flag with a list, and every
+  # flag it accepts is declared in that help.
+  - id: cli-surface
+    bash: "node --test scripts/tests/cli.test.mjs scripts/tests/cli-help.test.mjs scripts/tests/help-covers-flags.test.mjs"
+  # `stats --context` still measures, now with the new row beside the raw file
+  # it replaces.
+  - id: context-budget
+    bash: "node --test scripts/tests/context-budget.test.mjs"
+  # A new command costs no case anywhere else.
+  - id: suite-green
+    bash: "node --test scripts/tests/*.test.mjs"
 ---
 
 ## Goal
@@ -68,11 +86,11 @@ moved beside it.
 
 ## Acceptance criteria
 
-- [ ] A task's history is readable through the tool, without opening the file.
-- [ ] Rows written by one write print as one exchange, with the reason once.
-- [ ] The reading command carries `--json`.
-- [ ] A task with no log at all is answered as such, not as an error.
-- [ ] `stats --context` names what the new command costs.
+- [x] A task's history is readable through the tool, without opening the file. [proof: log-read]
+- [x] Rows written by one write print as one exchange, with the reason once. [proof: log-read]
+- [x] The reading command carries `--json`. [proof: envelope-green]
+- [x] A task with no log at all is answered as such, not as an error. [proof: log-read]
+- [x] `stats --context` names what the new command costs. [proof: context-budget]
 
 ## Notes
 

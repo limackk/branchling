@@ -320,6 +320,21 @@ write, as the `reason` field of the record in `history/` — which is why
 ships with the headings above; the tool does not require any particular set of
 them.
 
+**And a reason that is written down can be read back.** `branchling log <ID>`
+prints that task's recorded exchanges — one row per *write*, not per field, with
+the fields that moved beside it and the reason printed once:
+
+```
+branchling log TASK-1
+branchling log TASK-1 --limit 3 --json
+```
+
+The log itself stores one entry per field, so a single handoff keeps the same
+paragraph on `status`, on `owner`, on `role` and on the comment it leaves
+behind. That is right for something append-only and expensive to read: `cat`-ing
+the file makes you pay for one sentence four times over. Nothing is rewritten —
+this is a read.
+
 ### Editing a task by hand
 
 **Editing a task file by hand is supported, not merely tolerated: the file is

@@ -154,6 +154,33 @@ function newestClosedTask(tasksDir, config) {
 }
 
 /**
+ * The task whose history log is the longest in this tree, or null (TL-256).
+ *
+ * THE LONGEST AND NOT THE MEDIAN, deliberately. The median log holds a single
+ * creation record and folds to one exchange, so a row measured on it would
+ * report that reading a decision costs nothing — true of the backlog nobody has
+ * argued in, and false of every task that was handed over. The expensive case
+ * is the one worth knowing the price of.
+ */
+function longestLog(root) {
+  const dir = join(root, "history");
+  if (!existsSync(dir)) return null;
+  let best = null;
+  for (const file of readdirSync(dir)) {
+    const m = file.match(/^([A-Za-z][A-Za-z0-9]*-\d+)\.jsonl$/);
+    if (!m) continue;
+    const bytes = statSync(join(dir, file)).size;
+    if (!best || bytes > best.bytes) {
+      best = {
+        id: m[1], bytes,
+        records: readFileSync(join(dir, file), "utf8").split("\n").filter((l) => l.trim()).length,
+      };
+    }
+  }
+  return best;
+}
+
+/**
  * The cost table for THIS tree. Every row is measured; nothing is assumed.
  *
  * The rows are ordered cheapest first, because that order is itself the
@@ -188,6 +215,18 @@ export function contextBudget({ root, config, run, measureDone = true }) {
   }
   add("check", `${N} check`, run(["check"]).length,
     "what a session pays to learn the guards are green");
+  // THE READ THAT REPLACED A `cat` (TL-256). Both rows are measured on the SAME
+  // task — the one with the longest log in this tree — because the PAIR is the
+  // argument: the folded answer beside the file it was folded from. A median
+  // would hide it, since most logs hold one creation record and fold to
+  // themselves.
+  const talkative = longestLog(root);
+  if (talkative) {
+    add("log", `${N} log ${talkative.id}`, run(["log", talkative.id]).length,
+      "the decisions of the task with the longest log here, one row per exchange");
+    add("rawlog", "history/" + talkative.id + ".jsonl, read raw", talkative.bytes,
+      "the same " + talkative.records + " records before the fold — one entry per FIELD, so one handoff's reason is stored four times");
+  }
   add("task", "one task file (median)", median(sizes),
     "what `" + N + " next` hands over, whatever the backlog's size — the only cost here that does not grow");
   add("list", `${N} query` + (queue.length ? " --status " + queue.join(",") : ""),
