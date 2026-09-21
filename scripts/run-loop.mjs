@@ -470,6 +470,27 @@ export function blockedReason(attempts, detail, outcome) {
  * task to learn whether anything was done, which is exactly the reading cost
  * this status exists to remove.
  */
+/**
+ * What a park's reason gains when every attempt printed the same bytes
+ * (TL-283). PURE, for the same reason the two beside it are: the words land
+ * permanently in an append-only log.
+ *
+ * IT DOES NOT REPLACE THE CONTRACT ENTRY, and that is deliberate. A red
+ * verification is a fact whatever the hand was doing, and this repository pins
+ * a hand that repeats itself, fails its contract and must still be parked
+ * naming the entry. What is added is the evidence the reader was missing: the
+ * attempts were byte-identical and here is what the hand actually said. No
+ * cause is named — the loop reads no vendor's wording — so the reader, not the
+ * tool, decides whether the hand stopped.
+ */
+export function repeatedSuffix(reason, result) {
+  if (!result || !result.repeatedOutput) return reason;
+  const said = String(result.said || "").split("\n").map((s) => s.trim()).filter(Boolean)[0] || "";
+  return reason + " — every one of the " + result.attempts +
+    " attempts printed byte-identical output, which a working hand does not" +
+    (said ? "; it said: " + said : "");
+}
+
 export function vouchReason(detail) {
   const head = "the agent's work stands; a `manual:` entry is waiting for a person to vouch";
   const tail = String(detail || "").split("\n").map((s) => s.trim()).filter(Boolean)[0] || "";
@@ -1069,6 +1090,11 @@ async function workOne(ctx, task) {
   let feedbackRan = false;
   let failure = "";
   let attempts = 0;
+  // The PREVIOUS attempt's transcript, kept only to be compared with the next
+  // one, and the last line any attempt printed (TL-283).
+  let lastOutput = null;
+  let lastSaid = "";
+  let repeatedOutput = false;
   const provenance = [];
   const result = (fields) => ({ ...fields, provenance });
   const started = Date.now();
@@ -1122,6 +1148,32 @@ async function workOne(ctx, task) {
       failure = feedback;
       continue;
     }
+
+    // A HAND THAT REPEATS ITSELF BYTE FOR BYTE IS SAYING SOMETHING (TL-283).
+    //
+    // WHAT WAS MEASURED. On 2026-09-05 the hand working TL-150 was cut off by
+    // its vendor mid-task. Its whole transcript, on both attempts, was one line.
+    // The task was then parked with `no verification after 2 agent attempts:
+    // <entry>` — which a later reader takes as a finding about the WORK, when
+    // nothing about the work had been established — and the half-written
+    // deliverable the hand had produced was left uncommitted in the tree, one
+    // `git add -A` away from an unrelated commit (the hazard of TL-276).
+    //
+    // WHAT IS RECORDED HERE, AND WHY NOTHING MORE. Two consecutive attempts on
+    // one task produced identical, NON-EMPTY output. That is worth telling the
+    // reader: a hand that is working reads a tree the previous attempt moved and
+    // a refusal it earned, so its second answer differs. It is NOT worth acting
+    // on, and this repository already said so before the observation was made —
+    // `contract-scope.test.mjs` and `run-agent-launch.test.mjs` both pin a hand
+    // that prints the same line twice, fails its contract, and MUST keep every
+    // attempt and be parked naming the entry it failed. A quota cut-off and a
+    // hand that deterministically gives up are the same bytes. So the loop
+    // reports the repetition beside the ordinary ending and changes no ending:
+    // the reader is given the evidence, and no false diagnosis is manufactured
+    // from it. The empty transcript stays TL-184's, below.
+    if (attempt > 1 && output.trim() && output === lastOutput) repeatedOutput = true;
+    if (output.trim()) lastSaid = String(output).trim().split("\n").filter(Boolean).pop() || "";
+    lastOutput = output;
 
     // An attempt that changed nothing and said nothing is not an attempt
     // (TL-184). It is reported with the attempts ACTUALLY made — none, on the
@@ -1242,7 +1294,13 @@ async function workOne(ctx, task) {
     // they are looking at a blocked task. The agent still gets the whole output.
     failure = failedEntry(verdict) || String(feedback).split("\n")[0];
   }
-  return result({ id: task.id, outcome: "exhausted", attempts, ms: Date.now() - started, log: logPath, detail: failure });
+  return result({
+    id: task.id, outcome: "exhausted", attempts, ms: Date.now() - started, log: logPath, detail: failure,
+    // The OBSERVATION, carried beside the ending rather than replacing it
+    // (TL-283). An unattended caller reads `--json`, and this is the one field
+    // that tells it the attempts were spent on a hand that was not answering.
+    repeatedOutput, said: lastSaid || undefined,
+  });
 }
 
 function renderReport(report, plan) {
@@ -1298,6 +1356,24 @@ function renderReport(report, plan) {
         ? never.id + " was left in `" + never.status + "`, the status it was taken from"
         : never.id + " could not be given back — check its status by hand"
     ));
+  }
+  // A HAND THAT REPEATED ITSELF, AND THE WORK IT LEFT BEHIND (TL-283). Two
+  // facts the tally cannot carry, said where the reader meets the task. The
+  // first is evidence and not a diagnosis: the loop reads no vendor's wording
+  // and does not claim the hand was cut off — it says what it saw and quotes the
+  // hand, and the reader decides. The second is the consequence that was costing
+  // people commits: whatever the hand wrote before it stopped is sitting
+  // uncommitted in this tree, one `git add -A` from an unrelated commit — the
+  // hazard TL-276 recorded. The run neither tidies it nor lists it, because
+  // `resume` already reports the uncommitted half of a task's work (TL-272) and
+  // a second, poorer listing here would be a second place to be wrong.
+  for (const r of report.taken.filter((t) => t.repeatedOutput)) {
+    lines.push("");
+    lines.push("  " + MARK.warn + " " + r.id + ": all " + r.attempts +
+      " attempts printed byte-identical output — a hand that is working does not repeat itself.");
+    if (r.said) lines.push("      " + color.dim("it said: " + String(r.said).split("\n")[0]));
+    lines.push("      " + color.dim("anything it wrote before stopping STAYS IN YOUR TREE, uncommitted: " +
+      N + " resume " + r.id));
   }
   const waitingRoles = Object.keys(report.waiting || {}).sort();
   if (waitingRoles.length) {
@@ -1789,9 +1865,19 @@ export async function run(argv) {
         console.error(warn(task.id + ": its contract asks a person to vouch, and this backlog declares no " +
           "`awaiting_vouch_status` — parking it as `" + stuck.status + "`, which says the work failed"));
       }
+      // THE REASON FOLLOWS THE ENDING, not the number of attempts (TL-283). A
+      // task whose hand repeated itself is parked — nobody here can say the work
+      // is fine — but the sentence it is parked with must not name a contract
+      // that was never the thing at fault.
+      // THE SENTENCE A LATER READER MEETS, and what it must not leave out
+      // (TL-283). It still names the entry that failed — a contract red is a
+      // fact and the reader's next act is to run it — but when every attempt
+      // printed the same bytes it says so and quotes the hand, so that
+      // "no verification after 2 agent attempts" is not read as a finding about
+      // work nobody measured.
       const reason = toVouch
         ? vouchReason(result.detail)
-        : blockedReason(result.attempts, result.detail, result.outcome);
+        : repeatedSuffix(blockedReason(result.attempts, result.detail, result.outcome), result);
       const blocked = writeStatus({
         root, config, id: task.id, actor, reason, role, status: toVouch ? vouchStatus : stuck.status,
       });
@@ -1912,6 +1998,11 @@ export async function run(argv) {
         command: r.command || null,
         // Which role a handed-on task went to (TL-271); null for every other ending.
         toRole: r.toRole || null,
+        // Every attempt printed the same bytes, and the last line it printed
+        // (TL-283). EVIDENCE for the caller, never a cause: the loop does not
+        // read the hand's wording and does not say why it stopped answering.
+        repeatedOutput: !!r.repeatedOutput,
+        said: r.said || null,
         provenance: r.provenance || [],
       })),
     });
