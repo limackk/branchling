@@ -2929,6 +2929,7 @@ const HISTORY_FIELD_LABELS = {
   // compare them against. The entry's "to" is the list of those fields.
   __adopted__: "adopted with no reference point",
   __role_override__: "taken outside its role",
+  __takeover__: "claim taken over",
   updated: "Updated",
   created: "Created",
 };

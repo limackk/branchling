@@ -245,8 +245,12 @@ export const COMMANDS = {
     script: "take-task.mjs",
     summary: "claim ONE named task — reserve it, set it in progress, print it",
     usage: [
-      `${N} take <ID> [--actor <ns:name>] [--role <r>] [--reason "…"] [--json] [--dir <path>] [--probe]`,
+      `${N} take <ID> [--actor <ns:name>] [--role <r>] [--reason "…"] [--json] [--dir <path>] [--probe] [--take-over]`,
       "",
+      "  --take-over        claim it although somebody else holds it. Crosses BOTH halves",
+      "                     of their claim — the `owner:` field and the live reservation,",
+      "                     which is handed over rather than deleted — and records a",
+      "                     `__takeover__` event naming them. Refused without `--reason`",
       "  --probe            run the `verification:` contract now and print each entry's",
       "                     result after the file — the target, before any work (TL-268)",
       "  --actor <ns:name>  who is claiming it; becomes `owner:` and goes into the history",
