@@ -6,18 +6,28 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P2                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 30m                      # 30m | 2h | 1d | 1w
 confidence: high                   # how much you trust the estimate
 created: 2026-09-03
-updated: 2026-09-03
+updated: 2026-09-21
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
 verification:                      # HOW to check the task is really done
+  # REWRITTEN BECAUSE THE OLD BLOCK PASSED BEFORE ANY WORK WAS DONE (TL-260).
+  # `ask-green` ran two whole files that were already green: TL-167 had since
+  # moved the diagnosis into `reasonRefusal()`, so the wrong-cause sentence this
+  # task was filed for no longer existed and the contract measured nothing. What
+  # is still missing is the cap being DOCUMENTED rather than only enforced, so
+  # the first entry now names one case that failed against the tree as found,
+  # and greps for that case's own result line — a renamed or deleted test makes
+  # the entry fail rather than pass on a zero sample.
+  - id: help-states-the-cap
+    bash: "node --test --test-name-pattern 'the cap on .--question. and .--option. is documented' scripts/tests/ask.test.mjs | grep -F '✔ the cap on'"
   - id: ask-green
     bash: "node --test scripts/tests/ask.test.mjs scripts/tests/ask-options.test.mjs"
   - id: suite-green
@@ -93,10 +103,29 @@ limit is cheapest to read.
 
 ## Acceptance criteria
 
-- [ ] A `--question` over 500 characters is refused with a message that names
+- [x] A `--question` over 500 characters is refused with a message that names
       the length as the cause and gives both the limit and the actual length.
+      [proof: help-states-the-cap]
+- [x] An empty or reserved `--question` still gets the message it gets today.
       [proof: ask-green]
-- [ ] An empty or reserved `--question` still gets the message it gets today.
-      [proof: ask-green]
-- [ ] The same refusal for `--reason` in the other commands is either corrected
+- [x] `ask --help` states the cap beside `--question` AND beside `--option`,
+      with the number read from `REASON_MAX_LENGTH` rather than typed.
+      [proof: help-states-the-cap]
+- [x] The same refusal for `--reason` in the other commands is either corrected
       or its being left alone is recorded in Decisions. [proof: suite-green]
+
+## Decisions
+
+**The wrong-cause sentence was already gone.** TL-167 moved the diagnosis into
+`reasonRefusal(value, flag)` in `scripts/task-fields.mjs` and converted seven
+call sites, `--question` among them. Measured on 2026-09-21 against this tree, a
+587-character question is refused with "`--question` is 587 characters long, and
+at most 500 are kept", the value truncated to 60 characters — steps 1, 2 and 3
+of this task, done there. Only step 4, the cap in `ask --help`, was outstanding,
+and that is what this change is.
+
+**The other `--reason` call sites are not touched here.** The five commands this
+task named print what `reasonRefusal` returns already; the remaining direct
+`isValidReason` callers (`scripts/done-task.mjs`, `scripts/decide-task.mjs`) are
+TL-254 and TL-255, in flight in their own worktrees. Editing them here would put
+two tasks in one commit.

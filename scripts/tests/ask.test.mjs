@@ -24,7 +24,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { blockingStatus, parseAskArgs } from "../ask-task.mjs";
-import { questionBlockReason, questionIdFromReason } from "../history.mjs";
+import { questionBlockReason, questionIdFromReason, REASON_MAX_LENGTH } from "../history.mjs";
 import { staleBlocked } from "../check-backlog-refs.mjs";
 import { withDecisions } from "../decisions.mjs";
 
@@ -300,4 +300,57 @@ test("withDecisions places the block under the frontmatter and writes nothing wi
   // An unanswered question is shown too, with its id — that id is what an
   // answer has to name.
   assert.match(withDecisions(file, [q]), /unanswered — `Q1`/);
+});
+
+/**
+ * THE CAP IS DOCUMENTED WHERE IT IS CHEAPEST TO READ (TL-216).
+ *
+ * The refusal for an over-long `--question` names its cause correctly since
+ * TL-167 — but a refusal is still the FIRST place anybody learns the limit
+ * exists, which for an unattended session means one wasted round trip before
+ * it can shorten anything. The number is documented beside the two flags it
+ * governs, and it is READ from `REASON_MAX_LENGTH` rather than typed, so a
+ * changed cap cannot leave the help asserting the old one.
+ *
+ * The control is the enforcement itself: a value of exactly the documented
+ * length is accepted and one character more is refused, so the documented
+ * number is proved to be the number the code applies, not merely a number
+ * that appears in both files.
+ */
+test("the cap on `--question` and `--option` is documented, and it is the cap enforced", () => {
+  const help = run(["ask", "--help"]);
+  assert.equal(help.status, 0, help.stderr);
+  const cap = String(REASON_MAX_LENGTH);
+
+  // A flag's OWN description: its line and the continuation lines under it, up
+  // to the next flag. One mention of the number in a paragraph both flags share
+  // would satisfy neither reader looking at one flag.
+  const described = (flag) => {
+    const lines = help.stdout.split("\n");
+    const start = lines.findIndex((l) => l.trim().startsWith(flag + " "));
+    assert.ok(start >= 0, "`ask --help` does not document " + flag);
+    const out = [lines[start]];
+    for (let i = start + 1; i < lines.length && !/^\s+--/.test(lines[i]) && lines[i].trim(); i++) out.push(lines[i]);
+    return out.join("\n");
+  };
+  for (const flag of ["--question", "--option"]) {
+    const near = described(flag);
+    assert.ok(near.indexOf(cap) !== -1,
+      "`ask --help` does not state the " + cap + "-character cap beside " + flag +
+        ", so the refusal is still the first place anybody learns it exists:\n" + near);
+  }
+
+  const fx = fixture();
+  try {
+    const atCap = "q".repeat(REASON_MAX_LENGTH);
+    const overCap = "q".repeat(REASON_MAX_LENGTH + 1);
+    const ok = run(["ask", fx.ids[0], "--dir", fx.backlog, "--actor", "agent:w", "--question", atCap], fx.env);
+    assert.equal(ok.status, 0, "a question of exactly the documented length was refused: " + ok.stderr);
+    const over = run(["ask", fx.ids[1], "--dir", fx.backlog, "--actor", "agent:w", "--question", overCap], fx.env);
+    assert.equal(over.status, 2, "one character over the documented length was accepted");
+    assert.match(over.stderr, new RegExp(String(REASON_MAX_LENGTH + 1) + " characters long"));
+    assert.ok(over.stderr.indexOf("is empty or reserved") === -1, "the refusal still names the wrong cause");
+  } finally {
+    rmSync(fx.dir, { recursive: true, force: true });
+  }
 });

@@ -40,7 +40,7 @@ import { printJson } from "./json-envelope.mjs";
 import { MARK, color, failure } from "./ui.mjs";
 import { CHECK_GUARDS, effectiveSeverity, guardsForRun } from "./check-guards.mjs";
 import { resolveBacklogDir, resolveBacklogDirOrExit } from "./paths.mjs";
-import { FIELD_SHAPES } from "./task-fields.mjs";
+import { FIELD_SHAPES, REASON_MAX_LENGTH } from "./task-fields.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -1102,9 +1102,11 @@ export const COMMANDS = {
       `${N} ask <ID> --question "…" [--status <s>] [--json] [--dir <path>]`,
       "",
       "    --question \"…\"    REQUIRED, and first. The question itself, recorded as an",
-      "                       event with an id — the id a later `decide --resolves` names",
+      "                       event with an id — the id a later `decide --resolves` names.",
+      `                       At most ${REASON_MAX_LENGTH} characters: one question, not a brief`,
       "    --option \"…\"      one candidate answer, WITH the one-line reason it is a",
-      "                       candidate; repeatable, numbered from 1 in the order given",
+      "                       candidate; repeatable, numbered from 1 in the order given.",
+      `                       A chosen option becomes the reason, so the same ${REASON_MAX_LENGTH} apply`,
       "    --recommend <n>    which option you recommend. REQUIRED once options are given",
       "    --status <s>       which status it stops in. Only needed when more than one of",
       "                       this backlog's statuses means `waiting for somebody`",
