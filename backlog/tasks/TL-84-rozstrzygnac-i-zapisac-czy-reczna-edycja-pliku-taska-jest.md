@@ -4,7 +4,7 @@ title: "Decide and record: is manually editing a task file a supported path"
 type: task
 labels: [pre-launch]
 board: main
-epic: "worktrail — the tool"
+epic: "branchling — the tool"
 priority: P2
 status: done
 owner: agent:claude

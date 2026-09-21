@@ -4,7 +4,7 @@ title: "worktrail as one entry point: a command dispatcher instead of eight path
 type: code
 labels: [pre-launch]
 board: main
-epic: "worktrail — the tool"
+epic: "branchling — the tool"
 priority: P1
 status: done
 owner: claude

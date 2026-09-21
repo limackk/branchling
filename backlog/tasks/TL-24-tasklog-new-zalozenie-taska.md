@@ -4,7 +4,7 @@ title: "worktrail new — creating a task with a number scanned from all branche
 type: code
 labels: [pre-launch]
 board: main
-epic: "worktrail — the tool"
+epic: "branchling — the tool"
 priority: P2
 status: done
 owner: claude

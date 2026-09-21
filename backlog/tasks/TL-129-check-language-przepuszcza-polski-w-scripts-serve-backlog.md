@@ -4,7 +4,7 @@ title: "check --language lets Polish through in scripts/serve-backlog.mjs"
 type: task
 labels: []
 board: main
-epic: "worktrail — the tool"
+epic: "branchling — the tool"
 priority: P2
 status: done
 owner: agent:claude

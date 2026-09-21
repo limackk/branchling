@@ -4,7 +4,7 @@ title: "next-backlog-id.mjs finds nothing when the backlog is the git repository
 type: code
 labels: [pre-launch]
 board: main
-epic: "worktrail — the tool"
+epic: "branchling — the tool"
 priority: P2
 status: done
 owner: claude

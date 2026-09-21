@@ -4,7 +4,7 @@ title: "Polish assertion messages in scripts/tests/ against the \"all code in En
 type: task
 labels: []
 board: main
-epic: "worktrail — the tool"
+epic: "branchling — the tool"
 priority: P3
 status: done
 owner: agent:docs

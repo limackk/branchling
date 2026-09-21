@@ -4,7 +4,7 @@ title: "Foundation of the worktrail event log — 5 decisions that cannot be und
 type: code
 labels: [pre-launch]
 board: main
-epic: "worktrail — the tool"
+epic: "branchling — the tool"
 priority: P1
 status: done
 owner: claude

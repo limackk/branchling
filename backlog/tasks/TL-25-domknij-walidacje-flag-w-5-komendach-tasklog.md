@@ -4,7 +4,7 @@ title: "Closing the flag validation gap in 5 worktrail commands (build/viewer/ne
 type: code
 labels: [pre-launch]
 board: main
-epic: "worktrail — the tool"
+epic: "branchling — the tool"
 priority: P2
 status: done
 owner: claude

@@ -4,7 +4,7 @@ title: "worktrail init and stats — creating a backlog and showing its state in
 type: code
 labels: [pre-launch]
 board: main
-epic: "worktrail — the tool"
+epic: "branchling — the tool"
 priority: P2
 status: done
 owner: claude

@@ -4,7 +4,7 @@ title: "The suite fails intermittently under parallel load, and the message does
 type: bug
 labels: []
 board: main
-epic: "worktrail — the tool"
+epic: "branchling — the tool"
 priority: P2                       # P0 blocker | P1 critical | P2 nice | P3 backlog
 status: done  # pending | in_progress | blocked | done | cancelled
 owner: agent:claude

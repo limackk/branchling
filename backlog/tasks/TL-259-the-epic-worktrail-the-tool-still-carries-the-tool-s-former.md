@@ -6,20 +6,22 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P3                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 30m                       # 30m | 2h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-21
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
 verification:
   - id: no-old-name
-    bash: "! grep -q 'epic: .worktrail' backlog/tasks/*.md"
+    # ANCHORED to the frontmatter field. This task's own Goal quotes the value
+    # being replaced, and an unanchored grep counts that example as a carrier.
+    bash: "! grep -qE '^epic: .worktrail' backlog/tasks/*.md"
   - id: check-green
     bash: "node scripts/cli.mjs check"
 ---
@@ -65,12 +67,11 @@ rename is a gap in the CLI worth closing.
 
 ## Acceptance criteria
 
-- [ ] No task file has `epic:` naming the tool by its former name.
+- [x] No task file has `epic:` naming the tool by its former name.
       [proof: no-old-name]
-- [ ] The full check stays green. [proof: check-green]
+- [x] The full check stays green. [proof: check-green]
 
 ## Decisions
 
-Nothing decided. Step 1 is deliberately open: the replacement name is a
-vocabulary decision, and picking it before reading the other epics would be a
-guess.
+Recorded as an event, not here: `branchling history TL-259` prints the choice of
+`branchling — the tool` and the reason for it.
