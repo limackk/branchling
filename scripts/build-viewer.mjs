@@ -290,21 +290,8 @@ export function buildHtml(
   stats,
   config = loadConfig(defaultRoot()),
   history = readAllHistory(config.root),
-  plan = loadPlan(backlogPaths(config.root).planPath),
-  viewer = {}
+  plan = loadPlan(backlogPaths(config.root).planPath)
 ) {
-  const worktreesJson = JSON.stringify(
-    (viewer.worktrees || []).map((w) => ({
-      key: w.key, label: w.label, branch: w.branch, isSelf: !!w.isSelf,
-    }))
-  ).replace(/</g, "\\u003c");
-  const worktreeJson = JSON.stringify(viewer.worktree || null);
-  // Whether the SUBJECT may be written to — not whether there is anywhere to
-  // write. The client ands this with SERVER_MODE, which is what actually gates
-  // a file:// page, so the default here can stay permissive without opening a
-  // write path: the only caller that ever renders a foreign tree is the server,
-  // and it passes the flag explicitly.
-  const canEditJson = JSON.stringify(viewer.canEdit !== false);
   // WHICH FILES EACH TASK CHANGED (TL-75). Attached here rather than stored in
   // the frontmatter, for the reason modified-files.mjs gives at length: the
   // commits are the record, and an index over them is a view. Cached on HEAD, so
@@ -404,9 +391,6 @@ export function buildHtml(
   // The decision panel reads `openQuestions` from task-fields.mjs, pasted above.
   const decisionPanelModuleSrc = readModuleSource("decision-panel.mjs");
   const taskGraphModuleSrc = readModuleSource("task-graph.mjs");
-  // The board time-lapse (TL-91). AFTER task-graph.mjs, which it folds the log
-  // with: the paste order is the module graph, written out by hand.
-  const boardReplayModuleSrc = readModuleSource("board-replay.mjs");
   const historyJson = JSON.stringify(history).replace(/</g, "\\u003c");
 
   return `<!DOCTYPE html>
@@ -620,12 +604,12 @@ ${paletteVarCss}
   .filter-panel-clear:disabled { color: var(--fg-muted); opacity: 0.5; cursor: default; text-decoration: none; }
   /* The board scope — deliberately NOT looking like a filter beside Epic/Status:
      it is the context of work in which the filters then operate, so it sits above them. */
-  .dash-scope {
+  .scope-bar {
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
     margin: 0 0 12px; padding: 8px 12px; border: 1px solid var(--border);
     border-radius: 8px; background: var(--bg-elev); font-size: 13px; color: var(--fg-muted);
   }
-  .dash-scope strong { color: var(--fg); }
+  .scope-bar strong { color: var(--fg); }
   .board-scope { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 0 0 8px; }
   .board-scope-label { font-size: 12px; color: var(--fg-muted); margin-right: 2px; }
   .board-btn {
@@ -1057,93 +1041,6 @@ ${paletteBadgeCss}
   .btn-action.primary:hover { background: var(--accent); opacity: 0.9; }
   .btn-action:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  /* ─── Status changer (in detail panel) ──────────────────────────── */
-  .status-changer {
-    margin-top: 14px;
-    padding: 12px;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    box-shadow: var(--shadow);
-  }
-  .status-changer-label {
-    font-size: 11px;
-    color: var(--fg-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 8px;
-  }
-  .status-changer-buttons {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-  .status-btn {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--fg-muted);
-    padding: 5px 12px;
-    border-radius: 6px;
-    font-size: 12px;
-    cursor: pointer;
-    font-family: inherit;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-    font-weight: 600;
-    transition: all 120ms ease;
-  }
-  .status-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--fg); }
-  .status-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-  .status-changer-disabled-hint {
-    margin-top: 8px;
-    font-size: 11px;
-    color: var(--fg-muted);
-    font-style: italic;
-  }
-
-  /* ─── Why a change was made (TL-105) ───────────────────────────── */
-  .reason-ask {
-    margin: 12px 0;
-    padding: 12px;
-    border: 1px solid var(--accent);
-    border-radius: 6px;
-    background: var(--bg-card);
-  }
-  .reason-ask-head { font-size: 13px; margin-bottom: 4px; }
-  .reason-ask-hint { font-size: 11px; color: var(--fg-muted); margin-bottom: 8px; }
-  .reason-ask-error { font-size: 11px; color: var(--accent); margin-bottom: 8px; font-weight: 600; }
-  .reason-ask-input {
-    width: 100%;
-    font: inherit;
-    font-size: 13px;
-    padding: 6px 8px;
-    color: var(--fg);
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    resize: vertical;
-  }
-  .reason-ask-actions { margin-top: 8px; display: flex; gap: 8px; }
-  .reason-ask-save, .reason-ask-cancel {
-    font: inherit;
-    font-size: 12px;
-    padding: 4px 12px;
-    border-radius: 4px;
-    border: 1px solid var(--border);
-    background: var(--bg);
-    color: var(--fg);
-    cursor: pointer;
-  }
-  .reason-ask-save { border-color: var(--accent); }
-  .hist-reason {
-    margin-top: 2px;
-    font-size: 12px;
-    color: var(--fg-muted);
-    border-left: 2px solid var(--border);
-    padding-left: 8px;
-  }
-  .hist-reason.is-sentinel { font-style: italic; opacity: 0.75; }
-
   /* ─── Toast ─────────────────────────────────────────────────────── */
   .toast {
     position: fixed;
@@ -1202,174 +1099,6 @@ ${paletteBadgeCss}
     border: 1px solid var(--border);
     box-shadow: var(--shadow);
   }
-  /* ─── Field editing + history (BL-1396/BL-1397) ─────────────────────── */
-  .actor-picker { display: flex; align-items: center; gap: 4px; margin-left: auto; }
-  /* The worktree switcher (TL-188). It sits in the connection bar because that
-     bar already answers the two questions a foreign tree changes the answers to:
-     what am I looking at, and may I edit it. */
-  .worktree-picker { display: flex; align-items: center; gap: 6px; }
-  .worktree-label { font-size: 11px; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.04em; }
-  .worktree-select {
-    font: inherit; font-size: 12px; padding: 3px 8px; border-radius: 6px;
-    border: 1px solid var(--border); background: var(--bg-card); color: var(--fg); cursor: pointer;
-    max-width: 260px;
-  }
-  .worktree-select:disabled { cursor: default; opacity: 0.6; }
-  .connection-bar.foreign { border-color: var(--foreign-border); background: var(--foreign-bg); }
-  .actor-label { font-size: 11px; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.04em; }
-  .actor-btn {
-    font: inherit; font-size: 12px; padding: 3px 9px; border-radius: 999px;
-    border: 1px solid var(--border); background: var(--bg-card); color: var(--fg-muted); cursor: pointer;
-  }
-  .actor-btn:hover { border-color: var(--accent); color: var(--fg); }
-  .actor-btn.is-active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
-
-  .meta-value.is-editable, .detail-header h1.is-editable {
-    cursor: pointer; border-radius: 6px;
-    border: 1px dashed transparent; padding: 2px 4px; margin: -2px -4px;
-  }
-  .meta-value.is-editable:hover, .meta-value.is-editable:focus-visible,
-  .detail-header h1.is-editable:hover, .detail-header h1.is-editable:focus-visible {
-    border-color: var(--accent); background: var(--accent-soft); outline: none;
-  }
-  .edit-pen { opacity: 0; margin-left: 6px; color: var(--accent); font-size: 11px; }
-  .is-editable:hover .edit-pen, .is-editable:focus-visible .edit-pen { opacity: 1; }
-  .meta-row.is-editing { background: var(--accent-soft); border-radius: 8px; padding: 4px 6px; margin: -4px -6px; }
-  .meta-row-wide { grid-column: 1 / -1; }
-
-  .field-editor { font: inherit; font-size: 13px; }
-  select.field-editor, .field-input {
-    width: 100%; padding: 4px 6px; border: 1px solid var(--accent);
-    border-radius: 6px; background: var(--bg-card); color: var(--fg); font: inherit; font-size: 13px;
-  }
-  textarea.field-input { resize: vertical; line-height: 1.5; }
-  .chips-editor { display: flex; flex-wrap: wrap; gap: 5px; }
-  .chip-opt {
-    display: inline-flex; align-items: center; gap: 4px; font-size: 12px; cursor: pointer;
-    padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); background: var(--bg-card);
-  }
-  .chip-opt.is-on { border-color: var(--accent); background: var(--accent-soft); }
-  .editor-actions { display: flex; gap: 6px; margin-top: 6px; flex-basis: 100%; }
-  .editor-actions button {
-    font: inherit; font-size: 12px; padding: 3px 10px; border-radius: 6px;
-    border: 1px solid var(--border); background: var(--bg-card); color: var(--fg); cursor: pointer;
-  }
-  .editor-actions button:first-child { border-color: var(--accent); background: var(--accent); color: #fff; }
-
-  .field-stamp {
-    font: inherit; font-size: 10px; margin-left: 6px; padding: 1px 6px;
-    border-radius: 999px; border: 1px solid var(--border); background: var(--bg);
-    color: var(--fg-muted); cursor: pointer; text-transform: none; letter-spacing: 0;
-  }
-  .field-stamp:hover { border-color: var(--accent); color: var(--accent); }
-
-  .history-block { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 10px; }
-  /* ── The change graph (TL-116) ───────────────────────────────────────────
-     Every distinction here is carried by a MARK as well as a hue: a glyph per
-     class of actor, a dashed ring for an open question, and the words under
-     every node. The colours are emphasis. */
-  .tgraph-block { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 10px; }
-  .tgraph { margin-top: 8px; }
-  .tgraph.is-empty p, .tgraph-since, .tgraph-trailing {
-    margin: 0 0 6px;
-    font-size: 11px;
-    color: var(--fg-muted);
-  }
-  /* The graph scrolls INSIDE its frame. A long history must not stretch the
-     page — the detail panel is where somebody is reading and editing. */
-  .tgraph-scroll { overflow-x: auto; overflow-y: hidden; padding-bottom: 4px; }
-  .tgraph-svg { display: block; }
-  .tgraph-axis { stroke: var(--border); stroke-width: 2; }
-  .tgraph-link { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 3 2; }
-  .tgraph-collapsed circle { fill: var(--fg-muted); opacity: .5; }
-  .tgraph-collapsed text { fill: var(--fg-muted); font-size: 9px; text-anchor: middle; }
-  .tgraph-node { cursor: pointer; }
-  .tgraph-node circle { fill: var(--bg-card); stroke: var(--fg-muted); stroke-width: 2; }
-  .tgraph-node:hover circle, .tgraph-node:focus circle { stroke-width: 3; }
-  .tgraph-node:focus { outline: none; }
-  .tgraph-glyph { font-size: 9px; text-anchor: middle; fill: var(--fg-muted); }
-  .tgraph-when { font-size: 9px; text-anchor: middle; fill: var(--fg-muted); }
-  .tgraph-label { font-size: 10px; text-anchor: middle; fill: var(--fg); }
-  .tgraph-actor { font-size: 9px; text-anchor: middle; fill: var(--fg-muted); }
-  /* The three classes of identity. "legacy" and "unknown" share an appearance
-     on purpose: both mean "the log does not say who", and two shades of
-     not-knowing would suggest the tool can tell them apart. */
-  .tgraph-node.actor-agent circle { stroke: var(--accent); }
-  .tgraph-node.actor-agent .tgraph-glyph { fill: var(--accent); }
-  .tgraph-node.actor-local circle, .tgraph-node.actor-user circle { stroke: var(--ok, #4c9a6a); }
-  .tgraph-node.actor-local .tgraph-glyph, .tgraph-node.actor-user .tgraph-glyph { fill: var(--ok, #4c9a6a); }
-  .tgraph-node.actor-unknown circle, .tgraph-node.actor-legacy circle { stroke-dasharray: 2 2; }
-  /* An open question: a dashed ring, so it reads as unfinished without colour. */
-  .tgraph-node.is-open circle { stroke-dasharray: 4 3; stroke-width: 3; }
-  .tgraph-node.is-deleted circle { fill: var(--border); }
-  .tgraph-legend {
-    margin: 4px 0 0;
-    font-size: 10px;
-    color: var(--fg-muted);
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-  .tgraph-legend .actor-agent { color: var(--accent); }
-  .history-toggle {
-    font: inherit; font-size: 12px; font-weight: 600; color: var(--fg-muted);
-    background: none; border: none; padding: 0; cursor: pointer;
-  }
-  .history-toggle:hover { color: var(--accent); }
-  .history-filter { font-size: 11px; color: var(--fg-muted); margin-left: 8px; }
-  .history-filter button { font: inherit; border: none; background: none; cursor: pointer; color: var(--accent); }
-  .history-empty { font-size: 12px; color: var(--fg-muted); margin: 8px 0 0; }
-  .history-list { list-style: none; margin: 8px 0 0; padding: 0; max-height: 260px; overflow-y: auto; }
-  .history-entry {
-    display: grid; grid-template-columns: 96px 72px 1fr auto; gap: 8px; align-items: baseline;
-    font-size: 12px; padding: 3px 0; border-bottom: 1px solid var(--border);
-  }
-  .history-entry:last-child { border-bottom: none; }
-  .hist-when { color: var(--fg-muted); font-variant-numeric: tabular-nums; }
-  .hist-actor {
-    font-weight: 600; font-size: 11px; padding: 1px 6px; border-radius: 999px;
-    background: var(--accent-soft); color: var(--fg); text-align: center;
-  }
-  /* Coloured by the identity NAMESPACE, not by the name: an .actor-<name> class
-     was one project's vocabulary in the CSS and did not work in another backlog (BL-1404). */
-  .hist-actor.actor-ns-agent { background: var(--bg-sidebar); }
-  .hist-actor.actor-ns-user { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
-  .hist-actor.actor-ns-legacy { background: transparent; border: 1px solid var(--border); color: var(--fg-muted); }
-  .hist-actor.actor-ns-unknown { background: transparent; border: 1px dashed var(--border); color: var(--fg-muted); }
-  .hist-what s { color: var(--fg-muted); text-decoration-thickness: 1px; }
-  .hist-source { color: var(--fg-muted); font-size: 10px; }
-  .hist-answers {
-    font-size: 10px;
-    color: var(--accent);
-    border: 1px solid var(--accent);
-    border-radius: 999px;
-    padding: 0 6px;
-    white-space: nowrap;
-  }
-  @media (max-width: 720px) {
-    .history-entry { grid-template-columns: 1fr; gap: 2px; }
-  }
-
-  .meta-row { display: flex; flex-direction: column; gap: 2px; }
-  .meta-label {
-    font-size: 11px;
-    color: var(--fg-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-  .meta-value { font-size: 13px; font-weight: 500; }
-  .meta-value a {
-    font-family: "SF Mono", Monaco, Menlo, monospace;
-    font-size: 12px;
-    color: var(--accent);
-    text-decoration: none;
-    padding: 1px 5px;
-    border-radius: 3px;
-    background: var(--accent-soft);
-    margin-right: 4px;
-  }
-  .meta-value a:hover { text-decoration: underline; }
-
   /* ─── Markdown content ──────────────────────────────────────────── */
   .markdown-body h2 {
     font-size: 16px;
@@ -1775,17 +1504,6 @@ ${paletteBadgeCss}
   .dec-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
   .dec-head h2 { margin: 0; font-size: 16px; }
   .dec-lede { color: var(--fg-muted); font-size: 13px; max-width: 74ch; margin: 0 0 16px; }
-  .dec-filter {
-    font: inherit;
-    font-size: 11px;
-    padding: 3px 10px;
-    border-radius: 999px;
-    border: 1px solid var(--border);
-    background: var(--bg);
-    color: var(--fg-muted);
-    cursor: pointer;
-  }
-  .dec-filter.is-on { background: var(--accent-soft); border-color: var(--accent); color: var(--fg); }
   /* THREE KINDS, THREE SHAPES (TL-205, TL-212). A question is a paragraph
      somebody has to think about; a task marked for a person has nothing to read
      and one action; a vouch is finished work with one line to check.
@@ -1949,187 +1667,6 @@ ${paletteBadgeCss}
     font-variant-numeric: tabular-nums;
   }
 
-  /* ─── Dashboard ─────────────────────────────────────────────────── */
-  .dashboard-view { display: none; }
-  body.view-dashboard main.app-main { display: none; }
-  body.view-dashboard .filters-bar,
-  body.view-dashboard .stats { display: none; }
-  body.view-dashboard .dashboard-view {
-    display: block;
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    padding: 20px 24px 64px;
-  }
-
-  .dash-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-    gap: 16px;
-    margin-bottom: 16px;
-  }
-  .dash-grid.wide { grid-template-columns: 1fr; }
-  .dash-card {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 14px 16px 16px;
-    box-shadow: var(--shadow);
-    min-width: 0;
-  }
-  .dash-card h2 {
-    font-size: 13px;
-    margin: 0 0 2px;
-    font-weight: 600;
-    letter-spacing: 0.01em;
-  }
-  .dash-card .dash-sub {
-    font-size: 11px;
-    color: var(--fg-muted);
-    margin: 0 0 12px;
-  }
-  .dash-card .dash-note {
-    font-size: 11px;
-    color: var(--fg-muted);
-    margin: 10px 0 0;
-  }
-
-  .kpi-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 12px;
-    margin-bottom: 16px;
-  }
-  .kpi {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 12px 14px;
-    box-shadow: var(--shadow);
-  }
-  .kpi-label { font-size: 11px; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.04em; }
-  .kpi-value {
-    font-size: 24px;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    line-height: 1.2;
-    margin-top: 2px;
-  }
-  .kpi-meta { font-size: 11px; color: var(--fg-muted); font-variant-numeric: tabular-nums; }
-
-  .dash-chart { width: 100%; height: auto; display: block; overflow: visible; }
-  .dash-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 11px; color: var(--fg-muted); margin-top: 8px; }
-  .dash-legend span { display: inline-flex; align-items: center; gap: 6px; }
-  .dash-legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
-
-  .bars { display: flex; flex-direction: column; gap: 6px; }
-  .bar-row {
-    display: grid;
-    grid-template-columns: minmax(90px, 34%) 1fr 46px;
-    align-items: center;
-    gap: 10px;
-    font-size: 12px;
-    border: 0;
-    background: none;
-    color: inherit;
-    font-family: inherit;
-    padding: 1px 0;
-    text-align: left;
-    cursor: pointer;
-    width: 100%;
-  }
-  .bar-row:hover .bar-label { color: var(--accent); }
-  .bar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  /* display:block matters — these are <span>s, and an inline box ignores
-     width/height, so every bar rendered as an empty track. */
-  .bar-track { display: block; background: var(--bg); border-radius: 4px; height: 12px; overflow: hidden; border: 1px solid var(--border); }
-  .bar-fill { display: block; height: 100%; background: var(--accent); border-radius: 3px 0 0 3px; }
-  .bar-value { text-align: right; font-variant-numeric: tabular-nums; color: var(--fg-muted); }
-
-  .dash-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  .dash-table th {
-    text-align: left;
-    font-weight: 600;
-    font-size: 11px;
-    color: var(--fg-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    border-bottom: 1px solid var(--border);
-    padding: 6px 8px;
-    background: var(--bg-card);
-  }
-  /* Sticky only inside a scroll container. On a table that scrolls with the
-     page it detached and floated into the middle of its own rows. */
-  .dash-scroll .dash-table th { position: sticky; top: 0; }
-  .dash-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-  .dash-table tbody tr:hover { background: var(--bg); }
-  .dash-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
-  /* The header was left-aligned over right-aligned numbers, so every column
-     read as if its values belonged to the neighbour on the left. */
-  .dash-table th.num { text-align: right; }
-  .th-sort {
-    font: inherit;
-    color: inherit;
-    background: none;
-    border: 0;
-    padding: 0;
-    cursor: pointer;
-    text-transform: inherit;
-    letter-spacing: inherit;
-    font-weight: inherit;
-  }
-  .dash-table th.num .th-sort { display: block; width: 100%; text-align: right; }
-  .th-sort:hover { color: var(--accent); }
-  .sort-bar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 4px 6px;
-    margin: 0 0 10px;
-    font-size: 11px;
-    color: var(--fg-muted);
-  }
-  .sort-btn {
-    font: inherit;
-    padding: 2px 8px;
-    border: 1px solid var(--border);
-    background: var(--bg);
-    color: var(--fg-muted);
-    border-radius: 999px;
-    cursor: pointer;
-  }
-  .sort-btn:hover { border-color: var(--accent); color: var(--fg); }
-  .sort-btn.is-active { background: var(--accent-soft); border-color: var(--accent); color: var(--fg); font-weight: 600; }
-  .th-sort.is-active { color: var(--fg); }
-  .dash-table .epic-name { font-weight: 500; cursor: pointer; }
-  .dash-table .epic-name:hover { color: var(--accent); text-decoration: underline; }
-  .dash-scroll { max-height: 420px; overflow-y: auto; margin: 0 -6px; padding: 0 6px; }
-
-  .mini-progress {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 120px;
-  }
-  .mini-progress .bar-track { flex: 1; height: 8px; }
-  .mini-progress span { font-variant-numeric: tabular-nums; font-size: 11px; color: var(--fg-muted); width: 34px; text-align: right; }
-
-  .dash-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-  .dash-list li {
-    display: flex;
-    gap: 8px;
-    align-items: baseline;
-    font-size: 12px;
-    padding-bottom: 6px;
-    border-bottom: 1px solid var(--border);
-  }
-  .dash-list li:last-child { border-bottom: 0; }
-  .dash-list a { color: inherit; text-decoration: none; cursor: pointer; }
-  .dash-list a:hover { color: var(--accent); text-decoration: underline; }
-  .dash-list .dash-id { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--fg-muted); flex: none; }
-  .dash-list .dash-age { margin-left: auto; flex: none; font-variant-numeric: tabular-nums; color: var(--fg-muted); font-size: 11px; }
-  .dash-empty { font-size: 12px; color: var(--fg-muted); padding: 8px 0; }
-
   /* ─── Scrollbars ────────────────────────────────────────────────── */
   /* The default chrome is a light slab that ignores the theme — in dark mode
      it was the brightest thing on the page. */
@@ -2188,182 +1725,6 @@ ${paletteBadgeCss}
   .range-meta { color: var(--fg-muted); font-variant-numeric: tabular-nums; }
   .range-hint { flex-basis: 100%; color: var(--fg-muted); font-size: 11px; }
 
-  /* ─── Chart hover ───────────────────────────────────────────────── */
-  .hover-capture { cursor: crosshair; }
-  .hover-line { stroke: var(--fg-muted); stroke-width: 1; stroke-dasharray: 3 3; }
-  .hover-band { fill: var(--fg); opacity: 0.07; }
-  .hover-dot { stroke: var(--bg-card); stroke-width: 1.5; }
-  .chart-tip {
-    position: fixed;
-    z-index: 60;
-    pointer-events: none;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    box-shadow: var(--shadow-lg);
-    padding: 8px 10px;
-    font-size: 12px;
-    min-width: 168px;
-    font-variant-numeric: tabular-nums;
-  }
-  .chart-tip[hidden] { display: none; }
-  .chart-tip .tip-day { font-weight: 600; margin-bottom: 5px; }
-  .chart-tip .tip-row { display: flex; align-items: center; gap: 8px; line-height: 1.7; }
-  .chart-tip .tip-row i { width: 8px; height: 8px; border-radius: 2px; flex: none; }
-  .chart-tip .tip-row span { color: var(--fg-muted); }
-  .chart-tip .tip-row strong { margin-left: auto; font-weight: 600; }
-  .burn-bar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px 12px;
-    margin: 0 0 10px;
-    font-size: 12px;
-  }
-  .burn-bar select {
-    font: inherit;
-    color: var(--fg);
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 3px 6px;
-    max-width: 260px;
-  }
-
-  details.hyg { border-bottom: 1px solid var(--border); padding: 6px 0; }
-  details.hyg:last-of-type { border-bottom: 0; }
-  details.hyg > summary {
-    cursor: pointer;
-    font-size: 12px;
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-  details.hyg > summary::-webkit-details-marker { color: var(--fg-muted); }
-  .hyg-count {
-    font-variant-numeric: tabular-nums;
-    font-weight: 600;
-    color: var(--accent);
-    min-width: 28px;
-    display: inline-block;
-  }
-  .hyg-hint { color: var(--fg-muted); font-size: 11px; flex-basis: 100%; padding-left: 36px; }
-  details.hyg .dash-list { margin-top: 8px; max-height: 260px; overflow-y: auto; padding-left: 36px; }
-
-  .day-panel { position: relative; border-color: var(--accent); }
-  .day-panel h2 { padding-right: 28px; }
-  .day-panel h3 {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--fg-muted);
-    margin: 0 0 8px;
-    font-weight: 600;
-  }
-  .day-cols {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 16px;
-  }
-  .day-cols .dash-list { max-height: 320px; overflow-y: auto; }
-  .day-close {
-    position: absolute;
-    top: 10px;
-    right: 12px;
-    font: inherit;
-    font-size: 13px;
-    line-height: 1;
-    padding: 4px 7px;
-    border: 1px solid var(--border);
-    background: var(--bg);
-    color: var(--fg-muted);
-    border-radius: 6px;
-    cursor: pointer;
-  }
-  .day-close:hover { border-color: var(--accent); color: var(--fg); }
-
-  .chart-tip .tip-foot {
-    margin-top: 5px;
-    padding-top: 5px;
-    border-top: 1px solid var(--border);
-    color: var(--fg-muted);
-    font-size: 11px;
-  }
-
-  /* ─── Replay (the board at a moment, TL-91) ─────────────────────── */
-  .replay-view { display: none; }
-  body.view-replay main.app-main { display: none; }
-  body.view-replay .filters-bar,
-  body.view-replay .stats { display: none; }
-  body.view-replay .replay-view {
-    display: block;
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    padding: 20px 24px 64px;
-  }
-  .replay-head-bar h2 { margin: 0 0 2px; font-size: 16px; }
-  /* The left edge of the slider is where the DATA starts, not where the backlog
-     did. Said in words, above the control, because a reader who is not told will
-     read the first day as the day the project began. */
-  .replay-since { margin: 0 0 12px; color: var(--fg-muted); font-size: 12px; max-width: 78ch; }
-  .replay-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-  .replay-controls input[type="range"] { flex: 1; min-width: 220px; }
-  .replay-counter { font-size: 12px; color: var(--fg-muted); font-variant-numeric: tabular-nums; }
-  .replay-legend {
-    margin: 8px 0 16px;
-    font-size: 11px;
-    color: var(--fg-muted);
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-  .replay-legend .actor-agent { color: var(--accent); }
-  .replay-legend .actor-user { color: var(--ok, #4c9a6a); }
-  .replay-head {
-    display: flex;
-    gap: 14px;
-    flex-wrap: wrap;
-    margin: 0 0 10px;
-    font-size: 12px;
-    color: var(--fg-muted);
-  }
-  .replay-when { font-weight: 700; color: var(--fg); font-variant-numeric: tabular-nums; }
-  .replay-cols { display: flex; gap: 12px; align-items: flex-start; overflow-x: auto; padding-bottom: 8px; }
-  .replay-col {
-    flex: 0 0 220px;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 10px;
-  }
-  .replay-col h3 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
-  .replay-count { color: var(--fg-muted); font-weight: 400; }
-  .replay-col ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-  .replay-card {
-    display: flex;
-    align-items: baseline;
-    gap: 6px;
-    font-size: 12px;
-    padding: 5px 7px;
-    border: 1px solid var(--border);
-    border-left: 3px solid var(--fg-muted);
-    border-radius: 6px;
-    cursor: pointer;
-  }
-  /* The glyph is the fact and the colour is emphasis (TL-52). The two classes
-     that mean "the log does not say who" look alike on purpose. */
-  .replay-card.actor-agent { border-left-color: var(--accent); }
-  .replay-card.actor-local, .replay-card.actor-user { border-left-color: var(--ok, #4c9a6a); }
-  .replay-card.actor-unknown, .replay-card.actor-legacy { border-left-style: dashed; }
-  .replay-glyph { color: var(--fg-muted); }
-  .replay-card.actor-agent .replay-glyph { color: var(--accent); }
-  .replay-card.actor-local .replay-glyph, .replay-card.actor-user .replay-glyph { color: var(--ok, #4c9a6a); }
-  .replay-id { font-weight: 600; }
-  .replay-actor { margin-left: auto; color: var(--fg-muted); font-size: 11px; }
-  .replay-unknown, .replay-empty { color: var(--fg-muted); font-size: 13px; max-width: 70ch; }
-  .replay-empty h2 { color: var(--fg); font-size: 16px; margin: 0 0 6px; }
 </style>
 </head>
 <body>
@@ -2374,9 +1735,7 @@ ${paletteBadgeCss}
     <span class="build-meta">snapshot: ${buildTime}</span>
     <nav class="view-tabs" id="viewTabs">
       <button type="button" class="view-tab is-active" data-view="tasks">Tasks</button>
-      <button type="button" class="view-tab" data-view="dashboard">Dashboard</button>
       <button type="button" class="view-tab" data-view="execution">Execution</button>
-      <button type="button" class="view-tab" data-view="replay">Replay</button>
       <button type="button" class="view-tab" data-view="decisions" id="tabDecisions">Waiting on you</button>
       <button type="button" class="copy-link-btn" id="btnCopyLink"
               title="Copies the address of this view — filters, search, sort, board and the selected task">⧉ Copy link</button>
@@ -2391,7 +1750,6 @@ ${paletteBadgeCss}
     <button class="btn-action primary" id="btnConnect">Connect to the backlog folder</button>
     <button class="btn-action" id="btnRefresh" style="display:none">Refresh from disk</button>
     <button class="btn-action" id="btnDisconnect" style="display:none">Disconnect</button>
-    <div class="actor-picker" id="actorPicker" style="display:none"></div>
   </div>
 
   <div class="board-scope" id="boardScope"></div>
@@ -2417,11 +1775,8 @@ ${paletteBadgeCss}
   </article>
 </main>
 
-<section class="dashboard-view" id="dashboardView"></section>
 <section class="execution-view" id="executionView"></section>
-<section class="replay-view" id="replayView"></section>
 <section class="decisions-view" id="decisionsView"></section>
-<div class="chart-tip" id="chartTip" hidden></div>
 
 <script>
 // EVERY KEY THIS PAGE WRITES INTO THE BROWSER (TL-178). One prefix, injected
@@ -2479,24 +1834,12 @@ ${decisionPanelModuleSrc}
 ${taskGraphModuleSrc}
 // ─── end of the pasted module ─────────────────────────────────────────
 
-// ─── Pasted source of scripts/board-replay.mjs (TL-91) ───────────────
-// The board at a moment in time, folded from the same history with the same
-// stateAt() the graph above uses. Tested by
-// node --test scripts/tests/board-replay.test.mjs.
-${boardReplayModuleSrc}
-// ─── end of the pasted module ─────────────────────────────────────────
 
 // TASKS / STATS are mutable — live mode replaces them after reading from disk.
 // ALL_TASKS is the full set; TASKS is its narrowing to the selected board.
 // The split is here rather than at every place that reads TASKS, because a board
-// is meant to be a SCOPE, not a filter: a filter narrows the list of cards, but
-// the dashboard counts from TASKS and would show throughput, queue and burndown
-// summed across both boards under the heading of one. We narrow the source —
-// everything below narrows along with it.
-// The history of field changes: { "<ID>": [ {ts, field, from, to, actor, source}, ... ] }.
-// Embedded into the page at render time, refreshed from /api/history after every
-// edit and after an SSE signal. Under file:// the build's copy remains — it reads
-// the same way there, only nothing new can be appended.
+// is meant to be a SCOPE, not a filter: a filter narrows the list of cards,
+// while a scope narrows the source everything below reads from.
 // THE LIVE SIGNAL IS NOT EMBEDDED (TL-189) — it starts empty and is filled from
 // /api/in-flight. This file is also written to backlog/viewer.html and mailed
 // around, and the heartbeat log is a record of what hour a particular person
@@ -2521,20 +1864,6 @@ const CONFIG = ${configJson};
 // back on /api/tasks, so an edit to plan.yaml reaches an open tab.
 let PLAN = ${planJson};
 
-// ─── The subject of this page: which WORKTREE (TL-188) ────────────────
-// Every worktree of one clone has its own backlog/ — that is law 1, data
-// travelling with the branch — so a server standing in the main checkout shows a
-// board that does not move while a run drives a task somewhere else. These three
-// come from the SERVER; a file:// page gets an empty list and renders no
-// switcher, because with no server there is nothing to switch to.
-const WORKTREES = ${worktreesJson};
-const WORKTREE = ${worktreeJson};
-// Whether writes may reach the tree being shown. Read-only for every tree but the
-// one the server was started in: the server reads their files and will never
-// write them, so an editable-looking field would promise an edit that must fail.
-const SUBJECT_WRITABLE = ${canEditJson};
-const FOREIGN_WORKTREE = !SUBJECT_WRITABLE;
-
 // The id prefix is a PROJECT value (BL-1452), and the client had it hardcoded in
 // three places (TL-44): the file filter when reading from disk and two sorts by
 // number. Each of them, under a different prefix, quietly returned "nothing" or
@@ -2556,22 +1885,9 @@ const state = {
   sortBy: "priority",     // "priority" | "id_asc" | "id_desc"
   view: "tasks",          // "tasks" | "dashboard" | "execution" | "decisions"
   // The panel's own filter: "" = everything, "mine" = rows naming this actor.
-  decisionsMine: false,
   // The moment the replay is showing (TL-91): an ISO instant, or null for the
   // last one the log covers. A moment and not a day — everything within one day
   // would otherwise encode to the same address.
-  replayAt: null,
-  replayTimer: null,
-  replaySpeed: 600,
-  // Dashboard date range — flow metrics only, see computeDashboard().
-  dashRange: { preset: "all", from: null, to: null },
-  // Day pinned by clicking a chart point: { day, source } — source names which
-  // chart opened it, so the panel appears under that chart and not the others.
-  dashDay: null,
-  // What the burndown burns down: { kind: "label" | "epic" | "board", value }.
-  dashBurn: CONFIG.dashboard.burndown,
-  // Sort state per listing, keyed by the id passed to dashSortItems().
-  dashSorts: {},
   search: "",
   selectedId: null,
   liveMode: false,        // true after successful File System Access pick
@@ -2715,9 +2031,6 @@ const STATUSES = CONFIG.statuses;
 // order to ask BEFORE the write, and the server refuses independently, so an
 // answer typed here is a convenience and never the enforcement.
 const REASON_REQUIRED_STATUSES = CONFIG.reasonRequiredStatuses || [];
-function reasonRequiredFor(field, value) {
-  return field === "status" && REASON_REQUIRED_STATUSES.indexOf(String(value)) !== -1;
-}
 const FS_SUPPORTED = typeof window.showDirectoryPicker === "function";
 
 // Served by scripts/serve-backlog.mjs? Then the backlog path is known
@@ -2879,7 +2192,7 @@ async function connectToFolder(handle) {
 }
 async function refreshFromServer(quiet) {
   try {
-    const res = await fetch(apiUrl("api/tasks"), { cache: "no-store" });
+    const res = await fetch("api/tasks", { cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     ALL_TASKS = data.tasks;
@@ -2944,15 +2257,11 @@ async function disconnect() {
   updateConnectionBar();
   toast("Disconnected. You are now looking at the snapshot from the build.", "info");
 }
-// Writing a status no longer has a route of its own: the status is one of the
-// fields and goes through saveField() → POST /api/field → the server. There used
-// to be two implementations (fetch and File System Access), each knowing its own
-// version of the "what to set on a change" rules — and the second knew nothing
-// about the history.
-function changeTaskStatus(taskId, newStatus) {
-  return saveField(taskId, "status", newStatus);
-}
-
+// NOTHING BELOW WRITES (TL-379). There were once two implementations of a status
+// change — one through the server, one through File System Access — each with
+// its own idea of what else a change sets, and the second knowing nothing about
+// the history at all. Both are gone, and with them the question of which was
+// right: a field is changed in the Markdown, through the CLI, under review.
 // ─── The worktree switcher (TL-188) ──────────────────────────────────
 //
 // SWITCHING IS A NAVIGATION, not a swap of the data under an open page. The
@@ -2968,47 +2277,6 @@ function changeTaskStatus(taskId, newStatus) {
 // (#tasks, #dashboard, #execution) and clicking a tab would drop the subject,
 // while ?worktree= survives every view and is what makes "look at the fleet's
 // worktree" one link.
-// WORKTREE_PARAM, readWorktreeParam() and withWorktree() come from the pasted
-// source of viewer-url.mjs above — the link contract is one file, and
-// node --test runs the same code the browser does.
-
-/** The query string every read route needs, so a fetch answers about the tree
- *  the page is showing rather than the one the server stands in. */
-function apiUrl(path) {
-  if (!WORKTREE) return path;
-  return path + (path.indexOf("?") >= 0 ? "&" : "?") + WORKTREE_PARAM + "=" + encodeURIComponent(WORKTREE);
-}
-
-function switchWorktree(key) {
-  const self = (WORKTREES.find((w) => w.isSelf) || {}).key;
-  window.location.href = withWorktree(window.location, key, self);
-}
-
-function renderWorktreePicker() {
-  const el = document.getElementById("worktreePicker");
-  if (!el) return;
-  // One tree is not a choice, and a page the server did not build has no trees
-  // to offer. Either way an empty control would be furniture.
-  if (WORKTREES.length < 2) { el.style.display = "none"; return; }
-  el.style.display = "";
-  // escape(), not escapeHtmlStr(): the key goes into an ATTRIBUTE and only the
-  // first of the two escapes quotes. Declared further down the page and reached
-  // here by hoisting, as the rest of the render functions do.
-  const options = WORKTREES.map((w) => {
-    const sel = w.key === WORKTREE ? " selected" : "";
-    return '<option value="' + escape(w.key) + '"' + sel + ">" +
-      escape(w.label) + (w.isSelf ? " (this server)" : "") + "</option>";
-  }).join("");
-  el.innerHTML =
-    '<span class="worktree-label">Worktree</span>' +
-    '<select class="worktree-select" id="worktreeSelect" ' +
-    'title="Each worktree has its own copy of the backlog. Picking one shows the tasks in THAT tree; only the tree this server was started in can be edited.">' +
-    options + "</select>";
-  document.getElementById("worktreeSelect").addEventListener("change", (e) => {
-    switchWorktree(e.target.value);
-  });
-}
-
 // ─── Connection bar UI ───────────────────────────────────────────────
 function updateConnectionBar() {
   const bar = document.getElementById("connectionBar");
@@ -3017,22 +2285,6 @@ function updateConnectionBar() {
   const btnConnect = document.getElementById("btnConnect");
   const btnRefresh = document.getElementById("btnRefresh");
   const btnDisconnect = document.getElementById("btnDisconnect");
-  renderWorktreePicker();
-  if (SERVER_MODE && FOREIGN_WORKTREE) {
-    // The reason has to be ON THE PAGE, not only in a disabled field: the reader
-    // who came here from a shared link has no other way to learn why the pens are
-    // gone, and "the fields stopped working" is the report that follows silence.
-    const here = (WORKTREES.find((w) => w.key === WORKTREE) || {}).label || WORKTREE;
-    const home = (WORKTREES.find((w) => w.isSelf) || {}).label || "the server tree";
-    bar.classList.remove("snapshot", "live"); bar.classList.add("foreign");
-    status.textContent = "Read-only — another worktree";
-    hint.textContent = "You are looking at " + here + ". Its files are read, never written: this server was started in " +
-      home + " and edits go there. Switch back to it to change anything.";
-    btnConnect.style.display = "none";
-    btnDisconnect.style.display = "none";
-    btnRefresh.style.display = "";
-    return;
-  }
   if (SERVER_MODE) {
     bar.classList.remove("snapshot", "foreign"); bar.classList.add("live");
     status.textContent = "Live (local server)";
@@ -3624,15 +2876,10 @@ function renderCards() {
       card.classList.add(ew.className);
       card.title = ew.title;
     }
-    // Live NOW gets the outline; heard-from-but-quiet keeps only its badge. The
-    // rule is in in-flight.mjs, so the card and the badge cannot disagree.
-    const live = inFlightFor(t.id);
-    if (live && live.state.working) card.classList.add("in-flight");
     card.innerHTML = \`
       <div class="task-card-head">
         <span class="task-card-id">\${escape(t.id || "")}</span>
         <span class="task-card-meta">
-          <span data-in-flight="\${escape(t.id || "")}">\${inFlightBadgeHtml(t.id)}</span>
           <span class="badge badge-priority-\${t.priority}">\${escape(t.priority || "")}</span>
         </span>
       </div>
@@ -3663,33 +2910,10 @@ function selectTask(id) {
   tasksSyncHash({ push: true });
 }
 
-// ─── Task detail: every field clickable, and who changed it (BL-1396/BL-1397) ──
+// ─── Task detail ──────────────────────────────────────────────────────
 //
-// Editing goes ONLY through the server (\`${N}\`): one place validates, writes
-// the .md, appends to the history and rebuilds the views. Under file:// the fields
-// are read-only — a second write path (File System Access) would mean a second set
-// of rules and a second place that knows about the history.
-// SERVER_MODE says there IS somewhere to write; SUBJECT_WRITABLE says the tree
-// being shown is the one the server may write to (TL-188). Both, or nothing.
-const CAN_EDIT = SERVER_MODE && SUBJECT_WRITABLE;
+// Every field is text. Nothing here writes (TL-379).
 
-/**
- * WHY editing is off — there are now two answers and they call for opposite
- * actions (TL-188). "Run the server" is the wrong advice to a reader whose
- * server is running and who is simply looking at another worktree; they have to
- * switch back, not start anything.
- */
-function readOnlyReason() {
-  if (SERVER_MODE && FOREIGN_WORKTREE) {
-    const home = (WORKTREES.find((w) => w.isSelf) || {}).label || "the tree the server was started in";
-    return "You are looking at another worktree — its files are read, never written. Switch back to " +
-      home + " to edit.";
-  }
-  return "Editing fields only works through the local server — run ${N} in a terminal";
-}
-
-const ACTOR_STORAGE_KEY = STORAGE_PREFIX + "-actor";
-const ACTORS = CONFIG.actors || [];
 
 const HISTORY_FIELD_LABELS = {
   __created__: "task created",
@@ -3706,181 +2930,15 @@ const HISTORY_FIELD_LABELS = {
   created: "Created",
 };
 
-/**
- * The actor in the history. The CSS class takes the NAMESPACE, not the whole
- * value — the colon in agent:claude is not legal in a class name, and we want to
- * colour by the kind of identity anyway, not by the name. What stays visible is
- * the name; the namespace goes into the tooltip, because it says HOW MUCH the
- * attribution is worth.
- */
-function actorHtml(actor) {
-  const parts = actorParts(actor);
-  const hint = {
-    local: "declared locally, unverified",
-    agent: "written automatically",
-    user: "authenticated account",
-    legacy: "entry from before the namespace convention (BL-1404)",
-    unknown: "author unknown",
-  }[parts.namespace] || parts.namespace;
-  return '<span class="hist-actor actor-ns-' + escape(parts.namespace) + '" title="' +
-    escape(actor + " — " + hint) + '">' + escape(parts.name) + "</span>";
-}
-
-function fieldLabel(key) {
-  const spec = fieldSpec(key, FIELDS);
-  if (spec) return spec.label;
-  return HISTORY_FIELD_LABELS[key] || key;
-}
-
-function loadActor() {
-  try {
-    const v = localStorage.getItem(ACTOR_STORAGE_KEY);
-    if (v && isValidActorSlug(v)) return v;
-  } catch (e) { /* a private window */ }
-  return "founder";
-}
-function isValidActorSlug(v) {
-  return typeof v === "string" && v.length <= 32 && /^[a-z0-9][a-z0-9._-]*$/.test(v);
-}
-function setActor(v) {
-  if (!isValidActorSlug(v)) return;
-  state.actor = v;
-  try { localStorage.setItem(ACTOR_STORAGE_KEY, v); } catch (e) { /* ignore */ }
-  renderActorPicker();
-}
-function renderActorPicker() {
-  const el = document.getElementById("actorPicker");
-  if (!el) return;
-  if (!CAN_EDIT) { el.style.display = "none"; return; }
-  el.style.display = "";
-  const opts = ACTORS.slice();
-  if (opts.indexOf(state.actor) < 0) opts.push(state.actor);
-  el.innerHTML = '<span class="actor-label">Editing as</span>' +
-    opts.map(function (a) {
-      // The button shows the name alone; the full value with its namespace goes
-      // into data-actor and into the tooltip — that is what lands in the log.
-      return '<button type="button" class="actor-btn' + (a === state.actor ? " is-active" : "") +
-        '" title="' + escape(a) + '" data-actor="' + escape(a) + '">' + escape(actorParts(a).name) + "</button>";
-    }).join("");
-  el.querySelectorAll(".actor-btn").forEach(function (b) {
-    b.addEventListener("click", function () { setActor(b.dataset.actor); });
-  });
-}
-
-/** The values the schema does not know in advance — they come from the data. */
-function dynamicOptions() {
-  const uniq = function (key) {
-    const out = [];
-    for (const t of ALL_TASKS) {
-      const v = String(t[key] == null ? "" : t[key]).trim();
-      if (v && out.indexOf(v) < 0) out.push(v);
-    }
-    return out.sort();
-  };
-  return {
-    boards: knownBoards().map(function (b) { return b.slug; }),
-    epics: uniq("epic"),
-    owners: uniq("owner"),
-  };
-}
-
 // ─── History ──────────────────────────────────────────────────────────
-function historyFor(id) {
-  const entries = HISTORY[id] || [];
-  return entries.slice().sort(function (a, b) { return String(a.ts).localeCompare(String(b.ts)); });
-}
-function lastChangeFor(id, field) {
-  const entries = historyFor(id);
-  for (let i = entries.length - 1; i >= 0; i--) if (entries[i].field === field) return entries[i];
-  return null;
-}
 // The history is fetched ONCE per task and redrawn only when it really changed.
 // An unconditional renderDetail() after every fetch made a loop
 // (render → fetch → render) that wiped an open editor while somebody was typing.
 const historyLoaded = {};
-async function refreshHistory(id, force) {
-  if (!SERVER_MODE || !id) return;
-  if (!force && historyLoaded[id]) return;
-  historyLoaded[id] = true;
-  try {
-    const res = await fetch(apiUrl("api/history?id=" + encodeURIComponent(id)), { cache: "no-store" });
-    if (!res.ok) return;
-    const data = await res.json();
-    const next = data.entries || [];
-    const changed = JSON.stringify(next) !== JSON.stringify(HISTORY[id] || []);
-    HISTORY[id] = next;
-    if (changed && state.selectedId === id && !state.editing) renderDetail();
-  } catch (e) {
-    historyLoaded[id] = false;   // we will try again on the next visit
-  }
-}
 // ─── The live signal (TL-189) ──────────────────────────────────────
 //
 // The server holds the raw log; this side holds only the reduced signal and the
 // rules for reading it, which come from the pasted in-flight.mjs above.
-async function refreshInFlight() {
-  // Retained temporarily as a no-op while the read-only viewer is simplified.
-}
-
-/** The server's clock, kept advancing between fetches. */
-function inFlightNow() { return Date.now() + IN_FLIGHT_SKEW_MS; }
-
-function inFlightFor(id) {
-  return null;
-}
-
-/** The badge on a card: the age, and the whole sentence in the title. */
-function inFlightBadgeHtml(id) {
-  const live = inFlightFor(id);
-  if (!live) return "";
-  return '<span class="badge badge-in-flight' + (live.state.working ? "" : " stale") +
-    '" title="' + escape(inFlightPhrase(live.signal, live.state)) + '">' +
-    escape(live.state.short) + "</span>";
-}
-
-/** The whole row, hidden when there is nothing to say — an empty row would still
- *  take a column of the auto-fit grid and read as a field with no value. */
-function inFlightRow(id) {
-  const inner = inFlightRowHtml(id);
-  return '<div class="meta-row in-flight-row" data-in-flight="' + escape(id) + '"' +
-    (inner ? "" : " hidden") + ">" + inner + "</div>";
-}
-
-/** The detail panel says it in words — the panel has the room the card has not,
- *  and "last heard from 40 minutes ago" is the sentence a reader acts on. */
-function inFlightRowHtml(id) {
-  const live = inFlightFor(id);
-  if (!live) return "";
-  return '<div class="meta-label">Working</div><div class="meta-value">' +
-    escape(inFlightPhrase(live.signal, live.state)) + "</div>";
-}
-
-/**
- * Repaint the signal WITHOUT re-rendering anything else.
- *
- * A full renderCards() + renderDetail() would be simpler and wrong twice:
- * renderDetail() scrolls the panel back to the top, so a reader half way down a
- * task description would be thrown to the beginning every tick, and a rebuild of
- * every card would drop a field editor that happened to be open. Only the slots
- * change, and everything around them is left alone.
- */
-function paintInFlight() {
-  const slots = document.querySelectorAll("[data-in-flight]");
-  for (const slot of slots) {
-    const id = slot.getAttribute("data-in-flight");
-    slot.innerHTML = slot.classList.contains("in-flight-row")
-      ? inFlightRowHtml(id)
-      : inFlightBadgeHtml(id);
-    // An empty row still takes a column of the auto-fit grid, so it is removed
-    // from the layout rather than merely left blank.
-    if (slot.classList.contains("in-flight-row")) slot.hidden = !slot.innerHTML;
-  }
-  for (const card of document.querySelectorAll(".task-card[data-task-id]")) {
-    const live = inFlightFor(card.getAttribute("data-task-id"));
-    card.classList.toggle("in-flight", !!(live && live.state.working));
-  }
-}
-
 // A REPAINT ON A TIMER, WITH NO FETCH BEHIND IT. Silence is the signal that has
 // no event: a session that stops sends nothing, so nothing would ever move a card
 // off "1m" — and a card frozen at one minute is exactly the spinner this feature
@@ -3907,343 +2965,7 @@ function histTime(ts) {
 }
 
 // ─── Field editors ──────────────────────────────────────────────
-function startEdit(id, field) {
-  if (!CAN_EDIT) {
-    toast(readOnlyReason(), "error");
-    return;
-  }
-  state.editing = { id: id, field: field };
-  renderDetail();
-  const el = document.querySelector("[data-editor-focus]");
-  if (el) { el.focus(); if (el.select) el.select(); }
-}
-function cancelEdit() {
-  state.editing = null;
-  renderDetail();
-}
-
-function editorHtml(t, spec) {
-  const value = t[spec.key];
-  const opts = dynamicOptions();
-  const id = escape(t.id);
-  const key = escape(spec.key);
-  const common = ' data-editor-focus onkeydown="onEditorKey(event)"';
-
-  if (spec.kind === "enum") {
-    const list = (spec.dynamic ? (opts[spec.dynamic] || []) : spec.options).slice();
-    if (list.indexOf(String(value || "")) < 0 && value) list.push(String(value));
-    const empty = spec.allowEmpty ? '<option value="">— none —</option>' : "";
-    return '<select class="field-editor"' + common +
-      ' onchange="saveField(\\'' + id + '\\',\\'' + key + '\\', this.value)"' +
-      ' onblur="cancelEdit()">' + empty +
-      list.map(function (o) {
-        return '<option value="' + escape(o) + '"' + (String(value || "") === o ? " selected" : "") + ">" + escape(o) + "</option>";
-      }).join("") + "</select>";
-  }
-
-  if (spec.kind === "list" && spec.closed) {
-    return '<div class="field-editor chips-editor"' + common + ' tabindex="-1">' +
-      spec.options.map(function (o) {
-        const on = (value || []).indexOf(o) >= 0;
-        return '<label class="chip-opt' + (on ? " is-on" : "") + '"><input type="checkbox"' + (on ? " checked" : "") +
-          ' value="' + escape(o) + '"> ' + escape(o) + "</label>";
-      }).join("") +
-      '<div class="editor-actions">' +
-      '<button type="button" onclick="saveChips(\\'' + id + '\\',\\'' + key + '\\', this)">Save</button>' +
-      '<button type="button" onclick="cancelEdit()">Cancel</button></div></div>';
-  }
-
-  if (spec.kind === "list") {
-    const text = (value || []).join("\\n");
-    return '<div class="field-editor">' +
-      '<textarea class="field-input" rows="' + Math.max(2, (value || []).length + 1) + '"' + common +
-      ' placeholder="' + escape(spec.itemHint || "") + ' — one value per line">' + escape(text) + "</textarea>" +
-      '<div class="editor-actions">' +
-      '<button type="button" onclick="saveLines(\\'' + id + '\\',\\'' + key + '\\', this)">Save</button>' +
-      '<button type="button" onclick="cancelEdit()">Cancel</button></div></div>';
-  }
-
-  const suggest = (spec.dynamic ? (opts[spec.dynamic] || []) : []).concat(spec.suggest || [])
-    .filter(function (v, i, arr) { return v && arr.indexOf(v) === i; });
-  const listId = "sug-" + key;
-  return '<input class="field-editor field-input" type="text" value="' + escape(value == null ? "" : value) + '"' +
-    (suggest.length ? ' list="' + listId + '"' : "") +
-    (spec.maxLength ? ' maxlength="' + spec.maxLength + '"' : "") + common +
-    ' onblur="saveField(\\'' + id + '\\',\\'' + key + '\\', this.value)">' +
-    (suggest.length ? '<datalist id="' + listId + '">' + suggest.map(function (o) {
-      return '<option value="' + escape(o) + '">';
-    }).join("") + "</datalist>" : "");
-}
-
-function onEditorKey(e) {
-  if (e.key === "Escape") { e.preventDefault(); cancelEdit(); return; }
-  if (e.key === "Enter" && e.target.tagName === "INPUT") { e.preventDefault(); e.target.blur(); }
-}
-function saveChips(id, field, btn) {
-  const box = btn.closest(".chips-editor");
-  const values = Array.prototype.slice.call(box.querySelectorAll("input:checked")).map(function (i) { return i.value; });
-  saveField(id, field, values);
-}
-function saveLines(id, field, btn) {
-  const box = btn.closest(".field-editor");
-  const values = box.querySelector("textarea").value.split("\\n").map(function (l) { return l.trim(); }).filter(Boolean);
-  saveField(id, field, values);
-}
-
-/**
- * Writing a field. The validation comes from the same module as on the server —
- * the UI cannot let through a value the server will reject. The optimistic
- * update reverts to the previous state when a write fails: the state shown has to
- * always match the file on disk.
- */
-async function saveField(taskId, field, value, reason) {
-  const task = ALL_TASKS.find(function (t) { return t.id === taskId; });
-  if (!task) return;
-  if (!CAN_EDIT) {
-    toast(readOnlyReason(), "error");
-    return;
-  }
-  const norm = normalizeValue(field, value, { fields: FIELDS, options: dynamicOptions() });
-  if (!norm.ok) { toast(norm.error, "error"); return; }
-  if (sameValue(task[field], norm.value)) { cancelEdit(); return; }
-
-  // Asked BEFORE anything is written, and asked here rather than in the field
-  // editor, because this is the one place every write route passes through. A box
-  // that appears after the change had gone in would be asking why about something
-  // already done.
-  if (reasonRequiredFor(field, norm.value) && !isValidReason(reason)) {
-    state.editing = null;
-    state.reasonAsk = { id: taskId, field: field, value: norm.value, error: reason === undefined ? "" : "A reason is required — and \`unknown\`/\`proven\` are the tool's own words." };
-    renderDetail();
-    return;
-  }
-  state.reasonAsk = null;
-
-  const previous = task[field];
-  const previousUpdated = task.updated;
-  task[field] = norm.value;
-  task.updated = new Date().toISOString().slice(0, 10);
-  state.editing = null;
-  applyScope();
-  render();
-
-  try {
-    const res = await fetch("api/field", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: taskId, field: field, value: norm.value, actor: state.actor, reason: reason || "" }),
-    });
-    const data = await res.json().catch(function () { return {}; });
-    if (!res.ok) throw new Error(data.error || "HTTP " + res.status);
-    if (data.updated) task.updated = data.updated;
-    if (data.entries && data.entries.length) {
-      HISTORY[taskId] = (HISTORY[taskId] || []).concat(data.entries);
-    }
-    historyLoaded[taskId] = false;   // the server may have appended more than our diff
-    renderDetail();
-    toast(taskId + " · " + fieldLabel(field) + ": " + (formatValue(previous) || "—") + " → " + (formatValue(norm.value) || "—"), "success");
-  } catch (e) {
-    task[field] = previous;
-    task.updated = previousUpdated;
-    applyScope();
-    render();
-    console.error(e);
-    toast("The write did not succeed: " + e.message, "error");
-  }
-}
-
 // ─── Detail render ────────────────────────────────────────────────────
-function valueHtml(t, key) {
-  if (key === "status") return '<span class="badge badge-status-' + escape(t.status) + '">' + escape(t.status) + "</span>";
-  if (key === "priority") return '<span class="badge badge-priority-' + escape(t.priority) + '">' + escape(t.priority) + "</span>";
-  if (key === "type") return '<span class="badge badge-type-' + escape(t.type) + '">' + escape(t.type) + "</span>";
-  if (key === "labels") {
-    return (t.labels || []).map(function (l) {
-      return '<span class="badge badge-label-' + escape(l) + '">' + escape(l) + "</span>";
-    }).join(" ") || "—";
-  }
-  if (key === "board") return t.board ? '<span class="badge badge-board">' + escape(boardLabel(t.board)) + "</span>" : "—";
-  if (key === "epic") return t.epic ? '<span class="badge badge-epic">' + escape(t.epic) + "</span>" : "—";
-  if (key === "estimate") {
-    return escape(t.estimate || "—") +
-      (t.confidence ? ' <span style="color:var(--fg-muted);font-size:11px">(' + escape(t.confidence) + ")</span>" : "");
-  }
-  if (key === "blocked_by" || key === "blocks") {
-    const ids = t[key] || [];
-    if (!ids.length) return "—";
-    return ids.map(function (id) { return '<a href="#' + escape(id) + '">' + escape(id) + "</a>"; }).join(" ");
-  }
-  if (key === "related_docs") {
-    const docs = t.related_docs || [];
-    if (!docs.length) return "—";
-    return docs.map(function (d) { return '<a href="../../' + escape(d) + '" target="_blank">' + escape(d) + "</a>"; }).join(" ");
-  }
-  const v = t[key];
-  return escape((Array.isArray(v) ? v.join(", ") : v) || "—");
-}
-
-function metaRowHtml(t, spec) {
-  const editing = state.editing && state.editing.id === t.id && state.editing.field === spec.key;
-  const last = lastChangeFor(t.id, spec.key);
-  const wide = spec.key === "related_docs" || spec.key === "labels";
-  const stamp = last
-    ? '<button type="button" class="field-stamp" title="' + escape(last.actor + " · " + histDay(last.ts) + " " + histTime(last.ts) + " · source: " + last.source) +
-      '" onclick="openHistory(\\'' + escape(t.id) + '\\',\\'' + escape(spec.key) + '\\')">' +
-      escape(last.actor) + " · " + escape(histAgo(last.ts)) + "</button>"
-    : "";
-  const body = editing
-    ? editorHtml(t, spec)
-    : '<div class="meta-value' + (CAN_EDIT ? " is-editable" : "") + '"' +
-      (CAN_EDIT ? ' tabindex="0" role="button" title="Click to edit"' +
-        ' onclick="startEdit(\\'' + escape(t.id) + '\\',\\'' + escape(spec.key) + '\\')"' +
-        ' onkeydown="if(event.key===\\'Enter\\'||event.key===\\' \\'){event.preventDefault();startEdit(\\'' + escape(t.id) + '\\',\\'' + escape(spec.key) + '\\')}"' : "") +
-      ">" + valueHtml(t, spec.key) + (CAN_EDIT ? '<span class="edit-pen" aria-hidden="true">✎</span>' : "") + "</div>";
-  return '<div class="meta-row' + (wide ? " meta-row-wide" : "") + (editing ? " is-editing" : "") + '" data-field="' + escape(spec.key) + '">' +
-    '<div class="meta-label">' + escape(spec.label) + stamp + "</div>" + body + "</div>";
-}
-
-function openHistory(id, field) {
-  state.historyField = field || null;
-  state.historyOpen = true;
-  renderDetail();
-  const el = document.getElementById("historyBlock");
-  if (el) el.scrollIntoView({ block: "nearest" });
-}
-function toggleHistory() {
-  state.historyOpen = !state.historyOpen;
-  if (!state.historyOpen) state.historyField = null;
-  renderDetail();
-}
-function clearHistoryFilter() {
-  state.historyField = null;
-  renderDetail();
-}
-
-/**
- * The box that asks why. It sits in the detail pane rather than in a modal,
- * because the answer belongs to THIS task and the reader needs the task in front
- * of them to write it — a dialog over a dimmed page hides the thing being
- * explained.
- */
-function reasonAskHtml(t) {
-  const ask = state.reasonAsk;
-  if (!ask || ask.id !== t.id) return "";
-  return '<section class="reason-ask">' +
-    '<div class="reason-ask-head">Why <b>' + escape(fieldLabel(ask.field)) + " → " +
-      escape(formatValue(ask.value)) + "</b>?</div>" +
-    '<div class="reason-ask-hint">This transition is recorded with its reason (<code>reason_required_statuses</code>). ' +
-      "It is the part nobody can reconstruct later.</div>" +
-    (ask.error ? '<div class="reason-ask-error">' + escape(ask.error) + "</div>" : "") +
-    '<textarea class="reason-ask-input" id="reasonAskInput" rows="2" maxlength="' + REASON_MAX_LENGTH +
-      '" placeholder="one sentence about this change"></textarea>' +
-    '<div class="reason-ask-actions">' +
-      '<button type="button" class="reason-ask-save" onclick="submitReason()">Save</button>' +
-      '<button type="button" class="reason-ask-cancel" onclick="cancelReason()">Cancel</button>' +
-    "</div></section>";
-}
-
-function submitReason() {
-  const ask = state.reasonAsk;
-  if (!ask) return;
-  const el = document.getElementById("reasonAskInput");
-  const text = el ? el.value : "";
-  // The value is passed back through saveField, so there is ONE write path: the
-  // box cannot drift from what the ordinary edit does.
-  saveField(ask.id, ask.field, ask.value, text);
-}
-
-function cancelReason() {
-  state.reasonAsk = null;
-  renderDetail();
-}
-
-function historyHtml(t) {
-  const all = historyFor(t.id).slice().reverse();
-  const shown = state.historyField ? all.filter(function (e) { return e.field === state.historyField; }) : all;
-  const head = '<button type="button" class="history-toggle" onclick="toggleHistory()">' +
-    (state.historyOpen ? "▾" : "▸") + " Change history (" + all.length + ")</button>" +
-    (state.historyField
-      ? '<span class="history-filter">only: ' + escape(fieldLabel(state.historyField)) +
-        ' <button type="button" onclick="clearHistoryFilter()">×</button></span>'
-      : "");
-  if (!state.historyOpen) return '<section class="history-block" id="historyBlock">' + head + "</section>";
-
-  let body;
-  if (!all.length) {
-    body = '<p class="history-empty">No recorded changes. The history is recorded from the moment ' +
-      "the tool began keeping it — anything earlier lives in git.</p>";
-  } else if (!shown.length) {
-    body = '<p class="history-empty">No changes to this field.</p>';
-  } else {
-    body = '<ol class="history-list">' + shown.map(function (e) {
-      const from = formatValue(e.from);
-      const to = formatValue(e.to);
-      // The three readings come from historyEntryKind() in the task-fields.mjs
-      // pasted in by source, so the rule can be run by a test instead of being
-      // asserted against this page's HTML (BL-1404 for the list, TL-99 for the
-      // message kind). A pseudo-field usually reads as a label alone; when it
-      // carries BOTH ends the label without them is half the fact, and a comment
-      // is all content and no transition.
-      const label = escape(fieldLabel(e.field));
-      const kind = historyEntryKind(e);
-      // A decision that answers a question says so, and says which one: the pair
-      // is the point of the event type (TL-114), and a row that hid the link
-      // would leave the reader to match ULIDs by eye.
-      const answers = e.field === FIELD_DECISION && e.resolves
-        ? ' <span class="hist-answers" title="Answers the event ' + escape(e.resolves) + '">answers a question above</span>'
-        : "";
-      const change = kind === "message"
-        ? label + ": " + escape(to) + answers
-        : kind === "event"
-        ? label
-        : label + ': <s>' + escape(from || "—") + "</s> → <b>" + escape(to || "—") + "</b>";
-      // The reason is a SECOND line, not a tooltip: a why that has to be hovered
-      // for is a why nobody reads. A sentinel gets a muted marker instead — it is
-      // an answer about the kind of answer, and dressing it up as somebody's
-      // sentence would be the lie this whole field exists to stop.
-      // A message row carries its sentence as the content; the same sentence is
-      // also its reason, because a reason belongs to the ACT (TL-105). Printed
-      // twice it reads as two facts, so the second copy is dropped — the row
-      // still shows every word, once.
-      const reasonLine = hasStatedReason(e) && !(kind === "message" && e.reason === to)
-        ? '<div class="hist-reason">' + escape(e.reason) + "</div>"
-        : (e.reason === REASON_PROVEN
-            ? '<div class="hist-reason is-sentinel">proven by the verification run</div>'
-            : "");
-      return '<li class="history-entry">' +
-        '<span class="hist-when" title="' + escape(e.ts) + '">' + escape(histDay(e.ts)) + " " + escape(histTime(e.ts)) + "</span>" +
-        actorHtml(e.actor) +
-        '<span class="hist-what">' + change + reasonLine + "</span>" +
-        '<span class="hist-source">' + escape(e.source || "") + "</span></li>";
-    }).join("") + "</ol>";
-  }
-  return '<section class="history-block is-open" id="historyBlock">' + head + body + "</section>";
-}
-
-/**
- * The change graph, over the same events the list below it shows (TL-116).
- *
- * A SECOND READING, not a second mechanism: the list is denser, the graph
- * answers "where did this task go" at a glance. Both are folds of
- * \`history/<ID>.jsonl\`, so neither can be more current than the other.
- *
- * Collapsed behind a toggle, defaulting to closed: a reader who opened a task to
- * change a field should not have to scroll past a picture to reach it.
- */
-function taskGraphHtml(t) {
-  const entries = historyFor(t.id);
-  const head = '<button type="button" class="history-toggle" onclick="toggleTaskGraph()">' +
-    (state.graphOpen ? "▾" : "▸") + " Change graph (" + entries.length + ")</button>";
-  if (!state.graphOpen) return '<section class="tgraph-block">' + head + "</section>";
-  return '<section class="tgraph-block is-open">' + head +
-    renderTaskGraph(taskGraph(entries), { day: histDay }) + "</section>";
-}
-
-function toggleTaskGraph() {
-  state.graphOpen = !state.graphOpen;
-  renderDetail();
-}
-
 // ONE listener rather than one per node: the detail panel is re-rendered
 // wholesale on every edit and every SSE refresh, so per-node handlers would be
 // re-bound each time. A click narrows the history list to that node's field —
@@ -4268,10 +2990,15 @@ function renderDetail() {
     el.innerHTML = '<div class="empty-state">← Pick a task from the list, or use <code>#' + TASK_PREFIX + '-001</code> in the URL.</div>';
     return;
   }
-  if (state.editing && state.editing.id !== t.id) state.editing = null;
-
+  // ONE ROW PER FIELD, no pen (TL-379). The rows used to be editors that fell
+  // back to text when the page could not write; now they are text, because the
+  // page cannot write at all. A field is changed where it is authoritative — in
+  // the Markdown, through the CLI, under review.
   const rows = FIELDS.filter(function (spec) { return spec.key !== "title"; })
-    .map(function (spec) { return metaRowHtml(t, spec); }).join("");
+    .map(function (spec) {
+      return '<div class="meta-row"><div class="meta-label">' + escape(spec.label || spec.key) +
+        '</div><div class="meta-value">' + escape(formatValue(t[spec.key]) || "—") + "</div></div>";
+    }).join("");
 
   const files = t.modified_files || [];
   const filesRow = files.length
@@ -4282,28 +3009,13 @@ function renderDetail() {
   const readOnlyRows =
     '<div class="meta-row"><div class="meta-label">Created</div><div class="meta-value">' + escape(t.created || "—") + "</div></div>" +
     '<div class="meta-row"><div class="meta-label">Updated</div><div class="meta-value">' + escape(t.updated || "—") + "</div></div>" +
-    // WHAT IS HAPPENING RIGHT NOW (TL-189), repainted in place on a timer — hence
-    // a slot with an id rather than a value rendered once. Empty until the server
-    // answers, and permanently empty over file://, where there is nobody to ask.
-    inFlightRow(t.id) +
     // COMPUTED from commit messages, so there is no pen: it is not a field
     // anybody may edit, and offering one would invite a value that contradicts
     // the history it was derived from. Absent when the task has no commits yet —
     // an empty row would read as "this task changed nothing".
     filesRow;
 
-  const titleEditing = state.editing && state.editing.id === t.id && state.editing.field === "title";
-  const titleHtml = titleEditing
-    ? '<h1 class="title-editing">' + editorHtml(t, fieldSpec("title", FIELDS)) + "</h1>"
-    : "<h1" + (CAN_EDIT ? ' class="is-editable" tabindex="0" role="button" title="Click to edit the title"' +
-        ' onclick="startEdit(\\'' + escape(t.id) + '\\',\\'title\\')"' : "") + ">" + escape(t.title) +
-      (CAN_EDIT ? '<span class="edit-pen" aria-hidden="true">✎</span>' : "") + "</h1>";
-
-  const editHint = CAN_EDIT
-    ? ""
-    : SERVER_MODE && FOREIGN_WORKTREE
-    ? '<div class="status-changer-disabled-hint">' + escape(readOnlyReason()) + "</div>"
-    : '<div class="status-changer-disabled-hint">The fields are read-only — editing and history recording work in server mode (<code>${N}</code> in a terminal).</div>'
+  const titleHtml = "<h1>" + escape(t.title) + "</h1>";
 
   el.innerHTML =
     '<div class="detail-header">' +
@@ -4318,15 +3030,10 @@ function renderDetail() {
       "</div>" +
       titleHtml +
       '<div class="detail-meta-grid">' + rows + readOnlyRows + "</div>" +
-      editHint +
-      reasonAskHtml(t) +
-      taskGraphHtml(t) +
-      historyHtml(t) +
     "</div>" +
     '<div class="markdown-content">' + t.bodyHtml + "</div>";
 
   el.scrollTop = 0;
-  if (SERVER_MODE) refreshHistory(t.id);
 }
 
 // A status another branch or worktree disagrees with (TL-73). BOTH values
@@ -4350,710 +3057,14 @@ function escape(s) {
 
 // ─── Dashboard ────────────────────────────────────────────────────────
 // Every number below is derived from the SAME task frontmatter the list view
-// reads, so the two can never disagree. Two honesty constraints are baked in:
-//   1. There is no completion timestamp in the schema. "Completed on X" means
-//      \`status: done\` AND \`updated: X\` — the last touch, not a proven close.
-//      Every surface that uses it says so.
-//   2. The dashboard ignores the task-list filters on purpose: it answers
-//      "how the backlog stands", not "how my current filter stands".
-
-const DASH_OPEN = CONFIG.dashboard.openStatuses;
-
-function dashDay(s) { return (s || "").slice(0, 10); }
-function dashIsDay(s) { return /^\\d{4}-\\d{2}-\\d{2}$/.test(s || ""); }
-function dashToday() {
-  const d = new Date();
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-}
-function dashAddDays(key, n) {
-  const d = new Date(key + "T00:00:00Z");
-  d.setUTCDate(d.getUTCDate() + n);
-  return d.toISOString().slice(0, 10);
-}
-function dashDiffDays(a, b) {
-  return Math.round((Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 86400000);
-}
-function dashMedian(arr) {
-  if (!arr.length) return null;
-  const s = arr.slice().sort((x, y) => x - y);
-  const m = Math.floor(s.length / 2);
-  return s.length % 2 ? s[m] : Math.round((s[m - 1] + s[m]) / 2);
-}
-function dashPct(a, b) { return b ? Math.round((a / b) * 100) : 0; }
-function dashDaysLabel(n) { return n === 1 ? "1 day" : n + " days"; }
-
-// Estimates are free text in the frontmatter ("30m", "2h", "0.5d", "1w", "1mo").
-// Returns null — never 0 — for anything unparseable, so a typo shows up as
-// "N with no countable estimate" instead of quietly shrinking the queue.
-// dashHours / dashSumHours / dashHoursLabel → estimate.mjs (BL-1412)
-function dashBlNum(id) { return taskNum(id); }
-
-// Completion day: \`updated\` when it is a real date, else \`created\` (imported
-// tasks that were born done). Returns "" when neither parses.
-function dashDoneDay(t) {
-  const u = dashDay(t.updated);
-  if (dashIsDay(u)) return u;
-  const c = dashDay(t.created);
-  return dashIsDay(c) ? c : "";
-}
-
-// The burndown's scope predicate lives here, not inside computeDashboard, so
-// the day panel under the chart selects exactly the same tasks the chart counts.
-function dashInScope(t, burn) {
-  if (t.status === "cancelled") return false;
-  const kind = (burn && burn.kind) || BURN_DEFAULT.kind;
-  if (kind === "label") return (t.labels || []).includes(burn.value);
-  if (kind === "epic") return t.epic === burn.value;
-  if (kind === "board") return (t.board || "") === burn.value;
-  // Abolishing the \`focus\` field (BL-1386) took the burndown's default axis away.
-  // The new one comes from the configuration (dashboard_burndown_*) — without it
-  // the axis would be empty and the chart would lie with a zero instead of admitting
-  // that it is measuring nothing.
-  return (t.labels || []).includes(BURN_DEFAULT.value);
-}
-
-const BURN_DEFAULT = CONFIG.dashboard.burndown;
-
-function dashScopeLabel(burn) {
-  const kind = (burn && burn.kind) || BURN_DEFAULT.kind;
-  if (kind === "label" || kind === "epic" || kind === "board") return burn.value;
-  return BURN_DEFAULT.value;
-}
-
-function computeDashboard(tasks, range, burn) {
-  const today = dashToday();
-  const phaseLabels = CONFIG.labelAxes.timing || [];
-  const createdByDay = Object.create(null);
-  const doneByDay = Object.create(null);
-  let minDay = today;
-
-  for (const t of tasks) {
-    const c = dashDay(t.created);
-    if (dashIsDay(c)) {
-      createdByDay[c] = (createdByDay[c] || 0) + 1;
-      if (c < minDay) minDay = c;
-    }
-    if (t.status === "done") {
-      const d = dashDoneDay(t);
-      if (d) {
-        doneByDay[d] = (doneByDay[d] || 0) + 1;
-        if (d < minDay) minDay = d;
-      }
-    }
-  }
-
-  // Day axis, hard-capped so a typo'd year (2062-…) cannot spin the loop.
-  const days = [];
-  if (dashIsDay(minDay)) {
-    let k = minDay;
-    for (let i = 0; i < 4000 && k <= today; i++) { days.push(k); k = dashAddDays(k, 1); }
-  }
-
-  let cc = 0, dc = 0;
-  const series = days.map((d) => {
-    cc += createdByDay[d] || 0;
-    dc += doneByDay[d] || 0;
-    return { day: d, created: createdByDay[d] || 0, done: doneByDay[d] || 0, cumCreated: cc, cumDone: dc };
-  });
-
-  // ── Date range ────────────────────────────────────────────────
-  // The range governs FLOW — what happened between two dates. It deliberately
-  // does NOT govern STOCK (how many tasks are open, how epics stand, how the
-  // queue is distributed): a range-filtered "open" would answer a question
-  // nobody asks ("how many of those created in July were open") while
-  // looking exactly like the one everybody asks.
-  const first = series.length ? series[0].day : today;
-  const last = series.length ? series[series.length - 1].day : today;
-  const clamp = (v, fallback) => {
-    if (!dashIsDay(v)) return fallback;
-    if (v < first) return first;
-    if (v > last) return last;
-    return v;
-  };
-  let from = clamp(range && range.from, first);
-  let to = clamp(range && range.to, last);
-  // A window that lies entirely outside the data would otherwise render as a
-  // backwards label ("2026-05-23 → 2026-02-01") over three empty charts.
-  if (from > to) from = to;
-  const rangeSeries = series.filter((s) => s.day >= from && s.day <= to);
-  const rangeDays = rangeSeries.length || 1;
-
-  let doneRange = 0, newRange = 0;
-  for (const s of rangeSeries) { doneRange += s.done; newRange += s.created; }
-
-  // Lead time for tasks closed INSIDE the range, plus all-time as the fallback
-  // when the range holds no closures — the card says which sample it drew.
-  const leadAll = [], leadRange = [];
-  for (const t of tasks) {
-    if (t.status !== "done") continue;
-    const c = dashDay(t.created), d = dashDoneDay(t);
-    if (!dashIsDay(c) || !d) continue;
-    const days = dashDiffDays(c, d);
-    if (days < 0) continue;
-    leadAll.push(days);
-    if (d >= from && d <= to) leadRange.push(days);
-  }
-
-  // ── Burndown ──────────────────────────────────────────────────
-  // Whatever the scope is — a timing label, an epic, a board — it is a CURRENT
-  // field, not a history. Nothing in the frontmatter records when a task
-  // entered or left the set. This reconstructs the past of TODAY'S set: a task
-  // promoted yesterday is drawn as if it had been there since it was created,
-  // and one removed from the set is absent from the whole line. Enough to see
-  // whether the set is shrinking; not an audit of what it held in July.
-  const scopeKind = (burn && burn.kind) || BURN_DEFAULT.kind;
-  const scopeValue = burn && burn.value;
-  const burnTasks = tasks.filter((t) => dashInScope(t, burn));
-  const burnSeries = rangeSeries.map(function (s) {
-    let scope = 0, remaining = 0;
-    for (const t of burnTasks) {
-      const c = dashDay(t.created);
-      if (!dashIsDay(c) || c > s.day) continue;
-      scope++;
-      const dd = t.status === "done" ? dashDoneDay(t) : "";
-      if (!dd || dd > s.day) remaining++;
-    }
-    return { day: s.day, scope: scope, remaining: remaining };
-  });
-  let burnClosedInRange = 0, burnAddedInRange = 0;
-  for (const t of burnTasks) {
-    const c = dashDay(t.created);
-    if (dashIsDay(c) && c >= from && c <= to) burnAddedInRange++;
-    if (t.status !== "done") continue;
-    const dd = dashDoneDay(t);
-    if (dd && dd >= from && dd <= to) burnClosedInRange++;
-  }
-
-  const byStatus = Object.create(null);
-  const byPriority = Object.create(null);
-  const byType = Object.create(null);
-  const byOwner = Object.create(null);
-  const byLabel = Object.create(null);
-  const epics = new Map();
-
-  for (const t of tasks) {
-    const st = t.status || "—";
-    byStatus[st] = (byStatus[st] || 0) + 1;
-    if (DASH_OPEN.includes(st)) {
-      byPriority[t.priority || "—"] = (byPriority[t.priority || "—"] || 0) + 1;
-      byType[t.type || "—"] = (byType[t.type || "—"] || 0) + 1;
-      byOwner[t.owner || "(nobody)"] = (byOwner[t.owner || "(nobody)"] || 0) + 1;
-      for (const l of (t.labels || [])) byLabel[l] = (byLabel[l] || 0) + 1;
-    }
-    const key = t.epic || "";
-    if (!epics.has(key)) {
-      epics.set(key, { epic: key, total: 0, done: 0, open: 0, in_progress: 0, blocked: 0, p0: 0, p1: 0, last: "" });
-    }
-    const e = epics.get(key);
-    e.total++;
-    if (t.status === "done") e.done++;
-    else if (t.status !== "cancelled") {
-      e.open++;
-      if (t.status === "in_progress") e.in_progress++;
-      if (t.status === "blocked") e.blocked++;
-      if (t.priority === "P0") e.p0++;
-      if (t.priority === "P1") e.p1++;
-    }
-    const u = dashDay(t.updated);
-    if (dashIsDay(u) && u > e.last) e.last = u;
-  }
-
-  const openTasks = tasks.filter((t) => DASH_OPEN.includes(t.status));
-  const stale = openTasks
-    .filter((t) => dashIsDay(dashDay(t.updated)))
-    .map((t) => ({ t: t, age: dashDiffDays(dashDay(t.updated), today) }))
-    .filter((x) => x.age >= 0)
-    .sort((a, b) => b.age - a.age);
-
-  const blocked = tasks.filter((t) => t.status === "blocked");
-
-  // ── Aging: age from \`created\`, per priority. The "no movement" lists already
-  // cover \`updated\`; this answers a different question — how long the queue
-  // has been carrying a thing, not when it was last touched.
-  const AGE_BUCKETS = [
-    { label: "0–7 days", max: 7 },
-    { label: "8–30 days", max: 30 },
-    { label: "31–90 days", max: 90 },
-    { label: "over 90 days", max: Infinity },
-  ];
-  const PRIOS = ["P0", "P1", "P2", "P3"];
-  const aging = AGE_BUCKETS.map((b) => ({ label: b.label, total: 0, P0: 0, P1: 0, P2: 0, P3: 0 }));
-  for (const t of openTasks) {
-    const c = dashDay(t.created);
-    const a = dashIsDay(c) ? dashDiffDays(c, today) : 0;
-    let i = AGE_BUCKETS.findIndex((b) => a <= b.max);
-    if (i < 0) i = AGE_BUCKETS.length - 1;
-    aging[i].total++;
-    if (PRIOS.includes(t.priority)) aging[i][t.priority]++;
-  }
-
-  // ── Hygiene: cheap invariants over the queue. Each one is a claim the
-  // backlog makes about itself that its own fields contradict.
-  const byId = new Map(tasks.map((t) => [t.id, t]));
-  const isClosed = (id) => {
-    const o = byId.get(id);
-    return !!o && (o.status === "done" || o.status === "cancelled");
-  };
-  const hygiene = [
-    { key: "p0-untouched", label: "P0 untouched",
-      hint: "A blocker nobody has started — the next section in NOW.yaml.",
-      tasks: openTasks.filter((t) => t.priority === "P0" && t.status === "pending") },
-    { key: "blocked-noreason", label: "status blocked bez blocked_by",
-      hint: "The task declares it is blocked but does not say by what.",
-      tasks: openTasks.filter((t) => t.status === "blocked" && !(t.blocked_by || []).length) },
-    { key: "blocked-dead", label: "blocked_by points at a task already closed",
-      hint: "The blocker is gone, the status does not know it.",
-      tasks: openTasks.filter((t) => t.status === "blocked" && (t.blocked_by || []).length
-        && (t.blocked_by || []).every(isClosed)) },
-    { key: "blocked-unmarked", label: "a live blocker, but a status other than blocked",
-      hint: "The task is stuck, and the queue counts it as ready to take.",
-      tasks: openTasks.filter((t) => t.status !== "blocked"
-        && (t.blocked_by || []).some((b) => byId.has(b) && !isClosed(b))) },
-    { key: "unassigned", label: "owner: unassigned",
-      hint: "Nobody is answerable for it — neither you nor an agent.",
-      tasks: openTasks.filter((t) => !t.owner || t.owner === "unassigned") },
-    { key: "no-epic", label: "no epic",
-      hint: "It does not belong to any larger whole.",
-      tasks: openTasks.filter((t) => !t.epic) },
-    { key: "low-conf", label: "confidence: low",
-      hint: "Not a defect — a planning risk. The estimates of these tasks may fall apart.",
-      tasks: openTasks.filter((t) => t.confidence === "low") },
-    { key: "no-estimate", label: "estimate cannot be counted",
-      hint: "It drops out of the hours total below.",
-      tasks: openTasks.filter((t) => estimateHours(t.estimate) == null) },
-  ].filter((h) => h.tasks.length);
-
-  // ── Queue in hours ────────────────────────────────────────────────
-  const closedInRange = tasks.filter((t) => {
-    if (t.status !== "done") return false;
-    const dd = dashDoneDay(t);
-    return dd && dd >= from && dd <= to;
-  });
-  const hoursOpen = sumHours(openTasks);
-  const hoursDone = sumHours(closedInRange);
-  const hoursBy = (pred) => sumHours(openTasks.filter(pred)).hours;
-
-  return {
-    today: today,
-    tasks: tasks,
-    series: series,
-    total: tasks.length,
-    doneCount: tasks.filter((t) => t.status === "done").length,
-    cancelled: tasks.filter((t) => t.status === "cancelled").length,
-    open: openTasks.length,
-    inProgress: tasks.filter((t) => t.status === "in_progress").length,
-    blockedCount: blocked.length,
-    blocked: blocked,
-    p0Open: openTasks.filter((t) => t.priority === "P0").length,
-    p1Open: openTasks.filter((t) => t.priority === "P1").length,
-    // The breakdowns are computed PER VALUE from the vocabulary, not per value
-    // hardcoded in the code (BL-1400): a project with no "phase" axis gets an
-    // empty object rather than counters for somebody else's labels.
-    openByPhase: phaseLabels.reduce(function (acc, l) {
-      acc[l] = openTasks.filter((t) => (t.labels || []).includes(l)).length;
-      return acc;
-    }, {}),
-    from: from, to: to, rangeDays: rangeDays, rangeSeries: rangeSeries,
-    fullFrom: first, fullTo: last,
-    doneRange: doneRange, newRange: newRange,
-    burnSeries: burnSeries,
-    burnTotal: burnTasks.length,
-    burnRemaining: burnTasks.filter((t) => t.status !== "done").length,
-    burnClosedInRange: burnClosedInRange,
-    burnAddedInRange: burnAddedInRange,
-    leadMedianAll: dashMedian(leadAll),
-    leadMedianRange: dashMedian(leadRange),
-    leadRangeCount: leadRange.length,
-    leadAllCount: leadAll.length,
-    scopeKind: scopeKind, scopeValue: scopeValue,
-    aging: aging,
-    hygiene: hygiene,
-    hoursOpen: hoursOpen.hours,
-    hoursUnknown: hoursOpen.unknown,
-    hoursDoneRange: hoursDone.hours,
-    hoursByPhase: phaseLabels.reduce(function (acc, l) {
-      acc[l] = hoursBy((t) => (t.labels || []).includes(l));
-      return acc;
-    }, {}),
-    hoursP0: hoursBy((t) => t.priority === "P0"),
-    hoursP1: hoursBy((t) => t.priority === "P1"),
-    hoursLowConf: hoursBy((t) => t.confidence === "low"),
-    hoursByType: (CONFIG.types || []).reduce(function (acc, ty) {
-      acc[ty] = hoursBy((t) => t.type === ty);
-      return acc;
-    }, {}),
-    leadBuckets: dashLeadBuckets(leadRange.length ? leadRange : leadAll),
-    leadBucketsFrom: leadRange.length ? "the range" : "the whole history",
-    byStatus: byStatus, byPriority: byPriority, byType: byType, byOwner: byOwner, byLabel: byLabel,
-    epics: [...epics.values()],
-    stale: stale,
-  };
-}
-
-function dashLeadBuckets(vals) {
-  const defs = [
-    ["0–1 days", function (v) { return v <= 1; }],
-    ["2–3 days", function (v) { return v >= 2 && v <= 3; }],
-    ["4–7 days", function (v) { return v >= 4 && v <= 7; }],
-    ["8–14 days", function (v) { return v >= 8 && v <= 14; }],
-    ["15–30 days", function (v) { return v >= 15 && v <= 30; }],
-    ["31+ days", function (v) { return v > 30; }],
-  ];
-  return defs.map(function (d) {
-    return { label: d[0], count: vals.filter(d[1]).length };
-  });
-}
-
-// ─── Small SVG chart helpers (no libraries — the file must stay offline) ──
-function dashPolyline(points, color, width, dash) {
-  return '<polyline fill="none" stroke="' + color + '" stroke-width="' + width + '"'
-    + (dash ? ' stroke-dasharray="' + dash + '"' : "")
-    + ' stroke-linejoin="round" stroke-linecap="round" points="' + points + '"></polyline>';
-}
-
-function dashTimeTicks(days, x, H) {
-  let out = "";
-  const label = (i, text) => '<text x="' + x(i).toFixed(1) + '" y="' + (H - 8)
-    + '" font-size="10" fill="var(--fg-muted)" text-anchor="middle">' + text + "</text>";
-  if (days.length <= 70) {
-    const every = Math.max(1, Math.round(days.length / 8));
-    for (let i = 0; i < days.length; i += every) out += label(i, days[i].slice(5));
-    return out;
-  }
-  let lastMonth = "";
-  for (let i = 0; i < days.length; i++) {
-    const m = days[i].slice(0, 7);
-    if (m !== lastMonth) { lastMonth = m; out += label(i, m); }
-  }
-  return out;
-}
-
 // ─── Chart hover ──────────────────────────────────────────────────────
 // Each chart ships the pixel positions the builder already computed alongside
 // the values behind them. The hover code recomputes no scales: a second
 // implementation of the same mapping is a second chance to disagree with the
 // picture on screen — the tooltip would confidently name a point the line is
 // not drawn through.
-function dashHoverLayer(p) {
-  const dots = p.series.map(function (sr, i) {
-    return sr.y
-      ? '<circle class="hover-dot" data-dot="' + i + '" r="3.5" fill="' + sr.color + '" cx="-99" cy="-99"></circle>'
-      : "";
-  }).join("");
-  return '<g class="chart-hover" opacity="0" pointer-events="none">'
-    + '<rect class="hover-band" x="-99" y="' + p.top + '" width="0" height="' + (p.bottom - p.top) + '"></rect>'
-    + '<line class="hover-line" x1="-99" x2="-99" y1="' + p.top + '" y2="' + p.bottom + '"></line>'
-    + dots
-    + "</g>"
-    + '<rect class="hover-capture" x="' + p.left + '" y="' + p.top + '" width="' + (p.right - p.left)
-    + '" height="' + (p.bottom - p.top) + '" fill="transparent"></rect>';
-}
-
-function dashPinDay(pin) {
-  const same = state.dashDay && pin && state.dashDay.day === pin.day && state.dashDay.source === pin.source;
-  state.dashDay = same ? null : pin;   // clicking the same point again closes it
-  renderDashboard();
-  if (state.dashDay) {
-    const panel = document.querySelector("#dashboardView .day-panel");
-    if (panel) panel.scrollIntoView({ block: "nearest" });
-  }
-}
-
-function dashHoverHide() {
-  const tip = document.getElementById("chartTip");
-  if (tip) tip.hidden = true;
-  for (const g of document.querySelectorAll("#dashboardView .chart-hover")) g.setAttribute("opacity", "0");
-}
-
 // One lookup for both hover and click: if they resolved the index separately,
 // clicking could open a different day than the tooltip under the cursor names.
-function dashChartPointAt(target, clientX) {
-  const svg = target && target.closest ? target.closest("svg.dash-chart") : null;
-  if (!svg || !svg.dataset.chart) return null;
-  const p = svg.chartPayload || (svg.chartPayload = JSON.parse(svg.dataset.chart));
-  const box = svg.getBoundingClientRect();
-  if (!box.width || !p.x.length) return null;
-  // Viewport px → viewBox units. The SVG scales with the card, so the ratio has
-  // to be read live rather than assumed to be 1.
-  const vx = (clientX - box.left) * (p.W / box.width);
-  let idx = 0, best = Infinity;
-  for (let i = 0; i < p.x.length; i++) {
-    const dx = Math.abs(p.x[i] - vx);
-    if (dx < best) { best = dx; idx = i; }
-  }
-  return { svg: svg, p: p, idx: idx };
-}
-
-function dashHoverMove(e) {
-  const hit = dashChartPointAt(e.target, e.clientX);
-  if (!hit) { dashHoverHide(); return; }
-  const svg = hit.svg, p = hit.p, idx = hit.idx;
-  const cx = p.x[idx];
-
-  // Clear the other charts, or the crosshair you left behind on one keeps
-  // pointing at a day you are no longer reading.
-  const g = svg.querySelector(".chart-hover");
-  for (const other of document.querySelectorAll("#dashboardView .chart-hover")) {
-    if (other !== g) other.setAttribute("opacity", "0");
-  }
-  g.setAttribute("opacity", "1");
-  const band = g.querySelector(".hover-band");
-  const line = g.querySelector(".hover-line");
-  if (p.band) {
-    band.setAttribute("x", (cx - p.band / 2).toFixed(1));
-    band.setAttribute("width", p.band.toFixed(1));
-    line.setAttribute("opacity", "0");
-  } else {
-    band.setAttribute("width", "0");
-    line.setAttribute("opacity", "1");
-    line.setAttribute("x1", cx.toFixed(1));
-    line.setAttribute("x2", cx.toFixed(1));
-  }
-  for (const dot of g.querySelectorAll(".hover-dot")) {
-    const sr = p.series[Number(dot.dataset.dot)];
-    dot.setAttribute("cx", cx.toFixed(1));
-    dot.setAttribute("cy", sr.y[idx]);
-  }
-
-  let rows = "";
-  for (const sr of p.series) {
-    rows += '<div class="tip-row"><i style="background:' + sr.color + '"></i><span>'
-      + escape(sr.label) + "</span><strong>" + sr.values[idx] + "</strong></div>";
-  }
-  const tip = document.getElementById("chartTip");
-  tip.innerHTML = '<div class="tip-day">' + escape(p.days[idx]) + "</div>" + rows
-    + (p.foot ? '<div class="tip-foot">' + escape(p.foot[idx]) + "</div>" : "");
-  tip.hidden = false;
-
-  // Flip the box rather than let it run off the viewport edge.
-  let left = e.clientX + 14;
-  let top = e.clientY - tip.offsetHeight - 12;
-  if (left + tip.offsetWidth > window.innerWidth - 8) left = e.clientX - tip.offsetWidth - 14;
-  if (top < 8) top = e.clientY + 18;
-  tip.style.left = Math.max(8, left) + "px";
-  tip.style.top = top + "px";
-}
-
-function dashCumulativeChart(series) {
-  if (series.length < 2) return '<p class="dash-empty">Too few days with data to draw a trend.</p>';
-  const W = 900, H = 280, padL = 46, padR = 12, padT = 12, padB = 26;
-  // A sliced range can open at 800 created / 600 closed. Anchoring the axis at
-  // zero would squash the whole window into the top sliver and hide the very
-  // movement the range was chosen to look at.
-  const maxY = Math.max(series[series.length - 1].cumCreated, 1);
-  const minY = Math.max(0, Math.floor(series[0].cumDone * 0.98));
-  const span = Math.max(1, maxY - minY);
-  const x = (i) => padL + (i * (W - padL - padR)) / (series.length - 1);
-  const y = (v) => H - padB - ((v - minY) * (H - padT - padB)) / span;
-
-  let created = "", done = "";
-  for (let i = 0; i < series.length; i++) {
-    created += x(i).toFixed(1) + "," + y(series[i].cumCreated).toFixed(1) + " ";
-    done += x(i).toFixed(1) + "," + y(series[i].cumDone).toFixed(1) + " ";
-  }
-  // Open backlog = the gap between the two lines, drawn as a filled band.
-  let band = created + " ";
-  for (let i = series.length - 1; i >= 0; i--) {
-    band += x(i).toFixed(1) + "," + y(series[i].cumDone).toFixed(1) + " ";
-  }
-
-  let grid = "", ticks = "";
-  const steps = 4;
-  for (let s = 0; s <= steps; s++) {
-    const v = minY + Math.round((span / steps) * s);
-    grid += '<line x1="' + padL + '" x2="' + (W - padR) + '" y1="' + y(v).toFixed(1) + '" y2="' + y(v).toFixed(1)
-      + '" stroke="var(--border)" stroke-width="1"></line>';
-    grid += '<text x="' + (padL - 8) + '" y="' + (y(v) + 4).toFixed(1)
-      + '" font-size="11" fill="var(--fg-muted)" text-anchor="end">' + v + "</text>";
-  }
-  ticks += dashTimeTicks(series.map((p) => p.day), x, H);
-
-  const hover = {
-    source: "cumulative",
-    W: W, top: padT, bottom: H - padB, left: padL, right: W - padR,
-    days: series.map((p) => p.day),
-    x: series.map((_, i) => +x(i).toFixed(1)),
-    series: [
-      { label: "created", color: "var(--fg-muted)", values: series.map((p) => p.cumCreated),
-        y: series.map((p) => +y(p.cumCreated).toFixed(1)) },
-      { label: "completed", color: "var(--status-done)", values: series.map((p) => p.cumDone),
-        y: series.map((p) => +y(p.cumDone).toFixed(1)) },
-      { label: "open", color: "var(--accent)", values: series.map((p) => p.cumCreated - p.cumDone) },
-    ],
-      foot: series.map((p) => "that day: +" + p.created + " new, " + p.done + " closed"),
-  };
-
-  return '<svg class="dash-chart" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Backlog over time"'
-    + ' data-chart="' + escape(JSON.stringify(hover)) + '">'
-    + grid
-    + '<polygon fill="var(--accent)" opacity="0.10" points="' + band + '"></polygon>'
-    + dashPolyline(created, "var(--fg-muted)", 2)
-    + dashPolyline(done, "var(--status-done)", 2)
-    + ticks
-    + dashHoverLayer(hover)
-    + "</svg>";
-}
-
-function dashBurnChart(fseries) {
-  if (fseries.length < 2) return '<p class="dash-empty">Too few days in the range to draw a burndown.</p>';
-  const W = 900, H = 240, padL = 40, padR = 12, padT = 12, padB = 26;
-  let maxY = 1;
-  for (const p of fseries) if (p.scope > maxY) maxY = p.scope;
-  const x = (i) => padL + (i * (W - padL - padR)) / (fseries.length - 1);
-  const y = (v) => H - padB - (v * (H - padT - padB)) / maxY;
-
-  let scope = "", remaining = "";
-  for (let i = 0; i < fseries.length; i++) {
-    scope += x(i).toFixed(1) + "," + y(fseries[i].scope).toFixed(1) + " ";
-    remaining += x(i).toFixed(1) + "," + y(fseries[i].remaining).toFixed(1) + " ";
-  }
-  const area = remaining + x(fseries.length - 1).toFixed(1) + "," + y(0).toFixed(1) + " " + x(0).toFixed(1) + "," + y(0).toFixed(1);
-
-  let grid = "";
-  const steps = Math.min(4, maxY);
-  for (let st = 0; st <= steps; st++) {
-    const v = Math.round((maxY / steps) * st);
-    grid += '<line x1="' + padL + '" x2="' + (W - padR) + '" y1="' + y(v).toFixed(1) + '" y2="' + y(v).toFixed(1)
-      + '" stroke="var(--border)" stroke-width="1"></line>'
-      + '<text x="' + (padL - 8) + '" y="' + (y(v) + 4).toFixed(1)
-      + '" font-size="11" fill="var(--fg-muted)" text-anchor="end">' + v + "</text>";
-  }
-  const ticks = dashTimeTicks(fseries.map((p) => p.day), x, H);
-
-  const hover = {
-    source: "burn",
-    W: W, top: padT, bottom: H - padB, left: padL, right: W - padR,
-    days: fseries.map((p) => p.day),
-    x: fseries.map((_, i) => +x(i).toFixed(1)),
-    series: [
-      { label: "left to do", color: "var(--accent)", values: fseries.map((p) => p.remaining),
-        y: fseries.map((p) => +y(p.remaining).toFixed(1)) },
-      { label: "scope (created)", color: "var(--fg-muted)", values: fseries.map((p) => p.scope),
-        y: fseries.map((p) => +y(p.scope).toFixed(1)) },
-    ],
-      foot: fseries.map((p) => "closed by that day: " + (p.scope - p.remaining)),
-  };
-
-  return '<svg class="dash-chart" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Burndown of the selected range"'
-    + ' data-chart="' + escape(JSON.stringify(hover)) + '">'
-    + grid
-    + '<polygon fill="var(--accent)" opacity="0.12" points="' + area + '"></polygon>'
-    + dashPolyline(scope, "var(--fg-muted)", 2, "4 3")
-    + dashPolyline(remaining, "var(--accent)", 2)
-    + ticks
-    + dashHoverLayer(hover)
-    + "</svg>";
-}
-
-function dashDailyChart(slice) {
-  if (!slice.length) return '<p class="dash-empty">No daily data.</p>';
-  const W = 900, H = 220, padL = 30, padR = 10, padT = 16, padB = 22;
-  const maxUp = Math.max.apply(null, slice.map((d) => d.done).concat([1]));
-  const maxDown = Math.max.apply(null, slice.map((d) => d.created).concat([1]));
-  // ONE scale for both halves. Scaling each half to its own max would draw a
-  // 5-task day and a 40-task day as the same bar height on opposite sides —
-  // exactly the comparison this chart exists to make.
-  const scale = (H - padT - padB) / (maxUp + maxDown);
-  const upH = maxUp * scale, downH = maxDown * scale;
-  const mid = padT + upH;
-  const bw = (W - padL - padR) / slice.length;
-
-  let bars = "";
-  for (let i = 0; i < slice.length; i++) {
-    const d = slice[i];
-    const bx = padL + i * bw + bw * 0.12;
-    const w = Math.max(1.5, bw * 0.76);
-    if (d.done) {
-      const h = (d.done / maxUp) * upH;
-      bars += '<rect x="' + bx.toFixed(1) + '" y="' + (mid - h).toFixed(1) + '" width="' + w.toFixed(1)
-        + '" height="' + h.toFixed(1) + '" fill="var(--status-done)" rx="1"></rect>';
-    }
-    if (d.created) {
-      const h = (d.created / maxDown) * downH;
-      bars += '<rect x="' + bx.toFixed(1) + '" y="' + mid + '" width="' + w.toFixed(1)
-        + '" height="' + h.toFixed(1) + '" fill="var(--fg-muted)" opacity="0.55" rx="1"></rect>';
-    }
-  }
-  let ticks = "";
-  const every = Math.max(1, Math.round(slice.length / 10));
-  for (let i = 0; i < slice.length; i += every) {
-    ticks += '<text x="' + (padL + i * bw + bw / 2).toFixed(1) + '" y="' + (H - 6)
-      + '" font-size="10" fill="var(--fg-muted)" text-anchor="middle">' + slice[i].day.slice(5) + "</text>";
-  }
-  const hover = {
-    source: "daily",
-    W: W, top: padT, bottom: H - padB, left: padL, right: W - padR,
-    band: bw,
-    days: slice.map((d) => d.day),
-    x: slice.map((_, i) => +(padL + i * bw + bw / 2).toFixed(1)),
-    series: [
-      { label: "completed", color: "var(--status-done)", values: slice.map((d) => d.done) },
-      { label: "new", color: "var(--fg-muted)", values: slice.map((d) => d.created) },
-    ],
-    foot: slice.map((d) => "balance for the day: " + (d.created - d.done > 0 ? "+" : "") + (d.created - d.done)),
-  };
-
-  return '<svg class="dash-chart" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Day by day"'
-    + ' data-chart="' + escape(JSON.stringify(hover)) + '">'
-    + '<line x1="' + padL + '" x2="' + (W - padR) + '" y1="' + mid + '" y2="' + mid + '" stroke="var(--border)" stroke-width="1"></line>'
-    + '<text x="4" y="' + (mid - upH) + '" font-size="10" fill="var(--fg-muted)">' + maxUp + "</text>"
-    + '<text x="4" y="' + (mid + downH) + '" font-size="10" fill="var(--fg-muted)">' + maxDown + "</text>"
-    + bars + ticks + dashHoverLayer(hover) + "</svg>";
-}
-
-function dashBars(rows, filterKey, sortId, defKey) {
-  if (!rows.length) return '<p class="dash-empty">No data.</p>';
-  let bar = "";
-  if (sortId) {
-    const def = { key: defKey || "value", dir: defKey === "name" ? "asc" : "desc" };
-    bar = dashSortBar(sortId, BAR_COLUMNS, def);
-    rows = dashSortItems(rows, sortId, BAR_COLUMNS, def, (a, b) => String(a.label).localeCompare(String(b.label)));
-  }
-  const max = Math.max.apply(null, rows.map((r) => r.count));
-  return bar + '<div class="bars">' + rows.map(function (r) {
-    const w = max ? Math.max(2, Math.round((r.count / max) * 100)) : 0;
-    const color = r.color || "var(--accent)";
-    const attrs = filterKey
-      ? ' data-dash-filter="' + escape(filterKey) + '" data-dash-value="' + escape(r.value != null ? r.value : r.label) + '" title="Show in the task list"'
-      : ' style="cursor:default"';
-    return '<button type="button" class="bar-row"' + attrs + '>'
-      + '<span class="bar-label">' + escape(r.label) + "</span>"
-      + '<span class="bar-track"><span class="bar-fill" style="width:' + w + "%;background:" + color + '"></span></span>'
-      + '<span class="bar-value">' + r.count + "</span>"
-      + "</button>";
-  }).join("") + "</div>";
-}
-
-/** The meta line of the "P0/P1" KPI: a breakdown by the phase axis, if the project has one. */
-function dashPhaseMeta(d) {
-  const parts = Object.keys(d.openByPhase).map((l) => d.openByPhase[l] + " " + l);
-  return parts.join(" · ");
-}
-
-/**
- * A sentence about how the queue splits across kinds of work. Until BL-1400 it
- * spoke outright about one project's own types; now it describes the types the
- * project really has, and stays silent when there is nothing to describe.
- */
-function dashTypeSentence(d) {
-  const types = Object.keys(d.hoursByType).filter((ty) => d.hoursByType[ty] > 0);
-  if (!types.length) return "";
-  return types.map((ty) => "<strong>" + hoursLabel(d.hoursByType[ty]) + "</strong> to <code>" + escape(ty) + "</code>").join(", ") + ".";
-}
-
-function dashKpi(label, value, meta, color) {
-  return '<div class="kpi"><div class="kpi-label">' + escape(label) + "</div>"
-    + '<div class="kpi-value"' + (color ? ' style="color:' + color + '"' : "") + ">" + value + "</div>"
-    + '<div class="kpi-meta">' + (meta || "&nbsp;") + "</div></div>";
-}
-
-function dashTaskLine(t, right) {
-  return "<li>"
-    + '<span class="dash-id">' + escape(t.id) + "</span>"
-    + '<a data-dash-task="' + escape(t.id) + '">' + escape(t.title) + "</a>"
-    + '<span class="dash-age">' + right + "</span></li>";
-}
-
 const DASH_PRESETS = [
   { key: "30", label: "30 days", days: 30 },
   { key: "60", label: "60 days", days: 60 },
@@ -5062,152 +3073,10 @@ const DASH_PRESETS = [
 ];
 const DASH_RANGE_STORE = STORAGE_PREFIX + "-dash-range";
 
-function dashLoadRange() {
-  try {
-    const raw = localStorage.getItem(DASH_RANGE_STORE);
-    if (!raw) return null;
-    const p = JSON.parse(raw);
-    if (!p || typeof p !== "object") return null;
-    return { preset: p.preset || "all", from: p.from || null, to: p.to || null };
-  } catch (e) { return null; }
-}
-function dashSaveRange() {
-  try { localStorage.setItem(DASH_RANGE_STORE, JSON.stringify(state.dashRange)); } catch (e) { /* private mode */ }
-}
-
-function dashSetPreset(key) {
-  const p = DASH_PRESETS.find((x) => x.key === key);
-  if (!p) return;
-  state.dashRange = p.days
-    ? { preset: key, from: dashAddDays(dashToday(), -(p.days - 1)), to: null }
-    : { preset: "all", from: null, to: null };
-  dashSaveRange();
-  renderDashboard();
-}
-
-function dashSetBound(which, value) {
-  const v = dashIsDay(value) ? value : null;
-  const next = {
-    preset: "custom",
-    from: which === "from" ? v : state.dashRange.from,
-    to: which === "to" ? v : state.dashRange.to,
-  };
-  // A reversed range would silently render an empty dashboard; swap instead.
-  if (next.from && next.to && next.from > next.to) {
-    const tmp = next.from; next.from = next.to; next.to = tmp;
-  }
-  state.dashRange = next;
-  dashSaveRange();
-  renderDashboard();
-}
-
-function dashRangeBar(d) {
-  const presets = DASH_PRESETS.map(function (p) {
-    const active = state.dashRange.preset === p.key ? " is-active" : "";
-    return '<button type="button" class="range-preset' + active + '" data-range-preset="' + p.key + '">' + p.label + "</button>";
-  }).join("");
-  const custom = state.dashRange.preset === "custom" ? " is-active" : "";
-  return '<div class="range-bar">'
-    + '<span class="range-title">Date range</span>'
-    + '<span class="range-presets">' + presets + '<span class="range-preset' + custom + '" data-range-custom>Custom</span></span>'
-    + '<label class="range-field">from <input type="date" data-range-input="from" value="' + escape(d.from) + '" min="' + escape(d.fullFrom) + '" max="' + escape(d.fullTo) + '"></label>'
-    + '<label class="range-field">to <input type="date" data-range-input="to" value="' + escape(d.to) + '" min="' + escape(d.fullFrom) + '" max="' + escape(d.fullTo) + '"></label>'
-    + '<span class="range-meta">' + dashDaysLabel(d.rangeDays) + " · " + escape(d.from) + " → " + escape(d.to) + "</span>"
-    + '<span class="range-hint">The range measures <strong>flow</strong> (the charts, throughput, lead time). <strong>State</strong> — open tasks, epics, distributions — is always current.</span>'
-    + "</div>";
-}
-
 // Tasks behind one point on a chart. Same two definitions the charts are drawn
 // from — created day, and "closed" as status done + updated — so the list can
 // never show a different count than the bar above it.
-function dashDayPanel(day, source) {
-  const onlyBurn = source === "burn";
-  const pick = (t) => !onlyBurn || dashInScope(t, state.dashBurn);
-  const created = TASKS.filter((t) => pick(t) && dashDay(t.created) === day);
-  const closed = TASKS.filter((t) => pick(t) && t.status === "done" && dashDoneDay(t) === day);
-  const daySort = { key: "id", dir: "asc" };
-  const sortTasks = (list) => dashSortItems(list, "dayPanel", TASK_COLUMNS, daySort,
-    (a, b) => dashBlNum(a.id) - dashBlNum(b.id));
-
-  const list = (tasks, empty) => tasks.length
-    ? '<ul class="dash-list">' + tasks.map(function (t) {
-        return "<li>"
-          + '<span class="dash-id">' + escape(t.id) + "</span>"
-          + '<a data-dash-task="' + escape(t.id) + '">' + escape(t.title) + "</a>"
-          + '<span class="dash-age"><span class="badge" style="background:var(--status-' + escape(t.status || "pending")
-          + ');color:#fff">' + escape(t.status || "—") + "</span> " + escape(t.priority || "") + "</span>"
-          + "</li>";
-      }).join("") + "</ul>"
-    : '<p class="dash-empty">' + empty + "</p>";
-
-  const sortedCreated = sortTasks(created);
-  const sortedClosed = sortTasks(closed);
-
-  return '<div class="dash-grid wide"><div class="dash-card day-panel">'
-    + '<button type="button" class="day-close" data-dash-day-close aria-label="Close">✕</button>'
-    + "<h2>" + escape(day) + (onlyBurn ? " — " + escape(dashScopeLabel(state.dashBurn)) : "") + "</h2>"
-    + '<p class="dash-sub">' + created.length + " created · " + closed.length + " closed"
-    + (onlyBurn ? " (range only: " + escape(dashScopeLabel(state.dashBurn)) + ")" : "") + ". Click a title to open the task.</p>"
-    + dashSortBar("dayPanel", TASK_COLUMNS, daySort)
-    + '<div class="day-cols">'
-    + "<div><h3>Created (" + created.length + ")</h3>" + list(sortedCreated, "Nothing was created that day.") + "</div>"
-    + "<div><h3>Closed (" + closed.length + ")</h3>" + list(sortedClosed, "Nothing was closed that day.") + "</div>"
-    + "</div>"
-    + '<p class="dash-note">"Closed that day" means <code>status: done</code> plus an <code>updated</code> with that date. '
-    + "A task edited after being closed moves to a later day — here and on the chart alike.</p>"
-    + "</div></div>";
-}
-
-function dashDayPanelFor(source, from, to) {
-  if (!state.dashDay || state.dashDay.source !== source) return "";
-  // A pinned day outside the current range would sit under a chart that no
-  // longer draws it.
-  if (state.dashDay.day < from || state.dashDay.day > to) return "";
-  return dashDayPanel(state.dashDay.day, source);
-}
-
 const DASH_BURN_STORE = STORAGE_PREFIX + "-dash-burn";
-
-function dashLoadBurn() {
-  try {
-    const raw = localStorage.getItem(DASH_BURN_STORE);
-    if (!raw) return null;
-    const p = JSON.parse(raw);
-    if (!p || typeof p !== "object" || !p.kind) return null;
-    return { kind: p.kind, value: p.value || null };
-  } catch (e) { return null; }
-}
-
-function dashSetBurn(kind, value) {
-  state.dashBurn = { kind: kind, value: value || null };
-  try { localStorage.setItem(DASH_BURN_STORE, JSON.stringify(state.dashBurn)); } catch (e) { /* private mode */ }
-  // A day pinned from the previous scope would keep showing that scope's tasks.
-  if (state.dashDay && state.dashDay.source === "burn") state.dashDay = null;
-  renderDashboard();
-}
-
-function dashBurnScopeBar(d) {
-  const b = state.dashBurn || BURN_DEFAULT;
-  const btn = (kind, value, label) => {
-    const on = b.kind === kind && b.value === value;
-    return '<button type="button" class="range-preset' + (on ? " is-active" : "") + '"'
-      + ' data-burn-kind="' + kind + '" data-burn-value="' + escape(value || "") + '">' + escape(label) + "</button>";
-  };
-  const epics = d.epics
-    .filter((e) => e.epic && e.open > 0)
-    .sort((a, c) => c.open - a.open)
-    .map((e) => '<option value="' + escape(e.epic) + '"' + (b.kind === "epic" && b.value === e.epic ? " selected" : "")
-      + ">" + escape(e.epic) + " (" + e.open + ")</option>")
-    .join("");
-  return '<div class="burn-bar">'
-    + '<span class="range-title">Burndown scope</span>'
-    + '<span class="range-presets">'
-    + (CONFIG.labelAxes.timing || []).map((l) => btn("label", l, l)).join("")
-    + knownBoards().map((bd) => btn("board", bd.slug, bd.name)).join("")
-    + "</span>"
-    + '<label class="range-field">epic <select data-burn-epic><option value="">— pick one —</option>' + epics + "</select></label>"
-    + "</div>";
-}
 
 // ─── Sorting, once, for every listing on the dashboard ──────────────
 // A column declares its label, its value accessor and the direction it opens
@@ -5215,108 +3084,6 @@ function dashBurnScopeBar(d) {
 // about what "Blok." means, and the eight listings below cannot drift into
 // eight slightly different sorting behaviours.
 //
-// A column with no \`get\` is the natural order — whatever order the caller
-// built the rows in (lifecycle for statuses, P0→P3 for priorities, age buckets
-// ascending). Sorting it "ascending" reverses that order rather than inventing
-// a comparator for it.
-const DASH_SORT_SPECS = {};   // id → { cols, def }; rebuilt on every render
-
-function dashSortFor(id, def) {
-  return state.dashSorts[id] || def;
-}
-
-function dashRegisterSort(id, cols, def) {
-  DASH_SORT_SPECS[id] = { cols: cols, def: def };
-  return dashSortFor(id, def);
-}
-
-function dashSetSort(id, key) {
-  const spec = DASH_SORT_SPECS[id];
-  if (!spec) return;
-  const col = spec.cols.find((c) => c.key === key);
-  const cur = dashSortFor(id, spec.def);
-  state.dashSorts[id] = cur.key === key
-    ? { key: key, dir: cur.dir === "asc" ? "desc" : "asc" }
-    : { key: key, dir: (col && col.dir) || "desc" };
-  renderDashboard();
-}
-
-function dashSortItems(items, id, cols, def, tie) {
-  const cur = dashRegisterSort(id, cols, def);
-  const col = cols.find((c) => c.key === cur.key);
-  if (!col || !col.get) return cur.dir === "asc" ? items.slice().reverse() : items.slice();
-  const dir = cur.dir === "asc" ? 1 : -1;
-  return items.slice().sort(function (a, b) {
-    const va = col.get(a), vb = col.get(b);
-    if (va < vb) return -1 * dir;
-    if (va > vb) return 1 * dir;
-    // Ties resolved deterministically, or rows with equal counts would swap
-    // places between renders for no visible reason.
-    return tie ? tie(a, b) : 0;
-  });
-}
-
-function dashSortArrow(cur, key) {
-  return cur.key === key ? (cur.dir === "asc" ? " ▲" : " ▼") : "";
-}
-
-function dashTableHead(id, cols, def) {
-  const cur = dashRegisterSort(id, cols, def);
-  return cols.map(function (c) {
-    const on = cur.key === c.key;
-    return "<th" + (c.num ? ' class="num"' : "")
-      + (on ? ' aria-sort="' + (cur.dir === "asc" ? "ascending" : "descending") + '"' : "") + ">"
-      + '<button type="button" class="th-sort' + (on ? " is-active" : "") + '" data-sort-id="' + escape(id)
-      + '" data-sort-key="' + escape(c.key) + '">' + escape(c.label) + dashSortArrow(cur, c.key) + "</button></th>";
-  }).join("");
-}
-
-function dashSortBar(id, cols, def) {
-  const cur = dashRegisterSort(id, cols, def);
-  return '<div class="sort-bar"><span>sort:</span>' + cols.map(function (c) {
-    const on = cur.key === c.key;
-    return '<button type="button" class="sort-btn' + (on ? " is-active" : "") + '" data-sort-id="' + escape(id)
-      + '" data-sort-key="' + escape(c.key) + '">' + escape(c.label) + dashSortArrow(cur, c.key) + "</button>";
-  }).join("") + "</div>";
-}
-
-const EPIC_COLUMNS = [
-  { key: "epic", label: "Epic", num: false, dir: "asc", get: (e) => (e.epic || "").toLowerCase() },
-  { key: "pct", label: "Progress", num: false, dir: "desc", get: (e) => dashPct(e.done, e.total) },
-  { key: "total", label: "Total", num: true, dir: "desc", get: (e) => e.total },
-  { key: "done", label: "Done", num: true, dir: "desc", get: (e) => e.done },
-  { key: "open", label: "Open", num: true, dir: "desc", get: (e) => e.open },
-  { key: "in_progress", label: "In progress", num: true, dir: "desc", get: (e) => e.in_progress },
-  { key: "blocked", label: "Blocked", num: true, dir: "desc", get: (e) => e.blocked },
-  { key: "p0", label: "P0", num: true, dir: "desc", get: (e) => e.p0 },
-  { key: "p1", label: "P1", num: true, dir: "desc", get: (e) => e.p1 },
-  { key: "last", label: "Last movement", num: true, dir: "desc", get: (e) => e.last || "" },
-];
-const EPIC_SORT_DEF = { key: "open", dir: "desc" };
-
-// Rows for a bar list: their own order, their value, or their label.
-const BAR_COLUMNS = [
-  { key: "natural", label: "order" },
-  { key: "value", label: "value", dir: "desc", get: (r) => r.count },
-  { key: "name", label: "name", dir: "asc", get: (r) => String(r.label).toLowerCase() },
-];
-
-// Attention lists carry { t, age }; blocked rows have no age.
-const ATTN_COLUMNS = [
-  { key: "age", label: "age", dir: "desc", get: (x) => (x.age == null ? -1 : x.age) },
-  { key: "id", label: "ID", dir: "asc", get: (x) => dashBlNum(x.t.id) },
-  { key: "prio", label: "priority", dir: "asc", get: (x) => x.t.priority || "P9" },
-];
-const BLOCKED_COLUMNS = [
-  { key: "id", label: "ID", dir: "asc", get: (x) => dashBlNum(x.t.id) },
-  { key: "prio", label: "priority", dir: "asc", get: (x) => x.t.priority || "P9" },
-  { key: "blockers", label: "number of blockers", dir: "desc", get: (x) => (x.t.blocked_by || []).length },
-];
-const TASK_COLUMNS = [
-  { key: "id", label: "ID", dir: "asc", get: (t) => dashBlNum(t.id) },
-  { key: "prio", label: "priority", dir: "asc", get: (t) => t.priority || "P9" },
-  { key: "status", label: "status", dir: "asc", get: (t) => t.status || "" },
-];
 
 const AGING_COLUMNS = [
   { key: "natural", label: "Age" },
@@ -5326,300 +3093,6 @@ const AGING_COLUMNS = [
   { key: "P3", label: "P3", num: true, dir: "desc", get: (r) => r.P3 },
   { key: "total", label: "Total", num: true, dir: "desc", get: (r) => r.total },
 ];
-
-function renderDashboard() {
-  const el = document.getElementById("dashboardView");
-  if (!el) return;
-  const d = computeDashboard(TASKS, state.dashRange, state.dashBurn);
-  const netFlow = d.newRange - d.doneRange;
-  const pace = d.doneRange / d.rangeDays;
-  const eta = netFlow < 0 ? Math.ceil(d.open / (-netFlow / d.rangeDays)) : null;
-  const burnPace = d.burnClosedInRange / d.rangeDays;
-  const burnEta = burnPace > 0 ? Math.ceil(d.burnRemaining / burnPace) : null;
-
-  // ── Board scope ──────────────────────────────────────────────────
-  // EVERY number below is computed from TASKS, that is, from the current scope.
-  // Without this bar a board's dashboard and the whole backlog's dashboard look
-  // identical while differing in everything — that is the entire reason a board is
-  // a scope rather than a filter beside Epic.
-  let scopeBar = "";
-  if (state.board !== BOARD_ALL) {
-    scopeBar = '<div class="dash-scope">Scope: <strong>' + escape(boardLabel(state.board)) + "</strong>"
-      + " — " + TASKS.length + " of " + ALL_TASKS.length + " tasks. "
-      + '<button type="button" class="btn-action" data-board-scope="' + BOARD_ALL + '">Show every board</button></div>';
-  } else if (knownBoards().length > 1) {
-    scopeBar = '<div class="dash-scope">Scope: <strong>every board</strong> — the numbers sum '
-      + knownBoards().map(function (b) {
-          return '<button type="button" class="board-btn" data-board-scope="' + escape(b.slug) + '">'
-            + escape(b.name) + ' <span class="board-count">'
-            + ALL_TASKS.filter(function (t) { return (t.board || "") === b.slug; }).length + "</span></button>";
-        }).join(" ")
-      + "</div>";
-  }
-
-  // ── Range bar + KPI row ──────────────────────────────────────────
-  let html = scopeBar + dashRangeBar(d) + '<div class="kpi-row">'
-    + dashKpi("All tasks", d.total, escape(String(d.doneCount)) + " done · " + d.cancelled + " cancelled")
-    + dashKpi("Open", d.open, dashPct(d.doneCount, d.total) + "% of the backlog closed")
-    + dashKpi("In progress", d.inProgress, d.inProgress > 10 ? "too many at once — NOW.yaml warns about it" : "the in_progress section in NOW.yaml", "var(--status-in_progress)")
-    + dashKpi("Blocked", d.blockedCount, d.blockedCount ? "waiting to be unblocked" : "clear", d.blockedCount ? "var(--status-blocked)" : null)
-    + dashKpi("P0 / P1 open", d.p0Open + " / " + d.p1Open, dashPhaseMeta(d), "var(--priority-P0)")
-    + dashKpi("In the selected range", d.burnRemaining, d.burnClosedInRange + " closed · axis: " + escape(dashScopeLabel(state.dashBurn)), "var(--accent)")
-    + dashKpi("Throughput in range", d.doneRange, "≈ " + pace.toFixed(1) + " tasks/day · " + dashDaysLabel(d.rangeDays), "var(--status-done)")
-    + dashKpi("Balance in range", (netFlow > 0 ? "+" : "") + netFlow, d.newRange + " new vs " + d.doneRange + " closed",
-        netFlow > 0 ? "var(--status-blocked)" : "var(--status-done)")
-    + dashKpi("Median lead time", d.leadMedianRange != null ? d.leadMedianRange + " days" : "—",
-        d.leadRangeCount + " closed in the range")
-    + "</div>";
-
-  // ── Burn-up ──────────────────────────────────────────────────────
-  html += '<div class="dash-grid wide"><div class="dash-card">'
-    + "<h2>Backlog over time (cumulative)</h2>"
-    + '<p class="dash-sub">The gap between the lines is the open backlog. Growing means things are created faster than you close them. <strong>Click a day</strong> to see its tasks.</p>'
-    + dashCumulativeChart(d.rangeSeries)
-    + '<div class="dash-legend">'
-    + '<span><i style="background:var(--fg-muted)"></i>created (cumulative)</span>'
-    + '<span><i style="background:var(--status-done)"></i>completed (cumulative)</span>'
-    + '<span><i style="background:var(--accent);opacity:.3"></i>open</span>'
-    + "</div>"
-    + '<p class="dash-note">The day of completion is a task&#39;s <code>updated</code> with status <code>done</code>. '
-    + "The frontmatter has no separate closing-date field, so any later edit of a task moves it on the chart.</p>"
-    + "</div></div>"
-    + dashDayPanelFor("cumulative", d.from, d.to);
-
-  // ── Day by day ───────────────────────────────────────────────────
-  html += '<div class="dash-grid wide"><div class="dash-card">'
-    + "<h2>Day by day — " + dashDaysLabel(d.rangeDays) + "</h2>"
-    + '<p class="dash-sub">Above the axis: closed. Below the axis: newly created. In the range: ' + d.doneRange + " closed, " + d.newRange
-    + " new. <strong>Click a day</strong> to see its tasks.</p>"
-    + dashDailyChart(d.rangeSeries)
-    + '<div class="dash-legend">'
-    + '<span><i style="background:var(--status-done)"></i>completed</span>'
-    + '<span><i style="background:var(--fg-muted);opacity:.55"></i>new</span>'
-    + "</div></div></div>"
-    + dashDayPanelFor("daily", d.from, d.to);
-
-  // ── Burndown of the selected range ───────────────────────────────
-  html += '<div class="dash-grid wide"><div class="dash-card">'
-    + "<h2>Burndown: " + escape(dashScopeLabel(state.dashBurn)) + " — " + d.burnRemaining + " of " + d.burnTotal + " left to do</h2>"
-    + dashBurnScopeBar(d)
-    + '<p class="dash-sub">The solid line: how many of this range were still open on a given day. '
-    + "The dashed line: how many tasks of the range existed at all then — a rise there is scope growth, not progress. "
-    + "<strong>Click a day</strong> to see the range's tasks for that day.</p>"
-    + dashBurnChart(d.burnSeries)
-    + '<div class="dash-legend">'
-    + '<span><i style="background:var(--accent)"></i>left to do</span>'
-    + '<span><i style="background:var(--fg-muted)"></i>scope (created)</span>'
-    + "</div>"
-    + "<p>" + (d.burnRemaining === 0
-        ? "This range is empty — there is nothing to burn down."
-        : (burnEta != null
-            ? "Closed in the range: <strong>" + d.burnClosedInRange + "</strong>, added <strong>"
-              + d.burnAddedInRange + "</strong>. At that pace (" + burnPace.toFixed(2)
-              + "/day) the remaining <strong>" + d.burnRemaining + "</strong> would reach zero in <strong>≈ "
-              + burnEta + " days</strong>."
-            : "No task from this range was closed in this window (" + d.burnAddedInRange
-              + " were added), so there is nothing to compute a burn rate from."))
-    + "</p>"
-    + '<p class="dash-note">Mind the source: the label, the <code>epic</code> and the <code>board</code> are <strong>current</strong> fields, not history. '
-    + "The chart reproduces the past of <strong>today's</strong> set — a task added to it yesterday "
-    + "is drawn as though it had been in it since the day it was created, and a task removed from the set does not exist on the chart at all.</p>"
-    + "</div></div>"
-    + dashDayPanelFor("burn", d.from, d.to);
-
-  // ── Epics ────────────────────────────────────────────────────────
-  const epics = dashSortItems(d.epics.filter((e) => e.epic), "epics", EPIC_COLUMNS, EPIC_SORT_DEF,
-    (a, b) => (a.epic || "").localeCompare(b.epic || ""));
-  const noEpic = d.epics.find((e) => !e.epic);
-  let epicRows = epics.map(function (e) {
-    const pct = dashPct(e.done, e.total);
-    return "<tr>"
-      + '<td><span class="epic-name" data-dash-filter="filterEpic" data-dash-value="' + escape(e.epic) + '">' + escape(e.epic) + "</span></td>"
-      + '<td><div class="mini-progress"><span class="bar-track"><span class="bar-fill" style="width:' + pct + '%;background:var(--status-done)"></span></span><span>' + pct + "%</span></div></td>"
-      + '<td class="num">' + e.total + "</td>"
-      + '<td class="num">' + e.done + "</td>"
-      + '<td class="num">' + (e.open || "·") + "</td>"
-      + '<td class="num">' + (e.in_progress || "·") + "</td>"
-      + '<td class="num" style="color:' + (e.blocked ? "var(--status-blocked)" : "inherit") + '">' + (e.blocked || "·") + "</td>"
-      + '<td class="num" style="color:' + (e.p0 ? "var(--priority-P0)" : "inherit") + '">' + (e.p0 || "·") + "</td>"
-      + '<td class="num">' + (e.p1 || "·") + "</td>"
-      + '<td class="num">' + (e.last || "—") + "</td>"
-      + "</tr>";
-  }).join("");
-  if (noEpic) {
-    epicRows += '<tr><td><span class="epic-name" data-dash-filter="filterEpic" data-dash-value="' + NO_EPIC + '">(no epic)</span></td>'
-      + '<td><div class="mini-progress"><span class="bar-track"><span class="bar-fill" style="width:' + dashPct(noEpic.done, noEpic.total) + '%;background:var(--fg-muted)"></span></span><span>' + dashPct(noEpic.done, noEpic.total) + "%</span></div></td>"
-      + '<td class="num">' + noEpic.total + '</td><td class="num">' + noEpic.done + '</td><td class="num">' + (noEpic.open || "·")
-      + '</td><td class="num">' + (noEpic.in_progress || "·")
-      + '</td><td class="num">' + (noEpic.blocked || "·") + '</td><td class="num">' + (noEpic.p0 || "·") + '</td><td class="num">' + (noEpic.p1 || "·")
-      + '</td><td class="num">' + (noEpic.last || "—") + "</td></tr>";
-  }
-  html += '<div class="dash-grid wide"><div class="dash-card">'
-    + "<h2>Epics — " + epics.length + " active</h2>"
-    + '<p class="dash-sub">Click a name to filter the task list; click a column header to sort. '
-    + 'The "(no epic)" row stays at the bottom whatever the sorting — it is not an epic, it is the remainder.</p>'
-    + '<div class="dash-scroll"><table class="dash-table"><thead><tr>'
-    + dashTableHead("epics", EPIC_COLUMNS, EPIC_SORT_DEF)
-    + "</tr></thead><tbody>" + epicRows + "</tbody></table></div></div></div>";
-
-  // ── Distributions ────────────────────────────────────────────────
-  const statusRows = STATUSES.filter((s) => d.byStatus[s]).map(function (s) {
-    return { label: s, value: s, count: d.byStatus[s], color: "var(--status-" + s + ")" };
-  });
-  const prioRows = ["P0", "P1", "P2", "P3"].filter((p) => d.byPriority[p]).map(function (p) {
-    return { label: p, value: p, count: d.byPriority[p], color: "var(--priority-" + p + ")" };
-  });
-  const typeRows = Object.keys(d.byType).sort((a, b) => d.byType[b] - d.byType[a])
-    .map((k) => ({ label: k, value: k, count: d.byType[k] }));
-  const ownerRows = Object.keys(d.byOwner).sort((a, b) => d.byOwner[b] - d.byOwner[a]).slice(0, 8)
-    .map((k) => ({ label: k, count: d.byOwner[k] }));
-  const labelRows = Object.keys(d.byLabel).sort((a, b) => d.byLabel[b] - d.byLabel[a]).slice(0, 12)
-    .map((k) => ({ label: k, value: k, count: d.byLabel[k] }));
-
-  html += '<div class="dash-grid">'
-    + '<div class="dash-card"><h2>Statuses</h2><p class="dash-sub">Every task. Click to filter.</p>'
-    + dashBars(statusRows, "filterStatus", "barsStatus", "natural") + "</div>"
-    + '<div class="dash-card"><h2>Priorities of open tasks</h2><p class="dash-sub">Without done and cancelled — this is the queue.</p>'
-    + dashBars(prioRows, "filterPriority", "barsPriority", "natural") + "</div>"
-    + '<div class="dash-card"><h2>Type of open tasks</h2><p class="dash-sub">How much of the queue an agent will do (<code>code</code>), and how much needs you.</p>'
-    + dashBars(typeRows, "filterType", "barsType", "value") + "</div>"
-    + '<div class="dash-card"><h2>Owners of open tasks</h2><p class="dash-sub">Top 8 by number of open tasks.</p>'
-    + dashBars(ownerRows, null, "barsOwner", "value") + "</div>"
-    + '<div class="dash-card"><h2>Labels on open tasks</h2><p class="dash-sub">Top 12. Click to filter.</p>'
-    + dashBars(labelRows, "filterLabel", "barsLabel", "value") + "</div>"
-    + '<div class="dash-card"><h2>Lead time of closed tasks</h2>'
-    + '<p class="dash-sub">From <code>created</code> to the day of closing · sample: ' + escape(d.leadBucketsFrom)
-    + " (" + (d.leadRangeCount || d.leadAllCount) + " closed).</p>"
-    + dashBars(d.leadBuckets.map((b) => ({ label: b.label, count: b.count })), null, "barsLead", "natural")
-    + '<p class="dash-note">Median: <strong>' + (d.leadMedianRange != null ? d.leadMedianRange + " days" : "—")
-    + "</strong> (range) · <strong>" + (d.leadMedianAll != null ? d.leadMedianAll + " days" : "—") + "</strong> (whole history)</p>"
-    + "</div></div>";
-
-  // ── Attention lists ──────────────────────────────────────────────
-  // Sort first, cut second, and say what was cut. Cutting first would make the
-  // sort control a lie: it would reorder twelve rows chosen by a different key.
-  const ATTN_CAP = 12;
-  const capNote = (shown, total) => total > shown
-    ? '<p class="dash-note">Showing ' + shown + " of " + total + " — change the sorting to see the rest.</p>"
-    : "";
-  const attnList = (items, id, cols, def, right) => {
-    const sorted = dashSortItems(items, id, cols, def, (a, b) => dashBlNum(a.t.id) - dashBlNum(b.t.id));
-    return dashSortBar(id, cols, def)
-      + '<ul class="dash-list">' + sorted.slice(0, ATTN_CAP).map((x) => dashTaskLine(x.t, right(x))).join("") + "</ul>"
-      + capNote(Math.min(ATTN_CAP, sorted.length), sorted.length);
-  };
-
-  const staleInProgress = d.stale.filter((x) => x.t.status === "in_progress" && x.age >= 7);
-  const oldestOpen = d.stale.filter((x) => x.t.priority === "P0" || x.t.priority === "P1");
-  const blockedItems = d.blocked.map((t) => ({ t: t, age: null }));
-
-  html += '<div class="dash-grid">'
-    + '<div class="dash-card"><h2>In progress with no movement for ≥ 7 days</h2>'
-    + '<p class="dash-sub">' + (staleInProgress.length ? "Either finished and unmarked, or stuck." : "Nothing is hanging.") + "</p>"
-    + (staleInProgress.length
-        ? attnList(staleInProgress, "attnStale", ATTN_COLUMNS, { key: "age", dir: "desc" }, (x) => x.age + " days")
-        : '<p class="dash-empty">None.</p>')
-    + "</div>"
-    + '<div class="dash-card"><h2>Blocked</h2><p class="dash-sub">Who is waiting for whom.</p>'
-    + (blockedItems.length
-        ? attnList(blockedItems, "attnBlocked", BLOCKED_COLUMNS, { key: "id", dir: "asc" }, function (x) {
-            const by = (x.t.blocked_by || []).join(", ");
-            return by ? "← " + escape(by) : "—";
-          })
-        : '<p class="dash-empty">Nothing is blocked.</p>')
-    + "</div>"
-    + '<div class="dash-card"><h2>Oldest open P0/P1</h2><p class="dash-sub">Age counted from the last <code>updated</code>.</p>'
-    + (oldestOpen.length
-        ? attnList(oldestOpen, "attnOldest", ATTN_COLUMNS, { key: "age", dir: "desc" }, (x) => x.age + " days")
-        : '<p class="dash-empty">No open P0/P1.</p>')
-    + "</div></div>";
-
-  // ── Queue in hours ───────────────────────────────────────────────
-  // Deliberately NOT "h/day". Estimates are planned effort per task, and most
-  // of the queue is executed by an agent, so the sum closed in a 60-day window
-  // exceeds the hours that exist in it. Divided by days it reads as a working
-  // day and lands at an absurd 60 h — a true division producing a false claim.
-  // Expressed as "how many such windows is the queue worth", the same ratio
-  // says something the source can actually support.
-  const hoursWindows = d.hoursDoneRange > 0 ? d.hoursOpen / d.hoursDoneRange : null;
-  html += '<div class="dash-grid">'
-    + '<div class="dash-card"><h2>The queue in hours</h2>'
-    + '<p class="dash-sub">The sum of <code>estimate</code> over open tasks — ' + d.open + ' of them says nothing about time.'
-    + (d.hoursUnknown ? " <strong>" + d.hoursUnknown + "</strong> with no countable estimate (outside the sum)." : "")
-    + "</p>"
-    + dashBars([{ label: "total", count: d.hoursOpen }]
-        .concat(Object.keys(d.hoursByPhase).map((l) => ({ label: l, count: d.hoursByPhase[l] })))
-        .concat([
-          { label: "P0", count: d.hoursP0, color: "var(--priority-P0)" },
-          { label: "P1", count: d.hoursP1, color: "var(--priority-P1)" },
-        ])
-        .concat(Object.keys(d.hoursByType).map((ty) => ({ label: ty, count: d.hoursByType[ty] }))),
-      null, "barsHours", "natural")
-    + "<p>" + dashTypeSentence(d)
-    + (hoursWindows != null
-        ? " In the selected window (" + dashDaysLabel(d.rangeDays) + ") you closed tasks with a combined estimate of <strong>"
-        + hoursLabel(d.hoursDoneRange) + "</strong> — the current queue is worth <strong>≈ "
-          + hoursWindows.toFixed(1) + "</strong> such windows."
-        : "Nothing with a countable estimate was closed in the selected window, so there is nothing to compare this queue against.")
-    + "</p>"
-    + '<p class="dash-note">What this number does <strong>not</strong> mean: an estimate is a task&#39;s planned effort, not the clock time of your day. '
-    + "A sum closed inside a window can exceed the number of hours that window even had — this compares portions of work, not a timetable. "
-    + "On top of that, <strong>" + hoursLabel(d.hoursLowConf) + "</strong> of the queue sits in tasks marked <code>confidence: low</code>. "
-    + "A working day counts as 8 h, a week as 40 h, a month as 160 h.</p>"
-    + "</div>"
-
-    // ── Aging ──────────────────────────────────────────────────────
-    + '<div class="dash-card"><h2>Age of open tasks</h2>'
-    + '<p class="dash-sub">Counted from <code>created</code>. Not the same as "no movement" below — that one counts <code>updated</code>.</p>'
-    + '<table class="dash-table"><thead><tr>'
-    + dashTableHead("aging", AGING_COLUMNS, { key: "natural", dir: "desc" })
-    + "</tr></thead><tbody>"
-    + dashSortItems(d.aging, "aging", AGING_COLUMNS, { key: "natural", dir: "desc" }).map(function (row) {
-        return "<tr><td>" + escape(row.label) + "</td>"
-          + '<td class="num" style="color:' + (row.P0 ? "var(--priority-P0)" : "inherit") + '">' + (row.P0 || "·") + "</td>"
-          + '<td class="num">' + (row.P1 || "·") + "</td>"
-          + '<td class="num">' + (row.P2 || "·") + "</td>"
-          + '<td class="num">' + (row.P3 || "·") + "</td>"
-          + '<td class="num"><strong>' + row.total + "</strong></td></tr>";
-      }).join("")
-    + "</tbody></table>"
-    + '<p class="dash-note">Age is not a defect in itself — a P0 in the last row is.</p>'
-    + "</div>"
-
-    // ── Hygiene ────────────────────────────────────────────────────
-    + '<div class="dash-card"><h2>Backlog hygiene</h2>'
-    + '<p class="dash-sub">Places where the backlog contradicts its own fields. Expand a row to see the tasks.</p>'
-    + (d.hygiene.length ? dashSortBar("hygiene", TASK_COLUMNS, { key: "id", dir: "asc" }) : "")
-    + (d.hygiene.length
-        ? d.hygiene.map(function (h) {
-            return "<details class=\\"hyg\\"><summary><span class=\\"hyg-count\\">" + h.tasks.length + "</span> "
-              + escape(h.label) + '<span class="hyg-hint">' + escape(h.hint) + "</span></summary>"
-              + '<ul class="dash-list">' + dashSortItems(h.tasks, "hygiene", TASK_COLUMNS, { key: "id", dir: "asc" },
-                  (a, b) => dashBlNum(a.id) - dashBlNum(b.id)).map(function (t) {
-                  return "<li><span class=\\"dash-id\\">" + escape(t.id) + "</span>"
-                    + '<a data-dash-task="' + escape(t.id) + '">' + escape(t.title) + "</a>"
-                    + '<span class="dash-age">' + escape(t.priority || "") + "</span></li>";
-                }).join("") + "</ul></details>";
-          }).join("")
-        : '<p class="dash-empty">Nothing to tidy up.</p>')
-    + "</div></div>";
-
-  // ── Forecast ─────────────────────────────────────────────────────
-  html += '<div class="dash-grid wide"><div class="dash-card"><h2>Forecast to completion</h2>'
-    + '<p class="dash-sub">A simple extrapolation of the throughput in the selected range — not a plan, just the consequence of the current rate.</p>'
-    + "<p>" + (eta != null
-        ? "At a balance of <strong>" + netFlow + "</strong> tasks / " + d.rangeDays + " days, the current <strong>" + d.open
-          + "</strong> open would reach zero in <strong>≈ " + eta + " days</strong> (" + Math.round(eta / 30) + " months), "
-          + "provided the rate at which new ones appear does not change."
-        : (d.doneRange === 0
-            ? "Nothing was closed in the selected range — there is nothing to extrapolate from."
-            : "The backlog is growing: in " + d.rangeDays + " days <strong>" + d.newRange + "</strong> arrived and <strong>" + d.doneRange
-              + "</strong> left. At that balance the queue never closes — either the scope has to be cut, or people have to stop adding."))
-    + "</p></div></div>";
-
-  el.innerHTML = html;
-  dashSyncHash();
-}
 
 // ─── Tasks view state in the URL ──────────────────────────────────────
 // The same contract as the dashboard below, only for the task list: the filters,
@@ -5692,74 +3165,8 @@ function tasksApplyHash(query) {
 // makes a shared link exact: a recipient whose localStorage holds a different
 // range still sees the sender's. A bare "#dashboard" (what the tab button
 // produces) deliberately carries nothing and leaves your own state alone.
-function dashEncodeHash() {
-  const p = new URLSearchParams();
-  const r = state.dashRange || {};
-  p.set("range", r.preset && r.preset !== "custom" ? r.preset : (r.from || "") + ".." + (r.to || ""));
-  const b = state.dashBurn || BURN_DEFAULT;
-  p.set("burn", b.kind + ":" + (b.value || ""));
-  if (state.dashDay) p.set("day", state.dashDay.day + ":" + state.dashDay.source);
-  const sorts = Object.keys(state.dashSorts || {})
-    .map((id) => id + ":" + state.dashSorts[id].key + ":" + state.dashSorts[id].dir);
-  if (sorts.length) p.set("sort", sorts.join(","));
-  return "dashboard?" + p.toString();
-}
-
-function dashApplyHash(query) {
-  if (!query) return;                       // bare #dashboard — keep what you had
-  const p = new URLSearchParams(query);
-
-  const range = p.get("range");
-  if (range) {
-    if (range.indexOf("..") >= 0) {
-      const parts = range.split("..");
-      state.dashRange = { preset: "custom", from: parts[0] || null, to: parts[1] || null };
-    } else if (DASH_PRESETS.some((x) => x.key === range)) {
-      const preset = DASH_PRESETS.find((x) => x.key === range);
-      state.dashRange = preset.days
-        ? { preset: range, from: dashAddDays(dashToday(), -(preset.days - 1)), to: null }
-        : { preset: "all", from: null, to: null };
-    }
-  }
-
-  const burn = p.get("burn");
-  if (burn) {
-    const i = burn.indexOf(":");
-    // An old \`burn=focus\` link (from before BL-1386) has nothing left to select —
-    // it falls back to the default axis instead of showing an empty chart.
-    state.dashBurn = i < 0 ? { ...BURN_DEFAULT } : { kind: burn.slice(0, i), value: burn.slice(i + 1) };
-  }
-
-  const day = p.get("day");
-  if (day) {
-    const i = day.lastIndexOf(":");
-    const value = i < 0 ? day : day.slice(0, i);
-    // An unparseable day would pin a panel to a date no chart draws.
-    state.dashDay = dashIsDay(value) ? { day: value, source: i < 0 ? "daily" : day.slice(i + 1) } : null;
-  } else {
-    state.dashDay = null;
-  }
-
-  const sort = p.get("sort");
-  state.dashSorts = {};
-  if (sort) {
-    for (const part of sort.split(",")) {
-      const bits = part.split(":");
-      if (bits.length === 3) state.dashSorts[bits[0]] = { key: bits[1], dir: bits[2] === "asc" ? "asc" : "desc" };
-    }
-  }
-}
-
 // replaceState, not a hash assignment: assigning fires hashchange, which would
 // re-enter handleHash and re-apply the state that was just set.
-function dashSyncHash() {
-  if (state.view !== "dashboard") return;
-  const next = "#" + dashEncodeHash();
-  if (window.location.hash !== next) {
-    history.replaceState(null, "", window.location.pathname + window.location.search + next);
-  }
-}
-
 // ─── Execution view (TL-109) ──────────────────────────────────────────
 // The state is recomputed on every render from ALL_TASKS — deliberately not from
 // TASKS: a board is a scope over the LIST, while a plan spans the whole backlog,
@@ -5947,18 +3354,50 @@ function decisionRows() {
     // it. Guessing an empty one would put every task with any role into a
     // person's queue.
   });
-  return state.decisionsMine ? minePanel(items, state.actor) : items;
+  return items;
+}
+
+function srcHead(r) {
+  return '<a class="dec-id" href="#' + escapeHtmlStr(r.id) + '">' + escapeHtmlStr(r.id) + "</a>" +
+    '<span class="dec-title">' + escapeHtmlStr(r.title) + "</span>";
+}
+
+/** The menu the question was asked with, or nothing (TL-204, TL-207).
+ *
+ *  NOTHING IS INVENTED. A question asked before options existed, or asked
+ *  without them on purpose, gets no list — an empty \`<ol>\` reading "no options"
+ *  would be a sentence about the tool rather than about the decision.
+ *
+ *  THE NUMBERS ARE THE ONES \`decide --choose <n>\` TAKES, 1-based at every end
+ *  (TL-204), so a reader who moves to the terminal types what they read here.
+ *  Since TL-379 that move is the ONLY way to answer, and the list is plain text
+ *  rather than buttons: a disabled button is a promise the page cannot keep, and
+ *  a reader deserves to be told where the answer goes instead of finding out by
+ *  clicking. The event id is printed for the same reason — it is the argument
+ *  \`--resolves\` needs, and without it the reader has to go and find the log. */
+function decisionMenu(r) {
+  const options = r.options || [];
+  if (!options.length) return "";
+  const how = r.eventId
+    ? '<p class="dec-how">Answer it: <code>' + escapeHtmlStr(TASK_PREFIX ? "" : "") +
+      "decide " + escapeHtmlStr(r.id) + " --resolves " + escapeHtmlStr(r.eventId) +
+      " --choose &lt;n&gt;</code></p>"
+    : "";
+  return '<ol class="dec-menu">' + options.map(function (text, i) {
+    const n = i + 1;
+    const rec = n === r.recommend;
+    return '<li class="dec-opt' + (rec ? " is-rec" : "") + '">' +
+      '<span class="dec-opt-n">' + n + ".</span>" +
+      "<span>" + escapeHtmlStr(text) +
+      (rec ? '<span class="dec-rec">recommended</span>' : "") + "</span></li>";
+  }).join("") + "</ol>" + how;
 }
 
 function renderDecisions() {
   const host = document.getElementById("decisionsView");
   const rows = decisionRows();
   const head =
-    '<div class="dec-head"><h2>Waiting on you</h2>' +
-    '<button type="button" class="dec-filter' + (state.decisionsMine ? " is-on" : "") +
-    '" onclick="toggleDecisionsMine()">' +
-    (state.decisionsMine ? "only mine: " + escapeHtmlStr(state.actor || "(nobody declared)") : "everything") +
-    "</button></div>" +
+    '<div class="dec-head"><h2>Waiting on you</h2></div>' +
     // THE LEDE CARRIES WHAT IS CONSTANT so the rows do not have to (TL-205): a
     // card is a question to answer, a plain line is a task somebody marked for
     // a person. Stated once here, it is not repeated eleven times below.
@@ -5996,7 +3435,6 @@ function renderDecisions() {
         '<p class="dec-ask">' + escapeHtmlStr(r.question) + "</p>" +
         decisionMenu(r) +
         '<div class="dec-meta">asked by ' + escapeHtmlStr(r.asker || "somebody") + age + "</div>" +
-        decisionForm(r.id, r.eventId, r.options.length ? "menu" : "question") +
         "</article>";
     }
     if (r.kind === "vouch") {
@@ -6032,140 +3470,9 @@ function renderDecisions() {
       : '<span class="dec-meta">no agent here serves the role <code>' +
         escapeHtmlStr(r.role) + "</code></span>";
     return '<div class="dec-t">' + srcHead(r) + role +
-      '<span class="dec-gap"></span>' + unblocks + decisionForm(r.id, "", "task") + "</div>";
+      '<span class="dec-gap"></span>' + unblocks + "</div>";
   }).join("");
   updateDecisionsCount();
-}
-
-/** Which task a row came from, in both kinds of row: the id links to it and the
- *  title says what it is. On a card this is PROVENANCE and is set below the
- *  question in size; on a flat row it is the row. */
-function srcHead(r) {
-  return '<a class="dec-id" href="#' + escapeHtmlStr(r.id) + '">' + escapeHtmlStr(r.id) + "</a>" +
-    '<span class="dec-title">' + escapeHtmlStr(r.title) + "</span>";
-}
-
-/** The menu the question was asked with, or nothing (TL-204, TL-207).
- *
- *  NOTHING IS INVENTED. A question asked before options existed, or asked
- *  without them on purpose, gets no list — an empty \`<ol>\` reading "no options"
- *  would be a sentence about the tool rather than about the decision.
- *
- *  THE NUMBERS ARE THE ONES \`decide --choose <n>\` TAKES, 1-based at every end
- *  (TL-204), so a reader who moves to the terminal types what they read here.
- *  Picking a row records the option's TEXT as the reason, exactly as the command
- *  does — the page does not get its own idea of what an answer is. */
-function decisionMenu(r) {
-  const options = r.options || [];
-  if (!options.length) return "";
-  return '<ol class="dec-menu">' + options.map(function (text, i) {
-    const n = i + 1;
-    const rec = n === r.recommend;
-    const tag = rec ? '<span class="dec-rec">recommended</span>' : "";
-    // An option is worth READING even where it cannot be taken: a question
-    // whose event carries no id (a log written before \`ask\` stamped one) has
-    // nothing for \`resolves\`, and a row that posted without it would answer a
-    // question the server cannot identify.
-    const attrs = CAN_EDIT && r.eventId
-      ? ' data-decision-for="' + escapeHtmlStr(r.id) + '" data-resolves="' + escapeHtmlStr(r.eventId) +
-        '" data-choose="' + n + '"'
-      : " disabled";
-    return "<li>" +
-      '<button type="button" class="dec-opt' + (rec ? " is-rec" : "") + '"' + attrs + ">" +
-      '<span class="dec-opt-n">' + n + ".</span>" +
-      "<span>" + escapeHtmlStr(text) + tag + "</span>" +
-      "</button></li>";
-  }).join("") + "</ol>";
-}
-
-/** The one action the panel offers, and it writes through \`/api/decision\`,
- *  which calls the same function the \`decide\` command calls. A second write
- *  path would be a second set of rules about what a decision may say.
- *
- *  The handlers are DELEGATED rather than inline: a decision is free text and
- *  would break out of an onclick="…('…')" attribute the first time one carried
- *  an apostrophe — the reason the dashboard binds its own buttons that way. */
-function decisionForm(id, eventId, kind) {
-  if (!CAN_EDIT) {
-    const why = SERVER_MODE && FOREIGN_WORKTREE
-      ? escapeHtmlStr(readOnlyReason())
-      : "Read-only: connect to the folder (or run the server) to record a decision from here.";
-    // A marked task's box is behind a disclosure, so its read-only note would be
-    // a line nobody opens. The card's note stays visible: somebody came here to
-    // answer a question and has to be told why they cannot.
-    if (kind === "task") return "";
-    return '<div class="dec-actions"><span class="dec-hint">' + why + "</span></div>";
-  }
-  // THREE PROMPTS FOR THREE SITUATIONS (TL-205). \`What was decided, and why\`
-  // stood on every input in the panel, in the same place and weight, which is
-  // what made a wall of them: a phrase that never changes tells the reader
-  // nothing about the row it is on. Where the row differs, so does the prompt.
-  const prompt = kind === "menu" ? "An answer that is not on the menu" :
-    kind === "question" ? "Your answer, and why" : "What was decided, and why";
-  const label = kind === "question" ? "Answer" : "Record";
-  const form = '<div class="dec-actions">' +
-    '<input type="text" placeholder="' + prompt + '" ' +
-    'data-decision-for="' + escapeHtmlStr(id) + '" data-resolves="' + escapeHtmlStr(eventId) + '">' +
-    '<button type="button" class="btn-action primary" data-decision-submit="1">' + label + "</button>" +
-    "</div>";
-  // \`<details>\` and not a scripted toggle: it opens over file:// with none of
-  // the page's JavaScript running, and it is keyboard-reachable for free.
-  if (kind !== "task") return form;
-  return '<details class="dec-note"><summary>note a decision</summary>' + form + "</details>";
-}
-
-async function submitDecision(input) {
-  const text = String(input.value || "").trim();
-  if (!text) { toast("A decision with no content records that something was settled and leaves out what", "error"); return; }
-  await postDecision({
-    id: input.dataset.decisionFor,
-    reason: text,
-    resolves: input.dataset.resolves || null,
-  });
-}
-
-/** Answer by taking a row off the menu (TL-204's \`decide --choose <n>\`).
- *
- *  THE NUMBER IS SENT, NOT THE TEXT. The server resolves it against the very
- *  event the question was asked in, so the answer recorded is the option as it
- *  was WRITTEN — a page that posted the string it had rendered would be a second
- *  opinion about what option 2 says, and the one that is wrong after a log is
- *  edited. It is also what lets \`chose: <n>\` be written beside the answer. */
-async function chooseOption(btn) {
-  await postDecision({
-    id: btn.dataset.decisionFor,
-    resolves: btn.dataset.resolves || null,
-    choose: Number(btn.dataset.choose),
-  });
-}
-
-/** The one write path the panel has, and it reaches \`decideTask\` — the same
- *  function the \`decide\` command calls. A second path would be a second set of
- *  rules about what a decision may say. */
-async function postDecision(body) {
-  if (!state.actor) { toast("Say who you are first — the actor picker is in the header", "error"); return; }
-  try {
-    const res = await fetch("api/decision", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...body, actor: state.actor }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
-    toast(body.id + ": decision recorded", "success");
-    // The history is what the panel counts from, so it is re-read before the
-    // redraw — otherwise the answered question would still be sitting there.
-    await refreshHistory(body.id, true);
-    renderDecisions();
-  } catch (e) {
-    toast("The decision was not recorded: " + e.message, "error");
-  }
-}
-
-function toggleDecisionsMine() {
-  state.decisionsMine = !state.decisionsMine;
-  renderDecisions();
-  decisionsSyncHash();
 }
 
 /** The count on the tab, so the panel is visible from wherever you are. */
@@ -6181,7 +3488,7 @@ function updateDecisionsCount() {
 
 function decisionsSyncHash() {
   if (state.view !== "decisions") return;
-  const next = "#decisions" + (state.decisionsMine ? "?mine=1" : "");
+  const next = "#decisions";
   if (window.location.hash !== next) {
     history.replaceState(null, "", window.location.pathname + window.location.search + next);
   }
@@ -6189,7 +3496,6 @@ function decisionsSyncHash() {
 
 document.getElementById("decisionsView").addEventListener("click", (e) => {
   const opt = e.target.closest("[data-choose]");
-  if (opt) { chooseOption(opt); return; }
   const btn = e.target.closest("[data-decision-submit]");
   if (btn) submitDecision(btn.previousElementSibling);
 });
@@ -6204,7 +3510,6 @@ document.getElementById("decisionsView").addEventListener("keydown", (e) => {
   submitDecision(input);
 });
 
-window.toggleDecisionsMine = toggleDecisionsMine;
 
 // ─── Replay view (TL-91) ──────────────────────────────────────────────
 // The board as it stood at a moment, folded out of HISTORY on every frame.
@@ -6218,264 +3523,16 @@ window.toggleDecisionsMine = toggleDecisionsMine;
 // every task that has always sat where it sits — and the missing cards would
 // look exactly like a quiet week.
 
-/** How fast the animation steps, in milliseconds per day. */
-const REPLAY_SPEEDS = [[1200, "slow"], [600, "normal"], [220, "fast"]];
-
-/**
- * The positions the slider can stand on.
- *
- * The first one is the START of the first day, which is EARLIER than the first
- * entry — and that is the point of it: the reader can drag to the boundary and
- * be told the log does not reach that far, instead of being shown an empty
- * board. Every other position is the END of a day, so a day the log wrote to
- * shows what it looked like once it was over.
- */
-function replayPositions() {
-  const line = replayTimeline(HISTORY);
-  if (!line.days.length) return { line: line, moments: [] };
-  const moments = [line.days[0] + "T00:00:00.000Z"];
-  for (const d of line.days) moments.push(d + "T23:59:59.999Z");
-  return { line: line, moments: moments };
-}
-
-/** The moment being shown. null means the last one the log covers — the default
- *  a link with no "at" in it has to reproduce. */
-function replayMoment(moments) {
-  if (!moments.length) return null;
-  return state.replayAt || moments[moments.length - 1];
-}
-
-/** Where the thumb sits for a moment that may have come from a link and need not
- *  be one of the positions at all. */
-function replayIndexOf(at, moments) {
-  const t = Date.parse(at);
-  let idx = 0;
-  for (let i = 0; i < moments.length; i++) if (Date.parse(moments[i]) <= t) idx = i;
-  return idx;
-}
-
-function replayCounterText(p, at) {
-  const i = replayIndexOf(at, p.moments);
-  if (i === 0) return "before the log — day 0 of " + p.line.days.length;
-  return "day " + i + " of " + p.line.days.length + " — " + p.line.days[i - 1];
-}
-
-function replayEncodeHash() {
-  return encodeReplayHash({ at: state.replayAt, board: state.board === BOARD_ALL ? null : state.board });
-}
-
-function replayApplyHash(query) {
-  const v = parseReplayHash(query);
-  state.replayAt = v.at;
-  // The board is the reader's SCOPE for the rest of the page, not a filter on the
-  // frame — see the note at the top of this section.
-  if (v.board && v.board !== state.board) setBoardScope(v.board, { quiet: true });
-}
-
-function replaySyncHash() {
-  if (state.view !== REPLAY_HASH_ROUTE) return;
-  const next = "#" + replayEncodeHash();
-  if (window.location.hash === next) return;
-  // replaceState, not an assignment to the hash: an assignment fires hashchange,
-  // which would redraw the frame the slider has just drawn — during an animation
-  // that is a second full redraw per day.
-  history.replaceState(null, "", window.location.pathname + window.location.search + next);
-}
-
-function replayDrawFrame() {
-  const host = document.getElementById("replayFrame");
-  if (!host) return;
-  const p = replayPositions();
-  const at = replayMoment(p.moments);
-  host.innerHTML = renderReplayBoard(boardAt(HISTORY, at), { day: histDay, statuses: CONFIG.statuses });
-  const counter = document.getElementById("replayCounter");
-  if (counter) counter.textContent = replayCounterText(p, at);
-  const slider = document.getElementById("replaySlider");
-  // Never while the reader is dragging it: writing the value back would fight
-  // the thumb under their finger.
-  if (slider && document.activeElement !== slider) slider.value = String(replayIndexOf(at, p.moments));
-}
-
-function replayMoveTo(at) {
-  state.replayAt = at;
-  replayDrawFrame();
-  replaySyncHash();
-}
-
-function replayStop() {
-  if (state.replayTimer) { clearInterval(state.replayTimer); state.replayTimer = null; }
-  const btn = document.getElementById("replayPlay");
-  if (btn) btn.textContent = "Play";
-}
-
-function replayToggle() {
-  if (state.replayTimer) { replayStop(); return; }
-  const p = replayPositions();
-  if (!p.moments.length) return;
-  // Pressing play at the end would animate nothing; it starts over instead.
-  if (replayIndexOf(replayMoment(p.moments), p.moments) >= p.moments.length - 1) replayMoveTo(p.moments[0]);
-  const btn = document.getElementById("replayPlay");
-  if (btn) btn.textContent = "Pause";
-  state.replayTimer = setInterval(() => {
-    const pos = replayPositions();
-    const i = replayIndexOf(replayMoment(pos.moments), pos.moments) + 1;
-    if (i >= pos.moments.length) { replayStop(); return; }
-    replayMoveTo(pos.moments[i]);
-  }, state.replaySpeed);
-}
-
-function renderReplay_() {
-  const host = document.getElementById("replayView");
-  const p = replayPositions();
-  if (!p.moments.length) {
-    // A slider over invented days is worse than no slider: it would let the
-    // reader move through a calendar the log never covered.
-    host.innerHTML = '<div class="replay-empty"><h2>Nothing has been recorded yet</h2>' +
-      "<p>The replay is a fold of the change log, and this backlog has no entries in it. " +
-      "There is no calendar to run along until the first change is written.</p></div>";
-    return;
-  }
-  const at = replayMoment(p.moments);
-  const speeds = REPLAY_SPEEDS.map((sp) =>
-    '<option value="' + sp[0] + '"' + (sp[0] === state.replaySpeed ? " selected" : "") + ">" +
-    sp[1] + "</option>").join("");
-  host.innerHTML =
-    '<div class="replay-head-bar"><h2>Replay</h2>' +
-    '<p class="replay-since">history since ' + escapeHtmlStr(histDay(p.line.firstKnown)) +
-    " — the backlog is older than its log, so a moment before that day is marked as no data, " +
-    "not drawn as an empty board. Anything earlier is in git.</p>" +
-    '<div class="replay-controls">' +
-    '<button type="button" class="btn-action" id="replayPlay">Play</button>' +
-    '<input type="range" id="replaySlider" min="0" max="' + (p.moments.length - 1) +
-    '" step="1" value="' + replayIndexOf(at, p.moments) + '" aria-label="The moment being replayed">' +
-    '<select id="replaySpeed" aria-label="Speed of the animation">' + speeds + "</select>" +
-    '<span class="replay-counter" id="replayCounter"></span></div>' +
-    '<p class="replay-legend"><span class="actor-agent">' + ACTOR_GLYPH.agent + " an agent</span>" +
-    '<span class="actor-user">' + ACTOR_GLYPH.user + " a person</span>" +
-    '<span class="actor-unknown">' + ACTOR_GLYPH.unknown + " not recorded</span>" +
-    "<span>the whole backlog — a frame is not narrowed to a board</span></p></div>" +
-    '<div class="replay-frame" id="replayFrame"></div>';
-  replayDrawFrame();
-}
-
-document.getElementById("replayView").addEventListener("input", (e) => {
-  if (e.target.id !== "replaySlider") return;
-  const p = replayPositions();
-  // Dragging is a decision to look at one moment; the animation stops rather
-  // than fighting the reader for the thumb.
-  replayStop();
-  replayMoveTo(p.moments[Number(e.target.value)] || p.moments[0]);
-});
-
-document.getElementById("replayView").addEventListener("change", (e) => {
-  if (e.target.id !== "replaySpeed") return;
-  state.replaySpeed = Number(e.target.value) || state.replaySpeed;
-  if (state.replayTimer) { replayStop(); replayToggle(); }
-});
-
-document.getElementById("replayView").addEventListener("click", (e) => {
-  if (e.target.closest("#replayPlay")) { replayToggle(); return; }
-  const card = e.target.closest("[data-replay-task]");
-  if (!card) return;
-  const id = card.dataset.replayTask;
-  // A card in a frame is a task as it WAS. One that has since been deleted has
-  // no detail to open, and opening nothing would read as a broken link.
-  if (!ALL_TASKS.some((t) => t.id === id)) {
-    toast(id + " is not in the backlog any more — the replay is showing a moment when it was", "error");
-    return;
-  }
-  setView("tasks");
-  render();
-  selectTask(id);
-});
-
 function setView(view) {
   state.view = view;
-  document.body.classList.toggle("view-dashboard", view === "dashboard");
   document.body.classList.toggle("view-execution", view === "execution");
   document.body.classList.toggle("view-decisions", view === "decisions");
-  document.body.classList.toggle("view-replay", view === REPLAY_HASH_ROUTE);
-  // An animation left running in a hidden view would keep rewriting the address
-  // of a page the reader is no longer looking at.
-  if (view !== REPLAY_HASH_ROUTE) replayStop();
   for (const btn of document.querySelectorAll(".view-tab")) {
     btn.classList.toggle("is-active", btn.dataset.view === view);
   }
-  if (view === "dashboard") renderDashboard();
   if (view === "execution") renderExecution_();
   if (view === "decisions") renderDecisions();
-  if (view === REPLAY_HASH_ROUTE) renderReplay_();
 }
-
-function dashFilterTo(key, value) {
-  for (const spec of FILTER_SPECS) state[spec.key].clear();
-  state.search = "";
-  const input = document.getElementById("searchInput");
-  if (input) input.value = "";
-  if (state[key]) state[key].add(value);
-  setView("tasks");
-  // render() rewrites #dashboard into #tasks?<that filter>. Previously the hash was
-  // only cleared here, because it had nothing to describe the drill-down result
-  // with — and a reload came back to the dashboard with a filter silently applied.
-  render();
-}
-
-function dashOpenTask(id) {
-  for (const spec of FILTER_SPECS) state[spec.key].clear();
-  setView("tasks");
-  render();
-  selectTask(id);
-}
-
-window.dashFilterTo = dashFilterTo;
-window.dashOpenTask = dashOpenTask;
-
-// Delegation, not inline onclick: epic names and label values are free text and
-// would break out of an onclick="…('…')" attribute the first time one contained
-// an apostrophe.
-document.getElementById("dashboardView").addEventListener("click", (e) => {
-  const scopeBtn = e.target.closest("[data-board-scope]");
-  if (scopeBtn) { setBoardScope(scopeBtn.dataset.boardScope); return; }
-  if (e.target.closest("[data-dash-day-close]")) { dashPinDay(null); return; }
-  const hit = dashChartPointAt(e.target, e.clientX);
-  if (hit) {
-    dashPinDay({ day: hit.p.days[hit.idx], source: hit.p.source });
-    return;
-  }
-  const sortEl = e.target.closest("[data-sort-id]");
-  if (sortEl) { dashSetSort(sortEl.dataset.sortId, sortEl.dataset.sortKey); return; }
-  const burnEl = e.target.closest("[data-burn-kind]");
-  if (burnEl) { dashSetBurn(burnEl.dataset.burnKind, burnEl.dataset.burnValue); return; }
-  const presetEl = e.target.closest("[data-range-preset]");
-  if (presetEl) { dashSetPreset(presetEl.dataset.rangePreset); return; }
-  const filterEl = e.target.closest("[data-dash-filter]");
-  if (filterEl) {
-    dashFilterTo(filterEl.dataset.dashFilter, filterEl.dataset.dashValue);
-    return;
-  }
-  const taskEl = e.target.closest("[data-dash-task]");
-  if (taskEl) dashOpenTask(taskEl.dataset.dashTask);
-});
-
-// Hover: one listener on the container, because every chart is re-created on
-// each render. Hidden on leave AND on scroll — a fixed-position tooltip left
-// behind by a scroll would point at whatever moved under it.
-document.getElementById("dashboardView").addEventListener("pointermove", dashHoverMove);
-document.getElementById("dashboardView").addEventListener("pointerleave", dashHoverHide);
-document.getElementById("dashboardView").addEventListener("scroll", dashHoverHide, { passive: true });
-
-// The date inputs are re-created on every render, so the listener lives on the
-// container, not on the inputs.
-document.getElementById("dashboardView").addEventListener("change", (e) => {
-  const burnEpic = e.target.closest("[data-burn-epic]");
-  if (burnEpic) {
-    if (burnEpic.value) dashSetBurn("epic", burnEpic.value);
-    else dashSetBurn(BURN_DEFAULT.kind, BURN_DEFAULT.value);
-    return;
-  }
-  const input = e.target.closest("[data-range-input]");
-  if (input) dashSetBound(input.dataset.rangeInput, input.value);
-});
 
 // ─── Render all ───────────────────────────────────────────────────────
 function render() {
@@ -6487,13 +3544,10 @@ function render() {
   renderFilters();
   renderCards();
   renderDetail();
-  // Live mode replaces TASKS wholesale — the dashboard has to follow, or it
-  // silently shows the numbers from before the refresh.
-  if (state.view === "dashboard") renderDashboard();
-  // Same reason as the dashboard: the plan's state is computed from the tasks,
-  // so a refresh that did not redraw it would leave a card in a status the rest
-  // of the page no longer shows.
-  else if (state.view === "execution") renderExecution_();
+  // The plan's state is computed from the tasks, so a refresh that did not
+  // redraw it would leave a card in a status the rest of the page no longer
+  // shows.
+  if (state.view === "execution") renderExecution_();
   else if (state.view === "decisions") renderDecisions();
   // The one place where the list rewrites the URL: every change of a filter, a
   // chip, the sorting and the scope ends up here anyway, so there is no route by
@@ -6513,14 +3567,7 @@ function handleHash() {
   const raw = window.location.hash.replace(/^#/, "");
   const qi = raw.indexOf("?");
   const id = qi < 0 ? raw : raw.slice(0, qi);
-  if (id === "dashboard") {
-    dashApplyHash(qi < 0 ? "" : raw.slice(qi + 1));
-    if (state.view !== "dashboard") setView("dashboard");
-    else renderDashboard();
-    return;
-  }
   if (id === "decisions") {
-    state.decisionsMine = qi >= 0 && new URLSearchParams(raw.slice(qi + 1)).get("mine") === "1";
     if (state.view !== "decisions") setView("decisions");
     else renderDecisions();
     return;
@@ -6528,12 +3575,6 @@ function handleHash() {
   if (id === "execution") {
     if (state.view !== "execution") setView("execution");
     else renderExecution_();
-    return;
-  }
-  if (id === REPLAY_HASH_ROUTE) {
-    replayApplyHash(qi < 0 ? "" : raw.slice(qi + 1));
-    if (state.view !== REPLAY_HASH_ROUTE) setView(REPLAY_HASH_ROUTE);
-    else renderReplay_();
     return;
   }
   if (isTasksHash(id)) {
@@ -6618,7 +3659,7 @@ function copyTextToClipboard(text) {
 document.getElementById("btnCopyLink").addEventListener("click", () => {
   const url = window.location.href;
   copyTextToClipboard(url).then((ok) => {
-    if (ok) toast("Link skopiowany ✓", "success");
+    if (ok) toast("Link copied ✓", "success");
   else window.prompt("Copy the link to this view:", url);
   });
 });
@@ -6628,10 +3669,8 @@ for (const btn of document.querySelectorAll(".view-tab")) {
   btn.addEventListener("click", () => {
     const v = btn.dataset.view;
     setView(v);
-    if (v === "dashboard") window.location.hash = dashEncodeHash();
-    else if (v === "execution") window.location.hash = "execution";
-    else if (v === REPLAY_HASH_ROUTE) window.location.hash = replayEncodeHash();
-    else if (v === "decisions") window.location.hash = "decisions" + (state.decisionsMine ? "?mine=1" : "");
+    if (v === "execution") window.location.hash = "execution";
+    else if (v === "decisions") window.location.hash = "decisions";
     else tasksSyncHash();
   });
 }
@@ -6652,10 +3691,6 @@ for (const btn of document.querySelectorAll(".view-tab")) {
   applyScope();
 })();
 
-const savedDashRange = dashLoadRange();
-if (savedDashRange) state.dashRange = savedDashRange;
-const savedDashBurn = dashLoadBurn();
-if (savedDashBurn) state.dashBurn = savedDashBurn;
 render();
 handleHash();
 // Only now may the URL be overwritten: the link somebody arrived with has been
@@ -6664,8 +3699,6 @@ handleHash();
 hashRouted = true;
 tasksSyncHash();
 updateConnectionBar();
-state.actor = loadActor();
-renderActorPicker();
 
 // Server mode: already live at first paint (the page is rendered from a fresh
 // disk read), plus an SSE subscription so edits made outside the browser —
@@ -6677,31 +3710,11 @@ if (SERVER_MODE) {
   const meta = document.querySelector(".build-meta");
   if (meta) meta.textContent = "read from disk: " + new Date().toLocaleTimeString();
   let sseTimer = null;
-  let inFlightTimer = null;
-  // The first answer, before any heartbeat arrives — a page opened onto a session
-  // already two hours in must not have to wait for its next tool call to say so.
-  refreshInFlight();
-  // Silence has no event, so the ages are advanced by a clock rather than by a
-  // signal. No fetch: this only re-reads the answer already held.
-  setInterval(paintInFlight, IN_FLIGHT_TICK_MS);
   try {
     const es = new EventSource("api/events");
     es.addEventListener("tasks-changed", () => {
       clearTimeout(sseTimer);                    // debounce editor write bursts
       sseTimer = setTimeout(() => refreshFromServer(true), 250);
-    });
-    // A change made outside the viewer only reaches the history after
-    // reconciliation (a few seconds after the file is written) — which is why this
-    // is a separate signal rather than an appendage to tasks-changed.
-    es.addEventListener("history-changed", () => {
-      if (state.selectedId) refreshHistory(state.selectedId, true);
-    });
-    // A heartbeat changes nothing in the repository, so it can never arrive as
-    // tasks-changed (TL-189): the whole point of the signal is that it moves while
-    // the task file stands still.
-    es.addEventListener("activity-changed", () => {
-      clearTimeout(inFlightTimer);
-      inFlightTimer = setTimeout(refreshInFlight, 250);
     });
     es.onerror = () => { /* server stopped — keep showing the last render */ };
   } catch (e) {

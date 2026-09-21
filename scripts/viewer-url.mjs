@@ -92,37 +92,3 @@ export function isTasksHash(route) {
 //
 // It is also the half of the link that a server has to read before the page
 // exists, which a fragment can never be: the browser does not send a hash.
-
-/** The parameter name. Renaming it breaks links already sent. */
-export const WORKTREE_PARAM = "worktree";
-
-/** The worktree a URL names, or null for the default (the served tree). */
-export function readWorktreeParam(search) {
-  return new URLSearchParams(search || "").get(WORKTREE_PARAM) || null;
-}
-
-/**
- * This same page, pointed at another worktree.
- *
- * THE HASH IS CARRIED OVER. Switching trees is not a reason to also throw away
- * the filters, the sort and the open task — the reader asked "show me this, over
- * there", and losing half the question would make the switcher something people
- * use once.
- *
- * THE DEFAULT IS SPELLED BY ABSENCE. The served tree gets no parameter at all,
- * so there is ONE link for that view rather than two that look different and are
- * not. Every other query parameter is preserved: the address may carry things
- * this module knows nothing about.
- *
- * @param {{pathname: string, search: string, hash: string}} location
- * @param {?string} key       the worktree to point at
- * @param {?string} selfKey   the served tree, which needs no parameter
- */
-export function withWorktree(location, key, selfKey) {
-  const loc = location || {};
-  const params = new URLSearchParams(loc.search || "");
-  if (!key || key === selfKey) params.delete(WORKTREE_PARAM);
-  else params.set(WORKTREE_PARAM, key);
-  const query = params.toString();
-  return (loc.pathname || "") + (query ? "?" + query : "") + (loc.hash || "");
-}

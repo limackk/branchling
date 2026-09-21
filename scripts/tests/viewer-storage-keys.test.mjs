@@ -78,10 +78,17 @@ test("the built page declares one prefix, and every key hangs off it", () => {
   const declared = /const STORAGE_PREFIX = "([^"]+)";/.exec(html);
   assert.ok(declared, "the page declares no storage prefix at all");
   assert.equal(declared[1], STORAGE_KEY_PREFIX + "-backlog");
-  for (const key of ["-board", "-actor", "-dash-range", "-dash-burn", "-viewer"]) {
-    assert.ok(html.includes('STORAGE_PREFIX + "' + key + '"') || html.includes("STORAGE_PREFIX + '" + key + "'"),
-      "the key `" + key + "` does not hang off the prefix");
-  }
+  // THE LIST IS THE SAMPLE, THE RULE IS THE NAMESPACE. `-actor`, `-dash-range`
+  // and `-dash-burn` left with the editor and the dashboard (TL-379); keeping
+  // them here would have this test insist on a key for a feature that no longer
+  // exists. What may not shrink is the rule, so the keys still in the page are
+  // read out of it and every one of them is held to the prefix — a page that
+  // stopped using storage altogether fails on the count, not silently.
+  const keys = [...html.matchAll(/STORAGE_PREFIX \+ ["'](-[a-z-]+)["']/g)].map((m) => m[1]);
+  assert.ok(keys.length >= 2, "the page declares " + keys.length + " storage key(s) — too few to be proving a namespace");
+  assert.ok(keys.includes("-board"), "the board scope no longer remembers itself");
+  const bare = /localStorage\.(?:get|set|remove)Item\(\s*["']/.exec(html);
+  assert.equal(bare, null, "a storage key is written as a literal, outside the prefix");
 });
 
 test("the page's CODE carries no forbidden word; its DATA is the backlog and may", () => {

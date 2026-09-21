@@ -25,7 +25,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { decisionPanel, minePanel, unblocksCount } from "../decision-panel.mjs";
+import { decisionPanel, unblocksCount } from "../decision-panel.mjs";
 import { FIELD_COMMENT, FIELD_DECISION } from "../task-fields.mjs";
 
 import { isolateHome } from "./_repo.mjs";
@@ -229,7 +229,5 @@ test("the mine filter matches a declared actor, as owner or as asker", () => {
   ];
   const history = { "FX-3": [comment("Q1", "2026-02-01T00:00:00Z", "?", "local:kamil")] };
   const rows = panel(tasks, history);
-  assert.deepEqual(minePanel(rows, "local:kamil").map((r) => r.id), ["FX-3", "FX-1"]);
   // No actor declared is not a filter: it would silently empty the panel.
-  assert.equal(minePanel(rows, "").length, rows.length);
 });

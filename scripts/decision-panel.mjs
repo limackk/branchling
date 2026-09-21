@@ -219,14 +219,3 @@ export function decisionPanel(tasks, history, opts = {}) {
   return items;
 }
 
-/** Narrow the rows to one person's queue. PURE.
- *
- *  IT MATCHES A DECLARED ACTOR, not an authenticated identity — the viewer has
- *  no such thing yet, and saying so is better than a filter that quietly means
- *  something weaker than it looks. A row counts as "mine" when I hold the task,
- *  or when I am the one who asked the question and it is still open. */
-export function minePanel(items, actor) {
-  const me = String(actor || "").trim();
-  if (!me) return items;
-  return items.filter((i) => i.owner === me || i.asker === me);
-}

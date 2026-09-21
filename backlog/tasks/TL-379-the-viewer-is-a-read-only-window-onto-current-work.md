@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: "Evidence-gated product focus"
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-08
-updated: 2026-09-08
+updated: 2026-09-21
 blocked_by: [TL-377, TL-378]
 blocks: []                         # ids this task will unblock
 related_docs:
@@ -77,12 +77,12 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] The viewer displays current tasks, blockers, active wave and unanswered
+- [x] The viewer displays current tasks, blockers, active wave and unanswered
       questions from current task data. [proof: read-only-viewer]
-- [ ] The served application exposes no task mutation endpoint or active editor.
+- [x] The served application exposes no task mutation endpoint or active editor.
       [proof: read-only-viewer]
-- [ ] Telemetry, portfolio, export and historical-dashboard code is absent from
+- [x] Telemetry, portfolio, export and historical-dashboard code is absent from
       the viewer bundle. [proof: read-only-viewer]
-- [ ] A removed write request leaves its fixture byte-for-byte unchanged.
+- [x] A removed write request leaves its fixture byte-for-byte unchanged.
       [proof: read-only-viewer]
-- [ ] The complete remaining suite passes. [proof: suite-green]
+- [x] The complete remaining suite passes. [proof: suite-green]
