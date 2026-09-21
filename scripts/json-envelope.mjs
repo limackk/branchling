@@ -236,6 +236,16 @@ export const KINDS = {
   // absent unless `--seed-tasks` ran — an empty object would say a write
   // happened and found nothing to do.
   "docs-drift": { documents: null, minSignals: null, flagged: [], tooLittle: [], seeded: null },
+  // `red --json` (TL-276). `ran` is what keeps an empty `files` readable: a
+  // report nobody gave and a suite with nothing failing are the same empty list
+  // and call for opposite decisions, and `reason` says which — including the
+  // case where git could not be read, and every row is therefore unattributed
+  // for a reason that is not "nobody owns it". `tally` is a convenience over
+  // `files`, never a replacement: the whole point of the command is that a
+  // count cannot be acted on and a filename can.
+  "red-owners": {
+    command: null, ran: null, reason: null, exitCode: null, files: [], mine: null, tally: null,
+  },
 };
 
 /** The envelope's own keys — a payload may never carry them. */

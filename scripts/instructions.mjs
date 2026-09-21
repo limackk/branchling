@@ -547,6 +547,27 @@ the number is yours to state.
 
   {{tool}} query --status {{progress}} --json   what is claimed, and by whom
 
+A QUEUE SERVED BY SEVERAL HANDS COMMITS RED ON PURPOSE. Where the roles in
+\`roles:\` are used as a pipeline, one hand's whole deliverable is a FAILING
+test: it states a contract the next hand then has to satisfy. That red is
+committed and merged, so the hand after it inherits a tree whose suite is
+already not green — and every contract that runs the whole suite reports the
+inherited failure as the new hand's own. "Green" stops being available as an
+answer, and a hand with no way to tell its own red from the tree's will go
+looking for a baseline: reverting files by hand, or reaching for \`git stash\`,
+which is shared across every worktree of the clone.
+
+There is one call for this, and it needs no declaration to be kept in step:
+
+  {{tool}} red --command "<your suite>" --mine <ID>
+
+Each failing test FILE comes back with the task whose commit last touched it,
+and whether this working tree has edited it. It attributes; it never skips,
+never silences and never repeats the suite's verdict in its exit code — a test
+that stops running stops proving. A failure it calls \`elsewhere\` is evidence
+for a handover, not permission to close: a contract that is still red is still
+red, and \`{{tool}} done\` will say so.
+
 WHAT THE LOOP MUST NOT DO. Do not filter, sort or re-rank candidates yourself:
 that policy is \`next\`'s and it is tested. Do not set a status by hand to move a
 task along — every writing command records who and why, and an edit does not.

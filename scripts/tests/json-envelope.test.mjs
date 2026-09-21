@@ -145,6 +145,11 @@ const READING = {
   // `seeded` as null — the command wrote nothing, which is a different answer
   // from having written nothing useful.
   "docs-drift": ["docs-drift", "--json"],
+  // `red` with no report is a complete answer, not a usage error (TL-276): an
+  // empty `files` means "nothing failed in what I was shown", and `ran` with
+  // `reason` is what tells a consumer whether it was shown anything at all. No
+  // `--command` is given, so no suite runs inside this suite.
+  "red-owners": ["red", "--json"],
   // `resume` composes reads and writes nothing (TL-151), so it belongs in THIS
   // table and not beside `seed`: asking it twice of one tree is safe, and
   // `scripts/tests/resume-briefing.test.mjs` proves the tree is byte-identical
