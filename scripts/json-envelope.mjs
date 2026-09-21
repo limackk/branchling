@@ -106,6 +106,20 @@ export const KINDS = {
   check: { ok: null, root: null, failed: [], guards: [] },
   // `doctor --json`. `ok` is the answer CI reads; `checks` is why.
   doctor: { ok: null, root: null, next: null, checks: [] },
+  // `serve --list --json` and `serve --stop --json` (TL-266). Each entry in
+  // `servers` carries its own `state`, and that word is the whole point: a
+  // register cannot know that a process SIGKILLed behind its back is gone until
+  // somebody reads it, so `stale` has to be a value a consumer receives rather
+  // than an entry quietly missing from the list. `stateDir` and `host` are the
+  // two facts that say WHOSE register was read — a consumer comparing two
+  // machines' answers has no other way to tell them apart.
+  "serve-list": { servers: [], stateDir: null, host: null },
+  // `stopped` is one result per port asked about, each naming an `outcome`:
+  // `stopped`, `already-gone`, `not-registered`, `not-ours`, `elsewhere` or
+  // `would-not-stop`. A boolean here would merge "it is gone" with "it was
+  // never there" and with "I refused to kill a stranger's process", which are
+  // three different things to do next.
+  "serve-stop": { stopped: [], requested: null },
   // `board --json`. `rule` and `matched` are null exactly when `isDefault` is
   // true — nothing matched, so there is no rule to name.
   board: { board: null, rule: null, matched: null, isDefault: null, reason: null },
@@ -332,6 +346,15 @@ export const KIND_EXERCISE = {
   "task-list": { args: ["query", "--json"] },
   stats: { args: ["stats", "--json"] },
   doctor: { args: ["doctor", "--json"] },
+  // The register is machine-local state beside the locks, not a question about
+  // the fixture backlog (TL-266) — hence `noDir`, the same boundary the profile
+  // rows prove. It writes nothing and starts nothing: an empty `servers` on an
+  // isolated state directory is still a complete envelope.
+  "serve-list": { args: ["serve", "--list", "--json"], noDir: true },
+  // A port nothing was ever registered for: the `not-registered` outcome, which
+  // is the path most easily left without an envelope. It signals nothing, so it
+  // is not a `writes` row.
+  "serve-stop": { args: ["serve", "--stop", "1", "--json"], noDir: true },
   // The guards, as one document (TL-57). A NARROW selector on purpose: the
   // default run reads this installation's whole source, which is a second of
   // wall clock per fixture and answers nothing the envelope suite asks.

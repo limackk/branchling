@@ -140,7 +140,23 @@ export const COMMANDS = {
   serve: {
     script: "serve-backlog.mjs",
     summary: "run the viewer on 127.0.0.1 (the default command)",
-    usage: `${N} serve [--port <n>] [--no-open] [--dir <path>]`,
+    // The reading and stopping forms are part of the same command on purpose
+    // (TL-266): what starts a process is what has to be able to name it
+    // afterwards, and a separate `servers` command would be a second place to
+    // learn that the viewer exists.
+    usage: [
+      `${N} serve [--port <n>] [--no-open] [--dir <path>]`,
+      `${N} serve --list [--json]`,
+      `${N} serve --stop <port|all> [--json]`,
+      "",
+      "  --list         the viewers this tool has registered, and the state each is in:",
+      "                 `running`, `stale` (the entry outlived its process) or `elsewhere`",
+      "  --stop <port>  stop one, or `all`. It signals nothing unless the port answers",
+      "                 as this tool's viewer — a recycled pid is somebody else's process",
+      "",
+      "  A backgrounded serve does NOT stop when the shell that started it goes away,",
+      "  and it keeps reconciling the tree into backlog/history/ while it lives.",
+    ].join("\n"),
   },
   query: {
     script: "query.mjs",

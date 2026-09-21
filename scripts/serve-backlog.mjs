@@ -26,6 +26,7 @@
  */
 
 import { createServer, get } from "node:http";
+import { hostname } from "node:os";
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync, realpathSync, writeFileSync, watch } from "node:fs";
 import { basename, dirname, join } from "node:path";
@@ -46,6 +47,15 @@ import { crossBranchState } from "./branch-scan.mjs";
 import { ANY_TASK_ID } from "./task-id.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { refusal } from "./ui.mjs";
+import {
+  PING_ID,
+  listServers,
+  serversDir,
+  registerServer,
+  stopServer,
+  unregisterServer,
+} from "./serve-registry.mjs";
+import { printJson } from "./json-envelope.mjs";
 import {
   listTaskFiles,
   reconcile,
@@ -68,8 +78,129 @@ if (cliArgs.argv.some((a) => a === "--help" || a === "-h")) {
   console.log("serve — run the viewer on 127.0.0.1 (the default command)\n");
   console.log("usage:");
   console.log("  serve [--port <n>] [--no-open] [--dir <path>]");
+  console.log("  serve --list [--json]        what is listening on this machine");
+  console.log("  serve --stop <port|all>      stop a server this tool registered\n");
+  // SAID OUT LOUD BECAUSE IT IS WHAT PRODUCED THE ORPHANS (TL-266). Six servers
+  // were found running on one machine, three of them reparented to init after
+  // the shell that started them was gone. Nothing warned anybody, and `serve`
+  // WRITES — it reconciles on a timer and appends to backlog/history/.
+  console.log("This process does not stop when the shell that started it goes away.");
+  console.log("Backgrounded or left in a closed terminal, it keeps listening and keeps");
+  console.log("reconciling the tree. `serve --list` names them; `serve --stop <port>` ends one.");
   process.exit(0);
 }
+
+const argv = cliArgs.argv;
+const argValue = (name, fallback) => {
+  const i = argv.indexOf(name);
+  return i >= 0 && argv[i + 1] ? argv[i + 1] : fallback;
+};
+// An unknown argument FAILS (BL-1411). Previously it was quietly ignored, so
+// `query --status blocked` ended in an open browser tab — a silent no-op
+// with a side effect looks like the tool working, which is why it is worse than
+// an error. `--dir` has already been taken off by takeDirFlag, so it is not here.
+//
+// VALIDATED BEFORE THE BACKLOG IS RESOLVED (TL-266). `--list` and `--stop` ask
+// about processes on this MACHINE, and the register lives outside every
+// repository — demanding a backlog first would refuse the one question somebody
+// standing in the wrong directory needs answered.
+const KNOWN_FLAGS = ["--port", "--no-open", "--list", "--stop", "--json"];
+const FLAGS_WITH_VALUE = ["--port", "--stop"];
+for (let i = 0; i < argv.length; i++) {
+  const a = argv[i];
+  if (!a.startsWith("-")) {
+    // The preceding flag's value, not a separate argument.
+    if (i > 0 && FLAGS_WITH_VALUE.indexOf(argv[i - 1]) >= 0) continue;
+    console.error(refusal(N + " serve", "unexpected argument: " + a,
+      KNOWN_FLAGS.join(" ") + " --dir <path>"));
+    process.exit(2);
+  }
+  if (KNOWN_FLAGS.indexOf(a) < 0) {
+    console.error(refusal(N + " serve", "unknown flag: " + a,
+      KNOWN_FLAGS.join(" ") + " --dir <path>"));
+    process.exit(2);
+  }
+}
+
+const AS_JSON = argv.includes("--json");
+
+// ──────────────────────────────────────────────────────────────────────────
+// The register: what is running, and stopping one (TL-266)
+// ──────────────────────────────────────────────────────────────────────────
+//
+// BOTH ANSWER AND EXIT BEFORE ANYTHING IS STARTED. `serve` is the one command
+// whose mistake is not a message but a process waiting for connections, so a
+// reading flag that fell through to the boot path would start the very thing it
+// was asked to report on.
+
+/** One entry as a person reads it. `state` is never guessed — see the module. */
+function describe(entry) {
+  const where = entry.tree || "(unknown tree)";
+  const since = entry.startedAt ? " since " + entry.startedAt : "";
+  const mark = entry.state === "running" ? "·"
+    : entry.state === "stale" ? "!"
+      : "?";
+  return `  ${mark} port ${entry.port}  ${entry.state.padEnd(9)} pid ${entry.pid ?? "?"}  ${where}${since}`;
+}
+
+if (argv.includes("--list")) {
+  const servers = listServers();
+  if (AS_JSON) {
+    printJson("serve-list", { servers, stateDir: serversDir(), host: hostname() });
+  } else if (!servers.length) {
+    console.log(`${N} serve: no viewer is registered as running on this machine`);
+    console.log("  A server started before this version knows about the register is NOT here —");
+    console.log("  it was never recorded. `lsof -nP -iTCP -sTCP:LISTEN` still finds those.");
+  } else {
+    console.log(`${N} serve: ${servers.length} registered viewer(s)`);
+    for (const entry of servers) console.log(describe(entry));
+    if (servers.some((e) => e.state === "stale")) {
+      console.log("  `stale` means the entry outlived its process — SIGKILL, a crash or a reboot");
+      console.log("  runs no handler. The next `serve` removes it; `--stop <port>` removes it now.");
+    }
+  }
+  process.exit(0);
+}
+
+const STOP = argValue("--stop", null);
+if (argv.includes("--stop")) {
+  if (!STOP) {
+    console.error(refusal(N + " serve", "--stop needs a port, or `all`", "serve --stop <port|all>"));
+    process.exit(2);
+  }
+  const targets = STOP === "all"
+    ? listServers().filter((e) => e.state === "running").map((e) => e.port)
+    : [Number(STOP)];
+  if (STOP !== "all" && !Number.isInteger(targets[0])) {
+    console.error(refusal(N + " serve", "--stop takes a port number, or `all`", "serve --stop <port|all>"));
+    process.exit(2);
+  }
+  const results = [];
+  for (const port of targets) results.push(await stopServer(port));
+  if (AS_JSON) {
+    printJson("serve-stop", { stopped: results, requested: STOP });
+  } else if (!results.length) {
+    console.log(`${N} serve: nothing registered is running — nothing to stop`);
+  } else {
+    for (const r of results) {
+      const said = {
+        stopped: r.forced
+          ? `port ${r.port}: it did not exit on SIGTERM and was killed (pid ${r.pid})`
+          : `port ${r.port}: stopped (pid ${r.pid})`,
+        "already-gone": `port ${r.port}: the process was already gone — the stale entry is removed`,
+        "not-registered": `port ${r.port}: nothing is registered for it`,
+        "not-ours": `port ${r.port}: what answers there is not this tool's viewer — NOTHING was signalled`,
+        elsewhere: `port ${r.port}: registered by another host (${r.host}) — reported, not stopped`,
+        "would-not-stop": `port ${r.port}: pid ${r.pid} survived SIGTERM and SIGKILL`,
+      }[r.outcome];
+      console.log(`${N} serve: ${said}`);
+    }
+  }
+  // A refusal to kill a stranger's process is not success: the caller asked for
+  // a stop and did not get one, and a script must be able to tell.
+  process.exit(results.some((r) => r.outcome === "not-ours" || r.outcome === "would-not-stop") ? 1 : 0);
+}
+
 const BACKLOG_DIR = resolveBacklogDirOrExit({ dir: cliArgs.dir, moduleDir: __dirname }, N + " serve").root;
 const TASKS_DIR = join(BACKLOG_DIR, "tasks");
 const CONFIG = loadConfigOrExit(BACKLOG_DIR);
@@ -87,14 +218,10 @@ function canonicalDir(dir) {
   try { return realpathSync(dir); } catch { return dir; }
 }
 
-/**
- * Handshake token for `/api/ping`. Derived from the product name rather than
- * spelled out: it is computed at runtime and persisted nowhere, so a rename
- * costs nothing here. (Contrast BLOCK_MARKER_NAME, which keys blocks already
- * written into other people's repositories and is frozen for exactly that
- * reason.)
- */
-const PING_ID = `${N}-backlog-viewer`;
+// The `/api/ping` handshake token now lives in `serve-registry.mjs`: the
+// register's `--stop` asks a port who it is with the SAME token this server
+// answers with, and two definitions of one handshake is one of them being
+// wrong (TL-266).
 
 /** This process's identity as a probe from another process sees it. */
 const BACKLOG_DIR_ID = canonicalDir(BACKLOG_DIR);
@@ -102,33 +229,6 @@ const BACKLOG_DIR_ID = canonicalDir(BACKLOG_DIR);
 // ──────────────────────────────────────────────────────────────────────────
 // CLI args
 // ──────────────────────────────────────────────────────────────────────────
-
-const argv = cliArgs.argv;
-const argValue = (name, fallback) => {
-  const i = argv.indexOf(name);
-  return i >= 0 && argv[i + 1] ? argv[i + 1] : fallback;
-};
-// An unknown argument FAILS (BL-1411). Previously it was quietly ignored, so
-// `query --status blocked` ended in an open browser tab — a silent no-op
-// with a side effect looks like the tool working, which is why it is worse than
-// an error. `--dir` has already been taken off by takeDirFlag, so it is not here.
-const KNOWN_FLAGS = ["--port", "--no-open"];
-const FLAGS_WITH_VALUE = ["--port"];
-for (let i = 0; i < argv.length; i++) {
-  const a = argv[i];
-  if (!a.startsWith("-")) {
-    // The preceding flag's value, not a separate argument.
-    if (i > 0 && FLAGS_WITH_VALUE.indexOf(argv[i - 1]) >= 0) continue;
-    console.error(refusal(N + " serve", "unexpected argument: " + a,
-      KNOWN_FLAGS.join(" ") + " --dir <path>"));
-    process.exit(2);
-  }
-  if (KNOWN_FLAGS.indexOf(a) < 0) {
-    console.error(refusal(N + " serve", "unknown flag: " + a,
-      KNOWN_FLAGS.join(" ") + " --dir <path>"));
-    process.exit(2);
-  }
-}
 
 const DEFAULT_PORT = Number(argValue("--port", process.env.BACKLOG_PORT || 4321));
 const AUTO_OPEN = !argv.includes("--no-open");
@@ -498,6 +598,30 @@ function probeExisting(port, expectedDir) {
   });
 }
 
+/**
+ * Put this process in the register, and take it out again when it goes (TL-266).
+ *
+ * WHAT IS GUARANTEED AND WHAT IS NOT — stated here as well as in the register,
+ * because this is where somebody will come looking:
+ *
+ *   A normal exit, and SIGINT (Ctrl-C), SIGTERM or SIGHUP, remove the entry.
+ *   SIGKILL runs NO handler, and neither does a crash or a power cut; the
+ *   parent dying does not take this process with it either — that is exactly
+ *   how the orphans in TL-266 were made. Then the entry outlives the process,
+ *   `serve --list` reports it as `stale`, and the next `serve` reclaims it.
+ *
+ * The signal handlers exist ONLY so that the normal-exit path runs; each one
+ * ends in `process.exit(0)`, which is what the default disposition did anyway.
+ * Nothing else about stopping a foreground server changes.
+ */
+function registerHere(port) {
+  registerServer({ port, backlogDir: BACKLOG_DIR, projectName: CONFIG.projectName });
+  process.on("exit", () => { unregisterServer(port, { pid: process.pid }); });
+  for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
+    process.on(signal, () => { process.exit(0); });
+  }
+}
+
 function listen(port, attemptsLeft) {
   const server = createServer((req, res) => {
     handle(req, res).catch((e) => {
@@ -519,6 +643,7 @@ function listen(port, attemptsLeft) {
 
   server.listen(port, "127.0.0.1", () => {
     const target = `http://127.0.0.1:${port}/`;
+    registerHere(port);
     const count = listTaskFiles(TASKS_DIR).length;
     // Closing the "the server was down" gap: whatever changed in the meantime
     // reaches the history now — as `unknown`, because nobody saw the author.

@@ -617,6 +617,8 @@ implementation detail. Every reading command answers in the same envelope:
 | `query` | `task-list` | `tasks`, `total` (matches BEFORE `--limit`), `limit`, `scan`, `modifiedFile`, `elsewhereOnly` (the tasks only another branch has) |
 | `stats` | `stats` | `root`, `stats` (the tallies), `scan`, `divergent` (one row per task another branch disagrees with), `elsewhereOnly` (the tasks only another branch has), `context` (null unless `--context`: the measured cost rows) |
 | `doctor` | `doctor` | `ok`, `root`, `next`, `checks` |
+| `serve --list` | `serve-list` | `servers` (one row per registered viewer, each carrying its own state: running, stale — the entry outlived its process — or elsewhere, meaning another host wrote it and this one may not judge it), `stateDir`, `host` |
+| `serve --stop` | `serve-stop` | `stopped` (one result per port asked about, each naming an outcome: stopped, already-gone, not-registered, not-ours, elsewhere or would-not-stop), `requested` |
 | `check` | `check` | `ok`, `root`, `failed` (the guards that failed), `guards` |
 | `board` | `board` | `board`, `rule`, `matched`, `isDefault`, `reason` |
 | `next-id` | `next-id` | `nextId`, `id`, `prefix`, `max`, `source`, `trees`, `branches`, `known` |
