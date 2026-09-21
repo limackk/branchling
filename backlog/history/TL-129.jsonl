@@ -7,3 +7,4 @@
 {"id":"01M1HB3P2QVAHNN5FTER78W6WP","ts":"2026-09-02T15:16:57.559Z","task":"TL-129","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
 {"id":"01M1HB3P2QZJBVHP23B511BNAF","ts":"2026-09-02T15:16:57.559Z","task":"TL-129","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
 {"id":"01M1HBH470BW11HX7JPZ76Y2DD","ts":"2026-09-02T15:24:18.016Z","task":"TL-129","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
+{"id":"01M31WSPP5YWMYCSZ6Z1EWXAMY","ts":"2026-09-21T11:49:37.605Z","task":"TL-129","field":"epic","from":"worktrail — the tool","to":"branchling — the tool","actor":"agent:claude","source":"manual","reason":"TL-259 substituted the product name in the epic field of ten archived tasks; TL-395 rewrote the retired tool name in four open tasks and declared the deliberate occurrences in six more"}
