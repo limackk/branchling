@@ -1,7 +1,7 @@
 ---
 id: TL-77
 title: "Shell completions with values from config.yaml vocabularies"
-type: code
+type: task
 labels: [post-launch]
 board: main
 epic: "CLI surface"

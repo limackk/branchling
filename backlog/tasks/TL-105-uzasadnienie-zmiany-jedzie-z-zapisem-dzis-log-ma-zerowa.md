@@ -1,7 +1,7 @@
 ---
 id: TL-105
 title: "The reason for a change travels with the write — today ## Log has zero adoption"
-type: code
+type: task
 labels: [pre-launch]
 board: main
 epic: "History and attribution"

@@ -1,7 +1,7 @@
 ---
 id: TL-5
 title: "Dashboard: queue in hours, burndown per scope, age and hygiene"
-type: code
+type: task
 labels: [pre-launch]
 epic: ""
 board: main

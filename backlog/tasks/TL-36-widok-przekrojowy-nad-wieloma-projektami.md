@@ -1,7 +1,7 @@
 ---
 id: TL-36
 title: "Cross-project view over multiple projects"
-type: code
+type: task
 labels: [post-launch]
 board: main
 epic: "Backlog — open source publication"

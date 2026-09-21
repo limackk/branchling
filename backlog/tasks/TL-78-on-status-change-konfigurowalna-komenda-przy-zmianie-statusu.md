@@ -1,7 +1,7 @@
 ---
 id: TL-78
 title: "on_status_change — configurable command on status change"
-type: code
+type: task
 labels: [post-launch]
 board: main
 epic: "Configurability"

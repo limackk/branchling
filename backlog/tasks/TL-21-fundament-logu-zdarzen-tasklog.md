@@ -1,7 +1,7 @@
 ---
 id: TL-21
 title: "Foundation of the worktrail event log — 5 decisions that cannot be undone"
-type: code
+type: task
 labels: [pre-launch]
 board: main
 epic: "branchling — the tool"

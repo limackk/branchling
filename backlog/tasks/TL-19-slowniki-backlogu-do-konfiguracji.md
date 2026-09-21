@@ -1,7 +1,7 @@
 ---
 id: TL-19
 title: Move the backlog's vocabularies out of the code and into configuration
-type: code
+type: task
 labels: [pre-launch]
 board: main
 epic: "Backlog viewer"

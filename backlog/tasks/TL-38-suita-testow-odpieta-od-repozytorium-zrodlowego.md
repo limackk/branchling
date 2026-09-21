@@ -1,7 +1,7 @@
 ---
 id: TL-38
 title: "Test suite detached from its source repository"
-type: code
+type: task
 labels: []
 board: main
 epic: "Portability"

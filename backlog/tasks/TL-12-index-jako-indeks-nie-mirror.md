@@ -1,7 +1,7 @@
 ---
 id: TL-12
 title: "INDEX.yaml as an index, not a copy of the frontmatter — 149 KB → 70 KB"
-type: code
+type: task
 labels: [post-launch, ops-hardening]
 board: main
 epic: ""

@@ -1,7 +1,7 @@
 ---
 id: TL-359
 title: "Detached runs can be inspected waited for and cancelled"
-type: code
+type: task
 labels: []
 board: main
 epic: "Controlled and observable agent execution"

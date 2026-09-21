@@ -1,7 +1,7 @@
 ---
 id: TL-75
 title: "The modified_files field and searching tasks by touched file"
-type: code
+type: task
 labels: [post-launch]
 board: main
 epic: "Data integrity"

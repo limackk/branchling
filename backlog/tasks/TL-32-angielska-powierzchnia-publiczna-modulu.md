@@ -1,7 +1,7 @@
 ---
 id: TL-32
 title: "English public surface of the module"
-type: code
+type: task
 labels: [post-launch]
 board: main
 epic: "Backlog — open source publication"

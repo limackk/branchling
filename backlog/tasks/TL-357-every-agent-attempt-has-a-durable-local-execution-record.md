@@ -1,7 +1,7 @@
 ---
 id: TL-357
 title: "Every agent attempt has a durable local execution record"
-type: code
+type: task
 labels: []
 board: main
 epic: "Controlled and observable agent execution"

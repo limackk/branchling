@@ -1,7 +1,7 @@
 ---
 id: TL-23
 title: "worktrail init and stats — creating a backlog and showing its state in the terminal"
-type: code
+type: task
 labels: [pre-launch]
 board: main
 epic: "branchling — the tool"

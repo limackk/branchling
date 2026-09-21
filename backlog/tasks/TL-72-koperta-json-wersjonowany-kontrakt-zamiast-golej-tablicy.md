@@ -1,7 +1,7 @@
 ---
 id: TL-72
 title: "JSON envelope: a versioned contract instead of a bare array"
-type: code
+type: task
 labels: [post-launch]
 board: main
 epic: "CLI surface"

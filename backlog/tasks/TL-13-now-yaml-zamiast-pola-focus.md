@@ -1,7 +1,7 @@
 ---
 id: TL-13
 title: "NOW.yaml computed instead of a focus field — \"what now\" without a bit to maintain"
-type: code
+type: task
 labels: [post-launch, ops-hardening]
 board: main
 epic: ""

@@ -1,7 +1,7 @@
 ---
 id: TL-79
 title: "worktrail board export — a snapshot of the board as markdown to paste"
-type: code
+type: task
 labels: [post-launch]
 board: main
 epic: "CLI surface"

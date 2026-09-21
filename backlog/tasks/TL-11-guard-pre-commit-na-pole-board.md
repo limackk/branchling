@@ -1,7 +1,7 @@
 ---
 id: TL-11
 title: "Pre-commit guard on the board field — a partition must not drift silently"
-type: code
+type: task
 labels: [post-launch, ops-hardening]
 board: main
 epic: ""

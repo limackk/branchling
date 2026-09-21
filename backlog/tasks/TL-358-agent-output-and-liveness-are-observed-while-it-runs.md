@@ -1,7 +1,7 @@
 ---
 id: TL-358
 title: "Agent output and liveness are observed while it runs"
-type: code
+type: task
 labels: []
 board: main
 epic: "Controlled and observable agent execution"

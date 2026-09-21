@@ -1,7 +1,7 @@
 ---
 id: TL-254
 title: "done and decide --choose still name the wrong cause for a reason"
-type: code
+type: task
 labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards

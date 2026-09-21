@@ -1,7 +1,7 @@
 ---
 id: TL-346
 title: "Codex profiles map verified per-profile reasoning effort"
-type: code
+type: task
 labels: [agents, codex]
 board: main
 epic: ""                           # free text — the group this task counts towards

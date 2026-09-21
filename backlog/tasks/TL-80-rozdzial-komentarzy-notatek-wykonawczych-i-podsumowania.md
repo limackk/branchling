@@ -1,7 +1,7 @@
 ---
 id: TL-80
 title: "Separating comments, implementation notes, and the final summary"
-type: code
+type: task
 labels: [post-launch]
 board: main
 epic: "History and attribution"

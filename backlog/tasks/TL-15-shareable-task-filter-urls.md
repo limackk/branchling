@@ -1,7 +1,7 @@
 ---
 id: TL-15
 title: "Encode the task list filters in the viewer URL"
-type: code
+type: task
 labels: [pre-launch]
 board: main
 epic: ""

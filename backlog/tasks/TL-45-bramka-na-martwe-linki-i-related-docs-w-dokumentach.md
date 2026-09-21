@@ -1,7 +1,7 @@
 ---
 id: TL-45
 title: "Gate on dead links and related_docs in the tool's documents"
-type: code
+type: task
 labels: []
 board: main
 epic: "Backlog — open source publication"

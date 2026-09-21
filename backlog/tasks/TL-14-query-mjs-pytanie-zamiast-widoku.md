@@ -1,7 +1,7 @@
 ---
 id: TL-14
 title: "query.mjs — a question to the backlog instead of reading a whole view"
-type: code
+type: task
 labels: [post-launch, ops-hardening]
 board: main
 epic: ""

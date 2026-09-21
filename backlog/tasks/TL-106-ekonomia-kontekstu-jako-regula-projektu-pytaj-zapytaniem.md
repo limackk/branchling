@@ -1,7 +1,7 @@
 ---
 id: TL-106
 title: "Context economy as a project rule — ask with a query, do not read the tree"
-type: code
+type: task
 labels: [post-launch]
 board: main
 epic: "Onboarding"

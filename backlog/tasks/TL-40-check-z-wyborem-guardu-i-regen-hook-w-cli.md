@@ -1,7 +1,7 @@
 ---
 id: TL-40
 title: "check with guard selection and regen-hook in the CLI"
-type: code
+type: task
 labels: []
 board: main
 epic: "CLI surface"

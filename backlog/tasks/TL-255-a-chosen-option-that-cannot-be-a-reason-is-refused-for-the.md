@@ -1,7 +1,7 @@
 ---
 id: TL-255
 title: "A chosen option that cannot be a reason is refused for the cause that fired"
-type: code
+type: task
 labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards

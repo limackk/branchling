@@ -1,7 +1,7 @@
 ---
 id: TL-24
 title: "worktrail new — creating a task with a number scanned from all branches"
-type: code
+type: task
 labels: [pre-launch]
 board: main
 epic: "branchling — the tool"

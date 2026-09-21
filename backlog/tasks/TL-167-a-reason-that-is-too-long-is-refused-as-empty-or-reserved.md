@@ -1,7 +1,7 @@
 ---
 id: TL-167
 title: "A reason that is too long is refused as empty or reserved"
-type: code
+type: task
 labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards

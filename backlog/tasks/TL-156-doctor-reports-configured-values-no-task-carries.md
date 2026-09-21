@@ -1,7 +1,7 @@
 ---
 id: TL-156
 title: "doctor reports configured values that no task carries"
-type: code
+type: task
 labels: []
 board: main
 epic: "Data integrity"

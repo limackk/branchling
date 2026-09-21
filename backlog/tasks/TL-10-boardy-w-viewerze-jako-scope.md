@@ -1,7 +1,7 @@
 ---
 id: TL-10
 title: "Boards in the viewer as scope — lists, filters, and the dashboard in one scope"
-type: code
+type: task
 labels: [post-launch]
 board: main
 epic: ""

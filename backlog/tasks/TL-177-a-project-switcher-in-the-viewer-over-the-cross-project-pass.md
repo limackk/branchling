@@ -1,7 +1,7 @@
 ---
 id: TL-177
 title: "A project switcher in the viewer over the cross-project pass"
-type: code
+type: task
 labels: [post-launch]
 board: main
 epic: "Backlog viewer"

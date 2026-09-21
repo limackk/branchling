@@ -1,7 +1,7 @@
 ---
 id: TL-355
 title: "Every run names one orchestration authority"
-type: code
+type: task
 labels: []
 board: main
 epic: "Controlled and observable agent execution"

@@ -1,7 +1,7 @@
 ---
 id: TL-360
 title: "Watch distinguishes liveness progress and stalls"
-type: code
+type: task
 labels: []
 board: main
 epic: "Controlled and observable agent execution"

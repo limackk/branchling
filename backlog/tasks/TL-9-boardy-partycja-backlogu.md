@@ -1,7 +1,7 @@
 ---
 id: TL-9
 title: "Boards — partitioning the backlog into main and backlog-project"
-type: code
+type: task
 labels: [post-launch]
 board: main
 epic: ""

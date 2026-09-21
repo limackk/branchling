@@ -1,7 +1,7 @@
 ---
 id: TL-6
 title: "Epics table: header alignment, sorting, themed scrollbars"
-type: code
+type: task
 labels: [pre-launch]
 epic: ""
 board: main

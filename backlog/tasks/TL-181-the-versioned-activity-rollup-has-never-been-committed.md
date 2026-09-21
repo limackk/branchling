@@ -1,7 +1,7 @@
 ---
 id: TL-181
 title: "The versioned activity rollup has never been committed"
-type: code
+type: task
 labels: []
 board: main
 epic: "History and attribution"

@@ -1,7 +1,7 @@
 ---
 id: TL-74
 title: "worktrail instructions — the CLI issues workflow instructions, not a file in someone else's repo"
-type: code
+type: task
 labels: [post-launch]
 board: main
 epic: "Onboarding"

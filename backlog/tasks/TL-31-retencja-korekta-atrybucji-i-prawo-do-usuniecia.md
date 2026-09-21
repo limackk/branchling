@@ -1,7 +1,7 @@
 ---
 id: TL-31
 title: "Retention, attribution correction, and the right to deletion"
-type: code
+type: task
 labels: [post-launch]
 board: main
 epic: "Backlog — time tracking"

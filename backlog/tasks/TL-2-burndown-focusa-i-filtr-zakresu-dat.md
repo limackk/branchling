@@ -1,7 +1,7 @@
 ---
 id: TL-2
 title: "Focus burndown and date-range filter on the backlog dashboard"
-type: code
+type: task
 labels: [pre-launch]
 epic: ""
 board: main

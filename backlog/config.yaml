@@ -51,22 +51,31 @@ reason_required_statuses: [blocked, cancelled]
 
 priorities: [P0, P1, P2, P3]
 
-# Task kinds (TL-56). The values come from the TREE, not from the tool's
-# default: `types: [task]` stood here from the first commit and was never true —
-# tasks with `type: code` were already on disk by then. A placeholder rather
-# than a decision, so the reconciliation went the tree's way.
+# Task kinds. Two values, and the difference between them is one anybody can
+# apply without asking the author: `bug` is work that exists because something
+# already built behaves wrongly, `task` is everything else.
 #
-# `code` and `task` mean the SAME thing TODAY — ordinary work — and both are
-# actively written. That synonymy stays deliberately: collapsing it is a
-# migration over 59 files and a separate decision about the vocabulary, not a
-# side effect of fixing the mismatch (TL-123).
+# `code` was retired by TL-123 and the 81 files carrying it were rewritten. It
+# was never a third kind: it was the value of the first commit, and `task`
+# arrived with `_template.md` on 2026-08-31, after which `new` wrote `task` and
+# `code` could only be produced by editing a file by hand. Both words were
+# actively written on the SAME days, on work indistinguishable by content, so
+# the vocabulary declared a distinction the tree did not make. Inventing one
+# today was rejected: that meaning would have been authored here and then had to
+# be applied by re-reading every task in the tree.
+#
+# The rewrite covered ARCHIVED tasks too. `type` classifies a task for querying
+# and asserts nothing about what happened, and on the day each of those files
+# was written the two words meant the same thing — so nothing a closed file
+# claims was changed. A partial migration would also have been no migration: one
+# surviving `code` forces this line to keep the word.
 #
 # `manual` is NOT a value here, although the tree carried it once: `manual` is a
 # kind of VERIFICATION (`verification: - manual:`), not a kind of task. Its only
 # carrier, TL-20, had a `manual:` entry in its `verification:` and purely code
 # work — the word crossed between axes and was corrected, not admitted to the
 # vocabulary.
-types: [task, code, bug]
+types: [task, bug]
 
 # Labels. `labels_closed: true` turns a typo into a build failure instead of a
 # new, silent label.

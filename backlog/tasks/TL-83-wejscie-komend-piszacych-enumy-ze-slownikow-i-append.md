@@ -1,7 +1,7 @@
 ---
 id: TL-83
 title: "Input surface of writing commands: enums from dictionaries and --append instead of multiline strings"
-type: code
+type: task
 labels: [post-launch]
 board: main
 epic: "CLI surface"

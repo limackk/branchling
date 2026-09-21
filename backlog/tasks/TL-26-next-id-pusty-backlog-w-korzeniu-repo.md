@@ -1,7 +1,7 @@
 ---
 id: TL-26
 title: "next-backlog-id.mjs finds nothing when the backlog is the git repository root"
-type: code
+type: task
 labels: [pre-launch]
 board: main
 epic: "branchling — the tool"

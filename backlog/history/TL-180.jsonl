@@ -11,3 +11,4 @@
 {"id":"01M1MF4GZE5QSTYC4VM5AK60ZX","ts":"2026-09-03T20:25:02.702Z","task":"TL-180","field":"status","from":"pending","to":"in_progress","actor":"agent:dev","source":"next","reason":"unknown","session":"tree-f5221f0baf34","role":"dev"}
 {"id":"01M1MF4GZEPH9Y895A32CX3K7W","ts":"2026-09-03T20:25:02.702Z","task":"TL-180","field":"owner","from":"","to":"agent:dev","actor":"agent:dev","source":"next","reason":"unknown","session":"tree-f5221f0baf34","role":"dev"}
 {"id":"01M1MFC9M4CMFZ9PH6JGCJ56C9","ts":"2026-09-03T20:29:17.316Z","task":"TL-180","field":"status","from":"in_progress","to":"done","actor":"agent:dev","source":"done","reason":"proven","session":"tree-f5221f0baf34","role":"dev"}
+{"id":"01M32N6T088TRXWKFWF542WVPK","ts":"2026-09-21T18:56:12.808Z","task":"TL-180","field":"type","from":"code","to":"task","actor":"agent:claude","source":"manual","reason":"TL-123: the kind `code` is retired — ordinary work has one word, `task`, and `types:` narrows to [task, bug]"}
