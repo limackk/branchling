@@ -1,0 +1,1 @@
+{"id":"01M32F0FGT7WWT6Z34B06WRHWA","ts":"2026-09-21T17:07:54.010Z","task":"TL-415","field":"__created__","from":"","to":"A node_modules symlink is not ignored, so every worktree looks dirty","actor":"agent:claude","source":"new","reason":"unknown"}
