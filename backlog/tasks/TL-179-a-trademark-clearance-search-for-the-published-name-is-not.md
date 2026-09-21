@@ -32,6 +32,15 @@ deliverable is a dated, sourced result per register, not a reassurance.
 
 ## Context
 
+**Why `executor: human` (TL-218).** The act only a person can perform is
+running the register searches and standing behind the result. As the section
+below records, all four machine routes were tried on 2026-09-03 and all four
+refused: what is left is an OAuth credential somebody registers for, a session
+in a browser a person is sitting at, or a professional search — and the output
+is a dated legal clearance, which is a judgement with a name attached rather
+than a query result. Drafting the queries, the classes and the place the finding
+goes is agent work; being the person the clearance belongs to is not.
+
 Surfaced 2026-09-03 in
 [TL-169](TL-169-the-name-worktrail-is-already-a-github-organisation-the.md),  <!-- former-name: allow -->
 which established what `github.com/worktrail` is and could not establish this.  <!-- former-name: allow -->

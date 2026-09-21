@@ -32,6 +32,13 @@ the tool.
 
 ## Context
 
+**Why `executor: human` (TL-218).** The act only a person can perform is
+RECORDING the terminal session: asciinema captures a TTY, and an unattended run
+has no terminal to capture and no way to judge the pacing of the result against
+a 60-second limit. Writing `docs/demo/scenario.md` and every command in it is
+agent work; pressing record on a real terminal, and watching the playback to see
+whether the refusal reads as the scene it is meant to be, is not.
+
 In the "markdown backlog CLI" category, the leader's first contact is a
 kanban board in the terminal — nice, but generic. Our distinguisher is
 photogenic in a different way: **the refusal is more interesting than the
