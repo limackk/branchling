@@ -26,7 +26,7 @@ blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
 verification:                      # HOW to check the task is really done
   - id: the-name                   # optional; a criterion below points at this id
-    bash: "command to run"
+    bash: "command to run"         # THE PLACEHOLDER: `done` refuses this text, and until you replace it the guards read this entry as one nobody has written
 ---
 
 ## Goal

@@ -70,6 +70,33 @@ export const PROOF_ID = /^[a-z0-9][a-z0-9-]*$/;
  *  manual entry counts as passed is a decision at closing time, not here. */
 const VERIFICATION_KEYS = ["id", "bash", "manual"];
 
+/**
+ * The command `_template.md` writes into its `verification:` example.
+ *
+ * It is the one thing that tells an entry nobody has written from a contract:
+ * the id beside it is a NAME, and a name is exactly what an author keeps when
+ * they fill the entry in, so the id can never carry this meaning.
+ *
+ * WHY THERE ARE TWO COPIES OF THE STRING. `done` owns the other one and refuses
+ * to close a task that still carries it, which is the whole reason this guard
+ * may stay quiet about it. That module already imports this one, so reading its
+ * constant from here would pull the closing command in behind every guard;
+ * `scripts/tests/new-task-passes-check.test.mjs` fails on the day the two
+ * copies stop being the same string.
+ */
+export const TEMPLATE_PLACEHOLDER = "command to run";
+
+/**
+ * Is this entry still the template's, rather than somebody's?
+ *
+ * @param {{bash: string|null, manual: string|null}} entry one parsed entry
+ */
+export function isTemplatePlaceholder(entry) {
+  if (!entry) return false;
+  const text = entry.bash != null ? entry.bash : entry.manual;
+  return String(text == null ? "" : text).trim() === TEMPLATE_PLACEHOLDER;
+}
+
 
 /**
  * The `verification:` entries, in file order.
@@ -282,7 +309,16 @@ export function auditTask({ frontmatter, body, policy = "warn" }) {
     }
   }
   for (const e of entries) {
-    if (e.id !== null && !used.has(e.id)) {
+    // THE TEMPLATE'S OWN ENTRY IS NOT AN ORPHAN (TL-262). It proves no criterion
+    // because it proves nothing at all, and the advice this message gives —
+    // link it, or drop the `id:` — is the wrong repair for it twice: a
+    // placeholder has to be REPLACED, and dropping the id would hide the shape
+    // a real entry takes, which is what the example is there to show. Nothing is
+    // lost by the silence: `done` refuses to close a task that still carries
+    // this command, so the task cannot end on it either way. Warning here would
+    // fire on a state the tool authored, and a guard that reports its own output
+    // teaches its reader to delete what the tool just wrote.
+    if (e.id !== null && !used.has(e.id) && !isTemplatePlaceholder(e)) {
       severity.push(`\`verification\` entry \`${e.id}\` proves no criterion — either link it or drop the \`id:\``);
     }
   }
