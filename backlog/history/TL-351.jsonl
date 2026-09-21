@@ -1,1 +1,4 @@
 {"id":"01M1Y0R1Q1X2M50YG8GWWQRFBP","ts":"2026-09-07T13:25:58.113Z","task":"TL-351","field":"__created__","from":"","to":"A history write failure leaves handoff frontmatter changed","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M321SRPXSS3JPWRG64A1CABN","ts":"2026-09-21T13:17:02.557Z","task":"TL-351","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M321SRPXHEZW1A0VAPZC4VR5","ts":"2026-09-21T13:17:02.557Z","task":"TL-351","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M322FGPA5BQVNKDHCV4NRAQ0","ts":"2026-09-21T13:28:55.242Z","task":"TL-351","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
