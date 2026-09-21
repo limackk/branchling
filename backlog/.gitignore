@@ -14,9 +14,3 @@ viewer.html
 
 # The local reconciliation reference point — NOT a source of truth.
 history/.snapshot.json
-
-# The raw evidence of activity: somebody's working calendar. One `git add -A`
-# in a repository this tool was dropped into would put it in a public history
-# irreversibly. The per-task AGGREGATE under activity/rollup/ is NOT matched
-# here and stays versioned — it is what a report is built from.
-activity/*.jsonl

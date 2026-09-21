@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Agent harness"
 priority: P2
-status: pending
-owner: unassigned
+status: done
+owner: agent:claude
 role: ""
 executor: ""
 estimate: 3h
@@ -16,10 +16,12 @@ created: 2026-09-21
 updated: 2026-09-21
 blocked_by: []
 blocks: []
-related_docs: []
+related_docs: [docs/backlog-time-tracking.md]
 verification:
   - id: no-entry-names-a-missing-script
     bash: "node --test scripts/tests/agent-hooks.test.mjs"
+  - id: no-activity-data-in-the-tree
+    bash: "node --test scripts/tests/no-activity-product-surface.test.mjs"
 ---
 
 ## Goal
@@ -86,7 +88,7 @@ removed. The question is only what its removal owes the tree it left.
 
 ## Acceptance criteria
 
-- [ ] No entry in `COMMANDS` names a `script:` that is absent from `scripts/`.
+- [x] No entry in `COMMANDS` names a `script:` that is absent from `scripts/`.
       [proof: no-entry-names-a-missing-script]
-- [ ] `backlog/activity/rollup/` either agrees with `git ls-files` over itself,
-      or is gone. [proof: no-entry-names-a-missing-script]
+- [x] `backlog/activity/rollup/` either agrees with `git ls-files` over itself,
+      or is gone. [proof: no-activity-data-in-the-tree]

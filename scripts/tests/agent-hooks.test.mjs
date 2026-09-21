@@ -160,3 +160,37 @@ test("the allowlist stops short of the decisions AGENTS.md reserves", () => {
     assert.deepEqual(hit, [], "`" + reserved + "` is pre-approved by " + hit.join(", ") + ", which AGENTS.md does not allow");
   }
 });
+
+/**
+ * Every `script:` a command table names, read from the SOURCE TEXT.
+ *
+ * NOT from the exported `COMMANDS`, and that is the whole point (TL-394). An
+ * entry can be written into the table and deleted from it again a few hundred
+ * lines later — which is how `activity`, `focus`, `time`, `sessions`,
+ * `session`, `actors`, `quote` and `backfill-completions` survived the removal
+ * of the twenty files they pointed at. Unreachable, so no test could reach
+ * them; shipped, so every reader of `cli.mjs` found 250 lines describing
+ * retention windows and a privacy report in the present tense. A guard that
+ * reads the export sees the table AFTER the deletion and is green either way.
+ */
+export function scriptsNamedIn(source) {
+  return [...source.matchAll(/^\s*script:\s*"([^"]+)"/gm)].map((m) => m[1]);
+}
+
+test("every command entry names a script that is in the tree", () => {
+  const source = readFileSync(join(SCRIPTS_DIR, "cli.mjs"), "utf8");
+  const named = scriptsNamedIn(source);
+  assert.ok(named.length > 20, "only " + named.length + " command scripts found — the reader is looking at the wrong text");
+  const missing = named.filter((s) => !existsSync(join(SCRIPTS_DIR, s)));
+  assert.deepEqual(missing, [],
+    "these command entries describe a file that is not here — delete the entry, not just the dispatch");
+});
+
+test("the entry checker can fail", () => {
+  // Without this the assertion above passes just as happily against a reader
+  // that finds nothing at all.
+  const named = scriptsNamedIn('  focus: {\n    script: "focus-command.mjs",\n    summary: "gone",\n  },\n');
+  assert.deepEqual(named, ["focus-command.mjs"]);
+  assert.equal(existsSync(join(SCRIPTS_DIR, named[0])), false,
+    "if this file comes back, TL-378 is being undone rather than revisited");
+});

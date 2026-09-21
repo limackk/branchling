@@ -22,3 +22,16 @@ is unrelated to the removed telemetry product.
 
 Versioned historical rollups remain readable in older commits. They are not
 migrated, reinterpreted or used by the current binary.
+
+## What this repository did with its own
+
+On 2026-09-21 branchling's own backlog removed `backlog/activity/rollup/` — 206
+per-task aggregates of working minutes, 204 of them committed and two that never
+were, so the directory did not agree with itself. The advice above is addressed
+to the owner of the data; this is that owner acting on it (TL-394).
+
+The argument was not that the files were untidy. Nothing wrote them once TL-378
+removed the collector, nothing read them, and `activity forget` — the mechanism
+that had justified committing an aggregate at all — went in the same commit, so
+their subject had no way to correct or withdraw them. The objects stay in this
+repository's git history, which is immutable and does not reopen for this.
