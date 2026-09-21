@@ -48,6 +48,29 @@
  * guard's output is captured into a document, and a commentary meant for a
  * waiting operator has no reader inside it.
  *
+ * THE SECOND HALF: A CONTRACT THAT CANNOT FAIL (TL-260). The same walk asks the
+ * opposite question of tasks nobody has worked yet. A task in a QUEUE status has
+ * by definition had no work done on it, so a contract of its own that already
+ * passes against this tree is either unfalsifiable — green from birth, and the
+ * work it names could never have turned it red — or the task is already
+ * finished. Both are worth saying out loud, and until now nothing in the tool
+ * said either: `done` would have accepted such a contract, and the only thing
+ * that ever caught one was a rule in a charter outside the repository.
+ *
+ * WHY IT REPORTS AND DOES NOT FAIL. A wrong contract belongs to the task that
+ * owns it, and this guard is run over backlogs full of tasks the operator did
+ * not write and may not touch. A red exit would be red in every tree holding one
+ * such task, which is the same reason `task-state` reports rather than failing.
+ * So the finding joins the report, and the exit code keeps meaning exactly what
+ * it meant: a PROVEN closing that stopped holding.
+ *
+ * WHY IT RUNS THE COMMAND RATHER THAN READING IT. A static rule — a `grep` over
+ * a path that is absent — is cheaper and catches a real shape, but it cannot see
+ * the case this guard was written for: TL-143's contract grepped a file that
+ * existed and had been English for days. Only running it decides that, and
+ * `runContract` stops at the first failure, so a sound contract costs the
+ * commands up to its first red line and no more.
+ *
  * Usage:
  *   node scripts/check-backlog-proofs.mjs [--dir <backlog>] [--since <sha>] [--quiet]
  *
@@ -56,7 +79,8 @@
  * Exit 130 = interrupted; it says how far it got and proved nothing beyond that.
  *
  * Tests: `node --test scripts/tests/proofs.test.mjs`,
- *        `node --test scripts/tests/proofs-progress.test.mjs`
+ *        `node --test scripts/tests/proofs-progress.test.mjs`,
+ *        `node --test scripts/tests/check-contract-falsifiable.test.mjs`
  */
 
 import { spawnSync } from "node:child_process";
@@ -68,6 +92,7 @@ import { loadConfigOrExit } from "./config.mjs";
 import { parseVerification } from "./criteria.mjs";
 import { REASON_PROVEN, readHistory } from "./history.mjs";
 import { modifiedFiles } from "./modified-files.mjs";
+import { queueStatuses } from "./next-task.mjs";
 import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { readTaskRecords } from "./task-select.mjs";
@@ -95,6 +120,22 @@ export function provenClosing(entries, archivedStatuses) {
     found = e.reason === REASON_PROVEN ? { actor: e.actor || "", ts: e.ts || "", status: e.to } : null;
   }
   return found;
+}
+
+/**
+ * Did this contract pass without a single command being able to fail it? PURE.
+ *
+ * Three refusals, and each of them is a verdict this function must NOT invent:
+ * an empty result is a zero sample, which CLAUDE.md already rules has no
+ * evidentiary force; a `manual:` entry was not run at all, so counting it as
+ * passing would put a person's signature under something nobody signed; and one
+ * failing command is enough to make the whole contract falsifiable, which is the
+ * condition this guard is looking for the ABSENCE of.
+ */
+export function greenFromBirth(results) {
+  const rows = results || [];
+  if (!rows.length) return false;
+  return rows.every((r) => r && r.kind === "bash" && r.ok === true);
 }
 
 /** The paths a commit range touched, or null when the range cannot be read. */
@@ -147,18 +188,37 @@ async function main(argv) {
   const repoRoot = repoRootFor(root);
   const records = readTaskRecords(paths.tasksDir, config.taskId.file);
 
+  const contractOf = (t) => {
+    const raw = readFileSync(paths.tasksDir + "/" + String(t.file).replace(/^tasks\//, ""), "utf8");
+    return parseVerification(splitFrontmatter(raw).frontmatter).entries;
+  };
+
+  // The statuses a dispatcher may still hand out — that is, the statuses whose
+  // work has not begun. Derived, not named here: which word this backlog uses
+  // for "nobody has started" is its vocabulary and not the code's (law 3).
+  const queue = new Set(queueStatuses(config));
+
   const candidates = [];
+  const open = [];
   for (const t of records) {
-    if ((config.archivedStatuses || []).indexOf(t.status) < 0) continue;
+    if ((config.archivedStatuses || []).indexOf(t.status) < 0) {
+      if (!queue.has(t.status)) continue;
+      const entries = contractOf(t);
+      // A task still being WRITTEN has no contract to judge, and `check
+      // --criteria` already reports that. Two guards on one finding would say
+      // the same problem twice.
+      if (entries.length) open.push({ id: t.id, file: t.file, status: t.status, entries });
+      continue;
+    }
     const closing = provenClosing(readHistory(root, t.id), config.archivedStatuses);
     if (!closing) continue;
-    const raw = readFileSync(paths.tasksDir + "/" + String(t.file).replace(/^tasks\//, ""), "utf8");
-    const { entries } = parseVerification(splitFrontmatter(raw).frontmatter);
+    const entries = contractOf(t);
     if (!entries.length) continue;
     candidates.push({ id: t.id, file: t.file, closing, entries });
   }
 
   let selected = candidates;
+  let openSelected = open;
   let narrowedNote = null;
   if (since) {
     const changed = changedPaths(repoRoot, since);
@@ -167,10 +227,16 @@ async function main(argv) {
       return 2;
     }
     const index = modifiedFiles({ root: repoRoot, prefix: config.taskIdPrefix });
-    selected = candidates.filter((c) =>
-      touchedByRange(c, c.entries, changed, (index.byTask && index.byTask.get(c.id)) || []));
+    const keep = (c) =>
+      touchedByRange(c, c.entries, changed, (index.byTask && index.byTask.get(c.id)) || []);
+    selected = candidates.filter(keep);
+    // The SAME rule over the open half, for the same reason: a range is a
+    // statement about which questions are worth asking again, and asking it of
+    // one half only would make the narrowing mean two things at once.
+    openSelected = open.filter(keep);
     narrowedNote =
-      `narrowed to ${selected.length} of ${candidates.length} by ${since}..HEAD ` +
+      `narrowed to ${selected.length} of ${candidates.length} closing(s) and ` +
+      `${openSelected.length} of ${open.length} open contract(s) by ${since}..HEAD ` +
       "— a task is kept when the range touched a file it changed, or a path its contract names";
   }
 
@@ -199,7 +265,8 @@ async function main(argv) {
     // of the run at minute 68 learns it too late to decide anything.
     progress(
       `${MARK.bullet} proofs: re-running ${commandsTotal} verification command(s) from ` +
-        `${selected.length} proven closing(s)`
+        `${selected.length} proven closing(s), then the contract of ${openSelected.length} ` +
+        "task(s) nobody has started"
     );
     progress(`  in ${repoRoot} — narrow the run with \`--since <sha>\`, stop it with one interrupt`);
   }
@@ -240,6 +307,26 @@ async function main(argv) {
     }
     if (failed) broken.push({ ...c, failed });
   }
+  // THE SECOND HALF (TL-260), after the first and never instead of it: a broken
+  // proof is a defect in the tree and outranks a defect in a sentence nobody has
+  // acted on yet. An interrupt that stopped the first walk stops here too — the
+  // operator asked for the run to end, not for a different run to begin.
+  const unfalsifiable = [];
+  let openWalked = 0;
+  for (const c of openSelected) {
+    await new Promise((resolve) => setImmediate(resolve));
+    if (stopped) break;
+    openWalked++;
+    if (progress) {
+      progress(`  [${openWalked}/${openSelected.length}] ${c.id} (${c.status}): ${c.entries.length} entr(ies)`);
+    }
+    const { results } = runContract(c.entries, repoRoot, {
+      capture: true,
+      before: progress ? (e) => progress(`      ${MARK.arrow} ${e.bash}`) : undefined,
+    });
+    if (greenFromBirth(results)) unfalsifiable.push({ ...c, results });
+  }
+
   const seconds = ((Date.now() - started) / 1000).toFixed(1);
   process.removeListener("SIGINT", onSignal);
   process.removeListener("SIGTERM", onSignal);
@@ -247,6 +334,7 @@ async function main(argv) {
   if (stopped) {
     console.error(
       `${WARNM} proofs: stopped by ${stopped} after ${walked} of ${selected.length} proven closing(s) ` +
+        `and ${openWalked} of ${openSelected.length} open contract(s) ` +
         "— the command in flight was allowed to finish, so nothing was left running"
     );
   }
@@ -258,6 +346,32 @@ async function main(argv) {
       `  ${WARNM} ${vouched.length} manual entr(ies) were vouched for by a person and cannot be re-run`
     );
     for (const v of vouched) lines.push(`    ${MARK.bullet} ${v.id}: ${v.entry}`);
+  }
+  if (openSelected.length && !unfalsifiable.length) {
+    // THE SAMPLE, STATED. Silence here would read the same whether the guard
+    // examined forty contracts or none, and a green with no sample size behind
+    // it is exactly the shape of claim this guard exists to refuse.
+    lines.push(
+      `  ${MARK.ok} ${openWalked} open contract(s) can still fail against this tree`
+    );
+  }
+  if (unfalsifiable.length) {
+    // NAMED, NOT COUNTED. A number here would be a finding nobody can act on:
+    // the repair is in one task's frontmatter, and the reader has to be told
+    // which one and which command. The status is printed beside it because it
+    // is half the argument — this contract passes while nobody has started.
+    lines.push(
+      `  ${WARNM} ${unfalsifiable.length} open task(s) whose whole contract already passes ` +
+        "against this tree — green before the work, so the work cannot make it red"
+    );
+    for (const u of unfalsifiable) {
+      lines.push(`    ${MARK.bullet} ${u.id} (${u.status}): \`${u.results[0].command}\`` +
+        (u.results.length > 1 ? ` and ${u.results.length - 1} more` : ""));
+    }
+    lines.push(
+      "    Nothing was changed: a contract is the owning task's business. Either its work " +
+        "is already done, or the contract has to name something that is red today."
+    );
   }
 
   if (!broken.length) {

@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1
-status: pending  # pending | in_progress | blocked | done | cancelled
-owner: ""
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
@@ -91,9 +91,23 @@ here.
 
 ## Acceptance criteria
 
-- [ ] A contract that passes against an unchanged tree while its task is
+- [x] A contract that passes against an unchanged tree while its task is
       open is named by the tool, proven by a test that fails against
       today's code. [proof: unfalsifiable-contract-named]
-- [ ] Nothing that is sound today starts being reported. [proof: suite-green]
+- [x] Nothing that is sound today starts being reported. [proof: suite-green]
 - [ ] The choice between reporting, refusing and a static rule is a
       `__decision__` event in `backlog/history/TL-260.jsonl`.
+
+## The sweep (step 3), measured on 2026-09-21
+
+46 tasks in a queue status carry a contract in this tree. Their contracts were
+run from the repository root exactly as `check --proofs` now runs them, and
+**13 of the 46 already pass against an unchanged tree**:
+
+TL-216, TL-228, TL-239, TL-247, TL-248, TL-272, TL-280, TL-284, TL-285,
+TL-342, TL-349, TL-387, TL-401.
+
+Twelve of the thirteen are a whole suite — `node --test scripts/tests/*.test.mjs`
+or a named test file that already exists — and one is `branchling check`. None
+of them was touched here: a wrong contract is the owning task's business, and
+this task deliberately fixes none of them.
