@@ -28,6 +28,7 @@ import { resolveBacklogDirOrExit } from "./paths.mjs";
 import { buildFieldSpecs, extractMeta as sharedExtractMeta, normalizeValue, stripComment } from "./task-fields.mjs";
 import { MARK, color, errColor, refusal } from "./ui.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
+import { todayStamp } from "./today.mjs";
 
 
 const OKM = color.ok(MARK.ok);
@@ -317,7 +318,7 @@ function byPriorityThenId(a, b) {
 // If you ever add a `--check`/drift guard to this generator, this line becomes
 // that bug: derive the date from the DATA (as `build-growth-kb.mjs` now does
 // from the newest `fetched:`) before you add the guard, not after.
-const TODAY = new Date().toISOString().slice(0, 10);
+const TODAY = todayStamp();
 const GEN_HEADER = (title, extra) =>
   `# ${title}
 # =============================================================================

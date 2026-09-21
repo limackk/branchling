@@ -48,6 +48,7 @@ import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { readTaskRecords } from "./task-select.mjs";
 import { MARK, color, failure, heading, table } from "./ui.mjs";
+import { todayStamp } from "./today.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -273,7 +274,7 @@ export function handedBackAcross(tasks, history, { archived }) {
 /** In progress, with nothing recorded for `audit_stale_days`. */
 export function parked(tasks, history, { inProgressStatus, staleDays, today }) {
   if (!inProgressStatus) return { found: [], reason: "this backlog does not say which status means `in progress`" };
-  const cutoff = new Date(Date.parse(today) - staleDays * 86400000).toISOString().slice(0, 10);
+  const cutoff = todayStamp(Date.parse(today) - staleDays * 86400000);
   const found = [];
   for (const t of tasks) {
     if (t.status !== inProgressStatus) continue;
@@ -491,7 +492,7 @@ export function render(report, config) {
 // The run
 // ──────────────────────────────────────────────────────────────────────────
 
-export function main(argv, today = new Date().toISOString().slice(0, 10)) {
+export function main(argv, today = todayStamp()) {
   const cli = takeDirFlag(argv);
   let opts;
   try {

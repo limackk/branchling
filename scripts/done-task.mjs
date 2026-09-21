@@ -46,6 +46,7 @@ import { ACTOR_NAMESPACES, appendEntries, currentSession, eventId, FIELD_UNVERIF
 import { printJson } from "./json-envelope.mjs";
 import { releaseLock } from "./lock.mjs";
 import { MARK, color, errColor, failure } from "./ui.mjs";
+import { todayStamp } from "./today.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OKM = color.ok(MARK.ok);
@@ -272,11 +273,6 @@ export function transcriptBlock(output, opts = {}) {
   for (const row of rows) out.push(paint.dim(TRANSCRIPT_GUTTER) + row);
   out.push(paint.dim("── end of transcript · " + count + " written ──"));
   return out.join("\n") + "\n";
-}
-
-/** Today, as the frontmatter writes it. */
-function today() {
-  return new Date().toISOString().slice(0, 10);
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -841,7 +837,7 @@ function run(argv) {
   // nothing and silently writes nothing — a closed task with no `updated:` and
   // an exit code of 0. The setter edits inside the frontmatter, keeps the
   // comment and INSERTS a missing field in its ordered place.
-  const day = today();
+  const day = todayStamp();
   const specs = buildFieldSpecs(config);
   let text = proofed.text;
   try {

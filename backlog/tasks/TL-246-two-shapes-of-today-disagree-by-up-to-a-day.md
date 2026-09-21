@@ -6,20 +6,33 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P3
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1h
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-21
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
 verification:                      # HOW to check the task is really done
-  - id: one-shape
-    bash: "grep -rn 'function today()' scripts/*.mjs; test $(grep -rlc 'function today()' scripts/*.mjs | wc -l) -eq 0"
+  # REWRITTEN while the task was open (TL-260, TL-424). The original `one-shape`
+  # entry did fail against the untouched tree, so it was not one of the thirteen
+  # contracts that were green before any work — but it only ever looked for the
+  # literal `function today()`, which a fourth copy under any other name walks
+  # straight past, and it said nothing about WHICH of the two answers is right.
+  # The entries below name a test file that exists and was measured failing at
+  # 0d733ac (`new` wrote 2026-09-22 in Pacific/Kiritimati and 2026-09-21 in
+  # Pacific/Midway at the same instant), and the pattern scan now covers both
+  # shapes of the stamp rather than one function name.
+  - id: one-answer-in-every-timezone
+    bash: "test -f scripts/tests/today-stamp.test.mjs && node --test scripts/tests/today-stamp.test.mjs"
+  - id: one-implementation
+    bash: "! grep -Fn 'toISOString().slice(0, 10)' scripts/*.mjs | grep -v '^scripts/today.mjs:' && ! grep -Fn 'getMonth() + 1' scripts/*.mjs"
+  - id: every-writer-imports-it
+    bash: "for f in $(grep -Fln todayStamp scripts/*.mjs | grep -v scripts/today.mjs); do grep -Fq 'from \"./today.mjs\"' $f || { echo \"$f calls todayStamp without importing it\"; exit 1; }; done; test $(grep -Fln todayStamp scripts/*.mjs | grep -v scripts/today.mjs | wc -l) -ge 8"
   - id: suite-green
     bash: "node --test scripts/tests/*.test.mjs"
 ---
@@ -74,6 +87,11 @@ makes it, not to a change about writing `plan.yaml`.
 
 ## Acceptance criteria
 
-- [ ] No `scripts/*.mjs` file defines its own `today()`; every date stamp comes
-      from one exported function. [proof: one-shape]
-- [ ] The suite is green. [proof: suite-green]
+- [x] No `scripts/*.mjs` file builds a date stamp of its own, in either shape.
+      [proof: one-implementation]
+- [x] Every command that writes a date imports the one function.
+      [proof: every-writer-imports-it]
+- [x] `new`, `done` and the function itself answer with the same day in two
+      timezones 25 hours apart, driven from a fixed instant.
+      [proof: one-answer-in-every-timezone]
+- [x] The suite is green. [proof: suite-green]
