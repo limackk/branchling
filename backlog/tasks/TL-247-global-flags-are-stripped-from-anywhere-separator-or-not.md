@@ -6,22 +6,34 @@ labels: []
 board: main
 epic: "CLI surface"
 priority: P3
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude-opus-5
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-21
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs:
   - scripts/paths.mjs
   - scripts/cli.mjs
-verification:
+verification:                      # HOW to check the task is really done
+  # REWRITTEN BECAUSE THE OLD BLOCK PASSED BEFORE ANY WORK WAS DONE (TL-260).
+  # `node --test scripts/tests/paths.test.mjs scripts/tests/cli.test.mjs` was
+  # GREEN against the unmodified tree on 2026-09-21 (35 tests, 0 failures): it
+  # named the two FILES the defect lives in and not one case the defect makes
+  # fail, so it could be satisfied by changing nothing. The first entry below
+  # names a file whose four cases were all RED against the tree as found; the
+  # second greps for the end-to-end case's own result line, so a renamed or
+  # deleted test fails the entry instead of passing on a zero sample.
+  - id: separator-cases
+    bash: "node --test scripts/tests/global-flags-separator.test.mjs"
+  - id: the-write-does-not-move
+    bash: "node --test --test-name-pattern TITLED scripts/tests/global-flags-separator.test.mjs | grep -F '✔ a task can be TITLED'"
   - id: suite
-    bash: "node --test scripts/tests/paths.test.mjs scripts/tests/cli.test.mjs"
+    bash: "node --test scripts/tests/*.test.mjs"
 ---
 
 ## Goal
@@ -80,8 +92,12 @@ worse shape of bug than the one TL-58 fixes.
 
 ## Acceptance criteria
 
-- [ ] `takeDirFlag` and `takeColorFlags` read nothing after `--` as a flag, and
-      a case proves each one separately. [proof: suite]
-- [ ] A command run with a value of `--dir` after the separator writes into the
-      directory the FIRST `--dir` named. [proof: suite]
+- [x] `takeDirFlag` and `takeColorFlags` read nothing after `--` as a flag, and
+      a case proves each one separately, each with a positive control showing
+      the flag IS read before the separator. [proof: separator-cases]
+- [x] A command run with a value of `--dir` after the separator writes into the
+      directory the FIRST `--dir` named, and a second backlog directory that the
+      word past the separator names stays empty. [proof: the-write-does-not-move]
+- [x] Every other command still reads its arguments as it did — the separator is
+      the only line that changed. [proof: suite]
 

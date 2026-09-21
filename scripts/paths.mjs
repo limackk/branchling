@@ -199,11 +199,31 @@ export function resolveBacklogPaths(opts = {}) {
  * Take `--dir <x>` out of argv (and return the rest). Kept here so that every
  * script accepts the flag identically and no variant with `--backlog`, `--path`
  * or anything else appears.
+ *
+ * THE SCAN STOPS AT `--`, and the separator plus everything after it is handed
+ * on untouched (TL-247). `--` is this tool's one answer to "my value begins with
+ * a dash" — TL-58 taught `new` to read it, TL-248 taught `plan add | move`, and
+ * `foldAppendFlags()` and `wantsHelp()` in the dispatcher already honoured it.
+ * This function did not, and it runs ABOVE every command: a word the command was
+ * about to accept as a value was taken off the line before the command could see
+ * it, the write went to whatever directory followed, and nothing was printed.
+ * One command line read by two different grammars depending on which layer is
+ * looking is the defect — the layer nearest the user does not get its own.
+ *
+ * `--dir A -- --dir B` IS DIRECTORY A. The first occurrence is the flag, the
+ * second is text. There is no reading in which a word past the separator moves a
+ * write, because that is the whole promise the separator makes.
  */
 export function takeDirFlag(argv) {
   const rest = [];
   let dir = null;
   for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "--") {
+      // The separator STAYS: the command below reads it too, and a value that
+      // is a flag name is only distinguishable from a flag by its presence.
+      rest.push(...argv.slice(i));
+      break;
+    }
     if (argv[i] === "--dir") {
       dir = argv[++i] || null;
       continue;
