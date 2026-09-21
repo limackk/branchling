@@ -1,0 +1,1 @@
+{"id":"01M31ZESEP2F2NCFSPX6SDBDHP","ts":"2026-09-21T12:36:05.718Z","task":"TL-401","field":"__created__","from":"","to":"check --proofs leaves the contract in flight running after an interrupt","actor":"agent:claude","source":"new","reason":"unknown"}
