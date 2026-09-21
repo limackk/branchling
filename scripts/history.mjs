@@ -32,7 +32,7 @@ import { randomBytes } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { withMutex } from "./lock.mjs";
+import { withBacklogMutex, withMutex } from "./lock.mjs";
 import { ACTOR_UNKNOWN, FIELD_ATTRIBUTED, FIELD_COMMENT, FIELD_CREATED, FIELD_DECISION, FIELD_DELETED, REASON_UNKNOWN, TRACKED_FIELDS, diffMeta, extractMeta, formatValue, hasStatedReason, normalizeActor as normalizeActorFn, normalizeReason, splitFrontmatter } from "./task-fields.mjs";
 import { ANY_HISTORY_FILE, ANY_TASK_FILE, ANY_TASK_FILE_ID, ANY_TASK_ID, taskIdPatterns } from "./task-id.mjs";
 
@@ -981,25 +981,56 @@ export function unattributedChanges(backlogDir, opts = {}) {
   return out.sort((a, b) => String(a.entry.ts).localeCompare(String(b.entry.ts)));
 }
 
+/** The critical section a claim is decided in. It names the RESOURCE — the
+ *  attribution of this backlog's log — because every claimant has to compute
+ *  the same string for the exclusion to mean anything. */
+const ATTRIBUTION_SECTION = "history-attribution";
+
 /**
  * Claim them: one `__attributed__` entry per change, appended.
  *
  * @param {string} backlogDir
  * @param {Array<{task: string, entry: object}>} changes  from `unattributedChanges`
  * @param {{actor: string, reason: string, source?: string, ts?: string}} by
- * @returns {Array<object>} the entries written
+ * @returns {Array<object>} the entries written — SHORTER than `changes` when a
+ *          change was claimed by somebody else between the caller's read and
+ *          this call; that change is refused rather than claimed twice.
  */
 export function attributeChanges(backlogDir, changes, by) {
+  if (!changes.length) return [];
   const ts = by.ts || new Date().toISOString();
-  const written = [];
-  for (const { task, entry: target } of changes) {
-    // `to` is the FIELD that was changed, so the row reads as a sentence
-    // without following the link; `attributes` is the link, and it is what a
-    // second claim of the same change is refused by.
-    const e = entry(task, FIELD_ATTRIBUTED, "", target.field, by.actor, by.source || "manual", ts, by.reason);
-    e.attributes = target.id || null;
-    appendEntries(backlogDir, task, [e]);
-    written.push(e);
-  }
-  return written;
+  const tasks = [...new Set(changes.map((c) => c.task))];
+  // THE ELIGIBILITY AND THE APPEND ARE ONE ACT (TL-303). The caller read the
+  // candidates in its own time, and between that read and this call another
+  // process may have claimed the same change. Appending anyway leaves two
+  // first claims for one change standing in a file nobody may rewrite:
+  // `unattributedChanges` hides the second, so the log is wrong in a way no
+  // view ever shows. The section is REPOSITORY-scoped, like `new-task-id`,
+  // because the claimants are sessions in sibling worktrees of one clone.
+  return withBacklogMutex(backlogDir, ATTRIBUTION_SECTION, () => {
+    // Read again, INSIDE the section: this is the check the decision is made
+    // on, and the one the caller's read cannot stand in for.
+    const eligible = new Set(
+      unattributedChanges(backlogDir, { only: tasks })
+        .map(({ entry: target }) => target.id)
+        .filter(Boolean)
+    );
+    const written = [];
+    for (const { task, entry: target } of changes) {
+      // A loser is refused BEFORE its line exists. Deduplicating afterwards is
+      // not available: the log is append-only.
+      if (target.id) {
+        if (!eligible.has(target.id)) continue;
+        eligible.delete(target.id);
+      }
+      // `to` is the FIELD that was changed, so the row reads as a sentence
+      // without following the link; `attributes` is the link, and it is what a
+      // second claim of the same change is refused by.
+      const e = entry(task, FIELD_ATTRIBUTED, "", target.field, by.actor, by.source || "manual", ts, by.reason);
+      e.attributes = target.id || null;
+      appendEntries(backlogDir, task, [e]);
+      written.push(e);
+    }
+    return written;
+  });
 }

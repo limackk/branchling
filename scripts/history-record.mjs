@@ -26,7 +26,7 @@ import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { resolveActor } from "./actor.mjs";
-import { ACTOR_NAMESPACES, attributeChanges, isValidActor, reasonRefusal, reconcile, taskIdFromFile, unattributedChanges } from "./history.mjs";
+import { ACTOR_NAMESPACES, FIELD_ATTRIBUTED, attributeChanges, isValidActor, readHistory, reasonRefusal, reconcile, taskIdFromFile, unattributedChanges } from "./history.mjs";
 import { resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 
@@ -198,6 +198,33 @@ const selected = attribute ? selectClaim(unclaimed) : [];
 const claimed = selected.length
   ? attributeChanges(BACKLOG_DIR, selected, { actor, reason: reasonFlag, source })
   : [];
+
+// SOMEBODY ELSE CLAIMED IT WHILE THIS COMMAND WAS RUNNING (TL-303). The
+// selection above read the candidates, and the claim is decided inside a
+// critical section that reads them AGAIN — so a change already claimed there is
+// refused without an append. Saying nothing would be the worse outcome: the
+// command would exit 0 having written nothing, and its author would believe the
+// log carries their name.
+const claimedTargets = new Set(claimed.map((e) => e.attributes).filter(Boolean));
+const refused = selected.filter(({ entry }) => entry.id && !claimedTargets.has(entry.id));
+if (refused.length) {
+  for (const { task, entry: target } of refused) {
+    const winner = readHistory(BACKLOG_DIR, task)
+      .find((e) => e.field === FIELD_ATTRIBUTED && e.attributes === target.id);
+    console.error(
+      `${N} history: change \`` + target.id + "` was claimed by " +
+        (winner ? winner.actor + " at " + String(winner.ts).slice(0, 19) : "another process") +
+        " while this command was running."
+    );
+  }
+  console.error("  Nothing was appended for " + (refused.length === 1 ? "it" : "them") +
+    ": a recorded change carries ONE first claim, and this log is append-only,");
+  console.error("  so a second claim cannot be written beside the first and taken back later.");
+  if (claimed.length) {
+    console.error("  " + claimed.length + " other change(s) in this run WERE claimed for " + actor + ".");
+  }
+  process.exit(1);
+}
 
 if (quiet) process.exit(0);
 if (seeded) {
