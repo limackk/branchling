@@ -279,20 +279,26 @@ export function planStop(answer) {
   // Never silent: open work this run stepped over is exactly the part a reader
   // would otherwise take "the queue is empty" to cover.
   //
-  // THE TWO BRANCHES WORD IT DIFFERENTLY BECAUSE THE NUMBER MEANS TWO THINGS
-  // (TL-219). `skippedUnplanned` counts the open tasks outside the ACTIVE WAVE,
-  // which under an active wave includes everything the plan schedules LATER —
-  // so "the plan does not schedule them" would be false here. With no active
-  // wave there is no later, and an open task really is one the plan does not
-  // schedule. The field's name is wrong, not this sentence; TL-219 owns that.
-  const n = plan.skippedUnplanned;
-  if (!plan.wave) {
-    return "every wave of the plan is finished" +
-      (n ? ", and " + n + " open task(s) the plan does not schedule were left alone" : "");
-  }
+  // ONE WORDING, BECAUSE THE FIELD NOW MEANS ONE THING (TL-219). This clause
+  // used to be phrased "outside that wave" under an active wave and "the plan
+  // does not schedule" without one, because `skippedUnplanned` counted the open
+  // tasks outside the ACTIVE WAVE and therefore included everything scheduled
+  // LATER. It now counts the tasks NO wave holds, which is true in both
+  // branches, so the sentence no longer has to route around the field's name.
+  // Work waiting for its turn is reported separately, and only where there is a
+  // turn to wait for.
+  const unplanned = plan.skippedUnplanned;
+  const unplannedClause = unplanned
+    ? ", and " + unplanned + " open task(s) the plan does not schedule were left alone"
+    : "";
+  if (!plan.wave) return "every wave of the plan is finished" + unplannedClause;
+  const later = typeof plan.skippedOutsideWave === "number" && typeof unplanned === "number"
+    ? plan.skippedOutsideWave - unplanned
+    : 0;
   return "plan wave " + plan.wave + " (" + (plan.name || "unnamed") + ") is not finished — " +
     plan.open + " of " + plan.scheduled + " task(s) in it are still open and none was free to take" +
-    (n ? ", and " + n + " open task(s) outside that wave were left alone" : "");
+    (later ? ", " + later + " open task(s) in later waves are not reached yet" : "") +
+    unplannedClause;
 }
 
 /**
