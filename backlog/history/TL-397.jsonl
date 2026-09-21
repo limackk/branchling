@@ -1,0 +1,2 @@
+{"id":"01M31YHD7DSZXK164TYG00KT9J","ts":"2026-09-21T12:20:02.925Z","task":"TL-397","field":"__created__","from":"","to":"The plan guard outlived the plan it froze","actor":"agent:claude","source":"new","reason":"unknown"}
+{"id":"01M31ZBDZM61FFWV2DYY43TKJQ","ts":"2026-09-21T12:34:15.668Z","task":"TL-397","field":"status","from":"pending","to":"done","actor":"agent:claude","source":"done","reason":"The plan guard asserts the invariant against whatever plan.yaml holds, with a positive control; the full suite is green (1668/1668)."}

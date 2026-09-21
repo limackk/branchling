@@ -3,6 +3,20 @@
  *
  * The cancellation list is intentionally explicit. A broad title or epic
  * filter would turn a later naming change into a silent change of scope.
+ *
+ * WHAT THE PLAN TEST MAY ASSERT (TL-397). `backlog/plan.yaml` is data that is
+ * expected to be rewritten: the plan this file was written against closed
+ * completely on 2026-09-21 and was replaced, at which point the guard's frozen
+ * membership list — six ids scheduled, each before a seventh — began asserting
+ * that a finished plan is still scheduled. A red suite of that kind is worse
+ * than no guard, because every task verified by `node --test
+ * scripts/tests/*.test.mjs` inherits a failure that is not its own.
+ *
+ * So the plan test asserts only what survives a rewrite: the file parses, the
+ * plan's own consistency rules hold, no CANCELLED task is scheduled, and
+ * managed fleets have no wave. It deliberately does not assert that a
+ * scheduled task is still open — a plan keeps naming work while that work is
+ * being finished, so that would be the same staleness one step later.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -10,7 +24,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { BACKLOG_DIR, TASKS_DIR, isolateHome } from "./_repo.mjs";
-import { parsePlanYaml } from "../plan.mjs";
+import { parsePlanYaml, validatePlan } from "../plan.mjs";
 import { readTaskRecords } from "../task-select.mjs";
 import { loadConfig } from "../config.mjs";
 
@@ -48,18 +62,62 @@ test("the superseded work is cancelled with a stated reason", () => {
   }
 });
 
-test("the reduction plan schedules no cancelled work or managed-fleet wave", () => {
-  const text = readFileSync(join(BACKLOG_DIR, "plan.yaml"), "utf8");
+/**
+ * The invariant, as a function of the plan TEXT — so the positive control
+ * below can feed it a plan that does not exist on disk. Existence of every
+ * scheduled id and the absence of a duplicate are `validatePlan`'s rules, not
+ * this guard's; re-stating them here would be a second place to be wrong.
+ */
+function planProblems(text, tasks, config) {
   const { plan, problems } = parsePlanYaml(text);
-  assert.deepEqual(problems, [], "the execution plan parses before its order is asserted");
+  const found = problems.slice();
+  found.push(...validatePlan(plan, tasks, { archivedStatuses: config.archivedStatuses }).errors);
 
-  const scheduled = new Set(plan.waves.flatMap((wave) => wave.tasks));
-  for (const id of CANCELLED) assert.ok(!scheduled.has(id), id + " is not scheduled after cancellation");
-  assert.ok(!plan.waves.some((wave) => /managed fleets/i.test(wave.name)), "managed fleet work has no wave");
-
-  const position = (id) => plan.waves.findIndex((wave) => wave.tasks.includes(id));
-  for (const id of ["TL-378", "TL-379", "TL-380", "TL-381", "TL-382", "TL-383"]) {
-    assert.ok(position(id) >= 0, id + " is scheduled in the reduction plan");
-    assert.ok(position(id) < position("TL-384"), id + " precedes onboarding validation");
+  const byId = new Map(tasks.map((task) => [task.id, task]));
+  for (const wave of plan.waves) {
+    if (/managed fleets/i.test(wave.name)) found.push(`wave \`${wave.name}\` schedules managed-fleet work`);
+    for (const id of wave.tasks) {
+      const task = byId.get(id);
+      if (task && task.status === "cancelled") found.push(`${id} is cancelled and still scheduled`);
+    }
   }
+  return found;
+}
+
+test("the execution plan schedules no cancelled work and no managed-fleet wave", () => {
+  const config = loadConfig(BACKLOG_DIR);
+  const tasks = readTaskRecords(TASKS_DIR, config.taskId.file);
+  const text = readFileSync(join(BACKLOG_DIR, "plan.yaml"), "utf8");
+
+  assert.ok(tasks.some((task) => task.status === "cancelled"), "the tree has cancelled tasks to be found");
+  assert.deepEqual(planProblems(text, tasks, config), []);
+});
+
+test("a cancelled task scheduled in a wave is reported", () => {
+  // The positive control. The assertion above runs against live data and would
+  // pass just as loudly over a plan that happened to schedule nothing, so the
+  // same function is handed a plan that is wrong in exactly the way it exists
+  // to catch. The id comes from the reviewed set above, so the control cannot
+  // outlive the cancellation it relies on.
+  const config = loadConfig(BACKLOG_DIR);
+  const tasks = readTaskRecords(TASKS_DIR, config.taskId.file);
+  const id = CANCELLED[0];
+
+  const text = [
+    "updated: 2026-09-21",
+    'rationale: "a plan that schedules superseded work"',
+    "waves:",
+    '  - name: "Managed fleets"',
+    `    tasks: [${id}]`,
+  ].join("\n");
+
+  const found = planProblems(text, tasks, config);
+  assert.ok(
+    found.some((problem) => problem === `${id} is cancelled and still scheduled`),
+    "a cancelled id in a wave is reported: " + JSON.stringify(found)
+  );
+  assert.ok(
+    found.some((problem) => /managed-fleet/.test(problem)),
+    "a managed-fleet wave is reported: " + JSON.stringify(found)
+  );
 });
