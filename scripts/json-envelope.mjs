@@ -75,10 +75,15 @@ export const KINDS = {
     stoppedAt: null, stopped: null, agentNeverRan: null, waitingForRole: [],
     waitingForExecutor: [], waitingForSize: [], tally: null, sharedState: null, ms: null, tasks: [],
   },
+  // `advisories` are the findings `check` stopped reporting when it became a
+  // release gate (TL-383): each `{ name, output }`, where `name` is the same
+  // registry string `check --json` puts in `failed` and `output` is text written
+  // for a person.
   audit: {
     since: null, dayZero: null, tasks: null, findings: null,
     closedWithoutTrace: [], skippedBeforeSince: null, reopened: [],
     parked: [], withoutPremise: [], awaitingVouch: [], vouches: [],
+    advisories: [],
   },
   // `stats --json`. The tallies stay nested under `stats` instead of being
   // spread across the root: a future tally called `kind` would otherwise
@@ -90,7 +95,10 @@ export const KINDS = {
   // `check --json` (TL-57). `ok` is what CI reads, `failed` is what it acts on —
   // a consumer must not have to filter `guards` to learn which one to look at.
   // `output` beside each guard is text written for a PERSON and may be reworded;
-  // `name`, `ok` and `exit` are the contract.
+  // `name`, `ok`, `exit` and `severity` are the contract. `severity` says what a
+  // guard was allowed to do to `ok` — a consumer that treats an advisory finding
+  // as a release blocker is the failure mode TL-383 removed from the terminal,
+  // and it must not be reintroduced through the JSON.
   check: { ok: null, root: null, failed: [], guards: [] },
   // `doctor --json`. `ok` is the answer CI reads; `checks` is why.
   doctor: { ok: null, root: null, next: null, checks: [] },

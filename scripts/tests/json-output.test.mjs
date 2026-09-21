@@ -125,13 +125,22 @@ test("`check --json` names every guard it ran, and the ones that failed", () => 
   const answer = parsed(run(["check", "--json", "--dir", fx.backlog], fx.dir, fx.env), "check");
   assert.equal(answer.ok, true);
   assert.deepEqual(answer.failed, []);
-  assert.deepEqual(answer.guards.map((g) => g.name).sort(),
-    CHECK_GUARDS.filter((g) => !g.optIn).map((g) => g.name).sort(),
+  // ASSERTED AGAINST THE TEXT MODE ITSELF, not against a second list here. Since
+  // TL-383 the default run carries only guards that can fail a release, and which
+  // guards those are depends on the configuration — `criteria` is a gate only
+  // where `criteria_links: require`. A copy of that rule in this file would be
+  // the very second truth the guard table was extracted to prevent, so the
+  // question is put to the command: its own verdict line counts what it ran.
+  const text = run(["check", "--dir", fx.backlog], fx.dir, fx.env);
+  const counted = Number(text.stdout.match(/check: (\d+) release gate\(s\) passed/)[1]);
+  assert.equal(answer.guards.filter((g) => !g.skipped).length, counted,
     "a bare `check --json` did not run the same set the text mode runs");
   for (const guard of answer.guards) {
     assert.equal(typeof guard.output, "string");
     assert.equal(guard.exit, 0);
+    assert.equal(guard.severity, "gate", "an advisory guard ran in the default verdict");
   }
+  assert.ok(answer.guards.length > 0, "the bare run executed no guard at all");
 });
 
 test("a failing guard is NAMED in `failed`, not left to be filtered out of `guards`", () => {

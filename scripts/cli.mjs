@@ -37,7 +37,8 @@ import { fileURLToPath } from "node:url";
 import { PRODUCT_NAME as N, PRODUCT_VERSION } from "./product.mjs";
 import { ConfigError, formatConfigError, loadConfig } from "./config.mjs";
 import { printJson } from "./json-envelope.mjs";
-import { failure } from "./ui.mjs";
+import { MARK, color, failure } from "./ui.mjs";
+import { CHECK_GUARDS, effectiveSeverity, guardsForRun } from "./check-guards.mjs";
 import { resolveBacklogDir, resolveBacklogDirOrExit } from "./paths.mjs";
 import { FIELD_SHAPES } from "./task-fields.mjs";
 
@@ -46,7 +47,18 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const CHECK_USAGE = [
   `${N} check [--dir <path>] [--id-collisions] [--boards] [--refs] [--criteria] [--reasons] [--log-status] [--task-state] [--vocabulary] [--plan] [--product-name] [--proofs] [--since <sha>] [task-file.md …]`,
   "",
-  "  no selector          every guard; exit code = the WORST of them",
+  "  no selector          A RELEASE VERDICT: the guards that can FAIL one, and only those.",
+  "                       Exit code = the WORST of them. Guards that report and never",
+  "                       fail — legacy `## Log` prose, transitions that predate the",
+  "                       rule requiring a reason, a state change not committed yet,",
+  "                       criteria links this project configured as advisory — are not",
+  "                       run here. They are not lost: `audit` runs them and prints what",
+  "                       they found. The reason is not brevity. A command that exits 0",
+  "                       while printing findings it cannot act on teaches its reader to",
+  "                       skip most of its output, and then the one line that mattered",
+  "                       gets skipped too",
+  "  a named selector     the question you asked, whatever its severity — `--reasons`",
+  "                       answers about reasons even though a bare `check` no longer does",
   "  --json               the whole run as one document: which guards ran, which failed,",
   "                       and what each one said. Stdout carries the JSON and nothing",
   "                       else — a tick from a guard would break every consumer at once.",
@@ -1206,7 +1218,7 @@ export const COMMANDS = {
       "check-backlog-refs.mjs", "check-backlog-criteria.mjs",
       "check-backlog-vocabulary.mjs", "check-backlog-plan.mjs",
     ],
-    summary: "backlog guards: id collisions + boards + references + criteria links + vocabularies + the execution plan vs the tree + the product name of the source",
+    summary: "the release gate: every guard that can stop a publication, and nothing that cannot",
     usage: CHECK_USAGE,
   },
   "migrate-prefix": {
@@ -1795,6 +1807,13 @@ export function parseCheckArgs(args) {
     );
   }
 
+  // Was a guard NAMED? The default run is a release verdict and carries only
+  // the guards that can fail one; a named guard is somebody asking a narrower
+  // question, and gets answered whatever its severity (TL-383).
+  const explicit = wantIds || wantBoards || wantRefs || wantCriteria || wantReasons || wantLogStatus ||
+    wantHistory || wantTaskState || wantDocs || wantVocabulary || wantPlan ||
+    wantProductName || wantForeignContext || wantProofs;
+
   // No selector means all of them. A new guard joins the default run on purpose
   // (BL-1451): a dangling reference passed `check`, because `check` checked only
   // what somebody had once written into it.
@@ -1818,84 +1837,14 @@ export function parseCheckArgs(args) {
         "It narrows which proven closings are re-run; on its own there is nothing for it to narrow."
     );
   }
-  return { dir, json, wantIds, wantBoards, wantRefs, wantCriteria, wantReasons, wantLogStatus, wantHistory, wantTaskState, wantDocs, wantVocabulary, wantPlan, wantProductName, wantForeignContext, wantProofs, since, files };
+  return { dir, json, explicit, wantIds, wantBoards, wantRefs, wantCriteria, wantReasons, wantLogStatus, wantHistory, wantTaskState, wantDocs, wantVocabulary, wantPlan, wantProductName, wantForeignContext, wantProofs, since, files };
 }
 
-/**
- * The guards, as data (TL-57).
- *
- * WHY A TABLE AND NOT ELEVEN `if` BLOCKS, which is what this was. `check --json`
- * has to run the same set the text mode runs, and two lists of eleven guards
- * would differ the first time somebody added a twelfth to one of them — silently,
- * because the JSON consumer has no way to notice a guard that is not there.
- *
- * `args` IS A FUNCTION BECAUSE THE INPUT CONVENTIONS GENUINELY DIFFER, and the
- * discrepancy stays on the dispatcher's side rather than being normalised into
- * eleven guards: one takes the tasks directory positionally, most take the
- * backlog directory through `--dir`, and two take nothing at all.
- */
-export const CHECK_GUARDS = [
-  // An id collision is a property of the SET, so this one reads the whole tree.
-  { key: "ids", want: "wantIds", name: "id-collisions", script: "check-backlog-id-collisions.mjs",
-    args: (root, tasksDir) => [tasksDir] },
-  // A board is a property of ONE file, so a pre-commit hook can judge the staged
-  // files — otherwise my commit would fail because of somebody else's task.
-  { key: "boards", want: "wantBoards", name: "boards", script: "check-backlog-boards.mjs",
-    args: (root, tasksDir, files) => (files.length ? files : ["--all", tasksDir]) },
-  // A third input convention: the BACKLOG directory through --dir, not the tasks
-  // directory positionally.
-  { key: "refs", want: "wantRefs", name: "refs", script: "check-backlog-refs.mjs",
-    args: (root) => ["--dir", root] },
-  // Judges the SET, and needs the configuration to know which statuses are closed.
-  { key: "criteria", want: "wantCriteria", name: "criteria", script: "check-backlog-criteria.mjs",
-    args: (root) => ["--dir", root] },
-  // Reads the whole history; the configuration says which statuses require a reason.
-  { key: "reasons", want: "wantReasons", name: "reasons", script: "check-backlog-reasons.mjs",
-    args: (root) => ["--dir", root] },
-  // Compares each task against ITSELF — the only guard whose question is entirely
-  // inside one file. It needs the configuration twice over: for the statuses that
-  // make a log line a status claim at all, and for the archived ones that decide
-  // which direction of drift is a defect rather than stale prose.
-  { key: "log-status", want: "wantLogStatus", name: "log-status", script: "check-backlog-log-status.mjs",
-    args: (root) => ["--dir", root] },
-  // The only guard whose answer depends on something outside the backlog
-  // directory — it asks git — which is why it says so when there is no git.
-  { key: "history", want: "wantHistory", name: "history", script: "check-backlog-history-tracked.mjs",
-    args: (root) => ["--dir", root] },
-  // The second guard that asks git, and the only one that REPORTS rather than
-  // failing (TL-230): a task file whose state has not been committed yet is the
-  // normal condition of a session still working, so a red exit here would be
-  // red in every tree that is mid-task.
-  { key: "task-state", want: "wantTaskState", name: "task-state",
-    script: "check-backlog-task-state-committed.mjs", args: (root) => ["--dir", root] },
-  // Judges the REPOSITORY holding the backlog, not this installation: a
-  // `related_docs` entry resolves against the consumer's tree.
-  { key: "docs", want: "wantDocs", name: "docs", script: "check-docs-links.mjs",
-    args: (root) => ["--dir", root] },
-  // The one guard whose question is entirely the configuration file.
-  { key: "vocabulary", want: "wantVocabulary", name: "vocabulary", script: "check-backlog-vocabulary.mjs",
-    args: (root) => ["--dir", root] },
-  // The plan is judged against the WHOLE tree; a finished blocker outside the
-  // plan is not a gap.
-  { key: "plan", want: "wantPlan", name: "plan", script: "check-backlog-plan.mjs",
-    args: (root) => ["--dir", root] },
-  // No `--dir` either, and for the same reason. A user's task files may name the
-  // tool as often as they like — that is their prose, not our literal.
-  { key: "product-name", want: "wantProductName", name: "product-name", script: "check-product-name.mjs",
-    installationOnly: true, args: () => [] },
-  // Installation-only for the same reason again (TL-37): the subject is THIS
-  // repository's public documents. Somebody else's `docs/` may name whatever
-  // company they like — it is their repository, and their decision.
-  { key: "foreign-context", want: "wantForeignContext", name: "foreign-context",
-    script: "check-no-foreign-context.mjs", installationOnly: true, args: () => [] },
-  // OPT-IN ONLY — see `parseCheckArgs`. It re-runs the contracts of tasks that
-  // are already closed, so it costs what those test suites cost.
-  { key: "proofs", want: "wantProofs", name: "proofs", script: "check-backlog-proofs.mjs",
-    // The ONE guard outside the default run, and the flag says so in the table
-    // rather than in a name a test would have to know — see `parseCheckArgs`.
-    optIn: true,
-    args: (root, tasksDir, files, plan) => ["--dir", root].concat(plan.since ? ["--since", plan.since] : []) },
-];
+// The guard table and its severity axis live in `check-guards.mjs`, because
+// `audit` reads them too (TL-383). Re-exported here: `check`'s consumers have
+// always imported them from the dispatcher, and moving a file is not a reason
+// to break them.
+export { CHECK_GUARDS, effectiveSeverity, guardsForRun } from "./check-guards.mjs";
 
 /**
  * Is this backlog part of the checkout the tool is running FROM?
@@ -1915,6 +1864,29 @@ export function insideInstallation(root, moduleDir = HERE) {
 function skippedGuardLine(name) {
   return "· " + name + ": not run — it judges this tool's own source, and `--dir` " +
     "points at another backlog";
+}
+
+/**
+ * The line a release decision is actually made on (TL-383).
+ *
+ * WHY THE GUARDS CANNOT PROVIDE IT. Each one is a separate process that names
+ * its FINDING — "a dangling reference", "no plan.yaml" — in the vocabulary of
+ * the thing it judges, which is right for a guard called on its own. What no
+ * guard can say is which REGISTRY NAME it answers to, and that is the field
+ * `check --json` puts in `failed` and the flag a reader needs in order to ask
+ * again more narrowly. Before this, the two modes blamed the same failure in
+ * two vocabularies with nothing connecting them: a consumer told `refs` had
+ * failed could not find the sentence about it.
+ *
+ * ONE LINE ON SUCCESS, deliberately. A verdict that grows with the tree is the
+ * thing this task exists to remove.
+ */
+export function checkVerdict(failed, ran) {
+  if (!failed.length) {
+    return color.ok(MARK.ok) + " check: " + ran + " release gate(s) passed";
+  }
+  return color.err(MARK.err) + " check: " + failed.length + " gate(s) failed — " + failed.join(", ") + "\n" +
+    "  " + MARK.arrow + " " + N + " check --" + failed[0] + "   # that gate on its own, with what it found";
 }
 
 function runCheck(args) {
@@ -1938,8 +1910,9 @@ function runCheck(args) {
   // sometimes called straight from a hook. But called together they would print
   // the same error three times, and three copies of one sentence read like three
   // different problems.
+  let config;
   try {
-    loadConfig(root);
+    config = loadConfig(root);
   } catch (e) {
     if (!(e instanceof ConfigError)) throw e;
     console.error(formatConfigError(e, N));
@@ -1948,7 +1921,7 @@ function runCheck(args) {
     return 1;
   }
 
-  const guards = CHECK_GUARDS.filter((g) => plan[g.want]);
+  const guards = guardsForRun(plan, config);
 
   // WHOSE TREE IS BEING JUDGED (TL-163). Two guards read this installation's own
   // source and take no `--dir`; run against somebody else's backlog they answer
@@ -1971,12 +1944,12 @@ function runCheck(args) {
       if (guard.installationOnly && !ownBacklog) {
         // `skipped` rather than `ok: true`: a consumer counting green guards must
         // not be told a question was answered when it was never asked.
-        results.push({ name: guard.name, ok: true, skipped: true, exit: 0, output: skippedGuardLine(guard.name) });
+        results.push({ name: guard.name, severity: effectiveSeverity(guard, config), ok: true, skipped: true, exit: 0, output: skippedGuardLine(guard.name) });
         continue;
       }
       const { exit, output } = captureScript(guard.script, guard.args(root, tasksDir, plan.files, plan));
       worstJson = Math.max(worstJson, exit);
-      results.push({ name: guard.name, ok: exit === 0, exit, output });
+      results.push({ name: guard.name, severity: effectiveSeverity(guard, config), ok: exit === 0, exit, output });
     }
     printJson("check", {
       ok: worstJson === 0,
@@ -1990,6 +1963,8 @@ function runCheck(args) {
   }
 
   let worst = 0;
+  let ran = 0;
+  const failed = [];
   for (const guard of guards) {
     if (guard.installationOnly && !ownBacklog) {
       // SAID OUT LOUD, not silently dropped. A guard that did not run and a
@@ -1998,8 +1973,14 @@ function runCheck(args) {
       console.log(skippedGuardLine(guard.name));
       continue;
     }
-    worst = Math.max(worst, runScript(guard.script, guard.args(root, tasksDir, plan.files, plan)));
+    const exit = runScript(guard.script, guard.args(root, tasksDir, plan.files, plan));
+    ran += 1;
+    if (exit !== 0) failed.push(guard.name);
+    worst = Math.max(worst, exit);
   }
+  // Only the DEFAULT run is a verdict. Asked for one guard, the reader already
+  // knows which one they asked about, and a summary of one is noise.
+  if (!plan.explicit) console.log(checkVerdict(failed, ran));
   return worst;
 }
 

@@ -332,10 +332,16 @@ test("the report separates `unknown`, legacy rows and real gaps", () => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-test("a bare `check` runs the report — a guard wired to nothing proves nothing", () => {
+test("a real command runs the report — a guard wired to nothing proves nothing", () => {
+  // The point of this test never was WHICH command runs it. Since TL-383 the
+  // default `check` is a release gate and carries only guards that can fail one;
+  // this guard reports transitions that predate the rule requiring a reason, so
+  // it cannot fail and moved to `audit`. Both of its remaining doors are checked,
+  // because a guard reachable through neither is a guard nobody runs.
   const dir = sandbox();
-  const r = cli(["check"], dir);
-  assert.match(r.stdout, /reasons:/, "the default `check` run does not include the reasons report");
+  assert.match(cli(["audit"], dir).stdout, /reasons:/, "`audit` does not carry the reasons report");
+  assert.match(cli(["check", "--reasons"], dir).stdout, /reasons:/, "asked for by name, the guard says nothing");
+  assert.doesNotMatch(cli(["check"], dir).stdout, /reasons:/, "an advisory report leaked back into the release verdict");
   rmSync(dir, { recursive: true, force: true });
 });
 

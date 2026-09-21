@@ -150,10 +150,14 @@ test("a seeded backlog passes `check` with nothing to say", () => {
 
   const r = run(["check", "--dir", dir]);
   assert.equal(r.status, 0, r.stdout + r.stderr);
+  // "Nothing to say" is now literal: since TL-383 the default run reports only
+  // gates, and a seeded backlog trips none of them.
+  assert.deepEqual(r.stdout.split("\n").filter((l) => l.trimStart().startsWith("!")), []);
   // The criteria guard is the one that could be green on an empty sample: a task
   // with no criteria at all passes every rule below its own absence. So assert it
-  // actually saw links.
-  assert.match(r.stdout, /criterion→verification link\(s\) across 2 open tasks all resolve/);
+  // actually saw links — through `audit`, which is where it reports now.
+  assert.match(run(["audit", "--dir", dir]).stdout,
+    /criterion→verification link\(s\) across 2 open tasks all resolve/);
 });
 
 test("`next` hands out the unblocked task and skips the one waiting on it", () => {

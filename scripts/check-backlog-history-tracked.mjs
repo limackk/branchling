@@ -142,8 +142,49 @@ function idsIn(dir, pattern, strip) {
   return out;
 }
 
+/**
+ * Which half of this guard to speak (TL-383).
+ *
+ * THE GUARD ANSWERS TWO QUESTIONS AND ONLY ONE OF THEM IS A GATE. A log left
+ * untracked beside a task file that IS tracked can only mean the log was left
+ * behind, and another tree then reads a task with no history — current,
+ * repairable, and it fails. A log with no task in this tree usually means the
+ * task is on somebody else's branch, which is not a defect at all but the point
+ * of data travelling with branches: it cannot be repaired from here and never
+ * failed anything. Printed together in a release verdict, the second taught
+ * readers that a `!` from this command means nothing.
+ *
+ * ONE FLAG AND NOT TWO GUARDS, because the two findings are computed from one
+ * walk of the same two sets; splitting the script would walk the tree twice to
+ * separate outputs that were never expensive to separate. Absent, it says
+ * everything — a caller who asked for this guard by name asked the whole
+ * question.
+ */
+export function parseOnly(argv) {
+  const rest = [];
+  let only = null;
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "--only") {
+      only = argv[++i] || null;
+      if (!["gates", "advisory"].includes(only)) {
+        throw new Error("`--only` takes `gates` or `advisory`, not `" + (only || "") + "`");
+      }
+      continue;
+    }
+    rest.push(argv[i]);
+  }
+  return { only, argv: rest };
+}
+
 export function main(argv) {
-  const { dir, argv: rest } = takeDirFlag(argv);
+  let only, afterOnly;
+  try {
+    ({ only, argv: afterOnly } = parseOnly(argv));
+  } catch (e) {
+    console.error(e.message);
+    return 2;
+  }
+  const { dir, argv: rest } = takeDirFlag(afterOnly);
   if (rest.length) {
     console.error(`${N} check: unknown argument: ` + rest.join(" "));
     console.error("  usage: check-backlog-history-tracked.mjs [--dir <backlog>]");
@@ -181,7 +222,7 @@ export function main(argv) {
     (id) => tracked.has(rel(join(paths.historyDir, id + ".jsonl")))
   );
 
-  if (result.orphans.length) {
+  if (result.orphans.length && only !== "gates") {
     console.log(
       `${WARNM} history: ${result.orphans.length} log(s) with no task in this tree — ` +
         "usually a task on another branch, which is the point of data travelling with branches"
@@ -192,6 +233,13 @@ export function main(argv) {
     if (result.orphans.length > 10) console.log(`  … and ${result.orphans.length - 10} more`);
     console.log("  Counted apart from the untracked ones on purpose: this is somebody's other");
     console.log("  branch, that is somebody's missing commit, and one number would hide both.");
+  }
+
+  if (only === "advisory") {
+    // Asked for the advisory half alone, a tick about the gate would be an
+    // answer to a question nobody put — and `audit` is not entitled to report
+    // that a release gate passed.
+    return 0;
   }
 
   if (!result.untracked.length) {

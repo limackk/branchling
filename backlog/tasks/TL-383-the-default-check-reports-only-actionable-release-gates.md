@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: "Evidence-gated product focus"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1d
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-08
-updated: 2026-09-08
+updated: 2026-09-21
 blocked_by: [TL-377]
 blocks: []                         # ids this task will unblock
 related_docs:
@@ -77,12 +77,12 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] A clean default check emits a bounded success report with no warnings.
+- [x] A clean default check emits a bounded success report with no warnings.
       [proof: concise-check]
-- [ ] Every default finding makes the exit code non-zero and names a current
+- [x] Every default finding makes the exit code non-zero and names a current
       repair. [proof: concise-check]
-- [ ] Historical and advisory findings remain available through `audit` and do
+- [x] Historical and advisory findings remain available through `audit` and do
       not contaminate the release verdict. [proof: concise-check]
-- [ ] Human and JSON modes agree on which gate failed and on the exit code.
+- [x] Human and JSON modes agree on which gate failed and on the exit code.
       [proof: concise-check]
-- [ ] The complete remaining suite passes. [proof: suite-green]
+- [x] The complete remaining suite passes. [proof: suite-green]

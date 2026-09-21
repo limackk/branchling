@@ -40,6 +40,7 @@
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { collectAdvisories } from "./check-guards.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { FIELD_VERIFIED, outstandingVouches, readAllHistory } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
@@ -67,6 +68,10 @@ export const USAGE = [
   "                           carrying an empty `blocked_by`",
   "    awaiting a vouch       open, with a closing run stopped at a `manual:`",
   "                           entry nobody has vouched for",
+  "    advisory guards        what `check` stopped reporting when it became a",
+  "                           release gate (TL-383): real findings that cannot",
+  "                           fail a publication. They are RUN here, not copied,",
+  "                           so there is one definition and one reader more",
   "",
   "  --since <date>  the earliest closing date to judge. Defaults to the day the",
   "                  log first recorded a status transition: a task closed before",
@@ -77,8 +82,9 @@ export const USAGE = [
   "  THIS IS A TOOL FOR BACKLOG HYGIENE, NOT FOR JUDGING PEOPLE. It reports",
   "  evidence attached to tasks and does not score or rank actors.",
   "",
-  "  It is not `check`: that one judges structure and fails a commit, this one",
-  "  judges declarations and is read by a person. exit: 0 clean · 1 findings · 2 usage.",
+  "  It is not `check`: that one is the gate a release has to pass, this one is",
+  "  read by a person — which is why the findings that cannot fail a release live",
+  "  here. exit: 0 clean · 1 findings · 2 usage.",
 ].join("\n");
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -376,6 +382,19 @@ export function render(report, config) {
     ])));
   }
 
+  // WHAT `check` NO LONGER SAYS (TL-383). These guards report and cannot fail,
+  // so they were removed from the release verdict — and a finding dropped from
+  // one command without arriving in another is a finding deleted. They are RUN
+  // here, not reimplemented: one definition, one more reader.
+  if (report.advisories && report.advisories.length) {
+    out.push("");
+    out.push(heading("  advisory guards  (" + report.advisories.length + ")"));
+    out.push("  " + color.dim("`check` runs the gates that can fail a release; these report and never do"));
+    for (const advisory of report.advisories) {
+      for (const line of advisory.output.split("\n")) out.push(line ? "  " + line : "");
+    }
+  }
+
   out.push("");
   out.push(report.findings
     ? "  " + color.warn(MARK.warn) + " " + report.findings + " finding(s). This is a REPORT: nothing was changed, and nothing failed."
@@ -410,6 +429,10 @@ export function main(argv, today = new Date().toISOString().slice(0, 10)) {
   const tasks = readTaskRecords(backlogPaths(root).tasksDir, config.taskId.file);
   const history = readAllHistory(root);
   const report = auditBacklog({ tasks, history, config, since: opts.since, today });
+  // Attached after the analysis rather than computed inside it: `auditBacklog`
+  // is pure over tasks and history, and spawning processes from it would make
+  // every one of its unit tests spawn thirteen too.
+  report.advisories = collectAdvisories(root, config);
 
   if (opts.json) {
     printJson("audit", {
@@ -424,6 +447,9 @@ export function main(argv, today = new Date().toISOString().slice(0, 10)) {
       withoutPremise: report.withoutPremise.found,
       awaitingVouch: report.awaitingVouch.found,
       vouches: report.vouches.found,
+      // `output` is text written for a person; `name` is the field a consumer
+      // acts on, and the same string `check --json` puts in `failed`.
+      advisories: report.advisories,
     });
     return report.findings ? 1 : 0;
   }
