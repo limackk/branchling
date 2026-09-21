@@ -1,7 +1,7 @@
 ---
 id: TL-16
 title: Edit every task field with a click in the viewer
-type: code
+type: task
 labels: [pre-launch]
 board: main
 epic: "Backlog viewer"

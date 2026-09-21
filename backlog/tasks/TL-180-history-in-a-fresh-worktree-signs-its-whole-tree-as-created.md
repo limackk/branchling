@@ -1,7 +1,7 @@
 ---
 id: TL-180
 title: "history in a fresh worktree signs its whole tree as created by you"
-type: code
+type: task
 labels: []
 board: main
 epic: "History and attribution"

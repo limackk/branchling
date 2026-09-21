@@ -1,7 +1,7 @@
 ---
 id: TL-42
 title: "Task ID prefix is configuration, not code"
-type: code
+type: task
 labels: []
 board: main
 epic: "Configurability"

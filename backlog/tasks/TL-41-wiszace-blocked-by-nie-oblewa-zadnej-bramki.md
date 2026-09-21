@@ -1,7 +1,7 @@
 ---
 id: TL-41
 title: "A dangling blocked_by fails no gate"
-type: code
+type: task
 labels: []
 board: main
 epic: "Data integrity"

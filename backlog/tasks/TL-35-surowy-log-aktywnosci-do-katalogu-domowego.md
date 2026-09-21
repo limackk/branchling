@@ -1,7 +1,7 @@
 ---
 id: TL-35
 title: "Raw activity log moves to the home directory"
-type: code
+type: task
 labels: [post-launch]
 board: main
 epic: "Backlog — work-time measurement"

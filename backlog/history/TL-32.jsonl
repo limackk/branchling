@@ -2,3 +2,4 @@
 {"id":"01M1DSM4P78CGZZ89HFTZTS9K2","ts":"2026-09-01T06:13:39.143Z","task":"TL-32","field":"priority","from":"P3","to":"P1","actor":"agent:claude","source":"manual"}
 {"id":"01M1GFKZK57G2EY6X1YQYFHR56","ts":"2026-09-02T07:16:31.461Z","task":"TL-32","field":"title","from":"Angielska powierzchnia publiczna modułu","to":"English public surface of the module","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK5T6F164AH0Q53XFMH","ts":"2026-09-02T07:16:31.461Z","task":"TL-32","field":"epic","from":"Backlog — publikacja open source","to":"Backlog — open source publication","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M32N6Y621ZC1VHPW8GSCQB0N","ts":"2026-09-21T18:56:17.090Z","task":"TL-32","field":"type","from":"code","to":"task","actor":"agent:claude","source":"manual","reason":"TL-123: the kind `code` is retired — ordinary work has one word, `task`, and `types:` narrows to [task, bug]"}

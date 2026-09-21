@@ -1,7 +1,7 @@
 ---
 id: TL-33
 title: "Packaging — global install and npx"
-type: code
+type: task
 labels: [post-launch]
 board: main
 epic: "Backlog — open source release"

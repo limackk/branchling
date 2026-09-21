@@ -1,3 +1,4 @@
 {"id":"01M1B421521HWBWK7AMF2SJ12C","ts":"2026-08-31T05:18:16.738Z","task":"TL-8","field":"__created__","from":"","to":"Stan dashboardu w URL — widok da się podać dalej","actor":"unknown","source":"boot"}
 {"id":"01M1GFKZK539QA9X92W8VCGCZ4","ts":"2026-09-02T07:16:31.461Z","task":"TL-8","field":"title","from":"Stan dashboardu w URL — widok da się podać dalej","to":"Dashboard state in the URL — a view can be shared","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GXGYZEQS0DWF7Y1QHTHBN4","ts":"2026-09-02T11:19:32.590Z","task":"TL-8","field":"related_docs","from":["backlog/README.md"],"to":[],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M32N6ZMAW0GS00SVHDW9F9WY","ts":"2026-09-21T18:56:18.570Z","task":"TL-8","field":"type","from":"code","to":"task","actor":"agent:claude","source":"manual","reason":"TL-123: the kind `code` is retired — ordinary work has one word, `task`, and `types:` narrows to [task, bug]"}

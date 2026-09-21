@@ -1,7 +1,7 @@
 ---
 id: TL-37
 title: "Split the documents — the mechanism travels, the measurements stay"
-type: code
+type: task
 labels: [post-launch]
 board: main
 epic: "Backlog — open source publication"

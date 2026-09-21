@@ -1,7 +1,7 @@
 ---
 id: TL-348
 title: "Copied reference adapters expose an explicit update path"
-type: code
+type: task
 labels: [agents, setup]
 board: main
 epic: ""                           # free text — the group this task counts towards

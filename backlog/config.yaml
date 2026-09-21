@@ -51,22 +51,31 @@ reason_required_statuses: [blocked, cancelled]
 
 priorities: [P0, P1, P2, P3]
 
-# Task kinds (TL-56). The values come from the TREE, not from the tool's
-# default: `types: [task]` stood here from the first commit and was never true —
-# tasks with `type: code` were already on disk by then. A placeholder rather
-# than a decision, so the reconciliation went the tree's way.
+# Task kinds. Two values, and the difference between them is one anybody can
+# apply without asking the author: `bug` is work that exists because something
+# already built behaves wrongly, `task` is everything else.
 #
-# `code` and `task` mean the SAME thing TODAY — ordinary work — and both are
-# actively written. That synonymy stays deliberately: collapsing it is a
-# migration over 59 files and a separate decision about the vocabulary, not a
-# side effect of fixing the mismatch (TL-123).
+# `code` was retired by TL-123 and the 81 files carrying it were rewritten. It
+# was never a third kind: it was the value of the first commit, and `task`
+# arrived with `_template.md` on 2026-08-31, after which `new` wrote `task` and
+# `code` could only be produced by editing a file by hand. Both words were
+# actively written on the SAME days, on work indistinguishable by content, so
+# the vocabulary declared a distinction the tree did not make. Inventing one
+# today was rejected: that meaning would have been authored here and then had to
+# be applied by re-reading every task in the tree.
+#
+# The rewrite covered ARCHIVED tasks too. `type` classifies a task for querying
+# and asserts nothing about what happened, and on the day each of those files
+# was written the two words meant the same thing — so nothing a closed file
+# claims was changed. A partial migration would also have been no migration: one
+# surviving `code` forces this line to keep the word.
 #
 # `manual` is NOT a value here, although the tree carried it once: `manual` is a
 # kind of VERIFICATION (`verification: - manual:`), not a kind of task. Its only
 # carrier, TL-20, had a `manual:` entry in its `verification:` and purely code
 # work — the word crossed between axes and was corrected, not admitted to the
 # vocabulary.
-types: [task, code, bug]
+types: [task, bug]
 
 # Labels. `labels_closed: true` turns a typo into a build failure instead of a
 # new, silent label.
@@ -74,7 +83,25 @@ labels: []
 labels_closed: false
 
 owners: [unassigned]
-estimates: [30m, 2h, 1d, 1w]
+
+# How big a task is, ORDERED — the order is the whole meaning of the list.
+# `max_unattended_estimate` below compares by POSITION, never by parsing hours,
+# so a scale this project has not stated is never invented by the code.
+#
+# TL-244 widened the list from [30m, 2h, 1d, 1w] to fit the tree rather than
+# rewriting the tree to fit the list. 79 task files carried `1h`, `3h` or `4h`,
+# and `4h` — the commonest of the three — sits between two words that were
+# declared. The vocabulary is FREE, so those tasks were never a validation
+# failure; they were invisible to the size gate, which is the one reader that
+# goes by position. `scripts/estimate.mjs` already mapped all three to hours, so
+# every other reader — the viewer, the critical path, every sum — had been
+# treating them as real durations all along.
+#
+# Rewriting them onto the four declared words was rejected: an estimate is a
+# JUDGEMENT somebody made, and `4h` rewritten to `2h` makes the file assert a
+# judgement nobody ever made, in 79 files, including closed ones that every
+# estimate-weighted report reads.
+estimates: [30m, 1h, 2h, 3h, 4h, 1d, 1w]
 
 # The largest estimate `next` and `run` may hand to an unattended session
 # (TL-211). Above means LATER IN `estimates`, so this gates `1w` and nothing
@@ -83,8 +110,11 @@ estimates: [30m, 2h, 1d, 1w]
 #
 # `1d` because both tasks that provoked the key are `1w`: TL-137 was handed back
 # twice by the same run, and TL-149 states in its own text that it needs a
-# session of its own. An estimate this list has not got — `4h`, `3h` — has no
-# position in the order and is never gated.
+# session of its own. An estimate `estimates:` has not got still has no position
+# in the order and is never gated — that is unchanged by TL-244, which put the
+# three words the tree was actually using INTO the list rather than widening the
+# rule. Nothing crossed the threshold as a result: all three sit below `1d`, so
+# `1w` is still the only thing this gates.
 max_unattended_estimate: 1d
 
 # History actors — the namespace is mandatory:

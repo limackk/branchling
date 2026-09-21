@@ -1,7 +1,7 @@
 ---
 id: TL-104
 title: "Autonomous loop: worktrail next --claim, recovering abandoned tasks, fresh-session pattern"
-type: code
+type: task
 labels: [post-launch]
 board: main
 epic: "CLI surface"

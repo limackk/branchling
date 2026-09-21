@@ -1,7 +1,7 @@
 ---
 id: TL-182
 title: "new writes no history, so a task's birth is recorded by whoever reconciles first"
-type: code
+type: task
 labels: []
 board: main
 epic: "History and attribution"

@@ -4,3 +4,4 @@
 {"id":"01M1H167ZWQXATSR5HDPSVRJZH","ts":"2026-09-02T12:23:35.676Z","task":"TL-75","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"next","reason":"unknown"}
 {"id":"01M1H167ZWQWDBT30XGT82K3E2","ts":"2026-09-02T12:23:35.676Z","task":"TL-75","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
 {"id":"01M1H1KQHCJHTVVBPKN8WJDPJZ","ts":"2026-09-02T12:30:57.580Z","task":"TL-75","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
+{"id":"01M32N703XZ61G3CK55C68H0YZ","ts":"2026-09-21T18:56:19.069Z","task":"TL-75","field":"type","from":"code","to":"task","actor":"agent:claude","source":"manual","reason":"TL-123: the kind `code` is retired — ordinary work has one word, `task`, and `types:` narrows to [task, bug]"}

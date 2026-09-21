@@ -1,7 +1,7 @@
 ---
 id: TL-166
 title: "The suite is hermetic against the developer's own preferences"
-type: code
+type: task
 labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards

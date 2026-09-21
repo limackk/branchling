@@ -1,7 +1,7 @@
 ---
 id: TL-18
 title: Detach the backlog data directory from the code's location
-type: code
+type: task
 labels: [pre-launch]
 board: main
 epic: "Backlog viewer"

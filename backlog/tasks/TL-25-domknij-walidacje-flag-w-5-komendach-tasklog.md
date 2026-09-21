@@ -1,7 +1,7 @@
 ---
 id: TL-25
 title: "Closing the flag validation gap in 5 worktrail commands (build/viewer/next-id/board/history)"
-type: code
+type: task
 labels: [pre-launch]
 board: main
 epic: "branchling — the tool"

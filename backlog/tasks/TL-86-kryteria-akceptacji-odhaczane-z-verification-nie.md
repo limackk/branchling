@@ -1,7 +1,7 @@
 ---
 id: TL-86
 title: "Acceptance criteria checked off from verification, not declared by hand"
-type: code
+type: task
 labels: [pre-launch]
 board: main
 epic: "Data integrity"

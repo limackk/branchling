@@ -1,7 +1,7 @@
 ---
 id: TL-4
 title: "Click on a chart point — panel with that day's tasks"
-type: code
+type: task
 labels: [pre-launch]
 epic: ""
 board: main

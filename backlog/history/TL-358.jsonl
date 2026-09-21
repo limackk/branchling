@@ -2,3 +2,4 @@
 {"id":"01M1YAWG0TQ93VMGQEKRXBZBPH","ts":"2026-09-07T16:23:09.594Z","task":"TL-358","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
 {"id":"01M1YAWG0TCKQWVJVAZZH7AQW3","ts":"2026-09-07T16:23:09.594Z","task":"TL-358","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
 {"id":"01M1YBF9KA248SDQCBDPVYG710","ts":"2026-09-07T16:33:25.610Z","task":"TL-358","field":"status","from":"in_progress","to":"done","actor":"agent:codex","source":"done","reason":"proven","session":"tree-526f61f2043f"}
+{"id":"01M32N6X7SQ9D5HJ34517SQHAM","ts":"2026-09-21T18:56:16.121Z","task":"TL-358","field":"type","from":"code","to":"task","actor":"agent:claude","source":"manual","reason":"TL-123: the kind `code` is retired — ordinary work has one word, `task`, and `types:` narrows to [task, bug]"}

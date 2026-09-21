@@ -1,7 +1,7 @@
 ---
 id: TL-30
 title: "Token and session cost adapter"
-type: code
+type: task
 labels: [post-launch]
 board: main
 epic: "Backlog — work time measurement"

@@ -1,7 +1,7 @@
 ---
 id: TL-119
 title: "JSON envelope in the writing commands: take, next, handoff, done"
-type: code
+type: task
 labels: []
 board: main
 epic: "CLI surface"

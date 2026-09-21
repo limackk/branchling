@@ -1,3 +1,4 @@
 {"id":"01M1B42152K5JSMZ2SZ5077V7V","ts":"2026-08-31T05:18:16.738Z","task":"TL-40","field":"__created__","from":"","to":"check z wyborem guardu i regen-hook w CLI","actor":"unknown","source":"boot"}
 {"id":"01M1GFKZK5AK7XMDHSY39YZ5FB","ts":"2026-09-02T07:16:31.461Z","task":"TL-40","field":"title","from":"check z wyborem guardu i regen-hook w CLI","to":"check with guard selection and regen-hook in the CLI","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GFKZK5JJF6J17HSN2GWEYG","ts":"2026-09-02T07:16:31.461Z","task":"TL-40","field":"epic","from":"Powierzchnia CLI","to":"CLI surface","actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M32N6ZW9A54KM5SNYH1ZJJQY","ts":"2026-09-21T18:56:18.825Z","task":"TL-40","field":"type","from":"code","to":"task","actor":"agent:claude","source":"manual","reason":"TL-123: the kind `code` is retired — ordinary work has one word, `task`, and `types:` narrows to [task, bug]"}

@@ -7,3 +7,4 @@
 {"id":"01M1JTS8Y42R2Z76KMNZM1C2WM","ts":"2026-09-03T05:10:08.068Z","task":"TL-36","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown","session":"tree-6185cd1f78d5"}
 {"id":"01M1JVK7WWQMVD5SH13HQWJ6E8","ts":"2026-09-03T05:24:18.972Z","task":"TL-36","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven","session":"tree-6185cd1f78d5"}
 {"id":"01M1K5ZWCH01EJBRJGXYWX90JT","ts":"2026-09-03T08:25:58.929Z","task":"TL-36","field":"related_docs","from":["docs/worktrail-global-tool.md"],"to":["docs/branchling-global-tool.md"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M32N6YNA7ZYFBQ7BH8VSY0RR","ts":"2026-09-21T18:56:17.578Z","task":"TL-36","field":"type","from":"code","to":"task","actor":"agent:claude","source":"manual","reason":"TL-123: the kind `code` is retired — ordinary work has one word, `task`, and `types:` narrows to [task, bug]"}

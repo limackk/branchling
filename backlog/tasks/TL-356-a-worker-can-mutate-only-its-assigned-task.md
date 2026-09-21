@@ -1,7 +1,7 @@
 ---
 id: TL-356
 title: "A worker can mutate only its assigned task"
-type: code
+type: task
 labels: []
 board: main
 epic: "Controlled and observable agent execution"

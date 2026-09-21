@@ -1,7 +1,7 @@
 ---
 id: TL-22
 title: "worktrail as one entry point: a command dispatcher instead of eight paths"
-type: code
+type: task
 labels: [pre-launch]
 board: main
 epic: "branchling — the tool"

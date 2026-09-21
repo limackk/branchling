@@ -1,7 +1,7 @@
 ---
 id: TL-82
 title: "worktrail done — closing a task runs its verification and refuses on failure"
-type: code
+type: task
 labels: [pre-launch]
 board: main
 epic: "Data integrity"

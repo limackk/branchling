@@ -1,7 +1,7 @@
 ---
 id: TL-20
 title: Close the tool's name before open source publication
-type: code
+type: task
 labels: [pre-launch]
 board: main
 epic: "Backlog — open source publication"

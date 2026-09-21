@@ -1,7 +1,7 @@
 ---
 id: TL-1
 title: "Backlog dashboard in the viewer — status, epics, day-by-day pace"
-type: code
+type: task
 labels: [pre-launch]
 epic: ""
 board: main

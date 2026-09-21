@@ -1,7 +1,7 @@
 ---
 id: TL-73
 title: "Task state computed from active branches, not from the current checkout"
-type: code
+type: task
 labels: [post-launch]
 board: main
 epic: "Data integrity"

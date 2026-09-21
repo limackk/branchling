@@ -6,3 +6,4 @@
 {"id":"01M1H1MCMER99VN0BYD4ZYFBF1","ts":"2026-09-02T12:31:19.182Z","task":"TL-83","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"next","reason":"unknown"}
 {"id":"01M1H2515QNCQWEGX8VR7JNTDF","ts":"2026-09-02T12:40:24.503Z","task":"TL-83","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
 {"id":"01M1K5ZWCH7AZNV91TC00S6R0V","ts":"2026-09-03T08:25:58.929Z","task":"TL-83","field":"related_docs","from":["docs/worktrail-global-tool.md"],"to":["docs/branchling-global-tool.md"],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M32N6ZRA27Z8YTBAQ0X42N72","ts":"2026-09-21T18:56:18.698Z","task":"TL-83","field":"type","from":"code","to":"task","actor":"agent:claude","source":"manual","reason":"TL-123: the kind `code` is retired — ordinary work has one word, `task`, and `types:` narrows to [task, bug]"}

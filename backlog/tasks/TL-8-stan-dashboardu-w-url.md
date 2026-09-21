@@ -1,7 +1,7 @@
 ---
 id: TL-8
 title: "Dashboard state in the URL — a view can be shared"
-type: code
+type: task
 labels: [pre-launch]
 epic: ""
 board: main

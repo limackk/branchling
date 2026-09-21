@@ -1,7 +1,7 @@
 ---
 id: TL-76
 title: "Transitive dependency graph computed at read time"
-type: code
+type: task
 labels: [post-launch]
 board: main
 epic: "Data integrity"

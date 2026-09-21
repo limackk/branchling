@@ -1,7 +1,7 @@
 ---
 id: TL-3
 title: "Interactive dashboard charts — a tooltip with data under the cursor"
-type: code
+type: task
 labels: [pre-launch]
 epic: ""
 board: main

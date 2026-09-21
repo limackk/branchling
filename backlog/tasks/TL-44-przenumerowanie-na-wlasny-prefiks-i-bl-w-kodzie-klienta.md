@@ -1,7 +1,7 @@
 ---
 id: TL-44
 title: "Renumbering to our own prefix — and the BL that survived in the code"
-type: code
+type: task
 labels: []
 board: main
 epic: "Backlog — open source publication"

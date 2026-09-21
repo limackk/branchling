@@ -1,7 +1,7 @@
 ---
 id: TL-7
 title: "Sorting all dashboard lists and tables through one mechanism"
-type: code
+type: task
 labels: [pre-launch]
 epic: ""
 board: main

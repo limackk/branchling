@@ -1,7 +1,7 @@
 ---
 id: TL-34
 title: "Home directory — preferences and project registry"
-type: code
+type: task
 labels: [post-launch]
 board: main
 epic: "Backlog — open source publication"

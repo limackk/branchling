@@ -1,7 +1,7 @@
 ---
 id: TL-347
 title: "Agent runs expose requested and confirmed model provenance"
-type: code
+type: task
 labels: [agents, observability]
 board: main
 epic: ""                           # free text — the group this task counts towards

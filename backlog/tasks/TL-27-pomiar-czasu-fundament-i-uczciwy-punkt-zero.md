@@ -1,7 +1,7 @@
 ---
 id: TL-27
 title: "Work time measurement — foundation and an honest point zero"
-type: code
+type: task
 labels: [post-launch]
 board: main
 epic: "Backlog — work time measurement"

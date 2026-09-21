@@ -1,7 +1,7 @@
 ---
 id: TL-29
 title: "Estimate calibration from real data"
-type: code
+type: task
 labels: [post-launch]
 board: main
 epic: "Backlog — work time measurement"

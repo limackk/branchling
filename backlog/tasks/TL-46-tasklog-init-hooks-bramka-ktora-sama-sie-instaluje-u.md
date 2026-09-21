@@ -1,7 +1,7 @@
 ---
 id: TL-46
 title: "worktrail init --hooks — a gate that installs itself for the user"
-type: code
+type: task
 labels: [post-launch]
 board: main
 epic: "Backlog — open source publication"

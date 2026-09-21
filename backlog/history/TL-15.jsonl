@@ -1,3 +1,4 @@
 {"id":"01M1B421526K3EGZVP3BKAPDCJ","ts":"2026-08-31T05:18:16.738Z","task":"TL-15","field":"__created__","from":"","to":"Zakoduj filtry listy zadań w URL viewera","actor":"unknown","source":"boot"}
 {"id":"01M1GFKZK5M28CGRZHT52AAXG3","ts":"2026-09-02T07:16:31.461Z","task":"TL-15","field":"title","from":"Zakoduj filtry listy zadań w URL viewera","to":"Encode the task list filters in the viewer URL","actor":"unknown","source":"external","reason":"unknown"}
 {"id":"01M1GXGYZEKBFY073VA29D47WG","ts":"2026-09-02T11:19:32.590Z","task":"TL-15","field":"related_docs","from":["backlog/README.md"],"to":[],"actor":"unknown","source":"external","reason":"unknown"}
+{"id":"01M32N6RNQMK5VXCD7XVP9ADF4","ts":"2026-09-21T18:56:11.447Z","task":"TL-15","field":"type","from":"code","to":"task","actor":"agent:claude","source":"manual","reason":"TL-123: the kind `code` is retired — ordinary work has one word, `task`, and `types:` narrows to [task, bug]"}

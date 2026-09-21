@@ -1,7 +1,7 @@
 ---
 id: TL-178
 title: "The viewer's browser storage keys still carry the originating project's name"
-type: code
+type: task
 labels: []
 board: main
 epic: "Backlog viewer"

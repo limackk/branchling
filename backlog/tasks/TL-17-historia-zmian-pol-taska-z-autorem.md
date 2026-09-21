@@ -1,7 +1,7 @@
 ---
 id: TL-17
 title: Show the change history of a task's fields, with the author
-type: code
+type: task
 labels: [pre-launch]
 board: main
 epic: "Backlog viewer"
