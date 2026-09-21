@@ -49,11 +49,13 @@ import { fileURLToPath } from "node:url";
 
 import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { PROOF_ID } from "./criteria.mjs";
-import { TEMPLATE_PLACEHOLDER } from "./done-task.mjs";
 import { ACTOR_NAMESPACES, isValidActor, isValidReason, recordCreation, reconcile } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { createTask, driftMessage, slugify } from "./new-task.mjs";
+import {
+  VERIFICATION_KEYS, contractFor, isNonEmptyString, isPlainObject, renderBody, taskContent,
+  validateVerification,
+} from "./task-input.mjs";
 import { backlogPaths, looksLikeBacklogDir, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { buildFieldSpecs, fieldSpec, setFrontmatterField } from "./task-fields.mjs";
@@ -89,11 +91,6 @@ const ITEM_KEYS = [
   "plan_id", "title", "goal", "context", "steps", "blocked_by",
   "verification", "estimate", "priority",
 ];
-
-/** The keys one `verification` entry may carry. `bash` and `manual` are the two
- *  the task file itself accepts; `proves` is the SENTENCE this check earns —
- *  it becomes the acceptance criterion that points back at the entry. */
-const VERIFICATION_KEYS = ["id", "bash", "manual", "proves"];
 
 /** A local key. Deliberately not the shape of a task id: `plan_id` must be
  *  impossible to confuse with `TL-1234`, so that a plan naming a real id reads
@@ -164,14 +161,6 @@ export function parseSeedArgs(args) {
 // ──────────────────────────────────────────────────────────────────────────
 // Reading and judging the plan — PURE, no filesystem
 // ──────────────────────────────────────────────────────────────────────────
-
-function isPlainObject(v) {
-  return v !== null && typeof v === "object" && !Array.isArray(v);
-}
-
-function isNonEmptyString(v) {
-  return typeof v === "string" && v.trim() !== "";
-}
 
 /** `tasks[2] (plan_id: build-cli)` — a position a reader can find in their own
  *  file. The index alone is not enough (an adapter regenerates the order); the
@@ -283,72 +272,10 @@ export function validateItems(items) {
       errors.push(at + ": `blocked_by` must be an array of plan_id values");
     }
 
-    errors.push(...validateVerification(item, at));
+    errors.push(...validateVerification(item.verification, at));
   });
 
   errors.push(...validateDependencies(items, byPlanId));
-  return errors;
-}
-
-/**
- * The closing contract of ONE item.
- *
- * This is the gate the whole command exists for, so it is strict about the two
- * ways an entry can be present and still prove nothing: empty, and the
- * template's own placeholder.
- */
-function validateVerification(item, at) {
-  const errors = [];
-  const list = item.verification;
-  if (!Array.isArray(list) || !list.length) {
-    errors.push(
-      at + ": `verification` is required and must not be empty — a task with nothing " +
-        "that could prove it is done cannot be worked unattended"
-    );
-    return errors;
-  }
-  const ids = new Set();
-  list.forEach((raw, j) => {
-    const spot = at + " verification[" + j + "]";
-    const v = typeof raw === "string" ? { bash: raw } : raw;
-    if (!isPlainObject(v)) {
-      errors.push(spot + ": expecting a command string or an object with `bash:` or `manual:`");
-      return;
-    }
-    for (const key of Object.keys(v)) {
-      if (VERIFICATION_KEYS.indexOf(key) < 0) errors.push(spot + ": unknown key `" + key + "` (known: " + VERIFICATION_KEYS.join(", ") + ")");
-    }
-    const hasBash = v.bash !== undefined;
-    const hasManual = v.manual !== undefined;
-    if (hasBash && hasManual) errors.push(spot + ": `bash` and `manual` in one entry — one check, one way of checking it");
-    if (!hasBash && !hasManual) {
-      errors.push(spot + ": neither `bash` nor `manual` — there is nothing to check");
-      return;
-    }
-    const text = hasBash ? v.bash : v.manual;
-    if (!isNonEmptyString(text)) {
-      errors.push(spot + ": `" + (hasBash ? "bash" : "manual") + "` is empty — there is nothing to check");
-      return;
-    }
-    if (text.trim() === TEMPLATE_PLACEHOLDER) {
-      errors.push(
-        spot + ": still the template placeholder (`" + TEMPLATE_PLACEHOLDER + "`) — " +
-          "that field was filled in by the template, not by anybody who thought about this task"
-      );
-    }
-    if (v.id !== undefined) {
-      if (!isNonEmptyString(v.id) || !PROOF_ID.test(v.id)) {
-        errors.push(spot + ": `id` must be lower case letters, digits and dashes");
-      } else if (ids.has(v.id)) {
-        errors.push(spot + ": duplicate `id: " + v.id + "` — a proof reference would be ambiguous");
-      } else {
-        ids.add(v.id);
-      }
-    }
-    if (v.proves !== undefined && !isNonEmptyString(v.proves)) {
-      errors.push(spot + ": `proves` must be a non-empty string when given");
-    }
-  });
   return errors;
 }
 
@@ -430,54 +357,12 @@ export function findCycles(edges) {
 // Plan item → task file
 // ──────────────────────────────────────────────────────────────────────────
 
-/**
- * The `verification:` entries and the criteria they prove, for one item.
- *
- * EVERY entry gets an id, even when the plan did not give one. That is what
- * lets each acceptance criterion end in `[proof: <id>]`, which is the whole
- * reason `check --criteria` is quiet on a seeded backlog: a criterion here is
- * not a claim somebody typed, it is a sentence the tool will tick after a green
- * run (TL-86).
- */
-export function contractFor(item) {
-  const raw = item.verification.map((v) => (typeof v === "string" ? { bash: v } : v));
-  const taken = new Set(raw.map((v) => v.id).filter(Boolean));
-  const entries = [];
-  const criteria = [];
-  let n = 0;
-
-  for (const v of raw) {
-    let id = v.id;
-    if (!id) {
-      do { id = "check-" + ++n; } while (taken.has(id));
-      taken.add(id);
-    }
-    const command = v.bash !== undefined ? { bash: v.bash } : { manual: v.manual };
-    entries.push({ id, ...command });
-    // With no sentence from the plan, the criterion IS the check passing. That
-    // reads thinly, and it is still the honest statement of what this task has
-    // to earn — an invented sentence would be prettier and unproved.
-    criteria.push(v.proves || (v.bash !== undefined ? "`" + v.bash + "` passes." : v.manual));
-  }
-  return { entries, criteria };
-}
-
-/** The markdown below the frontmatter. The headings are the format's, the same
- *  ones `_template.md` writes — `parseCriteria` looks for one of them by name. */
-export function renderBody(item, criteria) {
-  const out = ["", "## Goal", "", item.goal.trim(), ""];
-  if (isNonEmptyString(item.context)) out.push("## Context", "", item.context.trim(), "");
-  const steps = Array.isArray(item.steps) ? item.steps : [];
-  if (steps.length) {
-    out.push("## Steps", "");
-    steps.forEach((s, i) => out.push(i + 1 + ". " + s.trim()));
-    out.push("");
-  }
-  out.push("## Acceptance criteria", "");
-  for (const c of criteria) out.push("- [ ] " + c.text + " [proof: " + c.id + "]");
-  out.push("");
-  return out.join("\n");
-}
+/** The task-document shape is SHARED with `new` (TL-237): a plan item is one
+ *  task plus its plan-local keys, so the judgement of its contract, the
+ *  criteria it earns and the markdown it renders are defined once, in
+ *  `task-input.mjs`, and re-exported here for the callers that already ask this
+ *  module for them. */
+export { contractFor, renderBody };
 
 // ──────────────────────────────────────────────────────────────────────────
 // The directory
@@ -709,7 +594,7 @@ export function writePlan({ root, config, board, plan, createOne = createTask })
   const written = [];
   try {
     for (const item of plan.tasks) {
-      const { entries, criteria } = contractFor(item);
+      const content = taskContent(item);
       const created = createOne({
         root, config, board,
         slug: slugify(item.title),
@@ -717,9 +602,9 @@ export function writePlan({ root, config, board, plan, createOne = createTask })
           title: item.title,
           priority: item.priority || undefined,
           estimate: item.estimate || undefined,
-          verification: entries,
+          verification: content.verification,
         },
-        body: renderBody(item, entries.map((e, i) => ({ id: e.id, text: criteria[i] }))),
+        body: content.body,
       });
       written.push({ planId: item.plan_id, id: created.taskId, file: created.path, title: item.title, item });
     }

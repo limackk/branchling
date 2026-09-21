@@ -40,6 +40,8 @@ import { detectPrefixMismatch, prefixMismatchMessage, taskIdPatterns } from "./t
 import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { auditVocabulary, extractMeta, splitFrontmatter } from "./task-fields.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
+import { readStdinText } from "./stdin.mjs";
+import { parseTaskDocument, taskContent } from "./task-input.mjs";
 import { failure } from "./ui.mjs";
 import { readTaskMetas } from "./task-io.mjs";
 
@@ -135,6 +137,9 @@ const FLAGS = {
   // NOT a frontmatter field: it schedules the task in `plan.yaml` (TL-213). The
   // value is checked against the waves that exist BEFORE anything is written.
   "--wave": "wave",
+  // NOT a frontmatter field either: it names the file the task DOCUMENT is read
+  // from, in place of stdin (TL-237).
+  "--body-file": "bodyFile",
 };
 
 /**
@@ -436,16 +441,80 @@ export function createTask(args) {
   return withBacklogMutex(args.root, "new-task-id", () => createTaskUnlocked(args));
 }
 
-export function main(argv) {
+/**
+ * THE CALLABLE INPUT (TL-237) — the task's prose and its closing contract, as a
+ * JSON document, in the shape `seed` already reads for one plan item.
+ *
+ * WHY A DOCUMENT AND NOT A FLAG PER SECTION. `--goal`, `--context`, `--steps`
+ * would write this project's template into the tool, and the template is data.
+ * The document carries what is the TASK's (goal, context, steps, verification);
+ * the frontmatter stays on flags, where it has been validated against this
+ * project's vocabulary since long before this input existed.
+ *
+ * WHY STDIN IS READ WITHOUT BEING ASKED FOR, and why an empty one is not an
+ * error. The fourth law is about composition: a session that has just found
+ * something pipes the task in, and a flag to announce that it is doing so would
+ * be a second thing to get right. The cost is that every OTHER caller of `new`
+ * — the suite, `init`, a script — also arrives with a stdin that is not a
+ * terminal, so nothing arriving has to mean exactly what it meant before this
+ * change: create the task from the template. The wait is bounded in
+ * `stdin.mjs`, so a parent that leaves stdin inherited and idle costs seconds
+ * rather than forever.
+ *
+ * `--body-file` is the same document from a file, for a caller whose stdin is
+ * already spoken for. It SUPPRESSES the read of stdin rather than competing
+ * with it: reading a pipe only to refuse it would reintroduce the block the
+ * flag exists to avoid.
+ *
+ * @returns {Promise<{document: object|null, code: number}>} `code` is non-zero
+ *          when the document was refused; nothing has been written by then.
+ */
+async function readTaskInput(opts) {
+  let text = null;
+  if (opts.bodyFile) {
+    try {
+      text = readFileSync(opts.bodyFile, "utf8");
+    } catch (e) {
+      return { document: null, code: fail("`--body-file " + opts.bodyFile + "` could not be read: " + e.message) };
+    }
+    if (!text.trim()) {
+      return { document: null, code: fail("`--body-file " + opts.bodyFile + "` is empty", "a file named and empty is a document somebody meant to write") };
+    }
+  } else {
+    text = await readStdinText();
+    // A terminal (`null`) and a writer that closed without sending anything are
+    // the same answer here: no document.
+    if (text === null || !text.trim()) return { document: null, code: 0 };
+  }
+
+  const { task, errors } = parseTaskDocument(text);
+  if (errors.length) {
+    console.error(failure(
+      `${N} new`, "the task document was refused, and nothing was written",
+      errors,
+      [`the shape: { "goal": "…", "context": "…", "steps": ["…"], "verification": [ { "id": "…", "bash": "…", "proves": "…" } ] }`]
+    ));
+    return { document: null, code: 2 };
+  }
+  return { document: task, code: 0 };
+}
+
+export async function main(argv) {
   const cli = takeDirFlag(argv);
   const parsed = parseArgs(cli.argv);
-  if (parsed.error) return fail(parsed.error, `usage: ${N} new --title "…" [--board b] [--priority P1] [--epic e] [--estimate 2h]`);
+  if (parsed.error) return fail(parsed.error, `usage: ${N} new --title "…" [--board b] [--priority P1] [--epic e] [--estimate 2h] [--body-file f]`);
 
   const opts = parsed.values;
   if (!opts.title) return fail(`give it a title: ${N} new --title "Do the thing"`, "a task with no title is useless to the next person");
 
   const slug = slugify(opts.title);
   if (!slug) return fail("no filename can be made from this title: " + JSON.stringify(opts.title), "at least one letter or digit is needed");
+
+  // BEFORE the directory is even resolved: a refused document must leave a tree
+  // that looks exactly like the one before the command ran.
+  const input = await readTaskInput(opts);
+  if (input.code) return input.code;
+  const content = input.document ? taskContent(input.document) : null;
 
   const root = resolveBacklogDir({ dir: cli.dir, moduleDir: HERE }).root;
   const config = loadConfigOrExit(root);
@@ -529,7 +598,13 @@ export function main(argv) {
 
   let created;
   try {
-    created = createTask({ root, config, board, slug, fields: opts, body: null });
+    created = createTask({
+      root, config, board, slug,
+      // The document's contract REPLACES the template's placeholder; with no
+      // document the template is left exactly as it was.
+      fields: content ? { ...opts, verification: content.verification } : opts,
+      body: content ? content.body : null,
+    });
   } catch (e) {
     if (e && e.code === "EEXIST") {
       return fail("the file already exists: " + e.file,
@@ -588,10 +663,15 @@ export function main(argv) {
   }
   console.log("  board: " + board + (opts.board ? "" : " (the registry default)"));
   if (scheduling) console.log("  wave: " + opts.wave + " — scheduled in " + paths.planPath);
-  console.log(`  next: fill in ## Goal and ## Context, then \`${N} build\``);
+  // What is left to do depends on what arrived: a task written from a document
+  // already has its goal and its closing contract, and telling its author to go
+  // and fill them in would be the tool disbelieving its own input.
+  console.log(content
+    ? `  next: \`${N} build\` — the goal and the verification came from the document`
+    : `  next: fill in ## Goal and ## Context, then \`${N} build\``);
   return 0;
 }
 
 if (process.argv[1] && process.argv[1].endsWith("new-task.mjs")) {
-  process.exit(main(process.argv.slice(2)));
+  process.exit(await main(process.argv.slice(2)));
 }

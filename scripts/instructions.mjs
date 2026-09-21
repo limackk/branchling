@@ -206,6 +206,18 @@ CREATE IT WITH THE TOOL.
 
   {{tool}} new --title "…" --priority {{top_priority}} [--board b] [--epic e] [--estimate e]
 
+HAND IT THE WHOLE TASK, NOT JUST ITS FRONTMATTER. The goal, the context, the
+steps and the \`verification:\` block arrive as one JSON document on stdin — or
+from \`--body-file\` — and the task is finished when the command returns:
+
+  echo '{"goal":"…","context":"…","steps":["…"],
+         "verification":[{"id":"…","bash":"…","proves":"…"}]}' | {{tool}} new --title "…"
+
+That is the whole point of creating tasks with the tool: a task written by \`new\`
+and then rewritten by hand is a task created by hand. A document that is refused
+writes nothing, and every complaint is reported at once. With nothing on stdin
+the template is written as before, for you to fill in.
+
 NEVER PICK THE NUMBER YOURSELF. \`new\` derives it from a scan of every branch and
 worktree, because another branch can hold the next number before any file for it
 exists — and two tasks with the same number surface only at merge time. \`max + 1\`
