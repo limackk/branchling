@@ -355,6 +355,18 @@ function planPayload(dir = BACKLOG_DIR) {
  * there is nothing to resolve. A reader who wants another worktree's backlog
  * starts a server in it — which is also the only arrangement in which the
  * answer and the tree it describes cannot drift apart.
+ *
+ * GIT IS NOT ASKED WHETHER THE BACKLOG EXISTS (TL-232). While the subject WAS
+ * resolved through the worktree list, a backlog outside any repository had no
+ * self entry to match, and every route answered
+ * `404 {"error":"No worktree of this repository is called ``"}` — a running
+ * server making a false claim about the tree it was pointed at, to the reader
+ * least able to tell: somebody who ran `init` minutes ago and has committed
+ * nothing yet. The subject is now the directory this process was started over,
+ * which exists whether or not git has heard of it, and no request handler
+ * shells out to git at all. `scripts/tests/serve-no-repository.test.mjs` sends
+ * the requests against a real server over a real tree with no repository above
+ * it; a handler that asks git again is how the 404 comes back.
  */
 
 async function handle(req, res) {

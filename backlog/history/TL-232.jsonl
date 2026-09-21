@@ -1,1 +1,4 @@
 {"id":"01M1NGPNR8RSH10G07KRKXVN1N","ts":"2026-09-04T06:11:40.424Z","task":"TL-232","field":"__created__","from":"","to":"The served viewer answers 404 when the backlog is not in a git repository","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-2bbffaec1a3e"}
+{"id":"01M32X1FN6P0G4MC3BT5NDWR6J","ts":"2026-09-21T21:13:06.982Z","task":"TL-232","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M32X1FN67CJZQ5NV8TQFDMJK","ts":"2026-09-21T21:13:06.982Z","task":"TL-232","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M32XP0H8VTGFS1SC5XMEQ10W","ts":"2026-09-21T21:24:19.624Z","task":"TL-232","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
