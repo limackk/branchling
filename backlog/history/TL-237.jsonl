@@ -1,3 +1,4 @@
 {"id":"01M1NM7VQ093PAK6PFDPTGZMH7","ts":"2026-09-04T07:13:29.312Z","task":"TL-237","field":"__created__","from":"","to":"new creates a task it cannot fill, against the fourth law","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-526f61f2043f"}
 {"id":"01M31XVMGRZ7Z0QXVMJN2HN2EK","ts":"2026-09-21T12:08:09.496Z","task":"TL-237","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown"}
 {"id":"01M31XVMGRYK726E6NT40QGV0S","ts":"2026-09-21T12:08:09.496Z","task":"TL-237","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M31ZKVJK06AQ27TJ738719GR","ts":"2026-09-21T12:38:51.731Z","task":"TL-237","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"The task document arrives on stdin or from --body-file, and a task created that way closes through done with no hand edit in between."}
