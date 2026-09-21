@@ -193,10 +193,29 @@ owes this paragraph another entry.
 exception; TL-137 translated both (145 files). That migration did **not**
 rename task files, because a filename migration is a separate, narrowly scoped
 change: it must preserve ids and update every path reference. That separation
-does not make non-English slugs acceptable indefinitely. **Every new filename,
-and every filename touched by a rename, uses a lowercase English slug.**
-Existing task filenames with Polish slugs are migrated by TL-385; history log
-filenames remain id-based and therefore need no language conversion.
+did not make non-English slugs acceptable indefinitely. **Every filename uses a
+lowercase English slug after its immutable id.** TL-385 renamed the 134
+historical task files that still carried a Polish one, with `git mv` so each
+rename is recorded as a rename, preserving every id and moving every path
+reference with it; history log filenames remain id-based and therefore needed no
+language conversion.
+
+**What a guard can prove here, and what it cannot.**
+`scripts/tests/task-filename-shape.test.mjs` judges the SHAPE — the id prefix
+from `config.yaml`, then lowercase ASCII words joined by single hyphens — and
+proves that the slug `new` generates has it, so a task created tomorrow
+conforms by construction rather than by review. It does not decide whether the
+words are English, and it says so in its own header: the deleted detector
+recognised one language, and a green result from it said nothing about any
+other. The language of a slug is a review responsibility, like every other
+sentence here.
+
+**A path that QUOTES a spelling is not a reference and does not move.** The
+migration rewrote 125 pointers and deliberately left two sentences alone —
+TL-45 and TL-138 each quote a filename as it was spelled on a given day, as the
+evidence for a claim about that day. `check --refs` already draws this line: it
+judges a filename written as a PATH and reads a bare name as data about a name.
+It is the distinction `renumber: allow` exists for.
 
 Other conventions:
 

@@ -1,7 +1,7 @@
 # branchling — state, synchronization and the boundary between modes
 
-**Status:** FOUNDATION IMPLEMENTED 2026-08-29 ([TL-21](../backlog/tasks/TL-21-fundament-logu-zdarzen-tasklog.md)) — **all 5 steps from §7 done; from §6, locks (TL-87, §6.1) and reading state across multiple branches (TL-73, §6.2) are done; §5 and the rest of §6 (reversing the direction, SQLite, the server) are still a project**
-**Concerns:** `backlog/` as the future `branchling` tool (working name — [TL-20](../backlog/tasks/TL-20-domknij-nazwe-narzedzia-przed-publikacja.md))
+**Status:** FOUNDATION IMPLEMENTED 2026-08-29 ([TL-21](../backlog/tasks/TL-21-foundation-of-the-worktrail-event-log-5-decisions-that.md)) — **all 5 steps from §7 done; from §6, locks (TL-87, §6.1) and reading state across multiple branches (TL-73, §6.2) are done; §5 and the rest of §6 (reversing the direction, SQLite, the server) are still a project**
+**Concerns:** `backlog/` as the future `branchling` tool (working name — [TL-20](../backlog/tasks/TL-20-close-the-tool-s-name-before-open-source-publication.md))
 **Predecessors:** [backlog-field-editing-history.md](backlog-field-editing-history.md) (the field change log), [backlog-config-and-portability.md](backlog-config-and-portability.md) (separating code from data)
 
 ---
@@ -78,7 +78,7 @@ measured at all. §9 assumption 4.
 
 ## 3. What we already have (and did not know we had)
 
-[TL-17](../backlog/tasks/TL-17-historia-zmian-pol-taska-z-autorem.md)
+[TL-17](../backlog/tasks/TL-17-show-the-change-history-of-a-task-s-fields-with-the-author.md)
 introduced a history entry shaped like this:
 
 ```json
@@ -359,7 +359,7 @@ with agents, i.e. for the open-source core.
 
 ## 7. Schema decisions — cheap today, irreversible after the first outside user
 
-These points are in [TL-21](../backlog/tasks/TL-21-fundament-logu-zdarzen-tasklog.md).
+These points are in [TL-21](../backlog/tasks/TL-21-foundation-of-the-worktrail-event-log-5-decisions-that.md).
 Why they are TOGETHER despite differing in weight: 1–3 pay off even if the
 server never gets built (they solve pain measured today), and 4–5 cost one
 line today, and after release — a migration of other people's data.

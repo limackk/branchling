@@ -29,7 +29,7 @@ verification:
 ## Context
 
 Found on 2026-09-02 while working on
-[TL-83](TL-83-wejscie-komend-piszacych-enumy-ze-slownikow-i-append.md), which
+[TL-83](TL-83-input-surface-of-writing-commands-enums-from-dictionaries.md), which
 made the WRITING commands describe and enforce their vocabularies. The reading
 side was left as it was:
 

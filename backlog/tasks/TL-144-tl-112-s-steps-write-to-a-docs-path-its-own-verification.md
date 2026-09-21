@@ -18,7 +18,7 @@ related_docs:
   - docs/license-and-contributions.md
 verification:                      # HOW to check that the task is really done
   - id: no-stale-path
-    bash: "! grep -q 'licencja-i-kontrybucje' backlog/tasks/TL-112-model-kontrybucji-i-granica-open-chmura-decyzja-z-terminem.md"
+    bash: "! grep -q 'licencja-i-kontrybucje' backlog/tasks/TL-112-contribution-model-and-the-open-cloud-boundary-a-decision.md"
 ---
 
 ## Goal

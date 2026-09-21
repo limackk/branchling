@@ -27,7 +27,7 @@ run, and a failure says which check failed rather than only `1 !== 0`.
 ## Context
 
 Observed on 2026-09-02 while closing
-[TL-84](TL-84-rozstrzygnac-i-zapisac-czy-reczna-edycja-pliku-taska-jest.md).
+[TL-84](TL-84-decide-and-record-is-manually-editing-a-task-file-a.md).
 Three consecutive full runs of the suite gave: green, one failure, green. Two
 different tests failed on different runs:
 

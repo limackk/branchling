@@ -30,7 +30,7 @@ window.
 ## Context
 
 Found on 2026-09-02 while building
-[TL-92](TL-92-tasklog-session-raport-z-sesji-agenta.md). That task's own context
+[TL-92](TL-92-worktrail-session-report-from-an-agent-s-session.md). That task's own context
 anticipated this exactly: *"correlating with a session requires the hook to also
 record a session identifier on a field change — if TL-28 did not provide for
 that, report it there, do not work around it here."* TL-28 did not, so this is

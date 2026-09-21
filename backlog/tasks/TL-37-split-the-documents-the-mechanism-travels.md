@@ -79,7 +79,7 @@ reasoning and there is no reason to maim it — this task does not edit a
 single file in the origin repository.
 
 The scope does NOT include translation — that is
-[TL-32](TL-32-angielska-powierzchnia-publiczna-modulu.md). Both tasks
+[TL-32](TL-32-english-public-surface-of-the-module.md). Both tasks
 rewrite the same files, so **sequentially, not in parallel**.
 
 ## Pre-flight reading

@@ -49,7 +49,7 @@ that is missing: *is there a change on disk that the log has not recorded?*
 would make a DIAGNOSIS write to the log, and `doctor` fixes nothing by design —
 its own header says so. It would also attribute the change to whoever happened
 to run `doctor`, which is the defect
-[TL-130](TL-130-reconcile-serwera-podpisuje-cudze-zmiany-jako-unknown.md)
+[TL-130](TL-130-the-server-s-reconcile-signs-someone-else-s-changes-as.md)
 already describes on the server's side. The row reports; the person decides who
 signs it.
 

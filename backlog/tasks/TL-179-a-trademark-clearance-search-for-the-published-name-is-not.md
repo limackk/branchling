@@ -49,7 +49,7 @@ fact about one organisation, this one is a search across legal registers whose
 result may be that a professional has to run it.
 
 **Why it decides something.**
-[TL-81](TL-81-kanaly-dystrybucji-i-kolizja-nazwy-tasklog-w-npx.md) raised the  <!-- former-name: allow -->
+[TL-81](TL-81-distribution-channels-and-the-worktrail-name-collision-in.md) raised the  <!-- former-name: allow -->
 name from a label to a business asset with an argument that only works one way
 round: under MIT, the licence does not stop a competitor standing a service up
 on this code, so **the name is the only thing stopping them standing it up
@@ -75,7 +75,7 @@ no scope attached is the shape of answer that gets re-asked at every release.
 ## Pre-flight reading
 
 1. `backlog/tasks/TL-169-the-name-worktrail-is-already-a-github-organisation-the.md` — the `## Findings` section: who TaPo-IT OG are, what they operate, and exactly which register lookups failed and how.  <!-- former-name: allow -->
-2. `backlog/tasks/TL-81-kanaly-dystrybucji-i-kolizja-nazwy-tasklog-w-npx.md` — the argument that makes the name a business asset rather than a label.  <!-- former-name: allow -->
+2. `backlog/tasks/TL-81-distribution-channels-and-the-worktrail-name-collision-in.md` — the argument that makes the name a business asset rather than a label.  <!-- former-name: allow -->
 3. `docs/license-and-contributions.md` §3 — the open/cloud line, which is the class of goods the search has to cover.
 4. `.claude/skills/branchling-release/SKILL.md` §7 — where the finding belongs once it exists.
 
@@ -84,7 +84,7 @@ no scope attached is the shape of answer that gets re-asked at every release.
 1. Settle the scope first: which registers (EUIPO, USPTO, WIPO/Madrid at minimum, given an Austrian incumbent and a US-facing launch) and which Nice classes (9 and 42 for software and SaaS). Write the scope down before searching, so the result has a boundary.
 2. Choose the route — a credentialed API, a manual search a person runs, or a paid clearance — and record why the others were rejected.
 3. Run it for the name currently in `package.json`, and record each result with its query, its date and its source. Include a direct look for TaPo-IT OG as proprietor.
-4. If a mark is found, do not decide the consequence here: hand it back to the naming decision in [TL-20](TL-20-domknij-nazwe-narzedzia-przed-publikacja.md) the way TL-169 does.
+4. If a mark is found, do not decide the consequence here: hand it back to the naming decision in [TL-20](TL-20-close-the-tool-s-name-before-open-source-publication.md) the way TL-169 does.
 5. Add the check to the pre-publication gate as a step with a route attached, so the next name is not cleared with a `curl` that cannot reach a register.
 
 ## Acceptance criteria

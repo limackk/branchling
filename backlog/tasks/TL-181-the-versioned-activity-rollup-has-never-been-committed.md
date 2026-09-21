@@ -47,7 +47,7 @@ there.
 working tree is exactly the failure the first law exists to prevent: it does not
 travel with the branch, so any report computed from it on another machine is
 computed from nothing and cannot tell. It is the same shape of defect as
-[TL-43](TL-43-log-historii-bywa-niesledzony-w-gicie-bramka-na-zapisie.md), which
+[TL-43](TL-43-the-history-log-sometimes-goes-untracked-in-git-the-write.md), which
 put a guard on the history log for the same reason — and that guard does not
 cover this directory.
 
@@ -62,8 +62,8 @@ plus a guard so it cannot silently drift out of the tree again.
 
 1. `backlog/.gitignore` — the rule and the comment that states the intent.
 2. `backlog/activity/rollup/*.json` — what a rollup entry actually contains, which is what decides the privacy question.
-3. `backlog/tasks/TL-43-log-historii-bywa-niesledzony-w-gicie-bramka-na-zapisie.md` — the same defect for the history log, and the guard that closed it.
-4. `backlog/tasks/TL-35-surowy-log-aktywnosci-do-katalogu-domowego.md` — why the RAW log went to the home directory in the first place.
+3. `backlog/tasks/TL-43-the-history-log-sometimes-goes-untracked-in-git-the-write.md` — the same defect for the history log, and the guard that closed it.
+4. `backlog/tasks/TL-35-raw-activity-log-moves-to-the-home-directory.md` — why the RAW log went to the home directory in the first place.
 
 ## Steps
 

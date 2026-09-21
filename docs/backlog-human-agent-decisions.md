@@ -1,14 +1,14 @@
 # Backlog — human/agent executor, decision log, panel and graph
 
 **Status:** PLANNED 2026-09-01
-([TL-113](../backlog/tasks/TL-113-pole-executor-wymog-czlowieka-egzekwowany-w-dyspozytorze.md),
-[TL-114](../backlog/tasks/TL-114-zdarzenie-decision-i-komenda-tasklog-decide.md),
-[TL-115](../backlog/tasks/TL-115-panel-decyzyjny-w-viewerze-co-czeka-na-czlowieka.md),
-[TL-116](../backlog/tasks/TL-116-graf-zmian-taska-w-viewerze-z-osi-historii.md))
+([TL-113](../backlog/tasks/TL-113-executor-field-human-requirement-enforced-in-the-dispatcher.md),
+[TL-114](../backlog/tasks/TL-114-the-decision-event-and-the-worktrail-decide-command.md),
+[TL-115](../backlog/tasks/TL-115-decision-panel-in-the-viewer-what-is-waiting-on-a-human.md),
+[TL-116](../backlog/tasks/TL-116-task-change-graph-in-the-viewer-built-from-the-history-axis.md))
 **Builds on:** roles and handoff
-([TL-97](../backlog/tasks/TL-97-pole-role-taska-wymog-roli-ze-slownika-konfiguracji.md),
-[TL-98](../backlog/tasks/TL-98-role-w-dyspozytorze-i-petli-next-role-agent-per-rola.md),
-[TL-99](../backlog/tasks/TL-99-tasklog-handoff-przekazanie-taska-z-powodem-i-sladem.md))
+([TL-97](../backlog/tasks/TL-97-task-role-field-role-requirement-from-the-configuration.md),
+[TL-98](../backlog/tasks/TL-98-roles-in-the-dispatcher-and-the-loop-next-role-agent-per.md),
+[TL-99](../backlog/tasks/TL-99-worktrail-handoff-handing-off-a-task-with-a-reason-and-a.md))
 and the history mechanism ([backlog-field-editing-history.md](backlog-field-editing-history.md)).
 
 ---
@@ -105,7 +105,7 @@ nodes are significant events (creation, status transitions, handoffs,
 questions, decisions), other field changes are collapsed; a question→decision
 pair is linked via `resolves`; color distinguishes `agent:`, a human, and
 `unknown`. The history fold is shared with the board time-lapse
-([TL-91](../backlog/tasks/TL-91-time-lapse-boardu-odtwarzany-z-logu-zdarzen.md))
+([TL-91](../backlog/tasks/TL-91-board-time-lapse-replayed-from-the-event-log.md))
 — two separate folds would drift in their definitions. The data boundary is
 explicit: history starts on 2026-08-30 and the graph does not hide that.
 

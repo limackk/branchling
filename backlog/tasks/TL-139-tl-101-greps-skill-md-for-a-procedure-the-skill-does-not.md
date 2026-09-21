@@ -58,7 +58,7 @@ The decision is between three, and it is a decision, not a repair:
 
 - `.claude/skills/backlog-workflow/SKILL.md` — what the skill deliberately does
   NOT contain, and why.
-- `backlog/tasks/TL-101-skill-backlog-workflow-take-i-close-zamiast-recznej-edycji.md`
+- `backlog/tasks/TL-101-skill-backlog-workflow-take-and-close-instead-of-manual.md`
   — the contract and the scope it was written for.
 - `scripts/instructions.mjs` — the topics that now carry the procedure.
 

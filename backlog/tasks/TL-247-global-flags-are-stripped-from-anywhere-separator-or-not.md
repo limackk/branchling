@@ -61,7 +61,7 @@ ALREADY stops at `--` (`scripts/cli.mjs`, the `passthrough` branch), and so does
 differently is a defect rather than a design.
 
 This surfaced while writing the failing test for
-[TL-58](TL-58-wartosc-zaczynajaca-sie-od-myslnika-oblewa-w-tasklog-new.md) and  <!-- former-name: allow -->
+[TL-58](TL-58-a-value-starting-with-a-dash-fails-in-worktrail-new.md) and  <!-- former-name: allow -->
 was deliberately kept OUT of it: TL-58 is one command's parser, this is the
 dispatcher every command passes through, and a test that demanded both would
 have made a two-hour task into a rewrite of the argument layer.

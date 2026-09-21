@@ -39,7 +39,7 @@ fact nobody had looked for: **`github.com/worktrail` exists.**
 `api.github.com/users/worktrail` returns 200 — `"type": "Organization"`,
 `"name": "WorkTrail"`, created 2013-04-05, 6 public repositories.
 
-[TL-81](TL-81-kanaly-dystrybucji-i-kolizja-nazwy-tasklog-w-npx.md) settled the
+[TL-81](TL-81-distribution-channels-and-the-worktrail-name-collision-in.md) settled the
 name against ONE registry. It measured npm thoroughly — `worktrail` 404, zero
 search hits, the typo neighbourhood free, no Homebrew formula — and concluded
 the name was clear. That check was necessary and is not being reopened: `npx
@@ -63,14 +63,14 @@ task is to find out which:
    and the finding is recorded together with the reason it was accepted.
 3. A live product in developer tooling or project management. Then the name
    costs more than it returns, and this task hands a rename back to the
-   decision that chose it ([TL-20](TL-20-domknij-nazwe-narzedzia-przed-publikacja.md)).
+   decision that chose it ([TL-20](TL-20-close-the-tool-s-name-before-open-source-publication.md)).
 
 The window is the same one TL-81 named: the name is exchangeable until the
 first publication, and only until then.
 
 ## Pre-flight reading
 
-1. `backlog/tasks/TL-81-kanaly-dystrybucji-i-kolizja-nazwy-tasklog-w-npx.md` — what was measured about the name, and the reasoning that made it a business asset rather than a label.
+1. `backlog/tasks/TL-81-distribution-channels-and-the-worktrail-name-collision-in.md` — what was measured about the name, and the reasoning that made it a business asset rather than a label.
 2. `docs/license-and-contributions.md` §3 — where the open/cloud line runs, which is why the name matters commercially.
 3. `.claude/skills/branchling-release/SKILL.md` §7 — the pre-publication name checks as they stand; this task's finding belongs there.
 
@@ -126,7 +126,7 @@ same shelf this tool is on — and it is the shelf the paid side of
 §3 is aimed at: work entries, reports, time sheets, team management.
 
 **The collision was already known, and was discounted on a premise that is
-false.** [TL-20](TL-20-domknij-nazwe-narzedzia-przed-publikacja.md)'s candidate
+false.** [TL-20](TL-20-close-the-tool-s-name-before-open-source-publication.md)'s candidate
 table of 2026-08-29 records the row `worktrail / tasktrail | free | free |
 taken / —`. The reversal of 2026-09-01 named that fact and dismissed it twice:
 `worktrail` "lost back then only on a taken GitHub account", and "GitHub: 17
@@ -146,7 +146,7 @@ free before: npm 404, PyPI 404, Homebrew 404, GitLab group 404, Docker Hub 404
 
 **What was NOT established: the trademark.** Whether TaPo-IT OG holds a
 registered mark on "WorkTrail" is the fact that decides whether this name can
-ever be the business asset [TL-81](TL-81-kanaly-dystrybucji-i-kolizja-nazwy-tasklog-w-npx.md)
+ever be the business asset [TL-81](TL-81-distribution-channels-and-the-worktrail-name-collision-in.md)
 argued it must be — and it could not be checked from here. The registers are
 not machine-queryable without credentials: USPTO's search API refuses POST,
 Justia is behind a Cloudflare challenge, WIPO's Global Brand Database serves
@@ -158,7 +158,7 @@ connection. That is a gap, not an absence of a mark, and it is
 
 - **The name is REOPENED, and this task does not choose a new one.** Outcome 3
   is what the evidence says, and the task's own framing sends outcome 3 back to
-  [TL-20](TL-20-domknij-nazwe-narzedzia-przed-publikacja.md). Choosing a name is
+  [TL-20](TL-20-close-the-tool-s-name-before-open-source-publication.md). Choosing a name is
   that task's work, with the criteria the release gate now carries; doing it
   here would settle in passing the one thing this task exists to hand over.
 - **The decisive argument is identity, not law.** It holds whether or not
@@ -189,7 +189,7 @@ connection. That is a gap, not an absence of a mark, and it is
   would not undo a forge namespace, a store listing and a review-site profile
   already pointing elsewhere.
 - **The cost of reopening is at its historical minimum and only rises.** Nothing
-  is published, npm is still 404, and [TL-117](TL-117-nazwa-produktu-z-jednej-stalej-a-nie-z-literalu.md)
+  is published, npm is still 404, and [TL-117](TL-117-product-name-from-a-single-constant-not-from-a-literal.md)
   has already pulled the name into `scripts/product.mjs`, so this is no longer
   the 158-file change the `tasklog` → `worktrail` pass was. The window TL-81
   named closes at the first publish, and it is still open.

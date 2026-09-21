@@ -1,6 +1,6 @@
 # Backlog — field editing and change history
 
-**Status:** IMPLEMENTED 2026-08-29 ([TL-16](../backlog/tasks/TL-16-edycja-kazdego-pola-taska-w-viewerze.md), [TL-17](../backlog/tasks/TL-17-historia-zmian-pol-taska-z-autorem.md))
+**Status:** IMPLEMENTED 2026-08-29 ([TL-16](../backlog/tasks/TL-16-edit-every-task-field-with-a-click-in-the-viewer.md), [TL-17](../backlog/tasks/TL-17-show-the-change-history-of-a-task-s-fields-with-the-author.md))
 **Code SSOT:** `backlog/scripts/task-fields.mjs`, `backlog/scripts/history.mjs`, `backlog/scripts/serve-backlog.mjs`, `backlog/scripts/build-viewer.mjs`
 **Tests:** `node --test backlog/scripts/tests/task-fields.test.mjs backlog/scripts/tests/history.test.mjs`
 

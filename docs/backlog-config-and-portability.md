@@ -1,6 +1,6 @@
 # Backlog — separating code from data, and configuration
 
-**Status:** IMPLEMENTED 2026-08-29 ([TL-18](../backlog/tasks/TL-18-katalog-danych-backlogu-jako-argument.md), [TL-19](../backlog/tasks/TL-19-slowniki-backlogu-do-konfiguracji.md))
+**Status:** IMPLEMENTED 2026-08-29 ([TL-18](../backlog/tasks/TL-18-detach-the-backlog-data-directory-from-the-code-s-location.md), [TL-19](../backlog/tasks/TL-19-move-the-backlog-s-vocabularies-out-of-the-code-and-into.md))
 **Code SSOT:** `backlog/scripts/paths.mjs`, `backlog/scripts/config.mjs`, `backlog/config.yaml`
 **Tests:** `node --test backlog/scripts/tests/paths.test.mjs backlog/scripts/tests/config.test.mjs`
 
@@ -269,7 +269,7 @@ compatibility alias `scripts/backlog`, the `npm run backlog` script and the
 `backlog` shell alias were removed on 2026-08-29 by the founder's decision —
 two names for one tool would have kept the old one alive in documents and
 muscle memory. The name is **not settled** — the decision and a possible npm
-reservation: [TL-20](../backlog/tasks/TL-20-domknij-nazwe-narzedzia-przed-publikacja.md).
+reservation: [TL-20](../backlog/tasks/TL-20-close-the-tool-s-name-before-open-source-publication.md).
 The `backlog/` directory, file names and `project_name` in the configuration
 were left untouched; `project_name` describes A BACKLOG, not the tool.
 

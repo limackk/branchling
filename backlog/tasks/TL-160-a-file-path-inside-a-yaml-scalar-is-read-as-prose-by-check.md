@@ -31,7 +31,7 @@ or renaming the file the path points at.
 ## Context
 
 Hit on 2026-09-02 while closing
-[TL-68](TL-68-log-mowi-done-frontmatter-mowi-pending-nikt-tego-nie-lapie.md).
+[TL-68](TL-68-the-log-says-done-the-frontmatter-says-pending-nothing.md).
 A verification entry that greps a task's own file:
 
 ```yaml

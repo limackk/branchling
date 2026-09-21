@@ -72,8 +72,12 @@ Four things, and each of them is a rule this project has paid for:
 
 Everything in the repository is written in English, including the backlog,
 filenames and commit messages. Task files use lowercase English slugs after
-their immutable ids. `check --language` enforces the source and documents;
-TL-385 migrates the remaining historical task filenames.
+their immutable ids — TL-385 renamed the last 134 that did not. No guard
+decides whether prose is English; the one that tried recognised a single
+language and was removed for it, so the language of a sentence, a filename or a
+commit title is settled in review. `node --test
+scripts/tests/task-filename-shape.test.mjs` enforces the SHAPE a filename must
+have, and that `new` generates one.
 
 ---
 
