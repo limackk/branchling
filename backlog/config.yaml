@@ -83,7 +83,25 @@ labels: []
 labels_closed: false
 
 owners: [unassigned]
-estimates: [30m, 2h, 1d, 1w]
+
+# How big a task is, ORDERED — the order is the whole meaning of the list.
+# `max_unattended_estimate` below compares by POSITION, never by parsing hours,
+# so a scale this project has not stated is never invented by the code.
+#
+# TL-244 widened the list from [30m, 2h, 1d, 1w] to fit the tree rather than
+# rewriting the tree to fit the list. 79 task files carried `1h`, `3h` or `4h`,
+# and `4h` — the commonest of the three — sits between two words that were
+# declared. The vocabulary is FREE, so those tasks were never a validation
+# failure; they were invisible to the size gate, which is the one reader that
+# goes by position. `scripts/estimate.mjs` already mapped all three to hours, so
+# every other reader — the viewer, the critical path, every sum — had been
+# treating them as real durations all along.
+#
+# Rewriting them onto the four declared words was rejected: an estimate is a
+# JUDGEMENT somebody made, and `4h` rewritten to `2h` makes the file assert a
+# judgement nobody ever made, in 79 files, including closed ones that every
+# estimate-weighted report reads.
+estimates: [30m, 1h, 2h, 3h, 4h, 1d, 1w]
 
 # The largest estimate `next` and `run` may hand to an unattended session
 # (TL-211). Above means LATER IN `estimates`, so this gates `1w` and nothing
@@ -92,8 +110,11 @@ estimates: [30m, 2h, 1d, 1w]
 #
 # `1d` because both tasks that provoked the key are `1w`: TL-137 was handed back
 # twice by the same run, and TL-149 states in its own text that it needs a
-# session of its own. An estimate this list has not got — `4h`, `3h` — has no
-# position in the order and is never gated.
+# session of its own. An estimate `estimates:` has not got still has no position
+# in the order and is never gated — that is unchanged by TL-244, which put the
+# three words the tree was actually using INTO the list rather than widening the
+# rule. Nothing crossed the threshold as a result: all three sit below `1d`, so
+# `1w` is still the only thing this gates.
 max_unattended_estimate: 1d
 
 # History actors — the namespace is mandatory:

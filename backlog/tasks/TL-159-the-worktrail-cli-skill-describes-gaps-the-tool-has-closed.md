@@ -9,7 +9,7 @@ priority: P3                       # P0 blocker | P1 critical | P2 nice | P3 bac
 status: done  # pending | in_progress | blocked | done | cancelled
 owner: agent:claude
 executor: ""
-estimate: 30m                       # 30m | 2h | 1d | 1w | 1mo
+estimate: 30m                       # 30m | 1h | 2h | 3h | 4h | 1d | 1w
 created: 2026-09-02
 updated: 2026-09-21
 blocked_by: []
