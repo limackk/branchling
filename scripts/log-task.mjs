@@ -52,7 +52,7 @@ import { backlogPaths, resolveBacklogDirOrExit } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import {
   FIELD_COMMENT, FIELD_DECISION, REASON_SENTINELS,
-  extractMeta, historyEntryKind, isPseudoField, isQuestion, splitFrontmatter,
+  extractMeta, historyEntryKind, isPseudoField, isQuestion, openQuestions, splitFrontmatter,
 } from "./task-fields.mjs";
 import { MARK, color, failure, heading, table } from "./ui.mjs";
 
@@ -138,6 +138,35 @@ export function foldExchanges(entries) {
   return out;
 }
 
+/**
+ * The exchanges that SETTLED something, plus the ones still waiting to be
+ * settled. PURE (TL-396).
+ *
+ * WHY THIS LIVES ON `log` AND NOT ON `decide`. `decide --help` advertised
+ * `decide <ID> [--json]` as "the decision and what remains unanswered, for a
+ * program", and the command refused it: with no `--reason` it has nothing to
+ * record, which is a usage error, not a request to read. Making the absence of
+ * a flag select a READING mode is worse than the `history --show` that TL-256
+ * already rejected — a `--reason` dropped by a shell would stop refusing and
+ * start printing, exit 0, with nothing written. So the promise is kept on the
+ * command that reads.
+ *
+ * WHAT IS KEPT, and why both halves. A `__decision__` is the answer; a
+ * `__comment__` asked as a question and pointed at by nothing is the part that
+ * is still open — "what remains unanswered" is not a separate report, it is the
+ * same list seen before its other half arrives. An ANSWERED question is left
+ * out: its text is in the decision that resolves it, and the full log is one
+ * flag away.
+ *
+ * @param {object[]} exchanges what `foldExchanges` returned
+ * @param {object[]} entries the raw history — `openQuestions` needs the pairs
+ */
+export function onlyDecisions(exchanges, entries) {
+  const open = new Set(openQuestions(entries).map((e) => String(e.id || "")));
+  return (exchanges || []).filter((x) =>
+    (x.messages || []).some((m) => m.kind === "decision" || (m.kind === "question" && open.has(m.id))));
+}
+
 // ──────────────────────────────────────────────────────────────────────────
 // Rendering
 // ──────────────────────────────────────────────────────────────────────────
@@ -187,14 +216,26 @@ export function renderLog(model) {
       model.path + " yet.");
     return out.join("\n");
   }
+  const matched = Number.isInteger(model.matched) ? model.matched : model.total;
   out.push("  " + color.dim(
     model.records + " record(s) folded into " + model.total + " exchange(s)" +
-    (model.limit && model.total > model.exchanges.length
+    (model.decisions
+      ? ", " + matched + " carrying a decision or an open question"
+      : "") +
+    (model.limit && matched > model.exchanges.length
       ? ", the newest " + model.exchanges.length + " shown"
       : "") +
     " — " + model.path
   ));
   out.push("");
+  // NOTHING DECIDED IS AN ANSWER, and it has to be said rather than shown as an
+  // empty screen: a reader who cannot tell "no decisions" from "the filter
+  // broke" has to go and read the whole log to find out, which is the cost this
+  // command exists to remove.
+  if (model.decisions && !model.exchanges.length) {
+    out.push("  " + model.id + " has recorded no decision and carries no open question.");
+    return out.join("\n");
+  }
   // The headlines are aligned against EACH OTHER, so the times, the actors and
   // the sources form columns a reader can scan down. That means one `table`
   // call over every row, cut back into lines afterwards — a table per row would
@@ -216,9 +257,9 @@ export function renderLog(model) {
       for (const line of (m.text || "").split("\n")) if (line) out.push("      " + line);
     }
   });
-  if (model.limit && model.total > model.exchanges.length) {
+  if (model.limit && matched > model.exchanges.length) {
     out.push("");
-    out.push("  " + color.dim("earlier exchanges: " + (model.total - model.exchanges.length) +
+    out.push("  " + color.dim("earlier exchanges: " + (matched - model.exchanges.length) +
       " — drop `--limit` to read them"));
   }
   return out.join("\n");
@@ -229,7 +270,7 @@ export function renderLog(model) {
 // ──────────────────────────────────────────────────────────────────────────
 
 const KNOWN_WITH_VALUE = ["--dir", "--limit"];
-const KNOWN_BARE = ["--json"];
+const KNOWN_BARE = ["--json", "--decisions"];
 
 export function parseLogArgs(argv) {
   const rest = [...argv];
@@ -237,6 +278,7 @@ export function parseLogArgs(argv) {
   let dir = null;
   let limit = null;
   let json = false;
+  let decisions = false;
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
     if (!a.startsWith("--")) {
@@ -245,6 +287,7 @@ export function parseLogArgs(argv) {
       continue;
     }
     if (a === "--json") { json = true; continue; }
+    if (a === "--decisions") { decisions = true; continue; }
     if (KNOWN_WITH_VALUE.indexOf(a) !== -1) {
       const value = rest[++i];
       if (value === undefined) throw new Error(a + " needs a value");
@@ -258,10 +301,10 @@ export function parseLogArgs(argv) {
       continue;
     }
     throw new Error("unknown flag: " + a +
-      "\navailable: --limit <n> --json --dir <path>");
+      "\navailable: --limit <n> --decisions --json --dir <path>");
   }
-  if (!id) throw new Error("no task id\nusage: " + N + " log <ID> [--limit <n>] [--json]");
-  return { id, dir, limit, json };
+  if (!id) throw new Error("no task id\nusage: " + N + " log <ID> [--limit <n>] [--decisions] [--json]");
+  return { id, dir, limit, json, decisions };
 }
 
 export function run(argv) {
@@ -307,18 +350,24 @@ export function run(argv) {
 
   const entries = readHistory(root, id);
   const all = foldExchanges(entries);
+  // THE FILTER RUNS BEFORE THE SLICE. `--limit 3 --decisions` means the three
+  // newest DECISIONS; slicing first would hand back three exchanges of which
+  // none need be one.
+  const kept = plan.decisions ? onlyDecisions(all, entries) : all;
   // THE NEWEST ARE THE ONES KEPT. `--limit` exists for the context budget, and
   // a session asking what was decided is asking about the last thing decided.
-  const exchanges = plan.limit ? all.slice(Math.max(0, all.length - plan.limit)) : all;
+  const exchanges = plan.limit ? kept.slice(Math.max(0, kept.length - plan.limit)) : kept;
   const model = {
     id, title, file, path: relative(root, logFile),
-    records: entries.length, total: all.length, exchanges, limit: plan.limit,
+    records: entries.length, total: all.length, matched: kept.length,
+    exchanges, limit: plan.limit, decisions: plan.decisions,
   };
 
   if (plan.json) {
     printJson("task-log", {
       ok: true, id, title, file, path: model.path,
-      records: model.records, total: model.total, limit: plan.limit, exchanges,
+      records: model.records, total: model.total, matched: model.matched,
+      decisions: plan.decisions, limit: plan.limit, exchanges,
     });
     return 0;
   }

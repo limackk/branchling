@@ -68,14 +68,16 @@ const CLI = join(SCRIPTS_DIR, "cli.mjs");
  * decision, because a successor that starts work on a task waiting for an
  * answer has wasted the whole session; (2) the Goal, which says what "done"
  * means; (3) what changed since the take, which says who else has touched it;
- * (4) the branch diff, which is the code the dead session wrote; (5) the
- * contract, which says how far it got.
+ * (4) the branch's work, which is the code the dead
+ * session wrote — in a commit AND on disk, because a session that was killed
+ * did not choose the moment it stopped (TL-272); (5) the contract, which says
+ * how far it got.
  */
 const HEADINGS = [
   "## Open questions and decisions",
   "## Goal",
   "## Since the take",
-  "## Diff against the merge base",
+  "## The branch's work — committed, and not yet committed",
   "## Verification",
 ];
 
@@ -88,6 +90,13 @@ const GOAL_MARKER = "GOAL-MARKER-the-parser-must-accept-an-empty-file";
 const QUESTION_MARKER = "QUESTION-MARKER: one file or two";
 const BRANCH_MARKER = "BRANCH_MARKER_written_by_the_dead_session";
 const FOREIGN_MARKER = "FOREIGN_MARKER_somebody_elses_commit";
+// The two halves of what a KILLED session leaves behind (TL-272): an edit to a
+// file git already tracks, and a file git has never heard of. They are separate
+// markers because they are separate states, reached by separate git commands,
+// and a briefing that reported one of them would pass a test written around the
+// other.
+const DIRTY_MARKER = "DIRTY_MARKER_edited_but_never_committed";
+const UNTRACKED_FILE = join("src", "UNTRACKED_FILE_never_added.mjs");
 
 function cli(root, state, args) {
   const r = spawnSync(process.execPath, [CLI, ...args], {
@@ -199,6 +208,14 @@ function fixture() {
   writeFileSync(join(root, "unrelated.txt"), FOREIGN_MARKER + "\n", "utf8");
   commit(root, "somebody else's commit, on main, after the session died");
   assert.equal(git(root, ["checkout", "-q", "tl-1-work"]).code, 0);
+
+  // AND THEN THE SESSION IS KILLED, mid-edit (TL-272). It did not choose the
+  // moment it stopped, so the last two things it wrote are in the working tree
+  // and in no commit at all: one edit to a file the branch already committed,
+  // and one file nobody has ever added.
+  writeFileSync(join(root, "src", "parser.mjs"),
+    "export const " + BRANCH_MARKER + " = 1;\nexport const " + DIRTY_MARKER + " = 2;\n", "utf8");
+  writeFileSync(join(root, UNTRACKED_FILE), "export const half_written = true;\n", "utf8");
 
   return { root, state, id, file, unclaimedId, unclaimedFile, nobody };
 }
@@ -323,6 +340,96 @@ test("the diff is against the merge base, so main's own movement stays out of it
     assert.match(section(r.stdout, HEADINGS[3]), new RegExp(BRANCH_MARKER));
     assert.doesNotMatch(r.stdout, new RegExp(FOREIGN_MARKER),
       "somebody else's commit on main was reported as this session's work");
+  });
+});
+
+/**
+ * WHAT A KILLED SESSION LEAVES BEHIND (TL-272).
+ *
+ * The committed range is the right answer to "what has this branch done that
+ * `main` has not", and it is NOT the whole answer to the question `resume` is
+ * asked. A session that was killed did not choose the moment it stopped, so the
+ * most recent thing it wrote is exactly the thing least likely to be in a
+ * commit — and the briefing used to answer `No commit on this branch since the
+ * merge base.` to a tree with an hour of edits in it.
+ *
+ * FOUR STATES, NOT TWO, and the tests below are one argument that the briefing
+ * separates all four: committed work; a tracked file edited and never
+ * committed; a file created and never added; and a clean tree, which is itself
+ * two different facts — clean because everything landed in a commit, and clean
+ * because nothing was ever written. A briefing that printed one sentence for
+ * the last two would be telling a successor with an hour of work behind it the
+ * same thing it tells one starting from nothing.
+ */
+test("the uncommitted half reaches the briefing, told apart from the committed half", () => {
+  withFixture((f) => {
+    const r = resume(f);
+    assert.equal(r.code, 0, r.all);
+    const work = section(r.stdout, HEADINGS[3]);
+
+    // The committed range TL-151 built is still there and still first: it is
+    // the right answer to its own question and this task does not replace it.
+    assert.match(work, new RegExp(BRANCH_MARKER), "the committed work left the briefing");
+    assert.match(work, new RegExp(DIRTY_MARKER),
+      "an edit the dead session never committed is invisible to its successor");
+    assert.match(work, new RegExp(UNTRACKED_FILE.replace(/[\\/]/g, "[\\\\/]")),
+      "a file the dead session created and never added is invisible to its successor");
+
+    // AND A SUCCESSOR CAN TELL WHICH IS WHICH. Mistaking an uncommitted edit
+    // for a landed one is worse than not being shown it: it is the difference
+    // between work that survives a `git checkout` and work that does not.
+    const committedAt = work.indexOf(BRANCH_MARKER);
+    const dirtyAt = work.indexOf(DIRTY_MARKER);
+    const untrackedAt = work.indexOf(UNTRACKED_FILE);
+    assert.ok(committedAt < dirtyAt, "the committed half does not come first");
+    const label = work.slice(committedAt, dirtyAt);
+    assert.match(label, /not yet committed/i,
+      "nothing between the committed work and the uncommitted work says which is which:\n" + work);
+    assert.match(work.slice(dirtyAt, untrackedAt + UNTRACKED_FILE.length), /untracked/i,
+      "a file that was never added is not told apart from one that was edited:\n" + work);
+  });
+});
+
+test("POSITIVE CONTROL: committing the same work empties the uncommitted half", () => {
+  withFixture((f) => {
+    // WITHOUT THIS the test above is satisfied by a section that prints the
+    // working tree unconditionally, which is a section that can never say a
+    // tree is clean.
+    commit(f.root, "the successor commits what the dead session left on disk");
+    const r = resume(f);
+    assert.equal(r.code, 0, r.all);
+    const work = section(r.stdout, HEADINGS[3]);
+
+    // The SAME two markers, now in the committed half — so the assertion below
+    // is about where they are reported, not about whether they exist.
+    assert.match(work, new RegExp(DIRTY_MARKER), "the committed work is missing after a commit");
+    const committedHalf = work.slice(0, work.search(/not yet committed/i) + 1 || work.length);
+    assert.ok(committedHalf.includes(DIRTY_MARKER),
+      "work that IS committed was still reported as uncommitted:\n" + work);
+    assert.doesNotMatch(work.slice(work.search(/not yet committed/i)), new RegExp(UNTRACKED_FILE),
+      "a file that has been added and committed is still listed as untracked:\n" + work);
+  });
+});
+
+test("POSITIVE CONTROL: a tree clean because it was committed reads differently from one that wrote nothing", () => {
+  withFixture((f) => {
+    commit(f.root, "the successor commits what the dead session left on disk");
+    const committed = section(resume(f).stdout, HEADINGS[3]);
+
+    // A branch off `main` that nobody has written a line on: clean for the
+    // opposite reason. `-f` and `clean` because the fixture is deliberately
+    // dirty and the point here is the OTHER state.
+    assert.equal(git(f.root, ["checkout", "-q", "-f", "-b", "tl-2-untouched", "main"]).code, 0);
+    assert.equal(git(f.root, ["clean", "-qfd"]).code, 0);
+    const untouched = cli(f.root, f.state,
+      ["resume", f.unclaimedId, "--dir", ".", "--actor", STRANGER, "--no-verify"]);
+    assert.equal(untouched.code, 0, untouched.all);
+    const nothing = section(untouched.stdout, HEADINGS[3]);
+
+    assert.doesNotMatch(nothing, new RegExp(BRANCH_MARKER), "the untouched branch reports work it never did");
+    assert.notEqual(nothing.trim(), committed.trim(),
+      "a branch that committed its work and a branch that wrote nothing are briefed with the same words, " +
+      "so a successor cannot tell an hour of landed work from an empty start:\n" + nothing);
   });
 });
 

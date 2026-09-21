@@ -39,7 +39,7 @@ throwaway tree — therefore carries one permanent untracked entry.
 The cost is not cosmetic. Everybody reading `git status --short` before a commit
 has one line of noise they must learn to ignore, and a rule learned as "ignore
 the first line" stops being read at all. Observed on 2026-09-21 while closing
-TL-256 in `tasklog-worktrees/tl-256`.
+TL-256 in a linked worktree of this clone.
 
 ## Steps
 

@@ -671,11 +671,16 @@ report a person reads:
 branchling audit                 # 0 = nothing found, 1 = findings
 ```
 
-It names four disagreements between what the files declare and what the history
+It names the disagreements between what the files declare and what the history
 recorded: a task standing in a closed status that no transition ever put there;
 a task reopened after being closed, counted per the actor who *closed* it; a
-task in progress with nothing recorded for `audit_stale_days`; and a status you
-may not enter without saying why, carrying an empty `blocked_by`.
+task in progress with nothing recorded for `audit_stale_days`; a status you
+may not enter without saying why, carrying an empty `blocked_by`; and — where
+several roles work one queue as a pipeline — an open task handed back and forth
+across the same pair of roles, with what each hand said when it let go. That
+last one is the deadlock two CORRECT hands produce when a change needs an edit
+on both sides of their charters: the queue can only report it as held
+elsewhere, which is also what it says about a role nobody serves.
 
 Three things keep the report from being a lie of its own. A task closed before
 the log first recorded a status transition is not accused — it left no trace for

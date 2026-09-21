@@ -33,7 +33,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renam
 import { join, resolve } from "node:path";
 
 import { withBacklogMutex, withMutex } from "./lock.mjs";
-import { ACTOR_UNKNOWN, FIELD_ADOPTED, FIELD_ATTRIBUTED, FIELD_COMMENT, FIELD_CREATED, FIELD_DECISION, FIELD_DELETED, REASON_UNKNOWN, TRACKED_FIELDS, diffMeta, extractMeta, formatValue, hasStatedReason, normalizeActor as normalizeActorFn, normalizeReason, splitFrontmatter } from "./task-fields.mjs";
+import { ACTOR_UNKNOWN, FIELD_ADOPTED, FIELD_ATTRIBUTED, FIELD_COMMENT, FIELD_CREATED, FIELD_DECISION, FIELD_DELETED, FIELD_TAKEOVER, REASON_UNKNOWN, TRACKED_FIELDS, diffMeta, extractMeta, formatValue, hasStatedReason, normalizeActor as normalizeActorFn, normalizeReason, splitFrontmatter } from "./task-fields.mjs";
 import { ANY_HISTORY_FILE, ANY_TASK_FILE, ANY_TASK_FILE_ID, ANY_TASK_ID, taskIdPatterns } from "./task-id.mjs";
 
 export const HISTORY_DIRNAME = "history";
@@ -44,7 +44,7 @@ export const MIGRATIONS_FILE = ".migrations.jsonl";
 // source, so the browser and node see the same list). Here only a re-export, so
 // that existing imports from history.mjs keep working.
 export { FIELD_CREATED, FIELD_DELETED, FIELD_BODY, FIELD_COMMENT, FIELD_VERIFIED, FIELD_UNVERIFIED,
-  FIELD_ROLE_OVERRIDE, FIELD_DECISION, FIELD_ATTRIBUTED, FIELD_ADOPTED, openQuestions, outstandingVouches, VOUCH_REFUSALS, VOUCH_SOURCES,
+  FIELD_ROLE_OVERRIDE, FIELD_DECISION, FIELD_ATTRIBUTED, FIELD_ADOPTED, FIELD_TAKEOVER, openQuestions, outstandingVouches, VOUCH_REFUSALS, VOUCH_SOURCES,
   PSEUDO_FIELDS, isPseudoField,
   ACTOR_NAMESPACES, ACTOR_UNKNOWN, actorParts, isValidActor, normalizeActor,
   REASON_UNKNOWN, REASON_PROVEN, REASON_SENTINELS, REASON_MAX_LENGTH, hasStatedReason, isValidReason, reasonRefusal,

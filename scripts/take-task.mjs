@@ -25,7 +25,15 @@
  * on". `status: in_progress` plus `owner:` is what NOW.yaml derives from, and
  * this command writes exactly those two.
  *
+ * TAKING A TASK OVER (TL-284). A claim has two halves — `owner:` in the file
+ * and the reservation outside the repository — and the refusal used to name a
+ * route through only one of them ("by editing the file"), which left `handoff`
+ * refusing on the lock a moment later. `--take-over` crosses both in one act,
+ * refuses without `--reason`, hands the reservation over rather than deleting
+ * it, and writes a `__takeover__` event naming the session taken from.
+ *
  * Tests: `node --test scripts/tests/next.test.mjs`
+ *        `node --test scripts/tests/takeover.test.mjs`
  */
 
 import { spawnSync } from "node:child_process";
@@ -37,10 +45,10 @@ import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { probeTask } from "./done-task.mjs";
 import { withProbe } from "./probe.mjs";
-import { ACTOR_NAMESPACES, appendEntries, changesRequiringReason, currentSession, eventId, FIELD_ROLE_OVERRIDE, isValidActor, isValidReason, normalizeReason, readHistory, reasonRefusal, recordEdit } from "./history.mjs";
+import { ACTOR_NAMESPACES, appendEntries, changesRequiringReason, currentSession, eventId, FIELD_ROLE_OVERRIDE, FIELD_TAKEOVER, isValidActor, isValidReason, normalizeReason, readHistory, reasonRefusal, recordEdit } from "./history.mjs";
 import { decisionsOf, withDecisions } from "./decisions.mjs";
 import { printJson } from "./json-envelope.mjs";
-import { acquireLock, releaseLock } from "./lock.mjs";
+import { acquireLock, isExpired, lockDir, readLock, releaseLock } from "./lock.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { buildFieldSpecs, extractMeta, fieldSpec, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
@@ -49,15 +57,16 @@ import { MARK, color, failure, warn } from "./ui.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-export const TAKE_FLAGS = ["--dir", "--actor", "--role", "--reason", "--json", "--probe"];
+export const TAKE_FLAGS = ["--dir", "--actor", "--role", "--reason", "--json", "--probe", "--take-over"];
 
 /** PURE — resolves `take`'s arguments. Throws on a usage error. */
 export function parseTakeArgs(args) {
-  const plan = { id: null, dir: null, actor: null, role: null, reason: null, json: false, probe: false };
+  const plan = { id: null, dir: null, actor: null, role: null, reason: null, json: false, probe: false, takeOver: false };
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === "--json") { plan.json = true; continue; }
     if (a === "--probe") { plan.probe = true; continue; }
+    if (a === "--take-over") { plan.takeOver = true; continue; }
     if (a === "--dir" || a === "--actor" || a === "--role" || a === "--reason") {
       const value = args[++i] || null;
       if (!value) throw new Error("`" + a + "` with no value");
@@ -76,6 +85,17 @@ export function parseTakeArgs(args) {
   if (plan.reason !== null) {
     const refusal = reasonRefusal(plan.reason, "--reason");
     if (refusal) throw new Error(refusal);
+  }
+  // A takeover with no sentence is the "silently" the refusal it replaces warns
+  // against. It is a usage error rather than a refusal about the task: it is
+  // wrong whatever the task says, and it has to fail BEFORE the owner field or
+  // the reservation is touched.
+  if (plan.takeOver && plan.reason === null) {
+    throw new Error(
+      "`--take-over` without `--reason`\n" +
+        "Crossing somebody's claim is the one take that cannot be quiet: the session\n" +
+        "it is taken from finds only the record you leave behind."
+    );
   }
   return plan;
 }
@@ -166,11 +186,24 @@ export function takeTask(opts) {
   // — `next` decides WHICH task, and a takeover is a kind of choice, not a kind
   // of write. What this function owes it is that the takeover is never quiet:
   // the old owner is in the history entry's `from` and in a warning on stdout.
-  if (record.status === inProgress && record.owner && record.owner !== actor && !opts.reclaim) {
+  //
+  // `takeOver` is the OTHER exception, and it is the caller's own declaration
+  // rather than a judgement made here (TL-284). It is not the same act as a
+  // reclaim: a reclaim is the dispatcher noticing that a claim stopped moving,
+  // while this is a named session deciding to cross a claim that is live. What
+  // the two share is that neither may be quiet — the old holder is in the
+  // history entry's `from`, in the `__takeover__` event and in a warning.
+  if (record.status === inProgress && record.owner && record.owner !== actor && !opts.reclaim && !opts.takeOver) {
     return {
       ok: false, kind: "other-owner", id,
       message: id + " is already " + inProgress + ", owner: " + record.owner,
-      details: ["Ask them, or take it over deliberately by editing the file — not silently."],
+      details: [
+        "Ask them, or take it over deliberately — not silently:",
+        "  " + N + " take " + id + " --take-over --reason \"…\"",
+        "That crosses the owner field AND their reservation in one act, and records",
+        "both actors. Editing the file by hand does not: the reservation is the",
+        "second gate, and it is the one that stops two sessions doing one task.",
+      ],
     };
   }
 
@@ -181,7 +214,18 @@ export function takeTask(opts) {
   // belongs HERE rather than in the lock — the durable claim is `owner:` in the
   // file, and a retry that refused on the strength of its own first run would be
   // unusable in exactly the loop this command exists for.
-  if (record.status === inProgress && record.owner === actor) {
+  // A reservation naming somebody else, still inside its TTL — the half of a
+  // claim the frontmatter cannot show. The idempotence below is what a retried
+  // `take` depends on, but it must not swallow a takeover whose whole purpose is
+  // that other half (TL-284): the case measured on 2026-09-05 was an `owner:`
+  // corrected by hand while the lock still named the session before it, where a
+  // take by the new owner returned "already yours" and the handoff after it
+  // refused on the lock.
+  const foreignHold = () => {
+    const held = readLock(lockDir(root, opts).dir, id);
+    return held && held.actor !== actor && !isExpired(held, config.lockTtlMinutes, now) ? held : null;
+  };
+  if (record.status === inProgress && record.owner === actor && !(opts.takeOver && foreignHold())) {
     return {
       ok: true, id, file, text: raw, before, after: before,
       alreadyOwned: true, warnings,
@@ -204,9 +248,27 @@ export function takeTask(opts) {
     };
   }
 
-  const lock = acquireLock({
+  const reserve = () => acquireLock({
     root, taskId: id, actor, ttlMinutes: config.lockTtlMinutes, now, env: opts.env,
   });
+  let lock = reserve();
+  // THE SECOND GATE (TL-284). The reservation is HANDED OVER, not deleted: the
+  // release is performed as the holder, which is the only actor `releaseLock`
+  // will drop a lock for, and the reservation is taken again immediately in the
+  // taker's name. Deleting it and leaving the task unreserved would open it to
+  // a third session for as long as this one works — the exact failure TL-87
+  // exists to prevent — and a takeover that ignored the lock entirely would be
+  // worse than the message that promised nothing.
+  let seized = null;
+  if (!lock.ok && opts.takeOver && lock.holder && lock.holder.actor) {
+    releaseLock({ root, taskId: id, actor: lock.holder.actor, env: opts.env });
+    const retaken = reserve();
+    // A failure here is a third session that got in between the two steps. It
+    // is reported as an ordinary refusal: it is not this takeover's holder any
+    // more, and saying so would name the wrong session.
+    if (retaken.ok) seized = lock.holder;
+    lock = retaken;
+  }
   if (!lock.ok) {
     const h = lock.holder || {};
     return {
@@ -216,8 +278,15 @@ export function takeTask(opts) {
         "since " + (h.ts || "?") + ", pid " + (h.pid || "?") + " on " + (h.host || "?"),
         "tree: " + (h.tree || "?"),
         "The lock expires after " + config.lockTtlMinutes + " minutes (`lock_ttl_minutes`).",
+        "Take it over deliberately with `--take-over --reason \"…\"` — or wait it out.",
       ],
     };
+  }
+  if (seized) {
+    warnings.push(
+      "took over the reservation held by " + seized.actor + " since " + (seized.ts || "?") +
+        ", pid " + (seized.pid || "?") + " on " + (seized.host || "?")
+    );
   }
   if (lock.lock && lock.lock.tookOver) {
     warnings.push(
@@ -279,6 +348,42 @@ export function takeTask(opts) {
       (cleared ? unblockedReason(before.status, cleared.blockers) : ""),
   });
 
+  // THE CROSSED CLAIMS, as events (TL-284). One per ACTOR whose claim was
+  // crossed, carrying which halves of it this take went through — the owner
+  // field, the reservation, or both. An owner change is already a tracked
+  // transition, but the reservation is not a field of anything, and the case
+  // this command exists for is exactly the one where the two halves name
+  // DIFFERENT actors: `owner:` corrected by hand while the lock still names the
+  // previous session. There a takeover changes no tracked field at all, and
+  // without this entry the seizure of a live reservation would be the one act
+  // in this tool that leaves no record.
+  const crossed = new Map();
+  if (opts.takeOver) {
+    // The OWNER counts as a crossed claim only under the same condition the
+    // gate above refuses on: the task in progress under somebody else's name.
+    // A queue status, or the project's word for nobody sitting in `owner:`, is
+    // not a claim — and an event asserting one would be this tool inventing a
+    // holder to have taken the task from.
+    const heldOwner = record.status === inProgress && record.owner ? record.owner : null;
+    for (const [who, half] of [[heldOwner, "owner"], [seized && seized.actor, "reservation"]]) {
+      if (!who || who === actor) continue;
+      crossed.set(who, (crossed.get(who) || []).concat(half));
+    }
+  }
+  for (const [who, halves] of crossed) {
+    appendEntries(root, id, [{
+      id: eventId(ts), ts, task: id, field: FIELD_TAKEOVER,
+      from: who, to: actor, crossed: halves,
+      actor, source: opts.source || "take",
+      reason: normalizeReason(opts.reason || ""),
+      session: currentSession(root, opts.env),
+    }]);
+    warnings.push(
+      "took over from " + who + " — their " + halves.join(" and ") +
+        (halves.length > 1 ? " claims" : " claim") + " (recorded in the history)"
+    );
+  }
+
   // Taken by somebody other than the role the task asks for. NOT a refusal: a
   // person naming a task outranks the field, and the gate belongs to the
   // dispatcher (TL-98). What it must not be is invisible — otherwise "was the
@@ -302,7 +407,12 @@ export function takeTask(opts) {
     );
   }
 
-  return { ok: true, id, file, text, before, after, lock: lock.lock, reclaimed: reclaim ? before.owner : null, warnings };
+  return {
+    ok: true, id, file, text, before, after, lock: lock.lock,
+    reclaimed: reclaim ? before.owner : null,
+    tookOver: [...crossed].map(([who, halves]) => ({ actor: who, crossed: halves })),
+    warnings,
+  };
 }
 
 /** The sentence a dispatched-after-unblocking take writes into the history when
@@ -349,8 +459,9 @@ export function renderTake(result, root, opts = {}) {
     // moves the status; a takeover of an abandoned claim moves the owner and
     // leaves the status where it was, and printing `in_progress → in_progress`
     // there would show the one field that did not change (TL-104).
-    const [from, to] = result.reclaimed
-      ? [result.reclaimed, result.after.owner]
+    const overTaken = (result.tookOver || []).find((t) => t.crossed.indexOf("owner") >= 0);
+    const [from, to] = result.reclaimed || overTaken
+      ? [result.reclaimed || overTaken.actor, result.after.owner]
       : [result.before.status, result.after.status];
     out.push(
       paint.ok(MARK.ok) + " " + paint.id(result.id) + " taken by " + result.after.owner +
@@ -413,6 +524,11 @@ export function takeJson(result, root) {
     // (TL-104) — `null` otherwise. A loop that reclaims work has to be able to
     // report it without parsing the warning text.
     reclaimed: result.reclaimed || null,
+    // The claims this take crossed deliberately (TL-284), as `{actor, crossed}`
+    // rows — empty when it crossed none. A loop that takes work over has to be
+    // able to report whose, and from which half of the claim, without parsing
+    // the warning text.
+    tookOver: result.tookOver || [],
     lock: result.lock || null,
   };
 }
@@ -487,7 +603,7 @@ export function run(argv) {
     );
   }
 
-  const result = takeTask({ root, config, id: plan.id, actor, role: plan.role, reason: plan.reason });
+  const result = takeTask({ root, config, id: plan.id, actor, role: plan.role, reason: plan.reason, takeOver: plan.takeOver });
   // THE CONTRACT'S LIVE STATE TRAVELS WITH THE HANDOVER when asked (TL-268).
   // Opt-in: a contract may cost the whole suite, and a loop wanting the task
   // in a second is not made to wait for it.

@@ -63,6 +63,17 @@ failure is re-rolled. TL-276 gave a hand the vocabulary to ask whose red a
 failure is; it answers with a task id, and it cannot say "this one is nobody's,
 run it again".
 
+**A second test of the same class, measured later the same day.** While
+TL-284 was closing, `scripts/tests/ui.test.mjs`, "the same call with and
+without colour carries IDENTICAL content", failed once inside a heavily loaded
+full-suite run and passed on every run afterwards; the two `check` outputs were
+byte-identical when reproduced by hand immediately. That is a second test whose
+result depends on machine load rather than on the code, which makes "the suite
+is red, whose is it" a question about this repository generally and not only
+about `next`. It is recorded here rather than as a third task because a fix for
+one may or may not cover the other, and that is exactly what step 1 has to
+measure.
+
 **Two candidate causes, both testable.** Either `next` gives up too early when
 `link()` loses — a bounded retry that is too short under load — or the
 candidate set it walks is computed once, before the losses, so five winners

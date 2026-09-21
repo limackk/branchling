@@ -86,7 +86,7 @@ export const KINDS = {
   audit: {
     since: null, dayZero: null, tasks: null, findings: null,
     closedWithoutTrace: [], skippedBeforeSince: null, reopened: [],
-    parked: [], withoutPremise: [], awaitingVouch: [], vouches: [],
+    parked: [], withoutPremise: [], awaitingVouch: [], handedBack: [], vouches: [],
     advisories: [],
   },
   // `stats --json`. The tallies stay nested under `stats` instead of being
@@ -170,7 +170,12 @@ export const KINDS = {
     // after the write, so a caller that has to give a claim back — `run` when
     // its agent never started — has nowhere else to read it.
     from: null,
-    warnings: [], reclaimed: null, lock: null,
+    warnings: [], reclaimed: null,
+    // The claims a deliberate takeover crossed, as `{actor, crossed}` rows
+    // (TL-284) — empty when it crossed none. A loop that takes work over has to
+    // report whose reservation it took without parsing a warning.
+    tookOver: [],
+    lock: null,
     refusalKind: null, refusal: null, details: [],
     // `next` only, and the reason each is here rather than in prose on stderr:
     // a loop must be able to tell an empty queue from a queue it was not allowed
@@ -212,16 +217,21 @@ export const KINDS = {
     ok: null, id: null, file: null, question: null, changes: [], blockedReason: null,
     refusalKind: null, refusal: null, details: [],
   },
-  // `resume --json` (TL-151). The five parts are declared in the ORDER the
+  // `resume --json` (TL-151). The parts are declared in the ORDER the
   // briefing fixes them, because the order IS the product: a consumer rendering
   // it would otherwise have to re-derive a sequence this tool already knows.
   // `verified` is what keeps an empty `verification` readable — under
   // `--no-verify` nothing ran, and "the contract was not re-run" must never be
   // mistaken for "the contract holds no entries".
+  // `uncommitted` is the SECOND half of the branch's work (TL-272): what the
+  // killed session left on disk and in no commit. It is a key of its own rather
+  // than lines appended to `diff`, because a consumer that could not tell a
+  // committed hunk from an uncommitted one would be wrong in the expensive
+  // direction — a `git checkout` destroys one and not the other.
   resume: {
     ok: null, id: null, file: null, actor: null, owner: null,
     base: null, mergeBase: null, verified: null,
-    decisions: [], goal: null, history: [], diff: null, verification: [],
+    decisions: [], goal: null, history: [], diff: null, uncommitted: null, verification: [],
     refusalKind: null, refusal: null, details: [],
   },
   // `done --json`. `entries` carries one row per `verification:` entry with its
@@ -259,9 +269,13 @@ export const KINDS = {
   // `task-list` carries its own `total` for. `path` names the log this came
   // from, so a reader who does want the raw file is told where it is instead of
   // guessing the layout.
+  // `decisions` and `matched` say WHICH question was asked and how much of the
+  // log answered it (TL-396): `total` is every exchange, `matched` the ones the
+  // filter kept, and without both a consumer cannot tell a filtered answer from
+  // a short log.
   "task-log": {
     ok: null, id: null, title: null, file: null, path: null,
-    records: null, total: null, limit: null, exchanges: [],
+    records: null, total: null, matched: null, decisions: null, limit: null, exchanges: [],
     refusalKind: null, refusal: null, details: [],
   },
 };
