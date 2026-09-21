@@ -45,7 +45,7 @@ One row = one change to one field:
   `blocked_by`, `blocks`, `related_docs`).
 - `field` — a frontmatter key or a task-event pseudo-field: `__created__`,
   `__deleted__`, `__verified__`, `__unverified__`, `__role_override__`,
-  `__comment__`, `__decision__`, `__attributed__`. The list is
+  `__comment__`, `__decision__`, `__attributed__`, `__adopted__`. The list is
   `PSEUDO_FIELDS` in `scripts/task-fields.mjs`, where each one carries the
   reason it is an event rather than a field change.
 - `actor` — **`<namespace>:<name>`** (TL-21): `local:` declared and

@@ -38,7 +38,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { FIELD_CREATED, appendEntries, loadSnapshot, readHistory, reconcile, saveSnapshot } from "../history.mjs";
+import { FIELD_ADOPTED, FIELD_CREATED, appendEntries, loadSnapshot, readHistory, reconcile, saveSnapshot } from "../history.mjs";
 import { SCRIPTS_DIR, isolateHome } from "./_repo.mjs";
 
 // The suite must not read the DEVELOPER's preferences: the actor chain reads the
@@ -88,6 +88,13 @@ function logEntry(over) {
 }
 
 const fields = (entries, task) => entries.filter((e) => e.task === task).map((e) => e.field);
+
+// The TRANSITIONS a run wrote. An `__adopted__` entry is also written now
+// (TL-387) and it is deliberately not one: it names the fields a run absorbed
+// with no reference point and asserts nothing about their values. The
+// assertions below are about what reconcile CLAIMS changed, so they leave the
+// adoption out; it has a file of its own, `history-adoption.test.mjs`.
+const transitions = (entries) => entries.filter((e) => e.field !== FIELD_ADOPTED);
 
 // ── 1. The seed must cover the tree, not the file that triggered it ────────
 
@@ -147,7 +154,7 @@ test("a task absent from the snapshot has its change RECORDED, not absorbed", ()
   assert.equal(written[1].to, "blocked");
   assert.equal(written[1].actor, "agent:claude");
   assert.equal(written[1].reason, "parked it");
-  assert.equal(res.entries.length, 1);
+  assert.equal(transitions(res.entries).length, 1);
   // And only now may the snapshot say it has seen it.
   assert.equal(loadSnapshot(dir).tasks["BL-900"].status, "blocked");
 });
@@ -163,8 +170,11 @@ test("a task absent from the snapshot whose log AGREES records nothing", () => {
 
   const res = reconcile(dir, { actor: "agent:claude", source: "manual" });
 
-  assert.deepEqual(res.entries, [], "a pulled task is not re-recorded as somebody else's");
-  assert.equal(readHistory(dir, "BL-900").length, 1);
+  assert.deepEqual(transitions(res.entries), [], "a pulled task is not re-recorded as somebody else's");
+  assert.equal(
+    readHistory(dir, "BL-900").filter((e) => e.field === "status").length, 1,
+    "and the field the log vouches for gains nothing"
+  );
   assert.equal(loadSnapshot(dir).tasks["BL-900"].status, "in_progress");
 });
 
@@ -192,8 +202,13 @@ test("a field the log has never mentioned is reported as adopted", () => {
   writeTask(dir, "BL-900-one.md", { id: "BL-900", status: "in_progress", estimate: "9h" });
   const res = reconcile(dir, { actor: "agent:claude", source: "manual" });
 
-  assert.deepEqual(res.entries, [], "nothing is fabricated");
+  assert.deepEqual(transitions(res.entries), [], "nothing is fabricated");
   assert.deepEqual(res.adopted, ["BL-900"], "and nothing is absorbed in silence either");
+  // TL-387: the naming outlives the run that did it. A report printed once is
+  // gone by the next command, which finds the value in the snapshot and has
+  // nothing left to say about it.
+  const adoption = readHistory(dir, "BL-900").find((e) => e.field === FIELD_ADOPTED);
+  assert.ok(adoption && adoption.to.includes("estimate"), "the absorbed field is named in the log");
 });
 
 test("`dryRun` reports what it would adopt and writes nothing", () => {
@@ -205,7 +220,7 @@ test("`dryRun` reports what it would adopt and writes nothing", () => {
 
   const res = reconcile(dir, { actor: "agent:claude", source: "manual", dryRun: true });
 
-  assert.equal(res.entries.length, 1);
+  assert.equal(transitions(res.entries).length, 1);
   assert.deepEqual(Object.keys(loadSnapshot(dir).tasks), [], "a diagnosis moves no reference point");
   assert.equal(readHistory(dir, "BL-900").length, 1, "and writes no entry");
 });
@@ -259,8 +274,10 @@ test("one run reports what it recorded AND what it adopted", () => {
   // the file's word. Naming only the tasks nothing was recorded for would say
   // the rest were fully accounted for, which is the claim that cannot be made.
   assert.match(run.stdout, /2 task\(s\) had no reference point/, "what it took on trust");
-  assert.match(run.stdout, /^ {2}BL-900$/m);
-  assert.match(run.stdout, /^ {2}BL-901$/m);
+  // Each adopted task names the fields it was adopted with (TL-387); the id
+  // alone left a caller who had just edited one of them to guess.
+  assert.match(run.stdout, /^ {2}BL-900 · .*estimate/m);
+  assert.match(run.stdout, /^ {2}BL-901 · /m);
   assert.doesNotMatch(run.stdout, /no changes to record/, "which was never true here");
 });
 
@@ -298,7 +315,7 @@ test("the 2026-09-03 sequence: hook seed, hand edits, then `history`", () => {
   const res = reconcile(dir, { actor: "agent:claude", source: "manual", reason: "my batch" });
 
   assert.deepEqual(
-    res.entries.map((e) => e.task + ":" + e.to).sort(), ["BL-901:blocked", "BL-902:done"],
+    transitions(res.entries).map((e) => e.task + ":" + e.to).sort(), ["BL-901:blocked", "BL-902:done"],
     "every change the snapshot absorbed is in the log"
   );
   for (const [id, status] of [["BL-901", "blocked"], ["BL-902", "done"]]) {

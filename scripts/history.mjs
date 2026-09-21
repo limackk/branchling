@@ -33,7 +33,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renam
 import { join, resolve } from "node:path";
 
 import { withBacklogMutex, withMutex } from "./lock.mjs";
-import { ACTOR_UNKNOWN, FIELD_ATTRIBUTED, FIELD_COMMENT, FIELD_CREATED, FIELD_DECISION, FIELD_DELETED, REASON_UNKNOWN, TRACKED_FIELDS, diffMeta, extractMeta, formatValue, hasStatedReason, normalizeActor as normalizeActorFn, normalizeReason, splitFrontmatter } from "./task-fields.mjs";
+import { ACTOR_UNKNOWN, FIELD_ADOPTED, FIELD_ATTRIBUTED, FIELD_COMMENT, FIELD_CREATED, FIELD_DECISION, FIELD_DELETED, REASON_UNKNOWN, TRACKED_FIELDS, diffMeta, extractMeta, formatValue, hasStatedReason, normalizeActor as normalizeActorFn, normalizeReason, splitFrontmatter } from "./task-fields.mjs";
 import { ANY_HISTORY_FILE, ANY_TASK_FILE, ANY_TASK_FILE_ID, ANY_TASK_ID, taskIdPatterns } from "./task-id.mjs";
 
 export const HISTORY_DIRNAME = "history";
@@ -44,7 +44,7 @@ export const MIGRATIONS_FILE = ".migrations.jsonl";
 // source, so the browser and node see the same list). Here only a re-export, so
 // that existing imports from history.mjs keep working.
 export { FIELD_CREATED, FIELD_DELETED, FIELD_BODY, FIELD_COMMENT, FIELD_VERIFIED, FIELD_UNVERIFIED,
-  FIELD_ROLE_OVERRIDE, FIELD_DECISION, FIELD_ATTRIBUTED, openQuestions, outstandingVouches, VOUCH_REFUSALS, VOUCH_SOURCES,
+  FIELD_ROLE_OVERRIDE, FIELD_DECISION, FIELD_ATTRIBUTED, FIELD_ADOPTED, openQuestions, outstandingVouches, VOUCH_REFUSALS, VOUCH_SOURCES,
   PSEUDO_FIELDS, isPseudoField,
   ACTOR_NAMESPACES, ACTOR_UNKNOWN, actorParts, isValidActor, normalizeActor,
   REASON_UNKNOWN, REASON_PROVEN, REASON_SENTINELS, REASON_MAX_LENGTH, hasStatedReason, isValidReason, reasonRefusal,
@@ -861,6 +861,44 @@ function reconcileLocked(backlogDir, opts) {
           // log. It is absorbed — and NAMED, because absorbing it in silence is
           // the whole defect this task was opened for.
           if (attested.length < TRACKED_FIELDS.length) adopted.push(id);
+          // AND THE NAMING GOES IN THE LOG, NOT ONLY IN THE TERMINAL (TL-387).
+          // TL-185 made this run say what it absorbed, which is one sentence in
+          // one session's output: the value moves into the snapshot, so every
+          // later run sees no difference and says "no changes to record" —
+          // truthfully about the tree and falsely about the log. Measured while
+          // repairing the links broken by TL-382: a hand `related_docs` update
+          // to sixteen tasks, of which two were recorded and the rest reported
+          // as no change at all.
+          //
+          // The entry claims no transition. `to` is the LIST OF FIELDS taken on
+          // trust and `from` is empty, because the missing previous value is
+          // exactly what is being declared. A reader who made that edit can now
+          // find it; `--attribute` can claim it when the run that absorbed it
+          // was somebody else's timer.
+          //
+          // ONLY FIELDS THAT CARRY A VALUE. An unattested field that is empty in
+          // the file says nothing was absorbed — the log has no value for it and
+          // neither has the task, so an entry naming it would be noise in a file
+          // that may never be tidied up.
+          const absorbed = TRACKED_FIELDS.filter(
+            (key) => known[key] === undefined && formatValue(after[key]) !== ""
+          );
+          // AND ONCE PER TASK, NOT ONCE PER TREE. Every worktree has its own
+          // snapshot, so the same task is absent from each of them in turn and
+          // each would otherwise append the same sentence to one shared,
+          // append-only file. The fact being recorded is about the TASK — these
+          // fields stand in the log with nothing behind them — and it does not
+          // become truer by being said four times. A previous adoption that
+          // already covers these fields is therefore the record; a later run
+          // with a field it did not name still writes, because that field is
+          // not covered by anything.
+          const covered = hist.some(
+            (e) => e.field === FIELD_ADOPTED &&
+              absorbed.every((key) => (Array.isArray(e.to) ? e.to : [e.to]).indexOf(key) >= 0)
+          );
+          if (absorbed.length && !covered) {
+            entries.push(entry(id, FIELD_ADOPTED, "", absorbed, actor, source, ts, reason));
+          }
         }
       } else {
         for (const c of diffMeta(before, after)) {

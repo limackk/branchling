@@ -15,7 +15,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
-import { actorParts, appendEntries, attributeChanges, currentSession, FIELD_ATTRIBUTED, FIELD_BODY, FIELD_COMMENT, FIELD_CREATED, FIELD_DELETED, hasSnapshot, historyPath, isUnattributed, isValidActor, lastChangeByField, loadSnapshot, metaFromText, normalizeActor, PSEUDO_FIELDS, readAllHistory, readHistory, reconcile, recordEdit, unattributedChanges } from "../history.mjs";
+import { actorParts, appendEntries, attributeChanges, currentSession, FIELD_ADOPTED, FIELD_ATTRIBUTED, FIELD_BODY, FIELD_COMMENT, FIELD_CREATED, FIELD_DELETED, hasSnapshot, historyPath, isUnattributed, isValidActor, lastChangeByField, loadSnapshot, metaFromText, normalizeActor, PSEUDO_FIELDS, readAllHistory, readHistory, reconcile, recordEdit, unattributedChanges } from "../history.mjs";
 import { diffMeta } from "../task-fields.mjs";
 import { isolateHome } from "./_repo.mjs";
 
@@ -223,8 +223,11 @@ test("a task brought in by a merge or pull does NOT get a second `__created__` e
   }]);
 
   const { entries } = reconcile(dir, { actor: "unknown", source: "boot" });
-  assert.deepEqual(entries, []);
-  assert.equal(readHistory(dir, "BL-901").length, 1);
+  // An `__adopted__` entry is written for the fields the merged log cannot
+  // vouch for (TL-387); it is not a creation and claims no value, which is what
+  // this test is about.
+  assert.deepEqual(entries.filter((e) => e.field !== FIELD_ADOPTED), []);
+  assert.equal(readHistory(dir, "BL-901").filter((e) => e.field === FIELD_CREATED).length, 1);
   rmSync(dir, { recursive: true, force: true });
 });
 
