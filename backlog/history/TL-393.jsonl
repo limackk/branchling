@@ -1,0 +1,4 @@
+{"id":"01M31HTE1TATXHHW5AP1FCFN8S","ts":"2026-09-21T08:37:47.194Z","task":"TL-393","field":"__created__","from":"","to":"History written on a branch reaches the log it belongs to","actor":"agent:claude","source":"new","reason":"unknown"}
+{"id":"01M31HW9XJGGNGFPSXQEWH7J1H","ts":"2026-09-21T08:38:48.498Z","task":"TL-393","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M31HW9XJ3ZE1NQHK0TBZWTDZ","ts":"2026-09-21T08:38:48.498Z","task":"TL-393","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M31HWD2BPA0T0P853P21H99J","ts":"2026-09-21T08:38:51.723Z","task":"TL-393","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
