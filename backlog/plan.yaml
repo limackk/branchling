@@ -1,24 +1,68 @@
 # The execution order is a deliberate product decision, not a generated view.
 # Earlier execution and fleet plans remain in Git history. They are not a
 # current promise after the evidence-gated product boundary was adopted.
-updated: 2026-09-08
-rationale: "Branchling first removes product surfaces that turn a repository-owned evidence protocol into a tracker, portfolio or fleet manager. Only then does onboarding demonstrate the reduced delivery loop."
+#
+# THE PREVIOUS PLAN CLOSED COMPLETELY on 2026-09-21 (TL-377, TL-378, TL-379,
+# TL-380, TL-381, TL-382, TL-383, TL-384). It answered "what is this product
+# NOT". Its four waves stay in Git history; repeating them here would report
+# eight closed tasks forever and say nothing about what is next.
+updated: 2026-09-21
+rationale: "The surface is now small enough to be trusted, and nothing has proved it is. Branchling first makes its evidence unfalsifiable, then its ledger whole, then its queue survivable by more than one hand; only what a stranger reads and what carries the tool outward comes after, because publishing a claim before it holds is the one failure no later wave can undo."
 waves:
-  # This gate cancels the superseded roadmap and makes the boundary executable
-  # before implementation removes capabilities that users may still rely on.
-  - name: "Evidence-gated product boundary"
-    tasks: [TL-377]
+  # THE PRODUCT HAS ONE CLAIM: a task closes only on a run that could have
+  # failed. Every task here defeats it at the same point — a verification with
+  # no failing path passes every audit the tool owns, `new` writes the
+  # placeholder that becomes one, and a suite that is red on purpose cannot
+  # tell the next hand whose failure it is looking at. A guard that takes an
+  # hour is in the same class: one nobody runs is one that proves nothing.
+  # Everything later in this plan is worth less until this wave holds.
+  - name: "Evidence that could have failed"
+    tasks: [TL-260, TL-262, TL-237, TL-276, TL-275, TL-273, TL-265]
 
-  # These removals are independent once the boundary is recorded. They leave
-  # one repository, a durable ledger, task verification and a small queue.
-  - name: "Remove non-core product surfaces"
-    tasks: [TL-378, TL-380, TL-381, TL-383]
+  # LAW 1: the state travels with the branch, and the ledger is that state.
+  # These are half-written records — a frontmatter change that outlived the
+  # history write meant to justify it, two claims appending for one event, a
+  # migration writing the snapshot outside the mutex. A record that is wrong in
+  # a way nobody can see is the failure mode this tool exists to prevent, and
+  # `backlog/history/` is append-only, so a bad row is permanent.
+  - name: "The ledger records it once, or not at all"
+    tasks: [TL-351, TL-303, TL-228, TL-387, TL-261]
 
-  # The viewer depends on telemetry removal; the thin adapter depends on the
-  # execution boundary. They complete the interactions that remain in core.
-  - name: "Finish the reduced interaction surface"
-    tasks: [TL-379, TL-382]
+  # LAW 4: `--json` on every reading command. Decisions are written correctly
+  # and can only be read by cat-ing the raw log; `decide` prints a reading form
+  # in its own usage and refuses it. This wave follows the one above because
+  # there is no point reading back a record that is not yet whole.
+  - name: "The record can be read back"
+    tasks: [TL-256, TL-396, TL-280, TL-285, TL-234]
 
-  # Onboarding is the integration proof, so it follows every retained surface.
-  - name: "Validate the evidence-gated product"
-    tasks: [TL-384]
+  # WHAT SEPARATES THIS FROM A TO-DO LIST is that a second hand can pick the
+  # work up. Today two hands pass one task back and forth because neither may
+  # cross the test boundary, a parked task is unparked by the next call, and an
+  # agent killed by its own quota leaves work uncommitted and blames the
+  # contract. These are the defects that only appear with more than one
+  # session, which is why they survived a plan written for one.
+  - name: "The queue survives a second hand"
+    tasks: [TL-277, TL-282, TL-283, TL-284, TL-349, TL-239, TL-272, TL-263, TL-257, TL-219]
+
+  # AN UNKNOWN FLAG MUST FAIL — AGENTS.md opens with it, because a silent no-op
+  # looks like it worked. It fails in four different shapes today, one command
+  # has none at all, and four commands accept flags their own `--help` never
+  # declares. Grouped after the waves above and not before them: a wrong
+  # refusal message wastes a minute, a false green wastes a release.
+  - name: "One shape for a refusal"
+    tasks: [TL-217, TL-220, TL-216, TL-247, TL-248, TL-254, TL-255, TL-246]
+
+  # WHAT A STRANGER READS when they open the repository. Polish in the shipped
+  # viewer, filenames in a language the repository forbids, a skill describing
+  # gaps that closed, two words for one kind of task. This is the last wave
+  # before publication because it is the one whose cost rises with every task
+  # written in the meantime.
+  - name: "What a stranger reads"
+    tasks: [TL-385, TL-208, TL-342, TL-159, TL-218, TL-123, TL-244]
+
+  # OUTWARD-FACING, AND THEREFORE LAST. A demonstration, a badge over a public
+  # run, an Action that comments proof of work on a pull request, and a name
+  # nobody has cleared. Each of them publishes a claim, and a claim published
+  # before it holds is the one failure no later wave can take back.
+  - name: "What carries it outward"
+    tasks: [TL-102, TL-179, TL-158, TL-232, TL-266, TL-89]
