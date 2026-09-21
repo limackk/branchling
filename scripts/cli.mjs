@@ -116,7 +116,10 @@ const CHECK_USAGE = [
   "  --proofs             re-run the `verification:` contract of every task this tool CLOSED",
   "                       with a proven reason, against the tree as it is now, and name each",
   "                       one that no longer passes. NEVER part of a bare `check`: those",
-  "                       contracts are test suites, and one of them may be this command",
+  "                       contracts are test suites, and one of them may be this command.",
+  "                       Then the opposite question of the tasks nobody has started yet: a",
+  "                       contract that ALREADY passes is named, because no work can make it",
+  "                       red. That finding reports and leaves the exit code alone",
   "  --since <sha>        with --proofs, keep the closings the range could plausibly have",
   "                       broken — a file the task changed, or a path its contract names",
 ].join("\n");
