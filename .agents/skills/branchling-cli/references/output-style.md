@@ -16,8 +16,10 @@ Contents:
 
 ## 1. When color is allowed
 
-Decide once, at import time, in one module. Color is on only when **all** of
-these hold:
+Decide in one module, and decide at the moment of PAINTING rather than at import
+(TL-238: frozen at import, the decision belonged to whoever imported first, and
+twelve tests were asserting the observer's terminal instead of the function).
+Color is on only when **all** of these hold:
 
 - `process.env.NO_COLOR` is unset (any value, including empty, means off — this
   is the [no-color.org](https://no-color.org) convention and users expect it),
@@ -27,7 +29,9 @@ these hold:
 - `--no-color` was not passed.
 
 `FORCE_COLOR` overrides the TTY check upward, for CI logs that render ANSI on
-purpose. `--color` does the same explicitly.
+purpose. `--color` does the same explicitly. Both switches are taken off the
+argument list ONCE, in `cli.mjs`, before dispatch — after `--` they are text,
+like every other global flag (TL-247).
 
 This ordering matters: a user who pipes output into `grep` gets clean text
 without asking, and a user who wants color in a captured log can insist. Both
@@ -41,7 +45,9 @@ bold and dim.**
 ## 2. The palette
 
 Six roles, no more. Adding a seventh means the output is carrying more
-distinctions than a reader can hold.
+distinctions than a reader can hold. They are `ROLES` in `scripts/ui.mjs`; the
+table below is here for the third column — what each one is FOR — which the code
+cannot state:
 
 | Role | Style | Used for |
 |---|---|---|
@@ -69,17 +75,20 @@ that measure them differently, and a misaligned table is worse than a plain one.
 
 ## 4. The `ui.mjs` module
 
-One module, imported by every command. Suggested surface — small enough that no
-command is tempted to reach past it:
+One module, imported by every command. It EXISTS — this section used to propose
+it, and a proposal read as a description for as long as it took somebody to
+notice (TL-159). Do not copy its surface into this file; a signature list here
+is a second place to be wrong. Read the real one:
 
-```js
-export const color = { enabled, ok, warn, err, id, dim, bold };  // string → string
-export function line(label, value, note);   // aligned "  label      42  note"
-export function heading(text);              // section heading
-export function ok(msg); export function warn(msg); export function fail(msg);
-export function fatal(message, hint, code); // stderr + exit
-export function table(rows, columns);       // aligned columns, no borders
 ```
+grep '^export' scripts/ui.mjs
+```
+
+Three things about it are worth knowing before you open it: the painters
+(`color` for stdout, `errColor` for stderr) decide at the moment they PAINT and
+not at import (TL-238), so a test may set `NO_COLOR` after importing; `plain` is
+the painter that never paints, for tests and `--json`; and `refusal()` is the
+one shape for "you passed something I do not accept" (see §6).
 
 Every function returns or prints plain text when color is off. Nothing outside
 this module writes an escape sequence — that is what makes `NO_COLOR` a property
@@ -104,13 +113,22 @@ decorative line above it; something is parsing it.
 
 ## 6. Anatomy of an error
 
-Three parts, in this order, on stderr:
+Three parts, in this order, on stderr — **and they are a function, not a
+convention you retype**: `failure()` composes them, and `refusal()` is the
+special case for an argument a command does not accept. Written as a convention
+this anatomy produced four wordings across the table (`available:`, `known
+flags:`, `known:`, a bare `usage:`, and in one command nothing at all); TL-220
+replaced all of them with the one call, because the wording is what
+`help-covers-flags.test.mjs` reads the accepted set out of.
 
 ```
 ✗ branchling query: unknown flag: --statu
-  available: --status --priority --board --label --epic --json --files --count
+  available: --blocked-by --board --count … --text --type -h
   → branchling query --help
 ```
+
+(The list is elided here on purpose: the real one comes from the command, and
+`branchling query --statu` prints today's.)
 
 1. **What went wrong**, prefixed with the command *as the user typed it* — not
    the script's filename. `branchling build`, not `[build-backlog]`.
@@ -118,11 +136,18 @@ Three parts, in this order, on stderr:
    "invalid".
 3. **What to do next**, as a command that can be pasted.
 
+The first sentence names the EVENT, and three events are kept apart: `unknown
+flag:` for a word beginning with `-`, `unknown subcommand:` where a subcommand
+was expected, `unexpected argument:` where nothing was. Collapsing them costs
+the reader the one word that says which mistake they made.
+
 The best error names the thing the user can act on. Compare:
 
 - `Error: Cannot find backlog directory` + a stack trace
-- `✗ branchling: no backlog here (looked upward from /home/me)` / `→ branchling init
-  --dir ./backlog` / `→ or point at an existing one: --dir <path>`
+- what `branchling query` actually prints outside a backlog: `✗ branchling
+  query: no backlog here: /home/me`, then how to point at an existing one
+  (`--dir`, `BACKLOG_DIR`, a directory with `backlog/tasks/`), then how to
+  start one (`branchling init --dir <path>`)
 
 The second one costs three lines and turns a first-contact failure into an
 onboarding step. A stack trace tells the user the tool crashed; a predicted,
@@ -130,57 +155,61 @@ documented state should never be presented as a crash.
 
 ## 7. Help layout
 
-```
-branchling — a backlog that lives in markdown files
+Run `branchling --help`; this is its shape, and the summaries are not repeated
+here because they are one `summary` field away in `COMMANDS`:
 
-usage
-  branchling                     start the viewer (same as `branchling serve`)
+```
+branchling — <one line, from the package description>
+
+usage:
+  branchling                 run the viewer (the same as `branchling serve`)
   branchling <command> [flags]
 
-commands
-  serve      start the viewer on 127.0.0.1 (default command)
-  query      ask the backlog a question
+commands:
+  serve           run the viewer on 127.0.0.1 (the default command)
+  query           ask about tasks — reads tasks/*.md, so it sees changes …
   …
 
-examples
-  branchling query --status blocked
-  branchling new --title "Fix the retry loop" --priority P1
-  branchling check
-
-`branchling <command> --help` shows that command's flags.
-`--dir <path>` points at another backlog; it works in every command.
+`branchling <command> --help` prints that command's flags.
+`--dir <path>` points at a different backlog; it works on every command.
 ```
 
-Examples earn their space: they are the fastest path from reading help to a
-working command, and they show flag combinations that a flag list cannot.
+Examples earn their space where a command has them: they are the fastest path
+from reading help to a working command, and they show flag combinations that a
+flag list cannot.
 
-If the top-level help promises `branchling <command> --help`, every command has to
-honour it. A promise the program breaks is worse than no promise.
+The top-level help promises `branchling <command> --help`, and every command
+honours it — that is asserted, per command, by `scripts/tests/cli-help.test.mjs`
+(exit 0, on stdout), and what it prints must declare the flags the command
+accepts (`help-covers-flags.test.mjs`). A promise the program breaks is worse
+than no promise, so both promises have a test rather than a paragraph.
 
 ## 8. Worked example: the stats report
 
-Current shape (correct, plain):
+This section once held a "current" shape and a "target" shape; the target was
+built (`scripts/stats-report.mjs`) and the "current" half went on quoting a
+Polish label that no longer exists (TL-159). Run `branchling stats` for today's
+output. Its shape:
 
 ```
-  tasks in total             47
-  aktywnych                 14
+branchling — /home/me/project/backlog
+
+  tasks in total           422
+  active                    39
+  archived                 383
+
+status (all):
+    pending                 38
+    …
+
+  waiting on other tasks     5  non-empty blocked_by
+  work to be done       81 h (10 working days)
 ```
 
-Target shape — same numbers, structure made visible:
-
-```
-branchling · /home/me/project/backlog
-
-  tasks            47      14 active · 33 archived
-
-  status           pending 14   in_progress 0   blocked 0
-  priority         P2 7   P3 7
-  waiting on others 7      non-empty blocked_by
-  work remaining   102 h   ≈13 working days
-```
-
-What changed and why: totals and their breakdown sit on one line because they
-answer one question; zero counts are dimmed rather than dropped, since a missing
+Why it is built that way, which is the part worth carrying: a heading names the
+backlog the numbers came from, because a session with several trees open cannot
+otherwise tell; numbers right-align in one column so magnitudes compare at a
+glance; zero counts are printed and dimmed rather than dropped, since a missing
 row reads as a missing category; units are dim so the number stays the thing you
 see. Nothing here needs color to be understood.
 
@@ -191,12 +220,14 @@ and assert the text; assert separately that `color.enabled` is false under
 `NO_COLOR` and true under `FORCE_COLOR`. That keeps the tests readable and stops
 a palette change from breaking twenty assertions.
 
-Two guards worth having, because both defects are silent:
-
-- stdout carries no diagnostics: capture both streams and assert the answer is
-  entirely on stdout.
-- `--json` output parses, on every reading command, including when there are
-  zero results.
+Two guards that used to be "worth having" now exist, and a new command joins
+them rather than re-deriving them: `json-output.test.mjs` asserts that every
+reading command's `--json` parses and that stdout carries the document and
+nothing else, and `json-pipe.test.mjs` pins the same answer through a pipe,
+where `process.exit` once truncated it at 64 KB.
+`suite-is-terminal-independent.test.mjs` is the third: the suite must answer the same at a keyboard as through
+a pipe, which is why the painters decide when they paint and take the painter as
+an argument.
 
 A test that would still pass against an empty backlog is green without proving
 anything — give it a positive control.
