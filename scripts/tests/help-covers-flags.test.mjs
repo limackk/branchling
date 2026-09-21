@@ -56,22 +56,18 @@ const NAMES = Object.keys(COMMANDS);
 const GLOBAL_FLAGS = new Set(["--dir", "--help", "-h"]);
 
 /**
- * Flags accepted but not yet declared, per command, each awaiting TL-217.
- * TL-194 documented `query`; documenting the rest is a separate change with its
- * own prose to write, and inflating this one would have blurred both.
+ * Flags accepted but not yet declared, per command. EMPTY since TL-217, and the
+ * case at the bottom of this file fails on an entry that outlives its defect —
+ * so an exemption can be granted again, but only with an argument, and only for
+ * as long as the defect it names is real.
  *
- * `plan-from` and `run` are TL-220's finding: they were outside this guard's
- * reach for as long as their refusal said `known flags:`, so the defect TL-194
- * measured in four commands was in six.
+ * The six it held were closed in two moves rather than one. Five commands got
+ * the prose their flags never had. `plan-from` needed the opposite: it LISTED
+ * `--from` and `--json` in its refusal and answered `unknown flag:` to both, so
+ * documenting them would have written down a promise the command does not keep
+ * — its accepted set was corrected to what it takes.
  */
-const UNDOCUMENTED = {
-  build: ["--root"],
-  board: ["--paths", "--registry"],
-  history: ["--quiet"],
-  init: ["--no-gitignore", "--no-example", "--no-nudge", "--skills"],
-  "plan-from": ["--from", "--json"],
-  run: ["--agent-for", "--profile-for", "--delegation", "--allow-uncontrolled-delegation"],
-};
+const UNDOCUMENTED = {};
 
 /**
  * The flags a command accepts, taken from its own refusal — or `null` when the
@@ -171,17 +167,42 @@ test("query declares every one of the flags TL-194 found hidden", () => {
   }
 });
 
-test("the exemption list does not outlive the defect it records", () => {
-  // An exemption for a flag that IS documented now is a lie about the state of
-  // the tool, and it would hide a genuine regression on that same flag.
-  for (const [name, flags] of Object.entries(UNDOCUMENTED)) {
-    assert.ok(COMMANDS[name], "exemption for a command that no longer exists: " + name);
+/**
+ * What is wrong with an exemption map, entry by entry — empty when every
+ * exemption still names a real defect.
+ *
+ * A FUNCTION because the real map is empty since TL-217, and a loop over
+ * nothing passes while proving nothing (`AGENTS.md`: a guard green on a zero
+ * sample has no evidentiary force). The positive control below runs it over a
+ * map that lies.
+ */
+function exemptionProblems(map) {
+  const problems = [];
+  for (const [name, flags] of Object.entries(map)) {
+    if (!COMMANDS[name]) { problems.push("exemption for a command that no longer exists: " + name); continue; }
     const accepts = new Set(accepted(name) || []);
     const has = declared(name);
     for (const flag of flags) {
-      assert.ok(accepts.has(flag), name + ": exempting " + flag + ", which it no longer accepts");
-      assert.equal(has.has(flag), false,
-        name + ": " + flag + " is documented now — remove it from the exemption list");
+      if (!accepts.has(flag)) problems.push(name + ": exempting " + flag + ", which it no longer accepts");
+      if (has.has(flag)) problems.push(name + ": " + flag + " is documented now — remove it from the exemption list");
     }
   }
+  return problems;
+}
+
+test("positive control: an exemption that lies about the tool IS caught", () => {
+  // `query` is the command TL-194 documented in full, so every flag of it is a
+  // lie in this map — and a flag no command accepts is the other way to be wrong.
+  assert.deepEqual(exemptionProblems({ query: ["--zzz-not-a-flag"] }).length, 1,
+    "an exemption for a flag nothing accepts passed");
+  assert.deepEqual(exemptionProblems({ query: ["--text"] }).length, 1,
+    "an exemption for a flag that IS documented passed");
+  assert.deepEqual(exemptionProblems({ "no-such-command": ["--x"] }).length, 1,
+    "an exemption for a command that does not exist passed");
+});
+
+test("the exemption list does not outlive the defect it records", () => {
+  // An exemption for a flag that IS documented now is a lie about the state of
+  // the tool, and it would hide a genuine regression on that same flag.
+  assert.deepEqual(exemptionProblems(UNDOCUMENTED), []);
 });

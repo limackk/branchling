@@ -6,20 +6,29 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P2                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude-opus-5
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
 confidence: high                   # how much you trust the estimate
 created: 2026-09-03
-updated: 2026-09-03
+updated: 2026-09-21
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
+# CHECKED AGAINST AN UNCHANGED TREE BEFORE THE WORK (TL-260's rule). The first
+# entry already FAILED there — the map held six commands, not zero — so it was
+# kept. What it could not prove is that the flags are declared rather than the
+# map merely deleted, and the guard that proves that was not named at all: it
+# is `flags-declared` below, the case that compares each command's accepted set
+# with its own `--help`. A third entry was added rather than the grep replaced,
+# because the grep is what makes WIDENING the exemption fail instead of pass.
 verification:                      # HOW to check the task is really done
   - id: exemption-list-empty
     bash: "grep -q 'const UNDOCUMENTED = {};' scripts/tests/help-covers-flags.test.mjs"
+  - id: flags-declared
+    bash: "node --test scripts/tests/help-covers-flags.test.mjs"
   - id: suite-green
     bash: "node --test scripts/tests/*.test.mjs"
 ---
@@ -84,7 +93,11 @@ and is likely to surface more of these.
 
 ## Acceptance criteria
 
-- [ ] `build --help`, `board --help`, `history --help` and `init --help` each
-      declare every flag their refusal lists, `--dir`/`--help`/`-h` aside.
-      [proof: exemption-list-empty]
-- [ ] The suite stays green. [proof: suite-green]
+- [x] `build --help`, `board --help`, `history --help`, `init --help` and
+      `run --help` each declare every flag their refusal lists, `--dir`,
+      `--help` and `-h` aside. [proof: flags-declared]
+- [x] `plan-from` no longer lists two flags it refuses: its accepted set names
+      what it takes. [proof: flags-declared]
+- [x] The exemption map is empty, so the next exemption needs the argument this
+      one had. [proof: exemption-list-empty]
+- [x] The suite stays green. [proof: suite-green]

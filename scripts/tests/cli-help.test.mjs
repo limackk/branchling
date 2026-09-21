@@ -124,5 +124,10 @@ test("a command's help is assembled from the table, not from a second descriptio
   // from the table at the first change to a flag.
   const text = commandHelpText("build", COMMANDS.build);
   assert.ok(text.includes(COMMANDS.build.summary));
-  assert.ok(text.includes(COMMANDS.build.usage));
+  // LINE BY LINE, because `commandHelpText` indents every usage line (TL-217
+  // gave `build` the flag descriptions it lacked, and a whole-string comparison
+  // asserted the indentation rather than the source of the text).
+  for (const line of COMMANDS.build.usage.split("\n")) {
+    assert.ok(text.includes(line), "the help dropped a usage line: " + JSON.stringify(line));
+  }
 });

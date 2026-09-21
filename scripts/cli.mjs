@@ -41,6 +41,7 @@ import { MARK, color, failure } from "./ui.mjs";
 import { CHECK_GUARDS, effectiveSeverity, guardsForRun } from "./check-guards.mjs";
 import { resolveBacklogDir, resolveBacklogDirOrExit } from "./paths.mjs";
 import { FIELD_SHAPES, REASON_MAX_LENGTH } from "./task-fields.mjs";
+import { DELEGATION_POLICIES } from "./agent-contract.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -188,7 +189,13 @@ export const COMMANDS = {
   build: {
     script: "build-backlog.mjs",
     summary: "rebuild the views (INDEX / NOW / archive / boards) from tasks/*.md",
-    usage: `${N} build [--dir <path>]`,
+    usage: [
+      `${N} build [--root <path>] [--dir <path>]`,
+      "",
+      "  --root <path>  the same directory as --dir, under the name this command was",
+      "                 born with. Kept because calls and hooks written before --dir",
+      "                 existed still pass it; --dir is the one every command takes",
+    ].join("\n"),
   },
   viewer: {
     script: "build-viewer.mjs",
@@ -203,13 +210,24 @@ export const COMMANDS = {
   board: {
     script: "suggest-board.mjs",
     summary: "which board a task belongs to — from path rules, not from guessing",
-    usage: `${N} board <task-file.md> [--json]`,
+    usage: [
+      `${N} board <task-file.md> [--json] [--dir <path>]`,
+      `${N} board --paths <path...> [--registry <boards.yaml>] [--json]`,
+      "",
+      "  The routing rule is the FILES a task touches, so the question can be asked",
+      "  about the paths alone — before the task exists, or about a change in hand.",
+      "",
+      "  --paths <path...>       judge these paths instead of a task file. Everything",
+      "                          after it that is not a flag is one of them",
+      "  --registry <boards.yaml>  read the board rules from this file rather than from",
+      "                          the backlog's own boards.yaml",
+    ].join("\n"),
   },
   history: {
     script: "history-record.mjs",
     summary: "record changes made outside the tool — and claim the ones already logged as nobody's",
     usage: [
-      `${N} history [--file <task.md>] --actor <ns:name> [--source s] [--reason "…"] [--attribute] [--event <id> | --all]`,
+      `${N} history [--file <task.md>] --actor <ns:name> [--source s] [--reason "…"] [--quiet] [--attribute] [--event <id> | --all]`,
       "",
       "  Diffs the tree against `history/.snapshot.json` and appends what changed, under",
       "  the actor you give. This is the supported path for an edit made by hand.",
@@ -222,6 +240,9 @@ export const COMMANDS = {
       "  --attribute       CLAIM recorded changes that carry no author. Needs a reason and a scope",
       "  --event <id>      claim this event only; required when the scope has several candidates",
       "  --all             explicitly claim every unowned change; cannot be combined with --file or --event",
+      "  --quiet           record, and say nothing — for the post-edit hook, which fires",
+      "                    after every save and must not print on unrelated work. The exit",
+      "                    code still reports; only the prose is suppressed",
       "",
       "  WHY `--attribute` EXISTS (TL-130). A running `" + N + " serve` reconciles on a timer,",
       "  so a change made by hand can reach the log — as `unknown` — before the session",
@@ -775,7 +796,19 @@ export const COMMANDS = {
   init: {
     script: "init-backlog.mjs",
     summary: "create a new backlog in an empty directory (--dir is mandatory)",
-    usage: `${N} init --dir <path>`,
+    usage: [
+      `${N} init --dir <path> [--no-gitignore] [--no-example] [--no-nudge] [--skills]`,
+      "",
+      "  --dir is mandatory on purpose: init WRITES files, and guessing where would",
+      "  be guessing about somebody's repository.",
+      "",
+      "  --no-gitignore  do not add the ignore rules for the computed views. They are",
+      "                  rebuilt from the tasks, so a repository that versions them",
+      "                  merges conflicts in files nobody wrote",
+      "  --no-example    do not write the example task",
+      "  --no-nudge      do not create the agent nudge file",
+      `  --skills        also install the packaged skills, as \`${N} skills install\` does`,
+    ].join("\n"),
   },
   instructions: {
     script: "instructions.mjs",
@@ -906,6 +939,8 @@ export const COMMANDS = {
       `${N} run --profile <name> [--max-attempts N] [--max-tasks N] [--timeout <s>]`,
       `${N} run [--dry-run] [--plan] [--json] [--actor <ns:name>] [--stuck-status <s>] [--dir <path>]`,
       `${N} run [--board b] [--label l] [--priority p] [--epic e] [--log-dir <path>]`,
+      `${N} run [--agent-for <role>=<command>] [--profile-for <role>=<name>]`,
+      `${N} run [--delegation <policy>] [--allow-uncontrolled-delegation]`,
       "",
       "  The loop is `next` → your agent → `done`, repeated until the queue is empty.",
       "  It is NOT an agent and never will be: `--agent` is a command template of",
@@ -973,6 +1008,16 @@ export const COMMANDS = {
       "",
       "  --dry-run prints the order and claims nothing. Agent output goes to one log",
       "  file per task, outside the repository, and the path is in the report.",
+      "",
+      "  --agent-for <role>=<command>  one hand for one role, repeatable — the same",
+      "                  command template as --agent, serving only tasks asking for that role",
+      "  --profile-for <role>=<name>   the same, with a profile instead of a command",
+      "  --delegation <policy>  who owns the sub-agents a hand starts. The policies are",
+      "                  " + DELEGATION_POLICIES.join(", ") + "; the first is the default —",
+      "                  the agent's own. The vocabulary comes from agent-contract.mjs, so",
+      "                  this line cannot fall behind it",
+      "  --allow-uncontrolled-delegation  run a managed profile whose adapter cannot",
+      "                  enforce the policy, recording the exception rather than refusing",
       "",
       "  exit: 0 the run finished (blocked tasks included) · 1 the agent never ran ·",
       "        2 usage error",
