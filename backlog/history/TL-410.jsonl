@@ -1,0 +1,1 @@
+{"id":"01M323CRJ2T0H8V71KDXW0E52M","ts":"2026-09-21T13:44:53.570Z","task":"TL-410","field":"__created__","from":"","to":"A migration renames a history log while a writer is appending to it","actor":"agent:claude","source":"new","reason":"unknown"}
