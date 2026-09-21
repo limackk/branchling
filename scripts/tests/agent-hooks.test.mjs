@@ -118,3 +118,45 @@ test("every committed skill symlink resolves", () => {
     assert.ok(existsSync(join(target, "SKILL.md")), entry + " resolves, but to something with no SKILL.md in it");
   }
 });
+
+/**
+ * A slash command may encode the ORDER of invocations, because the tool does not
+ * know it. It may not encode the VALUES, because the tool does — rendered from
+ * this project's `config.yaml`, which a copy here would contradict the moment
+ * somebody renames a status.
+ *
+ * The threshold is three and not one on purpose. `done` and `blocked` are both
+ * statuses AND ordinary English, and a command file is entitled to say
+ * `branchling done`; what no command file has a reason to do is enumerate the
+ * vocabulary, and an enumeration is what three of them in one file means.
+ */
+test("no slash command copies a vocabulary out of config.yaml", () => {
+  const dir = join(REPO_ROOT, ".claude", "commands");
+  const files = existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith(".md")) : [];
+  assert.ok(files.length > 0, ".claude/commands holds no command — the sample is empty, not green");
+  const config = loadConfig(BACKLOG_DIR);
+  for (const file of files) {
+    const text = readFileSync(join(dir, file), "utf8");
+    for (const [field, values] of [["status", config.statuses], ["priority", config.priorities]]) {
+      const found = values.filter((v) => new RegExp("\\b" + v + "\\b").test(text));
+      assert.ok(found.length < 3, file + " lists the " + field + " vocabulary (" + found.join(", ") + ") — ask the tool instead");
+    }
+  }
+});
+
+/**
+ * Three commands are deliberately absent from the allowlist, and each absence is
+ * a rule in AGENTS.md rather than caution: `git push` is named there as needing
+ * an explicit request, `git worktree remove` destroys a tree whose contents only
+ * a person can judge, and `done` closes a task by running its verification.
+ * Pre-approving any of them deletes the rule without saying so.
+ */
+test("the allowlist stops short of the decisions AGENTS.md reserves", () => {
+  const settings = JSON.parse(readFileSync(join(REPO_ROOT, ".claude", "settings.json"), "utf8"));
+  const allow = settings.permissions?.allow ?? [];
+  assert.ok(allow.length > 0, "the allowlist is empty — the sample is empty, not green");
+  for (const reserved of ["git push", "git worktree remove", "cli.mjs done"]) {
+    const hit = allow.filter((rule) => rule.includes(reserved));
+    assert.deepEqual(hit, [], "`" + reserved + "` is pre-approved by " + hit.join(", ") + ", which AGENTS.md does not allow");
+  }
+});

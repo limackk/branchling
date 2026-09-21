@@ -11,5 +11,38 @@
         ]
       }
     ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(node scripts/cli.mjs build:*)",
+      "Bash(node scripts/cli.mjs viewer:*)",
+      "Bash(node scripts/cli.mjs query:*)",
+      "Bash(node scripts/cli.mjs stats:*)",
+      "Bash(node scripts/cli.mjs plan:*)",
+      "Bash(node scripts/cli.mjs check:*)",
+      "Bash(node scripts/cli.mjs doctor:*)",
+      "Bash(node scripts/cli.mjs audit:*)",
+      "Bash(node scripts/cli.mjs docs-drift:*)",
+      "Bash(node scripts/cli.mjs pr-summary:*)",
+      "Bash(node scripts/cli.mjs where:*)",
+      "Bash(node scripts/cli.mjs board:*)",
+      "Bash(node scripts/cli.mjs next-id:*)",
+      "Bash(node scripts/cli.mjs instructions:*)",
+      "Bash(node scripts/cli.mjs new:*)",
+      "Bash(node --test scripts/tests/:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Bash(git ls-files:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git rev-list:*)",
+      "Bash(git check-ignore:*)",
+      "Bash(git worktree list:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git merge --ff-only:*)"
+    ]
   }
 }

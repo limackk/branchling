@@ -1,0 +1,4 @@
+{"id":"01M31GVF0DVB7YFF5A401B2WD4","ts":"2026-09-21T08:20:52.365Z","task":"TL-392","field":"__created__","from":"","to":"The Claude Code session surface ships with the repository","actor":"agent:claude","source":"new","reason":"unknown"}
+{"id":"01M31H8B82506BMPYF8AAVGRNF","ts":"2026-09-21T08:27:54.498Z","task":"TL-392","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M31H8B827FMHM2JKPD5QMDD1","ts":"2026-09-21T08:27:54.498Z","task":"TL-392","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M31H8BHB9KZY4MPYWGR1VXCW","ts":"2026-09-21T08:27:54.795Z","task":"TL-392","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
