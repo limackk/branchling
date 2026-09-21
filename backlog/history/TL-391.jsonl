@@ -1,0 +1,4 @@
+{"id":"01M31GVBHF0H7YH0RSSYY7HCTJ","ts":"2026-09-21T08:20:48.815Z","task":"TL-391","field":"__created__","from":"","to":"A configured hook points at a script that exists","actor":"agent:claude","source":"new","reason":"unknown"}
+{"id":"01M31H86Z93R0TMV1J7ZD7KKD2","ts":"2026-09-21T08:27:50.121Z","task":"TL-391","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M31H86Z9HQG29AP5D1S9YVTQ","ts":"2026-09-21T08:27:50.121Z","task":"TL-391","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M31H878DQW5BB6ZG12MEF0HS","ts":"2026-09-21T08:27:50.413Z","task":"TL-391","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
