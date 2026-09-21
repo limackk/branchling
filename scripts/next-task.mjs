@@ -329,10 +329,14 @@ export function heldElsewhere(task, handedOut) {
  *            claiming it here would manufacture the divergence. So the local
  *            status has to be one of this call's own.
  *
- * THE PLAN NARROWS IT AND NEVER REORDERS IT (TL-183). `filters.planIds` keeps
- * only the tasks of the wave the caller resolved; INSIDE the wave the policy
- * above still decides, because a wave is a batch and the plan makes no claim
- * about the order of its members.
+ * THE PLAN NARROWS IT AND THEN ORDERS WHAT IS LEFT (TL-257, superseding the
+ * half of TL-183 that said a wave makes no claim about the order of its
+ * members). `filters.planIds` keeps only the tasks of the wave the caller
+ * resolved, IN THE ORDER THE WAVE LISTS THEM, and that order ranks the
+ * candidates: a wave is an order, and inside one it is the only place an author
+ * can say that B reads A's correction — `priority:` is a property of a task and
+ * not of its position in a sequence. The policy above still ranks everything
+ * the plan does not schedule, which is every call without `--plan`.
  *
  * TWO QUANTITIES, TWO NAMES (TL-219). What the wave gate steps over is counted
  * twice, because a reader asks two different questions about it:
@@ -391,6 +395,53 @@ export function lastHandoff(entries) {
   return found;
 }
 
+/**
+ * THE RECORDS `selectCandidates` IS ENTITLED TO DECIDE ON — read once, here.
+ *
+ * `selectCandidates` is pure and reads no disk, so every fact about a task that
+ * lives outside its file has to be ATTACHED before the call: what the rest of
+ * this clone says about it (`elsewhere`), the log it was judged in (`history`)
+ * and the judgement itself (`handedBack`). A caller that reads the task files
+ * alone passes the same function a thinner tree and gets a different queue out
+ * of it — which is exactly what `run --dry-run` did until TL-239: it projected
+ * a task its own live loop would never be handed, because the handoff that
+ * excluded the task was in a log the projection never opened.
+ *
+ * SO THERE IS ONE LOADER AND BOTH PATHS CALL IT. The alternative — repeating
+ * the three attachments in the dispatcher's other caller — closes today's
+ * divergence and reopens it at the next fact added to selection, in a place
+ * nobody will think to look. The caller still owns its FILTERS, because those
+ * are the question being asked; this owns the tree the question is asked about.
+ *
+ * THE SCAN COMES BACK WITH THEM because its own summary is part of the answer:
+ * `next` prints WHY it could see no other branch, and a caller that had to run
+ * `crossBranchState` a second time to say so would be reading the tree twice to
+ * report on one reading of it.
+ *
+ * @param {string} root the repository root
+ * @param {object} config the loaded configuration
+ * @returns {{records: object[], scan: object}} the task records, with
+ *          `elsewhere`, `history` and `handedBack` attached, and the scan they
+ *          were attached from
+ */
+export function readDispatchRecords(root, config) {
+  const records = readTaskRecords(backlogPaths(root).tasksDir, config.taskId.file);
+  // What the REST of this clone says (TL-133). Attached exactly as `query`
+  // attaches it, from the same module, so the dispatcher and the listing cannot
+  // disagree about the tree they are both looking at.
+  const scan = crossBranchState(root, config);
+  for (const t of records) t.elsewhere = divergences(t.status, scan.byId.get(t.id));
+  // Read for the OPEN tasks only. A closed one can never be a candidate, and in
+  // a backlog that has been running a while most of the tree is closed — so
+  // this costs a read per task that could actually be handed out, not per task.
+  for (const t of records) {
+    if (config.archivedStatuses.indexOf(t.status) >= 0) continue;
+    t.history = readHistory(root, t.id);
+    t.handedBack = lastHandoff(t.history);
+  }
+  return { records, scan };
+}
+
 export function selectCandidates(records, config, filters, now) {
   const archived = new Set(config.archivedStatuses);
   // The species gate is applied to the RECORDS, before any selection: a task
@@ -436,6 +487,13 @@ export function selectCandidates(records, config, filters, now) {
   // correctly leaves nothing: falling through to unplanned work would answer a
   // question the caller did not ask.
   //
+  // ITS ITERATION ORDER IS PART OF THE ARGUMENT, NOT AN ACCIDENT (TL-257): the
+  // caller builds the set from the wave's own list, so the insertion order of a
+  // `Set` is the order its author wrote. That is what ranks the candidates
+  // below. A caller that built the set from anything else would be handing this
+  // function a wave it had reordered, which is a defect in the caller — there
+  // is no second field to keep in step, and no order to lose.
+  //
   // BOTH COUNTS ARE TAKEN HERE, past the two gates above (TL-219). That order
   // is deliberate and unchanged: a task this caller may never be handed is not
   // work the plan stepped over, and subtracting one count from the other stays
@@ -474,6 +532,21 @@ export function selectCandidates(records, config, filters, now) {
     }
   }
   sortTasks(fresh, "priority", config);
+  // AND THEN THE WAVE'S OWN ORDER, WHICH OUTRANKS THE PRIORITY (TL-257). It is
+  // applied AFTER the priority sort rather than instead of it, so a wave that
+  // lists a task the tree does not hold, and a `fresh` pool built from two
+  // pools, still come out deterministically ranked. `plan` prints this order and
+  // the dispatcher now follows it; before this, the first task of a wave was one
+  // id to the reader and another to the run.
+  if (filters.planIds) {
+    const rank = new Map();
+    for (const id of filters.planIds) rank.set(id, rank.size);
+    const at = (t) => {
+      const i = rank.get(String(t.id).toUpperCase());
+      return i === undefined ? rank.size : i;
+    };
+    fresh.sort((a, b) => at(a) - at(b));
+  }
 
   // A judgement this same actor already made about this same task. It is a
   // fact READ FROM THE TREE, not a rule a caller keeps to itself: selection
@@ -645,20 +718,7 @@ export function run(argv) {
   }
 
   const now = Date.now();
-  const records = readTaskRecords(backlogPaths(root).tasksDir, config.taskId.file);
-  // What the REST of this clone says (TL-133). Attached exactly as `query`
-  // attaches it, from the same module, so the dispatcher and the listing cannot
-  // disagree about the tree they are both looking at.
-  const scan = crossBranchState(root, config);
-  for (const t of records) t.elsewhere = divergences(t.status, scan.byId.get(t.id));
-  // Read for the OPEN tasks only. A closed one can never be a candidate, and in
-  // a backlog that has been running a while most of the tree is closed — so
-  // this costs a read per task that could actually be handed out, not per task.
-  for (const t of records) {
-    if (config.archivedStatuses.indexOf(t.status) >= 0) continue;
-    t.history = readHistory(root, t.id);
-    t.handedBack = lastHandoff(t.history);
-  }
+  const { records, scan } = readDispatchRecords(root, config);
   // The wave is resolved from the RECORDS just read, never from a generated
   // view: a view answers from the last `build`, and a wave whose last task
   // closed a minute ago would still be the one this hands work out of.

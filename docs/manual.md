@@ -260,9 +260,12 @@ next up (wave 2 — Consumers):
 
 **Asking the dispatcher to follow it** is `--plan`, on `next` and on `run`. The
 queue then holds only what the plan schedules, and only the earliest wave still
-holding an open task; inside that wave priority and id decide as they always
-did, because a wave is a batch and the plan makes no claim about the order of
-its members. `run --plan --dry-run` prints the order under its wave names.
+holding an open task; inside that wave the tasks are handed out IN THE ORDER THE
+WAVE LISTS THEM, which outranks priority and id. A wave is an order, and the
+sequence its author wrote is the only place they can say that one member reads
+another's correction — `priority:` is a property of a task, not of its position.
+Priority still ranks every queue the plan is not being followed for.
+`run --plan --dry-run` prints the order under its wave names.
 
 ```
 $ branchling run --plan --dry-run
@@ -628,7 +631,7 @@ implementation detail. Every reading command answers in the same envelope:
 | `<command> --help` | `command-help` | `command`, `summary`, `usage`, `configured`, `flags` |
 | `pr-summary` | `pr-summary` | `base`, `scanned`, `reason`, `tasks`, `engaged`, `cost` |
 | `audit` | `audit` | `since`, `dayZero`, `tasks`, `findings`, `closedWithoutTrace`, `skippedBeforeSince`, `reopened`, `parked`, `withoutPremise`, `awaitingVouch`, `handedBack`, `vouches`, `advisories` |
-| `run` | `run` | `ok`, `dryRun`, `agent`, `profile`, `agentFor`, `profileFor`, `delegation`, `allowUncontrolledDelegation`, `plan`, `order`, `considered`, `stoppedAt`, `stopped`, `agentNeverRan`, `waitingForRole`, `waitingForExecutor`, `waitingForSize`, `tally`, `sharedState`, `ms`, `tasks` |
+| `run` | `run` | `ok`, `dryRun`, `agent`, `profile`, `agentFor`, `profileFor`, `delegation`, `allowUncontrolledDelegation`, `plan`, `order`, `considered`, `stoppedAt`, `stopped`, `agentNeverRan`, `waitingForRole`, `waitingForExecutor`, `waitingForSize`, `tally`, `sharedState`, `ms`, `tasks`, `skippedHandedBack` |
 | `take`, `next` | `task-take` | `ok`, `taken`, `id`, `file`, `task`, `from`, `text`, `decisions`, `probe`, `warnings`, `reclaimed`, `tookOver`, `lock`, `refusalKind`, `refusal`, `details`, and — filled in by next — `passedOver`, `considered`, `searchedStatuses`, `skippedBlocked`, `skippedElsewhere`, `closedElsewhere`, `skippedExecutor`, `skippedHandedBack`, `skippedSize`, `skippedByRecord`, `scan`, `plan` |
 | `handoff` | `task-handoff` | `ok`, `id`, `file`, `task`, `role`, `owner`, `status` (each a from/to pair), `comment`, `released`, `warnings`, `refusalKind`, `refusal`, `details` |
 | `release` | `task-release` | `ok`, `id`, `status`, `owner`, `released`, `comment`, `refusalKind`, `refusal`, `details` |

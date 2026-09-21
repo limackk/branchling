@@ -88,7 +88,7 @@ import { readHistory, recordEdit } from "./history.mjs";
 import { roleBrief } from "./instructions.mjs";
 import { userConfigPath } from "./home.mjs";
 import { lockScope, releaseLock, stateRoot } from "./lock.mjs";
-import { callerSpecies, isOverSized, queueStatuses, selectCandidates, servesExecutor } from "./next-task.mjs";
+import { callerSpecies, isOverSized, queueStatuses, readDispatchRecords, selectCandidates, servesExecutor } from "./next-task.mjs";
 import { backlogPaths, repositoryRoot, resolveBacklogDir } from "./paths.mjs";
 import { loadPlanForDispatch, planState, projectionWall } from "./plan.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
@@ -1464,9 +1464,20 @@ export async function run(argv) {
   // The order comes from `next`'s own selection function rather than from a
   // second implementation of the policy — the same module, not a copy of it.
   if (plan.dryRun) {
-    const records = readTaskRecords(backlogPaths(root).tasksDir, config.taskId.file);
-    const base = { ...filters, callerSpecies: callerSpecies(actor) };
+    // THE SAME TREE THE LIVE LOOP'S `next` DECIDES ON (TL-239), from the one
+    // loader both paths call: the task files alone are not the tree selection
+    // runs against, and a projection built from them lists work the run is
+    // never offered.
+    const { records } = readDispatchRecords(root, config);
+    // AND THE SAME QUESTION, WHICH INCLUDES WHO IS ASKING. `actor` is a filter
+    // here for the reason it is one in `next`: a task this actor handed back is
+    // not handed to it again (TL-141), and a projection that leaves the actor
+    // out is projecting somebody else's queue.
+    const base = { ...filters, callerSpecies: callerSpecies(actor), actor };
     const rows = [];
+    // Named, never silent: what the projection declined for THIS actor's own
+    // earlier judgement is reported under the order, the way `next` reports it.
+    const handedBack = new Map();
     // The wave the projection stopped at, or null when it walked the plan out
     // (TL-206). It is reported in both renderings below: an operator reading an
     // order with nothing in it needs a second place to look for the reason, and
@@ -1484,9 +1495,10 @@ export async function run(argv) {
       const from = state.activeWave === null ? state.waves.length : state.activeWave;
       for (const w of state.waves.slice(from)) {
         const planIds = new Set(w.tasks.map((e) => String(e.id).toUpperCase()));
-        const { candidates, skippedBlocked } =
+        const { candidates, skippedBlocked, skippedHandedBack } =
           selectCandidates(records, config, { ...base, planIds }, Date.now());
         for (const t of candidates) rows.push({ task: t, wave: w.index + 1, name: w.name });
+        for (const s of skippedHandedBack) handedBack.set(s.id, s);
         // AND NO FURTHER THAN THE RUN WOULD GET. A task this wave's own members
         // are blocking is reachable — the run closes the blocker first, which is
         // what the footnote below has always said — so it counts towards
@@ -1497,8 +1509,9 @@ export async function run(argv) {
         if (wall) break;
       }
     } else {
-      const { candidates } = selectCandidates(records, config, base, Date.now());
+      const { candidates, skippedHandedBack } = selectCandidates(records, config, base, Date.now());
       for (const t of candidates) rows.push({ task: t, wave: null, name: "" });
+      for (const s of skippedHandedBack) handedBack.set(s.id, s);
     }
     const shown = plan.maxTasks ? rows.slice(0, plan.maxTasks) : rows;
     if (plan.json) {
@@ -1511,6 +1524,7 @@ export async function run(argv) {
           ...(planned ? { wave: r.wave, waveName: r.name } : {}),
         })),
         considered: rows.length,
+        skippedHandedBack: [...handedBack.values()].map((s) => ({ id: s.id, actor: s.actor, reason: s.reason })),
         ...(planned ? { stoppedAt: wall } : {}),
       });
     } else {
@@ -1526,6 +1540,11 @@ export async function run(argv) {
           r.task.priority + "  " + r.task.title);
       }
       console.log("");
+      for (const s of handedBack.values()) {
+        console.log("  " + color.dim(
+          s.id + " skipped — you handed it back yourself" + (s.reason ? ": " + s.reason : "")
+        ));
+      }
       if (wall) {
         console.log("  " + color.dim(
           "the projection stops at wave " + wall.wave + " — " + (wall.name || "unnamed") + ": " +

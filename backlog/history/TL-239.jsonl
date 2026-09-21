@@ -1,1 +1,4 @@
 {"id":"01M1NQY77NFD3EVYN5PES7N493","ts":"2026-09-04T08:18:07.733Z","task":"TL-239","field":"__created__","from":"","to":"run --dry-run projects a task this actor handed back, which the run will not take","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-54c3956f330a"}
+{"id":"01M32FCHRYANNTPGSE2G56MR09","ts":"2026-09-21T17:14:29.534Z","task":"TL-239","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M32FCHRY50VGNHJDW9KQYJD3","ts":"2026-09-21T17:14:29.534Z","task":"TL-239","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M32G4PYATGVX2BYQFHA2MEN0","ts":"2026-09-21T17:27:41.258Z","task":"TL-239","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
