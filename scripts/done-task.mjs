@@ -42,7 +42,7 @@ import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { applyProofs, auditTask, parseCriteria, parseVerification } from "./criteria.mjs";
 import { buildFieldSpecs, extractMeta, fieldSpec, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
-import { ACTOR_NAMESPACES, appendEntries, currentSession, eventId, FIELD_UNVERIFIED, FIELD_VERIFIED, isValidActor, isValidReason, REASON_PROVEN, recordEdit, requiresReason } from "./history.mjs";
+import { ACTOR_NAMESPACES, appendEntries, currentSession, eventId, FIELD_UNVERIFIED, FIELD_VERIFIED, isValidActor, REASON_PROVEN, reasonRefusal, recordEdit, requiresReason } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { releaseLock } from "./lock.mjs";
 import { MARK, color, errColor, failure } from "./ui.mjs";
@@ -129,17 +129,15 @@ export function parseDoneArgs(args) {
     if (a === "--reason") {
       reason = args[++i] || null;
       if (!reason) throw new Error("`--reason` with no text");
-      // A reserved value is a bad ARGUMENT — wrong whatever the task and whatever
-      // the configuration say — so it fails here with the other usage errors
-      // rather than as a refusal about this particular closure.
-      if (!isValidReason(reason)) {
-        throw new Error(
-          "`--reason " + reason + "` is reserved\n" +
-            "`unknown` and `proven` are what the tool writes when nobody stated a reason\n" +
-            "or when a run stood in for one. Typing them by hand would dress a machine's\n" +
-            "answer up as yours."
-        );
-      }
+      // An unusable value is a bad ARGUMENT — wrong whatever the task and
+      // whatever the configuration say — so it fails here with the other usage
+      // errors rather than as a refusal about this particular closure. WHICH of
+      // the three rules it breaks is `reasonRefusal`'s to say (TL-254): this
+      // site used to call every unusable reason "reserved" and echo the whole
+      // of it back, so a 600-character sentence was refused with the one cause
+      // it did not have, and the length that explains it was never printed.
+      const refusal = reasonRefusal(reason, "--reason");
+      if (refusal) throw new Error(refusal);
       continue;
     }
     if (a.startsWith("-")) {

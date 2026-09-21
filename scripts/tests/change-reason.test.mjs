@@ -480,13 +480,16 @@ const REASON_SITES = [
   { name: "history --reason", argv: (v) => ["history", "--actor", "local:me", "--reason", v] },
   { name: "ask --option", argv: (v) => ["ask", "FX-1", "--actor", "local:me", "--question", "which way?", "--option", v, "--option", "the other way"] },
   { name: "ask --question", argv: (v) => ["ask", "FX-1", "--actor", "local:me", "--question", v], emptyRefusedEarlier: true },
+  { name: "done --reason", argv: (v) => ["done", "FX-1", "--actor", "local:me", "--reason", v] },
 ];
 
 /** A guard iterating an empty table is green and proves nothing. The count is
- *  the six call sites TL-167 names plus `--question`, which shares the
- *  validator and therefore the defect. */
+ *  the six call sites TL-167 names, plus `--question`, which shares the
+ *  validator and therefore the defect, plus `done --reason` (TL-254), which
+ *  TL-167 missed because it phrased the same refusal in words of its own and
+ *  the grep that found the others looked for one literal sentence. */
 test("every call site that prints this refusal is in the table", () => {
-  assert.equal(REASON_SITES.length, 7);
+  assert.equal(REASON_SITES.length, 8);
 });
 
 /** The refusal, as a person reads it. Exit 2, because a reserved or malformed
