@@ -2,3 +2,4 @@
 {"id":"01M1ZZ84KYYHPDMNJACPWY4AHW","ts":"2026-09-08T07:38:17.086Z","task":"TL-380","field":"related_docs","from":[],"to":["docs/branchling-global-tool.md","README.md"],"actor":"local:me","source":"manual","reason":"Linked the task contract to its public implementation context"}
 {"id":"01M20ACSF1A2FJGZ9XQFQCPCW6","ts":"2026-09-08T10:53:03.841Z","task":"TL-380","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown"}
 {"id":"01M20ACSF1PR6ZXT77ZJE84G2Z","ts":"2026-09-08T10:53:03.841Z","task":"TL-380","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown"}
+{"id":"01M31JHYN2H7RQ9CH1Z2S4SJBZ","ts":"2026-09-21T08:50:37.858Z","task":"TL-380","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}

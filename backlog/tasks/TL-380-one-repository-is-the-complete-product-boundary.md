@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: "Evidence-gated product focus"
 priority: P2
-status: in_progress  # pending | in_progress | blocked | done | cancelled
+status: done  # pending | in_progress | blocked | done | cancelled
 owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1d
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-08
-updated: 2026-09-08
+updated: 2026-09-21
 blocked_by: [TL-377]
 blocks: []                         # ids this task will unblock
 related_docs:
@@ -70,10 +70,10 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] The public surface contains no project registry, all-project query or
+- [x] The public surface contains no project registry, all-project query or
       cross-project viewer state. [proof: one-repository]
-- [ ] `--dir`, `BACKLOG_DIR`, upward detection and co-location still resolve one
+- [x] `--dir`, `BACKLOG_DIR`, upward detection and co-location still resolve one
       backlog correctly. [proof: one-repository]
-- [ ] Deleting any old machine-local registry does not affect ordinary commands.
+- [x] Deleting any old machine-local registry does not affect ordinary commands.
       [proof: one-repository]
-- [ ] The complete remaining suite passes. [proof: suite-green]
+- [x] The complete remaining suite passes. [proof: suite-green]
