@@ -2,3 +2,4 @@
 {"id":"01M1ZZ846C5CT8XGSNDAHFX1H0","ts":"2026-09-08T07:38:16.652Z","task":"TL-378","field":"related_docs","from":[],"to":["docs/backlog-time-tracking.md","README.md"],"actor":"local:me","source":"manual","reason":"Linked the task contract to its public implementation context"}
 {"id":"01M200KD7K4DVPG52VGKGXCDHB","ts":"2026-09-08T08:01:54.931Z","task":"TL-378","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
 {"id":"01M200KD7K5KB8QAG20VM7Z4JJ","ts":"2026-09-08T08:01:54.931Z","task":"TL-378","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown","session":"tree-526f61f2043f"}
+{"id":"01M31JET5ZPFYGQ6S6FYH7D127","ts":"2026-09-21T08:48:54.975Z","task":"TL-378","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven"}
