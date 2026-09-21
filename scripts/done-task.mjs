@@ -214,6 +214,68 @@ export function suppressedNote(output) {
   return ", " + lines + " line" + (lines === 1 ? "" : "s") + " not shown";
 }
 
+/** The gutter every captured line is written behind. Two columns, so the
+ *  transcript keeps its own indentation relative to itself. */
+export const TRANSCRIPT_GUTTER = "│ ";
+
+/**
+ * THE REFUSAL FRAMES THE TRANSCRIPT IT PASTES (TL-275).
+ *
+ * WHAT WENT WRONG WITHOUT IT. A failing entry's output was written to stderr
+ * unframed, immediately before this command's own refusal, and the two layers
+ * share one alphabet: a test that runs this CLI and asserts it refuses captures
+ * `✗` and prints it inside the test runner's stream. Two sessions, six waves
+ * apart and neither having seen the other, read those fixture lines as failures
+ * of the repository they were closing a task in, and each paid for a second full
+ * suite run to find out they were not. A refusal is read by whoever has only the
+ * transcript, and an autonomous loop feeds that transcript to the next attempt
+ * as the reason the last one failed — so a wrong diagnosis is inherited rather
+ * than corrected.
+ *
+ * WHAT THE FRAME BUYS, PER LINE. Behind the gutter: output of the command the
+ * contract ran. Without it: this refusal. That is the whole boundary this
+ * command is in a position to know, and it is stated rather than left to the
+ * glyphs. The header resolves what is left inside the frame — a line carrying
+ * this tool's own error mark is this tool run BY that command — and counts those
+ * lines, so the reader knows how many are waiting for them before they scroll.
+ *
+ * WHY THE LINE COUNT APPEARS TWICE. The transcript is written WHOLE and always
+ * has been; what the second report met was a reader whose window cut it before
+ * the real failures. This command cannot stop that, and shortening the evidence
+ * to fit would be the wrong answer to it. Naming the count in the header and
+ * again in the footer makes a cut detectable instead of invisible: a reader who
+ * counts fewer lines than the frame claims knows something between here and them
+ * truncated it.
+ *
+ * @param {string|null} output the captured transcript
+ * @param {{command?: string, exitCode?: number, color?: object}} opts
+ */
+export function transcriptBlock(output, opts = {}) {
+  const paint = opts.color || errColor;
+  const body = String(output == null ? "" : output).replace(/\n+$/, "");
+  const rows = body.length ? body.split("\n") : [];
+  const count = rows.length + (rows.length === 1 ? " line" : " lines");
+  const nested = rows.filter((l) => l.indexOf(MARK.err) >= 0).length;
+  const out = [
+    "",
+    paint.dim("── transcript of ") + paint.id("`" + (opts.command || "") + "`") +
+      paint.dim(" (exit " + opts.exitCode + ") · " + count + " ──"),
+    paint.dim("   Every line behind `" + TRANSCRIPT_GUTTER.trim() + "` is that command's output, not this refusal."),
+  ];
+  if (nested) {
+    // The count is named, the MARK is not REPRINTED. A frame whose own header
+    // carried the glyph would put an unguttered error mark inside the region it
+    // exists to keep clean, and the sentence would be evidence against itself.
+    out.push(paint.dim(
+      "   " + nested + " of them " + (nested === 1 ? "is" : "are") + " " + N +
+      " refusing inside that command, not a failure of this run."
+    ));
+  }
+  for (const row of rows) out.push(paint.dim(TRANSCRIPT_GUTTER) + row);
+  out.push(paint.dim("── end of transcript · " + count + " written ──"));
+  return out.join("\n") + "\n";
+}
+
 /** Today, as the frontmatter writes it. */
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -711,7 +773,15 @@ function run(argv) {
   if (failed) {
     // Captured output is the failing entry's whole transcript, and it goes to
     // stderr before the refusal so the last screen a reader sees is the verdict.
-    if (failed.output) process.stderr.write(failed.output + (failed.output.endsWith("\n") ? "" : "\n"));
+    // FRAMED, not pasted (TL-275): unframed, its lines are indistinguishable
+    // from the refusal's own, and this tool's `✗` captured from a nested run
+    // reads as a failure of the repository being closed.
+    if (failed.output) {
+      process.stderr.write(transcriptBlock(failed.output, {
+        command: failed.entry.bash,
+        exitCode: failed.exitCode,
+      }));
+    }
     console.error("");
     console.error(
       failure(N + " done", plan.id + ": verification failed (exit " + failed.exitCode + ")", [
