@@ -24,7 +24,7 @@ import { ranked, summarize } from "./stats.mjs";
 import { readTaskMetas } from "./task-io.mjs";
 import { hoursLabel } from "./estimate.mjs";
 import { printJson } from "./json-envelope.mjs";
-import { heading, line, priorityPaint, statusPaint, table } from "./ui.mjs";
+import { heading, line, priorityPaint, refusal, statusPaint, table } from "./ui.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -35,8 +35,8 @@ const argv = cli.argv;
 const KNOWN_FLAGS = ["--json", "--context"];
 for (const a of argv) {
   if (KNOWN_FLAGS.indexOf(a) < 0) {
-    console.error(`${N} stats: unknown flag: ` + a);
-    console.error("  available: " + KNOWN_FLAGS.join(" ") + " --dir <path>");
+    console.error(refusal(N + " stats", "unknown flag: " + a,
+      KNOWN_FLAGS.join(" ") + " --dir <path>"));
     process.exit(2);
   }
 }

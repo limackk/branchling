@@ -55,6 +55,7 @@ import { explain as explainIndex, modifiedFiles, repoRoot, touches } from "./mod
 import { backlogPaths, resolveBacklogDir, resolveBacklogDirOrExit } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { SORT_KEYS, filterTasks, readTaskRecords, sortTasks, splitList, unknownFilterValues } from "./task-select.mjs";
+import { refusal } from "./ui.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -84,7 +85,8 @@ const argv = process.argv.slice(2);
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
   if (!a.startsWith("--") && a !== "-h") {
-    console.error(`✗ unexpected argument: ${a} (every criterion is given as a flag)`);
+    console.error(refusal(`${N} query`, `unexpected argument: ${a} (every criterion is given as a flag)`,
+      [...VALUE_FLAGS, ...BOOL_FLAGS].sort().join(" ")));
     process.exit(2);
   }
   if (BOOL_FLAGS.has(a)) {
@@ -97,8 +99,8 @@ for (let i = 0; i < argv.length; i++) {
     }
     opts[a.replace(/^--/, "")] = v;
   } else {
-    console.error(`✗ unknown flag: ${a}`);
-    console.error(`  available: ${[...VALUE_FLAGS, ...BOOL_FLAGS].sort().join(" ")}`);
+    console.error(refusal(`${N} query`, `unknown flag: ${a}`,
+      [...VALUE_FLAGS, ...BOOL_FLAGS].sort().join(" ")));
     process.exit(2);
   }
 }

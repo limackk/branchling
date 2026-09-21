@@ -42,7 +42,7 @@ import { auditVocabulary, extractMeta, splitFrontmatter } from "./task-fields.mj
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { readStdinText } from "./stdin.mjs";
 import { parseTaskDocument, taskContent } from "./task-input.mjs";
-import { failure } from "./ui.mjs";
+import { failure, refusal } from "./ui.mjs";
 import { readTaskMetas } from "./task-io.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -171,9 +171,9 @@ function parseArgs(argv) {
     const a = flags[i];
     if (!a.startsWith("-")) {
       if (i > 0 && FLAGS[flags[i - 1]]) continue; // the previous flag's value
-      return { error: "unexpected argument: " + a };
+      return { error: "unexpected argument: " + a, available: true };
     }
-    if (!FLAGS[a]) return { error: "unknown flag: " + a };
+    if (!FLAGS[a]) return { error: "unknown flag: " + a, available: true };
     // Only the LAST flag before the separator reaches past it, and only that
     // one is exempt from the dash heuristic.
     const beyond = i + 1 === flags.length;
@@ -182,7 +182,7 @@ function parseArgs(argv) {
     values[FLAGS[a]] = value;
   }
   const spent = flags.length > 0 && FLAGS[flags[flags.length - 1]] ? 1 : 0;
-  if (literal.length > spent) return { error: "unexpected argument: " + literal[spent] };
+  if (literal.length > spent) return { error: "unexpected argument: " + literal[spent], available: true };
   return { values };
 }
 
@@ -502,7 +502,17 @@ async function readTaskInput(opts) {
 export async function main(argv) {
   const cli = takeDirFlag(argv);
   const parsed = parseArgs(cli.argv);
-  if (parsed.error) return fail(parsed.error, `usage: ${N} new --title "…" [--board b] [--priority P1] [--epic e] [--estimate 2h] [--body-file f]`);
+  if (parsed.error) {
+    // An argument error names the ACCEPTED SET, in the one wording every command
+    // uses (TL-220); the old `usage:` line read well and could not be asked what
+    // `new` takes. `--dir` is taken off by takeDirFlag before this point, so it
+    // is named here rather than read out of FLAGS.
+    if (parsed.available) {
+      console.error(refusal(N + " new", parsed.error, Object.keys(FLAGS).join(" ") + " --dir <path>"));
+      return 2;
+    }
+    return fail(parsed.error, `usage: ${N} new --title "…" [--board b] [--priority P1] [--epic e] [--estimate 2h] [--body-file f]`);
+  }
 
   const opts = parsed.values;
   if (!opts.title) return fail(`give it a title: ${N} new --title "Do the thing"`, "a task with no title is useless to the next person");

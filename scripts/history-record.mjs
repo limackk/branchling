@@ -29,6 +29,7 @@ import { resolveActor } from "./actor.mjs";
 import { ACTOR_NAMESPACES, FIELD_ADOPTED, FIELD_ATTRIBUTED, attributeChanges, isValidActor, readHistory, reasonRefusal, reconcile, taskIdFromFile, unattributedChanges } from "./history.mjs";
 import { resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
+import { refusal } from "./ui.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -54,13 +55,13 @@ for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
   if (!a.startsWith("-")) {
     if (i > 0 && FLAGS_WITH_VALUE.indexOf(argv[i - 1]) >= 0) continue; // the previous flag's value
-    console.error(`${N} history: unexpected argument: ` + a);
-    console.error("  available: " + KNOWN_FLAGS.join(" ") + " --dir <path>");
+    console.error(refusal(N + " history", "unexpected argument: " + a,
+      KNOWN_FLAGS.join(" ") + " --dir <path>"));
     process.exit(2);
   }
   if (KNOWN_FLAGS.indexOf(a) < 0) {
-    console.error(`${N} history: unknown flag: ` + a);
-    console.error("  available: " + KNOWN_FLAGS.join(" ") + " --dir <path>");
+    console.error(refusal(N + " history", "unknown flag: " + a,
+      KNOWN_FLAGS.join(" ") + " --dir <path>"));
     process.exit(2);
   }
 }

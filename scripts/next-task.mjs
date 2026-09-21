@@ -94,7 +94,7 @@ export function parseNextArgs(args) {
       continue;
     }
     if (a.startsWith("-")) {
-      throw new Error("unknown flag: " + a + "\nknown flags: " + NEXT_FLAGS.concat(["--role-strict"]).join(" "));
+      throw new Error("unknown flag: " + a + "\navailable: " + NEXT_FLAGS.concat(["--role-strict"]).join(" "));
     }
     throw new Error(
       "unexpected argument: " + a + "\n" +

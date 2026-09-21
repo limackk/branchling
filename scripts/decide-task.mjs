@@ -100,7 +100,7 @@ export function parseDecideArgs(args) {
       continue;
     }
     if (a.startsWith("-")) {
-      throw new Error("unknown flag: " + a + "\nknown flags: " + DECIDE_FLAGS.join(" "));
+      throw new Error("unknown flag: " + a + "\navailable: " + DECIDE_FLAGS.join(" "));
     }
     if (plan.id) throw new Error("two task ids given: " + plan.id + " and " + a + " — one decision belongs to one task");
     plan.id = a;

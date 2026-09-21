@@ -142,7 +142,7 @@ export function parseSeedArgs(args) {
       }
       continue;
     }
-    if (a.startsWith("-")) throw new Error("unknown flag: " + a + "\nknown flags: " + FLAGS.join(" "));
+    if (a.startsWith("-")) throw new Error("unknown flag: " + a + "\navailable: " + FLAGS.join(" "));
     throw new Error(
       "unexpected argument: " + a + "\nthe plan comes in on stdin: `" + N + " seed --dir <path> < plan.json`"
     );

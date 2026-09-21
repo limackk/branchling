@@ -146,7 +146,7 @@ export function main(argv) {
   const sub = argv[0];
   if (sub !== "install") {
     console.error(failure(N + " skills", sub ? "unknown subcommand: " + sub : "no subcommand",
-      ["known: install"], [N + " skills --help"]));
+      ["available: install"], [N + " skills --help"]));
     return 2;
   }
   const cli = takeDirFlag(argv.slice(1));

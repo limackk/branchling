@@ -59,7 +59,14 @@ const HERE = dirname(fileURLToPath(import.meta.url));
  *  without a fork; see the header. */
 export const DEFAULT_PROMPT = join(HERE, "..", "templates", "seed-plan.md");
 
-const FLAGS = ["--from", "--prompt", "--json", "--dir"];
+// The accepted set, and nothing beside it (TL-217). It used to name `--from`
+// and `--json`, which this command has never taken: `--from` belongs to `seed`
+// (`seed --from spec.md` is the one-step route this one is the long form of),
+// and the plan is JSON whether anybody asks or not. The list is what a refusal
+// prints and what `help-covers-flags.test.mjs` reads back, so a flag listed
+// here and refused two lines below sent the reader to write a flag the command
+// answers `unknown flag:` to.
+const FLAGS = ["--prompt", "--dir <path>"];
 
 export const USAGE = [
   `${N} plan-from <spec-file> [--prompt <file>] [--dir <path>]`,
@@ -102,7 +109,7 @@ export function parseAdapterArgs(args) {
       if (!prompt) throw new Error("`--prompt` with no file");
       continue;
     }
-    if (a.startsWith("-")) throw new Error("unknown flag: " + a + "\nknown flags: " + FLAGS.join(" "));
+    if (a.startsWith("-")) throw new Error("unknown flag: " + a + "\navailable: " + FLAGS.join(" "));
     if (spec) throw new Error("more than one description: " + spec + " and " + a);
     spec = a;
   }

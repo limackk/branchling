@@ -47,7 +47,7 @@ import { ACTOR_NAMESPACES, MIGRATIONS_FILE, SNAPSHOT_FILE, appendMigration, appl
 import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { withSnapshotMutex } from "./snapshot-mutex.mjs";
 import { PREFIX_SHAPE, taskIdPatterns } from "./task-id.mjs";
-import { MARK, color, errColor } from "./ui.mjs";
+import { MARK, color, errColor, refusal } from "./ui.mjs";
 import { stripComment, unquote } from "./task-fields.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 
@@ -252,7 +252,8 @@ export function main(argv) {
   );
 
   if (unknown.length) {
-    console.error(`${N} migrate-prefix: unknown flag: ` + unknown.join(" ") + "\n" + USAGE);
+    console.error(refusal(N + " migrate-prefix", "unknown flag: " + unknown.join(" "),
+      "--to <NEW> --actor <ns:name> --dry-run --dir <path>"));
     return 2;
   }
   if (!to) {

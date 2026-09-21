@@ -143,7 +143,7 @@ export function parseDoneArgs(args) {
       continue;
     }
     if (a.startsWith("-")) {
-      throw new Error("unknown flag: " + a + "\nknown flags: " + FLAGS.join(" "));
+      throw new Error("unknown flag: " + a + "\navailable: " + FLAGS.join(" "));
     }
     if (id) throw new Error("two task ids given: " + id + " and " + a + " — close one task at a time");
     id = a;

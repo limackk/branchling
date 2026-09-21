@@ -88,7 +88,7 @@ export function parseHandoffArgs(args) {
       continue;
     }
     if (a.startsWith("-")) {
-      throw new Error("unknown flag: " + a + "\nknown flags: " + HANDOFF_FLAGS.join(" "));
+      throw new Error("unknown flag: " + a + "\navailable: " + HANDOFF_FLAGS.join(" "));
     }
     if (plan.id) throw new Error("two task ids given: " + plan.id + " and " + a + " — hand off one task at a time");
     plan.id = a;

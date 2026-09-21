@@ -315,7 +315,7 @@ export function parseAgentProfilesArgs(args) {
       plan.fields[arg.slice(2).replace("-", "_")] = value;
       continue;
     }
-    if (arg.startsWith("-")) throw new Error("unknown flag: " + arg + "\nknown flags: " + FLAGS.join(" "));
+    if (arg.startsWith("-")) throw new Error("unknown flag: " + arg + "\navailable: " + FLAGS.join(" "));
     if (plan.name !== null) throw new Error("two profile names: " + plan.name + ", " + arg);
     plan.name = arg;
   }
@@ -373,7 +373,7 @@ export async function run(argv, env = process.env) {
   let plan;
   try { plan = parseAgentProfilesArgs(argv); }
   catch (e) {
-    console.error(failure(N + " profile", e.message, ["known: " + SUBCOMMANDS.join(", ")], [N + " profile --help"]));
+    console.error(failure(N + " profile", e.message, ["available: " + SUBCOMMANDS.join(", ")], [N + " profile --help"]));
     return 2;
   }
   let projectRoot = null;

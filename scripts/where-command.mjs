@@ -30,7 +30,7 @@ import { fileURLToPath } from "node:url";
 import { agentProfilesPath, homePaths, loadUserConfig, userConfigPath } from "./home.mjs";
 import { resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
-import { MARK, color, failure, heading, table } from "./ui.mjs";
+import { MARK, color, failure, heading, refusal, table } from "./ui.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -110,8 +110,9 @@ export function main(argv) {
   const asJson = cli.argv.includes("--json");
   const unknown = cli.argv.filter((a) => !KNOWN_FLAGS.includes(a));
   if (unknown.length) {
-    console.error(failure(N + " where", "unexpected argument: " + unknown.join(" "), [],
-      [N + " where --help"]));
+    console.error(refusal(N + " where",
+      (unknown[0].startsWith("-") ? "unknown flag: " : "unexpected argument: ") + unknown.join(" "),
+      KNOWN_FLAGS.join(" ").replace("--dir", "--dir <path>")));
     return 2;
   }
 

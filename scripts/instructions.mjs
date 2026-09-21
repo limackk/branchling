@@ -917,7 +917,7 @@ export function parseInstructionsArgs(args) {
     if (a === "--json") { json = true; continue; }
     if (a === "--update-nudge") { updateNudge = true; continue; }
     if (a.startsWith("-")) {
-      throw new Error("unknown flag: " + a + "\nknown flags: " + INSTRUCTIONS_FLAGS.join(" ") + " --dir <path>");
+      throw new Error("unknown flag: " + a + "\navailable: " + INSTRUCTIONS_FLAGS.join(" ") + " --dir <path>");
     }
     if (topic === "role" && role === null) {
       role = a;

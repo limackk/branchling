@@ -36,7 +36,7 @@ import { resolveActor } from "./actor.mjs";
 import { backlogForTaskPath } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { STDIN_WAIT_MS, readStdinText } from "./stdin.mjs";
-import { failure } from "./ui.mjs";
+import { failure, refusal } from "./ui.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -126,6 +126,41 @@ export async function main() {
   return 0;
 }
 
+/**
+ * The arguments this command accepts — which is NONE (TL-220).
+ *
+ * WHY IT MATTERS MOST HERE. This is the one command a person does not type: it
+ * is wired into an editor's hook and fires after every save. A typo in that
+ * wiring used to exit 0 in silence, so an installed hook that had never once
+ * rebuilt anything was indistinguishable from one that worked — the exact
+ * silent no-op `AGENTS.md` opens by forbidding.
+ *
+ * WHY NOT `--dir`. The backlog root comes from the edited file's own path, which
+ * is the point of the command (see the header). A `--dir` here would be a second
+ * answer to a question already settled by the payload, and the two would
+ * disagree the first time an editor fired the hook from another tree.
+ *
+ * PURE, and separate from `main`, for the reason `flag-validation.test.mjs`
+ * records about `build-viewer.mjs`: a module imported under `node --test` must
+ * never read the RUNNER's argv, so the call lives in the direct-invocation
+ * branch alone.
+ *
+ * @returns {string|null} the offending argument, or null when there is none
+ */
+export function unknownArgument(argv) {
+  const rest = (argv || []).filter((a) => a !== "--help" && a !== "-h");
+  return rest.length ? rest[0] : null;
+}
+
 if (process.argv[1] && process.argv[1].endsWith("regen-hook.mjs")) {
+  const offender = unknownArgument(process.argv.slice(2));
+  if (offender !== null) {
+    console.error(refusal(
+      `${N} regen-hook`,
+      (offender.startsWith("-") ? "unknown flag: " : "unexpected argument: ") + offender,
+      "--help -h   # it takes no other argument: the payload arrives on stdin"
+    ));
+    process.exit(2);
+  }
   main().then((code) => process.exit(code));
 }

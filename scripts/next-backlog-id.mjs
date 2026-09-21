@@ -47,6 +47,7 @@ import { insideGitRepo } from './git-rules.mjs';
 import { taskIdPatterns } from './task-id.mjs';
 import { printJson } from './json-envelope.mjs';
 import { PRODUCT_NAME as N } from './product.mjs';
+import { refusal } from "./ui.mjs";
 
 // The prefix comes from THIS backlog's configuration (BL-1452). The scan then
 // goes across other branches and worktrees, but the pattern is one — otherwise
@@ -87,13 +88,11 @@ function fromRef(root, ref) {
     const a = argv[i];
     if (!a.startsWith('-')) {
       if (i > 0 && argv[i - 1] === '--dir') continue; // the value of --dir
-      console.error(`${N} next-id: unexpected argument: ` + a);
-      console.error('  available: --explain --json --dir <path>');
+      console.error(refusal(N + " next-id", "unexpected argument: " + a, "--explain --json --dir <path>"));
       process.exit(2);
     }
     if (!KNOWN.has(a)) {
-      console.error(`${N} next-id: unknown flag: ` + a);
-      console.error('  available: --explain --json --dir <path>');
+      console.error(refusal(N + " next-id", "unknown flag: " + a, "--explain --json --dir <path>"));
       process.exit(2);
     }
   }

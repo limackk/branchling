@@ -56,7 +56,7 @@ import { ACTOR_NAMESPACES, MIGRATIONS_FILE, appendRenumberMigration, applyIdMigr
 import { backlogPaths, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { withSnapshotMutex } from "./snapshot-mutex.mjs";
 import { taskIdPatterns, taskIdScanner } from "./task-id.mjs";
-import { MARK, color, errColor } from "./ui.mjs";
+import { MARK, color, errColor, refusal } from "./ui.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 
 const OKM = color.ok(MARK.ok);
@@ -421,8 +421,9 @@ export function main(argv) {
   const dryRun = afterAlso.includes("--dry-run");
 
   if (rest.length) {
-    console.error(`${ERRM} ${N} renumber: unknown argument: ` + rest.join(" "));
-    console.error("  usage: " + USAGE.split("\n")[0]);
+    console.error(refusal(N + " renumber",
+      (rest[0].startsWith("-") ? "unknown flag: " : "unexpected argument: ") + rest.join(" "),
+      "--start <n> --also <path> --actor <ns:name> --dry-run --dir <path>"));
     return 2;
   }
   if (!Number.isInteger(start) || start < 0) {
