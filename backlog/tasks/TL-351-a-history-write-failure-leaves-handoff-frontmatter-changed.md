@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-07
-updated: 2026-09-07
+updated: 2026-09-21
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: [scripts/handoff-task.mjs, scripts/history.mjs, scripts/lock.mjs]  # paths relative to the repository root
@@ -66,11 +66,11 @@ same split truth. Retrying without restoring first cannot reconstruct the lost
 
 ## Acceptance criteria
 
-- [ ] A failed history write makes `handoff` exit non-zero without changing task
+- [x] A failed history write makes `handoff` exit non-zero without changing task
   frontmatter or appending partial history. [proof: handoff-is-atomic]
-- [ ] Retrying after the failure records the complete transition from the original
+- [x] Retrying after the failure records the complete transition from the original
   state without a manual repair. [proof: handoff-is-atomic]
-- [ ] A successful handoff still writes matching status, owner, role, and comment
+- [x] A successful handoff still writes matching status, owner, role, and comment
   events beside the frontmatter change. [proof: handoff-is-atomic]
-- [ ] The complete automated test suite remains green. [proof: suite-green]
-- [ ] The repository consistency guards remain green. [proof: guards-green]
+- [x] The complete automated test suite remains green. [proof: suite-green]
+- [x] The repository consistency guards remain green. [proof: guards-green]

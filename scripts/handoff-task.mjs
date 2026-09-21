@@ -38,11 +38,22 @@
  * chose. And the owner is CLEARED rather than set to a word like "unassigned" —
  * that word is one project's, and it lives in `owners:` if they want it.
  *
+ * WHY THE WRITE IS STAGED (TL-351). The task file and the history are two halves
+ * of one fact, and a handoff that changes the frontmatter and then fails to
+ * record it leaves them disagreeing — with no way back, because the file already
+ * says `pending` and the transition out of the in-progress status no longer
+ * exists anywhere to be recorded. The history is APPEND-ONLY and therefore the
+ * half that cannot be undone, so it is written second-to-last, while the task
+ * file still holds its pre-command value; what remains after it is a rename
+ * whose prerequisites the staging already proved. See `handoffTask`.
+ *
  * Tests: `node --test scripts/tests/handoff.test.mjs`
+ *        `node --test scripts/tests/handoff-atomicity.test.mjs`
  */
 
 import { spawnSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import { chmodSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -144,6 +155,39 @@ export function requeueStatus(config, entries, inProgress) {
   const queue = queueStatuses(config);
   if (queue.length === 1) return { status: queue[0], from: "vocabulary" };
   return { ambiguous: queue };
+}
+
+/**
+ * Put the new task text on disk NEXT TO the file it will replace, without
+ * replacing it yet.
+ *
+ * The temporary name carries the pid and a random suffix so that two sessions
+ * handing off two tasks in the same directory cannot stage over one another,
+ * and it sits in the SAME directory because a rename across filesystems is a
+ * copy — that is, the very step whose failure this design assumes away.
+ *
+ * @returns {string} the staged path, for `commitStaged` or `discardStaged`
+ */
+function stageTaskText(file, text) {
+  const tmp = file + "." + process.pid + "." + randomBytes(4).toString("hex") + ".tmp";
+  writeFileSync(tmp, text, "utf8");
+  // A fresh file takes the umask's mode; the task file's own is the one the
+  // repository has been living with. Best effort — a filesystem that will not
+  // carry the mode is not a reason to refuse a handoff.
+  try { chmodSync(tmp, statSync(file).mode & 0o7777); } catch { /* the mode is not the transaction */ }
+  return tmp;
+}
+
+/** Replace the task file with the staged text, in one step nothing can observe
+ *  half of. */
+function commitStaged(staged, file) {
+  renameSync(staged, file);
+}
+
+/** Undo the staging. Best effort: the transaction has already been abandoned,
+ *  and throwing here would replace the real refusal with a housekeeping error. */
+function discardStaged(staged) {
+  try { unlinkSync(staged); } catch { /* never created, or already renamed */ }
 }
 
 /**
@@ -251,15 +295,13 @@ export function handoffTask(opts) {
   } catch (e) {
     return { ok: false, kind: "unwritable", id, message: id + ": " + e.message };
   }
-  writeFileSync(file, text, "utf8");
 
   const after = extractMeta(splitFrontmatter(text).frontmatter);
   const ts = new Date(now).toISOString();
-  const changes = recordEdit(root, { taskId: id, before, after, actor, ts, source: "handoff", reason: opts.reason });
 
-  // The comment carries the same sentence as the field rows above, and that is
-  // not an accident: a reason belongs to the ACT, and one act moving several
-  // fields copies it onto each so that any single row answers on its own
+  // The comment carries the same sentence as the field rows recorded below, and
+  // that is not an accident: a reason belongs to the ACT, and one act moving
+  // several fields copies it onto each so that any single row answers on its own
   // (TL-105). What the comment adds is an EVENT with an id — the thing an
   // answer can be attached to later.
   const comment = {
@@ -268,7 +310,50 @@ export function handoffTask(opts) {
     actor, source: "handoff", reason: normalizeReason(opts.reason),
     session: currentSession(root, opts.env),
   };
-  appendEntries(root, id, [comment]);
+
+  // ONE TRANSACTION, AND THE ORDER IS THE WHOLE OF IT (TL-351).
+  //
+  // The new frontmatter is written BESIDE the task file and linked into place
+  // last. Staging first is what makes the order safe rather than merely
+  // reversed: it proves the directory is writable and the bytes are on disk, so
+  // the only step left after the append-only history is a rename, which cannot
+  // fail for the reasons the history can (a mutex it must create, a section
+  // another process holds, a log directory that is not there). A history that
+  // fails therefore fails while the task file still holds its pre-command value,
+  // and the caller retries the same command with nothing to repair by hand.
+  let staged;
+  try {
+    staged = stageTaskText(file, text);
+  } catch (e) {
+    return { ok: false, kind: "unwritable", id, message: id + ": " + e.message };
+  }
+
+  let changes;
+  try {
+    changes = recordEdit(root, { taskId: id, before, after, actor, ts, source: "handoff", reason: opts.reason });
+    appendEntries(root, id, [comment]);
+  } catch (e) {
+    discardStaged(staged);
+    return {
+      ok: false, kind: "history-unwritable", id,
+      message: id + ": the handoff was not recorded — " + e.message,
+      details: [
+        "Nothing was changed: the task file still says what it said before.",
+        "Run the same command again once the history can be written.",
+      ],
+    };
+  }
+
+  try {
+    commitStaged(staged, file);
+  } catch (e) {
+    discardStaged(staged);
+    return {
+      ok: false, kind: "unwritable", id,
+      message: id + ": " + e.message,
+      details: ["The history already records the handoff; it is append-only and was not undone."],
+    };
+  }
 
   // The reservation is over: this session is no longer the one working on it.
   // Only OUR lock — `releaseLock` refuses somebody else's, and a task handed on
