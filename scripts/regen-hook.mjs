@@ -35,6 +35,7 @@ import { fileURLToPath } from "node:url";
 import { resolveActor } from "./actor.mjs";
 import { backlogForTaskPath } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
+import { STDIN_WAIT_MS, readStdinText } from "./stdin.mjs";
 import { failure } from "./ui.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -43,59 +44,14 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 // choice of root, so a second copy would mean two definitions of "this is a task".
 export { backlogForTaskPath };
 
-/**
- * How long a payload has to arrive before the hook concludes that none is coming.
- *
- * Generous by two orders of magnitude for the real caller — an editor has the
- * JSON in hand before it spawns anything — and short enough that a person who
- * ran the command to see what it does gets their prompt back. There is no knob:
- * this is not a preference anybody holds, it is the difference between waiting
- * and hanging.
- */
-export const STDIN_WAIT_MS = 2000;
-
-/**
- * The hook payload, or `null` when nobody sent one.
- *
- * Whatever HAS arrived when the clock runs out is returned rather than thrown
- * away: a writer that sends its JSON and then keeps the pipe open has told us
- * everything we needed, and punishing it for not closing would be the same
- * mistake in the other direction.
- */
-function readStdin() {
-  return new Promise((resolve) => {
-    // A terminal is a person, not a hook. It will never send EOF, and it has no
-    // payload to send — waiting on it is waiting on nothing.
-    if (process.stdin.isTTY) {
-      resolve(null);
-      return;
-    }
-
-    let data = "";
-    let settled = false;
-    const finish = (value) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      process.stdin.destroy();
-      resolve(value);
-    };
-    const timer = setTimeout(() => finish(data), STDIN_WAIT_MS);
-    // `unref` so a hook that already has its answer does not hold the process
-    // open for the rest of the window.
-    if (typeof timer.unref === "function") timer.unref();
-
-    process.stdin.setEncoding("utf8");
-    process.stdin.on("data", (chunk) => {
-      data += chunk;
-    });
-    process.stdin.on("end", () => finish(data));
-    process.stdin.on("error", () => finish(null));
-  });
-}
+/** The bounded read lives in `stdin.mjs` (TL-237), because `new` reads a
+ *  document the same way and the reasoning above must not exist twice. The
+ *  constant is re-exported: the guard that proves this command does not block
+ *  asks this module for the window it promises. */
+export { STDIN_WAIT_MS };
 
 export async function main() {
-  const raw = await readStdin();
+  const raw = await readStdinText();
   if (raw === null) {
     // Reached only by a person: the hook wiring always pipes. Saying so costs
     // one line and replaces the silence that used to look like a freeze.

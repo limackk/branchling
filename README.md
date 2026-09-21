@@ -156,6 +156,22 @@ It prints the path of the file it wrote, the board it chose and why.
 part of the conversation this task came out of carry it out without asking?**
 The shape of the fields is described in [The task file](#the-task-file).
 
+A program that already knows all that does not open the file: the task arrives
+whole, as one JSON document on stdin — the same shape `seed` reads for one plan
+item, minus the keys that belong to a plan.
+
+```bash
+echo '{"goal":"A stranger can run the tool in five minutes.",
+       "steps":["Write the quick start","Read it as a stranger"],
+       "verification":[{"id":"links","bash":"branchling check --docs",
+                        "proves":"Every link in the README resolves."}]}' \
+  | branchling new --title "Write a README for a new user" --priority P1
+```
+
+`goal` and a non-empty `verification` are required, `--body-file <path>` reads
+the same document from a file, and a document that is refused writes nothing and
+reports every complaint at once.
+
 **4. Rebuild the views** — after every frontmatter change.
 
 ```bash
