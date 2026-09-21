@@ -166,7 +166,12 @@ export const KINDS = {
     // after the write, so a caller that has to give a claim back — `run` when
     // its agent never started — has nowhere else to read it.
     from: null,
-    warnings: [], reclaimed: null, lock: null,
+    warnings: [], reclaimed: null,
+    // The claims a deliberate takeover crossed, as `{actor, crossed}` rows
+    // (TL-284) — empty when it crossed none. A loop that takes work over has to
+    // report whose reservation it took without parsing a warning.
+    tookOver: [],
+    lock: null,
     refusalKind: null, refusal: null, details: [],
     // `next` only, and the reason each is here rather than in prose on stderr:
     // a loop must be able to tell an empty queue from a queue it was not allowed

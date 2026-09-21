@@ -232,7 +232,12 @@ export function handoffTask(opts) {
     return {
       ok: false, kind: "other-owner", id,
       message: id + " is " + inProgress + ", owner: " + record.owner,
-      details: ["It is theirs to hand on. Ask them, or take it over deliberately — not silently."],
+      details: [
+        "It is theirs to hand on. Ask them, or take it over deliberately — not silently:",
+        "  " + N + " take " + id + " --take-over --reason \"…\"",
+        "Then hand it off as yourself. A takeover crosses their reservation as well,",
+        "which a hand edit of `owner:` does not (TL-284).",
+      ],
     };
   }
   const held = readLock(lockDir(root, opts).dir, id);
@@ -243,6 +248,8 @@ export function handoffTask(opts) {
       details: [
         "since " + (held.ts || "?") + ", pid " + (held.pid || "?") + " on " + (held.host || "?"),
         "The lock expires after " + config.lockTtlMinutes + " minutes (`lock_ttl_minutes`).",
+        "A live reservation is waited out, or taken over deliberately:",
+        "  " + N + " take " + id + " --take-over --reason \"…\"",
       ],
     };
   }
