@@ -77,7 +77,12 @@ export const CHECK_GUARDS = [
   // normal condition of a session still working, so a red exit here would be
   // red in every tree that is mid-task.
   { key: "task-state", severity: "advisory", want: "wantTaskState", name: "task-state",
-    script: "check-backlog-task-state-committed.mjs", args: (root) => ["--dir", root] },
+    script: "check-backlog-task-state-committed.mjs",
+    // `--actor` is threaded through so the guard can tell this session's own
+    // work from an abandoned closing (TL-261). `advisoryRuns` calls this with
+    // no plan, and an unstated actor is resolved from the usual chain there.
+    args: (root, tasksDir, files, plan) =>
+      ["--dir", root].concat(plan && plan.actor ? ["--actor", plan.actor] : []) },
   // Judges the REPOSITORY holding the backlog, not this installation: a
   // `related_docs` entry resolves against the consumer's tree.
   { key: "docs", severity: "gate", want: "wantDocs", name: "docs", script: "check-docs-links.mjs",

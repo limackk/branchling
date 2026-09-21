@@ -45,7 +45,7 @@ import { FIELD_SHAPES } from "./task-fields.mjs";
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 const CHECK_USAGE = [
-  `${N} check [--dir <path>] [--id-collisions] [--boards] [--refs] [--criteria] [--reasons] [--log-status] [--task-state] [--vocabulary] [--plan] [--product-name] [--proofs] [--since <sha>] [task-file.md …]`,
+  `${N} check [--dir <path>] [--id-collisions] [--boards] [--refs] [--criteria] [--reasons] [--log-status] [--task-state] [--vocabulary] [--plan] [--product-name] [--proofs] [--since <sha>] [--actor <ns:name>] [task-file.md …]`,
   "",
   "  no selector          A RELEASE VERDICT: the guards that can FAIL one, and only those.",
   "                       Exit code = the WORST of them. Guards that report and never",
@@ -78,6 +78,7 @@ const CHECK_USAGE = [
   "                       yet passes, and outside git the command says so rather than",
   "                       printing a tick it did not earn",
   "  --task-state         only whether a task's `status:` and `owner:` on disk still agree",
+  "  --actor <ns:name>    whose run this is — `--task-state` reports what this actor holds apart",
   "                       with the same file at HEAD. It REPORTS and never fails: an",
   "                       uncommitted state change is the normal condition of a session",
   "                       still working, and `take` writes one at the start. It matters when",
@@ -1524,7 +1525,7 @@ function captureScript(script, args) {
  * evidential force. The dispatcher supplies the mode so that nobody has to
  * remember it.
  */
-const CHECK_FLAGS = ["--dir", "--json", "--id-collisions", "--boards", "--refs", "--criteria", "--reasons", "--log-status", "--history", "--task-state", "--docs", "--vocabulary", "--plan", "--product-name", "--foreign-context", "--proofs", "--since"];
+const CHECK_FLAGS = ["--dir", "--json", "--id-collisions", "--boards", "--refs", "--criteria", "--reasons", "--log-status", "--history", "--task-state", "--docs", "--vocabulary", "--plan", "--product-name", "--foreign-context", "--proofs", "--since", "--actor"];
 
 /** PURE — resolves `check`'s arguments. Throws on a usage error. */
 export function parseCheckArgs(args) {
@@ -1544,6 +1545,11 @@ export function parseCheckArgs(args) {
   let wantForeignContext = false;
   let wantProofs = false;
   let since = null;
+  // WHOSE run is this? Only `--task-state` reads it — it separates the task
+  // this actor is holding right now from a closing somebody abandoned (TL-261).
+  // Unstated, the guard falls back on the same chain every writing command
+  // uses, so the answer matches the reservation `take` wrote.
+  let actor = null;
   let json = false;
   const files = [];
 
@@ -1569,6 +1575,11 @@ export function parseCheckArgs(args) {
     if (a === "--product-name") { wantProductName = true; continue; }
     if (a === "--foreign-context") { wantForeignContext = true; continue; }
     if (a === "--proofs") { wantProofs = true; continue; }
+    if (a === "--actor") {
+      actor = args[++i] || null;
+      if (!actor) throw new Error("`--actor` with no name, e.g. `--actor agent:claude`");
+      continue;
+    }
     if (a === "--since") {
       since = args[++i] || null;
       if (!since) throw new Error("`--since` with no commit");
@@ -1622,7 +1633,7 @@ export function parseCheckArgs(args) {
         "It narrows which proven closings are re-run; on its own there is nothing for it to narrow."
     );
   }
-  return { dir, json, explicit, wantIds, wantBoards, wantRefs, wantCriteria, wantReasons, wantLogStatus, wantHistory, wantTaskState, wantDocs, wantVocabulary, wantPlan, wantProductName, wantForeignContext, wantProofs, since, files };
+  return { dir, json, explicit, wantIds, wantBoards, wantRefs, wantCriteria, wantReasons, wantLogStatus, wantHistory, wantTaskState, wantDocs, wantVocabulary, wantPlan, wantProductName, wantForeignContext, wantProofs, since, actor, files };
 }
 
 // The guard table and its severity axis live in `check-guards.mjs`, because

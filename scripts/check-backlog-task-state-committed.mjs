@@ -37,8 +37,23 @@
  * loud rather than printing a tick it never earned, exactly as the history
  * guard does.
  *
+ * TWO CASES ARRIVED IN ONE BLOCK, AND ONLY ONE OF THEM NEEDS A READER
+ * (TL-261). A task this session is holding right now is `in_progress` on disk
+ * and `pending` at `HEAD` because `take` wrote it that way a minute ago; a task
+ * whose closing was abandoned is `done` on disk with the work already
+ * committed. Measured on 2026-09-04: two agents, on different tasks in the same
+ * wave, both got one block of two `!` lines and both resolved it by reading
+ * `git log` by hand. The tool already knows the answer — the reservation in the
+ * state directory names the holder and the moment it was taken — so the two are
+ * reported apart, and the remedy is printed only under the group that has one.
+ *
+ * WHY THE RESERVATION AND NOT `owner:`. In the measured case both lines carried
+ * the SAME `owner:`, because the abandoned closing was left by an earlier
+ * session of the same actor. `owner:` cannot separate them; a live reservation
+ * can, because `done` gives it back.
+ *
  * Usage:
- *   node scripts/check-backlog-task-state-committed.mjs [--dir <backlog>]
+ *   node scripts/check-backlog-task-state-committed.mjs [--dir <backlog>] [--actor <ns:name>]
  *
  * Exit 0 always — it reports. 2 is a usage error.
  *
@@ -50,7 +65,9 @@ import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
+import { DEFAULT_LOCK_TTL_MINUTES, isExpired, listLocks } from "./lock.mjs";
 import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { extractMeta, splitFrontmatter } from "./task-fields.mjs";
@@ -58,6 +75,7 @@ import { MARK, color } from "./ui.mjs";
 
 const OKM = color.ok(MARK.ok);
 const WARNM = color.warn(MARK.warn);
+const BULLET = color.dim(MARK.bullet);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /** The fields whose divergence means a session would be handed the wrong
@@ -107,6 +125,58 @@ export function compareStates(pairs) {
   return { diverged, compared };
 }
 
+/**
+ * Which of these divergences is the running session's own work? PURE — it is
+ * handed the reservations rather than reading the state directory (TL-261).
+ *
+ * A divergence counts as HELD when a reservation for that id exists, has not
+ * outlived its TTL, names THIS actor, and was taken in THIS tree. All four are
+ * needed. Reservations are keyed by the git common directory, so every worktree
+ * of a clone reads the same file: without the tree test a sibling session's
+ * live claim would be reported here as this session's work. The TTL matters
+ * because a reservation nobody released outlives the session that wrote it, and
+ * an expired one proves nothing about now.
+ *
+ * `pid` is deliberately NOT compared: `check` runs in a different process from
+ * the `take` that wrote the reservation, so equality there would hold for
+ * nobody.
+ *
+ * @param {Array} diverged  entries from `compareStates`
+ * @param {{locks: Array, actor: string, root: string, now?: number,
+ *          ttlMinutes?: number}} opts
+ * @returns {{held: Array, unheld: Array}} same entries, `held` carrying `.lock`
+ */
+export function partitionByHolder(diverged, opts) {
+  const now = opts.now || Date.now();
+  const ttl = opts.ttlMinutes === undefined ? DEFAULT_LOCK_TTL_MINUTES : opts.ttlMinutes;
+  const tree = resolve(opts.root);
+  const mine = new Map();
+  for (const lock of opts.locks || []) {
+    if (!lock || lock.actor !== opts.actor) continue;
+    if (resolve(String(lock.tree || "")) !== tree) continue;
+    if (isExpired(lock, ttl, now)) continue;
+    mine.set(lock.task, lock);
+  }
+  const held = [];
+  const unheld = [];
+  for (const d of diverged) {
+    const lock = mine.get(d.id);
+    if (lock) held.push({ ...d, lock });
+    else unheld.push(d);
+  }
+  return { held, unheld };
+}
+
+/** The moment a reservation was taken, as a local clock time — "taken 17:03" is
+ *  what makes a line recognisable as this session's own work. An unparseable
+ *  timestamp yields nothing rather than an invented time. */
+function takenAt(lock) {
+  const ts = Date.parse((lock && lock.ts) || "");
+  if (!Number.isFinite(ts)) return "";
+  const d = new Date(ts);
+  return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+}
+
 /** The frontmatter of one path as it stands at `HEAD`, or null if git has never
  *  committed it. A file merely STAGED has no `HEAD` blob either, and that is the
  *  same answer for the same reason. */
@@ -118,11 +188,29 @@ function metaAtHead(repoRoot, relPath, run = spawnSync) {
 
 export function main(argv) {
   const { dir, argv: rest } = takeDirFlag(argv);
-  if (rest.length) {
-    console.error(`${N} check: unknown argument: ` + rest.join(" "));
-    console.error("  usage: check-backlog-task-state-committed.mjs [--dir <backlog>]");
+  // `--actor` states WHOSE work this run is. Unstated, it comes off the same
+  // chain every writing command uses, which is what makes the answer match the
+  // reservation that `take` wrote in this session.
+  let actorFlag = "";
+  const args = [];
+  for (let i = 0; i < rest.length; i++) {
+    if (rest[i] === "--actor") {
+      actorFlag = rest[i + 1] || "";
+      if (!actorFlag) {
+        console.error(`${N} check: --actor needs a value, e.g. --actor agent:claude`);
+        return 2;
+      }
+      i++;
+      continue;
+    }
+    args.push(rest[i]);
+  }
+  if (args.length) {
+    console.error(`${N} check: unknown argument: ` + args.join(" "));
+    console.error("  usage: check-backlog-task-state-committed.mjs [--dir <backlog>] [--actor <ns:name>]");
     return 2;
   }
+  const actor = resolveActor(actorFlag);
   const root = resolveBacklogDir({ dir: dir || undefined, moduleDir: __dirname }).root;
   const config = loadConfigOrExit(root);
   const paths = backlogPaths(root);
@@ -166,25 +254,50 @@ export function main(argv) {
     return 0;
   }
 
-  console.log(
-    `${WARNM} task-state: ${diverged.length} of ${compared} task file(s) differ from HEAD — ` +
-      "a state change that has not travelled with the branch yet"
-  );
-  for (const d of diverged.slice(0, 20)) {
-    const shown = d.fields
+  const { held, unheld } = partitionByHolder(diverged, { locks: listLocks(root), actor, root });
+
+  const sides = (d) =>
+    d.fields
       .map((f) => `${f}: ${d.head[f] || "(none)"} at HEAD, ${d.tree[f] || "(none)"} on disk`)
       .join("; ");
-    console.log(`  - ${d.id} — ${shown}`);
+  const listOut = (entries, render) => {
+    for (const d of entries.slice(0, 20)) console.log(render(d));
+    if (entries.length > 20) console.log(`  … and ${entries.length - 20} more`);
+  };
+
+  // The group with a remedy goes first, and it is the only one that gets the
+  // warning mark. Nobody holds these, so nobody is going to commit them on
+  // their way out of a session.
+  if (unheld.length) {
+    console.log(
+      `${WARNM} task-state: ${unheld.length} of ${compared} task file(s) differ from HEAD ` +
+        "with no session holding them — a state change left behind"
+    );
+    listOut(unheld, (d) => `  - ${d.id} — ${sides(d)}`);
+    console.log("");
+    console.log("  Reported, never failed: the exit code is 0 either way. This is the group that");
+    console.log("  matters — the CODE was committed and the closing was not, and `next` reads the");
+    console.log("  task file, so the next tree to look sees the task as it was before the work.");
+    console.log("");
+    console.log("  → Commit each task file together with its `backlog/history/` entry, or, if the");
+    console.log("    change was never meant to be, restore it from HEAD.");
   }
-  if (diverged.length > 20) console.log(`  … and ${diverged.length - 20} more`);
-  console.log("");
-  console.log("  Reported, never failed: a task taken a minute ago is in exactly this state, and");
-  console.log("  a guard that failed here would fail every session mid-task. It matters when the");
-  console.log("  CODE was committed and the closing was not — `next` reads the task file, so the");
-  console.log("  next tree to look sees the task as it was before the work.");
-  console.log("");
-  console.log("  → If the work is finished, commit the task file and its `backlog/history/`");
-  console.log("    entry; if it is still in flight, this line is the normal condition.");
+
+  // The session's own work. Said in different words, under a neutral bullet,
+  // and with no remedy — there is nothing to do about a task still open.
+  if (held.length) {
+    if (unheld.length) console.log("");
+    console.log(
+      `${BULLET} task-state: ${held.length} of ${compared} task file(s) differ from HEAD and are ` +
+        `held by ${color.id(actor)} right now — the normal condition of a session mid-task`
+    );
+    listOut(held, (d) => {
+      const at = takenAt(d.lock);
+      return `  - ${d.id} — ${at ? `taken ${at} — ` : ""}${sides(d)}`;
+    });
+    console.log("");
+    console.log("  → Nothing to do while the work is open; it travels with the closing commit.");
+  }
   return 0;
 }
 
