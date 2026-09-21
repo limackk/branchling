@@ -74,7 +74,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 
 import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { ACTOR_NAMESPACES, appendEntries, currentSession, EVENT_ID_RE, eventId, FIELD_DECISION, isValidActor, isValidReason, normalizeReason, openQuestions, questionIdFromReason, readHistory, reasonRefusal, recordEdit } from "./history.mjs";
+import { ACTOR_NAMESPACES, appendEntries, currentSession, EVENT_ID_RE, eventId, FIELD_DECISION, isValidActor, normalizeReason, openQuestions, questionIdFromReason, readHistory, reasonRefusal, recordEdit } from "./history.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { todayStamp } from "./take-task.mjs";
@@ -229,16 +229,22 @@ export function decideTask(opts) {
     reason = options[opts.choose - 1];
     // A LOG EDITED BY HAND can hold an option this command may not record: the
     // two reserved words dressed as somebody's answer is the exact confusion
-    // `isValidReason` exists to prevent, and `normalizeReason` below would turn
+    // reason rules exist to prevent, and `normalizeReason` below would turn
     // an empty one into `unknown` — a machine's word written as a person's.
-    if (!isValidReason(reason)) {
+    //
+    // WHICH RULE, NOT ALL THREE (TL-255). The diagnosis is `reasonRefusal`'s,
+    // the one the seven flag-fed sites already print, so the length limit is
+    // whatever `REASON_MAX_LENGTH` says instead of a number frozen into a
+    // sentence that would start lying the day the constant moved. What this
+    // site keeps is its HEADLINE: nobody typed this value, so the reader is
+    // told which option, of which question, could not be recorded — and only
+    // then which of the three rules it broke.
+    const refusal = reasonRefusal(reason, "option " + opts.choose);
+    if (refusal) {
       return {
         ok: false, kind: "unusable-option", id,
         message: "option " + opts.choose + " of " + opts.resolves + " cannot be recorded as a reason",
-        details: [
-          "It is empty, longer than 500 characters, or one of the two words the tool",
-          "reserves for itself. Answer with `--reason \"…\"` instead.",
-        ],
+        details: refusal.split("\n").concat(["Answer with `--reason \"…\"` instead."]),
       };
     }
     chosen = { n: opts.choose, of: options.length, recommend: target.recommend || null };

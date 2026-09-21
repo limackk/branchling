@@ -6,22 +6,39 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P3                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 30m                      # 30m | 2h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-21
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
 verification:                      # HOW to check the task is really done
+  # REWRITTEN BEFORE THE WORK STARTED. The old first entry grepped
+  # scripts/decide-task.mjs for the sentence this task deletes. It did fail
+  # against the tree as it stood, but it is green for any change that DELETES
+  # the diagnosis — a branch that refused with no explanation at all would
+  # satisfy it — and it says nothing about which of the three causes is named
+  # or about the limit coming from `REASON_MAX_LENGTH`. Both halves of the one
+  # acceptance criterion it was asked to prove were therefore unproven. The
+  # first entry is now the test that asserts each cause names itself and no
+  # other, and it failed 3 of 52 against the unchanged code; the literal gets
+  # a proof of its own, and the suite keeps second place.
   - id: one-cause-not-three
-    bash: "grep -c 'longer than 500 characters' scripts/decide-task.mjs | grep -qx 0 && echo 'the refusal no longer enumerates every rule — OK'"
+    bash: "node --test scripts/tests/change-reason.test.mjs > /dev/null"
   - id: suite
     bash: "node --test scripts/tests/*.test.mjs > /dev/null"
+  # NO BACKSLASH IN THIS PATTERN. `\b` written here survives into the shell as
+  # two characters, so the word-boundary form matched nothing and the negation
+  # was green against the literal it was written to catch. The character class
+  # says the same thing and needs no escape; checked against the pre-change
+  # file, which it fails.
+  - id: no-literal-limit
+    bash: "! grep -qE '(^|[^0-9])500([^0-9]|$)' scripts/decide-task.mjs"
 ---
 
 ## Goal
@@ -75,6 +92,8 @@ option, of which question, could not be recorded.
 
 ## Acceptance criteria
 
-- [ ] An option refused by `decide --choose` is refused for the one rule it
-      breaks, and the length limit is read from `REASON_MAX_LENGTH`. [proof: one-cause-not-three]
-- [ ] Nothing else in the suite changes. [proof: suite]
+- [x] An option refused by `decide --choose` is refused for the one rule it
+      breaks — each cause naming itself and no other. [proof: one-cause-not-three]
+- [x] The length in that refusal is read from `REASON_MAX_LENGTH`: no `500` is
+      written out in `scripts/decide-task.mjs`. [proof: no-literal-limit]
+- [x] Nothing else in the suite changes. [proof: suite]

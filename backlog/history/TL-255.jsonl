@@ -1,1 +1,4 @@
 {"id":"01M1PA5CMCP1PY3DHQ3YDRRPAB","ts":"2026-09-04T13:36:37.004Z","task":"TL-255","field":"__created__","from":"","to":"A chosen option that cannot be a reason is refused for the cause that fired","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-d8049a34a914"}
+{"id":"01M32HA9TR0RE9K395SAXYSEQD","ts":"2026-09-21T17:48:13.016Z","task":"TL-255","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M32HA9TRMW1D381Q0SMENZWR","ts":"2026-09-21T17:48:13.016Z","task":"TL-255","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M32HZRE250PGF985PR9WHJBD","ts":"2026-09-21T17:59:56.098Z","task":"TL-255","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"the --choose refusal now names the cause that fired and reads the limit from REASON_MAX_LENGTH"}

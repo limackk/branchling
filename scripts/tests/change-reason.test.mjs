@@ -33,6 +33,7 @@ import { BACKLOG_DIR, REPO_ROOT, isolateHome } from "./_repo.mjs";
 isolateHome("change-reason");
 
 import {
+  FIELD_COMMENT,
   REASON_MAX_LENGTH,
   REASON_PROVEN,
   REASON_SENTINELS,
@@ -553,3 +554,105 @@ for (const site of REASON_SITES) {
     });
   }
 }
+
+// ── The eighth site: an option read out of the log (TL-255) ───────────────
+
+/**
+ * `decide --choose <n>` answers a question by picking a row from the menu the
+ * `ask` event carries, and the row BECOMES the decision's reason. The same
+ * three rules therefore judge it — but the value did not arrive in a flag
+ * somebody just typed: it was read out of `backlog/history/`, which can only
+ * hold an unusable option if the log was edited by hand. That is why this site
+ * is not in the table above: it returns a refusal object instead of throwing,
+ * and its headline has to keep naming WHICH option, of WHICH question, could
+ * not be recorded.
+ *
+ * TL-167 left it behind with a message that enumerated all three rules at once
+ * and wrote the length limit out as a literal. What is asserted here is the
+ * same contract the seven sites carry — each cause names itself and no other —
+ * plus the two things this site alone owes: the option number and the question
+ * id stay in the headline, and the limit is whatever `REASON_MAX_LENGTH` says,
+ * not a number frozen into a sentence.
+ */
+
+/** A Crockford base32 event id, so `--resolves` accepts it and the row it
+ *  names is the question this menu belongs to. */
+const QUESTION_ID = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+
+/** A backlog whose log already holds a question asked with ONE option. Written
+ *  by hand on purpose: `ask` refuses an unusable option at the boundary, so the
+ *  only way to reach this branch is the only way it happens in life. */
+function sandboxWithOption(option) {
+  const dir = sandbox();
+  mkdirSync(join(dir, "history"), { recursive: true });
+  const question = {
+    id: QUESTION_ID, ts: "2026-08-01T10:00:00.000Z", task: "FX-1", field: FIELD_COMMENT,
+    from: "", to: "which way?", actor: "local:me", source: "ask", reason: "which way?",
+    options: [option], recommend: 1,
+  };
+  writeFileSync(join(dir, "history", "FX-1.jsonl"), JSON.stringify(question) + "\n", "utf8");
+  return dir;
+}
+
+/** The refusal as a person reads it. Exit 1, not 2: the invocation is well
+ *  formed and the task exists — what is wrong is the state of the log. */
+function chooseRefusal(option) {
+  const dir = sandboxWithOption(option);
+  try {
+    const r = cli(["decide", "FX-1", "--actor", "local:me", "--resolves", QUESTION_ID, "--choose", "1"], dir);
+    assert.equal(r.status, 1, "`decide --choose` did not refuse:\n" + r.stdout + r.stderr);
+    return r.stderr + r.stdout;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test("positive control: `decide --choose` records an option that breaks no rule", () => {
+  // Without this every assertion below is green against a command that refused
+  // for a reason of its own — a malformed fixture, a flag it does not know.
+  const dir = sandboxWithOption("take the slow road");
+  try {
+    const r = cli(["decide", "FX-1", "--actor", "local:me", "--resolves", QUESTION_ID, "--choose", "1"], dir);
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(readFileSync(join(dir, "history", "FX-1.jsonl"), "utf8"), /take the slow road/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("`decide --choose` too long: the message names the length, not the sentinels", () => {
+  const text = chooseRefusal(OVER_LIMIT);
+  // The headline this site owes: which option, of which question.
+  assert.match(text, /option 1 of 01ARZ3NDEKTSV4RRFFQ69G5FAV/, "the refusal does not say which option it is about");
+  // The two numbers that explain it — the second read from the constant, so
+  // moving the limit moves the sentence with it.
+  assert.match(text, names(OVER_LIMIT.length), "the message does not say how long the option was");
+  assert.match(text, names(REASON_MAX_LENGTH), "the message does not say how long a reason may be");
+  // And not one word about the two rules this option does not break.
+  assert.doesNotMatch(text, /empty/i, "an option of " + OVER_LIMIT.length + " characters is not empty");
+  for (const sentinel of REASON_SENTINELS) {
+    assert.doesNotMatch(text, names(sentinel), "the option is not the reserved word `" + sentinel + "`");
+  }
+  assert.doesNotMatch(text, /reserved/i, "nothing here is reserved");
+  assert.ok(!text.includes(OVER_LIMIT), "the whole option is echoed back at the reader");
+});
+
+test("`decide --choose` reserved: the message names the word, not a length", () => {
+  for (const sentinel of REASON_SENTINELS) {
+    const text = chooseRefusal(sentinel);
+    assert.match(text, /option 1 of 01ARZ3NDEKTSV4RRFFQ69G5FAV/, "the refusal does not say which option it is about");
+    assert.match(text, names(sentinel), "the message does not name the word that was refused");
+    assert.doesNotMatch(text, /empty/i, "`" + sentinel + "` is not empty");
+    assert.doesNotMatch(text, names(REASON_MAX_LENGTH), "the length limit has nothing to do with this refusal");
+  }
+});
+
+test("`decide --choose` empty: the message says so, and says nothing else", () => {
+  const text = chooseRefusal(BLANK);
+  assert.match(text, /option 1 of 01ARZ3NDEKTSV4RRFFQ69G5FAV/, "the refusal does not say which option it is about");
+  assert.match(text, /empty/i, "the message does not say the option was empty");
+  for (const sentinel of REASON_SENTINELS) {
+    assert.doesNotMatch(text, names(sentinel), "a blank option is not the reserved word `" + sentinel + "`");
+  }
+  assert.doesNotMatch(text, names(REASON_MAX_LENGTH), "the length limit has nothing to do with this refusal");
+});
