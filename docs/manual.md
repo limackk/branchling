@@ -625,7 +625,6 @@ implementation detail. Every reading command answers in the same envelope:
 | `profile check` | `profile-check` | `ok`, `path`, `live`, `results` |
 | `conformance` | `adapter-conformance` | `ok`, `version`, `adapter`, `results`, `failures` |
 | `plan` | `plan` | `root`, `exists`, `updated`, `rationale`, `waves`, `activeWave`, `nextUp`, `inProgress`, `unplanned`, `coverage`, `stale`, `inProgressStatus` |
-| `time` | `time` | `root`, `closed`, `completed`, `unstamped` (ids, not a count), `leadTimeDays`, `throughput`, `perWeekMean`, `engaged`, `unknown_ratio`, `tokens` (null when no adapter has written any — never 0), `cost` (the per-model breakdown and why an amount is missing) |
 | `seed` | `seed` | `ok`, `root`, `dryRun`, `created`, `errors` |
 | `import` | `import` | `ok`, `root`, `dryRun`, `created`, `skipped`, `droppedLabels`, `withoutVerification`, `errors` |
 | `<command> --help` | `command-help` | `command`, `summary`, `usage`, `configured`, `flags` |
@@ -641,8 +640,6 @@ implementation detail. Every reading command answers in the same envelope:
 | `log` | `task-log` | `ok`, `id`, `title`, `file`, `path` (the log the answer came from), `records` (raw entries) and `total` (the exchanges they fold into — the ratio is what the fold is worth), `matched` (the exchanges left after the filter — equal to `total` when there is none) and `decisions` (whether `--decisions` narrowed the answer to what was settled and what is still open), `limit`, `exchanges` (one per write: its time, actor, source, session, role, the reason ONCE, the changes that moved, its events and its messages — a message whose text is null is that reason again, kept for its event id), `refusalKind`, `refusal`, `details` |
 | `red` | `red-owners` | `command`, `ran` (a report nobody gave is not an empty one), `reason`, `exitCode`, `files` (each failing test file with the task its commits name), `mine`, `tally` |
 | `docs-drift` | `docs-drift` | `documents`, `minSignals`, `flagged`, `tooLittle`, `seeded` (absent unless `--seed-tasks` ran) |
-| `sessions` | `sessions` | `correlation`, `total`, `sessions` |
-| `session` | `session` | `correlation`, `session` |
 
 **Adding a kind** (TL-285). A command that answers `--json` is registered in
 `scripts/json-envelope.mjs` and nowhere else: its keys go into `KINDS`, and the
