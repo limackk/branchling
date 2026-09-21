@@ -88,7 +88,7 @@ import { readHistory, recordEdit } from "./history.mjs";
 import { roleBrief } from "./instructions.mjs";
 import { userConfigPath } from "./home.mjs";
 import { lockScope, releaseLock, stateRoot } from "./lock.mjs";
-import { callerSpecies, isOverSized, queueStatuses, readDispatchRecords, selectCandidates, servesExecutor } from "./next-task.mjs";
+import { callerSpecies, isOverSized, parkedByRun, queueStatuses, readDispatchRecords, selectCandidates, servesExecutor } from "./next-task.mjs";
 import { backlogPaths, repositoryRoot, resolveBacklogDir } from "./paths.mjs";
 import { loadPlanForDispatch, planState, projectionWall } from "./plan.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
@@ -470,6 +470,27 @@ export function blockedReason(attempts, detail, outcome) {
  * task to learn whether anything was done, which is exactly the reading cost
  * this status exists to remove.
  */
+/**
+ * What a park's reason gains when every attempt printed the same bytes
+ * (TL-283). PURE, for the same reason the two beside it are: the words land
+ * permanently in an append-only log.
+ *
+ * IT DOES NOT REPLACE THE CONTRACT ENTRY, and that is deliberate. A red
+ * verification is a fact whatever the hand was doing, and this repository pins
+ * a hand that repeats itself, fails its contract and must still be parked
+ * naming the entry. What is added is the evidence the reader was missing: the
+ * attempts were byte-identical and here is what the hand actually said. No
+ * cause is named — the loop reads no vendor's wording — so the reader, not the
+ * tool, decides whether the hand stopped.
+ */
+export function repeatedSuffix(reason, result) {
+  if (!result || !result.repeatedOutput) return reason;
+  const said = String(result.said || "").split("\n").map((s) => s.trim()).filter(Boolean)[0] || "";
+  return reason + " — every one of the " + result.attempts +
+    " attempts printed byte-identical output, which a working hand does not" +
+    (said ? "; it said: " + said : "");
+}
+
 export function vouchReason(detail) {
   const head = "the agent's work stands; a `manual:` entry is waiting for a person to vouch";
   const tail = String(detail || "").split("\n").map((s) => s.trim()).filter(Boolean)[0] || "";
@@ -757,6 +778,10 @@ export function writeStatus(opts) {
     // hand by exactly this value — and a parked task whose entry does not say
     // which hand tried is a record that cannot be read back into a stage.
     role: opts.role,
+    // Only the PARK carries the marker (TL-282). The other write this function
+    // performs — giving a claim back untouched — restores the status the task
+    // was taken from and decides nothing about it.
+    park: !!opts.park,
     reason,
   });
   return { ok: true, status, file };
@@ -878,7 +903,10 @@ function contractProbe(file, cwd) {
  *     contract it is measured by.
  *   · `already-closed` — the task is finished. `closed-elsewhere` rather than
  *     `needs-person` because nobody is needed: it is the outcome TL-191 gave the
- *     same situation found one step later, at the stuck-status write.
+ *     same situation found one step later, at the stuck-status write. This one
+ *     is ANSWERED BEFORE THE MAP IS CONSULTED (TL-349), because its ending
+ *     depends on WHO closed the task and the map cannot ask; the entry stays so
+ *     that this remains one complete statement of which refusals are terminal.
  *
  * Everything else stays retryable, including a contract that genuinely failed.
  */
@@ -951,6 +979,40 @@ function claimAfterAttempt(ctx, task) {
   const role = String(record.role || "").trim();
   const served = !owner && role && role !== String(task.role || "").trim() && !!handFor(ctx.plan, role);
   return { ours: false, owner, role, toRole: served ? role : null, status: record.status };
+}
+
+/**
+ * THE ACTORS THIS RUN HANDED THE TASK TO — plural, and that is the whole point
+ * (TL-349).
+ *
+ * The loop claims a task under ONE actor, its own, and for a scalar `--agent`
+ * that is also the identity the hand closes under, because the hand is a
+ * command running as the run. A PROFILE is not: it publishes its own
+ * `agent:<name>` actor, which is what its agent passes to `done`, and which is
+ * deliberately different from the loop's. Comparing the closing actor against
+ * `ctx.actor` alone therefore filed every profile's own success as somebody
+ * else's closure — measured on the TL-225 profile run of 2026-09-07.
+ *
+ * The set stays SMALL on purpose: the run's actor and the actor of the hand
+ * that worked THIS task, and nothing else. Widening it to "any `agent:`" would
+ * turn the collision TL-191 protects into a closure this run takes credit for.
+ */
+function handedTo(ctx, hand) {
+  const profile = hand && hand.kind === "profile" ? hand.profile : null;
+  return [String(ctx.actor || "").trim(), String(profile && profile.actor || "").trim()].filter(Boolean);
+}
+
+/** The archived status a task carries NOW and who is recorded as having put it
+ *  there — read from the file and the append-only log, writing nothing. Null
+ *  when the task is not archived, which is the case where there is no closure
+ *  to account for at all. */
+function archivedNow(root, config, id) {
+  const archived = new Set(config.archivedStatuses || []);
+  const paths = backlogPaths(root);
+  const record = readTaskRecords(paths.tasksDir, config.taskId.file)
+    .find((t) => String(t.id).toUpperCase() === String(id).toUpperCase());
+  if (!record || !archived.has(record.status)) return null;
+  return { status: record.status, closedBy: archivedBy(root, record.id, archived) };
 }
 
 /** A local adapter path may identify a person, so execution receipts retain
@@ -1032,6 +1094,11 @@ async function workOne(ctx, task) {
   let feedbackRan = false;
   let failure = "";
   let attempts = 0;
+  // The PREVIOUS attempt's transcript, kept only to be compared with the next
+  // one, and the last line any attempt printed (TL-283).
+  let lastOutput = null;
+  let lastSaid = "";
+  let repeatedOutput = false;
   const provenance = [];
   const result = (fields) => ({ ...fields, provenance });
   const started = Date.now();
@@ -1085,6 +1152,32 @@ async function workOne(ctx, task) {
       failure = feedback;
       continue;
     }
+
+    // A HAND THAT REPEATS ITSELF BYTE FOR BYTE IS SAYING SOMETHING (TL-283).
+    //
+    // WHAT WAS MEASURED. On 2026-09-05 the hand working TL-150 was cut off by
+    // its vendor mid-task. Its whole transcript, on both attempts, was one line.
+    // The task was then parked with `no verification after 2 agent attempts:
+    // <entry>` — which a later reader takes as a finding about the WORK, when
+    // nothing about the work had been established — and the half-written
+    // deliverable the hand had produced was left uncommitted in the tree, one
+    // `git add -A` away from an unrelated commit (the hazard of TL-276).
+    //
+    // WHAT IS RECORDED HERE, AND WHY NOTHING MORE. Two consecutive attempts on
+    // one task produced identical, NON-EMPTY output. That is worth telling the
+    // reader: a hand that is working reads a tree the previous attempt moved and
+    // a refusal it earned, so its second answer differs. It is NOT worth acting
+    // on, and this repository already said so before the observation was made —
+    // `contract-scope.test.mjs` and `run-agent-launch.test.mjs` both pin a hand
+    // that prints the same line twice, fails its contract, and MUST keep every
+    // attempt and be parked naming the entry it failed. A quota cut-off and a
+    // hand that deterministically gives up are the same bytes. So the loop
+    // reports the repetition beside the ordinary ending and changes no ending:
+    // the reader is given the evidence, and no false diagnosis is manufactured
+    // from it. The empty transcript stays TL-184's, below.
+    if (attempt > 1 && output.trim() && output === lastOutput) repeatedOutput = true;
+    if (output.trim()) lastSaid = String(output).trim().split("\n").filter(Boolean).pop() || "";
+    lastOutput = output;
 
     // An attempt that changed nothing and said nothing is not an attempt
     // (TL-184). It is reported with the attempts ACTUALLY made — none, on the
@@ -1149,6 +1242,30 @@ async function workOne(ctx, task) {
     }
     const verdict = parseJson(closing.stdout) || {};
     const kind = String(verdict.refusalKind || "");
+    // THE ENDING IS DECIDED HERE, WHERE THE HAND IS KNOWN (TL-349). This refusal
+    // says the task is already finished, and the only remaining question is WHO
+    // finished it — a question the outer accounting used to answer from
+    // `ctx.actor` alone, which cannot recognise a profile's own actor. Nothing
+    // is written: the closure is a proven fact and the run reads it, exactly as
+    // TL-191 requires. Deciding it here also means the loop never reaches the
+    // stuck-status write for this task, so the contract is not paid for twice.
+    if (kind === "already-closed") {
+      const seen = archivedNow(ctx.root, ctx.config, task.id);
+      const ours = seen && seen.closedBy && handedTo(ctx, task.hand).includes(seen.closedBy);
+      appendFileSync(logPath, "\n=== already closed by " +
+        ((seen && seen.closedBy) || "nobody the log names") + "\n", "utf8");
+      return result({
+        id: task.id, outcome: ours ? "closed-by-agent" : "closed-elsewhere",
+        attempts, ms: Date.now() - started, log: logPath, refusalKind: kind,
+        status: seen ? seen.status : undefined,
+        closedBy: (seen && seen.closedBy) || undefined,
+        detail: ours
+          ? task.id + " was closed by " + seen.closedBy + ", a hand this run handed it to — `" +
+            N + " done` had nothing left to do"
+          : task.id + " reached `status: " + ((seen && seen.status) || "an archived status") +
+            "` while this run was working on it",
+      });
+    }
     if (TERMINAL_REFUSALS[kind]) {
       return result({
         id: task.id, outcome: TERMINAL_REFUSALS[kind], attempts, ms: Date.now() - started, log: logPath,
@@ -1181,7 +1298,13 @@ async function workOne(ctx, task) {
     // they are looking at a blocked task. The agent still gets the whole output.
     failure = failedEntry(verdict) || String(feedback).split("\n")[0];
   }
-  return result({ id: task.id, outcome: "exhausted", attempts, ms: Date.now() - started, log: logPath, detail: failure });
+  return result({
+    id: task.id, outcome: "exhausted", attempts, ms: Date.now() - started, log: logPath, detail: failure,
+    // The OBSERVATION, carried beside the ending rather than replacing it
+    // (TL-283). An unattended caller reads `--json`, and this is the one field
+    // that tells it the attempts were spent on a hand that was not answering.
+    repeatedOutput, said: lastSaid || undefined,
+  });
 }
 
 function renderReport(report, plan) {
@@ -1237,6 +1360,24 @@ function renderReport(report, plan) {
         ? never.id + " was left in `" + never.status + "`, the status it was taken from"
         : never.id + " could not be given back — check its status by hand"
     ));
+  }
+  // A HAND THAT REPEATED ITSELF, AND THE WORK IT LEFT BEHIND (TL-283). Two
+  // facts the tally cannot carry, said where the reader meets the task. The
+  // first is evidence and not a diagnosis: the loop reads no vendor's wording
+  // and does not claim the hand was cut off — it says what it saw and quotes the
+  // hand, and the reader decides. The second is the consequence that was costing
+  // people commits: whatever the hand wrote before it stopped is sitting
+  // uncommitted in this tree, one `git add -A` from an unrelated commit — the
+  // hazard TL-276 recorded. The run neither tidies it nor lists it, because
+  // `resume` already reports the uncommitted half of a task's work (TL-272) and
+  // a second, poorer listing here would be a second place to be wrong.
+  for (const r of report.taken.filter((t) => t.repeatedOutput)) {
+    lines.push("");
+    lines.push("  " + MARK.warn + " " + r.id + ": all " + r.attempts +
+      " attempts printed byte-identical output — a hand that is working does not repeat itself.");
+    if (r.said) lines.push("      " + color.dim("it said: " + String(r.said).split("\n")[0]));
+    lines.push("      " + color.dim("anything it wrote before stopping STAYS IN YOUR TREE, uncommitted: " +
+      N + " resume " + r.id));
   }
   const waitingRoles = Object.keys(report.waiting || {}).sort();
   if (waitingRoles.length) {
@@ -1473,7 +1614,13 @@ export async function run(argv) {
     // here for the reason it is one in `next`: a task this actor handed back is
     // not handed to it again (TL-141), and a projection that leaves the actor
     // out is projecting somebody else's queue.
-    const base = { ...filters, callerSpecies: callerSpecies(actor), actor };
+    // AND THE PARK, WHICH THE PROJECTION MUST HONOUR TOO (TL-282): a dry run
+    // that offered a task the real run leaves parked would be projecting a queue
+    // nobody is going to be handed.
+    const base = {
+      ...filters, callerSpecies: callerSpecies(actor), actor,
+      parkedByRun: parkedByRun(root, records, config),
+    };
     const rows = [];
     // Named, never silent: what the projection declined for THIS actor's own
     // earlier judgement is reported under the order, the way `next` reports it.
@@ -1626,8 +1773,28 @@ export async function run(argv) {
     // pipeline working. The same role twice is still the spin this guards.
     const turn = task.id + "@" + role;
     if (seen.has(turn)) {
+      // THE GUARD IS ASKED AFTER `next` HAS ALREADY CLAIMED, and that is not a
+      // detail to fix by reordering (TL-282): selection and reservation are ONE
+      // act on purpose, so the loop cannot ask the dispatcher what it would hand
+      // out without it being handed out. What it can do is put back what it was
+      // given. Without this the loop stopped leaving the task `in_progress`, an
+      // owner on it, and a reservation naming a process that had exited — a
+      // state nobody chose, from a turn nobody wanted.
+      const from = String(task.from || "");
+      if (from) {
+        const given = writeStatus({
+          root, config, id: task.id, actor, status: from, role, releaseOwner: true,
+          reason: "handed out twice in one run — the claim is given back, nothing about the task was measured",
+        });
+        if (!given.ok && given.reason !== "closed-elsewhere" && given.reason !== "held-elsewhere") {
+          console.error(warn(task.id + ": " + given.message));
+        }
+      } else {
+        console.error(warn(task.id + ": `" + N + " next` did not say which status it was taken from"));
+      }
+      releaseLock({ root, taskId: task.id, actor });
       stopped = task.id + " was handed out twice" + (role ? " to role `" + role + "`" : "") +
-        " — the loop stopped rather than spin";
+        " — the loop stopped rather than spin, and gave the claim back";
       break;
     }
     seen.add(turn);
@@ -1686,6 +1853,20 @@ export async function run(argv) {
     }
     if (result.outcome === "closed") {
       tally.closed++;
+    } else if (result.outcome === "closed-by-agent" || result.outcome === "closed-elsewhere") {
+      // THE HAND ALREADY CLOSED IT, and `workOne` has read WHO from the log
+      // (TL-349). Nothing is parked and nothing is written: the status in the
+      // file is a proven fact this run declined to touch (TL-191). Only the
+      // reservation goes back — `done` releases the one its own closure took,
+      // but a closure made by a hand under a DIFFERENT actor leaves this run's
+      // claim reserved until its TTL, invisible to the very next run.
+      if (result.outcome === "closed-by-agent") {
+        tally.closed++;
+        tally.closedByAgent++;
+      } else {
+        tally.closedElsewhere++;
+      }
+      releaseLock({ root, taskId: task.id, actor });
     } else if (result.outcome === "handed-on") {
       // NOTHING TO PARK AND NOTHING TO RELEASE (TL-271): `handoff` cleared the
       // owner and gave the reservation back itself. The task is `pending` for a
@@ -1714,11 +1895,25 @@ export async function run(argv) {
         console.error(warn(task.id + ": its contract asks a person to vouch, and this backlog declares no " +
           "`awaiting_vouch_status` — parking it as `" + stuck.status + "`, which says the work failed"));
       }
+      // THE REASON FOLLOWS THE ENDING, not the number of attempts (TL-283). A
+      // task whose hand repeated itself is parked — nobody here can say the work
+      // is fine — but the sentence it is parked with must not name a contract
+      // that was never the thing at fault.
+      // THE SENTENCE A LATER READER MEETS, and what it must not leave out
+      // (TL-283). It still names the entry that failed — a contract red is a
+      // fact and the reader's next act is to run it — but when every attempt
+      // printed the same bytes it says so and quotes the hand, so that
+      // "no verification after 2 agent attempts" is not read as a finding about
+      // work nobody measured.
       const reason = toVouch
         ? vouchReason(result.detail)
-        : blockedReason(result.attempts, result.detail, result.outcome);
+        : repeatedSuffix(blockedReason(result.attempts, result.detail, result.outcome), result);
       const blocked = writeStatus({
         root, config, id: task.id, actor, reason, role, status: toVouch ? vouchStatus : stuck.status,
+        // This write is the run DECLARING it could not verify the task, and the
+        // log has to keep that apart from a task waiting on its blockers
+        // (TL-282) — in this project both are the word `blocked`.
+        park: true,
       });
       if (blocked.reason === "closed-elsewhere") {
         // NOT a failure of this run and not a task it may park: somebody closed
@@ -1734,7 +1929,12 @@ export async function run(argv) {
         // itself does not change: the run still writes nothing over a proven
         // fact, and it is only the accounting that learns to tell the two
         // endings apart.
-        if (blocked.closedBy && blocked.closedBy === actor) {
+        // THE SAME QUESTION AND THEREFORE THE SAME ANSWER as the already-closed
+        // refusal above (TL-349): the hand this run gave the task to may publish
+        // its own actor, so the comparison is against the set, not the loop's
+        // actor alone. A run that exhausted its attempts and only then met a
+        // closure made by its own profile was reading the other result here.
+        if (blocked.closedBy && handedTo(ctx, hand).includes(blocked.closedBy)) {
           tally.closed++;
           tally.closedByAgent++;
           result.outcome = "closed-by-agent";
@@ -1832,6 +2032,11 @@ export async function run(argv) {
         command: r.command || null,
         // Which role a handed-on task went to (TL-271); null for every other ending.
         toRole: r.toRole || null,
+        // Every attempt printed the same bytes, and the last line it printed
+        // (TL-283). EVIDENCE for the caller, never a cause: the loop does not
+        // read the hand's wording and does not say why it stopped answering.
+        repeatedOutput: !!r.repeatedOutput,
+        said: r.said || null,
         provenance: r.provenance || [],
       })),
     });

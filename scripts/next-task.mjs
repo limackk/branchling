@@ -238,6 +238,40 @@ export function isOverSized(task, config) {
  * The status comes from the project's own `reason_required_statuses`; no value
  * is written into this code.
  */
+/**
+ * The ids a RUN parked, read from the append-only log (TL-282).
+ *
+ * WHY THIS EXISTS. `stuck_status` and the status a task waiting on `blocked_by`
+ * sits in are, in a project with one open non-queue status, the SAME value —
+ * here, `blocked`. So the moment a run parked a task whose named blockers were
+ * all closed, `isUnblocked` below admitted it and the very next `next` handed
+ * it straight back, in the same second, with the park's own reason still in the
+ * log above the reclaim's. The park was a no-op and the run reported `1 blocked`
+ * over a task that was `in_progress`, owned and holding a reservation.
+ *
+ * WHAT IS READ. The LAST status transition INTO the status the task now carries.
+ * `park: true` on it means the run wrote it, and "I could not verify this" is
+ * not the declaration TL-127 was written to discharge — no blocker closing can
+ * answer it. Anything else — a person's declaration, a status from before this
+ * field existed — is untouched, and the rule below applies as it always did.
+ *
+ * THE COST IS BOUNDED BY THE ANSWER. Only a task already in a protected status
+ * WITH named blockers can reach `isUnblocked` at all, so only those are read;
+ * a backlog with none pays for nothing.
+ */
+export function parkedByRun(root, records, config) {
+  const protectedOnes = new Set(config.reasonRequiredStatuses || []);
+  const out = new Set();
+  for (const t of records || []) {
+    if (!protectedOnes.has(t.status)) continue;
+    if (!(t.blocked_by || []).length) continue;
+    const last = readHistory(root, t.id)
+      .filter((e) => e && e.field === "status" && e.to === t.status).pop();
+    if (last && last.park === true) out.add(String(t.id).toUpperCase());
+  }
+  return out;
+}
+
 export function isUnblocked(task, byId, archived, config) {
   const protectedOnes = new Set(config.reasonRequiredStatuses || []);
   if (!protectedOnes.has(task.status)) return false;
@@ -527,6 +561,11 @@ export function selectCandidates(records, config, filters, now) {
   if (!filters.status) {
     for (const t of filterTasks(records, { ...filters, status: null }, archived)) {
       if (!isUnblocked(t, byId, archived, config)) continue;
+      // A PARK IS NOT A BLOCKER WAIT (TL-282). The caller reads the marker off
+      // the log and hands the set in, because this function is pure and the
+      // answer lives outside the task file — in the transition that wrote the
+      // status, not in the status itself.
+      if (filters.parkedByRun && filters.parkedByRun.has(String(t.id).toUpperCase())) continue;
       unblocked.add(String(t.id).toUpperCase());
       fresh.push(t);
     }
@@ -734,6 +773,9 @@ export function run(argv) {
     // nowhere, and it reported the first as the second.
     filters.plannedIds = scheduledIds(planned);
   }
+  // Which of the protected tasks a run parked, rather than a person declaring
+  // the status (TL-282). Read here and handed in, so the selection stays pure.
+  filters.parkedByRun = parkedByRun(root, records, config);
   const { candidates: selected, reclaimable, unblocked, skippedBlocked, skippedElsewhere, skippedExecutor, skippedHandedBack, skippedSize, skippedOutsideWave, skippedUnplanned } =
     selectCandidates(records, config, filters, now);
   // THE ACTOR'S RECORD, LAST OF ALL THE FILTERS (TL-150). It only removes, and

@@ -6,20 +6,29 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-05
-updated: 2026-09-05
+updated: 2026-09-21
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
 verification:
+  # REWRITTEN BEFORE THE WORK STARTED. `park-holds` named a file that did not
+  # exist, and `node --test` ignores a missing path silently, so the whole block
+  # was green against an unchanged tree and proved nothing. The file now exists
+  # and three of its five tests fail on the old code: the parked task comes back
+  # as `in_progress`, the park carries no marker, and the spin guard leaves an
+  # owner behind. `decision-recorded` proves the fourth acceptance criterion,
+  # which a test suite cannot see.
   - id: park-holds
     bash: "node --test scripts/tests/park-survives-next.test.mjs"
+  - id: decision-recorded
+    bash: "node scripts/cli.mjs log TL-282 --decisions | grep -q 'MARKER on the transition'"
   - id: suite-green
     bash: "node --test scripts/tests/*.test.mjs"
 ---
@@ -82,11 +91,42 @@ queue. Here the run parks correctly and the DISPATCHER undoes it.
 
 ## Acceptance criteria
 
-- [ ] A task parked by a run is still parked after the loop asks for more
+- [x] A task parked by a run is still parked after the loop asks for more
       work, proven by a test that fails against today's code, with a
       fixture whose blockers are all closed. [proof: park-holds]
-- [ ] A loop that stops on the spin guard leaves no claim and no lock.
+- [x] A loop that stops on the spin guard leaves no claim and no lock.
       [proof: park-holds]
-- [ ] Unblocking a genuinely blocked task still works. [proof: suite-green]
-- [ ] The separation of the two meanings is a `__decision__` event in
-      `backlog/history/TL-282.jsonl`.
+- [x] Unblocking a genuinely blocked task still works, and a task blocked
+      with nothing named is still left alone. [proof: park-holds]
+- [x] Nothing else in the dispatcher or the loop changed its answer.
+      [proof: suite-green]
+- [x] The separation of the two meanings is a `__decision__` event in
+      `backlog/history/TL-282.jsonl`. [proof: decision-recorded]
+
+## Decided
+
+Recorded with `branchling decide` on 2026-09-21.
+
+**The separation is a MARKER ON THE TRANSITION, not a second status.** The run's
+park writes `park: true` on the status entry it records, and TL-127's unblocking
+rule skips a task whose LAST transition into its current status carries it. The
+marker rides the transition rather than the task, so a person who later declares
+the same status themselves writes an unmarked transition and is discharged by
+the blocker rule exactly as before — nothing is frozen out of the queue.
+
+**Rejected: a `stuck_status` distinct from the blocker status, with `check`
+refusing the collision.** A project with ONE open non-queue status cannot
+satisfy it, which is this project, and a guard that tells a backlog to invent a
+second vocabulary entry to make the tool work is the tool's problem being
+handed to its user.
+
+**Rejected: inferring from the last entry's `source`.** `source: "run"` on a
+transition into a protected status would in practice mean a park, and that is
+inference standing where a declaration is available. A marker written by the act
+that made the decision cannot drift from it.
+
+**The spin guard gives the claim back.** Asking `seen` BEFORE `next` claims is
+not available: selection and reservation are one act on purpose (TL-87), so the
+loop cannot learn what would be handed out without it being handed out. What it
+can do is put back what it was given — the status the task was taken from, the
+owner cleared, the reservation released — which it now does before it stops.

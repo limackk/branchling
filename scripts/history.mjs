@@ -684,6 +684,21 @@ export function recordEdit(backlogDir, opts) {
   // together. Copying it onto every entry of the act is what makes the answer
   // survive reading any one of them alone.
   const entries = changes.map((c) => entry(taskId, c.field, c.from, c.to, actor, source, ts, reason, session, role));
+  // THE PARK IS A DECLARATION, AND IT SAYS SO ON THE TRANSITION (TL-282). A run
+  // that could not verify a task writes the project's stuck status, which in a
+  // project with one open non-queue status is the SAME value a task waiting on
+  // `blocked_by` sits in — and TL-127 dispatches that second kind on sight once
+  // every named blocker is closed. Without this field the two are one byte in
+  // the file and the park was undone by the very next `next`, in the same
+  // second, silently.
+  //
+  // IT RIDES THE TRANSITION, NOT THE TASK. A person who later declares the same
+  // status themselves writes a transition of their own with no marker, and the
+  // unblocking rule reads the LAST one — so nothing here freezes a task
+  // permanently out of the queue. Omitted when false, under the same rule as
+  // `session` and `role`: every line written before this field existed has no
+  // marker, and `false` would be a third state beside absent and present.
+  if (opts.park) for (const e of entries) if (e.field === "status") e.park = true;
   // The snapshot is one file for the whole backlog and this is a
   // read-modify-write of it (TL-214): without exclusion a writer that overlaps
   // with another saves a snapshot computed before the other's advance and

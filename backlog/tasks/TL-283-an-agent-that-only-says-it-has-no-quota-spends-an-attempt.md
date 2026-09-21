@@ -6,20 +6,30 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-05
-updated: 2026-09-05
+updated: 2026-09-21
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
 verification:
+  # REWRITTEN BEFORE THE WORK STARTED. The first entry named a file that did not
+  # exist; `node --test` ignores a missing path silently, so the block was green
+  # against an unchanged tree and proved nothing. The file now exists and its
+  # first test fails on the old loop, where `row.repeatedOutput` is undefined
+  # and the park names nothing but the entry. `run-help-hand-did-not-run` is the
+  # second half of the thesis — the
+  # uncommitted work is named where a reader meets it — and would pass on the
+  # old tree only if the paragraph were already there, which it was not.
   - id: quota-is-not-an-attempt
     bash: "node --test scripts/tests/agent-refusal-not-an-attempt.test.mjs"
+  - id: run-help-hand-did-not-run
+    bash: "node scripts/cli.mjs run --help | grep -q 'STAYS IN YOUR TREE, uncommitted' && node scripts/cli.mjs run --help | grep -q 'REPEATS ITSELF IS REPORTED'"
   - id: suite-green
     bash: "node --test scripts/tests/*.test.mjs"
 ---
@@ -104,8 +114,69 @@ attempts produced byte-identical output, which no working agent does.
 
 ## Acceptance criteria
 
-- [ ] A task parked after two identical, immediate agent refusals carries a
-      reason naming the agent rather than the contract, proven by a test
-      that fails against today's loop. [proof: quota-is-not-an-attempt]
-- [ ] An agent that genuinely worked and failed its contract still spends
-      its attempts and still names the contract. [proof: suite-green]
+- [x] A task whose every attempt printed byte-identical output is parked with
+      a reason that quotes the HAND beside the entry, and says so in `--json`,
+      proven by a test that fails against today's loop.
+      [proof: quota-is-not-an-attempt]
+- [x] A hand whose output DIFFERS between attempts carries no such
+      observation, and an EMPTY transcript is still TL-184's ending.
+      [proof: quota-is-not-an-attempt]
+- [x] `run --help` says what a repeating hand means and what it cannot mean,
+      and that whatever the hand wrote is left uncommitted in the tree.
+      [proof: run-help-hand-did-not-run]
+- [x] No ending, attempt budget or parked entry anywhere else in the loop
+      changed. [proof: suite-green]
+
+## Decided
+
+Recorded with `branchling decide` on 2026-09-21; a first decision the same day
+was SUPERSEDED, and both are in the log.
+
+**The first decision was wrong, and this repository is what proved it.** It
+said: two consecutive attempts with byte-identical, non-empty output end the
+task as `agent-repeated-itself`, park it with a reason naming only the hand,
+and stop the run. Three of the tool's own positive controls fail against that
+rule, and they fail because they are right:
+`scripts/tests/contract-scope.test.mjs:151` and
+`scripts/tests/run-agent-launch.test.mjs:198` each pin a hand that prints the
+same non-empty line on every attempt, fails its contract, and MUST spend every
+attempt and be parked naming the entry it failed;
+`scripts/tests/run-awaiting-vouch.test.mjs:281` pins the tally. A vendor
+cutting an agent off and a hand that gives up the same way every time are the
+same bytes, and this task's own warning — do not let a false positive turn a
+real contract failure into "quota" — is exactly what that rule would have done.
+
+**What was decided instead**, which is the third candidate this task listed and
+the one its author marked as changing no behaviour. The repetition is an
+OBSERVATION, reported beside the unchanged ending:
+
+- the park's reason still names the entry that failed — a red contract is a
+  fact whatever the hand was doing — and now adds that every attempt printed
+  byte-identical output and quotes the hand's last line, so
+  `no verification after N agent attempts` is no longer read as a finding about
+  work nobody measured;
+- `--json` carries `repeatedOutput` and `said` on the task row, for the
+  unattended caller that never sees the terminal;
+- the terminal report adds a paragraph per such task, saying what was seen and
+  that whatever the hand wrote STAYS IN YOUR TREE, uncommitted;
+- `run --help` says the same, including what the evidence cannot mean.
+
+**What this does NOT do, and why.** It does not cut the attempt budget short,
+so the second attempt's contract cost — one of the three consequences measured
+here — is NOT recovered. That saving requires acting on the evidence, and the
+evidence cannot be told apart from a genuine repeated failure. Paying for a
+contract twice is cheap beside renaming a real failure as a quota.
+
+**What the observation cannot distinguish, on the record.** A vendor quota, a
+wrapper failing fast, a crash before the prompt is reached and a deterministic
+refusal all look identical from here. A hand cut off on its ONLY attempt is not
+seen at all, and neither is one whose message carries a clock or a request id
+that differs between attempts. That is why nothing is named for a cause.
+
+**The empty transcript stays TL-184's.** Two attempts that print nothing are
+identical too; requiring non-empty output keeps a silent hand on the path that
+gives the claim back rather than parking the task.
+
+**The uncommitted work is pointed at, not duplicated.** The report names
+`resume <ID>`, which TL-272 gave an `uncommitted` section the same day. A
+second, poorer listing inside `run` would be a second place to be wrong.
