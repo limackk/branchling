@@ -1,27 +1,39 @@
 ---
 id: TL-208
-title: "The viewer's snapshot banner says Tryb snapshot"   # language-guard: allow — the shipped label IS the subject
+title: "The viewer's snapshot banner says Tryb snapshot"
 type: task
 labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-03
-updated: 2026-09-03
+updated: 2026-09-21
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
 verification:                      # HOW to check the task is really done
+  # REWRITTEN 2026-09-21, because the original block carried BOTH known defects.
+  # `language-control` named `branchling check --language`, a selector TL-298
+  # removed together with the detector itself — a criterion nobody could ever
+  # meet, and the flag class of the defect TL-424 names for test files. And
+  # `check` alone passes against an unchanged tree (TL-260): it says the backlog
+  # is consistent, never that the viewer says anything in particular. The proof
+  # is now a test file that EXISTS, over a fixed enumeration of the viewer's
+  # chrome, with its own positive controls. It is deliberately not a rebuilt
+  # language detector: AGENTS.md rules that out, and the removed one is exactly
+  # what read this banner as English.
+  - id: chrome-verbatim
+    bash: "node --test scripts/tests/viewer-ui-language.test.mjs"
+  - id: suite
+    bash: "node --test scripts/tests/*.test.mjs"
   - id: guards-green
     bash: "node scripts/cli.mjs check"
-  - id: language-control
-    manual: "A fixture line carrying the Polish string is REJECTED by `check --language`, and the tree passes"
 ---
 
 ## Goal
@@ -70,6 +82,11 @@ leaves the next one just as invisible.
 
 ## Acceptance criteria
 
-- [ ] No Polish in `scripts/build-viewer.mjs`. [proof: guards-green]
-- [ ] The guard rejects a fixture carrying `Tryb snapshot`, and passes on the
-      tree. [proof: language-control]
+- [x] The banner and the header tabs carry the reviewed English wording, and
+      the built page is asserted to contain each one verbatim.
+      [proof: chrome-verbatim]
+- [x] A banner translated out of English IS rejected, and the same string
+      sitting in a task title does not satisfy the assertion.
+      [proof: chrome-verbatim]
+- [x] Nothing else in the suite or in the release gates moved.
+      [proof: suite, guards-green]
