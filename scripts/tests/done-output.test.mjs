@@ -112,8 +112,10 @@ test("a FAILING entry's output is printed whole, and the task is not touched", (
     const r = done(dir, []);
     assert.equal(r.code, 1);
     assert.equal(statusOf(dir), "pending");
-    assert.match(r.stderr, /^1$/m);
-    assert.match(r.stderr, /^300$/m, "the failing transcript was truncated");
+    // Behind the gutter since TL-275 — the transcript is framed, not pasted, so
+    // a reader can tell a captured line from this command's own refusal.
+    assert.match(r.stderr, /^│ 1$/m);
+    assert.match(r.stderr, /^│ 300$/m, "the failing transcript was truncated");
     assert.match(r.stderr, /the-failing-line/);
     assert.match(r.stderr, /verification failed/);
     // The verdict comes AFTER the transcript, so it is the last thing on screen.
