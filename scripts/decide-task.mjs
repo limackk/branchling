@@ -19,6 +19,18 @@
  * handoff with no reason, and it is refused the same way, before anything is
  * written.
  *
+ * WHY THERE IS NO READING FORM (TL-396). `--help` advertised a third usage,
+ * `decide <ID> [--json]`, described as "the decision and what remains
+ * unanswered, for a program", and the command answered it with exit 2 and a
+ * sentence about the flag the caller deliberately had not passed. The line is
+ * gone rather than implemented: `decide` WRITES, and the only thing that could
+ * have selected a read is the ABSENCE of `--reason` — so a reason dropped by a
+ * shell, or arriving empty from a variable, would stop refusing and start
+ * printing, exit 0, with nothing recorded. TL-256 had already settled the
+ * general form of this when it rejected `history --show`: one name may not mean
+ * both a read and a write. The promise is kept where reading belongs —
+ * `log <ID> --decisions`, which the refusal above names.
+ *
  * WHY `--resolves` IS OPTIONAL BUT VALIDATED. Somebody may decide without having
  * been asked; a decision that stands alone is legitimate. What is not legitimate
  * is a pointer to an event that is not in this task's history — it would leave a
@@ -125,7 +137,9 @@ export function parseDecideArgs(args) {
       "`--reason` is required unless a menu row is chosen\n" +
         "a decision with no content records that something was settled and leaves out\n" +
         "what — which is the one thing a later reader cannot reconstruct.\n" +
-        "Where the question was asked with options, `--choose <n>` fills it from one."
+        "Where the question was asked with options, `--choose <n>` fills it from one.\n" +
+        "To READ what was decided already, and what is still open, ask the command that\n" +
+        "reads: `" + N + " log " + (plan.id || "<ID>") + " --decisions`."
     );
   }
 

@@ -166,7 +166,12 @@ export const KINDS = {
     // after the write, so a caller that has to give a claim back — `run` when
     // its agent never started — has nowhere else to read it.
     from: null,
-    warnings: [], reclaimed: null, lock: null,
+    warnings: [], reclaimed: null,
+    // The claims a deliberate takeover crossed, as `{actor, crossed}` rows
+    // (TL-284) — empty when it crossed none. A loop that takes work over has to
+    // report whose reservation it took without parsing a warning.
+    tookOver: [],
+    lock: null,
     refusalKind: null, refusal: null, details: [],
     // `next` only, and the reason each is here rather than in prose on stderr:
     // a loop must be able to tell an empty queue from a queue it was not allowed
@@ -255,9 +260,13 @@ export const KINDS = {
   // `task-list` carries its own `total` for. `path` names the log this came
   // from, so a reader who does want the raw file is told where it is instead of
   // guessing the layout.
+  // `decisions` and `matched` say WHICH question was asked and how much of the
+  // log answered it (TL-396): `total` is every exchange, `matched` the ones the
+  // filter kept, and without both a consumer cannot tell a filtered answer from
+  // a short log.
   "task-log": {
     ok: null, id: null, title: null, file: null, path: null,
-    records: null, total: null, limit: null, exchanges: [],
+    records: null, total: null, matched: null, decisions: null, limit: null, exchanges: [],
     refusalKind: null, refusal: null, details: [],
   },
 };

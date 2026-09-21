@@ -376,8 +376,25 @@ export const FIELD_ATTRIBUTED = "__attributed__";
 // exist, which is the whole reason the field is being adopted.
 export const FIELD_ADOPTED = "__adopted__";
 
+// A claim crossed deliberately (TL-284). `from` is the actor whose claim was
+// taken over, `to` is the actor taking it.
+//
+// WHY THE FRONTMATTER CANNOT SHOW IT. The claim has two halves — `owner:` in
+// the file and the reservation outside the repository (TL-87) — and the case
+// this was written for is the one where they DISAGREE: an owner corrected by
+// hand while the lock still names the previous session. A takeover there
+// changes no tracked field at all, so `diffMeta` sees nothing and the seizure
+// of somebody's reservation would be the one act in this tool with no record.
+//
+// WHY IT IS NOT A `reason` ON THE OWNER ROW. There may be no owner row. When
+// there is one it says who the task belongs to now; this says that a live
+// reservation was taken from a named session, which is the fact that session
+// has to be able to find afterwards.
+export const FIELD_TAKEOVER = "__takeover__";
+
 export const PSEUDO_FIELDS = [FIELD_CREATED, FIELD_DELETED, FIELD_BODY, FIELD_COMMENT, FIELD_VERIFIED,
-  FIELD_UNVERIFIED, FIELD_ROLE_OVERRIDE, FIELD_DECISION, FIELD_ATTRIBUTED, FIELD_ADOPTED];
+  FIELD_UNVERIFIED, FIELD_ROLE_OVERRIDE, FIELD_DECISION, FIELD_ATTRIBUTED, FIELD_ADOPTED,
+  FIELD_TAKEOVER];
 
 export function isPseudoField(key) {
   return PSEUDO_FIELDS.indexOf(key) !== -1;

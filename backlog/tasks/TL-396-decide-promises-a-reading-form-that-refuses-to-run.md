@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "CLI surface"                           # free text — the group this task counts towards
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h
@@ -19,7 +19,7 @@ blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
 verification:
   - id: the-documented-form-runs
-    bash: "node scripts/cli.mjs decide TL-395 --json"
+    bash: "node --test scripts/tests/decide-reading-form.test.mjs"
 ---
 
 ## Goal
@@ -78,5 +78,5 @@ terminal has none.
 
 ## Acceptance criteria
 
-- [ ] Every invocation `decide --help` prints can be run.
+- [x] Every invocation `decide --help` prints can be run.
       [proof: the-documented-form-runs]

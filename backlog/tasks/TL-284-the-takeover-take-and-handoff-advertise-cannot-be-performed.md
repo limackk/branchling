@@ -6,18 +6,27 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-05
-updated: 2026-09-05
+updated: 2026-09-21
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
 verification:                      # HOW to check the task is really done
+  # TL-260 measured this contract against an unchanged tree: its only entry was
+  # `suite-green`, which passed before any work had been done, so nothing here
+  # could fail for this task. The first entry now names the file written FOR
+  # this task, and it fails against the tree it was written on — `take` had no
+  # `--take-over` flag, so every takeover case exited 2 on an unknown flag. The
+  # suite stays as the second entry: a route through both gates can break
+  # neighbours (`next`, `run`, `handoff`) this one file does not exercise.
+  - id: takeover-route
+    bash: "node --test scripts/tests/takeover.test.mjs"
   - id: suite-green
     bash: "node --test scripts/tests/*.test.mjs"
 ---
@@ -106,11 +115,19 @@ seam, and TL-231 is the failure mode when a handoff cannot complete.
 
 ## Acceptance criteria
 
-- [ ] A refusal from `take` or `handoff` names only routes that exist: following
-      its own instruction reaches a handed-off task, or the message stops
-      offering the route. [proof: suite-green]
-- [ ] A takeover, if one is added, is refused without a reason and leaves an
-      event naming both actors. [proof: suite-green]
-- [ ] Positive control: an actor that holds neither the owner field nor the
-      reservation is still refused, so the new route narrows something real.
-      [proof: suite-green]
+- [x] A refusal from `take` or `handoff` names only routes that exist: the
+      command each message prints is run verbatim and reaches a handed-off task,
+      and neither message still says "by editing the file".
+      [proof: takeover-route]
+- [x] The takeover crosses BOTH gates: a task whose `owner:` names the taker
+      while the reservation names somebody else is taken over, and the lockfile
+      afterwards names the taker rather than having been deleted.
+      [proof: takeover-route]
+- [x] A takeover is refused without a reason (exit 2, nothing written) and
+      leaves a `__takeover__` event naming the actor taken from and the actor
+      taking. [proof: takeover-route]
+- [x] Positive control: an actor that holds neither the owner field nor the
+      reservation is still refused without the flag, by both `take` and
+      `handoff`, so the new route narrows something real. [proof: takeover-route]
+- [x] The rest of the suite still passes, including the neighbours that share
+      `takeTask()`. [proof: suite-green]
