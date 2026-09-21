@@ -74,6 +74,9 @@ function one(value) {
   return value ? String(value) : "(none declared)";
 }
 
+/** @see vocabulary — the environment names a hand is launched with. */
+export const ENV_PREFIX = String(N).toUpperCase().replace(/[^A-Z0-9]+/g, "_");
+
 /**
  * Everything the guides are allowed to say about THIS backlog. PURE.
  *
@@ -106,6 +109,17 @@ export function vocabulary(config) {
     types: list(config.types),
     estimates: list(config.estimates),
     boards: list((config.boards || []).map((b) => b.slug)),
+    // WHO MAY take a task, as opposed to who holds it (`owner:`) or which species
+    // may be handed it (`executor:`). A backlog that declares none gets
+    // "(none declared)", which is the answer the guide needs: there is nothing
+    // to serve, and the role-aware half of the loop is not for this project.
+    roles: list(config.roles),
+    // Not a value the project chose but the code's shape, like `tool`: the
+    // prefix of the environment a hand is launched with, derived from the
+    // product name exactly as `agentEnvironment` in run-loop.mjs derives it. It
+    // cannot be imported from there — run-loop reads THIS module for role
+    // briefs — so a guard asserts the two still agree.
+    env_prefix: ENV_PREFIX,
   };
 }
 
@@ -179,7 +193,8 @@ it alone: open the guide that matches what you are about to do.
   {{tool}} instructions task-creation      before writing a new task
   {{tool}} instructions task-execution     before starting work on one
   {{tool}} instructions task-finalization  before calling one finished
-  {{tool}} instructions autonomous-loop    running it as a queue, unattended
+  {{tool}} instructions autonomous-loop    running it as a queue, unattended —
+                                           one hand or one per role
   {{tool}} instructions context-budget     what an answer costs a session
 
 THIS BACKLOG'S OWN WORDS, read from its configuration. Do not carry values over
@@ -188,6 +203,7 @@ from another backlog and do not assume these:
   statuses    {{statuses}}
   archived    {{archived_statuses}}
   priorities  {{priorities}}
+  roles       {{roles}}
   task ids    {{prefix}}-<number>
 
 \`{{tool}} --help\` lists the commands; \`{{tool}} <command> --help\` prints one
@@ -473,11 +489,11 @@ a report of what closed, what did not and where the run stopped.
   {{tool}} run --dry-run     # the order it would work in, claiming nothing
 
 It changes nothing about the two commands at the ends: it calls \`{{tool}} next\`
-and \`{{tool}} done\` exactly as your shell would, and the agent is a template of
-yours
-run through your shell. A task whose contract keeps failing is never closed —
-after the last attempt it is parked in the status your \`reason_required_statuses\`
-protects, with the reason, and the dispatcher stops offering it.
+and \`{{tool}} done\` exactly as your shell would, and the agent is a template
+of yours run through your shell. A task whose contract keeps failing is never
+closed — after the last attempt it is parked in the status your
+\`reason_required_statuses\` protects, with the reason, and the dispatcher stops
+offering it.
 
 THE TWO ENDS OF A SESSION.
 
@@ -558,6 +574,62 @@ task stays claimed until a person looks. Neither answer is safe in the abstract;
 the number is yours to state.
 
   {{tool}} query --status {{progress}} --json   what is claimed, and by whom
+
+ONE QUEUE, SEVERAL HANDS. A task's \`role:\` says WHO MAY take it, \`owner:\`
+says who holds it NOW, and \`executor:\` says which species — a person or an
+agent — may be HANDED it at all. The three are independent: a role is a brief,
+not a species. The vocabulary is \`roles:\` in config.yaml, and this project
+declares
+
+  {{roles}}
+
+A backlog that declares none has nothing to serve here and can stop at the
+generalist loop above.
+
+  {{tool}} run --agent-for <role>=<command> --agent-for <role>=<command>
+  {{tool}} run --profile-for <role>=<name>         the same, with a local wrapper
+
+Each flag names ONE hand for ONE role and is repeatable; \`--agent\` or
+\`--profile\` then serves only the tasks that ask for NO role. With no role
+mapping at all the single generalist serves everything, which is the loop at the
+top of this page. A role this project does not declare fails before the first
+claim, not halfway through the run.
+
+A GENERALIST IS OPTIONAL ONCE A ROLE IS SERVED, and so is a hand for every role.
+A role you gave no hand for is not handed out and not failed over: it waits —
+possibly for a person — and the report counts those tasks BY NAME, on the
+terminal and under \`--json\`, as \`N task(s) ask for <role> — no --agent-for\`.
+Read that block: without it a queue whose every task asks for a hand you never
+named is indistinguishable from an empty one. The only invocation refused
+outright is the one with no command of any kind — no \`--agent\`, no
+\`--profile\` and no role mapping either.
+
+DRIVING THE SAME SELECTION BY HAND, in a loop of your own:
+
+  {{tool}} next --role a,b               \`a\` or \`b\` — OR no role at all
+  {{tool}} next --role a --role-strict   EXACTLY \`a\`; the role-less are not yours
+
+That is what \`run\` passes through for you: it asks for the roles it serves, and
+adds \`--role-strict\` when no generalist is among them, so the tasks asking for
+nobody are not handed to a specialist. A role outside \`roles:\` FAILS rather
+than matching nothing, because an empty result reads exactly like an empty
+queue.
+
+THE HAND IS TOLD WHO IT IS, AND HOW ITS STAGE ENDS. Every agent process runs
+with the actor the run claimed under, the role it is serving, the task id, the
+data directory and the repository in its environment — \`{{env_prefix}}_ACTOR\`,
+\`_ROLE\`, \`_TASK\`, \`_DIR\` and \`_REPOSITORY\` under the same prefix — so a
+hand can call the tool as the identity that actually holds the task, and can
+read its own brief with \`{{tool}} instructions role <role>\` wherever this
+project keeps one. A stage that is finished while the TASK is not ends with
+
+  {{tool}} handoff <ID> --to-role <role> --reason "…"
+
+which returns the task to the queue for the hand serving that role: one \`run\`
+reports the leg as \`handed-on\`, runs no \`{{tool}} done\` on it and hands the
+task out again with a fresh attempt count, so a pipeline of roles is ONE run and
+not one per role. A handoff to a role nobody here serves, or to a person, ends
+as held elsewhere — which is an open task, not a closed one.
 
 A QUEUE SERVED BY SEVERAL HANDS COMMITS RED ON PURPOSE. Where the roles in
 \`roles:\` are used as a pipeline, one hand's whole deliverable is a FAILING
