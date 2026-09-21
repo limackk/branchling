@@ -104,7 +104,13 @@ export const CHECK_GUARDS = [
     // The ONE guard outside the default run, and the flag says so in the table
     // rather than in a name a test would have to know — see `parseCheckArgs`.
     optIn: true,
-    args: (root, tasksDir, files, plan) => ["--dir", root].concat(plan.since ? ["--since", plan.since] : []) },
+    // `--quiet` UNDER `--json` (TL-265). The guard narrates its walk on stderr
+    // so that a waiting operator can see where it is; with `--json` that stderr
+    // is captured into the document's `output`, where the narration has no
+    // reader and would bury the verdict it was meant to accompany.
+    args: (root, tasksDir, files, plan) => ["--dir", root]
+      .concat(plan && plan.since ? ["--since", plan.since] : [])
+      .concat(plan && plan.json ? ["--quiet"] : []) },
 ];
 
 /**
