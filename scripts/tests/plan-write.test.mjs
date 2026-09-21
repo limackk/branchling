@@ -546,3 +546,100 @@ test("the plan guard agrees with the writer about what it just wrote", () =>
     assert.deepEqual(verdict.errors, []);
     assert.equal(verdict.planned, 5);
   }));
+
+// ── a value that begins with a dash, after `--` (TL-248) ──────────────────
+//
+// The same defect TL-58 removed from `new`, in the one parser that still
+// carried the line. `--why` takes a SENTENCE, and this project's sentences are
+// about flags, so a reason that opens with a dash was simply unwritable.
+// MEASURED ON 2026-09-21, before a line of the parser changed:
+//   $ branchling plan add TL-2 --wave "Flags" --why -- "--json is not free"
+//   branchling plan add: --why requires a value
+//
+// `--dir` is passed BEFORE the separator throughout: `takeDirFlag()` strips it
+// from anywhere on the line, separator or not, which is TL-247's subject and
+// not this one.
+
+/** The wave of that name, or undefined — asserted on rather than an index, so a
+ *  case that appended in the wrong place says so instead of reading a neighbour. */
+const waveNamed = (text, name) => parsed(text).waves.find((w) => w.name === name);
+
+test("`plan add`: after the separator a `--why` value beginning with a dash is written as typed", () =>
+  withSandbox((dir) => {
+    task(dir, "TL-5");
+    task(dir, "TL-6");
+
+    // THE POSITIVE CONTROL, and it runs first: an ordinary sentence creates a
+    // wave in this fixture. Without it every assertion below could fail because
+    // `plan add` writes nothing here at all, which has nothing to do with a dash.
+    const ordinary = run(["plan", "add", "TL-6", "--dir", dir, "--wave", "Control", "--why", "an ordinary sentence"]);
+    assert.equal(ordinary.code, 0, ordinary.out + ordinary.err);
+    assert.deepEqual(waveNamed(planOf(dir), "Control")?.tasks, ["TL-6"],
+      "`plan add` creates no wave in this fixture — the measurement is broken, not the parser");
+
+    const why = "--json is not free, and the wave says why";
+    const r = run(["plan", "add", "TL-5", "--dir", dir, "--wave", "Flags", "--why", "--", why]);
+    assert.equal(r.code, 0, "a why after the separator was refused: " + r.err);
+
+    const after = planOf(dir);
+    assert.deepEqual(waveNamed(after, "Flags")?.tasks, ["TL-5"], "the wave was not created");
+    assert.ok(comments(after).some((c) => c.includes(why)),
+      "the sentence is not in the file as it was typed: " + comments(after).join("\n"));
+    assert.equal(run(["check", "--plan", "--dir", dir]).code, 0, "the plan the writer produced does not pass the guard");
+  }));
+
+test("`plan add`: after the separator even a KNOWN flag is the value, and sets no other field", () =>
+  withSandbox((dir) => {
+    // The half that makes the separator worth having: after `--` NOTHING is
+    // read as a flag. A parser that merely tolerated a leading dash would write
+    // the reason AND take the word after it as a wave name.
+    task(dir, "TL-5");
+    const r = run(["plan", "add", "TL-5", "--dir", dir, "--wave", "Flags", "--why", "--", "--wave"]);
+    assert.equal(r.code, 0, "a why that is itself a flag name was refused: " + r.err);
+
+    const after = planOf(dir);
+    assert.deepEqual(waveNamed(after, "Flags")?.tasks, ["TL-5"],
+      "the word past the separator was consumed as a flag as well as a value");
+    assert.ok(comments(after).some((c) => c.includes("--wave")),
+      "the reason was dropped: " + comments(after).join("\n"));
+  }));
+
+test("`plan add`: WITHOUT the separator, `--why --wave` still fails and writes nothing", () =>
+  withSandbox((dir) => {
+    // The protection this task must not remove, and it is green today. A flag
+    // name where a value belongs is overwhelmingly a mistake, and a wave
+    // introduced by the paragraph "--wave" is the silent no-op it guards.
+    task(dir, "TL-5");
+    const before = planOf(dir);
+    const r = run(["plan", "add", "TL-5", "--dir", dir, "--why", "--wave", "Flags"]);
+    assert.equal(r.code, 2, "the un-separated form was accepted");
+    assert.equal(r.out, "", "a refusal does not belong on stdout");
+    assert.match(r.err, /--why/);
+    assert.equal(planOf(dir), before, "a refused command wrote to the file anyway");
+  }));
+
+test("`plan add`: `--why --` with nothing after the separator fails", () =>
+  withSandbox((dir) => {
+    // The separator is not itself a value.
+    task(dir, "TL-5");
+    const before = planOf(dir);
+    const r = run(["plan", "add", "TL-5", "--dir", dir, "--wave", "Flags", "--why", "--"]);
+    assert.equal(r.code, 2, "`--` was stored as the reason");
+    assert.equal(planOf(dir), before);
+  }));
+
+test("`plan add`: an argument past the separator's value is refused by name, not collected as an id", () =>
+  withSandbox((dir) => {
+    // DECIDED HERE, because `parseEditArgs` collects positional ids and `new`
+    // does not: the separator stops FLAG reading, it does not open a second
+    // place to name a task. A leftover is refused BY NAME — swallowed as an id
+    // it would turn into "one task id, and this names 2", a message about the
+    // wrong mistake.
+    task(dir, "TL-5");
+    task(dir, "TL-6");
+    const before = planOf(dir);
+    const r = run(["plan", "add", "TL-5", "--dir", dir, "--wave", "Flags", "--why", "--", "a reason", "TL-6"]);
+    assert.equal(r.code, 2, "the argument past the value was swallowed in silence");
+    assert.match(r.err, /TL-6/, "the message does not name the argument that was refused");
+    assert.equal(planOf(dir), before, "a refused command wrote to the file anyway");
+  }));

@@ -422,20 +422,57 @@ export function newPlanErrors(before, after, tasks, config) {
 
 const FLAGS = { "--wave": "wave", "--why": "why" };
 
+/**
+ * `--` ENDS FLAG READING (TL-248), the shape TL-58 settled for `new`.
+ *
+ * Without a separator a value beginning with a dash is still refused, and that
+ * heuristic stays: `--why --wave 3` is overwhelmingly a mistake, and a wave
+ * introduced by the paragraph "--wave" is the silent no-op this tool refuses to
+ * be. The price was that a reason which LEGITIMATELY begins with a dash had no
+ * way in at all — and `--why` is the flag that hurts, because it takes a
+ * sentence and this project's sentences are about flags.
+ *
+ * The separator is that way in, in the form a user already knows from `git` and
+ * `rm`: the flag before it takes the next argument WHATEVER it looks like, and
+ * nothing beyond the separator is read as a flag. The second half is why this
+ * is not merely a leading dash being tolerated: `--why -- --wave` must record
+ * the reason "--wave", not also take the word after it as a wave name.
+ *
+ * WHAT DIFFERS FROM `new`: this command takes a positional id. A non-flag
+ * argument BEFORE the separator is therefore an id rather than an error — but
+ * one past the separator's value is refused BY NAME, because the separator
+ * stops flag reading and does not open a second place to name a task. Collected
+ * as an id it would surface as "one task id, and this names 2", a message about
+ * the wrong mistake.
+ *
+ * A THIRD CALL SITE, NOT A SHARED PARSER. Two are not yet an argument for
+ * extracting one, and an extraction would touch every command at once; TL-247
+ * (global flags past the separator) and TL-220 (the four shapes of an unknown
+ * flag) are where that question belongs.
+ */
 function parseEditArgs(argv) {
   const values = {};
   const ids = [];
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
+  const sep = argv.indexOf("--");
+  const flags = sep < 0 ? argv : argv.slice(0, sep);
+  const literal = sep < 0 ? [] : argv.slice(sep + 1);
+  for (let i = 0; i < flags.length; i++) {
+    const a = flags[i];
     if (!a.startsWith("-")) {
+      if (i > 0 && FLAGS[flags[i - 1]]) continue; // the previous flag's value
       ids.push(a);
       continue;
     }
     if (!FLAGS[a]) return { error: "unknown flag: " + a };
-    if (argv[i + 1] === undefined || argv[i + 1].startsWith("-")) return { error: a + " requires a value" };
-    values[FLAGS[a]] = argv[i + 1];
-    i++;
+    // Only the LAST flag before the separator reaches past it, and only that
+    // one is exempt from the dash heuristic.
+    const beyond = i + 1 === flags.length;
+    const value = beyond ? literal[0] : flags[i + 1];
+    if (value === undefined || (!beyond && value.startsWith("-"))) return { error: a + " requires a value" };
+    values[FLAGS[a]] = value;
   }
+  const spent = flags.length > 0 && FLAGS[flags[flags.length - 1]] ? 1 : 0;
+  if (literal.length > spent) return { error: "unexpected argument: " + literal[spent] };
   return { values, ids };
 }
 

@@ -6,20 +6,30 @@ labels: []
 board: main
 epic: "CLI surface"
 priority: P3
-status: pending
-owner: unassigned
+status: done
+owner: agent:claude
 role: ""
 executor: ""
 estimate: 30m
 confidence: high
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-21
 blocked_by: []
 blocks: []
 related_docs: []
+# TL-260 measured this block against an unchanged tree and it PASSED: the whole
+# of plan-write.test.mjs was green before a line of this task was written, so the
+# contract could not tell a fix from no work at all. The first entry now names
+# only the cases added here — every one of them fails against today's parser —
+# and the file-wide and suite-wide runs follow it, so a fix that breaks a
+# neighbouring promise is still caught.
 verification:
   - id: separator-in-plan
+    bash: "node --test --test-name-pattern separator scripts/tests/plan-write.test.mjs"
+  - id: plan-write-file
     bash: "node --test scripts/tests/plan-write.test.mjs"
+  - id: suite
+    bash: "node --test scripts/tests/*.test.mjs"
 ---
 
 ## Goal
@@ -94,7 +104,16 @@ site appears, that is when the extraction earns its own task.
 
 ## Acceptance criteria
 
-- [ ] A `--why` value beginning with a dash is written as typed when it
+- [x] A `--why` value beginning with a dash is written as typed when it
       follows `--`. [proof: separator-in-plan]
-- [ ] Without a separator, `--why --wave` still fails with code 2 and writes
+- [x] After `--` a KNOWN flag name is the value and sets no other field.
+      [proof: separator-in-plan]
+- [x] Without a separator, `--why --wave` still fails with code 2 and writes
       nothing to `plan.yaml`. [proof: separator-in-plan]
+- [x] `--why --` with nothing after the separator fails with code 2.
+      [proof: separator-in-plan]
+- [x] An argument left over past the separator's value is refused by name
+      rather than collected as a second id. [proof: separator-in-plan]
+- [x] Every other promise plan-write.test.mjs makes is unchanged.
+      [proof: plan-write-file]
+- [x] The suite stays green. [proof: suite]
