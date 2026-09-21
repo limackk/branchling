@@ -59,6 +59,31 @@ is reproduced by a command. If deleting something hurts, it has stopped being
 computed and started being a truth; the error is then in the design, not in the
 person who deleted it.
 
+## The names the tasks were written under (TL-395)
+
+A stranger reading `backlog/tasks/` meets two names that no longer ship. Both
+are real, and neither is a mistake left in the files.
+
+| Name | Until | Why it went |
+|---|---|---|
+| `tasklog` | 2026-09-01 | the extraction; `TL-81` had raised the npm collision |
+| `worktrail` | 2026-09-03 | `TL-169` established that `github.com/worktrail` was already an organisation; `TL-20` carried out the rename |
+
+**The archived tasks keep the name of their own day, and that is a decision
+rather than an oversight** (TL-395). A task written on 2026-09-01 telling you to
+run `worktrail done` records what the command was called that day; rewriting it
+would make the file assert something that was never true, and this backlog is
+where the development history lives because the git history was flattened at
+extraction. The precedent that looks like the opposite — TL-137 rewriting 145
+task files — is a different operation: translating a sentence preserves its
+claim, renaming the tool inside it does not.
+
+**Open tasks are held to the current name**, because they are instructions
+somebody may follow tomorrow and `worktrail done` fails. An occurrence that is
+deliberate even there — the name as a subject, a path on disk, a quoted
+transcript — is marked `former-name: allow` on its line, and
+`scripts/tests/former-name.test.mjs` fails on every one that is not.
+
 ## Number redirects — the 2026-09-01 renumbering (TL-135)
 
 The numbering used to start at `TL-1303`, because the tool was a module of

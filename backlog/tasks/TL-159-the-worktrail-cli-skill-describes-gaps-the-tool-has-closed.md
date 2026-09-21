@@ -1,6 +1,6 @@
 ---
 id: TL-159
-title: "The worktrail-cli skill describes gaps the tool has closed"
+title: "The branchling-cli skill describes gaps the tool has closed"
 type: bug
 labels: []
 board: main
@@ -37,13 +37,13 @@ that was accurate when it was written and is now four claims out of date. Read
 today it sends a session looking for work that does not exist, and — worse —
 teaches it a false picture of the surface it is about to change:
 
-- *"`worktrail <command> --help` fails for most commands"* — closed by TL-51.
+- *"`branchling <command> --help` fails for most commands"* — closed by TL-51.
   `scripts/tests/cli-help.test.mjs` asserts every command answers `--help` with
   exit 0.
 - *"`query --help` prints the module's source comment, shebang line included"* —
   closed with the same task; the help text now comes from the command table.
 - *"Error prefixes leak internal script names"* — the failures now read
-  `worktrail <command>:` through `failure()` in `scripts/ui.mjs`.
+  `branchling <command>:` through `failure()` in `scripts/ui.mjs`.
 - *"There is no color anywhere, and therefore no `NO_COLOR` handling either"* —
   `scripts/ui.mjs` exists, with six colour roles, `MARK` symbols and
   `colorAllowed()`, and `scripts/tests/ui.test.mjs` covers it.
@@ -60,7 +60,7 @@ one paragraph, not a rewrite.
 
 **And the question worth asking while there:** a list of "known gaps" inside a
 skill is a snapshot, and it will go stale again. Consider whether it belongs
-there at all, or whether gaps belong in the backlog — where `worktrail next` can
+there at all, or whether gaps belong in the backlog — where `branchling next` can
 hand them out — with the skill pointing at a query instead of a list.
 
 ## Pre-flight reading

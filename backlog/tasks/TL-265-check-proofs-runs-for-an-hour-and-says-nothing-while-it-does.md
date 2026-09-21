@@ -63,6 +63,8 @@ guard that is not run.
 
 **Stopping it takes three kills, not one.** Measured while cleaning up:
 
+<!-- former-name: allow — a transcript of a real run, not an instruction -->
+
     $ pkill -f 'cli.mjs check --proofs'      # wrapper dies
     $ ps | grep tasklog
       9175  check-backlog-proofs.mjs …       # still running, 1h11m

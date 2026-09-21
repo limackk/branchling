@@ -42,13 +42,13 @@ A side effect of TL-56, deliberately excluded from it. While reconciling
 `code` and `task` do not split the backlog into two classes of work — both are
 actively written on THE SAME DAY and both sit on tasks indistinguishable by
 content. A sample from 2026-09-01: under `code` sit "JSON envelope in writing
-commands" and "Autonomous loop"; under `task` — "worktrail plan command with
+commands" and "Autonomous loop"; under `task` — "worktrail plan command with  <!-- former-name: allow -->
 --json" and "Product name from a single constant". This is the same work
 described with two words.
 
 Where both came from: `code` is the value from the first commit, `task` came
 in on 2026-08-31 together with `_template.md`, which carries `type: task`
-hardcoded. Since then `worktrail new` writes `task`, and `code` gets added by
+hardcoded. Since then `branchling new` writes `task`, and `code` gets added by
 manually editing the file — because `--type code` was REJECTED by the writing
 path until TL-56.
 
@@ -69,7 +69,7 @@ an axis this project measures at all — in which case the answer is
 
 1. `backlog/config.yaml` — the comment next to `types:` describes the state and this deferred decision.
 2. `scripts/check-backlog-vocabulary.mjs` — the guard that, since TL-56, checks that the tree and the vocabulary agree.
-3. `backlog/_template.md` — the source of `type: task` on every `worktrail new`.
+3. `backlog/_template.md` — the source of `type: task` on every `branchling new`.
 
 ## Steps
 
@@ -88,5 +88,5 @@ an axis this project measures at all — in which case the answer is
 - [ ] `types:` in `config.yaml` contains only values someone can actually tell apart.
 - [ ] If one value remains for ordinary work — no task carries the other.
 - [ ] If two remain — the distinguishing criterion sits in `config.yaml`, not in someone's head.
-- [ ] `worktrail check --vocabulary` green after the change.
+- [ ] `branchling check --vocabulary` green after the change.
 </content>

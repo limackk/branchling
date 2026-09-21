@@ -1,6 +1,6 @@
 ---
 id: TL-102
-title: "First-contact demo — worktrail done's refusal in 60 seconds"
+title: "First-contact demo — branchling done's refusal in 60 seconds"
 type: task
 labels: [pre-launch]
 board: main
@@ -25,7 +25,7 @@ verification:
 ## Goal
 
 A stranger sees, in 60 seconds, the one thing that exists nowhere else:
-`worktrail done` REFUSES to close a task because verification failed — it
+`branchling done` REFUSES to close a task because verification failed — it
 shows the test's output, the task stays `pending`. Then a fix and a green
 close. The recording hangs in the README header as the first contact with
 the tool.
@@ -50,8 +50,8 @@ Settled up front:
    reproducible after every CLI change, otherwise it rots like any
    screenshot.
 2. **Dramaturgy: failure first.** init → a task with `verification:` → work
-   "almost finished" → `worktrail done` → RED refusal with the test's output
-   → fix → `worktrail done` → green. We are not showing a command tour.
+   "almost finished" → `branchling done` → RED refusal with the test's output
+   → fix → `branchling done` → green. We are not showing a command tour.
 3. **60 seconds is a hard limit.** Anything that does not serve the refusal
    scene is cut.
 4. Format: asciinema as the source (text, lightweight, copyable), GIF as a
@@ -79,7 +79,7 @@ README for the recording to hang in.
 3. Record with asciinema; generate a GIF.
 4. Link it in the README header; keep the recording file out of the npm
    tarball (package size is part of the first impression).
-5. Add a gate to `worktrail-release`: the scenario passes on the current
+5. Add a gate to `branchling-release`: the scenario passes on the current
    CLI.
 
 ## Acceptance criteria
@@ -98,6 +98,6 @@ README for the recording to hang in.
 - 2026-09-01 in_progress — agent:claude — taken up; TL-82 and TL-49 closed, blockers gone.
 - 2026-09-01 in_progress — agent:claude — **NOT CLOSED: only the recording itself is missing.** I walked the scenario LIVE on a fresh directory (`git init` → `init` → `new` → a contract in the frontmatter → refusal → fix → green close); every "expected output" block in `docs/demo/scenario.md` is transcribed from the real run, not invented. Step 3 (asciinema/GIF) cannot be done here: this machine has no `asciinema`, `agg`, `vhs`, or `ttyrec`, and recording needs a TTY. It is left for a human, and the `manual:` entry describes exactly that.
 - 2026-09-01 in_progress — agent:claude — README **DELIBERATELY UNTOUCHED**. The criterion "recording visible from the header" needs a file that does not exist; a placeholder link in the header would be a dead link on the very first screen — exactly the opposite of this task's goal. A condition recorded for later: the link must be an ABSOLUTE URL — `files` in `package.json` is an allowlist with no `docs/`, so the README in the tarball has nothing to show at a relative path.
-- 2026-09-01 in_progress — agent:claude — the gate from step 5 was made AS A TEST, not as an item on a human checklist: `scripts/tests/demo-scenario.test.mjs` replays the scenario on every test run and asserts the three beats the recording rests on — a non-zero exit code for the refusal, the REAL test output in the message (not a summary), and the task file byte-for-byte untouched after the refusal. Scene 4 has a positive control: it first asserts that the first run FAILS, so the test cannot pass on a scenario that was never red. The `worktrail-release` skill got a §6b, which invokes this test and adds three more things to check by eye.
-- 2026-09-01 in_progress — agent:claude — A SHARP EDGE FOUND, worth recording outside this task: a nested `node --test` INHERITS `NODE_TEST_CONTEXT` and reports its result to the outer runner, ending with exit code 0. The gate test was therefore GREEN despite failing verification — exactly the kind of false green this whole tool exists to prevent. Fixed by clearing `NODE_TEST_CONTEXT` and `NODE_OPTIONS` in the child process's environment, with a comment at the spot. This affects EVERY task whose `verification:` calls `node --test`, when `worktrail done` is invoked from inside a test; in a normal user shell the problem does not occur.
+- 2026-09-01 in_progress — agent:claude — the gate from step 5 was made AS A TEST, not as an item on a human checklist: `scripts/tests/demo-scenario.test.mjs` replays the scenario on every test run and asserts the three beats the recording rests on — a non-zero exit code for the refusal, the REAL test output in the message (not a summary), and the task file byte-for-byte untouched after the refusal. Scene 4 has a positive control: it first asserts that the first run FAILS, so the test cannot pass on a scenario that was never red. The `worktrail-release` skill got a §6b, which invokes this test and adds three more things to check by eye.  <!-- former-name: allow -->
+- 2026-09-01 in_progress — agent:claude — A SHARP EDGE FOUND, worth recording outside this task: a nested `node --test` INHERITS `NODE_TEST_CONTEXT` and reports its result to the outer runner, ending with exit code 0. The gate test was therefore GREEN despite failing verification — exactly the kind of false green this whole tool exists to prevent. Fixed by clearing `NODE_TEST_CONTEXT` and `NODE_OPTIONS` in the child process's environment, with a comment at the spot. This affects EVERY task whose `verification:` calls `node --test`, when `worktrail done` is invoked from inside a test; in a normal user shell the problem does not occur.  <!-- former-name: allow -->
 - 2026-09-01 in_progress — agent:claude — 419/419 green, `check --language` green (20845 lines, 72 public files). I refused `--confirm-manual`: there is no recording, so manual attestation would be exactly the "I checked" that this mechanism exists to rule out as NOT proof.

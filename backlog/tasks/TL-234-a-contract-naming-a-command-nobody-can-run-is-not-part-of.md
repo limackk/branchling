@@ -33,7 +33,7 @@ finding belongs in that answer.
 
 ## Context
 
-TL-233 closed a live defect: eleven `manual:` entries named `worktrail`, a
+TL-233 closed a live defect: eleven `manual:` entries named `worktrail`, a  <!-- former-name: allow -->
 binary that has not existed since 2026-09-03, and TL-122 was waiting for a
 person to vouch for it by running one of them. The audit lives in
 `scripts/tests/contract-product-name.test.mjs`, which exports pure functions —

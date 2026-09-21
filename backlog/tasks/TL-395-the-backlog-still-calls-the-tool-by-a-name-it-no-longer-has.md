@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Repository readability"
 priority: P2
-status: pending
-owner: unassigned
+status: done
+owner: agent:claude
 role: ""
 executor: ""
 estimate: 4h
@@ -16,20 +16,22 @@ created: 2026-09-21
 updated: 2026-09-21
 blocked_by: []
 blocks: []
-related_docs: []
+related_docs: [LINEAGE.md]
 verification:
   - id: open-tasks-name-the-tool-correctly
-    bash: "test $(node scripts/cli.mjs query --status pending --json | grep -c worktrail) -eq 0"
+    bash: "node --test scripts/tests/former-name.test.mjs"
+  - id: the-decision-is-an-event
+    bash: "grep -q __decision__ backlog/history/TL-395.jsonl"
 ---
 
 ## Goal
 
 A stranger reading this backlog is told which tool it is about, and told it
-once. Today they are told `worktrail` 659 times, and no such thing ships.
+once. Today they are told `worktrail` 659 times, and no such thing ships.  <!-- former-name: allow -->
 
 ## Context
 
-`worktrail` was this tool's name. The product name now comes from
+`worktrail` was this tool's name. The product name now comes from  <!-- former-name: allow -->
 `scripts/product.mjs`, read from `package.json`, and `branchling check
 --product-name` enforces that — over `scripts/` and `bin/` only. `backlog/` was
 never inside that guard, so 138 task files kept the old name, 30 of them in the
@@ -39,14 +41,14 @@ Those two groups are not one problem, and the reason they are separated here is
 that the second one is a real decision.
 
 THE FIVE OPEN TASKS ARE STRAIGHTFORWARD. They are work somebody may pick up
-tomorrow, and an instruction to run `worktrail done` is an instruction that
+tomorrow, and an instruction to run `worktrail done` is an instruction that  <!-- former-name: allow -->
 fails. Fix them.
 
 THE 133 ARCHIVED ONES ARE A QUESTION, AND THIS TASK DOES NOT ANSWER IT.
 LINEAGE.md states that the tasks ARE this tool's development history, because
 the git history was flattened at extraction — which is the argument FOR the
 rename: the history a stranger reads should name the thing they installed.
-Against it: a task written on 2026-09-01 saying `worktrail done` is an accurate
+Against it: a task written on 2026-09-01 saying `worktrail done` is an accurate  <!-- former-name: allow -->
 record of what the command was called that day, and rewriting it makes the
 record assert something that was never true. That is the same hazard AGENTS.md
 documents for `renumber` — a rewritten id still exists and names a DIFFERENT
@@ -83,8 +85,8 @@ own former one. Filenames are TL-385.
 
 ## Acceptance criteria
 
-- [ ] No open task names the tool by a name it no longer has.
+- [x] No open task names the tool by a name it no longer has.
       [proof: open-tasks-name-the-tool-correctly]
-- [ ] The decision about archived tasks is an event in
+- [x] The decision about archived tasks is an event in
       `backlog/history/TL-395.jsonl`, not an argument in this file.
-      [proof: open-tasks-name-the-tool-correctly]
+      [proof: the-decision-is-an-event]

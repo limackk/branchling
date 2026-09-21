@@ -33,14 +33,14 @@ deliverable is a dated, sourced result per register, not a reassurance.
 ## Context
 
 Surfaced 2026-09-03 in
-[TL-169](TL-169-the-name-worktrail-is-already-a-github-organisation-the.md),
-which established what `github.com/worktrail` is and could not establish this.
+[TL-169](TL-169-the-name-worktrail-is-already-a-github-organisation-the.md),  <!-- former-name: allow -->
+which established what `github.com/worktrail` is and could not establish this.  <!-- former-name: allow -->
 It is separate work, not a loose end of that task: TL-169 answers a question of
 fact about one organisation, this one is a search across legal registers whose
 result may be that a professional has to run it.
 
 **Why it decides something.**
-[TL-81](TL-81-kanaly-dystrybucji-i-kolizja-nazwy-tasklog-w-npx.md) raised the
+[TL-81](TL-81-kanaly-dystrybucji-i-kolizja-nazwy-tasklog-w-npx.md) raised the  <!-- former-name: allow -->
 name from a label to a business asset with an argument that only works one way
 round: under MIT, the licence does not stop a competitor standing a service up
 on this code, so **the name is the only thing stopping them standing it up
@@ -65,8 +65,8 @@ no scope attached is the shape of answer that gets re-asked at every release.
 
 ## Pre-flight reading
 
-1. `backlog/tasks/TL-169-the-name-worktrail-is-already-a-github-organisation-the.md` — the `## Findings` section: who TaPo-IT OG are, what they operate, and exactly which register lookups failed and how.
-2. `backlog/tasks/TL-81-kanaly-dystrybucji-i-kolizja-nazwy-tasklog-w-npx.md` — the argument that makes the name a business asset rather than a label.
+1. `backlog/tasks/TL-169-the-name-worktrail-is-already-a-github-organisation-the.md` — the `## Findings` section: who TaPo-IT OG are, what they operate, and exactly which register lookups failed and how.  <!-- former-name: allow -->
+2. `backlog/tasks/TL-81-kanaly-dystrybucji-i-kolizja-nazwy-tasklog-w-npx.md` — the argument that makes the name a business asset rather than a label.  <!-- former-name: allow -->
 3. `docs/license-and-contributions.md` §3 — the open/cloud line, which is the class of goods the search has to cover.
 4. `.claude/skills/branchling-release/SKILL.md` §7 — where the finding belongs once it exists.
 

@@ -93,6 +93,20 @@ drift apart; a test fails if this copy falls behind it.
   to change; `BLOCK_MARKER_NAME` is a FROZEN key in the `.gitignore` and
   `.gitattributes` of other people's repositories — derived from the display
   name, a rename would produce a SECOND block instead of updating the first.
+- **An OPEN task names the tool that ships; an ARCHIVED one names the tool of
+  its own day** (TL-395). The tool was `tasklog` until 2026-09-01 and
+  `worktrail` until 2026-09-03, and 138 task files still carry one of those
+  names — five of them open. An open task is an instruction somebody may follow
+  tomorrow, and `worktrail done` fails; a closed one is a record, and renaming
+  the tool inside it would make the file assert something that was never true.
+  That is why TL-137 translating 145 files is not the precedent it looks like:
+  translating a sentence preserves its claim, renaming the tool replaces it.
+  `scripts/tests/former-name.test.mjs` holds the open half; a deliberate
+  occurrence there — the name as a subject, a path on disk, a quoted transcript
+  — is marked `former-name: allow` beside that ONE line, or on the line above an
+  indented block, which cannot carry a comment of its own. The names themselves
+  are explained in [`LINEAGE.md`](LINEAGE.md), and the guard fails if they stop
+  being.
 - **Session state (locks) lives OUTSIDE the repository** — `scripts/lock.mjs`,
   the `BACKLOG_STATE_DIR` / XDG directory, keyed by `git rev-parse
   --git-common-dir` (TL-87). The reason is not aesthetic: every worktree has its

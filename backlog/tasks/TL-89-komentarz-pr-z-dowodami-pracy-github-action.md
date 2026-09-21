@@ -35,7 +35,7 @@ verification:
 
 ## Goal
 
-`worktrail pr-summary --base main` prints (markdown to stdout) a summary of
+`branchling pr-summary --base main` prints (markdown to stdout) a summary of
 the tasks the current branch touches: status transitions, per-field change
 authorship (human vs `agent:`), and — when measurement data exists — estimate
 versus time and tokens. A thin GitHub Actions workflow publishes this as a PR
@@ -56,7 +56,7 @@ The split of responsibilities is a decision here, not a detail:
   <base>...HEAD -- <backlog>/tasks/` gives the list of tasks, `history/` gives
   transitions and actors, `activity/rollup/` (once it exists, after
   TL-27/25) gives time and tokens.
-- **The Action is dumb** — checkout, `npx worktrail pr-summary`, comment. Per
+- **The Action is dumb** — checkout, `npx branchling pr-summary`, comment. Per
   Law 4 (extensibility through composition): the Action is a script over a
   stable output, not a plugin. The same command works in GitLab CI or a hook
   with no change at all.
