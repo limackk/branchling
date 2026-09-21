@@ -640,6 +640,16 @@ implementation detail. Every reading command answers in the same envelope:
 | `sessions` | `sessions` | `correlation`, `total`, `sessions` |
 | `session` | `session` | `correlation`, `session` |
 
+**Adding a kind** (TL-285). A command that answers `--json` is registered in
+`scripts/json-envelope.mjs` and nowhere else: its keys go into `KINDS`, and the
+invocation that exercises it goes into `KIND_EXERCISE` in the same file —
+`{ args, noDir?, refuses?, writes?, input? }`, naming a task through the
+`FIRST_TASK` and `ABSENT_TASK` sentinels rather than typing an id. The suite
+runs that invocation against an empty backlog and a populated one, and a kind
+with no row fails before it can ship. Add the row to the table above in the same
+change; the suite compares it against the code in both directions. Nothing under
+`scripts/tests/` has to be touched to register a kind.
+
 **`--help --json` describes how to CALL a command** (TL-83), which is the other
 half of Law 4: the reading commands answer in JSON, and so does the description
 of the writing ones' input. Each entry in `flags` carries `flag`, `arg` (the
