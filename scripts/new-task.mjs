@@ -44,6 +44,7 @@ import { readStdinText } from "./stdin.mjs";
 import { parseTaskDocument, taskContent } from "./task-input.mjs";
 import { failure, refusal } from "./ui.mjs";
 import { readTaskMetas } from "./task-io.mjs";
+import { todayStamp } from "./today.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -77,12 +78,6 @@ export function slugify(title) {
 /** A YAML scalar for a value that may contain spaces and colons. */
 function quoted(v) {
   return '"' + String(v).replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
-}
-
-function today() {
-  const d = new Date();
-  const p = (n) => String(n).padStart(2, "0");
-  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
 }
 
 /** The numbers already taken in THIS directory — the fallback source, see the
@@ -343,7 +338,7 @@ function createTaskUnlocked({ root, config, board, slug, fields, body }) {
   const taskId = config.taskIdPrefix + "-" + id;
   const file = taskId + "-" + slug + ".md";
   const full = join(paths.tasksDir, file);
-  const day = today();
+  const day = todayStamp();
   const opts = fields || {};
 
   // The banner is dropped BEFORE the rewrites, not after: every `^key:` pattern

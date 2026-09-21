@@ -77,7 +77,7 @@ import { loadConfigOrExit } from "./config.mjs";
 import { ACTOR_NAMESPACES, appendEntries, currentSession, EVENT_ID_RE, eventId, FIELD_DECISION, isValidActor, normalizeReason, openQuestions, questionIdFromReason, readHistory, reasonRefusal, recordEdit } from "./history.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
-import { todayStamp } from "./take-task.mjs";
+import { todayStamp } from "./today.mjs";
 import { requeueStatus } from "./handoff-task.mjs";
 import { buildFieldSpecs, extractMeta, fieldSpec, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
 import { readTaskRecords } from "./task-select.mjs";

@@ -54,6 +54,7 @@ import { PRODUCT_NAME as N } from "./product.mjs";
 import { buildFieldSpecs, extractMeta, fieldSpec, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
 import { readTaskRecords } from "./task-select.mjs";
 import { MARK, color, failure, warn } from "./ui.mjs";
+import { todayStamp } from "./today.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -111,13 +112,6 @@ export function parseTakeArgs(args) {
  */
 export function inProgressStatus(config) {
   return config.inProgressStatus || null;
-}
-
-/** Today, as the frontmatter writes it. Exported because every command that
- *  touches `updated:` has to write the same shape — two of them agreeing by
- *  coincidence is a rewrite of the whole field waiting to happen. */
-export function todayStamp(now) {
-  return new Date(now || Date.now()).toISOString().slice(0, 10);
 }
 
 /**

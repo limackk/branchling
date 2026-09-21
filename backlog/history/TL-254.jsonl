@@ -1,1 +1,4 @@
 {"id":"01M1P964GJDJ8SDHC8NF6XVDR3","ts":"2026-09-04T13:19:32.882Z","task":"TL-254","field":"__created__","from":"","to":"done and decide --choose still name the wrong cause for a reason","actor":"agent:claude","source":"new","reason":"unknown","session":"tree-d8049a34a914"}
+{"id":"01M32KZ390M1JRKDA6V4PMQMW4","ts":"2026-09-21T18:34:31.584Z","task":"TL-254","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M32KZ3907JBGRWAG211N9ZX4","ts":"2026-09-21T18:34:31.584Z","task":"TL-254","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M32MJ97DM12SMSGJ5KK9YJJ9","ts":"2026-09-21T18:45:00.269Z","task":"TL-254","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"done --reason now asks reasonRefusal which rule the value breaks, and the site joined the behavioural table"}

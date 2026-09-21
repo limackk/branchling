@@ -92,7 +92,8 @@ import { callerSpecies, isOverSized, parkedByRun, queueStatuses, readDispatchRec
 import { backlogPaths, repositoryRoot, resolveBacklogDir } from "./paths.mjs";
 import { loadPlanForDispatch, planState, projectionWall } from "./plan.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
-import { inProgressStatus, rebuildViews, todayStamp } from "./take-task.mjs";
+import { inProgressStatus, rebuildViews } from "./take-task.mjs";
+import { todayStamp } from "./today.mjs";
 import { ACTOR_NAMESPACES, buildFieldSpecs, extractMeta, fieldSpec, isValidActor, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
 import { readTaskRecords, splitList, unknownFilterValues } from "./task-select.mjs";
 import { printJson } from "./json-envelope.mjs";

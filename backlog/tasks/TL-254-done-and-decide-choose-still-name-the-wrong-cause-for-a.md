@@ -6,24 +6,36 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P3                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 30m                       # 30m | 2h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-21
 blocked_by: [TL-167]                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
 verification:                      # HOW to check the task is really done
-  - id: no-refusal-names-the-wrong-cause
-    bash: "node --test scripts/tests/change-reason.test.mjs"
+  # REWRITTEN while the task was open (TL-260, TL-424). All three of the
+  # original entries passed against the untouched tree, so the contract was
+  # green before any work was done: the first ran a guard that is a
+  # hand-maintained table (TL-216), and the site this task is about was missing
+  # from the table exactly as it was missing from the code; the second counted
+  # the lines of a grep that already matched nothing. The first entry below
+  # drives `done` itself and fails against the code as it stood at 0d733ac; the
+  # second keeps the site inside the behavioural table, so it cannot fall out
+  # of it silently; the third reads the limit from the constant instead of
+  # naming it.
+  - id: done-names-the-length-not-a-reserved-word
+    bash: "limit=$(node -e \"import('./scripts/task-fields.mjs').then(m=>process.stdout.write(String(m.REASON_MAX_LENGTH)))\"); long=$(node -e \"process.stdout.write('x'.repeat(600))\"); out=$(node scripts/cli.mjs done TL-254 --actor local:me --reason $long 2>&1); echo \"$out\" | grep -q 600 && echo \"$out\" | grep -q \"$limit\" && ! echo \"$out\" | grep -qi reserved"
+  - id: every-reason-site-is-in-the-behavioural-table
+    bash: "test -f scripts/tests/change-reason.test.mjs && grep -q 'done --reason' scripts/tests/change-reason.test.mjs && node --test scripts/tests/change-reason.test.mjs"
   - id: the-limit-is-not-typed-in-prose
-    bash: "test $(grep -c '500 characters' scripts/*.mjs | grep -v ':0$' | wc -l) -eq 0 && echo 'the limit is read from the constant — OK'"
+    bash: "limit=$(node -e \"import('./scripts/task-fields.mjs').then(m=>process.stdout.write(String(m.REASON_MAX_LENGTH)))\"); ! grep -rn \"$limit character\" scripts/*.mjs bin/*.mjs"
   - id: suite
-    bash: "node --test scripts/tests/*.test.mjs > /dev/null"
+    bash: "node --test scripts/tests/*.test.mjs"
 ---
 
 ## Goal
@@ -86,15 +98,21 @@ named, and its message is already right.
 
 ## Acceptance criteria
 
-- [ ] A reason over the limit passed to `done` is refused with its length and
-      the limit, and is not called reserved. [proof: no-refusal-names-the-wrong-cause]
-- [ ] `decide --choose` on an option it cannot record names the one cause that
-      applies. [proof: no-refusal-names-the-wrong-cause]
-- [ ] No message types the limit into prose. [proof: the-limit-is-not-typed-in-prose]
-- [ ] Nothing else in the suite changes. [proof: suite]
+- [x] A reason over the limit passed to `done` is refused with its length and
+      the limit, and is not called reserved. [proof: done-names-the-length-not-a-reserved-word]
+- [x] `done --reason` is judged by the same guard as the other call sites, not
+      by a message of its own. [proof: every-reason-site-is-in-the-behavioural-table]
+- [x] `decide --choose` on an option it cannot record names the one cause that
+      applies. [proof: every-reason-site-is-in-the-behavioural-table]
+- [x] No message types the limit into prose. [proof: the-limit-is-not-typed-in-prose]
+- [x] Nothing else in the suite changes. [proof: suite]
 
 ## Notes
 
+- The `decide --choose` half was closed by TL-255 before this task was picked
+  up: `scripts/decide-task.mjs` already calls `reasonRefusal(value, flag)` and
+  the guard already carries the eighth section for it. What remained, and what
+  this task did, is the `scripts/done-task.mjs` site.
 - Surfaced while writing TL-167's failing test. It was kept out of that task
   deliberately: TL-167 enumerates six call sites and its guard greps for one
   phrase, so widening it there would have blurred a task already in flight.

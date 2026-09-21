@@ -56,7 +56,7 @@ import { loadConfigOrExit } from "./config.mjs";
 import { backlogPaths, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { parsePlanYaml, validatePlan } from "./plan.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
-import { todayStamp } from "./take-task.mjs";
+import { todayStamp } from "./today.mjs";
 import { stripComment, unquote } from "./task-fields.mjs";
 import { readTaskMetas } from "./task-io.mjs";
 import { MARK, color, fail, failure } from "./ui.mjs";
