@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P2                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 30m                       # 30m | 2h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-21
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
@@ -69,6 +69,36 @@ criteria link, which `check` already reports.
 
 ## Acceptance criteria
 
-- [ ] `check` runs the contract audit and names it in `--json`. [proof: registered]
-- [ ] The audit still holds against this tree, with its positive control intact.
+- [x] `check` runs the contract audit and names it in `--json`. [proof: registered]
+- [x] The audit still holds against this tree, with its positive control intact.
       [proof: suite]
+
+## Decisions
+
+**It FAILS; it does not report.** Both arguments are in step 3, and the finding
+decided it: a `verification:` entry in a task nobody has closed is an
+instruction somebody may follow tomorrow, so its correctness is a question about
+today — the same question `docs` answers about a `related_docs` path that leads
+nowhere, and that one fails without anybody arguing the file may come back. The
+guards that report instead — `reasons`, `log-status`, `task-state` — all find
+things in the past or mid-session, which is exactly what this guard refuses to
+read. The decision was also forced by the acceptance criterion: an advisory
+guard is not in a bare `check`, so it would not appear in `check --json` at all.
+
+**The counter-argument is answered by a follow-up, not by a weaker verdict.** An
+imported backlog could go red on a contract legitimately naming somebody else's
+binary, because `plan`, `new` and `init` are other programs' verbs too. The
+escape hatch is `FOREIGN_PROGRAMS`, which is another project's vocabulary living
+in this tool's code — TL-413 moves it into `config.yaml`, where the third law
+puts values.
+
+**The zero sample is a bullet, not a tick and not a `!`.** `!` means a finding
+the default run must not carry (TL-383), and a backlog with no open contract has
+nothing to repair; a plain `✓` would read as ninety entries examined and clean.
+So the line states the count and says "nothing was examined".
+
+**The guard's own positive control is a spawned run, not a pure call.** The
+audit already had a pure one. It could not catch a guard registered under the
+wrong script, or one whose exit code stopped meaning anything, so the test now
+builds a fixture backlog with a contract naming a foreign command and asserts
+exit 1 and the finding's text.

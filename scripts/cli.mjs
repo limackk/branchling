@@ -45,7 +45,7 @@ import { FIELD_SHAPES } from "./task-fields.mjs";
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 const CHECK_USAGE = [
-  `${N} check [--dir <path>] [--id-collisions] [--boards] [--refs] [--criteria] [--reasons] [--log-status] [--task-state] [--vocabulary] [--plan] [--product-name] [--proofs] [--since <sha>] [--actor <ns:name>] [task-file.md …]`,
+  `${N} check [--dir <path>] [--id-collisions] [--boards] [--refs] [--criteria] [--contracts] [--reasons] [--log-status] [--task-state] [--vocabulary] [--plan] [--product-name] [--proofs] [--since <sha>] [--actor <ns:name>] [task-file.md …]`,
   "",
   "  no selector          A RELEASE VERDICT: the guards that can FAIL one, and only those.",
   "                       Exit code = the WORST of them. Guards that report and never",
@@ -71,6 +71,12 @@ const CHECK_USAGE = [
   "  --criteria           only whether every acceptance criterion names the `verification:`",
   "                       entry that proves it; how hard it judges a MISSING link comes from",
   "                       `criteria_links` in config.yaml (off / warn / require)",
+  "  --contracts          only whether an OPEN task\'s `verification:` entry names a command",
+  "                       anybody can run. An entry is an INSTRUCTION, so its correctness is",
+  "                       a question about today: `<word> <subcommand>` in command position,",
+  "                       where the word is neither this tool nor a known foreign program,",
+  "                       FAILS. A CLOSED task is left alone \u2014 its contract records what was",
+  "                       run, under the name the tool had then",
   "  --history            only whether the history logs reach git. It FAILS on a log",
   "                       left untracked while its own task file is tracked — that pair",
   "                       can only mean the log was left behind, and another tree then",
@@ -1525,7 +1531,7 @@ function captureScript(script, args) {
  * evidential force. The dispatcher supplies the mode so that nobody has to
  * remember it.
  */
-const CHECK_FLAGS = ["--dir", "--json", "--id-collisions", "--boards", "--refs", "--criteria", "--reasons", "--log-status", "--history", "--task-state", "--docs", "--vocabulary", "--plan", "--product-name", "--foreign-context", "--proofs", "--since", "--actor"];
+const CHECK_FLAGS = ["--dir", "--json", "--id-collisions", "--boards", "--refs", "--criteria", "--contracts", "--reasons", "--log-status", "--history", "--task-state", "--docs", "--vocabulary", "--plan", "--product-name", "--foreign-context", "--proofs", "--since", "--actor"];
 
 /** PURE — resolves `check`'s arguments. Throws on a usage error. */
 export function parseCheckArgs(args) {
@@ -1534,6 +1540,7 @@ export function parseCheckArgs(args) {
   let wantBoards = false;
   let wantRefs = false;
   let wantCriteria = false;
+  let wantContracts = false;
   let wantReasons = false;
   let wantLogStatus = false;
   let wantHistory = false;
@@ -1565,6 +1572,7 @@ export function parseCheckArgs(args) {
     if (a === "--boards") { wantBoards = true; continue; }
     if (a === "--refs") { wantRefs = true; continue; }
     if (a === "--criteria") { wantCriteria = true; continue; }
+    if (a === "--contracts") { wantContracts = true; continue; }
     if (a === "--reasons") { wantReasons = true; continue; }
     if (a === "--log-status") { wantLogStatus = true; continue; }
     if (a === "--history") { wantHistory = true; continue; }
@@ -1606,17 +1614,18 @@ export function parseCheckArgs(args) {
   // Was a guard NAMED? The default run is a release verdict and carries only
   // the guards that can fail one; a named guard is somebody asking a narrower
   // question, and gets answered whatever its severity (TL-383).
-  const explicit = wantIds || wantBoards || wantRefs || wantCriteria || wantReasons || wantLogStatus ||
+  const explicit = wantIds || wantBoards || wantRefs || wantCriteria || wantContracts || wantReasons || wantLogStatus ||
     wantHistory || wantTaskState || wantDocs || wantVocabulary || wantPlan ||
     wantProductName || wantForeignContext || wantProofs;
 
   // No selector means all of them. A new guard joins the default run on purpose
   // (BL-1451): a dangling reference passed `check`, because `check` checked only
   // what somebody had once written into it.
-  if (!wantIds && !wantBoards && !wantRefs && !wantCriteria && !wantReasons && !wantLogStatus &&
+  if (!wantIds && !wantBoards && !wantRefs && !wantCriteria && !wantContracts && !wantReasons && !wantLogStatus &&
       !wantHistory && !wantTaskState && !wantDocs && !wantVocabulary && !wantPlan &&
       !wantProductName && !wantForeignContext && !wantProofs) {
-    wantIds = true; wantBoards = true; wantRefs = true; wantCriteria = true; wantReasons = true;
+    wantIds = true; wantBoards = true; wantRefs = true; wantCriteria = true; wantContracts = true;
+    wantReasons = true;
     wantLogStatus = true; wantHistory = true; wantTaskState = true; wantDocs = true;
     wantVocabulary = true; wantPlan = true; wantProductName = true;
     wantForeignContext = true;
@@ -1633,7 +1642,7 @@ export function parseCheckArgs(args) {
         "It narrows which proven closings are re-run; on its own there is nothing for it to narrow."
     );
   }
-  return { dir, json, explicit, wantIds, wantBoards, wantRefs, wantCriteria, wantReasons, wantLogStatus, wantHistory, wantTaskState, wantDocs, wantVocabulary, wantPlan, wantProductName, wantForeignContext, wantProofs, since, actor, files };
+  return { dir, json, explicit, wantIds, wantBoards, wantRefs, wantCriteria, wantContracts, wantReasons, wantLogStatus, wantHistory, wantTaskState, wantDocs, wantVocabulary, wantPlan, wantProductName, wantForeignContext, wantProofs, since, actor, files };
 }
 
 // The guard table and its severity axis live in `check-guards.mjs`, because
