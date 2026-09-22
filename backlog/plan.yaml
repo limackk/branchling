@@ -6,7 +6,7 @@
 # TL-380, TL-381, TL-382, TL-383, TL-384). It answered "what is this product
 # NOT". Its four waves stay in Git history; repeating them here would report
 # eight closed tasks forever and say nothing about what is next.
-updated: 2026-09-21
+updated: 2026-09-22
 rationale: "The surface is now small enough to be trusted, and nothing has proved it is. Branchling first makes its evidence unfalsifiable, then its ledger whole, then its queue survivable by more than one hand; only what a stranger reads and what carries the tool outward comes after, because publishing a claim before it holds is the one failure no later wave can undo."
 waves:
   # THE PRODUCT HAS ONE CLAIM: a task closes only on a run that could have
@@ -17,7 +17,7 @@ waves:
   # hour is in the same class: one nobody runs is one that proves nothing.
   # Everything later in this plan is worth less until this wave holds.
   - name: "Evidence that could have failed"
-    tasks: [TL-260, TL-262, TL-237, TL-276, TL-275, TL-273, TL-265]
+    tasks: [TL-260, TL-262, TL-237, TL-276, TL-275, TL-273, TL-265, TL-433, TL-434, TL-435, TL-436, TL-437]
 
   # LAW 1: the state travels with the branch, and the ledger is that state.
   # These are half-written records — a frontmatter change that outlived the
