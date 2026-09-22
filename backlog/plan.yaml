@@ -54,11 +54,12 @@ waves:
 
   # WHAT A STRANGER READS when they open the repository. Polish in the shipped
   # viewer, filenames in a language the repository forbids, a skill describing
-  # gaps that closed, two words for one kind of task. This is the last wave
+  # gaps that closed, two words for one kind of task, a default branch carrying
+  # a name the repository's own code had already stopped using. This is the last wave
   # before publication because it is the one whose cost rises with every task
   # written in the meantime.
   - name: "What a stranger reads"
-    tasks: [TL-385, TL-208, TL-342, TL-159, TL-218, TL-123, TL-244]
+    tasks: [TL-385, TL-208, TL-342, TL-159, TL-218, TL-123, TL-244, TL-439]
 
   # OUTWARD-FACING, AND THEREFORE LAST. A demonstration, a badge over a public
   # run, an Action that comments proof of work on a pull request, and a name

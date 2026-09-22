@@ -21,9 +21,9 @@ verification:
   - id: terminal-independence-suite
     bash: "test -f scripts/tests/suite-is-terminal-independent.test.mjs && node --test scripts/tests/suite-is-terminal-independent.test.mjs"
   - id: green-on-node-18
-    bash: "id=$(gh run list --workflow test.yml --branch master --limit 1 --json databaseId --jq '.[0].databaseId') && gh run view $id --json jobs --jq '.jobs[] | select(.name | test("18")) | .conclusion' | grep -vqx success && exit 1 || echo 'every Node 18 job of the latest run on master is green — OK'"
+    bash: "id=$(gh run list --workflow test.yml --branch main --limit 1 --json databaseId --jq '.[0].databaseId') && gh run view $id --json jobs --jq '.jobs[] | select(.name | test("18")) | .conclusion' | grep -vqx success && exit 1 || echo 'every Node 18 job of the latest run on main is green — OK'"
   - id: green-on-node-20
-    bash: "id=$(gh run list --workflow test.yml --branch master --limit 1 --json databaseId --jq '.[0].databaseId') && gh run view $id --json jobs --jq '.jobs[] | select(.name | test("20")) | .conclusion' | grep -vqx success && exit 1 || echo 'every Node 20 job of the latest run on master is green — OK'"
+    bash: "id=$(gh run list --workflow test.yml --branch main --limit 1 --json databaseId --jq '.[0].databaseId') && gh run view $id --json jobs --jq '.jobs[] | select(.name | test("20")) | .conclusion' | grep -vqx success && exit 1 || echo 'every Node 20 job of the latest run on main is green — OK'"
 ---
 
 ## Goal

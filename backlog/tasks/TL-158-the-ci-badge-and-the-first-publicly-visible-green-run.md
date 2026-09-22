@@ -12,7 +12,7 @@ executor: ""
 estimate: 30m                       # 30m | 1h | 2h | 3h | 4h | 1d | 1w
 created: 2026-09-02
 updated: 2026-09-22
-blocked_by: [TL-53, TL-433, TL-434, TL-435, TL-436]
+blocked_by: [TL-53, TL-433, TL-434, TL-435, TL-436, TL-439]
 blocks: []
 related_docs: []
 verification:                      # HOW to check that the task is really done
@@ -46,7 +46,7 @@ verification:                      # HOW to check that the task is really done
   - id: badge-agrees-with-manifest
     bash: "node -e \"const p=require('./package.json'); const s=/github[.]com[/:]([^/]+\\/[^/.]+)/.exec(p.repository.url)[1]; const u='https://github.com/'+s+'/actions/workflows/test.yml/badge.svg'; if(!require('fs').readFileSync('README.md','utf8').includes(u)) { console.error('the README carries no badge naming '+s); process.exit(1); } console.log('the badge and the manifest both name '+s+' — OK');\""
   - id: workflow-run-is-green
-    bash: "gh run list --workflow test.yml --branch master --limit 1 --json conclusion --jq '.[0].conclusion' | grep -qx success && echo 'the newest run of test.yml on master concluded success — OK'"
+    bash: "gh run list --workflow test.yml --branch main --limit 1 --json conclusion --jq '.[0].conclusion' | grep -qx success && echo 'the newest run of test.yml on main concluded success — OK'"
   - id: badge-served-green
     bash: "node -e \"const p=require('./package.json'); const s=/github[.]com[/:]([^/]+\\/[^/.]+)/.exec(p.repository.url)[1]; const u='https://github.com/'+s+'/actions/workflows/test.yml/badge.svg'; fetch(u).then(r=>r.text()).then(t=>{ const w=(t.match(/>(passing|failing|no status|cancelled)</)||[])[1]; if(w!=='passing') { console.error('the forge serves a badge saying '+w+' at '+u); process.exit(1); } console.log('the forge serves a passing badge at '+u+' — OK'); });\""
   - id: looks-right
@@ -112,10 +112,12 @@ at <https://github.com/limackk/branchling>, `origin` points at it over SSH (`git
 replaced `"private": true`. So the open question this task was parked on ("where
 is this published, and under whose account") is answered.
 
-**The default branch is `master`, not `main`** — locally and on the forge
-(`gh repo view` says `default=master`). AGENTS.md and many task files say
-`main`. Nothing was renamed here; the entries above name the branch that
-exists.
+**The default branch is `main`, settled on 2026-09-22 (TL-439).** It was
+`master` when this paragraph was first written, in the repository and on the
+forge, while AGENTS.md, the templates and `scripts/resume-task.mjs` already
+said `main`. The owner chose `main`; the local branch was renamed and the
+entries above now name it. The forge still has to follow, and that is a push,
+which is a separate decision — TL-439 carries it.
 
 **The workflow is RED, so the badge was withheld.** Run
 <https://github.com/limackk/branchling/actions/runs/35697131745> for commit
@@ -142,8 +144,8 @@ the next session pastes it rather than composing it:**
 
 It goes between the `# branchling` heading and the bold subtitle. No `?branch=`
 query: without one the forge reports the DEFAULT branch, so the badge cannot
-drift the day that branch is renamed — which, given the `master`/`main`
-discrepancy above, is a live possibility.
+drift the day that branch is renamed — which is exactly what TL-439 then did,
+and the badge line above needed no edit for it.
 
 **What was delivered instead:** `scripts/tests/readme-badge.test.mjs`, the
 answer to "derive the badge from the manifest, do not type the fact twice". A

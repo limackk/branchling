@@ -21,7 +21,7 @@ verification:
   - id: mcp-suite
     bash: "test -f scripts/tests/mcp.test.mjs && node --test scripts/tests/mcp.test.mjs"
   - id: green-on-macos
-    bash: "id=$(gh run list --workflow test.yml --branch master --limit 1 --json databaseId --jq '.[0].databaseId') && gh run view $id --json jobs --jq '.jobs[] | select(.name | test("macos")) | .conclusion' | grep -vqx success && exit 1 || echo 'every macOS job of the latest run on master is green — OK'"
+    bash: "id=$(gh run list --workflow test.yml --branch main --limit 1 --json databaseId --jq '.[0].databaseId') && gh run view $id --json jobs --jq '.jobs[] | select(.name | test("macos")) | .conclusion' | grep -vqx success && exit 1 || echo 'every macOS job of the latest run on main is green — OK'"
 ---
 
 ## Goal
