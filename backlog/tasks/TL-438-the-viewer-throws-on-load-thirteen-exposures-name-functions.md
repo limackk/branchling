@@ -6,7 +6,7 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P0
-status: in_progress  # pending | in_progress | blocked | done | cancelled
+status: done  # pending | in_progress | blocked | done | cancelled
 owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
@@ -69,8 +69,8 @@ is never reached.
 
 ## Acceptance criteria
 
-- [ ] The generated page assigns no name it does not define, proven by a test
+- [x] The generated page assigns no name it does not define, proven by a test
       that fails against the code as it was. [proof: every-exposure-is-defined]
-- [ ] The guard cannot pass on a zero sample and has a positive control for a
+- [x] The guard cannot pass on a zero sample and has a positive control for a
       missing definition. [proof: every-exposure-is-defined]
-- [ ] Nothing else in the suite changes. [proof: suite-green]
+- [x] Nothing else in the suite changes. [proof: suite-green]
