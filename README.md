@@ -1,5 +1,7 @@
 # branchling
 
+[![test](https://github.com/limackk/branchling/actions/workflows/test.yml/badge.svg)](https://github.com/limackk/branchling/actions/workflows/test.yml)
+
 **A Git-native engineering loop for work done by people and coding agents.**
 An agent harness knows how to edit code. branchling owns what must survive the
 agent, its context window and even the provider: what work is ready, who claimed
