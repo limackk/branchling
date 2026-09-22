@@ -44,6 +44,7 @@ import { fileURLToPath } from "node:url";
 import { COMMANDS, describeFlags } from "./cli.mjs";
 import { TOPIC_NAMES } from "./instructions.mjs";
 import { PRODUCT_NAME as N, PRODUCT_VERSION } from "./product.mjs";
+import { writeOut } from "./stdout.mjs";
 import { refusal } from "./ui.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -293,7 +294,26 @@ export function main(argv) {
 /** The read loop. Split out so a test can drive `handle` without a process. */
 export function listen(opts) {
   const rl = createInterface({ input: process.stdin });
-  const send = (m) => process.stdout.write(JSON.stringify(m) + "\n");
+
+  // WRITTEN SYNCHRONOUSLY, LIKE EVERY OTHER COMMAND'S OUTPUT (TL-435). This
+  // server used `process.stdout.write` and then answered the end of stdin with
+  // `process.exit(0)`, which is the defect TL-175 had already closed for the
+  // CLI: Node's stdout is synchronous for a file and for a TTY, but a PIPE is
+  // synchronous only on Linux and Windows — on macOS it is ASYNCHRONOUS, so the
+  // bytes `write` accepted may still be queued inside the process when `exit`
+  // throws that queue away.
+  //
+  // The handshake is where it showed, because it is the only exchange bigger
+  // than a pipe buffer: the answer to `tools/list` alone is about 25 KB against
+  // 16 KiB, so the tail never left and the client parsed a severed line —
+  // `Unterminated string in JSON at position 16354` on `test (20, macos-latest)`
+  // of run 35697131745, while both ubuntu jobs and every local run were green.
+  // A stream is correct when watched and wrong when used exactly as TL-175
+  // describes, so it takes TL-175's answer rather than a second one:
+  // `writeOut` returns when the operating system has the bytes, which makes the
+  // `process.exit(0)` below correct instead of forbidden.
+  const send = (m) => writeOut(JSON.stringify(m) + "\n");
+
   rl.on("line", (line) => {
     const text = line.trim();
     if (!text) return;
@@ -311,6 +331,8 @@ export function listen(opts) {
     }
     if (response) send(response);
   });
+  // Safe again now that `send` is synchronous: by the time this runs, every
+  // answer is in the pipe. See the comment on `send`.
   rl.on("close", () => process.exit(0));
   return null;
 }
