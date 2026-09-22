@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 1h | 2h | 3h | 4h | 1d | 1w
@@ -18,8 +18,22 @@ blocked_by: []                     # ids of tasks that MUST be closed before thi
 blocks: [TL-158]                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
 verification:
+  # This entry judges what a task CITES — a `related_docs:` entry, in either of
+  # the field's two shapes — and not the word. The first draft grepped for the
+  # directory name across `backlog/tasks`, which matched THIS task's own Goal,
+  # Context and Steps and so could never go green; the same trap caught a guard
+  # written for TL-438 the same day, because a task QUOTING a defect reads
+  # exactly like the defect. Measured on 2026-09-22: TL-33, TL-40, TL-158 and
+  # TL-433 each name such a path in prose as a SUBJECT, and none of them cites
+  # one. Prose about a path is discussion; `related_docs:` is the one place a
+  # task says "read this first", which is what `check-docs-links.mjs` says in
+  # its own header. Markdown links are not re-judged here — `docs-guard-green`
+  # owns those, and now reports them with a message of their own.
+  # The first command is the POSITIVE CONTROL: it feeds the pattern one citation
+  # of each shape and fails unless both are recognised, because an entry that
+  # matches nothing is green with no evidentiary force.
   - id: no-task-cites-node-modules
-    bash: "grep -rn node_modules backlog/tasks && exit 1 || echo 'no task cites a path under node_modules — OK'"
+    bash: "printf 'related_docs: [node_modules/pkg/README.md]' | grep -qE '^related_docs:.*node_modules/|^[[:space:]]*-[[:space:]]*node_modules/' || { echo 'control: the pattern recognises no citation, so a green run proves nothing'; exit 1; }; printf '  - node_modules/pkg/README.md' | grep -qE '^related_docs:.*node_modules/|^[[:space:]]*-[[:space:]]*node_modules/' || { echo 'control: the pattern recognises no citation, so a green run proves nothing'; exit 1; }; grep -rnE '^related_docs:.*node_modules/|^[[:space:]]*-[[:space:]]*node_modules/' backlog/tasks && exit 1 || echo 'no task cites a file inside an install directory — OK'"
   - id: docs-guard-green
     bash: "node scripts/cli.mjs check --docs"
   - id: docs-links-suite
@@ -49,6 +63,6 @@ Decide what TL-343 meant to cite (an upstream URL is citable, a path under `node
 
 ## Acceptance criteria
 
-- [ ] No task file cites a path that exists only after an install. [proof: no-task-cites-node-modules]
-- [ ] The docs guard passes over the whole tree. [proof: docs-guard-green]
-- [ ] The guard's own tests, including the control for the new message, pass. [proof: docs-links-suite]
+- [x] No task file cites a path that exists only after an install. [proof: no-task-cites-node-modules]
+- [x] The docs guard passes over the whole tree. [proof: docs-guard-green]
+- [x] The guard's own tests, including the control for the new message, pass. [proof: docs-links-suite]

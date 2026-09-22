@@ -27,7 +27,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  anchorsIn, auditLinks, classifyTarget, documentsToCheck, headingSlug, linksIn, relatedDocsIn,
+  anchorsIn, auditLinks, classifyTarget, documentsToCheck, headingSlug, isInstallArtefact, linksIn,
+  relatedDocsIn,
 } from "../check-docs-links.mjs";
 import { repositoryRoot } from "../paths.mjs";
 
@@ -235,6 +236,57 @@ test("a missing local anchor FAILS, then the same document passes once the headi
   const green = check(fx);
   assert.equal(green.status, 0, green.stdout + green.stderr);
   assert.match(green.stdout, /including 1 anchor/);
+});
+
+// ── a citation into an install directory (TL-433) ─────────────────────
+
+test("a target inside the install directory is judged by its PATH, not by the disk", () => {
+  assert.equal(isInstallArtefact("node_modules/@clack/prompts/README.md"), true);
+  assert.equal(isInstallArtefact("../node_modules/pkg/README.md"), true);
+  assert.equal(isInstallArtefact("docs/node_modules.md"), false,
+    "a document merely NAMED after the directory is not inside it");
+  assert.equal(isInstallArtefact("docs/manual.md"), false);
+
+  // The control that carries the weight: `exists` answers yes for everything,
+  // which is the developer machine where the install ran — and the finding
+  // stands anyway, because on the machine that matters it would not.
+  const docs = [{ file: "/r/docs/a.md", text: "[prompts](../node_modules/pkg/README.md)" }];
+  const audit = auditLinks(docs, () => true, "/r");
+  assert.deepEqual(audit.dead, [], "an install artefact is not a dead link and must not be filed as one");
+  assert.equal(audit.artefacts.length, 1);
+  assert.equal(audit.artefacts[0].line, 1);
+});
+
+test("…and a related_docs entry into it FAILS with ITS OWN message, file present", () => {
+  // The measured defect (TL-433): one task cited
+  // `node_modules/@clack/prompts/README.md`, which passed on every developer
+  // machine and failed on all six CI jobs. The install is REPRODUCED here, so a
+  // guard that asked the filesystem would be green and this test would be the
+  // one that never fires.
+  const fx = fixture();
+  mkdirSync(join(fx.dir, "node_modules", "pkg"), { recursive: true });
+  writeFileSync(join(fx.dir, "node_modules", "pkg", "README.md"), "# Present\n", "utf8");
+  const name = spawnSync("sh", ["-c", "ls backlog/tasks/" + fx.id + "-*.md"],
+    { cwd: fx.dir, encoding: "utf8" }).stdout.trim();
+  const path = join(fx.dir, name);
+  const original = readFileSync(path, "utf8");
+  const cite = (target) => writeFileSync(path,
+    original.replace(/^related_docs:.*$/m, "related_docs:\n  - " + target), "utf8");
+
+  cite("node_modules/pkg/README.md");
+  const red = check(fx);
+  assert.equal(red.status, 1, red.stdout + red.stderr);
+  assert.match(red.stdout, /point inside/);
+  assert.match(red.stdout, /node_modules\/pkg\/README\.md/);
+  assert.match(red.stdout, /related_docs/);
+  assert.equal(/lead nowhere/.test(red.stdout), false,
+    "filed as a dead link: finding the file fixes one of those and not this one\n" + red.stdout);
+
+  // The other half of the control: the same tree, the same guard, green once the
+  // citation is something a clone can follow.
+  cite("https://www.npmjs.com/package/@clack/prompts");
+  const green = check(fx);
+  assert.equal(green.status, 0, green.stdout + green.stderr);
 });
 
 // ── what it looks at ──────────────────────────────────────────────────────

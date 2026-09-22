@@ -16,7 +16,7 @@ created: 2026-09-07
 updated: 2026-09-07
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
-related_docs: [scripts/agent-profiles.mjs, backlog/tasks/TL-382-provider-execution-uses-one-thin-user-owned-adapter-path.md, node_modules/@clack/prompts/README.md] # paths relative to the repository root
+related_docs: [scripts/agent-profiles.mjs, backlog/tasks/TL-382-provider-execution-uses-one-thin-user-owned-adapter-path.md] # paths relative to the repository root
 verification:                      # HOW to check the task is really done
   - id: fleet-role-selection
     bash: "node --test scripts/tests/agent-profile-setup.test.mjs scripts/tests/agent-launches.test.mjs"
@@ -60,8 +60,9 @@ The files to read before the first edit, each with a reason.
 3. `scripts/tests/agent-profile-setup.test.mjs` — transcript contract, shared
    write boundary, and cancellation controls.
 4. `scripts/tests/agent-launches.test.mjs` — launch resolution contract.
-5. `node_modules/@clack/prompts/README.md` — supported multiselect behavior;
-   reuse the installed dependency rather than adding a terminal library.
+5. https://www.npmjs.com/package/@clack/prompts — supported multiselect
+   behavior; reuse the installed dependency rather than adding a terminal
+   library.
 
 ## Steps
 

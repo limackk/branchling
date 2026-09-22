@@ -35,6 +35,16 @@
  *   3. An external fragment. Its target is outside this repository, so its
  *      heading cannot be checked without making a network request.
  *
+ * AND ONE THING THAT IS A FINDING OF ITS OWN, NOT A DEAD LINK (TL-433). A target
+ * inside an install directory resolves on the machine that ran the install and
+ * nowhere else. Measured: `node_modules/@clack/prompts/README.md`, cited by one
+ * task, passed on every developer machine and failed on all six CI jobs, for a
+ * package this repository never depended on. Judging it by `existsSync` makes
+ * the verdict a property of the machine, so the rule reads the PATH instead and
+ * answers the same everywhere — and it is reported separately, because a dead
+ * link is fixed by finding the file and this one is fixed by citing the
+ * upstream URL, which no local tree can ever contain.
+ *
  * Local fragments are checked against Markdown headings. A bare `#section`
  * means the current document; `docs/manual.md#the-contract` means that file.
  *
@@ -60,10 +70,24 @@ const OKM = color.ok(MARK.ok);
 const ERRM = color.err(MARK.err);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-/** Directories never walked. `node_modules` is somebody else's documentation
- *  and would triple the runtime to report links nobody in this repository
- *  wrote. */
-const SKIP_DIRS = new Set(["node_modules", ".git", ".worktrees"]);
+/** The directory a package manager creates. Named once: it is both a place this
+ *  guard never READS from and a place no document here may POINT INTO. */
+export const INSTALL_DIR = "node_modules";
+
+/** Directories never walked. The install directory is somebody else's
+ *  documentation and would triple the runtime to report links nobody in this
+ *  repository wrote. */
+const SKIP_DIRS = new Set([INSTALL_DIR, ".git", ".worktrees"]);
+
+/**
+ * Does this target point inside an install directory? PURE, and deliberately
+ * NOT a question about the filesystem: the file is present wherever the install
+ * ran and absent everywhere else, so asking `existsSync` would make the guard
+ * answer differently on two machines looking at one repository (TL-433).
+ */
+export function isInstallArtefact(path) {
+  return String(path || "").split(/[\\/]+/).includes(INSTALL_DIR);
+}
 
 /** A markdown inline link: `[text](target)`. Reference-style definitions
  *  (`[id]: target`) are matched separately below — both carry a path, and a
@@ -229,6 +253,7 @@ export function documentsToCheck(root, tasksDir) {
  */
 export function auditLinks(documents, exists, root, read = () => "") {
   const dead = [];
+  const artefacts = [];
   const skipped = { empty: 0, "anchor-in-page": 0, external: 0, "other-repository": 0 };
   let checked = 0;
   let anchorsChecked = 0;
@@ -254,6 +279,12 @@ export function auditLinks(documents, exists, root, read = () => "") {
         continue;
       }
       checked++;
+      // Asked BEFORE the path is resolved, so the answer is the same on a
+      // machine that ran the install and on one that did not.
+      if (isInstallArtefact(verdict.path)) {
+        artefacts.push({ file: doc.file, line: entry.line, target: entry.target, kind: entry.kind || "link" });
+        continue;
+      }
       // TWO RESOLUTION RULES, because the format has two. A markdown link is
       // relative to the FILE it sits in, which is what makes a link between two
       // tasks in one directory read as a bare filename. A `related_docs` entry
@@ -277,7 +308,7 @@ export function auditLinks(documents, exists, root, read = () => "") {
       }
     }
   }
-  return { dead, skipped, checked, anchorsChecked, documents: documents.length };
+  return { dead, artefacts, skipped, checked, anchorsChecked, documents: documents.length };
 }
 
 export function main(argv) {
@@ -298,7 +329,25 @@ export function main(argv) {
   const result = auditLinks(documents, (p) => existsSync(p), root, (p) => readFileSync(p, "utf8"));
 
   const rel = (p) => relative(root, p) || p;
-  if (!result.dead.length) {
+  const label = (kind) =>
+    kind === "related_docs" ? "  (related_docs)" : kind === "anchor" ? "  (missing anchor)" : "";
+
+  if (result.artefacts.length) {
+    console.log(
+      `${ERRM} docs: ${result.artefacts.length} of ${result.checked} target(s) point inside ` +
+        `\`${INSTALL_DIR}/\`, which an install creates and no clone contains`
+    );
+    for (const a of result.artefacts.slice(0, 25)) {
+      console.log(`  - ${rel(a.file)}:${a.line} → ${a.target}` + label(a.kind));
+    }
+    if (result.artefacts.length > 25) console.log(`  … and ${result.artefacts.length - 25} more`);
+    console.log("");
+    console.log("  This is NOT a dead link and is not fixed by finding the file: it resolves on");
+    console.log("  the machine that ran the install and nowhere else, so it is green here and");
+    console.log("  red in CI. Cite the upstream URL, or nothing.");
+  }
+
+  if (!result.dead.length && !result.artefacts.length) {
     // The counts are the positive control: "0 dead" over 0 links read is a guard
     // that found nothing to judge, and it must not look like one that passed.
     console.log(
@@ -314,10 +363,11 @@ export function main(argv) {
     return 0;
   }
 
+  if (!result.dead.length) return 1;
+
   console.log(`${ERRM} docs: ${result.dead.length} of ${result.checked} target(s) lead nowhere or to a missing section`);
   for (const d of result.dead.slice(0, 25)) {
-    console.log(`  - ${rel(d.file)}:${d.line} → ${d.target}` +
-      (d.kind === "related_docs" ? "  (related_docs)" : d.kind === "anchor" ? "  (missing anchor)" : ""));
+    console.log(`  - ${rel(d.file)}:${d.line} → ${d.target}` + label(d.kind));
   }
   if (result.dead.length > 25) console.log(`  … and ${result.dead.length - 25} more`);
   console.log("");
