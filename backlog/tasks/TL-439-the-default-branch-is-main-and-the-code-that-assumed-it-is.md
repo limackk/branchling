@@ -6,7 +6,7 @@ labels: []
 board: main
 epic: ""
 priority: P1
-status: in_progress
+status: done
 owner: agent:claude
 role: ""
 executor: ""
@@ -88,6 +88,6 @@ the reader.
 
 ## Acceptance criteria
 
-- [ ] No local branch is called `master`, and `main` exists. [proof: master-is-gone]
-- [ ] No verification contract in the backlog names the branch `master`. [proof: no-contract-names-master]
-- [ ] The forge reports `main` as this repository's default branch. [proof: the-forge-agrees]
+- [x] No local branch is called `master`, and `main` exists. [proof: master-is-gone]
+- [x] No verification contract in the backlog names the branch `master`. [proof: no-contract-names-master]
+- [x] The forge reports `main` as this repository's default branch. [proof: the-forge-agrees]
