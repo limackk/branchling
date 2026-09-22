@@ -82,3 +82,40 @@ edit pays nothing.
       today's code. [proof: bulk-adoption-is-asked-for]
 - [ ] An unrecorded field edit is still never reported as no change.
       [proof: suite-green]
+
+## It happened, in the main checkout, uncommitted (2026-09-21)
+
+Measured while landing the plan's seventh wave, hours after TL-387 closed. An
+ordinary command in the main checkout appended one `__adopted__` line to each of
+twenty-one versioned logs — TL-397, TL-399 through TL-415, TL-417, TL-418 and
+TL-420, every task created during this session. The rows read:
+
+    {"field":"__adopted__","from":"","to":["title","priority","type","owner",
+     "estimate","confidence","board","epic","created"],
+     "actor":"unknown","source":"boot","reason":"unknown"}
+
+Three things this instance settles that the task could only predict.
+
+**It is not confined to `history`, and the writer was `serve`.** The rows carry
+`source: boot`, and `scripts/serve-backlog.mjs` calls
+`reconcile(BACKLOG_DIR, { actor: "unknown", source: "boot" })` when it starts,
+then again on a timer with `source: "external"`. So the adoption is written by a
+server nobody was looking at, into versioned logs, in a checkout whose operator
+never ran a writing command. Measured on the same machine the same day: one
+`serve-backlog.mjs` against the main checkout had been running for two days and
+three hours. The remedy this task sketches — report before writing, or write
+only for the tasks a run names — has to bind wherever reconcile is reached from,
+and the background caller is the one that needs it most: a command a person
+typed can at least print what it is about to do.
+
+**The actor is `unknown` and the reason is `unknown`.** Both are reserved words
+this project forbids a person to type, and they are correct here: nobody
+declared anything. That is the strongest argument that these rows should not be
+written unasked — an append-only log gains twenty-one rows attributed to nobody,
+for an event that did not happen.
+
+**Nothing was lost by refusing them.** They were uncommitted, so `git checkout
+-- backlog/history/` removed all twenty-one, and no field edit made by hand went
+with them: every one of those tasks was created by the tool, with its creation
+already recorded. Append-only protects what somebody wrote; it was never a
+licence to keep what nothing wrote.
