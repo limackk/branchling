@@ -35,9 +35,11 @@ import { fileURLToPath } from "node:url";
 import { COMMANDS } from "../cli.mjs";
 import { PRODUCT_NAME } from "../product.mjs";
 
-import { isolateHome } from "./_repo.mjs";
+import { isolateHome, plainOutput } from "./_repo.mjs";
 
 isolateHome("refusal-shape");
+// Assert against plain text, not against the observer's terminal (TL-238).
+plainOutput();
 
 const CLI = join(dirname(fileURLToPath(import.meta.url)), "..", "cli.mjs");
 const NAMES = Object.keys(COMMANDS);

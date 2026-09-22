@@ -98,9 +98,26 @@ export const TASKS_DIR = join(BACKLOG_DIR, "tasks");
  *
  * A test about COLOUR ITSELF must not call this — it has to state its own
  * expectation per case, which is the same rule seen from the other side.
+ *
+ * IT ALSO REMOVES THE COUNTER-DECLARATION, and that half was missing until
+ * TL-434. `NO_COLOR` beats `FORCE_COLOR` in `colorAllowed()`, so the painter
+ * was already right — but leaving BOTH variables set leaves the ENVIRONMENT
+ * self-contradictory, and Node 18 and 20 answer a contradiction with a process
+ * warning on stderr:
+ *
+ *   (node:…) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR'
+ *   env being set.
+ *
+ * Every spawned `cli.mjs` inherits the pair and prints that line, so a test
+ * asserting that a command said NOTHING on stderr was reading Node's sentence
+ * as the tool's. Measured on 2026-09-22: green on Node 22 and 24, red on 18 and
+ * 20 — a suite still reporting the observer, one runtime removed instead of one
+ * terminal. The environment carries ONE colour decision, written exactly as
+ * `childEnv()` in `cli.mjs` writes it: setting one variable deletes the other.
  */
 export function plainOutput() {
   process.env.NO_COLOR = "1";
+  delete process.env.FORCE_COLOR;
 }
 
 export function isolateHome(label = "home") {

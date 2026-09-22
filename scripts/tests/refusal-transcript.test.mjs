@@ -23,9 +23,11 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { isolateHome, SCRIPTS_DIR } from "./_repo.mjs";
+import { isolateHome, plainOutput, SCRIPTS_DIR } from "./_repo.mjs";
 
 isolateHome("refusal-transcript");
+// Assert against plain text, not against the observer's terminal (TL-238).
+plainOutput();
 
 import { TRANSCRIPT_GUTTER, transcriptBlock } from "../done-task.mjs";
 import { MARK } from "../ui.mjs";
