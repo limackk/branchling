@@ -6,7 +6,7 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
+status: done  # pending | in_progress | blocked | done | cancelled
 owner: unassigned
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
@@ -46,5 +46,5 @@ so the harness ran the compatible adapter twice and the `remote-done` probe neve
 
 ## Acceptance criteria
 
-- [ ] The harness tests pass in this session's environment. [proof: api-harness-suite]
-- [ ] Both Node 18 jobs of the newest run on the default branch concluded success. [proof: green-on-node-18]
+- [x] The harness tests pass in this session's environment. [proof: api-harness-suite]
+- [x] Both Node 18 jobs of the newest run on the default branch concluded success. [proof: green-on-node-18]
