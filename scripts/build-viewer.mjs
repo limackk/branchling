@@ -3609,21 +3609,13 @@ function handleHash() {
 }
 window.addEventListener("hashchange", handleHash);
 
-// expose for inline onclick in dynamically-generated content
+// Expose for inline onclick in dynamically-generated content. EVERY NAME HERE
+// MUST BE DEFINED ABOVE: this block runs at load, so one missing name throws a
+// ReferenceError and every statement after it — including the first render —
+// never runs. That is not a broken button, it is a blank page. TL-379 removed
+// the viewer's write surface and left thirteen of these behind, and no test
+// noticed because they all read the page as text. TL-438's guard now checks it.
 window.selectTask = selectTask;
-window.changeTaskStatus = changeTaskStatus;
-window.startEdit = startEdit;
-window.cancelEdit = cancelEdit;
-window.saveField = saveField;
-window.submitReason = submitReason;
-window.cancelReason = cancelReason;
-window.saveChips = saveChips;
-window.saveLines = saveLines;
-window.onEditorKey = onEditorKey;
-window.openHistory = openHistory;
-window.toggleHistory = toggleHistory;
-window.toggleTaskGraph = toggleTaskGraph;
-window.clearHistoryFilter = clearHistoryFilter;
 
 // ─── Connection bar event wiring ─────────────────────────────────────
 document.getElementById("btnConnect").addEventListener("click", pickDirectory);

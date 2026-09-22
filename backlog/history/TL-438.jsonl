@@ -1,0 +1,4 @@
+{"id":"01M340P1WQ4C9G6HEAG2VF1AK0","ts":"2026-09-22T07:36:01.175Z","task":"TL-438","field":"__created__","from":"","to":"The viewer throws on load: thirteen exposures name functions that no longer exist","actor":"agent:claude","source":"new","reason":"unknown"}
+{"id":"01M340P4AXPTKM4PBE61CX216H","ts":"2026-09-22T07:36:03.677Z","task":"TL-438","field":"__adopted__","from":"","to":["title","status","priority","type","owner","estimate","confidence","board","created"],"actor":"unknown","source":"boot","reason":"unknown"}
+{"id":"01M340RPSGKD0FGA9YCBH3K1C1","ts":"2026-09-22T07:37:28.112Z","task":"TL-438","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M340RPSGYAQ6ZPV7DDQASR38","ts":"2026-09-22T07:37:28.112Z","task":"TL-438","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown"}
