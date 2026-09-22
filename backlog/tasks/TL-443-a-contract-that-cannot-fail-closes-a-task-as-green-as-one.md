@@ -34,9 +34,11 @@ Surfaced on 2026-09-22 while analysing two published agent workflows. One of the
 
 1. Decide what can be established WITHOUT a second full run. A mutation-testing pass is out of scope and out of budget: the narrower question is whether this entry's run touched the files this task changed (`modified-files.mjs` already computes them).
 2. Weigh a negative control against a coverage signal. A negative control re-runs the contract against a tree with the change reverted and requires RED — expensive, and impossible where the change is not revertible in isolation. A coverage signal observes the run and requires that it executed at least one of the task's own modified files. Pick one, and record in the task why the other was rejected.
-3. The verdict belongs in the history beside the closing, not only on the terminal: a closing whose contract was never shown to be capable of failing must be readable back as such.
-4. Do not make this a gate that blocks `done` on the first pass. A task proved by a `manual:` entry, or one whose change is a document, has no negative control by construction, and a gate that failed those would be switched off within a week.
-5. Positive control: a task whose contract asserts nothing about its own change is reported, and the same task with a real assertion is not.
+3. THE VERDICT HAS THREE VALUES, not two: shown capable of failing, shown INCAPABLE, and undetermined by construction. A binary forces a wrong answer onto every task proved by a `manual:` entry and every task whose change is a document, and a signal that is wrong for a whole class of tasks is read as wrong for all of them.
+4. The verdict belongs in the history beside the closing, not only on the terminal: a closing whose contract was never shown to be capable of failing must be readable back as such.
+5. `done` DOES NOT REFUSE ON THIS, and the default may not become a refusal later without another task arguing for it. The reading belongs where a person already looks — `audit`, which judges declarations and is read by a human — and not in the closing path an unattended loop runs. A project that wants it to fail opts in through `config.yaml`, the way `reason_required_statuses` already does; it is never the default.
+6. Name the Goodhart risk in the implementation, because it is the way this feature fails WORSE than the state it replaces. A hand that knows the signal exists can satisfy a coverage check by importing the changed module and asserting nothing, and the closing then carries a green verdict saying the contract was checked. Whatever is chosen has to be something a hand cannot satisfy by touching a file.
+7. Positive control: a task whose contract asserts nothing about its own change is reported, and the same task with a real assertion is not.
 
 ## Acceptance criteria
 
