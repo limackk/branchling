@@ -119,7 +119,14 @@ test("two incompatible API harnesses close work without exposing credentials", a
       assert.equal(run(["build", "--dir", backlog], env, repo).status, 0);
 
       const inputPath = join(root, shape + "-adapter-input.txt");
-      const adapter = join(root, shape + "-api-adapter");
+      // `.mjs`, NOT an extensionless name: this adapter is written in ESM, and
+      // an extensionless file is CommonJS on every Node below 20.19 — its first
+      // `import` is a SyntaxError there, the adapter exits without writing the
+      // proof file, and the run reports the task exhausted rather than closed
+      // (TL-436, measured on 18.20.8). Node 20.19+ and 22.7+ infer the module
+      // system from the syntax, which is why the failure was invisible above
+      // the floor `engines` declares.
+      const adapter = join(root, shape + "-api-adapter.mjs");
       writeAdapter(adapter, shape, remote.endpoint, inputPath);
       const profile = run([
         "profile", "create", shape + "-api", "--adapter", adapter,
