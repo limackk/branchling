@@ -6,7 +6,7 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
+status: done  # pending | in_progress | blocked | done | cancelled
 owner: unassigned
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
@@ -49,6 +49,6 @@ It passes on Node 22 on both operating systems and on Node 24 locally, so the ca
 
 ## Acceptance criteria
 
-- [ ] The meta test passes on the Node version the session is running. [proof: terminal-independence-suite]
-- [ ] Both Node 18 jobs of the newest run on the default branch concluded success. [proof: green-on-node-18]
-- [ ] Both Node 20 jobs of the newest run on the default branch concluded success. [proof: green-on-node-20]
+- [x] The meta test passes on the Node version the session is running. [proof: terminal-independence-suite]
+- [x] Both Node 18 jobs of the newest run on the default branch concluded success. [proof: green-on-node-18]
+- [x] Both Node 20 jobs of the newest run on the default branch concluded success. [proof: green-on-node-20]
