@@ -481,15 +481,18 @@ const REASON_SITES = [
   { name: "ask --option", argv: (v) => ["ask", "FX-1", "--actor", "local:me", "--question", "which way?", "--option", v, "--option", "the other way"] },
   { name: "ask --question", argv: (v) => ["ask", "FX-1", "--actor", "local:me", "--question", v], emptyRefusedEarlier: true },
   { name: "done --reason", argv: (v) => ["done", "FX-1", "--actor", "local:me", "--reason", v] },
+  { name: "import --reason", argv: (v) => ["import", "--reason", v] },
+  { name: "seed --reason", argv: (v) => ["seed", "--reason", v] },
 ];
 
 /** A guard iterating an empty table is green and proves nothing. The count is
  *  the six call sites TL-167 names, plus `--question`, which shares the
  *  validator and therefore the defect, plus `done --reason` (TL-254), which
  *  TL-167 missed because it phrased the same refusal in words of its own and
- *  the grep that found the others looked for one literal sentence. */
+ *  the grep that found the others looked for one literal sentence, plus
+ *  `import-github` and `seed` (TL-421), which repeated that same sentence. */
 test("every call site that prints this refusal is in the table", () => {
-  assert.equal(REASON_SITES.length, 8);
+  assert.equal(REASON_SITES.length, 10);
 });
 
 /** The refusal, as a person reads it. Exit 2, because a reserved or malformed
@@ -520,6 +523,11 @@ for (const site of REASON_SITES) {
       text,
       names(REASON_UNKNOWN),
       "the refusal does not quote the value it was given, so it is probably not the validator's"
+    );
+    assert.doesNotMatch(
+      text,
+      /unknown (?:command|flag):/i,
+      "the invocation was refused before it reached the reason validator"
     );
   });
 

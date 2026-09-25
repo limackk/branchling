@@ -49,7 +49,7 @@ import { fileURLToPath } from "node:url";
 
 import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { ACTOR_NAMESPACES, isValidActor, isValidReason, recordCreation, reconcile } from "./history.mjs";
+import { ACTOR_NAMESPACES, isValidActor, reasonRefusal, recordCreation, reconcile } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { createTask, driftMessage, slugify } from "./new-task.mjs";
 import {
@@ -137,14 +137,8 @@ export function parseSeedArgs(args) {
     if (a === "--reason") {
       reason = args[++i] || null;
       if (!reason) throw new Error("`--reason` with no text");
-      if (!isValidReason(reason)) {
-        throw new Error(
-          "`--reason " + reason + "` is reserved\n" +
-            "`unknown` and `proven` are what the tool writes when nobody stated a reason\n" +
-            "or when a run stood in for one. Typing them by hand would dress a machine's\n" +
-            "answer up as yours."
-        );
-      }
+      const refusal = reasonRefusal(reason, "--reason");
+      if (refusal) throw new Error(refusal);
       continue;
     }
     if (a.startsWith("-")) throw new Error("unknown flag: " + a + "\navailable: " + FLAGS.join(" "));
