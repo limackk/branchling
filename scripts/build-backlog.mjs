@@ -25,6 +25,7 @@ import { fileURLToPath } from "node:url";
 import { loadConfigOrExit } from "./config.mjs";
 import { detectPrefixMismatch, prefixMismatchMessage } from "./task-id.mjs";
 import { resolveBacklogDirOrExit } from "./paths.mjs";
+import { printLine } from "./stdout.mjs";
 import { buildFieldSpecs, extractMeta as sharedExtractMeta, normalizeValue, stripComment } from "./task-fields.mjs";
 import { MARK, color, errColor, refusal } from "./ui.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
@@ -562,7 +563,7 @@ for (const e of roleErrors) console.error(e);
 const perBoard = BOARDS.slugs
   .map((s) => `${s}: ${active.filter((t) => t.board === s).length}`)
   .join(", ");
-console.log(
+printLine(
   `${OKM} backlog generated: ${tasks.length} tasks → ` +
     `${active.length} active (INDEX.yaml), ` +
     `${active.filter((t) => t.status === "in_progress").length} in progress (NOW.yaml), ` +

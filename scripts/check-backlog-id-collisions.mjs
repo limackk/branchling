@@ -34,6 +34,7 @@ import { fileURLToPath } from "node:url";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { inferPrefix, taskIdPatterns } from "./task-id.mjs";
+import { printLine } from "./stdout.mjs";
 import { MARK, color, errColor } from "./ui.mjs";
 import { stripComment, unquote } from "./task-fields.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
@@ -125,4 +126,4 @@ if (problems.length) {
   process.exit(1);
 }
 
-console.log(`${OKM} backlog: ${files.length} tasks, each ${PAT.prefix}-NNN used once`);
+printLine(`${OKM} backlog: ${files.length} tasks, each ${PAT.prefix}-NNN used once`);

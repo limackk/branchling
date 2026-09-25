@@ -27,6 +27,7 @@ import { taskIdPatterns } from "./task-id.mjs";
 import { backlogPaths, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { loadPlan } from "./plan.mjs";
 import { PRODUCT_NAME as N, STORAGE_KEY_PREFIX } from "./product.mjs";
+import { printLine } from "./stdout.mjs";
 import { refusal } from "./ui.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -3789,7 +3790,7 @@ if (invokedDirectly) {
   const OUTPUT_PATH = backlogPaths(root).viewerPath;
   writeFileSync(OUTPUT_PATH, html, "utf8");
 
-  console.log(
+  printLine(
     `${N} viewer: Built ${OUTPUT_PATH}\n` +
       `  ${tasks.length} tasks rendered\n` +
       `  ${Math.round(html.length / 1024)} KB output\n` +

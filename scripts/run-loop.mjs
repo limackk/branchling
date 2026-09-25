@@ -2057,5 +2057,5 @@ export async function run(argv) {
 }
 
 if (process.argv[1] && process.argv[1].endsWith("run-loop.mjs")) {
-  run(process.argv.slice(2)).then((code) => process.exit(code));
+  run(process.argv.slice(2)).then((code) => { process.exitCode = code; });
 }

@@ -36,6 +36,7 @@ import { resolveActor } from "./actor.mjs";
 import { backlogForTaskPath } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { STDIN_WAIT_MS, readStdinText } from "./stdin.mjs";
+import { printLine } from "./stdout.mjs";
 import { failure, refusal } from "./ui.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -80,7 +81,7 @@ export async function main() {
     { stdio: ["ignore", "ignore", "ignore"] }
   );
   if (build.status === 0) {
-    console.log("↻ backlog: rebuilt NOW/INDEX/archive from the edited task");
+    printLine("↻ backlog: rebuilt NOW/INDEX/archive from the edited task");
   }
 
   // A first sighting is a valid history result: history-record creates its
@@ -162,5 +163,5 @@ if (process.argv[1] && process.argv[1].endsWith("regen-hook.mjs")) {
     ));
     process.exit(2);
   }
-  main().then((code) => process.exit(code));
+  main().then((code) => { process.exitCode = code; });
 }

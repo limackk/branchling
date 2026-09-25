@@ -26,6 +26,7 @@ import { hoursLabel } from "./estimate.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { heading, line, priorityPaint, refusal, statusPaint, table } from "./ui.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
+import { printLine } from "./stdout.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -75,7 +76,7 @@ if (argv.includes("--context")) {
     printJson("stats", { root: ROOT, context: budget });
     process.exit(0);
   }
-  console.log(renderBudget(budget));
+  printLine(renderBudget(budget));
   process.exit(0);
 }
 
@@ -172,4 +173,4 @@ if (note) {
   out.push("  " + note);
 }
 
-console.log(out.join("\n"));
+printLine(out.join("\n"));

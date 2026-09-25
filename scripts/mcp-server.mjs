@@ -44,7 +44,7 @@ import { fileURLToPath } from "node:url";
 import { COMMANDS, describeFlags } from "./cli.mjs";
 import { TOPIC_NAMES } from "./instructions.mjs";
 import { PRODUCT_NAME as N, PRODUCT_VERSION } from "./product.mjs";
-import { writeOut } from "./stdout.mjs";
+import { printLine, writeOut } from "./stdout.mjs";
 import { refusal } from "./ui.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -271,7 +271,7 @@ const USAGE = [
 
 export function main(argv) {
   if (argv.some((a) => ["--help", "-h", "help"].includes(a))) {
-    console.log(USAGE);
+    printLine(USAGE);
     return 0;
   }
   let dir = null;

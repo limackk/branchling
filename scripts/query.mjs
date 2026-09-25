@@ -111,14 +111,14 @@ if (opts.help || opts.h) {
   // note for a co-author, not help for a user. The list of flags is now DERIVED
   // from the same sets the input is validated against, so it cannot drift away
   // from them; `query --help` goes through the command table in cli.mjs.
-  console.log("query — ask the backlog a question instead of reading a whole view\n");
-  console.log("usage:");
-  console.log("  query [criteria] [--json|--files|--count]\n");
-  console.log("criteria (a value follows the flag):");
-  console.log("  " + [...VALUE_FLAGS].sort().join(" "));
-  console.log("\nswitches:");
-  console.log("  " + [...BOOL_FLAGS].filter((f) => f !== "--help" && f !== "-h").sort().join(" "));
-  console.log("\nexit code: 0 = the query ran (including on zero matches), 2 = a usage error.");
+  printLine("query — ask the backlog a question instead of reading a whole view\n");
+  printLine("usage:");
+  printLine("  query [criteria] [--json|--files|--count]\n");
+  printLine("criteria (a value follows the flag):");
+  printLine("  " + [...VALUE_FLAGS].sort().join(" "));
+  printLine("\nswitches:");
+  printLine("  " + [...BOOL_FLAGS].filter((f) => f !== "--help" && f !== "-h").sort().join(" "));
+  printLine("\nexit code: 0 = the query ran (including on zero matches), 2 = a usage error.");
   process.exit(0);
 }
 
@@ -265,7 +265,7 @@ if (limit !== null && (!Number.isInteger(limit) || limit < 1)) {
 const shown = limit ? hits.slice(0, limit) : hits;
 
 if (opts.count) {
-  console.log(String(total));
+  printLine(String(total));
   // On stderr, so a count stays a number for a script. Silence would make a
   // backlog with work on an unmerged branch indistinguishable from one without.
   for (const line of elsewhereOnlyLines) console.error("# " + line);
@@ -344,26 +344,26 @@ for (const t of shown) {
 // the same class of defect as a silent cap in a report: the result looks like an
 // answer while it is a slice.
 if (limit && total > shown.length) {
-  console.log(`# showing ${shown.length} of ${total} matching (limit ${limit})`);
+  printLine(`# showing ${shown.length} of ${total} matching (limit ${limit})`);
 } else if (total === 0) {
-  console.log("# 0 matching tasks (check whether the filters exclude one another)");
+  printLine("# 0 matching tasks (check whether the filters exclude one another)");
 }
 
 // The tasks that exist only somewhere else, named one per line and kept out of
 // the list above — they are not rows of this tree (TL-145).
-for (const line of elsewhereOnlyLines) console.log("# " + line);
+for (const line of elsewhereOnlyLines) printLine("# " + line);
 
 // A scan that could not run has to SAY so. Silence here is indistinguishable
 // from "every branch agrees", and that is the answer this whole mechanism exists
 // to stop the tool from giving by accident.
 {
   const note = scanNote(SCAN.reason);
-  if (note) console.log("# " + note);
+  if (note) printLine("# " + note);
 }
 
 // The same rule for the file index: an empty answer has two causes and only one
 // of them is an answer.
 if (INDEX) {
   const why = explainIndex(INDEX.reason);
-  if (why) console.log("# " + why);
+  if (why) printLine("# " + why);
 }

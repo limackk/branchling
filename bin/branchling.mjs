@@ -17,4 +17,4 @@
 
 import { main } from "../scripts/cli.mjs";
 
-process.exit(main(process.argv.slice(2)));
+process.exitCode = main(process.argv.slice(2));

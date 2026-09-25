@@ -219,4 +219,4 @@ export function run(argv) {
   return result.ok ? 0 : 1;
 }
 
-if (process.argv[1] && process.argv[1].endsWith("adapter-conformance.mjs")) process.exit(run(process.argv.slice(2)));
+if (process.argv[1] && process.argv[1].endsWith("adapter-conformance.mjs")) process.exitCode = run(process.argv.slice(2));

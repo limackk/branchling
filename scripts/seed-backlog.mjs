@@ -711,5 +711,5 @@ function reportDryRun(plan, { root, prefix, firstId, json, fresh }) {
 }
 
 if (process.argv[1] && process.argv[1].endsWith("seed-backlog.mjs")) {
-  process.exit(main(process.argv.slice(2)));
+  process.exitCode = main(process.argv.slice(2));
 }

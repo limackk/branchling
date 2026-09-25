@@ -3,12 +3,12 @@
  * (TL-175).
  *
  * THE DEFECT THIS CLOSES. Node's stdout is asynchronous when it is a PIPE and
- * synchronous when it is a file or a TTY. Every command here ends
- * `console.log(...)` then `process.exit(0)`, and `process.exit` does not wait
- * for the pipe buffer to drain — so on a pipe everything past roughly one buffer
- * is lost. Measured on 2026-09-03: a broad JSON query produced 108993
- * valid bytes into a file and 65520 truncated ones through a pipe, where the
- * consumer saw `Unterminated string` instead of an answer.
+ * synchronous when it is a file or a TTY. At the time this was introduced,
+ * commands ended `console.log(...)` then `process.exit(0)`, and `process.exit`
+ * does not wait for the pipe buffer to drain — so on a pipe everything past
+ * roughly one buffer was lost. Measured on 2026-09-03: a broad JSON query
+ * produced 108993 valid bytes into a file and 65520 truncated ones through a
+ * pipe, where the consumer saw `Unterminated string` instead of an answer.
  *
  * WHY THAT IS WORSE THAN AN ORDINARY BUG. `--json` on every reading command is
  * law 4, the surface everything else is meant to be built on. The failure
@@ -17,12 +17,12 @@
  * tries it out. A tool that is correct when watched and wrong when used is worse
  * than one that fails outright.
  *
- * WHY SYNCHRONOUSLY, AND NOT `process.exitCode` PLUS AN ORDERLY EXIT. That is
- * the other correct fix, and it would mean auditing every `process.exit()` in
- * every command and keeping them audited — a convention nothing enforces, of the
- * kind TL-174 had just finished removing. Writing the bytes before returning
- * makes the callers' existing `process.exit()` correct instead of forbidden: by
- * the time it runs, the data is in the operating system's pipe.
+ * WHY SYNCHRONOUSLY, AND NOT ONLY `process.exitCode` PLUS AN ORDERLY EXIT. That
+ * is the other correct fix, but relying on it everywhere would make one future
+ * `process.exit()` enough to restore the defect. TL-440 now enforces the
+ * boundary: a file that exits abruptly cannot use an asynchronous output call.
+ * Writing the bytes before returning keeps an abrupt exit correct; an orderly
+ * command may instead set `process.exitCode` and let Node drain its streams.
  *
  * EAGAIN IS THE NORMAL CASE, NOT AN ERROR. A full pipe means the reader has not
  * caught up; the write is retried after a short sleep. The sleep is

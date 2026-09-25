@@ -46,6 +46,7 @@ import { loadPlan } from "./plan.mjs";
 import { crossBranchState } from "./branch-scan.mjs";
 import { ANY_TASK_ID } from "./task-id.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
+import { printLine } from "./stdout.mjs";
 import { refusal } from "./ui.mjs";
 import {
   PING_ID,
@@ -75,18 +76,18 @@ const cliArgs = takeDirFlag(process.argv.slice(2));
 // and the one that cannot be safely exercised by a test looping over the commands
 // unless this is handled.
 if (cliArgs.argv.some((a) => a === "--help" || a === "-h")) {
-  console.log("serve — run the viewer on 127.0.0.1 (the default command)\n");
-  console.log("usage:");
-  console.log("  serve [--port <n>] [--no-open] [--dir <path>]");
-  console.log("  serve --list [--json]        what is listening on this machine");
-  console.log("  serve --stop <port|all>      stop a server this tool registered\n");
+  printLine("serve — run the viewer on 127.0.0.1 (the default command)\n");
+  printLine("usage:");
+  printLine("  serve [--port <n>] [--no-open] [--dir <path>]");
+  printLine("  serve --list [--json]        what is listening on this machine");
+  printLine("  serve --stop <port|all>      stop a server this tool registered\n");
   // SAID OUT LOUD BECAUSE IT IS WHAT PRODUCED THE ORPHANS (TL-266). Six servers
   // were found running on one machine, three of them reparented to init after
   // the shell that started them was gone. Nothing warned anybody, and `serve`
   // WRITES — it reconciles on a timer and appends to backlog/history/.
-  console.log("This process does not stop when the shell that started it goes away.");
-  console.log("Backgrounded or left in a closed terminal, it keeps listening and keeps");
-  console.log("reconciling the tree. `serve --list` names them; `serve --stop <port>` ends one.");
+  printLine("This process does not stop when the shell that started it goes away.");
+  printLine("Backgrounded or left in a closed terminal, it keeps listening and keeps");
+  printLine("reconciling the tree. `serve --list` names them; `serve --stop <port>` ends one.");
   process.exit(0);
 }
 
@@ -148,15 +149,15 @@ if (argv.includes("--list")) {
   if (AS_JSON) {
     printJson("serve-list", { servers, stateDir: serversDir(), host: hostname() });
   } else if (!servers.length) {
-    console.log(`${N} serve: no viewer is registered as running on this machine`);
-    console.log("  A server started before this version knows about the register is NOT here —");
-    console.log("  it was never recorded. `lsof -nP -iTCP -sTCP:LISTEN` still finds those.");
+    printLine(`${N} serve: no viewer is registered as running on this machine`);
+    printLine("  A server started before this version knows about the register is NOT here —");
+    printLine("  it was never recorded. `lsof -nP -iTCP -sTCP:LISTEN` still finds those.");
   } else {
-    console.log(`${N} serve: ${servers.length} registered viewer(s)`);
-    for (const entry of servers) console.log(describe(entry));
+    printLine(`${N} serve: ${servers.length} registered viewer(s)`);
+    for (const entry of servers) printLine(describe(entry));
     if (servers.some((e) => e.state === "stale")) {
-      console.log("  `stale` means the entry outlived its process — SIGKILL, a crash or a reboot");
-      console.log("  runs no handler. The next `serve` removes it; `--stop <port>` removes it now.");
+      printLine("  `stale` means the entry outlived its process — SIGKILL, a crash or a reboot");
+      printLine("  runs no handler. The next `serve` removes it; `--stop <port>` removes it now.");
     }
   }
   process.exit(0);
@@ -180,7 +181,7 @@ if (argv.includes("--stop")) {
   if (AS_JSON) {
     printJson("serve-stop", { stopped: results, requested: STOP });
   } else if (!results.length) {
-    console.log(`${N} serve: nothing registered is running — nothing to stop`);
+    printLine(`${N} serve: nothing registered is running — nothing to stop`);
   } else {
     for (const r of results) {
       const said = {
@@ -193,7 +194,7 @@ if (argv.includes("--stop")) {
         elsewhere: `port ${r.port}: registered by another host (${r.host}) — reported, not stopped`,
         "would-not-stop": `port ${r.port}: pid ${r.pid} survived SIGTERM and SIGKILL`,
       }[r.outcome];
-      console.log(`${N} serve: ${said}`);
+      printLine(`${N} serve: ${said}`);
     }
   }
   // A refusal to kill a stranger's process is not success: the caller asked for
@@ -299,9 +300,9 @@ function scheduleReconcile() {
     try {
       const { entries, seeded } = reconcile(BACKLOG_DIR, { actor: "unknown", source: "external" });
       if (seeded) {
-        console.log(`${N} serve: history: reference point created (no entries)`);
+        printLine(`${N} serve: history: reference point created (no entries)`);
       } else if (entries.length) {
-        console.log(`${N} serve: history: ` + entries.length + " change(s) from outside the viewer (author: unknown)");
+        printLine(`${N} serve: history: ` + entries.length + " change(s) from outside the viewer (author: unknown)");
         for (const res of sseClients) {
           try { res.write("event: history-changed\ndata: {}\n\n"); } catch { sseClients.delete(res); }
         }
@@ -547,7 +548,7 @@ function openBrowser(target) {
   const cmd = process.platform === "darwin" ? "open"
     : process.platform === "win32" ? "start" : "xdg-open";
   spawn(cmd, [target], { stdio: "ignore", detached: true, shell: process.platform === "win32" })
-    .on("error", () => console.log("  (open it yourself: " + target + ")"))
+    .on("error", () => printLine("  (open it yourself: " + target + ")"))
     .unref();
 }
 
@@ -665,7 +666,7 @@ function listen(port, attemptsLeft) {
       ? `  Port ${COEXISTS_WITH.port} already serves ${COEXISTS_WITH.projectName} ` +
         `(${COEXISTS_WITH.backlogDir}) — ${CONFIG.projectName} is here on ${port}\n`
       : "";
-    console.log(
+    printLine(
       `${N} serve: ${target}\n` +
         `  ${count} tasks, live mode with no clicking (the folder is known server-side)\n` +
         beside +
@@ -684,7 +685,7 @@ const probe = await probeExisting(DEFAULT_PORT, BACKLOG_DIR_ID);
 // then a no-op that just brings the tab up.
 if (probe.state === "same") {
   const target = `http://127.0.0.1:${DEFAULT_PORT}/`;
-  console.log(`${N} serve: already running on ${target} — opening a tab`);
+  printLine(`${N} serve: already running on ${target} — opening a tab`);
   openBrowser(target);
   process.exit(0);
 }

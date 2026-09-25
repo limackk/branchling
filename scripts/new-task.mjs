@@ -678,5 +678,5 @@ export async function main(argv) {
 }
 
 if (process.argv[1] && process.argv[1].endsWith("new-task.mjs")) {
-  process.exit(await main(process.argv.slice(2)));
+  process.exitCode = await main(process.argv.slice(2));
 }

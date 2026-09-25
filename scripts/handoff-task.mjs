@@ -529,5 +529,5 @@ function fail2(problem, details) {
 }
 
 if (process.argv[1] && process.argv[1].endsWith("handoff-task.mjs")) {
-  process.exit(run(process.argv.slice(2)));
+  process.exitCode = run(process.argv.slice(2));
 }

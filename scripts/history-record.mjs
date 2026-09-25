@@ -29,6 +29,7 @@ import { resolveActor } from "./actor.mjs";
 import { ACTOR_NAMESPACES, FIELD_ADOPTED, FIELD_ATTRIBUTED, attributeChanges, isValidActor, readHistory, reasonRefusal, reconcile, taskIdFromFile, unattributedChanges } from "./history.mjs";
 import { resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
+import { printLine } from "./stdout.mjs";
 import { refusal } from "./ui.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -185,7 +186,7 @@ function selectClaim(changes) {
 const preflight = attribute ? unattributedChanges(BACKLOG_DIR, { only }) : [];
 if (attribute) selectClaim(preflight);
 if (attribute && all && !quiet) {
-  console.log(`${N} history: --all will claim ${preflight.length} recorded change(s) with no author.`);
+  printLine(`${N} history: --all will claim ${preflight.length} recorded change(s) with no author.`);
 }
 
 const { entries, seeded, adopted, seeds } = reconcile(BACKLOG_DIR, { actor, source, only, reason: reasonFlag || undefined });
@@ -241,16 +242,16 @@ const recorded = entries.filter((e) => e.field !== FIELD_ADOPTED);
 
 if (quiet) process.exit(0);
 if (seeded) {
-  console.log(`${N} history: reference point (snapshot) created — no history entries written`);
+  printLine(`${N} history: reference point (snapshot) created — no history entries written`);
 } else if (!recorded.length) {
-  if (!unclaimed.length && !adopted.length && !seeds.length) console.log(`${N} history: no changes to record`);
+  if (!unclaimed.length && !adopted.length && !seeds.length) printLine(`${N} history: no changes to record`);
 } else {
-  console.log(`${N} history: recorded ` + recorded.length + " change(s) (" + actor + "):");
+  printLine(`${N} history: recorded ` + recorded.length + " change(s) (" + actor + "):");
   for (const e of recorded.slice(0, 20)) {
     const fmt = (v) => (Array.isArray(v) ? v.join(", ") : String(v == null ? "" : v)) || "—";
-    console.log("  " + e.task + " · " + e.field + ": " + fmt(e.from) + " → " + fmt(e.to));
+    printLine("  " + e.task + " · " + e.field + ": " + fmt(e.from) + " → " + fmt(e.to));
   }
-  if (recorded.length > 20) console.log("  … and " + (recorded.length - 20) + " more");
+  if (recorded.length > 20) printLine("  … and " + (recorded.length - 20) + " more");
 }
 
 // TAKEN AS A REFERENCE POINT, WITH NOTHING TO GO ON (TL-180). These tasks were
@@ -262,14 +263,14 @@ if (seeded) {
 // creation that never reaches the log is written the day somebody notices,
 // while a false one cannot be taken back.
 if (seeds.length) {
-  console.log(
+  printLine(
     `${N} history: ` + seeds.length + " task(s) taken as a reference point (seed) — no " +
       "creation claimed:"
   );
-  for (const id of seeds.slice(0, 20)) console.log("  " + id);
-  if (seeds.length > 20) console.log("  … and " + (seeds.length - 20) + " more");
-  console.log("  Their log is empty and this snapshot has never covered the tree, so nothing");
-  console.log("  here knows whether they were created in this checkout or arrived on the branch.");
+  for (const id of seeds.slice(0, 20)) printLine("  " + id);
+  if (seeds.length > 20) printLine("  … and " + (seeds.length - 20) + " more");
+  printLine("  Their log is empty and this snapshot has never covered the tree, so nothing");
+  printLine("  here knows whether they were created in this checkout or arrived on the branch.");
 }
 
 // ABSORBED ON THE LOG'S WORD (TL-185). These tasks were not in the snapshot, so
@@ -279,7 +280,7 @@ if (seeds.length) {
 // into the snapshot, none reached a log, and the command printed nothing about
 // either. Normal after a pull or a merge; anything else deserves a look.
 if (adopted.length) {
-  console.log(
+  printLine(
     `${N} history: ` + adopted.length + " task(s) had no reference point and were adopted " +
       "from the log:"
   );
@@ -288,42 +289,42 @@ if (adopted.length) {
     // by hand needs to read whether THAT field was absorbed; the task id alone
     // leaves them to work it out from a log they were about to trust.
     const fields = adoptedFields.get(id);
-    console.log("  " + id + (fields && fields.length ? " · " + fields.join(", ") : ""));
+    printLine("  " + id + (fields && fields.length ? " · " + fields.join(", ") : ""));
   }
-  if (adopted.length > 20) console.log("  … and " + (adopted.length - 20) + " more");
-  console.log("  Fields the log has never recorded have no earlier value to compare against,");
-  console.log("  so a change to one of them before now cannot be recovered. Expected after a");
-  console.log("  `git pull` or a merge, which bring a task and its log together.");
+  if (adopted.length > 20) printLine("  … and " + (adopted.length - 20) + " more");
+  printLine("  Fields the log has never recorded have no earlier value to compare against,");
+  printLine("  so a change to one of them before now cannot be recovered. Expected after a");
+  printLine("  `git pull` or a merge, which bring a task and its log together.");
   if (adoptedFields.size) {
-    console.log("  The fields named above were absorbed as they stand and recorded as an");
-    console.log("  adoption (`" + FIELD_ADOPTED + "`) signed by " + actor + ": the entry states that");
-    console.log("  they entered the snapshot without a reference point, and claims no transition.");
+    printLine("  The fields named above were absorbed as they stand and recorded as an");
+    printLine("  adoption (`" + FIELD_ADOPTED + "`) signed by " + actor + ": the entry states that");
+    printLine("  they entered the snapshot without a reference point, and claims no transition.");
   }
 }
 
 if (claimed.length) {
-  console.log(`${N} history: claimed ` + claimed.length + " recorded change(s) for " + actor + ":");
-  for (const c of claimed.slice(0, 20)) console.log("  " + c.task + " · " + c.to);
-  if (claimed.length > 20) console.log("  … and " + (claimed.length - 20) + " more");
-  console.log("  the original entries still say `unknown` — this log is append-only, so a");
-  console.log("  claim stands BESIDE the change rather than rewriting it.");
+  printLine(`${N} history: claimed ` + claimed.length + " recorded change(s) for " + actor + ":");
+  for (const c of claimed.slice(0, 20)) printLine("  " + c.task + " · " + c.to);
+  if (claimed.length > 20) printLine("  … and " + (claimed.length - 20) + " more");
+  printLine("  the original entries still say `unknown` — this log is append-only, so a");
+  printLine("  claim stands BESIDE the change rather than rewriting it.");
 } else if (unclaimed.length) {
   // NEVER "no changes to record" while this is true. That sentence is what made
   // the defect invisible: it reads as "everything is recorded", and what was
   // actually true was "everything is recorded as nobody's".
-  console.log(
+  printLine(
     `${N} history: ` + unclaimed.length + " recorded change(s) carry no author — somebody else's " +
       "reconcile\n  (a running `" + N + " serve`, a `git pull`) got to them first:"
   );
   for (const u of unclaimed.slice(0, 20)) {
-    console.log(candidateLabel(u));
+    printLine(candidateLabel(u));
   }
-  if (unclaimed.length > 20) console.log("  … and " + (unclaimed.length - 20) + " more");
-  console.log("  If they are yours, say so:");
-  console.log(
+  if (unclaimed.length > 20) printLine("  … and " + (unclaimed.length - 20) + " more");
+  printLine("  If they are yours, say so:");
+  printLine(
     "    " + N + " history --attribute" +
     (unclaimed.length > 1 ? " --event " + (unclaimed[0].entry.id || "<id>") : "") +
     " --actor " + actor + ' --reason "…"'
   );
-  console.log("  The tool cannot work out whose they are, and guessing would invent attribution.");
+  printLine("  The tool cannot work out whose they are, and guessing would invent attribution.");
 }

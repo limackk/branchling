@@ -63,4 +63,4 @@ export function run(argv) {
   else console.log("✓ " + result.id + " released — " + result.before.status + " → " + result.after.status + "; owner cleared");
   return 0;
 }
-if (process.argv[1] && process.argv[1].endsWith("release-task.mjs")) process.exit(run(process.argv.slice(2)));
+if (process.argv[1] && process.argv[1].endsWith("release-task.mjs")) process.exitCode = run(process.argv.slice(2));

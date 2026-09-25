@@ -169,5 +169,5 @@ function main() {
 }
 
 if (process.argv[1] && process.argv[1].endsWith("check-product-name.mjs")) {
-  process.exit(main());
+  process.exitCode = main();
 }

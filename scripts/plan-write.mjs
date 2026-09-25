@@ -56,6 +56,7 @@ import { loadConfigOrExit } from "./config.mjs";
 import { backlogPaths, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { parsePlanYaml, validatePlan } from "./plan.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
+import { printLine } from "./stdout.mjs";
 import { todayStamp } from "./today.mjs";
 import { stripComment, unquote } from "./task-fields.mjs";
 import { readTaskMetas } from "./task-io.mjs";
@@ -542,14 +543,14 @@ export function runPlanEdit(op, argv) {
   writeFileSync(paths.planPath, edit.text, "utf8");
   const plan = parsePlanYaml(edit.text).plan;
   const at = plan.waves.findIndex((w) => w.tasks.indexOf(id) >= 0);
-  console.log(
+  printLine(
     color.ok(MARK.ok) + " plan: " +
       (op === "remove"
         ? id + " is no longer scheduled"
         : id + (op === "add" ? " is scheduled in" : " moved to") + " wave " + waveLabel(plan, at))
   );
-  if (parsed.values.why) console.log("  the wave was created, with your sentence above it");
-  console.log("  " + paths.planPath + " — the change is the diff of this one file, and of nothing else");
+  if (parsed.values.why) printLine("  the wave was created, with your sentence above it");
+  printLine("  " + paths.planPath + " — the change is the diff of this one file, and of nothing else");
   return 0;
 }
 
@@ -560,5 +561,5 @@ if (process.argv[1] && process.argv[1].endsWith("plan-write.mjs")) {
       ["available: " + EDIT_SUBCOMMANDS.join(", ")], [N + " plan --help"]));
     process.exit(2);
   }
-  process.exit(runPlanEdit(sub, process.argv.slice(3)));
+  process.exitCode = runPlanEdit(sub, process.argv.slice(3));
 }

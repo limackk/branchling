@@ -181,5 +181,5 @@ export function main(argv) {
 }
 
 if (process.argv[1] && process.argv[1].endsWith("install-skills.mjs")) {
-  process.exit(main(process.argv.slice(2)));
+  process.exitCode = main(process.argv.slice(2));
 }

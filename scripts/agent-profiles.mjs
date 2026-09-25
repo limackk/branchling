@@ -427,4 +427,4 @@ export async function run(argv, env = process.env) {
   return 0;
 }
 
-if (process.argv[1] && process.argv[1].endsWith("agent-profiles.mjs")) process.exit(await run(process.argv.slice(2)));
+if (process.argv[1] && process.argv[1].endsWith("agent-profiles.mjs")) process.exitCode = await run(process.argv.slice(2));

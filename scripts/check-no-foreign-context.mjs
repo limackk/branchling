@@ -276,5 +276,5 @@ function main(argv = process.argv.slice(2)) {
 }
 
 if (process.argv[1] && process.argv[1].endsWith("check-no-foreign-context.mjs")) {
-  process.exit(main());
+  process.exitCode = main();
 }

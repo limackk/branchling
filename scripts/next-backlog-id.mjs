@@ -47,6 +47,7 @@ import { insideGitRepo } from './git-rules.mjs';
 import { taskIdPatterns } from './task-id.mjs';
 import { printJson } from './json-envelope.mjs';
 import { PRODUCT_NAME as N } from './product.mjs';
+import { printLine } from './stdout.mjs';
 import { refusal } from "./ui.mjs";
 
 // The prefix comes from THIS backlog's configuration (BL-1452). The scan then
@@ -175,14 +176,14 @@ if (asJson) {
 }
 
 if (process.argv.includes('--explain') && max !== null) {
-  console.log(`maximum: ${PAT.prefix}-${max} (${sources.get(max)})`);
-  console.log(`trees examined: ${worktreeRoots(root).length}, branches: ${localRefs(root).length}`);
-  console.log(`unique numbers in the union: ${numbers.length}`);
+  printLine(`maximum: ${PAT.prefix}-${max} (${sources.get(max)})`);
+  printLine(`trees examined: ${worktreeRoots(root).length}, branches: ${localRefs(root).length}`);
+  printLine(`unique numbers in the union: ${numbers.length}`);
 }
-// A STRING, NOT A NUMBER (TL-238). `console.log` hands a non-string to
+// A STRING, NOT A NUMBER (TL-238). `printLine` hands a non-string to
 // `util.inspect`, which paints numbers yellow whenever the runtime thinks colour
 // is available — so the one value this command exists to print came out as
 // `\x1b[33m8\x1b[39m` under `FORCE_COLOR`, and the caller substituting it into
 // `$(…)` got escapes instead of a number. The formatting of an answer is this
 // command's decision, not the runtime's.
-console.log(String(next));
+printLine(String(next));

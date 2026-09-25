@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex-subagent
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 3h                       # 30m | 1h | 2h | 3h | 4h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-22
-updated: 2026-09-22
+updated: 2026-09-25
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: [scripts/stdout.mjs, scripts/mcp-server.mjs]
@@ -81,7 +81,7 @@ already has the shape for this: a marker beside that ONE line, like
 
 ## Acceptance criteria
 
-- [ ] A file that writes with `process.stdout.write` on a path that also exits fails the guard. [proof: the-guard-runs]
-- [ ] The positive control fails as designed, so the guard is not green on a zero sample. [proof: the-guard-runs]
-- [ ] The whole suite stays green. [proof: suite-green]
-- [ ] The release gates stay green. [proof: guards-green]
+- [x] A file that writes with `process.stdout.write` on a path that also exits fails the guard. [proof: the-guard-runs]
+- [x] The positive control fails as designed, so the guard is not green on a zero sample. [proof: the-guard-runs]
+- [x] The whole suite stays green. [proof: suite-green]
+- [x] The release gates stay green. [proof: guards-green]

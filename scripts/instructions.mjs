@@ -1004,5 +1004,5 @@ export function run(argv) {
 }
 
 if (process.argv[1] && process.argv[1].endsWith("instructions.mjs")) {
-  process.exit(run(process.argv.slice(2)));
+  process.exitCode = run(process.argv.slice(2));
 }
