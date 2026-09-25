@@ -204,7 +204,17 @@ test("a second server over the SAME backlog opens a tab and exits — no rival p
     assert.equal(second.status, 0, "recognising our own server is success, not an error");
     assert.match(second.stdout, /already running/);
     assert.doesNotMatch(second.stdout, LISTENING, "it must not have bound a port of its own");
-    assert.equal(await ping(bound + 1), null, "nothing may be listening on the next port");
+
+    // The child has exited, which is the proof that it did not stay behind as
+    // a rival server. `bound + 1` is NOT part of this fixture: ports are a
+    // machine-wide namespace, and another test file running in parallel may
+    // legitimately have been handed that number by the kernel. The previous
+    // case is the positive control — another backlog really does stay up on a
+    // second port — while this one also proves the original process survived.
+    const stillServing = await ping(bound);
+    assert.ok(stillServing, "the original server stopped answering after the repeated invocation");
+    assert.equal(stillServing.pid, server.proc.pid,
+      "the repeated invocation replaced the original server instead of focusing it");
   } finally {
     await stop(server);
     rmSync(dir, { recursive: true, force: true });
