@@ -43,7 +43,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { loadConfig } from "../config.mjs";
-import { FIELD_ATTRIBUTED, historyPath, readHistory, unattributedChanges } from "../history.mjs";
+import { FIELD_ATTRIBUTED, attributeChanges, historyEntryIdentity, historyPath, readHistory, unattributedChanges } from "../history.mjs";
 import { SCRIPTS_DIR, isolateHome } from "./_repo.mjs";
 
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
@@ -107,6 +107,30 @@ function fixture() {
   assert.equal(candidates.length, 1,
     "the fixture must offer exactly one unclaimed change, or the race is about two different events");
   return { dir, backlog, env, file, id, event: candidates[0].entry.id };
+}
+
+/** The same single candidate, rewritten into the byte shape predating event ids. */
+function legacyFixture() {
+  const fx = fixture();
+  const path = historyPath(fx.backlog, fx.id);
+  const lines = readFileSync(path, "utf8").trimEnd().split("\n");
+  let stripped = false;
+  const legacy = lines.map((line) => {
+    const entry = JSON.parse(line);
+    if (entry.id === fx.event) {
+      delete entry.id;
+      stripped = true;
+      return JSON.stringify(entry);
+    }
+    return line;
+  });
+  assert.equal(stripped, true, "the fixture did not find the event to make legacy");
+  writeFileSync(path, legacy.join("\n") + "\n", "utf8");
+
+  const candidates = unattributedChanges(fx.backlog, { only: [fx.id] });
+  assert.equal(candidates.length, 1, "the id-less fixture must offer one change");
+  assert.equal(candidates[0].entry.id, undefined, "the target still has a current event id");
+  return { ...fx, event: historyEntryIdentity(candidates[0].entry), candidate: candidates[0] };
 }
 
 /** Every `__attributed__` entry standing for one event. */
@@ -219,6 +243,78 @@ test("POSITIVE CONTROL: a second claimant, one after the other, is refused and a
     assert.equal(readFileSync(historyPath(backlog, id), "utf8"), before,
       "a refused claim appended a history line");
     assert.equal(claimsFor(backlog, id, event).length, 1);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("an id-less legacy change is offered once, claimed once, and a stale second claim appends nothing", () => {
+  const { dir, backlog, id, event, candidate } = legacyFixture();
+  try {
+    assert.match(event, /^legacy:[0-9a-f]{64}:1$/,
+      "an id-less line needs a stable, selectable identity");
+
+    const first = attributeChanges(backlog, [candidate], {
+      actor: "local:first", reason: "I made this legacy change",
+    });
+    assert.equal(first.length, 1);
+    assert.equal(first[0].attributes, event);
+    assert.equal(unattributedChanges(backlog, { only: [id] }).length, 0,
+      "a claimed id-less change was offered again");
+
+    const before = readFileSync(historyPath(backlog, id), "utf8");
+    const second = attributeChanges(backlog, [candidate], {
+      actor: "local:second", reason: "No, I made this legacy change",
+    });
+    assert.deepEqual(second, [], "a stale second claim was accepted");
+    assert.equal(readFileSync(historyPath(backlog, id), "utf8"), before,
+      "a refused id-less claim appended a history line");
+    assert.equal(claimsFor(backlog, id, event).length, 1);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("two byte-identical id-less changes keep separate claim identities", () => {
+  const { dir, backlog, id, candidate } = legacyFixture();
+  try {
+    const path = historyPath(backlog, id);
+    const duplicate = JSON.stringify(candidate.entry);
+    writeFileSync(path, readFileSync(path, "utf8") + duplicate + "\n", "utf8");
+
+    const offered = unattributedChanges(backlog, { only: [id] });
+    assert.equal(offered.length, 2, "identical legacy rows were collapsed into one change");
+    assert.deepEqual(offered.map(({ entry }) => historyEntryIdentity(entry)), [
+      historyEntryIdentity(candidate.entry),
+      historyEntryIdentity(candidate.entry).replace(/:1$/, ":2"),
+    ]);
+
+    assert.equal(attributeChanges(backlog, [offered[0]], {
+      actor: "local:first", reason: "I made the first legacy change",
+    }).length, 1);
+    const remaining = unattributedChanges(backlog, { only: [id] });
+    assert.equal(remaining.length, 1);
+    assert.equal(historyEntryIdentity(remaining[0].entry), historyEntryIdentity(offered[1].entry));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the CLI can select an id-less identity and refuses the same identity a second time", () => {
+  const { dir, backlog, env, file, id, event } = legacyFixture();
+  try {
+    const first = run(["history", "--dir", backlog, "--file", file, "--attribute", "--event", event,
+      "--actor", "local:first", "--reason", "I made this legacy change"], env);
+    assert.equal(first.status, 0, first.stderr);
+    assert.equal(claimsFor(backlog, id, event).length, 1);
+
+    const before = readFileSync(historyPath(backlog, id), "utf8");
+    const second = run(["history", "--dir", backlog, "--file", file, "--attribute", "--event", event,
+      "--actor", "local:second", "--reason", "No, I made this legacy change"], env);
+    assert.notEqual(second.status, 0, "a second command-level claim for an id-less change succeeded");
+    assert.match(second.stderr, new RegExp(event));
+    assert.equal(readFileSync(historyPath(backlog, id), "utf8"), before,
+      "the refused command-level claim appended a history line");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

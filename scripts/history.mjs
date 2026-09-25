@@ -28,7 +28,7 @@
  * Tests: `node --test scripts/tests/history.test.mjs`
  */
 
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -100,6 +100,24 @@ export function eventId(ts) {
 export const EVENT_ID_RE = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 
 export const TASK_FILE_RE = ANY_TASK_FILE;
+
+// An entry written before event ids existed still needs a stable name when an
+// attribution links to it. The log is append-only, so its exact JSON line is a
+// stable input; the occurrence distinguishes two genuine legacy changes whose
+// bytes happen to be identical. A non-enumerable symbol keeps that read-time
+// identity out of the entry's historical bytes and every JSON reading form.
+const LEGACY_ENTRY_IDENTITY = Symbol("legacy-history-entry-identity");
+
+function legacyEntryIdentity(line, occurrence) {
+  const digest = createHash("sha256").update(line, "utf8").digest("hex");
+  return "legacy:" + digest + ":" + occurrence;
+}
+
+/** The durable link name for a history entry, including a legacy id-less one. */
+export function historyEntryIdentity(entry) {
+  if (entry && typeof entry.id === "string" && entry.id) return entry.id;
+  return entry && entry[LEGACY_ENTRY_IDENTITY] || null;
+}
 
 // ──────────────────────────────────────────────────────────────────────────
 // Paths
@@ -290,6 +308,7 @@ export function readHistory(backlogDir, taskId) {
   if (!existsSync(file)) return [];
   const out = [];
   const seen = new Set();
+  const legacyOccurrences = new Map();
   for (const line of readFileSync(file, "utf8").split("\n")) {
     const trimmed = line.trim();
     if (!trimmed) continue;
@@ -298,6 +317,12 @@ export function readHistory(backlogDir, taskId) {
     if (parsed && typeof parsed.id === "string") {
       if (seen.has(parsed.id)) continue;
       seen.add(parsed.id);
+    } else if (parsed) {
+      const occurrence = (legacyOccurrences.get(trimmed) || 0) + 1;
+      legacyOccurrences.set(trimmed, occurrence);
+      Object.defineProperty(parsed, LEGACY_ENTRY_IDENTITY, {
+        value: legacyEntryIdentity(trimmed, occurrence),
+      });
     }
     out.push(parsed);
   }
@@ -1064,7 +1089,8 @@ export function unattributedChanges(backlogDir, opts = {}) {
       // because somebody spoke. Offering it back would let a claim be claimed.
       if (e.field === FIELD_ATTRIBUTED) continue;
       if (!isUnattributed(e)) continue;
-      if (e.id && claimed.has(e.id)) continue;
+      const identity = historyEntryIdentity(e);
+      if (identity && claimed.has(identity)) continue;
       out.push({ task, entry: e });
     }
   }
@@ -1102,22 +1128,21 @@ export function attributeChanges(backlogDir, changes, by) {
     // on, and the one the caller's read cannot stand in for.
     const eligible = new Set(
       unattributedChanges(backlogDir, { only: tasks })
-        .map(({ entry: target }) => target.id)
+        .map(({ entry: target }) => historyEntryIdentity(target))
         .filter(Boolean)
     );
     const written = [];
     for (const { task, entry: target } of changes) {
+      const identity = historyEntryIdentity(target);
       // A loser is refused BEFORE its line exists. Deduplicating afterwards is
       // not available: the log is append-only.
-      if (target.id) {
-        if (!eligible.has(target.id)) continue;
-        eligible.delete(target.id);
-      }
+      if (!identity || !eligible.has(identity)) continue;
+      eligible.delete(identity);
       // `to` is the FIELD that was changed, so the row reads as a sentence
       // without following the link; `attributes` is the link, and it is what a
       // second claim of the same change is refused by.
       const e = entry(task, FIELD_ATTRIBUTED, "", target.field, by.actor, by.source || "manual", ts, by.reason);
-      e.attributes = target.id || null;
+      e.attributes = identity;
       appendEntries(backlogDir, task, [e]);
       written.push(e);
     }

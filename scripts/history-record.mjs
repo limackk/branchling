@@ -26,7 +26,7 @@ import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { resolveActor } from "./actor.mjs";
-import { ACTOR_NAMESPACES, FIELD_ADOPTED, FIELD_ATTRIBUTED, attributeChanges, isValidActor, readHistory, reasonRefusal, reconcile, taskIdFromFile, unattributedChanges } from "./history.mjs";
+import { ACTOR_NAMESPACES, FIELD_ADOPTED, FIELD_ATTRIBUTED, attributeChanges, historyEntryIdentity, isValidActor, readHistory, reasonRefusal, reconcile, taskIdFromFile, unattributedChanges } from "./history.mjs";
 import { resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { printLine } from "./stdout.mjs";
@@ -156,12 +156,12 @@ if (attribute && !file && !all) {
 
 const candidateLabel = ({ task, entry }) =>
   "  " + task + " · " + entry.field + " · " + String(entry.ts).slice(0, 19) +
-  " · " + (entry.id || "no event id");
+  " · " + historyEntryIdentity(entry);
 
 function selectClaim(changes) {
   if (all) return changes;
   if (eventFlag) {
-    const selected = changes.filter(({ entry }) => entry.id === eventFlag);
+    const selected = changes.filter(({ entry }) => historyEntryIdentity(entry) === eventFlag);
     if (selected.length === 1) return selected;
     console.error(
       `${N} history: event \`` + eventFlag + "` is not an unclaimed change in this scope.\n" +
@@ -208,13 +208,17 @@ const claimed = selected.length
 // command would exit 0 having written nothing, and its author would believe the
 // log carries their name.
 const claimedTargets = new Set(claimed.map((e) => e.attributes).filter(Boolean));
-const refused = selected.filter(({ entry }) => entry.id && !claimedTargets.has(entry.id));
+const refused = selected.filter(({ entry }) => {
+  const identity = historyEntryIdentity(entry);
+  return identity && !claimedTargets.has(identity);
+});
 if (refused.length) {
   for (const { task, entry: target } of refused) {
+    const identity = historyEntryIdentity(target);
     const winner = readHistory(BACKLOG_DIR, task)
-      .find((e) => e.field === FIELD_ATTRIBUTED && e.attributes === target.id);
+      .find((e) => e.field === FIELD_ATTRIBUTED && e.attributes === identity);
     console.error(
-      `${N} history: change \`` + target.id + "` was claimed by " +
+      `${N} history: change \`` + identity + "` was claimed by " +
         (winner ? winner.actor + " at " + String(winner.ts).slice(0, 19) : "another process") +
         " while this command was running."
     );
