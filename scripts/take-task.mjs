@@ -37,7 +37,8 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import { chmodSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -59,6 +60,22 @@ import { todayStamp } from "./today.mjs";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export const TAKE_FLAGS = ["--dir", "--actor", "--role", "--reason", "--json", "--probe", "--take-over"];
+
+/**
+ * Replace a task without exposing the truncate-and-write interval to another
+ * dispatcher. The reservation excludes two writers of THIS task; the rename
+ * is what lets readers of the whole queue see either complete version.
+ */
+function replaceTaskText(file, text) {
+  const staged = file + "." + process.pid + "." + randomBytes(4).toString("hex") + ".tmp";
+  try {
+    writeFileSync(staged, text, "utf8");
+    try { chmodSync(staged, statSync(file).mode & 0o7777); } catch { /* the bytes are the transaction */ }
+    renameSync(staged, file);
+  } finally {
+    try { unlinkSync(staged); } catch { /* renamed, or staging never completed */ }
+  }
+}
 
 /** PURE — resolves `take`'s arguments. Throws on a usage error. */
 export function parseTakeArgs(args) {
@@ -318,7 +335,12 @@ export function takeTask(opts) {
     releaseLock({ root, taskId: id, actor, env: opts.env });
     return { ok: false, kind: "unwritable", id, message: id + ": " + e.message };
   }
-  writeFileSync(file, text, "utf8");
+  try {
+    replaceTaskText(file, text);
+  } catch (e) {
+    releaseLock({ root, taskId: id, actor, env: opts.env });
+    return { ok: false, kind: "unwritable", id, message: id + ": " + e.message };
+  }
 
   const after = extractMeta(splitFrontmatter(text).frontmatter);
   const ts = new Date(now).toISOString();
