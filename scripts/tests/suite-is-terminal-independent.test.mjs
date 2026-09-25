@@ -34,10 +34,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { isolateHome, plainOutput } from "./_repo.mjs";
 
@@ -46,19 +46,31 @@ plainOutput();
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
-// The files whose assertions read human-facing output. They are the ones that
-// were red at a keyboard; a new file that renders text belongs here too.
-const RENDERING_TESTS = [
-  "cross-branch-state.test.mjs",
-  "id-prefix.test.mjs",
-  "json-envelope.test.mjs",
-  "next-id-empty-backlog.test.mjs",
-  "next-id-root-backlog.test.mjs",
-  "plan-command.test.mjs",
-  "refusal-shape.test.mjs",
-  "refusal-transcript.test.mjs",
-  "ui.test.mjs",
-];
+const SELF = "suite-is-terminal-independent.test.mjs";
+
+/**
+ * Find tests that can observe human-facing output rather than asking their
+ * author to remember a second list. `plainOutput()` preserves every test that
+ * already declares the contract explicitly; importing the painter or spawning
+ * the CLI finds a new rendering test before that declaration has been added.
+ *
+ * This file is excluded because it deliberately starts a nested test runner.
+ * Running it inside itself would recurse; that exclusion is about the runner,
+ * not about which product output counts as rendered text.
+ */
+function discoverRenderingTests(testDir = HERE) {
+  return readdirSync(testDir)
+    .filter((name) => name.endsWith(".test.mjs") && name !== SELF)
+    .filter((name) => {
+      const source = readFileSync(join(testDir, name), "utf8");
+      const declaresPlainOutput = source.includes("plainOutput(");
+      const importsPainter = source.includes("../ui.mjs");
+      const spawnsCli = source.includes("cli.mjs") &&
+        /\b(?:spawn|spawnSync|execFile|execFileSync)\s*\(/.test(source);
+      return declaresPlainOutput || importsPainter || spawnsCli;
+    })
+    .sort();
+}
 
 /** `node --test <files>` with colour forced on, as a terminal implies. */
 function runInColour(files, cwd = HERE) {
@@ -77,9 +89,13 @@ function runInColour(files, cwd = HERE) {
 }
 
 test("the rendering tests pass with colour forced on", () => {
-  const r = runInColour(RENDERING_TESTS);
+  const renderingTests = discoverRenderingTests();
+  assert.ok(renderingTests.length > 0,
+    "the discovery found no rendering tests, so a green nested run would prove nothing");
+  const r = runInColour(renderingTests);
   assert.equal(r.status, 0,
-    "the suite is green through a pipe and red at a keyboard — it is reporting the observer\n" +
+    renderingTests.length + " rendering tests were discovered; the suite is green through a pipe " +
+      "and red at a keyboard — it is reporting the observer\n" +
       String(r.stdout || "").split("\n").filter((l) => l.includes("not ok") || l.includes("✖")).slice(0, 12).join("\n"));
 });
 
@@ -115,16 +131,28 @@ test("plainOutput() leaves ONE colour decision in the environment", () => {
 test("POSITIVE CONTROL: a test that DOES depend on colour is caught by that runner", () => {
   const dir = mkdtempSync(join(tmpdir(), "branchling-colour-control-"));
   try {
-    const file = join(dir, "depends-on-colour.test.mjs");
+    const tests = join(dir, "tests");
+    const file = join(tests, "depends-on-colour.test.mjs");
+    const fixtureUi = join(dir, "ui.mjs");
+    const realUi = join(HERE, "..", "ui.mjs");
+    // The relative import is the same signal a new repository test carries;
+    // the re-export keeps the fixture about the real painter rather than a
+    // hand-written imitation of it.
+    mkdirSync(tests, { recursive: true });
+    writeFileSync(fixtureUi,
+      'export { color } from "' + pathToFileURL(realUi).href + '";\n', "utf8");
     // It asserts that the painter does not paint — true through a pipe, false at
     // a keyboard. Exactly the defect, in one line.
     writeFileSync(file,
       'import { test } from "node:test";\n' +
       'import assert from "node:assert/strict";\n' +
-      'import { color } from "' + join(HERE, "..", "ui.mjs") + '";\n' +
+      'import { color } from "../ui.mjs";\n' +
       'test("assumes no colour", () => { assert.equal(color.id("x"), "x"); });\n',
       "utf8");
-    const r = runInColour([file], dir);
+    const discovered = discoverRenderingTests(tests);
+    assert.deepEqual(discovered, ["depends-on-colour.test.mjs"],
+      "a new rendering test was not selected until somebody edited a list");
+    const r = runInColour(discovered, tests);
     assert.notEqual(r.status, 0,
       "the runner cannot make a colour-dependent test fail, so it proves nothing about the others");
   } finally {

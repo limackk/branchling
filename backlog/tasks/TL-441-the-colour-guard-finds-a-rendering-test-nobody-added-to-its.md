@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex-subagent
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 1h | 2h | 3h | 4h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-22
-updated: 2026-09-22
+updated: 2026-09-25
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: [scripts/tests/suite-is-terminal-independent.test.mjs]
@@ -69,6 +69,6 @@ Whichever is chosen, the guard must keep its existing positive control.
 
 ## Acceptance criteria
 
-- [ ] A rendering test file that does not declare plain output fails the guard without anyone editing a list. [proof: the-colour-guard]
-- [ ] The guard's existing positive control still fails as designed. [proof: the-colour-guard]
-- [ ] The whole suite stays green. [proof: suite-green]
+- [x] A rendering test file that does not declare plain output fails the guard without anyone editing a list. [proof: the-colour-guard]
+- [x] The guard's existing positive control still fails as designed. [proof: the-colour-guard]
+- [x] The whole suite stays green. [proof: suite-green]
