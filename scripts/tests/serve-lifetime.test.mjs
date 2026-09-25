@@ -42,15 +42,14 @@ import { createServer } from "node:net";
 import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { isolateHome, SCRIPTS_DIR } from "./_repo.mjs";
+import { isolateHome, isolateState, SCRIPTS_DIR } from "./_repo.mjs";
 import { listServers, serversDir } from "../serve-registry.mjs";
 
 isolateHome("serve-lifetime");
 
 // The register is per-user machine state (`stateRoot()`), so a suite that did
 // not move it would read — and stop — the developer's own running viewers.
-const STATE_DIR = realpathSync(mkdtempSync(join(tmpdir(), "branchling-serve-state-")));
-process.env.BACKLOG_STATE_DIR = STATE_DIR;
+const STATE_DIR = isolateState("serve-lifetime");
 
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
 const SERVER = join(SCRIPTS_DIR, "serve-backlog.mjs");

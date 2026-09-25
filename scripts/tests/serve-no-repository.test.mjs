@@ -45,9 +45,10 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { isolateHome, SCRIPTS_DIR } from "./_repo.mjs";
+import { isolateHome, isolateState, SCRIPTS_DIR } from "./_repo.mjs";
 
 isolateHome("serve-no-repository");
+isolateState("serve-no-repository");
 
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
 const SERVER = join(SCRIPTS_DIR, "serve-backlog.mjs");

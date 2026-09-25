@@ -19,12 +19,13 @@
  * repository) and `<repo>` itself (a co-located consumer). The tool supports
  * both, so its own tests must not hard-code either.
  */
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { HOME_ENV } from "../home.mjs";
+import { STATE_DIR_ENV } from "../lock.mjs";
 import { loadConfig } from "../config.mjs";
 import { templateDrift } from "../new-task.mjs";
 import { looksLikeBacklogDir } from "../paths.mjs";
@@ -124,6 +125,25 @@ export function isolateHome(label = "home") {
   const dir = mkdtempSync(join(tmpdir(), "branchling-test-" + label + "-"));
   process.env[HOME_ENV] = dir;
   isolateGit(dir);
+  return dir;
+}
+
+/**
+ * Point this test process and every child it starts at throwaway machine state.
+ *
+ * WHY THIS IS SEPARATE FROM `isolateHome`. The home carries user preferences;
+ * the state directory carries cross-worktree locks, mutexes and the register of
+ * live viewer servers. Moving one does not move the other. A test that starts a
+ * real server without this helper leaves a stale register entry in the same
+ * directory the developer's own `serve --list` reads.
+ *
+ * Call it once, before a test file starts a server. Returning the resolved path
+ * lets a lifetime test inspect the register without reconstructing where the
+ * helper put it.
+ */
+export function isolateState(label = "state") {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), "branchling-test-" + label + "-")));
+  process.env[STATE_DIR_ENV] = dir;
   return dir;
 }
 

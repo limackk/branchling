@@ -58,15 +58,16 @@ import { join } from "node:path";
 
 import { DEFAULT_TASK_ID_PREFIX as P } from "../task-id.mjs";
 import { ConfigError, loadConfig } from "../config.mjs";
-import { isolateHome, SCRIPTS_DIR } from "./_repo.mjs";
+import { isolateHome, isolateState, SCRIPTS_DIR } from "./_repo.mjs";
 
 // THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
 // file in its own process, so one call covers every case in it. Without this a
 // test reads the DEVELOPER's `<config>/config.yaml` — their actor, their model
-// endpoint — and the suite answers differently on different machines. It also
-// moves the RESERVATION out of the machine's real state directory, which
-// matters here: the fixture really runs `take`.
+// endpoint — and the suite answers differently on different machines.
 isolateHome("serve-cross-branch-push");
+// This fixture really runs `take`; move its reservation and its server
+// register out of the machine's real state directory too.
+isolateState("serve-cross-branch-push");
 
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
 const SERVER = join(SCRIPTS_DIR, "serve-backlog.mjs");

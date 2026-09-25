@@ -29,6 +29,12 @@
  *      tell a shared-state change from a defect in their own work. The report
  *      carries `sharedState`, in `--json` and in the rendering, so the question
  *      has an answer that does not require reading this repository's source.
+ *   3. A TEST THAT STARTS A SERVER MOVES MACHINE STATE. A real viewer writes
+ *      its lifetime record outside the repository. The suite walks every test
+ *      file, follows whichever local binding names `serve-backlog.mjs`, and
+ *      requires `isolateState()` before the spawn. A renamed binding therefore
+ *      stays covered, and a newly added server test joins the check without
+ *      somebody maintaining a list.
  *
  * WHY THE PATHS ARE ASSERTED AGAINST TWO DIFFERENT DIRECTORIES. A report that
  * printed a constant would satisfy any single run. Two runs, pointed at two
@@ -74,6 +80,90 @@ function cli(args, env, opts = {}) {
     ...opts,
   });
 }
+
+// ── The test suite does not write into the developer's state ─────────────
+
+const escapeRegExp = (text) => String(text).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Find calls that start the real viewer module, following the local variable
+ * that names it instead of assuming that variable is called `SERVER`.
+ *
+ * This is deliberately a narrow source check: the server tests execute the
+ * module as `node <path>`, and it is that process which writes the register.
+ * Mere prose about `serve-backlog.mjs`, or importing its graph for inspection,
+ * is not a server start and must not make an unrelated test isolate state.
+ */
+function serverLaunches(source) {
+  const launches = new Set();
+  const declarations = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*([\s\S]{0,240}?);/g;
+  for (const declaration of source.matchAll(declarations)) {
+    if (!/["']serve-backlog\.mjs["']/.test(declaration[2])) continue;
+    const binding = escapeRegExp(declaration[1]);
+    const spawn = new RegExp(
+      "\\bspawn\\s*\\(\\s*process\\.execPath\\s*,\\s*\\[\\s*" + binding + "\\b",
+      "g"
+    );
+    for (const call of source.matchAll(spawn)) launches.add(call.index);
+  }
+
+  // Keep an inline path covered too; a fifth test need not introduce a local
+  // binding merely to satisfy this guard.
+  const inline = /\bspawn\s*\(\s*process\.execPath\s*,\s*\[[\s\S]{0,300}?["']serve-backlog\.mjs["']/g;
+  for (const call of source.matchAll(inline)) launches.add(call.index);
+  return [...launches].sort((a, b) => a - b);
+}
+
+/**
+ * @param {Record<string, string>} files test filename to source
+ * @returns {{starters: string[], problems: string[]}}
+ */
+export function serverStateIsolation(files) {
+  const starters = [];
+  const problems = [];
+  for (const [name, source] of Object.entries(files)) {
+    const launches = serverLaunches(source);
+    if (!launches.length) continue;
+    starters.push(name);
+    const isolation = /^[ \t]*(?:(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*=\s*)?isolateState\s*\(/m.exec(source);
+    if (!isolation || isolation.index > launches[0]) {
+      problems.push(name + ": starts serve-backlog.mjs before isolateState()");
+    }
+  }
+  return { starters: starters.sort(), problems: problems.sort() };
+}
+
+test("positive control: a server start is found after a binding rename and fails without isolation", () => {
+  const compliant = [
+    'const VIEWER_PROCESS = join(SCRIPTS_DIR, "serve-backlog.mjs");',
+    'isolateState("control");',
+    'spawn(process.execPath, [VIEWER_PROCESS, "--no-open"]);',
+  ].join("\n");
+  const good = serverStateIsolation({ "renamed-binding.test.mjs": compliant });
+  assert.deepEqual(good, { starters: ["renamed-binding.test.mjs"], problems: [] });
+
+  const bad = serverStateIsolation({
+    "missing-isolation.test.mjs": compliant.replace('isolateState("control");\n', ""),
+  });
+  assert.deepEqual(bad.starters, ["missing-isolation.test.mjs"]);
+  assert.deepEqual(bad.problems,
+    ["missing-isolation.test.mjs: starts serve-backlog.mjs before isolateState()"]);
+});
+
+test("every test that starts the viewer server isolates machine state first", () => {
+  const testsDir = join(SCRIPTS_DIR, "tests");
+  const files = Object.fromEntries(
+    readdirSync(testsDir)
+      .filter((name) => name.endsWith(".test.mjs"))
+      .map((name) => [name, readFileSync(join(testsDir, name), "utf8")])
+  );
+  const result = serverStateIsolation(files);
+  assert.ok(result.starters.includes("serve-lifetime.test.mjs"),
+    "the scan did not find its known real server start — a green result would be vacuous");
+  assert.ok(result.starters.length >= 5,
+    "the scan found only " + result.starters.length + " server tests; the measurement lost coverage");
+  assert.deepEqual(result.problems, []);
+});
 
 // ── Half one: the guide states the boundary ───────────────────────────────
 
