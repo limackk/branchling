@@ -1,4 +1,4 @@
-node_modules/
+node_modules
 *.tgz
 
 # The views are GENERATED from backlog/tasks/*.md — rebuild them with
