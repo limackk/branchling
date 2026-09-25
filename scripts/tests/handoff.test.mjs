@@ -143,6 +143,8 @@ test("a handoff moves the role, clears the owner, requeues, releases and records
   assert.equal(comment[0].actor, "agent:claude");
   assert.equal(comment[0].source, "handoff");
   assert.ok(comment[0].id, "the comment has no id — nothing can point at it later");
+  assert.equal(Object.hasOwn(comment[0], "files"), false,
+    "a handoff with no path grant acquired an empty history field");
 
   // The role change answers on its own, without the reader having to find the
   // comment: one act, one reason, copied onto every row it moved (TL-105).
@@ -153,6 +155,65 @@ test("a handoff moves the role, clears the owner, requeues, releases and records
   // TL-105 abolished `## Log`. The original task asked for a line there, and
   // writing one would be the second copy of what the history already holds.
   assert.equal(text.includes("## Log"), false, "the handoff wrote prose into the task file");
+});
+
+test("a handoff records the receiving hand's file grant on the event, not in prose", () => {
+  const dir = repo(ROLES);
+  const id = newTask(dir, "Repair the catalogue boundary");
+  const reason = "The change genuinely crosses both charters.";
+  const files = ["scripts/catalogue.mjs", "scripts/tests/catalogue.test.mjs"];
+
+  const r = run(dir, ["handoff", id, "--dir", ".", "--actor", "agent:claude",
+    "--to-role", "archivist", "--reason", reason,
+    "--with", files[0], "--with", files[1], "--json"]);
+  assert.equal(r.status, 0, r.stderr);
+
+  const answer = JSON.parse(r.stdout);
+  assert.deepEqual(answer.comment.files, files,
+    "the machine-readable handoff dropped the grant");
+
+  const entries = history(dir, id).filter((e) => e.source === "handoff");
+  const comment = entries.find((e) => e.field === FIELD_COMMENT);
+  assert.ok(comment, "the handoff event is missing");
+  assert.equal(comment.to, reason, "the file grant was folded into the reason prose");
+  assert.deepEqual(comment.files, files, "the event does not carry the granted files");
+  assert.equal(entries.filter((e) => e !== comment && Object.hasOwn(e, "files")).length, 0,
+    "the grant was copied onto field transitions instead of belonging to the event");
+
+  const logged = run(dir, ["log", id, "--dir", ".", "--json"]);
+  assert.equal(logged.status, 0, logged.stderr);
+  const exchange = JSON.parse(logged.stdout).exchanges.find((e) => e.source === "handoff");
+  assert.ok(exchange, "the recorded handoff is not readable through `log`");
+  assert.deepEqual(exchange.messages[0].files, files,
+    "`log --json` hid the structured grant from the next hand");
+
+  const human = run(dir, ["log", id, "--dir", "."]);
+  assert.equal(human.status, 0, human.stderr);
+  for (const file of files) assert.match(human.stdout, new RegExp(file.replaceAll(".", "\\.")));
+});
+
+test("a path grant is an exact repository-relative file list, or the handoff writes nothing", () => {
+  const bad = ["", "/tmp/outside", "../outside", "scripts/../README.md", "scripts\\catalogue.mjs"];
+  for (const file of bad) {
+    const dir = repo(ROLES);
+    const id = newTask(dir, "Repair the catalogue boundary");
+    const before = read(dir, id);
+    const beforeEntries = history(dir, id).length;
+    const r = run(dir, ["handoff", id, "--dir", ".", "--actor", "agent:claude",
+      "--to-role", "archivist", "--reason", "Crosses both charters.", "--with", file]);
+    assert.equal(r.status, 2, "invalid file grant was accepted: " + JSON.stringify(file));
+    assert.equal(read(dir, id), before, "an invalid grant changed the task file");
+    assert.equal(history(dir, id).length, beforeEntries, "an invalid grant reached history");
+  }
+
+  // Positive control: the same operation with an exact repository-relative
+  // path succeeds, so the refusals above do not pass because handoff is broken.
+  const dir = repo(ROLES);
+  const id = newTask(dir, "Repair the catalogue boundary");
+  const ok = run(dir, ["handoff", id, "--dir", ".", "--actor", "agent:claude",
+    "--to-role", "archivist", "--reason", "Crosses both charters.",
+    "--with", "scripts/catalogue.mjs"]);
+  assert.equal(ok.status, 0, ok.stderr);
 });
 
 test("the handed-off task goes back into the queue — `next` hands it out again", () => {
@@ -462,6 +523,8 @@ test("`--json` says what moved, and names the comment by its id", () => {
   assert.notEqual(out.status.from, out.status.to);
   assert.equal(out.comment.text, "Out of my mandate.");
   assert.ok(out.comment.id, "the comment has no id in the JSON answer");
+  assert.equal(Object.hasOwn(out.comment, "files"), false,
+    "a handoff without `--with` changed its JSON shape");
   assert.equal(out.released, true);
 
   // The id in the answer is the id on disk: an answer naming a row nobody can

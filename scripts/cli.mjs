@@ -390,7 +390,7 @@ export const COMMANDS = {
     script: "handoff-task.mjs",
     summary: "hand a task to another role — with the reason, and a trace of the exchange",
     usage: [
-      `${N} handoff <ID> --to-role <r> --reason "…" [--to-owner <o>] [--actor <ns:name>]`,
+      `${N} handoff <ID> --to-role <r> --reason "…" [--with <path> …] [--to-owner <o>] [--actor <ns:name>]`,
       `${N} handoff <ID> [--status <s>] [--json] [--dir <path>]`,
       "",
       "  --to-role <r>      the role the task now asks for. Its vocabulary is `roles` in",
@@ -398,6 +398,8 @@ export const COMMANDS = {
       "  --to-owner <o>     hand it to a named person instead of, or as well as, a role",
       "  --reason \"…\"       REQUIRED, and recorded twice on purpose: as the reason for the",
       "                     field change, and as a `__comment__` event an answer can point at",
+      "  --with <path>      grant the receiving hand one exact repository-relative file;",
+      "                     repeatable, recorded on the handoff event, not enforced later",
       "  --status <s>       which status it goes back to. Only needed when more than one of",
       "                     this backlog's statuses means `waiting for somebody`",
       "  --json             the task, the changed fields and the comment, for a program",

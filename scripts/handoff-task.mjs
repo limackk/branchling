@@ -54,7 +54,7 @@
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { chmodSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
-import { dirname, join, relative } from "node:path";
+import { dirname, isAbsolute, join, relative, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { resolveActor } from "./actor.mjs";
@@ -73,15 +73,68 @@ import { MARK, color, failure } from "./ui.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-export const HANDOFF_FLAGS = ["--dir", "--actor", "--to-role", "--to-owner", "--reason", "--status", "--json"];
+export const HANDOFF_FLAGS = ["--dir", "--actor", "--to-role", "--to-owner", "--reason", "--with", "--status", "--json"];
+
+/**
+ * Exact repository-relative files the receiving hand may change. PURE.
+ *
+ * The files need not exist yet: creating one can be the very work being handed
+ * on. What must already be knowable is which repository path the grant names.
+ * Backslashes are refused rather than translated so the bytes recorded in the
+ * append-only history mean the same path on every platform.
+ */
+export function resolveHandoffFiles(rawFiles) {
+  const files = [];
+  const seen = new Set();
+  for (const raw of rawFiles || []) {
+    const file = String(raw).trim();
+    if (!file) {
+      throw new Error(
+        "`--with` names no file\n" +
+          "Give one exact repository-relative path per `--with <path>` flag."
+      );
+    }
+    if (file.includes("\\") || isAbsolute(file) || win32.isAbsolute(file)) {
+      throw new Error(
+        "`--with " + file + "` is not a repository-relative path\n" +
+          "Use forward slashes and name the file from the repository root."
+      );
+    }
+    const parts = file.split("/");
+    if (parts.some((part) => !part || part === "." || part === "..")) {
+      throw new Error(
+        "`--with " + file + "` is not an exact file path\n" +
+          "Do not use empty, `.` or `..` path segments."
+      );
+    }
+    if (seen.has(file)) {
+      throw new Error(
+        "`--with " + file + "` was given twice\n" +
+          "One file needs one grant; repeat `--with` only for a different file."
+      );
+    }
+    seen.add(file);
+    files.push(file);
+  }
+  return files;
+}
 
 /** PURE — resolves `handoff`'s arguments. Throws on a usage error. */
 export function parseHandoffArgs(args) {
-  const plan = { id: null, dir: null, actor: null, toRole: null, toOwner: null, reason: null, status: null, json: false };
+  const plan = {
+    id: null, dir: null, actor: null, toRole: null, toOwner: null,
+    reason: null, files: [], status: null, json: false,
+  };
   const key = { "--to-role": "toRole", "--to-owner": "toOwner" };
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === "--json") { plan.json = true; continue; }
+    if (a === "--with") {
+      const value = args[++i];
+      if (value === undefined) throw new Error("`--with` with no value");
+      plan.files.push(value);
+      continue;
+    }
     if (HANDOFF_FLAGS.indexOf(a) >= 0) {
       const value = args[++i];
       if (value === undefined) throw new Error("`" + a + "` with no value");
@@ -117,6 +170,7 @@ export function parseHandoffArgs(args) {
   }
   const refusal = reasonRefusal(plan.reason, "--reason");
   if (refusal) throw new Error(refusal);
+  plan.files = resolveHandoffFiles(plan.files);
   return plan;
 }
 
@@ -198,7 +252,8 @@ function discardStaged(staged) {
  * `takeTask` does — so the shape is testable without a subprocess.
  *
  * @param {{root: string, config: object, id: string, actor: string, toRole?: string,
- *          toOwner?: string, reason: string, status?: string, now?: number, env?: object}} opts
+ *          toOwner?: string, reason: string, files?: string[], status?: string,
+ *          now?: number, env?: object}} opts
  */
 export function handoffTask(opts) {
   const { root, config, actor } = opts;
@@ -318,6 +373,10 @@ export function handoffTask(opts) {
     actor, source: "handoff", reason: normalizeReason(opts.reason),
     session: currentSession(root, opts.env),
   };
+  // ABSENT when no grant was stated. An empty key would turn a handoff made
+  // before this capability and one that deliberately granted no exception into
+  // two shapes for the same fact — and would change every ordinary handoff.
+  if (opts.files && opts.files.length) comment.files = opts.files.slice();
 
   // ONE TRANSACTION, AND THE ORDER IS THE WHOLE OF IT (TL-351).
   //
@@ -410,11 +469,21 @@ export function renderHandoff(result, opts = {}) {
     if (row) out.push(row);
   }
   out.push("  reason: " + result.comment.to);
+  for (const file of result.comment.files || []) {
+    out.push("  may change: " + paint.id(file));
+  }
   out.push("  " + paint.dim(shown));
   return out.join("\n");
 }
 
 export function handoffJson(result) {
+  const comment = {
+    id: result.comment.id, ts: result.comment.ts, text: result.comment.to,
+    actor: result.comment.actor,
+  };
+  if (result.comment.files && result.comment.files.length) {
+    comment.files = result.comment.files.slice();
+  }
   return {
     ok: true,
     id: result.id,
@@ -423,7 +492,7 @@ export function handoffJson(result) {
     role: { from: result.before.role || "", to: result.after.role || "" },
     owner: { from: result.before.owner || "", to: result.after.owner || "" },
     status: { from: result.before.status, to: result.after.status },
-    comment: { id: result.comment.id, ts: result.comment.ts, text: result.comment.to, actor: result.comment.actor },
+    comment,
     released: result.released,
     warnings: result.warnings || [],
   };
@@ -501,7 +570,8 @@ export function run(argv) {
 
   const result = handoffTask({
     root, config, id: plan.id, actor,
-    toRole: plan.toRole, toOwner: plan.toOwner, reason: plan.reason, status: plan.status,
+    toRole: plan.toRole, toOwner: plan.toOwner, reason: plan.reason,
+    files: plan.files, status: plan.status,
   });
   if (!result.ok) {
     if (plan.json) {

@@ -116,13 +116,18 @@ export function foldExchanges(entries) {
     const kind = historyEntryKind(e);
     if (e.field === FIELD_COMMENT || e.field === FIELD_DECISION) {
       const text = String(e.to || "");
-      current.messages.push({
+      const message = {
         id: String(e.id || ""),
         kind: messageKind(e),
         // `null` says: the reason above, verbatim. The id stays, because that
         // is what an answer points at.
         text: text && text === reason ? null : text,
-      });
+      };
+      // A path grant belongs to the handoff event, not to the field rows it
+      // happened to move. Keep it beside that message so both log renderings
+      // expose the structured record without parsing the reason.
+      if (Array.isArray(e.files) && e.files.length) message.files = e.files.slice();
+      current.messages.push(message);
     } else if (isPseudoField(e.field) && kind !== "transition") {
       current.events.push(String(e.field).replace(/^__|__$/g, "") +
         (e.to ? ": " + String(e.to) : ""));
@@ -195,7 +200,7 @@ function describeChange(c) {
 function headline(x) {
   let moved = x.changes.map(describeChange)
     .concat(x.events)
-    .concat(x.messages.filter((m) => m.text || m.kind !== "comment").map((m) => m.kind));
+    .concat(x.messages.filter((m) => m.text || m.kind !== "comment" || (m.files || []).length).map((m) => m.kind));
   // Unless the comment is ALL there was. An exchange that moved no field is a
   // message and nothing else, and a row saying `—` above a paragraph would be
   // hiding the one thing that happened.
@@ -252,9 +257,10 @@ export function renderLog(model) {
     for (const m of x.messages) {
       // A comment that only repeats the reason has already been printed; its id
       // is in `--json` for whoever needs to point at it.
-      if (!m.text && m.kind === "comment") continue;
+      if (!m.text && m.kind === "comment" && !(m.files || []).length) continue;
       out.push("      " + color.dim("[" + m.kind + " " + m.id + "]"));
       for (const line of (m.text || "").split("\n")) if (line) out.push("      " + line);
+      for (const file of m.files || []) out.push("      may change: " + color.id(file));
     }
   });
   if (model.limit && matched > model.exchanges.length) {
