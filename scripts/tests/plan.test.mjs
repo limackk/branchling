@@ -128,13 +128,25 @@ test("a task scheduled BEFORE its blocker is an error naming both ids and both w
   assert.match(r.errors[0], /Second/);
 });
 
-test("a blocker in the SAME wave is a warning, not an error", () => {
+test("a blocker before its dependent in the SAME wave is clean", () => {
   const r = validate(
     ["waves:", '  - name: "One"', "    tasks: [TL-1, TL-2]", ""].join("\n"),
     tasks(["TL-1"], ["TL-2", "pending", ["TL-1"]]),
   );
   assert.deepEqual(r.errors, []);
-  assert.equal(r.warnings.length, 1, JSON.stringify(r));
+  assert.deepEqual(r.warnings, []);
+});
+
+test("POSITIVE CONTROL: a dependent before its blocker in the SAME wave is an error", () => {
+  const r = validate(
+    ["waves:", '  - name: "One"', "    tasks: [TL-2, TL-1]", ""].join("\n"),
+    tasks(["TL-1"], ["TL-2", "pending", ["TL-1"]]),
+  );
+  assert.equal(r.errors.length, 1, JSON.stringify(r));
+  assert.match(r.errors[0], /TL-2/);
+  assert.match(r.errors[0], /TL-1/);
+  assert.match(r.errors[0], /One/);
+  assert.deepEqual(r.warnings, []);
 });
 
 test("a task scheduled AFTER its blocker is clean", () => {
@@ -332,7 +344,7 @@ test("a plan that cannot be PARSED fails — a shape error is not a warning", ()
   );
 });
 
-test("a warning alone does not fail the guard", () => {
+test("a satisfied dependency inside one wave is silent and does not fail the guard", () => {
   withSandbox(
     (d) => {
       task(d, "TL-1");
@@ -342,7 +354,7 @@ test("a warning alone does not fail the guard", () => {
     (dir) => {
       const r = run(["--dir", dir]);
       assert.equal(r.code, 0, r.out);
-      assert.match(r.out, /TL-2/);
+      assert.doesNotMatch(r.out + r.err, /TL-2/);
     },
   );
 });

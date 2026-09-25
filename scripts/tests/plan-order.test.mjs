@@ -13,8 +13,8 @@
  *      the earlier wave's only task is already claimed. The control is that the
  *      same tree, asked without the flag, still hands something out — otherwise
  *      "nothing to take" would prove an empty queue rather than a respected plan.
- *   3. Inside a wave nothing is re-ranked. A wave is a batch; the existing
- *      policy (priority, then id) still decides between its members.
+ *   3. Inside a wave nothing is re-ranked. Its authored order binds the
+ *      dispatcher (TL-257), ahead of the queue's priority-and-id policy.
  *   4. `--plan` with no plan.yaml is a USAGE ERROR, and it happens before
  *      anything is claimed. A filter that silently matched everything reads
  *      exactly like a plan that schedules everything.

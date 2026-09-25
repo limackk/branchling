@@ -80,8 +80,8 @@ export function reportPlanErrors(errors) {
   console.error("");
   console.error("The plan is advisory, but it may not contradict `blocked_by`: an order that puts a");
   console.error("task before its own blocker cannot be executed, so it is a defect in the plan and");
-  console.error("never a reason to edit the dependency. Move the task to a later wave, or schedule");
-  console.error("the blocker in an earlier one.");
+  console.error("never a reason to edit the dependency. Move the task after its blocker, whether");
+  console.error("that means reordering one wave or scheduling the blocker in an earlier wave.");
 }
 
 function main(argv) {

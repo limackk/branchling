@@ -226,12 +226,12 @@ export function loadPlan(planPath, read = readFileSync, exists = existsSync) {
 /**
  * Does the plan agree with the tree?
  *
- * THE SEVERITY SPLIT is the whole design. An order that puts a task BEFORE the
- * task it is blocked by is impossible to execute, so it is an error. A blocker
- * inside the SAME wave is only a warning: a wave is a batch, not a claim that
- * its members are mutually independent, and a sequence within one wave is a
- * normal way to plan. Treating that as an error would push people to split
- * waves for the tool's sake rather than for the work's.
+ * THE AUTHORED ORDER is the whole design. An order that puts a task BEFORE the
+ * task it is blocked by is impossible to execute, so it is an error whether
+ * the two tasks occupy different waves or the same one. Within one wave the
+ * sequence binds the dispatcher (TL-257): a blocker before its dependent
+ * already settles the dependency and is clean; the reverse order contradicts
+ * it. A `together` group does not suspend `blocked_by` or erase that sequence.
  *
  * A CLOSED TASK IN THE PLAN IS NOT A DEFECT. The plan is a record of an order
  * that was decided, and the earlier waves are meant to be finished; deleting
@@ -249,23 +249,25 @@ export function validatePlan(plan, tasks, config = {}) {
 
   const byId = new Map(tasks.map((t) => [t.id, t]));
   const waveOf = new Map();
+  const positionInWave = new Map();
   const waveName = (i) => `${i + 1} (${plan.waves[i].name || "unnamed"})`;
 
   let planned = 0;
   plan.waves.forEach((w, i) => {
-    for (const id of w.tasks) {
+    w.tasks.forEach((id, position) => {
       planned++;
       if (waveOf.has(id)) {
         errors.push(
           `${id} appears twice in the plan — wave ${waveName(waveOf.get(id))} and wave ${waveName(i)}`
         );
-        continue;
+        return;
       }
       waveOf.set(id, i);
+      positionInWave.set(id, position);
       if (!byId.has(id)) {
         errors.push(`wave ${waveName(i)} names ${id} — there is no such task in this backlog`);
       }
-    }
+    });
   });
 
   plan.waves.forEach((w, i) => {
@@ -299,10 +301,10 @@ export function validatePlan(plan, tasks, config = {}) {
             `${id} is in wave ${waveName(i)} but is blocked by ${blocker}, which the plan puts in ` +
               `wave ${waveName(j)} — the order cannot be executed`
           );
-        } else if (j === i) {
-          warnings.push(
-            `${id} and its blocker ${blocker} share wave ${waveName(i)} — fine if the wave is ` +
-              `meant to be worked in sequence, wrong if it is meant to be worked in parallel`
+        } else if (j === i && positionInWave.get(id) < positionInWave.get(blocker)) {
+          errors.push(
+            `${id} appears before its blocker ${blocker} inside wave ${waveName(i)} — ` +
+              `the authored order cannot be executed`
           );
         }
         continue;
