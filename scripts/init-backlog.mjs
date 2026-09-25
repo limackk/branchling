@@ -32,7 +32,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 
 import { DEFAULT_TASK_ID_PREFIX } from "./task-id.mjs";
 import { loadConfig } from "./config.mjs";
-import { TEMPLATE_FILENAME, backlogPaths, repositoryRoot } from "./paths.mjs";
+import { TEMPLATE_FILENAME, backlogPaths, repositoryRoot, takeDirFlag } from "./paths.mjs";
 import { installSkills, renderInstall } from "./install-skills.mjs";
 import { PRODUCT_NAME as N, BLOCK_MARKER_NAME as BLOCK_LABEL } from "./product.mjs";
 import { failure, refusal } from "./ui.mjs";
@@ -450,16 +450,15 @@ export function ensureGitRules(root, opts = {}) {
   return out;
 }
 
-function dirFlag(argv) {
-  const i = argv.indexOf("--dir");
-  return i >= 0 && argv[i + 1] ? argv[i + 1] : null;
-}
-
 const BOOL_FLAGS = ["--no-gitignore", "--no-example", "--no-nudge", "--skills"];
 
 export function main(argv) {
-  const unknown = argv.filter(
-    (a, i) => a.startsWith("-") && a !== "--dir" && BOOL_FLAGS.indexOf(a) < 0 && argv[i - 1] !== "--dir"
+  const taken = takeDirFlag(argv);
+  const sep = taken.argv.indexOf("--");
+  const flags = sep < 0 ? taken.argv : taken.argv.slice(0, sep);
+  const literal = sep < 0 ? [] : taken.argv.slice(sep + 1);
+  const unknown = flags.filter(
+    (a) => a.startsWith("-") && BOOL_FLAGS.indexOf(a) < 0
   );
   if (unknown.length) {
     console.error(refusal(N + " init", "unknown flag: " + unknown[0],
@@ -467,7 +466,13 @@ export function main(argv) {
     return 2;
   }
 
-  const target = dirFlag(argv);
+  if (literal.length) {
+    console.error(refusal(N + " init", "unexpected argument: " + literal[0],
+      "--dir <path> " + BOOL_FLAGS.join(" ")));
+    return 2;
+  }
+
+  const target = taken.dir;
   if (!target) {
     console.error(`${N} init: name a directory: ${N} init --dir <path>`);
     console.error("  --dir is mandatory on purpose: init WRITES files, and guessing the");
@@ -512,7 +517,7 @@ export function main(argv) {
 
   // Only now, because the question is "is the rule IN FORCE", not "was the file
   // created" — and that is settled after everything has been written (TL-59).
-  for (const line of ensureGitRules(root, { append: argv.indexOf("--no-gitignore") < 0 })) {
+  for (const line of ensureGitRules(root, { append: flags.indexOf("--no-gitignore") < 0 })) {
     console.log(line);
   }
 
@@ -525,11 +530,11 @@ export function main(argv) {
   // `--no-nudge` still ASKS, exactly as `--no-gitignore` does: it only stops the
   // write. Silence about a file we deliberately left alone reads like a file that
   // was already right.
-  for (const line of ensureNudge(root, { create: argv.indexOf("--no-nudge") < 0 })) {
+  for (const line of ensureNudge(root, { create: flags.indexOf("--no-nudge") < 0 })) {
     console.log(line);
   }
 
-  if (argv.indexOf("--no-example") < 0) {
+  if (flags.indexOf("--no-example") < 0) {
     for (const line of writeExample(root)) console.log(line);
   }
 
@@ -544,7 +549,7 @@ export function main(argv) {
   // flag rather than a default, it never overwrites, and it says what it
   // skipped. The same entry point `skills install` uses, because two commands
   // writing the same files two ways is one of them being wrong later.
-  if (argv.indexOf("--skills") >= 0) {
+  if (flags.indexOf("--skills") >= 0) {
     const result = installSkills(repositoryRoot(root));
     if (result.ok) console.log(renderInstall(result));
     else console.log("  WARNING: " + result.message);

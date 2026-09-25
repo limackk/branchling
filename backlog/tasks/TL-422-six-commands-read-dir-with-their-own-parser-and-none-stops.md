@@ -6,23 +6,24 @@ labels: []
 board: main
 epic: "CLI surface"
 priority: P3                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex-subagent
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 1h | 2h | 3h | 4h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-21
-updated: 2026-09-21
+updated: 2026-09-25
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs:
   - scripts/paths.mjs
   - scripts/done-task.mjs
   - scripts/take-task.mjs
+  - scripts/tests/global-flags-separator.test.mjs
 verification:                      # HOW to check the task is really done
   - id: the-name                   # optional; a criterion below points at this id
-    bash: "command to run"
+    bash: "node --test scripts/tests/global-flags-separator.test.mjs"
 ---
 
 ## Goal
@@ -68,6 +69,10 @@ WHY IT WAS NOT DONE INSIDE TL-247. That task's subject is the DISPATCHER —
 command parsers is a different blast radius, and two of the three files at the
 top of the list were being changed by another session on the same day.
 
+DECISION. The six commands call `takeDirFlag()` rather than copying its two
+rules. Its optional missing-value text preserves each command's established
+refusal while the separator and `--dir=` grammar have one implementation.
+
 ## Pre-flight reading
 
 1. `scripts/paths.mjs` — `takeDirFlag()`, including the TL-247 paragraph that
@@ -91,8 +96,8 @@ top of the list were being changed by another session on the same day.
 
 ## Acceptance criteria
 
-- [ ] In each of the six commands, a `--dir` that follows `--` does not change
+- [x] In each of the six commands, a `--dir` that follows `--` does not change
       the directory the command reads or writes, proved by one case per command.
       [proof: the-name]
-- [ ] No command-level refusal message changes wording — the diff of the suite
+- [x] No command-level refusal message changes wording — the diff of the suite
       shows no expected-message edit. [proof: the-name]

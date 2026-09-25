@@ -51,7 +51,7 @@ import { ACTOR_NAMESPACES, changesRequiringReason, currentSession, eventId, FIEL
 import { decisionsOf, withDecisions } from "./decisions.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { acquireLock, isExpired, lockDir, readLock, releaseLock } from "./lock.mjs";
-import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
+import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { buildFieldSpecs, extractMeta, fieldSpec, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
 import { readTaskRecords } from "./task-select.mjs";
@@ -89,19 +89,23 @@ function discardStaged(staged) {
 
 /** PURE — resolves `take`'s arguments. Throws on a usage error. */
 export function parseTakeArgs(args) {
-  const plan = { id: null, dir: null, actor: null, role: null, reason: null, json: false, probe: false, takeOver: false };
+  const taken = takeDirFlag(args, { missing: "`--dir` with no value" });
+  args = taken.argv;
+  const plan = { id: null, dir: taken.dir, actor: null, role: null, reason: null, json: false, probe: false, takeOver: false };
+  let literal = false;
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
-    if (a === "--json") { plan.json = true; continue; }
-    if (a === "--probe") { plan.probe = true; continue; }
-    if (a === "--take-over") { plan.takeOver = true; continue; }
-    if (a === "--dir" || a === "--actor" || a === "--role" || a === "--reason") {
+    if (!literal && a === "--") { literal = true; continue; }
+    if (!literal && a === "--json") { plan.json = true; continue; }
+    if (!literal && a === "--probe") { plan.probe = true; continue; }
+    if (!literal && a === "--take-over") { plan.takeOver = true; continue; }
+    if (!literal && (a === "--actor" || a === "--role" || a === "--reason")) {
       const value = args[++i] || null;
       if (!value) throw new Error("`" + a + "` with no value");
       plan[a.slice(2)] = value;
       continue;
     }
-    if (a.startsWith("-")) {
+    if (!literal && a.startsWith("-")) {
       throw new Error("unknown flag: " + a + "\navailable: " + TAKE_FLAGS.join(" "));
     }
     if (plan.id) throw new Error("two task ids given: " + plan.id + " and " + a + " — take one task at a time");

@@ -72,7 +72,7 @@ import { parseVerification } from "./criteria.mjs";
 import { contractProblem, findTaskFile, repoRootFor, runContract } from "./done-task.mjs";
 import { ACTOR_NAMESPACES, isValidActor, readHistory } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
-import { backlogPaths, resolveBacklogDirOrExit } from "./paths.mjs";
+import { backlogPaths, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import {
   FIELD_COMMENT, FIELD_DECISION, extractMeta, historyEntryKind, isQuestion, openQuestions, splitFrontmatter,
@@ -105,18 +105,22 @@ export const SECTIONS = [
 
 /** PURE — resolves `resume`'s arguments. Throws on a usage error. */
 export function parseResumeArgs(args) {
-  const plan = { id: null, dir: null, actor: null, base: DEFAULT_BASE, verify: true, json: false };
+  const taken = takeDirFlag(args, { missing: "`--dir` with no value" });
+  args = taken.argv;
+  const plan = { id: null, dir: taken.dir, actor: null, base: DEFAULT_BASE, verify: true, json: false };
+  let literal = false;
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
-    if (a === "--json") { plan.json = true; continue; }
-    if (a === "--no-verify") { plan.verify = false; continue; }
-    if (a === "--dir" || a === "--actor" || a === "--base") {
+    if (!literal && a === "--") { literal = true; continue; }
+    if (!literal && a === "--json") { plan.json = true; continue; }
+    if (!literal && a === "--no-verify") { plan.verify = false; continue; }
+    if (!literal && (a === "--actor" || a === "--base")) {
       const value = args[++i] || null;
       if (!value) throw new Error("`" + a + "` with no value");
       plan[a.slice(2)] = value;
       continue;
     }
-    if (a.startsWith("-")) {
+    if (!literal && a.startsWith("-")) {
       throw new Error("unknown flag: " + a + "\navailable: " + RESUME_FLAGS.join(" "));
     }
     if (plan.id) throw new Error("two task ids given: " + plan.id + " and " + a + " — one briefing is about one task");

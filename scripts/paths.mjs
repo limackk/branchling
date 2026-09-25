@@ -213,8 +213,12 @@ export function resolveBacklogPaths(opts = {}) {
  * `--dir A -- --dir B` IS DIRECTORY A. The first occurrence is the flag, the
  * second is text. There is no reading in which a word past the separator moves a
  * write, because that is the whole promise the separator makes.
+ *
+ * `opts.missing` lets a command retain the wording it already used for a bare
+ * `--dir`. The grammar is shared; the diagnostic remains part of that command's
+ * established interface.
  */
-export function takeDirFlag(argv) {
+export function takeDirFlag(argv, opts = {}) {
   const rest = [];
   let dir = null;
   for (let i = 0; i < argv.length; i++) {
@@ -226,6 +230,7 @@ export function takeDirFlag(argv) {
     }
     if (argv[i] === "--dir") {
       dir = argv[++i] || null;
+      if (!dir && opts.missing) throw new Error(opts.missing);
       continue;
     }
     if (argv[i].startsWith("--dir=")) {

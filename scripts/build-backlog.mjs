@@ -24,7 +24,7 @@ import { fileURLToPath } from "node:url";
 
 import { loadConfigOrExit } from "./config.mjs";
 import { detectPrefixMismatch, prefixMismatchMessage } from "./task-id.mjs";
-import { resolveBacklogDirOrExit } from "./paths.mjs";
+import { resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { printLine } from "./stdout.mjs";
 import { buildFieldSpecs, extractMeta as sharedExtractMeta, normalizeValue, stripComment } from "./task-fields.mjs";
 import { MARK, color, errColor, refusal } from "./ui.mjs";
@@ -44,9 +44,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // have: an unknown board slug, a task with no `board` field.
 // `--dir` is the canonical name since BL-1399 (every script accepts it the same
 // way); `--root` stays as an alias, because existing tests and calls use it.
-const rootFlag = process.argv.indexOf("--root") !== -1
-  ? process.argv.indexOf("--root")
-  : process.argv.indexOf("--dir");
+const takenDir = takeDirFlag(process.argv.slice(2));
+const separator = takenDir.argv.indexOf("--");
+const commandArgs = separator < 0 ? takenDir.argv : takenDir.argv.slice(0, separator);
+const literalArgs = separator < 0 ? [] : takenDir.argv.slice(separator + 1);
+const rootFlag = commandArgs.indexOf("--root");
 // BL-1445: through `resolveBacklogDir`, not through `join(__dirname, "..")`.
 // That shortcut is pure CO-LOCATION and works only when the code sits ABOVE the
 // data (`backlog/scripts` next to `backlog/tasks`). In the layout the module is
@@ -56,7 +58,9 @@ const rootFlag = process.argv.indexOf("--root") !== -1
 // sources and keeps co-location LAST, so the existing behaviour is untouched.
 // Regression: scripts/tests/non-colocated-layout.test.mjs
 const BACKLOG_DIR = resolveBacklogDirOrExit({
-  dir: rootFlag !== -1 && process.argv[rootFlag + 1] ? process.argv[rootFlag + 1] : undefined,
+  dir: rootFlag !== -1 && commandArgs[rootFlag + 1]
+    ? commandArgs[rootFlag + 1]
+    : takenDir.dir || undefined,
   moduleDir: __dirname,
 }, N + " build").root;
 
@@ -64,8 +68,8 @@ const BACKLOG_DIR = resolveBacklogDirOrExit({
 // without asking, so quietly accepting a typo would look like success with zero
 // evidential force (the same class of defect BL-1411 fixed in the server).
 {
-  const KNOWN = new Set(["--root", "--dir"]);
-  const argv = process.argv.slice(2);
+  const KNOWN = new Set(["--root"]);
+  const argv = commandArgs;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (!a.startsWith("-")) {
@@ -77,6 +81,10 @@ const BACKLOG_DIR = resolveBacklogDirOrExit({
       console.error(refusal(N + " build", "unknown flag: " + a, "--root <path> --dir <path>"));
       process.exit(2);
     }
+  }
+  if (literalArgs.length) {
+    console.error(refusal(N + " build", "unexpected argument: " + literalArgs[0], "--root <path> --dir <path>"));
+    process.exit(2);
   }
 }
 const TASKS_DIR = join(BACKLOG_DIR, "tasks");

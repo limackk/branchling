@@ -93,8 +93,10 @@ const FLAGS = ["--dir", "--dry-run", "--json", "--actor", "--role", "--status", 
 
 /** PURE — resolves `done`'s arguments. Throws on a usage error. */
 export function parseDoneArgs(args) {
+  const taken = takeDirFlag(args, { missing: "`--dir` with no path" });
+  args = taken.argv;
   let id = null;
-  let dir = null;
+  let dir = taken.dir;
   let dryRun = false;
   let json = false;
   let actor = null;
@@ -104,33 +106,30 @@ export function parseDoneArgs(args) {
   let role = null;
   let verbose = false;
 
+  let literal = false;
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
-    if (a === "--dir") {
-      dir = args[++i] || null;
-      if (!dir) throw new Error("`--dir` with no path");
-      continue;
-    }
-    if (a === "--dry-run") { dryRun = true; continue; }
-    if (a === "--json") { json = true; continue; }
-    if (a === "--confirm-manual") { confirmManual = true; continue; }
-    if (a === "--verbose") { verbose = true; continue; }
-    if (a === "--actor") {
+    if (!literal && a === "--") { literal = true; continue; }
+    if (!literal && a === "--dry-run") { dryRun = true; continue; }
+    if (!literal && a === "--json") { json = true; continue; }
+    if (!literal && a === "--confirm-manual") { confirmManual = true; continue; }
+    if (!literal && a === "--verbose") { verbose = true; continue; }
+    if (!literal && a === "--actor") {
       actor = args[++i] || null;
       if (!actor) throw new Error("`--actor` with no name");
       continue;
     }
-    if (a === "--role") {
+    if (!literal && a === "--role") {
       role = args[++i] || null;
       if (!role) throw new Error("`--role` with no value");
       continue;
     }
-    if (a === "--status") {
+    if (!literal && a === "--status") {
       status = args[++i] || null;
       if (!status) throw new Error("`--status` with no value");
       continue;
     }
-    if (a === "--reason") {
+    if (!literal && a === "--reason") {
       reason = args[++i] || null;
       if (!reason) throw new Error("`--reason` with no text");
       // An unusable value is a bad ARGUMENT — wrong whatever the task and
@@ -144,7 +143,7 @@ export function parseDoneArgs(args) {
       if (refusal) throw new Error(refusal);
       continue;
     }
-    if (a.startsWith("-")) {
+    if (!literal && a.startsWith("-")) {
       throw new Error("unknown flag: " + a + "\navailable: " + FLAGS.join(" "));
     }
     if (id) throw new Error("two task ids given: " + id + " and " + a + " — close one task at a time");

@@ -30,7 +30,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -41,6 +41,10 @@ plainOutput();
 
 import { takeDirFlag } from "../paths.mjs";
 import { takeColorFlags } from "../cli.mjs";
+import { parseDoneArgs } from "../done-task.mjs";
+import { parseTakeArgs } from "../take-task.mjs";
+import { parseResumeArgs } from "../resume-task.mjs";
+import { parseLogArgs } from "../log-task.mjs";
 
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
 
@@ -86,6 +90,30 @@ test("takeColorFlags reads nothing past `--` as a flag", () => {
   // The first occurrence still decides; the second is text.
   assert.equal(takeColorFlags(["new", "--no-color", "--title", "--", "--color"]).force, false);
 });
+
+const commandParsers = [
+  ["done", parseDoneArgs],
+  ["take", parseTakeArgs],
+  ["resume", parseResumeArgs],
+  ["log", parseLogArgs],
+];
+
+for (const [command, parse] of commandParsers) {
+  test(command + " takes its directory through the shared separator rule", () => {
+    // POSITIVE CONTROL: the command still reads the flag, including the one
+    // spelling its private parser did not recognise before TL-422.
+    const ordinary = parse(["TASK-1", "--dir=/the/backlog"]);
+    assert.equal(ordinary.dir, "/the/backlog",
+      command + " no longer reads a real --dir flag");
+
+    // Past the separator the same word is the positional value. A parser that
+    // merely stopped recognising --dir altogether would pass the dir assertion,
+    // which is why the positive control above is part of every command's case.
+    const literal = parse(["--", "--dir"]);
+    assert.equal(literal.id, "--dir", command + " did not preserve the literal value");
+    assert.equal(literal.dir, null, command + " read a literal value as a directory");
+  });
+}
 
 // ── the two layers composing, against a real write ────────────────────────
 
@@ -139,6 +167,53 @@ test("a SECOND `--dir` past the separator is a value, not a redirection", () => 
     assert.equal(r.code, 2, "a trailing argument was accepted: " + r.out + r.err);
     assert.equal(tasksIn(elsewhere).length, 0, "the second `--dir` moved the write");
     assert.equal(tasksIn(home).length, 0, "a refused invocation still wrote a task");
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+    rmSync(elsewhere, { recursive: true, force: true });
+  }
+});
+
+test("init shares the --dir spelling and writes nothing for one past `--`", () => {
+  const parent = mkdtempSync(join(tmpdir(), "branchling-init-sep-"));
+  const home = join(parent, "home");
+  const elsewhere = join(parent, "elsewhere");
+  try {
+    // POSITIVE CONTROL: `--dir=` names the tree and init really writes it.
+    const ordinary = run(["init", "--dir=" + home, "--no-example", "--no-nudge"]);
+    assert.equal(ordinary.code, 0, ordinary.out + ordinary.err);
+    assert.ok(existsSync(join(home, "tasks")), "init did not write the named backlog");
+
+    const r = run(["init", "--", "--dir", elsewhere]);
+    assert.equal(r.code, 2, "a literal --dir was accepted as init's flag");
+    assert.equal(existsSync(elsewhere), false, "the literal --dir moved init's write");
+  } finally {
+    rmSync(parent, { recursive: true, force: true });
+  }
+});
+
+test("build shares the --dir spelling and writes nothing for one past `--`", () => {
+  const home = sandbox();
+  const elsewhere = sandbox();
+  const homeIndex = join(home, "INDEX.yaml");
+  const elsewhereIndex = join(elsewhere, "INDEX.yaml");
+  try {
+    writeFileSync(homeIndex, "home sentinel\n", "utf8");
+    writeFileSync(elsewhereIndex, "elsewhere sentinel\n", "utf8");
+
+    const refused = run(["build", "--dir=" + home, "--", "--dir", elsewhere]);
+    assert.equal(refused.code, 2, "a literal --dir was accepted as build's flag");
+    assert.equal(readFileSync(homeIndex, "utf8"), "home sentinel\n",
+      "a refused build still wrote the selected tree");
+    assert.equal(readFileSync(elsewhereIndex, "utf8"), "elsewhere sentinel\n",
+      "the literal --dir moved build's write");
+
+    // POSITIVE CONTROL: the same fixture is buildable through the shared
+    // equals spelling, so unchanged sentinels above prove a refusal, not a
+    // command that cannot write either fixture.
+    const ordinary = run(["build", "--dir=" + home]);
+    assert.equal(ordinary.code, 0, ordinary.out + ordinary.err);
+    assert.notEqual(readFileSync(homeIndex, "utf8"), "home sentinel\n");
+    assert.equal(readFileSync(elsewhereIndex, "utf8"), "elsewhere sentinel\n");
   } finally {
     rmSync(home, { recursive: true, force: true });
     rmSync(elsewhere, { recursive: true, force: true });

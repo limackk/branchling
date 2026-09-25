@@ -49,7 +49,7 @@ import { findTaskFile } from "./done-task.mjs";
 import { historyPath, readHistory } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { explain, modifiedFiles, repoRoot, touches } from "./modified-files.mjs";
-import { backlogPaths, resolveBacklogDirOrExit } from "./paths.mjs";
+import { backlogPaths, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import {
   FIELD_COMMENT, FIELD_DECISION, REASON_SENTINELS,
@@ -320,20 +320,23 @@ export function renderAreaLog(model) {
 // The command
 // ──────────────────────────────────────────────────────────────────────────
 
-const KNOWN_WITH_VALUE = ["--dir", "--limit", "--modified-file"];
+const KNOWN_WITH_VALUE = ["--limit", "--modified-file"];
 const KNOWN_BARE = ["--json", "--decisions"];
 
 export function parseLogArgs(argv) {
-  const rest = [...argv];
+  const taken = takeDirFlag(argv, { missing: "--dir needs a value" });
+  const rest = taken.argv;
   let id = null;
-  let dir = null;
+  let dir = taken.dir;
   let limit = null;
   let json = false;
   let decisions = false;
   let modifiedFile = null;
+  let literal = false;
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
-    if (!a.startsWith("--")) {
+    if (!literal && a === "--") { literal = true; continue; }
+    if (literal || !a.startsWith("--")) {
       if (id) throw new Error("more than one task id: " + id + " and " + a);
       id = a;
       continue;
@@ -343,8 +346,7 @@ export function parseLogArgs(argv) {
     if (KNOWN_WITH_VALUE.indexOf(a) !== -1) {
       const value = rest[++i];
       if (value === undefined) throw new Error(a + " needs a value");
-      if (a === "--dir") dir = value;
-      else if (a === "--modified-file") modifiedFile = value;
+      if (a === "--modified-file") modifiedFile = value;
       else {
         limit = Number(value);
         if (!Number.isInteger(limit) || limit < 1) {
