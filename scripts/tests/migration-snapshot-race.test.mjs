@@ -53,11 +53,9 @@
  *      section released BEFORE the migration starts, must be green — otherwise
  *      a red race would not distinguish "they collided" from "the assertion was
  *      unsatisfiable".
- *   2. The section NAME is duplicated between `history.mjs` (privately) and
- *      `snapshot-mutex.mjs`, and a drift between them would switch exclusion
- *      off while every test above stayed green, because they would all be using
- *      the same, wrong name. The LAST test holds the section computed here and
- *      measures that a real `history --file` run is blocked by it.
+ *   2. The LAST test holds the shared snapshot section and measures that a real
+ *      `history --file` run is blocked by it. That proves the ordinary writer
+ *      actually enters the section exported for the migrations.
  *
  * NOTHING HERE ASSERTS ANOTHER PROJECT'S VALUES. The fixture is built by
  * `init`, the old prefix is read back from its own `config.yaml`, and the new
@@ -321,10 +319,9 @@ test("POSITIVE CONTROL: the section the migrations hold is the one an ordinary w
   const file = taskFileFor(f.backlog, f.ids[0]);
   writeFileSync(file, readFileSync(file, "utf8").replace(/^estimate: .*$/m, "estimate: 4h"), "utf8");
 
-  // The child must compute its section from `history.mjs`; this process computes
-  // its own from `snapshot-mutex.mjs`. If the two names ever drift apart, the
-  // child sails through and every other test in this file stays green while
-  // exclusion is off.
+  // This process takes the section through the shared wrapper. The child enters
+  // through the ordinary history command, so waiting proves that production
+  // writers use the same wrapper as the migrations.
   const previous = process.env.BACKLOG_STATE_DIR;
   process.env.BACKLOG_STATE_DIR = f.state;
   let child = null;
@@ -354,7 +351,6 @@ test("POSITIVE CONTROL: the section the migrations hold is the one an ordinary w
   // way it comes back short is exclusion that is not there.
   assert.ok(elapsed >= 1200,
     "a writer started while this process held the snapshot section returned after " + elapsed +
-    "ms, so it was not excluded. The name computed by scripts/snapshot-mutex.mjs and the one\n" +
-    "computed privately inside scripts/history.mjs no longer name the same section — which\n" +
-    "means the migrations now hold a section nobody else respects.");
+    "ms, so it was not excluded. The ordinary history writer did not enter the shared\n" +
+    "snapshot section that migrations hold.");
 });
