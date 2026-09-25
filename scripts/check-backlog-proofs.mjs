@@ -248,13 +248,15 @@ async function main(argv) {
   // the first signal and left the contract it had in flight — a whole `node
   // --test` run spawning into temporary trees — with no parent to stop it, so
   // stopping the command took three kills and the tree went on growing between
-  // them. The handler records the signal and the loop stops at the next
-  // boundary; the command already running is allowed to FINISH, because
-  // `runContract` is synchronous and a process that has no way to interrupt its
-  // child has no way to clean up after killing itself either. Finishing is what
-  // buys the guarantee: when this returns, nothing of its own is left running.
+  // them. The handler aborts the asynchronous contract runner, whose child is
+  // the leader of a process group; stopping that group reaches the shell, the
+  // command and its descendants before this audit returns.
   let stopped = null;
-  const onSignal = (sig) => { stopped = sig; };
+  const cancellation = new AbortController();
+  const onSignal = (sig) => {
+    stopped = sig;
+    cancellation.abort();
+  };
   process.on("SIGINT", onSignal);
   process.on("SIGTERM", onSignal);
 
@@ -278,12 +280,9 @@ async function main(argv) {
   let walked = 0;
   let commandsLeft = commandsTotal;
   for (const c of selected) {
-    // A TURN OF THE EVENT LOOP IS WHAT MAKES THE SIGNAL ARRIVE. `runContract` is
-    // synchronous, so a handler registered above cannot run while a contract is
-    // in flight and a wholly synchronous walk would deliver every queued signal
-    // only after the last one had finished — that is, exactly as if there were
-    // no handler at all. Yielding here is what turns "stops eventually" into
-    // "stops at the next boundary".
+    // Keep a boundary between tasks as well as the abortable boundary inside
+    // each command. A signal arriving after one contract closes must not start
+    // the next contract before its handler runs.
     await new Promise((resolve) => setImmediate(resolve));
     if (stopped) break;
     walked++;
@@ -293,13 +292,15 @@ async function main(argv) {
           `${commandsLeft} command(s) left`
       );
     }
-    const { results, failed } = runContract(c.entries, repoRoot, {
+    const { results, failed, interrupted } = await runContract(c.entries, repoRoot, {
       capture: true,
+      signal: cancellation.signal,
       // Named BEFORE it runs, not after: the line an operator needs while the
       // command hangs is the one that says which command is hanging.
       before: progress ? (e) => progress(`      ${MARK.arrow} ${e.bash}`) : undefined,
       after: progress ? (e, r) => progress(`      ${MARK.ok} ${(r.ms / 1000).toFixed(1)}s`) : undefined,
     });
+    if (interrupted) break;
     commandsLeft -= c.entries.length;
     for (const r of results) {
       if (r.kind === "manual") vouched.push({ id: c.id, entry: r.id || r.command });
@@ -320,10 +321,12 @@ async function main(argv) {
     if (progress) {
       progress(`  [${openWalked}/${openSelected.length}] ${c.id} (${c.status}): ${c.entries.length} entr(ies)`);
     }
-    const { results } = runContract(c.entries, repoRoot, {
+    const { results, interrupted } = await runContract(c.entries, repoRoot, {
       capture: true,
+      signal: cancellation.signal,
       before: progress ? (e) => progress(`      ${MARK.arrow} ${e.bash}`) : undefined,
     });
+    if (interrupted) break;
     if (greenFromBirth(results)) unfalsifiable.push({ ...c, results });
   }
 
@@ -335,7 +338,7 @@ async function main(argv) {
     console.error(
       `${WARNM} proofs: stopped by ${stopped} after ${walked} of ${selected.length} proven closing(s) ` +
         `and ${openWalked} of ${openSelected.length} open contract(s) ` +
-        "— the command in flight was allowed to finish, so nothing was left running"
+        "— the command in flight and its process tree were stopped"
     );
   }
 

@@ -20,7 +20,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -79,6 +79,19 @@ function withBacklog(n, fn, command) {
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+}
+
+function alive(pid) {
+  try { process.kill(pid, 0); return true; } catch { return false; }
+}
+
+async function waitFor(predicate, message, timeout = 4000) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    if (predicate()) return;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  assert.fail(message);
 }
 
 // ── The cost, before the first command ────────────────────────────────────
@@ -149,9 +162,63 @@ test("a single signal stops the walk, and it says where it stopped", async () =>
 
     assert.equal(code, 130, "an interrupted run did not say so in its exit code: " + err);
     assert.match(err, /stopped by SIGTERM after 1 of 2 proven closing\(s\)/, err);
-    assert.match(err, /nothing was left running/, err);
+    assert.match(err, /process tree were stopped/, err);
     assert.doesNotMatch(err, /\[2\/2\]/, "the walk carried on past the signal: " + err);
   } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("one SIGINT stops the contract child and its grandchild", {
+  skip: process.platform === "win32" ? "POSIX process-group contract" : false,
+}, async () => {
+  const dir = backlog(1, "node spawn-tree.mjs");
+  const childPidFile = join(dir, "child.pid");
+  const grandchildPidFile = join(dir, "grandchild.pid");
+  writeFileSync(join(dir, "spawn-tree.mjs"), [
+    'import { spawn } from "node:child_process";',
+    'import { writeFileSync } from "node:fs";',
+    'writeFileSync("child.pid", String(process.pid));',
+    'const grandchild = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });',
+    'writeFileSync("grandchild.pid", String(grandchild.pid));',
+    'setInterval(() => {}, 1000);',
+    "",
+  ].join("\n"), "utf8");
+
+  const audit = spawn(process.execPath,
+    [join(HERE, "..", "check-backlog-proofs.mjs"), "--dir", dir],
+    { env: { ...process.env, NO_COLOR: "1" }, stdio: ["ignore", "ignore", "pipe"] });
+  let err = "";
+  audit.stderr.on("data", (chunk) => { err += String(chunk); });
+  let childPid = null;
+  let grandchildPid = null;
+  try {
+    await waitFor(() => {
+      try {
+        childPid = Number(readFileSync(childPidFile, "utf8"));
+        grandchildPid = Number(readFileSync(grandchildPidFile, "utf8"));
+        return childPid > 0 && grandchildPid > 0;
+      } catch { return false; }
+    }, "the fixture never started its process tree");
+
+    // Positive control: both descendants exist before the signal. Without it,
+    // a test whose fixture never spawned anything would pass vacuously.
+    assert.equal(alive(childPid), true, "the contract child was not live before SIGINT");
+    assert.equal(alive(grandchildPid), true, "the contract grandchild was not live before SIGINT");
+
+    audit.kill("SIGINT");
+    const code = await Promise.race([
+      new Promise((resolve) => audit.once("close", resolve)),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("the audit survived SIGINT")), 4000)),
+    ]);
+    assert.equal(code, 130, err);
+    await waitFor(() => !alive(childPid) && !alive(grandchildPid),
+      "a contract descendant survived the interrupted audit");
+  } finally {
+    if (audit.exitCode === null && audit.signalCode === null) audit.kill("SIGKILL");
+    for (const pid of [childPid, grandchildPid]) {
+      if (pid && alive(pid)) try { process.kill(pid, "SIGKILL"); } catch { /* already exited */ }
+    }
     rmSync(dir, { recursive: true, force: true });
   }
 });

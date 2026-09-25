@@ -31,7 +31,7 @@
  * Tests: `node --test scripts/tests/verification-gate.test.mjs`
  */
 
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { closeSync, existsSync, mkdtempSync, openSync, readFileSync, readSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -354,6 +354,112 @@ function runBash(command, cwd, capture, observeCoverage = false) {
   };
 }
 
+/** Stop the shell and every descendant that inherited its process group. */
+function stopProcessTree(child, signal = "SIGTERM") {
+  if (!child || !child.pid) return;
+  if (process.platform === "win32") {
+    // Windows has no negative-pid process groups. `taskkill /T` is the native
+    // tree operation; the direct signal remains the fallback when it is not
+    // available (for example in a restricted test environment).
+    const args = ["/pid", String(child.pid), "/t"];
+    if (signal === "SIGKILL") args.push("/f");
+    const killed = spawnSync("taskkill", args, { stdio: "ignore" });
+    if (killed.status !== 0) {
+      try { child.kill(signal); } catch { /* it exited between the two calls */ }
+    }
+    return;
+  }
+  try {
+    process.kill(-child.pid, signal);
+  } catch {
+    try { child.kill(signal); } catch { /* the group already exited */ }
+  }
+}
+
+/**
+ * Run one shell command without blocking Node's signal handlers.
+ *
+ * On POSIX the shell leads a fresh process group, so an abort reaches the
+ * command, its child and every grandchild with one signal. The forced follow-up
+ * is deliberate: a descendant that catches SIGTERM must not outlive the audit
+ * whose operator just stopped it.
+ */
+function runBashAsync(command, cwd, capture, observeCoverage = false, signal = null) {
+  return new Promise((resolve) => {
+    const started = Date.now();
+    const env = { ...process.env };
+    delete env.NODE_TEST_CONTEXT;
+    const coverageDir = observeCoverage ? mkdtempSync(join(tmpdir(), "contract-coverage-")) : null;
+    if (coverageDir) env.NODE_V8_COVERAGE = coverageDir;
+
+    let stdout = "";
+    let stderr = "";
+    let bytes = 0;
+    let overflow = false;
+    let interrupted = Boolean(signal && signal.aborted);
+    let settled = false;
+    let forceTimer = null;
+    let child = null;
+
+    const finish = (status, error = null) => {
+      if (settled) return;
+      settled = true;
+      if (forceTimer) clearTimeout(forceTimer);
+      if (signal) signal.removeEventListener("abort", abort);
+      // The shell can exit before a stubborn descendant. A final group kill
+      // closes that race before the caller is told the process tree is gone.
+      if (interrupted && child) stopProcessTree(child, "SIGKILL");
+      const executedFiles = coverageDir ? [...readCoverageFiles(coverageDir, cwd)].sort() : [];
+      if (coverageDir) rmSync(coverageDir, { recursive: true, force: true });
+      resolve({
+        ok: !interrupted && !overflow && !error && status === 0,
+        exitCode: status == null ? 1 : status,
+        ms: Date.now() - started,
+        output: capture ? stdout + stderr : null,
+        coverageObserved: Boolean(coverageDir),
+        executedFiles,
+        interrupted,
+      });
+    };
+
+    const abort = () => {
+      interrupted = true;
+      if (!child) return;
+      stopProcessTree(child, "SIGTERM");
+      forceTimer = setTimeout(() => stopProcessTree(child, "SIGKILL"), 500);
+      forceTimer.unref();
+    };
+
+    if (interrupted) return finish(null);
+    child = spawn(command, {
+      shell: true,
+      cwd,
+      env,
+      detached: process.platform !== "win32",
+      stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit",
+    });
+    if (capture) {
+      const collect = (key, chunk) => {
+        const text = String(chunk);
+        bytes += Buffer.byteLength(text);
+        if (key === "stdout") stdout += text;
+        else stderr += text;
+        if (bytes > 64 * 1024 * 1024 && !overflow) {
+          overflow = true;
+          stopProcessTree(child, "SIGKILL");
+        }
+      };
+      child.stdout.on("data", (chunk) => collect("stdout", chunk));
+      child.stderr.on("data", (chunk) => collect("stderr", chunk));
+    }
+    child.once("error", (error) => finish(null, error));
+    child.once("close", (status) => finish(status));
+    if (signal) signal.addEventListener("abort", abort, { once: true });
+    // The signal can arrive between the first check and listener registration.
+    if (signal && signal.aborted) abort();
+  });
+}
+
 /**
  * RUN A CONTRACT. One implementation, shared by the command that closes a task
  * and by the guard that re-runs a closed one (TL-147).
@@ -375,10 +481,10 @@ function runBash(command, cwd, capture, observeCoverage = false) {
  *
  * @param {Array<object>} entries parsed `verification:` entries
  * @param {string} cwd where the commands run — the repository root
- * @param {{capture?: boolean, manual?: function, before?: function, after?: function}} opts
- * @returns {{results: Array<object>, failed: object|null}}
+ * @param {{capture?: boolean, manual?: function, before?: function, after?: function, signal?: AbortSignal}} opts
+ * @returns {Promise<{results: Array<object>, failed: object|null, interrupted: boolean}>}
  */
-export function runContract(entries, cwd, opts = {}) {
+export async function runContract(entries, cwd, opts = {}) {
   const results = [];
   for (let i = 0; i < entries.length; i++) {
     const e = entries[i];
@@ -392,8 +498,8 @@ export function runContract(entries, cwd, opts = {}) {
       continue;
     }
     if (opts.before) opts.before(e, i);
-    const r = runBash(e.bash, cwd, opts.capture,
-      Boolean(opts.observeCoverage && nodeTestFiles(e).length));
+    const r = await runBashAsync(e.bash, cwd, opts.capture,
+      Boolean(opts.observeCoverage && nodeTestFiles(e).length), opts.signal || null);
     const row = { id: e.id, kind: "bash", command: e.bash, ok: r.ok, exitCode: r.exitCode, ms: r.ms };
     // Coverage is private runner evidence. It feeds the compact capability
     // reading below rather than inflating `done --json` with every loaded file.
@@ -402,10 +508,11 @@ export function runContract(entries, cwd, opts = {}) {
       row.executedFiles = r.executedFiles;
     }
     results.push(row);
+    if (r.interrupted) return { results, failed: null, interrupted: true };
     if (!r.ok) return { results, failed: { entry: e, kind: "bash", ...r } };
     if (opts.after) opts.after(e, r);
   }
-  return { results, failed: null };
+  return { results, failed: null, interrupted: false };
 }
 
 /**
@@ -555,7 +662,7 @@ function refuse(plan, headline, details, results, reason) {
   return 1;
 }
 
-function run(argv) {
+async function run(argv) {
   let plan;
   try {
     plan = parseDoneArgs(argv);
@@ -728,7 +835,7 @@ function run(argv) {
   const capture = plan.json || !plan.verbose;
   const tagOf = (e, i) => "  " + (i + 1) + "/" + entries.length + "  " + (e.id ? e.id + "  " : "");
   let stop = null;
-  const { results, failed } = runContract(entries, cwd, {
+  const { results, failed } = await runContract(entries, cwd, {
     capture,
     observeCoverage: true,
     before: (e, i) => log(plan.json, tagOf(e, i) + "bash: " + e.bash),
@@ -1037,7 +1144,7 @@ function finishFailed(plan, results, code) {
 }
 
 if (process.argv[1] && process.argv[1].endsWith("done-task.mjs")) {
-  process.exitCode = run(process.argv.slice(2));
+  run(process.argv.slice(2)).then((code) => { process.exitCode = code; });
 }
 
 export { run };

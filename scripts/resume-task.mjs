@@ -344,11 +344,11 @@ export function decisionsOf(entries) {
  * Run the closing contract NOW. Nothing is recorded: this is a reading of the
  * tree, not a closing, and `done` remains the only thing that writes a verdict.
  */
-export function runVerification(frontmatter, cwd) {
+export async function runVerification(frontmatter, cwd) {
   const { entries, problems } = parseVerification(frontmatter);
   const problem = contractProblem(entries, problems);
   if (problem) return { entries: [], problem, failed: null };
-  const { results, failed } = runContract(entries, cwd, { capture: true });
+  const { results, failed } = await runContract(entries, cwd, { capture: true });
   // The entries the stop-at-first-failure never reached. Named, because a
   // contract of four whose second entry broke has told the reader nothing about
   // the other two, and a briefing that listed only what ran would look complete.
@@ -549,7 +549,7 @@ function refuse(plan, headline, details, kind) {
   return 1;
 }
 
-export function run(argv) {
+export async function run(argv) {
   let plan;
   try {
     plan = parseResumeArgs(argv);
@@ -613,7 +613,7 @@ export function run(argv) {
   };
 
   if (plan.verify) {
-    const contract = runVerification(frontmatter, cwd);
+    const contract = await runVerification(frontmatter, cwd);
     model.verification = contract.entries;
     model.contractProblem = contract.problem;
     model.failedOutput = contract.failed && contract.failed.output ? contract.failed.output : null;
@@ -649,5 +649,5 @@ export function run(argv) {
 }
 
 if (process.argv[1] && process.argv[1].endsWith("resume-task.mjs")) {
-  process.exitCode = run(process.argv.slice(2));
+  run(process.argv.slice(2)).then((code) => { process.exitCode = code; });
 }
