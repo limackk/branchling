@@ -48,12 +48,14 @@ import { loadConfigOrExit } from "./config.mjs";
 import { findTaskFile } from "./done-task.mjs";
 import { historyPath, readHistory } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
+import { explain, modifiedFiles, repoRoot, touches } from "./modified-files.mjs";
 import { backlogPaths, resolveBacklogDirOrExit } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import {
   FIELD_COMMENT, FIELD_DECISION, REASON_SENTINELS,
   extractMeta, historyEntryKind, isPseudoField, isQuestion, openQuestions, splitFrontmatter,
 } from "./task-fields.mjs";
+import { readTaskRecords } from "./task-select.mjs";
 import { MARK, color, failure, heading, table } from "./ui.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -197,7 +199,7 @@ function describeChange(c) {
  * the screen twice — the defect this command exists to remove. A question or a
  * decision stays, because it has an id somebody has to be able to name.
  */
-function headline(x) {
+function exchangeActions(x) {
   let moved = x.changes.map(describeChange)
     .concat(x.events)
     .concat(x.messages.filter((m) => m.text || m.kind !== "comment" || (m.files || []).length).map((m) => m.kind));
@@ -205,13 +207,29 @@ function headline(x) {
   // message and nothing else, and a row saying `—` above a paragraph would be
   // hiding the one thing that happened.
   if (!moved.length) moved = x.messages.map((m) => m.kind);
+  return moved.join("  " + MARK.bullet + " ") || "—";
+}
+
+function headline(x) {
   return [
     "  ",
     color.dim(whenever(x.ts)),
     color.id(x.actor),
     x.source || "",
-    moved.join("  " + MARK.bullet + " ") || "—",
+    exchangeActions(x),
   ];
+}
+
+function renderExchangeDetails(out, x) {
+  if (x.reason && !x.reserved) {
+    for (const line of x.reason.split("\n")) out.push("      " + line);
+  }
+  for (const m of x.messages) {
+    if (!m.text && m.kind === "comment" && !(m.files || []).length) continue;
+    out.push("      " + color.dim("[" + m.kind + " " + m.id + "]"));
+    for (const line of (m.text || "").split("\n")) if (line) out.push("      " + line);
+    for (const file of m.files || []) out.push("      may change: " + color.id(file));
+  }
 }
 
 export function renderLog(model) {
@@ -251,17 +269,7 @@ export function renderLog(model) {
     // THE REASON, ONCE. It is the sentence the whole command exists to hand
     // back, so it is on its own line under the row that names what moved, and
     // it is printed once however many fields carried it.
-    if (x.reason && !x.reserved) {
-      for (const line of x.reason.split("\n")) out.push("      " + line);
-    }
-    for (const m of x.messages) {
-      // A comment that only repeats the reason has already been printed; its id
-      // is in `--json` for whoever needs to point at it.
-      if (!m.text && m.kind === "comment" && !(m.files || []).length) continue;
-      out.push("      " + color.dim("[" + m.kind + " " + m.id + "]"));
-      for (const line of (m.text || "").split("\n")) if (line) out.push("      " + line);
-      for (const file of m.files || []) out.push("      may change: " + color.id(file));
-    }
+    renderExchangeDetails(out, x);
   });
   if (model.limit && matched > model.exchanges.length) {
     out.push("");
@@ -271,11 +279,48 @@ export function renderLog(model) {
   return out.join("\n");
 }
 
+/** Decisions carried by every task whose commits touched one file or directory. */
+export function renderAreaLog(model) {
+  const out = [heading("decisions for " + model.modifiedFile.path)];
+  const whyEmpty = explain(model.modifiedFile.reason);
+  if (whyEmpty) {
+    out.push("  " + whyEmpty + ".");
+    return out.join("\n");
+  }
+  out.push("  " + color.dim(
+    model.tasks.length + " task(s) touched this area; " + model.matched +
+    " decision or open question exchange(s) found" +
+    (model.limit && model.matched > model.exchanges.length
+      ? ", the newest " + model.exchanges.length + " shown"
+      : "")
+  ));
+  if (!model.exchanges.length) {
+    out.push("");
+    out.push("  No decision or open question is recorded for a task that touched this area.");
+    return out.join("\n");
+  }
+  out.push("");
+  const rows = table(model.exchanges.map((x) => [
+    "  ", color.dim(whenever(x.ts)), color.id(x.task.id), color.id(x.actor),
+    x.source || "", exchangeActions(x),
+  ])).split("\n");
+  model.exchanges.forEach((x, i) => {
+    out.push(rows[i]);
+    renderExchangeDetails(out, x);
+  });
+  if (model.limit && model.matched > model.exchanges.length) {
+    out.push("");
+    out.push("  " + color.dim("earlier exchanges: " + (model.matched - model.exchanges.length) +
+      " — drop `--limit` to read them"));
+  }
+  return out.join("\n");
+}
+
 // ──────────────────────────────────────────────────────────────────────────
 // The command
 // ──────────────────────────────────────────────────────────────────────────
 
-const KNOWN_WITH_VALUE = ["--dir", "--limit"];
+const KNOWN_WITH_VALUE = ["--dir", "--limit", "--modified-file"];
 const KNOWN_BARE = ["--json", "--decisions"];
 
 export function parseLogArgs(argv) {
@@ -285,6 +330,7 @@ export function parseLogArgs(argv) {
   let limit = null;
   let json = false;
   let decisions = false;
+  let modifiedFile = null;
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
     if (!a.startsWith("--")) {
@@ -298,6 +344,7 @@ export function parseLogArgs(argv) {
       const value = rest[++i];
       if (value === undefined) throw new Error(a + " needs a value");
       if (a === "--dir") dir = value;
+      else if (a === "--modified-file") modifiedFile = value;
       else {
         limit = Number(value);
         if (!Number.isInteger(limit) || limit < 1) {
@@ -307,10 +354,45 @@ export function parseLogArgs(argv) {
       continue;
     }
     throw new Error("unknown flag: " + a +
-      "\navailable: --limit <n> --decisions --json --dir <path>");
+      "\navailable: --limit <n> --decisions --modified-file <path> --json --dir <path>");
   }
-  if (!id) throw new Error("no task id\nusage: " + N + " log <ID> [--limit <n>] [--decisions] [--json]");
-  return { id, dir, limit, json, decisions };
+  if (id && modifiedFile) throw new Error("a task id and `--modified-file` select two different scopes");
+  if (!id && !modifiedFile) throw new Error("no task id or modified file\nusage: " + N + " log <ID> [--limit <n>] [--decisions] [--json]");
+  if (modifiedFile !== null && !modifiedFile) throw new Error("`--modified-file` needs a non-empty path");
+  if (modifiedFile && !decisions) {
+    throw new Error("`--modified-file` reads decisions by area and requires `--decisions`");
+  }
+  return { id, dir, limit, json, decisions, modifiedFile };
+}
+
+function areaLog(root, config, plan) {
+  const paths = backlogPaths(root);
+  const index = modifiedFiles({ root: repoRoot(root), prefix: config.taskIdPrefix });
+  const tasks = readTaskRecords(paths.tasksDir, config.taskId.file)
+    .filter((task) => touches(index.byTask.get(task.id) || new Set(), plan.modifiedFile))
+    .map((task) => ({ id: task.id, title: task.title || null, file: task.file || null }));
+  const exchanges = [];
+  let records = 0;
+  let total = 0;
+  for (const task of tasks) {
+    const entries = readHistory(root, task.id);
+    const all = foldExchanges(entries);
+    const kept = onlyDecisions(all, entries);
+    records += entries.length;
+    total += all.length;
+    for (const exchange of kept) exchanges.push({ ...exchange, task });
+  }
+  exchanges.sort((a, b) => String(a.ts).localeCompare(String(b.ts)) ||
+    String(a.task.id).localeCompare(String(b.task.id)));
+  const matched = exchanges.length;
+  const shown = plan.limit ? exchanges.slice(Math.max(0, exchanges.length - plan.limit)) : exchanges;
+  return {
+    ok: true,
+    id: null, title: null, file: null, path: null,
+    records, total, matched, decisions: true, limit: plan.limit,
+    exchanges: shown, tasks,
+    modifiedFile: { path: plan.modifiedFile, scanned: index.scanned, reason: index.reason },
+  };
 }
 
 export function run(argv) {
@@ -326,6 +408,13 @@ export function run(argv) {
   const root = resolveBacklogDirOrExit({ dir: plan.dir || undefined, moduleDir: __dirname }, COMMAND).root;
   const config = loadConfigOrExit(root);
   const paths = backlogPaths(root);
+
+  if (plan.modifiedFile) {
+    const model = areaLog(root, config, plan);
+    if (plan.json) printJson("task-log", model);
+    else console.log(renderAreaLog(model));
+    return 0;
+  }
 
   const file = findTaskFile(paths.tasksDir, config, plan.id);
   const logFile = historyPath(root, String(plan.id).toUpperCase());

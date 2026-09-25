@@ -336,6 +336,7 @@ the fields that moved beside it and the reason printed once:
 ```
 branchling log TASK-1
 branchling log TASK-1 --limit 3 --json
+branchling log --modified-file scripts/cli.mjs --decisions
 ```
 
 The log itself stores one entry per field, so a single handoff keeps the same
@@ -343,6 +344,12 @@ paragraph on `status`, on `owner`, on `role` and on the comment it leaves
 behind. That is right for something append-only and expensive to read: `cat`-ing
 the file makes you pay for one sentence four times over. Nothing is rewritten —
 this is a read.
+
+During a later review, the same reader can ask for decisions by area rather
+than guessing which task carried them. `--modified-file` computes the tasks
+from commit messages and returns their decisions; a trailing `/` selects a
+directory. It does not run a review or judge whether an earlier rejection was
+right.
 
 ### Editing a task by hand
 

@@ -1,0 +1,2 @@
+{"id":"01M3D8P3997686VBMQ025E7X1E","ts":"2026-09-25T21:49:01.097Z","task":"TL-446","field":"__created__","from":"","to":"npx package help reaches the top-level command","actor":"agent:claude","source":"new","reason":"unknown"}
+{"id":"01M3D8RHWV1QXMMQ6EH8TGNCAV","ts":"2026-09-25T21:50:21.595Z","task":"TL-446","field":"__adopted__","from":"","to":["title","status","priority","type","owner","estimate","confidence","board","created"],"actor":"agent:codex-subagent","source":"manual","reason":"unknown"}

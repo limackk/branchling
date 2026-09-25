@@ -304,6 +304,7 @@ export const KINDS = {
   "task-log": {
     ok: null, id: null, title: null, file: null, path: null,
     records: null, total: null, matched: null, decisions: null, limit: null, exchanges: [],
+    modifiedFile: null, tasks: [],
     refusalKind: null, refusal: null, details: [],
   },
 };
