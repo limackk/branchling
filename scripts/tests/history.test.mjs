@@ -222,7 +222,7 @@ test("a task brought in by a merge or pull does NOT get a second `__created__` e
     from: "", to: "From a merge", actor: "local:founder", source: "viewer",
   }]);
 
-  const { entries } = reconcile(dir, { actor: "unknown", source: "boot" });
+  const { entries } = reconcile(dir, { actor: "unknown", source: "boot", allowBulkAdoption: true });
   // An `__adopted__` entry is written for the fields the merged log cannot
   // vouch for (TL-387); it is not a creation and claims no value, which is what
   // this test is about.

@@ -405,6 +405,7 @@ export function writeImport({ root, config, board, items, createOne = createTask
 }
 
 function recordCreations(root, written, opts) {
+  if (!written.length) return;
   const actor = resolveActor(opts.actor);
   const ts = new Date().toISOString();
   // ONE SHAPE FOR A CREATION, in `history.mjs` (TL-187): `new` writes this
@@ -412,7 +413,15 @@ function recordCreations(root, written, opts) {
   for (const w of written) {
     recordCreation(root, { id: w.id, title: w.title }, { actor, source: "import", reason: opts.reason, ts });
   }
-  reconcile(root, { actor, source: "import", reason: opts.reason || undefined });
+  // Import owns the tasks in `written`, not every task missing from this
+  // checkout's local snapshot. Keep the reconciliation scope identical to the
+  // write scope so an import cannot adopt unrelated append-only history.
+  reconcile(root, {
+    actor,
+    source: "import",
+    reason: opts.reason || undefined,
+    only: written.map((w) => w.id),
+  });
 }
 
 // ──────────────────────────────────────────────────────────────────────────

@@ -26,11 +26,11 @@ import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { resolveActor } from "./actor.mjs";
-import { ACTOR_NAMESPACES, FIELD_ADOPTED, FIELD_ATTRIBUTED, attributeChanges, historyEntryIdentity, isValidActor, readHistory, reasonRefusal, reconcile, taskIdFromFile, unattributedChanges } from "./history.mjs";
+import { ACTOR_NAMESPACES, BulkAdoptionError, FIELD_ADOPTED, FIELD_ATTRIBUTED, attributeChanges, historyEntryIdentity, isValidActor, readHistory, reasonRefusal, reconcile, taskIdFromFile, unattributedChanges } from "./history.mjs";
 import { resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { printLine } from "./stdout.mjs";
-import { refusal } from "./ui.mjs";
+import { failure, refusal } from "./ui.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -50,7 +50,7 @@ const arg = (name, fallback) => {
 // appended history entries in a real session. It is the same class of defect
 // BL-1411 fixed in the server: a silent no-op with a side effect is worse than an
 // error, because it looks like the tool working.
-const KNOWN_FLAGS = ["--file", "--actor", "--source", "--quiet", "--reason", "--attribute", "--event", "--all"];
+const KNOWN_FLAGS = ["--file", "--actor", "--source", "--quiet", "--reason", "--adopt", "--attribute", "--event", "--all"];
 const FLAGS_WITH_VALUE = ["--file", "--actor", "--source", "--reason", "--event"];
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
@@ -71,6 +71,7 @@ const file = arg("--file", "");
 const actor = resolveActor(arg("--actor", ""));
 const source = arg("--source", file ? "hook" : "cli");
 const quiet = argv.includes("--quiet");
+const allowBulkAdoption = argv.includes("--adopt");
 
 // WHY THE REASON IS OPTIONAL ON THIS ROUTE ALONE (TL-105). Reconciliation looks
 // at changes that have ALREADY happened in files somebody edited elsewhere;
@@ -189,7 +190,31 @@ if (attribute && all && !quiet) {
   printLine(`${N} history: --all will claim ${preflight.length} recorded change(s) with no author.`);
 }
 
-const { entries, seeded, adopted, seeds } = reconcile(BACKLOG_DIR, { actor, source, only, reason: reasonFlag || undefined });
+let reconciliation;
+try {
+  reconciliation = reconcile(BACKLOG_DIR, {
+    actor,
+    source,
+    only,
+    reason: reasonFlag || undefined,
+    allowBulkAdoption,
+  });
+} catch (e) {
+  if (!(e instanceof BulkAdoptionError)) throw e;
+  if (!quiet) {
+    console.error(failure(
+      N + " history",
+      e.message + "; nothing was written",
+      [
+        "The history logs and snapshot are unchanged.",
+        "Use `--file <task.md>` to name one task, or opt in to the whole batch.",
+      ],
+      [N + " history --adopt --actor " + actor]
+    ));
+  }
+  process.exit(1);
+}
+const { entries, seeded, adopted, seeds } = reconciliation;
 
 // WHAT RECONCILE COULD NOT SEE (TL-130). A change already written by somebody
 // else's reconcile — the running server's, typically — is no longer a DIFFERENCE

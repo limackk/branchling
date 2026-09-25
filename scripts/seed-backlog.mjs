@@ -675,6 +675,7 @@ function linkDependencies(plan, written, config) {
  * reconciliation runs afterwards only to move the snapshot forward.
  */
 function recordCreations(root, written, opts) {
+  if (!written.length) return;
   const actor = resolveActor(opts.actor);
   const ts = new Date().toISOString();
   // ONE SHAPE FOR A CREATION, in `history.mjs` (TL-187): `new` writes this
@@ -682,7 +683,15 @@ function recordCreations(root, written, opts) {
   for (const w of written) {
     recordCreation(root, { id: w.id, title: w.title }, { actor, source: "seed", reason: opts.reason, ts });
   }
-  reconcile(root, { actor, source: "seed", reason: opts.reason || undefined });
+  // This command names exactly the tasks it created. Reconcile only those:
+  // widening the pass to the whole tree could append permanent adoption rows
+  // for unrelated tasks merely because this checkout has a partial snapshot.
+  reconcile(root, {
+    actor,
+    source: "seed",
+    reason: opts.reason || undefined,
+    only: written.map((w) => w.id),
+  });
 }
 
 /** `--dry-run`: what would be created, with the numbers it would be created

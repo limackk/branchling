@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex-subagent
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-21
-updated: 2026-09-21
+updated: 2026-09-25
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
@@ -77,10 +77,10 @@ edit pays nothing.
 
 ## Acceptance criteria
 
-- [ ] A run that would write adoptions for tasks the caller did not name says so
+- [x] A run that would write adoptions for tasks the caller did not name says so
       before writing, and the rule is proven by a test that fails against
       today's code. [proof: bulk-adoption-is-asked-for]
-- [ ] An unrecorded field edit is still never reported as no change.
+- [x] An unrecorded field edit is still never reported as no change.
       [proof: suite-green]
 
 ## It happened, in the main checkout, uncommitted (2026-09-21)

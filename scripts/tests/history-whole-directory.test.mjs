@@ -146,7 +146,9 @@ test("a task absent from the snapshot has its change RECORDED, not absorbed", ()
 
   // The hand edit, exactly the shape of the nine `executor:` edits.
   writeTask(dir, "BL-900-one.md", { id: "BL-900", status: "blocked" });
-  const res = reconcile(dir, { actor: "agent:claude", source: "manual", reason: "parked it" });
+  const res = reconcile(dir, {
+    actor: "agent:claude", source: "manual", reason: "parked it", allowBulkAdoption: true,
+  });
 
   const written = readHistory(dir, "BL-900").filter((e) => e.field === "status");
   assert.equal(written.length, 2, "the edit reached the log");
@@ -168,7 +170,7 @@ test("a task absent from the snapshot whose log AGREES records nothing", () => {
   appendEntries(dir, "BL-900", [logEntry({ field: "status", from: "pending", to: "in_progress" })]);
   saveSnapshot(dir, { version: 1, tasks: {} });
 
-  const res = reconcile(dir, { actor: "agent:claude", source: "manual" });
+  const res = reconcile(dir, { actor: "agent:claude", source: "manual", allowBulkAdoption: true });
 
   assert.deepEqual(transitions(res.entries), [], "a pulled task is not re-recorded as somebody else's");
   assert.equal(
@@ -200,7 +202,7 @@ test("a field the log has never mentioned is reported as adopted", () => {
   // `estimate` has never been logged, so there is no earlier value to write as
   // `from`. Inventing one would put a fabricated change in an append-only log.
   writeTask(dir, "BL-900-one.md", { id: "BL-900", status: "in_progress", estimate: "9h" });
-  const res = reconcile(dir, { actor: "agent:claude", source: "manual" });
+  const res = reconcile(dir, { actor: "agent:claude", source: "manual", allowBulkAdoption: true });
 
   assert.deepEqual(transitions(res.entries), [], "nothing is fabricated");
   assert.deepEqual(res.adopted, ["BL-900"], "and nothing is absorbed in silence either");
@@ -262,7 +264,7 @@ test("one run reports what it recorded AND what it adopted", () => {
 
   const run = spawnSync(process.execPath, [
     join(SCRIPTS_DIR, "history-record.mjs"), "--dir", dir,
-    "--actor", "agent:claude", "--source", "manual", "--reason", "a batch of my own edits",
+    "--actor", "agent:claude", "--source", "manual", "--reason", "a batch of my own edits", "--adopt",
   ], { encoding: "utf8", env: process.env });
 
   assert.equal(run.status, 0, run.stderr);

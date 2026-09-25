@@ -256,3 +256,36 @@ test("a first run with no snapshot still adopts nothing", () => {
   assert.equal(res.entries.length, 0, "a seed invents no history, and an adoption is history");
   assert.equal(readHistory(dir, "BL-900").length, 0);
 });
+
+// ── 9. A whole-tree adoption is an explicit, atomic decision (TL-412) ─────
+
+test("a whole-tree run refuses unnamed adoptions before writing", () => {
+  const dir = sandbox();
+  arrivedByMerge(dir, { log: [logEntry({})], docs: ["docs/one.md"] });
+  const beforeLog = readFileSync(join(dir, "history", "BL-900.jsonl"), "utf8");
+  const beforeSnapshot = readFileSync(join(dir, "history", ".snapshot.json"), "utf8");
+
+  const refused = run(dir, ["--actor", "agent:codex", "--source", "manual"]);
+
+  assert.equal(refused.code, 1, refused.out);
+  assert.match(refused.out, /1 adoption entry for 1 unnamed task requires explicit opt-in/);
+  assert.match(refused.out, /nothing was written/);
+  assert.match(refused.out, /--adopt/);
+  assert.equal(readFileSync(join(dir, "history", "BL-900.jsonl"), "utf8"), beforeLog,
+    "the refusal precedes the permanent append");
+  assert.equal(readFileSync(join(dir, "history", ".snapshot.json"), "utf8"), beforeSnapshot,
+    "the refusal also leaves the computed reference point untouched");
+});
+
+test("an explicit whole-tree adoption still records what entered without a reference point", () => {
+  const dir = sandbox();
+  arrivedByMerge(dir, { log: [logEntry({})], docs: ["docs/one.md"] });
+
+  const accepted = run(dir, ["--actor", "agent:codex", "--source", "manual", "--adopt"]);
+
+  assert.equal(accepted.code, 0, accepted.out);
+  assert.match(accepted.out, /1 task\(s\) had no reference point/);
+  const adoption = readHistory(dir, "BL-900").find((e) => e.field === FIELD_ADOPTED);
+  assert.ok(adoption, "the positive control proves the refusal did not make adoption unreachable");
+  assert.ok(adoption.to.includes("related_docs"), "the accepted entry still names the absorbed field");
+});

@@ -42,6 +42,25 @@ export const HISTORY_DIRNAME = "history";
 export const SNAPSHOT_FILE = ".snapshot.json";
 export const MIGRATIONS_FILE = ".migrations.jsonl";
 
+/**
+ * A whole-tree pass found permanent adoption entries for tasks the caller did
+ * not name. The refusal is raised inside the snapshot mutex, after the complete
+ * diff is known and before either the logs or the snapshot move.
+ */
+export class BulkAdoptionError extends Error {
+  constructor(entries) {
+    const tasks = [...new Set(entries.map((e) => e.task))];
+    super(
+      entries.length + " adoption entr" + (entries.length === 1 ? "y" : "ies") +
+      " for " + tasks.length + " unnamed task" + (tasks.length === 1 ? "" : "s") +
+      " require" + (entries.length === 1 ? "s" : "") + " explicit opt-in"
+    );
+    this.name = "BulkAdoptionError";
+    this.entries = entries;
+    this.tasks = tasks;
+  }
+}
+
 // The pseudo-fields live in task-fields.mjs (which is pasted into the viewer by
 // source, so the browser and node see the same list). Here only a re-export, so
 // that existing imports from history.mjs keep working.
@@ -799,7 +818,7 @@ export function recordEdit(backlogDir, opts) {
  *
  * @param {string} backlogDir
  * @param {{actor?: string, source?: string, ts?: string, only?: string[], reason?: string,
- *          dryRun?: boolean}} opts
+ *          dryRun?: boolean, allowBulkAdoption?: boolean}} opts
  *        `only` narrows which ids may produce ENTRIES (the hook knows one file).
  *        It does NOT narrow the seed: a first run writes a reference point for
  *        the whole tree, or it leaves 193 tasks in a state where their edits are
@@ -1019,6 +1038,20 @@ function reconcileLocked(backlogDir, opts) {
   if (!only) delete snap.partial;
 
   if (opts.dryRun) return { entries, seeded: seeding, adopted, seeds, dryRun: true };
+
+  // AN APPEND-ONLY BULK WRITE NEEDS AN EXPLICIT YES (TL-412). A partial local
+  // snapshot can make an ordinary whole-tree pass propose hundreds of
+  // `__adopted__` rows for tasks brought in by a pull. None of those tasks was
+  // named by the caller, and a background server may be the caller. Refuse the
+  // ENTIRE run inside this mutex: checking with a dry run and writing later
+  // would leave a race between two different trees, while appending the ordinary
+  // transitions first would make the refusal a partial write. A scoped `only`
+  // run already names every task it may adopt; a whole-tree run must carry the
+  // separate, explicit opt-in.
+  const bulkAdoptions = entries.filter((e) => e.field === FIELD_ADOPTED);
+  if (!only && bulkAdoptions.length && !opts.allowBulkAdoption) {
+    throw new BulkAdoptionError(bulkAdoptions);
+  }
 
   // THE LOG FIRST, THE SNAPSHOT AFTER, and the order is the guarantee (TL-185):
   // a crash between the two loses the reference point, which the next run
