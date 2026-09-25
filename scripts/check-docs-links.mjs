@@ -321,7 +321,9 @@ export function main(argv) {
   const backlog = resolveBacklogDir({ dir: dir || undefined, moduleDir: __dirname }).root;
   loadConfigOrExit(backlog);
   const paths = backlogPaths(backlog);
-  const root = repositoryRoot(backlog);
+  // With no git repository, the named backlog is the whole known scope. Its
+  // parent may hold another session's files and is not ours to judge (TL-403).
+  const root = repositoryRoot(backlog, { fallback: backlog });
 
   const documents = documentsToCheck(root, paths.tasksDir).map((file) => ({
     file, text: readFileSync(file, "utf8"),

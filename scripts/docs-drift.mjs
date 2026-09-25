@@ -508,7 +508,9 @@ export function main(argv) {
   }
   const config = loadConfigOrExit(backlog);
   const paths = backlogPaths(backlog);
-  const root = repositoryRoot(backlog);
+  // This command reads the same document set as `check --docs`; outside git,
+  // neither may infer that the backlog's parent belongs to the project.
+  const root = repositoryRoot(backlog, { fallback: backlog });
   const tasks = readTaskRecords(paths.tasksDir, config.taskId.file);
 
   let docs;

@@ -24,7 +24,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -103,4 +103,38 @@ test("a fixture's doctor is unaffected by this repository's own source", () => {
   const r = run(["doctor", "--dir", fixture()]);
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /backlog guards/);
+});
+
+test("a non-git co-located backlog reads no markdown from its parent", () => {
+  const parent = mkdtempSync(join(tmpdir(), "branchling-docs-boundary-"));
+  const backlog = join(parent, "project");
+  mkdirSync(backlog);
+  assert.equal(run(["init", "--dir", backlog, "--no-example"]).status, 0);
+
+  writeFileSync(join(parent, "stray.md"), "[outside](missing-outside.md)\n", "utf8");
+  const isolated = run(["check", "--docs", "--dir", backlog]);
+  assert.equal(isolated.status, 0, isolated.stdout + isolated.stderr);
+  assert.doesNotMatch(isolated.stdout, /stray\.md|missing-outside\.md/);
+
+  // POSITIVE CONTROL: the same broken link inside the named backlog must fail.
+  // Otherwise isolation could be implemented by reading no documents at all.
+  writeFileSync(join(backlog, "OWN.md"), "[inside](missing-inside.md)\n", "utf8");
+  const own = run(["check", "--docs", "--dir", backlog]);
+  assert.equal(own.status, 1, own.stdout + own.stderr);
+  assert.match(own.stdout, /OWN\.md:1/);
+  assert.match(own.stdout, /missing-inside\.md/);
+  assert.doesNotMatch(own.stdout, /stray\.md|missing-outside\.md/);
+});
+
+test("a non-colocated backlog still reads documents from its git repository root", () => {
+  const repository = mkdtempSync(join(tmpdir(), "branchling-docs-repository-"));
+  const backlog = join(repository, "backlog");
+  assert.equal(spawnSync("git", ["init", "-q"], { cwd: repository }).status, 0);
+  assert.equal(run(["init", "--dir", backlog, "--no-example"]).status, 0);
+  writeFileSync(join(repository, "BROKEN.md"), "[root](missing-at-root.md)\n", "utf8");
+
+  const result = run(["check", "--docs", "--dir", backlog]);
+  assert.equal(result.status, 1, result.stdout + result.stderr);
+  assert.match(result.stdout, /BROKEN\.md:1/);
+  assert.match(result.stdout, /missing-at-root\.md/);
 });

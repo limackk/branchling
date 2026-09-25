@@ -306,9 +306,12 @@ test("it reads top-level markdown, docs/ and the task files — and not node_mod
   assert.equal(check(fx).status, 0, "a link in node_modules failed the run");
 });
 
-test("the document root is the repository, and the backlog's parent without git", () => {
+test("the document root is the repository, with an explicit safe fallback without git", () => {
   assert.equal(repositoryRoot("/r/backlog", { run: () => ({ status: 0, stdout: "/r\n" }) }), "/r");
   assert.equal(repositoryRoot("/r/backlog", { run: () => ({ status: 128, stdout: "" }) }), "/r");
+  assert.equal(repositoryRoot("/r/backlog", {
+    run: () => ({ status: 128, stdout: "" }), fallback: "/r/backlog",
+  }), "/r/backlog");
 });
 
 // ── the whole repository ──────────────────────────────────────────────────

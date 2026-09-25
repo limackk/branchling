@@ -269,14 +269,16 @@ export function backlogForTaskPath(filePath) {
  * reads — are anchored to the REPOSITORY, not to the directory above the
  * backlog. Asking git is the only way to know which one that is.
  *
- * WITHOUT GIT IT FALLS BACK TO THE PARENT, deliberately, rather than refusing:
- * `init` runs before `git init` often enough that a refusal would make the
- * common first minute fail, and the parent is the right answer in the layout
- * `init` creates. The runner is injectable so both branches are testable.
+ * WITHOUT GIT THERE IS NO REPOSITORY FACT TO DISCOVER. The caller may provide
+ * `fallback`: document readers use the backlog itself because reading above a
+ * directory the user named crosses an unknown boundary. Existing callers that
+ * intentionally create repository-level files keep the historical parent
+ * fallback. The runner is injectable so both branches are testable.
  */
 export function repositoryRoot(backlogRoot, opts = {}) {
   const run = opts.run || spawnSync;
   const r = run("git", ["-C", backlogRoot, "rev-parse", "--show-toplevel"], { encoding: "utf8" });
   const top = r && r.status === 0 ? String(r.stdout || "").trim() : "";
-  return top || resolve(backlogRoot, "..");
+  const fallback = opts.fallback === undefined ? resolve(backlogRoot, "..") : resolve(opts.fallback);
+  return top || fallback;
 }
