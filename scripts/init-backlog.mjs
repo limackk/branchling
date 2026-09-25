@@ -100,6 +100,12 @@ criteria_links: warn
 # unless that narrow coverage signal is present; foreign and manual proofs are
 # undetermined and therefore refused under that policy.
 contract_capability: report
+
+# [free] Additional executable names a task contract may invoke when their
+# subcommands overlap this tool's command table. These ADD to the generic
+# defaults (git, npm, cargo, docker and peers); do not restate the defaults just
+# to admit one project-specific program. Bare program names only, never paths.
+contract_programs: []
 types: [task]                      # [tree]
 
 # [tree] Labels. \`labels_closed: true\` turns a typo into a build error instead

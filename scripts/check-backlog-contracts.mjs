@@ -52,9 +52,13 @@
  * backlog in that state, the same way a dangling `related_docs` path fails
  * without anybody arguing that the file may come back. `reasons` and
  * `log-status` report instead because their findings are in the archive, which
- * is precisely what this guard refuses to read. The escape hatch for a false
- * positive is `FOREIGN_PROGRAMS` below, and making that list the consumer's own
- * rather than ours is TL-413.
+ * is precisely what this guard refuses to read.
+ *
+ * WHICH OTHER PROGRAMS COUNT. `contract_programs` in config.yaml extends a
+ * generic default list. It does not replace it: a backlog adding `terraform`
+ * must not also restate `git`, `npm` and every other default merely to preserve
+ * yesterday's verdict. The code owns the bare-program SHAPE; the resolved
+ * configuration owns every VALUE the guard accepts.
  *
  * Usage:
  *   node scripts/check-backlog-contracts.mjs [--dir <backlog>]
@@ -74,7 +78,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { COMMANDS } from "./cli.mjs";
-import { loadConfig, loadConfigOrExit } from "./config.mjs";
+import { DEFAULTS, loadConfig, loadConfigOrExit } from "./config.mjs";
 import { parseVerification } from "./criteria.mjs";
 import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME } from "./product.mjs";
@@ -87,23 +91,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /** This tool's own verbs, from the command table — never a list of literals. */
 export const subcommands = () => new Set(Object.keys(COMMANDS));
-
-/**
- * Programs that own a subcommand vocabulary overlapping this one.
- *
- * WHY A LIST AT ALL. `git init`, `npm run build` and `gh run` put one of this
- * tool's verbs after a name that is not this tool — and they are correct. The
- * alternative was to ask the machine whether the word resolves on `PATH`, which
- * makes the verdict depend on what happens to be installed: a machine without
- * `git` would then fail the suite for a task file nobody touched.
- *
- * It is short because it only has to cover the overlap, not every program a
- * contract may call. A name added here is a claim that the word is somebody
- * else's binary, which is a sentence, not a hole in the pattern.
- */
-export const FOREIGN_PROGRAMS = new Set([
-  "git", "npm", "npx", "pnpm", "yarn", "cargo", "docker", "gh", "go", "pip", "brew", "make",
-]);
 
 /** A word that could be a command name on a `PATH`: no slash, no extension. */
 const BARE_NAME = /^[A-Za-z][A-Za-z0-9_-]*$/;
@@ -149,9 +136,14 @@ export function invocations(entry, verbs = subcommands()) {
 /**
  * The invocations of this tool under a name that is not this tool's. PURE.
  */
-export function foreignInvocations(entry, product = PRODUCT_NAME, verbs = subcommands()) {
+export function foreignInvocations(
+  entry,
+  product = PRODUCT_NAME,
+  verbs = subcommands(),
+  programs = new Set(DEFAULTS.contract_programs)
+) {
   return invocations(entry, verbs).filter(
-    (i) => i.name !== product && !FOREIGN_PROGRAMS.has(i.name)
+    (i) => i.name !== product && !programs.has(i.name)
   );
 }
 
@@ -164,6 +156,7 @@ export function foreignInvocations(entry, product = PRODUCT_NAME, verbs = subcom
 export function auditOpenContracts(backlogDir, tasksDir = backlogPaths(backlogDir).tasksDir, config = loadConfig(backlogDir)) {
   const archived = new Set(config.archivedStatuses || []);
   const verbs = subcommands();
+  const programs = new Set(config.contractPrograms || []);
   const findings = [];
   let entriesChecked = 0;
   let tasksChecked = 0;
@@ -175,7 +168,7 @@ export function auditOpenContracts(backlogDir, tasksDir = backlogPaths(backlogDi
     const frontmatter = (raw.match(/^---\r?\n([\s\S]*?)\r?\n---/) || [])[1] || "";
     for (const entry of parseVerification(frontmatter).entries) {
       entriesChecked++;
-      for (const bad of foreignInvocations(entry, PRODUCT_NAME, verbs)) {
+      for (const bad of foreignInvocations(entry, PRODUCT_NAME, verbs, programs)) {
         findings.push({ task: record.id, file: record.file, kind: entry.bash ? "bash" : "manual", ...bad });
       }
     }
@@ -213,7 +206,7 @@ export function main(argv) {
     }
     console.log(
       `${OKM} contracts: ${entriesChecked} verification entr(ies) across ${tasksChecked} open task(s) ` +
-        `name \`${PRODUCT_NAME}\` or a known foreign program`
+        `name \`${PRODUCT_NAME}\` or a program allowed by \`contract_programs\``
     );
     return 0;
   }
@@ -229,7 +222,8 @@ export function main(argv) {
   console.error("");
   console.error("A `verification:` entry is an INSTRUCTION, and an open task's instruction has to");
   console.error(`work today. Write the invocation as \`${PRODUCT_NAME} ${findings[0].sub}\`, or as the`);
-  console.error("path the command is really reached by. A CLOSED task is left alone on purpose: its");
+  console.error("path the command is really reached by; if it is another executable, add its bare");
+  console.error("name to `contract_programs` in config.yaml. A CLOSED task is left alone on purpose:");
   console.error("contract records what was run, under the name the tool had then.");
   return 1;
 }

@@ -56,6 +56,11 @@ reason_required_statuses: [blocked, cancelled]
 # undetermined because the tool did not observe them.
 contract_capability: report
 
+# Additional executables whose subcommands overlap this tool's command table.
+# Values here ADD to the generic defaults; they do not replace git, npm, cargo,
+# docker and their peers. Bare program names only, never paths.
+contract_programs: []
+
 priorities: [P0, P1, P2, P3]
 
 # Task kinds. Two values, and the difference between them is one anybody can

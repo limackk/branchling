@@ -104,6 +104,14 @@ export const DEFAULTS = Object.freeze({
   // documentation and foreign-program proofs are undetermined by construction.
   // `require` is an explicit project choice to refuse those closings.
   contract_capability: "report",
+  // Additional executable names whose subcommands overlap this tool's command
+  // table. These are generic ecosystem programs rather than one project's
+  // vocabulary; a project extends the list with `contract_programs` instead of
+  // replacing it, so adding one local tool cannot accidentally make `git init`
+  // or `npm run` fail an existing contract.
+  contract_programs: Object.freeze([
+    "git", "npm", "npx", "pnpm", "yarn", "cargo", "docker", "gh", "go", "pip", "brew", "make",
+  ]),
   // Which statuses may not be entered without a stated reason (TL-105). A
   // VOCABULARY, so it belongs here and not in the code: `blocked` and
   // `cancelled` are this project's words, and a list of literals in a script
@@ -242,7 +250,7 @@ const LIST_KEYS = new Set([
   "statuses", "archived_statuses", "priorities", "types", "confidence",
   "labels", "label_axis_timing", "label_axis_env", "owners", "estimates", "actors", "roles",
   "dashboard_open_statuses", "status_strikethrough", "reason_required_statuses",
-  "docs_status_pending_patterns",
+  "docs_status_pending_patterns", "contract_programs",
 ]);
 const MAP_KEYS = new Set(["epic_aliases", "status_colors", "priority_colors", "label_colors"]);
 const NUMBER_KEYS = new Set([
@@ -635,6 +643,13 @@ export function loadConfig(root, opts = {}) {
     },
     criteriaLinks: values.criteria_links,
     contractCapability: values.contract_capability,
+    // This key is deliberately ADDITIVE. The defaults are programs common to
+    // backlogs in any ecosystem; the configured values are the consumer's own.
+    // Replacing the defaults would make adding `terraform` also require a
+    // fragile restatement of `git`, `npm` and every other generic exemption.
+    contractPrograms: Object.freeze([
+      ...new Set([...DEFAULTS.contract_programs, ...(parsedValues.contract_programs || [])]),
+    ]),
     // Resolved here rather than in DEFAULTS, because the fallback is another
     // key's value and DEFAULTS is a flat literal.
     reasonRequiredStatuses: values.reason_required_statuses || values.archived_statuses,
@@ -699,6 +714,14 @@ export function validateConfig(config) {
     problems.push(
       "`contract_capability` = `" + config.contractCapability + "` — expecting one of: report, require"
     );
+  }
+  for (const program of config.contractPrograms || []) {
+    if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(String(program))) {
+      problems.push(
+        "`contract_programs` contains `" + program +
+          "` — expecting a bare program name: a letter, then letters/digits/`_`/`-`"
+      );
+    }
   }
 
   for (const s of config.archivedStatuses) {

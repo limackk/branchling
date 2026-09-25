@@ -132,6 +132,9 @@ labels_closed: true            # a typo becomes a build error, not a new label
 owners: [unassigned, ann, mark]
 estimates: [30m, 2h, 1d, 1w]
 title_max_length: 60
+
+# Adds to the generic programs already recognised in verification contracts.
+contract_programs: [terraform, helm]
 ```
 
 ```yaml

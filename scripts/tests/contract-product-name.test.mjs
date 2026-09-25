@@ -10,7 +10,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -141,6 +141,43 @@ test("POSITIVE CONTROL: the GUARD exits 1 on a contract naming a foreign command
   const r = guard(fx.backlog);
   assert.equal(r.status, 1, r.stdout + r.stderr);
   assert.match(r.stderr, new RegExp(id + " \\(manual\\): `oldname take`"));
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+test("configured contract programs extend the defaults without disabling the guard", () => {
+  const fx = fixture("contracts-configured-program");
+  const terraform = withContract(fx.backlog, 'bash: "terraform plan"');
+
+  const before = guard(fx.backlog);
+  assert.equal(before.status, 1, before.stdout + before.stderr);
+  assert.match(before.stderr, new RegExp(terraform + " \\(bash\\): `terraform plan`"));
+
+  appendFileSync(join(fx.backlog, "config.yaml"), "\ncontract_programs: [terraform]\n", "utf8");
+  const configured = guard(fx.backlog);
+  assert.equal(configured.status, 0, configured.stdout + configured.stderr);
+
+  // The configured list ADDS to the generic defaults: neither the original
+  // exemptions nor the positive control may disappear behind the new value.
+  withContract(fx.backlog, 'bash: "git init"');
+  const unknown = withContract(fx.backlog, 'manual: "Run `oldname take <ID>`"');
+  const stillJudged = guard(fx.backlog);
+  assert.equal(stillJudged.status, 1, stillJudged.stdout + stillJudged.stderr);
+  assert.match(stillJudged.stderr, new RegExp(unknown + " \\(manual\\): `oldname take`"));
+  assert.doesNotMatch(stillJudged.stderr, /`git init`|`terraform plan`/);
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+test("contract program configuration accepts bare names only", () => {
+  const fx = fixture("contracts-program-shape");
+  appendFileSync(join(fx.backlog, "config.yaml"), "\ncontract_programs: [terraform/plan]\n", "utf8");
+  const checked = spawnSync(
+    process.execPath,
+    [join(SCRIPTS_DIR, "check-backlog-vocabulary.mjs"), "--dir", fx.backlog],
+    { encoding: "utf8", env: { ...process.env, NO_COLOR: "1" } }
+  );
+  assert.equal(checked.status, 1, checked.stdout + checked.stderr);
+  assert.match(checked.stderr, /`contract_programs` contains `terraform\/plan`/);
+  assert.match(checked.stderr, /expecting a bare program name/);
   rmSync(fx.root, { recursive: true, force: true });
 });
 
