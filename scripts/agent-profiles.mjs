@@ -21,7 +21,7 @@ import { lockScope } from "./lock.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { isValidActor, stripComment, unquote } from "./task-fields.mjs";
-import { failure, heading, table } from "./ui.mjs";
+import { failure, heading, refusal, table } from "./ui.mjs";
 import { resolveBacklogDir } from "./paths.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -299,23 +299,32 @@ export function liveProbe(profile, env = process.env) {
 }
 
 const SUBCOMMANDS = ["create", "list", "show", "update", "remove", "check"];
-const FLAGS = ["--adapter", "--model", "--effort", "--prompt", "--prompt-file", "--secret-env", "--protocol-version", "--delegation-control", "--actor", "--live", "--json"];
+const PROFILE_FIELDS_FLAGS = ["--adapter", "--model", "--effort", "--prompt", "--prompt-file", "--secret-env", "--protocol-version", "--delegation-control", "--actor"];
+const FLAGS_BY_SUBCOMMAND = {
+  create: [...PROFILE_FIELDS_FLAGS, "--json"],
+  list: ["--json"],
+  show: ["--json"],
+  update: [...PROFILE_FIELDS_FLAGS, "--json"],
+  remove: ["--json"],
+  check: ["--live", "--json"],
+};
 
 export function parseAgentProfilesArgs(args) {
   const subcommand = args[0];
   if (SUBCOMMANDS.indexOf(subcommand) < 0) throw new Error(subcommand ? "unknown subcommand: " + subcommand : "no subcommand");
+  const flags = FLAGS_BY_SUBCOMMAND[subcommand];
   const plan = { subcommand, name: null, json: false, live: false, fields: {} };
   for (let i = 1; i < args.length; i++) {
     const arg = args[i];
     if (arg === "--json") { plan.json = true; continue; }
     if (arg === "--live") { plan.live = true; continue; }
-    if (FLAGS.indexOf(arg) >= 0) {
+    if (flags.indexOf(arg) >= 0) {
       const value = args[++i];
       if (value === undefined) throw new Error("`" + arg + "` with no value");
       plan.fields[arg.slice(2).replace("-", "_")] = value;
       continue;
     }
-    if (arg.startsWith("-")) throw new Error("unknown flag: " + arg + "\navailable: " + FLAGS.join(" "));
+    if (arg.startsWith("-")) throw new Error("unknown flag: " + arg);
     if (plan.name !== null) throw new Error("two profile names: " + plan.name + ", " + arg);
     plan.name = arg;
   }
@@ -373,7 +382,11 @@ export async function run(argv, env = process.env) {
   let plan;
   try { plan = parseAgentProfilesArgs(argv); }
   catch (e) {
-    console.error(failure(N + " profile", e.message, ["available: " + SUBCOMMANDS.join(", ")], [N + " profile --help"]));
+    const subcommand = argv[0];
+    const known = SUBCOMMANDS.includes(subcommand);
+    const command = N + " profile" + (known ? " " + subcommand : "");
+    console.error(refusal(command, e.message,
+      known ? FLAGS_BY_SUBCOMMAND[subcommand].join(" ") : SUBCOMMANDS.join(", ")));
     return 2;
   }
   let projectRoot = null;

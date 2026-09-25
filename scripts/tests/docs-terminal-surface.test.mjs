@@ -144,11 +144,9 @@ function surface(argv) {
   });
   const out = (r.stdout || "") + (r.stderr || "");
   const lines = [...out.matchAll(/available:([^\n]*)/g)];
-  // A refusal naming the event but no alternatives is an EMPTY accepted set,
-  // not an unreachable command: `skills install` takes no flags at all, so
-  // there is nothing for `available:` to introduce. The event word is what
-  // proves the invocation was parsed and refused rather than misunderstood —
-  // the three TL-220 named, and nothing else counts.
+  // A refusal naming the event is reachable even when its accepted set is
+  // empty. `refusal()` spells that set `(none)` so it cannot disappear into a
+  // missing detail line or be mistaken for an accepted subcommand.
   const refused = /(unknown flag|unknown subcommand|unexpected argument):/.test(out);
   let value = lines.length || refused ? { flags: new Set(), subcommands: new Set() } : null;
   for (const m of lines) {
@@ -211,19 +209,16 @@ test("positive control: a document naming a flag the command refuses IS caught",
   assert.match(found[0], /`query` does not accept --zzz-not-a-flag/);
 });
 
-test("positive control: a subcommand is asked, and one taking NO flags is not skipped", () => {
-  // Two things at once, because they fail in opposite directions. `profile
-  // create --adapter` must pass: the flags live one level down, and a guard
-  // asking only the top level would report every documented `profile create`
-  // line as wrong and be switched off within a day. `skills install` must
-  // still catch a flag: it accepts none, so its refusal names no alternatives,
-  // and reading that as "nothing to compare" would let any flag through on
-  // exactly the commands with the smallest surface.
+test("positive control: a subcommand is asked and its own set is enforced", () => {
+  // `profile create --adapter` must pass: the flags live one level down, and a
+  // guard asking only the top level would report every documented subcommand
+  // line as wrong. The opposite control asks a different subcommand for a flag
+  // outside its own set, so a union of sibling flags cannot pass.
   assert.deepEqual(offences("fixture.md", "`" + PRODUCT_NAME + ' profile create dev --adapter "./a.mjs"`\n'), []);
   assert.deepEqual(offences("fixture.md", "`" + PRODUCT_NAME + " skills install`\n"), []);
-  const found = offences("fixture.md", "`" + PRODUCT_NAME + " skills install --force`\n");
-  assert.equal(found.length, 1, "a flag on a command that accepts none passed: " + JSON.stringify(found));
-  assert.match(found[0], /`skills install` does not accept --force/);
+  const found = offences("fixture.md", "`" + PRODUCT_NAME + " profile list --adapter ./a.mjs`\n");
+  assert.equal(found.length, 1, "a sibling subcommand's flag passed: " + JSON.stringify(found));
+  assert.match(found[0], /`profile list` does not accept --adapter/);
 });
 
 test("positive control: prose about the product is not read as an invocation", () => {

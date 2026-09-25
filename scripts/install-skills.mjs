@@ -39,7 +39,7 @@ import { fileURLToPath } from "node:url";
 
 import { repositoryRoot, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
-import { MARK, color, failure } from "./ui.mjs";
+import { MARK, color, failure, refusal } from "./ui.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -145,15 +145,14 @@ const KNOWN_FLAGS = ["--dry-run", "--json", "--dir"];
 export function main(argv) {
   const sub = argv[0];
   if (sub !== "install") {
-    console.error(failure(N + " skills", sub ? "unknown subcommand: " + sub : "no subcommand",
-      ["available: install"], [N + " skills --help"]));
+    console.error(refusal(N + " skills", sub ? "unknown subcommand: " + sub : "no subcommand", "install"));
     return 2;
   }
   const cli = takeDirFlag(argv.slice(1));
   const unknown = cli.argv.filter((a) => !KNOWN_FLAGS.includes(a));
   if (unknown.length) {
-    console.error(failure(N + " skills install", "unexpected argument: " + unknown.join(" "), [],
-      [N + " skills --help"]));
+    const problem = unknown[0].startsWith("-") ? "unknown flag: " : "unexpected argument: ";
+    console.error(refusal(N + " skills install", problem + unknown.join(" "), KNOWN_FLAGS.join(" ")));
     return 2;
   }
 

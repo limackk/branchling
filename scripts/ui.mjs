@@ -241,6 +241,13 @@ export function fail(command, problem, details, next, code = 2) {
  * set out of (`scripts/tests/help-covers-flags.test.mjs`), so four wordings
  * meant three quarters of the table could not be asked what it accepts.
  *
+ * AN EMPTY SET IS SPELLED `(none)`. Omitting the detail line makes an empty
+ * set indistinguishable from a command that stopped following the anatomy;
+ * leaving the value blank gives a parser no positive token to recognise. The
+ * parenthesised word is deliberately not shaped like either a flag or a
+ * subcommand, so guards can read the answer as an empty set without inventing
+ * an accepted argument called `none`.
+ *
  * THE SENTENCE NAMES THE EVENT, the anatomy does not vary. `unknown flag:` for
  * something beginning with `-`, `unknown subcommand:` where a subcommand was
  * expected, `unexpected argument:` where nothing was. Those are three different
@@ -252,7 +259,8 @@ export function fail(command, problem, details, next, code = 2) {
  * @param {string} available the alternatives, already spelled as the user types them
  */
 export function refusal(command, problem, available, opts) {
-  return failure(command, problem, ["available: " + available], [command + " --help"], opts);
+  const accepted = String(available || "").trim() || "(none)";
+  return failure(command, problem, ["available: " + accepted], [command + " --help"], opts);
 }
 
 // ──────────────────────────────────────────────────────────────────────────

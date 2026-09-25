@@ -34,6 +34,7 @@ import { fileURLToPath } from "node:url";
 
 import { COMMANDS } from "../cli.mjs";
 import { PRODUCT_NAME } from "../product.mjs";
+import { refusal } from "../ui.mjs";
 
 import { isolateHome, plainOutput } from "./_repo.mjs";
 
@@ -61,9 +62,18 @@ export function shapeProblem(command, text) {
     return "the first line is not `✗ " + PRODUCT_NAME + " " + command +
       ": <which mistake>: <the argument>`: " + JSON.stringify(lines[0] || "");
   }
-  const available = lines.find((l) => l.startsWith("  available: "));
-  if (!available) return "no `  available:` line naming what it does accept";
-  if (!available.slice("  available: ".length).trim()) return "`available:` names nothing";
+  if (lines.some((line) => line.startsWith("available: "))) {
+    return "an unindented `available:` line escaped the anatomy";
+  }
+  const availableLines = lines.filter((line) => line.startsWith("  available: "));
+  if (!availableLines.length) return "no `  available:` line naming what it does accept";
+  if (availableLines.length !== 1) return "more than one `  available:` line";
+  const available = availableLines[0];
+  const accepted = available.slice("  available: ".length).trim();
+  if (!accepted) return "`available:` names nothing";
+  if (accepted.includes("(none)") && accepted !== "(none)") {
+    return "`(none)` is mixed with accepted arguments";
+  }
   const last = lines[lines.length - 1];
   if (last !== "  → " + PRODUCT_NAME + " " + command + " --help") {
     return "the last line is not the `--help` to paste: " + JSON.stringify(last);
@@ -71,11 +81,39 @@ export function shapeProblem(command, text) {
   return null;
 }
 
-function refusalOf(name) {
-  const r = spawnSync(process.execPath, [CLI, name, NONSENSE], {
+function refusalOf(argv) {
+  const r = spawnSync(process.execPath, [CLI, ...argv, NONSENSE], {
     encoding: "utf8", timeout: 20_000, input: "",
   });
   return { status: r.status, text: (r.stdout || "") + (r.stderr || "") };
+}
+
+/** Subcommands come from the program's own refusal, never from a list copied
+ *  into this guard. Only an `unknown subcommand` answer makes words on the
+ *  `available:` line subcommands; a flag refusal's values are a different set. */
+function subcommandsOf(name) {
+  const { text } = refusalOf([name]);
+  if (!/^✗ .*: unknown subcommand:/m.test(text)) return [];
+  const line = text.split("\n").find((value) => value.startsWith("  available: ")) || "";
+  const value = line.slice("  available: ".length).trim();
+  if (!value || value === "(none)") return [];
+  return value.split(/,\s*|\s+/).filter(Boolean);
+}
+
+function acceptedBy(argv) {
+  const line = refusalOf(argv).text.split("\n")
+    .find((value) => value.startsWith("  available: ")) || "";
+  const value = line.slice("  available: ".length).trim();
+  return value === "(none)" ? [] : value.split(/\s+/).filter(Boolean);
+}
+
+function surfaces() {
+  return NAMES.flatMap((name) => [
+    { argv: [name], command: name },
+    ...subcommandsOf(name).map((subcommand) => ({
+      argv: [name, subcommand], command: name + " " + subcommand,
+    })),
+  ]);
 }
 
 // ── Positive controls, first ──────────────────────────────────────────────
@@ -88,11 +126,20 @@ test("positive control: the checker CATCHES each way of losing the shape", () =>
   ].join("\n");
   assert.equal(shapeProblem("query", good), null, "the shape itself was rejected");
 
+  const empty = refusal(PRODUCT_NAME + " query", "unknown flag: --zzz", "");
+  assert.equal(shapeProblem("query", empty), null,
+    "the canonical empty accepted set was rejected: " + empty);
+
   assert.ok(shapeProblem("query", good.replace("✗ ", "")), "a missing failure mark passed");
   assert.ok(shapeProblem("query", good.replace("available:", "known flags:")),
     "`known flags:` passed — the wording is what a machine reads the set out of");
   assert.ok(shapeProblem("query", good.replace("  available: --status --board\n", "")),
     "a refusal naming no alternatives passed");
+  assert.ok(shapeProblem("query", good.replace("--status --board", "(none) --status")),
+    "the empty-set marker mixed with an accepted argument passed");
+  assert.ok(shapeProblem("query", good.replace("  available:", "available:")),
+    "an unindented accepted set passed");
+  assert.ok(shapeProblem("query", ""), "a subcommand that stopped answering passed");
   assert.ok(shapeProblem("query", good.split("\n").slice(0, 2).join("\n")),
     "a refusal with nothing to paste next passed");
   assert.ok(shapeProblem("query", good.replace(PRODUCT_NAME + " query:", "query:")),
@@ -108,13 +155,29 @@ test("positive control: there are commands to judge, and the table is whole", ()
   }
 });
 
+test("positive control: subcommands are discovered from real refusals", () => {
+  const nested = surfaces().filter(({ argv }) => argv.length === 2);
+  assert.ok(nested.length > 0, "no subcommand was discovered from the command table");
+  for (const { argv, command } of nested) {
+    assert.equal(argv.join(" "), command, "a discovered subcommand lost its typed spelling");
+  }
+});
+
+test("profile subcommands answer with their own accepted sets", () => {
+  const create = acceptedBy(["profile", "create"]);
+  const list = acceptedBy(["profile", "list"]);
+  assert.ok(create.includes("--adapter"), "profile create does not name --adapter");
+  assert.ok(!list.includes("--adapter"), "profile list inherited create's --adapter");
+  assert.notDeepEqual(list, create, "profile subcommands publish one union of sibling flags");
+});
+
 // ── The rule ──────────────────────────────────────────────────────────────
 
 test("every command refuses an unknown argument with exit 2", () => {
   const offenders = [];
-  for (const name of NAMES) {
-    const { status } = refusalOf(name);
-    if (status !== 2) offenders.push(name + ": exit " + status);
+  for (const { argv, command } of surfaces()) {
+    const { status } = refusalOf(argv);
+    if (status !== 2) offenders.push(command + ": exit " + status);
   }
   assert.deepEqual(offenders, [], "an argument nobody declared was not a usage error:\n  " +
     offenders.join("\n  "));
@@ -122,9 +185,9 @@ test("every command refuses an unknown argument with exit 2", () => {
 
 test("every command refuses in ONE shape", () => {
   const offenders = [];
-  for (const name of NAMES) {
-    const problem = shapeProblem(name, refusalOf(name).text);
-    if (problem) offenders.push(name + ": " + problem);
+  for (const { argv, command } of surfaces()) {
+    const problem = shapeProblem(command, refusalOf(argv).text);
+    if (problem) offenders.push(command + ": " + problem);
   }
   assert.deepEqual(offenders, [], "refusals that do not have the one shape:\n  " +
     offenders.join("\n  "));

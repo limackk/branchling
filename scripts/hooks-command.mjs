@@ -48,7 +48,7 @@ import { fileURLToPath } from "node:url";
 import { BLOCK_CLOSE, BLOCK_OPEN } from "./git-rules.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { takeDirFlag } from "./paths.mjs";
-import { MARK, color, failure, heading } from "./ui.mjs";
+import { MARK, color, failure, heading, refusal } from "./ui.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -261,16 +261,15 @@ function runUninstall(root, plan) {
 export function main(argv) {
   const sub = argv[0];
   if (SUBCOMMANDS.indexOf(sub) < 0) {
-    console.error(failure(N + " hooks", sub ? "unknown subcommand: " + sub : "no subcommand",
-      ["available: " + SUBCOMMANDS.join(", ")], [N + " hooks --help"]));
+    console.error(refusal(N + " hooks", sub ? "unknown subcommand: " + sub : "no subcommand",
+      SUBCOMMANDS.join(", ")));
     return 2;
   }
   const cli = takeDirFlag(argv.slice(1));
   const plan = { json: false };
   for (const a of cli.argv) {
     if (a === "--json") { plan.json = true; continue; }
-    console.error(failure(N + " hooks " + sub, "unknown flag: " + a,
-      ["available: " + FLAGS.join(" ")], [N + " hooks --help"]));
+    console.error(refusal(N + " hooks " + sub, "unknown flag: " + a, FLAGS.join(" ")));
     return 2;
   }
   const root = cli.dir ? resolve(cli.dir) : process.cwd();

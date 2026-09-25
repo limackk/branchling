@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: "CLI onboarding"
 priority: P2                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex-subagent
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-21
-updated: 2026-09-21
+updated: 2026-09-25
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: [scripts/ui.mjs, scripts/agent-profiles.mjs, scripts/install-skills.mjs, scripts/tests/refusal-shape.test.mjs]
@@ -84,12 +84,12 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] `profile create --zzz` and `profile list --zzz` name different accepted
+- [x] `profile create --zzz` and `profile list --zzz` name different accepted
       sets, and neither prints an unindented `available:` line.
       [proof: subcommand-refusals]
-- [ ] `skills install --zzz` answers in the anatomy, including what an empty
+- [x] `skills install --zzz` answers in the anatomy, including what an empty
       accepted set looks like, and points at its own `--help`.
       [proof: subcommand-refusals]
-- [ ] The guard reaches every subcommand named by a command's own refusal, and
+- [x] The guard reaches every subcommand named by a command's own refusal, and
       fails if one stops answering. [proof: subcommand-refusals]
-- [ ] The suite is green. [proof: suite-green]
+- [x] The suite is green. [proof: suite-green]
