@@ -78,6 +78,10 @@ export const KINDS = {
     // under the name `next --json` already gives the same list: the two paths
     // answer about one queue, so a consumer reads one key for one fact.
     skippedHandedBack: [],
+    // Open tasks the dispatcher refused after `handedBackAcross` found both
+    // directions over one role boundary (TL-417). The full finding travels so
+    // a consumer gets the pair and both hands' reasons without parsing prose.
+    skippedDeadlocked: [],
   },
   // `advisories` are the findings `check` stopped reporting when it became a
   // release gate (TL-383): each `{ name, output }`, where `name` is the same
@@ -196,7 +200,11 @@ export const KINDS = {
     // a loop must be able to tell an empty queue from a queue it was not allowed
     // to draw from, and it cannot parse a sentence to do it.
     passedOver: [], considered: null, searchedStatuses: [], skippedBlocked: null,
-    skippedElsewhere: [], closedElsewhere: [], skippedExecutor: [], skippedHandedBack: [], scan: null,
+    skippedElsewhere: [], closedElsewhere: [], skippedExecutor: [], skippedHandedBack: [],
+    // The audit finding reused as a queue gate (TL-417), including its role
+    // pair and handoff legs. Empty is materially different from an older shape
+    // that could silently hand the task out again.
+    skippedDeadlocked: [], scan: null,
     // Open work an unattended run may not be handed for its SIZE (TL-211).
     // Declared for the kind, so it is present and empty when the project
     // stated no threshold: a consumer must not have to tell "no value" from

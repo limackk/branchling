@@ -247,10 +247,11 @@ test("POSITIVE CONTROL: a task blocked with nothing named is still left alone", 
   }
 });
 
-test("a loop stopped by the spin guard leaves no claim and no lock", () => {
-  // The guard asks `seen` AFTER `next` has written the claim, so stopping used
-  // to leave an owner, an `in_progress` status and a live reservation behind.
-  // Two roles handing the task to each other is the shortest way to reach it.
+test("a loop stopped by the durable deadlock gate leaves no claim and no lock", () => {
+  // TL-417 moves this refusal before `next` writes a third claim. The older
+  // per-run spin guard remains a belt-and-braces invariant, but a hand-back in
+  // durable history must now stop at the queue boundary without creating state
+  // that has to be undone.
   const fx = base();
   try {
     const cfg = join(fx.backlog, "config.yaml");
@@ -274,7 +275,8 @@ test("a loop stopped by the spin guard leaves no claim and no lock", () => {
     assert.equal(r.status, 0, r.stdout + r.stderr);
 
     const report = JSON.parse(r.stdout);
-    assert.match(String(report.stopped), /handed out twice/, "the spin guard never fired");
+    assert.match(String(report.stopped), /deadlock/, "the durable deadlock gate never fired");
+    assert.deepEqual(report.skippedDeadlocked.map((finding) => finding.task), [work]);
     assert.notEqual(field(fx.backlog, work, "status"), "in_progress",
       "the loop stopped leaving the task claimed by a run that has ended");
     assert.equal(String(field(fx.backlog, work, "owner")).trim().replace(/^"|"$/g, ""), "",

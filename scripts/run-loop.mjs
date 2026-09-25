@@ -88,7 +88,7 @@ import { readHistory, recordEdit } from "./history.mjs";
 import { roleBrief } from "./instructions.mjs";
 import { userConfigPath } from "./home.mjs";
 import { lockScope, releaseLock, stateRoot } from "./lock.mjs";
-import { callerSpecies, isOverSized, parkedByRun, queueStatuses, readDispatchRecords, selectCandidates, servesExecutor } from "./next-task.mjs";
+import { callerSpecies, deadlockIdentity, describeDeadlock, isOverSized, parkedByRun, queueStatuses, readDispatchRecords, selectCandidates, servesExecutor } from "./next-task.mjs";
 import { backlogPaths, repositoryRoot, resolveBacklogDir } from "./paths.mjs";
 import { loadPlanForDispatch, planState, projectionWall } from "./plan.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
@@ -1346,6 +1346,14 @@ function renderReport(report, plan) {
     if (r.detail) lines.push("      " + color.dim(String(r.detail).split("\n")[0]));
   }
   if (!report.taken.length) lines.push("  " + color.dim(MARK.bullet + " nothing was taken"));
+  if (report.skippedDeadlocked && report.skippedDeadlocked.length) {
+    lines.push("");
+    lines.push("  " + MARK.warn + " " + report.skippedDeadlocked.length +
+      " task(s) skipped at a role-boundary deadlock");
+    for (const finding of report.skippedDeadlocked) {
+      lines.push("    " + color.dim(describeDeadlock(finding)));
+    }
+  }
   // THE FACT ABOUT THE MACHINE, SAID HERE AND NOWHERE ELSE (TL-184). The task
   // file carries nothing about this: no attempt was made, so there is nothing
   // about the task to record. The command is quoted in full because the reader's
@@ -1626,6 +1634,7 @@ export async function run(argv) {
     // Named, never silent: what the projection declined for THIS actor's own
     // earlier judgement is reported under the order, the way `next` reports it.
     const handedBack = new Map();
+    const deadlocked = new Map();
     // The wave the projection stopped at, or null when it walked the plan out
     // (TL-206). It is reported in both renderings below: an operator reading an
     // order with nothing in it needs a second place to look for the reason, and
@@ -1643,10 +1652,11 @@ export async function run(argv) {
       const from = state.activeWave === null ? state.waves.length : state.activeWave;
       for (const w of state.waves.slice(from)) {
         const planIds = new Set(w.tasks.map((e) => String(e.id).toUpperCase()));
-        const { candidates, skippedBlocked, skippedHandedBack } =
+        const { candidates, skippedBlocked, skippedHandedBack, skippedDeadlocked } =
           selectCandidates(records, config, { ...base, planIds }, Date.now());
         for (const t of candidates) rows.push({ task: t, wave: w.index + 1, name: w.name });
         for (const s of skippedHandedBack) handedBack.set(s.id, s);
+        for (const s of skippedDeadlocked) deadlocked.set(deadlockIdentity(s), s);
         // AND NO FURTHER THAN THE RUN WOULD GET. A task this wave's own members
         // are blocking is reachable — the run closes the blocker first, which is
         // what the footnote below has always said — so it counts towards
@@ -1657,9 +1667,10 @@ export async function run(argv) {
         if (wall) break;
       }
     } else {
-      const { candidates, skippedHandedBack } = selectCandidates(records, config, base, Date.now());
+      const { candidates, skippedHandedBack, skippedDeadlocked } = selectCandidates(records, config, base, Date.now());
       for (const t of candidates) rows.push({ task: t, wave: null, name: "" });
       for (const s of skippedHandedBack) handedBack.set(s.id, s);
+      for (const s of skippedDeadlocked) deadlocked.set(deadlockIdentity(s), s);
     }
     const shown = plan.maxTasks ? rows.slice(0, plan.maxTasks) : rows;
     if (plan.json) {
@@ -1673,6 +1684,7 @@ export async function run(argv) {
         })),
         considered: rows.length,
         skippedHandedBack: [...handedBack.values()].map((s) => ({ id: s.id, actor: s.actor, reason: s.reason })),
+        skippedDeadlocked: [...deadlocked.values()],
         ...(planned ? { stoppedAt: wall } : {}),
       });
     } else {
@@ -1692,6 +1704,9 @@ export async function run(argv) {
         console.log("  " + color.dim(
           s.id + " skipped — you handed it back yourself" + (s.reason ? ": " + s.reason : "")
         ));
+      }
+      for (const finding of deadlocked.values()) {
+        console.log("  " + color.dim(MARK.warn + " " + describeDeadlock(finding)));
       }
       if (wall) {
         console.log("  " + color.dim(
@@ -1738,6 +1753,11 @@ export async function run(argv) {
   // The one result that ends the run without being a fact about a task (TL-184).
   let neverStarted = null;
   const seen = new Set();
+  // Every `next` answer carries the deadlocks it stepped over. Keep them even
+  // when this run stops at `--max-tasks` before the final empty-queue answer;
+  // otherwise a skipped task disappears from the report whenever useful work
+  // happened after it.
+  const skippedDeadlocked = new Map();
   // How many hands have worked each task in this run — the leg number its log
   // is keyed on (TL-281).
   const legs = new Map();
@@ -1748,12 +1768,22 @@ export async function run(argv) {
       break;
     }
     const handed = cli(["next", "--dir", root, "--actor", actor, "--json"].concat(passthrough));
+    const answer = parseJson(handed.stdout);
+    for (const finding of (answer && answer.skippedDeadlocked) || []) {
+      skippedDeadlocked.set(deadlockIdentity(finding), finding);
+    }
     if (handed.status === 3) {
       // `nothing to take` is not `the backlog is empty`, and under `--plan` the
       // difference is the whole report (TL-186). The answer already carries the
       // wave and what was left alone; without the flag the sentence is untouched.
-      const why = planned ? planStop(parseJson(handed.stdout)) : null;
-      if (why) stopped = why;
+      const why = planned ? planStop(answer) : null;
+      const deadlockStop = ((answer && answer.skippedDeadlocked) || []).length
+        ? ((answer && answer.skippedDeadlocked) || []).length +
+          " task(s) were skipped at a role-boundary deadlock"
+        : null;
+      if (why && deadlockStop) stopped = why + "; " + deadlockStop;
+      else if (why) stopped = why;
+      else if (deadlockStop) stopped = deadlockStop;
       break;
     }
     if (handed.status !== 0) {
@@ -1761,7 +1791,7 @@ export async function run(argv) {
       stopped = "`" + N + " next` refused (exit " + handed.status + ")";
       break;
     }
-    const task = parseJson(handed.stdout);
+    const task = answer;
     if (!task || !task.id) {
       stopped = "`" + N + " next` answered with something this loop cannot read";
       break;
@@ -2003,6 +2033,7 @@ export async function run(argv) {
   const report = {
     taken, tally, ms: Date.now() - started, stopped, waiting, waitingExecutor, waitingSize,
     maxUnattendedEstimate: config.maxUnattendedEstimate, neverStarted, shared,
+    skippedDeadlocked: [...skippedDeadlocked.values()],
   };
   if (plan.json) {
     printJson("run", {
@@ -2022,6 +2053,7 @@ export async function run(argv) {
         .map((e) => ({ executor: e, count: waitingExecutor[e].length, ids: waitingExecutor[e] })),
       waitingForSize: Object.keys(waitingSize).sort()
         .map((e) => ({ estimate: e, count: waitingSize[e].length, ids: waitingSize[e] })),
+      skippedDeadlocked: report.skippedDeadlocked,
       tally: { ...tally, taken: taken.length },
       // What this run used outside the tree it was given. A consumer comparing
       // two runs can see a shared-state change for what it is (TL-202).

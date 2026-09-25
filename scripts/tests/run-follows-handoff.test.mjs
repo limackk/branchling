@@ -219,11 +219,13 @@ test("POSITIVE CONTROL: a handoff to a role this run does NOT serve is still hel
   }
 });
 
-test("a task that comes back under the SAME role stops the loop instead of spinning", () => {
+test("a task that comes back across the same boundary is reported as a deadlock", () => {
   const f = fixture();
   try {
     // Both hands hand off: first -> second -> first. The third arrival is the
-    // first role's second turn on this task, and that is where the loop stops.
+    // first role's second turn on this task. The durable handoff history now
+    // stops it before that third claim, rather than relying on this process's
+    // in-memory spin guard after the claim.
     const id = f.add("A task two hands pass back and forth", FIRST);
     const r = cli(["run", "--dir", f.backlog, "--actor", "agent:fleet", "--max-attempts", "2", "--json",
       "--agent-for", FIRST + "=" + handingHand(f.dir, "first.sh", SECOND),
@@ -233,7 +235,8 @@ test("a task that comes back under the SAME role stops the loop instead of spinn
     const report = JSON.parse(r.stdout);
     assert.equal(report.tasks.filter((t) => t.id === id && t.outcome === "handed-on").length, 2,
       JSON.stringify(report.tasks));
-    assert.match(String(report.stopped), /twice|spin/, "the loop did not name the spin: " + report.stopped);
+    assert.match(String(report.stopped), /deadlock/, "the loop did not name the deadlock: " + report.stopped);
+    assert.deepEqual(report.skippedDeadlocked.map((finding) => finding.task), [id]);
     assert.notEqual(field(f.backlog, id, "status"), "done");
   } finally {
     cleanup(f.dir);

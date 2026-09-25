@@ -54,6 +54,7 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { resolveActor } from "./actor.mjs";
+import { handedBackAcross } from "./audit.mjs";
 import { archivedElsewhereBySource, crossBranchState, describeDivergence, divergences, scanNote } from "./branch-scan.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { ACTOR_NAMESPACES, FIELD_COMMENT, isValidActor, openQuestions, readAllHistory, readHistory, reasonRefusal } from "./history.mjs";
@@ -476,6 +477,26 @@ export function readDispatchRecords(root, config) {
   return { records, scan };
 }
 
+/**
+ * One human-readable line for a boundary the queue refuses to cross again.
+ * PURE — shared by `next` and `run`, so the dispatcher and its loop do not give
+ * the same finding two names.
+ */
+export function describeDeadlock(finding) {
+  const roles = (finding.roles || []).join(" ↔ ") || "an unknown role boundary";
+  const legs = (finding.legs || []).map((leg) =>
+    leg.from + "→" + leg.to + ": " + (leg.reason || "(no reason recorded)"));
+  return finding.task + " skipped — deadlock across " + roles + " (" +
+    finding.crossings + " crossing" + (finding.crossings === 1 ? "" : "s") + ")" +
+    (legs.length ? ": " + legs.join(" · ") : "");
+}
+
+/** One task may be stuck at more than one boundary; neither report may erase
+ * one finding merely because both name the same task. */
+export function deadlockIdentity(finding) {
+  return [finding.task].concat(finding.roles || []).join("\u0000");
+}
+
 export function selectCandidates(records, config, filters, now) {
   const archived = new Set(config.archivedStatuses);
   // The species gate is applied to the RECORDS, before any selection: a task
@@ -587,6 +608,36 @@ export function selectCandidates(records, config, filters, now) {
     fresh.sort((a, b) => at(a) - at(b));
   }
 
+  // THE AUDIT FINDING IS THE QUEUE GATE (TL-417), not a second definition of
+  // what a deadlock is. `handedBackAcross` owns that judgement; selection only
+  // decides what to do with its answer. A task that crossed the same unordered
+  // role boundary both ways is skipped, while a one-way handoff remains in the
+  // queue exactly as before.
+  const history = {};
+  for (const t of records) history[t.id] = t.history || [];
+  const deadlocked = new Map();
+  for (const finding of handedBackAcross(records, history, {
+    archived: config.archivedStatuses,
+  }).found) {
+    const id = String(finding.task).toUpperCase();
+    if (!deadlocked.has(id)) deadlocked.set(id, []);
+    deadlocked.get(id).push(finding);
+  }
+  const skippedDeadlocked = [];
+  const reportedDeadlocks = new Set();
+  const notDeadlocked = (t) => {
+    const findings = deadlocked.get(String(t.id).toUpperCase());
+    if (!findings) return true;
+    for (const finding of findings) {
+      const key = deadlockIdentity(finding);
+      if (reportedDeadlocks.has(key)) continue;
+      reportedDeadlocks.add(key);
+      skippedDeadlocked.push(finding);
+    }
+    return false;
+  };
+  const dispatchable = fresh.filter(notDeadlocked);
+
   // A judgement this same actor already made about this same task. It is a
   // fact READ FROM THE TREE, not a rule a caller keeps to itself: selection
   // policy is the dispatcher's, and a loop that filtered candidates itself
@@ -615,13 +666,14 @@ export function selectCandidates(records, config, filters, now) {
   };
   // `&&` short-circuits on purpose: a task held back by this actor's own
   // handoff is reported under that heading and not a second time as `elsewhere`.
-  const candidates = fresh.filter((t) => notHandedBack(t) && free(t, heldElsewhere(t, handedOut)));
+  const candidates = dispatchable.filter((t) => notHandedBack(t) && free(t, heldElsewhere(t, handedOut)));
 
   const reclaimable = new Set();
   if (!filters.status) {
     const stale = filterTasks(records, { ...filters, status: [inProgressStatus(config)].filter(Boolean) }, archived)
       .filter((t) => isAbandoned(t, config, now || Date.now()))
       .filter((t) => isExecutable(t, byId, archived))
+      .filter(notDeadlocked)
       // ANY disagreement stops a reclaim, whatever it says. Taking over a claim
       // is already a guess made from a date; a tree that reports something else
       // about the same task is the one piece of evidence that the guess is
@@ -633,7 +685,7 @@ export function selectCandidates(records, config, filters, now) {
   }
   return {
     candidates, reclaimable, unblocked, skippedElsewhere, skippedExecutor, skippedHandedBack,
-    skippedSize, skippedOutsideWave, skippedUnplanned,
+    skippedDeadlocked, skippedSize, skippedOutsideWave, skippedUnplanned,
     // The count is of tasks that MATCHED and were held back by an open blocker;
     // the unblocked ones were never in `matching`, so they must not be
     // subtracted from it.
@@ -776,7 +828,7 @@ export function run(argv) {
   // Which of the protected tasks a run parked, rather than a person declaring
   // the status (TL-282). Read here and handed in, so the selection stays pure.
   filters.parkedByRun = parkedByRun(root, records, config);
-  const { candidates: selected, reclaimable, unblocked, skippedBlocked, skippedElsewhere, skippedExecutor, skippedHandedBack, skippedSize, skippedOutsideWave, skippedUnplanned } =
+  const { candidates: selected, reclaimable, unblocked, skippedBlocked, skippedElsewhere, skippedExecutor, skippedHandedBack, skippedDeadlocked, skippedSize, skippedOutsideWave, skippedUnplanned } =
     selectCandidates(records, config, filters, now);
   // THE ACTOR'S RECORD, LAST OF ALL THE FILTERS (TL-150). It only removes, and
   // it removes from a queue the dispatcher has already ordered — eligibility and
@@ -816,6 +868,7 @@ export function run(argv) {
   const handedBackLines = skippedHandedBack.map(
     (s) => s.id + " skipped — you handed it back yourself" + (s.reason ? ": " + s.reason : "")
   );
+  const deadlockLines = skippedDeadlocked.map(describeDeadlock);
   const recordLines = skippedByRecord.map((s) => s.id + " withheld — " + s.reason);
 
   // Candidates are tried IN ORDER, and a taken one is skipped rather than
@@ -858,7 +911,7 @@ export function run(argv) {
       if (plan.json) {
         printJson("task-take", {
           ...takeJson(result, root), passedOver, considered: candidates.length,
-          skippedElsewhere, skippedExecutor, skippedHandedBack, skippedSize, skippedByRecord,
+          skippedElsewhere, skippedExecutor, skippedHandedBack, skippedDeadlocked, skippedSize, skippedByRecord,
           closedElsewhere,
           plan: planJson,
           scan: { scanned: scan.scanned, reason: scan.reason },
@@ -869,6 +922,7 @@ export function run(argv) {
             MARK.bullet + " plan wave " + (wave.index + 1) + ": " + (wave.name || "unnamed")
           ));
         }
+        for (const line of deadlockLines) console.log(color.dim(MARK.warn + " " + line));
         for (const line of handedBackLines) console.log(color.dim(MARK.bullet + " " + line));
         for (const line of recordLines) console.log(color.dim(MARK.bullet + " " + line));
         for (const line of elsewhereLines) console.log(color.dim(MARK.bullet + " " + line));
@@ -952,6 +1006,10 @@ export function run(argv) {
     );
     for (const s of skippedSize) details.push("  " + MARK.bullet + " " + s.id + " → " + s.estimate);
   }
+  if (deadlockLines.length) {
+    details.push(deadlockLines.length + " candidate(s) stopped at a role-boundary deadlock");
+    for (const line of deadlockLines) details.push("  " + MARK.warn + " " + line);
+  }
   if (handedBackLines.length) {
     details.push(
       handedBackLines.length + " candidate(s) YOU handed back — another actor is still offered them"
@@ -990,7 +1048,7 @@ export function run(argv) {
       details,
       searchedStatuses: searched, skippedBlocked, passedOver, skippedElsewhere, skippedExecutor,
       closedElsewhere,
-      skippedHandedBack, skippedSize, skippedByRecord, plan: planJson,
+      skippedHandedBack, skippedDeadlocked, skippedSize, skippedByRecord, plan: planJson,
       scan: { scanned: scan.scanned, reason: scan.reason },
     });
   } else {

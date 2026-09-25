@@ -178,6 +178,14 @@ function newTask(dir, title, role) {
   return { id: r.stdout.match(/[A-Z]+-\d+/)[0], file };
 }
 
+function makeClosable(t) {
+  const raw = readFileSync(t.file, "utf8");
+  writeFileSync(t.file, raw
+    .replace(/verification:[\s\S]*?\n---/,
+      'verification:\n  - id: it-is-done\n    bash: "test -f ' + t.id + '.done"\n---')
+    .replace(/\[proof:[^\]]*\]/g, "[proof: it-is-done]"), "utf8");
+}
+
 function hand(dir, id, actor, toRole, reason) {
   const taken = run(["take", id, "--dir", dir, "--actor", actor]);
   assert.equal(taken.status, 0, taken.stderr);
@@ -220,4 +228,38 @@ test("a one-way handoff is not a finding", () => {
   assert.deepEqual(doc.handedBack, [], "an ordinary stage change was reported as a deadlock");
   assert.equal(doc.findings, 0, doc.findings + " finding(s) on a backlog whose only event is one handoff");
   assert.equal(r.status, 0);
+});
+
+test("run skips a task handed both ways, reports the boundary, and still dispatches a one-way handoff", () => {
+  const dir = backlog();
+  const deadlocked = newTask(dir, "A change returned by both charters", ROLES[0]);
+  hand(dir, deadlocked.id, "agent:one", ROLES[1], OVER);
+  hand(dir, deadlocked.id, "agent:two", ROLES[0], BACK);
+
+  const forward = newTask(dir, "A change handed forward once", ROLES[0]);
+  hand(dir, forward.id, "agent:one", ROLES[1], OVER);
+  makeClosable(forward);
+
+  const agent = 'id=$(grep -m1 "^id: " | sed "s/^id: //"); touch "$id.done"';
+  const dispatched = run([
+    "run", "--dir", dir, "--actor", "agent:loop", "--agent", agent,
+    "--max-tasks", "1", "--json",
+  ]);
+  assert.equal(dispatched.status, 0, dispatched.stderr || dispatched.stdout);
+  const report = JSON.parse(dispatched.stdout);
+  assert.deepEqual(report.tasks.map((t) => t.id), [forward.id],
+    "the one-way handoff was not dispatched exactly as ordinary work");
+  assert.deepEqual(report.skippedDeadlocked.map((f) => f.task), [deadlocked.id]);
+  assert.deepEqual(report.skippedDeadlocked[0].roles, ROLES.slice().sort());
+  assert.deepEqual(report.skippedDeadlocked[0].legs.map((leg) => leg.reason), [OVER, BACK]);
+
+  const human = run(["run", "--dir", dir, "--actor", "agent:reader", "--agent", agent]);
+  assert.equal(human.status, 0, human.stderr || human.stdout);
+  assert.match(human.stdout, new RegExp(deadlocked.id));
+  assert.match(human.stdout, /deadlock/i);
+  assert.match(human.stdout, new RegExp(ROLES[0] + ".{0,5}" + ROLES[1]));
+  assert.ok(human.stdout.includes(OVER), "the run report omitted the first hand's reason");
+  assert.ok(human.stdout.includes(BACK), "the run report omitted the returning hand's reason");
+  assert.doesNotMatch(human.stdout, /held elsewhere/i,
+    "the deadlock was reported as an ordinary cross-tree hold");
 });
