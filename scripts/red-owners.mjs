@@ -42,9 +42,10 @@
  *
  * WHAT ATTRIBUTION CAN AND CANNOT SAY. It names the task whose commit last
  * touched the failing file, and whether that file differs from HEAD in THIS
- * working tree. That is evidence, not a verdict: a file you edited is yours to
- * explain whoever wrote it first, and a file no commit names carries no answer
- * at all — which is reported as `unattributed` rather than guessed.
+ * working tree. With `--repairs`, it also names an open task whose task-named
+ * commit on an active sibling branch touches the file. Both links are evidence,
+ * not guesses: an uncommitted sibling edit has no task-to-file link, a closed
+ * task is no longer repairing, and a file no commit names stays `unattributed`.
  *
  * Exit: 0 the question was answered (a red suite is an answer, not a failure of
  * this command) · 1 the report could not be read · 2 the invocation was wrong.
@@ -57,6 +58,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
 import { loadConfigOrExit } from "./config.mjs";
+import { crossBranchRepairs, scanNote } from "./branch-scan.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { modifiedFilesCached, repoRoot } from "./modified-files.mjs";
 import { resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
@@ -64,7 +66,7 @@ import { PRODUCT_NAME as N } from "./product.mjs";
 import { taskIdScanner } from "./task-id.mjs";
 import { MARK, color, failure, refusal, heading, table } from "./ui.mjs";
 
-const KNOWN_FLAGS = ["--json", "--dir"];
+const KNOWN_FLAGS = ["--json", "--repairs", "--dir"];
 const VALUE_FLAGS = ["--command", "--report", "--mine"];
 
 /**
@@ -185,7 +187,10 @@ export function verdictFor(row, mine) {
 
 /** The whole answer, as data. Reads git; writes nothing. */
 export function redOwners(opts = {}) {
-  const { text, command = null, exitCode = null, root, prefix, mine = null, run = spawnSync } = opts;
+  const {
+    text, command = null, exitCode = null, root, prefix, mine = null, run = spawnSync,
+    repairScan = null,
+  } = opts;
   const index = modifiedFilesCached({ root, prefix, run });
   const scanner = taskIdScanner(prefix);
 
@@ -202,6 +207,9 @@ export function redOwners(opts = {}) {
       : { path, tasks: [], lastTask: null, uncommitted: false };
     row.failures = entry.failures;
     row.verdict = verdictFor(row, mine);
+    if (repairScan) {
+      row.repairs = (repairScan.byPath.get(path) || []).filter((repair) => repair.id !== row.lastTask);
+    }
     return row;
   });
 
@@ -212,7 +220,7 @@ export function redOwners(opts = {}) {
     unattributed: files.filter((f) => f.verdict === "unattributed").length,
   };
 
-  return {
+  const report = {
     command,
     ran: text !== null,
     reason: text === null ? "no-report" : (index.scanned ? "ok" : index.reason),
@@ -221,6 +229,14 @@ export function redOwners(opts = {}) {
     mine,
     tally,
   };
+  if (repairScan) {
+    report.repairScan = {
+      scanned: repairScan.scanned,
+      reason: repairScan.reason,
+      branches: repairScan.branches,
+    };
+  }
+  return report;
 }
 
 /** The text answer. PURE, so a test reads it without a terminal. */
@@ -244,7 +260,11 @@ export function renderRed(report, opts = {}) {
   }
 
   const rows = report.files.map((f) => {
-    const owner = f.uncommitted ? "uncommitted here" : (f.lastTask || "no task in any commit");
+    let owner = f.uncommitted ? "uncommitted here" : (f.lastTask || "no task in any commit");
+    if (f.repairs && f.repairs.length) {
+      const repairers = f.repairs.map((r) => r.id + " @ " + r.source).join(", ");
+      owner = "broke: " + owner + " · repairing: " + repairers;
+    }
     return ["    " + f.path, owner, f.verdict];
   });
   out.push("  " + report.tally.failed + " failing test file(s):");
@@ -255,6 +275,15 @@ export function renderRed(report, opts = {}) {
     "  ·  unattributed: " + report.tally.unattributed);
   if (!report.mine) {
     out.push("  " + MARK.bullet + " `--mine <ID>` names the task you hold, and the verdicts sharpen");
+  }
+  if (report.repairScan) {
+    if (!report.repairScan.scanned) {
+      const note = scanNote(report.repairScan.reason) ||
+        "repair attribution unavailable — cross-branch state is disabled";
+      out.push("  " + paint.warn(MARK.warn) + " " + note);
+    } else if (!report.files.some((f) => f.repairs && f.repairs.length)) {
+      out.push("  " + MARK.bullet + " no open task on an active sibling branch touches these files");
+    }
   }
   if (report.reason !== "ok") {
     out.push("  " + paint.warn(MARK.warn) + " the file index could not be computed (" + report.reason +
@@ -311,6 +340,7 @@ export function main(argv, io = {}) {
   }
 
   const asJson = rest.includes("--json");
+  const withRepairs = rest.includes("--repairs");
   const root = resolveBacklogDirOrExit({ dir: cli.dir }, N + " red").root;
   const config = loadConfigOrExit(root);
   const repo = repoRoot(root);
@@ -362,10 +392,19 @@ export function main(argv, io = {}) {
     }
   }
 
-  const report = redOwners({
+  const preliminary = redOwners({
     text, command, exitCode, root: repo, prefix: config.taskIdPrefix, mine,
     cwd: repo || process.cwd(), run: spawnSync,
   });
+  const repairScan = withRepairs
+    ? crossBranchRepairs(root, config, preliminary.files.map((file) => file.path))
+    : null;
+  const report = withRepairs
+    ? redOwners({
+      text, command, exitCode, root: repo, prefix: config.taskIdPrefix, mine,
+      cwd: repo || process.cwd(), run: spawnSync, repairScan,
+    })
+    : preliminary;
 
   if (asJson) {
     printJson("red-owners", report);

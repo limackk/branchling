@@ -46,7 +46,9 @@ import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { join, relative } from "node:path";
 
 import { HISTORY_DIRNAME } from "./history.mjs";
+import { gitLogArgs, parseLog } from "./modified-files.mjs";
 import { parseTaskRecord } from "./task-select.mjs";
+import { taskIdScanner } from "./task-id.mjs";
 
 /** A day, in seconds — the unit `active_branch_days` is expressed in. */
 const DAY = 86_400;
@@ -593,6 +595,94 @@ export function crossBranchState(root, config, opts = {}) {
     self: repoRoot,
   });
   return { scanned: true, reason: null, ...scan };
+}
+
+/**
+ * Open tasks whose commits on active sibling branches touch one of `paths`.
+ *
+ * This is deliberately a separate, opt-in scan from `crossBranchState()`: a
+ * caller asking only about this tree must not pay one `git log` per branch.
+ * A task id in the branch-only commit and that task's open status on the SAME
+ * ref are both required. The commit ties the task to the file; the task file
+ * proves that "repairing" is still true rather than historical.
+ *
+ * @returns {{byPath: Map<string, Array<{id: string, source: string, kind: string}>>,
+ *            branches: string[]}}
+ */
+export function scanRepairingTasks(opts) {
+  const { repoRoot, backlogRel, taskFile, prefix } = opts;
+  const wantedPaths = new Set(opts.paths || []);
+  const byPath = new Map();
+  if (!wantedPaths.size) return { byPath, branches: [] };
+
+  const all = worktrees(repoRoot);
+  const pinned = new Set(all.map((w) => w.branch).filter(Boolean));
+  const selfKey = opts.self ? samePathKey(opts.self) : null;
+  const selfBranch = selfKey
+    ? (all.find((w) => samePathKey(w.path) === selfKey) || {}).branch || null
+    : null;
+  const merged = mergedRefs(repoRoot);
+  const refs = activeRefs(repoRoot, { days: opts.days, now: opts.now, pinned }).filter(
+    (r) => r.ref !== selfBranch && !merged.has(r.ref)
+  );
+  const archived = new Set(opts.archivedStatuses || []);
+
+  for (const ref of refs) {
+    const entries = taskEntriesInRef(repoRoot, ref.ref, backlogRel).filter((e) => taskFile.test(e.name));
+    const blobs = readBlobs(repoRoot, entries.map((e) => e.sha));
+    const statusById = new Map();
+    for (const entry of entries) {
+      const raw = blobs.get(entry.sha);
+      const task = raw ? parseTaskRecord(raw, entry.name) : null;
+      if (task && task.id) statusById.set(task.id, task.status);
+    }
+
+    const log = spawnSync("git", [...gitLogArgs(), "HEAD.." + ref.ref], {
+      cwd: repoRoot, encoding: "utf8", timeout: 120_000, maxBuffer: 256 * 1024 * 1024,
+    });
+    if (log.status !== 0) continue;
+    const touchedByTask = parseLog(log.stdout, taskIdScanner(prefix));
+    for (const [id, touched] of touchedByTask) {
+      const status = statusById.get(id);
+      if (!status || archived.has(status)) continue;
+      for (const path of touched) {
+        if (!wantedPaths.has(path)) continue;
+        const observations = byPath.get(path) || [];
+        const key = id + "\u0000" + ref.name;
+        if (!observations.some((o) => o.id + "\u0000" + o.source === key)) {
+          observations.push({ id, source: ref.name, kind: "branch" });
+          byPath.set(path, observations);
+        }
+      }
+    }
+  }
+
+  return { byPath, branches: refs.map((r) => r.name) };
+}
+
+/** The repository-shaped wrapper for the opt-in repair attribution scan. */
+export function crossBranchRepairs(root, config, paths, opts = {}) {
+  const empty = (reason) => ({ scanned: false, reason, byPath: new Map(), branches: [] });
+  if (!config || config.crossBranchState === false) return empty("disabled");
+  const repoRoot = repoRootFor(root);
+  if (!repoRoot) return empty("not-a-repository");
+  const backlogRel = backlogRelFor(repoRoot, root);
+  if (backlogRel === null) return empty("outside-repository");
+  return {
+    scanned: true,
+    reason: null,
+    ...scanRepairingTasks({
+      repoRoot,
+      backlogRel,
+      taskFile: config.taskId.file,
+      prefix: config.taskIdPrefix,
+      archivedStatuses: config.archivedStatuses,
+      days: config.activeBranchDays,
+      now: opts.now,
+      self: repoRoot,
+      paths,
+    }),
+  };
 }
 
 /**

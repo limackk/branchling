@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex-subagent
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-21
-updated: 2026-09-21
+updated: 2026-09-25
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: [scripts/red-owners.mjs, scripts/branch-scan.mjs]
@@ -86,7 +86,7 @@ become a ten-second one for every caller.
 
 ## Acceptance criteria
 
-- [ ] A failing file broken by one task and under repair by another reports
+- [x] A failing file broken by one task and under repair by another reports
       both, and which is which. [proof: repairing-task-named]
-- [ ] With nothing repairing it, the row is byte-identical to today's.
+- [x] With nothing repairing it, the row is byte-identical to today's.
       [proof: repairing-task-named]

@@ -34,7 +34,9 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { parseFailures, redOwners, verdictFor } from "../red-owners.mjs";
+import { crossBranchRepairs } from "../branch-scan.mjs";
+import { loadConfig } from "../config.mjs";
+import { parseFailures, redOwners, renderRed, verdictFor } from "../red-owners.mjs";
 import { DEFAULT_TASK_ID_PREFIX as P } from "../task-id.mjs";
 import { isolateHome } from "./_repo.mjs";
 
@@ -200,7 +202,42 @@ function repoWithHistory({ titled = true } = {}) {
   commit(P + "-1", "alpha.test.mjs", "// red on purpose\n", "the alpha contract is stated and unmet");
   commit(P + "-2", "beta.test.mjs", "// green\n", "the beta contract holds");
   commit(P + "-3", "gamma.test.mjs", "// red on purpose\n", "the gamma contract is stated and unmet");
-  return { root, backlog };
+  return { root, backlog, git };
+}
+
+function addRepairBranch(fixture, { id = P + "-9", status = "in_progress", branch = "repair-alpha" } = {}) {
+  fixture.git("switch", "-qc", branch);
+  writeFileSync(join(fixture.root, "tests", "alpha.test.mjs"), "// repair in progress\n", "utf8");
+  writeFileSync(join(fixture.backlog, "tasks", id + "-repair-alpha.md"), [
+    "---",
+    "id: " + id,
+    'title: "repair alpha"',
+    "type: task",
+    "labels: []",
+    "board: main",
+    "priority: P2",
+    "status: " + status,
+    "owner: agent:test",
+    "role: \"\"",
+    "executor: \"\"",
+    "estimate: 30m",
+    "confidence: high",
+    "created: 2026-09-25",
+    "updated: 2026-09-25",
+    "blocked_by: []",
+    "blocks: []",
+    "related_docs: []",
+    "verification: []",
+    "---",
+    "",
+    "## Goal",
+    "",
+    "Repair alpha.",
+    "",
+  ].join("\n"), "utf8");
+  fixture.git("add", "-A");
+  fixture.git("commit", "-qm", id + " alpha is under repair");
+  fixture.git("switch", "-q", "main");
 }
 
 test("each failing file is attributed to the task whose commit last touched it", () => {
@@ -227,6 +264,49 @@ test("POSITIVE CONTROL: with no task id in any commit title, every row is unattr
   assert.deepEqual(report.files.map((f) => f.lastTask), [null, null]);
   assert.deepEqual(report.files.map((f) => f.verdict), ["unattributed", "unattributed"]);
   assert.equal(report.tally.elsewhere, 0);
+});
+
+test("an open sibling task that touches a failing file is named as its repairer", () => {
+  const fixture = repoWithHistory();
+  addRepairBranch(fixture);
+  const scan = crossBranchRepairs(
+    fixture.backlog,
+    loadConfig(fixture.backlog),
+    ["tests/alpha.test.mjs", "tests/gamma.test.mjs"],
+  );
+  assert.equal(scan.scanned, true);
+
+  const report = redOwners({
+    text: TAP, root: fixture.root, cwd: fixture.root, prefix: P, repairScan: scan,
+  });
+  const alpha = report.files.find((file) => file.path === "tests/alpha.test.mjs");
+  const gamma = report.files.find((file) => file.path === "tests/gamma.test.mjs");
+  assert.equal(alpha.lastTask, P + "-1", "the task that made the file red was replaced");
+  assert.deepEqual(alpha.repairs, [{ id: P + "-9", source: "repair-alpha", kind: "branch" }]);
+  assert.deepEqual(gamma.repairs, [], "a task was guessed for an untouched file");
+  assert.match(renderRed(report), new RegExp("broke: " + P + "-1 .* repairing: " + P + "-9 @ repair-alpha"));
+});
+
+test("POSITIVE CONTROL: no open sibling repair leaves today's row byte-identical", () => {
+  const fixture = repoWithHistory();
+  addRepairBranch(fixture, { status: "done", branch: "closed-alpha" });
+  const plain = redOwners({ text: TAP, root: fixture.root, cwd: fixture.root, prefix: P });
+  const scan = crossBranchRepairs(
+    fixture.backlog,
+    loadConfig(fixture.backlog),
+    ["tests/alpha.test.mjs", "tests/gamma.test.mjs"],
+  );
+  const checked = redOwners({
+    text: TAP, root: fixture.root, cwd: fixture.root, prefix: P, repairScan: scan,
+  });
+  assert.deepEqual(checked.files.flatMap((file) => file.repairs), [],
+    "an archived task was described as repairing");
+
+  const rowFor = (text, path) => text.split("\n").find((line) => line.includes(path));
+  assert.equal(
+    rowFor(renderRed(checked), "tests/alpha.test.mjs"),
+    rowFor(renderRed(plain), "tests/alpha.test.mjs"),
+  );
 });
 
 test("NOTHING IS SUPPRESSED: every failing file is reported, including another task's", () => {
@@ -272,6 +352,35 @@ test("`red` answers in one call, and its exit code is not the suite's verdict", 
   assert.equal(answer.tally.failed, 2);
   assert.equal(answer.tally.elsewhere, 1);
   assert.equal(answer.files.find((f) => f.path === "tests/alpha.test.mjs").lastTask, P + "-1");
+});
+
+test("`red --repairs` carries breaker and repairer through the JSON command surface", () => {
+  const fixture = repoWithHistory();
+  addRepairBranch(fixture);
+  const tap = join(fixture.root, "run.txt");
+  writeFileSync(tap, TAP, "utf8");
+
+  const r = spawnSync(process.execPath, [
+    CLI, "red", "--report", tap, "--repairs", "--json", "--dir", fixture.backlog,
+  ], { encoding: "utf8", timeout: 120_000, cwd: fixture.root });
+  assert.equal(r.status, 0, r.stderr);
+  const answer = JSON.parse(r.stdout);
+  const alpha = answer.files.find((file) => file.path === "tests/alpha.test.mjs");
+  assert.equal(alpha.lastTask, P + "-1");
+  assert.deepEqual(alpha.repairs, [{ id: P + "-9", source: "repair-alpha", kind: "branch" }]);
+  assert.equal(answer.repairScan.scanned, true);
+});
+
+test("a requested repair scan says when project configuration disabled it", () => {
+  const fixture = repoWithHistory();
+  const config = { ...loadConfig(fixture.backlog), crossBranchState: false };
+  const scan = crossBranchRepairs(fixture.backlog, config, ["tests/alpha.test.mjs"]);
+  const report = redOwners({
+    text: TAP, root: fixture.root, cwd: fixture.root, prefix: P, repairScan: scan,
+  });
+  assert.equal(scan.scanned, false);
+  assert.equal(scan.reason, "disabled");
+  assert.match(renderRed(report), /repair attribution unavailable — cross-branch state is disabled/);
 });
 
 test("an unknown flag fails with exit 2 and names what it accepts", () => {

@@ -274,6 +274,11 @@ export const KINDS = {
   // count cannot be acted on and a filename can.
   "red-owners": {
     command: null, ran: null, reason: null, exitCode: null, files: [], mine: null, tally: null,
+    // Null means the caller kept the cheap, current-tree answer. When present,
+    // this says whether the explicitly requested sibling-branch repair scan
+    // actually ran; an empty repairs list without it would conflate "none"
+    // with "could not look".
+    repairScan: null,
   },
   // `log --json` (TL-256). `records` is the number of RAW entries the log holds
   // and `total` the number of EXCHANGES they fold into; both are here because

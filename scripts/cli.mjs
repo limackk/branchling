@@ -1095,7 +1095,7 @@ export const COMMANDS = {
     script: "red-owners.mjs",
     summary: "whose failure is this — attribute each failing test file to the task that made it red",
     usage: [
-      `${N} red [--command "<cmd>"] [--report <file>] [--mine <ID>] [--json] [--dir <path>]`,
+      `${N} red [--command "<cmd>"] [--report <file>] [--mine <ID>] [--repairs] [--json] [--dir <path>]`,
       "",
       '  --command "<cmd>"  run the suite through your shell and attribute what fails',
       "  --report <file>    attribute a `node --test` run you already have, in either",
@@ -1104,6 +1104,9 @@ export const COMMANDS = {
       "  --mine <ID>        the task you hold. Without it the rows are attributed but not",
       "                     divided: `elsewhere` is a claim about YOU, and the tool will",
       "                     not invent which task you are",
+      "  --repairs          scan active sibling branches for an open task whose commit",
+      "                     touches the failing file; labels the historical task as",
+      "                     `broke` and the open sibling task as `repairing`",
       "  --json             every failing file with the task its commits name, for a loop",
       "",
       "  A two-hand pipeline commits red ON PURPOSE — a `spec` hand's deliverable IS a",
