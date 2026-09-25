@@ -53,5 +53,8 @@ The files to read before the first edit, each with a reason.
 
 Each one names the `verification:` entry that PROVES it, and the tool ticks it
 after a green run — a checkbox you tick by hand is a claim, not evidence.
+Replace the example below together with the example verification entry. Until
+its exact sentence and proof id change, the criteria guard recognises it as the
+template's placeholder rather than as an authored link.
 
 - [ ] Verifiable, not subjective. [proof: the-name]

@@ -87,6 +87,18 @@ const VERIFICATION_KEYS = ["id", "bash", "manual"];
 export const TEMPLATE_PLACEHOLDER = "command to run";
 
 /**
+ * The criterion `_template.md` writes beside its verification example.
+ *
+ * The sentence AND its proof id identify the placeholder. The id alone cannot:
+ * an author may keep `the-name` while replacing both examples, and that real
+ * criterion must still fail when its proof is absent. Keep these values beside
+ * the verification placeholder above because the template presents them as one
+ * example and `new-task-passes-check.test.mjs` guards both directions.
+ */
+export const TEMPLATE_CRITERION = "Verifiable, not subjective.";
+export const TEMPLATE_CRITERION_PROOF = "the-name";
+
+/**
  * Is this entry still the template's, rather than somebody's?
  *
  * @param {{bash: string|null, manual: string|null}} entry one parsed entry
@@ -95,6 +107,16 @@ export function isTemplatePlaceholder(entry) {
   if (!entry) return false;
   const text = entry.bash != null ? entry.bash : entry.manual;
   return String(text == null ? "" : text).trim() === TEMPLATE_PLACEHOLDER;
+}
+
+/** Is this criterion still the exact example `_template.md` wrote? */
+export function isTemplateCriterion(item) {
+  return Boolean(
+    item &&
+    item.text === TEMPLATE_CRITERION &&
+    item.proofs.length === 1 &&
+    item.proofs[0] === TEMPLATE_CRITERION_PROOF
+  );
 }
 
 
@@ -280,6 +302,17 @@ export function auditTask({ frontmatter, body, policy = "warn" }) {
   const used = new Set();
 
   for (const item of items) {
+    // THE TEMPLATE'S OWN CRITERION IS NOT A BROKEN LINK (TL-404). Once an
+    // author replaces the example verification entry, its example proof id no
+    // longer exists. Reporting that exact state as corruption means the tool's
+    // own line makes the release gate red. Identify the placeholder by BOTH
+    // the sentence and proof id: changing either makes it authored data again,
+    // so every real dangling reference below remains an error.
+    //
+    // Do not add its proof to `used`, even when a real entry happens to keep
+    // `id: the-name`. A placeholder is not evidence that an author linked that
+    // entry; the orphan rule must continue to report it.
+    if (isTemplateCriterion(item)) continue;
     for (const ref of item.proofs) {
       used.add(ref);
       if (!ids.has(ref)) {

@@ -11,12 +11,12 @@
  * on it. A guard that fires on a state the tool authored teaches its reader to
  * delete two of the three lines the tool just wrote.
  *
- * WHAT IS PROVED HERE. A placeholder announces itself by its COMMAND, so the
- * orphan rule skips it, and every entry somebody really wrote is still
- * reported — including one that kept the template's id but got a real command.
- * The last case is the positive control the whole decision rests on: if the
- * rule were "the template's id is exempt", that case would go quiet too and
- * `criteria_links` would be weaker than it was.
+ * WHAT IS PROVED HERE. Each placeholder announces itself by content: the
+ * verification entry by its command, the criterion by its exact sentence and
+ * proof id. The guards skip those examples and still report every entry or
+ * dangling link somebody really wrote. Those positive controls are the whole
+ * decision: exempting an id rather than an exact example would make
+ * `criteria_links` weaker than it was.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -26,7 +26,11 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { TEMPLATE_PLACEHOLDER } from "../criteria.mjs";
+import {
+  TEMPLATE_CRITERION,
+  TEMPLATE_CRITERION_PROOF,
+  TEMPLATE_PLACEHOLDER,
+} from "../criteria.mjs";
 import { TEMPLATE_PLACEHOLDER as PLACEHOLDER_DONE_REFUSES } from "../done-task.mjs";
 import { isolateHome } from "./_repo.mjs";
 
@@ -95,6 +99,50 @@ test("the placeholder survives the author writing their own criteria", () => {
   assert.ok(
     !/proves no criterion/.test(r.stdout + r.stderr),
     "the template's own entry must not be reported:\n" + r.stdout + r.stderr
+  );
+});
+
+test("the criterion placeholder survives the author writing verification", () => {
+  const dir = freshBacklog("authored-verification");
+  const file = newTask(dir, "A task whose verification the author wrote");
+
+  // Mirror the transition above: replace only the verification example and
+  // leave the exact criterion the template wrote. The remaining `mine` warning
+  // is intentional; under the default migration policy it does not fail the
+  // gate, while the template's now-dangling proof must not produce an error.
+  const raw = readFileSync(file, "utf8");
+  const withOwnVerification = raw.replace(
+    /^verification:[\s\S]*?(?=^---$)/m,
+    'verification:\n  - id: mine\n    bash: "true"\n'
+  );
+  writeFileSync(file, withOwnVerification);
+
+  const r = criteriaCheck(dir);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.doesNotMatch(
+    r.stdout + r.stderr,
+    new RegExp("`\\[proof: " + TEMPLATE_CRITERION_PROOF + "\\]` names no")
+  );
+  assert.match(r.stdout + r.stderr, /`mine` proves no criterion/);
+});
+
+test("an authored dangling criterion is still an error", () => {
+  const dir = freshBacklog("authored-criterion");
+  const file = newTask(dir, "A task with a real criterion and a broken link");
+
+  const raw = readFileSync(file, "utf8");
+  writeFileSync(file, raw
+    .replace(TEMPLATE_CRITERION, "A criterion somebody really wrote.")
+    .replace(
+      /^verification:[\s\S]*?(?=^---$)/m,
+      'verification:\n  - id: mine\n    bash: "true"\n'
+    ));
+
+  const r = criteriaCheck(dir);
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  assert.match(
+    r.stdout + r.stderr,
+    new RegExp("`\\[proof: " + TEMPLATE_CRITERION_PROOF + "\\]` names no")
   );
 });
 
