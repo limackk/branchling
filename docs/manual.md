@@ -631,7 +631,7 @@ implementation detail. Every reading command answers in the same envelope:
 | `conformance` | `adapter-conformance` | `ok`, `version`, `adapter`, `results`, `failures` |
 | `plan` | `plan` | `root`, `exists`, `updated`, `rationale`, `waves`, `activeWave`, `nextUp`, `inProgress`, `unplanned`, `coverage`, `stale`, `inProgressStatus` |
 | `seed` | `seed` | `ok`, `root`, `dryRun`, `created`, `errors` |
-| `import` | `import` | `ok`, `root`, `dryRun`, `created`, `skipped`, `droppedLabels`, `withoutVerification`, `errors` |
+| `import` | `import` | `ok`, `root`, `dryRun`, `created`, `wouldCreate`, `skipped`, `droppedLabels`, `withoutVerification`, `errors` |
 | `<command> --help` | `command-help` | `command`, `summary`, `usage`, `configured`, `flags` |
 | `pr-summary` | `pr-summary` | `base`, `scanned`, `reason`, `tasks`, `engaged`, `cost` |
 | `audit` | `audit` | `since`, `dayZero`, `tasks`, `findings`, `closedWithoutTrace`, `skippedBeforeSince`, `reopened`, `parked`, `withoutPremise`, `awaitingVouch`, `handedBack`, `vouches`, `contractCapability`, `advisories` |

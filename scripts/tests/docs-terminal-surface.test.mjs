@@ -259,16 +259,11 @@ test("every command line in the documents is one the tool would accept", () => {
 
 /**
  * A kind the manual documents that the code cannot yet emit, with the task that
- * will settle it. The alternative was to fix `import` here, and a command that
- * throws a stack trace instead of answering is a defect with its own
- * verification, not a documentation drift — inflating this task would have left
- * both unverifiable. The case at the bottom fails on an entry that outlives its
- * defect, so the exemption cannot quietly become permanent.
+ * will settle it. The case at the bottom fails on an entry that outlives its
+ * defect, so this deliberately empty map cannot quietly accumulate permanent
+ * exceptions.
  */
-const UNSETTLED_KINDS = {
-  // `import --from github --dry-run --json` throws `unknown JSON kind: import`.
-  import: "TL-425",
-};
+const UNSETTLED_KINDS = {};
 
 /**
  * The `kind` column of the manual's `--json` contract table. PURE.

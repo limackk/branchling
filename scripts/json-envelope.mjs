@@ -151,6 +151,13 @@ export const KINDS = {
   // was refused for, in full — an adapter retrying with the model (TL-95) needs
   // every complaint, not the first.
   seed: { ok: null, root: null, dryRun: null, created: [], errors: [] },
+  // `import --json`. A dry run reports `wouldCreate`; a real import reports
+  // `created` and `withoutVerification`. Both paths share one kind, so the
+  // other path's keys stay present with their declared empty values.
+  import: {
+    ok: null, root: null, dryRun: null, created: [], wouldCreate: [],
+    skipped: [], droppedLabels: [], withoutVerification: null, errors: [],
+  },
   // `plan --json`. `exists` is false for a backlog with no `plan.yaml`, and then
   // every other key carries its empty value — the execution order is optional,
   // so its absence is an answer and not an error to be told apart from one.
@@ -467,6 +474,20 @@ export const KIND_EXERCISE = {
         verification: [{ id: "it-runs", bash: "true", proves: "The check runs." }],
       }],
     }),
+  },
+  // A real issue rather than `[]`: the dry run must traverse the import plan
+  // and expose a non-empty `wouldCreate`, so the registry cannot go green on a
+  // command that only handles an empty sample.
+  import: {
+    args: ["import", "--from", "github", "--dry-run", "--json"],
+    input: JSON.stringify([{
+      number: 1,
+      title: "An imported issue",
+      body: "The fixture issue body.",
+      state: "OPEN",
+      labels: [],
+      url: "https://example.test/issues/1",
+    }]),
   },
 };
 

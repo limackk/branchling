@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: "CLI onboarding"
 priority: P1                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex-subagent
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-21
-updated: 2026-09-21
+updated: 2026-09-25
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: [scripts/import-github.mjs, scripts/json-envelope.mjs, docs/manual.md]
@@ -84,10 +84,10 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] `import --from github --dry-run --json` exits 0 and prints one envelope
+- [x] `import --from github --dry-run --json` exits 0 and prints one envelope
       rather than a stack trace. [proof: import-answers-json]
-- [ ] `import` is declared in `KINDS` and exercised by `KIND_EXERCISE`, and the
+- [x] `import` is declared in `KINDS` and exercised by `KIND_EXERCISE`, and the
       manual's row agrees with it in both directions.
       [proof: envelope-suite]
-- [ ] The documentation guard passes with no exemption for this kind.
+- [x] The documentation guard passes with no exemption for this kind.
       [proof: envelope-suite]

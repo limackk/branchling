@@ -404,6 +404,11 @@ test("the answers DIFFER between an empty backlog and a populated one", () => {
   assert.equal(ask("next-id", full).known, 3);
 
   assert.ok(ask("doctor", full).checks.length > 0, "a diagnosis with no rows proves nothing");
+
+  const imported = ask("import", full);
+  assert.equal(imported.wouldCreate.length, 1,
+    "the import registration exercised only an empty input");
+  assert.equal(imported.wouldCreate[0].title, "An imported issue");
 });
 
 test("query --json says how many matched, not just how many it shows", () => {
