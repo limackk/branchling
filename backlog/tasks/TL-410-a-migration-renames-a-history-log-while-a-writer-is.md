@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex-subagent
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-21
-updated: 2026-09-21
+updated: 2026-09-25
 blocked_by: [TL-409]                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
@@ -92,8 +92,8 @@ section for longer"; it needs its own mechanism and its own decision.
 
 ## Acceptance criteria
 
-- [ ] An event appended during a migration is readable under the new id
+- [x] An event appended during a migration is readable under the new id
       afterwards, proven by a test that fails against today's code.
       [proof: append-survives-a-rename]
-- [ ] The snapshot section TL-228 created keeps its scope and its decision.
+- [x] The snapshot section TL-228 created keeps its scope and its decision.
       [proof: suite-green]

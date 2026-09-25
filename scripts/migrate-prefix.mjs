@@ -44,6 +44,7 @@ import { fileURLToPath } from "node:url";
 import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { ACTOR_NAMESPACES, MIGRATIONS_FILE, SNAPSHOT_FILE, appendMigration, applyIdMigrations, isValidActor, loadSnapshot, saveSnapshot } from "./history.mjs";
+import { withHistoryLogMutex } from "./history-log-mutex.mjs";
 import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { withSnapshotMutex } from "./snapshot-mutex.mjs";
 import { PREFIX_SHAPE, taskIdPatterns } from "./task-id.mjs";
@@ -194,13 +195,25 @@ export function applyMigration(root, plan, opts = {}) {
   // Content first, then names: a crash between the two leaves files whose body
   // is already correct, which the mismatch guard can explain. The reverse order
   // leaves renamed files with stale ids, which looks like corruption.
-  for (const r of plan.renames) {
+  for (const r of plan.renames.filter((entry) => entry.kind === "task")) {
     const raw = readFileSync(r.from, "utf8");
-    const next = r.kind === "task" ? rewriteTask(raw, plan) : rewriteHistory(raw, plan);
+    const next = rewriteTask(raw, plan);
     if (next !== raw) writeFileSync(r.from, next, "utf8");
   }
-  for (const r of plan.renames) {
+  for (const r of plan.renames.filter((entry) => entry.kind === "task")) {
     if (r.from !== r.to) renameSync(r.from, r.to);
+  }
+
+  // One logical log at a time. A writer either appends to the old path before
+  // this section and travels with the rename, or waits, re-resolves, and appends
+  // to the new path afterwards. The lock never spans the whole-tree rewrite.
+  for (const r of plan.renames.filter((entry) => entry.kind === "history")) {
+    withHistoryLogMutex(root, r.newId, () => {
+      const raw = readFileSync(r.from, "utf8");
+      const next = rewriteHistory(raw, plan);
+      if (next !== raw) writeFileSync(r.from, next, "utf8");
+      if (r.from !== r.to) renameSync(r.from, r.to);
+    });
   }
 
   // After the renames, because the rekeying reads the TREE to decide: the same

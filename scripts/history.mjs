@@ -33,6 +33,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renam
 import { join } from "node:path";
 
 import { withBacklogMutex } from "./lock.mjs";
+import { withHistoryLogMutex } from "./history-log-mutex.mjs";
 import { withSnapshotMutex } from "./snapshot-mutex.mjs";
 import { ACTOR_UNKNOWN, FIELD_ADOPTED, FIELD_ATTRIBUTED, FIELD_COMMENT, FIELD_CREATED, FIELD_DECISION, FIELD_DELETED, FIELD_TAKEOVER, REASON_UNKNOWN, TRACKED_FIELDS, diffMeta, extractMeta, formatValue, hasStatedReason, normalizeActor as normalizeActorFn, normalizeReason, splitFrontmatter } from "./task-fields.mjs";
 import { ANY_HISTORY_FILE, ANY_TASK_FILE, ANY_TASK_FILE_ID, ANY_TASK_ID, taskIdPatterns } from "./task-id.mjs";
@@ -144,9 +145,52 @@ export function appendEntries(backlogDir, taskId, entries) {
   // state beside "absent" and "present" that means the same as the first — and a
   // reader would have to know that to count correctly.
   for (const e of entries) if (e && !e.session) delete e.session;
-  const lines = entries.map((e) => JSON.stringify(e)).join("\n") + "\n";
-  appendFileSync(historyPath(backlogDir, taskId), lines, "utf8");
-  return entries;
+  const destinationId = migratedTaskId(backlogDir, taskId);
+  return withHistoryLogMutex(backlogDir, destinationId, () => {
+    // Resolve only AFTER entering the same section as the rename. If the old
+    // path still exists, the append belongs there and the migration carries it
+    // across. If a renumber has staged it, append to the temporary inode. Only
+    // after neither exists is the destination path authoritative.
+    const target = historyAppendTarget(backlogDir, taskId);
+    for (const e of entries) if (e && e.task === taskId) e.task = target.taskId;
+    const lines = entries.map((e) => JSON.stringify(e)).join("\n") + "\n";
+    appendFileSync(target.path, lines, "utf8");
+    return entries;
+  });
+}
+
+/** Apply every recorded migration to an id, in recorded order. */
+export function migratedTaskId(backlogDir, taskId) {
+  let current = taskId;
+  for (const migration of readMigrations(backlogDir)) {
+    const next = migratedId(migration, current);
+    if (next !== null) current = next;
+  }
+  return current;
+}
+
+/**
+ * The writable path for an id lineage while holding its destination mutex.
+ * Renumber's temporary name is part of the protocol: writers may append to it
+ * between the two short locked rename stages, and the second stage carries the
+ * accepted rows to their final name.
+ */
+function historyAppendTarget(backlogDir, taskId) {
+  let current = taskId;
+  let file = historyPath(backlogDir, current);
+  if (existsSync(file)) return { path: file, taskId: current };
+
+  for (const migration of readMigrations(backlogDir)) {
+    const next = migratedId(migration, current);
+    if (next === null) continue;
+    const nextPath = historyPath(backlogDir, next);
+    const staged = nextPath + ".renumbering";
+    if (existsSync(staged)) return { path: staged, taskId: next };
+    current = next;
+    file = nextPath;
+    if (existsSync(file)) return { path: file, taskId: current };
+  }
+  return { path: file, taskId: current };
 }
 
 // ──────────────────────────────────────────────────────────────────────────

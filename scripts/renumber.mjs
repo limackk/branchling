@@ -53,6 +53,7 @@ import { fileURLToPath } from "node:url";
 
 import { loadConfigOrExit } from "./config.mjs";
 import { ACTOR_NAMESPACES, MIGRATIONS_FILE, appendRenumberMigration, applyIdMigrations, isValidActor, loadSnapshot, saveSnapshot } from "./history.mjs";
+import { withHistoryLogMutex } from "./history-log-mutex.mjs";
 import { backlogPaths, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { withSnapshotMutex } from "./snapshot-mutex.mjs";
 import { taskIdPatterns, taskIdScanner } from "./task-id.mjs";
@@ -308,21 +309,14 @@ export function applyRenumber(root, plan, opts = {}) {
   // Content before names. A crash between the two leaves files whose body is
   // already right, which the tree can still explain; the reverse leaves renamed
   // files carrying somebody else's id, which reads as corruption.
-  for (const r of plan.renames) {
+  for (const r of plan.renames.filter((entry) => entry.kind === "task")) {
     const abs = join(r.dir, r.from);
     const raw = readFileSync(abs, "utf8");
-    let next;
-    if (r.kind === "history") {
-      const res = rewriteHistoryFile(raw, idMap, prefix);
-      next = res.text;
-      report.historyProse += res.prose;
-    } else {
-      const res = rewriteIds(raw, idMap, prefix);
-      next = res.text;
-      report.replacements += res.changed;
-      noteExempt(relative(root, abs), res.exempt);
-      note(relative(root, abs), res.unknown);
-    }
+    const res = rewriteIds(raw, idMap, prefix);
+    const next = res.text;
+    report.replacements += res.changed;
+    noteExempt(relative(root, abs), res.exempt);
+    note(relative(root, abs), res.unknown);
     if (next !== raw) {
       writeFileSync(abs, next, "utf8");
       report.files++;
@@ -332,14 +326,41 @@ export function applyRenumber(root, plan, opts = {}) {
   // Through a temporary name, because old and new id spaces OVERLAP: renaming
   // PROJ-1303 to PROJ-1 while PROJ-1 is still a file that has not moved yet would
   // overwrite it. Two passes cost nothing and remove the ordering question.
-  const staged = [];
-  for (const r of plan.renames) {
+  const stagedTasks = [];
+  for (const r of plan.renames.filter((entry) => entry.kind === "task")) {
     if (r.from === r.to) continue;
     const tmp = r.to + ".renumbering";
     renameSync(join(r.dir, r.from), join(r.dir, tmp));
-    staged.push({ dir: r.dir, tmp, to: r.to });
+    stagedTasks.push({ dir: r.dir, tmp, to: r.to });
   }
-  for (const s of staged) renameSync(join(s.dir, s.tmp), join(s.dir, s.to));
+  for (const s of stagedTasks) renameSync(join(s.dir, s.tmp), join(s.dir, s.to));
+
+  // History needs the same two passes because its id space overlaps, but each
+  // individual move has its own short section. Between the passes a writer
+  // finds the `.renumbering` path and appends there; the final move then carries
+  // that accepted row with the rest of the log.
+  const stagedHistory = [];
+  for (const r of plan.renames.filter((entry) => entry.kind === "history")) {
+    withHistoryLogMutex(root, r.newId, () => {
+      const abs = join(r.dir, r.from);
+      const raw = readFileSync(abs, "utf8");
+      const res = rewriteHistoryFile(raw, idMap, prefix);
+      report.historyProse += res.prose;
+      if (res.text !== raw) {
+        writeFileSync(abs, res.text, "utf8");
+        report.files++;
+      }
+      if (r.from === r.to) return;
+      const tmp = r.to + ".renumbering";
+      renameSync(abs, join(r.dir, tmp));
+      stagedHistory.push({ ...r, tmp });
+    });
+  }
+  for (const s of stagedHistory) {
+    withHistoryLogMutex(root, s.newId, () => {
+      renameSync(join(s.dir, s.tmp), join(s.dir, s.to));
+    });
+  }
 
   // Files that hold ids but are not themselves named after one.
   const extra = [paths.configPath, paths.planPath, ...(opts.also || [])];
