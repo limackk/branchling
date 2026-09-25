@@ -684,6 +684,11 @@ export function recordEdit(backlogDir, opts) {
   // together. Copying it onto every entry of the act is what makes the answer
   // survive reading any one of them alone.
   const entries = changes.map((c) => entry(taskId, c.field, c.from, c.to, actor, source, ts, reason, session, role));
+  // Some commands carry events that are part of the same act but cannot be
+  // derived from frontmatter (`take` crossing a reservation, for example).
+  // Append them with the field rows so a persistence failure cannot split one
+  // command's history into an attributed transition and missing event rows.
+  entries.push(...(opts.extraEntries || []));
   // THE PARK IS A DECLARATION, AND IT SAYS SO ON THE TRANSITION (TL-282). A run
   // that could not verify a task writes the project's stuck status, which in a
   // project with one open non-queue status is the SAME value a task waiting on

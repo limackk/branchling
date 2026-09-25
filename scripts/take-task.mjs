@@ -34,6 +34,7 @@
  *
  * Tests: `node --test scripts/tests/next.test.mjs`
  *        `node --test scripts/tests/takeover.test.mjs`
+ *        `node --test scripts/tests/take-atomicity.test.mjs`
  */
 
 import { spawnSync } from "node:child_process";
@@ -46,7 +47,7 @@ import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { probeTask } from "./done-task.mjs";
 import { withProbe } from "./probe.mjs";
-import { ACTOR_NAMESPACES, appendEntries, changesRequiringReason, currentSession, eventId, FIELD_ROLE_OVERRIDE, FIELD_TAKEOVER, isValidActor, isValidReason, normalizeReason, readHistory, reasonRefusal, recordEdit } from "./history.mjs";
+import { ACTOR_NAMESPACES, changesRequiringReason, currentSession, eventId, FIELD_ROLE_OVERRIDE, FIELD_TAKEOVER, isValidActor, isValidReason, normalizeReason, readHistory, reasonRefusal, recordEdit } from "./history.mjs";
 import { decisionsOf, withDecisions } from "./decisions.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { acquireLock, isExpired, lockDir, readLock, releaseLock } from "./lock.mjs";
@@ -66,15 +67,24 @@ export const TAKE_FLAGS = ["--dir", "--actor", "--role", "--reason", "--json", "
  * dispatcher. The reservation excludes two writers of THIS task; the rename
  * is what lets readers of the whole queue see either complete version.
  */
-function replaceTaskText(file, text) {
+function stageTaskText(file, text) {
   const staged = file + "." + process.pid + "." + randomBytes(4).toString("hex") + ".tmp";
   try {
     writeFileSync(staged, text, "utf8");
     try { chmodSync(staged, statSync(file).mode & 0o7777); } catch { /* the bytes are the transaction */ }
-    renameSync(staged, file);
-  } finally {
-    try { unlinkSync(staged); } catch { /* renamed, or staging never completed */ }
+    return staged;
+  } catch (e) {
+    try { unlinkSync(staged); } catch { /* staging never completed */ }
+    throw e;
   }
+}
+
+function commitStaged(staged, file) {
+  renameSync(staged, file);
+}
+
+function discardStaged(staged) {
+  try { unlinkSync(staged); } catch { /* never created, or already renamed */ }
 }
 
 /** PURE — resolves `take`'s arguments. Throws on a usage error. */
@@ -335,8 +345,9 @@ export function takeTask(opts) {
     releaseLock({ root, taskId: id, actor, env: opts.env });
     return { ok: false, kind: "unwritable", id, message: id + ": " + e.message };
   }
+  let staged;
   try {
-    replaceTaskText(file, text);
+    staged = stageTaskText(file, text);
   } catch (e) {
     releaseLock({ root, taskId: id, actor, env: opts.env });
     return { ok: false, kind: "unwritable", id, message: id + ": " + e.message };
@@ -351,19 +362,6 @@ export function takeTask(opts) {
   // pseudo-field either, because `owner:` really did change and `diffMeta` can
   // already see it. A pseudo-field is for an event the frontmatter cannot show
   // (`__verified__`, `__role_override__`); this is not one.
-  recordEdit(root, {
-    taskId: id, before, after, actor, ts,
-    // The role the CALLER declared with `--role` — what they were acting as, not
-    // what the task asks for (TL-222). The mismatch event below records the two
-    // disagreeing; this records the half a reader cannot reconstruct afterwards.
-    role: opts.role,
-    source: opts.source || "take",
-    reason:
-      opts.reason ||
-      (reclaim ? reclaimReason(before.owner, before.updated, reclaim.afterDays) : "") ||
-      (cleared ? unblockedReason(before.status, cleared.blockers) : ""),
-  });
-
   // THE CROSSED CLAIMS, as events (TL-284). One per ACTOR whose claim was
   // crossed, carrying which halves of it this take went through — the owner
   // field, the reservation, or both. An owner change is already a tracked
@@ -386,14 +384,15 @@ export function takeTask(opts) {
       crossed.set(who, (crossed.get(who) || []).concat(half));
     }
   }
+  const extraEntries = [];
   for (const [who, halves] of crossed) {
-    appendEntries(root, id, [{
+    extraEntries.push({
       id: eventId(ts), ts, task: id, field: FIELD_TAKEOVER,
       from: who, to: actor, crossed: halves,
       actor, source: opts.source || "take",
       reason: normalizeReason(opts.reason || ""),
       session: currentSession(root, opts.env),
-    }]);
+    });
     warnings.push(
       "took over from " + who + " — their " + halves.join(" and ") +
         (halves.length > 1 ? " claims" : " claim") + " (recorded in the history)"
@@ -410,17 +409,60 @@ export function takeTask(opts) {
   const declaredRole = String(opts.role || "").trim();
   const wantedRole = String(before.role || "").trim();
   if (declaredRole && wantedRole && declaredRole !== wantedRole) {
-    appendEntries(root, id, [{
+    extraEntries.push({
       id: eventId(ts), ts, task: id, field: FIELD_ROLE_OVERRIDE,
       from: wantedRole, to: declaredRole,
       actor, source: opts.source || "take",
       reason: normalizeReason(opts.reason || ""),
       session: currentSession(root, opts.env),
-    }]);
+    });
     warnings.push(
       "taken outside its role — the task asks for `" + wantedRole + "`, you declared `" +
         declaredRole + "` (recorded in the history)"
     );
+  }
+
+  // ONE TRANSACTION, in the same order handoff uses (TL-407). The task bytes
+  // are staged while the original file is still in place. Every history row
+  // for this take is then appended in one call, and only a successful history
+  // write lets the staged frontmatter replace the original. A failed history
+  // write therefore leaves both durable halves at their pre-command values.
+  try {
+    recordEdit(root, {
+      taskId: id, before, after, actor, ts,
+      // The role the CALLER declared with `--role` — what they were acting as, not
+      // what the task asks for (TL-222). The mismatch event above records the two
+      // disagreeing; this records the half a reader cannot reconstruct afterwards.
+      role: opts.role,
+      source: opts.source || "take",
+      reason:
+        opts.reason ||
+        (reclaim ? reclaimReason(before.owner, before.updated, reclaim.afterDays) : "") ||
+        (cleared ? unblockedReason(before.status, cleared.blockers) : ""),
+      extraEntries,
+    });
+  } catch (e) {
+    discardStaged(staged);
+    releaseLock({ root, taskId: id, actor, env: opts.env });
+    return {
+      ok: false, kind: "history-unwritable", id,
+      message: id + ": the take was not recorded — " + e.message,
+      details: [
+        "Nothing was changed: the task file still says what it said before.",
+        "Run the same command again once the history can be written.",
+      ],
+    };
+  }
+
+  try {
+    commitStaged(staged, file);
+  } catch (e) {
+    discardStaged(staged);
+    return {
+      ok: false, kind: "unwritable", id,
+      message: id + ": " + e.message,
+      details: ["The history already records the take; it is append-only and was not undone."],
+    };
   }
 
   return {
