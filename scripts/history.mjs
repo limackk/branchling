@@ -699,6 +699,15 @@ export function recordEdit(backlogDir, opts) {
   // `session` and `role`: every line written before this field existed has no
   // marker, and `false` would be a third state beside absent and present.
   if (opts.park) for (const e of entries) if (e.field === "status") e.park = true;
+  // The reading belongs on the closing transition: detached from it, a later
+  // reopen/close cycle could make evidence from the first run look current.
+  // The wording says only what coverage measured, never that the contract
+  // guarded the task's thesis (TL-443).
+  if (opts.contractCapability) {
+    for (const e of entries) {
+      if (e.field === "status") e.contractCapability = opts.contractCapability;
+    }
+  }
   // The snapshot is one file for the whole backlog and this is a
   // read-modify-write of it (TL-214): without exclusion a writer that overlaps
   // with another saves a snapshot computed before the other's advance and

@@ -270,6 +270,13 @@ The file is byte-for-byte unchanged, which is the point: a run that could not
 verify a task may not record that it did. Fix the work, run the same command
 again, and the criterion is ticked from the run rather than by hand.
 
+For literal `node --test` entries, the same run records whether coverage shows
+that it executed a file the task changed. `branchling audit` reports a closing
+that executed none; foreign commands and manual checks remain `undetermined`
+rather than receiving a guessed verdict. This reading does not block `done` by
+default. A project can opt into that stricter gate with
+`contract_capability: require` in `config.yaml`.
+
 The full script for the third one, with the output as it is recorded, is
 [`docs/demo/scenario.md`](docs/demo/scenario.md).
 

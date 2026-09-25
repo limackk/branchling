@@ -99,6 +99,11 @@ export const DEFAULTS = Object.freeze({
   // `warn` while it is being linked up, and flips to `require` once it is. A
   // BROKEN link fails under every setting, `off` included.
   criteria_links: "warn",
+  // What a project does when coverage cannot show that a closing contract ran
+  // one of the task's changed files. Reporting is the safe default: manual,
+  // documentation and foreign-program proofs are undetermined by construction.
+  // `require` is an explicit project choice to refuse those closings.
+  contract_capability: "report",
   // Which statuses may not be entered without a stated reason (TL-105). A
   // VOCABULARY, so it belongs here and not in the code: `blocked` and
   // `cancelled` are this project's words, and a list of literals in a script
@@ -629,6 +634,7 @@ export function loadConfig(root, opts = {}) {
       label: values.label_colors,
     },
     criteriaLinks: values.criteria_links,
+    contractCapability: values.contract_capability,
     // Resolved here rather than in DEFAULTS, because the fallback is another
     // key's value and DEFAULTS is a flat literal.
     reasonRequiredStatuses: values.reason_required_statuses || values.archived_statuses,
@@ -687,6 +693,11 @@ export function validateConfig(config) {
   if (LINK_POLICIES.indexOf(config.criteriaLinks) < 0) {
     problems.push(
       "`criteria_links` = `" + config.criteriaLinks + "` — expecting one of: " + LINK_POLICIES.join(", ")
+    );
+  }
+  if (["report", "require"].indexOf(config.contractCapability) < 0) {
+    problems.push(
+      "`contract_capability` = `" + config.contractCapability + "` — expecting one of: report, require"
     );
   }
 

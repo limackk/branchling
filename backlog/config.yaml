@@ -49,6 +49,13 @@ awaiting_vouch_status: awaiting_vouch
 # the reason IS the whole content of the event.
 reason_required_statuses: [blocked, cancelled]
 
+# A closing records whether its Node test run executed a file the task changed.
+# `report` keeps that reading in history and exposes incapable closings through
+# `audit` without blocking unattended work. `require` is the explicit opt-in to
+# make the same narrow signal a closing gate; foreign/manual proofs remain
+# undetermined because the tool did not observe them.
+contract_capability: report
+
 priorities: [P0, P1, P2, P3]
 
 # Task kinds. Two values, and the difference between them is one anybody can

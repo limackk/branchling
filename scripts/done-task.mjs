@@ -32,7 +32,8 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { closeSync, existsSync, openSync, readFileSync, readSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, mkdtempSync, openSync, readFileSync, readSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -47,6 +48,8 @@ import { printJson } from "./json-envelope.mjs";
 import { releaseLock } from "./lock.mjs";
 import { MARK, color, errColor, failure } from "./ui.mjs";
 import { todayStamp } from "./today.mjs";
+import { CAPABLE, contractCapability, readCoverageFiles } from "./contract-capability.mjs";
+import { taskModifiedFiles } from "./modified-files.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OKM = color.ok(MARK.ok);
@@ -320,13 +323,15 @@ export function transcriptBlock(output, opts = {}) {
 // Running the contract
 // ──────────────────────────────────────────────────────────────────────────
 
-function runBash(command, cwd, capture) {
+function runBash(command, cwd, capture, observeCoverage = false) {
   const started = Date.now();
   const env = { ...process.env };
   // A contract is a child process, not a subtest of the test that happens to
   // exercise `done`. Letting Node inherit this private runner marker makes
   // `node --test` silently skip the very proof the contract asked for.
   delete env.NODE_TEST_CONTEXT;
+  const coverageDir = observeCoverage ? mkdtempSync(join(tmpdir(), "contract-coverage-")) : null;
+  if (coverageDir) env.NODE_V8_COVERAGE = coverageDir;
   const r = spawnSync(command, {
     shell: true,
     cwd,
@@ -337,11 +342,15 @@ function runBash(command, cwd, capture) {
     // Node's 1 MB default would turn a long green run into a spurious failure.
     maxBuffer: 64 * 1024 * 1024,
   });
+  const executedFiles = coverageDir ? [...readCoverageFiles(coverageDir, cwd)].sort() : [];
+  if (coverageDir) rmSync(coverageDir, { recursive: true, force: true });
   return {
     ok: r.status === 0,
     exitCode: r.status == null ? 1 : r.status,
     ms: Date.now() - started,
     output: capture ? (r.stdout || "") + (r.stderr || "") : null,
+    coverageObserved: Boolean(coverageDir),
+    executedFiles,
   };
 }
 
@@ -383,8 +392,16 @@ export function runContract(entries, cwd, opts = {}) {
       continue;
     }
     if (opts.before) opts.before(e, i);
-    const r = runBash(e.bash, cwd, opts.capture);
-    results.push({ id: e.id, kind: "bash", command: e.bash, ok: r.ok, exitCode: r.exitCode, ms: r.ms });
+    const r = runBash(e.bash, cwd, opts.capture,
+      Boolean(opts.observeCoverage && nodeTestFiles(e).length));
+    const row = { id: e.id, kind: "bash", command: e.bash, ok: r.ok, exitCode: r.exitCode, ms: r.ms };
+    // Coverage is private runner evidence. It feeds the compact capability
+    // reading below rather than inflating `done --json` with every loaded file.
+    if (opts.observeCoverage) {
+      row.coverageObserved = r.coverageObserved;
+      row.executedFiles = r.executedFiles;
+    }
+    results.push(row);
     if (!r.ok) return { results, failed: { entry: e, kind: "bash", ...r } };
     if (opts.after) opts.after(e, r);
   }
@@ -713,6 +730,7 @@ function run(argv) {
   let stop = null;
   const { results, failed } = runContract(entries, cwd, {
     capture,
+    observeCoverage: true,
     before: (e, i) => log(plan.json, tagOf(e, i) + "bash: " + e.bash),
     after: (e, r) => {
       log(plan.json, "  " + OKM + " passed (" + r.ms + " ms" + suppressedNote(r.output) + ")");
@@ -844,6 +862,26 @@ function run(argv) {
     return finishFailed(plan, results, 1);
   }
 
+  const modified = taskModifiedFiles({ root: cwd, prefix: config.taskIdPrefix, taskId: before.id });
+  const capability = modified.scanned
+    ? contractCapability(results, modified.files)
+    : contractCapability(results.map((r) => ({ ...r, coverageObserved: false })), []);
+
+  if (config.contractCapability === "require" && capability.verdict !== CAPABLE) {
+    return refuse(
+      plan,
+      plan.id + ": the closing contract did not execute a file this task changed",
+      [
+        capability.statement + ".",
+        "",
+        "`contract_capability: require` makes this project's opt-in policy a closing gate.",
+        "The verification commands passed, but the task file was NOT touched.",
+      ],
+      results,
+      "contract-capability"
+    );
+  }
+
   // Every entry is green. Tick what that proves, then refuse if anything is left
   // unproved — a task closed with a dead checkbox is the defect measured in
   // TL-86 (12 of 44 closed tasks, 60 dead checkboxes).
@@ -882,7 +920,10 @@ function run(argv) {
     log(plan.json, "    would set: status " + before.status + " → " + status);
     log(plan.json, "    would tick: " + (proofed.ticked.length || "no") + " criteri" +
       (proofed.ticked.length === 1 ? "on" : "a"));
-    if (plan.json) answer(plan, results, { status: before.status, wouldBe: status, ticked: proofed.ticked, closed: false });
+    log(plan.json, "    contract capability: " + capability.statement);
+    if (plan.json) answer(plan, results, {
+      status: before.status, wouldBe: status, ticked: proofed.ticked, closed: false, capability,
+    });
     return 0;
   }
 
@@ -919,6 +960,7 @@ function run(argv) {
     // names the stage rather than leaving it to be guessed from the actor.
     role: plan.role,
     reason: statedReason || REASON_PROVEN,
+    contractCapability: capability,
   }); } catch (error) {
     // A closed file without its append-only explanation is a false close. The
     // history route can fail (for example a local state directory is unwritable)
@@ -944,6 +986,7 @@ function run(argv) {
 
   log(plan.json, "");
   log(plan.json, "  " + OKM + " " + plan.id + " closed — status " + before.status + " → " + status);
+  log(plan.json, "    contract capability: " + capability.statement);
   if (proofed.ticked.length) {
     log(plan.json, "    ticked " + proofed.ticked.length + " criteri" + (proofed.ticked.length === 1 ? "on" : "a") + " from the run");
   }
@@ -960,7 +1003,7 @@ function run(argv) {
     console.error(WARNM + " the views were not rebuilt — run `" + N + " build` yourself");
   }
 
-  if (plan.json) answer(plan, results, { status, ticked: proofed.ticked, closed: true });
+  if (plan.json) answer(plan, results, { status, ticked: proofed.ticked, closed: true, capability });
   return 0;
 }
 
@@ -983,7 +1026,7 @@ function answer(plan, results, extra) {
     task: plan.id,
     ok: results.every((r) => r.ok),
     dryRun: plan.dryRun,
-    entries: results,
+    entries: results.map(({ coverageObserved, executedFiles, ...entry }) => entry),
     ...extra,
   });
 }

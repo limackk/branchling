@@ -365,6 +365,41 @@ export function vouches(history) {
   return { found };
 }
 
+/**
+ * The coverage reading attached to the LAST closing of each closed task.
+ *
+ * Missing readings are legacy, not `undetermined`: the distinction did not
+ * exist when those tasks closed, so assigning them a verdict now would claim a
+ * run was observed when it was not. They are counted so the zero sample stays
+ * visible without flooding a newly upgraded backlog with findings.
+ */
+export function closingContractCapability(tasks, history, { archived }) {
+  const closed = new Set(archived || []);
+  const incapable = [];
+  const undetermined = [];
+  let capable = 0;
+  let legacy = 0;
+  for (const task of tasks || []) {
+    if (!closed.has(task.status)) continue;
+    const closing = (history[task.id] || [])
+      .filter((e) => e.field === "status" && closed.has(e.to))
+      .slice().sort((a, b) => String(a.ts).localeCompare(String(b.ts))).at(-1);
+    if (!closing || !closing.contractCapability) { legacy++; continue; }
+    const reading = closing.contractCapability;
+    const row = {
+      task: task.id,
+      title: task.title || "",
+      actor: closing.actor || "unknown",
+      statement: reading.statement || "",
+      changedFilesExecuted: reading.changedFilesExecuted || [],
+    };
+    if (reading.verdict === "capable") capable++;
+    else if (reading.verdict === "incapable") incapable.push(row);
+    else undetermined.push(row);
+  }
+  return { incapable, undetermined, capable, legacy };
+}
+
 /** Every detector, over one read. PURE. */
 export function auditBacklog({ tasks, history, config, since, today }) {
   const archived = config.archivedStatuses || [];
@@ -380,9 +415,10 @@ export function auditBacklog({ tasks, history, config, since, today }) {
   const vouch = awaitingVouch(tasks, history, { archived });
   const handedBack = handedBackAcross(tasks, history, { archived });
   const given = vouches(history);
+  const capability = closingContractCapability(tasks, history, { archived });
 
   const findings = trace.found.length + reopen.found.length + stale.found.length +
-    premise.found.length + vouch.found.length + handedBack.found.length;
+    premise.found.length + vouch.found.length + handedBack.found.length + capability.incapable.length;
   return {
     since: from,
     dayZero,
@@ -397,6 +433,7 @@ export function auditBacklog({ tasks, history, config, since, today }) {
     // NOT added to `findings`: a vouch is a fact about how work was closed, not
     // a disagreement between a declaration and its trace.
     vouches: given,
+    contractCapability: capability,
   };
 }
 
@@ -453,6 +490,16 @@ export function render(report, config) {
       f.legs.map((l) => l.from + "→" + l.to + ": " + (l.reason || "(no reason recorded)")).join("  ·  "),
     ]),
     "an open task each hand returned inside its own charter; the queue calls this `held elsewhere`, which is what it also calls a task nobody serves");
+
+  section(out,
+    "closing contract executed no changed file",
+    report.contractCapability.incapable.map((f) => [f.task, f.actor, f.title]),
+    "coverage measured the run, and it executed none of the files attributed to this task");
+
+  section(out,
+    "closing contract capability undetermined",
+    report.contractCapability.undetermined.map((f) => [f.task, f.actor, f.title]),
+    report.contractCapability.legacy + " legacy closing(s) predate this reading; manual and foreign-program proofs are not guessed");
 
   out.push("");
   out.push(heading("  vouched `manual:` entries  (" + report.vouches.found.length + ")"));
@@ -533,6 +580,7 @@ export function main(argv, today = todayStamp()) {
       awaitingVouch: report.awaitingVouch.found,
       handedBack: report.handedBack.found,
       vouches: report.vouches.found,
+      contractCapability: report.contractCapability,
       // `output` is text written for a person; `name` is the field a consumer
       // acts on, and the same string `check --json` puts in `failed`.
       advisories: report.advisories,

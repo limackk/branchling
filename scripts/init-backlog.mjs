@@ -94,6 +94,12 @@ priorities: [P0, P1, P2, P3]       # [tree]
 # A BROKEN link — a criterion naming an id that does not exist — fails under all
 # three: only someone already using the mechanism can write one.
 criteria_links: warn
+
+# \`report\` records and audits whether a Node test executed a file the task
+# changed, but never blocks a closing. \`require\` opts into refusing a closing
+# unless that narrow coverage signal is present; foreign and manual proofs are
+# undetermined and therefore refused under that policy.
+contract_capability: report
 types: [task]                      # [tree]
 
 # [tree] Labels. \`labels_closed: true\` turns a typo into a build error instead

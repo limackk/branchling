@@ -87,6 +87,7 @@ export const KINDS = {
     since: null, dayZero: null, tasks: null, findings: null,
     closedWithoutTrace: [], skippedBeforeSince: null, reopened: [],
     parked: [], withoutPremise: [], awaitingVouch: [], handedBack: [], vouches: [],
+    contractCapability: null,
     advisories: [],
   },
   // `stats --json`. The tallies stay nested under `stats` instead of being
@@ -254,7 +255,7 @@ export const KINDS = {
   // moved, which `--dry-run` makes a different answer from `ok`.
   "verification-run": {
     ok: null, task: null, dryRun: null, closed: null, entries: [],
-    status: null, wouldBe: null, ticked: [],
+    status: null, wouldBe: null, ticked: [], capability: null,
     refusalKind: null, refusal: null, details: [],
   },
   // `docs-drift --json` (TL-100). `flagged` and `tooLittle` are both LISTS of

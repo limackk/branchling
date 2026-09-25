@@ -113,6 +113,45 @@ export function modifiedFiles({ root, prefix, run = spawnSync }) {
 }
 
 /**
+ * Files changed in the working tree, including untracked files.
+ *
+ * A closing happens before its one-task commit, so the history index above
+ * cannot yet contain the implementation being proved. The worktree is the
+ * current task's other half under the one-task-per-worktree convention. It is
+ * kept separate from `modifiedFiles()` because committed attribution and local
+ * dirt are different facts and other readers ask only the first question.
+ */
+export function workingTreeFiles({ root, run = spawnSync }) {
+  if (!root) return { files: new Set(), scanned: false, reason: "no-git" };
+  const changed = run("git", ["diff", "--name-only", "-z", "HEAD"], {
+    cwd: root, encoding: "utf8", timeout: 30_000,
+  });
+  const untracked = run("git", ["ls-files", "--others", "--exclude-standard", "-z"], {
+    cwd: root, encoding: "utf8", timeout: 30_000,
+  });
+  if (changed.status !== 0 || untracked.status !== 0) {
+    return { files: new Set(), scanned: false, reason: "git-failed" };
+  }
+  const files = new Set((String(changed.stdout || "") + String(untracked.stdout || ""))
+    .split("\0").filter(Boolean));
+  return { files, scanned: true, reason: "ok" };
+}
+
+/** Committed files attributed to a task, plus its not-yet-committed work. */
+export function taskModifiedFiles({ root, prefix, taskId, run = spawnSync }) {
+  const committed = modifiedFiles({ root, prefix, run });
+  const working = workingTreeFiles({ root, run });
+  if (!committed.scanned && !working.scanned) {
+    return { files: new Set(), scanned: false, reason: committed.reason || working.reason };
+  }
+  return {
+    files: new Set([...(committed.byTask.get(taskId) || []), ...working.files]),
+    scanned: true,
+    reason: "ok",
+  };
+}
+
+/**
  * The same index, computed at most once per COMMIT.
  *
  * WHY A CACHE AT ALL. The viewer is rebuilt on every change while `serve` is
