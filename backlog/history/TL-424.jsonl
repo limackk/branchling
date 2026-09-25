@@ -1,1 +1,4 @@
 {"id":"01M32KKA3HZDV5809TCZMNCGE2","ts":"2026-09-21T18:28:05.361Z","task":"TL-424","field":"__created__","from":"","to":"A verification entry naming a file that does not exist passes green","actor":"agent:claude","source":"new","reason":"unknown"}
+{"id":"01M3CT0YXMCWJZE3CDCV39FX93","ts":"2026-09-25T17:32:48.436Z","task":"TL-424","field":"status","from":"pending","to":"in_progress","actor":"agent:codex-subagent","source":"take","reason":"unknown"}
+{"id":"01M3CT0YXMFWV4QSF8YDZ56EZ9","ts":"2026-09-25T17:32:48.436Z","task":"TL-424","field":"owner","from":"unassigned","to":"agent:codex-subagent","actor":"agent:codex-subagent","source":"take","reason":"unknown"}
+{"id":"01M3CTKMMA7KST77T3QP1VY3H6","ts":"2026-09-25T17:43:00.490Z","task":"TL-424","field":"status","from":"in_progress","to":"done","actor":"agent:codex-subagent","source":"done","reason":"proven"}

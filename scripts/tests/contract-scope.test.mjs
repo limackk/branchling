@@ -81,6 +81,11 @@ function fixture() {
   const tests = join(repo, "contract-tests");
   const env = { BACKLOG_STATE_DIR: join(dir, "state") };
   mkdirSync(tests, { recursive: true });
+  // The contract paths are repository-relative. Establish that repository
+  // explicitly; without git, `done` deliberately falls back to the backlog
+  // directory rather than guessing that its parent is a repository root.
+  const git = spawnSync("git", ["init", "-q", repo], { encoding: "utf8", env: { ...process.env, ...env } });
+  assert.equal(git.status, 0, git.stderr);
 
   let r = cli(["init", "--dir", backlog, "--no-example"], env, { cwd: repo });
   assert.equal(r.status, 0, r.stderr);

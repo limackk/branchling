@@ -32,8 +32,8 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { closeSync, openSync, readFileSync, readSync, readdirSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { closeSync, existsSync, openSync, readFileSync, readSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { resolveActor } from "./actor.mjs";
@@ -187,6 +187,47 @@ export function contractProblem(entries, problems) {
         "`verification:` still holds the template placeholder (`" + TEMPLATE_PLACEHOLDER + "`).\n" +
         "The field was filled in by the template, not by anybody who thought about this task."
       );
+    }
+  }
+  return null;
+}
+
+/**
+ * Literal repository-relative JavaScript files passed to `node --test`.
+ *
+ * This is deliberately not a shell parser. Only a plain path has one certain
+ * meaning before execution; globs, variables, substitutions, absolute paths
+ * and arbitrary commands stay the shell runner's responsibility.
+ */
+const LITERAL_TEST_FILE = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*\.(?:cjs|js|mjs)$/;
+
+export function nodeTestFiles(entry) {
+  if (!entry || !entry.bash) return [];
+  const found = [];
+  for (const segment of String(entry.bash).split(/\n|;|&&|\|\|/)) {
+    const match = segment.trim().match(
+      /^(?:[A-Za-z_][A-Za-z0-9_]*=[^\s]+\s+)*(?:[^\s/]+\/)*node\s+--test(?:\s+([\s\S]*))?$/
+    );
+    if (!match || !match[1]) continue;
+    for (let token of match[1].trim().split(/\s+/)) {
+      if ((token.startsWith('"') && token.endsWith('"')) ||
+          (token.startsWith("'") && token.endsWith("'"))) token = token.slice(1, -1);
+      if (LITERAL_TEST_FILE.test(token)) found.push(token);
+    }
+  }
+  return found;
+}
+
+/** The first literal `node --test` file that cannot be run, or null. */
+export function missingNodeTestFile(entries, repoRoot) {
+  for (const entry of entries || []) {
+    for (const path of nodeTestFiles(entry)) {
+      const absolute = resolve(repoRoot, path);
+      try {
+        if (!existsSync(absolute) || !statSync(absolute).isFile()) return { entry, path };
+      } catch {
+        return { entry, path };
+      }
     }
   }
   return null;
@@ -612,6 +653,24 @@ function run(argv) {
     return refuse(plan, plan.id + " has no closing contract", contract.split("\n"), [], "no-contract");
   }
 
+  const cwd = repoRootFor(root);
+  const missingTest = missingNodeTestFile(entries, cwd);
+  if (missingTest) {
+    return refuse(
+      plan,
+      plan.id + ": a `node --test` file in the closing contract does not exist",
+      [
+        "`" + missingTest.path + "`",
+        "",
+        "Create the named file or correct the contract. Nothing was run and the task file was untouched.",
+        "This check covers literal repository-relative `.js`, `.cjs` and `.mjs` paths after",
+        "`node --test`; it does not guess at globs, variables or other shell expansions.",
+      ],
+      [],
+      "missing-test-file"
+    );
+  }
+
   // A BROKEN criterion link fails before anything runs: it can only have been
   // written by somebody already using the mechanism, so it is a mistake to fix,
   // not a legacy task to be lenient with (TL-86).
@@ -630,8 +689,6 @@ function run(argv) {
       "criteria"
     );
   }
-
-  const cwd = repoRootFor(root);
 
   log(plan.json, "");
   log(plan.json, "  " + plan.id + " — " + entries.length + " verification entr" +
