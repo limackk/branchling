@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Backlog viewer"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1w
@@ -43,5 +43,5 @@ TL-379 removed all browser mutation routes because the previous surface added ac
 
 ## Acceptance criteria
 
-- [ ] Only a valid local page can make a validated, attributed and atomic task edit. [proof: write-boundary]
-- [ ] Restoring the write path preserves the complete product contract. [proof: suite-green]
+- [x] Only a valid local page can make a validated, attributed and atomic task edit. [proof: write-boundary]
+- [x] Restoring the write path preserves the complete product contract. [proof: suite-green]

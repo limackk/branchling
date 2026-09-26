@@ -524,12 +524,14 @@ schema as the CLI, can attribute the person and can append history before it
 rebuilds computed views. No browser-only or folder-handle write path is part of
 the contract.
 
-The current build keeps live editing disabled while that attributed server
-boundary is restored. What the server adds today is a fresh read from disk,
-changes pushed over SSE when an agent, editor or `git checkout` changes a task,
-and support for every browser without a folder picker. A mutation request still
-answers 404 and leaves the task byte-for-byte unchanged. When editing returns,
-only the served page gains editors; a mailed snapshot remains read-only.
+The served page now receives a short-lived per-process capability for one
+`/api/task` mutation route. The server rejects foreign origins and hosts, stale
+or guessed capabilities, unknown fields, invalid actors, oversized bodies,
+path-shaped ids and status transitions missing a configured reason. A passing
+edit is attributed in history, rebuilds the computed views and emits the same
+SSE change signal used for edits made outside the viewer. Inline controls are
+implemented separately; a mailed snapshot remains read-only and receives no
+capability or mutation route.
 
 **A board is a scope, not a filter.** The `Board:` bar switches the scope of the
 whole viewer — the lists, the counters in the header AND the dashboard. A filter

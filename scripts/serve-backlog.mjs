@@ -11,15 +11,16 @@
  * — so opening viewer.html off the disk always costs at least one click. Over
  * HTTP there is nothing to grant.
  *
- * What it adds over the file:// flow in the current read-only build:
+ * What it adds over the file:// flow:
  *   - zero clicks to reach live mode, in any browser (not just Chrome/Edge)
  *   - SSE push on tasks/ changes — edits made by an agent or an editor appear
  *     without a reload
+ *   - one guarded, attributed task-field write API for the served page
  *
  * Snapshot mode stays read-only. Live mode is the only viewer mode permitted
- * to write, but it does not regain that capability until the server can
- * validate, attribute and record one atomic edit. Until then every mutation
- * route is absent rather than hidden behind the page.
+ * to write; equivalently, it is the only mode permitted to write. The server
+ * validates, attributes and records one atomic edit behind
+ * a same-origin, short-lived capability injected only into the served page.
  *
  * Usage:
  *   node backlog/scripts/serve-backlog.mjs          # opens the browser
@@ -31,7 +32,8 @@
 import { createServer, get } from "node:http";
 import { hostname } from "node:os";
 import { spawn } from "node:child_process";
-import { existsSync, readFileSync, realpathSync, watch } from "node:fs";
+import { randomBytes } from "node:crypto";
+import { existsSync, readFileSync, realpathSync, renameSync, unlinkSync, watch, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -39,6 +41,8 @@ import { readTasks, computeStats, buildHtml } from "./build-viewer.mjs";
 import {
   buildFieldSpecs,
   extractMeta,
+  isValidActor,
+  isValidReason,
   normalizeValue,
   setFrontmatterField,
   splitFrontmatter,
@@ -60,9 +64,12 @@ import {
   unregisterServer,
 } from "./serve-registry.mjs";
 import { printJson } from "./json-envelope.mjs";
+import { todayStamp } from "./today.mjs";
 import {
   listTaskFiles,
   reconcile,
+  recordEdit,
+  requiresReason,
 } from "./history.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -86,7 +93,8 @@ if (cliArgs.argv.some((a) => a === "--help" || a === "-h")) {
   // were found running on one machine, three of them reparented to init after
   // the shell that started them was gone. Nothing warned anybody, and `serve`
   // RECONCILES — it watches task files and appends externally observed changes
-  // to backlog/history/. The page itself has no write route in this build.
+  // to backlog/history/. The served page's write capability remains local to
+  // this process and expires; leaving the server alive therefore still matters.
   printLine("This process does not stop when the shell that started it goes away.");
   printLine("Backgrounded or left in a closed terminal, it keeps listening and keeps");
   printLine("reconciling the tree. `serve --list` names them; `serve --stop <port>` ends one.");
@@ -207,6 +215,10 @@ if (argv.includes("--stop")) {
 const BACKLOG_DIR = resolveBacklogDirOrExit({ dir: cliArgs.dir, moduleDir: __dirname }, N + " serve").root;
 const TASKS_DIR = join(BACKLOG_DIR, "tasks");
 const CONFIG = loadConfigOrExit(BACKLOG_DIR);
+const FIELDS = buildFieldSpecs(CONFIG);
+const CAPABILITY_TTL_MS = Math.max(1, Number(process.env.VIEWER_WRITE_CAPABILITY_TTL_MS) || 15 * 60 * 1000);
+const capabilities = new Map();
+let editQueue = Promise.resolve();
 
 /**
  * The canonical spelling of a backlog directory, for comparison only.
@@ -248,6 +260,85 @@ function sendJson(res, code, obj) {
     "Cache-Control": "no-store",
   });
   res.end(body);
+}
+
+function readBody(req, limitBytes = 16 * 1024) {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    let failed = false;
+    const chunks = [];
+    req.on("data", (chunk) => {
+      if (failed) return;
+      size += chunk.length;
+      if (size > limitBytes) {
+        failed = true;
+        reject(Object.assign(new Error("Request body exceeds 16 KiB"), { status: 413 }));
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on("end", () => { if (!failed) resolve(Buffer.concat(chunks).toString("utf8")); });
+    req.on("error", reject);
+  });
+}
+
+function newCapability() {
+  const token = randomBytes(32).toString("base64url");
+  const expiresAt = Date.now() + CAPABILITY_TTL_MS;
+  capabilities.set(token, expiresAt);
+  for (const [candidate, expiry] of capabilities) {
+    if (expiry <= Date.now()) capabilities.delete(candidate);
+  }
+  return { token, expiresAt };
+}
+
+function injectCapability(html, capability) {
+  const payload = JSON.stringify(capability).replaceAll("<", "\\u003c");
+  return html.replace("</head>", `<script>window.VIEWER_WRITE=${payload}</script></head>`);
+}
+
+function localRequest(req) {
+  const host = String(req.headers.host || "");
+  const origin = String(req.headers.origin || "");
+  const localPort = req.socket.localPort;
+  const allowedHosts = new Set([`127.0.0.1:${localPort}`, `localhost:${localPort}`, `[::1]:${localPort}`]);
+  return allowedHosts.has(host) && origin === `http://${host}`;
+}
+
+function hasWriteCapability(req) {
+  const token = String(req.headers["x-viewer-capability"] || "");
+  const expiry = capabilities.get(token) || 0;
+  if (expiry <= Date.now()) {
+    if (token) capabilities.delete(token);
+    return false;
+  }
+  return true;
+}
+
+function fileForTaskId(id) {
+  if (!ANY_TASK_ID.test(String(id || ""))) return null;
+  return listTaskFiles(TASKS_DIR).find((file) => file.startsWith(id + "-")) || null;
+}
+
+function fieldOptions() {
+  const tasks = readTasks(BACKLOG_DIR, CONFIG);
+  const values = (key) => [...new Set(tasks.map((task) => String(task[key] || "").trim()).filter(Boolean))].sort();
+  return { boards: CONFIG.boards.map((board) => board.slug), epics: values("epic"), owners: values("owner") };
+}
+
+function atomicReplace(file, text) {
+  const staged = file + `.viewer-${process.pid}-${randomBytes(6).toString("hex")}`;
+  writeFileSync(staged, text, { encoding: "utf8", flag: "wx" });
+  try { renameSync(staged, file); } catch (error) {
+    try { unlinkSync(staged); } catch { /* the rename may already have consumed it */ }
+    throw error;
+  }
+}
+
+function serializeEdit(fn) {
+  const run = editQueue.then(fn, fn);
+  editQueue = run.catch(() => {});
+  return run;
 }
 
 /** Regenerate FOCUS/INDEX/archive — the .md files are the source of truth. */
@@ -472,6 +563,52 @@ function planPayload(dir = BACKLOG_DIR) {
  * it; a handler that asks git again is how the 404 comes back.
  */
 
+async function handleFieldEdit(payload) {
+  return serializeEdit(async () => {
+    const id = String(payload?.id || "");
+    const field = String(payload?.field || "");
+    const actor = String(payload?.actor || "");
+    const reason = typeof payload?.reason === "string" ? payload.reason.trim() : "";
+    if (!isValidActor(actor)) throw Object.assign(new Error("actor must use a declared namespace"), { status: 400 });
+
+    const spec = FIELDS.find((candidate) => candidate.key === field);
+    if (!spec) throw Object.assign(new Error("This field is not editable: " + field), { status: 400 });
+    const normalized = normalizeValue(field, payload?.value, { fields: FIELDS, options: fieldOptions() });
+    if (!normalized.ok) throw Object.assign(new Error(normalized.error), { status: 400 });
+    if (requiresReason(CONFIG, { field, to: normalized.value }) && !isValidReason(reason)) {
+      throw Object.assign(new Error("This status requires a non-reserved reason"), { status: 422, needsReason: true });
+    }
+
+    const taskFile = fileForTaskId(id);
+    if (!taskFile) throw Object.assign(new Error("Task not found: " + id), { status: 404 });
+    const full = join(TASKS_DIR, taskFile);
+    const original = readFileSync(full, "utf8");
+    const before = extractMeta(splitFrontmatter(original).frontmatter);
+    let text = setFrontmatterField(original, field, normalized.value, spec);
+    text = setFrontmatterField(text, "updated", todayStamp());
+    const after = extractMeta(splitFrontmatter(text).frontmatter);
+
+    suppressUntil = Date.now() + 1500;
+    atomicReplace(full, text);
+    let entries;
+    try {
+      entries = recordEdit(BACKLOG_DIR, {
+        taskId: after.id || id, before, after, actor, source: "viewer", reason,
+      });
+    } catch (error) {
+      atomicReplace(full, original);
+      throw Object.assign(new Error("History could not be recorded; the task was restored: " + error.message), { status: 500 });
+    }
+
+    const regenerated = await regenerateViews();
+    if (!regenerated) throw Object.assign(new Error("The edit landed, but computed views could not be rebuilt"), { status: 500 });
+    for (const client of sseClients) {
+      try { client.write("event: tasks-changed\ndata: {}\n\n"); } catch { sseClients.delete(client); }
+    }
+    return { ok: true, id, field, value: normalized.value, actor, entries, regenerated };
+  });
+}
+
 async function handle(req, res) {
   const url = new URL(req.url, "http://127.0.0.1");
   const path = url.pathname;
@@ -479,12 +616,12 @@ async function handle(req, res) {
   if (path === "/" || path === "/index.html") {
     // Rendered fresh per request, so the first paint is already live data.
     const tasks = readTasks(BACKLOG_DIR, CONFIG);
-    const html = buildHtml(
+    const html = injectCapability(buildHtml(
       tasks,
       computeStats(tasks),
       CONFIG,
       loadPlan(join(BACKLOG_DIR, PLAN_FILENAME))
-    );
+    ), newCapability());
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
     res.end(html);
     return;
@@ -521,7 +658,31 @@ async function handle(req, res) {
     return;
   }
 
-  // WHAT IS NOT HERE, and why the absence is the feature (TL-379).
+  if (path === "/api/task" && req.method === "POST") {
+    if (!localRequest(req)) {
+      sendJson(res, 403, { error: "Writes require a same-origin loopback page" });
+      return;
+    }
+    if (!hasWriteCapability(req)) {
+      sendJson(res, 403, { error: "The write capability is missing or stale" });
+      return;
+    }
+    if (!String(req.headers["content-type"] || "").toLowerCase().startsWith("application/json")) {
+      sendJson(res, 415, { error: "Writes require application/json" });
+      return;
+    }
+    try {
+      const payload = JSON.parse(await readBody(req));
+      sendJson(res, 200, await handleFieldEdit(payload));
+    } catch (error) {
+      sendJson(res, error.status || 400, { error: error.message, needsReason: error.needsReason === true });
+    }
+    return;
+  }
+
+  // One mutation route is present, guarded by same-origin loopback headers and
+  // the short-lived capability injected only into a served page. Snapshot mode
+  // has neither the route nor the capability and remains read-only.
   //
   // This server used to answer `/api/field`, `/api/status` and `/api/decision`
   // with a POST, and to serve `/api/fields`, `/api/history` and
@@ -672,7 +833,7 @@ function listen(port, attemptsLeft) {
       `${N} serve: ${target}\n` +
         `  ${count} tasks, live read mode with no clicking (the folder is known server-side)\n` +
         beside +
-        `  Editing is unavailable in this build; only a served viewer may regain a write path\n` +
+        `  Served-page write API enabled; snapshots remain read-only\n` +
         (VIEWS_BUILT ? "" : "  WARNING: build-backlog.mjs did not pass — the views may be stale\n") +
         boot +
         `  Ctrl-C stops it`

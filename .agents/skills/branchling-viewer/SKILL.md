@@ -72,8 +72,9 @@ Encode only what is set. Empty filters must not litter the link.
 ## Edits and history
 
 Snapshot mode is read-only. Live mode, served on loopback, is the only viewer
-mode permitted to write. During the restoration of editing the source may still
-expose no mutation route; do not describe a planned editor as shipped behavior.
+mode permitted to write. Its single `/api/task` route requires the same-origin
+loopback page's short-lived capability; do not add an unguarded alias or
+describe the not-yet-built inline controls as shipped behavior.
 
 Writes from the live page go through `task-fields.mjs` — `buildFieldSpecs()`,
 `normalizeValue()`, `setFrontmatterField()` — which is the same module that

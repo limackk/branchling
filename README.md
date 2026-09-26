@@ -65,7 +65,8 @@ at this backlog is a reporting job you would be writing yourself. A generated
 `viewer.html` snapshot is portable and read-only. A page served on loopback is
 the only viewer mode permitted to write, because only the server can validate
 the field, attribute the person and append the history beside the Markdown.
-Editing is disabled in the current build while that boundary is restored.
+The server now exposes that guarded write API; the inline controls that use it
+are the next viewer layer. A portable snapshot never receives its capability.
 
 **It is not a managed agent factory.** It does not contain an agent, choose one,
 host one, or run your agents for you. `run` starts exactly the command template

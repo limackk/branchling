@@ -11,7 +11,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { REPO_ROOT } from "./_repo.mjs";
+import { isolateHome, REPO_ROOT } from "./_repo.mjs";
+
+isolateHome("community-health");
 
 const read = (path) => readFileSync(join(REPO_ROOT, path), "utf8");
 const security = read("SECURITY.md");

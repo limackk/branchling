@@ -10,7 +10,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { REPO_ROOT } from "./_repo.mjs";
+import { isolateHome, REPO_ROOT } from "./_repo.mjs";
+
+isolateHome("repository-metadata");
 
 const manifest = JSON.parse(readFileSync(join(REPO_ROOT, "package.json"), "utf8"));
 const expectedDescription =

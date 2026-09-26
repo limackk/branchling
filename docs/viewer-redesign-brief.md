@@ -4,8 +4,8 @@
 the richer viewer that existed before TL-379 reduced it to a read-only page.
 The owner has now chosen to restore a dashboard and manual editing, but through
 a stricter boundary: snapshots remain read-only, and only the loopback-served
-page may write. The current build is still read-only while the attributed
-server API and its editors are implemented.
+page may write. The attributed server API is implemented; inline editors and
+the dashboard remain the next product layers.
 
 This document is written for somebody who has never opened this repository. It
 describes what the product is, who reads its one screen, what that screen

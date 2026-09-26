@@ -12,7 +12,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { REPO_ROOT } from "./_repo.mjs";
+import { isolateHome, REPO_ROOT } from "./_repo.mjs";
+
+isolateHome("viewer-mode-contract");
 
 const read = (path) => readFileSync(join(REPO_ROOT, path), "utf8");
 
@@ -41,11 +43,11 @@ export function contractProblems(sources) {
     }
   }
   const publicText = [sources.readme, sources.manual, sources.brief].join("\n");
-  if (!/current build[^.\n]{0,100}(?:read-only|editing disabled|keeps live editing disabled)/i.test(publicText)) {
-    problems.push("public documentation does not state that editing is currently disabled");
+  if (!/(guarded write API|attributed server API is implemented|short-lived per-process capability)/i.test(publicText)) {
+    problems.push("public documentation does not state that the guarded live write API is implemented");
   }
-  if (!/Editing is unavailable in this build/.test(sources.server || "")) {
-    problems.push("serve startup still implies that a field can be edited now");
+  if (!/Served-page write API enabled; snapshots remain read-only/.test(sources.server || "")) {
+    problems.push("serve startup does not state the current write boundary");
   }
   return problems;
 }
