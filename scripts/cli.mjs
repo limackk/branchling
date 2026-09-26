@@ -768,7 +768,7 @@ export const COMMANDS = {
   },
   hooks: {
     script: "hooks-command.mjs",
-    summary: "the pre-commit gate: print it, install it, take it back out",
+    summary: "the Git gates: print them, install them, take them back out",
     usage: [
       `${N} hooks print     [--dir <path>] [--json]`,
       `${N} hooks install   [--dir <path>] [--json]`,
@@ -782,7 +782,7 @@ export const COMMANDS = {
       "  problem for none of the risk, and leaves the decision to write inside a",
       "  `.git/` with the person who owns it.",
       "",
-      "  INSTALL refuses rather than merges when a `pre-commit` hook already exists:",
+      "  INSTALL refuses rather than merges when a `pre-commit` or `commit-msg` hook already exists:",
       "  appending to somebody else's gate means guessing where in it this belongs",
       "  and what their `exit` does to it. The block is printed instead.",
       "",
@@ -794,9 +794,23 @@ export const COMMANDS = {
       "",
       "  UNINSTALL removes exactly the lines between the markers and leaves the rest",
       "  of the file byte for byte. A file left holding only a shebang is deleted:",
-      "  an empty executable `pre-commit` is a gate that always passes.",
+      "  an empty executable hook is a gate that always passes.",
       "",
       "  exit: 0 done (`print` included) · 1 refused, with the reason · 2 usage error",
+    ].join("\n"),
+  },
+  "commit-message": {
+    script: "commit-message.mjs",
+    summary: "reject literal paragraph-break escapes before Git records a message",
+    usage: [
+      `${N} commit-message <message-file>`,
+      "",
+      "  The `commit-msg` hook installed by `hooks install` calls this with Git's",
+      "  message file. It rejects literal `\\n\\n` pairs that a shell preserved",
+      "  instead of real blank lines. Ordinary commit bodies, including real",
+      "  paragraph breaks, pass unchanged.",
+      "",
+      "  exit: 0 accepted · 1 rejected or unreadable · 2 usage error",
     ].join("\n"),
   },
   skills: {

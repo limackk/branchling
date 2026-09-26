@@ -198,6 +198,32 @@ and it is not that answer.
 
 ---
 
+## Protecting commits
+
+Install the Git gates in a repository after `branchling` is on your `PATH`:
+
+```bash
+branchling hooks install
+```
+
+It installs a `pre-commit` gate for the backlog checks and a `commit-msg` gate
+for the message Git is about to record. The latter rejects a literal `\\n\\n`
+pair where a shell preserved escaped paragraph separators instead of writing
+real blank lines. Write separate paragraphs with separate `-m` arguments:
+
+```bash
+git commit -m "TL-123 the task is true" \
+  -m "The first paragraph explains why." \
+  -m "The second paragraph records what was rejected."
+```
+
+`branchling hooks print` shows both fenced hook blocks without writing them;
+`branchling hooks uninstall` removes only blocks it installed. An existing
+`pre-commit` or `commit-msg` hook is left untouched and named, so place the
+printed block in that hook yourself if you choose to combine gates.
+
+---
+
 ## Three things worth seeing before you commit to it
 
 Each runs offline, in a throwaway directory, with no account and no network. Any

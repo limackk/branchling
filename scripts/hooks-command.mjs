@@ -55,9 +55,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const SUBCOMMANDS = ["print", "install", "uninstall"];
 const FLAGS = ["--json", "--dir"];
 
-/** The hook this command manages. `pre-commit` and nothing else: the guards
- *  judge a SET of task files, which is what a commit is. */
+/** The task-set gate keeps the old export for callers that name it directly. */
 export const HOOK_NAME = "pre-commit";
+/** Git gives this hook the final message file, before the commit exists. */
+export const COMMIT_MESSAGE_HOOK_NAME = "commit-msg";
+export const HOOK_NAMES = [HOOK_NAME, COMMIT_MESSAGE_HOOK_NAME];
 
 /**
  * The lines written into the hook. PURE, so the test asserts on the same text
@@ -66,19 +68,22 @@ export const HOOK_NAME = "pre-commit";
  * `|| exit 1` and not a captured status: a gate that swallows a failure is
  * worse than no gate, and the whole point of the block is that a commit stops.
  */
-export function hookBlock(command = N) {
+export function hookBlock(name = HOOK_NAME, command = N) {
+  const gate = name === COMMIT_MESSAGE_HOOK_NAME
+    ? command + ' commit-message "$1" || exit 1'
+    : command + " check || exit 1";
   return [
     BLOCK_OPEN,
     "# Installed by `" + command + " hooks install`. Remove with `" + command + " hooks uninstall`,",
     "# or delete these lines — nothing outside the markers belongs to it.",
-    command + " check || exit 1",
+    gate,
     BLOCK_CLOSE,
   ].join("\n");
 }
 
 /** A fresh hook file, when there was none. */
-export function hookFile(command = N) {
-  return "#!/bin/sh\n" + hookBlock(command) + "\n";
+export function hookFile(name = HOOK_NAME, command = N) {
+  return "#!/bin/sh\n" + hookBlock(name, command) + "\n";
 }
 
 function git(root, args) {
@@ -96,7 +101,7 @@ function git(root, args) {
  * command refuses instead of writing into a directory whose owner has its own
  * ideas.
  */
-export function hooksTarget(root) {
+export function hooksTarget(root, name = HOOK_NAME) {
   const inside = git(root, ["rev-parse", "--is-inside-work-tree"]);
   if (inside.status !== 0 || String(inside.stdout).trim() !== "true") {
     return { ok: false, kind: "not-a-repository",
@@ -117,7 +122,7 @@ export function hooksTarget(root) {
   const configured = git(root, ["config", "--get", "core.hooksPath"]);
   const custom = configured.status === 0 ? String(configured.stdout).trim() : "";
   const dir = resolve(root, String(path.stdout).trim());
-  return { ok: true, dir, path: join(dir, HOOK_NAME), custom: custom || null };
+  return { ok: true, name, dir, path: join(dir, name), custom: custom || null };
 }
 
 /** What is already there, in the terms this command has to decide by. */
@@ -157,19 +162,22 @@ function renderTarget(target) {
 }
 
 function runPrint(root, plan) {
-  const target = hooksTarget(root);
-  const block = hookBlock();
+  const targets = HOOK_NAMES.map((name) => hooksTarget(root, name));
   if (plan.json) {
-    console.log(JSON.stringify({ hook: HOOK_NAME, block, target: target.ok ? target : null,
-      error: target.ok ? null : target.message }, null, 2));
+    console.log(JSON.stringify({ hooks: targets.map((target) => ({
+      hook: target.name, block: hookBlock(target.name), target: target.ok ? target : null,
+      error: target.ok ? null : target.message,
+    })) }, null, 2));
     return 0;
   }
-  console.log(heading("the " + HOOK_NAME + " gate"));
-  console.log("");
-  console.log(block.split("\n").map((l) => "  " + l).join("\n"));
-  console.log("");
-  if (target.ok) for (const line of renderTarget(target)) console.log(line);
-  else console.log("  " + MARK.bullet + " " + target.message);
+  console.log(heading("the Git gates"));
+  for (const target of targets) {
+    console.log("");
+    console.log("  " + target.name);
+    console.log(hookBlock(target.name).split("\n").map((l) => "    " + l).join("\n"));
+    if (target.ok) for (const line of renderTarget(target)) console.log(line);
+    else console.log("  " + MARK.bullet + " " + target.message);
+  }
   console.log("");
   // PRINTING IS THE DEFAULT ON PURPOSE. It solves most of the problem for none
   // of the risk, and it leaves the decision to write in somebody's `.git/` with
@@ -179,82 +187,95 @@ function runPrint(root, plan) {
 }
 
 function runInstall(root, plan) {
-  const target = hooksTarget(root);
-  if (!target.ok) {
-    console.error(failure(N + " hooks install", target.message, target.details || []));
+  const targets = HOOK_NAMES.map((name) => hooksTarget(root, name));
+  const unusable = targets.find((target) => !target.ok);
+  if (unusable) {
+    console.error(failure(N + " hooks install", unusable.message, unusable.details || []));
     return 1;
   }
-  const found = inspect(target);
+  const found = targets.map((target) => ({ target, found: inspect(target) }));
+  const foreign = found.find((entry) => entry.found.state === "foreign");
 
-  if (found.state === "foreign") {
+  if (foreign) {
     // REFUSED, NOT MERGED. Appending to somebody else's hook means guessing
     // where in their gate ours belongs and what their `exit` does to it. The
     // block is printed instead, so the choice stays with the person who wrote
     // the file.
     console.error(failure(N + " hooks install",
-      "there is already a " + HOOK_NAME + " hook here", [
-        target.path,
+      "there is already a " + foreign.target.name + " hook here", [
+        foreign.target.path,
         "",
         "It was not touched. Add this yourself where it belongs in your gate:",
-        ...hookBlock().split("\n"),
+        ...hookBlock(foreign.target.name).split("\n"),
       ], [N + " hooks print"]));
     return 1;
   }
 
-  if (found.state === "ours") {
-    console.log(color.dim(MARK.bullet + " already installed — " + target.path));
-    for (const line of renderTarget(target)) console.log(line);
-    return 0;
+  for (const entry of found) {
+    if (entry.found.state === "ours") continue;
+    if (!existsSync(entry.target.dir)) mkdirSync(entry.target.dir, { recursive: true });
+    writeFileSync(entry.target.path, hookFile(entry.target.name), "utf8");
+    chmodSync(entry.target.path, 0o755);
   }
-
-  if (!existsSync(target.dir)) mkdirSync(target.dir, { recursive: true });
-  writeFileSync(target.path, hookFile(), "utf8");
-  chmodSync(target.path, 0o755);
   if (plan.json) {
-    console.log(JSON.stringify({ installed: true, path: target.path, custom: target.custom }, null, 2));
+    console.log(JSON.stringify({ installed: true, hooks: found.map((entry) => ({
+      hook: entry.target.name, path: entry.target.path, installed: entry.found.state !== "ours",
+    })), custom: targets[0].custom }, null, 2));
     return 0;
   }
-  console.log(color.ok(MARK.ok) + " " + HOOK_NAME + " installed — " + target.path);
-  for (const line of renderTarget(target)) console.log(line);
+  for (const entry of found) {
+    const line = entry.found.state === "ours"
+      ? color.dim(MARK.bullet + " already installed — " + entry.target.path)
+      : color.ok(MARK.ok) + " " + entry.target.name + " installed — " + entry.target.path;
+    console.log(line);
+  }
+  for (const line of renderTarget(targets[0])) console.log(line);
   console.log("  " + color.dim("`" + N + " hooks uninstall` removes exactly these lines."));
   return 0;
 }
 
 function runUninstall(root, plan) {
-  const target = hooksTarget(root);
-  if (!target.ok) {
-    console.error(failure(N + " hooks uninstall", target.message, target.details || []));
+  const targets = HOOK_NAMES.map((name) => hooksTarget(root, name));
+  const unusable = targets.find((target) => !target.ok);
+  if (unusable) {
+    console.error(failure(N + " hooks uninstall", unusable.message, unusable.details || []));
     return 1;
   }
-  const found = inspect(target);
-  if (found.state === "absent") {
-    console.log(color.dim(MARK.bullet + " nothing installed here — " + target.path));
-    return 0;
-  }
-  if (found.state === "foreign") {
+  const found = targets.map((target) => ({ target, found: inspect(target) }));
+  const foreign = found.find((entry) => entry.found.state === "foreign");
+  if (foreign) {
     console.error(failure(N + " hooks uninstall",
-      "the " + HOOK_NAME + " hook here is not ours", [
-        target.path,
+      "the " + foreign.target.name + " hook here is not ours", [
+        foreign.target.path,
         "It carries no `" + BLOCK_OPEN + "` marker, so removing it would be deleting",
         "somebody else's gate. Nothing was changed.",
       ]));
     return 1;
   }
-
-  const stripped = withoutBlock(found.text);
-  // A FILE THAT IS NOW ONLY A SHEBANG IS DELETED, not left behind empty: an
-  // empty executable `pre-commit` is a hook that runs and does nothing, which
-  // is indistinguishable from a gate that passes.
-  const remains = stripped.text.replace(/^#!.*\n?/, "").trim();
-  if (!remains) rmSync(target.path, { force: true });
-  else writeFileSync(target.path, stripped.text, "utf8");
-
-  if (plan.json) {
-    console.log(JSON.stringify({ removed: true, path: target.path, fileDeleted: !remains }, null, 2));
+  const ours = found.filter((entry) => entry.found.state === "ours");
+  if (!ours.length) {
+    console.log(color.dim(MARK.bullet + " nothing installed here — " + targets.map((target) => target.path).join(", ")));
     return 0;
   }
-  console.log(color.ok(MARK.ok) + " removed — " +
-    (remains ? "the rest of " + target.path + " is untouched" : target.path + " is gone; it held nothing else"));
+  const removed = [];
+  for (const entry of ours) {
+    const stripped = withoutBlock(entry.found.text);
+    const remains = stripped.text.replace(/^#!.*\n?/, "").trim();
+    if (!remains) rmSync(entry.target.path, { force: true });
+    else writeFileSync(entry.target.path, stripped.text, "utf8");
+    removed.push({ target: entry.target, remains });
+  }
+
+  if (plan.json) {
+    console.log(JSON.stringify({ removed: true, hooks: removed.map((entry) => ({
+      hook: entry.target.name, path: entry.target.path, fileDeleted: !entry.remains,
+    })) }, null, 2));
+    return 0;
+  }
+  for (const entry of removed) {
+    console.log(color.ok(MARK.ok) + " " + entry.target.name + " removed — " +
+      (entry.remains ? "the rest of " + entry.target.path + " is untouched" : entry.target.path + " is gone; it held nothing else"));
+  }
   return 0;
 }
 
