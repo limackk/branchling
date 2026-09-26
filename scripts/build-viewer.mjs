@@ -3623,7 +3623,7 @@ document.getElementById("btnConnect").addEventListener("click", pickDirectory);
 document.getElementById("btnRefresh").addEventListener("click", refreshFromDisk);
 document.getElementById("btnDisconnect").addEventListener("click", disconnect);
 
-// ─── Kopiowanie linku ────────────────────────────────────────────────
+// ─── Copying the link ────────────────────────────────────────────────
 // The URL is always current anyway (every filter change rewrites it), so the
 // button simply copies location.href — it works the same for the task list and
 // for the dashboard.

@@ -78,7 +78,7 @@ const FILE = [
 
 const meta = (text) => extractMeta(splitFrontmatter(text).frontmatter);
 
-// ── Parsowanie ────────────────────────────────────────────────────────────
+// ── Parsing ───────────────────────────────────────────────────────────────
 
 test("extractMeta reads scalars, inline lists and block lists", () => {
   const m = meta(FILE);
@@ -183,7 +183,7 @@ test("a newline never enters the frontmatter", () => {
   assert.equal(normalizeValue("related_docs", ["a\nb"], ctx()).ok, false);
 });
 
-// ── Serializacja ──────────────────────────────────────────────────────────
+// ── Serialization ─────────────────────────────────────────────────────────
 
 test("yamlScalar quotes where YAML would come apart", () => {
   assert.equal(yamlScalar("an ordinary title"), "an ordinary title");

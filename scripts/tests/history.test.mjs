@@ -52,7 +52,7 @@ function sandbox(tasks = { "BL-900-zrob-rzecz.md": taskFile() }) {
   return dir;
 }
 
-// ── Aktorzy ───────────────────────────────────────────────────────────────
+// ── Actors ────────────────────────────────────────────────────────────────
 
 test("actor: a slug with a namespace passes, junk lands as unknown", () => {
   assert.equal(isValidActor("local:founder"), true);
@@ -285,7 +285,7 @@ test("the history lives in backlog/history/<ID>.jsonl — one task, one file", (
   rmSync(dir, { recursive: true, force: true });
 });
 
-// ── Identyfikator zdarzenia (BL-1404 krok 1) ──────────────────────────────
+// ── Event identifier (BL-1404 step 1) ─────────────────────────────────────
 //
 // WHY AN id: the log has to merge by the union of lines (`merge=union`) and one
 // day synchronise with a server. Both require being able to say "this is THE
@@ -378,8 +378,8 @@ test("actor: a namespace is required for new records", () => {
 });
 
 test("actor: a name WITHOUT a namespace is not promoted — guessing is inventing", () => {
-  // `claude` to agent, `founder` to czlowiek. Hurtowe dopisanie `local:`
-  // would reclassify an agent as a person — a tidy untruth.
+  // `claude` could be an agent and `founder` a person. Adding `local:` in
+  // bulk would reclassify an agent as a person — a tidy untruth.
   assert.equal(normalizeActor("kamil"), "unknown");
   assert.equal(normalizeActor("claude"), "unknown");
 });
@@ -427,7 +427,7 @@ test("actor: a record with a namespace travels the whole way to the file", () =>
   rmSync(dir, { recursive: true, force: true });
 });
 
-// -- Zarezerwowane typy zdarzen (BL-1404 krok 5) --------------------------
+// -- Reserved event types (BL-1404 step 5) ---------------------------------
 //
 // We do not implement body history or comments. The schema is to ADMIT them, so
 // that adding them is an append rather than a migration of somebody's data.

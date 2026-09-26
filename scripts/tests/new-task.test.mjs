@@ -35,7 +35,7 @@ import { isolateHome } from "./_repo.mjs";
 isolateHome("new-task");
 
 // The patterns come from the tool's own FUNCTIONS, not retyped in the test — a
-// bywa cichym „prawie tym samym" (BL-1452).
+// retyped pattern silently becomes "almost the same" (BL-1452).
 const PAT = taskIdPatterns(P);
 
 const CLI = join(dirname(fileURLToPath(import.meta.url)), "..", "cli.mjs");
@@ -95,7 +95,7 @@ test("slug: it is trimmed, but not in the middle of a word", () => {
   assert.ok(!s.endsWith("-"), "the trim left a dash at the end");
 });
 
-// ── Tworzenie taska ───────────────────────────────────────────────────────
+// ── Task creation ─────────────────────────────────────────────────────────
 
 test("new creates a file with a number, a slug and a filled-in frontmatter", () => {
   const dir = freshBacklog();

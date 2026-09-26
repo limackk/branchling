@@ -97,7 +97,7 @@ test("an unknown flag STILL fails — BL-1417 untouched", () => {
 
 test("the help scan stops at `--`", () => {
   // So that a value beginning with a dash is not mistaken for a flag once
-  // separator wejdzie w TL-58.
+  // the separator from TL-58 is present.
   assert.equal(wantsHelp(["--help"]), true);
   assert.equal(wantsHelp(["--status", "pending", "-h"]), true);
   assert.equal(wantsHelp(["--", "--help"]), false);

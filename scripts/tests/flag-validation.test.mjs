@@ -57,7 +57,7 @@ function freshBacklog() {
  * `next-backlog-id.mjs` scans BRANCHES — without a git repository there is
  * nothing to scan and the script correctly ends with "not a single task file
  * found", regardless of flag validation. The tests for this one command need
- * PRAWDZIWEGO repo.
+ * a REAL repository.
  *
  * The backlog lies in a SUBDIRECTORY of the repository (`repo/backlog/`), not at
  * its root. A backlog AT THE ROOT of a repo (a relative path that is an empty

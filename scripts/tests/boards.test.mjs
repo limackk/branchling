@@ -454,8 +454,8 @@ test("INDEX: blocked_by stays (it drives the order), blocks goes (it is the inve
 /**
  * The views have been generated and NOT versioned since BL-1404, so a fresh clone
  * and a new worktree do not have them. The ratchets below measure the REAL tree, so
- * they have to build it first — a silent skip on a missing file would look like
- * zerowej mocy dowodowej.
+ * they have to build it first — a silent skip on a missing file would have no
+ * evidential force.
  */
 function ensureRealViews() {
   const build = join(SCRIPTS, "build-backlog.mjs");

@@ -24,7 +24,7 @@
  * does NOT fail, because a `doctor` in CI that fails over a detail gets switched
  * off, and then nobody sees anything.
  *
- * Testy: `node --test scripts/tests/doctor.test.mjs`
+ * Tests: `node --test scripts/tests/doctor.test.mjs`
  */
 
 import { spawnSync } from "node:child_process";

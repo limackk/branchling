@@ -1,5 +1,5 @@
 /**
- * `branchling init` i `branchling stats` (BL-1412).
+ * `branchling init` and `branchling stats` (BL-1412).
  *
  * Two commands with opposite risks, so the assertions are opposite too:
  *
@@ -49,7 +49,7 @@ function task(over) {
   );
 }
 
-// ── Estymaty (pure) ───────────────────────────────────────────────────────
+// ── Estimates (pure) ──────────────────────────────────────────────────────
 
 test("estimate: the units convert to hours", () => {
   assert.equal(estimateHours("30m"), 0.5);
@@ -79,7 +79,7 @@ test("estimate: the label converts to working days only above one day", () => {
   assert.match(hoursLabel(40), /working days/);
 });
 
-// ── Podsumowanie (pure) ───────────────────────────────────────────────────
+// ── Summary (pure) ────────────────────────────────────────────────────────
 
 const CFG = {
   statuses: ["pending", "in_progress", "blocked", "done"],
@@ -220,7 +220,7 @@ test("the configuration from init is GENERIC — no project's vocabulary", () =>
   }
 });
 
-// ── stats (prawdziwe uruchomienie) ────────────────────────────────────────
+// ── stats (real run) ──────────────────────────────────────────────────────
 
 test("stats counts real tasks and gives a sum of hours", () => {
   const dir = emptyDir();

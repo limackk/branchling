@@ -78,7 +78,7 @@ function withBacklog(opts, fn) {
   }
 }
 
-// ── Kontrakt konfiguracji ─────────────────────────────────────────────────
+// ── Configuration contract ────────────────────────────────────────────────
 
 test("the default prefix is GENERIC — not `BL`", () => {
   assert.equal(DEFAULTS.task_id_prefix, DEFAULT_TASK_ID_PREFIX);
@@ -199,7 +199,7 @@ test("an empty backlog is NOT a mismatch — having no tasks is a legal state", 
   });
 });
 
-// ── Migracja ──────────────────────────────────────────────────────────────
+// ── Migration ─────────────────────────────────────────────────────────────
 
 test("the migration renumbers the tasks, the history AND blocked_by/blocks", () => {
   withBacklog(

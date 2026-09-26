@@ -58,7 +58,7 @@ function unionMerge(cwd) {
   return /merge:\s*union/.test(String(r.stdout || ""));
 }
 
-// ── Kontrola pozytywna ────────────────────────────────────────────────────
+// ── Positive control ──────────────────────────────────────────────────────
 
 test("positive control: with no rules git does NOT ignore the views", () => {
   const dir = repo();
@@ -107,7 +107,7 @@ test("appending is idempotent — a second init does not add a second block", ()
   assert.equal(blocks, 1, "the branchling block appeared " + blocks + " times");
 });
 
-// ── Rezygnacja ────────────────────────────────────────────────────────────
+// ── Opting out ────────────────────────────────────────────────────────────
 
 test("--no-gitignore: the file is untouched, but the user gets the rules to paste", () => {
   const dir = repo();

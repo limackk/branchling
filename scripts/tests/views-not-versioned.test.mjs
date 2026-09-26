@@ -118,7 +118,7 @@ test("an aggregate outside git: the same two branches merge cleanly", () => {
 
 test("in THIS repository the views are ignored and untracked", () => {
   for (const rel of VIEWS) {
-    // ignorowany…
+    // ignored…
     const ignored = execFileSync("git", ["check-ignore", rel], {
       cwd: BACKLOG_DIR, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"],
     }).trim();
