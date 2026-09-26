@@ -542,10 +542,10 @@ a set of local refs than they can give.
 WHAT A SESSION MAY WRITE OUTSIDE ITS OWN TREE. Two paths, and no other:
 
   the state directory       \`${STATE_DIR_ENV}\`, or the XDG default under it:
-                            locks, the activity log, and this run's per-task
-                            agent logs. It is outside the repository on purpose
-                            — every worktree carries its own backlog, so a lock
-                            written into one of them would exclude nobody.
+                            locks and this run's per-task agent logs. It is
+                            outside the repository on purpose — every worktree
+                            carries its own backlog, so a lock written into one
+                            of them would exclude nobody.
   the user configuration    \`${HOME_ENV}\`, the layer that holds facts about
                             the person rather than about the project.
 

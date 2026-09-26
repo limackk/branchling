@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: "CLI onboarding"
 priority: P2                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex-subagent
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 2h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-21
-updated: 2026-09-21
+updated: 2026-09-26
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: [scripts/instructions.mjs, scripts/run-loop.mjs, scripts/home.mjs, scripts/history.mjs]
@@ -86,9 +86,9 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] No text `branchling instructions` prints names the activity log or a
+- [x] No text `branchling instructions` prints names the activity log or a
       report over it. [proof: printed-text-has-no-activity-log]
-- [ ] The state directory's inventory in `run-loop.mjs` and `home.mjs`, and the
+- [x] The state directory's inventory in `run-loop.mjs` and `home.mjs`, and the
       `currentSession()` comment, each keep their reason without the deleted
       command. [proof: suite-green]
-- [ ] The suite is green. [proof: suite-green]
+- [x] The suite is green. [proof: suite-green]

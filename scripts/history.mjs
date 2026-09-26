@@ -654,11 +654,11 @@ function entry(taskId, field, from, to, actor, source, ts, reason, session, role
  * The session this process belongs to, for stamping an entry it is about to
  * write (TL-164).
  *
- * THE SAME VALUE THE ACTIVITY LOG USES, from the same function — that is the
- * whole point. The `session <id>` report joins the two logs, and a second
- * derivation of "which session is this" would make the join fail in exactly the
- * cases it exists for. `focus.mjs` documents why the fallback is the worktree
- * and why a per-process id would be worse.
+ * ONE DERIVATION FOR THE FIELD, from this function — that is the whole point.
+ * Every write route asks here instead of deciding independently which session
+ * it belongs to, so the optional `session` field has one meaning across the
+ * append-only history. Telemetry removal made that answer empty; keeping the
+ * boundary central prevents one writer from silently restoring a second one.
  *
  * WHICH WRITES MAY STAMP IT, and this is the decision the field turns on: only
  * a command that MADE the change. Reconciliation records changes it merely
@@ -671,8 +671,8 @@ export function currentSession(backlogDir, env = process.env) {
   return "";
 }
 
-/** The same shape the activity log accepts, so the two sides of the join cannot
- *  disagree about what counts as an identifier. */
+/** The history field's one on-disk shape, so write routes cannot disagree about
+ *  what counts as a session identifier. */
 export function normalizeSession(value) {
   return String(value || "").trim().replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 64);
 }

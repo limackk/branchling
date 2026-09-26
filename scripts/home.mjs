@@ -18,9 +18,9 @@
  * truth the vocabulary was moved into `config.yaml` to create.
  *
  * CONFIG AND DATA ARE SEPARATE DIRECTORIES (§5), and that is contract rather
- * than tidiness: preferences are a file a human edits and backs up, while the
- * activity log is machine data nobody wants sitting among their dotfiles — and
- * the two want opposite answers to "should this be synced between machines".
+ * than tidiness: preferences are files a human edits and backs up, while locks
+ * and run logs are machine state nobody wants sitting among their dotfiles —
+ * and the two want opposite answers to "should this be synced between machines".
  *
  * WHY THE DIRECTORY NAME IS THE FROZEN MARKER AND NOT `PRODUCT_NAME`. It is a
  * path on disk holding a user's own files, so it is an ON-DISK KEY, exactly

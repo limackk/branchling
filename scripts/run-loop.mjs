@@ -600,14 +600,14 @@ export function stuckStatus(config, requested) {
  * (TL-202).
  *
  * Both are legitimate and the tool cannot work without them — the state
- * directory holds the locks, the activity log and this run's agent logs, and
- * the user configuration holds the layer that is about the person rather than
- * the project. What makes them worth naming in a report is the asymmetry: a
- * write inside the tree travels with a branch and arrives at the other trees
- * when somebody merges, while a change to either of these is instant for every
- * tree on this machine. On 2026-09-03 that difference cost an operator a run:
- * their tree began failing the moment another session wrote the user
- * configuration, and nothing in either tree said so.
+ * directory holds the locks and this run's agent logs, and the user
+ * configuration holds the layer that is about the person rather than the
+ * project. What makes them worth naming in a report is the asymmetry: a write
+ * inside the tree travels with a branch and arrives at the other trees when
+ * somebody merges, while a change to either of these is instant for every tree
+ * on this machine. On 2026-09-03 that difference cost an operator a run: their
+ * tree began failing the moment another session wrote the user configuration,
+ * and nothing in either tree said so.
  *
  * COMPUTED FROM THE ENVIRONMENT, never written down. A report that printed the
  * defaults would be right only on a machine using them, and silent about the
