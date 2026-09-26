@@ -1,10 +1,11 @@
 # The branchling viewer — a brief for a redesign
 
-**Status:** PROJECT (2026-09-05) — a brief handed to a designer; nothing in the
-"What to design" sections is implemented
-([TL-208](../backlog/tasks/TL-208-the-viewer-s-snapshot-banner-says-tryb-snapshot.md),
-[TL-232](../backlog/tasks/TL-232-the-served-viewer-answers-404-when-the-backlog-is-not-in-a.md),
-[TL-253](../backlog/tasks/TL-253-plan-reports-the-open-work-outside-every-wave-as-a-share.md))
+**Status:** ACTIVE PRODUCT CONTRACT (2026-09-26). The inventory below records
+the richer viewer that existed before TL-379 reduced it to a read-only page.
+The owner has now chosen to restore a dashboard and manual editing, but through
+a stricter boundary: snapshots remain read-only, and only the loopback-served
+page may write. The current build is still read-only while the attributed
+server API and its editors are implemented.
 
 This document is written for somebody who has never opened this repository. It
 describes what the product is, who reads its one screen, what that screen
@@ -321,8 +322,9 @@ the three row types, then a list of rows:
 
 ## 5. Writing, editing and adding — how the interface must behave
 
-The viewer is not read-only, and the write paths carry most of the product's
-promises.
+This is the target contract, not a claim that the current build already keeps
+it. Snapshot mode is always read-only. Live mode is the only mode permitted to
+write, and its write paths carry most of the product's promises.
 
 - **Editing a field is a click on the value**, in the detail panel, in live mode
   only. There is no edit mode and no save button: the change is written on

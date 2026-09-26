@@ -61,9 +61,11 @@ neither, and saying so is cheaper for both of us than finding out in week three.
 board, no login, no notification, no status roll-up for somebody who will never
 clone this. Tasks are files on a branch and go through review like code; a
 stakeholder who needs a weekly summary needs a different tool, and pointing one
-at this backlog is a reporting job you would be writing yourself. The browser
-page is a read-only window onto the files — it shows current work and cannot
-change any of it.
+at this backlog is a reporting job you would be writing yourself. A generated
+`viewer.html` snapshot is portable and read-only. A page served on loopback is
+the only viewer mode permitted to write, because only the server can validate
+the field, attribute the person and append the history beside the Markdown.
+Editing is disabled in the current build while that boundary is restored.
 
 **It is not a managed agent factory.** It does not contain an agent, choose one,
 host one, or run your agents for you. `run` starts exactly the command template

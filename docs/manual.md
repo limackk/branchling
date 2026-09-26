@@ -512,19 +512,24 @@ branchling serve --no-open       # do not open a window
 branchling viewer                # just rebuild viewer.html, no server
 ```
 
-The server listens **on 127.0.0.1 only**, validates every field it writes with
-the same schema the CLI uses, and resolves a task file by listing the directory
-rather than by concatenating a path out of input. Starting it while it is
-already running only opens a tab; an `/api/ping` probe checks the identity of
-the process, so a stranger's service on that port is not mistaken for ours.
+The server listens **on 127.0.0.1 only**. Starting it while it is already
+running only opens a tab; an `/api/ping` probe checks the identity of the
+process, so a stranger's service on that port is not mistaken for ours.
 
-**What the server adds over opening `viewer.html` from disk:** editing fields
-(click a value in the detail panel — status, priority, owner, epic, labels,
-dependencies), writes that go straight into the `.md` with the views regenerated
-automatically, changes pushed from disk over SSE (a task edited by an agent or by
-`git checkout` appears without a reload), and support for every browser. Under
-`file://` the fields are read-only: a second write path would mean a second set
-of validation rules.
+There are two modes of the same generated page. **Snapshot mode is read-only:**
+opening `viewer.html` from disk reads the data embedded at build time and never
+writes a task. **Live mode is the only viewer mode permitted to write:** the
+loopback server knows the backlog path, can validate a field through the same
+schema as the CLI, can attribute the person and can append history before it
+rebuilds computed views. No browser-only or folder-handle write path is part of
+the contract.
+
+The current build keeps live editing disabled while that attributed server
+boundary is restored. What the server adds today is a fresh read from disk,
+changes pushed over SSE when an agent, editor or `git checkout` changes a task,
+and support for every browser without a folder picker. A mutation request still
+answers 404 and leaves the task byte-for-byte unchanged. When editing returns,
+only the served page gains editors; a mailed snapshot remains read-only.
 
 **A board is a scope, not a filter.** The `Board:` bar switches the scope of the
 whole viewer — the lists, the counters in the header AND the dashboard. A filter
@@ -545,12 +550,16 @@ filters. A parameter that is absent from the link means "the default", not
 "keep whatever you had": otherwise a recipient with their own filters would get
 a different set and the link would have lied.
 
-**The dashboard** (the second tab, its state also fully in the URL) shows
-throughput, the queue, the distribution across epics and a burndown of the range
-you pick.
+**The dashboard contract** reserves a URL-addressable view of throughput, queue
+health, epics and plan waves. The current page does not expose that tab yet; its
+restoration follows the same rule as every other viewer control: state that a
+recipient must reproduce belongs in the URL, while identity and write
+capabilities never do.
 
 **Field history** is a separate, committed file — `history/<ID>.jsonl`,
-append-only, one line per field change:
+append-only, one line per field change. A future live-viewer write uses
+`source: "viewer"`; current entries come from the CLI or a reconciled manual
+edit:
 
 ```json
 {"id":"01M174H5H6T1622A7KGR4ZR3W9","ts":"2026-08-29T13:17:10.970Z",

@@ -71,11 +71,16 @@ Encode only what is set. Empty filters must not litter the link.
 
 ## Edits and history
 
-Writes from the page go through `task-fields.mjs` — `buildFieldSpecs()`,
+Snapshot mode is read-only. Live mode, served on loopback, is the only viewer
+mode permitted to write. During the restoration of editing the source may still
+expose no mutation route; do not describe a planned editor as shipped behavior.
+
+Writes from the live page go through `task-fields.mjs` — `buildFieldSpecs()`,
 `normalizeValue()`, `setFrontmatterField()` — which is the same module that
 validates writes on the server and from which the viewer draws its editors. One
 definition of a field, three call sites. Adding a field means adding it there,
-not adding a branch in the page.
+not adding a branch in the page. A browser-only folder-handle writer would be a
+second validation boundary and is outside the contract.
 
 Every write is recorded by `history.mjs` with an actor and a timestamp, and the
 server regenerates views afterwards so the generated YAML cannot go stale behind

@@ -11,12 +11,15 @@
  * — so opening viewer.html off the disk always costs at least one click. Over
  * HTTP there is nothing to grant.
  *
- * What it adds over the file:// flow:
+ * What it adds over the file:// flow in the current read-only build:
  *   - zero clicks to reach live mode, in any browser (not just Chrome/Edge)
- *   - status writes regenerate INDEX/FOCUS/archive automatically, so the
- *     generated YAML views can no longer go stale behind your back
  *   - SSE push on tasks/ changes — edits made by an agent or an editor appear
  *     without a reload
+ *
+ * Snapshot mode stays read-only. Live mode is the only viewer mode permitted
+ * to write, but it does not regain that capability until the server can
+ * validate, attribute and record one atomic edit. Until then every mutation
+ * route is absent rather than hidden behind the page.
  *
  * Usage:
  *   node backlog/scripts/serve-backlog.mjs          # opens the browser
@@ -28,7 +31,7 @@
 import { createServer, get } from "node:http";
 import { hostname } from "node:os";
 import { spawn } from "node:child_process";
-import { existsSync, readFileSync, realpathSync, writeFileSync, watch } from "node:fs";
+import { existsSync, readFileSync, realpathSync, watch } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -60,8 +63,6 @@ import { printJson } from "./json-envelope.mjs";
 import {
   listTaskFiles,
   reconcile,
-  recordEdit,
-  requiresReason,
 } from "./history.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -84,7 +85,8 @@ if (cliArgs.argv.some((a) => a === "--help" || a === "-h")) {
   // SAID OUT LOUD BECAUSE IT IS WHAT PRODUCED THE ORPHANS (TL-266). Six servers
   // were found running on one machine, three of them reparented to init after
   // the shell that started them was gone. Nothing warned anybody, and `serve`
-  // WRITES — it reconciles on a timer and appends to backlog/history/.
+  // RECONCILES — it watches task files and appends externally observed changes
+  // to backlog/history/. The page itself has no write route in this build.
   printLine("This process does not stop when the shell that started it goes away.");
   printLine("Backgrounded or left in a closed terminal, it keeps listening and keeps");
   printLine("reconciling the tree. `serve --list` names them; `serve --stop <port>` ends one.");
@@ -668,9 +670,9 @@ function listen(port, attemptsLeft) {
       : "";
     printLine(
       `${N} serve: ${target}\n` +
-        `  ${count} tasks, live mode with no clicking (the folder is known server-side)\n` +
+        `  ${count} tasks, live read mode with no clicking (the folder is known server-side)\n` +
         beside +
-        `  Editing a field writes the .md, appends to the history and rebuilds NOW/INDEX/archive\n` +
+        `  Editing is unavailable in this build; only a served viewer may regain a write path\n` +
         (VIEWS_BUILT ? "" : "  WARNING: build-backlog.mjs did not pass — the views may be stale\n") +
         boot +
         `  Ctrl-C stops it`
@@ -694,9 +696,9 @@ if (probe.state === "same") {
  * Somebody else's backlog on our port: start BESIDE it, never instead of it.
  *
  * One server serves one backlog, and that is not a simplification to undo
- * later: the server WRITES — the .md file, the history entry, the regenerated
- * views — and one writing process spanning N repositories divorces state from
- * the branch it belongs to (Law 1).
+ * later. The live-mode contract permits this process to write one attributed
+ * backlog; spanning N repositories would divorce state from the branch it
+ * belongs to (Law 1). The current build remains read-only from the page.
  */
 const COEXISTS_WITH = probe.state === "other"
   ? {
