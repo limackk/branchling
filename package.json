@@ -1,18 +1,16 @@
 {
   "name": "branchling",
   "version": "0.1.0",
-  "description": "A backlog that lives in markdown files and is driven from the terminal: one task is one file with YAML frontmatter, and every index, view and aggregate is computed from those files rather than committed.",
+  "description": "Git-native task execution for people and coding agents with verification-gated closure.",
   "keywords": [
-    "backlog",
-    "task-management",
-    "markdown",
-    "cli",
-    "issue-tracker",
-    "project-management",
-    "yaml-frontmatter",
     "git",
-    "todo",
-    "kanban"
+    "markdown",
+    "task-management",
+    "coding-agents",
+    "cli",
+    "verification",
+    "backlog",
+    "yaml-frontmatter"
   ],
   "homepage": "https://github.com/limackk/branchling#readme",
   "bugs": "https://github.com/limackk/branchling/issues",
