@@ -210,7 +210,8 @@ export const COMMANDS = {
       "",
       "  --root <path>  the same directory as --dir, under the name this command was",
       "                 born with. Kept because calls and hooks written before --dir",
-      "                 existed still pass it; --dir is the one every command takes",
+      "                 existed still pass it; --dir is the shared spelling for a",
+      "                 backlog override on commands that take one",
     ].join("\n"),
   },
   viewer: {
@@ -1274,7 +1275,8 @@ export function helpText() {
     rows,
     "",
     `\`${N} <command> --help\` prints that command's flags.`,
-    "`--dir <path>` points at a different backlog; it works on every command.",
+    "`--dir <path>` points backlog-aware commands at a different backlog.",
+    "`regen-hook` instead uses its edited-file payload to select the backlog.",
   ].join("\n");
 }
 

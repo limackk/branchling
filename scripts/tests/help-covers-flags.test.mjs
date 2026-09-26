@@ -20,8 +20,9 @@
  *     `--tasks` that way for as long as it was undocumented.
  *
  * `--dir`, `--help` and `-h` are excluded because they are documented ONCE, in
- * the main help, as working on every command. The exclusion is not assumed: the
- * test below fails if the main help stops saying so.
+ * the main help for commands that select a backlog. `regen-hook` is named
+ * separately because its payload already identifies the backlog. The exclusion
+ * is not assumed: the test below compares that sentence with the live command.
  *
  * THE EXEMPTIONS ARE NAMED, not silent. Six commands carry the same defect;
  * they are listed with the task that will settle them, so a seventh cannot
@@ -51,8 +52,8 @@ isolateHome("help-covers-flags");
 const CLI = join(dirname(fileURLToPath(import.meta.url)), "..", "cli.mjs");
 const NAMES = Object.keys(COMMANDS);
 
-/** Documented once in the main help as working everywhere, so a command that
- *  does not repeat them is not hiding anything. */
+/** Documented once in the main help, so a command that does not repeat them is
+ *  not hiding anything. `regen-hook` names its different selection rule there. */
 const GLOBAL_FLAGS = new Set(["--dir", "--help", "-h"]);
 
 /**
@@ -77,7 +78,7 @@ const UNDOCUMENTED = {};
  * positive control below turns a `null` into a failure here too, so a command
  * cannot leave this comparison by changing its own error message.
  */
-function accepted(name) {
+function available(name) {
   const r = spawnSync(process.execPath, [CLI, name, "--zzz-not-a-flag"], {
     encoding: "utf8", timeout: 20_000, input: "",
   });
@@ -86,7 +87,12 @@ function accepted(name) {
   // `<path...>` and `<boards.yaml>` are value placeholders, not flags; the
   // lookbehind keeps the scan off anything inside one.
   const flags = [...line[1].matchAll(/(?<![\w<-])--[a-z0-9][a-z0-9-]*/g)].map((m) => m[0]);
-  return [...new Set(flags)].filter((f) => !GLOBAL_FLAGS.has(f));
+  return [...new Set(flags)];
+}
+
+function accepted(name) {
+  const flags = available(name);
+  return flags && flags.filter((f) => !GLOBAL_FLAGS.has(f));
 }
 
 /** What the command's `--help` declares, by the same rule `--help --json` uses. */
@@ -128,14 +134,22 @@ test("positive control: a flag removed from the help is CAUGHT", () => {
     "a flag accepted but absent from the help was not reported as missing");
 });
 
-test("positive control: the main help still carries the global flags", () => {
+test("positive control: the main help's regen-hook exception agrees with the command", () => {
   // GLOBAL_FLAGS above is an exemption granted because the main help documents
-  // them for every command at once. If that sentence goes, the exemption has to
-  // go with it, or --dir becomes undocumented everywhere and nothing notices.
+  // them once. The sentence and the live command are checked together: teaching
+  // regen-hook to accept --dir, or removing its distinct selection rule from the
+  // help, breaks this proof instead of leaving either side unchecked.
   const main = spawnSync(process.execPath, [CLI, "--help"], { encoding: "utf8", timeout: 20_000 });
   assert.equal(main.status, 0, main.stderr);
-  assert.match(main.stdout, /--dir <path>.*every command/s,
-    "the main help no longer says --dir works on every command");
+  assert.match(main.stdout,
+    /--dir <path>.*points backlog-aware commands at a different backlog\.\s+`regen-hook` instead uses its edited-file payload to select the backlog\./s,
+    "the main help does not name regen-hook's payload-based selection rule");
+  const regen = spawnSync(process.execPath, [CLI, "regen-hook", "--dir", "unused"], {
+    encoding: "utf8", timeout: 20_000, input: "",
+  });
+  assert.equal(regen.status, 2, "regen-hook accepted the competing --dir selection rule");
+  assert.match(regen.stderr, /unknown flag: --dir/,
+    "regen-hook did not identify --dir as unsupported");
   assert.match(main.stdout, /--help.*prints that command's flags/s,
     "the main help no longer promises a per-command --help");
 });

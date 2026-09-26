@@ -151,10 +151,12 @@ export function buildArgv(command, input) {
  *
  * A SERVER STARTED WITH `--dir` PASSES IT ON AS `BACKLOG_DIR`, not as a flag.
  * `resolveBacklogDir` already reads that variable, second only to an explicit
- * `--dir`, so one line covers every command — including the several whose usage
- * does not document `--dir` although they accept it, where injecting a flag
- * would have silently missed. A caller naming its own `--dir` still outranks it,
- * because that order is the resolver's and is not decided here.
+ * `--dir`, so one line covers every command that resolves a backlog independently
+ * — including the several whose usage does not document `--dir` although they
+ * accept it, where injecting a flag would have silently missed. `regen-hook` is
+ * the exception: its edited-file payload already selects the backlog. A caller
+ * naming its own `--dir` still outranks the environment, because that order is
+ * the resolver's and is not decided here.
  */
 export function callCli(command, input, opts = {}) {
   const argv = buildArgv(command, input);

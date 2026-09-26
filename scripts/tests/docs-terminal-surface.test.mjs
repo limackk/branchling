@@ -67,10 +67,11 @@ function documents() {
 }
 
 /**
- * Documented once in the main help as working on every command, so a command
- * whose own `available:` list omits them is not contradicting a document that
- * writes them. `help-covers-flags.test.mjs` holds that sentence in the main
- * help, which is what makes the exemption legitimate rather than assumed.
+ * Documented once in the main help, so a command whose own `available:` list
+ * omits them is not contradicting a document that writes them. `regen-hook`'s
+ * payload-based selection rule is named there and checked against the live
+ * command by `help-covers-flags.test.mjs`, which makes the exemption legitimate
+ * rather than assumed.
  */
 const GLOBAL_FLAGS = new Set(["--dir", "--help", "-h"]);
 

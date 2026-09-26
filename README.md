@@ -601,7 +601,7 @@ branchling instructions autonomous-loop
 ## Where the data lives
 
 The backlog directory is **an argument, not a property of where the code sits**.
-Every command resolves it the same way, in this order:
+Commands that accept a backlog override resolve it the same way, in this order:
 
 | # | Source | Notes |
 |---|---|---|
@@ -610,8 +610,10 @@ Every command resolves it the same way, in this order:
 | 3 | walking up from the current directory | needs `tasks/` **plus** one of `config.yaml` / `boards.yaml` / `_template.md` |
 | 4 | the directory above the code (co-location) | last resort; it is what lets a backlog sit next to the scripts |
 
-`--dir` works on every command, so one checkout of the tool drives any number
-of backlogs: `branchling query --dir ~/other-project/backlog --status blocked`.
+`--dir` is available to commands that select a backlog independently. The
+editor-only `regen-hook` instead takes that answer from its edited-file payload.
+One checkout of the tool therefore drives any number of backlogs: `branchling
+query --dir ~/other-project/backlog --status blocked`.
 
 ---
 

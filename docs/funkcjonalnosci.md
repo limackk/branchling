@@ -70,9 +70,11 @@ to be checkable, not declared.
 ### 2.2 Commands
 
 An unknown command and an unknown flag **fail** — a silent no-op looks like it
-worked. `--dir <path>` works on every command; the data directory is resolved
-by `resolveBacklogDir()` from four sources: `--dir` → `BACKLOG_DIR` →
-detection upwards from cwd → co-location.
+worked. `--dir <path>` is available to commands that select a backlog
+independently. The editor-only `regen-hook` instead takes that answer from its
+edited-file payload. Backlog overrides are resolved by `resolveBacklogDir()`
+from four sources: `--dir` → `BACKLOG_DIR` → detection upwards from cwd →
+co-location.
 
 **Reading**
 
