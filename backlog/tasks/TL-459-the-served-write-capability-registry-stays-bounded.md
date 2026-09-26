@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Backlog viewer"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 4h
@@ -50,4 +50,4 @@ The files to read before the first edit, each with a reason.
 
 ## Acceptance criteria
 
-- [ ] Capability issuance remains bounded under repeated page requests and current/stale tokens retain their intended behavior. [proof: bounded-capabilities]
+- [x] Capability issuance remains bounded under repeated page requests and current/stale tokens retain their intended behavior. [proof: bounded-capabilities]

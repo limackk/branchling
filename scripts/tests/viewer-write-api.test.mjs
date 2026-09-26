@@ -128,6 +128,29 @@ test("only a same-origin served page can make an attributed edit", async () => {
   } finally { await stop(handle); rmSync(fx.dir, { recursive: true, force: true }); }
 });
 
+test("repeated page requests evict old capabilities while the current page can write", async () => {
+  const fx = fixture();
+  const handle = start(fx.root, await freePort());
+  try {
+    const port = await handle.bound;
+    const issued = [];
+    for (let i = 0; i < 33; i++) issued.push(await capability(port));
+    const origin = `http://127.0.0.1:${port}`;
+    const body = { id: fx.id, field: "title", value: "Bounded capability registry", actor: "local:owner" };
+
+    const evicted = await call(port, "/api/task", {
+      method: "POST", body, capability: issued[0].token, origin,
+    });
+    assert.equal(evicted.status, 403, "the oldest unexpired capability should be pruned at the bound");
+
+    const current = await call(port, "/api/task", {
+      method: "POST", body, capability: issued.at(-1).token, origin,
+    });
+    assert.equal(current.status, 200, current.text);
+    assert.match(readFileSync(taskPath(fx.root, fx.id), "utf8"), /title: Bounded capability registry/);
+  } finally { await stop(handle); rmSync(fx.dir, { recursive: true, force: true }); }
+});
+
 test("stale tokens, traversal, invalid actors and oversized input are refused", async () => {
   const fx = fixture();
   const handle = start(fx.root, await freePort(), 20);

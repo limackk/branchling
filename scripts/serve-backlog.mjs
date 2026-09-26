@@ -217,6 +217,10 @@ const TASKS_DIR = join(BACKLOG_DIR, "tasks");
 const CONFIG = loadConfigOrExit(BACKLOG_DIR);
 const FIELDS = buildFieldSpecs(CONFIG);
 const CAPABILITY_TTL_MS = Math.max(1, Number(process.env.VIEWER_WRITE_CAPABILITY_TTL_MS) || 15 * 60 * 1000);
+// A page load is unauthenticated, so expiry alone is not a memory bound: a
+// foreign page can make opaque GET requests to a guessed loopback port. Keep a
+// small tab-sized window and evict deterministically in issuance order.
+const MAX_WRITE_CAPABILITIES = 32;
 const capabilities = new Map();
 let editQueue = Promise.resolve();
 
@@ -283,12 +287,16 @@ function readBody(req, limitBytes = 16 * 1024) {
 }
 
 function newCapability() {
-  const token = randomBytes(32).toString("base64url");
-  const expiresAt = Date.now() + CAPABILITY_TTL_MS;
-  capabilities.set(token, expiresAt);
+  const now = Date.now();
   for (const [candidate, expiry] of capabilities) {
-    if (expiry <= Date.now()) capabilities.delete(candidate);
+    if (expiry <= now) capabilities.delete(candidate);
   }
+  while (capabilities.size >= MAX_WRITE_CAPABILITIES) {
+    capabilities.delete(capabilities.keys().next().value);
+  }
+  const token = randomBytes(32).toString("base64url");
+  const expiresAt = now + CAPABILITY_TTL_MS;
+  capabilities.set(token, expiresAt);
   return { token, expiresAt };
 }
 
