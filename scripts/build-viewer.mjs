@@ -391,6 +391,7 @@ export function buildHtml(
   // `viewer-plan.mjs` renders what `planState()` returns.
   const planModuleSrc = readModuleSource("plan.mjs");
   const viewerPlanModuleSrc = readModuleSource("viewer-plan.mjs");
+  const dashboardModuleSrc = readModuleSource("viewer-dashboard.mjs");
   // The decision panel reads `openQuestions` from task-fields.mjs, pasted above.
   const decisionPanelModuleSrc = readModuleSource("decision-panel.mjs");
   const taskGraphModuleSrc = readModuleSource("task-graph.mjs");
@@ -1243,6 +1244,56 @@ ${paletteBadgeCss}
   }
   .copy-link-btn:hover { border-color: var(--accent); color: var(--fg); }
 
+  /* ─── Dashboard ─────────────────────────────────────────────────── */
+  .dashboard-view { display: none; }
+  body.view-dashboard main.app-main { display: none; }
+  body.view-dashboard .filters-bar,
+  body.view-dashboard .stats { display: none; }
+  body.view-dashboard .dashboard-view {
+    display: block; flex: 1; min-height: 0; overflow-y: auto;
+    padding: 20px 24px 64px;
+  }
+  .dash-head { display: flex; justify-content: space-between; gap: 18px; align-items: start; }
+  .dash-head h2, .dashboard-view h3 { margin: 0 0 5px; }
+  .dash-head p, .dash-quality, .dash-empty { margin: 0 0 14px; color: var(--fg-muted); font-size: 12px; }
+  .dash-kpis, .dash-flow { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 10px; margin-bottom: 20px; }
+  .dash-kpi, .dash-flow-card {
+    display: flex; flex-direction: column; gap: 5px; min-height: 112px;
+    border: 1px solid var(--border); border-radius: 10px; padding: 12px;
+    background: var(--bg-card); box-shadow: var(--shadow);
+  }
+  .dash-kpi span, .dash-flow-card span { color: var(--fg-muted); font-size: 11px; }
+  .dash-kpi strong, .dash-flow-card strong { font-size: 24px; font-variant-numeric: tabular-nums; }
+  .dash-kpi small { color: var(--fg-muted); }
+  .dash-link, .dash-day, .dash-progress, .dash-epic {
+    color: var(--accent); background: transparent; border: 0; padding: 0;
+    font: inherit; font-size: 11px; text-align: left; cursor: pointer;
+  }
+  .dash-link:hover, .dash-progress:hover, .dash-epic:hover { text-decoration: underline; }
+  .dash-link.is-empty { color: var(--fg-muted); cursor: default; }
+  .dash-chart {
+    display: flex; align-items: flex-end; gap: 5px; min-height: 150px;
+    border: 1px solid var(--border); border-radius: 10px; padding: 12px;
+    background: var(--bg-card); overflow-x: auto; margin-bottom: 20px;
+  }
+  .dash-day {
+    flex: 1 0 32px; min-width: 32px; height: var(--day-height); min-height: 8px;
+    background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 5px 5px 0 0;
+    color: transparent; overflow: hidden;
+  }
+  .dash-day:focus { outline: 2px solid var(--fg); outline-offset: 2px; }
+  .dash-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+  .dash-columns section { display: flex; flex-direction: column; gap: 6px; }
+  .dash-progress, .dash-epic {
+    color: var(--fg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px; background: var(--bg-card);
+  }
+  .dash-progress:hover, .dash-epic:hover { border-color: var(--accent); text-decoration: none; }
+  .dash-range { display: flex; gap: 4px; margin: 0 0 12px; }
+  .dash-range button { font: inherit; font-size: 11px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--bg); color: var(--fg); cursor: pointer; }
+  .dash-range button.is-active { border-color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+  @media (max-width: 680px) { .dash-columns { grid-template-columns: 1fr; } .dashboard-view { padding: 14px 12px 48px; } }
+
   /* ─── Execution (the plan as waves, TL-109) ─────────────────────── */
   /* A flow, not a table: the whole point of the view is that it does not look
      like the rest of the page. Every colour is a token, so the dark block below
@@ -1738,6 +1789,7 @@ ${paletteBadgeCss}
     <span class="build-meta">snapshot: ${buildTime}</span>
     <nav class="view-tabs" id="viewTabs">
       <button type="button" class="view-tab is-active" data-view="tasks">Tasks</button>
+      <button type="button" class="view-tab" data-view="dashboard">Dashboard</button>
       <button type="button" class="view-tab" data-view="execution">Execution</button>
       <button type="button" class="view-tab" data-view="decisions" id="tabDecisions">Waiting on you</button>
       <button type="button" class="copy-link-btn" id="btnCopyLink"
@@ -1780,6 +1832,14 @@ ${paletteBadgeCss}
 
 <section class="execution-view" id="executionView"></section>
 <section class="decisions-view" id="decisionsView"></section>
+<section class="dashboard-view" id="dashboardView">
+  <div class="dash-range" id="dashboardRange" aria-label="Dashboard time range">
+    <button type="button" data-range-days="30" class="is-active">30 days</button>
+    <button type="button" data-range-days="90">90 days</button>
+    <button type="button" data-range-days="0">All history</button>
+  </div>
+  <div id="dashboardContent"></div>
+</section>
 
 <script>
 // EVERY KEY THIS PAGE WRITES INTO THE BROWSER (TL-178). One prefix, injected
@@ -1827,6 +1887,10 @@ ${planModuleSrc}
 // The Execution view: the model and the HTML, tested by
 // node --test scripts/tests/viewer-plan.test.mjs.
 ${viewerPlanModuleSrc}
+// ─── end of the pasted module ─────────────────────────────────────────
+
+// ─── Pasted source of scripts/viewer-dashboard.mjs (TL-451) ──────────
+${dashboardModuleSrc}
 // ─── end of the pasted module ─────────────────────────────────────────
 
 // ─── Pasted source of scripts/decision-panel.mjs (TL-115) ────────────
@@ -1892,7 +1956,9 @@ const state = {
   filterEnv: new Set(),   // the values of the label_axis_env axis plus "n/a"
   filterEpic: new Set(),  // values: epic name | NO_EPIC constant
   sortBy: "priority",     // "priority" | "id_asc" | "id_desc"
-  view: "tasks",          // "tasks" | "execution" | "decisions"
+  view: "tasks",          // "tasks" | "dashboard" | "execution" | "decisions"
+  dashboardDays: 30,
+  dashboardIds: new Set(), // exact aggregate drill-down; serialized as repeated task= values
   // The panel's own filter: "" = everything, "mine" = rows naming this actor.
   // The moment the replay is showing (TL-91): an ISO instant, or null for the
   // last one the log covers. A moment and not a day — everything within one day
@@ -2760,6 +2826,21 @@ function renderActiveChips(computed) {
   };
 
   let any = false;
+  if (state.dashboardIds.size) {
+    any = true;
+    const chip = document.createElement("span");
+    chip.className = "active-chip";
+    chip.innerHTML = '<span class="active-chip-key">Dashboard:</span><span class="active-chip-val">' +
+      state.dashboardIds.size + " tasks</span>";
+    const x = document.createElement("button");
+    x.type = "button";
+    x.className = "active-chip-x";
+    x.textContent = "✕";
+    x.setAttribute("aria-label", "Clear dashboard task set");
+    x.onclick = () => { state.dashboardIds = new Set(); render(); };
+    chip.appendChild(x);
+    el.appendChild(chip);
+  }
   for (const spec of FILTER_SPECS) {
     for (const value of state[spec.key]) {
       any = true;
@@ -2795,6 +2876,7 @@ function renderActiveChips(computed) {
     resetBtn.textContent = "✕ Clear all";
     resetBtn.onclick = () => {
       FILTER_KEYS.forEach(k => { state[k] = new Set(); });
+      state.dashboardIds = new Set();
       render();
     };
     el.appendChild(resetBtn);
@@ -2812,6 +2894,7 @@ function getFilteredTasks() {
       const sel = state[spec.key];
       if (sel.size && ![...sel].some(v => spec.match(t, v))) return false;
     }
+    if (state.dashboardIds.size && !state.dashboardIds.has(t.id)) return false;
     if (q) {
       if (!(t.id + " " + t.title).toLowerCase().includes(q)) return false;
     }
@@ -3073,6 +3156,7 @@ function tasksViewState() {
     search: state.search,
     sortBy: state.sortBy,
     selectedId: state.selectedId,
+    taskIds: [...state.dashboardIds],
   };
 }
 
@@ -3102,6 +3186,7 @@ function tasksApplyHash(query) {
   if (v.board !== null) applyBoardFromUrl(v.board);
   for (const spec of FILTER_SPECS) state[spec.key] = new Set(v.filters[spec.param] || []);
   state.search = v.search;
+  state.dashboardIds = new Set(v.taskIds || []);
   const input = document.getElementById("searchInput");
   if (input) input.value = v.search;
   state.sortBy = v.sortBy;
@@ -3114,6 +3199,52 @@ function tasksApplyHash(query) {
     toast(v.selectedId + " does not exist in this data — showing the list alone", "error");
   }
 }
+
+// ─── Dashboard (TL-451) ─────────────────────────────────────────────
+function dashboardPlanState() {
+  if (!PLAN || !PLAN.exists || (PLAN.problems && PLAN.problems.length)) return null;
+  return planState(PLAN.plan, TASKS, {
+    archivedStatuses: CONFIG.archivedStatuses,
+    inProgressStatus: CONFIG.inProgressStatus,
+  });
+}
+
+function renderDashboard_() {
+  const now = Date.now();
+  const from = state.dashboardDays ? now - state.dashboardDays * 86400000 : 0;
+  const model = dashboardModel(TASKS, HISTORY, dashboardPlanState(), {
+    archivedStatuses: CONFIG.archivedStatuses,
+    inProgressStatus: CONFIG.inProgressStatus,
+    awaitingVouchStatus: CONFIG.awaitingVouchStatus,
+    priorities: CONFIG.priorities,
+    now, from, to: now,
+  });
+  document.getElementById("dashboardContent").innerHTML = renderDashboard(model);
+  for (const button of document.querySelectorAll("#dashboardRange [data-range-days]")) {
+    button.classList.toggle("is-active", Number(button.dataset.rangeDays) === state.dashboardDays);
+  }
+}
+
+document.getElementById("dashboardRange").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-range-days]");
+  if (!button) return;
+  state.dashboardDays = Number(button.dataset.rangeDays);
+  renderDashboard_();
+});
+
+document.getElementById("dashboardContent").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-dashboard-tasks]");
+  if (!button) return;
+  const ids = button.dataset.dashboardTasks.split(",").filter(Boolean);
+  state.dashboardIds = new Set(ids);
+  state.search = "";
+  state.selectedId = null;
+  for (const key of FILTER_KEYS) state[key] = new Set();
+  const input = document.getElementById("searchInput");
+  if (input) input.value = "";
+  setView("tasks");
+  render();
+});
 
 // ─── Execution view (TL-109) ──────────────────────────────────────────
 // The state is recomputed on every render from ALL_TASKS — deliberately not from
@@ -3473,11 +3604,13 @@ document.getElementById("decisionsView").addEventListener("keydown", (e) => {
 
 function setView(view) {
   state.view = view;
+  document.body.classList.toggle("view-dashboard", view === "dashboard");
   document.body.classList.toggle("view-execution", view === "execution");
   document.body.classList.toggle("view-decisions", view === "decisions");
   for (const btn of document.querySelectorAll(".view-tab")) {
     btn.classList.toggle("is-active", btn.dataset.view === view);
   }
+  if (view === "dashboard") renderDashboard_();
   if (view === "execution") renderExecution_();
   if (view === "decisions") renderDecisions();
 }
@@ -3495,7 +3628,8 @@ function render() {
   // The plan's state is computed from the tasks, so a refresh that did not
   // redraw it would leave a card in a status the rest of the page no longer
   // shows.
-  if (state.view === "execution") renderExecution_();
+  if (state.view === "dashboard") renderDashboard_();
+  else if (state.view === "execution") renderExecution_();
   else if (state.view === "decisions") renderDecisions();
   // The one place where the list rewrites the URL: every change of a filter, a
   // chip, the sorting and the scope ends up here anyway, so there is no route by
@@ -3515,6 +3649,11 @@ function handleHash() {
   const raw = window.location.hash.replace(/^#/, "");
   const qi = raw.indexOf("?");
   const id = qi < 0 ? raw : raw.slice(0, qi);
+  if (id === "dashboard") {
+    if (state.view !== "dashboard") setView("dashboard");
+    else renderDashboard_();
+    return;
+  }
   if (id === "decisions") {
     if (state.view !== "decisions") setView("decisions");
     else renderDecisions();
@@ -3608,7 +3747,8 @@ for (const btn of document.querySelectorAll(".view-tab")) {
   btn.addEventListener("click", () => {
     const v = btn.dataset.view;
     setView(v);
-    if (v === "execution") window.location.hash = "execution";
+    if (v === "dashboard") window.location.hash = "dashboard";
+    else if (v === "execution") window.location.hash = "execution";
     else if (v === "decisions") window.location.hash = "decisions";
     else tasksSyncHash();
   });
