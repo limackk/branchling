@@ -381,7 +381,7 @@ export function buildHtml(
   const storagePrefix = JSON.stringify(STORAGE_KEY_PREFIX + "-backlog");
   const urlModuleSrc = readModuleSource("viewer-url.mjs");
   const fieldsModuleSrc = readModuleSource("task-fields.mjs");
-  // Estimate → hours: ONE implementation for the dashboard and for
+  // Estimate → hours: ONE implementation for the viewer and for
   // the `stats` command (BL-1412). A second copy would mean the terminal and the
   // browser could give two different numbers for the same question.
   const estimateModuleSrc = readModuleSource("estimate.mjs");
@@ -1885,7 +1885,7 @@ const state = {
   filterEnv: new Set(),   // the values of the label_axis_env axis plus "n/a"
   filterEpic: new Set(),  // values: epic name | NO_EPIC constant
   sortBy: "priority",     // "priority" | "id_asc" | "id_desc"
-  view: "tasks",          // "tasks" | "dashboard" | "execution" | "decisions"
+  view: "tasks",          // "tasks" | "execution" | "decisions"
   // The panel's own filter: "" = everything, "mine" = rows naming this actor.
   // The moment the replay is showing (TL-91): an ISO instant, or null for the
   // last one the log covers. A moment and not a day — everything within one day
@@ -2276,7 +2276,7 @@ async function disconnect() {
 // which is the same guarantee \`${N} viewer\` gives in the terminal.
 //
 // The subject travels in the QUERY STRING, not the hash: the hash is per-view
-// (#tasks, #dashboard, #execution) and clicking a tab would drop the subject,
+// (#tasks, #execution, #decisions) and clicking a tab would drop the subject,
 // while ?worktree= survives every view and is what makes "look at the fleet's
 // worktree" one link.
 // ─── Connection bar UI ───────────────────────────────────────────────
@@ -3061,51 +3061,11 @@ function escape(s) {
     .replace(/"/g, "&quot;");
 }
 
-// ─── Dashboard ────────────────────────────────────────────────────────
-// Every number below is derived from the SAME task frontmatter the list view
-// ─── Chart hover ──────────────────────────────────────────────────────
-// Each chart ships the pixel positions the builder already computed alongside
-// the values behind them. The hover code recomputes no scales: a second
-// implementation of the same mapping is a second chance to disagree with the
-// picture on screen — the tooltip would confidently name a point the line is
-// not drawn through.
-// One lookup for both hover and click: if they resolved the index separately,
-// clicking could open a different day than the tooltip under the cursor names.
-const DASH_PRESETS = [
-  { key: "30", label: "30 days", days: 30 },
-  { key: "60", label: "60 days", days: 60 },
-  { key: "90", label: "90 days", days: 90 },
-  { key: "all", label: "Whole history", days: null },
-];
-const DASH_RANGE_STORE = STORAGE_PREFIX + "-dash-range";
-
-// Tasks behind one point on a chart. Same two definitions the charts are drawn
-// from — created day, and "closed" as status done + updated — so the list can
-// never show a different count than the bar above it.
-const DASH_BURN_STORE = STORAGE_PREFIX + "-dash-burn";
-
-// ─── Sorting, once, for every listing on the dashboard ──────────────
-// A column declares its label, its value accessor and the direction it opens
-// in. Header, comparator and cell therefore cannot drift into disagreeing
-// about what "Blok." means, and the eight listings below cannot drift into
-// eight slightly different sorting behaviours.
-//
-
-const AGING_COLUMNS = [
-  { key: "natural", label: "Age" },
-  { key: "P0", label: "P0", num: true, dir: "desc", get: (r) => r.P0 },
-  { key: "P1", label: "P1", num: true, dir: "desc", get: (r) => r.P1 },
-  { key: "P2", label: "P2", num: true, dir: "desc", get: (r) => r.P2 },
-  { key: "P3", label: "P3", num: true, dir: "desc", get: (r) => r.P3 },
-  { key: "total", label: "Total", num: true, dir: "desc", get: (r) => r.total },
-];
-
 // ─── Tasks view state in the URL ──────────────────────────────────────
-// The same contract as the dashboard below, only for the task list: the filters,
-// the search, the sorting, the board scope and the selected task travel in the
-// hash, so "look at these blockers from the Legal epic" can be SENT instead of
-// described. The encoding lives in \`viewer-url.mjs\` (pasted at the top of the
-// the page state.
+// The filters, the search, the sorting, the board scope and the selected task
+// travel in the hash, so "look at these blockers from the Legal epic" can be
+// SENT instead of described. The encoding lives in \`viewer-url.mjs\` (pasted
+// at the top of the page state).
 const TASKS_FILTER_PARAMS = FILTER_SPECS.map((s) => s.param);
 
 // The first render runs BEFORE anybody has read the hash. Without this gate it
@@ -3162,17 +3122,6 @@ function tasksApplyHash(query) {
   }
 }
 
-// ─── View switching ───────────────────────────────────────────────────
-// ─── Dashboard state in the URL ───────────────────────────────────────
-// The hash carries what you are looking at, so a view can be handed to someone
-// else — or to an agent, or back from one — instead of described in prose.
-//
-// Range and burn scope are ALWAYS emitted, day and sorts only when set. That
-// makes a shared link exact: a recipient whose localStorage holds a different
-// range still sees the sender's. A bare "#dashboard" (what the tab button
-// produces) deliberately carries nothing and leaves your own state alone.
-// replaceState, not a hash assignment: assigning fires hashchange, which would
-// re-enter handleHash and re-apply the state that was just set.
 // ─── Execution view (TL-109) ──────────────────────────────────────────
 // The state is recomputed on every render from ALL_TASKS — deliberately not from
 // TASKS: a board is a scope over the LIST, while a plan spans the whole backlog,
@@ -3625,8 +3574,7 @@ document.getElementById("btnDisconnect").addEventListener("click", disconnect);
 
 // ─── Copying the link ────────────────────────────────────────────────
 // The URL is always current anyway (every filter change rewrites it), so the
-// button simply copies location.href — it works the same for the task list and
-// for the dashboard.
+// button simply copies location.href — it works the same for all three views.
 //
 // Three routes, because the viewer lives in two contexts: through the server
 // (127.0.0.1 is a secure context, so \`navigator.clipboard\` exists) and from a file

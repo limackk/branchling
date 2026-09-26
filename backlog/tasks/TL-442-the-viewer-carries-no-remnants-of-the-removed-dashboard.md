@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: ""
 priority: P3
-status: pending
-owner: unassigned
+status: done
+owner: agent:codex-subagent
 role: ""
 executor: ""
 estimate: 1h
 confidence: high
 created: 2026-09-22
-updated: 2026-09-22
+updated: 2026-09-26
 blocked_by: []
 blocks: []
 related_docs:
@@ -77,6 +77,6 @@ nothing writes. Line numbers are from `d7a5fd9` and will move.
 
 ## Acceptance criteria
 
-- [ ] Neither `scripts/build-viewer.mjs` nor `scripts/viewer-url.mjs` contains
+- [x] Neither `scripts/build-viewer.mjs` nor `scripts/viewer-url.mjs` contains
       the word "dashboard" or a `DASH_` identifier. [proof: no-dashboard-remnants]
-- [ ] The whole suite is green. [proof: suite-green]
+- [x] The whole suite is green. [proof: suite-green]

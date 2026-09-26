@@ -22,8 +22,8 @@
  *      in localStorage) travels in the link ALWAYS — even when it is the default.
  */
 
-/** The hash prefix of the tasks view — tells it apart from `#dashboard` and from
- *  a bare `#BL-NNN`. */
+/** The hash prefix of the tasks view — tells it apart from `#execution`,
+ *  `#decisions` and a bare `#BL-NNN`. */
 export const TASKS_HASH_ROUTE = "tasks";
 
 /** The list orderings that can be clicked in the sort bar. */
@@ -86,7 +86,7 @@ export function isTasksHash(route) {
 //
 // IN THE QUERY STRING, NOT THE HASH, and that is the whole reason this lives
 // beside the hash contract rather than inside it. The hash is per-VIEW —
-// `#tasks`, `#dashboard`, `#execution` — so a subject encoded there would be
+// `#tasks`, `#execution`, `#decisions` — so a subject encoded there would be
 // dropped the moment somebody clicked a tab. The worktree is not part of a view;
 // it is what every view is a view OF, and `?worktree=` survives all of them.
 //
