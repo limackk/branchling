@@ -83,7 +83,7 @@ test("the help names the command and says what it is for", () => {
 
 test("-h does the same as --help", () => {
   for (const name of NAMES) {
-    assert.equal(help(name, "-h").status, 0, name + " -h oblewa");
+    assert.equal(help(name, "-h").status, 0, name + " -h fails");
   }
 });
 
@@ -91,7 +91,7 @@ test("-h does the same as --help", () => {
 
 test("an unknown flag STILL fails — BL-1417 untouched", () => {
   // A fix that lets everything through would also make `--help` green.
-  const r = spawnSync(process.execPath, [CLI, "stats", "--nieistniejaca"], { encoding: "utf8", timeout: 15_000 });
+  const r = spawnSync(process.execPath, [CLI, "stats", "--does-not-exist"], { encoding: "utf8", timeout: 15_000 });
   assert.equal(r.status, 2, "a typo in a flag went through");
 });
 

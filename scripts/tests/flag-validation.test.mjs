@@ -59,14 +59,13 @@ function freshBacklog() {
  * found", regardless of flag validation. The tests for this one command need
  * a REAL repository.
  *
- * The backlog lies in a SUBDIRECTORY of the repository (`repo/backlog/`), not at
- * its root. A backlog AT THE ROOT of a repo (a relative path that is an empty
- * empty) is a separate case, found while writing this test: `BACKLOG_REL`
- * treats an empty string as invalid and quietly substitutes 'backlog', so it
- * script looks for `<root>/backlog/tasks` instead of `<root>/tasks` and finds
- * NOTHING. That is a real scenario for `branchling init --dir .` in a fresh
- * (open source), but that is a SEPARATE defect from flag validation — outside the
- * BL-1417, reported separately.
+ * This fixture puts the backlog in a SUBDIRECTORY of the repository
+ * (`repo/backlog/`), matching the layout whose branch scan this file exercises.
+ * A backlog at the repository root once exposed a separate `BACKLOG_REL` defect:
+ * the empty relative path was mistaken for an invalid one, so the scan looked in
+ * `<root>/backlog/tasks` instead of `<root>/tasks`. That layout is valid after
+ * `branchling init --dir .`; BL-1418 fixed it and
+ * `next-id-root-backlog.test.mjs` now carries its regression coverage.
  */
 function gitBacklog() {
   const repoRoot = mkdtempSync(join(tmpdir(), "branchling-flags-repo-"));
