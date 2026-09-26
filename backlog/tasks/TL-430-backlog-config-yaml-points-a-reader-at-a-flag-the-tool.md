@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P3
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex-subagent
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 1h | 2h | 3h | 4h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-21
-updated: 2026-09-21
+updated: 2026-09-26
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
@@ -76,6 +76,6 @@ guard behind it.
 
 ## Acceptance criteria
 
-- [ ] No flag named in a comment in `backlog/config.yaml` is refused by the
+- [x] No flag named in a comment in `backlog/config.yaml` is refused by the
       command it is named under.
       [proof: no-refused-flag-in-the-config-comments]
