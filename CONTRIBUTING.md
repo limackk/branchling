@@ -8,6 +8,11 @@ project, is in
 
 The code is MIT, and your contribution goes out under MIT.
 
+Participation is governed by the [code of conduct](CODE_OF_CONDUCT.md). The
+[support policy](SUPPORT.md) explains which issues and pull requests fit the
+project and what evidence they should carry. Report an undisclosed vulnerability
+through the private route in [SECURITY.md](SECURITY.md), never in a public issue.
+
 ---
 
 ## Running it
@@ -109,3 +114,10 @@ An issue template asks for `branchling --version`, your Node version and your
 operating system. They are asked for because the three of them settle most
 questions before anybody has to guess, not as ceremony — and a report without
 them usually costs a round trip.
+
+Issues and pull requests are reviewed as maintainer availability permits; there
+is no guaranteed response or acceptance time. A contribution is accepted for
+fit with the single-machine product boundary and for the evidence it carries,
+not because an implementation was submitted. See [SUPPORT.md](SUPPORT.md) for
+the complete support boundary and [SECURITY.md](SECURITY.md) for confidential
+vulnerability reporting.

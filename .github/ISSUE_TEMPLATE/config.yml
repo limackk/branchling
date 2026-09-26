@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/limackk/branchling/security/advisories/new
+    about: Send an undisclosed vulnerability privately to the maintainers.
+  - name: Read the support policy
+    url: https://github.com/limackk/branchling/blob/main/SUPPORT.md
+    about: Check the supported scope and what to include before opening an issue.
