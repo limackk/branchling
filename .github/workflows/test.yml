@@ -22,14 +22,18 @@ jobs:
   test:
     # THE MATRIX MATCHES `engines` IN package.json, and that is not decoration.
     # `>=18` with CI on one version is an unverified declaration — either it is
-    # measured or it is narrowed, and this measures it. Two operating systems
-    # because the tool writes lockfiles and reads paths, and those are where the
-    # platforms differ.
+    # measured or it is narrowed, and this measures it. Linux and macOS cover
+    # every supported Node line; Windows runs the current LTS line because its
+    # path, shell and process-tree semantics are the platform boundary we need
+    # to prove without multiplying the whole matrix by a third.
     strategy:
       fail-fast: false
       matrix:
-        node: ["18", "20", "22"]
         os: [ubuntu-latest, macos-latest]
+        node: ["18", "20", "22"]
+        include:
+          - os: windows-latest
+            node: "22"
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

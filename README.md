@@ -82,7 +82,14 @@ orchestrator, CI job or shell loop can drive, and every reading command answers
 in JSON for exactly that reason. This tool holds the evidence; what drives it is
 your decision and stays yours.
 
-Requirements: Node 18+. Zero npm dependencies.
+Requirements: Node 18+. Zero npm dependencies. CI supports Linux and macOS on
+Node 18, 20 and 22, and Windows on Node 22.
+
+Verification commands use the operating system's default shell. On Windows that
+is `cmd.exe`, so task contracts must use portable commands or explicitly invoke
+PowerShell, Git Bash or another shell they require. Interrupting a verification
+or agent run stops its descendant process tree with the native Windows
+`taskkill` command.
 
 ---
 

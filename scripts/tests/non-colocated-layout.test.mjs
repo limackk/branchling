@@ -39,7 +39,10 @@ const SCRIPTS = join(HERE, "..");
 
 /** Builds a tree shaped like the extracted repo: code BESIDE the data, not ABOVE it. */
 function makeSplitRepo() {
-  const root = mkdtempSync(join(tmpdir(), "branchling-split-"));
+  // The space is deliberate: Windows installations commonly live below
+  // `C:\Users\First Last`, and a split-layout test that only exercises paths
+  // without spaces misses the quoting boundary users are most likely to hit.
+  const root = mkdtempSync(join(tmpdir(), "branchling split "));
   cpSync(SCRIPTS, join(root, "scripts"), { recursive: true });
 
   const bl = join(root, "backlog");

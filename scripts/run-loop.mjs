@@ -98,6 +98,7 @@ import { ACTOR_NAMESPACES, buildFieldSpecs, extractMeta, fieldSpec, isValidActor
 import { readTaskRecords, splitList, unknownFilterValues } from "./task-select.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { MARK, color, failure, warn } from "./ui.mjs";
+import { processTreeDetached, stopProcessTree } from "./process-tree.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CLI = join(__dirname, "cli.mjs");
@@ -1046,8 +1047,13 @@ export function attemptProvenance(task, attempt) {
 export function superviseAgent(command, opts) {
   return new Promise((resolve) => {
     let stdout = ""; let stderr = ""; let bytes = 0; let timedOut = false; let overflow = false; let settled = false;
-    const child = opts.raw ? spawn(command, { shell: true, cwd: opts.cwd, env: opts.env, stdio: ["pipe", "pipe", "pipe"] })
-      : spawn(command, [], { shell: false, cwd: opts.cwd, env: opts.env, stdio: ["pipe", "pipe", "pipe"] });
+    const child = opts.raw ? spawn(command, {
+      shell: true, cwd: opts.cwd, env: opts.env,
+      detached: processTreeDetached(), stdio: ["pipe", "pipe", "pipe"],
+    }) : spawn(command, [], {
+      shell: false, cwd: opts.cwd, env: opts.env,
+      detached: processTreeDetached(), stdio: ["pipe", "pipe", "pipe"],
+    });
     const receive = (key, chunk) => {
       const text = String(chunk); bytes += Buffer.byteLength(text);
       const safe = opts.profile ? redactSecrets(text, opts.profile) : text;
@@ -1069,9 +1075,7 @@ export function superviseAgent(command, opts) {
     // the supervisor before it can record that result.
     child.stdin.once("error", () => {});
     child.stdin.end(opts.input);
-    const stop = () => {
-      try { if (process.platform !== "win32" && child.pid) process.kill(-child.pid, "SIGTERM"); else child.kill("SIGTERM"); } catch { child.kill("SIGTERM"); }
-    };
+    const stop = () => stopProcessTree(child, "SIGTERM");
     const timeout = setTimeout(() => { timedOut = true; stop(); }, opts.timeout * 1000);
     const finish = (result) => {
       if (settled) return;

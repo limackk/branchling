@@ -50,6 +50,7 @@ import { MARK, color, errColor, failure } from "./ui.mjs";
 import { todayStamp } from "./today.mjs";
 import { CAPABLE, contractCapability, readCoverageFiles } from "./contract-capability.mjs";
 import { taskModifiedFiles } from "./modified-files.mjs";
+import { processTreeDetached, stopProcessTree } from "./process-tree.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OKM = color.ok(MARK.ok);
@@ -369,28 +370,6 @@ function runBash(command, cwd, capture, observeCoverage = false) {
   };
 }
 
-/** Stop the shell and every descendant that inherited its process group. */
-function stopProcessTree(child, signal = "SIGTERM") {
-  if (!child || !child.pid) return;
-  if (process.platform === "win32") {
-    // Windows has no negative-pid process groups. `taskkill /T` is the native
-    // tree operation; the direct signal remains the fallback when it is not
-    // available (for example in a restricted test environment).
-    const args = ["/pid", String(child.pid), "/t"];
-    if (signal === "SIGKILL") args.push("/f");
-    const killed = spawnSync("taskkill", args, { stdio: "ignore" });
-    if (killed.status !== 0) {
-      try { child.kill(signal); } catch { /* it exited between the two calls */ }
-    }
-    return;
-  }
-  try {
-    process.kill(-child.pid, signal);
-  } catch {
-    try { child.kill(signal); } catch { /* the group already exited */ }
-  }
-}
-
 /**
  * Run one shell command without blocking Node's signal handlers.
  *
@@ -450,7 +429,7 @@ function runBashAsync(command, cwd, capture, observeCoverage = false, signal = n
       shell: true,
       cwd,
       env,
-      detached: process.platform !== "win32",
+      detached: processTreeDetached(),
       stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit",
     });
     if (capture) {
