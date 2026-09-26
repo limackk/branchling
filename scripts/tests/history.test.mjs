@@ -412,7 +412,7 @@ test("actor: a log from before BL-1404 reads unchanged — we do not rewrite his
     // A BARE actor — this is what an entry looked like before BL-1404.
     { ts: "2026-08-01T10:00:00.000Z", task: "BL-900", field: "status", from: "pending", to: "done", actor: "claude", source: "hook" },
   ]);
-  assert.equal(readHistory(dir, "BL-900")[0].actor, "claude", "bajty w logu zostaja nietkniete");
+  assert.equal(readHistory(dir, "BL-900")[0].actor, "claude", "the log bytes remain untouched");
   rmSync(dir, { recursive: true, force: true });
 });
 
@@ -438,18 +438,18 @@ test("pseudo-fields: body and comment are reserved alongside created/deleted", (
   for (const f of [FIELD_CREATED, FIELD_DELETED, FIELD_BODY, FIELD_COMMENT]) {
     assert.ok(PSEUDO_FIELDS.includes(f), f + " has to be in PSEUDO_FIELDS");
   }
-  assert.equal(new Set(PSEUDO_FIELDS).size, PSEUDO_FIELDS.length, "bez duplikatow");
+  assert.equal(new Set(PSEUDO_FIELDS).size, PSEUDO_FIELDS.length, "no duplicates");
 });
 
 test("pseudo-fields: a body and a comment entry survive a write and a read", () => {
   const dir = sandbox();
   appendEntries(dir, "BL-900", [
     { id: "01J00000000000000000000BOD", ts: "2026-08-01T10:00:00.000Z", task: "BL-900", field: FIELD_BODY, from: "", to: "new body", actor: "user:abc", source: "server" },
-    { id: "01J00000000000000000000COM", ts: "2026-08-01T10:01:00.000Z", task: "BL-900", field: FIELD_COMMENT, from: "", to: "support: klient zglosil ponownie", actor: "user:abc", source: "server" },
+    { id: "01J00000000000000000000COM", ts: "2026-08-01T10:01:00.000Z", task: "BL-900", field: FIELD_COMMENT, from: "", to: "support: the client reported it again", actor: "user:abc", source: "server" },
   ]);
   const entries = readHistory(dir, "BL-900");
   assert.equal(entries.length, 2);
-  assert.equal(lastChangeByField(entries)[FIELD_COMMENT].to, "support: klient zglosil ponownie");
+  assert.equal(lastChangeByField(entries)[FIELD_COMMENT].to, "support: the client reported it again");
   rmSync(dir, { recursive: true, force: true });
 });
 
@@ -457,7 +457,7 @@ test("pseudo-fields: a frontmatter diff NEVER produces them", () => {
   // Were they to leak into diffMeta, reconciliation would start inventing changes to
   // a body it does not read at all.
   const changes = diffMeta(metaFromText(taskFile()), metaFromText(taskFile({ status: "done" })));
-  for (const c of changes) assert.ok(!PSEUDO_FIELDS.includes(c.field), "diffMeta wyprodukowal " + c.field);
+  for (const c of changes) assert.ok(!PSEUDO_FIELDS.includes(c.field), "diffMeta produced " + c.field);
 });
 
 // ── CLI history-record: the output must not lie about the author ──────────
