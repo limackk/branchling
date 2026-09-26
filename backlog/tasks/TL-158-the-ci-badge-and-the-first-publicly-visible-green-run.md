@@ -6,12 +6,13 @@ labels: [pre-launch]
 board: main
 epic: "Backlog — open source publication"
 priority: P2                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: blocked  # pending | in_progress | blocked | done | cancelled
+status: awaiting_vouch  # pending | in_progress | blocked | done | cancelled
 owner: ""
 executor: ""
+role: review
 estimate: 30m                       # 30m | 1h | 2h | 3h | 4h | 1d | 1w
 created: 2026-09-02
-updated: 2026-09-22
+updated: 2026-09-26
 blocked_by: [TL-53, TL-433, TL-434, TL-435, TL-436, TL-439]
 blocks: []
 related_docs: []
