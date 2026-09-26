@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex-subagent
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1h
@@ -41,5 +41,5 @@ The full suite run for TL-431 on 2026-09-26 passed 1972 of 1973 tests. The only 
 
 ## Acceptance criteria
 
-- [ ] The guard accepts the current shrinking backlog while retaining positive controls for both the real scan and retired-name detection. [proof: former-name-guard]
-- [ ] The evergreen positive control composes with every repository guard. [proof: full-suite]
+- [x] The guard accepts the current shrinking backlog while retaining positive controls for both the real scan and retired-name detection. [proof: former-name-guard]
+- [x] The evergreen positive control composes with every repository guard. [proof: full-suite]

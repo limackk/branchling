@@ -26,7 +26,8 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { BACKLOG_DIR, REPO_ROOT, isolateHome } from "./_repo.mjs";
@@ -82,24 +83,45 @@ export function frontmatterStatus(text) {
   return block ? (block[1].match(/^status:\s*(\S+)/m)?.[1] ?? null) : null;
 }
 
-/** The task files whose status is one a reader may still be handed. */
-function openTaskFiles() {
-  const dir = join(BACKLOG_DIR, "tasks");
+/** Every authored task file under `dir`; computed files never enter this scan. */
+function taskFiles(dir = join(BACKLOG_DIR, "tasks")) {
   return readdirSync(dir)
     .filter((f) => f.endsWith(".md") && f !== "_template.md")
-    .map((f) => ({ name: f, text: readFileSync(join(dir, f), "utf8") }))
-    .filter((t) => OPEN_STATUSES.includes(frontmatterStatus(t.text)));
+    .map((f) => ({ name: f, text: readFileSync(join(dir, f), "utf8") }));
+}
+
+/** The task files whose status is one a reader may still be handed. */
+function openTaskFiles(files) {
+  return files.filter((t) => OPEN_STATUSES.includes(frontmatterStatus(t.text)));
+}
+
+/** Prove the scan reached this backlog, even after every task is archived. */
+function assertRealTaskScan(files) {
+  assert.ok(
+    files.some(({ text }) => /^id:\s*TL-395\s*$/m.test(text)),
+    "the task scan did not find TL-395 — it is looking in the wrong place",
+  );
 }
 
 test("no open task tells anybody to run a command that no longer exists", () => {
-  const files = openTaskFiles();
-  assert.ok(files.length > 10, "only " + files.length + " open tasks found — the scan is looking in the wrong place");
+  const allFiles = taskFiles();
+  assertRealTaskScan(allFiles);
+  const files = openTaskFiles(allFiles);
   const offences = [];
   for (const { name, text } of files) {
     for (const hit of unmarkedFormerNames(text)) offences.push(name + ":" + hit.line + "  " + hit.text);
   }
   assert.deepEqual(offences, [],
     "these open tasks name a retired tool — rewrite the line, or declare it with `" + ALLOW_MARKER + "`");
+});
+
+test("POSITIVE CONTROL: an empty task path cannot pass as the real backlog", (t) => {
+  const emptyDir = mkdtempSync(join(tmpdir(), "branchling-former-name-"));
+  t.after(() => rmSync(emptyDir, { recursive: true, force: true }));
+  assert.throws(
+    () => assertRealTaskScan(taskFiles(emptyDir)),
+    /did not find TL-395/,
+  );
 });
 
 test("POSITIVE CONTROL: the scan catches what it is looking for", () => {
