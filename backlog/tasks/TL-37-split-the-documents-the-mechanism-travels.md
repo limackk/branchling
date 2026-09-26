@@ -199,7 +199,7 @@ git checkout docs/branchling-global-tool.md
   Every fact a reader needs survives — that there was a parent repository, and
   that the low numbers belonged to it.
 - **Two of this repository's OWN counts were rotting and were replaced with the
-  command instead**: the test count in `docs/funkcjonalnosci.md` and the task
+  command instead**: the test count in `docs/functionality.md` and the task
   count in `LINEAGE.md`. They are not foreign context, but they are the same
   defect TL-172 named — a number in prose that is wrong by the next commit —
   and they were in files this task was already rewriting under exactly that

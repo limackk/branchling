@@ -6,17 +6,17 @@ labels: []
 board: main
 epic: "Repository readability"
 priority: P3                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex-subagent
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 30m                      # 30m | 2h | 1d | 1w
 confidence: high                   # how much you trust the estimate
 created: 2026-09-21
-updated: 2026-09-21
+updated: 2026-09-26
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
-related_docs: [docs/funkcjonalnosci.md, AGENTS.md]
+related_docs: [docs/functionality.md, AGENTS.md]
 verification:                      # HOW to check the task is really done
   # Both run against this tree. The first fails today — the file is there — so
   # neither entry can pass on an empty sample.
@@ -71,7 +71,7 @@ after a green run — a checkbox you tick by hand is a claim, not evidence. A
 criterion may wrap onto further indented lines; the marker goes at the end of
 the last one.
 
-- [ ] No file under `docs/` carries a non-English slug.
+- [x] No file under `docs/` carries a non-English slug.
       [proof: no-polish-filename]
-- [ ] Every `related_docs` entry and prose path that named it resolves.
+- [x] Every `related_docs` entry and prose path that named it resolves.
       [proof: links-resolve]

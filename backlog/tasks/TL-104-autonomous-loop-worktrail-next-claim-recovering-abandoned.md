@@ -15,7 +15,7 @@ updated: 2026-09-01
 blocked_by: [TL-82]
 blocks: []
 related_docs:
-  - docs/funkcjonalnosci.md
+  - docs/functionality.md
   - docs/branchling-state-and-sync.md
 verification:
   - bash: "node --test scripts/tests/next-claim.test.mjs"

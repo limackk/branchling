@@ -16,7 +16,7 @@ updated: 2026-09-08
 blocked_by: [TL-102]
 blocks: []
 related_docs:
-  - docs/funkcjonalnosci.md
+  - docs/functionality.md
 verification:
   - bash: "test -f docs/launch/post.md && grep -qi 'verification' docs/launch/post.md"
   - manual: "The post can be read in 3 minutes, opens with a measurement from our own backlog (with a command to repeat it), not a description of features; the Show HN title and first sentence name the problem, not the tool"
@@ -62,7 +62,7 @@ consistent with the whole character of the tool.
 1. `backlog/tasks/TL-86-*.md`, `## Context` section — the source
    measurement and its methodology; the post must not claim more than the
    measurement showed.
-2. `docs/funkcjonalnosci.md` §4 — what will deliberately not exist; the post
+2. `docs/functionality.md` §4 — what will deliberately not exist; the post
    does not promise anything from this list.
 3. `backlog/tasks/TL-81-*.md` — the settled package name and channels; the
    post must give a working install command.

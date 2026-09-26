@@ -16,7 +16,7 @@ updated: 2026-09-21
 blocked_by: [TL-82, TL-49]
 blocks: [TL-103]
 related_docs:
-  - docs/funkcjonalnosci.md
+  - docs/functionality.md
 verification:
   - bash: "test -f docs/demo/scenario.md && grep -q 'exit' docs/demo/scenario.md"
   - manual: "A recording (asciinema or GIF) is linked in the README header, runs up to 60 seconds and ends with a RED refusal from `branchling done`, followed by a fix and a green close"

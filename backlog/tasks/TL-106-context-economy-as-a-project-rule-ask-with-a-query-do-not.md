@@ -16,7 +16,7 @@ blocked_by: []
 blocks: []
 related_docs:
   - CLAUDE.md
-  - docs/funkcjonalnosci.md
+  - docs/functionality.md
 verification:
   - bash: "node --test scripts/tests/context-budget.test.mjs"
   - bash: "node scripts/cli.mjs query --status pending --count"
