@@ -185,15 +185,15 @@ export function boundaryStated(text) {
   // would be measuring the typesetting.
   const flat = String(text).replace(/\s+/g, " ");
   const problems = [];
-  const stateAt = flat.indexOf(STATE_DIR_ENV);
+  const stateIndex = flat.indexOf(STATE_DIR_ENV);
   const homeAt = flat.indexOf(HOME_ENV);
-  if (stateAt < 0) problems.push("the state directory is not named (" + STATE_DIR_ENV + ")");
+  if (stateIndex < 0) problems.push("the state directory is not named (" + STATE_DIR_ENV + ")");
   if (homeAt < 0) problems.push("the user configuration is not named (" + HOME_ENV + ")");
   // With neither name there is no paragraph to read, and reporting four
   // problems where the reader has one thing to write would be noise.
-  if (stateAt < 0 || homeAt < 0) return problems;
+  if (stateIndex < 0 || homeAt < 0) return problems;
 
-  const window = flat.slice(Math.max(0, Math.min(stateAt, homeAt) - 700), Math.max(stateAt, homeAt) + 700);
+  const window = flat.slice(Math.max(0, Math.min(stateIndex, homeAt) - 700), Math.max(stateIndex, homeAt) + 700);
   if (!/\bonly\b|\bno other\b|nothing else/i.test(window)) {
     problems.push("the list of writable paths is not stated to be closed");
   }

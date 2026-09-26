@@ -12,8 +12,7 @@
  *     third — never folded into either, because the log does not say which they
  *     were;
  *   - a task deleted and created again keeps both events, in order;
- *   - the left edge is labelled as the start of the DATA, not of the task;
- *   - `stateAt()` is one fold, shared with the board time-lapse (TL-91).
+ *   - the left edge is labelled as the start of the DATA, not of the task.
  *
  * The fixture's vocabulary is its own: the statuses below appear in no
  * configuration this repository ships, so a literal in the fold fails here.
@@ -22,7 +21,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  ACTOR_GLYPH, actorClass, nodeKind, nodeLabel, renderTaskGraph, stateAt, taskGraph,
+  ACTOR_GLYPH, actorClass, nodeKind, nodeLabel, renderTaskGraph, taskGraph,
 } from "../task-graph.mjs";
 
 import { isolateHome } from "./_repo.mjs";
@@ -220,117 +219,4 @@ test("a title carrying HTML cannot break out of the drawing", () => {
   ]));
   assert.ok(!html.includes("<img"), "the value has to be escaped");
   assert.match(html, /&lt;img/);
-});
-
-// ── One fold, shared with the time-lapse (TL-91) ──────────────────────────
-
-test("stateAt replays the log up to a moment and stops there", () => {
-  const entries = [
-    entry({ ts: at(1), field: "__created__", from: "", to: "A task" }),
-    entry({ ts: at(2), field: "status", from: "icebox", to: "surveying" }),
-    entry({ ts: at(3), field: "status", from: "surveying", to: "charted" }),
-  ];
-  assert.equal(stateAt(entries, at(2)).fields.status, "surveying");
-  assert.equal(stateAt(entries, at(3)).fields.status, "charted");
-});
-
-test("a field the log never mentions is ABSENT, not empty", () => {
-  const s = stateAt([entry({ field: "status" })], at(9));
-  assert.equal("priority" in s.fields, false,
-    "`the history does not say` and `it was blank` are different facts");
-});
-
-test("a task whose log begins after it did still EXISTS", () => {
-  // No `__created__` anywhere: the log started later. Answering `false` would
-  // report a task plainly on disk as one that is not.
-  assert.equal(stateAt([entry({ field: "status" })], at(9)).exists, true);
-});
-
-test("a deletion is visible in the replay, and so is a later re-creation", () => {
-  const entries = [
-    entry({ ts: at(1), field: "__created__", from: "", to: "A task" }),
-    entry({ ts: at(2), field: "__deleted__", from: "A task", to: "" }),
-    entry({ ts: at(3), field: "__created__", from: "", to: "A task" }),
-  ];
-  assert.equal(stateAt(entries, at(2)).exists, false);
-  assert.equal(stateAt(entries, at(3)).exists, true);
-});
-
-test("before the first entry, the log says nothing at all", () => {
-  assert.equal(stateAt([entry({ ts: at(5), field: "status" })], at(1)).exists, null);
-});
-
-// ── The seed: what the fold may know before a field's first change (TL-280) ──
-//
-// The rule decided in TL-280 and recorded in `backlog/history/TL-280.jsonl`:
-// the EARLIEST entry for a field carries `from`, the value it held before that
-// change, and that value holds backwards to the log's first entry for the task
-// — no further, and never from today's frontmatter or today's template.
-
-test("the value before a field's first change is known, back to the log's start", () => {
-  const entries = [
-    entry({ ts: at(1), field: "__created__", from: "", to: "A task" }),
-    entry({ ts: at(4), field: "status", from: "icebox", to: "surveying" }),
-  ];
-  // Day 2 is after the log begins and before the only status entry: `from`
-  // records what the status WAS then, so the fold is not entitled to shrug.
-  assert.equal(stateAt(entries, at(2)).fields.status, "icebox");
-  assert.equal(stateAt(entries, at(4)).fields.status, "surveying");
-});
-
-test("a seeded value is named as seeded, never passed off as a replayed change", () => {
-  const entries = [
-    entry({ ts: at(1), field: "__created__", from: "", to: "A task" }),
-    entry({ ts: at(4), field: "status", from: "icebox", to: "surveying" }),
-  ];
-  assert.deepEqual(stateAt(entries, at(2)).seeded, ["status"]);
-  assert.deepEqual(stateAt(entries, at(4)).seeded, [],
-    "once the change itself is replayed, nothing is inferred any more");
-});
-
-test("the seed stops at the log's first entry and does not reach before it", () => {
-  const entries = [entry({ ts: at(5), field: "status", from: "icebox", to: "surveying" })];
-  const before = stateAt(entries, at(1));
-  assert.equal(before.exists, null);
-  assert.equal("status" in before.fields, false,
-    "`from` extends a field's past to the start of the log, never before it");
-});
-
-test("an empty `from` seeds nothing — blank and unrecorded are not the same fact", () => {
-  const entries = [
-    entry({ ts: at(1), field: "__created__", from: "", to: "A task" }),
-    entry({ ts: at(4), field: "owner", from: "", to: "ann" }),
-  ];
-  assert.equal("owner" in stateAt(entries, at(2)).fields, false);
-});
-
-test("a task older than its log and never changed since stays unknown", () => {
-  // Only a comment: nothing in the log records a field of this task, so the
-  // seed has nothing to work from and must narrow the case, not remove it.
-  const entries = [entry({ ts: at(1), field: "__comment__", from: "", to: "a note" })];
-  const s = stateAt(entries, at(3));
-  assert.equal(s.exists, true);
-  assert.equal("status" in s.fields, false);
-  assert.deepEqual(s.seeded, []);
-});
-
-test("only the EARLIEST entry of a field seeds; a later `from` is not replayed backwards", () => {
-  const entries = [
-    entry({ ts: at(1), field: "status", from: "icebox", to: "surveying" }),
-    entry({ ts: at(5), field: "status", from: "surveying", to: "charted" }),
-  ];
-  assert.equal(stateAt(entries, at(3)).fields.status, "surveying",
-    "day 3 is after the first change, which the replay already covers");
-  assert.deepEqual(stateAt(entries, at(3)).seeded, []);
-});
-
-test("a list field is seeded by its first `from` as well, and an empty list is not a value", () => {
-  const entries = [
-    entry({ ts: at(1), field: "__created__", from: "", to: "A task" }),
-    entry({ ts: at(4), field: "labels", from: ["chart"], to: ["chart", "fold"] }),
-    entry({ ts: at(4), field: "blocked_by", from: [], to: ["MAP-9"] }),
-  ];
-  const s = stateAt(entries, at(2));
-  assert.deepEqual(s.fields.labels, ["chart"]);
-  assert.equal("blocked_by" in s.fields, false);
 });
