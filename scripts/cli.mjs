@@ -1273,6 +1273,18 @@ export function versionText() {
   return null;
 }
 
+/**
+ * npm keeps the separator that ends ITS options when it forwards arguments to
+ * a package executable. At this boundary that first `--` is not part of this
+ * program's grammar: it precedes the first program argument, so there cannot
+ * yet be a command whose own parser needs to see it. Later separators stay
+ * untouched; they belong to the command selected below.
+ */
+export function normalizePackageArgs(argv) {
+  const args = Array.isArray(argv) ? argv.slice() : [];
+  return args[0] === "--" ? args.slice(1) : args;
+}
+
 export function helpText() {
   const width = Math.max(...Object.keys(COMMANDS).map((k) => k.length));
   const rows = Object.entries(COMMANDS)

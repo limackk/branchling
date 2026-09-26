@@ -16,5 +16,6 @@
  */
 
 import { main } from "../scripts/cli.mjs";
+import { normalizePackageArgs } from "../scripts/cli.mjs";
 
-process.exitCode = main(process.argv.slice(2));
+process.exitCode = main(normalizePackageArgs(process.argv.slice(2)));

@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:codex-subagent
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1h
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-25
-updated: 2026-09-25
+updated: 2026-09-26
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
@@ -38,4 +38,4 @@ Surfaced while running the publication gate for TL-444 on 2026-09-25. From a dir
 
 ## Acceptance criteria
 
-- [ ] The documented npx first-contact invocation reaches top-level help while existing separator behavior remains explicit. [proof: npx-help-top-level]
+- [x] The documented npx first-contact invocation reaches top-level help while existing separator behavior remains explicit. [proof: npx-help-top-level]
