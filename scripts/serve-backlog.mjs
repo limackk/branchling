@@ -831,7 +831,7 @@ function listen(port, attemptsLeft) {
       : "";
     printLine(
       `${N} serve: ${target}\n` +
-        `  ${count} tasks, live read mode with no clicking (the folder is known server-side)\n` +
+        `  ${count} tasks, live viewer for this backlog (the folder is known server-side)\n` +
         beside +
         `  Served-page write API enabled; snapshots remain read-only\n` +
         (VIEWS_BUILT ? "" : "  WARNING: build-backlog.mjs did not pass — the views may be stale\n") +

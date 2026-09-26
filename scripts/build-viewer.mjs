@@ -1044,6 +1044,44 @@ ${paletteBadgeCss}
   .btn-action.primary:hover { background: var(--accent); opacity: 0.9; }
   .btn-action:disabled { opacity: 0.5; cursor: not-allowed; }
 
+  /* The live editor is intentionally plain: the important facts are the tree
+     being changed, the named actor, and whether the server accepted the write. */
+  .edit-context { display: none; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .connection-bar.live .edit-context { display: flex; }
+  .edit-context-path { font-family: "SF Mono", Monaco, Menlo, monospace; font-size: 11px; color: var(--fg-muted); }
+  .actor-input, .field-editor, .field-input {
+    font: inherit; color: var(--fg); background: var(--bg-card);
+    border: 1px solid var(--border); border-radius: 6px; padding: 5px 7px;
+  }
+  .actor-input { width: 150px; }
+  .meta-value.is-editable, .detail-header h1.is-editable {
+    cursor: pointer; border: 1px dashed transparent; border-radius: 6px;
+    padding: 2px 4px; margin: -2px -4px;
+  }
+  .meta-value.is-editable:hover, .meta-value.is-editable:focus-visible,
+  .detail-header h1.is-editable:hover, .detail-header h1.is-editable:focus-visible {
+    border-color: var(--accent); background: var(--accent-soft); outline: none;
+  }
+  .edit-pen { margin-left: 6px; color: var(--accent); }
+  .meta-row.is-editing { background: var(--accent-soft); border-radius: 8px; padding: 6px; margin: -6px; }
+  .meta-row-wide { grid-column: 1 / -1; }
+  select.field-editor, .field-input { width: 100%; }
+  textarea.field-input { resize: vertical; line-height: 1.45; }
+  .chips-editor { display: flex; flex-wrap: wrap; gap: 5px; }
+  .chip-opt { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; cursor: pointer; }
+  .editor-actions { display: flex; gap: 6px; margin-top: 7px; flex-basis: 100%; }
+  .editor-actions button, .reason-actions button {
+    font: inherit; font-size: 12px; padding: 4px 10px; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--bg-card); color: var(--fg); cursor: pointer;
+  }
+  .editor-actions button:first-child, .reason-actions button:first-child { border-color: var(--accent); }
+  .read-only-note, .edit-result { margin-top: 10px; font-size: 12px; color: var(--fg-muted); }
+  .edit-result[role="alert"] { color: var(--status-blocked); }
+  .reason-ask { margin-top: 12px; padding: 12px; border: 1px solid var(--accent); border-radius: 8px; background: var(--bg-card); }
+  .reason-ask textarea { width: 100%; margin-top: 8px; }
+  .reason-actions { display: flex; gap: 6px; margin-top: 8px; }
+  .history-summary { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 12px; color: var(--fg-muted); }
+
   /* ─── Toast ─────────────────────────────────────────────────────── */
   .toast {
     position: fixed;
@@ -1753,6 +1791,13 @@ ${paletteBadgeCss}
     <button class="btn-action primary" id="btnConnect">Connect to the backlog folder</button>
     <button class="btn-action" id="btnRefresh" style="display:none">Refresh from disk</button>
     <button class="btn-action" id="btnDisconnect" style="display:none">Disconnect</button>
+    <div class="edit-context" id="editContext">
+      <span class="edit-context-path" id="editContextPath">This server's backlog</span>
+      <label for="editingActor">Editing as</label>
+      <input class="actor-input" id="editingActor" value="user:" placeholder="user:name"
+             aria-describedby="editingActorHint" autocomplete="off">
+      <span id="editingActorHint" class="edit-context-path">A namespaced identity is recorded in history.</span>
+    </div>
   </div>
 
   <div class="board-scope" id="boardScope"></div>
@@ -1904,9 +1949,12 @@ const state = {
   // Field editing (BL-1396): { id, field } or null. One field at a time — an open
   // an editor is a state of the view, not a state of the task.
   editing: null,
-  // Who is editing (BL-1397). The entry goes into the history, so the default
-  // value has to be the one that IS true in typical use of the viewer.
-  actor: "founder",
+  // Identity never travels in a shared URL or local storage. The user must name
+  // the actor for this server session before the first write.
+  actor: "user:",
+  reasonAsk: null,
+  editMessage: "",
+  editError: false,
   historyOpen: false,
   // The change graph (TL-116) is closed by default: a reader who opened a task
   // to change a field must not have to scroll past a picture to reach it.
@@ -2301,6 +2349,7 @@ function updateConnectionBar() {
     btnConnect.style.display = "none";
     btnDisconnect.style.display = "none";
     btnRefresh.style.display = "";
+    refreshEditingContext();
     return;
   }
   if (state.liveMode) {
@@ -2321,6 +2370,16 @@ function updateConnectionBar() {
     btnConnect.style.display = "";
     btnRefresh.style.display = "none"; btnDisconnect.style.display = "none";
   }
+}
+
+async function refreshEditingContext() {
+  if (!SERVER_MODE) return;
+  const path = document.getElementById("editContextPath");
+  try {
+    const res = await fetch("api/ping", { cache: "no-store" });
+    const data = await res.json();
+    if (path && res.ok) path.textContent = "Writing to " + data.backlogDir;
+  } catch { if (path) path.textContent = "Writing to this server's backlog"; }
 }
 
 // ─── Stats ────────────────────────────────────────────────────────────
@@ -2964,6 +3023,149 @@ function histTime(ts) {
 }
 
 // ─── Field editors ──────────────────────────────────────────────
+const CAN_EDIT = SERVER_MODE && !!window.VIEWER_WRITE;
+
+function reasonRequiredFor(field, value) {
+  return field === "status" && REASON_REQUIRED_STATUSES.indexOf(String(value)) !== -1;
+}
+
+function fieldLabel(key) {
+  const spec = fieldSpec(key, FIELDS);
+  return spec ? spec.label : (HISTORY_FIELD_LABELS[key] || key);
+}
+
+function dynamicOptions() {
+  const unique = function (key) {
+    return [...new Set(ALL_TASKS.map(function (task) {
+      return String(task[key] == null ? "" : task[key]).trim();
+    }).filter(Boolean))].sort();
+  };
+  return { boards: knownBoards().map(function (board) { return board.slug; }), epics: unique("epic"), owners: unique("owner") };
+}
+
+function startEdit(id, field) {
+  if (!CAN_EDIT) return;
+  if (!isValidActor(state.actor) || !state.actor.startsWith("user:")) {
+    state.editMessage = "Enter a user:name identity before editing.";
+    state.editError = true;
+    renderDetail();
+    document.getElementById("editingActor").focus();
+    return;
+  }
+  state.editing = { id: id, field: field };
+  state.editMessage = "";
+  renderDetail();
+  const input = document.querySelector("[data-editor-focus]");
+  if (input) input.focus();
+}
+
+function cancelEdit() { state.editing = null; renderDetail(); }
+
+function editorHtml(t, spec) {
+  const value = t[spec.key];
+  const options = dynamicOptions();
+  const id = escape(t.id);
+  const key = escape(spec.key);
+  if (spec.kind === "enum") {
+    const list = (spec.dynamic ? (options[spec.dynamic] || []) : (spec.options || [])).slice();
+    if (value && list.indexOf(String(value)) < 0) list.push(String(value));
+    return '<select class="field-editor" data-editor-focus>' +
+      (spec.allowEmpty ? '<option value="">— none —</option>' : "") +
+      list.map(function (item) { return '<option value="' + escape(item) + '"' + (String(value || "") === item ? " selected" : "") + '>' + escape(labelTitle(item)) + '</option>'; }).join("") +
+      '</select><div class="editor-actions"><button type="button" onclick="saveSelected(\\'' + id + '\\',\\'' + key + '\\',this)">Save</button><button type="button" onclick="cancelEdit()">Cancel</button></div>';
+  }
+  if (spec.kind === "list" && spec.closed) {
+    return '<div class="field-editor chips-editor" data-editor-focus tabindex="-1">' + (spec.options || []).map(function (item) {
+      const on = (value || []).indexOf(item) >= 0;
+      return '<label class="chip-opt"><input type="checkbox" value="' + escape(item) + '"' + (on ? " checked" : "") + '> ' + escape(item) + '</label>';
+    }).join("") + '<div class="editor-actions"><button type="button" onclick="saveChips(\\'' + id + '\\',\\'' + key + '\\',this)">Save</button><button type="button" onclick="cancelEdit()">Cancel</button></div></div>';
+  }
+  if (spec.kind === "list") {
+    return '<div class="field-editor"><textarea class="field-input" data-editor-focus rows="3" placeholder="' + escape(spec.itemHint || "one value per line") + '">' + escape((value || []).join("\\n")) + '</textarea><div class="editor-actions"><button type="button" onclick="saveLines(\\'' + id + '\\',\\'' + key + '\\',this)">Save</button><button type="button" onclick="cancelEdit()">Cancel</button></div></div>';
+  }
+  return '<div class="field-editor"><input class="field-input" data-editor-focus value="' + escape(value == null ? "" : value) + '"' + (spec.maxLength ? ' maxlength="' + spec.maxLength + '"' : '') + '><div class="editor-actions"><button type="button" onclick="saveText(\\'' + id + '\\',\\'' + key + '\\',this)">Save</button><button type="button" onclick="cancelEdit()">Cancel</button></div></div>';
+}
+
+function saveSelected(id, field, button) { saveField(id, field, button.parentElement.previousElementSibling.value); }
+function saveText(id, field, button) { saveField(id, field, button.closest(".field-editor").querySelector("input").value); }
+function saveLines(id, field, button) { saveField(id, field, button.closest(".field-editor").querySelector("textarea").value.split("\\n").map(function (line) { return line.trim(); }).filter(Boolean)); }
+function saveChips(id, field, button) { saveField(id, field, [...button.closest(".chips-editor").querySelectorAll("input:checked")].map(function (input) { return input.value; })); }
+
+async function saveField(taskId, field, value, reason) {
+  const task = ALL_TASKS.find(function (candidate) { return candidate.id === taskId; });
+  const normalized = normalizeValue(field, value, { fields: FIELDS, options: dynamicOptions() });
+  if (!task || !normalized.ok) {
+    state.editMessage = normalized.error || "The task is no longer available.";
+    state.editError = true;
+    renderDetail();
+    return;
+  }
+  if (sameValue(task[field], normalized.value)) { cancelEdit(); return; }
+  if (reasonRequiredFor(field, normalized.value) && !isValidReason(reason)) {
+    state.editing = null;
+    state.reasonAsk = { id: taskId, field: field, value: normalized.value, error: reason === undefined ? "" : "Enter a specific reason; reserved words are not accepted." };
+    renderDetail();
+    return;
+  }
+  state.reasonAsk = null;
+  state.editing = null;
+  state.editMessage = "Saving…";
+  state.editError = false;
+  renderDetail();
+  try {
+    const res = await fetch("api/task", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Viewer-Capability": window.VIEWER_WRITE.token },
+      body: JSON.stringify({ id: taskId, field: field, value: normalized.value, actor: state.actor, reason: reason || "" }),
+    });
+    const data = await res.json().catch(function () { return {}; });
+    if (!res.ok) {
+      if (data.needsReason) {
+        state.reasonAsk = { id: taskId, field: field, value: normalized.value, error: data.error || "A reason is required." };
+      }
+      throw new Error(data.error || "HTTP " + res.status);
+    }
+    if (data.entries) HISTORY[taskId] = (HISTORY[taskId] || []).concat(data.entries);
+    await refreshFromServer(true);
+    state.editMessage = fieldLabel(field) + " saved to Markdown and history as " + state.actor + ".";
+    state.editError = false;
+    renderDetail();
+  } catch (error) {
+    state.editMessage = "Not saved: " + error.message;
+    state.editError = true;
+    renderDetail();
+  }
+}
+
+function submitReason() {
+  const ask = state.reasonAsk;
+  const input = document.getElementById("reasonAskInput");
+  if (ask) saveField(ask.id, ask.field, ask.value, input ? input.value : "");
+}
+function cancelReason() { state.reasonAsk = null; renderDetail(); }
+
+function reasonAskHtml(t) {
+  const ask = state.reasonAsk;
+  if (!ask || ask.id !== t.id) return "";
+  return '<section class="reason-ask"><strong>Why ' + escape(fieldLabel(ask.field)) + ' → ' + escape(formatValue(ask.value)) + '?</strong><p>This protected transition must carry a reason in history.</p>' +
+    (ask.error ? '<p role="alert">' + escape(ask.error) + '</p>' : '') +
+    '<textarea class="field-input" id="reasonAskInput" rows="2" maxlength="' + REASON_MAX_LENGTH + '" placeholder="One sentence about this change"></textarea><div class="reason-actions"><button type="button" onclick="submitReason()">Save with reason</button><button type="button" onclick="cancelReason()">Cancel</button></div></section>';
+}
+
+function valueHtml(t, key) {
+  const value = t[key];
+  if (key === "status" || key === "priority" || key === "type") return '<span class="badge badge-' + key + '-' + escape(value) + '">' + escape(value || "—") + '</span>';
+  if (key === "labels") return (value || []).map(function (item) { return '<span class="badge badge-label-' + escape(item) + '">' + escape(item) + '</span>'; }).join(" ") || "—";
+  return escape(formatValue(value) || "—");
+}
+
+function metaRowHtml(t, spec) {
+  const editing = state.editing && state.editing.id === t.id && state.editing.field === spec.key;
+  const editable = CAN_EDIT;
+  const body = editing ? editorHtml(t, spec) : '<div class="meta-value' + (editable ? ' is-editable' : '') + '"' + (editable ? ' tabindex="0" role="button" onclick="startEdit(\\'' + escape(t.id) + '\\',\\'' + escape(spec.key) + '\\')" onkeydown="if(event.key===\\'Enter\\'||event.key===\\' \\'){event.preventDefault();startEdit(\\'' + escape(t.id) + '\\',\\'' + escape(spec.key) + '\\')}"' : '') + '>' + valueHtml(t, spec.key) + (editable ? '<span class="edit-pen" aria-hidden="true">edit</span>' : '') + '</div>';
+  return '<div class="meta-row' + ((spec.kind === "list") ? ' meta-row-wide' : '') + (editing ? ' is-editing' : '') + '"><div class="meta-label">' + escape(spec.label) + '</div>' + body + '</div>';
+}
+
 // ─── Detail render ────────────────────────────────────────────────────
 // ONE listener rather than one per node: the detail panel is re-rendered
 // wholesale on every edit and every SSE refresh, so per-node handlers would be
@@ -2989,15 +3191,9 @@ function renderDetail() {
     el.innerHTML = '<div class="empty-state">← Pick a task from the list, or use <code>#' + TASK_PREFIX + '-001</code> in the URL.</div>';
     return;
   }
-  // ONE ROW PER FIELD, no pen (TL-379). The rows used to be editors that fell
-  // back to text when the page could not write; now they are text, because the
-  // page cannot write at all. A field is changed where it is authoritative — in
-  // the Markdown, through the CLI, under review.
+  if (state.editing && state.editing.id !== t.id) state.editing = null;
   const rows = FIELDS.filter(function (spec) { return spec.key !== "title"; })
-    .map(function (spec) {
-      return '<div class="meta-row"><div class="meta-label">' + escape(spec.label || spec.key) +
-        '</div><div class="meta-value">' + escape(formatValue(t[spec.key]) || "—") + "</div></div>";
-    }).join("");
+    .map(function (spec) { return metaRowHtml(t, spec); }).join("");
 
   const files = t.modified_files || [];
   const filesRow = files.length
@@ -3014,7 +3210,13 @@ function renderDetail() {
     // an empty row would read as "this task changed nothing".
     filesRow;
 
-  const titleHtml = "<h1>" + escape(t.title) + "</h1>";
+  const titleEditing = state.editing && state.editing.id === t.id && state.editing.field === "title";
+  const titleHtml = titleEditing ? '<h1>' + editorHtml(t, fieldSpec("title", FIELDS)) + '</h1>' : '<h1' + (CAN_EDIT ? ' class="is-editable" tabindex="0" role="button" onclick="startEdit(\\'' + escape(t.id) + '\\',\\'title\\')"' : '') + '>' + escape(t.title) + (CAN_EDIT ? '<span class="edit-pen" aria-hidden="true">edit</span>' : '') + '</h1>';
+  const history = HISTORY[t.id] || [];
+  const last = history[history.length - 1];
+  const historySummary = last ? '<div class="history-summary">Latest recorded change: ' + escape(fieldLabel(last.field)) + ' by ' + escape(last.actor) + (last.reason && last.reason !== "unknown" ? ' — ' + escape(last.reason) : '') + '</div>' : '<div class="history-summary">No recorded field changes yet.</div>';
+  const readOnlyNote = CAN_EDIT ? '' : '<div class="read-only-note">This snapshot is read-only. Start the local server to edit this repository.</div>';
+  const editResult = state.editMessage ? '<div class="edit-result" role="' + (state.editError ? 'alert' : 'status') + '" aria-live="polite">' + escape(state.editMessage) + '</div>' : '';
 
   el.innerHTML =
     '<div class="detail-header">' +
@@ -3029,6 +3231,7 @@ function renderDetail() {
       "</div>" +
       titleHtml +
       '<div class="detail-meta-grid">' + rows + readOnlyRows + "</div>" +
+      readOnlyNote + editResult + reasonAskHtml(t) + historySummary +
     "</div>" +
     '<div class="markdown-content">' + t.bodyHtml + "</div>";
 
@@ -3615,6 +3818,13 @@ for (const btn of document.querySelectorAll(".view-tab")) {
 }
 
 // ─── Initial render + auto-reconnect ─────────────────────────────────
+const editingActorInput = document.getElementById("editingActor");
+editingActorInput.addEventListener("input", function () {
+  state.actor = editingActorInput.value.trim();
+  state.editMessage = "";
+  state.editError = false;
+});
+
 // The scope is loaded BEFORE the first render: if it came after, the first frame
 // would show the full backlog and only then collapse to the board.
 // The order of the sources: ?board= in the URL (a link can be passed on) > localStorage.
