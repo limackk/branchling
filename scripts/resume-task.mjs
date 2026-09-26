@@ -69,7 +69,7 @@ import { fileURLToPath } from "node:url";
 import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { parseVerification } from "./criteria.mjs";
-import { contractProblem, findTaskFile, repoRootFor, runContract } from "./done-task.mjs";
+import { contractProblem, findTaskFile, repoRootFor, runContract, transcriptBlock } from "./done-task.mjs";
 import { ACTOR_NAMESPACES, isValidActor, readHistory } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { backlogPaths, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
@@ -77,7 +77,7 @@ import { PRODUCT_NAME as N } from "./product.mjs";
 import {
   FIELD_COMMENT, FIELD_DECISION, extractMeta, historyEntryKind, isQuestion, openQuestions, splitFrontmatter,
 } from "./task-fields.mjs";
-import { MARK, failure } from "./ui.mjs";
+import { MARK, failure, plain } from "./ui.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -529,8 +529,15 @@ function renderVerification(model) {
     else out.push("  " + MARK.bullet + " " + r.id + "  manual, and nothing here can re-run it");
   }
   if (model.failedOutput) {
-    out.push("");
-    for (const line of String(model.failedOutput).replace(/\n$/, "").split("\n")) out.push("  " + line);
+    const failed = model.verification.find((r) => r.ok === false) || {};
+    out.push(...transcriptBlock(model.failedOutput, {
+      command: failed.command || "",
+      exitCode: failed.exitCode,
+      reportName: "briefing",
+      // The briefing is a document carried on stdout and sometimes embedded in
+      // JSON. Its captured transcript must never inherit stderr's TTY colour.
+      color: plain,
+    }).replace(/\n$/, "").split("\n"));
   }
   return out;
 }

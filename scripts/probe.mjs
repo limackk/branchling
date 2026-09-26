@@ -12,14 +12,17 @@
  * PURE: takes the probe, returns text. Nothing here reaches the file on disk.
  */
 
+import { transcriptBlock } from "./done-task.mjs";
+import { plain } from "./ui.mjs";
+
 const HEAD_LIMIT = 40;
 
 /** The last lines of a command's output, capped — the tail is where a test
  *  runner puts its summary and a shell puts its error. */
 function tail(output, limit = HEAD_LIMIT) {
   const lines = String(output || "").replace(/\s+$/, "").split("\n");
-  if (lines.length <= limit) return lines;
-  return ["… (" + (lines.length - limit) + " lines not shown)"].concat(lines.slice(-limit));
+  if (lines.length <= limit) return { rows: lines, omittedLines: 0 };
+  return { rows: lines.slice(-limit), omittedLines: lines.length - limit };
 }
 
 /** @param {{rows: Array<object>, ran: number, failed: number, allPassed: boolean, problems?: string[]}} probe */
@@ -58,10 +61,16 @@ export function renderProbe(probe) {
     const mark = r.ok ? "passes" : "FAILS (exit " + r.exitCode + ")";
     out.push("- " + (i + 1) + ". " + name + " — **" + mark + "**, " + r.ms + " ms: `" + r.command + "`");
     if (!r.ok && r.output && String(r.output).trim()) {
-      out.push("");
-      out.push("  ```");
-      for (const l of tail(r.output)) out.push("  " + l);
-      out.push("  ```");
+      const excerpt = tail(r.output);
+      out.push(...transcriptBlock(excerpt.rows.join("\n"), {
+        command: r.command,
+        exitCode: r.exitCode,
+        omittedLines: excerpt.omittedLines,
+        reportName: "handover",
+        // This block becomes task text and JSON data as well as terminal text.
+        // It therefore has no stream whose TTY state may colour it.
+        color: plain,
+      }).replace(/\n$/, "").split("\n"));
     }
   });
   out.push("");

@@ -261,7 +261,7 @@ export function suppressedNote(output) {
 export const TRANSCRIPT_GUTTER = "│ ";
 
 /**
- * THE REFUSAL FRAMES THE TRANSCRIPT IT PASTES (TL-275).
+ * EVERY REPORT FRAMES THE TRANSCRIPT IT PASTES (TL-275, TL-399).
  *
  * WHAT WENT WRONG WITHOUT IT. A failing entry's output was written to stderr
  * unframed, immediately before this command's own refusal, and the two layers
@@ -290,19 +290,35 @@ export const TRANSCRIPT_GUTTER = "│ ";
  * truncated it.
  *
  * @param {string|null} output the captured transcript
- * @param {{command?: string, exitCode?: number, color?: object}} opts
+ * `omittedLines` is for a caller that deliberately relays a tail. The frame
+ * then counts the command lines it ACTUALLY writes separately from the earlier
+ * lines it names but does not print. A synthetic truncation notice must not sit
+ * behind the gutter: every guttered line is promised to come from the command.
+ *
+ * @param {{command?: string, exitCode?: number, color?: object, omittedLines?: number,
+ *          reportName?: string}} opts
  */
 export function transcriptBlock(output, opts = {}) {
   const paint = opts.color || errColor;
   const body = String(output == null ? "" : output).replace(/\n+$/, "");
   const rows = body.length ? body.split("\n") : [];
   const count = rows.length + (rows.length === 1 ? " line" : " lines");
+  const omitted = Number.isInteger(opts.omittedLines) && opts.omittedLines > 0 ? opts.omittedLines : 0;
+  const total = rows.length + omitted;
+  const headerCount = omitted
+    ? rows.length + " of " + total + " command lines shown"
+    : count;
+  const footerCount = omitted
+    ? rows.length + " command lines written · " + omitted + " earlier command lines omitted"
+    : count + " written";
+  const reportName = opts.reportName || "refusal";
   const nested = rows.filter((l) => l.indexOf(MARK.err) >= 0).length;
   const out = [
     "",
     paint.dim("── transcript of ") + paint.id("`" + (opts.command || "") + "`") +
-      paint.dim(" (exit " + opts.exitCode + ") · " + count + " ──"),
-    paint.dim("   Every line behind `" + TRANSCRIPT_GUTTER.trim() + "` is that command's output, not this refusal."),
+      paint.dim(" (exit " + opts.exitCode + ") · " + headerCount + " ──"),
+    paint.dim("   Every line behind `" + TRANSCRIPT_GUTTER.trim() + "` is that command's output, not this " +
+      reportName + "."),
   ];
   if (nested) {
     // The count is named, the MARK is not REPRINTED. A frame whose own header
@@ -314,7 +330,7 @@ export function transcriptBlock(output, opts = {}) {
     ));
   }
   for (const row of rows) out.push(paint.dim(TRANSCRIPT_GUTTER) + row);
-  out.push(paint.dim("── end of transcript · " + count + " written ──"));
+  out.push(paint.dim("── end of transcript · " + footerCount + " ──"));
   return out.join("\n") + "\n";
 }
 

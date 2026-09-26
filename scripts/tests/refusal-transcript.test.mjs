@@ -30,6 +30,8 @@ isolateHome("refusal-transcript");
 plainOutput();
 
 import { TRANSCRIPT_GUTTER, transcriptBlock } from "../done-task.mjs";
+import { renderProbe } from "../probe.mjs";
+import { renderBriefing } from "../resume-task.mjs";
 import { MARK } from "../ui.mjs";
 
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
@@ -131,6 +133,80 @@ test("an empty transcript is framed without claiming a line", () => {
 // ──────────────────────────────────────────────────────────────────────────
 // A real refusal, with a real nested run inside it
 // ──────────────────────────────────────────────────────────────────────────
+
+// The same provenance boundary is owed by the two other commands that relay a
+// contract's captured output. These tests live here so the predicate has one
+// owner rather than three subtly different spellings.
+function resumeModel(output) {
+  return {
+    id: "TASK-1",
+    actor: "agent:successor",
+    owner: "agent:successor",
+    verified: true,
+    decisions: [],
+    goal: "The captured failure is attributable.",
+    take: null,
+    history: [],
+    diff: { base: "main", mergeBase: "0123456789abcdef", branch: "topic", patch: "", reason: null },
+    working: { patch: "", untracked: [], reason: null },
+    verification: [{
+      id: "nested",
+      kind: "bash",
+      command: "node --test scripts/tests/nested.test.mjs",
+      ok: false,
+      exitCode: 7,
+      ms: 12,
+      output,
+    }],
+    contractProblem: null,
+    failedOutput: output,
+  };
+}
+
+test("`resume --verify` frames the failing entry's complete captured output", () => {
+  const briefing = renderBriefing(resumeModel(CAPTURED));
+  assert.ok(capturedLinesAreMarked(briefing, CAPTURED), "resume pasted a captured line without provenance:\n" + briefing);
+  assert.ok(frameRegionIsClean(briefing), "resume's frame contains an unguttered nested refusal:\n" + briefing);
+  assert.match(briefing, /transcript of `node --test scripts\/tests\/nested\.test\.mjs` \(exit 7\)/);
+  assert.match(briefing, /that command's output, not this briefing\./);
+});
+
+test("`probe` frames only real command lines and states how much of the tail it omitted", () => {
+  const earlier = Array.from({ length: 9 }, (_, i) => "earlier output " + (i + 1));
+  const captured = earlier.concat(CAPTURED.split("\n"), Array.from({ length: 36 }, (_, i) => "tail output " + (i + 1))).join("\n");
+  const probe = renderProbe({
+    rows: [{
+      id: "nested",
+      kind: "bash",
+      command: "node --test scripts/tests/nested.test.mjs",
+      ok: false,
+      exitCode: 7,
+      ms: 12,
+      output: captured,
+    }],
+    ran: 1,
+    failed: 1,
+    allPassed: false,
+  });
+
+  const shown = CAPTURED.split("\n").concat(Array.from({ length: 36 }, (_, i) => "tail output " + (i + 1))).join("\n");
+  assert.ok(capturedLinesAreMarked(probe, shown), "probe pasted a captured tail line without provenance:\n" + probe);
+  assert.ok(frameRegionIsClean(probe), "probe's frame contains an unguttered nested refusal:\n" + probe);
+  assert.match(probe, /40 of 49 command lines shown/);
+  assert.match(probe, /9 earlier command lines omitted/);
+  assert.match(probe, /that command's output, not this handover\./);
+  assert.equal(probe.split("\n").filter((l) => l.startsWith(TRANSCRIPT_GUTTER)).length, 40,
+    "probe's gutter contains something other than the command lines it says it showed");
+  assert.doesNotMatch(probe, /^│ … \(.*not shown\)$/m,
+    "probe put its own truncation notice behind the command-output gutter");
+});
+
+test("POSITIVE CONTROL: the two historical two-space renderings fail the provenance predicate", () => {
+  const historicalResume = CAPTURED.split("\n").map((line) => "  " + line).join("\n");
+  const historicalProbe = ["  ```", historicalResume, "  ```"].join("\n");
+  assert.equal(capturedLinesAreMarked(historicalResume, CAPTURED), false);
+  assert.equal(capturedLinesAreMarked(historicalProbe, CAPTURED), false);
+});
 
 function task(verification) {
   return [
