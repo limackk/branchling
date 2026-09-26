@@ -93,6 +93,14 @@ async function capability(port) {
   return JSON.parse(match[1]);
 }
 
+async function revision(port, id) {
+  const response = await call(port, "/api/tasks");
+  assert.equal(response.status, 200);
+  const task = response.json().tasks.find((candidate) => candidate.id === id);
+  assert.ok(task?.revision, "the read API did not expose an optimistic revision");
+  return task.revision;
+}
+
 async function stop(handle) {
   if (handle.proc.exitCode !== null) return;
   handle.proc.kill("SIGTERM");
@@ -109,7 +117,10 @@ test("only a same-origin served page can make an attributed edit", async () => {
   try {
     const port = await handle.bound;
     const cap = await capability(port);
-    const body = { id: fx.id, field: "title", value: "Edited in the live viewer", actor: "local:owner", reason: "Clarify the task" };
+    const body = {
+      id: fx.id, field: "title", value: "Edited in the live viewer",
+      actor: "local:owner", reason: "Clarify the task", revision: await revision(port, fx.id),
+    };
     for (const headers of [
       {},
       { capability: "guessed", origin: `http://127.0.0.1:${port}` },
@@ -136,14 +147,15 @@ test("stale tokens, traversal, invalid actors and oversized input are refused", 
     const cap = await capability(port);
     await new Promise((resolve) => setTimeout(resolve, 30));
     const base = { method: "POST", capability: cap.token, origin: `http://127.0.0.1:${port}` };
-    assert.equal((await call(port, "/api/task", { ...base, body: { id: fx.id, field: "title", value: "No", actor: "local:owner" } })).status, 403);
+    assert.equal((await call(port, "/api/task", { ...base, body: { id: fx.id, field: "title", value: "No", actor: "local:owner", revision: "stale" } })).status, 403);
 
     const fresh = await capability(port);
     const live = { ...base, capability: fresh.token };
-    assert.equal((await call(port, "/api/task", { ...live, body: { id: "../config", field: "title", value: "No", actor: "local:owner" } })).status, 404);
-    assert.equal((await call(port, "/api/task", { ...live, body: { id: fx.id, field: "title", value: "No", actor: "owner" } })).status, 400);
+    const current = await revision(port, fx.id);
+    assert.equal((await call(port, "/api/task", { ...live, body: { id: "../config", field: "title", value: "No", actor: "local:owner", revision: current } })).status, 404);
+    assert.equal((await call(port, "/api/task", { ...live, body: { id: fx.id, field: "title", value: "No", actor: "owner", revision: current } })).status, 400);
     const needsReason = await call(port, "/api/task", {
-      ...live, body: { id: fx.id, field: "status", value: "blocked", actor: "local:owner" },
+      ...live, body: { id: fx.id, field: "status", value: "blocked", actor: "local:owner", revision: current },
     });
     assert.equal(needsReason.status, 422);
     assert.equal(needsReason.json().needsReason, true);
@@ -151,7 +163,7 @@ test("stale tokens, traversal, invalid actors and oversized input are refused", 
     const huge = "x".repeat(17 * 1024);
     const oversized = await call(port, "/api/task", {
       ...live, capability: latest.token,
-      body: { id: fx.id, field: "title", value: huge, actor: "local:owner" },
+      body: { id: fx.id, field: "title", value: huge, actor: "local:owner", revision: current },
     });
     assert.equal(oversized.status, 413);
   } finally { await stop(handle); rmSync(fx.dir, { recursive: true, force: true }); }
@@ -166,26 +178,37 @@ test("a history failure restores the task and concurrent edits stay serialized",
     const origin = `http://127.0.0.1:${port}`;
     const file = taskPath(fx.root, fx.id);
     const original = readFileSync(file, "utf8");
+    const staleRevision = await revision(port, fx.id);
+    const external = original.replace(/^title: .*$/m, "title: External writer won");
+    writeFileSync(file, external, "utf8");
+    const conflicted = await call(port, "/api/task", {
+      method: "POST", capability: cap.token, origin,
+      body: { id: fx.id, field: "title", value: "Must not overwrite", actor: "local:owner", revision: staleRevision },
+    });
+    assert.equal(conflicted.status, 409);
+    assert.equal(readFileSync(file, "utf8"), external);
+
     const history = join(fx.root, "history");
     const saved = history + ".saved";
     renameSync(history, saved);
     writeFileSync(history, "not a directory\n", "utf8");
     const failed = await call(port, "/api/task", {
       method: "POST", capability: cap.token, origin,
-      body: { id: fx.id, field: "title", value: "Must roll back", actor: "local:owner" },
+      body: { id: fx.id, field: "title", value: "Must roll back", actor: "local:owner", revision: await revision(port, fx.id) },
     });
     assert.equal(failed.status, 500);
-    assert.equal(readFileSync(file, "utf8"), original);
+    assert.equal(readFileSync(file, "utf8"), external);
     rmSync(history);
     renameSync(saved, history);
 
+    const sharedRevision = await revision(port, fx.id);
     const edit = (value) => call(port, "/api/task", {
       method: "POST", capability: cap.token, origin,
-      body: { id: fx.id, field: "title", value, actor: "local:owner" },
+      body: { id: fx.id, field: "title", value, actor: "local:owner", revision: sharedRevision },
     });
     const replies = await Promise.all([edit("First concurrent title"), edit("Second concurrent title")]);
-    assert.deepEqual(replies.map((reply) => reply.status), [200, 200]);
+    assert.deepEqual(replies.map((reply) => reply.status).sort(), [200, 409]);
     const rows = readFileSync(join(history, fx.id + ".jsonl"), "utf8").trim().split("\n").map(JSON.parse);
-    assert.equal(rows.filter((row) => row.field === "title" && row.source === "viewer").length, 2);
+    assert.equal(rows.filter((row) => row.field === "title" && row.source === "viewer").length, 1);
   } finally { await stop(handle); rmSync(fx.dir, { recursive: true, force: true }); }
 });

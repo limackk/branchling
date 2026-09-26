@@ -787,7 +787,6 @@ export function recordEdit(backlogDir, opts) {
   // against. The entries are appended inside the section too, so that a reader
   // never sees a snapshot that has moved past entries nobody has written yet.
   return withSnapshotMutex(backlogDir, () => {
-    appendEntries(backlogDir, taskId, entries);
     // A SNAPSHOT THIS ROUTE CREATES COVERS ONE TASK, AND SAYS SO (TL-180). Every
     // writing command comes through here, and `.snapshot.json` is computed, so
     // it is gitignored and never travels: in a fresh worktree the first `next`
@@ -797,9 +796,26 @@ export function recordEdit(backlogDir, opts) {
     // snapshot" — which `reconcile` cannot then tell apart from "created here".
     // The flag is that missing fact; the first pass over the whole tree clears
     // it, because such a pass really does cover everything.
-    const snap = loadSnapshot(backlogDir) || { version: 1, partial: true, tasks: {} };
+    const previous = loadSnapshot(backlogDir);
+    const snap = previous
+      ? JSON.parse(JSON.stringify(previous))
+      : { version: 1, partial: true, tasks: {} };
     snap.tasks[taskId] = pickTracked(after);
     saveSnapshot(backlogDir, snap);
+    try {
+      // The append is LAST. There is no fallible persistence step after the
+      // immutable ledger row, so a caller may restore its task when this throws
+      // without leaving history that describes a reverted transition.
+      appendEntries(backlogDir, taskId, entries);
+    } catch (error) {
+      try {
+        if (previous) saveSnapshot(backlogDir, previous);
+        else unlinkSync(snapshotPath(backlogDir));
+      } catch (rollbackError) {
+        error.message += "; snapshot rollback also failed: " + rollbackError.message;
+      }
+      throw error;
+    }
     return entries;
   });
 }

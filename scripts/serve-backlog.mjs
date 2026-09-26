@@ -32,7 +32,7 @@
 import { createServer, get } from "node:http";
 import { hostname } from "node:os";
 import { spawn } from "node:child_process";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { existsSync, readFileSync, realpathSync, renameSync, unlinkSync, watch, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -320,6 +320,17 @@ function fileForTaskId(id) {
   return listTaskFiles(TASKS_DIR).find((file) => file.startsWith(id + "-")) || null;
 }
 
+function taskRevision(text) {
+  return createHash("sha256").update(text).digest("base64url");
+}
+
+function tasksWithRevisions() {
+  return readTasks(BACKLOG_DIR, CONFIG).map((task) => {
+    const file = fileForTaskId(task.id);
+    return { ...task, revision: file ? taskRevision(readFileSync(join(TASKS_DIR, file), "utf8")) : "" };
+  });
+}
+
 function fieldOptions() {
   const tasks = readTasks(BACKLOG_DIR, CONFIG);
   const values = (key) => [...new Set(tasks.map((task) => String(task[key] || "").trim()).filter(Boolean))].sort();
@@ -583,6 +594,12 @@ async function handleFieldEdit(payload) {
     if (!taskFile) throw Object.assign(new Error("Task not found: " + id), { status: 404 });
     const full = join(TASKS_DIR, taskFile);
     const original = readFileSync(full, "utf8");
+    const revision = taskRevision(original);
+    if (typeof payload?.revision !== "string" || payload.revision !== revision) {
+      throw Object.assign(new Error("The task changed after this page read it; refresh before editing"), {
+        status: 409, revision,
+      });
+    }
     const before = extractMeta(splitFrontmatter(original).frontmatter);
     let text = setFrontmatterField(original, field, normalized.value, spec);
     text = setFrontmatterField(text, "updated", todayStamp());
@@ -605,7 +622,10 @@ async function handleFieldEdit(payload) {
     for (const client of sseClients) {
       try { client.write("event: tasks-changed\ndata: {}\n\n"); } catch { sseClients.delete(client); }
     }
-    return { ok: true, id, field, value: normalized.value, actor, entries, regenerated };
+    return {
+      ok: true, id, field, value: normalized.value, actor, entries, regenerated,
+      revision: taskRevision(text),
+    };
   });
 }
 
@@ -615,7 +635,7 @@ async function handle(req, res) {
 
   if (path === "/" || path === "/index.html") {
     // Rendered fresh per request, so the first paint is already live data.
-    const tasks = readTasks(BACKLOG_DIR, CONFIG);
+    const tasks = tasksWithRevisions();
     const html = injectCapability(buildHtml(
       tasks,
       computeStats(tasks),
@@ -638,7 +658,7 @@ async function handle(req, res) {
   }
 
   if (path === "/api/tasks") {
-    const tasks = readTasks(BACKLOG_DIR, CONFIG);
+    const tasks = tasksWithRevisions();
     sendJson(res, 200, { tasks, stats: computeStats(tasks), plan: planPayload(BACKLOG_DIR) });
     return;
   }
@@ -675,7 +695,11 @@ async function handle(req, res) {
       const payload = JSON.parse(await readBody(req));
       sendJson(res, 200, await handleFieldEdit(payload));
     } catch (error) {
-      sendJson(res, error.status || 400, { error: error.message, needsReason: error.needsReason === true });
+      sendJson(res, error.status || 400, {
+        error: error.message,
+        needsReason: error.needsReason === true,
+        ...(error.revision ? { revision: error.revision } : {}),
+      });
     }
     return;
   }

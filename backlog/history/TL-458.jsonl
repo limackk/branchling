@@ -1,1 +1,3 @@
 {"id":"01M3F4CKGVN95NPDYFJ46CHE1Y","ts":"2026-09-26T15:12:24.603Z","task":"TL-458","field":"__created__","from":"","to":"Viewer edits preserve concurrent writers and ledger truth","actor":"agent:claude","source":"new","reason":"unknown"}
+{"id":"01M3F4HJBV421NMQNT7EQZEVMS","ts":"2026-09-26T15:15:07.259Z","task":"TL-458","field":"status","from":"pending","to":"in_progress","actor":"agent:codex","source":"take","reason":"unknown"}
+{"id":"01M3F4HJBV4J7AZCR4GJXH2AW9","ts":"2026-09-26T15:15:07.259Z","task":"TL-458","field":"owner","from":"unassigned","to":"agent:codex","actor":"agent:codex","source":"take","reason":"unknown"}
