@@ -6,9 +6,9 @@ labels: []
 board: main
 epic: "Backlog — open source publication"
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
-role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
+status: awaiting_vouch  # pending | in_progress | blocked | done | cancelled
+owner: ""
+role: review  # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1w
 confidence: medium                 # how much you trust the estimate
