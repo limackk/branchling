@@ -78,7 +78,7 @@ waves:
   # claim published before it holds is the one failure no later wave can take
   # back — which is why all six waves above come first.
   - name: "What carries it outward"
-    tasks: [TL-448, TL-454, TL-456, TL-457]
+    tasks: [TL-448]
 
   # A writable viewer returns only after its contract and public boundary agree on what may write.
   - name: "A safe write boundary"
@@ -92,9 +92,13 @@ waves:
   - name: "The expanded viewer earns trust"
     tasks: [TL-452]
 
-  # The demo, rendered badge and name clearance are explicit human evidence and should not stall agent-executable product work.
+  # Repository metadata, Windows CI and community policies are implemented,
+  # but their contracts require evidence from the public repository. The demo,
+  # rendered badge and name clearance are human evidence as well. Keeping these
+  # gates together prevents publication work from stalling the agent-executable
+  # viewer waves without pretending the public checks already happened.
   - name: "Human publication gates"
-    tasks: [TL-102, TL-158, TL-179]
+    tasks: [TL-454, TL-456, TL-457, TL-102, TL-158, TL-179]
 
   # The final README can only embed and prove the recording after the human demo gate has closed.
   - name: "The public front door"
