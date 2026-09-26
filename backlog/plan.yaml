@@ -86,7 +86,7 @@ waves:
 
   # Once the server has one safe write path, editing and project health can become useful in parallel.
   - name: "The viewer becomes an operating surface"
-    tasks: [TL-450, TL-451]
+    tasks: [TL-458, TL-459, TL-451, TL-450]
 
   # Accessibility and cross-mode QA judge the complete editing and dashboard surface rather than either half.
   - name: "The expanded viewer earns trust"
