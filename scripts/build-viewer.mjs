@@ -3116,10 +3116,14 @@ async function saveField(taskId, field, value, reason) {
     const res = await fetch("api/task", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Viewer-Capability": window.VIEWER_WRITE.token },
-      body: JSON.stringify({ id: taskId, field: field, value: normalized.value, actor: state.actor, reason: reason || "" }),
+      body: JSON.stringify({
+        id: taskId, field: field, value: normalized.value, actor: state.actor,
+        reason: reason || "", revision: task.revision,
+      }),
     });
     const data = await res.json().catch(function () { return {}; });
     if (!res.ok) {
+      if (res.status === 409) await refreshFromServer(true);
       if (data.needsReason) {
         state.reasonAsk = { id: taskId, field: field, value: normalized.value, error: data.error || "A reason is required." };
       }

@@ -23,6 +23,8 @@ export function editingContractProblems(page) {
     ["field controls come from the shared specs", /FIELDS\.filter[\s\S]*metaRowHtml/],
     ["the guarded route is used", /fetch\("api\/task"/],
     ["the capability accompanies the write", /"X-Viewer-Capability": window\.VIEWER_WRITE\.token/],
+    ["the task revision accompanies the write", /revision: task\.revision/],
+    ["a stale write refreshes instead of overwriting", /res\.status === 409\) await refreshFromServer\(true\)/],
     ["protected transitions ask first", /reasonRequiredFor\(field, normalized\.value\)[\s\S]*state\.reasonAsk/],
     ["a successful write refreshes disk state", /await refreshFromServer\(true\)/],
     ["the result is announced", /aria-live="polite"/],
@@ -41,7 +43,7 @@ test("negative control: an unguarded optimistic writer fails the contract", () =
   const broken = PAGE
     .replace("const CAN_EDIT = SERVER_MODE && !!window.VIEWER_WRITE", "const CAN_EDIT = true")
     .replace('"X-Viewer-Capability": window.VIEWER_WRITE.token', '"X-Viewer-Capability": "public"')
-    .replace("await refreshFromServer(true)", "task[field] = normalized.value");
+    .replaceAll("await refreshFromServer(true)", "task[field] = normalized.value");
   const problems = editingContractProblems(broken);
   assert.ok(problems.includes("only served pages can edit"));
   assert.ok(problems.includes("the capability accompanies the write"));
