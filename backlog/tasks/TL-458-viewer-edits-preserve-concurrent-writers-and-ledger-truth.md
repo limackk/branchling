@@ -6,7 +6,7 @@ labels: []
 board: main
 epic: "Backlog viewer"
 priority: P0
-status: in_progress  # pending | in_progress | blocked | done | cancelled
+status: done  # pending | in_progress | blocked | done | cancelled
 owner: agent:codex
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
@@ -59,5 +59,5 @@ The files to read before the first edit, each with a reason.
 
 ## Acceptance criteria
 
-- [ ] External writers cannot be silently overwritten and a post-append failure cannot split the task from its ledger. [proof: cross-process-atomicity]
-- [ ] The repair preserves the complete product contract. [proof: suite-green]
+- [x] External writers cannot be silently overwritten and a post-append failure cannot split the task from its ledger. [proof: cross-process-atomicity]
+- [x] The repair preserves the complete product contract. [proof: suite-green]

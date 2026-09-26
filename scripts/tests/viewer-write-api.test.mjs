@@ -147,7 +147,10 @@ test("repeated page requests evict old capabilities while the current page can w
     const issued = [];
     for (let i = 0; i < 33; i++) issued.push(await capability(port));
     const origin = `http://127.0.0.1:${port}`;
-    const body = { id: fx.id, field: "title", value: "Bounded capability registry", actor: "local:owner" };
+    const body = {
+      id: fx.id, field: "title", value: "Bounded capability registry",
+      actor: "local:owner", revision: await revision(port, fx.id),
+    };
 
     const evicted = await call(port, "/api/task", {
       method: "POST", body, capability: issued[0].token, origin,
@@ -164,11 +167,11 @@ test("repeated page requests evict old capabilities while the current page can w
 
 test("stale tokens, traversal, invalid actors and oversized input are refused", async () => {
   const fx = fixture();
-  const handle = start(fx.root, await freePort(), 20);
+  const handle = start(fx.root, await freePort(), 2_000);
   try {
     const port = await handle.bound;
     const cap = await capability(port);
-    await new Promise((resolve) => setTimeout(resolve, 30));
+    await new Promise((resolve) => setTimeout(resolve, 2_100));
     const base = { method: "POST", capability: cap.token, origin: `http://127.0.0.1:${port}` };
     assert.equal((await call(port, "/api/task", { ...base, body: { id: fx.id, field: "title", value: "No", actor: "local:owner", revision: "stale" } })).status, 403);
 
