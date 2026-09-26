@@ -386,6 +386,7 @@ export function buildHtml(
   // browser could give two different numbers for the same question.
   const estimateModuleSrc = readModuleSource("estimate.mjs");
   const elsewhereModuleSrc = readModuleSource("elsewhere.mjs");
+  const historyModuleSrc = readModuleSource("viewer-history.mjs");
   // The plan's arithmetic and the Execution view. `plan.mjs` comes first:
   // `viewer-plan.mjs` renders what `planState()` returns.
   const planModuleSrc = readModuleSource("plan.mjs");
@@ -1809,6 +1810,12 @@ ${estimateModuleSrc}
 ${elsewhereModuleSrc}
 // ─── end of the pasted module ─────────────────────────────────────────
 
+// ─── Pasted source of scripts/viewer-history.mjs (TL-429) ──────────────
+// Relative history labels use the UTC calendar of the date stamps they read.
+// The module is tested directly, so the browser cannot grow a second answer.
+${historyModuleSrc}
+// ─── end of the pasted module ─────────────────────────────────────────
+
 // ─── Pasted source of scripts/plan.mjs (TL-107) ──────────────────────
 // \`planState()\` — the five definitions of "active wave", "next up", "in
 // progress", "unplanned" and "stale". The \`plan\` command imports THIS file, so the
@@ -2951,20 +2958,6 @@ const historyLoaded = {};
 // exists instead of. The tick only re-reads a clock.
 const IN_FLIGHT_TICK_MS = 30000;
 
-function histDay(ts) { return String(ts || "").slice(0, 10); }
-function histAgo(ts) {
-  const day = histDay(ts);
-  if (!day) return "";
-  const today = new Date();
-  const t0 = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
-  const parts = day.split("-");
-  const t1 = Date.UTC(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-  const days = Math.round((t0 - t1) / 86400000);
-  if (days <= 0) return "today";
-  if (days === 1) return "yesterday";
-  if (days < 30) return days + " days ago";
-  return day;
-}
 function histTime(ts) {
   const m = String(ts || "").match(/T(\\d{2}:\\d{2})/);
   return m ? m[1] : "";
