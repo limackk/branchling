@@ -803,12 +803,15 @@ export function stripComment(raw) {
 }
 
 /** The value without its surrounding quotes. Exported for the same reason as
- *  `stripComment()`: one convention, one implementation (TL-70). */
+ *  `stripComment()`: one convention, one implementation (TL-70).
+ *
+ *  Each quote style expands its OWN escape: `\"` inside double quotes, `''`
+ *  inside single quotes (TL-464). Leaving `''` in place handed bash a command
+ *  whose inner quotes had turned into empty pairs. */
 export function unquote(s) {
   const v = String(s == null ? "" : s).trim();
-  if (v.length >= 2 && ((v[0] === '"' && v[v.length - 1] === '"') || (v[0] === "'" && v[v.length - 1] === "'"))) {
-    return v.slice(1, -1).replace(/\\"/g, '"');
-  }
+  if (v.length >= 2 && v[0] === '"' && v[v.length - 1] === '"') return v.slice(1, -1).replace(/\\"/g, '"');
+  if (v.length >= 2 && v[0] === "'" && v[v.length - 1] === "'") return v.slice(1, -1).replace(/''/g, "'");
   return v;
 }
 

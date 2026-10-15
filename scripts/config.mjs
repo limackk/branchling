@@ -37,7 +37,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { backlogPaths } from "./paths.mjs";
 import { PRODUCT_NAME } from "./product.mjs";
 import { DEFAULT_TASK_ID_PREFIX, PREFIX_SHAPE, inferPrefix, taskIdPatterns } from "./task-id.mjs";
-import { ACTOR_NAMESPACES, ROLE_SHAPE, isValidActor } from "./task-fields.mjs";
+import { ACTOR_NAMESPACES, ROLE_SHAPE, isValidActor, unquote } from "./task-fields.mjs";
 import { LINK_POLICIES } from "./criteria.mjs";
 import { DEFAULT_LOCK_TTL_MINUTES } from "./lock.mjs";
 import { USER_KEYS, loadUserConfig } from "./home.mjs";
@@ -273,14 +273,6 @@ function stripComment(line) {
     if (c === "#" && (i === 0 || /\s/.test(line[i - 1]))) return line.slice(0, i);
   }
   return line;
-}
-
-function unquote(s) {
-  const v = String(s == null ? "" : s).trim();
-  if (v.length >= 2 && ((v[0] === '"' && v.endsWith('"')) || (v[0] === "'" && v.endsWith("'")))) {
-    return v.slice(1, -1);
-  }
-  return v;
 }
 
 /** Levenshtein, small enough not to pull in a dependency for a single hint. It

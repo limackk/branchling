@@ -158,6 +158,17 @@ test("an unknown key inside a verification entry FAILS, like everywhere else in 
   assert.match(problems[0], /unknown key `proof`/);
 });
 
+// TL-464: the shape a Sentry import writes — valid YAML, a single-quoted bash
+// command whose inner single quotes are escaped as ''. The command bash
+// receives must keep its quotes, or grep searches for a different string.
+test("a single-quoted bash entry reaches the runner with its '' escapes expanded", () => {
+  const { entries, problems } = parseVerification(
+    ["verification:", `  - bash: 'curl -s "$URL" | grep -q ''"status":"resolved"'''`].join("\n")
+  );
+  assert.deepEqual(problems, []);
+  assert.equal(entries[0].bash, `curl -s "$URL" | grep -q '"status":"resolved"'`);
+});
+
 test("`manual:` is a verification entry too — it can be named by a criterion", () => {
   const raw = taskFile({
     verification: ["  - id: eyeballed", '    manual: "someone looked at the rendered page"'],

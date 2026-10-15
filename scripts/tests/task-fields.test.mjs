@@ -26,6 +26,7 @@ import {
   diffMeta,
   sameValue,
   formatValue,
+  unquote,
 } from "../task-fields.mjs";
 import { loadConfig } from "../config.mjs";
 import { BACKLOG_DIR, isolateHome } from "./_repo.mjs";
@@ -95,6 +96,20 @@ test("a comment after the value does not enter the value, but a # inside quotes 
   assert.equal(meta(FILE).type, "code");
   const withHash = FILE.replace('title: "Encode', 'title: "Fix #42 in');
   assert.equal(meta(withHash).title, "Fix #42 in the task list filters in the viewer URL");
+});
+
+// TL-464: in a single-quoted YAML scalar `''` is ONE apostrophe. Left
+// unexpanded, a verification entry reached bash with empty quote pairs that
+// bash concatenates away, so `grep -q ''"status":"resolved"''` searched for
+// `status:resolved` and `done` refused a task whose condition was true.
+test("a single-quoted value expands the YAML escape '' to one apostrophe", () => {
+  assert.equal(unquote("'it''s'"), "it's");
+  assert.equal(unquote(`'grep -q ''"status":"resolved"'''`), `grep -q '"status":"resolved"'`);
+  assert.equal(unquote("''"), "");
+  assert.equal(unquote("''''"), "'");
+  // Double quotes have their own escapes; '' inside them is two apostrophes.
+  assert.equal(unquote(`"it''s"`), "it''s");
+  assert.equal(unquote("bare''value"), "bare''value");
 });
 
 // ── Validation ────────────────────────────────────────────────────────────
