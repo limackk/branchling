@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 1h | 2h | 3h | 4h | 1d | 1w
@@ -18,8 +18,10 @@ blocked_by: []                     # ids of tasks that MUST be closed before thi
 blocks: [TL-455]                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
 verification:                      # HOW to check the task is really done
-  - id: the-name                   # optional; a criterion below points at this id
-    bash: "command to run"
+  - id: hook-control
+    bash: "env PATH=/usr/bin:/bin \"$(command -v node)\" --test scripts/tests/commit-message-shape.test.mjs"
+  - id: suite
+    bash: "node --test scripts/tests/*.test.mjs"
 ---
 
 ## Goal
@@ -58,5 +60,5 @@ same cause, not a second one.
 
 ## Acceptance criteria
 
-- [ ] The hook control passes with no `branchling` on `PATH`. [proof: hook-control]
-- [ ] The whole suite stays green. [proof: suite]
+- [x] The hook control passes with no `branchling` on `PATH`. [proof: hook-control]
+- [x] The whole suite stays green. [proof: suite]
