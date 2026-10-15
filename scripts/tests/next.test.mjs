@@ -31,12 +31,16 @@ import { acquireLock, isExpired, listLocks, lockScope, readLock, releaseLock, st
 import { loadConfig, parseConfigYaml } from "../config.mjs";
 import { callerSpecies, lastHandoff, queueStatuses, selectCandidates, servesExecutor } from "../next-task.mjs";
 import { readTaskRecords } from "../task-select.mjs";
-import { isolateHome } from "./_repo.mjs";
+import { isolateHome, plainOutput } from "./_repo.mjs";
 
 // The suite must not read the DEVELOPER's preferences: since TL-157 the actor
 // chain reads the user layer, so a machine with `actor:` in its own config file
 // would otherwise see every default-actor assertion below fail.
 isolateHome("next");
+// Every child here is asked for plain output with `NO_COLOR`; without this the
+// suite's forced-colour rerun leaves `FORCE_COLOR` beside it, and Node 18 and
+// 20 print a warning on stderr that these tests read as the command's (TL-462).
+plainOutput();
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPTS = join(HERE, "..");
