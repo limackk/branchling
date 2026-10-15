@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: "Backlog — open source publication"
 priority: P1
-status: awaiting_vouch  # pending | in_progress | blocked | done | cancelled
+status: done  # pending | in_progress | blocked | done | cancelled
 owner: ""
 role: review  # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-26
-updated: 2026-09-26
+updated: 2026-10-15
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
@@ -42,5 +42,5 @@ On 2026-09-26 the public GitHub description was only branchling, homepage was em
 
 ## Acceptance criteria
 
-- [ ] The versioned package metadata carries the canonical URLs, focused description and searchable product vocabulary. [proof: package-metadata]
-- [ ] A stranger can discover and understand the repository from GitHub metadata alone. [proof: github-metadata]
+- [x] The versioned package metadata carries the canonical URLs, focused description and searchable product vocabulary. [proof: package-metadata]
+- [x] A stranger can discover and understand the repository from GitHub metadata alone. [proof: github-metadata]
