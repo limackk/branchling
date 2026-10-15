@@ -120,20 +120,21 @@ than after a migration.
 
 ## Getting it
 
-The package is not published to the npm registry yet, so the entry point is a
-clone.
-
 ```bash
-git clone <repository-url> ~/tools/branchling
-cd ~/tools/branchling
-npm link                          # puts the `branchling` binary on your PATH
+npm install -g branchling
 branchling --version
 ```
 
-Two routes that write nothing to your global `node_modules`, if you prefer:
-an `alias branchling="$HOME/tools/branchling/bin/branchling.mjs"` in `~/.zshrc`
-(not `~/.zprofile` — zsh reads that one only for login shells), or
-`npx --yes ~/tools/branchling`, which leaves nothing behind at all.
+To try it without installing anything, `npx branchling --help` runs the same
+package once and leaves nothing behind.
+
+To work on branchling itself, start from a clone instead:
+
+```bash
+git clone https://github.com/limackk/branchling.git
+cd branchling
+npm link                          # puts the `branchling` binary on your PATH
+```
 
 ---
 

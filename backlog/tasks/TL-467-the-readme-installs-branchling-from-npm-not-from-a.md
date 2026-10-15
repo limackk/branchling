@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Backlog — open source publication"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude-code
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 1h | 2h | 3h | 4h | 1d | 1w
@@ -40,5 +40,5 @@ On 2026-10-15 the owner decided to publish a basic 0.1.0 before the public annou
 
 ## Acceptance criteria
 
-- [ ] The README installs from npm and carries no repository placeholder. [proof: readme-npm-install]
-- [ ] The changed README remains safe to publish and its links resolve. [proof: readme-gates]
+- [x] The README installs from npm and carries no repository placeholder. [proof: readme-npm-install]
+- [x] The changed README remains safe to publish and its links resolve. [proof: readme-gates]
