@@ -45,14 +45,17 @@ replaces get `\\\"` wrong in one of the two orders. Other YAML escapes (`\t`,
 `\n`) stay literal: `yamlScalar()` never writes them, and expanding them would
 change hand-written regexes.
 
-Audit of consumer backlogs on 2026-10-15 (tala-workspace `backlog/tasks`,
-this repository's `backlog/tasks` and its open worktrees TL-450 and TL-451, 3549 files):
-156 double-quoted tokens change meaning, and all 156 now equal what the `yaml`
-parser returns for the same token, so not one of them relied on the old
-reading. 26 sit in tasks that are not closed (22 in tala-workspace, 4 in
-the copies of TL-158 in the two worktrees), mostly `grep 'a\\|b'`
-verifications that only now search for what they say. None shows the
-doubling growth a repeated edit would leave.
+Which tokens the change affects is decided by one mechanism, and any backlog
+can be audited for it: a double-quoted frontmatter token whose source contains
+`\\` or `\"` now reads back as the `yaml` parser reads it, and every other
+token reads back unchanged. To audit a tree, parse each `tasks/*.md`
+frontmatter with both the old `unquote()` and the `yaml` package and list the
+tokens where the two disagree: those are the tokens whose meaning changes, and
+the new `unquote()` must agree with `yaml` on every one of them. The tokens
+most likely to change are `grep 'a\\|b'` verification commands, which only now
+search for the alternation they state. A token that a repeated edit had doubled
+would show as a run of four or more backslashes; an audit should look for that
+growth specifically.
 
 ## Steps
 
