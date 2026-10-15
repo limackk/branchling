@@ -92,6 +92,13 @@ waves:
   - name: "The expanded viewer earns trust"
     tasks: [TL-452]
 
+  # The first push since 2026-09-22 (run 38738911603) was red on all seven
+  # jobs. The public gates below judge that run, so it has to be green first:
+  # a hook test that needs a global install, three colour-dependent tests on
+  # Node 18-22, and the first Windows run.
+  - name: "The public CI is green"
+    tasks: [TL-461, TL-462, TL-463]
+
   # Repository metadata, Windows CI and community policies are implemented,
   # but their contracts require evidence from the public repository. The demo,
   # rendered badge and name clearance are human evidence as well. Keeping these
