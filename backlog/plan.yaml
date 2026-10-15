@@ -97,7 +97,7 @@ waves:
   # a hook test that needs a global install, three colour-dependent tests on
   # Node 18-22, and the first Windows run.
   - name: "The public CI is green"
-    tasks: [TL-461, TL-462, TL-463]
+    tasks: [TL-461, TL-462, TL-463, TL-466]
 
   # Repository metadata, Windows CI and community policies are implemented,
   # but their contracts require evidence from the public repository. The demo,

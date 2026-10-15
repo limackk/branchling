@@ -14,7 +14,7 @@ estimate: 1d
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-26
 updated: 2026-10-15
-blocked_by: [TL-158, TL-179, TL-453, TL-454, TL-457, TL-461, TL-462, TL-463] # ids of tasks that MUST be closed before this one starts
+blocked_by: [TL-158, TL-179, TL-453, TL-454, TL-457, TL-461, TL-462, TL-463, TL-466] # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
 verification:
