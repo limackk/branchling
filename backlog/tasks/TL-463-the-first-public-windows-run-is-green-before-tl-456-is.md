@@ -15,7 +15,7 @@ confidence: medium                 # how much you trust the estimate
 created: 2026-10-15
 updated: 2026-10-15
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
-blocks: [TL-455]                         # ids this task will unblock
+blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
 verification:                      # HOW to check the task is really done
   - id: windows-run

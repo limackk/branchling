@@ -11,7 +11,7 @@
 # and TL-444, most of them measured while landing its waves. The order keeps
 # the same argument — evidence first, publication last — because the defects
 # found along the way fall into the same classes, in the same order of cost.
-updated: 2026-09-26
+updated: 2026-10-15
 rationale: "Landing the last plan surfaced its own defects: a green that could not have been red, a suite that answers differently twice in a row, guards kept by hand, and records a second session can still split. Branchling first makes its green mean something again, then makes its guards keep themselves, then closes the ledger and the queue against a second hand; only then the shape of a refusal, what a stranger reads, and — last — what carries the tool outward."
 waves:
   # THE ONE CLAIM, AGAIN. A verification entry naming a test file that does
@@ -107,10 +107,21 @@ waves:
   - name: "Human publication gates"
     tasks: [TL-454, TL-456, TL-457, TL-102, TL-158, TL-179]
 
-  # The final README can only embed and prove the recording after the human demo gate has closed.
-  - name: "The public front door"
-    tasks: [TL-453]
+  # The README is the package page on npmjs.com, so the one section a release
+  # cannot ship without is the installation command that works once it exists.
+  - name: "The README installs from npm"
+    tasks: [TL-467]
 
-  # Publication follows every product, metadata, policy, name and first-contact gate because it cannot be quietly undone.
+  # Publication waits for the name clearance and the npm installation section
+  # because a published name cannot be quietly withdrawn; everything that only
+  # polishes the first impression waits for the announcement instead.
   - name: "The first public release"
     tasks: [TL-455]
+
+  # The release claims the name; the announcement makes the first impression.
+  # The demo and the compact front door are what an announcement needs, not what
+  # an installable package needs, so they follow the first release rather than
+  # gate it (decided 2026-10-15). The final README can only embed and prove the
+  # recording after the human demo gate has closed.
+  - name: "The public announcement"
+    tasks: [TL-453, TL-468]

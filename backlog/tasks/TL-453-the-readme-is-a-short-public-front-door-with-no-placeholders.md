@@ -13,9 +13,9 @@ executor: ""                       # human | agent — WHICH SPECIES may be HAND
 estimate: 1d
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-26
-updated: 2026-09-26
+updated: 2026-10-15
 blocked_by: [TL-102]               # ids of tasks that MUST be closed before this one starts
-blocks: []                         # ids this task will unblock
+blocks: [TL-468]                   # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
 verification:
   - id: front-door

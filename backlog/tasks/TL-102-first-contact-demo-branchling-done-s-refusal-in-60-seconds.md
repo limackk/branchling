@@ -12,9 +12,9 @@ executor: "human"
 estimate: 3h
 confidence: medium
 created: 2026-09-01
-updated: 2026-09-21
+updated: 2026-10-15
 blocked_by: [TL-82, TL-49]
-blocks: [TL-103]
+blocks: [TL-103, TL-468]
 related_docs:
   - docs/functionality.md
 verification:
