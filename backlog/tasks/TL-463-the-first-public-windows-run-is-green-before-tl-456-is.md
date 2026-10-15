@@ -18,8 +18,8 @@ blocked_by: []                     # ids of tasks that MUST be closed before thi
 blocks: [TL-455]                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
 verification:                      # HOW to check the task is really done
-  - id: the-name                   # optional; a criterion below points at this id
-    bash: "command to run"
+  - id: windows-run
+    bash: "gh run list --workflow test.yml --branch main --limit 1 --json databaseId --jq '.[0].databaseId' | xargs -I{} gh run view {} --json jobs --jq '.jobs[] | select(.name | test(\"windows\")) | .conclusion' | grep -qx success && echo 'the newest Windows job on main concluded success - OK'"
 ---
 
 ## Goal
