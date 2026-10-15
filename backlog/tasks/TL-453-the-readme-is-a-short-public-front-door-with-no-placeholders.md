@@ -6,15 +6,15 @@ labels: []
 board: main
 epic: "Backlog — open source publication"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude-code
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1d
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-26
 updated: 2026-10-15
-blocked_by: [TL-102]               # ids of tasks that MUST be closed before this one starts
+blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: [TL-468]                   # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
 verification:
@@ -30,11 +30,11 @@ A stranger can decide in thirty seconds whether branchling fits their workflow a
 
 ## Context
 
-TL-153 previously reduced the README below 400 lines, but it has regressed to 1033 lines. The current clone instructions still contain the literal placeholder <repository-url>. TL-297 established the correct thesis: plan, claim, execute, capture discoveries, verify and review. TL-102 already owns the sixty-second recording, so this task links that artifact when available rather than duplicating it. Named competitor comparisons remain deliberately excluded because they drift with somebody else releases.
+TL-153 previously reduced the README below 400 lines, but it has regressed to 1033 lines. The current clone instructions still contain the literal placeholder <repository-url>. TL-297 established the correct thesis: plan, claim, execute, capture discoveries, verify and review. TL-102 already owns the sixty-second recording. On 2026-10-15 the owner asked for the compact README before the first release rather than after the demo, so this task no longer waits for TL-102: embedding the recording in the README header moves to the announcement, TL-468, which is blocked by TL-102 anyway. Named competitor comparisons remain deliberately excluded because they drift with somebody else releases.
 
 ## Steps
 
-1. Keep the first screen to the product thesis, the evidence-gated loop, one concrete differentiator and the tested demo.
+1. Keep the first screen to the product thesis, the evidence-gated loop, one concrete differentiator and the tested demonstration commands; the recording is linked later by TL-468.
 2. Replace every repository placeholder with the canonical public URL.
 3. Present one installation path, one five-minute path and one compact end-to-end example before any advanced feature.
 4. Move command reference, adapters, profiles, import, configuration and format details to docs/manual.md or to commands that already print them.
@@ -43,5 +43,5 @@ TL-153 previously reduced the README below 400 lines, but it has regressed to 10
 
 ## Acceptance criteria
 
-- [ ] README stays compact, contains no repository placeholder and leads to a runnable first success with valid links. [proof: front-door]
-- [ ] The shortened public documentation remains safe to publish. [proof: release-gates]
+- [x] README stays compact, contains no repository placeholder and leads to a runnable first success with valid links. [proof: front-door]
+- [x] The shortened public documentation remains safe to publish. [proof: release-gates]
