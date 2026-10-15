@@ -112,6 +112,27 @@ test("a single-quoted value expands the YAML escape '' to one apostrophe", () =>
   assert.equal(unquote("bare''value"), "bare''value");
 });
 
+// TL-465: yamlScalar writes a backslash as `\\` inside double quotes, and the
+// reader used to expand only `\"`. Every save of a title or a bash entry with
+// a regex like `\s` doubled its backslashes, so a value grew with each edit.
+test("a double-quoted value written by yamlScalar reads back unchanged", () => {
+  for (const v of [
+    "a\\b",
+    "grep -E '\\s+done'",
+    "ends in a backslash \\",
+    "\\\\server\\share",
+    'a \\"quoted\\" escape',
+    'mixed \\ and "quote"',
+  ]) {
+    assert.equal(unquote(yamlScalar(v)), v, "round trip of " + JSON.stringify(v));
+  }
+  // One pass, left to right: `\\"` is a backslash and then the closing escape
+  // of a quote, never an escaped backslash followed by a stray `"`.
+  assert.equal(unquote('"\\\\\\""'), '\\"');
+  // An escape YAML defines but yamlScalar never writes stays as it was read.
+  assert.equal(unquote('"tab\\there"'), "tab\\there");
+});
+
 // ── Validation ────────────────────────────────────────────────────────────
 
 test("an enum accepts only values from the vocabulary", () => {

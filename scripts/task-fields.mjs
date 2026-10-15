@@ -805,12 +805,18 @@ export function stripComment(raw) {
 /** The value without its surrounding quotes. Exported for the same reason as
  *  `stripComment()`: one convention, one implementation (TL-70).
  *
- *  Each quote style expands its OWN escape: `\"` inside double quotes, `''`
- *  inside single quotes (TL-464). Leaving `''` in place handed bash a command
- *  whose inner quotes had turned into empty pairs. */
+ *  Each quote style expands its OWN escapes: `\\` and `\"` inside double
+ *  quotes (TL-465), `''` inside single quotes (TL-464). Leaving `''` in place
+ *  handed bash a command whose inner quotes had turned into empty pairs.
+ *
+ *  The double-quote escapes are the two `yamlScalar()` writes, expanded in ONE
+ *  left-to-right pass: two sequential replaces read `\\"` either as `\"` plus
+ *  a stray quote or as a doubled backslash, depending on their order. Other
+ *  YAML escapes (`\t`, `\n`, ...) stay literal — yamlScalar never writes them,
+ *  and a hand-written `\s` in a regex must not turn into something else. */
 export function unquote(s) {
   const v = String(s == null ? "" : s).trim();
-  if (v.length >= 2 && v[0] === '"' && v[v.length - 1] === '"') return v.slice(1, -1).replace(/\\"/g, '"');
+  if (v.length >= 2 && v[0] === '"' && v[v.length - 1] === '"') return v.slice(1, -1).replace(/\\(["\\])/g, "$1");
   if (v.length >= 2 && v[0] === "'" && v[v.length - 1] === "'") return v.slice(1, -1).replace(/''/g, "'");
   return v;
 }
