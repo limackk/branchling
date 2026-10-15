@@ -23,7 +23,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -85,13 +85,45 @@ test("--files survives the same pipe — it exists to be handed to xargs", () =>
     "a list cut off at one buffer would silently open the wrong subset of files");
 });
 
-test("POSITIVE CONTROL: the old pattern truncates over the same number of bytes", () => {
+/**
+ * Run `script` with stdout on a pipe that is NOT read until the child exits.
+ *
+ * WHY NOT `spawnSync`. Whether `console.log` then `process.exit` loses bytes
+ * depends on whether the reader drains the pipe before the exit: the bug is a
+ * race, and a reader that happens to keep up hides it. Through `spawnSync` the
+ * control passed in every ordinary CI job and failed once on Node 22 in the
+ * busier forced-colour rerun (TL-462) — a control that depends on scheduling
+ * cannot say whether the platform reproduces the bug. Holding the reader paused
+ * until `exit` makes the slow consumer certain, so what the child gets out is
+ * bounded by the pipe's own buffer and the timing no longer decides.
+ */
+function runWithStalledReader(script) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [script], { stdio: ["ignore", "pipe", "ignore"] });
+    child.stdout.pause();
+    const timer = setTimeout(() => {
+      child.kill();
+      reject(new Error("the child did not exit with its reader stalled — a blocking stdout cannot truncate, and this platform cannot run the control"));
+    }, 30_000);
+    child.on("error", reject);
+    child.on("exit", () => {
+      clearTimeout(timer);
+      let out = "";
+      child.stdout.setEncoding("utf8");
+      child.stdout.on("data", (chunk) => { out += chunk; });
+      child.stdout.on("end", () => resolve(out));
+      child.stdout.resume();
+    });
+  });
+}
+
+test("POSITIVE CONTROL: the old pattern truncates over the same number of bytes", async () => {
   const dir = mkdtempSync(join(tmpdir(), "branchling-json-pipe-control-"));
   const script = join(dir, "old-pattern.mjs");
   writeFileSync(script,
     'console.log(JSON.stringify({ blob: "x".repeat(' + PAYLOAD_BYTES + ') }));\n' +
     "process.exit(0);\n", "utf8");
-  const r = spawnSync(process.execPath, [script], { encoding: "utf8", timeout: 30_000 });
+  const r = { stdout: await runWithStalledReader(script) };
   assert.ok(r.stdout.length < PAYLOAD_BYTES,
     "`console.log` then `process.exit` did NOT truncate here — this platform cannot " +
       "distinguish the fix from the bug, and the tests above prove nothing on it");

@@ -27,11 +27,15 @@ import { fileURLToPath } from "node:url";
 
 import { REASON_PROVEN, REASON_UNKNOWN } from "../history.mjs";
 
-import { isolateHome } from "./_repo.mjs";
+import { isolateHome, plainOutput } from "./_repo.mjs";
 
 // The home is isolated for the whole file (TL-166): without it a test reads the
 // developer's own configuration and the suite answers differently per machine.
 isolateHome("proofs-progress");
+// Every child here is asked for plain output with `NO_COLOR`; without this the
+// suite's forced-colour rerun leaves `FORCE_COLOR` beside it, and Node 18 and
+// 20 print a warning on stderr that these tests read as the command's (TL-462).
+plainOutput();
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CLI = join(HERE, "..", "cli.mjs");

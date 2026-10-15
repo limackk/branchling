@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 1h | 2h | 3h | 4h | 1d | 1w
@@ -18,8 +18,10 @@ blocked_by: []                     # ids of tasks that MUST be closed before thi
 blocks: [TL-455]                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
 verification:                      # HOW to check the task is really done
-  - id: the-name                   # optional; a criterion below points at this id
-    bash: "command to run"
+  - id: colour-forced
+    bash: "FORCE_COLOR=1 node --test scripts/tests/json-pipe.test.mjs scripts/tests/next.test.mjs scripts/tests/proofs-progress.test.mjs"
+  - id: terminal-independent
+    bash: "node --test scripts/tests/suite-is-terminal-independent.test.mjs"
 ---
 
 ## Goal
@@ -53,5 +55,5 @@ Node 24, which is why none of this showed before the push.
 
 ## Acceptance criteria
 
-- [ ] The three tests pass with colour forced on. [proof: colour-forced]
-- [ ] The terminal-independence guard is green. [proof: terminal-independent]
+- [x] The three tests pass with colour forced on. [proof: colour-forced]
+- [x] The terminal-independence guard is green. [proof: terminal-independent]
