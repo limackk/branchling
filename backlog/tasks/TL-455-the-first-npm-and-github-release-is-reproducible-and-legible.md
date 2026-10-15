@@ -13,7 +13,7 @@ executor: ""                       # human | agent — WHICH SPECIES may be HAND
 estimate: 1d
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-26
-updated: 2026-09-26
+updated: 2026-10-15
 blocked_by: [TL-158, TL-179, TL-453, TL-454, TL-457] # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
@@ -33,6 +33,8 @@ Version 0.1.0 is published from the reviewed commit to npm and GitHub with prove
 ## Context
 
 The package currently passes npm pack --dry-run and its allowlist excludes this repository backlog, but npm view branchling still returns 404 and GitHub has no releases. Do not start publication until TL-102, TL-158 and TL-179 are closed: the demo, publicly inspected badge and name clearance are human gates. Publishing and pushing remain external actions requiring explicit owner authorization at execution time.
+
+The npm organization `branchling` was registered by the owner on 2026-10-15. The package itself stays unscoped as `branchling`; the organization reserves the `@branchling` scope for any later package and is the account the release is published from, so its members, not one personal login, own the name.
 
 ## Steps
 
