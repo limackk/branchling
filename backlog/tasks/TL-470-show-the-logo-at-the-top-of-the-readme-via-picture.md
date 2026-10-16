@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Brand identity"
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1h
@@ -53,6 +53,6 @@ The README is covered by tests (e.g. `scripts/tests/agent-onboarding.test.mjs`, 
 
 ## Acceptance criteria
 
-- [ ] The README shows the logo through a picture element with a dark-scheme source and a light fallback. [proof: readme-picture]
-- [ ] Every logo path the README references exists in the tree, and at least two were found. [proof: readme-logo-paths-exist]
-- [ ] The README tests and the rest of the suite stay green. [proof: readme-suite-green]
+- [x] The README shows the logo through a picture element with a dark-scheme source and a light fallback. [proof: readme-picture]
+- [x] Every logo path the README references exists in the tree, and at least two were found. [proof: readme-logo-paths-exist]
+- [x] The README tests and the rest of the suite stay green. [proof: readme-suite-green]

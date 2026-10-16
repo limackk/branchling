@@ -1,4 +1,9 @@
-# branchling
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/logo/branchling-horizontal-on-dark.svg">
+    <img src="docs/brand/logo/branchling-horizontal-color.svg" alt="branchling" height="88">
+  </picture>
+</h1>
 
 [![test](https://github.com/limackk/branchling/actions/workflows/test.yml/badge.svg)](https://github.com/limackk/branchling/actions/workflows/test.yml)
 [![npm](https://img.shields.io/npm/v/branchling)](https://www.npmjs.com/package/branchling)
@@ -184,4 +189,5 @@ and [`SECURITY.md`](SECURITY.md) before reporting a vulnerability.
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE). The branchling name and logo are not covered by it; see
+[`docs/brand/`](docs/brand/README.md#licence).

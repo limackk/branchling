@@ -13,11 +13,11 @@ organisation avatar. They are not part of the npm package.
 | File | Use |
 |---|---|
 | `logo/branchling-horizontal-color.svg` | Symbol and wordmark on a light background, transparent. |
-| `logo/branchling-horizontal-on-dark.svg` | The same lockup for dark backgrounds; carries its own `#171514` background. |
+| `logo/branchling-horizontal-on-dark.svg` | The same lockup in the dark-scheme colours, transparent, for dark backgrounds. |
 | `logo/branchling-horizontal-mono-black.svg` | One-colour version for light backgrounds and print. |
 | `logo/branchling-horizontal-mono-white.svg` | One-colour version for dark backgrounds, transparent. |
 | `logo/branchling-symbol-color.svg` | The symbol alone, transparent: favicons and small spaces. |
-| `logo/branchling-symbol-on-dark.svg` | The symbol on its own `#171514` background. |
+| `logo/branchling-symbol-on-dark.svg` | The symbol in the dark-scheme colours, transparent. |
 | `social/og-1200x630.png` | GitHub social preview and link cards. |
 | `social/avatar-1080.png` | Square avatar for the GitHub organisation and social profiles. |
 
