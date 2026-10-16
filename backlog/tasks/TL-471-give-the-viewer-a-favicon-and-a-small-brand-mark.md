@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Brand identity"
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h
@@ -19,9 +19,9 @@ blocks: []                         # ids this task will unblock
 related_docs: [scripts/build-viewer.mjs]                   # paths relative to the repository root
 verification:
   - id: viewer-favicon-inline
-    bash: "node scripts/cli.mjs build >/dev/null && grep -q 'rel="icon"' backlog/viewer.html && grep -q 'data:image/svg+xml' backlog/viewer.html"
+    bash: "node scripts/cli.mjs viewer >/dev/null && grep -q 'rel="icon"' backlog/viewer.html && grep -q 'data:image/svg+xml' backlog/viewer.html"
   - id: viewer-title-is-project
-    bash: "node scripts/cli.mjs build >/dev/null && node -e 'const s=require("fs").readFileSync("backlog/viewer.html","utf8");const t=s.match(/<title>([^<]*)<\/title>/)[1];const h=s.match(/<div class="app-title">\s*<h1>([^<]*)<\/h1>/);if(!h||h[1]!==t)process.exit(1)'"
+    bash: "node scripts/cli.mjs viewer >/dev/null && node -e 'const s=require("fs").readFileSync("backlog/viewer.html","utf8");const t=s.match(/<title>([^<]*)<\/title>/)[1];const h=s.match(/<div class="app-title">\s*<h1>([^<]*)<\/h1>/);if(!h||h[1]!==t)process.exit(1)'"
   - id: viewer-product-name-guard
     bash: "node scripts/cli.mjs check --product-name"
   - id: viewer-suite-green
@@ -62,7 +62,7 @@ Use the `branchling-viewer` skill.
 
 ## Acceptance criteria
 
-- [ ] The built viewer carries an inline SVG favicon rather than a path to a file it does not ship. [proof: viewer-favicon-inline]
-- [ ] The project name is still both the page title and the header h1; the mark did not take its place. [proof: viewer-title-is-project]
-- [ ] No product-name literal was introduced into scripts/. [proof: viewer-product-name-guard]
-- [ ] The viewer tests and the rest of the suite stay green. [proof: viewer-suite-green]
+- [x] The built viewer carries an inline SVG favicon rather than a path to a file it does not ship. [proof: viewer-favicon-inline]
+- [x] The project name is still both the page title and the header h1; the mark did not take its place. [proof: viewer-title-is-project]
+- [x] No product-name literal was introduced into scripts/. [proof: viewer-product-name-guard]
+- [x] The viewer tests and the rest of the suite stay green. [proof: viewer-suite-green]

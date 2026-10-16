@@ -28,6 +28,7 @@ import { backlogPaths, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag }
 import { loadPlan } from "./plan.mjs";
 import { PRODUCT_NAME as N, STORAGE_KEY_PREFIX } from "./product.mjs";
 import { printLine } from "./stdout.mjs";
+import { faviconDataUri, headerMarkSvg } from "./brand-mark.mjs";
 import { refusal } from "./ui.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -402,6 +403,7 @@ export function buildHtml(
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(config.projectName)}</title>
+<link rel="icon" type="image/svg+xml" href="${faviconDataUri()}">
 <style>
   /* ─── Reset + theme ─────────────────────────────────────────────── */
   *, *::before, *::after { box-sizing: border-box; }
@@ -414,6 +416,8 @@ export function buildHtml(
     --border: #E5E0D8;
     --accent: #C97B5C;
     --accent-soft: #F4DED1;
+    --brand-stem: #1E1C1A;
+    --brand-shoot: #D9480F;
     --shadow: 0 1px 3px rgba(30, 58, 92, 0.05);
     --shadow-md: 0 4px 12px rgba(30, 58, 92, 0.08);
     --shadow-lg: 0 12px 32px rgba(30, 58, 92, 0.16), 0 2px 6px rgba(30, 58, 92, 0.08);
@@ -449,6 +453,8 @@ ${paletteVarCss}
       --border: #2D3748;
       --accent: #E89A7D;
       --accent-soft: #3D2A23;
+      --brand-stem: #F5F2EE;
+      --brand-shoot: #FF7A3D;
       --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
       --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
       --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4);
@@ -491,6 +497,11 @@ ${paletteVarCss}
     margin-bottom: 12px;
   }
   .app-title h1 { font-size: 18px; margin: 0; font-weight: 600; }
+  /* The tool's mark sits at the far end of the title row, smaller than the
+     project's name: the page belongs to the project whose backlog it shows. */
+  .app-title .brand-mark { width: 20px; height: 20px; flex: none; align-self: center; }
+  .brand-mark .brand-stem { fill: var(--brand-stem); }
+  .brand-mark .brand-shoot { fill: var(--brand-shoot); }
   .app-title .build-meta {
     font-size: 12px;
     color: var(--fg-muted);
@@ -1743,6 +1754,7 @@ ${paletteBadgeCss}
       <button type="button" class="copy-link-btn" id="btnCopyLink"
               title="Copies the address of this view — filters, search, sort, board and the selected task">⧉ Copy link</button>
     </nav>
+    ${headerMarkSvg()}
   </div>
 
   <div class="connection-bar snapshot" id="connectionBar">
