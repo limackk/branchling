@@ -861,6 +861,22 @@ export function nudgeRoot(root) {
 }
 
 /**
+ * What the agent files at the repository root carry, read only — the question
+ * `doctor` asks (TL-475). `version` is null for a file without the block.
+ *
+ * @param {string} root the backlog directory
+ * @returns {{base: string, files: {name: string, version: number|null, importsNeutral: boolean}[]}}
+ */
+export function nudgeState(root) {
+  const base = nudgeRoot(root);
+  const files = AGENT_FILES.filter((f) => existsSync(join(base, f))).map((name) => {
+    const found = readFileSync(join(base, name), "utf8").match(nudgeBlockRe());
+    return { name, version: found ? Number(found[1]) : null, importsNeutral: importsNeutral(join(base, name)) };
+  });
+  return { base, files };
+}
+
+/**
  * Install or refresh the pointer. Returns lines to print; empty means everything
  * was already current.
  *
