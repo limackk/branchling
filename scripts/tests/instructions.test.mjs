@@ -406,11 +406,13 @@ test("`init` appends the pointer, keeps what was there, and does not append twic
   assert.equal(twice.split(NUDGE_CLOSE).length - 1, 1, "the pointer was appended a second time");
 });
 
-test("with no agent file, exactly one is created — the editor-neutral one", () => {
+test("with no agent file, the pointer goes into the editor-neutral one", () => {
+  // CLAUDE.md is created too, as an import of this file only — that case and
+  // its reasons are `init-agent-pointer.test.mjs` (TL-474).
   const fx = fixture();
   assert.equal(run(["init", "--dir", fx.dir]).status, 0);
-  assert.equal(agentFile(fx, "CLAUDE.md"), null, "an editor-specific file was invented");
   assert.ok(String(agentFile(fx, "AGENTS.md")).includes(NUDGE_CLOSE), "no agent file was written at all");
+  assert.ok(!String(agentFile(fx, "CLAUDE.md")).includes(NUDGE_CLOSE), "the pointer was written twice");
 });
 
 test("`--no-nudge` writes nothing — and says so rather than passing over it", () => {

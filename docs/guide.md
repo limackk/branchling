@@ -686,7 +686,10 @@ teaches somebody else's statuses.
 It is a command rather than a file on purpose. A guide copied into a repository
 freezes on the day it was copied and goes on teaching flags that no longer
 exist; a command ships with the tool and cannot drift from it. `branchling init`
-writes one short pointer to that command into `CLAUDE.md` or `AGENTS.md`.
+writes one short pointer to that command into `CLAUDE.md` or `AGENTS.md`. In a
+repository with neither, the pointer goes into `AGENTS.md` and a one-line
+`CLAUDE.md` imports it (`@AGENTS.md`), because Claude Code reads only the
+latter.
 
 **For editors that load skills**, the same pointer ships as one:
 
