@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Brand identity"
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h
@@ -63,8 +63,8 @@ Licensing is an open decision for the owner and must be written down, not assume
 
 ## Acceptance criteria
 
-- [ ] The logo variants the README and the viewer need, the social preview image and the brand README exist under docs/brand. [proof: brand-files-present]
-- [ ] No Polish filename and no Polish metadata text remains under docs/brand. [proof: brand-english-only]
-- [ ] Every imported SVG still carries the AI-involvement disclosure, in English, and the check ran on a non-empty set. [proof: brand-ai-disclosure-kept]
-- [ ] The npm tarball does not ship docs/brand, checked against a tarball listing that is known to contain README.md. [proof: brand-not-in-tarball]
-- [ ] The test suite stays green with the new files in the tree. [proof: brand-suite-green]
+- [x] The logo variants the README and the viewer need, the social preview image and the brand README exist under docs/brand. [proof: brand-files-present]
+- [x] No Polish filename and no Polish metadata text remains under docs/brand. [proof: brand-english-only]
+- [x] Every imported SVG still carries the AI-involvement disclosure, in English, and the check ran on a non-empty set. [proof: brand-ai-disclosure-kept]
+- [x] The npm tarball does not ship docs/brand, checked against a tarball listing that is known to contain README.md. [proof: brand-not-in-tarball]
+- [x] The test suite stays green with the new files in the tree. [proof: brand-suite-green]
