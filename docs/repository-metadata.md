@@ -26,15 +26,25 @@ signed out and confirm that:
   issue tracker;
 - GitHub identifies the repository license as MIT;
 - the landing card is understandable without repository-private context; and
-- the social preview uses no private image or generated backlog artifact. Leave
-  the custom social preview unset until a stable public image is versioned in
-  the repository.
+- the social preview is the versioned image
+  [`docs/brand/social/og-1200x630.png`](brand/social/og-1200x630.png), and no
+  private image or generated backlog artifact. GitHub has no API for uploading
+  it: the owner sets it in the repository's Settings, General, Social preview,
+  and uploads that file again whenever it changes.
 
 The public settings can be inspected without changing them:
 
 ```bash
 gh repo view limackk/branchling \
   --json description,homepageUrl,repositoryTopics,url,licenseInfo
+```
+
+Whether a custom social preview is set at all is readable, though the image
+itself has to be compared by eye:
+
+```bash
+gh api graphql \
+  -f query='{repository(owner:"limackk",name:"branchling"){usesCustomOpenGraphImage openGraphImageUrl}}'
 ```
 
 The local half is checked by:
