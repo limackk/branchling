@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 1h | 2h | 3h | 4h | 1d | 1w
@@ -38,4 +38,4 @@ On 2026-10-16 `branchling init --dir backlog` in a fresh repository ended with a
 
 ## Acceptance criteria
 
-- [ ] init names `skills install` only when the skill was not installed and always names `hooks print` [proof: init-next-steps]
+- [x] init names `skills install` only when the skill was not installed and always names `hooks print` [proof: init-next-steps]

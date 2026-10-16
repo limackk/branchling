@@ -78,7 +78,9 @@ branchling                                          # open the viewer in your br
 ```
 
 `init` never overwrites an existing file. After it, every command finds the
-backlog by itself from anywhere inside the repository. An unknown command or
+backlog by itself from anywhere inside the repository. It also points your
+`CLAUDE.md` or `AGENTS.md` at `branchling instructions overview`; `--skills`
+adds the agent skill, and `branchling doctor` names whatever is still missing. An unknown command or
 flag fails rather than doing nothing, and `branchling <command> --help` prints
 the flags of each one.
 
