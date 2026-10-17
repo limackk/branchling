@@ -108,7 +108,7 @@ test("writing is stopped too — `new` does not create a task under a broken con
   const dir = backlog();
   appendFileSync(join(dir, "config.yaml"), "statusess: [a]\n", "utf8");
   assert.notEqual(run(dir, ["new", "--title", "Cokolwiek"]).status, 0);
-  assert.equal(readdirSync(join(dir, "tasks")).length, 0, "it wrote a task despite an unreadable configuration");
+  assert.equal(readdirSync(join(dir, "tasks")).filter((f) => f.endsWith(".md")).length, 0, "it wrote a task despite an unreadable configuration");
 });
 
 // ── The distinction: a predicted state versus a defect in the program ──────

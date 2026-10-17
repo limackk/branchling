@@ -88,7 +88,7 @@ test("a broken configuration: the `config` row is red, the rest honestly uncheck
 test("a value outside the vocabulary: the `vocabulary` row goes red and names the field", () => {
   const dir = repo();
   newTask(dir, "A task");
-  const f = join(dir, "tasks", readdirSync(join(dir, "tasks"))[0]);
+  const f = join(dir, "tasks", readdirSync(join(dir, "tasks")).filter((f) => f.endsWith(".md"))[0]);
   writeFileSync(f, readFileSync(f, "utf8").replace(/^status: .*$/m, "status: wymyslony"), "utf8");
 
   const d = rows(dir);
@@ -135,7 +135,7 @@ test("a view already tracked: a separate row with `git rm --cached`", () => {
 test("a failing guard: the `guards` row is red", () => {
   const dir = repo();
   newTask(dir, "A task");
-  const f = join(dir, "tasks", readdirSync(join(dir, "tasks"))[0]);
+  const f = join(dir, "tasks", readdirSync(join(dir, "tasks")).filter((f) => f.endsWith(".md"))[0]);
   // The pattern allows a comment at the end of the line: the template has one, and
   // a test about a DANGLING REFERENCE should not fail because a field's
   // explanation changed.

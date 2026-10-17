@@ -381,7 +381,7 @@ function backlogFrom(templatePath) {
 function createdTask(dir) {
   const r = spawnSync(process.execPath, [CLI, "new", "--dir", dir, "--title", "A fresh task"], { encoding: "utf8" });
   assert.equal(r.status, 0, r.stderr);
-  const files = readdirSync(join(dir, "tasks"));
+  const files = readdirSync(join(dir, "tasks")).filter((f) => f.endsWith(".md"));
   assert.equal(files.length, 1, "expected exactly one created task, got: " + files.join(", "));
   return readFileSync(join(dir, "tasks", files[0]), "utf8");
 }

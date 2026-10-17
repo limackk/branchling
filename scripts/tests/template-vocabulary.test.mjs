@@ -119,7 +119,7 @@ test("the SAME backlog writes once the template is corrected", () => {
   const r = run(["new", "--dir", dir, "--title", "First"]);
   assert.equal(r.status, 0, r.stderr);
   assert.equal(taskCount(dir), 1);
-  const file = join(dir, "tasks", readdirSync(join(dir, "tasks"))[0]);
+  const file = join(dir, "tasks", readdirSync(join(dir, "tasks")).filter((f) => f.endsWith(".md"))[0]);
   assert.match(readFileSync(file, "utf8"), /^status: todo$/m);
 });
 
@@ -198,7 +198,7 @@ test("`init`'s example takes its priority from the vocabulary, not from a litera
   const r = run(["init", "--dir", dir]);
   assert.equal(r.status, 0, r.stderr);
   assert.equal(taskCount(dir), 1, "no example was created");
-  const file = join(dir, "tasks", readdirSync(join(dir, "tasks"))[0]);
+  const file = join(dir, "tasks", readdirSync(join(dir, "tasks")).filter((f) => f.endsWith(".md"))[0]);
   const priority = readFileSync(file, "utf8").match(/^priority: (\S+)/m)[1];
   assert.ok(loadConfig(dir).priorities.includes(priority), "the example carries `" + priority + "`, which is not in the vocabulary");
 });

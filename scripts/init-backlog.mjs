@@ -474,6 +474,10 @@ function skippedSteps(root) {
   return ["  optional:"].concat(steps.map((s) => "    " + s));
 }
 
+/** The directories git has to carry before they hold a file of their own. */
+export const KEPT_DIRS = ["tasks", "history"];
+export const KEEP_FILE = ".gitkeep";
+
 const BOOL_FLAGS = ["--no-gitignore", "--no-example", "--no-nudge", "--skills"];
 
 export function main(argv) {
@@ -516,6 +520,18 @@ export function main(argv) {
       mkdirSync(p, { recursive: true });
       created.push(sub + "/");
     }
+  }
+  // git does not track an empty directory, and detection requires `tasks/`: a
+  // backlog committed straight after init was missing from every clone of it
+  // (TL-477). A placeholder keeps the two directories that are TRUTH — the
+  // other two hold computed views and are ignored anyway. Placing it here rather
+  // than relaxing detection is deliberate: a bare `config.yaml` is far too
+  // common a file to count as a backlog on its own.
+  for (const sub of KEPT_DIRS) {
+    const dir = join(root, sub);
+    if (readdirSync(dir).length) continue;
+    writeFileSync(join(dir, KEEP_FILE), "", "utf8");
+    created.push(sub + "/" + KEEP_FILE);
   }
   for (const f of FILES) {
     const p = join(root, f.name);
