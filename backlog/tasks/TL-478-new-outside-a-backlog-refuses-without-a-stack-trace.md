@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 1h | 2h | 3h | 4h | 1d | 1w
@@ -38,4 +38,4 @@ Observed on 2026-10-17 in a clone with no backlog/tasks/: `branchling new --titl
 
 ## Acceptance criteria
 
-- [ ] new and every other backlog command outside a backlog exit non-zero with the refusal and without a stack trace [proof: new-no-backlog]
+- [x] new and every other backlog command outside a backlog exit non-zero with the refusal and without a stack trace [proof: new-no-backlog]

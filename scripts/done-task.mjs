@@ -39,7 +39,7 @@ import { fileURLToPath } from "node:url";
 
 import { resolveActor } from "./actor.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
-import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { backlogPaths, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { applyProofs, auditTask, parseCriteria, parseVerification } from "./criteria.mjs";
 import { buildFieldSpecs, extractMeta, fieldSpec, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
@@ -666,7 +666,7 @@ async function run(argv) {
     return 2;
   }
 
-  const root = resolveBacklogDir({ dir: plan.dir || undefined, moduleDir: __dirname }).root;
+  const root = resolveBacklogDirOrExit({ dir: plan.dir || undefined, moduleDir: __dirname }, N + " done").root;
   const config = loadConfigOrExit(root);
   const tasksDir = backlogPaths(root).tasksDir;
 

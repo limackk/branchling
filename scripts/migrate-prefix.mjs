@@ -45,7 +45,7 @@ import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { ACTOR_NAMESPACES, MIGRATIONS_FILE, SNAPSHOT_FILE, appendMigration, applyIdMigrations, isValidActor, loadSnapshot, saveSnapshot } from "./history.mjs";
 import { withHistoryLogMutex } from "./history-log-mutex.mjs";
-import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { backlogPaths, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { withSnapshotMutex } from "./snapshot-mutex.mjs";
 import { PREFIX_SHAPE, taskIdPatterns } from "./task-id.mjs";
 import { MARK, color, errColor, refusal } from "./ui.mjs";
@@ -286,7 +286,7 @@ export function main(argv) {
     return 2;
   }
 
-  const root = resolveBacklogDir({ dir: dir || undefined, moduleDir: __dirname }).root;
+  const root = resolveBacklogDirOrExit({ dir: dir || undefined, moduleDir: __dirname }, N + " migrate-prefix").root;
   // STRICT (TL-60): this is a command that RENAMES FILES. When the typo sits in
   // `task_id_prefix` itself, the source prefix comes out of the default value and
   // the migration renumbers the tree from something other than what it thinks.

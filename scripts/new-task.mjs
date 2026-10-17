@@ -37,7 +37,7 @@ import { withBacklogMutex } from "./lock.mjs";
 import { parsePlanYaml } from "./plan.mjs";
 import { editPlanText, newPlanErrors } from "./plan-write.mjs";
 import { detectPrefixMismatch, prefixMismatchMessage, taskIdPatterns } from "./task-id.mjs";
-import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { backlogPaths, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { auditVocabulary, extractMeta, splitFrontmatter } from "./task-fields.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { readStdinText } from "./stdin.mjs";
@@ -521,7 +521,7 @@ export async function main(argv) {
   if (input.code) return input.code;
   const content = input.document ? taskContent(input.document) : null;
 
-  const root = resolveBacklogDir({ dir: cli.dir, moduleDir: HERE }).root;
+  const root = resolveBacklogDirOrExit({ dir: cli.dir, moduleDir: HERE }, N + " new").root;
   const config = loadConfigOrExit(root);
   const paths = backlogPaths(root);
 
