@@ -706,11 +706,21 @@ statuses would be a second truth about them, wrong the moment you renamed one.
 
 ## Platform notes
 
-Verification commands use the operating system's default shell. On Windows that
-is `cmd.exe`, so task contracts must use portable commands or explicitly invoke
-PowerShell, Git Bash or another shell they require. Interrupting a verification
-or agent run stops its descendant process tree with the native Windows
-`taskkill` command.
+A stored command line — a `bash:` verification entry, `--agent`, `--agent-for`
+— runs in a POSIX shell on every platform, so one contract means the same thing
+on every machine that closes the task. On Linux and macOS that is `/bin/sh`. On
+Windows it is the `bash` that ships with Git for Windows, found next to the
+`git` on your PATH (not the first `bash.exe` on PATH, which can be the WSL
+launcher). Write contracts in POSIX shell syntax, with `/` in paths.
+
+An adapter named by a profile is a file, not a command line. A script with a
+shebang runs on Windows through that same `bash`, a `.cmd` or `.bat` through
+`cmd.exe`, and an `.exe` directly — so one adapter file serves both platforms.
+
+Interrupting a verification or agent run stops its descendant process tree with
+the native Windows `taskkill` command. Windows has no signal a process can catch
+and exit cleanly on: `serve` stopped that way ends at once, and the entry it
+leaves in the register is reported as stale and reclaimed by the next `serve`.
 
 ## Activity telemetry
 
