@@ -32,24 +32,35 @@ function adapter(root, name, source, shebang = "#!/usr/bin/env node") {
   return file;
 }
 
+/**
+ * The compatible adapter is written in JavaScript, not sh, and the reason is
+ * the `cancelled` scenario: it names the child it stopped, and the probe checks
+ * that PID with `process.kill(pid, 0)`. Under Git's bash on Windows `$!` is an
+ * MSYS process id the operating system has never heard of, so an sh fixture
+ * could not pass there however correct the tool was (TL-463). A Node child's
+ * `pid` is the operating system's on every platform.
+ */
 function compatibleAdapter(root, witness) {
-  return adapter(root, "compatible-adapter.sh", [
-    "input=$(cat)",
-    "printf '%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' \"$" + CONFORMANCE_SCENARIO_ENV + "\" \"$" + CONFORMANCE_ENV + "\" \"$" + CONFORMANCE_VERSION_ENV + "\" \"$" + PREFIX + "_ACTOR\" \"$" + PREFIX + "_ROLE\" \"$" + PREFIX + "_TASK\" \"$" + PREFIX + "_DIR\" \"$" + PREFIX + "_REPOSITORY\" \"$" + PREFIX + "_PROMPT\" \"$" + PREFIX + "_MODEL\" \"$" + PREFIX + "_EFFORT\" >> " + JSON.stringify(witness),
-    "printf '%s' \"$input\" > " + JSON.stringify(witness + ".input"),
-    "printf '%s' \"$" + CONFORMANCE_SECRET_ENV + "\" >&2",
-    "if [ \"$" + CONFORMANCE_SCENARIO_ENV + "\" = cancelled ]; then",
-        // Its output goes nowhere: a background child holding the adapter's stdout
-    // keeps the pipe open after the adapter exits, and on Windows the probe then
-    // waits for the pipe until its own timeout (TL-463).
-    "  sleep 30 >/dev/null 2>&1 & child=$!",
-    "  kill \"$child\"",
-    "  wait \"$child\" 2>/dev/null",
-    "  printf '{\"version\":1,\"scenario\":\"%s\",\"outcome\":\"%s\",\"childPid\":%s,\"delegation\":{\"policy\":\"%s\",\"control\":\"requested\",\"evidence\":\"prompt-directive\"}}' \"$" + CONFORMANCE_SCENARIO_ENV + "\" \"$" + CONFORMANCE_SCENARIO_ENV + "\" \"$child\" \"$" + PREFIX + "_DELEGATION\"",
-    "else",
-    "  printf '{\"version\":1,\"scenario\":\"%s\",\"outcome\":\"%s\",\"delegation\":{\"policy\":\"%s\",\"control\":\"requested\",\"evidence\":\"prompt-directive\"}}' \"$" + CONFORMANCE_SCENARIO_ENV + "\" \"$" + CONFORMANCE_SCENARIO_ENV + "\" \"$" + PREFIX + "_DELEGATION\"",
-    "fi",
-  ].join("\n"), "#!/bin/sh");
+  const env = (name) => "(process.env[" + JSON.stringify(name) + '] || "")';
+  const fields = [CONFORMANCE_SCENARIO_ENV, CONFORMANCE_ENV, CONFORMANCE_VERSION_ENV]
+    .concat(["ACTOR", "ROLE", "TASK", "DIR", "REPOSITORY", "PROMPT", "MODEL", "EFFORT"].map((k) => PREFIX + "_" + k));
+  return adapter(root, "compatible-adapter.mjs", [
+    'import { appendFileSync, readFileSync, writeFileSync } from "node:fs";',
+    'import { spawn } from "node:child_process";',
+    'const input = readFileSync(0, "utf8");',
+    "const scenario = " + env(CONFORMANCE_SCENARIO_ENV) + ";",
+    "appendFileSync(" + JSON.stringify(witness) + ", [" + fields.map(env).join(", ") + '].join("\\t") + "\\n");',
+    "writeFileSync(" + JSON.stringify(witness + ".input") + ", input);",
+    "process.stderr.write(" + env(CONFORMANCE_SECRET_ENV) + ");",
+    "const response = { version: 1, scenario, outcome: scenario,",
+    '  delegation: { policy: ' + env(PREFIX + "_DELEGATION") + ', control: "requested", evidence: "prompt-directive" } };',
+    'if (scenario === "cancelled") {',
+    '  const child = spawn(process.execPath, ["-e", "setTimeout(() => {}, 30000)"], { stdio: "ignore" });',
+    '  await new Promise((resolve) => { child.on("exit", resolve); child.kill(); });',
+    "  response.childPid = child.pid;",
+    "}",
+    "process.stdout.write(JSON.stringify(response));",
+  ].join("\n"));
 }
 
 function cleanup(root) {

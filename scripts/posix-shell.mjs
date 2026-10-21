@@ -17,7 +17,7 @@
  * POSIX shell a Windows user of it is guaranteed to have.
  */
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { closeSync, existsSync, openSync, readSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 let cached;
@@ -44,8 +44,12 @@ export function posixShell() {
  * Windows only `.exe` and `.com` start that way: a `.cmd` or `.bat` needs
  * `cmd.exe` (Node refuses one without a shell, CVE-2024-27980), and a script
  * with a shebang — the form every adapter example takes — means nothing to
- * Windows at all. Git's bash honours a shebang, so the same adapter file works
- * on both platforms rather than needing a second, Windows-only copy.
+ * Windows at all. So the shebang is read HERE: `#!/usr/bin/env <program>`
+ * starts that program from PATH with the file as its argument, and any other
+ * interpreter line (`#!/bin/sh`, `#!/bin/bash`) goes to Git's bash. Handing
+ * every script to bash was measured not to work: bash given a FILE runs it as
+ * bash and ignores the shebang, so an adapter written in JavaScript died on
+ * its first `import`. One adapter file serves both platforms.
  *
  * @returns {{file: string, args: string[], shell: boolean}}
  */
@@ -53,5 +57,27 @@ export function executableInvocation(path) {
   if (process.platform !== "win32") return { file: path, args: [], shell: false };
   if (/\.(exe|com)$/i.test(path)) return { file: path, args: [], shell: false };
   if (/\.(cmd|bat)$/i.test(path)) return { file: '"' + path + '"', args: [], shell: true };
+  const line = shebangOf(path);
+  const env = line && line.match(/^\S*[\\/]env\s+(.+)$/);
+  if (env) {
+    const command = env[1].trim().split(/\s+/).filter((word) => word !== "-S");
+    return { file: command[0], args: command.slice(1).concat([path]), shell: false };
+  }
   return { file: posixShell(), args: [String(path).replace(/\\/g, "/")], shell: false };
+}
+
+/** The interpreter line of a script, without `#!`, or null. Reads one block. */
+function shebangOf(path) {
+  let fd;
+  try {
+    fd = openSync(path, "r");
+    const buffer = Buffer.alloc(512);
+    const read = readSync(fd, buffer, 0, buffer.length, 0);
+    const head = buffer.subarray(0, read).toString("utf8").split(/\r?\n/)[0];
+    return head.startsWith("#!") ? head.slice(2).trim() : null;
+  } catch {
+    return null;
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+  }
 }

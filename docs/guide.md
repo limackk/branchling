@@ -713,9 +713,11 @@ Windows it is the `bash` that ships with Git for Windows, found next to the
 `git` on your PATH (not the first `bash.exe` on PATH, which can be the WSL
 launcher). Write contracts in POSIX shell syntax, with `/` in paths.
 
-An adapter named by a profile is a file, not a command line. A script with a
-shebang runs on Windows through that same `bash`, a `.cmd` or `.bat` through
-`cmd.exe`, and an `.exe` directly — so one adapter file serves both platforms.
+An adapter named by a profile is a file, not a command line. On Windows the
+tool reads its first line: `#!/usr/bin/env node` (or any `env <program>`)
+starts that program from PATH, any other interpreter line goes to that same
+`bash`, a `.cmd` or `.bat` runs through `cmd.exe`, and an `.exe` directly — so
+one adapter file serves both platforms.
 
 Interrupting a verification or agent run stops its descendant process tree with
 the native Windows `taskkill` command. Windows has no signal a process can catch
