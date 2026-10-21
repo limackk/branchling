@@ -6,7 +6,7 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: in_progress  # pending | in_progress | blocked | done | cancelled
+status: done  # pending | in_progress | blocked | done | cancelled
 owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
@@ -59,5 +59,5 @@ The Windows job is TL-463 and is out of scope here.
 
 ## Acceptance criteria
 
-- [ ] The guard passes locally and says "timed out" when it does. [proof: terminal-independent]
-- [ ] Every macOS job of the newest run on main concluded success. [proof: macos-runs-green]
+- [x] The guard passes locally and says "timed out" when it does. [proof: terminal-independent]
+- [x] Every macOS job of the newest run on main concluded success. [proof: macos-runs-green]
