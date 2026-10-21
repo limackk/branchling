@@ -27,6 +27,17 @@
  * away and in Node's own formatting of a value. Running them under the variable
  * a terminal implies is the only reading that cannot be fooled.
  *
+ * A FOURTH CAUSE, AND IT WAS NOT COLOUR (TL-466). The rerun is the suite a
+ * second time, and on GitHub's macOS runners it outgrew its ten-minute limit on
+ * Node 18 and 20. The killed child exited non-zero, and the assertion read that
+ * as a colour dependence — with not one failing test to name. Two changes. A
+ * timeout now says it was a timeout. And a run whose own environment is already
+ * the one a terminal implies (`FORCE_COLOR` set, `NO_COLOR` absent — which is
+ * how CI starts the suite) does not repeat itself: every rendering test of that
+ * run already ran under colour, so its verdict IS this guard's, measured once.
+ * Raising the limit was rejected — it would have doubled every job a second
+ * time to learn nothing the surrounding run had not already said.
+ *
  * THE POSITIVE CONTROL is a fixture test written to depend on colour. If the
  * runner below cannot make that one fail, it is not exercising anything and
  * every other assertion in this file is worthless.
@@ -40,6 +51,17 @@ import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { isolateHome, plainOutput } from "./_repo.mjs";
+
+/**
+ * Read BEFORE `plainOutput()` rewrites it: was this process started the way a
+ * terminal would start it? The nested run below sets exactly this pair, so a
+ * surrounding run that already carries it is the nested run.
+ */
+function startedInColour(env) {
+  return env.NO_COLOR === undefined && env.FORCE_COLOR !== undefined && env.FORCE_COLOR !== "0";
+}
+
+const STARTED_IN_COLOUR = startedInColour(process.env);
 
 isolateHome("terminal-independent");
 plainOutput();
@@ -72,8 +94,18 @@ function discoverRenderingTests(testDir = HERE) {
     .sort();
 }
 
+const RERUN_TIMEOUT_MS = 600_000;
+
+/**
+ * A child killed by its limit has no verdict on colour, and must not be read as
+ * one: the status is null and the error says why.
+ */
+function timedOut(r) {
+  return r.error?.code === "ETIMEDOUT" || (r.status === null && r.signal !== null);
+}
+
 /** `node --test <files>` with colour forced on, as a terminal implies. */
-function runInColour(files, cwd = HERE) {
+function runInColour(files, cwd = HERE, timeout = RERUN_TIMEOUT_MS) {
   // The child must be an ORDINARY test run. `node --test` exports its own
   // context to children (`NODE_TEST_CONTEXT`), and a nested runner that inherits
   // it reports upwards instead of running, which exits 0 in milliseconds — a
@@ -84,15 +116,24 @@ function runInColour(files, cwd = HERE) {
   delete env.NODE_TEST_CONTEXT;
   delete env.NODE_OPTIONS;
   return spawnSync(process.execPath, ["--test"].concat(files), {
-    cwd, encoding: "utf8", timeout: 600_000, env,
+    cwd, encoding: "utf8", timeout, env,
   });
 }
 
-test("the rendering tests pass with colour forced on", () => {
+test("the rendering tests pass with colour forced on", (t) => {
   const renderingTests = discoverRenderingTests();
   assert.ok(renderingTests.length > 0,
     "the discovery found no rendering tests, so a green nested run would prove nothing");
+  if (STARTED_IN_COLOUR) {
+    t.diagnostic(renderingTests.length + " rendering tests run in THIS suite under FORCE_COLOR; " +
+      "its verdict is this guard's, so they are not run a second time");
+    return;
+  }
   const r = runInColour(renderingTests);
+  assert.ok(!timedOut(r),
+    "the colour rerun of " + renderingTests.length + " rendering tests timed out after " +
+      RERUN_TIMEOUT_MS / 1000 + " s and was killed (" + (r.signal || r.error?.code) + ") — " +
+      "that says nothing about colour; run the suite with FORCE_COLOR=1 instead, as CI does");
   assert.equal(r.status, 0,
     renderingTests.length + " rendering tests were discovered; the suite is green through a pipe " +
       "and red at a keyboard — it is reporting the observer\n" +
@@ -155,6 +196,37 @@ test("POSITIVE CONTROL: a test that DOES depend on colour is caught by that runn
     const r = runInColour(discovered, tests);
     assert.notEqual(r.status, 0,
       "the runner cannot make a colour-dependent test fail, so it proves nothing about the others");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+/**
+ * BOTH NEW EXITS NEED A CONTROL (TL-466). A deferral that fires in a plain run
+ * would turn the guard into a green that ran nothing; a timeout check that never
+ * fires would leave the old misreading in place.
+ */
+test("only a run started the way a terminal starts it defers to itself", () => {
+  assert.equal(startedInColour({ FORCE_COLOR: "1" }), true);
+  assert.equal(startedInColour({}), false, "a pipe with no declaration is not a colour run");
+  assert.equal(startedInColour({ FORCE_COLOR: "0" }), false);
+  assert.equal(startedInColour({ FORCE_COLOR: "1", NO_COLOR: "" }), false,
+    "NO_COLOR wins in the painter, so a run carrying it is not a colour run either");
+});
+
+test("POSITIVE CONTROL: a rerun killed by its limit is read as a timeout, not a verdict", () => {
+  const dir = mkdtempSync(join(tmpdir(), "branchling-colour-timeout-"));
+  try {
+    writeFileSync(join(dir, "slow.test.mjs"),
+      'import { test } from "node:test";\n' +
+      'test("waits", () => new Promise((resolve) => setTimeout(resolve, 30_000)));\n',
+      "utf8");
+    writeFileSync(join(dir, "quick.test.mjs"),
+      'import { test } from "node:test";\ntest("returns", () => {});\n', "utf8");
+    const r = runInColour(["slow.test.mjs"], dir, 1_000);
+    assert.equal(timedOut(r), true, "a child killed at its limit was not recognised as one");
+    const quick = runInColour(["quick.test.mjs"], dir, 60_000);
+    assert.equal(timedOut(quick), false, "a run that finished was read as a timeout");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
