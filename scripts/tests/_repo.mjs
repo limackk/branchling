@@ -121,6 +121,30 @@ export function plainOutput() {
   delete process.env.FORCE_COLOR;
 }
 
+const WINDOWS = process.platform === "win32";
+
+/**
+ * Options and arguments for starting `npm`, or a package's `.bin` entry, from a
+ * test (TL-463).
+ *
+ * On Windows both are `.cmd` shims, and Node refuses to start one without a
+ * shell (CVE-2024-27980) — `execFileSync("npm", …)` there is ENOENT, which reads
+ * like a missing npm rather than a missing shell. Through a shell the arguments
+ * are joined into one line, so the ones that could split are quoted here rather
+ * than at each caller. Elsewhere nothing changes: no shell, arguments as given.
+ */
+export const SHIM = { shell: WINDOWS };
+
+/** A `.bin` entry by the name the platform runs: `<name>.cmd` on Windows. */
+export function shimPath(path) {
+  return WINDOWS ? path + ".cmd" : path;
+}
+
+export function shimArgs(args) {
+  if (!WINDOWS) return args;
+  return args.map((a) => (/[\s"&|<>^]/.test(a) ? '"' + a.replace(/"/g, '""') + '"' : a));
+}
+
 export function isolateHome(label = "home") {
   const dir = mkdtempSync(join(tmpdir(), "branchling-test-" + label + "-"));
   process.env[HOME_ENV] = dir;

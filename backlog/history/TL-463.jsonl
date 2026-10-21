@@ -1,1 +1,3 @@
 {"id":"01M4ZVTDN3PSH9TQ2G2YXY5FSY","ts":"2026-10-15T13:25:27.331Z","task":"TL-463","field":"__created__","from":"","to":"The first public Windows run is green before TL-456 is vouched","actor":"agent:claude","source":"new","reason":"unknown"}
+{"id":"01M5EYBKESS725SVYQFSVAK9F9","ts":"2026-10-21T09:58:23.961Z","task":"TL-463","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M5EYBKES1MCT45ANWGN7D5X7","ts":"2026-10-21T09:58:23.961Z","task":"TL-463","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown"}

@@ -32,7 +32,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { PACKAGED_SKILLS, USER_SKILLS, installSkills, skillsTarget } from "../install-skills.mjs";
-import { isolateHome, REPO_ROOT } from "./_repo.mjs";
+import { isolateHome, REPO_ROOT, SHIM } from "./_repo.mjs";
 
 // THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
 // file in its own process, so one call covers every case in it. Without this a
@@ -71,7 +71,7 @@ test("the skill is in the tarball", () => {
   // It works in this repository regardless, so nothing else would notice it
   // missing — and the failure is invisible until somebody installs the package.
   const packed = spawnSync("npm", ["pack", "--dry-run", "--json"], {
-    cwd: REPO_ROOT, encoding: "utf8", timeout: 120_000,
+    ...SHIM, cwd: REPO_ROOT, encoding: "utf8", timeout: 120_000,
   });
   assert.equal(packed.status, 0, packed.stderr);
   const files = JSON.parse(packed.stdout)[0].files.map((f) => f.path);
@@ -85,7 +85,7 @@ test("only the user-facing skill ships — not the ones about developing the too
   // noise at best.
   assert.deepEqual(USER_SKILLS, ["backlog-workflow"]);
   const packed = spawnSync("npm", ["pack", "--dry-run", "--json"], {
-    cwd: REPO_ROOT, encoding: "utf8", timeout: 120_000,
+    ...SHIM, cwd: REPO_ROOT, encoding: "utf8", timeout: 120_000,
   });
   const shipped = JSON.parse(packed.stdout)[0].files
     .map((f) => f.path).filter((f) => f.startsWith(".agents/skills/"));

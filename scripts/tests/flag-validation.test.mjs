@@ -26,7 +26,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { DEFAULT_TASK_ID_PREFIX as P } from "../task-id.mjs";
 
 import { isolateHome } from "./_repo.mjs";
@@ -228,9 +228,9 @@ test("build-viewer: IMPORTING it as a module (with no CLI argv) does not blow up
   const dir = freshBacklog();
   try {
     const script = [
-      "import { readTasks, computeStats, buildHtml } from " + JSON.stringify(join(SCRIPTS, "build-viewer.mjs")) + ";",
+      "import { readTasks, computeStats, buildHtml } from " + JSON.stringify(pathToFileURL(join(SCRIPTS, "build-viewer.mjs")).href) + ";",
       "const tasks = readTasks(" + JSON.stringify(dir) + ");",
-      "buildHtml(tasks, computeStats(tasks), (await import(" + JSON.stringify(join(SCRIPTS, "config.mjs")) + ")).loadConfig(" + JSON.stringify(dir) + "));",
+      "buildHtml(tasks, computeStats(tasks), (await import(" + JSON.stringify(pathToFileURL(join(SCRIPTS, "config.mjs")).href) + ")).loadConfig(" + JSON.stringify(dir) + "));",
       "console.log('OK-IMPORTED');",
     ].join("\n");
     const tmp = join(dir, "probe.mjs");

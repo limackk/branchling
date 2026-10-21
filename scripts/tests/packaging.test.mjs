@@ -26,7 +26,7 @@ import { BacklogNotFoundError, looksLikeBacklogDir, resolveBacklogDir } from "..
 import { PRODUCT_NAME, PRODUCT_VERSION, MANIFEST_PATH, readManifest } from "../product.mjs";
 import { versionText, helpText } from "../cli.mjs";
 
-import { isolateHome, REPO_ROOT as PKG_ROOT } from "./_repo.mjs";
+import { isolateHome, REPO_ROOT as PKG_ROOT, SHIM, shimArgs, shimPath } from "./_repo.mjs";
 
 // THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
 // file in its own process, so one call covers every case in it. Without this a
@@ -107,7 +107,8 @@ test("ON THE PACKED ARTEFACT: the tarball carries no data, and the install does 
   // question "will this behave correctly from somebody else's directory".
   const work = mkdtempSync(join(tmpdir(), "branchling-install-"));
   try {
-    const packed = execFileSync("npm", ["pack", "--pack-destination", work, "--silent"], {
+    const packed = execFileSync("npm", shimArgs(["pack", "--pack-destination", work, "--silent"]), {
+      ...SHIM,
       cwd: PKG_ROOT,
       encoding: "utf8",
     }).trim().split("\n").pop();
@@ -127,15 +128,16 @@ test("ON THE PACKED ARTEFACT: the tarball carries no data, and the install does 
     const home = join(work, "elsewhere");
     mkdirSync(home, { recursive: true });
     writeFileSync(join(home, "package.json"), JSON.stringify({ name: "probe", private: true }));
-    execFileSync("npm", ["install", "--no-audit", "--no-fund", "--silent", tarball], {
+    execFileSync("npm", shimArgs(["install", "--no-audit", "--no-fund", "--silent", tarball]), {
+      ...SHIM,
       cwd: home,
       encoding: "utf8",
     });
-    const installed = join(home, "node_modules", ".bin", "branchling");
+    const installed = shimPath(join(home, "node_modules", ".bin", "branchling"));
 
     // `--version` works with no backlog anywhere in reach.
     assert.match(
-      execFileSync(installed, ["--version"], { cwd: home, encoding: "utf8" }),
+      execFileSync(installed, shimArgs(["--version"]), { ...SHIM, cwd: home, encoding: "utf8" }),
       /^branchling \d+\.\d+\.\d+/
     );
 
@@ -143,7 +145,8 @@ test("ON THE PACKED ARTEFACT: the tarball carries no data, and the install does 
     let code = 0;
     let out = "";
     try {
-      out = execFileSync(installed, ["query", "--count"], {
+      out = execFileSync(installed, shimArgs(["query", "--count"]), {
+        ...SHIM,
         cwd: home,
         env: { ...process.env, BACKLOG_DIR: "" },
         encoding: "utf8",
