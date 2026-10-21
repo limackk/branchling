@@ -100,7 +100,9 @@ export const KINDS = {
   // broke.
   // `divergent` is the list behind the `divergent` tally inside `stats`: the
   // tasks another branch disagrees with, each naming both statuses (TL-73).
-  stats: { root: null, stats: null, scan: null, divergent: [], elsewhereOnly: [], context: null },
+  // `agentTime` is `stats --agent-time` (TL-480): the per-estimate buckets
+  // computed from the ledger, with their verdict and what could not be measured.
+  stats: { root: null, stats: null, scan: null, divergent: [], elsewhereOnly: [], context: null, agentTime: null },
   // `check --json` (TL-57). `ok` is what CI reads, `failed` is what it acts on —
   // a consumer must not have to filter `guards` to learn which one to look at.
   // `output` beside each guard is text written for a PERSON and may be reworded;
@@ -196,6 +198,9 @@ export const KINDS = {
     // after the write, so a caller that has to give a claim back — `run` when
     // its agent never started — has nowhere else to read it.
     from: null,
+    // `next` only (TL-480): the agent-time bucket of the task's estimate, from
+    // the ledger; null below the threshold rather than a number from too few.
+    agentTime: null,
     warnings: [], reclaimed: null,
     // The claims a deliberate takeover crossed, as `{actor, crossed}` rows
     // (TL-284) — empty when it crossed none. A loop that takes work over has to

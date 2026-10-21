@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1d
@@ -56,8 +56,8 @@ The removed `scripts/calibration.mjs` (recoverable from commit ceebed5 / the par
 
 ## Acceptance criteria
 
-- [ ] Buckets, segments, outliers, the threshold and the hint behave as specified on fixtures, independent of this repository's data. [proof: fixtures]
-- [ ] The report runs against a real tree and always carries a correlation verdict, whatever the data says. [proof: report-runs]
-- [ ] The narrow reversal of TL-378 is written down, not only implied by the code. [proof: decision-recorded]
-- [ ] No removed telemetry command or surface came back with this change. [proof: telemetry-still-absent]
-- [ ] The whole suite stays green. [proof: suite-green]
+- [x] Buckets, segments, outliers, the threshold and the hint behave as specified on fixtures, independent of this repository's data. [proof: fixtures]
+- [x] The report runs against a real tree and always carries a correlation verdict, whatever the data says. [proof: report-runs]
+- [x] The narrow reversal of TL-378 is written down, not only implied by the code. [proof: decision-recorded]
+- [x] No removed telemetry command or surface came back with this change. [proof: telemetry-still-absent]
+- [x] The whole suite stays green. [proof: suite-green]

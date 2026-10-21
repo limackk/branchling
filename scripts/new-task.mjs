@@ -44,6 +44,8 @@ import { readStdinText } from "./stdin.mjs";
 import { parseTaskDocument, taskContent } from "./task-input.mjs";
 import { failure, refusal } from "./ui.mjs";
 import { readTaskMetas } from "./task-io.mjs";
+import { agentTimeHint, hintLine } from "./agent-time.mjs";
+import { readAgentTime } from "./agent-time-read.mjs";
 import { todayStamp } from "./today.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -668,6 +670,13 @@ export async function main(argv) {
   }
   console.log("  board: " + board + (opts.board ? "" : " (the registry default)"));
   if (scheduling) console.log("  wave: " + opts.wave + " — scheduled in " + paths.planPath);
+  // The one moment an estimate can still change a decision is while it is being
+  // written (TL-480). Silent below the threshold: a hint from three samples
+  // would be advice with the authority of a measurement.
+  if (opts.estimate) {
+    const bucket = agentTimeHint(readAgentTime(root, config), opts.estimate);
+    if (bucket) console.log("  " + hintLine(bucket));
+  }
   // What is left to do depends on what arrived: a task written from a document
   // already has its goal and its closing contract, and telling its author to go
   // and fill them in would be the tool disbelieving its own input.

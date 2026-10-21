@@ -24,6 +24,8 @@ import { ranked, summarize } from "./stats.mjs";
 import { readTaskMetas } from "./task-io.mjs";
 import { hoursLabel } from "./estimate.mjs";
 import { printJson } from "./json-envelope.mjs";
+import { minutesLabel } from "./agent-time.mjs";
+import { readAgentTime } from "./agent-time-read.mjs";
 import { heading, line, priorityPaint, refusal, statusPaint, table } from "./ui.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { printLine } from "./stdout.mjs";
@@ -33,7 +35,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const cli = takeDirFlag(process.argv.slice(2));
 const argv = cli.argv;
 
-const KNOWN_FLAGS = ["--json", "--context"];
+const KNOWN_FLAGS = ["--json", "--context", "--agent-time"];
 for (const a of argv) {
   if (KNOWN_FLAGS.indexOf(a) < 0) {
     console.error(refusal(N + " stats", "unknown flag: " + a,
@@ -77,6 +79,24 @@ if (argv.includes("--context")) {
     process.exit(0);
   }
   printLine(renderBudget(budget));
+  process.exit(0);
+}
+
+// AGENT TIME FROM THE LEDGER (TL-480). A separate report, like `--context`:
+// it reads every history file, and a summary that does that on every call is
+// a summary that costs more than the question it answers.
+if (argv.includes("--agent-time")) {
+  if (argv.includes("--context")) {
+    console.error(refusal(N + " stats", "--agent-time and --context are two reports, ask for one",
+      KNOWN_FLAGS.join(" ") + " --dir <path>"));
+    process.exit(2);
+  }
+  const report = readAgentTime(ROOT, CONFIG, { tasks });
+  if (argv.includes("--json")) {
+    printJson("stats", { root: ROOT, agentTime: report });
+    process.exit(0);
+  }
+  printLine(renderAgentTime(report));
   process.exit(0);
 }
 
@@ -174,3 +194,38 @@ if (note) {
 }
 
 printLine(out.join("\n"));
+
+/**
+ * The agent-time table. The verdict comes FIRST and every time: a table read
+ * before its verdict is read as authoritative, and `uncorrelated` exists to stop
+ * exactly that.
+ */
+function renderAgentTime(r) {
+  const out = [];
+  out.push(heading("agent time per estimate — from the task ledger"));
+  out.push("");
+  out.push(line("verdict", r.verdict.verdict, r.verdict.reason));
+  if (r.verdict.verdict === "uncorrelated") {
+    out.push("  the table below is for inspection, not for planning");
+  }
+  out.push("");
+  if (!r.buckets.length) {
+    out.push("  no closed task has a measurable agent interval yet");
+  } else {
+    const rows = r.buckets.map((b) => b.insufficient
+      ? ["  " + b.label, b.n, "not enough data (needs n=" + r.minN + ")", ""]
+      : ["  " + b.label, b.n, minutesLabel(b.p20) + "–" + minutesLabel(b.p80), minutesLabel(b.median)]);
+    out.push(table([["  estimate", "n", "p20–p80", "median"]].concat(rows)));
+  }
+  out.push("");
+  // The counts beside the table are not decoration: a calibration built from 9
+  // of 141 closed tasks and one built from 130 of 141 print identical medians.
+  const w = { labelWidth: 26 };
+  out.push(line("measured", r.measured, "", w));
+  out.push(line("closed, never measured", r.unmeasured, r.unmeasured ? "no agent claim, or a claim still open" : "", w));
+  out.push(line("worked partly by a person", r.mixed, r.mixed ? "not timed — the agent half alone would understate it" : "", w));
+  out.push(line("no countable estimate", r.unestimated, "", w));
+  out.push(line("outliers", r.outliers.length,
+    r.outliers.length ? "a segment longer than " + r.capHours + "h: " + r.outliers.join(", ") : "", w));
+  return out.join("\n");
+}

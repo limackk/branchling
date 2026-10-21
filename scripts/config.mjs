@@ -40,6 +40,7 @@ import { DEFAULT_TASK_ID_PREFIX, PREFIX_SHAPE, inferPrefix, taskIdPatterns } fro
 import { ACTOR_NAMESPACES, ROLE_SHAPE, isValidActor, unquote } from "./task-fields.mjs";
 import { LINK_POLICIES } from "./criteria.mjs";
 import { DEFAULT_LOCK_TTL_MINUTES } from "./lock.mjs";
+import { estimateHours } from "./estimate.mjs";
 import { USER_KEYS, loadUserConfig } from "./home.mjs";
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -162,6 +163,16 @@ export const DEFAULTS = Object.freeze({
   // a week off without accusing anybody. A project that works in shorter cycles
   // lowers it; the code knows the shape, this line knows the value.
   audit_stale_days: 7,
+  // ── Agent time from the task ledger (TL-480) ────────────────────────────
+  // `stats --agent-time` and the hint in `new`/`next`. How many closed tasks a
+  // bucket needs before it may state a number: below it the bucket says "not
+  // enough data", because a median of three is a number, not knowledge.
+  agent_time_min_n: 8,
+  // The longest in-progress segment still read as work, as an estimate-shaped
+  // duration. Wall-clock cannot tell an agent working from a claim left open
+  // overnight, so a task with a longer segment is reported as an outlier and
+  // kept out of every bucket rather than averaged in.
+  agent_time_segment_cap: "8h",
   // ── Documentation drift (TL-100) ────────────────────────────────────────
   // `docs-drift` detects that a document is going stale; it never writes one.
   // Every value below is a PROJECT's, because every one of them encodes a
@@ -256,7 +267,7 @@ const MAP_KEYS = new Set(["epic_aliases", "status_colors", "priority_colors", "l
 const NUMBER_KEYS = new Set([
   "title_max_length", "lock_ttl_minutes", "active_branch_days", "abandoned_after_days",
   "cross_branch_poll_seconds",
-  "audit_stale_days", "docs_drift_task_threshold", "docs_drift_min_signals",
+  "audit_stale_days", "agent_time_min_n", "docs_drift_task_threshold", "docs_drift_min_signals",
 ]);
 const BOOL_KEYS = new Set(["labels_closed", "cross_branch_state"]);
 
@@ -609,6 +620,14 @@ export function loadConfig(root, opts = {}) {
     labelsClosed: values.labels_closed,
     roles: values.roles,
     auditStaleDays: values.audit_stale_days,
+    // The cap stays a string here and is parsed where it is validated and used:
+    // `null` from an unparseable value has to reach `validateConfig` as a
+    // refusal, not turn into a default nobody wrote.
+    agentTime: {
+      minN: values.agent_time_min_n,
+      segmentCap: values.agent_time_segment_cap,
+      capHours: estimateHours(values.agent_time_segment_cap),
+    },
     // Documentation drift (TL-100). Grouped, because the four keys are one
     // policy: what counts as a signal, how much of it is enough to speak, and
     // who gets handed the result.
@@ -712,6 +731,18 @@ export function validateConfig(config) {
       problems.push(
         "`contract_programs` contains `" + program +
           "` — expecting a bare program name: a letter, then letters/digits/`_`/`-`"
+      );
+    }
+  }
+
+  if (config.agentTime) {
+    if (!(config.agentTime.minN >= 1)) {
+      problems.push("`agent_time_min_n` = `" + config.agentTime.minN + "` — expecting a whole number of at least 1");
+    }
+    if (!(config.agentTime.capHours > 0)) {
+      problems.push(
+        "`agent_time_segment_cap` = `" + config.agentTime.segmentCap +
+          "` — expecting a duration such as 30m, 8h or 1d"
       );
     }
   }
