@@ -10,18 +10,13 @@
  * keeps every hold within the scale `withMutex`'s stale rule was designed for.
  */
 
-import { realpathSync } from "node:fs";
-import { resolve } from "node:path";
 
 import { withMutex } from "./lock.mjs";
+import { canonicalPath } from "./canonical-path.mjs";
 
 export function historyLogSection(backlogDir, destinationId) {
-  let path = resolve(backlogDir);
-  try {
-    path = realpathSync(path);
-  } catch {
-    // A not-yet-created backlog still has one stable resolved spelling.
-  }
+  // A not-yet-created backlog still has one stable resolved spelling.
+  const path = canonicalPath(backlogDir);
   return "history-log:" + path + "\0" + destinationId;
 }
 

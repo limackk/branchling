@@ -48,8 +48,8 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, realpathSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { existsSync, readdirSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadConfigOrExit } from "./config.mjs";
@@ -57,6 +57,7 @@ import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { ANY_HISTORY_FILE } from "./task-id.mjs";
 import { MARK, color } from "./ui.mjs";
+import { canonicalPath } from "./canonical-path.mjs";
 
 const OKM = color.ok(MARK.ok);
 const WARNM = color.warn(MARK.warn);
@@ -72,7 +73,7 @@ export function gitRoot(dir, opts = {}) {
   const r = run("git", ["-C", dir, "rev-parse", "--show-toplevel"], { encoding: "utf8" });
   if (!r || r.status !== 0) return null;
   const top = String(r.stdout || "").trim();
-  return top || null;
+  return top ? canonicalPath(top) : null;
 }
 
 /**
@@ -87,7 +88,7 @@ export function gitRoot(dir, opts = {}) {
  * reason: an empty set has no asymmetry in it.
  */
 function real(path) {
-  try { return realpathSync(path); } catch { return resolve(path); }
+  return canonicalPath(path);
 }
 
 /** Every path git tracks under one directory, relative to the repository root.

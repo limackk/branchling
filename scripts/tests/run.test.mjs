@@ -34,7 +34,7 @@ import { fileURLToPath } from "node:url";
 
 import { agentFor, agentInput, blockedReason, parseRunArgs, renderAgentCommand, servedRoles, stuckStatus, waitingForExecutor, waitingForRole } from "../run-loop.mjs";
 
-import { isolateHome } from "./_repo.mjs";
+import { isolateHome, posixPath } from "./_repo.mjs";
 
 // THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
 // file in its own process, so one call covers every case in it. Without this a
@@ -118,7 +118,7 @@ function agentScript(dir, name, body) {
   const p = join(dir, name);
   writeFileSync(p, "#!/bin/sh\n" + body + "\n", "utf8");
   chmodSync(p, 0o755);
-  return p;
+  return posixPath(p);
 }
 
 function statusOf(backlog, id) {

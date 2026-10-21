@@ -42,13 +42,14 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
 import { HISTORY_DIRNAME } from "./history.mjs";
 import { gitLogArgs, parseLog } from "./modified-files.mjs";
 import { parseTaskRecord } from "./task-select.mjs";
 import { taskIdScanner } from "./task-id.mjs";
+import { canonicalPath } from "./canonical-path.mjs";
 
 /** A day, in seconds — the unit `active_branch_days` is expressed in. */
 const DAY = 86_400;
@@ -81,7 +82,8 @@ function git(args, cwd, opts = {}) {
 
 /** The top level of the working tree `cwd` sits in, or null outside a repository. */
 export function repoRootFor(cwd) {
-  return git(["rev-parse", "--show-toplevel"], cwd).trim() || null;
+  const top = git(["rev-parse", "--show-toplevel"], cwd).trim();
+  return top ? canonicalPath(top) : null;
 }
 
 /**
@@ -98,7 +100,7 @@ export function backlogRelFor(repoRoot, backlogDir) {
     // `resolveBacklogDir()` has not, so on macOS the /tmp to /private/tmp pair
     // made `relative()` return a path starting with `..` for a backlog in the
     // right place (BL-1418).
-    const rel = relative(repoRoot, realpathSync(backlogDir));
+    const rel = relative(canonicalPath(repoRoot), canonicalPath(backlogDir));
     return rel.startsWith("..") ? null : rel;
   } catch {
     return null;
@@ -122,7 +124,8 @@ export function worktrees(root) {
   let current = null;
   for (const line of git(["worktree", "list", "--porcelain"], root).split("\n")) {
     if (line.startsWith("worktree ")) {
-      current = { path: line.slice("worktree ".length).trim(), branch: null };
+      const path = line.slice("worktree ".length).trim();
+      current = { path: path ? canonicalPath(path) : "", branch: null };
       if (current.path) out.push(current);
     } else if (line.startsWith("branch ") && current) {
       current.branch = line.slice("branch ".length).trim();
@@ -379,11 +382,7 @@ function observe(byId, id, entry) {
 /** Symlinks and trailing separators are the two ways one tree gets two names;
  *  without normalising, the caller's own worktree is read a second time. */
 function samePathKey(p) {
-  try {
-    return realpathSync(p);
-  } catch {
-    return String(p).replace(/\/+$/, "");
-  }
+  return canonicalPath(String(p).replace(/[\\/]+$/, "") || p);
 }
 
 /**

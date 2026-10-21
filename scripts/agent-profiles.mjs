@@ -23,6 +23,7 @@ import { PRODUCT_NAME as N } from "./product.mjs";
 import { isValidActor, stripComment, unquote } from "./task-fields.mjs";
 import { failure, heading, refusal, table } from "./ui.mjs";
 import { resolveBacklogDir } from "./paths.mjs";
+import { executableInvocation } from "./posix-shell.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -289,7 +290,8 @@ export function liveProbe(profile, env = process.env) {
   if (!executable) return { ok: false, state: "adapter-unavailable", outcome: "unavailable" };
   const probeEnv = { PATH: env.PATH || "", [PROFILE_PROBE_ENV]: "1", [PROFILE_PROTOCOL_VERSION_ENV]: String(ADAPTER_PROTOCOL_VERSION) };
   for (const key of secretEnvironmentNames(profile)) if (Object.prototype.hasOwnProperty.call(env, key)) probeEnv[key] = env[key];
-  const child = spawnSync(executable, [], { shell: false, encoding: "utf8", env: probeEnv, timeout: 15_000, maxBuffer: 64 * 1024 });
+  const start = executableInvocation(executable);
+  const child = spawnSync(start.file, start.args, { shell: start.shell, encoding: "utf8", env: probeEnv, timeout: 15_000, maxBuffer: 64 * 1024 });
   if (child.error || child.status !== 0) return { ok: false, state: "probe-failed", outcome: "unavailable" };
   try {
     const response = JSON.parse(String(child.stdout || "").trim());

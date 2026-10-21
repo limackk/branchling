@@ -51,6 +51,8 @@ import { todayStamp } from "./today.mjs";
 import { CAPABLE, contractCapability, readCoverageFiles } from "./contract-capability.mjs";
 import { taskModifiedFiles } from "./modified-files.mjs";
 import { processTreeDetached, stopProcessTree } from "./process-tree.mjs";
+import { canonicalPath } from "./canonical-path.mjs";
+import { posixShell } from "./posix-shell.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OKM = color.ok(MARK.ok);
@@ -245,7 +247,7 @@ export function missingNodeTestFile(entries, repoRoot) {
 export function repoRootFor(backlogRoot) {
   const r = spawnSync("git", ["-C", backlogRoot, "rev-parse", "--show-toplevel"], { encoding: "utf8" });
   const out = (r.stdout || "").trim();
-  return r.status === 0 && out ? out : backlogRoot;
+  return r.status === 0 && out ? canonicalPath(out) : backlogRoot;
 }
 
 /** How much a passing entry said, for the verdict line — `, 1698 lines not shown`
@@ -349,7 +351,7 @@ function runBash(command, cwd, capture, observeCoverage = false) {
   const coverageDir = observeCoverage ? mkdtempSync(join(tmpdir(), "contract-coverage-")) : null;
   if (coverageDir) env.NODE_V8_COVERAGE = coverageDir;
   const r = spawnSync(command, {
-    shell: true,
+    shell: posixShell(),
     cwd,
     encoding: "utf8",
     env,
@@ -426,7 +428,7 @@ function runBashAsync(command, cwd, capture, observeCoverage = false, signal = n
 
     if (interrupted) return finish(null);
     child = spawn(command, {
-      shell: true,
+      shell: posixShell(),
       cwd,
       env,
       detached: processTreeDetached(),

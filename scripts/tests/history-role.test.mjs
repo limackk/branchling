@@ -33,7 +33,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { isolateHome } from "./_repo.mjs";
+import { isolateHome, posixPath } from "./_repo.mjs";
 
 isolateHome("history-role");
 
@@ -111,7 +111,7 @@ function worker(dir, name) {
   const p = join(dir, name);
   writeFileSync(p, "#!/bin/sh\ncat >/dev/null\necho 'the work is done'\n", "utf8");
   chmodSync(p, 0o755);
-  return p;
+  return posixPath(p);
 }
 
 /**
@@ -125,7 +125,7 @@ function mustNotRun(dir, marker) {
   const p = join(dir, "generalist.sh");
   writeFileSync(p, "#!/bin/sh\ncat >/dev/null\ntouch '" + marker + "'\necho 'the wrong hand'\n", "utf8");
   chmodSync(p, 0o755);
-  return p;
+  return posixPath(p);
 }
 
 function cleanup(...dirs) {

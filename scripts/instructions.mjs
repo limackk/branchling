@@ -54,6 +54,7 @@ import { BLOCK_MARKER_NAME as MARKER, PRODUCT_NAME as N } from "./product.mjs";
 import { inProgressStatus } from "./take-task.mjs";
 import { failure } from "./ui.mjs";
 import { writeOut } from "./stdout.mjs";
+import { canonicalPath } from "./canonical-path.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -856,7 +857,7 @@ export function nudgeBlock() {
  */
 export function nudgeRoot(root) {
   const r = spawnSync("git", ["rev-parse", "--show-toplevel"], { cwd: root, encoding: "utf8", timeout: 10_000 });
-  if (r.status === 0 && String(r.stdout).trim()) return String(r.stdout).trim();
+  if (r.status === 0 && String(r.stdout).trim()) return canonicalPath(String(r.stdout).trim());
   return root;
 }
 

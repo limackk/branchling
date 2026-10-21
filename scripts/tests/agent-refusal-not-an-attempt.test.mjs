@@ -42,7 +42,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { HOME_ENV } from "../home.mjs";
-import { isolateHome, SCRIPTS_DIR } from "./_repo.mjs";
+import { isolateHome, SCRIPTS_DIR, posixPath } from "./_repo.mjs";
 
 isolateHome("agent-refusal-not-an-attempt");
 
@@ -118,7 +118,7 @@ function agentScript(root, name, body) {
   const p = join(root, name);
   writeFileSync(p, "#!/bin/sh\n" + body + "\n", "utf8");
   chmodSync(p, 0o755);
-  return p;
+  return posixPath(p);
 }
 
 function contractRuns(witness) {

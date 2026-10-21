@@ -18,22 +18,16 @@
  * holds this section and measures that a real `history --file` run waits for it.
  */
 
-import { realpathSync } from "node:fs";
-import { resolve } from "node:path";
 
 import { withMutex } from "./lock.mjs";
+import { canonicalPath } from "./canonical-path.mjs";
 
 /** `realpath` is what makes two spellings of one directory the same section;
  *  a directory not yet on disk still yields a usable name. */
 export function snapshotSection(backlogDir) {
-  let path = resolve(backlogDir);
-  try {
-    path = realpathSync(path);
-  } catch {
-    // Not yet on disk: the resolved path names the same resource, it simply
-    // cannot be canonicalised.
-  }
-  return "snapshot:" + path;
+  // Not yet on disk: the resolved path names the same resource, it simply
+  // cannot be canonicalised.
+  return "snapshot:" + canonicalPath(backlogDir);
 }
 
 /**

@@ -33,7 +33,7 @@ import { createServer, get } from "node:http";
 import { hostname } from "node:os";
 import { spawn } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
-import { existsSync, readFileSync, realpathSync, renameSync, unlinkSync, watch, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, renameSync, unlinkSync, watch, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -71,6 +71,7 @@ import {
   recordEdit,
   requiresReason,
 } from "./history.mjs";
+import { canonicalPath } from "./canonical-path.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BUILD_BACKLOG = join(__dirname, "build-backlog.mjs");
@@ -234,7 +235,7 @@ let editQueue = Promise.resolve();
  * a failed comparison must not take the process down.
  */
 function canonicalDir(dir) {
-  try { return realpathSync(dir); } catch { return dir; }
+  return canonicalPath(dir);
 }
 
 // The `/api/ping` handshake token now lives in `serve-registry.mjs`: the

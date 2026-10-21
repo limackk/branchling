@@ -36,6 +36,7 @@
 import { spawnSync } from "node:child_process";
 
 import { taskIdScanner } from "./task-id.mjs";
+import { canonicalPath } from "./canonical-path.mjs";
 
 /**
  * ASCII record and unit separators, built rather than typed: a commit message
@@ -52,7 +53,7 @@ export function repoRoot(cwd) {
   const r = spawnSync("git", ["rev-parse", "--show-toplevel"], { cwd, encoding: "utf8", timeout: 30_000 });
   if (r.status !== 0) return null;
   const out = String(r.stdout || "").trim();
-  return out || null;
+  return out ? canonicalPath(out) : null;
 }
 
 /**

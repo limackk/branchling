@@ -135,6 +135,16 @@ const WINDOWS = process.platform === "win32";
  */
 export const SHIM = { shell: WINDOWS };
 
+/**
+ * A fixture script as a stored command line names it (TL-463). The tool runs
+ * `--agent` and `bash:` lines in a POSIX shell on every platform, and that shell
+ * reads `D:\a\x.sh` as `D:ax.sh`; forward slashes are a path Git's bash and
+ * Windows both accept. Elsewhere the path is returned as it is.
+ */
+export function posixPath(path) {
+  return WINDOWS ? String(path).replace(/\\/g, "/") : path;
+}
+
 /** A `.bin` entry by the name the platform runs: `<name>.cmd` on Windows. */
 export function shimPath(path) {
   return WINDOWS ? path + ".cmd" : path;

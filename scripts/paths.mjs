@@ -36,6 +36,7 @@ import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { ANY_TASK_FILE } from "./task-id.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { failure } from "./ui.mjs";
+import { canonicalPath } from "./canonical-path.mjs";
 
 export const CONFIG_FILENAME = "config.yaml";
 export const BOARDS_FILENAME = "boards.yaml";
@@ -285,5 +286,5 @@ export function repositoryRoot(backlogRoot, opts = {}) {
   const r = run("git", ["-C", backlogRoot, "rev-parse", "--show-toplevel"], { encoding: "utf8" });
   const top = r && r.status === 0 ? String(r.stdout || "").trim() : "";
   const fallback = opts.fallback === undefined ? resolve(backlogRoot, "..") : resolve(opts.fallback);
-  return top || fallback;
+  return top ? canonicalPath(top) : fallback;
 }

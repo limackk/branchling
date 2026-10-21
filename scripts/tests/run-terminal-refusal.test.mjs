@@ -31,7 +31,7 @@ import { fileURLToPath } from "node:url";
 
 import { TERMINAL_REFUSALS } from "../run-loop.mjs";
 
-import { isolateHome } from "./_repo.mjs";
+import { isolateHome, posixPath } from "./_repo.mjs";
 
 isolateHome("run-terminal-refusal");
 
@@ -98,7 +98,7 @@ function agentScript(dir, name, body) {
   const p = join(dir, name);
   writeFileSync(p, "#!/bin/sh\n" + 'echo x >> ' + JSON.stringify(join(dir, "calls")) + "\n" + body + "\n", "utf8");
   chmodSync(p, 0o755);
-  return p;
+  return posixPath(p);
 }
 
 function calls(dir) {

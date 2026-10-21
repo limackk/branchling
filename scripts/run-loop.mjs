@@ -99,6 +99,7 @@ import { readTaskRecords, splitList, unknownFilterValues } from "./task-select.m
 import { printJson } from "./json-envelope.mjs";
 import { MARK, color, failure, warn } from "./ui.mjs";
 import { processTreeDetached, stopProcessTree } from "./process-tree.mjs";
+import { executableInvocation, posixShell } from "./posix-shell.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CLI = join(__dirname, "cli.mjs");
@@ -1047,11 +1048,12 @@ export function attemptProvenance(task, attempt) {
 export function superviseAgent(command, opts) {
   return new Promise((resolve) => {
     let stdout = ""; let stderr = ""; let bytes = 0; let timedOut = false; let overflow = false; let settled = false;
+    const start = opts.raw ? null : executableInvocation(command);
     const child = opts.raw ? spawn(command, {
-      shell: true, cwd: opts.cwd, env: opts.env,
+      shell: posixShell(), cwd: opts.cwd, env: opts.env,
       detached: processTreeDetached(), stdio: ["pipe", "pipe", "pipe"],
-    }) : spawn(command, [], {
-      shell: false, cwd: opts.cwd, env: opts.env,
+    }) : spawn(start.file, start.args, {
+      shell: start.shell, cwd: opts.cwd, env: opts.env,
       detached: processTreeDetached(), stdio: ["pipe", "pipe", "pipe"],
     });
     const receive = (key, chunk) => {

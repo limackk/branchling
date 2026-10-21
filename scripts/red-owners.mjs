@@ -65,6 +65,7 @@ import { resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { taskIdScanner } from "./task-id.mjs";
 import { MARK, color, failure, refusal, heading, table } from "./ui.mjs";
+import { posixShell } from "./posix-shell.mjs";
 
 const KNOWN_FLAGS = ["--json", "--repairs", "--dir"];
 const VALUE_FLAGS = ["--command", "--report", "--mine"];
@@ -356,7 +357,7 @@ export function main(argv, io = {}) {
     // in does not matter: both name the file beside each failure, and both are
     // read.
     const r = (io.run || spawnSync)(command, {
-      cwd: repo || root, encoding: "utf8", shell: true, timeout: 30 * 60_000,
+      cwd: repo || root, encoding: "utf8", shell: posixShell(), timeout: 30 * 60_000,
       maxBuffer: 256 * 1024 * 1024,
     });
     if (r.error) {

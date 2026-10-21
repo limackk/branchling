@@ -33,6 +33,7 @@ import { DELEGATION_ENFORCEMENT, DELEGATION_POLICIES } from "./agent-contract.mj
 import { printJson } from "./json-envelope.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { failure } from "./ui.mjs";
+import { executableInvocation } from "./posix-shell.mjs";
 
 export const CONFORMANCE_VERSION = 1;
 export const CONFORMANCE_SCENARIOS = [
@@ -156,8 +157,9 @@ function runScenario(plan, context, scenario, delegation) {
     [CONFORMANCE_VERSION_ENV]: String(CONFORMANCE_VERSION),
     [CONFORMANCE_SCENARIO_ENV]: scenario.id,
   };
-  const child = spawnSync(plan.adapter, [], {
-    shell: false, cwd: context.repository, env, encoding: "utf8",
+  const start = executableInvocation(plan.adapter);
+  const child = spawnSync(start.file, start.args, {
+    shell: start.shell, cwd: context.repository, env, encoding: "utf8",
     input: conformanceInput(), timeout: plan.timeout * 1000, maxBuffer: 64 * 1024,
   });
   if (child.error && child.error.code === "ETIMEDOUT") return { scenario: scenario.id, outcome: null, ok: false, problem: "adapter process timed out" };

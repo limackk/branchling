@@ -29,7 +29,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { HOME_ENV } from "../home.mjs";
-import { isolateHome, SCRIPTS_DIR } from "./_repo.mjs";
+import { isolateHome, SCRIPTS_DIR, posixPath } from "./_repo.mjs";
 
 isolateHome("run-profile-closes-own-task");
 
@@ -110,7 +110,7 @@ function adapterClosingAs(root, name, backlog, closer) {
     "echo closed",
   ].join("\n") + "\n", "utf8");
   chmodSync(p, 0o755);
-  return p;
+  return posixPath(p);
 }
 
 function withProfile(f) {
