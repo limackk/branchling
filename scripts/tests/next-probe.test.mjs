@@ -196,7 +196,7 @@ test("POSITIVE CONTROL: without `--probe` nothing is run and the envelope says s
   try {
     const witness = join(f.dir, "ran.txt");
     const id = f.add("A task whose contract leaves a trace",
-      'verification:\n  - id: trace\n    bash: "echo ran > ' + witness + '"');
+      'verification:\n  - id: trace\n    bash: "echo ran > ' + posixPath(witness) + '"');
     const r = cli(["take", id, "--dir", f.backlog, "--actor", "agent:hand", "--json"], f.env, { cwd: f.repo });
     assert.equal(r.status, 0, r.stdout + r.stderr);
     const out = JSON.parse(r.stdout);

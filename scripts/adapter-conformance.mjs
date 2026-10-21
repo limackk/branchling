@@ -34,6 +34,7 @@ import { printJson } from "./json-envelope.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { failure } from "./ui.mjs";
 import { executableInvocation } from "./posix-shell.mjs";
+import { processEssentials } from "./process-env.mjs";
 
 export const CONFORMANCE_VERSION = 1;
 export const CONFORMANCE_SCENARIOS = [
@@ -151,7 +152,7 @@ function runScenario(plan, context, scenario, delegation) {
   const task = { id: TASK_ID, role: ROLE, profile, delegation, delegationEnforcement: "unsupported" };
   const env = {
     ...adapterEnvironment({ actor: "agent:conformance", root: context.backlog, cwd: context.repository, plan: { delegation } }, task, {
-      PATH: process.env.PATH || "", [CONFORMANCE_SECRET_ENV]: CONFORMANCE_SENTINEL,
+      ...processEssentials(), [CONFORMANCE_SECRET_ENV]: CONFORMANCE_SENTINEL,
     }),
     [CONFORMANCE_ENV]: "1",
     [CONFORMANCE_VERSION_ENV]: String(CONFORMANCE_VERSION),

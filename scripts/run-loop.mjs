@@ -100,6 +100,7 @@ import { printJson } from "./json-envelope.mjs";
 import { MARK, color, failure, warn } from "./ui.mjs";
 import { processTreeDetached, stopProcessTree } from "./process-tree.mjs";
 import { executableInvocation, posixShell } from "./posix-shell.mjs";
+import { processEssentials } from "./process-env.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CLI = join(__dirname, "cli.mjs");
@@ -951,8 +952,8 @@ export function adapterEnvironment(ctx, task, env = process.env) {
   out[prefix + "_DELEGATION_ENFORCEMENT"] = String(task.delegationEnforcement || "unsupported");
   // PATH is not application data or a credential; preserving it lets a local
   // profile name an installed executable while every other ambient variable is
-  // deliberately withheld.
-  if (env.PATH) out.PATH = env.PATH;
+  // deliberately withheld. On Windows a process needs a few more just to start.
+  Object.assign(out, processEssentials(env));
   for (const name of secretEnvironmentNames(task.profile)) {
     if (Object.prototype.hasOwnProperty.call(env, name)) out[name] = env[name];
   }

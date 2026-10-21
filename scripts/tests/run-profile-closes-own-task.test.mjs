@@ -90,7 +90,7 @@ function fixture() {
   const file = taskFile(backlog, id);
   writeFileSync(file, readFileSync(file, "utf8")
     .replace(/verification:[\s\S]*?\n---/,
-      'verification:\n  - id: it-is-done\n    bash: "echo ran >> ' + witness + ' && test -f ' + id + '.done"\n---')
+      'verification:\n  - id: it-is-done\n    bash: "echo ran >> ' + posixPath(witness) + ' && test -f ' + id + '.done"\n---')
     .replace(/\[proof:[^\]]*\]/g, "[proof: it-is-done]"), "utf8");
   assert.equal(cli(["build", "--dir", backlog], env, repo).status, 0);
   return { root, repo, backlog, env, id, witness };

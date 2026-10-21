@@ -5,6 +5,7 @@ import { chmodSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, w
 import { execFileSync, spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { COMMANDS, resolveCommand } from "../cli.mjs";
 import { parseRunArgs } from "../run-loop.mjs";
@@ -12,7 +13,7 @@ import { isolateHome, posixPath } from "./_repo.mjs";
 
 isolateHome("execution-product-boundary");
 
-const CLI = new URL("../cli.mjs", import.meta.url).pathname;
+const CLI = fileURLToPath(new URL("../cli.mjs", import.meta.url));
 
 function cli(args, env, cwd) {
   return spawnSync(process.execPath, [CLI, ...args], {
