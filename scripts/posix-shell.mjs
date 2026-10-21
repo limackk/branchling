@@ -55,6 +55,10 @@ export function posixShell() {
  */
 export function executableInvocation(path) {
   if (process.platform !== "win32") return { file: path, args: [], shell: false };
+  // A file that is not there is started as itself, so the spawn fails as it does
+  // on POSIX — "could not be started". Through bash it would be bash exiting 127,
+  // which reads as an adapter that ran and failed.
+  if (!existsSync(path)) return { file: path, args: [], shell: false };
   if (/\.(exe|com)$/i.test(path)) return { file: path, args: [], shell: false };
   if (/\.(cmd|bat)$/i.test(path)) return { file: '"' + path + '"', args: [], shell: true };
   const line = shebangOf(path);
