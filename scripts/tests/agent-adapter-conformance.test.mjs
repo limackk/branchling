@@ -39,7 +39,10 @@ function compatibleAdapter(root, witness) {
     "printf '%s' \"$input\" > " + JSON.stringify(witness + ".input"),
     "printf '%s' \"$" + CONFORMANCE_SECRET_ENV + "\" >&2",
     "if [ \"$" + CONFORMANCE_SCENARIO_ENV + "\" = cancelled ]; then",
-    "  sleep 30 & child=$!",
+        // Its output goes nowhere: a background child holding the adapter's stdout
+    // keeps the pipe open after the adapter exits, and on Windows the probe then
+    // waits for the pipe until its own timeout (TL-463).
+    "  sleep 30 >/dev/null 2>&1 & child=$!",
     "  kill \"$child\"",
     "  wait \"$child\" 2>/dev/null",
     "  printf '{\"version\":1,\"scenario\":\"%s\",\"outcome\":\"%s\",\"childPid\":%s,\"delegation\":{\"policy\":\"%s\",\"control\":\"requested\",\"evidence\":\"prompt-directive\"}}' \"$" + CONFORMANCE_SCENARIO_ENV + "\" \"$" + CONFORMANCE_SCENARIO_ENV + "\" \"$child\" \"$" + PREFIX + "_DELEGATION\"",
@@ -126,7 +129,9 @@ test("malformed and unavailable adapters fail deterministically without exposing
     const badOut = JSON.parse(bad.stdout);
     assert.equal(badOut.ok, false);
     assert.equal(badOut.failures.length, CONFORMANCE_SCENARIOS.length * 3);
-    assert.ok(badOut.failures.every((row) => row.problem === "adapter did not return one JSON response"));
+    assert.ok(badOut.failures.every((row) => row.problem === "adapter did not return one JSON response"),
+      "a malformed adapter was reported as something else: " +
+        JSON.stringify([...new Set(badOut.failures.map((row) => row.problem))]));
     assert.equal(readdirSync(root).sort().join(","), "malformed-adapter.mjs", "a failed probe changed the adapter directory");
 
     const unavailable = cli(["conformance", "--adapter", join(root, "not-installed"), "--json"]);
