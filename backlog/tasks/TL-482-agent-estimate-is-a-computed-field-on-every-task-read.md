@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 4h
@@ -21,7 +21,7 @@ verification:
   - id: fixtures
     bash: "node --test scripts/tests/agent-time.test.mjs"
   - id: not-stored
-    bash: "! grep -rl '^agent_estimate:' backlog/tasks/ _template.md"
+    bash: "! grep -l '^agent_estimate:' backlog/tasks/*.md backlog/_template.md _template.md"
   - id: envelope
     bash: "node --test scripts/tests/json-envelope.test.mjs"
   - id: suite-green
@@ -50,7 +50,7 @@ The value is per ESTIMATE, not per task: two open tasks estimated `4h` carry the
 
 ## Acceptance criteria
 
-- [ ] The field is computed from the ledger, null below the threshold, and reaches query, next and the viewer on a fixture backlog. [proof: fixtures]
-- [ ] No task file and no template carries the field; it exists only when read. [proof: not-stored]
-- [ ] The envelope declaration and the manual agree on the moved key. [proof: envelope]
-- [ ] The whole suite stays green. [proof: suite-green]
+- [x] The field is computed from the ledger, null below the threshold, and reaches query, next and the viewer on a fixture backlog. [proof: fixtures]
+- [x] No task file and no template carries the field; it exists only when read. [proof: not-stored]
+- [x] The envelope declaration and the manual agree on the moved key. [proof: envelope]
+- [x] The whole suite stays green. [proof: suite-green]

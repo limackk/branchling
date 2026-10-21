@@ -44,7 +44,7 @@ import { readStdinText } from "./stdin.mjs";
 import { parseTaskDocument, taskContent } from "./task-input.mjs";
 import { failure, refusal } from "./ui.mjs";
 import { readTaskMetas } from "./task-io.mjs";
-import { agentTimeHint, hintLine } from "./agent-time.mjs";
+import { agentEstimate, agentEstimateText } from "./agent-time.mjs";
 import { readAgentTime } from "./agent-time-read.mjs";
 import { todayStamp } from "./today.mjs";
 
@@ -671,11 +671,12 @@ export async function main(argv) {
   console.log("  board: " + board + (opts.board ? "" : " (the registry default)"));
   if (scheduling) console.log("  wave: " + opts.wave + " — scheduled in " + paths.planPath);
   // The one moment an estimate can still change a decision is while it is being
-  // written (TL-480). Silent below the threshold: a hint from three samples
-  // would be advice with the authority of a measurement.
+  // written (TL-480), shown as the computed field it is everywhere else
+  // (TL-482). Silent below the threshold: a value from three samples would be
+  // advice with the authority of a measurement.
   if (opts.estimate) {
-    const bucket = agentTimeHint(readAgentTime(root, config), opts.estimate);
-    if (bucket) console.log("  " + hintLine(bucket));
+    const field = agentEstimate(readAgentTime(root, config), opts.estimate);
+    if (field) console.log("  agent_estimate: " + agentEstimateText(field) + " (computed, not stored)");
   }
   // What is left to do depends on what arrived: a task written from a document
   // already has its goal and its closing contract, and telling its author to go

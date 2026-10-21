@@ -66,7 +66,7 @@ import { probeTask } from "./done-task.mjs";
 import { inProgressStatus, rebuildViews, refusalCode, refusalPayload, renderTake, takeJson, takeTask } from "./take-task.mjs";
 import { filterTasks, readTaskRecords, sortTasks, splitList, unknownFilterValues } from "./task-select.mjs";
 import { MARK, color, failure, warn } from "./ui.mjs";
-import { agentTimeHint, hintLine } from "./agent-time.mjs";
+import { agentEstimate, agentEstimateText } from "./agent-time.mjs";
 import { readAgentTime } from "./agent-time-read.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -910,12 +910,15 @@ export function run(argv) {
       if (!rebuildViews(root)) {
         console.error(warn("the views were not rebuilt — run `" + N + " build` yourself"));
       }
-      // What the estimate has been worth for an agent, from the ledger (TL-480);
+      // What the estimate has been worth for an agent, from the ledger (TL-480),
+      // carried ON the task as the computed field it is in `query` (TL-482);
       // `null` below the threshold, never a number from three samples.
-      const agentTimeBucket = agentTimeHint(readAgentTime(root, config), result.after && result.after.estimate);
+      const agentField = agentEstimate(readAgentTime(root, config), result.after && result.after.estimate);
       if (plan.json) {
+        const handover = takeJson(result, root);
         printJson("task-take", {
-          ...takeJson(result, root), agentTime: agentTimeBucket, passedOver, considered: candidates.length,
+          ...handover, task: handover.task ? { ...handover.task, agent_estimate: agentField } : handover.task,
+          passedOver, considered: candidates.length,
           skippedElsewhere, skippedExecutor, skippedHandedBack, skippedDeadlocked, skippedSize, skippedByRecord,
           closedElsewhere,
           plan: planJson,
@@ -935,7 +938,7 @@ export function run(argv) {
         for (const p of passedOver) {
           console.log(color.dim(MARK.bullet + " " + p.id + " passed over: " + p.why));
         }
-        if (agentTimeBucket) console.log(color.dim(MARK.bullet + " " + hintLine(agentTimeBucket)));
+        if (agentField) console.log(color.dim(MARK.bullet + " agent_estimate: " + agentEstimateText(agentField) + " (computed, not stored)"));
         console.log(renderTake(result, root));
       }
       return 0;

@@ -56,6 +56,8 @@ import { backlogPaths, resolveBacklogDir, resolveBacklogDirOrExit } from "./path
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { SORT_KEYS, filterTasks, readTaskRecords, sortTasks, splitList, unknownFilterValues } from "./task-select.mjs";
 import { refusal } from "./ui.mjs";
+import { agentEstimate } from "./agent-time.mjs";
+import { readAgentTime } from "./agent-time-read.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -214,6 +216,19 @@ if (unknownValues.length) {
 // With no explicit --status we are asking about work to be done, not about the
 // archive: in a backlog of any age most tasks are closed and would flood every
 // answer. Measure your own: `query --status done --count`.
+// THE COMPUTED FIELD `agent_estimate` (TL-482), on rows that leave as data. The
+// ledger is read once per backlog and only for `--json`: the text output and
+// `--count` answer cheaper questions and must not pay for this one. Never on
+// disk — it is what the ledger says about this estimate TODAY. `--tasks <dir>`
+// has no ledger to read, so its rows say `null` rather than going without the
+// key: a consumer must not have to tell "no value" from "a version without it".
+if (opts.json) {
+  for (const one of COLLECTED) {
+    const report = one.root && one.config ? readAgentTime(one.root, one.config, { tasks: one.tasks }) : null;
+    for (const t of one.tasks) t.agent_estimate = report ? agentEstimate(report, t.estimate) : null;
+  }
+}
+
 let hits = [];
 for (const one of COLLECTED) {
   const archived = new Set(one.config ? one.config.archivedStatuses : ["done", "cancelled"]);

@@ -21,6 +21,8 @@ import { fileURLToPath } from "node:url";
 import { extractMeta, splitFrontmatter } from "./task-fields.mjs";
 import { crossBranchState, divergences } from "./branch-scan.mjs";
 import { readAllHistory } from "./history.mjs";
+import { agentEstimate, agentEstimateText, minutesLabel } from "./agent-time.mjs";
+import { readAgentTime } from "./agent-time-read.mjs";
 import { modifiedFilesCached, repoRoot } from "./modified-files.mjs";
 import { loadConfig, loadConfigOrExit } from "./config.mjs";
 import { taskIdPatterns } from "./task-id.mjs";
@@ -301,9 +303,20 @@ export function buildHtml(
   // a `serve` rebuilding on every keystroke pays for one `git log` per commit
   // rather than one per rebuild.
   const fileIndex = modifiedFilesCached({ root: repoRoot(config.root), prefix: config.taskIdPrefix });
+  // THE COMPUTED FIELD `agent_estimate` (TL-482), from the ledger the page
+  // already receives — the same function `query --json` and `next` call, so
+  // the card and the terminal cannot show two ranges for one estimate. Computed
+  // at build time and never written back: the page is a view, and the value is
+  // what the ledger says about this estimate on the day the page was built.
+  const agentReport = readAgentTime(config.root, config, { tasks, history });
+  // The sentence is composed HERE, by the function the terminal uses, rather
+  // than by a copy of it inside the page.
+  const withText = (field) =>
+    (field ? { ...field, text: agentEstimateText(field), short: minutesLabel(field.median) } : null);
   const withFiles = tasks.map((t) => ({
     ...t,
     modified_files: [...(fileIndex.byTask.get(t.id) || [])].sort(),
+    agent_estimate: withText(agentEstimate(agentReport, t.estimate)),
   }));
   const tasksJson = JSON.stringify(withFiles).replace(/</g, "\\u003c");
   const statsJson = JSON.stringify(stats);
@@ -999,6 +1012,22 @@ ${paletteBadgeCss}
     text-transform: none;
     letter-spacing: 0;
     font-weight: 500;
+  }
+  /* The computed agent estimate (TL-482). Tokens only, so both themes follow;
+     the dashed outline sets it apart from the written \`~estimate\` beside it,
+     and the word "agent" says the same thing for anybody who cannot see it. */
+  .badge-agent-estimate {
+    background: var(--bg-sidebar);
+    color: var(--fg-muted);
+    border: 1px dashed var(--fg-muted);
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 500;
+  }
+  .meta-note {
+    color: var(--fg-muted);
+    font-size: 11px;
+    margin-top: 2px;
   }
   @media (prefers-color-scheme: dark) {
     .badge-elsewhere { background: rgba(251, 191, 36, 0.16); color: #FCD34D; border-color: rgba(251, 191, 36, 0.45); }
@@ -2913,6 +2942,7 @@ function renderCards() {
         \${elsewhereHtml(t)}
         \${t.epic ? \`<span class="badge badge-epic" title="Epic">\${escape(t.epic)}</span>\` : ""}
         \${t.estimate ? \`<span class="badge" style="background:var(--bg-sidebar);color:var(--fg-muted)">~\${escape(t.estimate)}</span>\` : ""}
+        \${t.agent_estimate ? \`<span class="badge badge-agent-estimate" title="Agent estimate, computed from the task history: \${escape(t.agent_estimate.text)}">agent ~\${escape(t.agent_estimate.short)}</span>\` : ""}
       </div>
     \`;
     card.onclick = () => selectTask(t.id);
@@ -3020,6 +3050,16 @@ function renderDetail() {
   const readOnlyRows =
     '<div class="meta-row"><div class="meta-label">Created</div><div class="meta-value">' + escape(t.created || "—") + "</div></div>" +
     '<div class="meta-row"><div class="meta-label">Updated</div><div class="meta-value">' + escape(t.updated || "—") + "</div></div>" +
+    // COMPUTED from the task history (TL-482), like the files below: what
+    // agents took on closed tasks with this estimate. No pen and no file
+    // behind it — it changes as tasks close, so it is never stored.
+    (t.agent_estimate
+      ? '<div class="meta-row meta-row-wide"><div class="meta-label">Agent estimate</div><div class="meta-value">' +
+        escape(t.agent_estimate.text) +
+        '<div class="meta-note">computed from the task history of closed tasks with this estimate, not stored' +
+        (t.agent_estimate.verdict === "correlated" ? "" : " — estimates do not yet predict agent time here, read it as a range, not a plan") +
+        "</div></div></div>"
+      : "") +
     // COMPUTED from commit messages, so there is no pen: it is not a field
     // anybody may edit, and offering one would invite a value that contradicts
     // the history it was derived from. Absent when the task has no commits yet —

@@ -198,9 +198,6 @@ export const KINDS = {
     // after the write, so a caller that has to give a claim back — `run` when
     // its agent never started — has nowhere else to read it.
     from: null,
-    // `next` only (TL-480): the agent-time bucket of the task's estimate, from
-    // the ledger; null below the threshold rather than a number from too few.
-    agentTime: null,
     warnings: [], reclaimed: null,
     // The claims a deliberate takeover crossed, as `{actor, crossed}` rows
     // (TL-284) — empty when it crossed none. A loop that takes work over has to

@@ -647,7 +647,7 @@ implementation detail. Every reading command answers in the same envelope:
 | `pr-summary` | `pr-summary` | `base`, `scanned`, `reason`, `tasks`, `engaged`, `cost` |
 | `audit` | `audit` | `since`, `dayZero`, `tasks`, `findings`, `closedWithoutTrace`, `skippedBeforeSince`, `reopened`, `parked`, `withoutPremise`, `awaitingVouch`, `handedBack`, `vouches`, `contractCapability`, `advisories` |
 | `run` | `run` | `ok`, `dryRun`, `agent`, `profile`, `agentFor`, `profileFor`, `delegation`, `allowUncontrolledDelegation`, `plan`, `order`, `considered`, `stoppedAt`, `stopped`, `agentNeverRan`, `waitingForRole`, `waitingForExecutor`, `waitingForSize`, `tally`, `sharedState`, `ms`, `tasks`, `skippedHandedBack`, `skippedDeadlocked` |
-| `take`, `next` | `task-take` | `ok`, `taken`, `id`, `file`, `task`, `from`, `text`, `decisions`, `probe`, `warnings`, `reclaimed`, `tookOver`, `lock`, `refusalKind`, `refusal`, `details`, and — filled in by next — `agentTime` (the bucket of the task's estimate, null below the threshold), `passedOver`, `considered`, `searchedStatuses`, `skippedBlocked`, `skippedElsewhere`, `closedElsewhere`, `skippedExecutor`, `skippedHandedBack`, `skippedDeadlocked`, `skippedSize`, `skippedByRecord`, `scan`, `plan` |
+| `take`, `next` | `task-take` | `ok`, `taken`, `id`, `file`, `task`, `from`, `text`, `decisions`, `probe`, `warnings`, `reclaimed`, `tookOver`, `lock`, `refusalKind`, `refusal`, `details`, and — filled in by next — `passedOver`, `considered`, `searchedStatuses`, `skippedBlocked`, `skippedElsewhere`, `closedElsewhere`, `skippedExecutor`, `skippedHandedBack`, `skippedDeadlocked`, `skippedSize`, `skippedByRecord`, `scan`, `plan` |
 | `handoff` | `task-handoff` | `ok`, `id`, `file`, `task`, `role`, `owner`, `status` (each a from/to pair), `comment`, `released`, `warnings`, `refusalKind`, `refusal`, `details` |
 | `release` | `task-release` | `ok`, `id`, `status`, `owner`, `released`, `comment`, `refusalKind`, `refusal`, `details` |
 | `ask` | `task-ask` | `ok`, `id`, `file`, `question` (its event id, timestamp, text and asker), `changes`, `blockedReason`, `refusalKind`, `refusal`, `details` |
@@ -656,6 +656,16 @@ implementation detail. Every reading command answers in the same envelope:
 | `log` | `task-log` | `ok`, `id`, `title`, `file`, `path` (the log the answer came from), `records` (raw entries) and `total` (the exchanges they fold into — the ratio is what the fold is worth), `matched` (the exchanges left after the filter — equal to `total` when there is none) and `decisions` (whether `--decisions` narrowed the answer to what was settled and what is still open), `limit`, `exchanges` (one per write: its time, actor, source, session, role, the reason ONCE, the changes that moved, its events and its messages — a message whose text is null is that reason again, kept for its event id), `modifiedFile` and `tasks` (the computed area and its matching tasks when `--modified-file` selects decisions by path; otherwise null and empty), `refusalKind`, `refusal`, `details` |
 | `red` | `red-owners` | `command`, `ran` (a report nobody gave is not an empty one), `reason`, `exitCode`, `files` (each failing test file with the task its commits name and, with `--repairs`, open sibling-branch repairers), `mine`, `tally`, `repairScan` (null unless requested; then whether the cross-branch scan ran and which branches it read) |
 | `docs-drift` | `docs-drift` | `documents`, `minSignals`, `flagged`, `tooLittle`, `seeded` (absent unless `--seed-tasks` ran) |
+
+**`agent_estimate` is a computed field, not a stored one** (TL-482). Every task
+row in `query --json` and the `task` that `next --json` hands over carry it:
+what agents took on closed tasks with the same `estimate`, read from
+`backlog/history/` on every call — `label` (the p20–p80 range), `median`,
+`p20` and `p80` in minutes, `n`, and the `verdict` of `stats --agent-time`.
+It is `null` until that estimate has `agent_time_min_n` measured closings, and
+it is never written into a task file, so it cannot go stale and never shows in
+a diff. The viewer shows the same value as a badge on the card and a row in the
+detail panel.
 
 **Adding a kind** (TL-285). A command that answers `--json` is registered in
 `scripts/json-envelope.mjs` and nowhere else: its keys go into `KINDS`, and the

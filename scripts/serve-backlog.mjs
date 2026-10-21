@@ -67,6 +67,7 @@ import { printJson } from "./json-envelope.mjs";
 import { todayStamp } from "./today.mjs";
 import {
   listTaskFiles,
+  readAllHistory,
   reconcile,
   recordEdit,
   requiresReason,
@@ -645,10 +646,15 @@ async function handle(req, res) {
   if (path === "/" || path === "/index.html") {
     // Rendered fresh per request, so the first paint is already live data.
     const tasks = tasksWithRevisions();
+    // The ledger in its own position (TL-482). The plan used to arrive in the
+    // `history` slot, so the served page folded its decisions, its board at a
+    // moment and its agent estimates out of plan.yaml instead of the history —
+    // and the file:// page, which takes the defaults, showed the right ones.
     const html = injectCapability(buildHtml(
       tasks,
       computeStats(tasks),
       CONFIG,
+      readAllHistory(BACKLOG_DIR),
       loadPlan(join(BACKLOG_DIR, PLAN_FILENAME))
     ), newCapability());
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });

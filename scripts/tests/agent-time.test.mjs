@@ -13,19 +13,24 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
+import { get } from "node:http";
+import { createServer } from "node:net";
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { agentSegments, agentTime, agentTimeHint, hintLine, measureTask } from "../agent-time.mjs";
+import { agentEstimate, agentEstimateText, agentSegments, agentTime, agentTimeHint, measureTask } from "../agent-time.mjs";
 
-import { isolateHome } from "./_repo.mjs";
+import { isolateHome, isolateState } from "./_repo.mjs";
 
 // THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166): without it a test reads the
 // developer's user configuration and answers differently on another machine.
 isolateHome("agent-time");
+// The served page registers itself beside the locks; a test server must not
+// land in the developer's registry.
+isolateState("agent-time");
 
 const CLI = join(dirname(fileURLToPath(import.meta.url)), "..", "cli.mjs");
 
@@ -182,10 +187,20 @@ test("the hint is absent below the threshold and present above it", () => {
   const solid = agentTime(...Object.values(fleet({ "2h": [5, 7, 9] })), OPTS);
   const b = agentTimeHint(solid, "2h");
   assert.ok(b, "a bucket at the threshold speaks");
-  assert.match(hintLine(b), /2h/);
-  assert.match(hintLine(b), /n=3/);
   assert.equal(agentTimeHint(solid, "1w"), null, "an estimate with no bucket has nothing to say");
   assert.equal(agentTimeHint(solid, "soon"), null);
+});
+
+// ── The computed field ────────────────────────────────────────────────────
+
+test("agent_estimate is the bucket shaped as a field, null below the threshold", () => {
+  assert.equal(agentEstimate(agentTime(...Object.values(fleet({ "2h": [5, 7] })), OPTS), "2h"), null);
+  const field = agentEstimate(agentTime(...Object.values(fleet({ "2h": [5, 7, 9] })), OPTS), "2h");
+  assert.deepEqual(field, { label: "6m–8m", median: 7, p20: 5.8, p80: 8.2, n: 3, verdict: "insufficient" });
+  // The verdict is said beside the number whenever it does not support planning.
+  assert.equal(agentEstimateText(field), "6m–8m, median 7m (n=3) — insufficient");
+  assert.equal(agentEstimateText({ ...field, verdict: "correlated" }), "6m–8m, median 7m (n=3)");
+  assert.equal(agentEstimateText(null), "");
 });
 
 // ── The commands, on a fixture backlog ────────────────────────────────────
@@ -226,17 +241,16 @@ test("stats --agent-time --json reports the bucket and the verdict from the ledg
   assert.equal(report.verdict.verdict, "insufficient", "one bucket cannot answer the correlation gate");
 });
 
-test("new --estimate prints the hint only when the bucket meets the threshold", () => {
+test("new --estimate prints the field only when the bucket meets the threshold", () => {
   const solid = fixtureBacklog(3, [5, 7, 9]);
   const yes = cli(solid, ["new", "--title", "Something to do", "--estimate", "2h"]);
   assert.equal(yes.status, 0, yes.stderr);
-  assert.match(yes.stdout, /agent time/);
-  assert.match(yes.stdout, /n=3/);
+  assert.match(yes.stdout, /agent_estimate: 6m–8m, median 7m \(n=3\)/);
 
   const thin = fixtureBacklog(5, [5, 7, 9]);
   const no = cli(thin, ["new", "--title", "Something to do", "--estimate", "2h"]);
   assert.equal(no.status, 0, no.stderr);
-  assert.doesNotMatch(no.stdout, /agent time/);
+  assert.doesNotMatch(no.stdout, /agent_estimate/);
 });
 
 test("an unparseable segment cap is refused by the configuration", () => {
@@ -246,4 +260,108 @@ test("an unparseable segment cap is refused by the configuration", () => {
   const r = cli(dir, ["stats", "--agent-time"]);
   assert.notEqual(r.status, 0);
   assert.match(r.stderr + r.stdout, /agent_time_segment_cap/);
+});
+
+/** A fixture backlog plus one OPEN task estimated `2h`, the one a reader asks about. */
+function withOpenTask(minN, samples) {
+  const dir = fixtureBacklog(minN, samples);
+  writeFileSync(join(dir, "tasks", "TASK-100-open.md"), [
+    "---", "id: TASK-100", "title: \"open work\"", "type: task", "labels: []", "board: main",
+    "priority: P1", "status: pending", "owner: unassigned", "estimate: 2h",
+    "created: 2026-10-01", "updated: 2026-10-01", "blocked_by: []", "blocks: []", "---", "", "## Goal", "", "Open.", "",
+  ].join("\n"));
+  return dir;
+}
+
+test("query --json carries agent_estimate on every row, null where the bucket is thin", () => {
+  const solid = withOpenTask(3, [5, 7, 9]);
+  const rows = JSON.parse(cli(solid, ["query", "--json"]).stdout).tasks;
+  const open = rows.find((t) => t.id === "TASK-100");
+  assert.equal(open.agent_estimate.median, 7);
+  assert.equal(open.agent_estimate.n, 3);
+
+  const thin = withOpenTask(5, [5, 7, 9]);
+  const thinRows = JSON.parse(cli(thin, ["query", "--json"]).stdout).tasks;
+  const row = thinRows.find((t) => t.id === "TASK-100");
+  assert.ok("agent_estimate" in row, "the key is present even when it has no value");
+  assert.equal(row.agent_estimate, null);
+});
+
+test("next --json hands the field over ON the task, not beside it", () => {
+  const dir = withOpenTask(3, [5, 7, 9]);
+  const r = cli(dir, ["next", "--actor", "agent:test", "--json"]);
+  assert.equal(r.status, 0, r.stderr);
+  const d = JSON.parse(r.stdout);
+  assert.equal(d.id, "TASK-100");
+  assert.equal(d.task.agent_estimate.median, 7);
+  assert.equal("agentTime" in d, false, "the TL-480 top-level key is gone");
+});
+
+test("the built viewer embeds the field for a task whose bucket qualifies", () => {
+  const dir = withOpenTask(3, [5, 7, 9]);
+  const r = cli(dir, ["viewer"]);
+  assert.equal(r.status, 0, r.stderr);
+  const html = readFileSync(join(dir, "viewer.html"), "utf8");
+  const tasks = JSON.parse(html.match(/let ALL_TASKS = (\[.*?\]);\n/s)[1]);
+  const open = tasks.find((t) => t.id === "TASK-100");
+  assert.equal(open.agent_estimate.text, "6m–8m, median 7m (n=3) — insufficient");
+  assert.equal(open.agent_estimate.short, "7m");
+});
+
+/** A port nothing holds right now, from the kernel rather than a literal. */
+function freePort() {
+  return new Promise((resolve, reject) => {
+    const probe = createServer();
+    probe.on("error", reject);
+    probe.listen(0, "127.0.0.1", () => {
+      const { port } = probe.address();
+      probe.close(() => resolve(port));
+    });
+  });
+}
+
+function fetchText(port, path) {
+  return new Promise((resolve, reject) => {
+    get({ host: "127.0.0.1", port, path, timeout: 10_000 }, (res) => {
+      let body = "";
+      res.setEncoding("utf8");
+      res.on("data", (c) => { body += c; });
+      res.on("end", () => resolve(body));
+    }).on("error", reject);
+  });
+}
+
+test("the SERVED page reads the field from the ledger, not from the plan", async () => {
+  // Until TL-482 the server handed the plan to `buildHtml` in the history slot,
+  // so the served page folded its history out of plan.yaml while the file://
+  // page, which takes the defaults, read the ledger.
+  const dir = withOpenTask(3, [5, 7, 9]);
+  // The server script itself, not `cli.mjs serve`: the CLI runs it as a child,
+  // and killing the parent would leave the child holding the pipe open.
+  const proc = spawn(process.execPath, [join(dirname(CLI), "serve-backlog.mjs"), "--dir", dir,
+    "--port", String(await freePort()), "--no-open"], { stdio: ["ignore", "pipe", "pipe"] });
+  try {
+    const port = await new Promise((resolve, reject) => {
+      let out = "";
+      const timer = setTimeout(() => reject(new Error("no port in 20s: " + out)), 20_000);
+      proc.stdout.setEncoding("utf8");
+      proc.stdout.on("data", (c) => {
+        out += c;
+        const m = out.match(/http:\/\/127\.0\.0\.1:(\d+)\//);
+        if (m) { clearTimeout(timer); resolve(Number(m[1])); }
+      });
+      proc.on("exit", (code) => { clearTimeout(timer); reject(new Error("server exited " + code + ": " + out)); });
+    });
+    const html = await fetchText(port, "/");
+    const tasks = JSON.parse(html.match(/let ALL_TASKS = (\[.*?\]);\n/s)[1]);
+    assert.equal(tasks.find((t) => t.id === "TASK-100").agent_estimate.median, 7);
+    const history = JSON.parse(html.match(/let HISTORY = (.*?);\n/s)[1]);
+    assert.ok(Array.isArray(history["TASK-1"]), "HISTORY is the ledger, keyed by task id");
+  } finally {
+    await new Promise((resolve) => {
+      if (proc.exitCode !== null || proc.signalCode !== null) return resolve();
+      proc.on("exit", () => resolve());
+      proc.kill("SIGKILL");
+    });
+  }
 });

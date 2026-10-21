@@ -247,8 +247,40 @@ export function agentTimeHint(report, estimate) {
   return b && !b.insufficient ? b : null;
 }
 
-/** The one line `new` and `next` print for a bucket that met the threshold. */
-export function hintLine(bucket) {
-  return "agent time for " + bucket.label + " tasks: " + minutesLabel(bucket.p20) + "–" +
-    minutesLabel(bucket.p80) + ", median " + minutesLabel(bucket.median) + " (n=" + bucket.n + ")";
+/**
+ * The COMPUTED field `agent_estimate` (TL-482): what the ledger says about one
+ * estimate, shaped to sit on a task beside `estimate`. Never written into a
+ * task file — a value derived from every closing would go stale with the next
+ * one, and refreshing it would rewrite the whole tree (the second law).
+ *
+ * Per ESTIMATE, not per task: two tasks estimated `4h` carry the same value,
+ * which is all the ledger can say about work nobody has done yet. The report's
+ * verdict travels WITH it, so a reader of one task is told what the report
+ * prints above its table. `null` below the threshold, never a guess.
+ */
+export function agentEstimate(report, estimate) {
+  const b = agentTimeHint(report, estimate);
+  if (!b) return null;
+  return {
+    label: minutesLabel(b.p20) + "–" + minutesLabel(b.p80),
+    // Tenths of a minute: the interpolated percentiles carry precision the
+    // sample cannot support, and a field is read, not recomputed.
+    median: tenths(b.median),
+    p20: tenths(b.p20),
+    p80: tenths(b.p80),
+    n: b.n,
+    verdict: report.verdict.verdict,
+  };
+}
+
+function tenths(n) {
+  return Math.round(n * 10) / 10;
+}
+
+/** The field as a reader sees it: `6m–12m, median 9m (n=30)`, plus the verdict
+ *  when it does not support planning. */
+export function agentEstimateText(field) {
+  if (!field) return "";
+  return field.label + ", median " + minutesLabel(field.median) + " (n=" + field.n + ")" +
+    (field.verdict === "correlated" ? "" : " — " + field.verdict);
 }
