@@ -263,7 +263,7 @@ test("a loop stopped by the durable deadlock gate leaves no claim and no lock", 
     const handOn = (name, to) => agentScript(fx.root, name, [
       "cat >/dev/null",
       'printf "passing it on\\n"',
-      process.execPath + " " + JSON.stringify(CLI) + " handoff " + work +
+      JSON.stringify(posixPath(process.execPath)) + " " + JSON.stringify(CLI) + " handoff " + work +
         " --dir " + JSON.stringify(fx.backlog) + " --to-role " + to +
         " --actor " + ACTOR + ' --reason "the next stage owns this" >/dev/null 2>&1',
     ].join("\n"));

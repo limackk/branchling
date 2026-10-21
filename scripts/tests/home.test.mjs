@@ -29,7 +29,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { ACTOR_ENV, DEFAULT_ACTOR, resolveActor } from "../actor.mjs";
@@ -91,22 +91,22 @@ test("BRANCHLING_HOME wins over everything, and is the hook the rest is tested t
     XDG_DATA_HOME: "/xdg/data",
     APPDATA: "C:\\Users\\x\\AppData\\Roaming",
   }, "win32");
-  assert.equal(paths.home, "/somewhere/mine");
-  assert.equal(paths.config, "/somewhere/mine/config");
-  assert.equal(paths.data, "/somewhere/mine/data");
+  assert.equal(paths.home, resolve("/somewhere/mine"));
+  assert.equal(paths.config, join(resolve("/somewhere/mine"), "config"));
+  assert.equal(paths.data, join(resolve("/somewhere/mine"), "data"));
   assert.equal(paths.source, "env");
 });
 
 test("XDG is respected when set, and each variable is honoured on its own", () => {
   const both = homePaths({ XDG_CONFIG_HOME: "/xdg/config", XDG_DATA_HOME: "/xdg/data" }, "linux");
-  assert.equal(both.config, "/xdg/config/branchling");
-  assert.equal(both.data, "/xdg/data/branchling");
+  assert.equal(both.config, join(resolve("/xdg/config"), "branchling"));
+  assert.equal(both.data, join(resolve("/xdg/data"), "branchling"));
   assert.equal(both.source, "xdg");
 
   // Only one of the two set is a real configuration, not an error: the other
   // falls back to the platform default rather than dragging both into it.
   const half = homePaths({ XDG_CONFIG_HOME: "/xdg/config" }, "linux");
-  assert.equal(half.config, "/xdg/config/branchling");
+  assert.equal(half.config, join(resolve("/xdg/config"), "branchling"));
   assert.equal(half.data, join(homedir(), ".local", "share", "branchling"));
 });
 

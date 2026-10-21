@@ -123,7 +123,7 @@ test("a task the agent closed itself is NOT written over by the stuck status", (
     const agent = agentScript(dir, "closer.sh", [
       'id=$(grep -m1 "^id: " | sed "s/^id: //")',
       'touch "$id.done"',
-      process.execPath + ' ' + JSON.stringify(CLI) +
+      JSON.stringify(posixPath(process.execPath)) + " " + JSON.stringify(CLI) +
         ' done "$id" --dir ' + JSON.stringify(backlog) + ' --actor user:someone >/dev/null 2>&1',
     ].join("\n"));
 
@@ -158,7 +158,7 @@ test("the same run, read on the terminal, does not call it blocked", () => {
     const agent = agentScript(dir, "closer.sh", [
       'id=$(grep -m1 "^id: " | sed "s/^id: //")',
       'touch "$id.done"',
-      process.execPath + ' ' + JSON.stringify(CLI) +
+      JSON.stringify(posixPath(process.execPath)) + " " + JSON.stringify(CLI) +
         ' done "$id" --dir ' + JSON.stringify(backlog) + ' --actor user:someone >/dev/null 2>&1',
     ].join("\n"));
 
@@ -237,7 +237,7 @@ test("a task handed on while the run worked is NOT parked by that run", () => {
     // agents over work that is now theirs.
     const agent = agentScript(dir, "hander.sh", [
       'id=$(grep -m1 "^id: " | sed "s/^id: //")',
-      process.execPath + " " + JSON.stringify(CLI) +
+      JSON.stringify(posixPath(process.execPath)) + " " + JSON.stringify(CLI) +
         ' handoff "$id" --dir ' + JSON.stringify(backlog) +
         ' --actor agent:worker --to-owner user:someone --reason "a person has to decide this one"',
     ].join("\n"));
@@ -275,7 +275,7 @@ test("the terminal report tells `held elsewhere` from `closed elsewhere`", () =>
   try {
     const agent = agentScript(dir, "hander.sh", [
       'id=$(grep -m1 "^id: " | sed "s/^id: //")',
-      process.execPath + " " + JSON.stringify(CLI) +
+      JSON.stringify(posixPath(process.execPath)) + " " + JSON.stringify(CLI) +
         ' handoff "$id" --dir ' + JSON.stringify(backlog) +
         ' --actor agent:worker --to-owner user:someone --reason "a person has to decide this one"',
     ].join("\n"));

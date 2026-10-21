@@ -105,7 +105,7 @@ function adapterClosingAs(root, name, backlog, closer) {
     "input=$(cat)",
     "id=$(printf '%s' \"$input\" | sed -n 's/^id: //p' | head -n 1)",
     'touch "$id.done"',
-    process.execPath + " " + JSON.stringify(CLI) + ' done "$id" --dir ' + JSON.stringify(backlog) +
+    JSON.stringify(posixPath(process.execPath)) + " " + JSON.stringify(CLI) + ' done "$id" --dir ' + JSON.stringify(backlog) +
       " --actor " + closer + " >/dev/null 2>&1",
     "echo closed",
   ].join("\n") + "\n", "utf8");

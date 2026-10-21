@@ -43,13 +43,13 @@
 
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join } from "node:path";
 
 import { HISTORY_DIRNAME } from "./history.mjs";
 import { gitLogArgs, parseLog } from "./modified-files.mjs";
 import { parseTaskRecord } from "./task-select.mjs";
 import { taskIdScanner } from "./task-id.mjs";
-import { canonicalPath } from "./canonical-path.mjs";
+import { canonicalPath, repoRelative } from "./canonical-path.mjs";
 
 /** A day, in seconds — the unit `active_branch_days` is expressed in. */
 const DAY = 86_400;
@@ -100,7 +100,7 @@ export function backlogRelFor(repoRoot, backlogDir) {
     // `resolveBacklogDir()` has not, so on macOS the /tmp to /private/tmp pair
     // made `relative()` return a path starting with `..` for a backlog in the
     // right place (BL-1418).
-    const rel = relative(canonicalPath(repoRoot), canonicalPath(backlogDir));
+    const rel = repoRelative(repoRoot, backlogDir);
     return rel.startsWith("..") ? null : rel;
   } catch {
     return null;

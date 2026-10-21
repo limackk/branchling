@@ -24,7 +24,7 @@ import assert from "node:assert/strict";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { acquireLock, isExpired, listLocks, lockScope, readLock, releaseLock, stateRoot } from "../lock.mjs";
@@ -162,8 +162,8 @@ test("every worktree of one repository shares the lock namespace", () => {
 });
 
 test("the state directory is redirectable and never guessed from the product name", () => {
-  assert.equal(stateRoot({ BACKLOG_STATE_DIR: "/tmp/x" }), "/tmp/x");
-  assert.ok(stateRoot({ XDG_STATE_HOME: "/tmp/xdg" }).startsWith("/tmp/xdg/"));
+  assert.equal(stateRoot({ BACKLOG_STATE_DIR: "/tmp/x" }), resolve("/tmp/x"));
+  assert.ok(stateRoot({ XDG_STATE_HOME: "/tmp/xdg" }).startsWith(join(resolve("/tmp/xdg"), "")));
   assert.ok(stateRoot({}).includes(".local"));
 });
 

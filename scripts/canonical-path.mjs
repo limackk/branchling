@@ -16,7 +16,7 @@
  * canonicalisation must not take a command down.
  */
 import { realpathSync } from "node:fs";
-import { resolve } from "node:path";
+import { relative, resolve, sep } from "node:path";
 
 export function canonicalPath(path) {
   const absolute = resolve(String(path));
@@ -25,4 +25,14 @@ export function canonicalPath(path) {
   } catch {
     return absolute;
   }
+}
+
+/**
+ * A path inside the repository as git spells it: relative to the root, with
+ * `/` between segments on every platform. This is the form `git ls-files`,
+ * `git log -- <path>` and every index this tool builds speak; a `\` from
+ * `relative()` on Windows matches none of them.
+ */
+export function repoRelative(root, path) {
+  return relative(canonicalPath(root), canonicalPath(path)).split(sep).join("/");
 }

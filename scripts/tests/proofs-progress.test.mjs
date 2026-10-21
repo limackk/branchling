@@ -143,7 +143,10 @@ test("the narration is on stderr and the report on stdout, unchanged", () => {
 
 // ── One interrupt ends the audit ──────────────────────────────────────────
 
-test("a single signal stops the walk, and it says where it stopped", async () => {
+test("a single signal stops the walk, and it says where it stopped", {
+  // Windows has no signal a child can catch and finish its entry on (TL-463).
+  skip: process.platform === "win32" ? "POSIX signal contract" : false,
+}, async () => {
   // The measured failure this defends against: the audit died on the first
   // signal and left the contract it had in flight spawning into temporary
   // trees, so stopping the command took three kills. Here the signal arrives

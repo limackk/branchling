@@ -8,7 +8,7 @@ import { join } from "node:path";
 
 import { COMMANDS, resolveCommand } from "../cli.mjs";
 import { parseRunArgs } from "../run-loop.mjs";
-import { isolateHome } from "./_repo.mjs";
+import { isolateHome, posixPath } from "./_repo.mjs";
 
 isolateHome("execution-product-boundary");
 
@@ -50,7 +50,7 @@ test("only foreground execution ships, and it leaves the caller's Git topology u
     writeFileSync(agent, '#!/bin/sh\nid=$(sed -n "s/^id: //p" | head -1)\ntouch "$id.done"\n');
     chmodSync(agent, 0o755);
     const before = { branch: git(["branch", "--show-current"], repo), trees: git(["worktree", "list", "--porcelain"], repo) };
-    const ran = cli(["run", "--dir", backlog, "--actor", "agent:test", "--agent", agent, "--max-tasks", "1", "--json"], { BACKLOG_STATE_DIR: state }, repo);
+    const ran = cli(["run", "--dir", backlog, "--actor", "agent:test", "--agent", posixPath(agent), "--max-tasks", "1", "--json"], { BACKLOG_STATE_DIR: state }, repo);
     assert.equal(ran.status, 0, ran.stdout + ran.stderr);
     assert.equal(JSON.parse(ran.stdout).tasks[0].outcome, "closed");
     assert.deepEqual({ branch: git(["branch", "--show-current"], repo), trees: git(["worktree", "list", "--porcelain"], repo) }, before);

@@ -27,7 +27,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 import { extractMeta, stripComment, unquote } from "../task-fields.mjs";
 import { parseBoardsYaml } from "../config.mjs";
@@ -142,7 +142,7 @@ test("the refs guard SEES a blocked_by that has a comment beside it", () => {
   const result = auditRefs(
     "/tasks",
     "BL",
-    (p) => files[p.split("/").pop()],
+    (p) => files[basename(p)],
     () => Object.keys(files),
   );
   const dangling = JSON.stringify(result);

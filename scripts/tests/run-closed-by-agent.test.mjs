@@ -113,7 +113,7 @@ function closerAs(dir, name, backlog, closer) {
   return agentScript(dir, name, [
     'id=$(grep -m1 "^id: " | sed "s/^id: //")',
     'touch "$id.done"',
-    process.execPath + " " + JSON.stringify(CLI) +
+    JSON.stringify(posixPath(process.execPath)) + " " + JSON.stringify(CLI) +
       ' done "$id" --dir ' + JSON.stringify(backlog) +
       " --actor " + closer + " >/dev/null 2>&1",
   ].join("\n"));

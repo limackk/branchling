@@ -121,7 +121,7 @@ test("a task the agent closed itself ends the run in ONE attempt", () => {
     const agent = agentScript(dir, "closer.sh", [
       'id=$(grep -m1 "^id: " | sed "s/^id: //")',
       'touch "$id.done"',
-      process.execPath + ' ' + JSON.stringify(CLI) +
+      JSON.stringify(posixPath(process.execPath)) + " " + JSON.stringify(CLI) +
         ' done "$id" --dir ' + JSON.stringify(backlog) + ' --actor user:someone >/dev/null 2>&1',
     ].join("\n"));
 

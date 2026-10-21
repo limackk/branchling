@@ -27,7 +27,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
@@ -35,7 +35,8 @@ import {
   normalizeDocPath, parseDriftArgs, seedTasks, statusClaims, tasksNewerThanDoc,
 } from "../docs-drift.mjs";
 import { taskIdPatterns } from "../task-id.mjs";
-import { alignTemplate, isolateHome } from "./_repo.mjs";
+import { alignTemplate, isolateHome, posixPath } from "./_repo.mjs";
+import { posixShell } from "../posix-shell.mjs";
 
 // THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
 // file in its own process, so one call covers every case in it. Without this a
@@ -428,10 +429,12 @@ test("what --seed-tasks writes passes check, and its contract really runs", () =
   const bin = join(dir, ".bin");
   mkdirSync(bin, { recursive: true });
   const shim = join(bin, "branchling");
-  writeFileSync(shim, '#!/bin/sh\nexec "' + process.execPath + '" "' + CLI + '" "$@"\n', "utf8");
+  writeFileSync(shim, '#!/bin/sh\nexec "' + posixPath(process.execPath) + '" "' + posixPath(CLI) + '" "$@"\n', "utf8");
   chmodSync(shim, 0o755);
-  const sh = (cmd) => spawnSync("/bin/sh", ["-c", cmd], {
-    cwd: dir, encoding: "utf8", env: { ...process.env, NO_COLOR: "1", PATH: bin + ":" + process.env.PATH },
+  // In the shell `done` uses, so the shim is found the way the contract will be.
+  const sh = (cmd) => spawnSync(cmd, {
+    shell: posixShell(), cwd: dir, encoding: "utf8",
+    env: { ...process.env, NO_COLOR: "1", PATH: bin + delimiter + process.env.PATH },
   });
 
   assert.equal(sh(contract).status, 1, "the contract must FAIL while the document is still broken");

@@ -22,7 +22,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -209,9 +209,7 @@ test("`new` takes the number from a FIELD, not from the last line of stdout", ()
   // against a regex so that a scanner printing anything unexpected could not
   // produce a `TASK-NaN-*.md`. That regex was the only thing standing between
   // the two.
-  const source = spawnSync("node", ["-e",
-    "process.stdout.write(require('fs').readFileSync('" + join(HERE, "..", "new-task.mjs") + "', 'utf8'))"],
-    { encoding: "utf8" }).stdout;
+  const source = readFileSync(join(HERE, "..", "new-task.mjs"), "utf8");
   assert.match(source, /next-backlog-id\.mjs".*"--json"|"--json"/s,
     "`new` no longer asks for JSON");
   assert.equal(/split\("\\n"\)\.pop\(\)/.test(source), false,

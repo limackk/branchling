@@ -20,6 +20,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { isolateHome, SCRIPTS_DIR } from "./_repo.mjs";
+import { canonicalPath } from "../canonical-path.mjs";
 
 // THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
 // file in its own process, so one call covers every case in it. Without this a
@@ -447,7 +448,7 @@ test("the working directory is the REPOSITORY root, in both layouts", () => {
   const repo = mkdtempSync(join(tmpdir(), "branchling-root-"));
   try {
     assert.equal(spawnSync("git", ["-C", repo, "init", "-q"]).status, 0, "git init failed");
-    const real = spawnSync("git", ["-C", repo, "rev-parse", "--show-toplevel"], { encoding: "utf8" }).stdout.trim();
+    const real = canonicalPath(spawnSync("git", ["-C", repo, "rev-parse", "--show-toplevel"], { encoding: "utf8" }).stdout.trim());
 
     mkdirSync(join(repo, "backlog", "tasks"), { recursive: true });
     assert.equal(repoRootFor(join(repo, "backlog")), real, "nested layout: not the repository root");

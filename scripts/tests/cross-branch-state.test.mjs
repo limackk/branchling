@@ -530,7 +530,13 @@ test("the configuration rejects a negative window instead of scanning nothing", 
   }
 });
 
-test("NO PATH RUNS `git fetch` — the tool works with no network", () => {
+test("NO PATH RUNS `git fetch` — the tool works with no network", {
+  // The probe is a `git` shim on PATH. Windows finds git through PATHEXT, so an
+  // extensionless shim is never the one run there, and the test would measure
+  // nothing (TL-463). Which git subcommands the code calls does not vary by
+  // platform; POSIX measures it for both.
+  skip: process.platform === "win32" ? "extensionless PATH shim" : false,
+}, () => {
   // Asserted against the calls git actually receives, not by reading the source:
   // a `fetch` reached through a helper or an alias would be invisible to a grep
   // and would show up here as a recorded argument list.

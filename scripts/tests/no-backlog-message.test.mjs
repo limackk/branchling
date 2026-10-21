@@ -24,7 +24,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { COMMANDS } from "../cli.mjs";
 import { BacklogNotFoundError, resolveBacklogDirOrExit } from "../paths.mjs";
@@ -79,7 +79,7 @@ test("POSITIVE CONTROL: a genuine programmer error STILL shows its stack", () =>
   const dir = mkdtempSync(join(tmpdir(), "branchling-boom-"));
   const script = join(dir, "boom.mjs");
   writeFileSync(script,
-    'import { resolveBacklogDirOrExit } from ' + JSON.stringify(join(dirname(CLI), "paths.mjs")) + ';\n' +
+    'import { resolveBacklogDirOrExit } from ' + JSON.stringify(pathToFileURL(join(dirname(CLI), "paths.mjs")).href) + ';\n' +
     "resolveBacklogDirOrExit({ get dir() { throw new TypeError('a real bug'); } });\n", "utf8");
   const r = spawnSync(process.execPath, [script], { cwd: dir, encoding: "utf8", timeout: 30_000 });
   assert.notEqual(r.status, 0);

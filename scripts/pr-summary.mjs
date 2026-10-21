@@ -39,7 +39,7 @@
 
 import { spawnSync } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
-import { dirname, join, relative } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadConfigOrExit } from "./config.mjs";
@@ -50,6 +50,7 @@ import { PRODUCT_NAME as N } from "./product.mjs";
 import { actorParts } from "./task-fields.mjs";
 import { taskIdPatterns } from "./task-id.mjs";
 import { failure } from "./ui.mjs";
+import { repoRelative } from "./canonical-path.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -344,8 +345,8 @@ export function buildSummary({ root, config, base, cost, run = git }) {
     return { ...empty, reason: "not a git repository — a branch summary has no range to read" };
   }
   const paths = backlogPaths(root);
-  const tasksRel = relative(repo, paths.tasksDir) || ".";
-  const historyRel = relative(repo, paths.historyDir) || ".";
+  const tasksRel = repoRelative(repo, paths.tasksDir) || ".";
+  const historyRel = repoRelative(repo, paths.historyDir) || ".";
 
   const range = base + "...HEAD";
   const names = run(repo, ["diff", "--name-status", range, "--", tasksRel]);

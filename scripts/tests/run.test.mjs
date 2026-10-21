@@ -488,7 +488,7 @@ test("each role is worked by ITS OWN command, and the role-less task by --agent"
     // fixture's directory.
     const ledger = join(dir, "who.log");
     const mk = (name) => agentScript(dir, name + ".sh",
-      'id=$(grep -m1 "^id: " | sed "s/^id: //"); touch "$id.done"; echo "$id ' + name + '" >> ' + ledger);
+      'id=$(grep -m1 "^id: " | sed "s/^id: //"); touch "$id.done"; echo "$id ' + name + '" >> ' + JSON.stringify(ledger));
     const r = cli([
       "run", "--dir", backlog, "--actor", "agent:worker",
       "--agent", mk("general"),

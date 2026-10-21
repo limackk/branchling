@@ -17,13 +17,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { get } from "node:http";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { isolateHome, isolateState, SCRIPTS_DIR } from "./_repo.mjs";
+import { canonicalPath } from "../canonical-path.mjs";
 
 // THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
 // file in its own process, so one call covers every case in it. Without this a
@@ -53,7 +54,7 @@ function freePort() {
 
 /** A real backlog on disk, created by the tool itself, named as we ask. */
 function makeBacklog(projectName) {
-  const dir = realpathSync(mkdtempSync(join(tmpdir(), "branchling-identity-")));
+  const dir = canonicalPath(mkdtempSync(join(tmpdir(), "branchling-identity-")));
   const init = spawnSync(process.execPath, [CLI, "init", "--dir", dir], {
     encoding: "utf8",
     timeout: 30_000,
@@ -138,7 +139,7 @@ test("/api/ping names the backlog it serves, resolved and absolute", async () =>
     const bound = await server.bound;
     const body = await ping(bound);
     assert.ok(body, "the probe endpoint did not answer");
-    assert.equal(body.backlogDir, realpathSync(dir), "backlogDir must be the resolved absolute path");
+    assert.equal(body.backlogDir, canonicalPath(dir), "backlogDir must be the resolved absolute path");
     assert.equal(body.projectName, "Ping Project");
     assert.ok(body.pid > 0, "pid is what makes the answer actionable in `kill`");
   } finally {

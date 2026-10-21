@@ -117,7 +117,13 @@ function runWithStalledReader(script) {
   });
 }
 
-test("POSITIVE CONTROL: the old pattern truncates over the same number of bytes", async () => {
+test("POSITIVE CONTROL: the old pattern truncates over the same number of bytes", {
+  // A Windows pipe write blocks until the reader drains it, so the race this
+  // control reproduces cannot happen there and the child never exits (TL-463).
+  // The fix is still tested on Windows by every case above; only the proof
+  // that the platform CAN lose bytes is POSIX-only.
+  skip: process.platform === "win32" ? "POSIX non-blocking pipe" : false,
+}, async () => {
   const dir = mkdtempSync(join(tmpdir(), "branchling-json-pipe-control-"));
   const script = join(dir, "old-pattern.mjs");
   writeFileSync(script,

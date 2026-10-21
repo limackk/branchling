@@ -86,7 +86,7 @@ test("a compatible adapter passes every offline outcome in human and JSON modes 
     assert.equal(sample[3], "agent:conformance");
     assert.equal(sample[4], "conformance");
     assert.equal(sample[5], "TL-CONFORMANCE-1");
-    assert.match(sample[6], /repository\/backlog$/);
+    assert.match(sample[6], /repository[\\/]backlog$/);
     assert.match(sample[7], /repository$/);
     assert.equal(sample[8], "Prove the adapter contract from evidence only.");
     assert.equal(sample[9], "conformance-model");

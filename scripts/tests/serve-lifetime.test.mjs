@@ -129,7 +129,13 @@ function call(port, path) {
 const entries = () => listServers();
 const entryFor = (port) => entries().find((e) => e.port === port) || null;
 
-test("a running server is in the register, and its entry goes when it exits", async () => {
+// Windows delivers no SIGTERM or SIGINT to a handler: `kill()` there ends the
+// process outright, so a graceful-exit contract has nothing to observe (TL-463).
+// A server killed that way leaves a stale entry, which the SIGKILL case below
+// already shows the next serve reclaiming.
+const POSIX_SIGNALS = process.platform === "win32" ? "POSIX signal contract" : false;
+
+test("a running server is in the register, and its entry goes when it exits", { skip: POSIX_SIGNALS }, async () => {
   const fixture = backlog();
   const port = await freePort();
   const handle = startServer(fixture.root, port);
@@ -166,7 +172,7 @@ test("a running server is in the register, and its entry goes when it exits", as
   }
 });
 
-test("Ctrl-C still stops it, exit 0, and the entry goes with it", async () => {
+test("Ctrl-C still stops it, exit 0, and the entry goes with it", { skip: POSIX_SIGNALS }, async () => {
   const fixture = backlog();
   const port = await freePort();
   const handle = startServer(fixture.root, port);
