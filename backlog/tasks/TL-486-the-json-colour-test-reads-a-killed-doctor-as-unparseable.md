@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 1h | 2h | 3h | 4h | 1d | 1w
@@ -34,5 +34,5 @@ On 2026-10-26, during the pre-publication run for 0.1.1, the test failed once in
 
 ## Acceptance criteria
 
-- [ ] the --json test reports a killed child as such and its messages are English [proof: ui]
-- [ ] the whole suite stays green [proof: suite]
+- [x] the --json test reports a killed child as such and its messages are English [proof: ui]
+- [x] the whole suite stays green [proof: suite]

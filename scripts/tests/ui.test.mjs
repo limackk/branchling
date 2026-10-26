@@ -40,13 +40,22 @@ const CLI = join(SCRIPTS, "cli.mjs");
 const ESC = "\u001b";
 const SEQ = /\u001b\[[0-9;]*m/g;
 
-function run(args, env) {
+function run(args, env, timeout = 30_000) {
   return spawnSync(process.execPath, [CLI].concat(args), {
     cwd: join(SCRIPTS, ".."),
     encoding: "utf8",
-    timeout: 30_000,
+    timeout,
     env: { ...process.env, ...env },
   });
+}
+
+/**
+ * A child killed by its budget printed nothing to judge, and must not be read
+ * as output that fails to parse (TL-486): that verdict would be about the
+ * machine's load, reported as if it were about the program.
+ */
+function killed(r) {
+  return r.error?.code === "ETIMEDOUT" || (r.status === null && r.signal !== null);
 }
 
 // ── When colour is allowed ────────────────────────────────────────────────
@@ -98,12 +107,35 @@ test("--no-color works like the variable, through the dispatcher", () => {
 
 // ── --json belongs to the machine ─────────────────────────────────────────
 
+// `doctor` inspects the configuration, the tree, git and the guards: about 4 s
+// on its own in this repository, against under half a second for `stats` and
+// `query`. The shared 30 s left it a margin of seven, and the whole suite
+// running in parallel consumed it once (TL-486), so its budget is sized for a
+// loaded machine rather than for the median run.
+const JSON_COMMANDS = [
+  { args: ["stats", "--json"], budget: 30_000 },
+  { args: ["query", "--json"], budget: 30_000 },
+  { args: ["doctor", "--json"], budget: 120_000 },
+];
+
 test("--json is NEVER coloured and always parses", () => {
-  for (const args of [["stats", "--json"], ["query", "--json"], ["doctor", "--json"]]) {
-    const r = run(args, { FORCE_COLOR: "1", NO_COLOR: undefined });
-    assert.ok(!r.stdout.includes(ESC), args.join(" ") + ": sekwencje w JSON-ie");
-    assert.doesNotThrow(() => JSON.parse(r.stdout), args.join(" ") + ": does not parse");
+  for (const { args, budget } of JSON_COMMANDS) {
+    const r = run(args, { FORCE_COLOR: "1", NO_COLOR: undefined }, budget);
+    const name = args.join(" ");
+    assert.ok(!killed(r), name + ": killed (" + (r.signal || r.error?.code) + ") after its " +
+      budget / 1000 + " s budget, so there was no output to judge; that is the machine's load, " +
+      "not the command's JSON");
+    assert.ok(!r.stdout.includes(ESC), name + ": escape sequences in the JSON");
+    assert.doesNotThrow(() => JSON.parse(r.stdout), name + ": does not parse");
   }
+});
+
+test("a child killed by its budget is recognised as killed, not as output", () => {
+  const r = spawnSync(process.execPath, ["-e", "setTimeout(() => {}, 10_000)"], {
+    encoding: "utf8", timeout: 200,
+  });
+  assert.equal(killed(r), true, "a child stopped by its timeout was not recognised");
+  assert.equal(killed(run(["stats", "--json"], {})), false, "a finished child was read as killed");
 });
 
 // ── A rule, not a one-off fix ─────────────────────────────────────────────
