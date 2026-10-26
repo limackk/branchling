@@ -1,0 +1,1 @@
+{"id":"01M5WKB1XMABTWW3XKSYHXS9JW","ts":"2026-10-26T17:15:13.716Z","task":"TL-488","field":"__created__","from":"","to":"A live id mutex holder is never judged stale by its own scanner timeout","actor":"agent:claude","source":"new","reason":"unknown"}
