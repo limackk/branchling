@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 3h
@@ -43,5 +43,5 @@ The guard exists for a dispatcher that hands out the same task with nothing chan
 
 ## Acceptance criteria
 
-- [ ] a task returning after its new blocker closed is worked again, and an unchanged repeat still stops the run [proof: run]
-- [ ] the whole suite stays green [proof: suite]
+- [x] a task returning after its new blocker closed is worked again, and an unchanged repeat still stops the run [proof: run]
+- [x] the whole suite stays green [proof: suite]

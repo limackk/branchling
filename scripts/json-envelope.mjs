@@ -82,6 +82,10 @@ export const KINDS = {
     // directions over one role boundary (TL-417). The full finding travels so
     // a consumer gets the pair and both hands' reasons without parsing prose.
     skippedDeadlocked: [],
+    // `{id, role, eligible}` when the spin guard ended the run (TL-484): the
+    // stop is a fact about one task, and `eligible` counts the OTHER tasks the
+    // dispatcher would still hand out, so it never reads as an empty queue.
+    spinGuard: null,
   },
   // `advisories` are the findings `check` stopped reporting when it became a
   // release gate (TL-383): each `{ name, output }`, where `name` is the same

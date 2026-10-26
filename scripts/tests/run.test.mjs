@@ -32,7 +32,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { agentFor, agentInput, blockedReason, parseRunArgs, renderAgentCommand, servedRoles, stuckStatus, waitingForExecutor, waitingForRole } from "../run-loop.mjs";
+import { agentFor, agentInput, blockedReason, parseRunArgs, renderAgentCommand, servedRoles, stuckStatus, turnKey, waitingForExecutor, waitingForRole } from "../run-loop.mjs";
 
 import { isolateHome, posixPath } from "./_repo.mjs";
 
@@ -684,4 +684,100 @@ test("a backlog straight out of `init` needs no repair before a run (TL-140)", (
   } finally {
     cleanup(dir);
   }
+});
+
+// ── The spin guard and a task that legitimately comes back (TL-484) ─────────
+
+/** Rewrite frontmatter lines of one task in place — the edit a hand makes. */
+function setFields(backlog, id, fields) {
+  const file = join(backlog, "tasks", readdirSync(join(backlog, "tasks")).find((f) => f.startsWith(id + "-")));
+  let raw = readFileSync(file, "utf8");
+  for (const [key, value] of Object.entries(fields)) {
+    raw = raw.replace(new RegExp("^" + key + ":.*$", "m"), key + ": " + value);
+  }
+  writeFileSync(file, raw, "utf8");
+}
+
+/** A shell line that parks `id` on `blockers` and gives up the claim, as a hand
+ *  that met a new obstacle does. Absolute paths: the hand's cwd is not ours. */
+function parkLine(backlog, id, blockers) {
+  const file = posixPath(join(backlog, "tasks", readdirSync(join(backlog, "tasks")).find((f) => f.startsWith(id + "-"))));
+  return "sed -e 's/^status:.*/status: blocked/' -e 's/^owner:.*/owner: unassigned/'" +
+    " -e 's/^blocked_by:.*/blocked_by: [" + blockers.join(", ") + "]/' '" + file + "' > '" + file + ".tmp'" +
+    " && mv '" + file + ".tmp' '" + file + "'";
+}
+
+test("a task parked on a new blocker the run then closed is worked again (TL-484)", () => {
+  // The five steps measured downstream: A is handed out, its hand parks it on
+  // B, the same run closes B, `next` hands A out again — and the run must work
+  // it rather than call that a spin.
+  const { dir, repo, backlog, env, ids } = fixture(2);
+  const [a, b] = ids;
+  try {
+    setFields(backlog, b, { priority: "P2" });
+    const marker = posixPath(join(dir, a + ".parked-once"));
+    const agent = agentScript(dir, "obstacle.sh", [
+      'id=$(grep -m1 "^id: " | sed "s/^id: //")',
+      'if [ "$id" = "' + a + '" ] && [ ! -f "' + marker + '" ]; then',
+      '  touch "' + marker + '"',
+      "  " + parkLine(backlog, a, [b]),
+      "else",
+      '  touch "$id.done"',
+      "fi",
+    ].join("\n"));
+    const r = cli(["run", "--dir", backlog, "--actor", "agent:worker", "--agent", agent, "--max-attempts", "1", "--json"], env, { cwd: repo });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    const out = JSON.parse(r.stdout);
+    assert.ok(existsSync(join(dir, a + ".parked-once")), "the hand never parked the task, so nothing was reproduced");
+    assert.deepEqual(out.tasks.map((t) => t.id), [a, b, a], JSON.stringify(out.tasks));
+    assert.equal(statusOf(backlog, b), "done");
+    assert.equal(statusOf(backlog, a), "done", "the task that came back was not worked: " + out.stopped);
+    assert.equal(out.spinGuard, null);
+    assert.equal(out.stopped, "the queue is empty");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("POSITIVE CONTROL: a task handed out again with nothing changed still stops the run (TL-484)", () => {
+  // A waits on B, which is already closed, so `next` hands A out. Its hand
+  // parks it on the SAME blocker — nothing about the task changed — and `next`
+  // hands it straight back. That is the spin, and the third task, still
+  // eligible, is what the stop has to name.
+  const { dir, repo, backlog, env, ids } = fixture(3);
+  const [a, b, c] = ids;
+  try {
+    setFields(backlog, b, { status: "done" });
+    setFields(backlog, a, { status: "blocked", blocked_by: "[" + b + "]" });
+    setFields(backlog, c, { priority: "P2" });
+    const count = posixPath(join(dir, a + ".turns"));
+    const agent = agentScript(dir, "same.sh", [
+      'id=$(grep -m1 "^id: " | sed "s/^id: //")',
+      'if [ "$id" = "' + a + '" ]; then',
+      '  echo turn >> "' + count + '"',
+      "  " + parkLine(backlog, a, [b]),
+      "else",
+      '  touch "$id.done"',
+      "fi",
+    ].join("\n"));
+    const r = cli(["run", "--dir", backlog, "--actor", "agent:worker", "--agent", agent, "--max-attempts", "1", "--json"], env, { cwd: repo });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    const out = JSON.parse(r.stdout);
+    assert.equal(readFileSync(join(dir, a + ".turns"), "utf8").trim().split("\n").length, 1,
+      "the unchanged task was worked a second time");
+    assert.match(out.stopped, new RegExp(a + " was handed out twice"), out.stopped);
+    assert.match(out.stopped, /1 other task\(s\) are still eligible/, out.stopped);
+    assert.deepEqual(out.spinGuard, { id: a, role: "", eligible: 1 });
+    assert.equal(statusOf(backlog, a), "blocked", "the claim was not given back");
+    assert.equal(statusOf(backlog, c), "pending", "the run went on after its guard fired");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("turnKey: the blockers at hand-out are part of the turn, their order and case are not", () => {
+  assert.equal(turnKey("TL-1", "", []), turnKey("tl-1", "", undefined)); // renumber: allow
+  assert.equal(turnKey("TL-1", "dev", ["TL-3", "tl-2"]), turnKey("TL-1", "dev", "TL-2, TL-3")); // renumber: allow
+  assert.notEqual(turnKey("TL-1", "", ["TL-2"]), turnKey("TL-1", "", ["TL-2", "TL-3"])); // renumber: allow
+  assert.notEqual(turnKey("TL-1", "dev", []), turnKey("TL-1", "qa", [])); // renumber: allow
 });
