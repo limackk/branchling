@@ -54,6 +54,8 @@ import { BLOCK_MARKER_NAME as MARKER, PRODUCT_NAME as N } from "./product.mjs";
 import { inProgressStatus } from "./take-task.mjs";
 import { failure } from "./ui.mjs";
 import { writeOut } from "./stdout.mjs";
+import { canonicalPath } from "./canonical-path.mjs";
+import { gitDiscoveryEnv } from "./git-env.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -495,6 +497,14 @@ closed — after the last attempt it is parked in the status your
 \`reason_required_statuses\` protects, with the reason, and the dispatcher stops
 offering it.
 
+STOPPING A RUN WITHOUT CUTTING A TASK IN HALF. \`{{tool}} run --stop\`, from any
+shell on the same clone, asks every run of it to finish the task it is on and
+then claim nothing new; each reads the request before its next \`next\` and ends
+with \`stopped: asked to stop after <ID>\`. Do not freeze or kill the loop to get
+the same effect: a run killed between \`{{tool}} next\` and \`{{tool}} done\`
+leaves a claim that nobody is working, and one frozen while \`next\` runs holds
+a task \`next\` has already claimed.
+
 THE TWO ENDS OF A SESSION.
 
   starting   \`{{tool}} next --actor <ns:name>\` — one task, already claimed and
@@ -805,6 +815,17 @@ export const NUDGE_CLOSE = `<!-- <<< ${MARKER}:instructions -->`;
 
 /** The agent files a nudge is written into, most specific first. */
 export const AGENT_FILES = ["CLAUDE.md", "AGENTS.md"];
+export const CLAUDE_AGENT_FILE = AGENT_FILES[0];
+export const NEUTRAL_AGENT_FILE = AGENT_FILES[AGENT_FILES.length - 1];
+
+/** Claude Code's import syntax: the named file is loaded as if it were inline. */
+export const CLAUDE_IMPORT_LINE = "@" + NEUTRAL_AGENT_FILE;
+
+/** Whether the file at `path` imports AGENTS.md on a line of its own. */
+export function importsNeutral(path) {
+  if (!existsSync(path)) return false;
+  return readFileSync(path, "utf8").split(/\r?\n/).some((l) => l.trim() === CLAUDE_IMPORT_LINE);
+}
 
 /** Matches a block this tool wrote, whatever its version. */
 function nudgeBlockRe() {
@@ -844,9 +865,25 @@ export function nudgeBlock() {
  * named is the scattering that `init --dir` is mandatory to prevent.
  */
 export function nudgeRoot(root) {
-  const r = spawnSync("git", ["rev-parse", "--show-toplevel"], { cwd: root, encoding: "utf8", timeout: 10_000 });
-  if (r.status === 0 && String(r.stdout).trim()) return String(r.stdout).trim();
+  const r = spawnSync("git", ["rev-parse", "--show-toplevel"], { cwd: root, encoding: "utf8", timeout: 10_000, env: gitDiscoveryEnv() });
+  if (r.status === 0 && String(r.stdout).trim()) return canonicalPath(String(r.stdout).trim());
   return root;
+}
+
+/**
+ * What the agent files at the repository root carry, read only — the question
+ * `doctor` asks (TL-475). `version` is null for a file without the block.
+ *
+ * @param {string} root the backlog directory
+ * @returns {{base: string, files: {name: string, version: number|null, importsNeutral: boolean}[]}}
+ */
+export function nudgeState(root) {
+  const base = nudgeRoot(root);
+  const files = AGENT_FILES.filter((f) => existsSync(join(base, f))).map((name) => {
+    const found = readFileSync(join(base, name), "utf8").match(nudgeBlockRe());
+    return { name, version: found ? Number(found[1]) : null, importsNeutral: importsNeutral(join(base, name)) };
+  });
+  return { base, files };
 }
 
 /**
@@ -870,8 +907,24 @@ export function ensureNudge(root, opts = {}) {
   const present = AGENT_FILES.filter((f) => existsSync(join(base, f)));
   // Nothing to append to: create the neutral one rather than guessing which
   // editor the reader uses.
-  const targets = present.length ? present : [AGENT_FILES[AGENT_FILES.length - 1]];
+  let targets = present.length ? present : [NEUTRAL_AGENT_FILE];
+  // A CLAUDE.md that imports AGENTS.md already shows Claude Code the block
+  // written there; a second copy would be read twice.
+  if (targets.length > 1 && importsNeutral(join(base, CLAUDE_AGENT_FILE))) {
+    targets = targets.filter((f) => f !== CLAUDE_AGENT_FILE);
+  }
   const out = [];
+
+  // From nothing, AGENTS.md alone is invisible to Claude Code, which loads only
+  // CLAUDE.md (TL-474). The bridge is one import line, not a second pointer: the
+  // block lives in exactly one file, so a refresh has one place to update. It is
+  // created only when the repository had NO agent file — an existing AGENTS.md
+  // without a CLAUDE.md is somebody's choice of editor, and `doctor` reports it
+  // instead of this function overruling it.
+  if (!present.length && opts.create !== false) {
+    writeFileSync(join(base, CLAUDE_AGENT_FILE), CLAUDE_IMPORT_LINE + "\n", "utf8");
+    out.push(`  ${CLAUDE_AGENT_FILE}: created — it imports ${NEUTRAL_AGENT_FILE}, so Claude Code reads the same pointer`);
+  }
 
   for (const name of targets) {
     const path = join(base, name);

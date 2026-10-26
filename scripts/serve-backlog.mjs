@@ -32,8 +32,8 @@
 import { createServer, get } from "node:http";
 import { hostname } from "node:os";
 import { spawn } from "node:child_process";
-import { randomBytes } from "node:crypto";
-import { existsSync, readFileSync, realpathSync, renameSync, unlinkSync, watch, writeFileSync } from "node:fs";
+import { createHash, randomBytes } from "node:crypto";
+import { existsSync, readFileSync, renameSync, unlinkSync, watch, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -67,10 +67,12 @@ import { printJson } from "./json-envelope.mjs";
 import { todayStamp } from "./today.mjs";
 import {
   listTaskFiles,
+  readAllHistory,
   reconcile,
   recordEdit,
   requiresReason,
 } from "./history.mjs";
+import { canonicalPath } from "./canonical-path.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BUILD_BACKLOG = join(__dirname, "build-backlog.mjs");
@@ -217,6 +219,10 @@ const TASKS_DIR = join(BACKLOG_DIR, "tasks");
 const CONFIG = loadConfigOrExit(BACKLOG_DIR);
 const FIELDS = buildFieldSpecs(CONFIG);
 const CAPABILITY_TTL_MS = Math.max(1, Number(process.env.VIEWER_WRITE_CAPABILITY_TTL_MS) || 15 * 60 * 1000);
+// A page load is unauthenticated, so expiry alone is not a memory bound: a
+// foreign page can make opaque GET requests to a guessed loopback port. Keep a
+// small tab-sized window and evict deterministically in issuance order.
+const MAX_WRITE_CAPABILITIES = 32;
 const capabilities = new Map();
 let editQueue = Promise.resolve();
 
@@ -230,7 +236,7 @@ let editQueue = Promise.resolve();
  * a failed comparison must not take the process down.
  */
 function canonicalDir(dir) {
-  try { return realpathSync(dir); } catch { return dir; }
+  return canonicalPath(dir);
 }
 
 // The `/api/ping` handshake token now lives in `serve-registry.mjs`: the
@@ -283,12 +289,16 @@ function readBody(req, limitBytes = 16 * 1024) {
 }
 
 function newCapability() {
-  const token = randomBytes(32).toString("base64url");
-  const expiresAt = Date.now() + CAPABILITY_TTL_MS;
-  capabilities.set(token, expiresAt);
+  const now = Date.now();
   for (const [candidate, expiry] of capabilities) {
-    if (expiry <= Date.now()) capabilities.delete(candidate);
+    if (expiry <= now) capabilities.delete(candidate);
   }
+  while (capabilities.size >= MAX_WRITE_CAPABILITIES) {
+    capabilities.delete(capabilities.keys().next().value);
+  }
+  const token = randomBytes(32).toString("base64url");
+  const expiresAt = now + CAPABILITY_TTL_MS;
+  capabilities.set(token, expiresAt);
   return { token, expiresAt };
 }
 
@@ -318,6 +328,17 @@ function hasWriteCapability(req) {
 function fileForTaskId(id) {
   if (!ANY_TASK_ID.test(String(id || ""))) return null;
   return listTaskFiles(TASKS_DIR).find((file) => file.startsWith(id + "-")) || null;
+}
+
+function taskRevision(text) {
+  return createHash("sha256").update(text).digest("base64url");
+}
+
+function tasksWithRevisions() {
+  return readTasks(BACKLOG_DIR, CONFIG).map((task) => {
+    const file = fileForTaskId(task.id);
+    return { ...task, revision: file ? taskRevision(readFileSync(join(TASKS_DIR, file), "utf8")) : "" };
+  });
 }
 
 function fieldOptions() {
@@ -583,6 +604,12 @@ async function handleFieldEdit(payload) {
     if (!taskFile) throw Object.assign(new Error("Task not found: " + id), { status: 404 });
     const full = join(TASKS_DIR, taskFile);
     const original = readFileSync(full, "utf8");
+    const revision = taskRevision(original);
+    if (typeof payload?.revision !== "string" || payload.revision !== revision) {
+      throw Object.assign(new Error("The task changed after this page read it; refresh before editing"), {
+        status: 409, revision,
+      });
+    }
     const before = extractMeta(splitFrontmatter(original).frontmatter);
     let text = setFrontmatterField(original, field, normalized.value, spec);
     text = setFrontmatterField(text, "updated", todayStamp());
@@ -605,7 +632,10 @@ async function handleFieldEdit(payload) {
     for (const client of sseClients) {
       try { client.write("event: tasks-changed\ndata: {}\n\n"); } catch { sseClients.delete(client); }
     }
-    return { ok: true, id, field, value: normalized.value, actor, entries, regenerated };
+    return {
+      ok: true, id, field, value: normalized.value, actor, entries, regenerated,
+      revision: taskRevision(text),
+    };
   });
 }
 
@@ -615,11 +645,16 @@ async function handle(req, res) {
 
   if (path === "/" || path === "/index.html") {
     // Rendered fresh per request, so the first paint is already live data.
-    const tasks = readTasks(BACKLOG_DIR, CONFIG);
+    const tasks = tasksWithRevisions();
+    // The ledger in its own position (TL-482). The plan used to arrive in the
+    // `history` slot, so the served page folded its decisions, its board at a
+    // moment and its agent estimates out of plan.yaml instead of the history —
+    // and the file:// page, which takes the defaults, showed the right ones.
     const html = injectCapability(buildHtml(
       tasks,
       computeStats(tasks),
       CONFIG,
+      readAllHistory(BACKLOG_DIR),
       loadPlan(join(BACKLOG_DIR, PLAN_FILENAME))
     ), newCapability());
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
@@ -638,7 +673,7 @@ async function handle(req, res) {
   }
 
   if (path === "/api/tasks") {
-    const tasks = readTasks(BACKLOG_DIR, CONFIG);
+    const tasks = tasksWithRevisions();
     sendJson(res, 200, { tasks, stats: computeStats(tasks), plan: planPayload(BACKLOG_DIR) });
     return;
   }
@@ -675,7 +710,11 @@ async function handle(req, res) {
       const payload = JSON.parse(await readBody(req));
       sendJson(res, 200, await handleFieldEdit(payload));
     } catch (error) {
-      sendJson(res, error.status || 400, { error: error.message, needsReason: error.needsReason === true });
+      sendJson(res, error.status || 400, {
+        error: error.message,
+        needsReason: error.needsReason === true,
+        ...(error.revision ? { revision: error.revision } : {}),
+      });
     }
     return;
   }

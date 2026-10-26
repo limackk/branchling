@@ -55,7 +55,7 @@
 
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { relative, resolve } from "node:path";
+import { resolve } from "node:path";
 
 import { loadConfigOrExit } from "./config.mjs";
 import { crossBranchRepairs, scanNote } from "./branch-scan.mjs";
@@ -65,6 +65,8 @@ import { resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { taskIdScanner } from "./task-id.mjs";
 import { MARK, color, failure, refusal, heading, table } from "./ui.mjs";
+import { posixShell } from "./posix-shell.mjs";
+import { repoRelative } from "./canonical-path.mjs";
 
 const KNOWN_FLAGS = ["--json", "--repairs", "--dir"];
 const VALUE_FLAGS = ["--command", "--report", "--mine"];
@@ -201,7 +203,7 @@ export function redOwners(opts = {}) {
     // The index speaks in repository-root paths, so the two are reconciled here
     // rather than at every comparison.
     const abs = resolve(opts.cwd || process.cwd(), entry.name);
-    const path = root && existsSync(abs) ? relative(root, abs) : entry.name;
+    const path = root && existsSync(abs) ? repoRelative(root, abs) : entry.name;
     const row = root
       ? attributeFile(path, { root, byTask: index.byTask, scanner, run })
       : { path, tasks: [], lastTask: null, uncommitted: false };
@@ -356,7 +358,7 @@ export function main(argv, io = {}) {
     // in does not matter: both name the file beside each failure, and both are
     // read.
     const r = (io.run || spawnSync)(command, {
-      cwd: repo || root, encoding: "utf8", shell: true, timeout: 30 * 60_000,
+      cwd: repo || root, encoding: "utf8", shell: posixShell(), timeout: 30 * 60_000,
       maxBuffer: 256 * 1024 * 1024,
     });
     if (r.error) {

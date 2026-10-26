@@ -37,13 +37,15 @@ import { withBacklogMutex } from "./lock.mjs";
 import { parsePlanYaml } from "./plan.mjs";
 import { editPlanText, newPlanErrors } from "./plan-write.mjs";
 import { detectPrefixMismatch, prefixMismatchMessage, taskIdPatterns } from "./task-id.mjs";
-import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { backlogPaths, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { auditVocabulary, extractMeta, splitFrontmatter } from "./task-fields.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { readStdinText } from "./stdin.mjs";
 import { parseTaskDocument, taskContent } from "./task-input.mjs";
 import { failure, refusal } from "./ui.mjs";
 import { readTaskMetas } from "./task-io.mjs";
+import { agentEstimate, agentEstimateText } from "./agent-time.mjs";
+import { readAgentTime } from "./agent-time-read.mjs";
 import { todayStamp } from "./today.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -521,7 +523,7 @@ export async function main(argv) {
   if (input.code) return input.code;
   const content = input.document ? taskContent(input.document) : null;
 
-  const root = resolveBacklogDir({ dir: cli.dir, moduleDir: HERE }).root;
+  const root = resolveBacklogDirOrExit({ dir: cli.dir, moduleDir: HERE }, N + " new").root;
   const config = loadConfigOrExit(root);
   const paths = backlogPaths(root);
 
@@ -668,6 +670,14 @@ export async function main(argv) {
   }
   console.log("  board: " + board + (opts.board ? "" : " (the registry default)"));
   if (scheduling) console.log("  wave: " + opts.wave + " — scheduled in " + paths.planPath);
+  // The one moment an estimate can still change a decision is while it is being
+  // written (TL-480), shown as the computed field it is everywhere else
+  // (TL-482). Silent below the threshold: a value from three samples would be
+  // advice with the authority of a measurement.
+  if (opts.estimate) {
+    const field = agentEstimate(readAgentTime(root, config), opts.estimate);
+    if (field) console.log("  agent_estimate: " + agentEstimateText(field) + " (computed, not stored)");
+  }
   // What is left to do depends on what arrived: a task written from a document
   // already has its goal and its closing contract, and telling its author to go
   // and fill them in would be the tool disbelieving its own input.

@@ -31,7 +31,7 @@ import { fileURLToPath } from "node:url";
 
 import { TERMINAL_REFUSALS } from "../run-loop.mjs";
 
-import { isolateHome } from "./_repo.mjs";
+import { isolateHome, posixPath } from "./_repo.mjs";
 
 isolateHome("run-terminal-refusal");
 
@@ -98,7 +98,7 @@ function agentScript(dir, name, body) {
   const p = join(dir, name);
   writeFileSync(p, "#!/bin/sh\n" + 'echo x >> ' + JSON.stringify(join(dir, "calls")) + "\n" + body + "\n", "utf8");
   chmodSync(p, 0o755);
-  return p;
+  return posixPath(p);
 }
 
 function calls(dir) {
@@ -121,7 +121,7 @@ test("a task the agent closed itself ends the run in ONE attempt", () => {
     const agent = agentScript(dir, "closer.sh", [
       'id=$(grep -m1 "^id: " | sed "s/^id: //")',
       'touch "$id.done"',
-      process.execPath + ' ' + JSON.stringify(CLI) +
+      JSON.stringify(posixPath(process.execPath)) + " " + JSON.stringify(CLI) +
         ' done "$id" --dir ' + JSON.stringify(backlog) + ' --actor user:someone >/dev/null 2>&1',
     ].join("\n"));
 

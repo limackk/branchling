@@ -39,7 +39,7 @@ import { fileURLToPath } from "node:url";
 
 import { resolveActor } from "./actor.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
-import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { backlogPaths, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { applyProofs, auditTask, parseCriteria, parseVerification } from "./criteria.mjs";
 import { buildFieldSpecs, extractMeta, fieldSpec, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
@@ -51,6 +51,9 @@ import { todayStamp } from "./today.mjs";
 import { CAPABLE, contractCapability, readCoverageFiles } from "./contract-capability.mjs";
 import { taskModifiedFiles } from "./modified-files.mjs";
 import { processTreeDetached, stopProcessTree } from "./process-tree.mjs";
+import { canonicalPath } from "./canonical-path.mjs";
+import { posixShell } from "./posix-shell.mjs";
+import { gitDiscoveryEnv } from "./git-env.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OKM = color.ok(MARK.ok);
@@ -243,9 +246,9 @@ export function missingNodeTestFile(entries, repoRoot) {
  *  is a rule you may assume. Git knows; when there is no git, the backlog root
  *  is the only defensible answer left, and it is stated rather than guessed. */
 export function repoRootFor(backlogRoot) {
-  const r = spawnSync("git", ["-C", backlogRoot, "rev-parse", "--show-toplevel"], { encoding: "utf8" });
+  const r = spawnSync("git", ["-C", backlogRoot, "rev-parse", "--show-toplevel"], { encoding: "utf8", env: gitDiscoveryEnv() });
   const out = (r.stdout || "").trim();
-  return r.status === 0 && out ? out : backlogRoot;
+  return r.status === 0 && out ? canonicalPath(out) : backlogRoot;
 }
 
 /** How much a passing entry said, for the verdict line — `, 1698 lines not shown`
@@ -349,7 +352,7 @@ function runBash(command, cwd, capture, observeCoverage = false) {
   const coverageDir = observeCoverage ? mkdtempSync(join(tmpdir(), "contract-coverage-")) : null;
   if (coverageDir) env.NODE_V8_COVERAGE = coverageDir;
   const r = spawnSync(command, {
-    shell: true,
+    shell: posixShell(),
     cwd,
     encoding: "utf8",
     env,
@@ -426,7 +429,7 @@ function runBashAsync(command, cwd, capture, observeCoverage = false, signal = n
 
     if (interrupted) return finish(null);
     child = spawn(command, {
-      shell: true,
+      shell: posixShell(),
       cwd,
       env,
       detached: processTreeDetached(),
@@ -666,7 +669,7 @@ async function run(argv) {
     return 2;
   }
 
-  const root = resolveBacklogDir({ dir: plan.dir || undefined, moduleDir: __dirname }).root;
+  const root = resolveBacklogDirOrExit({ dir: plan.dir || undefined, moduleDir: __dirname }, N + " done").root;
   const config = loadConfigOrExit(root);
   const tasksDir = backlogPaths(root).tasksDir;
 

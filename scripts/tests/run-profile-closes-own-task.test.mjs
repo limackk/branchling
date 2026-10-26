@@ -29,7 +29,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { HOME_ENV } from "../home.mjs";
-import { isolateHome, SCRIPTS_DIR } from "./_repo.mjs";
+import { isolateHome, SCRIPTS_DIR, posixPath } from "./_repo.mjs";
 
 isolateHome("run-profile-closes-own-task");
 
@@ -90,7 +90,7 @@ function fixture() {
   const file = taskFile(backlog, id);
   writeFileSync(file, readFileSync(file, "utf8")
     .replace(/verification:[\s\S]*?\n---/,
-      'verification:\n  - id: it-is-done\n    bash: "echo ran >> ' + witness + ' && test -f ' + id + '.done"\n---')
+      'verification:\n  - id: it-is-done\n    bash: "echo ran >> ' + posixPath(witness) + ' && test -f ' + id + '.done"\n---')
     .replace(/\[proof:[^\]]*\]/g, "[proof: it-is-done]"), "utf8");
   assert.equal(cli(["build", "--dir", backlog], env, repo).status, 0);
   return { root, repo, backlog, env, id, witness };
@@ -105,12 +105,12 @@ function adapterClosingAs(root, name, backlog, closer) {
     "input=$(cat)",
     "id=$(printf '%s' \"$input\" | sed -n 's/^id: //p' | head -n 1)",
     'touch "$id.done"',
-    process.execPath + " " + JSON.stringify(CLI) + ' done "$id" --dir ' + JSON.stringify(backlog) +
+    JSON.stringify(posixPath(process.execPath)) + " " + JSON.stringify(CLI) + ' done "$id" --dir ' + JSON.stringify(backlog) +
       " --actor " + closer + " >/dev/null 2>&1",
     "echo closed",
   ].join("\n") + "\n", "utf8");
   chmodSync(p, 0o755);
-  return p;
+  return posixPath(p);
 }
 
 function withProfile(f) {

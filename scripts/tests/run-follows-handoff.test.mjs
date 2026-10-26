@@ -42,7 +42,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { PRODUCT_NAME } from "../product.mjs";
-import { isolateHome } from "./_repo.mjs";
+import { isolateHome, posixPath } from "./_repo.mjs";
 
 isolateHome("run-follows-handoff");
 
@@ -119,7 +119,7 @@ function handingHand(dir, name, toRole) {
     "",
   ].join("\n"), "utf8");
   chmodSync(p, 0o755);
-  return p;
+  return posixPath(p);
 }
 
 /** A hand that finishes, and writes down who the loop said it was. */
@@ -133,7 +133,7 @@ function closingHand(dir, name, witness) {
     "",
   ].join("\n"), "utf8");
   chmodSync(p, 0o755);
-  return p;
+  return posixPath(p);
 }
 
 function cleanup(...dirs) {

@@ -33,7 +33,8 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 import { DEFAULT_TASK_ID_PREFIX } from "./task-id.mjs";
 import { loadConfig } from "./config.mjs";
 import { TEMPLATE_FILENAME, backlogPaths, repositoryRoot, takeDirFlag } from "./paths.mjs";
-import { installSkills, renderInstall } from "./install-skills.mjs";
+import { USER_SKILLS, installSkills, renderInstall, skillsTarget } from "./install-skills.mjs";
+import { HOOK_NAMES, hooksTarget, inspect } from "./hooks-command.mjs";
 import { PRODUCT_NAME as N, BLOCK_MARKER_NAME as BLOCK_LABEL } from "./product.mjs";
 import { failure, refusal } from "./ui.mjs";
 import { createTask, slugify } from "./new-task.mjs";
@@ -450,6 +451,33 @@ export function ensureGitRules(root, opts = {}) {
   return out;
 }
 
+/**
+ * The optional setup init does not perform by default, named only while it is
+ * still missing (TL-476). Both pieces write outside the backlog — `.claude/` and
+ * `.git/hooks/` belong to the repository's owner — so init stays opt-in for
+ * them; but a newcomer cannot opt into a step nobody mentioned. The hooks are
+ * named with `print`, not `install`, for the reason `hooks --help` gives.
+ */
+function skippedSteps(root) {
+  const steps = [];
+  const repo = repositoryRoot(root);
+  if (USER_SKILLS.some((name) => !existsSync(join(skillsTarget(repo), name, "SKILL.md")))) {
+    steps.push(`${N} skills install   # tell an editor that loads skills that a backlog is here`);
+  }
+  if (insideGitRepo(root) && HOOK_NAMES.some((name) => {
+    const target = hooksTarget(root, name);
+    return !target.ok || inspect(target).state !== "ours";
+  })) {
+    steps.push(`${N} hooks print      # run the guards on every commit, not when somebody remembers`);
+  }
+  if (!steps.length) return [];
+  return ["  optional:"].concat(steps.map((s) => "    " + s));
+}
+
+/** The directories git has to carry before they hold a file of their own. */
+export const KEPT_DIRS = ["tasks", "history"];
+export const KEEP_FILE = ".gitkeep";
+
 const BOOL_FLAGS = ["--no-gitignore", "--no-example", "--no-nudge", "--skills"];
 
 export function main(argv) {
@@ -492,6 +520,18 @@ export function main(argv) {
       mkdirSync(p, { recursive: true });
       created.push(sub + "/");
     }
+  }
+  // git does not track an empty directory, and detection requires `tasks/`: a
+  // backlog committed straight after init was missing from every clone of it
+  // (TL-477). A placeholder keeps the two directories that are TRUTH — the
+  // other two hold computed views and are ignored anyway. Placing it here rather
+  // than relaxing detection is deliberate: a bare `config.yaml` is far too
+  // common a file to count as a backlog on its own.
+  for (const sub of KEPT_DIRS) {
+    const dir = join(root, sub);
+    if (readdirSync(dir).length) continue;
+    writeFileSync(join(dir, KEEP_FILE), "", "utf8");
+    created.push(sub + "/" + KEEP_FILE);
   }
   for (const f of FILES) {
     const p = join(root, f.name);
@@ -561,6 +601,7 @@ export function main(argv) {
 
   if (!created.length) console.log("  nothing to do — the backlog is already here");
   else console.log(`  next: ${N}        # the viewer, in your browser`);
+  for (const line of skippedSteps(root)) console.log(line);
   return 0;
 }
 

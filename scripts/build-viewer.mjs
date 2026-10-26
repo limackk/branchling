@@ -21,6 +21,8 @@ import { fileURLToPath } from "node:url";
 import { extractMeta, splitFrontmatter } from "./task-fields.mjs";
 import { crossBranchState, divergences } from "./branch-scan.mjs";
 import { readAllHistory } from "./history.mjs";
+import { agentEstimate, agentEstimateText, minutesLabel } from "./agent-time.mjs";
+import { readAgentTime } from "./agent-time-read.mjs";
 import { modifiedFilesCached, repoRoot } from "./modified-files.mjs";
 import { loadConfig, loadConfigOrExit } from "./config.mjs";
 import { taskIdPatterns } from "./task-id.mjs";
@@ -28,6 +30,7 @@ import { backlogPaths, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag }
 import { loadPlan } from "./plan.mjs";
 import { PRODUCT_NAME as N, STORAGE_KEY_PREFIX } from "./product.mjs";
 import { printLine } from "./stdout.mjs";
+import { faviconDataUri, headerMarkSvg } from "./brand-mark.mjs";
 import { refusal } from "./ui.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -300,9 +303,20 @@ export function buildHtml(
   // a `serve` rebuilding on every keystroke pays for one `git log` per commit
   // rather than one per rebuild.
   const fileIndex = modifiedFilesCached({ root: repoRoot(config.root), prefix: config.taskIdPrefix });
+  // THE COMPUTED FIELD `agent_estimate` (TL-482), from the ledger the page
+  // already receives — the same function `query --json` and `next` call, so
+  // the card and the terminal cannot show two ranges for one estimate. Computed
+  // at build time and never written back: the page is a view, and the value is
+  // what the ledger says about this estimate on the day the page was built.
+  const agentReport = readAgentTime(config.root, config, { tasks, history });
+  // The sentence is composed HERE, by the function the terminal uses, rather
+  // than by a copy of it inside the page.
+  const withText = (field) =>
+    (field ? { ...field, text: agentEstimateText(field), short: minutesLabel(field.median) } : null);
   const withFiles = tasks.map((t) => ({
     ...t,
     modified_files: [...(fileIndex.byTask.get(t.id) || [])].sort(),
+    agent_estimate: withText(agentEstimate(agentReport, t.estimate)),
   }));
   const tasksJson = JSON.stringify(withFiles).replace(/</g, "\\u003c");
   const statsJson = JSON.stringify(stats);
@@ -403,6 +417,7 @@ export function buildHtml(
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(config.projectName)}</title>
+<link rel="icon" type="image/svg+xml" href="${faviconDataUri()}">
 <style>
   /* ─── Reset + theme ─────────────────────────────────────────────── */
   *, *::before, *::after { box-sizing: border-box; }
@@ -415,6 +430,8 @@ export function buildHtml(
     --border: #E5E0D8;
     --accent: #C97B5C;
     --accent-soft: #F4DED1;
+    --brand-stem: #1E1C1A;
+    --brand-shoot: #D9480F;
     --shadow: 0 1px 3px rgba(30, 58, 92, 0.05);
     --shadow-md: 0 4px 12px rgba(30, 58, 92, 0.08);
     --shadow-lg: 0 12px 32px rgba(30, 58, 92, 0.16), 0 2px 6px rgba(30, 58, 92, 0.08);
@@ -450,6 +467,8 @@ ${paletteVarCss}
       --border: #2D3748;
       --accent: #E89A7D;
       --accent-soft: #3D2A23;
+      --brand-stem: #F5F2EE;
+      --brand-shoot: #FF7A3D;
       --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
       --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
       --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4);
@@ -492,6 +511,11 @@ ${paletteVarCss}
     margin-bottom: 12px;
   }
   .app-title h1 { font-size: 18px; margin: 0; font-weight: 600; }
+  /* The tool's mark sits at the far end of the title row, smaller than the
+     project's name: the page belongs to the project whose backlog it shows. */
+  .app-title .brand-mark { width: 20px; height: 20px; flex: none; align-self: center; }
+  .brand-mark .brand-stem { fill: var(--brand-stem); }
+  .brand-mark .brand-shoot { fill: var(--brand-shoot); }
   .app-title .build-meta {
     font-size: 12px;
     color: var(--fg-muted);
@@ -989,6 +1013,22 @@ ${paletteBadgeCss}
     text-transform: none;
     letter-spacing: 0;
     font-weight: 500;
+  }
+  /* The computed agent estimate (TL-482). Tokens only, so both themes follow;
+     the dashed outline sets it apart from the written \`~estimate\` beside it,
+     and the word "agent" says the same thing for anybody who cannot see it. */
+  .badge-agent-estimate {
+    background: var(--bg-sidebar);
+    color: var(--fg-muted);
+    border: 1px dashed var(--fg-muted);
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 500;
+  }
+  .meta-note {
+    color: var(--fg-muted);
+    font-size: 11px;
+    margin-top: 2px;
   }
   @media (prefers-color-scheme: dark) {
     .badge-elsewhere { background: rgba(251, 191, 36, 0.16); color: #FCD34D; border-color: rgba(251, 191, 36, 0.45); }
@@ -1795,6 +1835,7 @@ ${paletteBadgeCss}
       <button type="button" class="copy-link-btn" id="btnCopyLink"
               title="Copies the address of this view — filters, search, sort, board and the selected task">⧉ Copy link</button>
     </nav>
+    ${headerMarkSvg()}
   </div>
 
   <div class="connection-bar snapshot" id="connectionBar">
@@ -2984,6 +3025,7 @@ function renderCards() {
         \${elsewhereHtml(t)}
         \${t.epic ? \`<span class="badge badge-epic" title="Epic">\${escape(t.epic)}</span>\` : ""}
         \${t.estimate ? \`<span class="badge" style="background:var(--bg-sidebar);color:var(--fg-muted)">~\${escape(t.estimate)}</span>\` : ""}
+        \${t.agent_estimate ? \`<span class="badge badge-agent-estimate" title="Agent estimate, computed from the task history: \${escape(t.agent_estimate.text)}">agent ~\${escape(t.agent_estimate.short)}</span>\` : ""}
       </div>
     \`;
     card.onclick = () => selectTask(t.id);
@@ -3091,6 +3133,16 @@ function renderDetail() {
   const readOnlyRows =
     '<div class="meta-row"><div class="meta-label">Created</div><div class="meta-value">' + escape(t.created || "—") + "</div></div>" +
     '<div class="meta-row"><div class="meta-label">Updated</div><div class="meta-value">' + escape(t.updated || "—") + "</div></div>" +
+    // COMPUTED from the task history (TL-482), like the files below: what
+    // agents took on closed tasks with this estimate. No pen and no file
+    // behind it — it changes as tasks close, so it is never stored.
+    (t.agent_estimate
+      ? '<div class="meta-row meta-row-wide"><div class="meta-label">Agent estimate</div><div class="meta-value">' +
+        escape(t.agent_estimate.text) +
+        '<div class="meta-note">computed from the task history of closed tasks with this estimate, not stored' +
+        (t.agent_estimate.verdict === "correlated" ? "" : " — estimates do not yet predict agent time here, read it as a range, not a plan") +
+        "</div></div></div>"
+      : "") +
     // COMPUTED from commit messages, so there is no pen: it is not a field
     // anybody may edit, and offering one would invite a value that contradicts
     // the history it was derived from. Absent when the task has no commits yet —

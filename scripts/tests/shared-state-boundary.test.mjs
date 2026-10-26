@@ -58,7 +58,7 @@ import { loadConfig } from "../config.mjs";
 import { HOME_ENV, userConfigPath } from "../home.mjs";
 import { STATE_DIR_ENV } from "../lock.mjs";
 import { topicText } from "../instructions.mjs";
-import { isolateHome, SCRIPTS_DIR } from "./_repo.mjs";
+import { isolateHome, SCRIPTS_DIR, posixPath } from "./_repo.mjs";
 
 // THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
 // file in its own process, so one call covers every case in it. Without this a
@@ -285,7 +285,7 @@ function runFixture() {
   const agent = join(dir, "agent.sh");
   writeFileSync(agent, '#!/bin/sh\nid=$(grep -m1 "^id: " | sed "s/^id: //"); touch "$id.done"\n', "utf8");
   chmodSync(agent, 0o755);
-  return { dir, repo, backlog, home, state, env, id, agent };
+  return { dir, repo, backlog, home, state, env, id, agent: posixPath(agent) };
 }
 
 /** One run, and what it reported. */

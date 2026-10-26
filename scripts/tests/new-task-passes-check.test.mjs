@@ -56,7 +56,7 @@ function freshBacklog(label) {
 function newTask(dir, title) {
   const r = run(["new", "--dir", dir, "--title", title]);
   assert.equal(r.status, 0, r.stderr);
-  const files = readdirSync(join(dir, "tasks"));
+  const files = readdirSync(join(dir, "tasks")).filter((f) => f.endsWith(".md"));
   assert.equal(files.length, 1, "expecting exactly the task just created");
   return join(dir, "tasks", files[0]);
 }

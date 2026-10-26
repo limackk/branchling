@@ -54,7 +54,8 @@ function freshBacklog() {
   return dir;
 }
 
-const tasksIn = (dir) => readdirSync(join(dir, "tasks"));
+// Task files only: `tasks/` also holds the placeholder init writes (TL-477).
+const tasksIn = (dir) => readdirSync(join(dir, "tasks")).filter((f) => f.endsWith(".md"));
 
 /** The document format: the task's prose and its closing contract. */
 const DOCUMENT = {

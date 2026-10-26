@@ -28,7 +28,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { waitingForRole } from "../run-loop.mjs";
-import { isolateHome } from "./_repo.mjs";
+import { isolateHome, posixPath } from "./_repo.mjs";
 
 isolateHome("run-roles");
 
@@ -96,7 +96,7 @@ function worker(dir, name) {
   const p = join(dir, name);
   writeFileSync(p, "#!/bin/sh\ncat >/dev/null\necho 'the work is done'\n", "utf8");
   chmodSync(p, 0o755);
-  return p;
+  return posixPath(p);
 }
 
 function cleanup(...dirs) {

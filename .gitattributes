@@ -1,0 +1,7 @@
+# Every text file in this repository is LF, on every checkout (TL-463).
+#
+# Git for Windows converts to CRLF on checkout by default, and the first
+# Windows run of the suite was mostly that: patterns written against `\n`
+# reading files that ended their lines in `\r\n`. The repository fixes its
+# own encoding rather than leaving it to the cloning machine.
+* text=auto eol=lf

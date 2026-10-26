@@ -32,21 +32,35 @@ function adapter(root, name, source, shebang = "#!/usr/bin/env node") {
   return file;
 }
 
+/**
+ * The compatible adapter is written in JavaScript, not sh, and the reason is
+ * the `cancelled` scenario: it names the child it stopped, and the probe checks
+ * that PID with `process.kill(pid, 0)`. Under Git's bash on Windows `$!` is an
+ * MSYS process id the operating system has never heard of, so an sh fixture
+ * could not pass there however correct the tool was (TL-463). A Node child's
+ * `pid` is the operating system's on every platform.
+ */
 function compatibleAdapter(root, witness) {
-  return adapter(root, "compatible-adapter.sh", [
-    "input=$(cat)",
-    "printf '%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' \"$" + CONFORMANCE_SCENARIO_ENV + "\" \"$" + CONFORMANCE_ENV + "\" \"$" + CONFORMANCE_VERSION_ENV + "\" \"$" + PREFIX + "_ACTOR\" \"$" + PREFIX + "_ROLE\" \"$" + PREFIX + "_TASK\" \"$" + PREFIX + "_DIR\" \"$" + PREFIX + "_REPOSITORY\" \"$" + PREFIX + "_PROMPT\" \"$" + PREFIX + "_MODEL\" \"$" + PREFIX + "_EFFORT\" >> " + JSON.stringify(witness),
-    "printf '%s' \"$input\" > " + JSON.stringify(witness + ".input"),
-    "printf '%s' \"$" + CONFORMANCE_SECRET_ENV + "\" >&2",
-    "if [ \"$" + CONFORMANCE_SCENARIO_ENV + "\" = cancelled ]; then",
-    "  sleep 30 & child=$!",
-    "  kill \"$child\"",
-    "  wait \"$child\" 2>/dev/null",
-    "  printf '{\"version\":1,\"scenario\":\"%s\",\"outcome\":\"%s\",\"childPid\":%s,\"delegation\":{\"policy\":\"%s\",\"control\":\"requested\",\"evidence\":\"prompt-directive\"}}' \"$" + CONFORMANCE_SCENARIO_ENV + "\" \"$" + CONFORMANCE_SCENARIO_ENV + "\" \"$child\" \"$" + PREFIX + "_DELEGATION\"",
-    "else",
-    "  printf '{\"version\":1,\"scenario\":\"%s\",\"outcome\":\"%s\",\"delegation\":{\"policy\":\"%s\",\"control\":\"requested\",\"evidence\":\"prompt-directive\"}}' \"$" + CONFORMANCE_SCENARIO_ENV + "\" \"$" + CONFORMANCE_SCENARIO_ENV + "\" \"$" + PREFIX + "_DELEGATION\"",
-    "fi",
-  ].join("\n"), "#!/bin/sh");
+  const env = (name) => "(process.env[" + JSON.stringify(name) + '] || "")';
+  const fields = [CONFORMANCE_SCENARIO_ENV, CONFORMANCE_ENV, CONFORMANCE_VERSION_ENV]
+    .concat(["ACTOR", "ROLE", "TASK", "DIR", "REPOSITORY", "PROMPT", "MODEL", "EFFORT"].map((k) => PREFIX + "_" + k));
+  return adapter(root, "compatible-adapter.mjs", [
+    'import { appendFileSync, readFileSync, writeFileSync } from "node:fs";',
+    'import { spawn } from "node:child_process";',
+    'const input = readFileSync(0, "utf8");',
+    "const scenario = " + env(CONFORMANCE_SCENARIO_ENV) + ";",
+    "appendFileSync(" + JSON.stringify(witness) + ", [" + fields.map(env).join(", ") + '].join("\\t") + "\\n");',
+    "writeFileSync(" + JSON.stringify(witness + ".input") + ", input);",
+    "process.stderr.write(" + env(CONFORMANCE_SECRET_ENV) + ");",
+    "const response = { version: 1, scenario, outcome: scenario,",
+    '  delegation: { policy: ' + env(PREFIX + "_DELEGATION") + ', control: "requested", evidence: "prompt-directive" } };',
+    'if (scenario === "cancelled") {',
+    '  const child = spawn(process.execPath, ["-e", "setTimeout(() => {}, 30000)"], { stdio: "ignore" });',
+    '  await new Promise((resolve) => { child.on("exit", resolve); child.kill(); });',
+    "  response.childPid = child.pid;",
+    "}",
+    "process.stdout.write(JSON.stringify(response));",
+  ].join("\n"));
 }
 
 function cleanup(root) {
@@ -86,7 +100,7 @@ test("a compatible adapter passes every offline outcome in human and JSON modes 
     assert.equal(sample[3], "agent:conformance");
     assert.equal(sample[4], "conformance");
     assert.equal(sample[5], "TL-CONFORMANCE-1");
-    assert.match(sample[6], /repository\/backlog$/);
+    assert.match(sample[6], /repository[\\/]backlog$/);
     assert.match(sample[7], /repository$/);
     assert.equal(sample[8], "Prove the adapter contract from evidence only.");
     assert.equal(sample[9], "conformance-model");
@@ -126,7 +140,9 @@ test("malformed and unavailable adapters fail deterministically without exposing
     const badOut = JSON.parse(bad.stdout);
     assert.equal(badOut.ok, false);
     assert.equal(badOut.failures.length, CONFORMANCE_SCENARIOS.length * 3);
-    assert.ok(badOut.failures.every((row) => row.problem === "adapter did not return one JSON response"));
+    assert.ok(badOut.failures.every((row) => row.problem === "adapter did not return one JSON response"),
+      "a malformed adapter was reported as something else: " +
+        JSON.stringify([...new Set(badOut.failures.map((row) => row.problem))]));
     assert.equal(readdirSync(root).sort().join(","), "malformed-adapter.mjs", "a failed probe changed the adapter directory");
 
     const unavailable = cli(["conformance", "--adapter", join(root, "not-installed"), "--json"]);

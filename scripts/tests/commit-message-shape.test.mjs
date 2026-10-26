@@ -15,7 +15,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { literalParagraphBreaks } from "../commit-message.mjs";
-import { COMMIT_MESSAGE_HOOK_NAME, hooksTarget } from "../hooks-command.mjs";
+import { HOOK_NAMES, hookBlock, hooksTarget } from "../hooks-command.mjs";
 import { isolateHome } from "./_repo.mjs";
 
 isolateHome("commit-message-shape");
@@ -72,15 +72,22 @@ test("POSITIVE CONTROL: the installed commit-msg hook blocks a literal separator
   assert.equal(run(["init", "--dir", "backlog", "--no-example"], dir).status, 0);
   assert.equal(run(["hooks", "install"], dir).status, 0);
 
-  const hooks = hooksTarget(dir, COMMIT_MESSAGE_HOOK_NAME);
-  assert.ok(hooks.ok, "the fixture did not resolve Git's commit-msg hook path");
-  const hook = readFileSync(hooks.path, "utf8")
-    .replace(/^branchling check \|\| exit 1$/m,
-      process.execPath + " " + CLI + " check --dir " + join(dir, "backlog") + " || exit 1")
-    .replace(/^branchling commit-message "\$1" \|\| exit 1$/m,
-      process.execPath + " " + CLI + " commit-message \"$1\" || exit 1");
-  writeFileSync(hooks.path, hook, "utf8");
-  chmodSync(hooks.path, 0o755);
+  // EVERY hook `install` wrote, not only the one under test: Git runs
+  // pre-commit before commit-msg, so a bare binary name left in either one
+  // fails on a machine without a global install — every CI runner — and the
+  // assertion below then reads the wrong error. The block is swapped as a
+  // whole, from the same pure function `install` uses, and a block that does
+  // not match fails here rather than leaving the bare name in place.
+  const command = JSON.stringify(process.execPath) + " " + JSON.stringify(CLI);
+  for (const name of HOOK_NAMES) {
+    const hooks = hooksTarget(dir, name);
+    assert.ok(hooks.ok, "the fixture did not resolve Git's " + name + " hook path");
+    const installed = readFileSync(hooks.path, "utf8");
+    assert.ok(installed.includes(hookBlock(name)),
+      "the installed " + name + " hook no longer carries the block the fixture rewrites");
+    writeFileSync(hooks.path, installed.replace(hookBlock(name), hookBlock(name, command)), "utf8");
+    chmodSync(hooks.path, 0o755);
+  }
 
   writeFileSync(join(dir, "proof.txt"), "x\n", "utf8");
   assert.equal(git(dir, "add", "proof.txt").status, 0);

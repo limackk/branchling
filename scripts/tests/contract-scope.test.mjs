@@ -32,7 +32,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { isolateHome } from "./_repo.mjs";
+import { isolateHome, posixPath } from "./_repo.mjs";
 
 isolateHome("contract-scope");
 
@@ -51,7 +51,7 @@ function cli(args, env, opts = {}) {
 function shellScript(path, body) {
   writeFileSync(path, "#!/bin/sh\nset -eu\n" + body + "\n", "utf8");
   chmodSync(path, 0o755);
-  return path;
+  return posixPath(path);
 }
 
 function taskFile(backlog, id) {

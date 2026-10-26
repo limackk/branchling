@@ -36,7 +36,7 @@ import { decisionPanel } from "../decision-panel.mjs";
 import { queueStatuses } from "../next-task.mjs";
 import { stuckStatus, vouchReason } from "../run-loop.mjs";
 
-import { isolateHome } from "./_repo.mjs";
+import { isolateHome, posixPath } from "./_repo.mjs";
 
 isolateHome("run-awaiting-vouch");
 
@@ -127,7 +127,7 @@ function worker(dir, name) {
   const p = join(dir, name);
   writeFileSync(p, "#!/bin/sh\ncat >/dev/null\necho 'the work is done'\n", "utf8");
   chmodSync(p, 0o755);
-  return p;
+  return posixPath(p);
 }
 
 function runLoop(backlog, repo, env, agent, extra = []) {

@@ -82,7 +82,16 @@ export const KINDS = {
     // directions over one role boundary (TL-417). The full finding travels so
     // a consumer gets the pair and both hands' reasons without parsing prose.
     skippedDeadlocked: [],
+    // `{id, role, eligible}` when the spin guard ended the run (TL-484): the
+    // stop is a fact about one task, and `eligible` counts the OTHER tasks the
+    // dispatcher would still hand out, so it never reads as an empty queue.
+    spinGuard: null,
+    // `{requestedAt, by, after}` when `run --stop` ended the run (TL-485).
+    stopRequested: null,
   },
+  // `run --stop --json` (TL-485): the request as written, and where. `origin`
+  // is the clone it reaches — every run of it, from any of its worktrees.
+  "run-stop": { ok: null, requestedAt: null, by: null, origin: null, path: null },
   // `advisories` are the findings `check` stopped reporting when it became a
   // release gate (TL-383): each `{ name, output }`, where `name` is the same
   // registry string `check --json` puts in `failed` and `output` is text written
@@ -100,7 +109,9 @@ export const KINDS = {
   // broke.
   // `divergent` is the list behind the `divergent` tally inside `stats`: the
   // tasks another branch disagrees with, each naming both statuses (TL-73).
-  stats: { root: null, stats: null, scan: null, divergent: [], elsewhereOnly: [], context: null },
+  // `agentTime` is `stats --agent-time` (TL-480): the per-estimate buckets
+  // computed from the ledger, with their verdict and what could not be measured.
+  stats: { root: null, stats: null, scan: null, divergent: [], elsewhereOnly: [], context: null, agentTime: null },
   // `check --json` (TL-57). `ok` is what CI reads, `failed` is what it acts on —
   // a consumer must not have to filter `guards` to learn which one to look at.
   // `output` beside each guard is text written for a PERSON and may be reworded;
@@ -441,6 +452,11 @@ export const KIND_EXERCISE = {
   resume: { args: ["resume", FIRST_TASK, "--actor", "agent:test", "--no-verify", "--json"] },
   run: { args: ["run", "--dry-run", "--json"] },
   // ── The rows that WRITE (TL-119) ─────────────────────────────────────────
+  //
+  // A stop request is written to the state directory, never to the tree, and
+  // reaches only a run started before it — none is running here.
+  "run-stop": { args: ["run", "--stop", "--json"], writes: true },
+  //
   //
   // `take` and `next` share ONE kind, because they answer the same question.
   // The registry names it once and exercises it with `next`; the refusal case

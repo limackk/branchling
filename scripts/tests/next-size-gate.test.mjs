@@ -62,7 +62,7 @@ import { fileURLToPath } from "node:url";
 import * as nextTask from "../next-task.mjs";
 import * as runLoop from "../run-loop.mjs";
 
-import { isolateHome, plainOutput } from "./_repo.mjs";
+import { isolateHome, plainOutput, posixPath } from "./_repo.mjs";
 
 /**
  * The two new exports, reached through the module NAMESPACE rather than named
@@ -174,7 +174,7 @@ function agentScript(dir, body) {
   const p = join(dir, "agent.sh");
   writeFileSync(p, "#!/bin/sh\n" + body + "\n", "utf8");
   chmodSync(p, 0o755);
-  return p;
+  return posixPath(p);
 }
 
 function cleanup(dir) {

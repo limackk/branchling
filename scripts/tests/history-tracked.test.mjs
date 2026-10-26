@@ -29,7 +29,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { auditTracking, gitRoot } from "../check-backlog-history-tracked.mjs";
@@ -155,7 +155,7 @@ test("outside a repository it says there is nothing to check, and does not tick"
 test("gitRoot answers null rather than throwing when git is not there", () => {
   const fake = () => ({ status: 128, stdout: "", stderr: "not a git repository" });
   assert.equal(gitRoot("/anywhere", { run: fake }), null);
-  assert.equal(gitRoot("/anywhere", { run: () => ({ status: 0, stdout: "/repo\n" }) }), "/repo");
+  assert.equal(gitRoot("/anywhere", { run: () => ({ status: 0, stdout: "/repo\n" }) }), resolve("/repo"));
   assert.equal(gitRoot("/anywhere", { run: () => ({ status: 0, stdout: "  \n" }) }), null);
 });
 
