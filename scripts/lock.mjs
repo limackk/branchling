@@ -36,7 +36,10 @@
 
 import { spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
-import { closeSync, existsSync, linkSync, mkdirSync, openSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
+import {
+  closeSync, existsSync, fstatSync, linkSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync,
+  statSync, unlinkSync, writeFileSync,
+} from "node:fs";
 import { homedir, hostname } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -321,6 +324,73 @@ function readRecord(path) {
 }
 
 /**
+ * The holder's record together with the identity of the FILE it was read from,
+ * or null when there is no file. Read through one descriptor, so the record and
+ * the inode describe the same file even if the name is replaced meanwhile.
+ *
+ * WHY ABSENCE IS NOT A CORRUPT RECORD (TL-481). Both used to read as "names no
+ * holder" and both led to removing the file — but a file that is ABSENT was
+ * released between this writer's failed create and its read, and by the time
+ * the removal ran a third writer could have created a fresh one. Unlinking that
+ * fresh file let two writers into the section; sixteen processes contending for
+ * one mutex measured it 3 to 8 times in 4800 entries, with no load beyond the
+ * contention itself.
+ */
+function readHolder(path) {
+  let fd;
+  try {
+    fd = openSync(path, "r");
+  } catch (e) {
+    if (e.code === "ENOENT") return null;
+    throw e;
+  }
+  try {
+    const { dev, ino } = fstatSync(fd);
+    let record = null;
+    try {
+      const rec = JSON.parse(readFileSync(fd, "utf8"));
+      record = rec && typeof rec === "object" ? rec : null;
+    } catch {
+      // Corrupt, as in `readRecord`: present, but naming nobody.
+    }
+    return { record, dev, ino };
+  } finally {
+    closeSync(fd);
+  }
+}
+
+/**
+ * Remove the mutex file only if it is still the file that was judged stale.
+ *
+ * There is no compare-and-unlink, so the file is first RENAMED out of the way —
+ * atomic, and from then on nobody else can remove it — and its identity is
+ * compared afterwards. A file that turns out to be a different one was created
+ * by a live writer after the judgement and is linked back under its name. The
+ * one interleaving this cannot settle needs a fourth writer to create the name in
+ * the instant between the rename and the link back; it is reported by `link`
+ * failing rather than hidden.
+ */
+function removeIfUnchanged(path, judged) {
+  const aside = path + "." + process.pid + "." + randomBytes(4).toString("hex") + ".stale";
+  try {
+    renameSync(path, aside);
+  } catch (e) {
+    if (e.code === "ENOENT") return;
+    throw e;
+  }
+  const moved = statSync(aside);
+  if (moved.dev === judged.dev && moved.ino === judged.ino) {
+    unlinkSync(aside);
+    return;
+  }
+  try {
+    linkSync(aside, path);
+  } finally {
+    unlinkSync(aside);
+  }
+}
+
+/**
  * Run `fn` with no other process on this machine inside the section `name`.
  *
  * @param {string} name  identifies the RESOURCE, not the caller — every writer
@@ -342,20 +412,30 @@ export function withMutex(name, fn, opts = {}) {
   // as two different processes. PID alone is not ownership: a section may be
   // judged stale and taken over while its original process is still alive.
   const token = randomBytes(16).toString("hex");
-  const record = {
-    section: name, token, pid: process.pid, host: hostname(),
-    ts: new Date(now()).toISOString(),
-  };
+  const record = { section: name, token, pid: process.pid, host: hostname() };
+  // A test seam, like `now`: it runs at the two points where another process
+  // can change the file under this one, so a test can force the interleaving
+  // instead of waiting for a loaded machine to produce it.
+  const interleave = opts.interleave || (() => {});
 
   const deadline = now() + Math.max(0, waitMs);
   for (;;) {
+    // Stamped at every attempt, not once before the wait: the stamp says since
+    // when the section is HELD, and a stamp taken before waiting made a holder
+    // look up to `waitMs` older than it was.
+    record.ts = new Date(now()).toISOString();
     if (createExclusively(path, JSON.stringify(record) + "\n")) break;
-    const holder = readRecord(path);
+    interleave("contended");
+    const seen = readHolder(path);
+    // Released since the create failed: try again, and remove nothing.
+    if (!seen) continue;
+    const holder = seen.record;
     const heldSince = holder ? Date.parse(holder.ts || "") : NaN;
     if (!Number.isFinite(heldSince) || now() - heldSince > staleMs) {
+      interleave("judged-stale");
       // Whoever loses this removal finds the winner's fresh record on the next
-      // pass and waits for it, the same way `acquireLock` settles a stale lock.
-      try { unlinkSync(path); } catch (e) { if (e.code !== "ENOENT") throw e; }
+      // pass and waits for it.
+      removeIfUnchanged(path, seen);
       continue;
     }
     if (now() >= deadline) {

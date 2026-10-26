@@ -6,20 +6,20 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 4h
 confidence: medium                 # how much you trust the estimate
 created: 2026-10-21
-updated: 2026-10-21
+updated: 2026-10-26
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
 verification:
   - id: concurrency
-    bash: "node --test scripts/tests/new-task-concurrency.test.mjs"
+    bash: "node --test scripts/tests/new-task-concurrency.test.mjs scripts/tests/mutex-takeover.test.mjs"
   - id: suite-green
     bash: "node --test scripts/tests/*.test.mjs"
 ---
@@ -41,5 +41,5 @@ On 2026-10-21, during the closing run of TL-480, that test failed once inside `n
 
 ## Acceptance criteria
 
-- [ ] Concurrent creation still produces unique ids and one creation event each. [proof: concurrency]
-- [ ] The full suite, under its own load, stays green. [proof: suite-green]
+- [x] Concurrent creation still produces unique ids and one creation event each. [proof: concurrency]
+- [x] The full suite, under its own load, stays green. [proof: suite-green]
