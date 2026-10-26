@@ -2,126 +2,58 @@
 # Earlier execution and fleet plans remain in Git history. They are not a
 # current promise after the evidence-gated product boundary was adopted.
 #
-# THE PREVIOUS PLAN (2026-09-22) closed 46 of its 52 tasks. Waves 2-6 closed
-# in full; what it left open — TL-437 and the three outward-facing tasks — is
-# carried into this one rather than kept under names that no longer describe
-# the work around them. Its seven waves stay in Git history.
+# THE PREVIOUS PLAN (2026-10-15) closed waves 1-8, 11 and 13 in full, and
+# eight of its tasks closed in waves after the one it marked active. Its
+# release wave was overtaken by the release itself: 0.1.0 reached npm on
+# 2026-10-22 and 0.1.1 on 2026-10-26, before the name clearance it waited
+# for. Its fifteen waves stay in Git history.
 #
-# THIS PLAN schedules what that one surfaced: 37 tasks filed between TL-399
-# and TL-444, most of them measured while landing its waves. The order keeps
-# the same argument — evidence first, publication last — because the defects
-# found along the way fall into the same classes, in the same order of cost.
-updated: 2026-10-15
-rationale: "Landing the last plan surfaced its own defects: a green that could not have been red, a suite that answers differently twice in a row, guards kept by hand, and records a second session can still split. Branchling first makes its green mean something again, then makes its guards keep themselves, then closes the ledger and the queue against a second hand; only then the shape of a refusal, what a stranger reads, and — last — what carries the tool outward."
+# THIS PLAN schedules the fifteen tasks still open on 2026-10-26, six of which
+# that plan never placed. The order keeps the same argument — a green that
+# means something first, outward claims last — and adds one: a human gate is
+# closed by a vouch, so the vouch has to be recorded under the right name
+# before any gate is closed with one.
+updated: 2026-10-26
+rationale: "The package is already public, so what remains is making each later claim true before it is made. Branchling first makes its suite answer the same way twice, then records a person's vouch as that person's and reads a CRLF checkout like an LF one; the viewer runs alongside, on files neither of those touches. Only then the human gates, and last the release evidence and the announcement that point at all of it."
 waves:
-  # THE ONE CLAIM, AGAIN. A verification entry naming a test file that does
-  # not exist passes; a contract that asserts nothing closes a task with the
-  # same `proven` as one that guards the thesis; the suite reports `fail 1`
-  # and then `fail 0` over an unchanged tree. TL-406 goes first because its
-  # intermittently red test is the likeliest cause of TL-437's flake, and a
-  # suite that is red by chance cannot tell anybody what the rest of this
-  # wave broke.
-  - name: "A green that could have been red"
-    tasks: [TL-406, TL-437, TL-424, TL-443, TL-404]
+  # A SUITE THAT IS RED BY CHANCE CLOSES NOTHING. `done` runs the suite, so a
+  # duplicate id under load (TL-481) and a killed child read as unparseable
+  # JSON (TL-486) each refuse a close that deserved to pass — and train the
+  # next session to rerun until green, which is the habit this tool exists
+  # to break.
+  - name: "The suite answers the same way twice"
+    tasks: [TL-481, TL-486]
 
-  # A GUARD KEPT BY HAND IS A CONVENTION. The colour guard re-runs a list
-  # somebody has to remember; the synchronous-stdout rule was an audit nobody
-  # automated, and the defect shipped twice; four test files write into the
-  # developer's real state directory; `check --docs` reads files outside the
-  # backlog it was given; one interrupt does not end `check --proofs`; the
-  # programs a contract may name are the backlog's values, written into code.
-  # A worktree whose `git status` always carries one line of noise trains its
-  # reader to skip the line that matters. These follow wave 1 because a guard
-  # is only as good as the suite it runs inside.
-  - name: "A guard that keeps itself"
-    tasks: [TL-440, TL-441, TL-432, TL-403, TL-401, TL-413, TL-405, TL-415]
+  # A VOUCH UNDER THE WRONG NAME IS PERMANENT. Every gate in the human wave
+  # below closes with a `manual:` vouch, and TL-460 records one typed by a
+  # person as `agent:claude` in an append-only log. TL-479 precedes the
+  # Windows vouch (TL-456): supporting Windows while a CRLF checkout reads
+  # differently would be a claim the tool does not keep.
+  - name: "A vouch and a checkout say what is true"
+    tasks: [TL-460, TL-479]
 
-  # LAW 1, THE LEDGER. `take` still writes its frontmatter before its history,
-  # the order TL-351 fixed for `handoff`; a migration renames a log a writer
-  # may be appending to; a legacy entry with no event id can be claimed twice;
-  # a first `history` run appends hundreds of permanent lines nobody asked
-  # for. `backlog/history/` is append-only, so every wrong row here is
-  # permanent. TL-409 precedes TL-410, which it blocks.
-  - name: "The ledger records it once, or not at all"
-    tasks: [TL-407, TL-409, TL-410, TL-408, TL-412]
-
-  # WHAT ONLY A SECOND SESSION SEES. Two `new` calls in two worktrees are
-  # handed one id — measured three times in one afternoon; `run` dispatches a
-  # task a third time across a boundary it has crossed twice; a handoff cannot
-  # name the files the receiving hand may change; a rejected review finding
-  # cannot be found by the next reviewer; the plan warns about blockers the
-  # wave's own order already settles. Each of them survived because the
-  # plan that preceded this one was worked mostly by one hand at a time.
-  - name: "The queue survives a second hand"
-    tasks: [TL-402, TL-417, TL-418, TL-444, TL-420]
-
-  # ONE ANATOMY FOR EVERYTHING THE TOOL SAYS BACK. `import --json` throws
-  # instead of answering; a subcommand refuses in a second shape; two commands
-  # echo a whole over-long value as "reserved"; six commands parse `--dir` on
-  # their own; `--help` promises `--dir` on a command that refuses it; two
-  # commands paste a captured transcript unframed; the output still mentions
-  # telemetry TL-378 deleted. After the ledger and the queue: a wrong message
-  # costs a minute, a wrong record costs the history.
-  - name: "One shape for what the tool says"
-    tasks: [TL-425, TL-426, TL-421, TL-422, TL-423, TL-399, TL-427]
-
-  # WHAT A STRANGER READS. A config comment pointing at a refused flag, Polish
-  # prose left in three test files, the last Polish filename in `docs/`, a
-  # dead dashboard's constants in the viewer, an exported fold with no
-  # reader, and relative dates computed in the wrong calendar. Cheap, and
-  # placed here because this cost rises with every task written before it.
-  - name: "What a stranger reads"
-    tasks: [TL-430, TL-400, TL-411, TL-431, TL-428, TL-442, TL-414, TL-429]
-
-  # OUTWARD-FACING, AND THEREFORE LAST. A demonstration, a name nobody has
-  # cleared, and a badge over a public run. Each publishes a claim, and a
-  # claim published before it holds is the one failure no later wave can take
-  # back — which is why all six waves above come first.
-  - name: "What carries it outward"
-    tasks: [TL-448]
-
-  # A writable viewer returns only after its contract and public boundary agree on what may write.
-  - name: "A safe write boundary"
-    tasks: [TL-449]
-
-  # Once the server has one safe write path, editing and project health can become useful in parallel.
+  # The viewer touches build-viewer.mjs and serve-backlog.mjs only, so it can
+  # run beside the two waves above rather than after them. Both halves exist
+  # on their own branches; they land before the surface is judged as a whole.
   - name: "The viewer becomes an operating surface"
-    tasks: [TL-458, TL-459, TL-451, TL-450]
+    tasks: [TL-451, TL-450]
 
-  # Accessibility and cross-mode QA judge the complete editing and dashboard surface rather than either half.
+  # Accessibility and cross-mode QA judge the complete editing and dashboard
+  # surface rather than either half. The phone-width title row comes first,
+  # because TL-452 is the task that judges responsiveness.
   - name: "The expanded viewer earns trust"
-    tasks: [TL-452]
+    tasks: [TL-473, TL-452]
 
-  # The first push since 2026-09-22 (run 38738911603) was red on all seven
-  # jobs. The public gates below judge that run, so it has to be green first:
-  # a hook test that needs a global install, three colour-dependent tests on
-  # Node 18-22, and the first Windows run.
-  - name: "The public CI is green"
-    tasks: [TL-461, TL-462, TL-463, TL-466]
-
-  # Repository metadata, Windows CI and community policies are implemented,
-  # but their contracts require evidence from the public repository. The demo,
-  # rendered badge and name clearance are human evidence as well. Keeping these
-  # gates together prevents publication work from stalling the agent-executable
-  # viewer waves without pretending the public checks already happened.
+  # Acts only a person can perform: a dated name clearance, a recorded demo,
+  # an uploaded social preview, and vouches over the public Windows run and
+  # the published community policies. The name is already public, so TL-179
+  # is the most urgent of them — every day without it raises the price of a
+  # rename it might still require.
   - name: "Human publication gates"
-    tasks: [TL-454, TL-456, TL-457, TL-102, TL-158, TL-179]
+    tasks: [TL-179, TL-456, TL-457, TL-472, TL-102]
 
-  # The README is the package page on npmjs.com, so the one section a release
-  # cannot ship without is the installation command that works once it exists.
-  - name: "The README installs from npm"
-    tasks: [TL-467]
-
-  # Publication waits for the name clearance and the npm installation section
-  # because a published name cannot be quietly withdrawn; everything that only
-  # polishes the first impression waits for the announcement instead.
-  - name: "The first public release"
-    tasks: [TL-455]
-
-  # The release claims the name; the announcement makes the first impression.
-  # The demo and the compact front door are what an announcement needs, not what
-  # an installable package needs, so they follow the first release rather than
-  # gate it (decided 2026-10-15). The final README can only embed and prove the
-  # recording after the human demo gate has closed.
-  - name: "The public announcement"
-    tasks: [TL-453, TL-468]
+  # The release happened; what stays open is the evidence that the next one
+  # repeats it rather than remembering it. The announcement follows, because
+  # it points at the demo, the front door and that release together.
+  - name: "The release is repeatable and announced"
+    tasks: [TL-455, TL-468]
