@@ -16,13 +16,14 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync, rmSync } from "node:fs";
 import { execFileSync, spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { BacklogNotFoundError, backlogPaths, looksLikeBacklogDir, repositoryRoot, resolveBacklogDir } from "../paths.mjs";
 import { gitDiscoveryEnv } from "../git-env.mjs";
+import { canonicalPath } from "../canonical-path.mjs";
 
 import { SCRIPTS_DIR, isolateHome } from "./_repo.mjs";
 
@@ -174,7 +175,10 @@ test("on a REAL tree: discovery from a subdirectory lands on the backlog directo
  * this file assumes.
  */
 function worktreeFixture() {
-  const base = realpathSync(mkdtempSync(join(tmpdir(), "backlog-gitdir-")));
+  // THE SPELLING GIT PRINTS, which `repositoryRoot()` also returns: on Windows
+  // the temporary directory is an 8.3 short name (`RUNNER~1`) that git expands
+  // and plain `realpathSync` does not, so the two would differ on the same path.
+  const base = canonicalPath(mkdtempSync(join(tmpdir(), "backlog-gitdir-")));
   const main = join(base, "main");
   const wt = join(base, "wt");
   const env = { ...process.env, NO_COLOR: "1", BACKLOG_STATE_DIR: join(base, "state") };
@@ -207,7 +211,7 @@ test("with GIT_DIR set in a linked worktree the root is still the worktree's top
     // would pass against a git that ignored `GIT_DIR`, and prove nothing.
     const raw = spawnSync("git", ["-C", join(f.wt, "backlog"), "rev-parse", "--show-toplevel"],
       { encoding: "utf8", env: { ...process.env, GIT_DIR: f.gitDir } });
-    assert.equal(realpathSync(raw.stdout.trim()), join(f.wt, "backlog"),
+    assert.equal(canonicalPath(raw.stdout.trim()), join(f.wt, "backlog"),
       "git no longer takes cwd as the work tree under GIT_DIR — the fixture no longer reproduces the hook");
 
     process.env.GIT_DIR = f.gitDir;
