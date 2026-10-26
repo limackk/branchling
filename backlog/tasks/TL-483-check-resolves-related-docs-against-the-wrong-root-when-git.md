@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h
@@ -57,5 +57,5 @@ The downstream workaround is `unset GIT_DIR` at the top of `.git/hooks/pre-commi
 
 ## Acceptance criteria
 
-- [ ] repositoryRoot() returns the work tree root with GIT_DIR set in a linked worktree [proof: paths]
-- [ ] the whole suite stays green [proof: suite]
+- [x] repositoryRoot() returns the work tree root with GIT_DIR set in a linked worktree [proof: paths]
+- [x] the whole suite stays green [proof: suite]

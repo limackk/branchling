@@ -55,6 +55,7 @@ import { inProgressStatus } from "./take-task.mjs";
 import { failure } from "./ui.mjs";
 import { writeOut } from "./stdout.mjs";
 import { canonicalPath } from "./canonical-path.mjs";
+import { gitDiscoveryEnv } from "./git-env.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -856,7 +857,7 @@ export function nudgeBlock() {
  * named is the scattering that `init --dir` is mandatory to prevent.
  */
 export function nudgeRoot(root) {
-  const r = spawnSync("git", ["rev-parse", "--show-toplevel"], { cwd: root, encoding: "utf8", timeout: 10_000 });
+  const r = spawnSync("git", ["rev-parse", "--show-toplevel"], { cwd: root, encoding: "utf8", timeout: 10_000, env: gitDiscoveryEnv() });
   if (r.status === 0 && String(r.stdout).trim()) return canonicalPath(String(r.stdout).trim());
   return root;
 }

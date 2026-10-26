@@ -58,6 +58,7 @@ import { PRODUCT_NAME as N } from "./product.mjs";
 import { ANY_HISTORY_FILE } from "./task-id.mjs";
 import { MARK, color } from "./ui.mjs";
 import { canonicalPath } from "./canonical-path.mjs";
+import { gitDiscoveryEnv } from "./git-env.mjs";
 
 const OKM = color.ok(MARK.ok);
 const WARNM = color.warn(MARK.warn);
@@ -70,7 +71,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  */
 export function gitRoot(dir, opts = {}) {
   const run = opts.run || spawnSync;
-  const r = run("git", ["-C", dir, "rev-parse", "--show-toplevel"], { encoding: "utf8" });
+  const r = run("git", ["-C", dir, "rev-parse", "--show-toplevel"], { encoding: "utf8", env: gitDiscoveryEnv() });
   if (!r || r.status !== 0) return null;
   const top = String(r.stdout || "").trim();
   return top ? canonicalPath(top) : null;

@@ -49,6 +49,7 @@ import { BLOCK_CLOSE, BLOCK_OPEN } from "./git-rules.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { takeDirFlag } from "./paths.mjs";
 import { MARK, color, failure, heading, refusal } from "./ui.mjs";
+import { gitDiscoveryEnv } from "./git-env.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -87,7 +88,7 @@ export function hookFile(name = HOOK_NAME, command = N) {
 }
 
 function git(root, args) {
-  return spawnSync("git", args, { cwd: root, encoding: "utf8", timeout: 10_000 });
+  return spawnSync("git", args, { cwd: root, encoding: "utf8", timeout: 10_000, env: gitDiscoveryEnv() });
 }
 
 /**

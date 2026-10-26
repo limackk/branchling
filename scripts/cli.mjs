@@ -42,6 +42,7 @@ import { CHECK_GUARDS, effectiveSeverity, guardsForRun } from "./check-guards.mj
 import { resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { FIELD_SHAPES, REASON_MAX_LENGTH } from "./task-fields.mjs";
 import { DELEGATION_POLICIES } from "./agent-contract.mjs";
+import { dropInferredGitDir } from "./git-env.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -1965,6 +1966,12 @@ function runCheck(args) {
 }
 
 export function main(argv) {
+  // A hook in a linked worktree exports `GIT_DIR` without `GIT_WORK_TREE`, and
+  // every git call a command makes from the backlog directory would then take
+  // THAT directory as the top of the work tree (TL-483). Removed once, here,
+  // because every command is a child of this process and inherits it; the
+  // discovery helpers apply the same rule for callers that import them directly.
+  dropInferredGitDir(process.env);
   if (argv.length && HELP_FLAGS.includes(argv[0])) {
     console.log(helpText());
     return 0;

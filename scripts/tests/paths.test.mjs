@@ -16,19 +16,23 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync, rmSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { BacklogNotFoundError, backlogPaths, looksLikeBacklogDir, resolveBacklogDir } from "../paths.mjs";
+import { BacklogNotFoundError, backlogPaths, looksLikeBacklogDir, repositoryRoot, resolveBacklogDir } from "../paths.mjs";
+import { gitDiscoveryEnv } from "../git-env.mjs";
 
-import { isolateHome } from "./_repo.mjs";
+import { SCRIPTS_DIR, isolateHome } from "./_repo.mjs";
 
 // THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
 // file in its own process, so one call covers every case in it. Without this a
 // test reads the DEVELOPER's `<config>/config.yaml` — their actor, their model
 // endpoint — and the suite answers differently on different machines.
 isolateHome("paths");
+
+const CLI = join(SCRIPTS_DIR, "cli.mjs");
 
 /**
  * A fixture path as the platform spells it. The resolver works in native
@@ -159,4 +163,80 @@ test("on a REAL tree: discovery from a subdirectory lands on the backlog directo
   assert.equal(r.root, join(tmp, "backlog"));
   assert.equal(r.source, "discovery");
   rmSync(tmp, { recursive: true, force: true });
+});
+
+// ── The repository root under a hook's environment (TL-483) ─────────────────
+
+/**
+ * A repository with a backlog whose one task points at `docs/spec.md`, and a
+ * linked worktree of it — the layout the pre-commit hook runs in. Built through
+ * the CLI, so the backlog is the shape `init` and `new` produce rather than one
+ * this file assumes.
+ */
+function worktreeFixture() {
+  const base = realpathSync(mkdtempSync(join(tmpdir(), "backlog-gitdir-")));
+  const main = join(base, "main");
+  const wt = join(base, "wt");
+  const env = { ...process.env, NO_COLOR: "1", BACKLOG_STATE_DIR: join(base, "state") };
+  delete env.GIT_DIR;
+  const git = (cwd, args) => execFileSync("git", args, { cwd, env, encoding: "utf8" });
+  const cli = (cwd, args, extra = {}, input) =>
+    spawnSync(process.execPath, [CLI].concat(args), { cwd, env: { ...env, ...extra }, encoding: "utf8", input });
+  mkdirSync(join(main, "docs"), { recursive: true });
+  git(main, ["init", "-q"]);
+  writeFileSync(join(main, "docs", "spec.md"), "# Spec\n", "utf8");
+  assert.equal(cli(main, ["init", "--dir", "backlog", "--no-example"]).status, 0);
+  const made = cli(main, ["new", "--title", "A task", "--dir", "backlog"], {},
+    JSON.stringify({ goal: "g", verification: [{ id: "v", bash: "true", proves: "p" }] }));
+  assert.equal(made.status, 0, made.stderr);
+  const tasks = join(main, "backlog", "tasks");
+  const file = join(tasks, readdirSync(tasks).find((f) => f.endsWith("-a-task.md")));
+  writeFileSync(file, readFileSync(file, "utf8").replace(/^related_docs: \[\]/m, "related_docs: [docs/spec.md]"), "utf8");
+  git(main, ["add", "-A"]);
+  git(main, ["commit", "-q", "-m", "fixture"]);
+  git(main, ["worktree", "add", "-q", wt, "-b", "wt"]);
+  const gitDir = git(wt, ["rev-parse", "--absolute-git-dir"]).trim();
+  return { base, wt, gitDir, cli };
+}
+
+test("with GIT_DIR set in a linked worktree the root is still the worktree's top (TL-483)", () => {
+  const f = worktreeFixture();
+  const saved = process.env.GIT_DIR;
+  try {
+    // POSITIVE CONTROL: the environment really is the trap. Without it this test
+    // would pass against a git that ignored `GIT_DIR`, and prove nothing.
+    const raw = spawnSync("git", ["-C", join(f.wt, "backlog"), "rev-parse", "--show-toplevel"],
+      { encoding: "utf8", env: { ...process.env, GIT_DIR: f.gitDir } });
+    assert.equal(realpathSync(raw.stdout.trim()), join(f.wt, "backlog"),
+      "git no longer takes cwd as the work tree under GIT_DIR — the fixture no longer reproduces the hook");
+
+    process.env.GIT_DIR = f.gitDir;
+    assert.equal(repositoryRoot(join(f.wt, "backlog")), f.wt);
+  } finally {
+    if (saved === undefined) delete process.env.GIT_DIR;
+    else process.env.GIT_DIR = saved;
+    rmSync(f.base, { recursive: true, force: true });
+  }
+});
+
+test("`check --docs` answers the same with and without the hook's GIT_DIR (TL-483)", () => {
+  const f = worktreeFixture();
+  try {
+    const plain = f.cli(f.wt, ["check", "--docs"]);
+    assert.equal(plain.status, 0, plain.stdout + plain.stderr);
+    assert.match(plain.stdout, /1 link\(s\) and related_docs/, "the gate judged nothing, so its green is no evidence");
+    const hooked = f.cli(f.wt, ["check", "--docs"], { GIT_DIR: f.gitDir });
+    assert.equal(hooked.status, 0, hooked.stdout + hooked.stderr);
+  } finally {
+    rmSync(f.base, { recursive: true, force: true });
+  }
+});
+
+test("GIT_DIR is kept when GIT_WORK_TREE names the work tree, and dropped when it does not", () => {
+  const env = { GIT_DIR: "/r/.git", GIT_INDEX_FILE: "/r/.git/index", PATH: "/bin" };
+  assert.deepEqual(gitDiscoveryEnv(env), { GIT_INDEX_FILE: "/r/.git/index", PATH: "/bin" });
+  const pinned = { ...env, GIT_WORK_TREE: "/r" };
+  assert.equal(gitDiscoveryEnv(pinned), pinned);
+  const none = { PATH: "/bin" };
+  assert.equal(gitDiscoveryEnv(none), none);
 });

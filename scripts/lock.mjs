@@ -42,6 +42,7 @@ import { join, resolve } from "node:path";
 
 import { BLOCK_MARKER_NAME } from "./product.mjs";
 import { canonicalPath } from "./canonical-path.mjs";
+import { gitDiscoveryEnv } from "./git-env.mjs";
 
 /** The directory name under the user's state directory.
  *
@@ -82,7 +83,7 @@ export function lockScope(backlogRoot, opts = {}) {
   const run = opts.run || spawnSync;
   const root = resolve(backlogRoot);
   let origin = root;
-  const r = run("git", ["-C", root, "rev-parse", "--git-common-dir"], { encoding: "utf8" });
+  const r = run("git", ["-C", root, "rev-parse", "--git-common-dir"], { encoding: "utf8", env: gitDiscoveryEnv() });
   if (r && r.status === 0 && String(r.stdout).trim()) {
     // `--git-common-dir` answers with the MAIN repository's `.git` even when it
     // is called from a linked worktree — that is precisely why it is the key.

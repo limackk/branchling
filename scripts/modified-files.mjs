@@ -37,6 +37,7 @@ import { spawnSync } from "node:child_process";
 
 import { taskIdScanner } from "./task-id.mjs";
 import { canonicalPath } from "./canonical-path.mjs";
+import { gitDiscoveryEnv } from "./git-env.mjs";
 
 /**
  * ASCII record and unit separators, built rather than typed: a commit message
@@ -50,7 +51,7 @@ const US = String.fromCharCode(31);
 
 /** The repository holding this backlog, or `null` when there is none. */
 export function repoRoot(cwd) {
-  const r = spawnSync("git", ["rev-parse", "--show-toplevel"], { cwd, encoding: "utf8", timeout: 30_000 });
+  const r = spawnSync("git", ["rev-parse", "--show-toplevel"], { cwd, encoding: "utf8", timeout: 30_000, env: gitDiscoveryEnv() });
   if (r.status !== 0) return null;
   const out = String(r.stdout || "").trim();
   return out ? canonicalPath(out) : null;

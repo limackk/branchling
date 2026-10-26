@@ -50,6 +50,7 @@ import { gitLogArgs, parseLog } from "./modified-files.mjs";
 import { parseTaskRecord } from "./task-select.mjs";
 import { taskIdScanner } from "./task-id.mjs";
 import { canonicalPath, repoRelative } from "./canonical-path.mjs";
+import { gitDiscoveryEnv } from "./git-env.mjs";
 
 /** A day, in seconds — the unit `active_branch_days` is expressed in. */
 const DAY = 86_400;
@@ -70,6 +71,7 @@ const NUL = "\u0000";
 function git(args, cwd, opts = {}) {
   const r = spawnSync("git", args, {
     cwd,
+    env: gitDiscoveryEnv(),
     encoding: opts.buffer ? undefined : "utf8",
     input: opts.input,
     maxBuffer: 256 * 1024 * 1024,

@@ -53,6 +53,7 @@ import { taskModifiedFiles } from "./modified-files.mjs";
 import { processTreeDetached, stopProcessTree } from "./process-tree.mjs";
 import { canonicalPath } from "./canonical-path.mjs";
 import { posixShell } from "./posix-shell.mjs";
+import { gitDiscoveryEnv } from "./git-env.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OKM = color.ok(MARK.ok);
@@ -245,7 +246,7 @@ export function missingNodeTestFile(entries, repoRoot) {
  *  is a rule you may assume. Git knows; when there is no git, the backlog root
  *  is the only defensible answer left, and it is stated rather than guessed. */
 export function repoRootFor(backlogRoot) {
-  const r = spawnSync("git", ["-C", backlogRoot, "rev-parse", "--show-toplevel"], { encoding: "utf8" });
+  const r = spawnSync("git", ["-C", backlogRoot, "rev-parse", "--show-toplevel"], { encoding: "utf8", env: gitDiscoveryEnv() });
   const out = (r.stdout || "").trim();
   return r.status === 0 && out ? canonicalPath(out) : backlogRoot;
 }
