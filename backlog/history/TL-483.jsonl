@@ -1,0 +1,1 @@
+{"id":"01M5VE95HBBZFNZPVFD3V5ZHFV","ts":"2026-10-26T06:27:34.571Z","task":"TL-483","field":"__created__","from":"","to":"check resolves related_docs against the wrong root when GIT_DIR is set in a worktree","actor":"agent:claude","source":"new","reason":"unknown"}
