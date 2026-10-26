@@ -54,7 +54,15 @@ jobs:
             console.log("zero runtime dependencies — OK");
           '
 
+      # UNDER THE COLOUR A TERMINAL IMPLIES, and that saves a whole second run.
+      # `suite-is-terminal-independent` exists to rerun the rendering tests with
+      # `FORCE_COLOR`; started this way, the suite already is that rerun and the
+      # guard defers to it (TL-466). Rerunning instead doubled every job and
+      # outgrew its limit on the macOS runners. A plain pipe is the run every
+      # local session makes, so this is the one place colour gets measured.
       - name: tests
+        env:
+          FORCE_COLOR: "1"
         run: node --test scripts/tests/*.test.mjs
 
       # The guards judge the SET, and a change that passes its own test can

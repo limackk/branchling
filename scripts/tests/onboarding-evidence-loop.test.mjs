@@ -30,7 +30,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { HOME_ENV } from "../home.mjs";
-import { REPO_ROOT, SCRIPTS_DIR, isolateHome } from "./_repo.mjs";
+import { REPO_ROOT, SCRIPTS_DIR, SHIM, isolateHome } from "./_repo.mjs";
 
 isolateHome("onboarding-evidence-loop");
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
@@ -118,7 +118,7 @@ test("no onboarding command block is empty", () => {
 
 test("every shipped file the onboarding points at is in the package", () => {
   const packed = JSON.parse(execFileSync("npm", ["pack", "--dry-run", "--json"], {
-    cwd: REPO_ROOT, encoding: "utf8", timeout: 120_000,
+    ...SHIM, cwd: REPO_ROOT, encoding: "utf8", timeout: 120_000,
   }));
   const files = new Set(packed[0].files.map((f) => f.path));
   assert.ok(files.size > 10, "the package lists " + files.size + " file(s) — the sample is empty, not green");

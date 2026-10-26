@@ -33,7 +33,7 @@ import { createServer, get } from "node:http";
 import { hostname } from "node:os";
 import { spawn } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
-import { existsSync, readFileSync, realpathSync, renameSync, unlinkSync, watch, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, renameSync, unlinkSync, watch, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -67,10 +67,12 @@ import { printJson } from "./json-envelope.mjs";
 import { todayStamp } from "./today.mjs";
 import {
   listTaskFiles,
+  readAllHistory,
   reconcile,
   recordEdit,
   requiresReason,
 } from "./history.mjs";
+import { canonicalPath } from "./canonical-path.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BUILD_BACKLOG = join(__dirname, "build-backlog.mjs");
@@ -234,7 +236,7 @@ let editQueue = Promise.resolve();
  * a failed comparison must not take the process down.
  */
 function canonicalDir(dir) {
-  try { return realpathSync(dir); } catch { return dir; }
+  return canonicalPath(dir);
 }
 
 // The `/api/ping` handshake token now lives in `serve-registry.mjs`: the
@@ -644,10 +646,15 @@ async function handle(req, res) {
   if (path === "/" || path === "/index.html") {
     // Rendered fresh per request, so the first paint is already live data.
     const tasks = tasksWithRevisions();
+    // The ledger in its own position (TL-482). The plan used to arrive in the
+    // `history` slot, so the served page folded its decisions, its board at a
+    // moment and its agent estimates out of plan.yaml instead of the history —
+    // and the file:// page, which takes the defaults, showed the right ones.
     const html = injectCapability(buildHtml(
       tasks,
       computeStats(tasks),
       CONFIG,
+      readAllHistory(BACKLOG_DIR),
       loadPlan(join(BACKLOG_DIR, PLAN_FILENAME))
     ), newCapability());
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });

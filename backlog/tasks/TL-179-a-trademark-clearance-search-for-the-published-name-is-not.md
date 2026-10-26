@@ -13,9 +13,9 @@ executor: human
 estimate: 3h
 confidence: low
 created: 2026-09-03
-updated: 2026-09-03
+updated: 2026-10-15
 blocked_by: []
-blocks: []
+blocks: [TL-455]
 related_docs:
   - docs/license-and-contributions.md
 verification:

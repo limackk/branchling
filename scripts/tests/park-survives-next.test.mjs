@@ -40,7 +40,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { HOME_ENV } from "../home.mjs";
-import { isolateHome, SCRIPTS_DIR } from "./_repo.mjs";
+import { isolateHome, SCRIPTS_DIR, posixPath } from "./_repo.mjs";
 
 isolateHome("park-survives-next");
 
@@ -130,7 +130,7 @@ function agentScript(root, name, body) {
   const p = join(root, name);
   writeFileSync(p, "#!/bin/sh\n" + body + "\n", "utf8");
   chmodSync(p, 0o755);
-  return p;
+  return posixPath(p);
 }
 
 function cleanup(root) {
@@ -263,7 +263,7 @@ test("a loop stopped by the durable deadlock gate leaves no claim and no lock", 
     const handOn = (name, to) => agentScript(fx.root, name, [
       "cat >/dev/null",
       'printf "passing it on\\n"',
-      process.execPath + " " + JSON.stringify(CLI) + " handoff " + work +
+      JSON.stringify(posixPath(process.execPath)) + " " + JSON.stringify(CLI) + " handoff " + work +
         " --dir " + JSON.stringify(fx.backlog) + " --to-role " + to +
         " --actor " + ACTOR + ' --reason "the next stage owns this" >/dev/null 2>&1',
     ].join("\n"));

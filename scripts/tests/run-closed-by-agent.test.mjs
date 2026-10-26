@@ -34,7 +34,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { isolateHome } from "./_repo.mjs";
+import { isolateHome, posixPath } from "./_repo.mjs";
 
 isolateHome("run-closed-by-agent");
 
@@ -104,7 +104,7 @@ function agentScript(dir, name, body) {
   const p = join(dir, name);
   writeFileSync(p, "#!/bin/sh\n" + body + "\n", "utf8");
   chmodSync(p, 0o755);
-  return p;
+  return posixPath(p);
 }
 
 /** An agent that satisfies the contract and then closes the task itself, as
@@ -113,7 +113,7 @@ function closerAs(dir, name, backlog, closer) {
   return agentScript(dir, name, [
     'id=$(grep -m1 "^id: " | sed "s/^id: //")',
     'touch "$id.done"',
-    process.execPath + " " + JSON.stringify(CLI) +
+    JSON.stringify(posixPath(process.execPath)) + " " + JSON.stringify(CLI) +
       ' done "$id" --dir ' + JSON.stringify(backlog) +
       " --actor " + closer + " >/dev/null 2>&1",
   ].join("\n"));

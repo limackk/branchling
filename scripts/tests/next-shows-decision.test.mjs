@@ -29,7 +29,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { decisionsOf } from "../decisions.mjs";
-import { isolateHome } from "./_repo.mjs";
+import { isolateHome, posixPath } from "./_repo.mjs";
 
 isolateHome("next-shows-decision");
 
@@ -158,7 +158,7 @@ test("a hand fed by `run` receives the decision on stdin", () => {
     const agent = join(f.dir, "agent.sh");
     writeFileSync(agent, "#!/bin/sh\ncat > " + JSON.stringify(witness) + "\necho 'read it'\n", "utf8");
     chmodSync(agent, 0o755);
-    const r = cli(["run", "--dir", f.backlog, "--actor", "agent:fleet", "--max-attempts", "1", "--agent", agent],
+    const r = cli(["run", "--dir", f.backlog, "--actor", "agent:fleet", "--max-attempts", "1", "--agent", posixPath(agent)],
       f.env, { cwd: f.repo });
     assert.equal(r.status, 0, r.stdout + r.stderr);
     const got = readFileSync(witness, "utf8");

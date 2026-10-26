@@ -57,7 +57,7 @@
  */
 
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadConfigOrExit } from "./config.mjs";
@@ -330,7 +330,7 @@ export function main(argv) {
   }));
   const result = auditLinks(documents, (p) => existsSync(p), root, (p) => readFileSync(p, "utf8"));
 
-  const rel = (p) => relative(root, p) || p;
+  const rel = (p) => relative(root, p).split(sep).join("/") || p;
   const label = (kind) =>
     kind === "related_docs" ? "  (related_docs)" : kind === "anchor" ? "  (missing anchor)" : "";
 

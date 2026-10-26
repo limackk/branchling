@@ -26,7 +26,7 @@ import { loadConfigOrExit } from "./config.mjs";
 import { detectPrefixMismatch, prefixMismatchMessage } from "./task-id.mjs";
 import { resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { printLine } from "./stdout.mjs";
-import { buildFieldSpecs, extractMeta as sharedExtractMeta, normalizeValue, stripComment } from "./task-fields.mjs";
+import { buildFieldSpecs, extractMeta as sharedExtractMeta, normalizeValue, stripComment, unquote } from "./task-fields.mjs";
 import { MARK, color, errColor, refusal } from "./ui.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { todayStamp } from "./today.mjs";
@@ -178,12 +178,6 @@ function extractMeta(frontmatter) {
     if (m) meta.id = unquote(stripComment(m[1]));
   }
   return meta;
-}
-
-function unquote(v) {
-  return v.length >= 2 && ((v[0] === '"' && v.endsWith('"')) || (v[0] === "'" && v.endsWith("'")))
-    ? v.slice(1, -1)
-    : v;
 }
 
 // ── YAML emit helpers ─────────────────────────────────────────────────────

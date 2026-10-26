@@ -6,13 +6,13 @@ labels: [pre-launch]
 board: main
 epic: "Backlog — open source publication"
 priority: P2                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: awaiting_vouch  # pending | in_progress | blocked | done | cancelled
+status: done  # pending | in_progress | blocked | done | cancelled
 owner: ""
 executor: ""
 role: review
 estimate: 30m                       # 30m | 1h | 2h | 3h | 4h | 1d | 1w
 created: 2026-09-02
-updated: 2026-09-26
+updated: 2026-10-15
 blocked_by: [TL-53, TL-433, TL-434, TL-435, TL-436, TL-439]
 blocks: []
 related_docs: []
@@ -98,12 +98,12 @@ carries a `manual:` entry rather than a grep alone.
 
 ## Acceptance criteria
 
-- [ ] The whole suite is green. [proof: suite]
-- [ ] The guard that measures badge-against-manifest agreement is in the suite, with its own positive controls. [proof: badge-guard]
-- [ ] The README carries a workflow badge whose owner and repository are the ones `package.json` names, so editing either side alone fails. [proof: badge-agrees-with-manifest]
-- [ ] The newest run of the workflow on the default branch concluded success. [proof: workflow-run-is-green]
-- [ ] The forge serves a PASSING badge at the URL the README carries. [proof: badge-served-green]
-- [ ] It renders as an image, above the fold, and clicking it lands on a run of this repository. [proof: looks-right]
+- [x] The whole suite is green. [proof: suite]
+- [x] The guard that measures badge-against-manifest agreement is in the suite, with its own positive controls. [proof: badge-guard]
+- [x] The README carries a workflow badge whose owner and repository are the ones `package.json` names, so editing either side alone fails. [proof: badge-agrees-with-manifest]
+- [x] The newest run of the workflow on the default branch concluded success. [proof: workflow-run-is-green]
+- [x] The forge serves a PASSING badge at the URL the README carries. [proof: badge-served-green]
+- [x] It renders as an image, above the fold, and clicking it lands on a run of this repository. [proof: looks-right]
 
 ## What happened on 2026-09-22, and why the badge is not in the README yet
 

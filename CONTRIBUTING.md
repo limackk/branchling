@@ -20,7 +20,7 @@ through the private route in [SECURITY.md](SECURITY.md), never in a public issue
 Node 18 or newer. **There are no dependencies**, so there is nothing to install:
 
 ```bash
-git clone <repository-url> branchling
+git clone https://github.com/limackk/branchling.git
 cd branchling
 node --test scripts/tests/*.test.mjs   # the suite
 node scripts/cli.mjs check             # the guards

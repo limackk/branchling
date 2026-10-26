@@ -276,7 +276,7 @@ test("`next` reads the SHARED scan module, not a copy of its own", () => {
   assert.doesNotMatch(src, /child_process/, "the dispatcher grew git calls of its own");
 });
 
-test("the guarantee is stated as a CLONE, in the README and in the instructions", () => {
+test("the guarantee is stated as a CLONE, in the guide and in the instructions", () => {
   // The boundary moved: the lock stops at the machine, the scan stops at the
   // clone, and the documentation may not keep promising the narrower one as if
   // it were the whole answer.
@@ -293,11 +293,13 @@ test("the guarantee is stated as a CLONE, in the README and in the instructions"
   // does it name the clone as the boundary, and does it admit that two clones
   // can still collide. A rewording passes; a narrowing back to one checkout, or
   // a paragraph quietly deleted, does not.
-  const readme = readFileSync(join(SCRIPTS, "..", "README.md"), "utf8");
-  const at = readme.indexOf("Where the guarantee ends");
-  assert.notEqual(at, -1, "the README no longer states where the guarantee ends at all");
-  const para = readme.slice(at, at + 1500);
+  // TL-453 moved the paragraph from the README into docs/guide.md when the
+  // README became a short front door; the promise is asked of the guide now.
+  const guide = readFileSync(join(SCRIPTS, "..", "docs", "guide.md"), "utf8");
+  const at = guide.indexOf("Where the guarantee ends");
+  assert.notEqual(at, -1, "the guide no longer states where the guarantee ends at all");
+  const para = guide.slice(at, at + 1500);
   assert.match(para, /worktree of one clone/, "the reservation is no longer stated as covering the clone");
   assert.match(para, /branch and worktree of that clone/, "the scan's reach across branches is no longer stated");
-  assert.match(para, /two clones/, "the README no longer admits that two clones can both take one task");
+  assert.match(para, /two clones/, "the guide no longer admits that two clones can both take one task");
 });

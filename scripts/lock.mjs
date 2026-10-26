@@ -36,11 +36,13 @@
 
 import { spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
-import { closeSync, existsSync, linkSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, linkSync, mkdirSync, openSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir, hostname } from "node:os";
 import { join, resolve } from "node:path";
 
 import { BLOCK_MARKER_NAME } from "./product.mjs";
+import { canonicalPath } from "./canonical-path.mjs";
+import { gitDiscoveryEnv } from "./git-env.mjs";
 
 /** The directory name under the user's state directory.
  *
@@ -81,19 +83,16 @@ export function lockScope(backlogRoot, opts = {}) {
   const run = opts.run || spawnSync;
   const root = resolve(backlogRoot);
   let origin = root;
-  const r = run("git", ["-C", root, "rev-parse", "--git-common-dir"], { encoding: "utf8" });
+  const r = run("git", ["-C", root, "rev-parse", "--git-common-dir"], { encoding: "utf8", env: gitDiscoveryEnv() });
   if (r && r.status === 0 && String(r.stdout).trim()) {
     // `--git-common-dir` answers with the MAIN repository's `.git` even when it
     // is called from a linked worktree — that is precisely why it is the key.
     // It may come back relative to the directory it was run in.
     origin = resolve(root, String(r.stdout).trim());
   }
-  try {
-    origin = realpathSync(origin);
-  } catch {
-    // A path that cannot be resolved is still a usable key; it just cannot be
-    // canonicalised. Failing here would mean no locking at all, which is worse.
-  }
+  // A path that cannot be resolved is still a usable key; it just cannot be
+  // canonicalised. Failing there would mean no locking at all, which is worse.
+  origin = canonicalPath(origin);
   return { origin, key: createHash("sha256").update(origin).digest("hex").slice(0, 16) };
 }
 

@@ -88,6 +88,7 @@ import { readHistory, recordEdit } from "./history.mjs";
 import { roleBrief } from "./instructions.mjs";
 import { userConfigPath } from "./home.mjs";
 import { lockScope, releaseLock, stateRoot } from "./lock.mjs";
+import { requestStop, stopRequestedSince } from "./run-stop.mjs";
 import { callerSpecies, deadlockIdentity, describeDeadlock, isOverSized, parkedByRun, queueStatuses, readDispatchRecords, selectCandidates, servesExecutor } from "./next-task.mjs";
 import { backlogPaths, repositoryRoot, resolveBacklogDir } from "./paths.mjs";
 import { loadPlanForDispatch, planState, projectionWall } from "./plan.mjs";
@@ -97,8 +98,10 @@ import { todayStamp } from "./today.mjs";
 import { ACTOR_NAMESPACES, buildFieldSpecs, extractMeta, fieldSpec, isValidActor, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
 import { readTaskRecords, splitList, unknownFilterValues } from "./task-select.mjs";
 import { printJson } from "./json-envelope.mjs";
-import { MARK, color, failure, warn } from "./ui.mjs";
+import { MARK, color, failure, ok, warn } from "./ui.mjs";
 import { processTreeDetached, stopProcessTree } from "./process-tree.mjs";
+import { executableInvocation, posixShell } from "./posix-shell.mjs";
+import { processEssentials } from "./process-env.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CLI = join(__dirname, "cli.mjs");
@@ -121,8 +124,12 @@ export const AGENT_ENV = "BACKLOG_AGENT_COMMAND";
 export const RUN_FLAGS = [
   "--dir", "--actor", "--agent", "--agent-for", "--profile", "--profile-for", "--max-attempts", "--max-tasks", "--timeout",
   "--log-dir", "--stuck-status", "--delegation", "--allow-uncontrolled-delegation", "--json", "--dry-run", "--plan", "--probe",
-  "--board", "--label", "--priority", "--epic",
+  "--board", "--label", "--priority", "--epic", "--stop",
 ];
+
+/** What `--stop` may be combined with: it names a clone and who asks, nothing a
+ *  loop would use, so anything else on the line is a run somebody meant to start. */
+const STOP_FLAGS = ["--stop", "--dir", "--actor", "--json"];
 
 const DEFAULT_MAX_ATTEMPTS = 2;
 const DEFAULT_TIMEOUT_SECONDS = 900;
@@ -132,11 +139,14 @@ export function parseRunArgs(args) {
   const plan = {
     dir: null, actor: null, agent: null, profile: null, agentFor: {}, profileFor: {}, json: false, dryRun: false, usePlan: false,
     maxAttempts: DEFAULT_MAX_ATTEMPTS, maxTasks: 0, timeout: DEFAULT_TIMEOUT_SECONDS, probe: false, delegation: "provider", allowUncontrolledDelegation: false,
-    logDir: null, stuckStatus: null, board: null, label: null, priority: null, epic: null,
+    logDir: null, stuckStatus: null, board: null, label: null, priority: null, epic: null, stop: false,
   };
+  const given = [];
   const numbers = { "--max-attempts": "maxAttempts", "--max-tasks": "maxTasks", "--timeout": "timeout" };
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
+    if (a.startsWith("-")) given.push(a);
+    if (a === "--stop") { plan.stop = true; continue; }
     if (a === "--json") { plan.json = true; continue; }
     if (a === "--dry-run") { plan.dryRun = true; continue; }
     if (a === "--probe") { plan.probe = true; continue; }
@@ -195,6 +205,13 @@ export function parseRunArgs(args) {
         "`run` takes no task id — it empties the queue, and a dispatcher that is\n" +
         "told which task to run is a queue with the choosing put back in."
     );
+  }
+  if (plan.stop) {
+    const extra = given.filter((f) => STOP_FLAGS.indexOf(f) < 0);
+    if (extra.length) {
+      throw new Error("`--stop` asks the runs already going to stop; it does not start one: " + extra.join(" ") + "\n" +
+        "It takes only " + STOP_FLAGS.slice(1).join(", ") + ".");
+    }
   }
   if (plan.agent && plan.profile) throw new Error("`--agent` and `--profile` are alternatives — name one generalist");
   if (!DELEGATION_POLICIES.includes(plan.delegation)) throw new Error("`--delegation` must be one of: " + DELEGATION_POLICIES.join(", "));
@@ -377,6 +394,24 @@ export function waitingForRole(records, config, served, servesRoleless = true) {
     (out[role] = out[role] || []).push(t.id);
   }
   return out;
+}
+
+/**
+ * What makes two hand-outs of one task the SAME turn, for the spin guard.
+ *
+ * THE PAIR WAS NOT ENOUGH (TL-484). `(id, role)` was chosen so a task handed on
+ * to another role is worked again (TL-271), and it still stopped a task whose
+ * return was the queue working: the hand opened a new blocker and parked the
+ * task on it, the same run closed that blocker, and `next` rightly handed the
+ * task out again — measured downstream as eight idle hours with work left. What
+ * such a return changes is `blocked_by`, so the list at hand-out joins the key.
+ * A dispatcher repeating a task with nothing changed repeats the list too, and
+ * is still stopped. Order and case are not part of the identity of a list of ids.
+ */
+export function turnKey(id, role, blockedBy) {
+  const list = Array.isArray(blockedBy) ? blockedBy : (splitList(blockedBy) || []);
+  const blockers = [...new Set(list.map((b) => String(b).trim().toUpperCase()).filter(Boolean))].sort();
+  return String(id).toUpperCase() + "@" + String(role || "") + "#" + blockers.join(",");
 }
 
 export function renderAgentCommand(template, task) {
@@ -950,8 +985,8 @@ export function adapterEnvironment(ctx, task, env = process.env) {
   out[prefix + "_DELEGATION_ENFORCEMENT"] = String(task.delegationEnforcement || "unsupported");
   // PATH is not application data or a credential; preserving it lets a local
   // profile name an installed executable while every other ambient variable is
-  // deliberately withheld.
-  if (env.PATH) out.PATH = env.PATH;
+  // deliberately withheld. On Windows a process needs a few more just to start.
+  Object.assign(out, processEssentials(env));
   for (const name of secretEnvironmentNames(task.profile)) {
     if (Object.prototype.hasOwnProperty.call(env, name)) out[name] = env[name];
   }
@@ -1047,11 +1082,12 @@ export function attemptProvenance(task, attempt) {
 export function superviseAgent(command, opts) {
   return new Promise((resolve) => {
     let stdout = ""; let stderr = ""; let bytes = 0; let timedOut = false; let overflow = false; let settled = false;
+    const start = opts.raw ? null : executableInvocation(command);
     const child = opts.raw ? spawn(command, {
-      shell: true, cwd: opts.cwd, env: opts.env,
+      shell: posixShell(), cwd: opts.cwd, env: opts.env,
       detached: processTreeDetached(), stdio: ["pipe", "pipe", "pipe"],
-    }) : spawn(command, [], {
-      shell: false, cwd: opts.cwd, env: opts.env,
+    }) : spawn(start.file, start.args, {
+      shell: start.shell, cwd: opts.cwd, env: opts.env,
       detached: processTreeDetached(), stdio: ["pipe", "pipe", "pipe"],
     });
     const receive = (key, chunk) => {
@@ -1461,6 +1497,20 @@ export async function run(argv) {
     console.error(failure(N + " run", e.message, []));
     return 2;
   }
+  // A REQUEST, NOT A RUN (TL-485). It needs the clone and nothing else — no
+  // configuration, no profile, no agent — so it is answered before any of them
+  // is read, and a backlog whose configuration is broken can still be told to stop.
+  if (plan.stop) {
+    const asked = requestStop(root, { actor: resolveActor(plan.actor, { fallback: "" }) || null });
+    if (plan.json) {
+      printJson("run-stop", { ok: true, requestedAt: asked.requestedAt, by: asked.by, origin: asked.origin, path: asked.path });
+    } else {
+      console.log(ok("stop requested — every run of " + asked.origin +
+        " finishes the task it is on, then claims nothing new"));
+      console.log("  " + color.dim("a run started after this request is not affected · " + asked.path));
+    }
+    return 0;
+  }
   const config = loadConfigOrExit(root);
   // A role in the map that the project does not declare is a typo, and it fails
   // BEFORE the loop starts: found in the middle of a run it would have wasted
@@ -1614,6 +1664,17 @@ export async function run(argv) {
     filters.role = generalist ? served.concat([""]) : served.slice();
   }
 
+  // THE SAME QUESTION `next` IS ASKED, WHICH INCLUDES WHO IS ASKING. `actor` is
+  // a filter here for the reason it is one in `next`: a task this actor handed
+  // back is not handed to it again (TL-141), and a selection that leaves the
+  // actor out is selecting somebody else's queue. AND THE PARK, WHICH IT MUST
+  // HONOUR TOO (TL-282): offering a task the real run leaves parked would be
+  // describing a queue nobody is going to be handed.
+  const selectionBase = (records) => ({
+    ...filters, callerSpecies: callerSpecies(actor), actor,
+    parkedByRun: parkedByRun(root, records, config),
+  });
+
   // `--dry-run` asks WHICH tasks, in what order, and must not claim any of them.
   // The order comes from `next`'s own selection function rather than from a
   // second implementation of the policy — the same module, not a copy of it.
@@ -1623,17 +1684,7 @@ export async function run(argv) {
     // runs against, and a projection built from them lists work the run is
     // never offered.
     const { records } = readDispatchRecords(root, config);
-    // AND THE SAME QUESTION, WHICH INCLUDES WHO IS ASKING. `actor` is a filter
-    // here for the reason it is one in `next`: a task this actor handed back is
-    // not handed to it again (TL-141), and a projection that leaves the actor
-    // out is projecting somebody else's queue.
-    // AND THE PARK, WHICH THE PROJECTION MUST HONOUR TOO (TL-282): a dry run
-    // that offered a task the real run leaves parked would be projecting a queue
-    // nobody is going to be handed.
-    const base = {
-      ...filters, callerSpecies: callerSpecies(actor), actor,
-      parkedByRun: parkedByRun(root, records, config),
-    };
+    const base = selectionBase(records);
     const rows = [];
     // Named, never silent: what the projection declined for THIS actor's own
     // earlier judgement is reported under the order, the way `next` reports it.
@@ -1757,6 +1808,30 @@ export async function run(argv) {
   // The one result that ends the run without being a fact about a task (TL-184).
   let neverStarted = null;
   const seen = new Set();
+  // Set only when a `run --stop` made after this run started ended it (TL-485).
+  let stopRequest = null;
+  // Set only when the guard below ends the run, so a caller of `--json` can
+  // tell that stop from an empty queue without parsing the sentence.
+  let spin = null;
+  // How many tasks other than `id` the dispatcher would hand out now, asked of
+  // its own selection without claiming any — under `--plan`, from the wave it
+  // is handing out of.
+  const eligibleBesides = (id) => {
+    const { records } = readDispatchRecords(root, config);
+    let opts = selectionBase(records);
+    if (planned) {
+      const state = planState(planned, records, {
+        archivedStatuses: config.archivedStatuses,
+        inProgressStatus: inProgressStatus(config),
+      });
+      if (state.activeWave === null) return 0;
+      const wave = state.waves[state.activeWave];
+      opts = { ...opts, planIds: new Set(wave.tasks.map((e) => String(e.id).toUpperCase())) };
+    }
+    const own = String(id).toUpperCase();
+    return selectCandidates(records, config, opts, Date.now()).candidates
+      .filter((t) => String(t.id).toUpperCase() !== own).length;
+  };
   // Every `next` answer carries the deadlocks it stepped over. Keep them even
   // when this run stops at `--max-tasks` before the final empty-queue answer;
   // otherwise a skipped task disappears from the report whenever useful work
@@ -1767,6 +1842,16 @@ export async function run(argv) {
   const legs = new Map();
 
   for (;;) {
+    // ASKED BEFORE EVERY `next`, because `next` claims (TL-485): once the
+    // request is seen nothing new is taken, and the task just finished was
+    // finished whole — its attempts, its `done` and its park all ran.
+    const asked = stopRequestedSince(root, started);
+    if (asked) {
+      const after = taken.length ? taken[taken.length - 1].id : null;
+      stopRequest = { requestedAt: asked.requestedAt, by: asked.by || null, after };
+      stopped = after ? "asked to stop after " + after : "asked to stop before any task was taken";
+      break;
+    }
     if (plan.maxTasks && taken.length >= plan.maxTasks) {
       stopped = "--max-tasks " + plan.maxTasks;
       break;
@@ -1803,10 +1888,12 @@ export async function run(argv) {
     const role = String((task.task && task.task.role) || "").trim();
     // A dispatcher that hands out the same id twice has a defect; a loop that
     // does not notice has an endless one. Better to stop and say so than to
-    // spend a night proving it. THE KEY IS THE PAIR, not the id (TL-271): a task
-    // that comes back under a DIFFERENT role was handed on, and that is the
-    // pipeline working. The same role twice is still the spin this guards.
-    const turn = task.id + "@" + role;
+    // spend a night proving it. THE KEY IS NOT THE ID ALONE: a task that comes
+    // back under a DIFFERENT role was handed on (TL-271), and one that comes back
+    // with a different `blocked_by` was parked on a new blocker this run then
+    // closed (TL-484). Both are the queue working. The same task with nothing
+    // changed is still the spin this guards.
+    const turn = turnKey(task.id, role, task.task && task.task.blocked_by);
     if (seen.has(turn)) {
       // THE GUARD IS ASKED AFTER `next` HAS ALREADY CLAIMED, and that is not a
       // detail to fix by reordering (TL-282): selection and reservation are ONE
@@ -1828,8 +1915,15 @@ export async function run(argv) {
         console.error(warn(task.id + ": `" + N + " next` did not say which status it was taken from"));
       }
       releaseLock({ root, taskId: task.id, actor });
+      // A STOP THAT READS LIKE AN EMPTY QUEUE IS NOT NEUTRAL (TL-484). The run
+      // this was measured on sat idle for eight hours because nothing said the
+      // queue still held work. The count is the selection `next` would make,
+      // asked without claiming anything, minus the task the guard just stopped.
+      const left = eligibleBesides(task.id);
+      spin = { id: task.id, role, eligible: left };
       stopped = task.id + " was handed out twice" + (role ? " to role `" + role + "`" : "") +
-        " — the loop stopped rather than spin, and gave the claim back";
+        " — the loop stopped rather than spin, and gave the claim back" +
+        (left ? "; " + left + " other task(s) are still eligible, so the queue is not empty" : "");
       break;
     }
     seen.add(turn);
@@ -2058,6 +2152,12 @@ export async function run(argv) {
       waitingForSize: Object.keys(waitingSize).sort()
         .map((e) => ({ estimate: e, count: waitingSize[e].length, ids: waitingSize[e] })),
       skippedDeadlocked: report.skippedDeadlocked,
+      // `{id, role, eligible}` when the spin guard ended the run (TL-484), with
+      // the number of OTHER tasks still eligible at that moment; null otherwise.
+      spinGuard: spin,
+      // `{requestedAt, by, after}` when `run --stop` ended the run (TL-485);
+      // `after` is the last task it finished, null when it had taken none.
+      stopRequested: stopRequest,
       tally: { ...tally, taken: taken.length },
       // What this run used outside the tree it was given. A consumer comparing
       // two runs can see a shared-state change for what it is (TL-202).

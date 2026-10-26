@@ -38,10 +38,13 @@ import { ConfigError, formatConfigError, loadConfig } from "./config.mjs";
 import { commandRunner, contextBudget } from "./context-budget.mjs";
 import { ATTRIBUTE_RULES, IGNORE_RULES, hasUnionMerge, insideGitRepo, trackedViews, unignoredViews } from "./git-rules.mjs";
 import { SNAPSHOT_FILE, loadSnapshot, readMigrations, reconcile } from "./history.mjs";
+import { HOOK_NAMES, hooksTarget, inspect } from "./hooks-command.mjs";
+import { CLAUDE_AGENT_FILE, CLAUDE_IMPORT_LINE, NEUTRAL_AGENT_FILE, NUDGE_VERSION, nudgeState } from "./instructions.mjs";
+import { USER_SKILLS, skillsTarget } from "./install-skills.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { MARK as UI_MARK, color, errColor, heading, refusal } from "./ui.mjs";
-import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { backlogPaths, repositoryRoot, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { summarize } from "./stats.mjs";
 import { vocabularyUsage } from "./task-fields.mjs";
 import { detectPrefixMismatch, taskIdPatterns } from "./task-id.mjs";
@@ -310,6 +313,69 @@ function checkGitIgnore(root) {
   return rows;
 }
 
+/**
+ * The agent-facing setup (TL-475): the pointer to `instructions`, the packaged
+ * skill, the git gates. Each one is OPTIONAL — `init --no-nudge`, an editor
+ * without skills, a team that gates in CI — so none of them is an error. What
+ * an error-free doctor must not do is stay silent about a repository where an
+ * agent has no path to the procedure at all.
+ */
+function checkAgentPointer(root) {
+  const { files } = nudgeState(root);
+  const carrying = files.filter((f) => f.version !== null);
+  if (!carrying.length) {
+    return check("agent-pointer", "agent instructions pointer", WARN,
+      files.length
+        ? "no pointer in " + files.map((f) => f.name).join(" or ") + " — an agent here works the backlog by guesswork"
+        : "no CLAUDE.md or AGENTS.md — an agent here works the backlog by guesswork",
+      N + " instructions --update-nudge");
+  }
+  const stale = carrying.filter((f) => f.version !== NUDGE_VERSION);
+  if (stale.length) {
+    return check("agent-pointer", "agent instructions pointer", WARN,
+      stale.map((f) => f.name + " carries v" + f.version).join(", ") + ", this release writes v" + NUDGE_VERSION,
+      N + " instructions --update-nudge");
+  }
+  // Claude Code reads CLAUDE.md and what it imports, never AGENTS.md on its own.
+  const claude = files.find((f) => f.name === CLAUDE_AGENT_FILE);
+  const neutral = files.find((f) => f.name === NEUTRAL_AGENT_FILE);
+  const claudeReaches = claude && (claude.version !== null || (claude.importsNeutral && neutral && neutral.version !== null));
+  if (!claudeReaches) {
+    return check("agent-pointer", "agent instructions pointer", INFO,
+      "in " + carrying.map((f) => f.name).join(", ") + ", which Claude Code does not load",
+      "add the line `" + CLAUDE_IMPORT_LINE + "` to " + CLAUDE_AGENT_FILE + ", if Claude Code works here");
+  }
+  return check("agent-pointer", "agent instructions pointer", OK,
+    carrying.map((f) => f.name).join(", ") + plural(carrying.length, " points", " point") + " at `" + N + " instructions overview`");
+}
+
+function checkSkill(root) {
+  const target = skillsTarget(repositoryRoot(root));
+  const missing = USER_SKILLS.filter((name) => !existsSync(join(target, name, "SKILL.md")));
+  if (missing.length) {
+    return check("agent-skill", "packaged skill", INFO,
+      "not installed: " + missing.join(", ") + " — an editor that loads skills will not know a backlog is here",
+      N + " skills install");
+  }
+  return check("agent-skill", "packaged skill", OK, USER_SKILLS.join(", ") + " in " + target);
+}
+
+function checkHooks(root) {
+  if (!insideGitRepo(root)) return [];
+  const states = HOOK_NAMES.map((name) => {
+    const target = hooksTarget(root, name);
+    return { name, state: target.ok ? inspect(target).state : "unknown" };
+  });
+  const missing = states.filter((s) => s.state !== "ours");
+  if (missing.length) {
+    return [check("git-hooks", "git gates on commit", INFO,
+      missing.map((s) => s.name + (s.state === "foreign" ? " (a hook of your own, without ours)" : " (none)")).join(", ") +
+        " — the guards run only when somebody remembers",
+      N + " hooks print")];
+  }
+  return [check("git-hooks", "git gates on commit", OK, HOOK_NAMES.join(", ") + " run the guards")];
+}
+
 /** How long the guards may take before the run is abandoned. Named, because the
  *  row below has to be able to say the number when it is hit. */
 const GUARD_TIMEOUT_MS = 60_000;
@@ -414,6 +480,7 @@ export function diagnose(root) {
   rows.push(...checkClosedElsewhere(root, config, metas));
   rows.push(checkVolume(metas, config));
   rows.push(checkContextBudget(root, config));
+  rows.push(checkAgentPointer(root), checkSkill(root), ...checkHooks(root));
   return rows;
 }
 

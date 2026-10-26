@@ -19,6 +19,7 @@
 import { spawnSync } from "node:child_process";
 
 import { BLOCK_MARKER_NAME } from "./product.mjs";
+import { gitDiscoveryEnv } from "./git-env.mjs";
 
 /** The ignore rules for the views. DATA, not text — `init` writes the file from
  *  them and `doctor` checks against them, and one copy cannot drift from the
@@ -54,7 +55,7 @@ export const VIEW_PATHS = [
 ];
 
 function git(root, args) {
-  return spawnSync("git", args, { cwd: root, encoding: "utf8", timeout: 10_000 });
+  return spawnSync("git", args, { cwd: root, encoding: "utf8", timeout: 10_000, env: gitDiscoveryEnv() });
 }
 
 export function insideGitRepo(root) {

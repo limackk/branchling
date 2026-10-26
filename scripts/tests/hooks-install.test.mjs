@@ -23,14 +23,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { HOOK_NAME, hookBlock, hooksTarget, withoutBlock } from "../hooks-command.mjs";
 import { BLOCK_OPEN } from "../git-rules.mjs";
-import { isolateHome } from "./_repo.mjs";
+import { isolateHome, posixPath } from "./_repo.mjs";
+import { canonicalPath } from "../canonical-path.mjs";
 
 isolateHome("hooks-install");
 
@@ -132,9 +133,10 @@ test("inside a worktree the hook goes to the COMMON directory git actually reads
 
   const target = hooksTarget(tree);
   assert.ok(target.ok);
-  // `realpathSync` on both sides: on macOS the temporary directory is reached
-  // through a symlink, and git answers with the resolved path.
-  assert.equal(realpathSync(target.dir), realpathSync(join(dir, ".git", "hooks")),
+  // `canonicalPath` on both sides: on macOS the temporary directory is reached
+  // through a symlink, on Windows through an 8.3 short name, and git answers
+  // with the resolved path.
+  assert.equal(canonicalPath(target.dir), canonicalPath(join(dir, ".git", "hooks")),
     "a hook under .git/worktrees/<name>/hooks is never run — that is trap 2 from another direction");
 });
 
@@ -199,7 +201,8 @@ test("POSITIVE CONTROL: with the hook installed, a commit with a real defect FAI
   const path = hookPath(dir);
   writeFileSync(path, readFileSync(path, "utf8")
     .replace(/^branchling check \|\| exit 1$/m,
-      process.execPath + " " + CLI + " check --id-collisions --dir " + join(dir, "backlog") + " || exit 1"), "utf8");
+      [process.execPath, CLI].map(posixPath).join(" ") + " check --id-collisions --dir " +
+        posixPath(join(dir, "backlog")) + " || exit 1"), "utf8");
   chmodSync(path, 0o755);
 
   // `TASK-`, because that is the prefix a fresh `init` writes into config.yaml.

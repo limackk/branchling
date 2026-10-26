@@ -32,7 +32,7 @@ import { fileURLToPath } from "node:url";
 
 import { probeContract } from "../done-task.mjs";
 import { renderProbe } from "../probe.mjs";
-import { isolateHome } from "./_repo.mjs";
+import { isolateHome, posixPath } from "./_repo.mjs";
 
 isolateHome("next-probe");
 
@@ -152,7 +152,7 @@ test("`next --probe` does the same, and `run --probe` feeds it to the hand on st
     const agent = join(f.dir, "agent.sh");
     writeFileSync(agent, "#!/bin/sh\ncat > " + JSON.stringify(witness) + "\necho 'read it'\n", "utf8");
     chmodSync(agent, 0o755);
-    const r = cli(["run", "--dir", f.backlog, "--actor", "agent:scout", "--max-attempts", "1", "--probe", "--agent", agent],
+    const r = cli(["run", "--dir", f.backlog, "--actor", "agent:scout", "--max-attempts", "1", "--probe", "--agent", posixPath(agent)],
       f.env, { cwd: f.repo });
     assert.equal(r.status, 0, r.stdout + r.stderr);
     assert.ok(existsSync(witness), "the agent never ran: " + r.stdout);
@@ -196,7 +196,7 @@ test("POSITIVE CONTROL: without `--probe` nothing is run and the envelope says s
   try {
     const witness = join(f.dir, "ran.txt");
     const id = f.add("A task whose contract leaves a trace",
-      'verification:\n  - id: trace\n    bash: "echo ran > ' + witness + '"');
+      'verification:\n  - id: trace\n    bash: "echo ran > ' + posixPath(witness) + '"');
     const r = cli(["take", id, "--dir", f.backlog, "--actor", "agent:hand", "--json"], f.env, { cwd: f.repo });
     assert.equal(r.status, 0, r.stdout + r.stderr);
     const out = JSON.parse(r.stdout);

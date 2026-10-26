@@ -138,7 +138,10 @@ test("two incompatible API harnesses close work without exposing credentials", a
 
       const result = await runAsync(["run", "--dir", backlog, "--actor", "agent:api", "--profile", shape + "-api"], env, repo);
       assert.equal(result.status, 0, result.stdout + result.stderr);
-      assert.match(result.stdout, /1 closed/);
+      // On a miss, the run log is the only record of what the adapter said; it
+      // is redacted by the tool, and the assertions below check that it is.
+      const runLog = () => { try { return readFileSync(logPathFor(backlog, id, { env }), "utf8"); } catch { return "(no run log)"; } };
+      assert.match(result.stdout, /1 closed/, shape + ": the task did not close\n" + result.stdout + "\n" + runLog());
       assert.doesNotMatch(result.stdout + result.stderr, new RegExp(SECRET));
       assert.doesNotMatch(readFileSync(inputPath, "utf8"), new RegExp(SECRET));
       assert.ok(readFileSync(join(backlog, id + ".done"), "utf8"));

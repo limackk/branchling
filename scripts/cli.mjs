@@ -42,6 +42,7 @@ import { CHECK_GUARDS, effectiveSeverity, guardsForRun } from "./check-guards.mj
 import { resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { FIELD_SHAPES, REASON_MAX_LENGTH } from "./task-fields.mjs";
 import { DELEGATION_POLICIES } from "./agent-contract.mjs";
+import { dropInferredGitDir } from "./git-env.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -927,9 +928,15 @@ export const COMMANDS = {
     usage: [
       `${N} stats [--dir <path>] [--json]`,
       `${N} stats --context`,
+      `${N} stats --agent-time [--json]`,
       "",
       "  --context          what an answer costs a session, measured in THIS tree by",
       "                     running the commands it reports on",
+      "  --agent-time       how long agents actually took per estimate, computed from the",
+      "                     claims and closings in history/ — a p20–p80 range per bucket,",
+      "                     \"not enough data\" below `agent_time_min_n`, and a verdict on",
+      "                     whether the estimate predicts agent time at all. Nothing is",
+      "                     collected for it; the ledger already holds every record.",
       "",
       "  exit: 0 read · 2 usage error",
     ].join("\n"),
@@ -985,6 +992,7 @@ export const COMMANDS = {
       `${N} run [--board b] [--label l] [--priority p] [--epic e] [--log-dir <path>]`,
       `${N} run [--agent-for <role>=<command>] [--profile-for <role>=<name>]`,
       `${N} run [--delegation <policy>] [--allow-uncontrolled-delegation]`,
+      `${N} run --stop [--dir <path>] [--actor <ns:name>] [--json]`,
       "",
       "  The loop is `next` → your agent → `done`, repeated until the queue is empty.",
       "  It is NOT an agent and never will be: `--agent` is a command template of",
@@ -1040,8 +1048,13 @@ export const COMMANDS = {
       "  hand serving `r`; the run reports that leg as `handed-on`, runs no `done` on",
       "  it, and hands the task out again with a fresh attempt count. A pipeline of",
       "  roles is therefore ONE `run`, not one per role. A handoff to a role nobody",
-      "  here serves, or to a person, ends as `held elsewhere` as before. The same",
-      "  role twice on one task stops the run rather than spin.",
+      "  here serves, or to a person, ends as `held elsewhere` as before.",
+      "",
+      "  A TASK HANDED OUT AGAIN WITH NOTHING CHANGED STOPS THE RUN rather than spin:",
+      "  the same task, the same role and the same `blocked_by` twice. A task parked",
+      "  on a new blocker that this run then closed comes back with a different",
+      "  `blocked_by`, and is worked again. The stop gives the claim back and says how",
+      "  many other tasks are still eligible, so it never reads as an empty queue.",
       "",
       "  THE HAND IS TOLD WHO IT IS. Every agent process runs with the actor this run",
       "  claimed the task under, the role it is serving, the task id, data directory",
@@ -1067,6 +1080,15 @@ export const COMMANDS = {
       "",
       "  --dry-run prints the order and claims nothing. Agent output goes to one log",
       "  file per task, outside the repository, and the path is in the report.",
+      "",
+      "  --stop, from another shell, asks every run of this clone to finish the task",
+      "  it is on and then stop: the request is written to the state directory, keyed",
+      "  like the locks, and each run reads it before every `next`, so nothing new is",
+      "  claimed and nothing in flight is cut short. The report ends with `stopped:",
+      "  asked to stop after <ID>`. A run started after the request is not affected.",
+      "  It is a file and not a signal because the pid you see is this dispatcher, not",
+      "  the loop, and Ctrl-C reaches every foreground child — a `done` mid-contract",
+      "  included.",
       "",
       "  --agent-for <role>=<command>  one hand for one role, repeatable — the same",
       "                  command template as --agent, serving only tasks asking for that role",
@@ -1959,6 +1981,12 @@ function runCheck(args) {
 }
 
 export function main(argv) {
+  // A hook in a linked worktree exports `GIT_DIR` without `GIT_WORK_TREE`, and
+  // every git call a command makes from the backlog directory would then take
+  // THAT directory as the top of the work tree (TL-483). Removed once, here,
+  // because every command is a child of this process and inherits it; the
+  // discovery helpers apply the same rule for callers that import them directly.
+  dropInferredGitDir(process.env);
   if (argv.length && HELP_FLAGS.includes(argv[0])) {
     console.log(helpText());
     return 0;

@@ -23,7 +23,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
@@ -39,6 +39,9 @@ import { isolateHome } from "./_repo.mjs";
 // test reads the DEVELOPER's `<config>/config.yaml` — their actor, their model
 // endpoint — and the suite answers differently on different machines.
 isolateHome("docs-links");
+
+/** A POSIX-shaped fixture path as the platform spells it (TL-463). */
+const at = (p) => resolve(p);
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CLI = join(HERE, "..", "cli.mjs");
@@ -103,8 +106,8 @@ test("a bare `#section` is a link inside the page, not a path", () => {
 });
 
 test("an anchor resolves against the target document after path validation", () => {
-  const docs = [{ file: "/r/docs/a.md", text: "[x](b.md#heading) and [y](b.md)" }];
-  const audit = auditLinks(docs, (p) => p === "/r/docs/b.md", "/r", () => "# Heading\n");
+  const docs = [{ file: at("/r/docs/a.md"), text: "[x](b.md#heading) and [y](b.md)" }];
+  const audit = auditLinks(docs, (p) => p === at("/r/docs/b.md"), at("/r"), () => "# Heading\n");
   assert.deepEqual(audit.dead, [], "the anchor was carried into the path and broke it");
   assert.equal(audit.checked, 2, "the path and anchor are both local targets");
   assert.equal(audit.anchorsChecked, 1, "only the anchored link reads a heading");
@@ -123,21 +126,21 @@ test("a markdown link resolves against its FILE, a related_docs entry against th
   // field that `related_docs` paths are relative to the repository root, while
   // a markdown link between two tasks in one directory is a bare filename.
   const docs = [{
-    file: "/r/backlog/tasks/T-1.md",
+    file: at("/r/backlog/tasks/T-1.md"),
     text: "---\nrelated_docs:\n  - docs/manual.md\n---\n\nSee [the other](T-2.md).\n",
   }];
-  const exists = (p) => p === "/r/docs/manual.md" || p === "/r/backlog/tasks/T-2.md";
-  assert.deepEqual(auditLinks(docs, exists, "/r").dead, []);
+  const exists = (p) => p === at("/r/docs/manual.md") || p === at("/r/backlog/tasks/T-2.md");
+  assert.deepEqual(auditLinks(docs, exists, at("/r")).dead, []);
 
   // …and swapping the two rules must break both, or the assertion above proves
   // nothing about which rule was applied.
-  const swapped = (p) => p === "/r/backlog/tasks/docs/manual.md" || p === "/r/T-2.md";
-  assert.equal(auditLinks(docs, swapped, "/r").dead.length, 2);
+  const swapped = (p) => p === at("/r/backlog/tasks/docs/manual.md") || p === at("/r/T-2.md");
+  assert.equal(auditLinks(docs, swapped, at("/r")).dead.length, 2);
 });
 
 test("a leading slash resolves against the repository root", () => {
-  const docs = [{ file: "/r/docs/deep/a.md", text: "[x](/README.md)" }];
-  assert.deepEqual(auditLinks(docs, (p) => p === "/r/README.md", "/r").dead, []);
+  const docs = [{ file: at("/r/docs/deep/a.md"), text: "[x](/README.md)" }];
+  assert.deepEqual(auditLinks(docs, (p) => p === at("/r/README.md"), at("/r")).dead, []);
 });
 
 // ── the parsers ───────────────────────────────────────────────────────────
@@ -250,8 +253,8 @@ test("a target inside the install directory is judged by its PATH, not by the di
   // The control that carries the weight: `exists` answers yes for everything,
   // which is the developer machine where the install ran — and the finding
   // stands anyway, because on the machine that matters it would not.
-  const docs = [{ file: "/r/docs/a.md", text: "[prompts](../node_modules/pkg/README.md)" }];
-  const audit = auditLinks(docs, () => true, "/r");
+  const docs = [{ file: at("/r/docs/a.md"), text: "[prompts](../node_modules/pkg/README.md)" }];
+  const audit = auditLinks(docs, () => true, at("/r"));
   assert.deepEqual(audit.dead, [], "an install artefact is not a dead link and must not be filed as one");
   assert.equal(audit.artefacts.length, 1);
   assert.equal(audit.artefacts[0].line, 1);
@@ -299,19 +302,19 @@ test("it reads top-level markdown, docs/ and the task files — and not node_mod
 
   const files = documentsToCheck(fx.dir, join(fx.backlog, "tasks"));
   assert.ok(files.some((f) => f.endsWith("TOP.md")));
-  assert.ok(files.some((f) => f.includes("/docs/")));
-  assert.ok(files.some((f) => f.includes("/tasks/")));
+  assert.ok(files.some((f) => f.includes(sep + "docs" + sep)));
+  assert.ok(files.some((f) => f.includes(sep + "tasks" + sep)));
   assert.equal(files.some((f) => f.includes("node_modules")), false,
     "somebody else's documentation is not this repository's defect");
   assert.equal(check(fx).status, 0, "a link in node_modules failed the run");
 });
 
 test("the document root is the repository, with an explicit safe fallback without git", () => {
-  assert.equal(repositoryRoot("/r/backlog", { run: () => ({ status: 0, stdout: "/r\n" }) }), "/r");
-  assert.equal(repositoryRoot("/r/backlog", { run: () => ({ status: 128, stdout: "" }) }), "/r");
-  assert.equal(repositoryRoot("/r/backlog", {
-    run: () => ({ status: 128, stdout: "" }), fallback: "/r/backlog",
-  }), "/r/backlog");
+  assert.equal(repositoryRoot(at("/r/backlog"), { run: () => ({ status: 0, stdout: "/r\n" }) }), at("/r"));
+  assert.equal(repositoryRoot(at("/r/backlog"), { run: () => ({ status: 128, stdout: "" }) }), at("/r"));
+  assert.equal(repositoryRoot(at("/r/backlog"), {
+    run: () => ({ status: 128, stdout: "" }), fallback: at("/r/backlog"),
+  }), at("/r/backlog"));
 });
 
 // ── the whole repository ──────────────────────────────────────────────────

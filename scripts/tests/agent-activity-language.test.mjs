@@ -10,7 +10,7 @@ isolateHome("agent-activity-language");
 const PATHS = {
   agents: join(REPO_ROOT, "AGENTS.md"),
   instructions: join(REPO_ROOT, "scripts", "instructions.mjs"),
-  readme: join(REPO_ROOT, "README.md"),
+  guide: join(REPO_ROOT, "docs", "guide.md"),
 };
 
 function sources() {
@@ -28,13 +28,13 @@ function auditActivityLanguage(source) {
     ["instructions", /durable claim of responsibility, not evidence that an agent or process is/],
     ["instructions", /LIVE means you can name and poll a runtime handle now\./],
     ["instructions", /Execution is checkpointed; no background/],
-    ["readme", /state means the work is claimed; it does not prove that an agent or/],
-    ["readme", /durable task state, not a\n+liveness probe/],
+    ["guide", /state means the work is claimed; it does not prove that an agent or/],
+    ["guide", /durable task state, not a\n+liveness probe/],
   ];
   const misleading = [
     ["agents", /status: in_progress proves (?:that )?(?:an agent|execution) is (?:live|running)/i],
     ["instructions", /Taking sets the status[^\n]*and proves[^\n]*(?:live|running)/i],
-    ["readme", /in_progress[^\n]*means (?:an agent|execution) is (?:live|running)/i],
+    ["guide", /in_progress[^\n]*means (?:an agent|execution) is (?:live|running)/i],
   ];
 
   for (const [name, pattern] of required) {
@@ -56,7 +56,7 @@ test("NEGATIVE CONTROL: restoring status-based liveness claims fails the guard",
   const source = sources();
   source.agents += "\nstatus: in_progress proves an agent is live.\n";
   source.instructions += "\nTaking sets the status and proves execution is running.\n";
-  source.readme += "\nin_progress means an agent is running.\n";
+  source.guide += "\nin_progress means an agent is running.\n";
 
   const errors = auditActivityLanguage(source);
   assert.equal(errors.length, 3, `the misleading fixtures escaped:\n${errors.join("\n")}`);

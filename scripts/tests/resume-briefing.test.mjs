@@ -372,7 +372,8 @@ test("the uncommitted half reaches the briefing, told apart from the committed h
     assert.match(work, new RegExp(BRANCH_MARKER), "the committed work left the briefing");
     assert.match(work, new RegExp(DIRTY_MARKER),
       "an edit the dead session never committed is invisible to its successor");
-    assert.match(work, new RegExp(UNTRACKED_FILE.replace(/[\\/]/g, "[\\\\/]")),
+    const untrackedPattern = new RegExp(UNTRACKED_FILE.replace(/[\\/]/g, "[\\\\/]"));
+    assert.match(work, untrackedPattern,
       "a file the dead session created and never added is invisible to its successor");
 
     // AND A SUCCESSOR CAN TELL WHICH IS WHICH. Mistaking an uncommitted edit
@@ -380,7 +381,8 @@ test("the uncommitted half reaches the briefing, told apart from the committed h
     // between work that survives a `git checkout` and work that does not.
     const committedAt = work.indexOf(BRANCH_MARKER);
     const dirtyAt = work.indexOf(DIRTY_MARKER);
-    const untrackedAt = work.indexOf(UNTRACKED_FILE);
+    // git prints the path with `/`; the fixture wrote it with the platform's separator.
+    const untrackedAt = work.search(untrackedPattern);
     assert.ok(committedAt < dirtyAt, "the committed half does not come first");
     const label = work.slice(committedAt, dirtyAt);
     assert.match(label, /not yet committed/i,

@@ -42,7 +42,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { HOME_ENV } from "../home.mjs";
-import { isolateHome, SCRIPTS_DIR } from "./_repo.mjs";
+import { isolateHome, SCRIPTS_DIR, posixPath } from "./_repo.mjs";
 
 isolateHome("agent-refusal-not-an-attempt");
 
@@ -108,7 +108,7 @@ function fixture(title) {
   const file = taskFile(backlog, id);
   writeFileSync(file, readFileSync(file, "utf8")
     .replace(/verification:[\s\S]*?\n---/,
-      'verification:\n  - id: it-is-done\n    bash: "echo ran >> ' + witness + ' && test -f ' + id + '.done"\n---')
+      'verification:\n  - id: it-is-done\n    bash: "echo ran >> ' + posixPath(witness) + ' && test -f ' + id + '.done"\n---')
     .replace(/\[proof:[^\]]*\]/g, "[proof: it-is-done]"), "utf8");
   assert.equal(cli(["build", "--dir", backlog], env, repo).status, 0);
   return { root, repo, backlog, env, id, witness };
@@ -118,7 +118,7 @@ function agentScript(root, name, body) {
   const p = join(root, name);
   writeFileSync(p, "#!/bin/sh\n" + body + "\n", "utf8");
   chmodSync(p, 0o755);
-  return p;
+  return posixPath(p);
 }
 
 function contractRuns(witness) {
