@@ -497,6 +497,14 @@ closed — after the last attempt it is parked in the status your
 \`reason_required_statuses\` protects, with the reason, and the dispatcher stops
 offering it.
 
+STOPPING A RUN WITHOUT CUTTING A TASK IN HALF. \`{{tool}} run --stop\`, from any
+shell on the same clone, asks every run of it to finish the task it is on and
+then claim nothing new; each reads the request before its next \`next\` and ends
+with \`stopped: asked to stop after <ID>\`. Do not freeze or kill the loop to get
+the same effect: a run killed between \`{{tool}} next\` and \`{{tool}} done\`
+leaves a claim that nobody is working, and one frozen while \`next\` runs holds
+a task \`next\` has already claimed.
+
 THE TWO ENDS OF A SESSION.
 
   starting   \`{{tool}} next --actor <ns:name>\` — one task, already claimed and

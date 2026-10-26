@@ -781,3 +781,63 @@ test("turnKey: the blockers at hand-out are part of the turn, their order and ca
   assert.notEqual(turnKey("TL-1", "", ["TL-2"]), turnKey("TL-1", "", ["TL-2", "TL-3"])); // renumber: allow
   assert.notEqual(turnKey("TL-1", "dev", []), turnKey("TL-1", "qa", [])); // renumber: allow
 });
+
+// ── Asking a run to stop after the task it is on (TL-485) ──────────────────
+
+test("a stop requested while the first task's agent works ends the run after that task (TL-485)", () => {
+  const { dir, repo, backlog, env, ids } = fixture(2);
+  try {
+    // The hand asks for the stop itself, mid-task, from a process of its own —
+    // the shape of a person typing `run --stop` in a second shell — and then
+    // finishes its task. Whichever task comes first is the one that asks.
+    const marker = posixPath(join(dir, "asked"));
+    const agent = agentScript(dir, "asks.sh", [
+      'id=$(grep -m1 "^id: " | sed "s/^id: //")',
+      'if [ ! -f "' + marker + '" ]; then',
+      '  "' + posixPath(process.execPath) + '" "' + posixPath(CLI) + '" run --stop --dir "' + posixPath(backlog) + '" > "' + marker + '"',
+      "fi",
+      'touch "$id.done"',
+    ].join("\n"));
+    const r = cli(["run", "--dir", backlog, "--actor", "agent:worker", "--agent", agent, "--json"], env, { cwd: repo });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    const out = JSON.parse(r.stdout);
+    assert.match(readFileSync(join(dir, "asked"), "utf8"), /stop requested/, "the request itself was refused");
+    assert.equal(out.tally.taken, 1, JSON.stringify(out.tasks));
+    const [first] = out.tasks.map((t) => t.id);
+    const other = ids.find((id) => id !== first);
+    assert.equal(statusOf(backlog, first), "done", "the task in flight was cut short");
+    assert.equal(statusOf(backlog, other), "pending", "the run claimed something after the request");
+    assert.equal(ownerOf(backlog, other), "unassigned");
+    assert.equal(out.stopped, "asked to stop after " + first);
+    assert.equal(out.stopRequested.after, first);
+    assert.ok(out.stopRequested.requestedAt, "the report does not say when the stop was asked for");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("POSITIVE CONTROL: a stop requested before the run started does not stop it (TL-485)", () => {
+  // Without this, the test above passes against a loop that stops on the mere
+  // existence of the file — which would also stop every run started tomorrow.
+  const { dir, repo, backlog, env, ids } = fixture(2);
+  try {
+    const asked = cli(["run", "--stop", "--dir", backlog, "--json"], env, { cwd: repo });
+    assert.equal(asked.status, 0, asked.stderr);
+    assert.equal(JSON.parse(asked.stdout).ok, true);
+    const agent = agentScript(dir, "agent.sh", 'id=$(grep -m1 "^id: " | sed "s/^id: //"); touch "$id.done"');
+    const r = cli(["run", "--dir", backlog, "--actor", "agent:worker", "--agent", agent, "--json"], env, { cwd: repo });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    const out = JSON.parse(r.stdout);
+    for (const id of ids) assert.equal(statusOf(backlog, id), "done", id + " was left by a stale request");
+    assert.equal(out.stopped, "the queue is empty");
+    assert.equal(out.stopRequested, null);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("`--stop` does not start a run, so a flag only a run uses FAILS beside it (TL-485)", () => {
+  assert.throws(() => parseRunArgs(["--stop", "--agent", "true"]), /does not start one: --agent/);
+  assert.throws(() => parseRunArgs(["--stop", "--max-tasks", "2"]), /--max-tasks/);
+  assert.equal(parseRunArgs(["--stop", "--dir", "x", "--actor", "user:me", "--json"]).stop, true);
+});

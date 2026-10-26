@@ -88,6 +88,7 @@ import { readHistory, recordEdit } from "./history.mjs";
 import { roleBrief } from "./instructions.mjs";
 import { userConfigPath } from "./home.mjs";
 import { lockScope, releaseLock, stateRoot } from "./lock.mjs";
+import { requestStop, stopRequestedSince } from "./run-stop.mjs";
 import { callerSpecies, deadlockIdentity, describeDeadlock, isOverSized, parkedByRun, queueStatuses, readDispatchRecords, selectCandidates, servesExecutor } from "./next-task.mjs";
 import { backlogPaths, repositoryRoot, resolveBacklogDir } from "./paths.mjs";
 import { loadPlanForDispatch, planState, projectionWall } from "./plan.mjs";
@@ -97,7 +98,7 @@ import { todayStamp } from "./today.mjs";
 import { ACTOR_NAMESPACES, buildFieldSpecs, extractMeta, fieldSpec, isValidActor, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
 import { readTaskRecords, splitList, unknownFilterValues } from "./task-select.mjs";
 import { printJson } from "./json-envelope.mjs";
-import { MARK, color, failure, warn } from "./ui.mjs";
+import { MARK, color, failure, ok, warn } from "./ui.mjs";
 import { processTreeDetached, stopProcessTree } from "./process-tree.mjs";
 import { executableInvocation, posixShell } from "./posix-shell.mjs";
 import { processEssentials } from "./process-env.mjs";
@@ -123,8 +124,12 @@ export const AGENT_ENV = "BACKLOG_AGENT_COMMAND";
 export const RUN_FLAGS = [
   "--dir", "--actor", "--agent", "--agent-for", "--profile", "--profile-for", "--max-attempts", "--max-tasks", "--timeout",
   "--log-dir", "--stuck-status", "--delegation", "--allow-uncontrolled-delegation", "--json", "--dry-run", "--plan", "--probe",
-  "--board", "--label", "--priority", "--epic",
+  "--board", "--label", "--priority", "--epic", "--stop",
 ];
+
+/** What `--stop` may be combined with: it names a clone and who asks, nothing a
+ *  loop would use, so anything else on the line is a run somebody meant to start. */
+const STOP_FLAGS = ["--stop", "--dir", "--actor", "--json"];
 
 const DEFAULT_MAX_ATTEMPTS = 2;
 const DEFAULT_TIMEOUT_SECONDS = 900;
@@ -134,11 +139,14 @@ export function parseRunArgs(args) {
   const plan = {
     dir: null, actor: null, agent: null, profile: null, agentFor: {}, profileFor: {}, json: false, dryRun: false, usePlan: false,
     maxAttempts: DEFAULT_MAX_ATTEMPTS, maxTasks: 0, timeout: DEFAULT_TIMEOUT_SECONDS, probe: false, delegation: "provider", allowUncontrolledDelegation: false,
-    logDir: null, stuckStatus: null, board: null, label: null, priority: null, epic: null,
+    logDir: null, stuckStatus: null, board: null, label: null, priority: null, epic: null, stop: false,
   };
+  const given = [];
   const numbers = { "--max-attempts": "maxAttempts", "--max-tasks": "maxTasks", "--timeout": "timeout" };
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
+    if (a.startsWith("-")) given.push(a);
+    if (a === "--stop") { plan.stop = true; continue; }
     if (a === "--json") { plan.json = true; continue; }
     if (a === "--dry-run") { plan.dryRun = true; continue; }
     if (a === "--probe") { plan.probe = true; continue; }
@@ -197,6 +205,13 @@ export function parseRunArgs(args) {
         "`run` takes no task id — it empties the queue, and a dispatcher that is\n" +
         "told which task to run is a queue with the choosing put back in."
     );
+  }
+  if (plan.stop) {
+    const extra = given.filter((f) => STOP_FLAGS.indexOf(f) < 0);
+    if (extra.length) {
+      throw new Error("`--stop` asks the runs already going to stop; it does not start one: " + extra.join(" ") + "\n" +
+        "It takes only " + STOP_FLAGS.slice(1).join(", ") + ".");
+    }
   }
   if (plan.agent && plan.profile) throw new Error("`--agent` and `--profile` are alternatives — name one generalist");
   if (!DELEGATION_POLICIES.includes(plan.delegation)) throw new Error("`--delegation` must be one of: " + DELEGATION_POLICIES.join(", "));
@@ -1482,6 +1497,20 @@ export async function run(argv) {
     console.error(failure(N + " run", e.message, []));
     return 2;
   }
+  // A REQUEST, NOT A RUN (TL-485). It needs the clone and nothing else — no
+  // configuration, no profile, no agent — so it is answered before any of them
+  // is read, and a backlog whose configuration is broken can still be told to stop.
+  if (plan.stop) {
+    const asked = requestStop(root, { actor: resolveActor(plan.actor, { fallback: "" }) || null });
+    if (plan.json) {
+      printJson("run-stop", { ok: true, requestedAt: asked.requestedAt, by: asked.by, origin: asked.origin, path: asked.path });
+    } else {
+      console.log(ok("stop requested — every run of " + asked.origin +
+        " finishes the task it is on, then claims nothing new"));
+      console.log("  " + color.dim("a run started after this request is not affected · " + asked.path));
+    }
+    return 0;
+  }
   const config = loadConfigOrExit(root);
   // A role in the map that the project does not declare is a typo, and it fails
   // BEFORE the loop starts: found in the middle of a run it would have wasted
@@ -1779,6 +1808,8 @@ export async function run(argv) {
   // The one result that ends the run without being a fact about a task (TL-184).
   let neverStarted = null;
   const seen = new Set();
+  // Set only when a `run --stop` made after this run started ended it (TL-485).
+  let stopRequest = null;
   // Set only when the guard below ends the run, so a caller of `--json` can
   // tell that stop from an empty queue without parsing the sentence.
   let spin = null;
@@ -1811,6 +1842,16 @@ export async function run(argv) {
   const legs = new Map();
 
   for (;;) {
+    // ASKED BEFORE EVERY `next`, because `next` claims (TL-485): once the
+    // request is seen nothing new is taken, and the task just finished was
+    // finished whole — its attempts, its `done` and its park all ran.
+    const asked = stopRequestedSince(root, started);
+    if (asked) {
+      const after = taken.length ? taken[taken.length - 1].id : null;
+      stopRequest = { requestedAt: asked.requestedAt, by: asked.by || null, after };
+      stopped = after ? "asked to stop after " + after : "asked to stop before any task was taken";
+      break;
+    }
     if (plan.maxTasks && taken.length >= plan.maxTasks) {
       stopped = "--max-tasks " + plan.maxTasks;
       break;
@@ -2114,6 +2155,9 @@ export async function run(argv) {
       // `{id, role, eligible}` when the spin guard ended the run (TL-484), with
       // the number of OTHER tasks still eligible at that moment; null otherwise.
       spinGuard: spin,
+      // `{requestedAt, by, after}` when `run --stop` ended the run (TL-485);
+      // `after` is the last task it finished, null when it had taken none.
+      stopRequested: stopRequest,
       tally: { ...tally, taken: taken.length },
       // What this run used outside the tree it was given. A consumer comparing
       // two runs can see a shared-state change for what it is (TL-202).

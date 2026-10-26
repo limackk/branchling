@@ -86,7 +86,12 @@ export const KINDS = {
     // stop is a fact about one task, and `eligible` counts the OTHER tasks the
     // dispatcher would still hand out, so it never reads as an empty queue.
     spinGuard: null,
+    // `{requestedAt, by, after}` when `run --stop` ended the run (TL-485).
+    stopRequested: null,
   },
+  // `run --stop --json` (TL-485): the request as written, and where. `origin`
+  // is the clone it reaches — every run of it, from any of its worktrees.
+  "run-stop": { ok: null, requestedAt: null, by: null, origin: null, path: null },
   // `advisories` are the findings `check` stopped reporting when it became a
   // release gate (TL-383): each `{ name, output }`, where `name` is the same
   // registry string `check --json` puts in `failed` and `output` is text written
@@ -447,6 +452,11 @@ export const KIND_EXERCISE = {
   resume: { args: ["resume", FIRST_TASK, "--actor", "agent:test", "--no-verify", "--json"] },
   run: { args: ["run", "--dry-run", "--json"] },
   // ── The rows that WRITE (TL-119) ─────────────────────────────────────────
+  //
+  // A stop request is written to the state directory, never to the tree, and
+  // reaches only a run started before it — none is running here.
+  "run-stop": { args: ["run", "--stop", "--json"], writes: true },
+  //
   //
   // `take` and `next` share ONE kind, because they answer the same question.
   // The registry names it once and exercises it with `next`; the refusal case

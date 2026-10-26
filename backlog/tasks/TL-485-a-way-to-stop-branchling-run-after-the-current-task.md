@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 4h
@@ -42,5 +42,5 @@ Reported from a downstream repository on 2026-10-26 (branchling 0.1.0). Today th
 
 ## Acceptance criteria
 
-- [ ] a stop request ends the run after the current task and claims nothing new [proof: run]
-- [ ] the whole suite stays green [proof: suite]
+- [x] a stop request ends the run after the current task and claims nothing new [proof: run]
+- [x] the whole suite stays green [proof: suite]
