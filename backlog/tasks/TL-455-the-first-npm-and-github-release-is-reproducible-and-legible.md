@@ -6,7 +6,7 @@ labels: []
 board: main
 epic: "Backlog — open source publication"
 priority: P1
-status: awaiting_vouch  # pending | in_progress | blocked | done | cancelled
+status: done  # pending | in_progress | blocked | done | cancelled
 owner: ""
 role: review  # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
@@ -60,6 +60,6 @@ released version.
 
 ## Acceptance criteria
 
-- [ ] The versioned tree and package satisfy the reproducible release, tarball and first-contact contracts. [proof: release-package]
-- [ ] Every repository publication gate passes on the release commit. [proof: release-guards]
-- [ ] The first public release is actually available and understandable to a stranger. [proof: public-release]
+- [x] The versioned tree and package satisfy the reproducible release, tarball and first-contact contracts. [proof: release-package]
+- [x] Every repository publication gate passes on the release commit. [proof: release-guards]
+- [x] The first public release is actually available and understandable to a stranger. [proof: public-release]
