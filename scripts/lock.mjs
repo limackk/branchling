@@ -189,7 +189,8 @@ export function isExpired(lock, ttlMinutes, now = Date.now()) {
  * Take the lock, or say who is holding it.
  *
  * @param {{root: string, taskId: string, actor: string, ttlMinutes?: number,
- *          now?: number, env?: object, scope?: object}} opts
+ *          now?: number, env?: object, scope?: object,
+ *          interleave?: (step: string) => void}} opts
  * @returns {{ok: boolean, lock?: object, holder?: object, tookOver?: object,
  *            path: string}}
  */
@@ -209,12 +210,25 @@ export function acquireLock(opts) {
     ts: new Date(now).toISOString(),
   };
 
-  for (let attempt = 0; attempt < 2; attempt++) {
+  // A test seam, as in `withMutex`: it runs at the two points where another
+  // session can change the file under this one.
+  const interleave = opts.interleave || (() => {});
+
+  // Three passes: one may be spent on a reservation released under this one,
+  // one on removing an expired reservation, and the last decides.
+  for (let attempt = 0; attempt < 3; attempt++) {
     if (createExclusively(path, JSON.stringify(record) + "\n")) {
       return { ok: true, lock: record, path };
     }
+    interleave("contended");
 
-    const held = readLock(dir, opts.taskId);
+    // Absence is not an expired reservation (TL-487, the shape TL-481 found in
+    // the mutex): the holder released between the failed create and this read,
+    // and removing whatever stands under the name by the time the removal runs
+    // could take another session's fresh reservation.
+    const seen = readHolder(path);
+    if (!seen) continue;
+    const held = seen.record;
     // The same session asking again is not a collision: `take` on a task you are
     // already holding has to be idempotent, otherwise a retried command refuses
     // on the strength of its own first run.
@@ -223,14 +237,12 @@ export function acquireLock(opts) {
     }
     if (!isExpired(held, ttl, now)) return { ok: false, holder: held, path };
 
-    // Stale. Remove it and try ONCE more — the `wx` create below is what decides
-    // between two processes that both saw the same stale lock; whoever loses the
-    // race reads the winner's fresh record on the next pass and steps aside.
-    try {
-      unlinkSync(path);
-    } catch (e) {
-      if (e.code !== "ENOENT") throw e;
-    }
+    // Stale. Remove it — but only if it is still the file judged expired — and
+    // try again. The exclusive create is what decides between two sessions that
+    // both saw the same stale lock; whoever loses the race reads the winner's
+    // fresh record on the next pass and steps aside.
+    interleave("judged-expired");
+    removeIfUnchanged(path, seen);
     record.tookOver = held || null;
   }
 
@@ -361,7 +373,8 @@ function readHolder(path) {
 }
 
 /**
- * Remove the mutex file only if it is still the file that was judged stale.
+ * Remove a mutex or reservation file only if it is still the file that was
+ * judged stale.
  *
  * There is no compare-and-unlink, so the file is first RENAMED out of the way —
  * atomic, and from then on nobody else can remove it — and its identity is

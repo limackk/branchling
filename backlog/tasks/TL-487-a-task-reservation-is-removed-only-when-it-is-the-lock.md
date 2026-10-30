@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h
 confidence: medium                 # how much you trust the estimate
 created: 2026-10-26
-updated: 2026-10-26
+updated: 2026-10-30
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
@@ -42,5 +42,5 @@ TL-481 found that `withMutex` treated an ABSENT holder file like a corrupt one: 
 
 ## Acceptance criteria
 
-- [ ] A reservation is removed only when it is the file judged expired, and an expired one is still taken over. [proof: reservation-takeover]
-- [ ] Taking and reserving tasks still behaves as before. [proof: next-suite]
+- [x] A reservation is removed only when it is the file judged expired, and an expired one is still taken over. [proof: reservation-takeover]
+- [x] Taking and reserving tasks still behaves as before. [proof: next-suite]
