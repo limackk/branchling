@@ -179,6 +179,16 @@ one. A third window would need a reason at least as strong as "the alternative
 is publishing somebody else's project name forever", and the person opening it
 owes this paragraph another entry.
 
+**The third window, on 2026-10-30, touched only commits that had never been
+pushed.** Tasks filed from a downstream run of parallel loops (TL-489 to
+TL-493) carried that repository's name, paths, task ids and measurements, in
+two commit titles and in the files of four commits that sat ahead of
+`origin/main`. Those four commits were rebuilt with the names replaced; the
+resulting tree is identical to the one before the rewrite, and no commit that
+`origin` had ever received changed. It is the reason the second window
+named: somebody else's project name, before anybody had it. The rule above
+still holds for everything that has been pushed.
+
 **What was written in Polish before this rule STAYS, and always will:**
 
 - **`backlog/history/*.jsonl`.** The log is append-only. A `reason` written by a
