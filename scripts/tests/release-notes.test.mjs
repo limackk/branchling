@@ -53,3 +53,18 @@ test("the release workflow publishes from a tag with provenance and checks the v
   assert.match(workflow, /npm publish --provenance/, "the workflow publishes without provenance");
   assert.match(workflow, /does not match package\.json version/, "the workflow does not compare the tag with the manifest");
 });
+
+// v0.2.0 failed twice at `npm publish` with E403 while both files described
+// the credential as an organization's automation token: a kind npm no longer
+// issues, for an owner the package does not have (TL-499).
+test("the release document names the token that publishes and how to recover", () => {
+  const releasing = readFileSync(join(REPO_ROOT, "docs", "releasing.md"), "utf8");
+  const workflow = readFileSync(join(REPO_ROOT, ".github", "workflows", "release.yml"), "utf8");
+  for (const [name, text] of [["docs/releasing.md", releasing], ["release.yml", workflow]]) {
+    assert.doesNotMatch(text, /automation[\s#]+token/i, name + " still calls the credential an automation token");
+  }
+  assert.match(releasing, /granular access token/, "the document does not name the kind of token");
+  assert.match(releasing, /bypasses two-factor authentication/, "the document omits the two-factor bypass");
+  assert.match(releasing, /403 Forbidden/, "the document does not show what a refused token looks like");
+  assert.match(releasing, /gh run rerun <run-id> --failed/, "the document does not say a failed publish is rerun, not retagged");
+});
