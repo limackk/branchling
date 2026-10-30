@@ -35,7 +35,7 @@ import { join } from "node:path";
 import { withBacklogMutex } from "./lock.mjs";
 import { withHistoryLogMutex } from "./history-log-mutex.mjs";
 import { withSnapshotMutex } from "./snapshot-mutex.mjs";
-import { ACTOR_UNKNOWN, FIELD_ADOPTED, FIELD_ATTRIBUTED, FIELD_COMMENT, FIELD_CREATED, FIELD_DECISION, FIELD_DELETED, FIELD_TAKEOVER, REASON_UNKNOWN, TRACKED_FIELDS, diffMeta, extractMeta, formatValue, hasStatedReason, normalizeActor as normalizeActorFn, normalizeReason, splitFrontmatter } from "./task-fields.mjs";
+import { ACTOR_UNKNOWN, FIELD_ADOPTED, FIELD_ATTRIBUTED, FIELD_COMMENT, FIELD_CREATED, FIELD_DECISION, FIELD_DELETED, FIELD_TAKEOVER, REASON_UNKNOWN, TRACKED_FIELDS, diffMeta, extractMeta, formatValue, hasStatedReason, lineEnding, normalizeActor as normalizeActorFn, normalizeReason, splitFrontmatter } from "./task-fields.mjs";
 import { ANY_HISTORY_FILE, ANY_TASK_FILE, ANY_TASK_FILE_ID, ANY_TASK_ID, taskIdPatterns } from "./task-id.mjs";
 
 export const HISTORY_DIRNAME = "history";
@@ -190,7 +190,11 @@ export function appendEntries(backlogDir, taskId, entries) {
     // after neither exists is the destination path authoritative.
     const target = historyAppendTarget(backlogDir, taskId);
     for (const e of entries) if (e && e.task === taskId) e.task = target.taskId;
-    const lines = entries.map((e) => JSON.stringify(e)).join("\n") + "\n";
+    // A log checked out with CRLF is appended to in CRLF (TL-479). JSON.parse
+    // reads either, so this is not about the reader: a log of mixed endings is
+    // a whole-file change to git's eyes on the next normalisation.
+    const eol = existsSync(target.path) ? lineEnding(readFileSync(target.path, "utf8")) : "\n";
+    const lines = entries.map((e) => JSON.stringify(e)).join(eol) + eol;
     appendFileSync(target.path, lines, "utf8");
     return entries;
   });

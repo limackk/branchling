@@ -37,7 +37,7 @@ import { withBacklogMutex } from "./lock.mjs";
 import { editPlanText, newPlanErrors, waveTargetProblem } from "./plan-write.mjs";
 import { detectPrefixMismatch, prefixMismatchMessage, taskIdPatterns } from "./task-id.mjs";
 import { backlogPaths, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
-import { auditVocabulary, extractMeta, splitFrontmatter } from "./task-fields.mjs";
+import { auditVocabulary, extractMeta, lineEnding, splitFrontmatter, withLineEnding } from "./task-fields.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { readStdinText } from "./stdin.mjs";
 import { parseTaskDocument, taskContent } from "./task-input.mjs";
@@ -345,7 +345,15 @@ function createTaskUnlocked({ root, config, board, slug, fields, body }) {
   // The banner is dropped BEFORE the rewrites, not after: every `^key:` pattern
   // below is anchored per line, and a comment line that happened to start with
   // one of those words would otherwise be a rewrite target.
-  const template = stripTemplateBanner(readFileSync(join(root, "_template.md"), "utf8"));
+  //
+  // The rewrites below are written against LF, so a template checked out with
+  // CRLF is read as LF and the task is written back in the template's ending
+  // (TL-479). Matched against `\r\n` directly, the banner, the verification
+  // block and the body boundary all missed, and `new` exited 0 with the
+  // template's placeholders standing in for the caller's task.
+  const raw = readFileSync(join(root, "_template.md"), "utf8");
+  const eol = lineEnding(raw);
+  const template = stripTemplateBanner(withLineEnding(raw, "\n"));
   let text = template
     .replace(/^id: .*$/m, "id: " + taskId)
     .replace(/^title: .*$/m, "title: " + quoted(opts.title))
@@ -401,6 +409,7 @@ function createTaskUnlocked({ root, config, board, slug, fields, body }) {
     const end = text.indexOf("\n---\n", 3);
     if (end >= 0) text = text.slice(0, end + 5) + body;
   }
+  text = withLineEnding(text, eol);
 
   // BEFORE the write, not after (TL-69). A file already on disk is a value the
   // tree now carries, and every reader downstream — the views, `next`, the

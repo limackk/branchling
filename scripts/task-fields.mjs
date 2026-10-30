@@ -950,7 +950,11 @@ export function setFrontmatterField(text, key, value, spec) {
   if (!match) throw new Error("The file has no YAML frontmatter");
   const [, open, fm, close, body] = match;
 
-  const lines = fm.split("\n");
+  // The edited lines are joined with the ending the file opens with (TL-479).
+  // Splitting on "\n" alone kept a `\r` on every untouched line and none on the
+  // rewritten one, so a CRLF checkout came back with mixed endings.
+  const eol = lineEnding(open);
+  const lines = fm.split(/\r?\n/);
   const topLevelKey = (line) => {
     const m = line.match(/^([A-Za-z_][A-Za-z0-9_-]*):/);
     return m ? m[1] : null;
@@ -984,7 +988,24 @@ export function setFrontmatterField(text, key, value, spec) {
     lines.splice(insertAt, 0, ...newLines);
   }
 
-  return open + lines.join("\n") + close + body;
+  return open + lines.join(eol) + close + body;
+}
+
+/**
+ * The line ending a text uses, judged by its FIRST line break: `"\r\n"` or
+ * `"\n"` (TL-479). Git with `core.autocrlf=true` checks a whole file out in one
+ * ending, so the first break speaks for the rest; a text with no break at all
+ * answers LF, which is what the tool writes when nothing says otherwise.
+ */
+export function lineEnding(text) {
+  const i = String(text == null ? "" : text).indexOf("\n");
+  return i > 0 && text[i - 1] === "\r" ? "\r\n" : "\n";
+}
+
+/** Every line break of `text` written as `eol`, whatever it was before. */
+export function withLineEnding(text, eol) {
+  const lf = String(text == null ? "" : text).replace(/\r\n/g, "\n");
+  return eol === "\r\n" ? lf.replace(/\n/g, "\r\n") : lf;
 }
 
 function trailingComment(line) {
