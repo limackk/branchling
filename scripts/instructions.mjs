@@ -509,12 +509,12 @@ SEVERAL LOOPS, ONE WORKTREE EACH. A wrapper that runs one \`{{tool}} run\` per
 worktree of a clone, merging the base branch in before a task and back out
 after it, meets two costs of the claim being written to the tree on purpose:
 a pause that lands after \`next\` leaves a claim and its give-back uncommitted,
-and the next merge fails on them. Three pieces keep the bookkeeping out of its
+and the next merge fails on them. Four pieces keep the bookkeeping out of its
 way; commits and branch topology stay the wrapper's.
 
   {{tool}} run --agent "<command>" \\
     --before-next "./wrapper sync" \\
-    --commit-state
+    --commit-state --wait 60
 
   --before-next   the wrapper's merge or pause check, run before every \`next\`.
                   A non-zero exit ends the run before anything is claimed, so
@@ -522,6 +522,10 @@ way; commits and branch topology stay the wrapper's.
   --commit-state  the task file and \`history/<ID>.jsonl\` are committed after
                   each outcome, and nothing else. Staged paths of anybody else
                   stop the run instead of being swept into that commit.
+  --wait <s>      when the rest of the queue is held by the other loops, keep
+                  asking every <s> seconds instead of ending — a relaunch under
+                  a new actor is not needed to pick up a task one of them frees.
+                  \`--wait-max <s>\` bounds it.
   on pause        call \`{{tool}} run --stop\` once — it reaches every loop of
                   the clone — and have the agent command exit SILENTLY for a
                   task already handed out: an agent that printed nothing and

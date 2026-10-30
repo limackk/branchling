@@ -99,6 +99,11 @@ export const KINDS = {
     // `{id, message}` when `--commit-state` ended the run; `id` is null when
     // it refused to claim over paths somebody else staged (TL-489).
     stateCommitRefused: null,
+    // `{count, ids}` of the tasks another tree of this clone holds open, read
+    // from the last "nothing to take" answer (TL-491).
+    heldInOtherTrees: null,
+    // `{polls, seconds, gaveUp}` under `--wait` (TL-491).
+    waited: null,
   },
   // `run --stop --json` (TL-485): the request as written, and where. `origin`
   // is the clone it reaches — every run of it, from any of its worktrees.

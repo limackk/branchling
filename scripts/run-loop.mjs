@@ -125,7 +125,7 @@ export const AGENT_ENV = "BACKLOG_AGENT_COMMAND";
 export const RUN_FLAGS = [
   "--dir", "--actor", "--agent", "--agent-for", "--profile", "--profile-for", "--max-attempts", "--max-tasks", "--timeout",
   "--log-dir", "--stuck-status", "--delegation", "--allow-uncontrolled-delegation", "--json", "--dry-run", "--plan", "--probe",
-  "--board", "--label", "--priority", "--epic", "--stop", "--before-next", "--commit-state",
+  "--board", "--label", "--priority", "--epic", "--stop", "--before-next", "--commit-state", "--wait", "--wait-max",
 ];
 
 /** What `--stop` may be combined with: it names a clone and who asks, nothing a
@@ -134,6 +134,10 @@ const STOP_FLAGS = ["--stop", "--dir", "--actor", "--json"];
 
 const DEFAULT_MAX_ATTEMPTS = 2;
 const DEFAULT_TIMEOUT_SECONDS = 900;
+// How long `--wait` keeps polling without `--wait-max` (TL-491). A claim held
+// by a loop that died is still read as held until somebody releases it, so an
+// unbounded default would turn one crash elsewhere into a run that never ends.
+const DEFAULT_WAIT_MAX_SECONDS = 3600;
 
 /** PURE — resolves `run`'s arguments. Throws on a usage error. */
 export function parseRunArgs(args) {
@@ -141,10 +145,10 @@ export function parseRunArgs(args) {
     dir: null, actor: null, agent: null, profile: null, agentFor: {}, profileFor: {}, json: false, dryRun: false, usePlan: false,
     maxAttempts: DEFAULT_MAX_ATTEMPTS, maxTasks: 0, timeout: DEFAULT_TIMEOUT_SECONDS, probe: false, delegation: "provider", allowUncontrolledDelegation: false,
     logDir: null, stuckStatus: null, board: null, label: null, priority: null, epic: null, stop: false,
-    beforeNext: null, commitState: false,
+    beforeNext: null, commitState: false, wait: 0, waitMax: 0,
   };
   const given = [];
-  const numbers = { "--max-attempts": "maxAttempts", "--max-tasks": "maxTasks", "--timeout": "timeout" };
+  const numbers = { "--max-attempts": "maxAttempts", "--max-tasks": "maxTasks", "--timeout": "timeout", "--wait": "wait", "--wait-max": "waitMax" };
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a.startsWith("-")) given.push(a);
@@ -216,11 +220,14 @@ export function parseRunArgs(args) {
         "It takes only " + STOP_FLAGS.slice(1).join(", ") + ".");
     }
   }
-  // Both act on the live loop only: a dry run calls no `next` to gate and
-  // writes no state to commit, and a flag that silently did nothing would read
-  // as a gate that passed (TL-489).
+  // A bound on nothing is a typo for the flag it bounds, and a silent no-op.
+  if (plan.waitMax && !plan.wait) throw new Error("`--wait-max` bounds `--wait`, which was not given");
+  if (plan.wait && !plan.waitMax) plan.waitMax = DEFAULT_WAIT_MAX_SECONDS;
+  // These act on the live loop only: a dry run calls no `next` to gate, writes
+  // no state to commit and has no claim to wait for, and a flag that silently
+  // did nothing would read as a gate that passed (TL-489, TL-491).
   if (plan.dryRun) {
-    const live = given.filter((f) => f === "--before-next" || f === "--commit-state");
+    const live = given.filter((f) => ["--before-next", "--commit-state", "--wait", "--wait-max"].includes(f));
     if (live.length) {
       throw new Error("`--dry-run` claims nothing, so " + live.join(" and ") + " has nothing to act on");
     }
@@ -297,9 +304,10 @@ export function servedRoles(plan) {
  * `passthrough` above), so describing a wave it had computed here would be
  * describing a different wave than the dispatcher refused from.
  *
- * ENDING THE RUN IS STILL RIGHT: this tool has no work for this session, and
- * waiting for a wave somebody else is finishing is a different feature. Only the
- * sentence changes.
+ * ENDING THE RUN IS STILL THE DEFAULT: this tool has no work for this session.
+ * Waiting for a wave somebody else is finishing is `--wait` (TL-491), which
+ * re-asks `next` in the foreground while the wave is in flight; without it only
+ * the sentence changes.
  *
  * @param {object|null} answer the `task-take` envelope `next` printed on exit 3
  * @returns {string|null} the sentence, or null when that answer carries no plan
@@ -330,6 +338,28 @@ export function planStop(answer) {
     plan.open + " of " + plan.scheduled + " task(s) in it are still open and none was free to take" +
     (later ? ", " + later + " open task(s) in later waves are not reached yet" : "") +
     unplannedClause;
+}
+
+/**
+ * The tasks `next` stepped over because another tree of this clone holds them
+ * open (TL-491). PURE.
+ *
+ * `skippedElsewhere` carries two different facts: a task another tree reports
+ * in an open status it does not hand out — a parallel loop working on it — and
+ * one another branch has already CLOSED. Only the first is held: it comes back
+ * when that loop gives it up, so it is worth naming as "not an empty queue" and
+ * worth waiting for. The second comes back only through a merge, which `next`
+ * already says in its own words.
+ *
+ * @param {object|null} answer the envelope `next` printed on exit 3
+ * @param {string[]} archivedStatuses `archived_statuses` from config.yaml
+ * @returns {string[]} the held ids
+ */
+export function heldInOtherTrees(answer, archivedStatuses) {
+  const archived = new Set(archivedStatuses || []);
+  return ((answer && answer.skippedElsewhere) || [])
+    .filter((s) => (s.elsewhere || []).some((o) => !archived.has(o.status)))
+    .map((s) => s.id);
 }
 
 /**
@@ -1947,6 +1977,13 @@ export async function run(argv) {
   let spin = null;
   // `{command, exit, timedOut, output}` when `--before-next` refused (TL-489).
   let gateRefused = null;
+  // `{count, ids}` from the last "nothing to take" answer (TL-491); null when
+  // the run ended before `next` gave one.
+  let heldNow = null;
+  // `{polls, seconds, gaveUp}` under `--wait`, null without it. `waitingSince`
+  // is when the current stretch of waiting began; a task handed out ends it.
+  const waited = plan.wait ? { polls: 0, seconds: 0, gaveUp: false } : null;
+  let waitingSince = null;
   // `{id, message}` when `--commit-state` could not commit, or refused to
   // claim over staged paths that are not its own (`id` is null then).
   let stateRefused = null;
@@ -2046,11 +2083,44 @@ export async function run(argv) {
         ? ((answer && answer.skippedDeadlocked) || []).length +
           " task(s) were skipped at a role-boundary deadlock"
         : null;
-      if (why && deadlockStop) stopped = why + "; " + deadlockStop;
-      else if (why) stopped = why;
-      else if (deadlockStop) stopped = deadlockStop;
+      // NOT AN EMPTY QUEUE EITHER (TL-491): work another loop of this clone is
+      // holding comes back when that loop gives it up, and a run that called
+      // this "the queue is empty" was relaunched every five minutes under a
+      // new actor by a supervisor that believed it.
+      const held = heldInOtherTrees(answer, config.archivedStatuses);
+      heldNow = { count: held.length, ids: held };
+      const inFlight = !!(planned && answer && answer.plan && answer.plan.wave && answer.plan.open > 0);
+      let gaveUp = false;
+      if (waited && (held.length || inFlight)) {
+        // SEQUENTIAL, IN THE FOREGROUND (TL-381): the same loop asks `next`
+        // again after the interval, so the stop request, the gate and the
+        // staged-path check above are all asked again before any claim.
+        if (waitingSince === null) waitingSince = Date.now();
+        const left = plan.waitMax * 1000 - (Date.now() - waitingSince);
+        if (left > 0) {
+          const pause = Math.min(plan.wait * 1000, left);
+          waited.polls++;
+          waited.seconds += pause / 1000;
+          await new Promise((resolve) => setTimeout(resolve, pause));
+          continue;
+        }
+        gaveUp = waited.gaveUp = true;
+      }
+      const heldStop = held.length
+        ? held.length + " task(s): " + held.join(", ")
+        : null;
+      const parts = [why, deadlockStop].filter(Boolean);
+      if (heldStop) {
+        parts.push(parts.length
+          ? heldStop + " are held in another tree of this clone"
+          : "every eligible task is held in another tree of this clone — " + heldStop);
+      }
+      if (parts.length) stopped = parts.join("; ");
+      if (gaveUp) stopped += "; waited " + plan.waitMax + "s (--wait-max) and nothing was freed";
       break;
     }
+    // A task was handed out, so the next wait is a new one with its own bound.
+    waitingSince = null;
     if (handed.status !== 0) {
       console.error(handed.stderr || handed.stdout);
       stopped = "`" + N + " next` refused (exit " + handed.status + ")";
@@ -2351,6 +2421,11 @@ export async function run(argv) {
       // `{id, message}` when `--commit-state` ended the run; `id` is null when
       // it refused to claim over staged paths that are not its own.
       stateCommitRefused: stateRefused,
+      // `{count, ids}` of the tasks another tree of this clone holds open, from
+      // the last "nothing to take" answer (TL-491); null when none was given.
+      heldInOtherTrees: heldNow,
+      // `{polls, seconds, gaveUp}` under `--wait` (TL-491); null without it.
+      waited,
       tally: { ...tally, taken: taken.length },
       // What this run used outside the tree it was given. A consumer comparing
       // two runs can see a shared-state change for what it is (TL-202).
