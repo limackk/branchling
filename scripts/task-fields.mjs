@@ -523,7 +523,22 @@ export const FIELD_SHAPES = [
   // decision no agent may take, whatever its role.
   { key: "executor", label: "Executor", kind: "enum", values: ["human", "agent"], allowEmpty: true, dictionaryRequired: true },
   { key: "related_docs", label: "Related docs", kind: "list", style: "block", itemHint: "docs/x.md" },
+  // WHAT AREA OF THE CODE IT TOUCHES, as the dispatcher reads it (TL-492): a
+  // task is not handed out while another task naming one of the same values is
+  // in progress here or in another tree. The values are free text and belong to
+  // the project — a module name, a migration sequence — so there is no
+  // dictionary; `conflict_group_from` in config.yaml supplies one for the
+  // tasks that name none.
+  { key: "conflict_group", label: "Conflict group", kind: "list", style: "inline", itemHint: "module" },
 ];
+
+/**
+ * The fields `conflict_group_from` may name (TL-492). Each one says WHERE the
+ * work lands rather than what state it is in or who holds it, and each is
+ * carried by the dispatcher's record, so a group read from it cannot be a
+ * silent empty value.
+ */
+export const CONFLICT_GROUP_SOURCES = Object.freeze(["epic", "board", "labels", "type", "role"]);
 
 /**
  * The canonical key order, used ONLY when a key is missing and has to be
@@ -533,7 +548,7 @@ export const FIELD_SHAPES = [
  */
 export const FRONTMATTER_ORDER = [
   "id", "title", "type", "labels", "board", "epic", "priority", "status",
-  "owner", "role", "estimate", "confidence", "created", "updated",
+  "owner", "role", "conflict_group", "estimate", "confidence", "created", "updated",
   "blocked_by", "blocks", "related_docs", "verification",
 ];
 
@@ -774,6 +789,7 @@ export function extractMeta(frontmatter) {
     blocked_by: getInlineList("blocked_by"),
     blocks: getInlineList("blocks"),
     related_docs: getBlockList("related_docs"),
+    conflict_group: getInlineList("conflict_group"),
   };
 }
 

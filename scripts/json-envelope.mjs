@@ -82,6 +82,11 @@ export const KINDS = {
     // directions over one role boundary (TL-417). The full finding travels so
     // a consumer gets the pair and both hands' reasons without parsing prose.
     skippedDeadlocked: [],
+    // The conflict-group skips of the run's LAST `next` answer (TL-492), under
+    // the name `next --json` gives them. The last, not every one: a group is
+    // held only while its task is in progress, so an earlier skip may since
+    // have been handed out by this very run.
+    skippedConflict: [],
     // `{id, role, eligible}` when the spin guard ended the run (TL-484): the
     // stop is a fact about one task, and `eligible` counts the OTHER tasks the
     // dispatcher would still hand out, so it never reads as an empty queue.
@@ -233,6 +238,9 @@ export const KINDS = {
     // where no project declared an `actor_policy_*`: a loop must be able to tell
     // an empty queue from a queue it was not allowed to draw from.
     skippedByRecord: [],
+    // Candidates held back because a task of the same conflict group is in
+    // progress here or in another tree (TL-492), each `{id, group, heldBy}`.
+    skippedConflict: [],
     // `--plan` only (TL-183): which wave was followed, and how many open tasks
     // were left alone because the plan does not schedule them. `null` when the
     // flag was not given — a wave number of 0 would say a plan was consulted.

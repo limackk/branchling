@@ -399,6 +399,19 @@ counted and named (`skippedSize` in `next --json`, `waitingForSize` in `run
 --json`), and `take <ID>` still works — naming a task is the deliberate decision
 the threshold asks for.
 
+**Two loops in one area collide even on two different tasks.** `conflict_group:`
+on a task names the area it touches — a module, a migration sequence, any value
+your project chooses — as a list. `next` and `run` do not hand a task out while
+another task sharing one of its groups is in progress in this tree, or is
+reported in progress by another worktree or branch through the same scan that
+keeps two sessions off one task. For a backlog that will not acquire a new field
+by hand, `conflict_group_from: <field>` in `config.yaml` reads the group from
+`epic`, `board`, `labels`, `type` or `role` for every task that names none; a
+task's own `conflict_group:` replaces that default rather than adding to it,
+and without the key there is no default at all. The skipped tasks are named
+with the group and the task holding it (`skippedConflict` in `next --json` and
+`run --json`, each `{id, group, heldBy}`); `take <ID>` still works.
+
 **One queue, several hands.** A task may ask for a competence in `role:`, and a
 run can serve more than one of them: `--agent-for <role>=<command>`, repeatable,
 with `--agent` serving the tasks that ask for nobody in particular. A role you
@@ -646,9 +659,9 @@ implementation detail. Every reading command answers in the same envelope:
 | `<command> --help` | `command-help` | `command`, `summary`, `usage`, `configured`, `flags` |
 | `pr-summary` | `pr-summary` | `base`, `scanned`, `reason`, `tasks`, `engaged`, `cost` |
 | `audit` | `audit` | `since`, `dayZero`, `tasks`, `findings`, `closedWithoutTrace`, `skippedBeforeSince`, `reopened`, `parked`, `withoutPremise`, `awaitingVouch`, `handedBack`, `vouches`, `contractCapability`, `advisories` |
-| `run` | `run` | `ok`, `dryRun`, `agent`, `profile`, `agentFor`, `profileFor`, `delegation`, `allowUncontrolledDelegation`, `plan`, `order`, `considered`, `stoppedAt`, `stopped`, `agentNeverRan`, `waitingForRole`, `waitingForExecutor`, `waitingForSize`, `tally`, `sharedState`, `ms`, `tasks`, `skippedHandedBack`, `skippedDeadlocked`, `spinGuard`, `stopRequested` |
+| `run` | `run` | `ok`, `dryRun`, `agent`, `profile`, `agentFor`, `profileFor`, `delegation`, `allowUncontrolledDelegation`, `plan`, `order`, `considered`, `stoppedAt`, `stopped`, `agentNeverRan`, `waitingForRole`, `waitingForExecutor`, `waitingForSize`, `tally`, `sharedState`, `ms`, `tasks`, `skippedHandedBack`, `skippedDeadlocked`, `skippedConflict`, `spinGuard`, `stopRequested` |
 | `run --stop` | `run-stop` | `ok`, `requestedAt`, `by`, `origin` (the clone the request reaches), `path` |
-| `take`, `next` | `task-take` | `ok`, `taken`, `id`, `file`, `task`, `from`, `text`, `decisions`, `probe`, `warnings`, `reclaimed`, `tookOver`, `lock`, `refusalKind`, `refusal`, `details`, and — filled in by next — `passedOver`, `considered`, `searchedStatuses`, `skippedBlocked`, `skippedElsewhere`, `closedElsewhere`, `skippedExecutor`, `skippedHandedBack`, `skippedDeadlocked`, `skippedSize`, `skippedByRecord`, `scan`, `plan` |
+| `take`, `next` | `task-take` | `ok`, `taken`, `id`, `file`, `task`, `from`, `text`, `decisions`, `probe`, `warnings`, `reclaimed`, `tookOver`, `lock`, `refusalKind`, `refusal`, `details`, and — filled in by next — `passedOver`, `considered`, `searchedStatuses`, `skippedBlocked`, `skippedElsewhere`, `closedElsewhere`, `skippedExecutor`, `skippedHandedBack`, `skippedDeadlocked`, `skippedSize`, `skippedByRecord`, `skippedConflict`, `scan`, `plan` |
 | `handoff` | `task-handoff` | `ok`, `id`, `file`, `task`, `role`, `owner`, `status` (each a from/to pair), `comment`, `released`, `warnings`, `refusalKind`, `refusal`, `details` |
 | `release` | `task-release` | `ok`, `id`, `status`, `owner`, `released`, `comment`, `refusalKind`, `refusal`, `details` |
 | `ask` | `task-ask` | `ok`, `id`, `file`, `question` (its event id, timestamp, text and asker), `changes`, `blockedReason`, `refusalKind`, `refusal`, `details` |

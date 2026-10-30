@@ -37,7 +37,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { backlogPaths } from "./paths.mjs";
 import { PRODUCT_NAME } from "./product.mjs";
 import { DEFAULT_TASK_ID_PREFIX, PREFIX_SHAPE, inferPrefix, taskIdPatterns } from "./task-id.mjs";
-import { ACTOR_NAMESPACES, ROLE_SHAPE, isValidActor, unquote } from "./task-fields.mjs";
+import { ACTOR_NAMESPACES, CONFLICT_GROUP_SOURCES, ROLE_SHAPE, isValidActor, unquote } from "./task-fields.mjs";
 import { LINK_POLICIES } from "./criteria.mjs";
 import { DEFAULT_LOCK_TTL_MINUTES } from "./lock.mjs";
 import { estimateHours } from "./estimate.mjs";
@@ -80,6 +80,13 @@ export const DEFAULTS = Object.freeze({
   // A word outside the list is refused where it is read, rather than silently
   // gate nothing.
   max_unattended_estimate: "",
+  // The field a task's CONFLICT GROUP is read from when it names no
+  // `conflict_group:` of its own (TL-492). Empty, the default, means no
+  // fallback: only the tasks that name a group are held apart. A backlog of
+  // several hundred tasks will not acquire a new field by hand, and a project
+  // that keeps one epic per module already wrote the groups down, so `epic`
+  // makes the rule work on the first day. One of `CONFLICT_GROUP_SOURCES`.
+  conflict_group_from: "",
   actors: ["unknown"],   // namespaces: local: / agent: / user: (BL-1404)
   title_max_length: 60,
   epic_aliases: {},
@@ -643,6 +650,8 @@ export function loadConfig(root, opts = {}) {
     // Empty reaches the code as `null`, so the one test the dispatcher makes is
     // "did this project state a threshold" and not "is this string non-empty".
     maxUnattendedEstimate: values.max_unattended_estimate || null,
+    // `null` when unset, for the same reason as the threshold above.
+    conflictGroupFrom: values.conflict_group_from || null,
     actors: values.actors,
     titleMaxLength: values.title_max_length,
     epicAliases: values.epic_aliases,
@@ -814,6 +823,14 @@ export function validateConfig(config) {
     problems.push(
       "`active_branch_days` = `" + config.activeBranchDays +
         "` — expecting a number of days, 0 for no window"
+    );
+  }
+  // A field the dispatcher's record does not carry would group nothing and read
+  // exactly like the absent key that means "no fallback".
+  if (config.conflictGroupFrom && CONFLICT_GROUP_SOURCES.indexOf(config.conflictGroupFrom) < 0) {
+    problems.push(
+      "`conflict_group_from` = `" + config.conflictGroupFrom + "` — expecting one of " +
+        CONFLICT_GROUP_SOURCES.join(", ")
     );
   }
   for (const s of config.reasonRequiredStatuses) {

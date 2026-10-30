@@ -386,7 +386,8 @@ export function heldElsewhere(task, handedOut) {
  *
  * @returns {{candidates: object[], reclaimable: Set<string>, skippedBlocked: number,
  *            skippedOutsideWave: number, skippedUnplanned: number|null,
- *            skippedElsewhere: Array<{id: string, elsewhere: object[]}>}}
+ *            skippedElsewhere: Array<{id: string, elsewhere: object[]}>,
+ *            skippedConflict: Array<{id: string, group: string[], heldBy: object[]}>}}
  */
 /**
  * WHO, IF ANYBODY, HANDED THIS TASK BACK LAST. PURE — it takes the entries.
@@ -493,6 +494,73 @@ export function describeDeadlock(finding) {
     (legs.length ? ": " + legs.join(" · ") : "");
 }
 
+/**
+ * The conflict groups of one task (TL-492). PURE.
+ *
+ * Its own `conflict_group:` when it names any; otherwise the value of the
+ * field `conflict_group_from` names, when the project set one. A task that
+ * names a group of its own is never ALSO grouped by the fallback: the field is
+ * the author narrowing the default, and adding the default back would hold the
+ * task apart from an area its author said it does not touch.
+ *
+ * @returns {string[]} distinct, trimmed values; empty means no group
+ */
+export function conflictGroups(task, config) {
+  const clean = (values) => [...new Set(values.map((v) => String(v == null ? "" : v).trim()).filter(Boolean))];
+  const own = clean(task.conflict_group || []);
+  if (own.length) return own;
+  const from = config && config.conflictGroupFrom;
+  if (!from) return [];
+  const value = task[from];
+  return clean(Array.isArray(value) ? value : [value]);
+}
+
+/**
+ * Who holds each conflict group right now (TL-492): every task in the
+ * in-progress status in THIS tree, and every task another tree or branch
+ * reports in it. PURE — the scan's observations are already on the records.
+ *
+ * THE GROUP IS READ FROM THE LOCAL FILE, not from the other tree. The scan
+ * carries a status and a source; the task is the same task, and which area it
+ * touches is not something two trees disagree about in practice. Reading the
+ * other tree's frontmatter would make the scan a second parser for one field.
+ *
+ * A task closed HERE holds nothing: a closed task touches nothing any more, and
+ * a branch still saying it is in progress is the stale half of a disagreement
+ * `skippedElsewhere` already reports.
+ *
+ * @returns {Map<string, Array<{id: string, kind: string, source: string|null}>>}
+ */
+function groupHolders(records, config, archived, inProgress) {
+  const held = new Map();
+  if (!inProgress) return held;
+  for (const t of records) {
+    if (archived.has(t.status)) continue;
+    const groups = conflictGroups(t, config);
+    if (!groups.length) continue;
+    const where = [];
+    if (t.status === inProgress) where.push({ id: t.id, kind: "here", source: null });
+    for (const o of t.elsewhere || []) {
+      if (o.status === inProgress) where.push({ id: t.id, kind: o.kind, source: o.source });
+    }
+    for (const g of groups) {
+      if (!held.has(g)) held.set(g, []);
+      held.get(g).push(...where);
+    }
+  }
+  for (const [g, list] of held) if (!list.length) held.delete(g);
+  return held;
+}
+
+/** One human-readable line for a candidate held back by its conflict group.
+ *  PURE — shared by `next` and `run`, like `describeDeadlock`. */
+export function describeConflict(skip) {
+  const holders = (skip.heldBy || []).map((h) =>
+    h.id + (h.kind === "here" ? " here" : " on " + h.source));
+  return skip.id + " skipped — conflict group " + (skip.group || []).join(", ") +
+    " is in progress: " + holders.join(", ");
+}
+
 /** One task may be stuck at more than one boundary; neither report may erase
  * one finding merely because both name the same task. */
 export function deadlockIdentity(finding) {
@@ -508,6 +576,9 @@ export function selectCandidates(records, config, filters, now) {
   const byId = new Map(records.map((t) => [String(t.id).toUpperCase(), t]));
   const species = filters.callerSpecies || null;
   const inProgress = inProgressStatus(config);
+  // Taken from the WHOLE set, before any gate below: a task this caller may not
+  // be handed still occupies its area while somebody works on it.
+  const holders = groupHolders(records, config, archived, inProgress);
   const skippedExecutor = [];
   if (species) {
     const kept = [];
@@ -666,9 +737,35 @@ export function selectCandidates(records, config, filters, now) {
     skippedElsewhere.push({ id: task.id, elsewhere: held });
     return false;
   };
+  // A CANDIDATE WHOSE AREA SOMEBODY IS WORKING IN (TL-492). Two loops on two
+  // tasks of one module collide on the same files and the same migration
+  // numbers, and every merge after that needs a person; the task is held back
+  // rather than pushed to the end for the reason `free` gives: a candidate at
+  // the end is still handed out the moment nothing else is left. The task's own
+  // claim is not a conflict with itself, which matters to a reclaim.
+  const skippedConflict = [];
+  const unconflicted = (t) => {
+    if (!holders.size) return true;
+    const own = String(t.id).toUpperCase();
+    const group = [];
+    const heldBy = [];
+    for (const g of conflictGroups(t, config)) {
+      const by = (holders.get(g) || []).filter((h) => String(h.id).toUpperCase() !== own);
+      if (!by.length) continue;
+      group.push(g);
+      for (const h of by) heldBy.push({ id: h.id, group: g, kind: h.kind, source: h.source });
+    }
+    if (!heldBy.length) return true;
+    skippedConflict.push({ id: t.id, group, heldBy });
+    return false;
+  };
+
   // `&&` short-circuits on purpose: a task held back by this actor's own
-  // handoff is reported under that heading and not a second time as `elsewhere`.
-  const candidates = dispatchable.filter((t) => notHandedBack(t) && free(t, heldElsewhere(t, handedOut)));
+  // handoff is reported under that heading and not a second time as `elsewhere`,
+  // and a task claimed elsewhere is not reported a second time as a conflict.
+  const candidates = dispatchable.filter(
+    (t) => notHandedBack(t) && free(t, heldElsewhere(t, handedOut)) && unconflicted(t)
+  );
 
   const reclaimable = new Set();
   if (!filters.status) {
@@ -680,14 +777,15 @@ export function selectCandidates(records, config, filters, now) {
       // is already a guess made from a date; a tree that reports something else
       // about the same task is the one piece of evidence that the guess is
       // wrong, and it costs nothing to believe it.
-      .filter((t) => free(t, (t.elsewhere || []).slice()));
+      .filter((t) => free(t, (t.elsewhere || []).slice()))
+      .filter(unconflicted);
     sortTasks(stale, "priority", config);
     for (const t of stale) reclaimable.add(String(t.id).toUpperCase());
     candidates.push(...stale);
   }
   return {
     candidates, reclaimable, unblocked, skippedElsewhere, skippedExecutor, skippedHandedBack,
-    skippedDeadlocked, skippedSize, skippedOutsideWave, skippedUnplanned,
+    skippedDeadlocked, skippedSize, skippedOutsideWave, skippedUnplanned, skippedConflict,
     // The count is of tasks that MATCHED and were held back by an open blocker;
     // the unblocked ones were never in `matching`, so they must not be
     // subtracted from it.
@@ -830,7 +928,7 @@ export function run(argv) {
   // Which of the protected tasks a run parked, rather than a person declaring
   // the status (TL-282). Read here and handed in, so the selection stays pure.
   filters.parkedByRun = parkedByRun(root, records, config);
-  const { candidates: selected, reclaimable, unblocked, skippedBlocked, skippedElsewhere, skippedExecutor, skippedHandedBack, skippedDeadlocked, skippedSize, skippedOutsideWave, skippedUnplanned } =
+  const { candidates: selected, reclaimable, unblocked, skippedBlocked, skippedElsewhere, skippedExecutor, skippedHandedBack, skippedDeadlocked, skippedSize, skippedOutsideWave, skippedUnplanned, skippedConflict } =
     selectCandidates(records, config, filters, now);
   // THE ACTOR'S RECORD, LAST OF ALL THE FILTERS (TL-150). It only removes, and
   // it removes from a queue the dispatcher has already ordered — eligibility and
@@ -871,6 +969,7 @@ export function run(argv) {
     (s) => s.id + " skipped — you handed it back yourself" + (s.reason ? ": " + s.reason : "")
   );
   const deadlockLines = skippedDeadlocked.map(describeDeadlock);
+  const conflictLines = skippedConflict.map(describeConflict);
   const recordLines = skippedByRecord.map((s) => s.id + " withheld — " + s.reason);
 
   // Candidates are tried IN ORDER, and a taken one is skipped rather than
@@ -920,7 +1019,7 @@ export function run(argv) {
           ...handover, task: handover.task ? { ...handover.task, agent_estimate: agentField } : handover.task,
           passedOver, considered: candidates.length,
           skippedElsewhere, skippedExecutor, skippedHandedBack, skippedDeadlocked, skippedSize, skippedByRecord,
-          closedElsewhere,
+          skippedConflict, closedElsewhere,
           plan: planJson,
           scan: { scanned: scan.scanned, reason: scan.reason },
         });
@@ -934,6 +1033,7 @@ export function run(argv) {
         for (const line of handedBackLines) console.log(color.dim(MARK.bullet + " " + line));
         for (const line of recordLines) console.log(color.dim(MARK.bullet + " " + line));
         for (const line of elsewhereLines) console.log(color.dim(MARK.bullet + " " + line));
+        for (const line of conflictLines) console.log(color.dim(MARK.bullet + " " + line));
         for (const line of closedElsewhereLines) console.log(color.dim(MARK.bullet + " " + line));
         for (const p of passedOver) {
           console.log(color.dim(MARK.bullet + " " + p.id + " passed over: " + p.why));
@@ -1037,6 +1137,10 @@ export function run(argv) {
     for (const line of elsewhereLines) details.push("  " + MARK.bullet + " " + line);
     for (const line of closedElsewhereLines) details.push("  " + MARK.bullet + " " + line);
   }
+  if (conflictLines.length) {
+    details.push(conflictLines.length + " candidate(s) touch a conflict group that is in progress");
+    for (const line of conflictLines) details.push("  " + MARK.bullet + " " + line);
+  }
   const note = scanNote(scan.reason);
   if (note) details.push(note);
   if (!(config.abandonedAfterDays > 0)) {
@@ -1057,7 +1161,7 @@ export function run(argv) {
       details,
       searchedStatuses: searched, skippedBlocked, passedOver, skippedElsewhere, skippedExecutor,
       closedElsewhere,
-      skippedHandedBack, skippedDeadlocked, skippedSize, skippedByRecord, plan: planJson,
+      skippedHandedBack, skippedDeadlocked, skippedSize, skippedByRecord, skippedConflict, plan: planJson,
       scan: { scanned: scan.scanned, reason: scan.reason },
     });
   } else {

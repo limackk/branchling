@@ -164,6 +164,9 @@ export function parseTaskRecord(raw, file) {
     // (TL-100) — and that answer has to come from the same parse as every other
     // field, not from a second walk over the tree.
     related_docs: meta.related_docs,
+    // The area a task touches, as the dispatcher compares it (TL-492). Read
+    // here so the skip rule and the worktree scan read one parse of the file.
+    conflict_group: meta.conflict_group,
     file: `tasks/${file}`,
     // What OTHER branches and worktrees say this task's status is, when they
     // disagree with the line above (TL-73). Filled in by the caller from

@@ -89,7 +89,7 @@ import { roleBrief } from "./instructions.mjs";
 import { userConfigPath } from "./home.mjs";
 import { lockScope, releaseLock, stateRoot } from "./lock.mjs";
 import { requestStop, stopRequestedSince } from "./run-stop.mjs";
-import { callerSpecies, deadlockIdentity, describeDeadlock, isOverSized, parkedByRun, queueStatuses, readDispatchRecords, selectCandidates, servesExecutor } from "./next-task.mjs";
+import { callerSpecies, deadlockIdentity, describeConflict, describeDeadlock, isOverSized, parkedByRun, queueStatuses, readDispatchRecords, selectCandidates, servesExecutor } from "./next-task.mjs";
 import { backlogPaths, repositoryRoot, resolveBacklogDir } from "./paths.mjs";
 import { loadPlanForDispatch, planState, projectionWall } from "./plan.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
@@ -1394,6 +1394,12 @@ function renderReport(report, plan) {
       lines.push("    " + color.dim(describeDeadlock(finding)));
     }
   }
+  if (report.skippedConflict && report.skippedConflict.length) {
+    lines.push("");
+    lines.push("  " + MARK.bullet + " " + report.skippedConflict.length +
+      " task(s) held back while their conflict group is in progress");
+    for (const skip of report.skippedConflict) lines.push("    " + color.dim(describeConflict(skip)));
+  }
   // THE FACT ABOUT THE MACHINE, SAID HERE AND NOWHERE ELSE (TL-184). The task
   // file carries nothing about this: no attempt was made, so there is nothing
   // about the task to record. The command is quoted in full because the reader's
@@ -1690,6 +1696,7 @@ export async function run(argv) {
     // earlier judgement is reported under the order, the way `next` reports it.
     const handedBack = new Map();
     const deadlocked = new Map();
+    const conflicted = new Map();
     // The wave the projection stopped at, or null when it walked the plan out
     // (TL-206). It is reported in both renderings below: an operator reading an
     // order with nothing in it needs a second place to look for the reason, and
@@ -1707,9 +1714,10 @@ export async function run(argv) {
       const from = state.activeWave === null ? state.waves.length : state.activeWave;
       for (const w of state.waves.slice(from)) {
         const planIds = new Set(w.tasks.map((e) => String(e.id).toUpperCase()));
-        const { candidates, skippedBlocked, skippedHandedBack, skippedDeadlocked } =
+        const { candidates, skippedBlocked, skippedHandedBack, skippedDeadlocked, skippedConflict } =
           selectCandidates(records, config, { ...base, planIds }, Date.now());
         for (const t of candidates) rows.push({ task: t, wave: w.index + 1, name: w.name });
+        for (const s of skippedConflict) conflicted.set(s.id, s);
         for (const s of skippedHandedBack) handedBack.set(s.id, s);
         for (const s of skippedDeadlocked) deadlocked.set(deadlockIdentity(s), s);
         // AND NO FURTHER THAN THE RUN WOULD GET. A task this wave's own members
@@ -1722,8 +1730,9 @@ export async function run(argv) {
         if (wall) break;
       }
     } else {
-      const { candidates, skippedHandedBack, skippedDeadlocked } = selectCandidates(records, config, base, Date.now());
+      const { candidates, skippedHandedBack, skippedDeadlocked, skippedConflict } = selectCandidates(records, config, base, Date.now());
       for (const t of candidates) rows.push({ task: t, wave: null, name: "" });
+      for (const s of skippedConflict) conflicted.set(s.id, s);
       for (const s of skippedHandedBack) handedBack.set(s.id, s);
       for (const s of skippedDeadlocked) deadlocked.set(deadlockIdentity(s), s);
     }
@@ -1740,6 +1749,7 @@ export async function run(argv) {
         considered: rows.length,
         skippedHandedBack: [...handedBack.values()].map((s) => ({ id: s.id, actor: s.actor, reason: s.reason })),
         skippedDeadlocked: [...deadlocked.values()],
+        skippedConflict: [...conflicted.values()],
         ...(planned ? { stoppedAt: wall } : {}),
       });
     } else {
@@ -1763,6 +1773,7 @@ export async function run(argv) {
       for (const finding of deadlocked.values()) {
         console.log("  " + color.dim(MARK.warn + " " + describeDeadlock(finding)));
       }
+      for (const skip of conflicted.values()) console.log("  " + color.dim(describeConflict(skip)));
       if (wall) {
         console.log("  " + color.dim(
           "the projection stops at wave " + wall.wave + " — " + (wall.name || "unnamed") + ": " +
@@ -1837,6 +1848,11 @@ export async function run(argv) {
   // otherwise a skipped task disappears from the report whenever useful work
   // happened after it.
   const skippedDeadlocked = new Map();
+  // The conflict-group skips of the LAST answer only (TL-492): a group is held
+  // while its task is in progress, so an earlier skip may since have been
+  // handed out by this very run, and reporting it would name a task as waiting
+  // that this run finished.
+  let skippedConflict = [];
   // How many hands have worked each task in this run — the leg number its log
   // is keyed on (TL-281).
   const legs = new Map();
@@ -1861,6 +1877,7 @@ export async function run(argv) {
     for (const finding of (answer && answer.skippedDeadlocked) || []) {
       skippedDeadlocked.set(deadlockIdentity(finding), finding);
     }
+    if (answer) skippedConflict = answer.skippedConflict || [];
     if (handed.status === 3) {
       // `nothing to take` is not `the backlog is empty`, and under `--plan` the
       // difference is the whole report (TL-186). The answer already carries the
@@ -2132,6 +2149,7 @@ export async function run(argv) {
     taken, tally, ms: Date.now() - started, stopped, waiting, waitingExecutor, waitingSize,
     maxUnattendedEstimate: config.maxUnattendedEstimate, neverStarted, shared,
     skippedDeadlocked: [...skippedDeadlocked.values()],
+    skippedConflict,
   };
   if (plan.json) {
     printJson("run", {
@@ -2152,6 +2170,7 @@ export async function run(argv) {
       waitingForSize: Object.keys(waitingSize).sort()
         .map((e) => ({ estimate: e, count: waitingSize[e].length, ids: waitingSize[e] })),
       skippedDeadlocked: report.skippedDeadlocked,
+      skippedConflict: report.skippedConflict,
       // `{id, role, eligible}` when the spin guard ended the run (TL-484), with
       // the number of OTHER tasks still eligible at that moment; null otherwise.
       spinGuard: spin,
