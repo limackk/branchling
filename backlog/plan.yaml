@@ -13,7 +13,7 @@
 # means something first, outward claims last — and adds one: a human gate is
 # closed by a vouch, so the vouch has to be recorded under the right name
 # before any gate is closed with one.
-updated: 2026-10-26
+updated: 2026-10-30
 rationale: "The package is already public, so what remains is making each later claim true before it is made. Branchling first makes its suite answer the same way twice, then records a person's vouch as that person's and reads a CRLF checkout like an LF one; the viewer runs alongside, on files neither of those touches. Only then the human gates, and last the release evidence and the announcement that point at all of it."
 waves:
   # A SUITE THAT IS RED BY CHANCE CLOSES NOTHING. `done` runs the suite, so a
@@ -57,3 +57,13 @@ waves:
   # it points at the demo, the front door and that release together.
   - name: "The release is repeatable and announced"
     tasks: [TL-455, TL-468]
+
+  # Three run loops in worktrees of one clone paused on four separate causes.
+  # A decided question that strands its task comes first because it is a plain
+  # bug; then the dispatch rule behind every real code conflict, conflict
+  # groups; then the opt-in gate and state commit that end the bookkeeping
+  # cascade, a run that waits for work held in other trees instead of exiting,
+  # and last the seeding, multi-id plan and closing contract that a module
+  # backlog needs at intake.
+  - name: "Parallel worktree loops stop colliding"
+    tasks: [TL-490, TL-492, TL-489, TL-491, TL-493]
