@@ -96,6 +96,24 @@ test("a stale mutex replaced by a fresh one before its removal keeps the fresh o
   unlinkSync(path);
 });
 
+test("a fresh mutex that reuses the stale file's inode is kept (TL-494)", () => {
+  const path = mutexPath("inode-reused");
+  writeFileSync(path, holderRecord("dead-holder", "2000-01-01T00:00:00.000Z"), "utf8");
+  let judged = false;
+  const entered = enterBusy("inode-reused", (step) => {
+    if (step !== "judged-stale" || judged) return;
+    judged = true;
+    // Rewriting in place keeps the inode, which is what Linux hands a file
+    // created right after the stale one was unlinked: same `(dev, ino)`, a
+    // different holder.
+    writeFileSync(path, holderRecord("live-writer"), "utf8");
+  });
+  assert.equal(judged, true, "the stale holder was never judged stale");
+  assert.equal(entered, false, "the contender removed a live writer's mutex and entered");
+  assert.equal(JSON.parse(readFileSync(path, "utf8")).token, "live-writer");
+  unlinkSync(path);
+});
+
 test("the holder's stamp is the moment it entered, not the moment it began to wait", () => {
   const path = mutexPath("stamp-on-entry");
   writeFileSync(path, holderRecord("brief-holder"), "utf8");

@@ -346,14 +346,15 @@ function readHolder(path) {
   }
   try {
     const { dev, ino } = fstatSync(fd);
+    const raw = readFileSync(fd, "utf8");
     let record = null;
     try {
-      const rec = JSON.parse(readFileSync(fd, "utf8"));
+      const rec = JSON.parse(raw);
       record = rec && typeof rec === "object" ? rec : null;
     } catch {
       // Corrupt, as in `readRecord`: present, but naming nobody.
     }
-    return { record, dev, ino };
+    return { record, raw, dev, ino };
   } finally {
     closeSync(fd);
   }
@@ -369,6 +370,11 @@ function readHolder(path) {
  * one interleaving this cannot settle needs a fourth writer to create the name in
  * the instant between the rename and the link back; it is reported by `link`
  * failing rather than hidden.
+ *
+ * Identity is the inode AND the bytes (TL-494). Linux hands a freed inode number
+ * to the next file created in the directory, so a live writer's mutex created
+ * right after the stale one was unlinked commonly has the same `(dev, ino)`;
+ * only its content, which carries the holder's token, tells the two apart.
  */
 function removeIfUnchanged(path, judged) {
   const aside = path + "." + process.pid + "." + randomBytes(4).toString("hex") + ".stale";
@@ -379,7 +385,7 @@ function removeIfUnchanged(path, judged) {
     throw e;
   }
   const moved = statSync(aside);
-  if (moved.dev === judged.dev && moved.ino === judged.ino) {
+  if (moved.dev === judged.dev && moved.ino === judged.ino && readFileSync(aside, "utf8") === judged.raw) {
     unlinkSync(aside);
     return;
   }
