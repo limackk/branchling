@@ -74,8 +74,8 @@
 
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { resolveActor } from "./actor.mjs";
@@ -84,7 +84,8 @@ import { DELEGATION_ENFORCEMENT, DELEGATION_POLICIES, executionReceipt } from ".
 import { loadConfigOrExit } from "./config.mjs";
 import { probeContract, repoRootFor } from "./done-task.mjs";
 import { parseVerification } from "./criteria.mjs";
-import { readHistory, recordEdit } from "./history.mjs";
+import { gitDiscoveryEnv } from "./git-env.mjs";
+import { historyPath, readHistory, recordEdit } from "./history.mjs";
 import { roleBrief } from "./instructions.mjs";
 import { userConfigPath } from "./home.mjs";
 import { lockScope, releaseLock, stateRoot } from "./lock.mjs";
@@ -124,7 +125,7 @@ export const AGENT_ENV = "BACKLOG_AGENT_COMMAND";
 export const RUN_FLAGS = [
   "--dir", "--actor", "--agent", "--agent-for", "--profile", "--profile-for", "--max-attempts", "--max-tasks", "--timeout",
   "--log-dir", "--stuck-status", "--delegation", "--allow-uncontrolled-delegation", "--json", "--dry-run", "--plan", "--probe",
-  "--board", "--label", "--priority", "--epic", "--stop",
+  "--board", "--label", "--priority", "--epic", "--stop", "--before-next", "--commit-state",
 ];
 
 /** What `--stop` may be combined with: it names a clone and who asks, nothing a
@@ -140,6 +141,7 @@ export function parseRunArgs(args) {
     dir: null, actor: null, agent: null, profile: null, agentFor: {}, profileFor: {}, json: false, dryRun: false, usePlan: false,
     maxAttempts: DEFAULT_MAX_ATTEMPTS, maxTasks: 0, timeout: DEFAULT_TIMEOUT_SECONDS, probe: false, delegation: "provider", allowUncontrolledDelegation: false,
     logDir: null, stuckStatus: null, board: null, label: null, priority: null, epic: null, stop: false,
+    beforeNext: null, commitState: false,
   };
   const given = [];
   const numbers = { "--max-attempts": "maxAttempts", "--max-tasks": "maxTasks", "--timeout": "timeout" };
@@ -152,6 +154,7 @@ export function parseRunArgs(args) {
     if (a === "--probe") { plan.probe = true; continue; }
     if (a === "--allow-uncontrolled-delegation") { plan.allowUncontrolledDelegation = true; continue; }
     if (a === "--plan") { plan.usePlan = true; continue; }
+    if (a === "--commit-state") { plan.commitState = true; continue; }
     if (RUN_FLAGS.indexOf(a) >= 0) {
       const value = args[++i] || null;
       if (!value) throw new Error("`" + a + "` with no value");
@@ -193,7 +196,7 @@ export function parseRunArgs(args) {
         plan.profileFor[role] = profile;
         continue;
       }
-      const key = { "--log-dir": "logDir", "--stuck-status": "stuckStatus" }[a] || a.slice(2);
+      const key = { "--log-dir": "logDir", "--stuck-status": "stuckStatus", "--before-next": "beforeNext" }[a] || a.slice(2);
       plan[key] = value;
       continue;
     }
@@ -211,6 +214,15 @@ export function parseRunArgs(args) {
     if (extra.length) {
       throw new Error("`--stop` asks the runs already going to stop; it does not start one: " + extra.join(" ") + "\n" +
         "It takes only " + STOP_FLAGS.slice(1).join(", ") + ".");
+    }
+  }
+  // Both act on the live loop only: a dry run calls no `next` to gate and
+  // writes no state to commit, and a flag that silently did nothing would read
+  // as a gate that passed (TL-489).
+  if (plan.dryRun) {
+    const live = given.filter((f) => f === "--before-next" || f === "--commit-state");
+    if (live.length) {
+      throw new Error("`--dry-run` claims nothing, so " + live.join(" and ") + " has nothing to act on");
     }
   }
   if (plan.agent && plan.profile) throw new Error("`--agent` and `--profile` are alternatives — name one generalist");
@@ -845,6 +857,107 @@ function treeState(cwd) {
 }
 
 /**
+ * The `--before-next` gate: the caller's command, run before every `next`
+ * (TL-489).
+ *
+ * WHY BEFORE `next` AND NOT AFTER IT. `next` claims, and a claim given back is
+ * two writes to the task file and its history that the caller then has to
+ * merge or discard. A wrapper that pauses its loops on a failed merge used to
+ * learn of the pause only after the claim, so every pause left a `release` in
+ * the tree and the next merge failed on it in turn. Asked first, a gate that
+ * says no costs the tree nothing.
+ *
+ * Run through the caller's shell from the repository root, like the agent
+ * template. Its output is captured rather than inherited so that `--json`
+ * keeps stdout to itself; it reaches the reader only when the gate refused.
+ *
+ * @returns {{ok: boolean, exit: number|null, output: string, timedOut: boolean}}
+ */
+function runGate(command, cwd, timeoutSeconds) {
+  const r = spawnSync(command, {
+    shell: posixShell(), cwd, encoding: "utf8", env: process.env,
+    timeout: timeoutSeconds * 1000, maxBuffer: 16 * 1024 * 1024,
+  });
+  const output = (String(r.stdout || "") + String(r.stderr || "")).trim();
+  const timedOut = !!(r.error && r.error.code === "ETIMEDOUT");
+  return { ok: r.status === 0 && !r.error, exit: r.status, output, timedOut };
+}
+
+function git(args, cwd) {
+  return spawnSync("git", args, { cwd, encoding: "utf8", env: gitDiscoveryEnv(), maxBuffer: 64 * 1024 * 1024 });
+}
+
+/**
+ * Where the backlog directory sits inside its repository, as git spells it
+ * (`backlog/`, or the empty string for a co-located backlog), or null outside
+ * a work tree.
+ *
+ * ASKED OF GIT FROM THE BACKLOG DIRECTORY rather than computed as a relative
+ * path between two absolute ones: the repository root git prints and the
+ * directory this run was given may spell one place two ways (`/var` and
+ * `/private/var`), and a pathspec built from the difference names nothing.
+ */
+function backlogPrefix(root) {
+  const r = git(["rev-parse", "--show-prefix"], root);
+  if (r.error || r.status !== 0) return null;
+  return String(r.stdout || "").trim();
+}
+
+/**
+ * Staged paths that are not this run's to commit, repository-relative as git
+ * prints them. A commit made over them would carry the caller's half-staged
+ * work under a title naming one task, so the run refuses instead of committing
+ * — and, asked before `next`, instead of claiming (TL-489).
+ */
+function foreignStaged(root, allowed) {
+  const r = git(["diff", "--cached", "--name-only", "-z"], root);
+  if (r.error || r.status !== 0) return { error: "`git diff --cached` failed in " + root };
+  const own = new Set(allowed || []);
+  return { paths: String(r.stdout || "").split("\0").filter((p) => p && !own.has(p)) };
+}
+
+/**
+ * `--commit-state`: commit the task file and its history log, and nothing
+ * else, after one outcome (TL-489).
+ *
+ * THE BOOKKEEPING, NOT THE WORK. What the hand changed in the tree stays the
+ * caller's, exactly as without the flag: TL-381 keeps commits of the work and
+ * the branch topology with whoever drives the loop. The two files committed
+ * here are the ones `next`, `done` and the park write themselves, and they are
+ * the files a wrapper's next merge of the base branch failed on.
+ *
+ * A pathspec commit, so a path the hand left modified is not swept in. Nothing
+ * to commit is not an error: a hand that committed the state itself has done
+ * this already. The repository's hooks run; a hook that refuses is reported as
+ * the refusal it is.
+ *
+ * @returns {{ok: true, sha: string|null} | {ok: false, message: string}}
+ */
+function commitTaskState(ctx, id) {
+  const { root, config } = ctx;
+  const prefix = backlogPrefix(root);
+  if (prefix === null) return { ok: false, message: root + " is not inside a git work tree" };
+  const record = readTaskRecords(backlogPaths(root).tasksDir, config.taskId.file)
+    .find((t) => String(t.id).toUpperCase() === String(id).toUpperCase());
+  const local = (record ? [record.file] : [])
+    .concat([relative(root, historyPath(root, id)).split(sep).join("/")]);
+  const foreign = foreignStaged(root, local.map((p) => prefix + p));
+  if (foreign.error) return { ok: false, message: foreign.error };
+  if (foreign.paths.length) return { ok: false, message: "other paths are already staged: " + foreign.paths.join(", ") };
+  const present = local.filter((p) => existsSync(join(root, p)));
+  if (!present.length) return { ok: true, sha: null };
+  const added = git(["add", "-A", "--"].concat(present), root);
+  if (added.status !== 0) return { ok: false, message: "`git add` refused: " + String(added.stderr || "").trim() };
+  if (git(["diff", "--cached", "--quiet", "--"].concat(present), root).status === 0) return { ok: true, sha: null };
+  const title = id + " is " + (record ? record.status : "gone") + " — task state recorded by " + N + " run";
+  const made = git(["commit", "-q", "-m", title, "--"].concat(present), root);
+  if (made.status !== 0) {
+    return { ok: false, message: "`git commit` refused: " + (String(made.stderr || "") + String(made.stdout || "")).trim() };
+  }
+  return { ok: true, sha: String(git(["rev-parse", "HEAD"], root).stdout || "").trim() || null };
+}
+
+/**
  * Did this task's agent ever run? PURE (both readings are taken by the caller).
  *
  * THE DISTINCTION IS NOT "DID THE AGENT FAIL" BUT "DID IT RUN" (TL-184). A task
@@ -1384,6 +1497,7 @@ function renderReport(report, plan) {
       " attempt" + (r.attempts === 1 ? "" : "s") + "  " + Math.round(r.ms / 1000) + "s");
     lines.push("      " + color.dim(r.log));
     if (r.detail) lines.push("      " + color.dim(String(r.detail).split("\n")[0]));
+    if (r.stateCommit) lines.push("      " + color.dim("state committed: " + r.stateCommit.slice(0, 12)));
   }
   if (!report.taken.length) lines.push("  " + color.dim(MARK.bullet + " nothing was taken"));
   if (report.skippedDeadlocked && report.skippedDeadlocked.length) {
@@ -1801,6 +1915,13 @@ export async function run(argv) {
   // where the verification does not look.
   const cwd = repoRootFor(root);
   const ctx = { root, config, actor, cwd, plan };
+  // Refused before the first claim, like the plan and the roles above: found at
+  // the first outcome, it would have cost a claim nobody can commit.
+  if (plan.commitState && backlogPrefix(root) === null) {
+    console.error(failure(N + " run", "`--commit-state` needs a git work tree, and " + root + " is not inside one",
+      [], [N + " run --help"]));
+    return 2;
+  }
 
   // Where a task whose contract ends in a `manual:` entry is parked (TL-212).
   // Null when this backlog has not declared one, and then nothing changes: such
@@ -1824,6 +1945,23 @@ export async function run(argv) {
   // Set only when the guard below ends the run, so a caller of `--json` can
   // tell that stop from an empty queue without parsing the sentence.
   let spin = null;
+  // `{command, exit, timedOut, output}` when `--before-next` refused (TL-489).
+  let gateRefused = null;
+  // `{id, message}` when `--commit-state` could not commit, or refused to
+  // claim over staged paths that are not its own (`id` is null then).
+  let stateRefused = null;
+  // The commit after one outcome; false when the run must stop on a refusal.
+  const recordState = (id, result) => {
+    if (!plan.commitState) return true;
+    const made = commitTaskState(ctx, id);
+    if (made.ok) {
+      if (result) result.stateCommit = made.sha;
+      return true;
+    }
+    stateRefused = { id, message: made.message };
+    return false;
+  };
+  const stateStop = () => "`--commit-state` did not commit " + stateRefused.id + ": " + stateRefused.message;
   // How many tasks other than `id` the dispatcher would hand out now, asked of
   // its own selection without claiming any — under `--plan`, from the wave it
   // is handing out of.
@@ -1871,6 +2009,27 @@ export async function run(argv) {
     if (plan.maxTasks && taken.length >= plan.maxTasks) {
       stopped = "--max-tasks " + plan.maxTasks;
       break;
+    }
+    // THE CALLER'S GATE, THEN OURS, both before the claim (TL-489). The gate
+    // goes first because it is typically the caller's merge of the base branch,
+    // and what it leaves staged is exactly what the second check must see.
+    if (plan.beforeNext) {
+      const gate = runGate(plan.beforeNext, cwd, plan.timeout);
+      if (!gate.ok) {
+        if (gate.output) console.error(gate.output);
+        gateRefused = { command: plan.beforeNext, exit: gate.exit, timedOut: gate.timedOut, output: gate.output || null };
+        stopped = "`--before-next` " + (gate.timedOut ? "did not finish within --timeout " + plan.timeout + "s"
+          : "exited " + gate.exit) + " — nothing was claimed";
+        break;
+      }
+    }
+    if (plan.commitState) {
+      const foreign = foreignStaged(root, []);
+      if (foreign.error || foreign.paths.length) {
+        stateRefused = { id: null, message: foreign.error || "other paths are already staged: " + foreign.paths.join(", ") };
+        stopped = "`--commit-state`: " + stateRefused.message + " — nothing was claimed";
+        break;
+      }
     }
     const handed = cli(["next", "--dir", root, "--actor", actor, "--json"].concat(passthrough));
     const answer = parseJson(handed.stdout);
@@ -1941,6 +2100,7 @@ export async function run(argv) {
       stopped = task.id + " was handed out twice" + (role ? " to role `" + role + "`" : "") +
         " — the loop stopped rather than spin, and gave the claim back" +
         (left ? "; " + left + " other task(s) are still eligible, so the queue is not empty" : "");
+      if (!recordState(task.id, null)) stopped += "; " + stateStop();
       break;
     }
     seen.add(turn);
@@ -1995,6 +2155,7 @@ export async function run(argv) {
       neverStarted = result;
       taken.push(result);
       stopped = "the agent command never ran";
+      if (!recordState(task.id, result)) stopped += "; " + stateStop();
       break;
     }
     if (result.outcome === "closed") {
@@ -2130,6 +2291,13 @@ export async function run(argv) {
       releaseLock({ root, taskId: task.id, actor });
     }
     taken.push(result);
+    // A refused commit stops the run: the next claim would pile a second
+    // task's state onto the uncommitted first, which is the state this flag
+    // exists to keep out of the tree.
+    if (!recordState(task.id, result)) {
+      stopped = stateStop();
+      break;
+    }
   }
 
   if (!rebuildViews(root)) {
@@ -2177,6 +2345,12 @@ export async function run(argv) {
       // `{requestedAt, by, after}` when `run --stop` ended the run (TL-485);
       // `after` is the last task it finished, null when it had taken none.
       stopRequested: stopRequest,
+      // `{command, exit, timedOut, output}` when `--before-next` ended the run
+      // before a claim (TL-489); null otherwise.
+      beforeNextRefused: gateRefused,
+      // `{id, message}` when `--commit-state` ended the run; `id` is null when
+      // it refused to claim over staged paths that are not its own.
+      stateCommitRefused: stateRefused,
       tally: { ...tally, taken: taken.length },
       // What this run used outside the tree it was given. A consumer comparing
       // two runs can see a shared-state change for what it is (TL-202).
@@ -2194,6 +2368,9 @@ export async function run(argv) {
         repeatedOutput: !!r.repeatedOutput,
         said: r.said || null,
         provenance: r.provenance || [],
+        // The commit `--commit-state` made for this outcome; null without the
+        // flag, and when there was nothing left to commit.
+        stateCommit: r.stateCommit || null,
       })),
     });
   } else {

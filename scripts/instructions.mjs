@@ -505,6 +505,31 @@ the same effect: a run killed between \`{{tool}} next\` and \`{{tool}} done\`
 leaves a claim that nobody is working, and one frozen while \`next\` runs holds
 a task \`next\` has already claimed.
 
+SEVERAL LOOPS, ONE WORKTREE EACH. A wrapper that runs one \`{{tool}} run\` per
+worktree of a clone, merging the base branch in before a task and back out
+after it, meets two costs of the claim being written to the tree on purpose:
+a pause that lands after \`next\` leaves a claim and its give-back uncommitted,
+and the next merge fails on them. Three pieces keep the bookkeeping out of its
+way; commits and branch topology stay the wrapper's.
+
+  {{tool}} run --agent "<command>" \\
+    --before-next "./wrapper sync" \\
+    --commit-state
+
+  --before-next   the wrapper's merge or pause check, run before every \`next\`.
+                  A non-zero exit ends the run before anything is claimed, so
+                  a paused loop does not claim a task only to give it back.
+  --commit-state  the task file and \`history/<ID>.jsonl\` are committed after
+                  each outcome, and nothing else. Staged paths of anybody else
+                  stop the run instead of being swept into that commit.
+  on pause        call \`{{tool}} run --stop\` once — it reaches every loop of
+                  the clone — and have the agent command exit SILENTLY for a
+                  task already handed out: an agent that printed nothing and
+                  changed nothing never ran, so the run gives that claim back
+                  itself, in the status it was taken from, and exits 1. Do not
+                  release the task and do not kill the loop; either leaves a
+                  claim nobody is working.
+
 THE TWO ENDS OF A SESSION.
 
   starting   \`{{tool}} next --actor <ns:name>\` — one task, already claimed and

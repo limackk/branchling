@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: "Parallel worktree loops"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1d
 confidence: medium                 # how much you trust the estimate
 created: 2026-10-27
-updated: 2026-10-27
+updated: 2026-10-30
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
@@ -41,5 +41,5 @@ Observed in a downstream repository on the night of 2026-10-26/27: three `branch
 
 ## Acceptance criteria
 
-- [ ] a failing gate stops the run before anything is claimed [proof: gate]
-- [ ] after each outcome only the task file and its history are committed [proof: commit-state]
+- [x] a failing gate stops the run before anything is claimed [proof: gate]
+- [x] after each outcome only the task file and its history are committed [proof: commit-state]

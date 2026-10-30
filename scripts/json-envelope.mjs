@@ -93,6 +93,12 @@ export const KINDS = {
     spinGuard: null,
     // `{requestedAt, by, after}` when `run --stop` ended the run (TL-485).
     stopRequested: null,
+    // `{command, exit, timedOut, output}` when `--before-next` refused before
+    // a claim (TL-489).
+    beforeNextRefused: null,
+    // `{id, message}` when `--commit-state` ended the run; `id` is null when
+    // it refused to claim over paths somebody else staged (TL-489).
+    stateCommitRefused: null,
   },
   // `run --stop --json` (TL-485): the request as written, and where. `origin`
   // is the clone it reaches — every run of it, from any of its worktrees.
