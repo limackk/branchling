@@ -1,0 +1,62 @@
+name: release
+
+# A RELEASE IS A TAG, AND THE TAG IS THE ONLY TRIGGER (TL-455).
+# 0.1.0 and 0.1.1 were published from a maintainer's machine, so neither
+# carries an npm provenance attestation and nothing but memory tied the tarball
+# to a commit. Publishing from here binds the package to the tagged commit and
+# to this workflow run, and the steps below refuse a tag that the tree does not
+# back: a version that disagrees with package.json, or a version with no notes.
+#
+# The registry credential is the repository secret NPM_TOKEN, an automation
+# token of the npm organization that owns the name. The process around this
+# file, including what a person does before pushing the tag, is
+# docs/releasing.md.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      # A tag that names another version than the manifest would publish one
+      # number under the other's name, and a registry version cannot be reused.
+      - name: the tag names the manifest's version and its notes exist
+        shell: bash
+        run: |
+          version=$(node -p 'require("./package.json").version')
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "tag $GITHUB_REF_NAME does not match package.json version $version"
+            exit 1
+          fi
+          test -f "docs/releases/v$version.md" || { echo "docs/releases/v$version.md is missing"; exit 1; }
+
+      # The suite already ran on this commit in the test workflow; it runs
+      # again here because this job, not that one, is what publishes, and a
+      # tag can be pushed on a commit whose test run was never looked at.
+      - name: tests
+        run: node --test scripts/tests/*.test.mjs
+
+      - name: guards
+        run: node scripts/cli.mjs check
+
+      - name: publish to npm with provenance
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: GitHub release from the same notes
+        run: gh release create "$GITHUB_REF_NAME" --verify-tag --title "$GITHUB_REF_NAME" --notes-file "docs/releases/$GITHUB_REF_NAME.md"
+        env:
+          GH_TOKEN: ${{ github.token }}

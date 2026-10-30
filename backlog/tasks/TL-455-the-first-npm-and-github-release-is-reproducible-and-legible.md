@@ -6,20 +6,20 @@ labels: []
 board: main
 epic: "Backlog — open source publication"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
-role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
+status: awaiting_vouch  # pending | in_progress | blocked | done | cancelled
+owner: ""
+role: review  # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1d
 confidence: medium                 # how much you trust the estimate
 created: 2026-09-26
-updated: 2026-10-26
+updated: 2026-10-30
 blocked_by: [TL-467]               # ids of tasks that MUST be closed before this one starts
 blocks: [TL-468]                   # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
 verification:
   - id: release-package
-    bash: "node --test scripts/tests/release.test.mjs scripts/tests/publish-gate.test.mjs scripts/tests/demo-scenario.test.mjs"
+    bash: "node --test scripts/tests/release.test.mjs scripts/tests/publish-gate.test.mjs scripts/tests/demo-scenario.test.mjs scripts/tests/release-notes.test.mjs"
   - id: release-guards
     bash: "node scripts/cli.mjs check"
   - id: public-release
