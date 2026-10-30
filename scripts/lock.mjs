@@ -313,6 +313,13 @@ export const MUTEX_STALE_MS = 30_000;
  *  records it, whereas proceeding unlocked is the one outcome that loses it. */
 export const MUTEX_WAIT_MS = 10_000;
 
+/** How long a holder whose process is still alive ON THIS HOST keeps a section
+ *  past `MUTEX_STALE_MS` (TL-488). The id mutex spans a scanner run allowed 60
+ *  seconds, so a slow but living holder outlived the stale limit and was taken
+ *  over just before it wrote. A pid can be reused by an unrelated process once
+ *  its holder dies, and this ceiling is what bounds the wait that costs. */
+export const MUTEX_LIVE_HOLDER_MAX_MS = 300_000;
+
 /** Sections this process is already inside. Reconcile and `recordEdit` are both
  *  synchronous, so nothing interleaves within one process — but a caller that
  *  nests them would otherwise wait for a lock it holds itself. */
@@ -410,12 +417,36 @@ function removeIfUnchanged(path, judged) {
 }
 
 /**
+ * Is this pid still a process?
+ *
+ * `EPERM` means it exists and is not ours to signal, which is still ALIVE —
+ * answering "gone" there would report a running server as stale and invite a
+ * second one onto the same tree.
+ *
+ * WHAT IT CANNOT SEE, stated because `--stop` was written wrong once on the
+ * strength of it: a ZOMBIE — a process that has exited and whose parent has not
+ * reaped it — still accepts signal 0, so for that window an entry reads
+ * `running` although nothing is being served. That is why `stopServer` decides
+ * at the PORT and not here: a corpse cannot answer `/api/ping`.
+ */
+export function pidAlive(pid, kill = process.kill.bind(process)) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    kill(pid, 0);
+    return true;
+  } catch (e) {
+    return e.code === "EPERM";
+  }
+}
+
+/**
  * Run `fn` with no other process on this machine inside the section `name`.
  *
  * @param {string} name  identifies the RESOURCE, not the caller — every writer
  *        of one file has to compute the same string for any of this to hold.
  * @param {Function} fn
- * @param {{env?: object, waitMs?: number, staleMs?: number, now?: () => number}} opts
+ * @param {{env?: object, waitMs?: number, staleMs?: number, liveMaxMs?: number,
+ *          now?: () => number, interleave?: (step: string) => void}} opts
  * @returns whatever `fn` returns
  * @throws {Error} with `code: "EBUSY"` when the wait ran out
  */
@@ -424,6 +455,7 @@ export function withMutex(name, fn, opts = {}) {
   const now = opts.now || Date.now;
   const waitMs = opts.waitMs === undefined ? MUTEX_WAIT_MS : opts.waitMs;
   const staleMs = opts.staleMs === undefined ? MUTEX_STALE_MS : opts.staleMs;
+  const liveMaxMs = opts.liveMaxMs === undefined ? MUTEX_LIVE_HOLDER_MAX_MS : opts.liveMaxMs;
   const dir = join(stateRoot(opts.env), "mutex");
   mkdirSync(dir, { recursive: true });
   const path = join(dir, createHash("sha256").update(name).digest("hex").slice(0, 16) + ".mutex");
@@ -450,7 +482,14 @@ export function withMutex(name, fn, opts = {}) {
     if (!seen) continue;
     const holder = seen.record;
     const heldSince = holder ? Date.parse(holder.ts || "") : NaN;
-    if (!Number.isFinite(heldSince) || now() - heldSince > staleMs) {
+    const age = now() - heldSince;
+    // A holder on this host whose process still answers is working, not dead,
+    // however long its section takes — up to the ceiling. A holder on another
+    // host cannot be signalled, and this process's own pid in the file is a
+    // leftover, since a live section of ours would have been re-entered above.
+    const living = holder && holder.host === hostname() && holder.pid !== process.pid &&
+      pidAlive(holder.pid) && age <= liveMaxMs;
+    if (!Number.isFinite(heldSince) || (age > staleMs && !living)) {
       interleave("judged-stale");
       // Whoever loses this removal finds the winner's fresh record on the next
       // pass and waits for it.

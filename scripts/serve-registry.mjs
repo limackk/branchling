@@ -64,7 +64,11 @@ import { get } from "node:http";
 import { hostname } from "node:os";
 import { join, resolve } from "node:path";
 
-import { lockScope, stateRoot } from "./lock.mjs";
+import { lockScope, pidAlive, stateRoot } from "./lock.mjs";
+
+// Moved to lock.mjs (TL-488), where the mutex judges a holder by it too; the
+// export stays here for the callers that import it from the registry.
+export { pidAlive };
 import { PRODUCT_NAME as N } from "./product.mjs";
 
 /**
@@ -140,29 +144,6 @@ function readEntry(port, env) {
     // Unreadable names nobody, exactly as in `readLock`. An entry we cannot
     // parse is reported as stale by `listServers`, not respected as a holder.
     return null;
-  }
-}
-
-/**
- * Is this pid still a process?
- *
- * `EPERM` means it exists and is not ours to signal, which is still ALIVE —
- * answering "gone" there would report a running server as stale and invite a
- * second one onto the same tree.
- *
- * WHAT IT CANNOT SEE, stated because `--stop` was written wrong once on the
- * strength of it: a ZOMBIE — a process that has exited and whose parent has not
- * reaped it — still accepts signal 0, so for that window an entry reads
- * `running` although nothing is being served. That is why `stopServer` decides
- * at the PORT and not here: a corpse cannot answer `/api/ping`.
- */
-export function pidAlive(pid, kill = process.kill.bind(process)) {
-  if (!Number.isInteger(pid) || pid <= 0) return false;
-  try {
-    kill(pid, 0);
-    return true;
-  } catch (e) {
-    return e.code === "EPERM";
   }
 }
 

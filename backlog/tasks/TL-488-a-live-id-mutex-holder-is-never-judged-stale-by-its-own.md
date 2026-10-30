@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P3
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 3h
 confidence: medium                 # how much you trust the estimate
 created: 2026-10-26
-updated: 2026-10-26
+updated: 2026-10-30
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
@@ -38,4 +38,4 @@ No critical section guarded by `withMutex` can legitimately outlive `MUTEX_STALE
 
 ## Acceptance criteria
 
-- [ ] A live holder working past the stale limit keeps the section, and a dead one is still taken over. [proof: long-section]
+- [x] A live holder working past the stale limit keeps the section, and a dead one is still taken over. [proof: long-section]

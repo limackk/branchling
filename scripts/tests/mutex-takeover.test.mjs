@@ -18,6 +18,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { spawn, spawnSync } from "node:child_process";
+import { hostname } from "node:os";
 
 import { withMutex } from "../lock.mjs";
 import { isolateHome, isolateState } from "./_repo.mjs";
@@ -150,4 +152,47 @@ test("a record nobody can read is still taken over", () => {
   let entered = false;
   withMutex("corrupt", () => { entered = true; }, { env: ENV, waitMs: 200 });
   assert.equal(entered, true);
+});
+
+/** A record naming a process on THIS host, so the liveness rule applies to it. */
+function localRecord(token, pid, ts) {
+  return JSON.stringify({ section: "other", token, pid, host: hostname(), ts }) + "\n";
+}
+
+/** A pid that answered once and has exited and been reaped since. */
+function deadPid() {
+  return spawnSync(process.execPath, ["-e", "process.stdout.write(String(process.pid))"], { encoding: "utf8" }).stdout * 1;
+}
+
+test("a living holder on this host keeps the section past the stale limit (TL-488)", (t) => {
+  const child = spawn(process.execPath, ["-e", "setTimeout(() => {}, 60000)"], { stdio: "ignore" });
+  t.after(() => child.kill());
+  const path = mutexPath("living-holder");
+  // Older than the stale limit, younger than the ceiling: a slow scanner run.
+  const ts = new Date(Date.now() - 45_000).toISOString();
+  writeFileSync(path, localRecord("slow-writer", child.pid, ts), "utf8");
+  const entered = enterBusy("living-holder", () => {});
+  assert.equal(entered, false, "a living holder was judged stale by its age alone");
+  assert.equal(JSON.parse(readFileSync(path, "utf8")).token, "slow-writer");
+  unlinkSync(path);
+});
+
+test("a holder on this host whose process is gone is still taken over", () => {
+  const path = mutexPath("dead-local-holder");
+  const ts = new Date(Date.now() - 45_000).toISOString();
+  writeFileSync(path, localRecord("dead-writer", deadPid(), ts), "utf8");
+  let entered = false;
+  withMutex("dead-local-holder", () => { entered = true; }, { env: ENV, waitMs: 200 });
+  assert.equal(entered, true, "a dead holder kept the section");
+});
+
+test("a living holder past the ceiling is taken over, which bounds a reused pid", (t) => {
+  const child = spawn(process.execPath, ["-e", "setTimeout(() => {}, 60000)"], { stdio: "ignore" });
+  t.after(() => child.kill());
+  const path = mutexPath("past-ceiling");
+  const ts = new Date(Date.now() - 45_000).toISOString();
+  writeFileSync(path, localRecord("reused-pid", child.pid, ts), "utf8");
+  let entered = false;
+  withMutex("past-ceiling", () => { entered = true; }, { env: ENV, waitMs: 200, liveMaxMs: 40_000 });
+  assert.equal(entered, true, "a holder older than the ceiling kept the section");
 });
