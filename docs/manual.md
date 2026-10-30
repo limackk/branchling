@@ -113,6 +113,13 @@ It never stands in for a task's own contract: a task with an empty
 that closing before anything runs, because a `[proof: id]` naming it would be
 ambiguous.
 
+`take --probe`, `next --probe` and `check --proofs` read the same contract
+through the same function, so a probe before the work and an audit after it see
+the red lines the closing will. The one exception is the half of `check
+--proofs` that looks for unfalsifiable contracts in tasks nobody has started: it
+judges a task by its own entries, because the project's are not the work's to
+turn red.
+
 **The limit, stated rather than left to be discovered.** A task file is a text
 file and anybody can set `status: done` in an editor. This gate raises the *cost*
 of a lie — it does not make one impossible, and there is no `--force` flag,

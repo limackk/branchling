@@ -669,7 +669,7 @@ export function run(argv) {
   // THE CONTRACT'S LIVE STATE TRAVELS WITH THE HANDOVER when asked (TL-268).
   // Opt-in: a contract may cost the whole suite, and a loop wanting the task
   // in a second is not made to wait for it.
-  if (result.ok && plan.probe) result.probe = probeTask(root, result.file);
+  if (result.ok && plan.probe) result.probe = probeTask(root, result.file, config);
   if (!result.ok) {
     if (plan.json) {
       printJson("task-take", refusalPayload(result, plan.id));

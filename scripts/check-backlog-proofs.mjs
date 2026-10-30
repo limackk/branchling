@@ -80,7 +80,8 @@
  *
  * Tests: `node --test scripts/tests/proofs.test.mjs`,
  *        `node --test scripts/tests/proofs-progress.test.mjs`,
- *        `node --test scripts/tests/check-contract-falsifiable.test.mjs`
+ *        `node --test scripts/tests/check-contract-falsifiable.test.mjs`,
+ *        `node --test scripts/tests/done-closing-contract.test.mjs`
  */
 
 import { spawnSync } from "node:child_process";
@@ -89,7 +90,6 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadConfigOrExit } from "./config.mjs";
-import { parseVerification } from "./criteria.mjs";
 import { REASON_PROVEN, readHistory } from "./history.mjs";
 import { modifiedFiles } from "./modified-files.mjs";
 import { queueStatuses } from "./next-task.mjs";
@@ -98,7 +98,7 @@ import { PRODUCT_NAME as N } from "./product.mjs";
 import { readTaskRecords } from "./task-select.mjs";
 import { splitFrontmatter } from "./task-fields.mjs";
 import { MARK, color, errColor } from "./ui.mjs";
-import { repoRootFor, runContract } from "./done-task.mjs";
+import { closingContractOf, collisionHeadline, repoRootFor, runContract } from "./done-task.mjs";
 
 const OKM = color.ok(MARK.ok);
 const ERRM = errColor.err(MARK.err);
@@ -188,9 +188,13 @@ async function main(argv) {
   const repoRoot = repoRootFor(root);
   const records = readTaskRecords(paths.tasksDir, config.taskId.file);
 
+  // THE CONTRACT `done` RUNS (TL-495): the task's entries, then the project's
+  // `closing_contract`, read by the same function `done` reads them with. A
+  // proof re-run without the project's half would stay green over the very
+  // guard the closing was refused on.
   const contractOf = (t) => {
     const raw = readFileSync(paths.tasksDir + "/" + String(t.file).replace(/^tasks\//, ""), "utf8");
-    return parseVerification(splitFrontmatter(raw).frontmatter).entries;
+    return closingContractOf(splitFrontmatter(raw).frontmatter, config);
   };
 
   // The statuses a dispatcher may still hand out — that is, the statuses whose
@@ -199,11 +203,16 @@ async function main(argv) {
   const queue = new Set(queueStatuses(config));
 
   const candidates = [];
+  const collided = [];
   const open = [];
   for (const t of records) {
     if ((config.archivedStatuses || []).indexOf(t.status) < 0) {
       if (!queue.has(t.status)) continue;
-      const entries = contractOf(t);
+      // The task's OWN entries only. This half asks whether the work could turn
+      // the contract red, and the project's entries are not the work's to turn:
+      // a red repository guard would hide an unfalsifiable contract here, and a
+      // green one would add nothing but its cost to every open task.
+      const entries = contractOf(t).own;
       // A task still being WRITTEN has no contract to judge, and `check
       // --criteria` already reports that. Two guards on one finding would say
       // the same problem twice.
@@ -212,9 +221,16 @@ async function main(argv) {
     }
     const closing = provenClosing(readHistory(root, t.id), config.archivedStatuses);
     if (!closing) continue;
-    const entries = contractOf(t);
-    if (!entries.length) continue;
-    candidates.push({ id: t.id, file: t.file, closing, entries });
+    const contract = contractOf(t);
+    if (!contract.own.length) continue;
+    // A shared id is refused as `done` refuses it, before anything runs: the
+    // proof can no longer be re-run as it was written, which is a finding about
+    // this closing and not a pass.
+    if (contract.collisions.length) {
+      collided.push({ id: t.id, file: t.file, collisions: contract.collisions });
+      continue;
+    }
+    candidates.push({ id: t.id, file: t.file, closing, entries: contract.entries });
   }
 
   let selected = candidates;
@@ -377,7 +393,7 @@ async function main(argv) {
     );
   }
 
-  if (!broken.length) {
+  if (!broken.length && !collided.length) {
     console.log(
       `${OKM} proofs: ${ran} verification command(s) re-run across ${selected.length} proven closing(s), ` +
         `each still passing (${seconds}s)`
@@ -388,7 +404,7 @@ async function main(argv) {
     return stopped ? 130 : 0;
   }
 
-  console.error(`${ERRM} proofs: ${broken.length} closed task(s) whose proof no longer holds`);
+  if (broken.length) console.error(`${ERRM} proofs: ${broken.length} closed task(s) whose proof no longer holds`);
   for (const b of broken) {
     const range = b.closing.ts ? " closed " + b.closing.ts : "";
     console.error(
@@ -397,7 +413,16 @@ async function main(argv) {
     );
     console.error(`    ${b.file}`);
   }
+  if (collided.length) {
+    console.error(`${ERRM} proofs: ${collided.length} closed task(s) whose proof cannot be re-run as written`);
+    for (const c of collided) {
+      console.error(`  - ${collisionHeadline(c.id)}: ${c.collisions.map((id) => "`id: " + id + "`").join(", ")}`);
+      console.error(`    ${c.file}`);
+    }
+    console.error("    A proof id names ONE entry; rename the task's entry or the project's. Nothing was run for these.");
+  }
   for (const l of lines) console.error(l);
+  if (!broken.length) return 1;
   console.error("");
   console.error("Nothing was changed and no task was reopened: a broken proof is a finding for a");
   console.error("person. The task file says why the work was done and what it decided — start there,");

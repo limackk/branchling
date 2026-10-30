@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Parallel worktree loops"
 priority: P3
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 1h | 2h | 3h | 4h | 1d | 1w
@@ -38,4 +38,4 @@ TL-493 added `closing_contract` and `withClosingContract()` in scripts/done-task
 
 ## Acceptance criteria
 
-- [ ] probe and check --proofs run the project closing_contract [proof: probe-closing]
+- [x] probe and check --proofs run the project closing_contract [proof: probe-closing]

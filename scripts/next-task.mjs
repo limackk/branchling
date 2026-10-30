@@ -1005,7 +1005,7 @@ export function run(argv) {
     });
     if (result.ok) {
       // The contract's live state, when asked for (TL-268) — see `take`.
-      if (plan.probe) result.probe = probeTask(root, result.file);
+      if (plan.probe) result.probe = probeTask(root, result.file, config);
       if (!rebuildViews(root)) {
         console.error(warn("the views were not rebuilt — run `" + N + " build` yourself"));
       }

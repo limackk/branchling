@@ -40,7 +40,7 @@ import { fileURLToPath } from "node:url";
 import { resolveActor } from "./actor.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { backlogPaths, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
-import { loadConfigOrExit } from "./config.mjs";
+import { loadConfig, loadConfigOrExit } from "./config.mjs";
 import { applyProofs, auditTask, parseCriteria, parseVerification } from "./criteria.mjs";
 import { buildFieldSpecs, extractMeta, fieldSpec, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
 import { ACTOR_NAMESPACES, appendEntries, currentSession, eventId, FIELD_UNVERIFIED, FIELD_VERIFIED, isValidActor, REASON_PROVEN, reasonRefusal, recordEdit, requiresReason } from "./history.mjs";
@@ -214,6 +214,34 @@ export function withClosingContract(entries, closing) {
   const own = new Set(entries.filter((e) => e.id).map((e) => e.id));
   const collisions = project.filter((e) => e.id && own.has(e.id)).map((e) => e.id);
   return { entries: entries.concat(project), collisions };
+}
+
+/**
+ * The contract a closing of this task would run, read from its frontmatter
+ * (TL-495). ONE reader for `done`, the probe and the proofs audit: each of them
+ * used to parse `verification:` on its own, and the two that did not append the
+ * project's entries reported green where `done` would refuse.
+ *
+ * `own` is the task's contract alone, because `done` judges it BEFORE the
+ * project's entries exist for it — an empty or unreadable one is a task nobody
+ * finished writing, however many project entries would run. Neither of those
+ * gets the project's entries appended, so no caller can mistake a contract made
+ * entirely of somebody else's lines for this task's proof.
+ *
+ * @returns {{own: Array<object>, entries: Array<object>, problems: string[], collisions: string[]}}
+ */
+export function closingContractOf(frontmatter, config) {
+  const { entries, problems } = parseVerification(frontmatter);
+  if ((problems && problems.length) || !entries.length) {
+    return { own: entries, entries, problems: problems || [], collisions: [] };
+  }
+  const merged = withClosingContract(entries, (config || {}).closingContract);
+  return { own: entries, entries: merged.entries, problems: [], collisions: merged.collisions };
+}
+
+/** The sentence every reader of the contract refuses a shared id with. */
+export function collisionHeadline(id) {
+  return id + ": a verification id is also an id in the project's `closing_contract`";
 }
 
 /**
@@ -551,13 +579,16 @@ export function probeContract(entries, cwd) {
   let failed = 0;
   for (const e of entries || []) {
     if (e.manual) {
-      rows.push({ id: e.id || null, kind: "manual", command: e.manual, ok: null, exitCode: null, ms: 0, output: null });
+      rows.push({ id: e.id || null, kind: "manual", command: e.manual, ok: null, exitCode: null, ms: 0, output: null,
+        ...(e.project ? { project: true } : {}) });
       continue;
     }
     const r = runBash(e.bash, cwd, true);
     ran++;
     if (!r.ok) failed++;
-    rows.push({ id: e.id || null, kind: "bash", command: e.bash, ok: r.ok, exitCode: r.exitCode, ms: r.ms, output: r.output });
+    const row = { id: e.id || null, kind: "bash", command: e.bash, ok: r.ok, exitCode: r.exitCode, ms: r.ms, output: r.output };
+    if (e.project) row.project = true;
+    rows.push(row);
   }
   return { rows, ran, failed, allPassed: ran > 0 && failed === 0 };
 }
@@ -571,11 +602,21 @@ export function probeContract(entries, cwd) {
  *
  * @returns {{rows: Array<object>, ran: number, failed: number, allPassed: boolean, problems: string[]}}
  */
-export function probeTask(root, taskFile) {
+export function probeTask(root, taskFile, config) {
   const raw = readFileSync(taskFile, "utf8");
   const { frontmatter } = splitFrontmatter(raw);
-  const { entries, problems } = parseVerification(frontmatter);
-  if (problems && problems.length) return { rows: [], ran: 0, failed: 0, allPassed: false, problems };
+  // THE CONTRACT `done` WILL RUN, not the task's half of it (TL-495): a probe
+  // that leaves out the project's entries answers "is my module green" while
+  // the closing asks "is the repository green", and the hand learns the
+  // difference only when `done` refuses.
+  const { entries, problems, collisions } = closingContractOf(frontmatter, config || loadConfig(root));
+  if (problems.length) return { rows: [], ran: 0, failed: 0, allPassed: false, problems };
+  // Refused before anything runs, as `done` refuses it: which of the two
+  // entries a `[proof: id]` meant is the author's decision, not the probe's.
+  if (collisions.length) {
+    return { rows: [], ran: 0, failed: 0, allPassed: false,
+      problems: collisions.map((id) => collisionHeadline("`id: " + id + "`")) };
+  }
   const probe = probeContract(entries, repoRootFor(root));
   return { ...probe, problems: [] };
 }
@@ -771,7 +812,8 @@ async function run(argv) {
   // An actual `done` keeps refusing here — a moved tree must not be closed a
   // second time merely because its old contract still happens to pass.
 
-  let { entries, problems } = parseVerification(frontmatter);
+  const closingContract = closingContractOf(frontmatter, config);
+  let { own: entries, problems } = closingContract;
   const contract = contractProblem(entries, problems);
   if (contract) {
     // TWO DEFECTS, TWO DIAGNOSES (TL-173). "has no closing contract" is the
@@ -795,16 +837,15 @@ async function run(argv) {
   // AFTER the task's own contract is judged, never in place of it: a task with
   // no `verification:` is still a task nobody finished writing, however many
   // project entries would run for it.
-  const merged = withClosingContract(entries, config.closingContract);
-  if (merged.collisions.length) {
-    return refuse(plan, plan.id + ": a verification id is also an id in the project's `closing_contract`",
-      merged.collisions.map((id) => "`id: " + id + "`").concat([
+  if (closingContract.collisions.length) {
+    return refuse(plan, collisionHeadline(plan.id),
+      closingContract.collisions.map((id) => "`id: " + id + "`").concat([
         "",
         "A proof id names ONE entry, and a criterion pointing at it would be ambiguous.",
         "Rename the task's entry; nothing was run and the file is untouched.",
       ]), [], "closing-contract-collision");
   }
-  entries = merged.entries;
+  entries = closingContract.entries;
 
   const cwd = repoRootFor(root);
   const missingTest = missingNodeTestFile(entries, cwd);

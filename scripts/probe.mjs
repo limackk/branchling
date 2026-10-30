@@ -51,9 +51,19 @@ export function renderProbe(probe) {
     out.push(probe.failed + " of " + probe.ran + " entr" + (probe.ran === 1 ? "y" : "ies") + " fail" +
       (probe.failed === 1 ? "s" : "") + " now. That is the target.");
     out.push("");
+    // THE TASK'S OWN HALF, judged on its own (TL-495). A red project entry
+    // makes the whole contract fail, and without this line it would hide the
+    // one finding the probe exists for: that nothing of THIS task's could fail.
+    const own = probe.rows.filter((r) => !r.project && r.kind === "bash");
+    if (own.length && own.every((r) => r.ok) && probe.rows.some((r) => r.project && r.ok === false)) {
+      out.push("**Every entry of this task's own passed before any work was done**; only the project's " +
+        "`closing_contract` is red. Establish whether this task's contract can fail at all.");
+      out.push("");
+    }
   }
   probe.rows.forEach((r, i) => {
-    const name = r.id ? "`" + r.id + "`" : "(no id)";
+    // A project entry is named as one: its repair is not in this task's file.
+    const name = (r.id ? "`" + r.id + "`" : "(no id)") + (r.project ? " (project `closing_contract`)" : "");
     if (r.kind === "manual") {
       out.push("- " + (i + 1) + ". " + name + " — **manual**, asks a person: " + r.command);
       return;

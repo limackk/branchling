@@ -30,7 +30,8 @@ import { isolateHome, SCRIPTS_DIR } from "./_repo.mjs";
 isolateHome("done-closing-contract");
 
 import { ConfigError, loadConfig, parseConfigYaml } from "../config.mjs";
-import { withClosingContract } from "../done-task.mjs";
+import { probeTask, withClosingContract } from "../done-task.mjs";
+import { renderProbe } from "../probe.mjs";
 
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
 
@@ -158,5 +159,116 @@ test("a closing_contract does not stand in for a task with no contract of its ow
     assert.notEqual(r.code, 0, r.out);
     assert.match(r.out, /no closing contract/);
     assert.equal(statusOf(dir), "pending");
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// The probe and the proofs audit (TL-495)
+// ──────────────────────────────────────────────────────────────────────────
+
+const TASK_FILE = (dir) => join(dir, "tasks", "TASK-1-x.md");
+
+function checkProofs(dir) {
+  const r = spawnSync(process.execPath, [CLI, "check", "--proofs", "--dir", dir], { encoding: "utf8", input: "" });
+  return { code: r.status, out: (r.stdout || "") + (r.stderr || "") };
+}
+
+// The closing is made under one configuration and audited under another: the
+// audit has to read the project contract as it stands NOW, as `done` would.
+function setContract(dir, config) {
+  writeFileSync(join(dir, "config.yaml"), 'task_id_prefix: "TASK"\n' + config, "utf8");
+}
+
+test("the probe runs the project's entries after the task's own and names them as the project's", () => {
+  const config = 'closing_contract:\n  - id: repo-guard\n    bash: "test -f own-ran && touch guard-ran"\n';
+  withBacklog(config, OWN, (dir) => {
+    const probe = probeTask(dir, TASK_FILE(dir));
+    assert.deepEqual(probe.problems, []);
+    assert.deepEqual(probe.rows.map((r) => [r.id, Boolean(r.project), r.ok]),
+      [["own", false, true], ["repo-guard", true, true]]);
+    assert.ok(existsSync(join(dir, "guard-ran")), "the project entry did not run after the task's own");
+    assert.match(renderProbe(probe), /`repo-guard` \(project `closing_contract`\)/);
+  });
+});
+
+test("POSITIVE CONTROL: a failing project entry turns the probe red, and the own green half is still said", () => {
+  const config = 'closing_contract:\n  - id: repo-guard\n    bash: "exit 3"\n';
+  withBacklog(config, OWN, (dir) => {
+    const probe = probeTask(dir, TASK_FILE(dir));
+    assert.equal(probe.allPassed, false);
+    assert.equal(probe.failed, 1);
+    assert.deepEqual(probe.rows.map((r) => r.ok), [true, false]);
+    assert.match(renderProbe(probe), /Every entry of this task's own passed/);
+  });
+});
+
+test("the probe refuses a shared id before anything runs, as done does", () => {
+  const config = 'closing_contract:\n  - id: own\n    bash: "touch guard-ran"\n';
+  withBacklog(config, OWN, (dir) => {
+    const probe = probeTask(dir, TASK_FILE(dir));
+    assert.deepEqual(probe.rows, []);
+    assert.match(probe.problems.join("\n"), /`id: own`: a verification id is also an id in the project's `closing_contract`/);
+    assert.ok(!existsSync(join(dir, "own-ran")) && !existsSync(join(dir, "guard-ran")), "an entry ran");
+  });
+});
+
+test("the probe appends no project entries to a task with no contract of its own", () => {
+  withBacklog('closing_contract:\n  - id: repo-guard\n    bash: "touch guard-ran"\n', [], (dir) => {
+    const probe = probeTask(dir, TASK_FILE(dir));
+    assert.deepEqual(probe.rows, []);
+    assert.ok(!existsSync(join(dir, "guard-ran")));
+  });
+});
+
+test("take --probe hands over the contract done will run, project entries included", () => {
+  withBacklog('closing_contract:\n  - id: repo-guard\n    bash: "exit 3"\n', OWN, (dir) => {
+    const r = spawnSync(process.execPath, [CLI, "take", "TASK-1", "--probe", "--actor", "agent:test", "--dir", dir],
+      { encoding: "utf8", input: "" });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /1 of 2 entries fails now/);
+    assert.match(r.stdout, /`repo-guard` \(project `closing_contract`\) — \*\*FAILS \(exit 3\)\*\*/);
+  });
+});
+
+test("check --proofs re-runs the project's entries with a proven closing, and holds while they pass", () => {
+  const passing = 'closing_contract:\n  - id: repo-guard\n    bash: "test -f own-ran && touch guard-ran"\n';
+  withBacklog(passing, OWN, (dir) => {
+    assert.equal(done(dir).code, 0);
+    rmSync(join(dir, "own-ran"));
+    rmSync(join(dir, "guard-ran"));
+    const r = checkProofs(dir);
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, /2 verification command\(s\) re-run across 1 proven closing/);
+    assert.ok(existsSync(join(dir, "guard-ran")), "the project entry was not re-run after the task's own");
+  });
+});
+
+test("POSITIVE CONTROL: check --proofs fails a proven closing once a project entry is red", () => {
+  withBacklog('closing_contract:\n  - id: repo-guard\n    bash: "true"\n', OWN, (dir) => {
+    assert.equal(done(dir).code, 0);
+    setContract(dir, 'closing_contract:\n  - id: repo-guard\n    bash: "exit 3"\n');
+    const r = checkProofs(dir);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /TASK-1 .*`exit 3` exits 3/);
+  });
+});
+
+test("check --proofs refuses a shared id as done does, and runs nothing for that closing", () => {
+  withBacklog('closing_contract:\n  - id: repo-guard\n    bash: "true"\n', OWN, (dir) => {
+    assert.equal(done(dir).code, 0);
+    rmSync(join(dir, "own-ran"));
+    setContract(dir, 'closing_contract:\n  - id: own\n    bash: "touch guard-ran"\n');
+    const r = checkProofs(dir);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /TASK-1: a verification id is also an id in the project's `closing_contract`: `id: own`/);
+    assert.ok(!existsSync(join(dir, "own-ran")) && !existsSync(join(dir, "guard-ran")), "an entry ran");
+  });
+});
+
+test("check --proofs judges an open task's falsifiability by its own entries, not a red project entry", () => {
+  withBacklog('closing_contract:\n  - id: repo-guard\n    bash: "exit 3"\n', OWN, (dir) => {
+    const r = checkProofs(dir);
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, /1 open task\(s\) whose whole contract already passes/);
   });
 });
