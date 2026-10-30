@@ -435,6 +435,10 @@ A \`manual:\` entry asks a person to vouch, and records who did. Answer it only
 when you actually hold the evidence it names — the prompt lists what is not
 evidence, and "I checked" is on that list. With no terminal to ask at,
 \`--confirm-manual\` vouches for every manual entry at once, under your actor.
+A vouch typed at the prompt needs an actor somebody STATED — \`--actor\`, the
+actor environment variable, or \`actor:\` in the user config; with none,
+\`{{tool}} done\` refuses before running anything rather than sign a person's
+act with the fallback, and its refusal names all three.
 
 A REFUSAL IS RECORDED TOO (TL-170). Declining, or having nobody to ask, leaves a
 \`__unverified__\` entry in the log naming which entry stopped the run — the task

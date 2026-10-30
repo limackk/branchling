@@ -37,7 +37,8 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { resolveActor } from "./actor.mjs";
+import { ACTOR_ENV, resolveActorSource } from "./actor.mjs";
+import { userConfigPath } from "./home.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { backlogPaths, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { loadConfig, loadConfigOrExit } from "./config.mjs";
@@ -663,6 +664,38 @@ export function manualPrompt(entry, actor) {
   return lines.join("\n");
 }
 
+/**
+ * Would this run ask a person to type `confirm` while nobody has said who that
+ * person is? (TL-460)
+ *
+ * The fallback actor is `agent:claude`, and `scripts/actor.mjs` explains why
+ * that is the right answer for an automated write. It is the wrong one for a
+ * typed vouch: the prompt is reached only with a terminal attached, the entry
+ * exists because a PERSON looked, and `agent:` is the namespace that means
+ * automated and unverified. So the decision is made here, for this act alone —
+ * the default and the resolution order stay what they are for every other
+ * write.
+ *
+ * Only the TYPED path is judged. `--confirm-manual` is a stated act whoever
+ * runs it, `--json` already refuses to ask, and with no terminal nobody is
+ * asked, so in all three the record says what it always said.
+ *
+ * @returns {boolean} true when the run must stop before anything runs
+ */
+export function vouchNeedsStatedActor({ entries, source, confirmManual, json, terminal }) {
+  if (source !== "default" || confirmManual || json || !terminal) return false;
+  return (entries || []).some((e) => e.manual);
+}
+
+/** How to state an actor — the three sources above the fallback, by name. */
+function statedActorOptions(env) {
+  return [
+    "  · `--actor user:<name>` on this command;",
+    "  · `" + ACTOR_ENV + "=user:<name>` in this shell;",
+    "  · `actor: user:<name>` in " + userConfigPath(env) + ", stated once and kept.",
+  ];
+}
+
 // ──────────────────────────────────────────────────────────────────────────
 // The command
 // ──────────────────────────────────────────────────────────────────────────
@@ -718,7 +751,16 @@ function refuse(plan, headline, details, results, reason) {
   return 1;
 }
 
-async function run(argv) {
+/**
+ * @param {string[]} argv
+ * @param {{env?: object, terminal?: boolean, ask?: (prompt: string) => string | null}} io
+ *        injected so a test can stand in for a person at a terminal without
+ *        one, and never resolves the actor of the session running it.
+ */
+async function run(argv, io = {}) {
+  const env = io.env || process.env;
+  const terminal = io.terminal === undefined ? !!process.stdin.isTTY : io.terminal;
+  const ask = io.ask || askLine;
   let plan;
   try {
     plan = parseDoneArgs(argv);
@@ -743,7 +785,7 @@ async function run(argv) {
       [N + " done --help"]));
     return 2;
   }
-  const actor = resolveActor(plan.actor);
+  const { actor, source: actorSource } = resolveActorSource(plan.actor, { env });
   if (!isValidActor(actor)) {
     console.error(
       failure(N + " done", "the actor `" + actor + "` has no valid namespace", [
@@ -884,6 +926,25 @@ async function run(argv) {
     );
   }
 
+  // BEFORE the contract runs, and before anything is written (TL-460). Asking at
+  // the `manual:` entry itself would spend the whole run first, and stopping
+  // there leaves the `__unverified__` record of TL-170 — signed by the very
+  // fallback this refusal exists to keep off a person's act. Nobody was asked
+  // here, so there is no refusal of a vouch to record.
+  if (vouchNeedsStatedActor({ entries, source: actorSource, confirmManual: plan.confirmManual, json: plan.json, terminal })) {
+    return refuse(
+      plan,
+      plan.id + ": a `manual:` entry is vouched for by a person, and nobody said who",
+      [
+        "With no actor stated the vouch would be recorded as " + actor + " — the namespace",
+        "for an automated, unverified write, which is the opposite of what typing `" + CONFIRM_WORD + "`",
+        "means. Nothing was run and nothing was written. State who you are:",
+      ].concat(statedActorOptions(env)),
+      [],
+      "unstated-actor"
+    );
+  }
+
   log(plan.json, "");
   log(plan.json, "  " + plan.id + " — " + entries.length + " verification entr" +
     (entries.length === 1 ? "y" : "ies") + ", run in " + cwd);
@@ -942,7 +1003,7 @@ async function run(argv) {
         return { ok: false };
       }
       if (!confirmed) {
-        const answer = askLine("  type `" + CONFIRM_WORD + "` to vouch, anything else to stop: ");
+        const answer = ask("  type `" + CONFIRM_WORD + "` to vouch, anything else to stop: ");
         confirmed = answer === CONFIRM_WORD;
         if (answer === null) {
           stop = {

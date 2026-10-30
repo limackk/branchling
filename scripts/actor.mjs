@@ -90,15 +90,34 @@ export function userActor(env = process.env) {
  *        an unstated actor comes back unstated.
  */
 export function resolveActor(flag, opts = {}) {
+  return resolveActorSource(flag, opts).actor;
+}
+
+/**
+ * The actor, and WHICH of the four sources named it (TL-460): `flag`, `env`,
+ * `user` or `default`.
+ *
+ * The value alone cannot say whether anybody stated it — `agent:claude` passed
+ * on purpose and `agent:claude` reached by falling through are the same string.
+ * A caller recording a person's act needs the difference: the default is honest
+ * for an automated write and false for a vouch somebody typed by hand. The
+ * order and the default are the ones in the header; this only reports which
+ * rung answered.
+ *
+ * @param {string} flag  the value of `--actor`, or anything falsy
+ * @param {{env?: object, fallback?: string}} opts  as for `resolveActor`
+ * @returns {{actor: string, source: "flag" | "env" | "user" | "default"}}
+ */
+export function resolveActorSource(flag, opts = {}) {
   const env = opts.env || process.env;
   const stated = typeof flag === "string" ? flag.trim() : "";
-  if (stated) return stated;
+  if (stated) return { actor: stated, source: "flag" };
 
   const fromEnv = String(env[ACTOR_ENV] || "").trim();
-  if (fromEnv) return fromEnv;
+  if (fromEnv) return { actor: fromEnv, source: "env" };
 
   const fromUser = userActor(env);
-  if (fromUser) return fromUser;
+  if (fromUser) return { actor: fromUser, source: "user" };
 
-  return opts.fallback === undefined ? DEFAULT_ACTOR : opts.fallback;
+  return { actor: opts.fallback === undefined ? DEFAULT_ACTOR : opts.fallback, source: "default" };
 }
