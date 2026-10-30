@@ -10,8 +10,9 @@
  *   2. THE ANSWER REALLY LIFTS IT, and only the right answer does. A decision
  *      naming another question leaves the task where it is; without that control
  *      a `decide` that unblocked unconditionally would look identical.
- *   3. IT GOES BACK WHERE IT CAME FROM, read from the history rather than
- *      chosen — a task asked about while `in_progress` returns to `in_progress`.
+ *   3. IT GOES BACK TO THE QUEUE, not to `in_progress`: `ask` cleared the
+ *      owner, and an in-progress task claimed by nobody is never handed out
+ *      again (TL-490).
  *   4. NOTHING IS STORED. The task file gains no field; what a later session
  *      reads is rendered at print time from the log.
  */
@@ -115,11 +116,11 @@ test("`next` passes over it and hands out the next task instead", () => {
 
 // ── The answer lifts it, and only the right answer ────────────────────────
 
-test("`decide --resolves` lifts the block and restores the status it came from", () => {
+test("`decide --resolves` lifts the block into the queue, not back into progress", () => {
   const fx = fixture();
   try {
-    // Taken first, so the status it returns to is one the history recorded and
-    // not the only one the vocabulary offers.
+    // Taken first, so the history's own answer would be `in_progress` — the
+    // status the block was entered from, and one nobody holds any more.
     assert.equal(run(["next", "--dir", fx.backlog, "--actor", "agent:w1", "--json"], fx.env).status, 0);
     assert.equal(field(taskText(fx.backlog, fx.ids[0]), "status"), "in_progress");
 
@@ -127,12 +128,12 @@ test("`decide --resolves` lifts the block and restores the status it came from",
     const r = run(["decide", fx.ids[0], "--dir", fx.backlog, "--actor", "user:kamil",
       "--resolves", qid, "--reason", "migrate: the old prefix is not worth the tooling"], fx.env);
     assert.equal(r.status, 0, r.stderr);
-    assert.match(r.stdout, /the block is lifted — blocked . in_progress/);
-    assert.equal(field(taskText(fx.backlog, fx.ids[0]), "status"), "in_progress",
-      "the task did not go back where it came from");
+    assert.match(r.stdout, /the block is lifted — blocked . pending/);
+    assert.equal(field(taskText(fx.backlog, fx.ids[0]), "status"), "pending",
+      "the task went back into progress with nobody holding it");
 
     // The lift is a recorded change with the DECISION as its reason.
-    const rows = history(fx.backlog, fx.ids[0]).filter((e) => e.field === "status" && e.to === "in_progress");
+    const rows = history(fx.backlog, fx.ids[0]).filter((e) => e.field === "status" && e.to === "pending");
     assert.match(rows[rows.length - 1].reason, /migrate: the old prefix/);
     assert.equal(rows[rows.length - 1].actor, "user:kamil");
   } finally {

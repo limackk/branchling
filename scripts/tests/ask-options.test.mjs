@@ -274,7 +274,7 @@ test("`--choose` records the option's TEXT, so the log reads like a typed answer
 test("a chosen answer lifts the block exactly as a typed one does", () => {
   const fx = fixture();
   try {
-    // Taken first, so the status it returns to is one the history recorded.
+    // Taken first, so the lift has an in-progress `from` to refuse (TL-490).
     assert.equal(run(["take", fx.id, "--dir", fx.backlog, "--actor", "agent:worker"], fx.env).status, 0);
     const asked = askWithOptions(fx);
     assert.match(taskText(fx.backlog, fx.id), /^status: blocked/m);
@@ -282,12 +282,12 @@ test("a chosen answer lifts the block exactly as a typed one does", () => {
     const r = run(["decide", fx.id, "--dir", fx.backlog, "--actor", "user:kamil",
       "--resolves", asked.question.id, "--choose", "1"], fx.env);
     assert.equal(r.status, 0, r.stderr);
-    assert.match(taskText(fx.backlog, fx.id), /^status: in_progress/m,
+    assert.match(taskText(fx.backlog, fx.id), /^status: pending/m,
       "answering by number did not lift the block");
     assert.match(r.stdout, /chose option 1 of 2 — the one recommended/);
 
     // The lift carries the CHOSEN SENTENCE as its reason, like any other answer.
-    const rows = history(fx.backlog, fx.id).filter((e) => e.field === "status" && e.to === "in_progress");
+    const rows = history(fx.backlog, fx.id).filter((e) => e.field === "status" && e.to === "pending");
     assert.equal(rows[rows.length - 1].reason, SOLID);
   } finally {
     rmSync(fx.dir, { recursive: true, force: true });

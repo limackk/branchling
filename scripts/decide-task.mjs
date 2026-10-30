@@ -300,7 +300,9 @@ export function decideTask(opts) {
  *
  * WHERE IT GOES BACK TO is read from the history, never chosen: `requeueStatus`
  * finds the `from` of the change that entered the blocking status. Restoring it
- * is undoing a transition, not making one.
+ * is undoing a transition, not making one — except when that `from` is the
+ * in-progress status, which `ask` left with no owner: the task goes to the
+ * queue instead, where `next` can hand it out again (TL-490).
  */
 function liftQuestionBlock(ctx) {
   const { root, config, id, actor, entries, decision, now, paths } = ctx;
