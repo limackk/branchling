@@ -40,8 +40,32 @@ that moment, however many times it was approved before.
 `release.yml` then refuses a tag that does not name the manifest's version or
 has no notes, runs the suite and `branchling check` again, publishes to npm
 with a provenance attestation, and creates the GitHub release from the same
-notes file. The repository secret `NPM_TOKEN` must hold an automation token of
-the npm organization that owns the name.
+notes file.
+
+### The registry credential
+
+The repository secret `NPM_TOKEN` holds the token `npm publish` runs with. npm
+issues only granular access tokens, and the one that publishes from a workflow
+has to satisfy all of these at once:
+
+- it is created by an account that may publish the package — `branchling` is
+  owned by the maintainer's personal account, not by the `branchling` npm
+  organization, so an organization-scoped token does not cover it;
+- it grants **read and write** on the package `branchling`;
+- it **bypasses two-factor authentication**, because a workflow cannot answer a
+  one-time password;
+- the package's *Publishing access* setting allows tokens at all; "require
+  two-factor authentication and disallow tokens" refuses every one of them.
+
+A token that misses any of these fails the same way, after the suite, the
+guards and the provenance signature have already passed:
+
+```text
+npm error 403 403 Forbidden - PUT https://registry.npmjs.org/branchling - You may not perform that action with these credentials.
+```
+
+The message does not say which condition failed. v0.2.0 met it twice before
+the third token published.
 
 ## After the workflow
 
@@ -60,6 +84,19 @@ entry of TL-455's contract, and it is a person's check: what a stranger sees is
 not something the repository can measure about itself.
 
 ## When a release goes wrong
+
+A run that failed before `npm publish` succeeded has published nothing, and
+the tag is still right. Fix the cause — for an E403, replace the secret — and
+rerun the failed job against the same tag:
+
+```bash
+gh run rerun <run-id> --failed
+```
+
+Moving or recreating the tag would make the signed tag name something other
+than what it named when it was pushed. A rerun signs one more provenance
+statement into the transparency log; that is harmless, because only the
+statement of the publish that succeeds is attached to the version.
 
 A published version cannot be reused. A broken release is fixed by the next
 patch version, never by deleting and republishing the same number; `npm

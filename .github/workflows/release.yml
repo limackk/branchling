@@ -7,10 +7,11 @@ name: release
 # to this workflow run, and the steps below refuse a tag that the tree does not
 # back: a version that disagrees with package.json, or a version with no notes.
 #
-# The registry credential is the repository secret NPM_TOKEN, an automation
-# token of the npm organization that owns the name. The process around this
-# file, including what a person does before pushing the tag, is
-# docs/releasing.md.
+# The registry credential is the repository secret NPM_TOKEN; which token can
+# publish, and what an E403 at the publish step means, is described in
+# docs/releasing.md rather than here, so the two cannot drift apart. That
+# document is also the process around this file, including what a person does
+# before pushing the tag.
 
 on:
   push:
