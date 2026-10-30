@@ -199,6 +199,24 @@ export function contractProblem(entries, problems) {
 }
 
 /**
+ * The task's contract followed by the project's `closing_contract` (TL-493).
+ *
+ * APPENDED, not prepended: the task's own entries are the cheaper, narrower
+ * question, and a module test that fails should say so before a repository-wide
+ * guard spends its minutes. An id the two share is returned as a collision
+ * rather than resolved, because which entry a `[proof: id]` meant is a decision
+ * only the author of the task can make.
+ *
+ * @returns {{entries: Array<object>, collisions: string[]}}
+ */
+export function withClosingContract(entries, closing) {
+  const project = (closing || []).map((e) => ({ ...e, project: true }));
+  const own = new Set(entries.filter((e) => e.id).map((e) => e.id));
+  const collisions = project.filter((e) => e.id && own.has(e.id)).map((e) => e.id);
+  return { entries: entries.concat(project), collisions };
+}
+
+/**
  * Literal repository-relative JavaScript files passed to `node --test`.
  *
  * This is deliberately not a shell parser. Only a plain path has one certain
@@ -753,7 +771,7 @@ async function run(argv) {
   // An actual `done` keeps refusing here — a moved tree must not be closed a
   // second time merely because its old contract still happens to pass.
 
-  const { entries, problems } = parseVerification(frontmatter);
+  let { entries, problems } = parseVerification(frontmatter);
   const contract = contractProblem(entries, problems);
   if (contract) {
     // TWO DEFECTS, TWO DIAGNOSES (TL-173). "has no closing contract" is the
@@ -773,6 +791,20 @@ async function run(argv) {
     }
     return refuse(plan, plan.id + " has no closing contract", contract.split("\n"), [], "no-contract");
   }
+
+  // AFTER the task's own contract is judged, never in place of it: a task with
+  // no `verification:` is still a task nobody finished writing, however many
+  // project entries would run for it.
+  const merged = withClosingContract(entries, config.closingContract);
+  if (merged.collisions.length) {
+    return refuse(plan, plan.id + ": a verification id is also an id in the project's `closing_contract`",
+      merged.collisions.map((id) => "`id: " + id + "`").concat([
+        "",
+        "A proof id names ONE entry, and a criterion pointing at it would be ambiguous.",
+        "Rename the task's entry; nothing was run and the file is untouched.",
+      ]), [], "closing-contract-collision");
+  }
+  entries = merged.entries;
 
   const cwd = repoRootFor(root);
   const missingTest = missingNodeTestFile(entries, cwd);
@@ -830,7 +862,10 @@ async function run(argv) {
   // the transcript is the answer. `--verbose` streams everything as it runs,
   // for the person watching a slow contract who wants to see it move.
   const capture = plan.json || !plan.verbose;
-  const tagOf = (e, i) => "  " + (i + 1) + "/" + entries.length + "  " + (e.id ? e.id + "  " : "");
+  // A project entry is named as one, so a red line nobody wrote into the task
+  // file is not hunted for there.
+  const tagOf = (e, i) => "  " + (i + 1) + "/" + entries.length + "  " +
+    (e.project ? "closing_contract  " : "") + (e.id ? e.id + "  " : "");
   let stop = null;
   const { results, failed } = await runContract(entries, cwd, {
     capture,

@@ -58,7 +58,9 @@ import {
 } from "./task-input.mjs";
 import { backlogPaths, looksLikeBacklogDir, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
-import { buildFieldSpecs, fieldSpec, setFrontmatterField } from "./task-fields.mjs";
+import { editPlanTextMany, newPlanErrors, waveTargetProblem } from "./plan-write.mjs";
+import { buildFieldSpecs, fieldSpec, normalizeValue, setFrontmatterField } from "./task-fields.mjs";
+import { readTaskMetas } from "./task-io.mjs";
 import { DEFAULT_TASK_ID_PREFIX, detectPrefixMismatch, prefixMismatchMessage } from "./task-id.mjs";
 import { MARK, color, failure } from "./ui.mjs";
 
@@ -90,7 +92,14 @@ const TOP_KEYS = ["planVersion", "meta", "tasks"];
 const ITEM_KEYS = [
   "plan_id", "title", "goal", "context", "steps", "blocked_by",
   "verification", "estimate", "priority",
+  "epic", "role", "executor", "labels", "related_docs", "wave",
 ];
+
+/** Frontmatter fields a plan item may set, judged by the field's own spec from
+ *  `task-fields.mjs` (TL-493). Seeding a module's tasks without them meant a
+ *  hand edit of every file afterwards, which is what `seed` exists to remove. */
+const SCALAR_FIELDS = ["epic", "role", "executor"];
+const LIST_FIELDS = ["labels", "related_docs"];
 
 /** A local key. Deliberately not the shape of a task id: `plan_id` must be
  *  impossible to confuse with `TL-1234`, so that a plan naming a real id reads
@@ -258,8 +267,15 @@ export function validateItems(items) {
     if (!isNonEmptyString(item.goal)) {
       errors.push(at + ": `goal` is required — a task whose reason for existing is not written down cannot be picked up by anybody else");
     }
-    for (const key of ["context", "estimate", "priority"]) {
+    for (const key of ["context", "estimate", "priority", "wave"].concat(SCALAR_FIELDS)) {
       if (item[key] !== undefined && !isNonEmptyString(item[key])) errors.push(at + ": `" + key + "` must be a non-empty string when given");
+    }
+    for (const key of LIST_FIELDS) {
+      if (item[key] === undefined) continue;
+      if (!Array.isArray(item[key])) errors.push(at + ": `" + key + "` must be an array of strings");
+      else item[key].forEach((s, j) => {
+        if (!isNonEmptyString(s)) errors.push(at + ": `" + key + "[" + j + "]` is not a non-empty string");
+      });
     }
     if (item.steps !== undefined) {
       if (!Array.isArray(item.steps)) errors.push(at + ": `steps` must be an array of strings");
@@ -517,6 +533,7 @@ function seedFromText(input, cli, opts) {
   // Values the plan borrows from THIS project's vocabulary — checkable only now
   // that the configuration is known, and still before any task is written.
   const vocabulary = [];
+  const specs = buildFieldSpecs(config);
   for (const [i, item] of plan.tasks.entries()) {
     if (item.priority && config.priorities.length && config.priorities.indexOf(item.priority) < 0) {
       vocabulary.push(
@@ -524,6 +541,22 @@ function seedFromText(input, cli, opts) {
           config.priorities.join(" | ") + ")"
       );
     }
+    // The judgement every other writer of a frontmatter field uses, so a role
+    // outside `roles:` or a label outside a closed `labels:` is refused here in
+    // the words `set` would use — and before a number is reserved, rather than
+    // by the template check in `createTask` after half the plan is written.
+    for (const key of SCALAR_FIELDS.concat(LIST_FIELDS)) {
+      if (item[key] === undefined) continue;
+      const judged = normalizeValue(key, item[key], { fields: specs });
+      if (!judged.ok) vocabulary.push(where(i, item) + ": `" + key + "`: " + judged.error);
+    }
+  }
+  // The waves are checked as `new --wave` checks them, by the same function:
+  // a wave named by a typo would schedule a task nowhere anybody is reading.
+  const waves = [...new Set(plan.tasks.map((item) => item.wave).filter(Boolean))];
+  if (waves.length) {
+    const target = waveTargetProblem(paths.planPath, waves, "wave");
+    if (target.problem) vocabulary.push(target.problem + " — " + target.hint);
   }
   if (vocabulary.length) return refused(vocabulary, opts.json);
 
@@ -568,7 +601,8 @@ function seedFromText(input, cli, opts) {
   if (initialised) console.log("  the backlog was created here first (`" + N + " init`)");
   for (const w of written) {
     const blockers = (w.item.blocked_by || []).map((ref) => idFor(written, ref)).filter(Boolean);
-    console.log("  " + color.id(w.id) + "  " + w.title + (blockers.length ? "  " + MARK.arrow + " after " + blockers.join(", ") : ""));
+    console.log("  " + color.id(w.id) + "  " + w.title + (blockers.length ? "  " + MARK.arrow + " after " + blockers.join(", ") : "") +
+      (w.item.wave ? "  (wave: " + w.item.wave + ")" : ""));
   }
   if (built.status !== 0) console.log("  WARNING: could not rebuild the views — run `" + N + " build`");
   console.log("  next: `" + N + " next --actor <ns:name>` hands out the first task nothing blocks");
@@ -601,6 +635,11 @@ export function writePlan({ root, config, board, plan, createOne = createTask })
           title: item.title,
           priority: item.priority || undefined,
           estimate: item.estimate || undefined,
+          epic: item.epic || undefined,
+          role: item.role || undefined,
+          executor: item.executor || undefined,
+          labels: item.labels,
+          related_docs: item.related_docs,
           verification: content.verification,
         },
         body: content.body,
@@ -608,6 +647,7 @@ export function writePlan({ root, config, board, plan, createOne = createTask })
       written.push({ planId: item.plan_id, id: created.taskId, file: created.path, title: item.title, item });
     }
     linkDependencies(plan, written, config);
+    schedule(root, config, written);
   } catch (e) {
     for (const w of written) {
       try { unlinkSync(w.file); } catch { /* already gone — nothing to undo */ }
@@ -616,6 +656,31 @@ export function writePlan({ root, config, board, plan, createOne = createTask })
     throw e;
   }
   return written;
+}
+
+/**
+ * Every `wave` of the plan, written to `plan.yaml` as ONE edit, LAST.
+ *
+ * Inside the writing pass rather than after it, because the plan guard judges
+ * the order against `blocked_by` — a task scheduled before the task it waits
+ * for is an order nobody can execute — and that is knowable only once the
+ * dependencies are on disk. A refusal here throws, and the task files this run
+ * created are removed with the plan untouched: the same one act `new --wave`
+ * is, for a whole plan.
+ */
+function schedule(root, config, written) {
+  const specs = written.filter((w) => w.item.wave).map((w) => ({ op: "add", id: w.id, wave: w.item.wave }));
+  if (!specs.length) return;
+  const { planPath, tasksDir } = backlogPaths(root);
+  const before = readFileSync(planPath, "utf8");
+  const edit = editPlanTextMany(before, specs);
+  const problems = edit.problems.length
+    ? edit.problems
+    : newPlanErrors(before, edit.text, readTaskMetas(tasksDir, config), config);
+  if (problems.length) {
+    throw new Error("the plan's waves cannot be scheduled in " + planPath + ": " + problems.join("; "));
+  }
+  writeFileSync(planPath, edit.text, "utf8");
 }
 
 /** The allocated id for a plan key. */
@@ -707,7 +772,8 @@ function reportDryRun(plan, { root, prefix, firstId, json, fresh }) {
   if (fresh) console.log("  this directory is not a backlog yet — `" + N + " init` would create it first");
   for (const item of plan.tasks) {
     const after = (item.blocked_by || []).map((ref) => ids.get(ref)).filter(Boolean);
-    console.log("  " + color.id(ids.get(item.plan_id)) + "  " + item.title + (after.length ? "  " + MARK.arrow + " after " + after.join(", ") : ""));
+    console.log("  " + color.id(ids.get(item.plan_id)) + "  " + item.title + (after.length ? "  " + MARK.arrow + " after " + after.join(", ") : "") +
+      (item.wave ? "  (wave: " + item.wave + ")" : ""));
   }
   console.log("  the numbers are PROVISIONAL — nothing is reserved, so a session allocating in between moves them");
   return 0;

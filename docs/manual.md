@@ -97,6 +97,22 @@ Three things it deliberately does:
   server, not the editor hook. A task arriving in a pull request carries a shell
   command, and it runs only when a person deliberately closes that task.
 
+**A project contract runs after every task's own.** `closing_contract:` in
+`config.yaml` holds entries of the same shape as `verification:`, and `done`
+appends them to each task's contract — for the repository-wide guard a module's
+tests never reach, stated once instead of in every task file:
+
+```yaml
+closing_contract:
+  - id: repo-guards
+    bash: "npm run check"
+```
+
+It never stands in for a task's own contract: a task with an empty
+`verification:` is still refused. An `id` a task's own entry also uses refuses
+that closing before anything runs, because a `[proof: id]` naming it would be
+ambiguous.
+
 **The limit, stated rather than left to be discovered.** A task file is a text
 file and anybody can set `status: done` in an editor. This gate raises the *cost*
 of a lie — it does not make one impossible, and there is no `--force` flag,
@@ -346,6 +362,12 @@ my-planner spec.md | branchling seed --dir ./backlog --json
 | `verification` | required | non-empty; a command string, or `{ "id", "bash" \| "manual", "proves" }` |
 | `estimate` | optional | free text, e.g. `"2h"` |
 | `priority` | optional | a value from *your* `config.yaml` |
+| `epic` | optional | free text, the group the task counts towards |
+| `role` | optional | a value from *your* `roles:` |
+| `executor` | optional | `human` or `agent` |
+| `labels` | optional | array; under `labels_closed: true`, values from *your* `labels:` |
+| `related_docs` | optional | array of paths relative to the repository root |
+| `wave` | optional | an existing wave of `plan.yaml`; the task is scheduled there as `new --wave` does, and an order the plan guard rejects rolls the whole seed back |
 
 `proves` becomes the acceptance criterion that points back at the entry, so a
 seeded task already has the criterion→proof link `check --criteria` asks for. An

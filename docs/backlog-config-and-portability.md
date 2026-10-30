@@ -90,6 +90,7 @@ does not know it is two files. No `config.yaml` = generic `DEFAULTS` (no
 | `status_colors`, `priority_colors`, `label_colors`, `status_strikethrough` | presentation; no entry = a color from the cyclic palette |
 | `dashboard_open_statuses`, `dashboard_burndown_kind/value` | what "open" means and what the burndown burns down |
 | `contract_programs` | additional bare executable names a verification contract may invoke when their subcommands overlap this tool's commands; values add to the generic defaults rather than replacing them |
+| `closing_contract` | verification entries `done` appends to every task's own contract and runs after it — the shape of a task's `verification:` entries (`- id:` then `bash:` or `manual:`). For the repository-wide guard a module's tests do not reach. It never stands in for a missing task contract, and an id a task's own entry also uses refuses that closing before anything runs |
 
 `roles` is the only vocabulary whose EMPTY value means something. Every other
 enum with no vocabulary degrades, in `buildFieldSpecs`, to free text — a

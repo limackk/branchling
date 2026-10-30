@@ -26,7 +26,7 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -34,8 +34,7 @@ import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { recordCreation } from "./history.mjs";
 import { withBacklogMutex } from "./lock.mjs";
-import { parsePlanYaml } from "./plan.mjs";
-import { editPlanText, newPlanErrors } from "./plan-write.mjs";
+import { editPlanText, newPlanErrors, waveTargetProblem } from "./plan-write.mjs";
 import { detectPrefixMismatch, prefixMismatchMessage, taskIdPatterns } from "./task-id.mjs";
 import { backlogPaths, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { auditVocabulary, extractMeta, splitFrontmatter } from "./task-fields.mjs";
@@ -355,8 +354,9 @@ function createTaskUnlocked({ root, config, board, slug, fields, body }) {
     .replace(/^updated: .*$/m, "updated: " + day);
   // `role` joins the scalar fields rather than getting a branch of its own: it
   // is one more enum from the configuration, and `docs-drift --seed-tasks`
-  // (TL-100) is the first caller that has to set it programmatically.
-  for (const key of ["priority", "status", "type", "estimate", "owner", "role"]) {
+  // (TL-100) is the first caller that has to set it programmatically. `executor`
+  // is the same kind of field, and `seed` (TL-493) the caller that sets it.
+  for (const key of ["priority", "status", "type", "estimate", "owner", "role", "executor"]) {
     if (opts[key]) text = text.replace(new RegExp("^" + key + ": .*$", "m"), key + ": " + opts[key]);
   }
   if (opts.epic) text = text.replace(/^epic: .*$/m, "epic: " + quoted(opts.epic));
@@ -554,23 +554,9 @@ export async function main(argv) {
   // argument and this command has nowhere to ask for one.
   let scheduling = null;
   if (opts.wave) {
-    if (!existsSync(paths.planPath)) {
-      return fail("`--wave` was given and this backlog has no plan to schedule into",
-        "expected: " + paths.planPath + " — the execution order is an optional decision, and this backlog has not made it");
-    }
-    const text = readFileSync(paths.planPath, "utf8");
-    const read = parsePlanYaml(text);
-    if (read.problems.length) {
-      return fail("the plan cannot be read, so nothing can be scheduled in it",
-        paths.planPath + ": " + read.problems[0]);
-    }
-    const waves = read.plan.waves.map((w) => w.name);
-    if (waves.indexOf(opts.wave) < 0) {
-      return fail("there is no wave `" + opts.wave + "` in " + paths.planPath,
-        (waves.length ? "the waves it has: " + waves.join(" | ") : "the plan has no waves yet") +
-          ` — a wave is created by \`${N} plan add <ID> --wave "…" --why "…"\`, never by a typo here`);
-    }
-    scheduling = { text };
+    const target = waveTargetProblem(paths.planPath, [opts.wave]);
+    if (target.problem) return fail(target.problem, target.hint);
+    scheduling = { text: target.text };
   }
 
   const pat = taskIdPatterns(config.taskIdPrefix);

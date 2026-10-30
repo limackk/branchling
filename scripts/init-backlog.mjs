@@ -107,6 +107,12 @@ contract_capability: report
 # defaults (git, npm, cargo, docker and peers); do not restate the defaults just
 # to admit one project-specific program. Bare program names only, never paths.
 contract_programs: []
+
+# [free] Verification entries \`done\` appends to EVERY task's own contract, in
+# the shape of a task's \`verification:\` entries (\`- id:\` then \`bash:\` or
+# \`manual:\`). For the repository-wide guard a module's own tests do not run.
+# An id here that a task's own entry also uses refuses that closing.
+closing_contract: []
 types: [task]                      # [tree]
 
 # [tree] Labels. \`labels_closed: true\` turns a typo into a build error instead

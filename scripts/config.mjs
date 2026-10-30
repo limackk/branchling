@@ -38,7 +38,7 @@ import { backlogPaths } from "./paths.mjs";
 import { PRODUCT_NAME } from "./product.mjs";
 import { DEFAULT_TASK_ID_PREFIX, PREFIX_SHAPE, inferPrefix, taskIdPatterns } from "./task-id.mjs";
 import { ACTOR_NAMESPACES, CONFLICT_GROUP_SOURCES, ROLE_SHAPE, isValidActor, unquote } from "./task-fields.mjs";
-import { LINK_POLICIES } from "./criteria.mjs";
+import { LINK_POLICIES, parseVerification } from "./criteria.mjs";
 import { DEFAULT_LOCK_TTL_MINUTES } from "./lock.mjs";
 import { estimateHours } from "./estimate.mjs";
 import { USER_KEYS, loadUserConfig } from "./home.mjs";
@@ -120,6 +120,12 @@ export const DEFAULTS = Object.freeze({
   contract_programs: Object.freeze([
     "git", "npm", "npx", "pnpm", "yarn", "cargo", "docker", "gh", "go", "pip", "brew", "make",
   ]),
+  // Verification entries `done` appends to EVERY task's own contract (TL-493),
+  // in the shape a task's `verification:` entries have. A module's tests can be
+  // green while a repository-wide guard fails after the merge; a project states
+  // that guard once here rather than in every task file. Empty — the default —
+  // adds nothing.
+  closing_contract: Object.freeze([]),
   // Which statuses may not be entered without a stated reason (TL-105). A
   // VOCABULARY, so it belongs here and not in the code: `blocked` and
   // `cancelled` are this project's words, and a list of literals in a script
@@ -326,6 +332,25 @@ function nearestKey(key) {
 }
 
 /**
+ * `closing_contract:` — a list of verification entries, the one key whose items
+ * are objects rather than scalars.
+ *
+ * READ BY THE TASK'S OWN PARSER. The block is handed to `parseVerification`
+ * under the header it reads, so an entry here has exactly the shape, the keys
+ * and the refusals of an entry in a task file; a second reader of that shape
+ * would let the two contracts drift apart in what they accept.
+ */
+function readClosingContract(inline, rawBody, problems) {
+  if (inline && inline !== "[]") {
+    problems.push("closing_contract: expecting a block list of verification entries or `[]`, got `" + inline + "`");
+    return [];
+  }
+  const parsed = parseVerification("verification:\n" + rawBody.join("\n"));
+  for (const p of parsed.problems) problems.push("closing_contract: " + p.replace(/^verification: /, ""));
+  return Object.freeze(parsed.entries.map((e) => Object.freeze({ id: e.id, bash: e.bash, manual: e.manual })));
+}
+
+/**
  * @returns {{values: Record<string, unknown>, problems: string[]}}
  */
 export function parseConfigYaml(text) {
@@ -368,6 +393,12 @@ export function parseConfigYaml(text) {
       if (!next.trim()) continue;
       if (!/^\s/.test(next)) break;
       body.push(next.trim());
+    }
+
+    if (key === "closing_contract") {
+      values[key] = readClosingContract(inline, lines.slice(i + 1, j), problems);
+      i = j - 1;
+      continue;
     }
 
     if (MAP_KEYS.has(key)) {
@@ -670,6 +701,7 @@ export function loadConfig(root, opts = {}) {
     contractPrograms: Object.freeze([
       ...new Set([...DEFAULTS.contract_programs, ...(parsedValues.contract_programs || [])]),
     ]),
+    closingContract: values.closing_contract,
     // Resolved here rather than in DEFAULTS, because the fallback is another
     // key's value and DEFAULTS is a flat literal.
     reasonRequiredStatuses: values.reason_required_statuses || values.archived_statuses,

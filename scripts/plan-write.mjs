@@ -408,6 +408,74 @@ export function editPlanText(text, spec = {}) {
 }
 
 /**
+ * SEVERAL edits as ONE (TL-493). PURE, and all-or-nothing in the same sense as
+ * `editPlanText`: the first refusal returns the input byte for byte, with the
+ * problem prefixed by the id it concerns, so a caller never holds a text in
+ * which half of the ids moved.
+ *
+ * Each edit is applied to the result of the one before it, which is what makes
+ * the second id of a new wave join the wave the first one created.
+ *
+ * @param {string} text the file as it stands
+ * @param {Array<object>} specs `editPlanText` specs, in order
+ * @returns {{text: string, problems: string[], kind: "usage"|"state"|null}}
+ */
+export function editPlanTextMany(text, specs) {
+  const src = String(text == null ? "" : text);
+  let next = src;
+  for (const spec of specs) {
+    const edit = editPlanText(next, spec);
+    if (edit.problems.length) {
+      // Named only when there is more than one id to tell apart; a single edit
+      // keeps `editPlanText`'s wording exactly.
+      const [head, ...rest] = edit.problems;
+      const who = specs.length > 1 ? String(spec.id == null ? "" : spec.id).trim() : "";
+      return { text: src, problems: [(who ? who + ": " : "") + head].concat(rest), kind: edit.kind };
+    }
+    next = edit.text;
+  }
+  return { text: next, problems: [], kind: null };
+}
+
+/**
+ * Can a task be scheduled into these waves of the plan at `planPath`? The check
+ * `new --wave` makes BEFORE a number is reserved (TL-213), shared with `seed`
+ * so a wave named by a typo is refused in the same words by both.
+ *
+ * @returns {{text: string|null, problem: string|null, hint: string|null}}
+ *          `text` is the plan as read, for the edit that follows the write
+ */
+export function waveTargetProblem(planPath, waveNames, flag = "--wave") {
+  if (!existsSync(planPath)) {
+    return {
+      text: null,
+      problem: "`" + flag + "` was given and this backlog has no plan to schedule into",
+      hint: "expected: " + planPath + " — the execution order is an optional decision, and this backlog has not made it",
+    };
+  }
+  const text = readFileSync(planPath, "utf8");
+  const read = parsePlanYaml(text);
+  if (read.problems.length) {
+    return {
+      text: null,
+      problem: "the plan cannot be read, so nothing can be scheduled in it",
+      hint: planPath + ": " + read.problems[0],
+    };
+  }
+  const waves = read.plan.waves.map((w) => w.name);
+  for (const wave of waveNames) {
+    if (waves.indexOf(wave) >= 0) continue;
+    return {
+      text: null,
+      problem: "there is no wave `" + wave + "` in " + planPath,
+      hint: (waves.length ? "the waves it has: " + waves.join(" | ") : "the plan has no waves yet") +
+        " — a wave is created by `" + N + " plan add <ID> --wave \"…\" --why \"…\"`, never by a typo here",
+    };
+  }
+  return { text, problem: null, hint: null };
+}
+
+/**
  * The errors this edit would ADD, in the guard's own words.
  *
  * WHY THE DIFFERENCE AND NOT THE VERDICT. A plan can already be in error — a
@@ -490,15 +558,23 @@ export function runPlanEdit(op, argv) {
   const cli = takeDirFlag(argv);
   const parsed = parseEditArgs(cli.argv);
   const usage = [
-    "usage: " + N + " plan add <ID> --wave \"<name>\" [--why \"<sentence>\"]",
+    "usage: " + N + " plan add <ID>... --wave \"<name>\" [--why \"<sentence>\"]",
     "       " + N + " plan move <ID> --wave \"<name>\" [--why \"<sentence>\"]",
     "       " + N + " plan remove <ID>",
   ];
   if (parsed.error) return fail(command, parsed.error, usage, [N + " plan --help"]);
-  if (parsed.ids.length !== 1) {
-    return fail(command, "one task id, and this names " + (parsed.ids.length || "none"), usage, [N + " plan --help"]);
+  // SEVERAL IDS ONLY FOR `add` (TL-493). Seeding a module schedules dozens of
+  // new tasks into one wave, and one call per id was dozens of diffs of the
+  // same file. `move` and `remove` stay one id: each is a decision about where
+  // ONE task stands, and a batch of them is a rewrite of the order that belongs
+  // in a hand edit somebody reviews.
+  if (!parsed.ids.length || (op !== "add" && parsed.ids.length !== 1)) {
+    return fail(command, (op === "add" ? "at least one task id" : "one task id") +
+      ", and this names " + (parsed.ids.length || "none"), usage, [N + " plan --help"]);
   }
-  const id = parsed.ids[0];
+  const ids = parsed.ids;
+  const twice = ids.find((x, i) => ids.indexOf(x) !== i);
+  if (twice) return fail(command, twice + " is named twice in one call", usage, [N + " plan --help"]);
 
   const root = resolveBacklogDirOrExit({ dir: cli.dir, moduleDir: HERE }, command).root;
   const config = loadConfigOrExit(root);
@@ -518,18 +594,26 @@ export function runPlanEdit(op, argv) {
   // refused rather than written into a wave — `check --plan` would report it a
   // moment later. `remove` is exempt on purpose: an id whose task is gone is
   // precisely what a removal repairs.
-  if (op !== "remove" && !tasks.some((t) => t.id === id)) {
-    return fail(command, id + " is not a task in this backlog", [
+  const unknown = op === "remove" ? [] : ids.filter((x) => !tasks.some((t) => t.id === x));
+  if (unknown.length) {
+    return fail(command, unknown.join(", ") + (unknown.length === 1 ? " is not a task" : " are not tasks") +
+      " in this backlog", [
       "read from " + paths.tasksDir,
       "The plan schedules work; a wave naming an id nothing in the tree carries is a defect,",
-      "not a placeholder.",
+      "not a placeholder." + (ids.length > 1 ? " Nothing was scheduled." : ""),
     ], [N + " new --title \"…\""], 1);
   }
 
-  const edit = editPlanText(before, { op, id, wave: parsed.values.wave, why: parsed.values.why });
+  // `--why` creates the wave, so it travels with the FIRST id only; the ids
+  // after it join the wave that edit made.
+  const edit = editPlanTextMany(before, ids.map((id, i) => ({
+    op, id, wave: parsed.values.wave, why: i === 0 ? parsed.values.why : undefined,
+  })));
   if (edit.problems.length) {
     const [head, ...rest] = edit.problems;
-    console.error(failure(command, head, rest, [N + " plan --help"]));
+    console.error(failure(command, head,
+      rest.concat(ids.length > 1 ? ["nothing was scheduled — one refused id refuses the whole call"] : []),
+      [N + " plan --help"]));
     return edit.kind === "usage" ? 2 : 1;
   }
 
@@ -542,13 +626,15 @@ export function runPlanEdit(op, argv) {
 
   writeFileSync(paths.planPath, edit.text, "utf8");
   const plan = parsePlanYaml(edit.text).plan;
-  const at = plan.waves.findIndex((w) => w.tasks.indexOf(id) >= 0);
-  printLine(
-    color.ok(MARK.ok) + " plan: " +
-      (op === "remove"
-        ? id + " is no longer scheduled"
-        : id + (op === "add" ? " is scheduled in" : " moved to") + " wave " + waveLabel(plan, at))
-  );
+  for (const id of ids) {
+    const at = plan.waves.findIndex((w) => w.tasks.indexOf(id) >= 0);
+    printLine(
+      color.ok(MARK.ok) + " plan: " +
+        (op === "remove"
+          ? id + " is no longer scheduled"
+          : id + (op === "add" ? " is scheduled in" : " moved to") + " wave " + waveLabel(plan, at))
+    );
+  }
   if (parsed.values.why) printLine("  the wave was created, with your sentence above it");
   printLine("  " + paths.planPath + " — the change is the diff of this one file, and of nothing else");
   return 0;
