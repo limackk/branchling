@@ -43,6 +43,7 @@ import { DEFAULT_LOCK_TTL_MINUTES } from "./lock.mjs";
 import { estimateHours } from "./estimate.mjs";
 import { USER_KEYS, loadUserConfig } from "./home.mjs";
 import { readDeployTargets } from "./deploy-targets.mjs";
+import { GAP_NAMES, RELEASE_GATE_MODES } from "./release-gaps.mjs";
 
 // ──────────────────────────────────────────────────────────────────────────
 // Default values — generic, for a fresh repository
@@ -133,6 +134,15 @@ export const DEFAULTS = Object.freeze({
   // environments and nothing that reads deployment state has anything to say.
   // The shape is validated by `scripts/deploy-targets.mjs`.
   deploy_targets: Object.freeze([]),
+  // How hard `check --release` judges a gap in release traceability (TL-503),
+  // mirroring `contract_capability`: `report` prints the gaps and exits 0,
+  // `require` exits non-zero on any gap `release_gate_accept` does not name.
+  // `report` is the default by the owner's decision of 2026-11-01 — a blocking
+  // default would fail every repository whose version-bump commits carry no id.
+  release_gate: "report",
+  // Gap names (`GAP_NAMES` in release-gaps.mjs) this project knowingly accepts.
+  // An accepted gap is still printed; it only stops blocking under `require`.
+  release_gate_accept: Object.freeze([]),
   // Which statuses may not be entered without a stated reason (TL-105). A
   // VOCABULARY, so it belongs here and not in the code: `blocked` and
   // `cancelled` are this project's words, and a list of literals in a script
@@ -281,7 +291,7 @@ const LIST_KEYS = new Set([
   "statuses", "archived_statuses", "priorities", "types", "confidence",
   "labels", "label_axis_timing", "label_axis_env", "owners", "estimates", "actors", "roles",
   "dashboard_open_statuses", "status_strikethrough", "reason_required_statuses",
-  "docs_status_pending_patterns", "contract_programs",
+  "docs_status_pending_patterns", "contract_programs", "release_gate_accept",
 ]);
 const MAP_KEYS = new Set(["epic_aliases", "status_colors", "priority_colors", "label_colors"]);
 const NUMBER_KEYS = new Set([
@@ -720,6 +730,8 @@ export function loadConfig(root, opts = {}) {
     // Normalised by the reader: every stage carries `refs`, even one written
     // with `ref:`. Read by `scripts/environments.mjs`.
     deployTargets: values.deploy_targets,
+    releaseGate: values.release_gate,
+    releaseGateAccept: values.release_gate_accept,
     // Resolved here rather than in DEFAULTS, because the fallback is another
     // key's value and DEFAULTS is a flat literal.
     reasonRequiredStatuses: values.reason_required_statuses || values.archived_statuses,
@@ -784,6 +796,18 @@ export function validateConfig(config) {
     problems.push(
       "`contract_capability` = `" + config.contractCapability + "` — expecting one of: report, require"
     );
+  }
+  if (RELEASE_GATE_MODES.indexOf(config.releaseGate) < 0) {
+    problems.push(
+      "`release_gate` = `" + config.releaseGate + "` — expecting one of: " + RELEASE_GATE_MODES.join(", ")
+    );
+  }
+  for (const gap of config.releaseGateAccept || []) {
+    if (GAP_NAMES.indexOf(gap) < 0) {
+      problems.push(
+        "`release_gate_accept` contains `" + gap + "` — expecting gap names from: " + GAP_NAMES.join(", ")
+      );
+    }
   }
   for (const program of config.contractPrograms || []) {
     if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(String(program))) {

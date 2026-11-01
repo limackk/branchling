@@ -43,6 +43,7 @@
  *   stageMatches(task, selector)   `full` / `not-full` / `unknown` / `none` for `--env`
  *   parseStageSelector(text, targets)  `stage` or `target/stage`, validated
  *   explain(reason)                why an empty answer is empty
+ *   defaultTrunk(root)             the remote default branch, else `HEAD`
  *
  * Tests: `node --test scripts/tests/environments.test.mjs`
  */
@@ -126,6 +127,29 @@ export function resolveRef({ root, spec, run = spawnSync }) {
   const sha = r.status === 0 ? String(r.stdout || "").trim() : "";
   if (!sha) return { spec, ref: name === spec ? null : name, sha: null, status: "unknown", why: "the ref does not resolve to a commit" };
   return { spec, ref: name, sha, status: "resolved", why: null };
+}
+
+/**
+ * The trunk a repository-wide question should be asked against: the remote's
+ * default branch when the clone knows it, otherwise `HEAD`.
+ *
+ * WHY NOT `HEAD` ALONE. `deploymentState()` defaults to `HEAD`, which is right
+ * for "what has THIS branch reached" and wrong for "was this finished work ever
+ * merged": run on a feature branch, `HEAD` holds that branch's own commits, so
+ * a task closed there and never merged would read as being on the trunk. The
+ * remote default is what a clone records as the line everybody merges into.
+ * `source` says which one was used, because a report built on a fallback has
+ * to be able to say so.
+ *
+ * @returns {{spec: string, source: "remote-default"|"head"}}
+ */
+export function defaultTrunk(root, run = spawnSync) {
+  if (root) {
+    const r = git(run, root, ["symbolic-ref", "--quiet", "refs/remotes/origin/HEAD"]);
+    const spec = r && r.status === 0 ? String(r.stdout || "").trim() : "";
+    if (spec) return { spec, source: "remote-default" };
+  }
+  return { spec: "HEAD", source: "head" };
 }
 
 function combine(states) {

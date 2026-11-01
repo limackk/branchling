@@ -151,10 +151,14 @@ inspectable. A CI step or a person calls it; the tool never polls (TL-506).
 
 ## 7. The gaps the gate refuses
 
-The planned release mode of `check` (TL-503), run by CI before a promotion,
-fails on: a deployed commit naming no task; a deployed task that is still open; a
+The release mode of `check` (`check --release`, TL-503), run by CI before a
+promotion, reports: a deployed commit naming no task; a deployed task that is still open; a
 partially deployed task; a commit in a later stage missing from the trunk or
 an earlier stage; a `done` task whose commits never reached the trunk; a
 task id that does not exist; a commit touching no target's paths. A project
-that knowingly accepts one of these names it in configuration; an unknown
-gap name fails.
+that knowingly accepts one of these names it in configuration
+(`release_gate_accept`); an unknown gap name fails. Whether a gap blocks is
+`release_gate`: `report`, the default, prints and exits 0; `require` exits
+non-zero on any gap not accepted (decided by the owner on 2026-11-01, because
+version-bump commits carry no task id). The usage is in
+[`manual.md`](manual.md#the-release-gate).

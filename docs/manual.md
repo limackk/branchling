@@ -347,6 +347,47 @@ no git event of their own — store review, an update channel, a customer's
 installation — and self-hosted installations are planned as recorded stages
 (TL-506); until then they are not declared.
 
+#### The release gate
+
+`check --release` asks whether a promotion has a gap in its traceability, and
+names the commit or task that proves each one:
+
+| Gap | What it means |
+|---|---|
+| `untracked-commit` | a deployed commit names no task id |
+| `open-task-deployed` | a deployed commit names a task that is still open |
+| `partial-task` | some of a task's commits are in a ref and later ones are not, or one parallel ref holds it and another does not |
+| `stage-only-commit` | a stage holds a commit the trunk or an earlier stage lacks — the next ordinary promotion reverts it |
+| `done-not-on-trunk` | a task closed as done whose commits exist only on a branch or remote the trunk never received |
+| `unknown-task-id` | a deployed commit names an id no task file carries |
+| `untargeted-commit` | a deployed commit touches no declared target's paths |
+
+In CI it is one line before the deploy step:
+
+```bash
+branchling check --release --env production --trunk origin/main
+```
+
+- **`release_gate: report`** (the default) prints the gaps and exits 0;
+  **`release_gate: require`** exits 1 on any gap `release_gate_accept` does
+  not name, on any stage ref that does not resolve, and on a trunk that does
+  not resolve in a repository that has commits (a mistyped `--trunk`, a CI
+  clone that never fetched the remote default branch) — a gate that could
+  not look must not read as one that found nothing. An accepted gap is still
+  printed, marked `(accepted)`; an unknown gap name in `release_gate_accept`
+  fails the configuration.
+- **The trunk is named in every report.** Without `--trunk` it is the remote's
+  default branch (`refs/remotes/origin/HEAD`), else `HEAD`. A CI checkout
+  often records no remote default, so pass `--trunk` there.
+- **Commits older than the first one naming a task id are not judged** — the
+  history before a project adopted ids cannot be repaired by any future
+  commit — and the report says how many were left out.
+- **`--env`** judges one stage (`stage` or `target/stage`); `done-not-on-trunk`
+  is a question about the trunk and is asked either way. `--json` carries the
+  whole report as the `report` of the `release` guard.
+- **It is never part of a bare `check`**, which is the verdict on publishing
+  the backlog, not on promoting a deployment.
+
 ## The execution order (`plan.yaml`)
 
 Which task comes first is a **decision**, not something the tree can recompute —
