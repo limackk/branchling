@@ -47,7 +47,7 @@ import { dropInferredGitDir } from "./git-env.mjs";
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 const CHECK_USAGE = [
-  `${N} check [--dir <path>] [--id-collisions] [--boards] [--refs] [--criteria] [--contracts] [--reasons] [--log-status] [--task-state] [--vocabulary] [--plan] [--product-name] [--proofs] [--since <sha>] [--actor <ns:name>] [task-file.md …]`,
+  `${N} check [--dir <path>] [--id-collisions] [--boards] [--refs] [--criteria] [--contracts] [--reasons] [--log-status] [--task-state] [--vocabulary] [--plan] [--product-name] [--proofs] [--since <sha>] [--release [--env <stage>] [--trunk <ref>]] [--actor <ns:name>] [task-file.md …]`,
   "",
   "  no selector          A RELEASE VERDICT: the guards that can FAIL one, and only those.",
   "                       Exit code = the WORST of them. Guards that report and never",
@@ -129,6 +129,20 @@ const CHECK_USAGE = [
   "                       Then the opposite question of the tasks nobody has started yet: a",
   "                       contract that ALREADY passes is named, because no work can make it",
   "                       red. That finding reports and leaves the exit code alone",
+  "  --release            whether a promotion has a gap in its traceability: a deployed",
+  "                       commit naming no task, or a task that is open or unknown; a task",
+  "                       partially in a stage or in one parallel ref and not another; a",
+  "                       commit a stage holds that the trunk or an earlier stage lacks; a",
+  "                       done task whose commits are only off the trunk; a commit touching",
+  "                       no target's paths. Every finding names its commit or task. Under",
+  "                       `release_gate: report` (the default) it exits 0; under `require`",
+  "                       any gap `release_gate_accept` does not name, any stage ref that",
+  "                       does not resolve, and a trunk that does not resolve in a",
+  "                       repository with commits, exits 1. NEVER part of a bare `check`:",
+  "                       CI runs it as the step before a deploy",
+  "  --env <stage>        with --release, judge one stage (`stage` or `target/stage`)",
+  "  --trunk <ref>        with --release, the trunk; by default the remote's default",
+  "                       branch, else HEAD — the report names which",
   "  --since <sha>        with --proofs, keep the closings the range could plausibly have",
   "                       broken — a file the task changed, or a path its contract names",
 ].join("\n");
@@ -1796,7 +1810,7 @@ function captureScript(script, args) {
  * evidential force. The dispatcher supplies the mode so that nobody has to
  * remember it.
  */
-const CHECK_FLAGS = ["--dir", "--json", "--id-collisions", "--boards", "--refs", "--criteria", "--contracts", "--reasons", "--log-status", "--history", "--task-state", "--docs", "--vocabulary", "--plan", "--product-name", "--foreign-context", "--proofs", "--since", "--actor"];
+const CHECK_FLAGS = ["--dir", "--json", "--id-collisions", "--boards", "--refs", "--criteria", "--contracts", "--reasons", "--log-status", "--history", "--task-state", "--docs", "--vocabulary", "--plan", "--product-name", "--foreign-context", "--proofs", "--since", "--release", "--env", "--trunk", "--actor"];
 
 /** PURE — resolves `check`'s arguments. Throws on a usage error. */
 export function parseCheckArgs(args) {
@@ -1817,6 +1831,9 @@ export function parseCheckArgs(args) {
   let wantForeignContext = false;
   let wantProofs = false;
   let since = null;
+  let wantRelease = false;
+  let env = null;
+  let trunk = null;
   // WHOSE run is this? Only `--task-state` reads it — it separates the task
   // this actor is holding right now from a closing somebody abandoned (TL-261).
   // Unstated, the guard falls back on the same chain every writing command
@@ -1848,6 +1865,13 @@ export function parseCheckArgs(args) {
     if (a === "--product-name") { wantProductName = true; continue; }
     if (a === "--foreign-context") { wantForeignContext = true; continue; }
     if (a === "--proofs") { wantProofs = true; continue; }
+    if (a === "--release") { wantRelease = true; continue; }
+    if (a === "--env" || a === "--trunk") {
+      const v = args[++i] || null;
+      if (!v || v.startsWith("-")) throw new Error("`" + a + "` with no value");
+      if (a === "--env") env = v; else trunk = v;
+      continue;
+    }
     if (a === "--actor") {
       actor = args[++i] || null;
       if (!actor) throw new Error("`--actor` with no name, e.g. `--actor agent:claude`");
@@ -1881,14 +1905,14 @@ export function parseCheckArgs(args) {
   // question, and gets answered whatever its severity (TL-383).
   const explicit = wantIds || wantBoards || wantRefs || wantCriteria || wantContracts || wantReasons || wantLogStatus ||
     wantHistory || wantTaskState || wantDocs || wantVocabulary || wantPlan ||
-    wantProductName || wantForeignContext || wantProofs;
+    wantProductName || wantForeignContext || wantProofs || wantRelease;
 
   // No selector means all of them. A new guard joins the default run on purpose
   // (BL-1451): a dangling reference passed `check`, because `check` checked only
   // what somebody had once written into it.
   if (!wantIds && !wantBoards && !wantRefs && !wantCriteria && !wantContracts && !wantReasons && !wantLogStatus &&
       !wantHistory && !wantTaskState && !wantDocs && !wantVocabulary && !wantPlan &&
-      !wantProductName && !wantForeignContext && !wantProofs) {
+      !wantProductName && !wantForeignContext && !wantProofs && !wantRelease) {
     wantIds = true; wantBoards = true; wantRefs = true; wantCriteria = true; wantContracts = true;
     wantReasons = true;
     wantLogStatus = true; wantHistory = true; wantTaskState = true; wantDocs = true;
@@ -1907,7 +1931,13 @@ export function parseCheckArgs(args) {
         "It narrows which proven closings are re-run; on its own there is nothing for it to narrow."
     );
   }
-  return { dir, json, explicit, wantIds, wantBoards, wantRefs, wantCriteria, wantContracts, wantReasons, wantLogStatus, wantHistory, wantTaskState, wantDocs, wantVocabulary, wantPlan, wantProductName, wantForeignContext, wantProofs, since, actor, files };
+  if ((env !== null || trunk !== null) && !wantRelease) {
+    throw new Error(
+      "`" + (env !== null ? "--env" : "--trunk") + "` with no `--release`\n" +
+        "It narrows which stage, or which trunk, the release gate judges; on its own there is nothing for it to narrow."
+    );
+  }
+  return { dir, json, explicit, wantIds, wantBoards, wantRefs, wantCriteria, wantContracts, wantReasons, wantLogStatus, wantHistory, wantTaskState, wantDocs, wantVocabulary, wantPlan, wantProductName, wantForeignContext, wantProofs, since, wantRelease, env, trunk, actor, files };
 }
 
 // The guard table and its severity axis live in `check-guards.mjs`, because
@@ -2019,7 +2049,18 @@ function runCheck(args) {
       }
       const { exit, output } = captureScript(guard.script, guard.args(root, tasksDir, plan.files, plan));
       worstJson = Math.max(worstJson, exit);
-      results.push({ name: guard.name, severity: effectiveSeverity(guard, config), ok: exit === 0, exit, output });
+      const entry = { name: guard.name, severity: effectiveSeverity(guard, config), ok: exit === 0, exit, output };
+      // A guard that answers `--json` with a document of its own: the document
+      // is the `report`, and `output` stays the one line a person reads.
+      if (guard.jsonReport) {
+        try {
+          entry.report = JSON.parse(output);
+          entry.output = entry.report.summary || "";
+        } catch {
+          entry.report = null;
+        }
+      }
+      results.push(entry);
     }
     printJson("check", {
       ok: worstJson === 0,

@@ -129,6 +129,29 @@ export function resolveRef({ root, spec, run = spawnSync }) {
   return { spec, ref: name, sha, status: "resolved", why: null };
 }
 
+/**
+ * The trunk a repository-wide question should be asked against: the remote's
+ * default branch when the clone knows it, otherwise `HEAD`.
+ *
+ * WHY NOT `HEAD` ALONE. `deploymentState()` defaults to `HEAD`, which is right
+ * for "what has THIS branch reached" and wrong for "was this finished work ever
+ * merged": run on a feature branch, `HEAD` holds that branch's own commits, so
+ * a task closed there and never merged would read as being on the trunk. The
+ * remote default is what a clone records as the line everybody merges into.
+ * `source` says which one was used, because a report built on a fallback has
+ * to be able to say so.
+ *
+ * @returns {{spec: string, source: "remote-default"|"head"}}
+ */
+export function defaultTrunk(root, run = spawnSync) {
+  if (root) {
+    const r = git(run, root, ["symbolic-ref", "--quiet", "refs/remotes/origin/HEAD"]);
+    const spec = r && r.status === 0 ? String(r.stdout || "").trim() : "";
+    if (spec) return { spec, source: "remote-default" };
+  }
+  return { spec: "HEAD", source: "head" };
+}
+
 function combine(states) {
   if (states.some((s) => s === "unknown")) return "unknown";
   if (states.every((s) => s === "full")) return "full";
@@ -250,27 +273,6 @@ export function deploymentState({ root, prefix, targets, trunk = "HEAD", run = s
     missing,
     byTask,
   };
-}
-
-/**
- * The trunk a report should read when the caller names none.
- *
- * `deploymentState()` defaults to `HEAD`, which is right for the stages of the
- * branch being looked at and wrong for "closed but not on the trunk" run from a
- * feature branch: there `HEAD` holds the branch's own commits, and a task closed
- * on it would read as merged. The remote's default branch is what the project
- * calls its trunk, so it is preferred; a clone with no `origin/HEAD` falls back
- * to `HEAD`, and `source` says which happened so a report can print it.
- *
- * @returns {{spec: string, source: "remote-default"|"head"}}
- */
-export function defaultTrunk(root, run = spawnSync) {
-  if (root) {
-    const r = git(run, root, ["symbolic-ref", "--quiet", "refs/remotes/origin/HEAD"]);
-    const ref = r && r.status === 0 ? String(r.stdout || "").trim() : "";
-    if (ref) return { spec: ref, source: "remote-default" };
-  }
-  return { spec: "HEAD", source: "head" };
 }
 
 /** One task's answer. A task with no commits on the trunk gets an empty entry,

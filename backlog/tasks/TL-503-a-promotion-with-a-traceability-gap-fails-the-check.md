@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Release tracking across environments"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 conflict_group: []                 # the AREA it touches (e.g. a module): `next` and `run` hold it back while a task of the same group is in progress. Empty = `conflict_group_from`, or none
@@ -53,4 +53,4 @@ Each gap is reported with the commit or task that proves it. Gaps that a project
 
 ## Acceptance criteria
 
-- [ ] Every one of the seven gaps is detected on a fixture that contains it, a clean fixture passes, and the exit code is non-zero when any gap is found. [proof: gaps-tests]
+- [x] Every one of the seven gaps is detected on a fixture that contains it, a clean fixture passes, and the exit code is non-zero when any gap is found. [proof: gaps-tests]
