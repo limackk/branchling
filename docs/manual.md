@@ -818,6 +818,19 @@ filters. A parameter that is absent from the link means "the default", not
 "keep whatever you had": otherwise a recipient with their own filters would get
 a different set and the link would have lied.
 
+**The Release tab** shows the same answer as `release status`, drawn as a
+board: one lane per deploy target, and one column per step of its promotion —
+closed but not merged, on the trunk, then each stage from `deploy_targets`. A
+card sits in the last step it has fully reached; a card whose next stage holds
+only some of its commits, or only some of a stage's parallel refs, carries a
+**PARTIAL** marker naming which refs hold it. Below the lanes, a panel lists
+the gaps `check --release` reports. The state is read from git when the page is
+built, so the tab prints the build time and the SHA of every ref it read —
+rebuild to see where the refs are now. Environments are not boards: the board
+scope and the filters narrow the cards here exactly as they narrow the list, and
+the link carries them (`viewer.html#release?board=main&epic=Payments`). A project
+with no `deploy_targets` sees no tab.
+
 **The dashboard contract** reserves a URL-addressable view of throughput, queue
 health, epics and plan waves. The current page does not expose that tab yet; its
 restoration follows the same rule as every other viewer control: state that a

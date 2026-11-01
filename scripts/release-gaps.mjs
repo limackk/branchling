@@ -95,15 +95,19 @@ function place(target, stage, spec, parallel) {
  * @param {{id: string, status: string}[]} opts.tasks every task file
  * @param {{target: string|null, stage: string}|null} [opts.selector] `--env`
  * @param {{spec: string, source: string}} opts.trunk from `defaultTrunk()` or `--trunk`
+ * @param {object} [opts.state] a `deploymentState()` the caller already computed
+ *   for the SAME root, prefix, targets and trunk — the viewer's Release view
+ *   (TL-504) reads it for its columns too, and two passes over the same refs
+ *   would only double the cost of one build
  * @returns {{
  *   scanned: boolean, reason: string, trunk: {spec: string, sha: string|null, source: string},
  *   refs: object[], unknownRefs: object[], excludedBeforeAdoption: number,
  *   gaps: {gap: string, accepted: boolean, subject: string, where: string[], commits: string[], detail: string}[],
  * }}
  */
-export function releaseGaps({ root, config, tasks, selector = null, trunk, run = spawnSync }) {
+export function releaseGaps({ root, config, tasks, selector = null, trunk, state: given = null, run = spawnSync }) {
   const targets = config.deployTargets || [];
-  const state = deploymentState({ root, prefix: config.taskIdPrefix, targets, trunk: trunk.spec, run });
+  const state = given || deploymentState({ root, prefix: config.taskIdPrefix, targets, trunk: trunk.spec, run });
   const base = {
     scanned: state.scanned, reason: state.reason,
     trunk: { spec: trunk.spec, sha: state.trunk.sha, source: trunk.source },

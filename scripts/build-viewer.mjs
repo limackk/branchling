@@ -32,6 +32,8 @@ import { PRODUCT_NAME as N, STORAGE_KEY_PREFIX } from "./product.mjs";
 import { printLine } from "./stdout.mjs";
 import { faviconDataUri, headerMarkSvg } from "./brand-mark.mjs";
 import { refusal } from "./ui.mjs";
+import { releaseViewData } from "./release-view.mjs";
+import { RELEASE_CSS } from "./viewer-release.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -409,6 +411,15 @@ export function buildHtml(
   const decisionPanelModuleSrc = readModuleSource("decision-panel.mjs");
   const taskGraphModuleSrc = readModuleSource("task-graph.mjs");
   const historyJson = JSON.stringify(history).replace(/</g, "\\u003c");
+  // THE RELEASE VIEW (TL-504): where each task stands in each deploy target's
+  // promotion, read from git NOW and carried with the time it was read. Ids
+  // only — the page takes titles from ALL_TASKS. A project with no
+  // `deploy_targets` reads nothing and shows no tab.
+  const release = config.root
+    ? releaseViewData({ root: config.root, config, tasks })
+    : releaseViewData({ root: null, config: { ...config, deployTargets: [] }, tasks });
+  const releaseJson = JSON.stringify(release).replace(/</g, "\\u003c");
+  const viewerReleaseModuleSrc = readModuleSource("viewer-release.mjs");
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -1532,6 +1543,7 @@ ${paletteBadgeCss}
     overflow-x: auto;
   }
 
+${RELEASE_CSS}
   /* ─── Waiting on you (TL-115) ────────────────────────────────────── */
   .decisions-view { display: none; }
   body.view-decisions main.app-main { display: none; }
@@ -1780,6 +1792,7 @@ ${paletteBadgeCss}
       <button type="button" class="view-tab is-active" data-view="tasks">Tasks</button>
       <button type="button" class="view-tab" data-view="execution">Execution</button>
       <button type="button" class="view-tab" data-view="decisions" id="tabDecisions">Waiting on you</button>
+      <button type="button" class="view-tab" data-view="release" id="tabRelease"${release.reason === "no-targets" ? " hidden" : ""}>Release</button>
       <button type="button" class="copy-link-btn" id="btnCopyLink"
               title="Copies the address of this view — filters, search, sort, board and the selected task">⧉ Copy link</button>
     </nav>
@@ -1821,6 +1834,7 @@ ${paletteBadgeCss}
 
 <section class="execution-view" id="executionView"></section>
 <section class="decisions-view" id="decisionsView"></section>
+<section class="release-view" id="releaseView"></section>
 
 <script>
 // EVERY KEY THIS PAGE WRITES INTO THE BROWSER (TL-178). One prefix, injected
@@ -1870,6 +1884,12 @@ ${planModuleSrc}
 ${viewerPlanModuleSrc}
 // ─── end of the pasted module ─────────────────────────────────────────
 
+// ─── Pasted source of scripts/viewer-release.mjs (TL-504) ────────────
+// The Release view: the model and the HTML, tested by
+// node --test scripts/tests/viewer-release.test.mjs.
+${viewerReleaseModuleSrc}
+// ─── end of the pasted module ─────────────────────────────────────────
+
 // ─── Pasted source of scripts/decision-panel.mjs (TL-115) ────────────
 // What hangs on a person's decision — computed from the tasks and the history,
 // with no stored state of its own. Tested by
@@ -1913,6 +1933,9 @@ const CONFIG = ${configJson};
 // The plan file as it was read from disk. Mutable: the server hands a fresh copy
 // back on /api/tasks, so an edit to plan.yaml reaches an open tab.
 let PLAN = ${planJson};
+// Deployment state as git showed it at build time (TL-504). Not refreshed by
+// /api/tasks: it is read from refs, not task files, and the view prints when.
+const RELEASE = ${releaseJson};
 
 // The id prefix is a PROJECT value (BL-1452), and the client had it hardcoded in
 // three places (TL-44): the file filter when reading from disk and two sorts by
@@ -1933,7 +1956,7 @@ const state = {
   filterEnv: new Set(),   // the values of the label_axis_env axis plus "n/a"
   filterEpic: new Set(),  // values: epic name | NO_EPIC constant
   sortBy: "priority",     // "priority" | "id_asc" | "id_desc"
-  view: "tasks",          // "tasks" | "execution" | "decisions"
+  view: "tasks",          // "tasks" | "execution" | "decisions" | "release"
   // The panel's own filter: "" = everything, "mine" = rows naming this actor.
   // The moment the replay is showing (TL-91): an ISO instant, or null for the
   // last one the log covers. A moment and not a day — everything within one day
@@ -3523,15 +3546,40 @@ document.getElementById("decisionsView").addEventListener("keydown", (e) => {
 // every task that has always sat where it sits — and the missing cards would
 // look exactly like a quiet week.
 
+// ─── Release view (TL-504) ────────────────────────────────────────────
+// Unlike Execution, this view IS narrowed by the board and the filters: a
+// release question is asked about a slice ("what of the Legal epic is in
+// production"), and a task's columns do not depend on the other tasks.
+function releaseVisible() {
+  const narrowed = state.board !== BOARD_ALL || !!state.search || FILTER_SPECS.some((s) => state[s.key].size);
+  return narrowed ? new Set(getFilteredTasks().map((t) => t.id)) : null;
+}
+
+function renderRelease_() {
+  const vm = releaseViewModel(RELEASE, { tasks: ALL_TASKS, visible: releaseVisible(), search: state.search, now: Date.now() });
+  document.getElementById("releaseView").innerHTML = renderRelease(vm);
+  releaseSyncHash();
+}
+
+function releaseSyncHash() {
+  if (!hashRouted || state.view !== "release") return;
+  const v = tasksViewState();
+  const next = "#" + encodeReleaseHash({ board: v.board, filters: v.filters, search: v.search });
+  if (window.location.hash === next) return;
+  history.replaceState(null, "", window.location.pathname + window.location.search + next);
+}
+
 function setView(view) {
   state.view = view;
   document.body.classList.toggle("view-execution", view === "execution");
   document.body.classList.toggle("view-decisions", view === "decisions");
+  document.body.classList.toggle("view-release", view === "release");
   for (const btn of document.querySelectorAll(".view-tab")) {
     btn.classList.toggle("is-active", btn.dataset.view === view);
   }
   if (view === "execution") renderExecution_();
   if (view === "decisions") renderDecisions();
+  if (view === "release") renderRelease_();
 }
 
 // ─── Render all ───────────────────────────────────────────────────────
@@ -3549,6 +3597,7 @@ function render() {
   // shows.
   if (state.view === "execution") renderExecution_();
   else if (state.view === "decisions") renderDecisions();
+  else if (state.view === "release") renderRelease_();
   // The one place where the list rewrites the URL: every change of a filter, a
   // chip, the sorting and the scope ends up here anyway, so there is no route by
   // which the state changes without a link (except the search — that renders cards only).
@@ -3575,6 +3624,13 @@ function handleHash() {
   if (id === "execution") {
     if (state.view !== "execution") setView("execution");
     else renderExecution_();
+    return;
+  }
+  if (isReleaseHash(id)) {
+    // The same parameters as the tasks link, so a filter means one thing on both tabs.
+    tasksApplyHash(qi < 0 ? "" : raw.slice(qi + 1));
+    if (state.view !== "release") setView("release");
+    render();
     return;
   }
   if (isTasksHash(id)) {
@@ -3662,6 +3718,7 @@ for (const btn of document.querySelectorAll(".view-tab")) {
     setView(v);
     if (v === "execution") window.location.hash = "execution";
     else if (v === "decisions") window.location.hash = "decisions";
+    else if (v === "release") releaseSyncHash();
     else tasksSyncHash();
   });
 }
@@ -3689,6 +3746,7 @@ handleHash();
 // form that can be copied from the address bar and sent.
 hashRouted = true;
 tasksSyncHash();
+releaseSyncHash();
 updateConnectionBar();
 
 // Server mode: already live at first paint (the page is rendered from a fresh

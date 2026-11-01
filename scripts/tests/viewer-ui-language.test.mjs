@@ -45,6 +45,7 @@ export const SHIPPED_CHROME = [
   { id: "tab-tasks", text: ">Tasks<" },
   { id: "tab-execution", text: ">Execution<" },
   { id: "tab-decisions", text: ">Waiting on you<" },
+  { id: "tab-release", text: ">Release<" },
   { id: "copy-link", text: "⧉ Copy link" },
   { id: "bar-snapshot", text: "Snapshot mode" },
   { id: "bar-snapshot-hint", text: "Data from the moment of the build. Connect to the folder to work on live files and edit statuses." },

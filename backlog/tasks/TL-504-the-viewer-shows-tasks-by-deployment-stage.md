@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Release tracking across environments"
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 conflict_group: []                 # the AREA it touches (e.g. a module): `next` and `run` hold it back while a task of the same group is in progress. Empty = `conflict_group_from`, or none
@@ -43,4 +43,4 @@ The environment state is computed at build time, so the view carries the time of
 
 ## Acceptance criteria
 
-- [ ] The Release view model places each fixture task in the right stage, marks partial tasks including a task held by only one of two parallel refs, lists the gaps and records the resolved SHA of every ref. [proof: viewer-tests]
+- [x] The Release view model places each fixture task in the right stage, marks partial tasks including a task held by only one of two parallel refs, lists the gaps and records the resolved SHA of every ref. [proof: viewer-tests]
