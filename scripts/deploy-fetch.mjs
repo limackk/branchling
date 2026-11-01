@@ -27,16 +27,16 @@
 
 import { spawnSync } from "node:child_process";
 
-import { isGlob } from "./deploy-targets.mjs";
+import { GIT_NAMESPACES, isGlob } from "./deploy-targets.mjs";
 import { gitDiscoveryEnv } from "./git-env.mjs";
 
 /**
- * The namespaces git's own refspecs already describe: local branches, the
- * remote-tracking copies the default refspec writes, and tags. A declared ref
- * in one of them is outside this question — `origin/main` moves on every
- * default fetch.
+ * The namespaces git's own refspecs already describe (declared in
+ * `deploy-targets.mjs`, which also keeps recorded stages out of them). A
+ * declared ref in one of them is outside this question — `origin/main` moves
+ * on every default fetch.
  */
-export const GIT_NAMESPACES = Object.freeze(["refs/heads/", "refs/remotes/", "refs/tags/"]);
+export { GIT_NAMESPACES };
 
 /** PURE — the literal text of a glob before its first glob character. */
 function literalPrefix(spec) {

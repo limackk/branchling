@@ -9,10 +9,11 @@ import { resolveBacklogDir } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { failure } from "./ui.mjs";
 import { run as runStatus } from "./release-status.mjs";
+import { run as runRecord } from "./release-record.mjs";
 
 /** The words after `release` that name a subcommand rather than a task. A task
  *  id always carries its prefix and a number, so such a word is never one. */
-export const RELEASE_SUBCOMMANDS = Object.freeze(["status"]);
+export const RELEASE_SUBCOMMANDS = Object.freeze(["status", "record"]);
 
 export const RELEASE_FLAGS = ["--dir", "--actor", "--reason", "--status", "--json"];
 
@@ -41,8 +42,10 @@ export function parseReleaseArgs(args) {
 export function run(argv) {
   // `release status` (TL-502) reads where finished work stands; `release <ID>`
   // writes. One word, two verbs, because the design names the group `release`
-  // (`docs/release-tracking.md`) and the planned `release record` joins it.
+  // (`docs/release-tracking.md`); `release record` (TL-506) writes a stage git
+  // cannot observe.
   if (argv[0] === "status") return runStatus(argv.slice(1));
+  if (argv[0] === "record") return runRecord(argv.slice(1));
   let plan;
   const wantsJson = argv.includes("--json");
   const refuse = (message, details = [], code = 1, refusalKind = "refused") => {

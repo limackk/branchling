@@ -426,10 +426,60 @@ deploy_targets:
       - { name: production, ref: refs/deploys/worker/production }
 ```
 
-A project with no environments omits the key, and nothing changes. Stages with
-no git event of their own — store review, an update channel, a customer's
-installation — and self-hosted installations are planned as recorded stages
-(TL-506); until then they are not declared.
+A project with no environments omits the key, and nothing changes.
+
+**A stage git cannot observe is recorded.** Store review, an update channel, a
+staged rollout reaching 100%, a customer's installation, a sign-off on the test
+environment: nothing in git moves when they happen, and the tool does not query
+stores, flag systems or CI providers. Declare the stage `recorded: true`, and
+whoever knows — a CI step or a person — calls `release record`:
+
+```yaml
+deploy_targets:
+  - name: mobile
+    paths: [app/]
+    stages:
+      - { name: tagged, ref: "refs/tags/mobile-v*" }
+      - { name: review, ref: refs/deploys/mobile/review, recorded: true }
+      - { name: rollout, ref: refs/deploys/mobile/rollout, recorded: true }
+  - name: server
+    stages:
+      - { name: published, ref: "refs/tags/v*" }
+      - name: installed                       # one ref per customer
+        refs: [refs/deploys/server/acme, refs/deploys/server/globex]
+        recorded: true
+```
+
+```bash
+branchling release record --target mobile --stage review mobile-v2.4.0 --reason "approved by the store"
+branchling release record --target mobile --stage rollout mobile-v2.4.0 --reason "staged rollout at 100%"
+branchling release record --target mobile --stage rollout mobile-v2.3.1 --reason "rollout halted: crash on start"
+branchling release record --target server --stage installed --ref acme v1.8.0 --reason "Acme upgraded"
+```
+
+- **The ref moves onto an annotated tag object** whose tagger is the actor,
+  whose date is the moment of the record, and whose message carries the reason
+  and the commit the ref stood at before. So a recorded stage is still a git
+  ref: every reader sees the commit, `git push` shares it, and `git cat-file
+  tag <ref>` reads the record back. No `refs/tags/` entry is created.
+- **`release status` names who recorded each stage, when and why**, under the
+  ref's line, and in `records` with `--json`.
+- **It prints the push command and never pushes.** Another clone sees the
+  record only once its fetch refspec carries `refs/deploys/*`; the output and
+  `doctor` print the line that adds it.
+- **It refuses** a stage not declared `recorded` (moving a ref git observes by
+  hand would assert a deployment nobody made), a missing or reserved
+  `--reason`, a stage of parallel refs without `--ref`, and a commit the
+  previous stage does not hold — or a previous stage that does not resolve,
+  because "cannot tell" is not "yes". The first stage has no previous stage to
+  ask.
+- **A move backwards is accepted** — it is how a halted rollout is recorded —
+  and the output names the direction: `first`, `unchanged`, `forward`,
+  `backward` or `diverged`.
+- **A recorded stage's refs are full names outside `refs/heads/`,
+  `refs/remotes/` and `refs/tags/`, never globs**: the tool writes them, and a
+  branch, a remote-tracking ref or a tag is moved by something else. By
+  convention they live under `refs/deploys/<target>/`.
 
 #### The release gate
 
@@ -971,7 +1021,8 @@ implementation detail. Every reading command answers in the same envelope:
 | `take`, `next` | `task-take` | `ok`, `taken`, `id`, `file`, `task`, `from`, `text`, `decisions`, `probe`, `warnings`, `reclaimed`, `tookOver`, `lock`, `refusalKind`, `refusal`, `details`, and — filled in by next — `passedOver`, `considered`, `searchedStatuses`, `skippedBlocked`, `skippedElsewhere`, `closedElsewhere`, `skippedExecutor`, `skippedHandedBack`, `skippedDeadlocked`, `skippedSize`, `skippedByRecord`, `skippedConflict`, `scan`, `plan` |
 | `handoff` | `task-handoff` | `ok`, `id`, `file`, `task`, `role`, `owner`, `status` (each a from/to pair), `comment`, `released`, `warnings`, `refusalKind`, `refusal`, `details` |
 | `release` | `task-release` | `ok`, `id`, `status`, `owner`, `released`, `comment`, `refusalKind`, `refusal`, `details` |
-| `release status` | `release-status` | `trunk` (the ref whose commits count, its SHA, and whether it is the remote's default branch or HEAD), `scan` (every ref read, with its SHA), `explanation` (why an empty answer is empty), `filter`, `targets` (per target its buckets in pipeline order — each with its kind, stage, label, count, whether it is unknown and which refs made it so, whether it is listed — the last stage is counted, not listed — and its tasks, each with the status, the day it closed, the wait in days, its state in the stage and the parallel refs holding it), `unplaced` (closed tasks no commit names), `release` (with `--release`: the release name, how many tasks it plans, how many shipped — counted, not listed — and four lists, notShipped, open, unplanned and dropped, each a count and its tasks; every task carries its status, priority, release, commit count, where it stands per target, and a note such as no-commits or unknown. Null without the flag) |
+| `release status` | `release-status` | `trunk` (the ref whose commits count, its SHA, and whether it is the remote's default branch or HEAD), `scan` (every ref read, with its SHA), `explanation` (why an empty answer is empty), `filter`, `targets` (per target its buckets in pipeline order — each with its kind, stage, label, count, whether it is unknown and which refs made it so, whether it is listed — the last stage is counted, not listed — and its tasks, each with the status, the day it closed, the wait in days, its state in the stage and the parallel refs holding it), `unplaced` (closed tasks no commit names), `release` (with `--release`: the release name, how many tasks it plans, how many shipped — counted, not listed — and four lists, notShipped, open, unplanned and dropped, each a count and its tasks; every task carries its status, priority, release, commit count, where it stands per target, and a note such as no-commits or unknown. Null without the flag), `records` (per recorded stage ref: who recorded it, when and why) |
+| `release record` | `release-record` | `ok`, `target`, `stage`, `ref`, `commit`, `tag` (the annotated tag object the ref now points at), `previous` (the commit it stood at before, null on the first record), `direction` (first, unchanged, forward, backward or diverged), `actor`, `reason`, `recordedAt`, `remote`, `push` (the command that shares the record — printed, never run), `fetchFix` (the refspec other clones need, null when the remote fetches the ref), `refusalKind`, `refusal`, `details` |
 | `ask` | `task-ask` | `ok`, `id`, `file`, `question` (its event id, timestamp, text and asker), `changes`, `blockedReason`, `refusalKind`, `refusal`, `details` |
 | `done` | `verification-run` | `ok`, `task`, `dryRun`, `closed`, `entries` (one per `verification:` entry, with its exit code), `status`, `wouldBe`, `ticked`, `capability`, `refusalKind`, `refusal`, `details` |
 | `resume` | `resume` | `ok`, `id`, `file`, `actor`, `owner`, `base`, `mergeBase`, `verified` (false under --no-verify: the contract was not re-run, which is not the same as a contract with no entries), `decisions`, `goal`, `history`, `diff` (the merge-base range: what this branch COMMITTED), `uncommitted` (what it left on disk in no commit: a patch of tracked edits, a list of untracked paths, and a reason — a null in any of the three means the working tree could not be read, not that it is clean), `verification` — the parts in the order the briefing fixes them — `refusalKind`, `refusal`, `details` |

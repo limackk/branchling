@@ -109,7 +109,7 @@ Some stages have no git event: a store approves a build, an update channel
 is promoted, a staged rollout reaches 100%, a customer installs a version,
 somebody signs off a feature on the test environment. Querying
 those systems would make the tool depend on each of them; Law 4 points the
-other way — a callable input. A planned `release record` command, given a
+other way — a callable input. The `release record` command, given a
 target, a stage, a commit or tag and a reason, moves the stage's ref and
 writes an annotated tag object carrying the actor, the time and the reason, so a
 recorded stage is still a ref, is shared by `git push`, and its history is

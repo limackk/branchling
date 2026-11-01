@@ -278,8 +278,20 @@ export const KINDS = {
   // target carries its buckets in pipeline order, a bucket whose stage could
   // not be read is `unknown` rather than zero, and `listed: false` marks the
   // last stage, which is counted and never listed. `release` is the planned
-  // scope of `--release <name>` (TL-505), null without the flag.
-  "release-status": { trunk: null, scan: null, explanation: null, filter: null, targets: [], unplaced: null, release: null },
+  // scope of `--release <name>` (TL-505), null without the flag. `records`
+  // names who recorded each recorded stage, when and why (TL-506).
+  "release-status": { trunk: null, scan: null, explanation: null, filter: null, targets: [], unplaced: null, release: null, records: [] },
+  // `release record --json` (TL-506). `tag` is the annotated tag object the
+  // ref now points at; `previous` the commit it stood at before, null on the
+  // first record; `direction` one of first, unchanged, forward, backward,
+  // diverged. `push` is the command that shares the record — it is printed,
+  // never run — and `fetchFix` the refspec other clones need, null when the
+  // remote already fetches the ref.
+  "release-record": {
+    ok: null, target: null, stage: null, ref: null, commit: null, tag: null, previous: null, direction: null,
+    actor: null, reason: null, recordedAt: null, remote: null, push: null, fetchFix: null,
+    refusalKind: null, refusal: null, details: [],
+  },
   // `ask --json` (TL-148). The question's EVENT ID is the payload that matters:
   // it is what a later `decide --resolves` has to name, and the reason the task
   // now carries names it too — so a consumer never has to parse a sentence.
@@ -499,6 +511,13 @@ export const KIND_EXERCISE = {
     refuses: true, writes: true,
   },
   "release-status": { args: ["release", "status", "--json"] },
+  // The fixture declares no `deploy_targets`, so this is the refusal path: an
+  // undeclared target. It is reached only after the reason and the actor pass,
+  // so both are given; nothing is written.
+  "release-record": {
+    args: ["release", "record", "--target", "web", "--stage", "production", "HEAD", "--actor", "agent:test", "--reason", "a fixture", "--json"],
+    refuses: true, writes: true,
+  },
   "task-release": {
     args: ["release", ABSENT_TASK, "--actor", "agent:test", "--reason", "a fixture", "--json"],
     refuses: true, writes: true,

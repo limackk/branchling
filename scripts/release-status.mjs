@@ -63,6 +63,10 @@
  * planned task whose last stage did not resolve is `unknown`, never shipped and
  * never absent.
  *
+ * A RECORDED STAGE (TL-506) is a ref `release record` moved onto an annotated
+ * tag. The report names who recorded it, when and why (`records`), because a
+ * stage moved on somebody's word is only as good as the word.
+ *
  * Tests: `node --test scripts/tests/release-status.test.mjs`,
  *        `node --test scripts/tests/release-scope.test.mjs`
  */
@@ -79,6 +83,7 @@ import {
 } from "./environments.mjs";
 import { gitDiscoveryEnv } from "./git-env.mjs";
 import { readHistory } from "./history.mjs";
+import { readRecord } from "./release-record.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { repoRoot } from "./modified-files.mjs";
 import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
@@ -444,6 +449,26 @@ function readOffTrunk({ run, root, state, targets, prefix, archivedIds }) {
   return { placed, unplaced };
 }
 
+/** The record behind every resolved ref of a recorded stage. A ref of such a
+ *  stage that carries no record (CI moved it, or it was set by hand) is left
+ *  out rather than described as one. */
+function readRecords({ run, root, targets, refs }) {
+  const out = [];
+  if (!root) return out;
+  for (const t of targets || []) {
+    for (const s of t.stages) {
+      if (!s.recorded) continue;
+      for (const r of refs || []) {
+        if (r.target !== t.name || r.stage !== s.name || !r.sha || !r.ref) continue;
+        const rec = readRecord({ root, ref: r.ref, run });
+        if (!rec || rec.commit !== r.sha) continue;
+        out.push({ target: t.name, stage: s.name, spec: r.spec, sha: r.sha, actor: rec.actor, at: rec.at, reason: rec.reason });
+      }
+    }
+  }
+  return out;
+}
+
 function shortSha(sha) { return sha ? sha.slice(0, 12) : null; }
 
 const TRUNK_SOURCE_TEXT = {
@@ -463,6 +488,8 @@ export function renderStatus(report, paint = color) {
     if (report.filter.target !== null && r.target !== report.filter.target) continue;
     const where = (r.target + "/" + r.stage).padEnd(refWidth);
     lines.push("  " + where + "  " + refName(r).padEnd(nameWidth) + "  " + (r.sha ? shortSha(r.sha) : paint.warn("unknown") + " — " + r.why));
+    const rec = (report.records || []).find((x) => x.target === r.target && x.stage === r.stage && x.spec === r.spec);
+    if (rec) lines.push("  " + " ".repeat(refWidth) + "  " + paint.dim("recorded by " + rec.actor + " at " + rec.at + " — " + rec.reason));
   }
   if (report.release) {
     lines.push("");
@@ -552,6 +579,7 @@ export function computeStatus({ root, config, filter, count, release = null, now
     targets: [],
     unplaced: { count: 0, ids: [] },
     release: null,
+    records: readRecords({ run, root: repo, targets, refs: state.refs }),
   };
   // The plan is read even when git could not be: which planned tasks are open
   // is still an answer. Every other planned task is marked `unscanned` rather
@@ -648,6 +676,7 @@ export function run(argv) {
     printJson("release-status", {
       trunk: report.trunk, scan: report.scan, explanation: report.explanation,
       filter: report.filter, targets: report.targets, unplaced: report.unplaced, release: report.release,
+      records: report.records,
     });
   } else if (!state.scanned) {
     console.log(color.ok(MARK.ok) + " nothing to report — " + report.explanation);

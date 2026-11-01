@@ -332,7 +332,9 @@ test("a well-formed deploy_targets loads, with both stage spellings normalised (
 test("every malformed form of deploy_targets fails", () => {
   const cases = [
     ["deploy_targets: []", /non-empty list of targets/],
-    ["deploy_targets:\n  - name: a\n    stages:\n      - { name: s, ref: x, recorded: true }", /unknown key `recorded`/],
+    // `recorded` is a key since TL-506; a misspelling of it still fails.
+    ["deploy_targets:\n  - name: a\n    stages:\n      - { name: s, ref: refs/deploys/a/s, recoded: true }", /unknown key `recoded`/],
+    ["deploy_targets:\n  - name: a\n    stages:\n      - { name: s, ref: x, recorded: true }", /a recorded stage needs a full ref name/],
     ["deploy_targets:\n  - name: a\n    path: [x/]\n    stages:\n      - { name: s, ref: x }", /unknown key `path`/],
     ["deploy_targets:\n  - name: a\n    stages:\n      - { name: s, ref: x, refs: [y] }", /exactly one of `ref`/],
     ["deploy_targets:\n  - name: a\n    stages:\n      - { name: s }", /exactly one of `ref`/],

@@ -28,12 +28,37 @@
  * are per level (`TARGET_KEYS`, `STAGE_KEYS`) so a later task adds a key — the
  * `recorded:` stage flag of TL-506 — by extending one set and validating its
  * value, without loosening anything else.
+ *
+ * A RECORDED STAGE (`recorded: true`, TL-506) is one git cannot observe — store
+ * review, an update channel, a sign-off — so `release record` moves its ref on
+ * somebody's word (`scripts/release-record.mjs`). The tool WRITES that ref, so
+ * every ref of such a stage must be one it can write and nothing else moves:
+ *
+ *   - a literal name, never a glob — a glob names no single ref to move;
+ *   - a full `refs/…` name — a short name is resolved by git's search order and
+ *     could land on a branch or a tag;
+ *   - outside `refs/heads/`, `refs/remotes/` and `refs/tags/` — a branch moves
+ *     with every commit, a remote-tracking ref is overwritten by the next fetch,
+ *     and a tag that moves is a tag nobody can trust.
+ *
+ * The last rule is also what puts every recorded ref in front of `doctor`'s
+ * fetch-refspec row (TL-508), which judges exactly the full names outside those
+ * namespaces: a recorded stage cannot be declared where that check is blind.
  */
 
 /** The keys a target may carry. */
 export const TARGET_KEYS = Object.freeze(["name", "paths", "stages"]);
 /** The keys a stage may carry. Exactly one of `ref` and `refs`. */
-export const STAGE_KEYS = Object.freeze(["name", "ref", "refs"]);
+export const STAGE_KEYS = Object.freeze(["name", "ref", "refs", "recorded"]);
+
+/**
+ * The namespaces git's own refspecs already describe: local branches, the
+ * remote-tracking copies the default refspec writes, and tags. Declared here,
+ * beside the shape, because two readers need the same list: the fetch check
+ * (`scripts/deploy-fetch.mjs`) skips them, and a recorded stage may not live in
+ * them (below).
+ */
+export const GIT_NAMESPACES = Object.freeze(["refs/heads/", "refs/remotes/", "refs/tags/"]);
 
 /** A target or stage name: it is typed as a flag value (`query --env`) and
  *  joined with `/` as `target/stage`, so it may not contain a slash or a space. */
@@ -224,7 +249,7 @@ function nonEmptyString(v) {
  * where the configuration said so.
  *
  * @returns {{targets: {name: string, paths: string[]|null,
- *   stages: {name: string, refs: string[], parallel: boolean}[]}[], problems: string[]}}
+ *   stages: {name: string, refs: string[], parallel: boolean, recorded: boolean}[]}[], problems: string[]}}
  */
 export function validateDeployTargets(raw) {
   const problems = [];
@@ -303,7 +328,25 @@ export function validateDeployTargets(raw) {
             problems.push(sWhere + ": the glob `" + r + "` must be a full ref name starting with `refs/` (for example `refs/tags/" + r + "`)");
           }
         }
-        stages.push(Object.freeze({ name: s.name, refs: Object.freeze(refs), parallel: hasRefs }));
+        let recorded = false;
+        if (Object.prototype.hasOwnProperty.call(s, "recorded")) {
+          if (s.recorded !== true && s.recorded !== false) {
+            problems.push(sWhere + ": `recorded` = `" + s.recorded + "` — expecting `true` or `false`");
+          } else {
+            recorded = s.recorded;
+          }
+        }
+        if (recorded) {
+          for (const r of refs) {
+            if (isGlob(r)) {
+              problems.push(sWhere + ": a recorded stage moves one named ref, and `" + r + "` is a glob");
+            } else if (!r.startsWith("refs/") || GIT_NAMESPACES.some((ns) => r.startsWith(ns))) {
+              problems.push(sWhere + ": a recorded stage needs a full ref name outside refs/heads/, refs/remotes/ and refs/tags/ (for example `refs/deploys/" +
+                (nonEmptyString(t.name) ? t.name : "<target>") + "/" + (nonEmptyString(s.name) ? s.name : "<stage>") + "`), not `" + r + "`");
+            }
+          }
+        }
+        stages.push(Object.freeze({ name: s.name, refs: Object.freeze(refs), parallel: hasRefs, recorded }));
       });
     }
     targets.push(Object.freeze({ name: t.name, paths: paths && Object.freeze(paths), stages: Object.freeze(stages) }));
