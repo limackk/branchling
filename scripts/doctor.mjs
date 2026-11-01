@@ -35,6 +35,7 @@ import { fileURLToPath } from "node:url";
 import { auditLogStatus, readTaskTexts } from "./check-backlog-log-status.mjs";
 import { archivedElsewhereBySource, crossBranchState, divergences } from "./branch-scan.mjs";
 import { ConfigError, formatConfigError, loadConfig } from "./config.mjs";
+import { deployFetchState } from "./deploy-fetch.mjs";
 import { commandRunner, contextBudget } from "./context-budget.mjs";
 import { ATTRIBUTE_RULES, IGNORE_RULES, hasUnionMerge, insideGitRepo, trackedViews, unignoredViews } from "./git-rules.mjs";
 import { SNAPSHOT_FILE, loadSnapshot, readMigrations, reconcile } from "./history.mjs";
@@ -376,6 +377,54 @@ function checkHooks(root) {
   return [check("git-hooks", "git gates on commit", OK, HOOK_NAMES.join(", ") + " run the guards")];
 }
 
+/**
+ * Does every declared deploy ref reach this clone on `git fetch`? (TL-508)
+ *
+ * AN ERROR, not a warning. A ref the remote's refspec does not carry is not
+ * stale by a few minutes — it never moves here at all, so every stage built on
+ * it reads as unknown or, worse, as the copy this clone happened to write once,
+ * which looks exactly like the current one. The fix is one line of the owner's
+ * git configuration; doctor prints it and never applies it, for the same
+ * reason the tool never pushes.
+ *
+ * NO ROW when nothing is declared outside git's own namespaces: a project
+ * without `deploy_targets`, or one whose stages are branches and tags, has
+ * nothing to ask here, and a tick about it would be green with no evidentiary
+ * force.
+ */
+function checkDeployFetch(root, config) {
+  if (!insideGitRepo(root)) return [];
+  const title = "deploy refs reach every clone";
+  const st = deployFetchState({ root, targets: config.deployTargets });
+  if (!st.declared.length) return [];
+  // A glob whose first component under refs/ starts with a glob character has
+  // no namespace narrower than `refs/*`; it is named by its spec instead.
+  const namespaces = [...new Set(st.declared.map((d) => d.namespace || d.spec))];
+  if (st.why === "no-remote") {
+    return [check("deploy-fetch", title, INFO,
+      "no remote — " + namespaces.join(", ") + " can reach no other clone from here")];
+  }
+  if (st.why === "ambiguous") {
+    return [check("deploy-fetch", title, WARN,
+      "remotes " + st.remotes.join(", ") + " and no upstream on this branch — cannot tell which one the deploy refs come from",
+      "git branch --set-upstream-to <remote>/<branch>   # then " + N + " doctor")];
+  }
+  if (st.missing.length) {
+    const commands = st.missing.filter((m) => m.fix).map((m) => m.fix);
+    const inexpressible = st.missing.filter((m) => !m.fix).flatMap((m) => m.specs);
+    const note = inexpressible.length
+      ? "declare " + inexpressible.join(", ") + " under a literal namespace such as refs/<name>/ — only refs/* covers it, and that mirrors every ref of the remote"
+      : null;
+    return [check("deploy-fetch", title, ERR,
+      "remote `" + st.remote + "` does not fetch " +
+        st.missing.map((m) => (m.namespace || "any refspec narrower than refs/*") + " (" + m.specs.join(", ") + ")").join("; ") +
+        " — another clone reads those stages as unknown or stale",
+      commands.length ? commands.join(" && ") + (note ? "   # then " + note : "") : note)];
+  }
+  return [check("deploy-fetch", title, OK,
+    "remote `" + st.remote + "` fetches " + namespaces.join(", ") + " under the same names")];
+}
+
 /** How long the guards may take before the run is abandoned. Named, because the
  *  row below has to be able to say the number when it is hit. */
 const GUARD_TIMEOUT_MS = 60_000;
@@ -476,6 +525,7 @@ export function diagnose(root) {
   rows.push(checkUnrecorded(root));
   rows.push(checkLogStatus(root, config));
   rows.push(...checkGitIgnore(root));
+  rows.push(...checkDeployFetch(root, config));
   rows.push(checkGuards(root));
   rows.push(...checkClosedElsewhere(root, config, metas));
   rows.push(checkVolume(metas, config));
