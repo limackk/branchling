@@ -260,6 +260,50 @@ branchling query --env backend/test                    # in test, for one target
 branchling query --text checkout --json                # each task's `deploy` per target and stage
 ```
 
+**What waits for which environment** is one command, `release status`. For each
+target it prints the promotion pipeline as buckets, each holding the tasks
+between two adjacent steps:
+
+```text
+trunk  refs/remotes/origin/main 3f1c2a9b0d4e  (the remote's default branch)
+  web/test        origin/main                     3f1c2a9b0d4e
+  web/production  refs/deploys/web/production-eu  9a0b1c2d3e4f
+  web/production  refs/deploys/web/production-us  9a0b1c2d3e4f
+
+web
+  closed, not on the trunk         1
+    TASK-12  Export to CSV  done 2026-10-30 · waiting 2d
+  on the trunk, waiting for test   0
+  in test, waiting for production  1
+    TASK-14  Retry failed uploads  done 2026-10-29 · waiting 3d · partial (held by refs/deploys/web/production-eu)
+  in production                    41  (counted, not listed)
+```
+
+- **A task is placed by the first stage that does not hold it in full**, so
+  each bucket answers "what does the next promotion carry". The last stage is
+  counted and never listed: it grows with the project's whole history.
+- **Closed but not on the trunk** is an archived task whose commits exist only
+  off the trunk; its target comes from the paths those commits touched. A
+  closed task that no commit names at all cannot be given a target and is
+  counted on its own line.
+- **The trunk is the remote's default branch** (`origin/HEAD`) when the clone
+  knows one, else `HEAD`, and the header says which: on a feature branch `HEAD`
+  holds that branch's commits, and a task closed there would read as merged.
+- **The wait is measured from the newest commit** of the task for that target,
+  because git records no deploy time — or, when the stage the task already
+  stands in is an annotated tag, from the tag's date.
+- **A ref that does not resolve makes its bucket and every later one
+  `unknown`**, never zero: no task can be placed past a stage nobody could read.
+- **An empty bucket prints as `0`**, and the header names every ref with its
+  SHA, because the answer is only as fresh as the refs it read.
+
+```bash
+branchling release status                       # every target, every bucket
+branchling release status --env production      # only what waits for production
+branchling release status --target web --count  # counts only, inside a context budget
+branchling release status --json                # the same buckets, kind `release-status`
+```
+
 One declaration per product shape:
 
 ```yaml
@@ -832,6 +876,7 @@ implementation detail. Every reading command answers in the same envelope:
 | `take`, `next` | `task-take` | `ok`, `taken`, `id`, `file`, `task`, `from`, `text`, `decisions`, `probe`, `warnings`, `reclaimed`, `tookOver`, `lock`, `refusalKind`, `refusal`, `details`, and — filled in by next — `passedOver`, `considered`, `searchedStatuses`, `skippedBlocked`, `skippedElsewhere`, `closedElsewhere`, `skippedExecutor`, `skippedHandedBack`, `skippedDeadlocked`, `skippedSize`, `skippedByRecord`, `skippedConflict`, `scan`, `plan` |
 | `handoff` | `task-handoff` | `ok`, `id`, `file`, `task`, `role`, `owner`, `status` (each a from/to pair), `comment`, `released`, `warnings`, `refusalKind`, `refusal`, `details` |
 | `release` | `task-release` | `ok`, `id`, `status`, `owner`, `released`, `comment`, `refusalKind`, `refusal`, `details` |
+| `release status` | `release-status` | `trunk` (the ref whose commits count, its SHA, and whether it is the remote's default branch or HEAD), `scan` (every ref read, with its SHA), `explanation` (why an empty answer is empty), `filter`, `targets` (per target its buckets in pipeline order — each with its kind, stage, label, count, whether it is unknown and which refs made it so, whether it is listed — the last stage is counted, not listed — and its tasks, each with the status, the day it closed, the wait in days, its state in the stage and the parallel refs holding it), `unplaced` (closed tasks no commit names) |
 | `ask` | `task-ask` | `ok`, `id`, `file`, `question` (its event id, timestamp, text and asker), `changes`, `blockedReason`, `refusalKind`, `refusal`, `details` |
 | `done` | `verification-run` | `ok`, `task`, `dryRun`, `closed`, `entries` (one per `verification:` entry, with its exit code), `status`, `wouldBe`, `ticked`, `capability`, `refusalKind`, `refusal`, `details` |
 | `resume` | `resume` | `ok`, `id`, `file`, `actor`, `owner`, `base`, `mergeBase`, `verified` (false under --no-verify: the contract was not re-run, which is not the same as a contract with no entries), `decisions`, `goal`, `history`, `diff` (the merge-base range: what this branch COMMITTED), `uncommitted` (what it left on disk in no commit: a patch of tracked edits, a list of untracked paths, and a reason — a null in any of the three means the working tree could not be read, not that it is clean), `verification` — the parts in the order the briefing fixes them — `refusalKind`, `refusal`, `details` |

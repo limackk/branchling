@@ -8,6 +8,11 @@ import { printJson } from "./json-envelope.mjs";
 import { resolveBacklogDir } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { failure } from "./ui.mjs";
+import { run as runStatus } from "./release-status.mjs";
+
+/** The words after `release` that name a subcommand rather than a task. A task
+ *  id always carries its prefix and a number, so such a word is never one. */
+export const RELEASE_SUBCOMMANDS = Object.freeze(["status"]);
 
 export const RELEASE_FLAGS = ["--dir", "--actor", "--reason", "--status", "--json"];
 
@@ -22,7 +27,9 @@ export function parseReleaseArgs(args) {
       plan[arg.slice(2)] = value;
       continue;
     }
-    if (arg.startsWith("-")) throw new Error("unknown flag: " + arg + "\navailable: " + RELEASE_FLAGS.join(" "));
+    // The subcommand is named in the same line, so a reader of the refusal —
+    // and the guard that reads it — learns that `release status` exists.
+    if (arg.startsWith("-")) throw new Error("unknown flag: " + arg + "\navailable: " + RELEASE_FLAGS.join(" ") + ", " + RELEASE_SUBCOMMANDS.join(", ") + " (subcommand)");
     if (plan.id) throw new Error("two task ids: " + plan.id + ", " + arg);
     plan.id = arg;
   }
@@ -32,6 +39,10 @@ export function parseReleaseArgs(args) {
 }
 
 export function run(argv) {
+  // `release status` (TL-502) reads where finished work stands; `release <ID>`
+  // writes. One word, two verbs, because the design names the group `release`
+  // (`docs/release-tracking.md`) and the planned `release record` joins it.
+  if (argv[0] === "status") return runStatus(argv.slice(1));
   let plan;
   const wantsJson = argv.includes("--json");
   const refuse = (message, details = [], code = 1, refusalKind = "refused") => {

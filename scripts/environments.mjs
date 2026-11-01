@@ -43,6 +43,7 @@
  *   stageMatches(task, selector)   `full` / `not-full` / `unknown` / `none` for `--env`
  *   parseStageSelector(text, targets)  `stage` or `target/stage`, validated
  *   explain(reason)                why an empty answer is empty
+ *   defaultTrunk(root)             the remote's default branch, else `HEAD`
  *
  * Tests: `node --test scripts/tests/environments.test.mjs`
  */
@@ -249,6 +250,27 @@ export function deploymentState({ root, prefix, targets, trunk = "HEAD", run = s
     missing,
     byTask,
   };
+}
+
+/**
+ * The trunk a report should read when the caller names none.
+ *
+ * `deploymentState()` defaults to `HEAD`, which is right for the stages of the
+ * branch being looked at and wrong for "closed but not on the trunk" run from a
+ * feature branch: there `HEAD` holds the branch's own commits, and a task closed
+ * on it would read as merged. The remote's default branch is what the project
+ * calls its trunk, so it is preferred; a clone with no `origin/HEAD` falls back
+ * to `HEAD`, and `source` says which happened so a report can print it.
+ *
+ * @returns {{spec: string, source: "remote-default"|"head"}}
+ */
+export function defaultTrunk(root, run = spawnSync) {
+  if (root) {
+    const r = git(run, root, ["symbolic-ref", "--quiet", "refs/remotes/origin/HEAD"]);
+    const ref = r && r.status === 0 ? String(r.stdout || "").trim() : "";
+    if (ref) return { spec: ref, source: "remote-default" };
+  }
+  return { spec: "HEAD", source: "head" };
 }
 
 /** One task's answer. A task with no commits on the trunk gets an empty entry,
