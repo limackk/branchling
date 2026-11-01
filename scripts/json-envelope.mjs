@@ -55,7 +55,9 @@ export const KINDS = {
   // `modifiedFile` is `null` unless `--modified-file` was asked for, and then it
   // says whether the git index could be computed at all (TL-75): zero matches
   // and an unscanned repository are otherwise the same empty `tasks`.
-  "task-list": { tasks: [], total: null, limit: null, scan: null, modifiedFile: null, elsewhereOnly: [] },
+  // `deploy` is `null` unless deployment state was computed (TL-501), and then
+  // names the trunk and every ref read, with its SHA, so the answer can be dated.
+  "task-list": { tasks: [], total: null, limit: null, scan: null, modifiedFile: null, deploy: null, elsewhereOnly: [] },
   // `<command> --help --json` (TL-83). `flags` describes the input surface, and
   // a flag drawing on a vocabulary carries THIS project's values in `values` —
   // so an agent narrows its input instead of guessing and retrying. `configured`

@@ -24,6 +24,7 @@
  *   query --modified-file scripts/cli.mjs        (as part of what was it touched)
  *   query --modified-file scripts/               (the whole directory)
  *   query --status done --text audit --count
+ *   query --status done --not-env production   (finished, not yet in production)
  *
  * Filters (AND between axes, OR inside an axis — comma-separated values):
  *   --status --priority --board --label --epic --owner --type --role --executor
@@ -33,6 +34,9 @@
  *                    up to date. Paths are relative to the REPOSITORY root; a
  *                    trailing `/` matches a whole directory
  *   --text
+ *   --env / --not-env  a deployment stage (`stage` or `target/stage`) the task
+ *                    has reached in full, or has not — COMPUTED from git refs
+ *                    declared in `deploy_targets:` (TL-501)
  * By default only ACTIVE ones (status not in archived_statuses); passing
  * --status explicitly lifts that restriction, so `--status done` searches the
  * closed ones.
@@ -52,6 +56,10 @@ import { DEFAULTS, loadConfigOrExit } from "./config.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { printLine } from "./stdout.mjs";
 import { explain as explainIndex, modifiedFiles, repoRoot, touches } from "./modified-files.mjs";
+import {
+  deploymentScanJson, deploymentState, describeUnknownRefs, explain as explainDeploy,
+  parseStageSelector, stageMatches, taskDeployment, taskDeploymentJson,
+} from "./environments.mjs";
 import { backlogPaths, resolveBacklogDir, resolveBacklogDirOrExit } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { SORT_KEYS, filterTasks, readTaskRecords, sortTasks, splitList, unknownFilterValues } from "./task-select.mjs";
@@ -76,7 +84,7 @@ function collectBacklog(root, opts = {}) {
 const VALUE_FLAGS = new Set([
   "--status", "--priority", "--board", "--label", "--epic", "--owner", "--type",
   "--role", "--executor", "--blocked-by", "--text", "--limit", "--sort", "--tasks", "--dir",
-  "--modified-file",
+  "--modified-file", "--env", "--not-env",
 ]);
 const BOOL_FLAGS = new Set(["--json", "--files", "--count", "--help", "-h"]);
 
@@ -136,6 +144,11 @@ const FILE_QUERY = opts["modified-file"];
 let COLLECTED = [];
 
 if (opts.tasks) {
+  if (opts.env !== undefined || opts["not-env"] !== undefined) {
+    console.error("✗ --env and --not-env need the configuration, which `--tasks <dir>` bypasses");
+    console.error("  the stages are declared in `deploy_targets:` in config.yaml");
+    process.exit(2);
+  }
   if (FILE_QUERY !== undefined) {
     console.error("✗ --modified-file needs the configuration, which `--tasks <dir>` bypasses");
     console.error("  the task id prefix is what links a commit message to a task");
@@ -209,6 +222,35 @@ if (unknownValues.length) {
   process.exit(2);
 }
 
+// DEPLOYMENT STATE (TL-501), computed only when something asks for it: a
+// `--env`/`--not-env` filter, or `--json` in a project that declares targets.
+// A stage name outside `deploy_targets` FAILS for the same reason a status
+// outside `statuses` does.
+const ENV_SELECTORS = [];
+for (const [flag, want] of [["env", "full"], ["not-env", "not-full"]]) {
+  if (opts[flag] === undefined) continue;
+  const cfg = COLLECTED[0].config;
+  const sel = parseStageSelector(opts[flag], cfg.deployTargets);
+  if (!sel.ok) {
+    console.error("✗ --" + flag + ": " + sel.message);
+    process.exit(2);
+  }
+  ENV_SELECTORS.push({ ...sel, want });
+}
+let DEPLOY = null;
+{
+  const one = COLLECTED[0];
+  if (one.config && (ENV_SELECTORS.length || (opts.json && one.config.deployTargets.length))) {
+    DEPLOY = deploymentState({
+      root: repoRoot(one.root), prefix: one.config.taskIdPrefix, targets: one.config.deployTargets,
+    });
+    for (const t of one.tasks) t.deploy = taskDeploymentJson(taskDeployment(DEPLOY, t.id));
+  }
+}
+if (opts.json) {
+  for (const one of COLLECTED) for (const t of one.tasks) if (t.deploy === undefined) t.deploy = null;
+}
+
 // FILTERED PER PROJECT, THEN CONCATENATED. Which status counts as closed is a
 // project's own decision (`archived_statuses`), so one shared set would apply
 // somebody else's definition of "done" to a project that never agreed to it.
@@ -237,6 +279,13 @@ for (const one of COLLECTED) {
   // that module is the one `next` also uses to choose work, and a criterion that
   // needs a git process has no business in the dispatcher's hot path.
   if (one.index) some = some.filter((t) => touches(one.index.byTask.get(t.id) || new Set(), FILE_QUERY));
+  // A task that touched no target declaring the stage, or whose answer hangs
+  // on a ref that did not resolve, matches NEITHER filter: it is not "in
+  // production" and it is not "missing from production" either.
+  if (DEPLOY && ENV_SELECTORS.length) {
+    some = some.filter((t) => ENV_SELECTORS.every((sel) =>
+      stageMatches(taskDeployment(DEPLOY, t.id), sel) === sel.want));
+  }
   hits = hits.concat(some);
 }
 
@@ -284,6 +333,7 @@ if (opts.count) {
   // On stderr, so a count stays a number for a script. Silence would make a
   // backlog with work on an unmerged branch indistinguishable from one without.
   for (const line of elsewhereOnlyLines) console.error("# " + line);
+  for (const line of deployNotes()) console.error("# " + line);
   process.exit(0);
 }
 if (opts.json) {
@@ -306,6 +356,10 @@ if (opts.json) {
     // the same empty `tasks` (TL-75). Present either way: the envelope's rule is
     // that a declared key never goes missing.
     modifiedFile: INDEX ? { query: FILE_QUERY, scanned: INDEX.scanned, reason: INDEX.reason } : null,
+    // `null` unless deployment state was computed (TL-501), and then whether it
+    // could be, from which trunk, and EVERY ref it read with its SHA: the answer
+    // is only as fresh as those refs, and an unresolved one is `unknown`.
+    deploy: DEPLOY ? deploymentScanJson(DEPLOY) : null,
     // WHAT THE PASS COULD NOT REACH (TL-36). In the RESULT and not only on
     // stderr: a consumer reading this envelope would otherwise count an
     // incomplete set as complete, and "you moved the repository" would arrive
@@ -331,6 +385,7 @@ if (opts.files) {
     const why = explainIndex(INDEX.reason);
     if (why) console.error("# " + why);
   }
+  for (const line of deployNotes()) console.error("# " + line);
   process.exit(0);
 }
 
@@ -381,4 +436,17 @@ for (const line of elsewhereOnlyLines) printLine("# " + line);
 if (INDEX) {
   const why = explainIndex(INDEX.reason);
   if (why) printLine("# " + why);
+}
+
+// The same rule for deployment state: an unresolved ref is unknown, and an
+// empty answer says which empty it is.
+for (const line of deployNotes()) printLine("# " + line);
+
+function deployNotes() {
+  if (!DEPLOY || !ENV_SELECTORS.length) return [];
+  const lines = [];
+  const why = explainDeploy(DEPLOY.reason);
+  if (why) lines.push(why);
+  for (const l of describeUnknownRefs(DEPLOY)) lines.push(l + " — tasks that depend on it match neither --env nor --not-env");
+  return lines;
 }

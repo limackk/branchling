@@ -91,6 +91,7 @@ does not know it is two files. No `config.yaml` = generic `DEFAULTS` (no
 | `dashboard_open_statuses`, `dashboard_burndown_kind/value` | what "open" means and what the burndown burns down |
 | `contract_programs` | additional bare executable names a verification contract may invoke when their subcommands overlap this tool's commands; values add to the generic defaults rather than replacing them |
 | `closing_contract` | verification entries `done` appends to every task's own contract and runs after it — the shape of a task's `verification:` entries (`- id:` then `bash:` or `manual:`). For the repository-wide guard a module's tests do not reach. It never stands in for a missing task contract, and an id a task's own entry also uses refuses that closing before anything runs. `take --probe`, `next --probe` and `check --proofs` run the same contract (TL-495) |
+| `deploy_targets` | the deployables of the project and, for each, its promotion stages as an ordered list of git refs (`ref:`, or `refs:` for refs deployed in parallel). Which stage a task has reached is COMPUTED from those refs, never typed — `query --env`/`--not-env` and `query --json` (TL-501). Absent means the project tracks no environments. Shapes and examples: [`manual.md`](manual.md#deployment-stages), design: [`release-tracking.md`](release-tracking.md) |
 
 `roles` is the only vocabulary whose EMPTY value means something. Every other
 enum with no vocabulary degrades, in `buildFieldSpecs`, to free text — a

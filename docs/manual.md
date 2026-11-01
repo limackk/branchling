@@ -208,6 +208,145 @@ how many it left alone. A number in prose may point at a task in another
 repository, and a bulk replace would silently repoint it. On an empty backlog
 the change is free: fix the line in `config.yaml` and you are done.
 
+### Deployment stages
+
+Whether a task is FINISHED is its status. Whether it has REACHED the test
+environment or production is a different question, and it is answered from git
+rather than typed: `deploy_targets:` declares what the project deploys and, for
+each deployable, its promotion stages as an ordered list of git refs. The
+design, and the reasons a hand-kept `environment:` field was rejected, are in
+[`release-tracking.md`](release-tracking.md).
+
+```yaml
+deploy_targets:
+  - name: backend                 # something deployed on its own
+    paths: [backend/]             # which commits belong to it; omit for the whole repository
+    stages:                       # in promotion order
+      - { name: test, ref: origin/main }
+      - { name: production, ref: origin/production }
+```
+
+- **A commit belongs to a task through the task id in its message**, anywhere
+  in it. Only commits reachable from the trunk (`HEAD`) count, so a squash
+  merge, a merge commit and a rebase give the same answer; merge commits
+  themselves are skipped.
+- **A task's targets are the ones whose `paths` its commits touched.** A path
+  ending in `/` selects a directory; any other entry selects that file, or the
+  directory of that name. There are no globs in `paths`.
+- **Per target and stage the answer is `full`, `partial` or `absent`** — all,
+  some or none of the task's commits for that target are in the stage. A
+  commit cherry-picked onto a stage counts by patch identity (`git cherry`),
+  not by SHA.
+- **A ref is a ref name or a `refs/…` glob**, and a glob resolves to the newest
+  match by version sort, so `refs/tags/v*` picks `v1.10` over `v1.9`.
+- **`refs:` instead of `ref:` declares refs deployed in parallel** — regions,
+  tenants, maintained release lines. The stage is reached only when every one
+  of them holds the task; until then the answer names which ones do.
+- **A ref that does not resolve is `unknown`, never empty.** A task whose answer
+  depends on it matches neither `--env` nor `--not-env`, and the output says
+  which ref it was. Every answer also names each ref it read with its SHA:
+  a remote-tracking branch moves only on `git fetch`, and the default refspec
+  does not fetch `refs/deploys/*`.
+- **A rollback needs no edit.** Move the ref back and the tasks leave the stage.
+- **An unknown key fails** at every level, and so do a stage with both or
+  neither of `ref` and `refs`, a duplicated name, and a glob that is not a full
+  ref name.
+
+Asking:
+
+```bash
+branchling query --status done --not-env production   # finished, not yet in production
+branchling query --env backend/test                    # in test, for one target
+branchling query --text checkout --json                # each task's `deploy` per target and stage
+```
+
+One declaration per product shape:
+
+```yaml
+# Web application or API, a branch per environment
+deploy_targets:
+  - name: web
+    stages:
+      - { name: test, ref: origin/main }
+      - { name: production, ref: origin/production }
+```
+
+```yaml
+# Web application, trunk-based: CI moves a ref after each deploy, e.g.
+#   git push --force origin <sha>:refs/deploys/web/production
+deploy_targets:
+  - name: web
+    stages:
+      - { name: trunk, ref: origin/main }
+      - { name: staging, ref: refs/deploys/web/staging }
+      - { name: canary, ref: refs/deploys/web/canary }
+      - { name: production, ref: refs/deploys/web/production }
+```
+
+```yaml
+# Desktop or mobile application: releases are tags
+deploy_targets:
+  - name: desktop
+    paths: [desktop/]
+    stages:
+      - { name: tagged, ref: "refs/tags/desktop-v*" }
+  - name: mobile
+    paths: [app/]
+    stages:
+      - { name: tagged, ref: "refs/tags/mobile-v*" }
+```
+
+```yaml
+# Library or CLI published to a registry, where CI publishes every tag
+deploy_targets:
+  - name: package
+    stages:
+      - { name: published, ref: "refs/tags/v*" }
+```
+
+```yaml
+# GitFlow: release branches, newest by version
+deploy_targets:
+  - name: app
+    stages:
+      - { name: trunk, ref: origin/develop }
+      - { name: release, ref: "refs/remotes/origin/release/*" }
+      - { name: production, ref: origin/main }
+```
+
+```yaml
+# Regions deployed separately, or maintained release lines patched in parallel
+deploy_targets:
+  - name: api
+    stages:
+      - { name: test, ref: origin/main }
+      - name: production
+        refs: [refs/deploys/api/production-eu, refs/deploys/api/production-us]
+  - name: lib
+    paths: [lib/]
+    stages:
+      - name: maintained
+        refs: [origin/release-1.x, origin/release-2.x]
+```
+
+```yaml
+# Several deployables in one repository
+deploy_targets:
+  - name: api
+    paths: [api/]
+    stages:
+      - { name: production, ref: refs/deploys/api/production }
+  - name: worker
+    paths: [worker/, shared/]
+    stages:
+      - { name: production, ref: refs/deploys/worker/production }
+```
+
+A project with no environments omits the key, and nothing changes. Stages with
+no git event of their own — store review, an update channel, a customer's
+installation — and self-hosted installations are planned as recorded stages
+(TL-506); until then they are not declared.
+
 ## The execution order (`plan.yaml`)
 
 Which task comes first is a **decision**, not something the tree can recompute —
@@ -670,7 +809,7 @@ implementation detail. Every reading command answers in the same envelope:
 
 | Command | `kind` | Payload |
 |---|---|---|
-| `query` | `task-list` | `tasks`, `total` (matches BEFORE `--limit`), `limit`, `scan`, `modifiedFile`, `elsewhereOnly` (the tasks only another branch has) |
+| `query` | `task-list` | `tasks`, `total` (matches BEFORE `--limit`), `limit`, `scan`, `modifiedFile`, `deploy` (null unless deployment state was computed — then the trunk and every ref read, with its SHA; each task then carries its own `deploy` per target and stage), `elsewhereOnly` (the tasks only another branch has) |
 | `stats` | `stats` | `root`, `stats` (the tallies), `scan`, `divergent` (one row per task another branch disagrees with), `elsewhereOnly` (the tasks only another branch has), `context` (null unless `--context`: the measured cost rows), `agentTime` (null unless `--agent-time`: per-estimate buckets from the ledger, the verdict, and what could not be measured) |
 | `doctor` | `doctor` | `ok`, `root`, `next`, `checks` |
 | `serve --list` | `serve-list` | `servers` (one row per registered viewer, each carrying its own state: running, stale — the entry outlived its process — or elsewhere, meaning another host wrote it and this one may not judge it), `stateDir`, `host` |

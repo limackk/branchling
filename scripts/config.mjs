@@ -42,6 +42,7 @@ import { LINK_POLICIES, parseVerification } from "./criteria.mjs";
 import { DEFAULT_LOCK_TTL_MINUTES } from "./lock.mjs";
 import { estimateHours } from "./estimate.mjs";
 import { USER_KEYS, loadUserConfig } from "./home.mjs";
+import { readDeployTargets } from "./deploy-targets.mjs";
 
 // ──────────────────────────────────────────────────────────────────────────
 // Default values — generic, for a fresh repository
@@ -126,6 +127,12 @@ export const DEFAULTS = Object.freeze({
   // that guard once here rather than in every task file. Empty — the default —
   // adds nothing.
   closing_contract: Object.freeze([]),
+  // The deployables of the project and, for each, its promotion stages as an
+  // ordered list of git refs (TL-501, `docs/release-tracking.md`). Empty — the
+  // default, written by omitting the key — means the project tracks no
+  // environments and nothing that reads deployment state has anything to say.
+  // The shape is validated by `scripts/deploy-targets.mjs`.
+  deploy_targets: Object.freeze([]),
   // Which statuses may not be entered without a stated reason (TL-105). A
   // VOCABULARY, so it belongs here and not in the code: `blocked` and
   // `cancelled` are this project's words, and a list of literals in a script
@@ -393,6 +400,14 @@ export function parseConfigYaml(text) {
       if (!next.trim()) continue;
       if (!/^\s/.test(next)) break;
       body.push(next.trim());
+    }
+
+    if (key === "deploy_targets") {
+      const read = readDeployTargets(inline, lines.slice(i + 1, j).map(stripComment));
+      for (const p of read.problems) problems.push(p);
+      values[key] = read.targets;
+      i = j - 1;
+      continue;
     }
 
     if (key === "closing_contract") {
@@ -702,6 +717,9 @@ export function loadConfig(root, opts = {}) {
       ...new Set([...DEFAULTS.contract_programs, ...(parsedValues.contract_programs || [])]),
     ]),
     closingContract: values.closing_contract,
+    // Normalised by the reader: every stage carries `refs`, even one written
+    // with `ref:`. Read by `scripts/environments.mjs`.
+    deployTargets: values.deploy_targets,
     // Resolved here rather than in DEFAULTS, because the fallback is another
     // key's value and DEFAULTS is a flat literal.
     reasonRequiredStatuses: values.reason_required_statuses || values.archived_statuses,
