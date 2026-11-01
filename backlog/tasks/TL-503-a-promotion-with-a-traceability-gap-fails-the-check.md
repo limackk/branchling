@@ -16,7 +16,7 @@ confidence: medium                 # how much you trust the estimate
 created: 2026-11-01
 updated: 2026-11-01
 blocked_by: [TL-501]                     # ids of tasks that MUST be closed before this one starts
-blocks: []                         # ids this task will unblock
+blocks: [TL-504, TL-507]                         # ids this task will unblock
 related_docs: [docs/release-tracking.md] # paths relative to the repository root
 verification:
   - id: gaps-tests
@@ -42,6 +42,8 @@ Depends on scripts/environments.mjs from the same epic. 'No gaps' in release tra
 A stage with parallel refs (`refs:`) is checked per ref: a task in one region and missing from another is gap 3, partial, and the report names the ref.
 
 Each gap is reported with the commit or task that proves it. Gaps that a project knowingly accepts (for example merge commits without an id) are configured, not hard-coded; an unknown gap name in that configuration fails. A positive control is required: the test must show the gate failing on a fixture with every gap, not only passing on a clean one.
+
+**Decided 2026-11-01 by the owner:** the gate's default is `report`, mirroring `contract_capability: report|require`. Gaps are printed and the exit code is 0 unless config.yaml opts into `require`; with `require`, any gap not explicitly accepted in configuration exits non-zero. A blocking default was rejected because this repository's own version-bump commits carry no task id.
 
 ## Steps
 

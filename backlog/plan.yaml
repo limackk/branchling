@@ -13,7 +13,7 @@
 # means something first, outward claims last — and adds one: a human gate is
 # closed by a vouch, so the vouch has to be recorded under the right name
 # before any gate is closed with one.
-updated: 2026-10-30
+updated: 2026-11-01
 rationale: "The package is already public, so what remains is making each later claim true before it is made. Branchling first makes its suite answer the same way twice, then records a person's vouch as that person's and reads a CRLF checkout like an LF one; the viewer runs alongside, on files neither of those touches. Only then the human gates, and last the release evidence and the announcement that point at all of it."
 waves:
   # A SUITE THAT IS RED BY CHANCE CLOSES NOTHING. `done` runs the suite, so a
@@ -67,3 +67,19 @@ waves:
   # backlog needs at intake.
   - name: "Parallel worktree loops stop colliding"
     tasks: [TL-490, TL-492, TL-489, TL-491, TL-493]
+
+  # Every other release-tracking task reads the stage a task has reached, so the computation and the deploy_targets key land first and alone.
+  - name: "Deploy stages are computed from git"
+    tasks: [TL-501]
+
+  # Three readers of the same computation that touch different commands: release status, check --release and doctor. They run side by side.
+  - name: "The report, the gate and the fetch check"
+    tasks: [TL-502, TL-503, TL-508]
+
+  # The viewer needs the report and the gap detectors; planned scope and recorded stages extend the report. The owner chose to land the viewer before the unmerged viewer branches.
+  - name: "Views and declarations on top of the report"
+    tasks: [TL-504, TL-505, TL-506]
+
+  # Small and last: it teaches the gap detectors to skip targets whose code lives in another repository, so it follows the gate and the scope check that it changes.
+  - name: "Unobservable targets"
+    tasks: [TL-507]

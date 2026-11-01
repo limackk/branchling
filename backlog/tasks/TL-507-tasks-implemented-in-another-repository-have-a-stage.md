@@ -15,7 +15,7 @@ estimate: 1d
 confidence: medium                 # how much you trust the estimate
 created: 2026-11-01
 updated: 2026-11-01
-blocked_by: [TL-501]                     # ids of tasks that MUST be closed before this one starts
+blocked_by: [TL-501, TL-503]                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: [docs/release-tracking.md] # paths relative to the repository root
 verification:
@@ -33,9 +33,11 @@ Filed while generalising `docs/release-tracking.md` across product shapes. TL-50
 
 Options to weigh, none chosen: a `repository:` key on a deploy target naming a local clone or remote whose refs are fetched read-only; reading the other repository's commits through the `<repo>#<path>` reference form `check --refs` already recognises; or declaring such targets unobservable and excluding their tasks from the gate with an explicit note. Law 1 constrains the choice: the task stays in the backlog's repository, only the evidence of deployment would be read from elsewhere.
 
+**Decided 2026-11-01 by the owner:** implement the third option only. A deploy target may declare that its code lives in another repository; tasks of such a target are reported as unobservable and no gap detector reports them. Reading another repository's refs is deferred and NOT part of this task.
+
 ## Steps
 
-1. Decide among the options above and record the decision in docs/release-tracking.md §6.
+1. Record the decision above in docs/release-tracking.md §6 and add the target-level declaration to the `deploy_targets` validator.
 2. Implement the chosen behaviour in scripts/environments.mjs and the gap detectors.
 3. Add a fixture with two repositories.
 

@@ -15,7 +15,7 @@ estimate: 1d
 confidence: medium                 # how much you trust the estimate
 created: 2026-11-01
 updated: 2026-11-01
-blocked_by: [TL-501]                     # ids of tasks that MUST be closed before this one starts
+blocked_by: [TL-501, TL-502]                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: [docs/release-tracking.md] # paths relative to the repository root
 verification:

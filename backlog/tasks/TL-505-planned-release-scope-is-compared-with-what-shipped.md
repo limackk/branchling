@@ -15,7 +15,7 @@ estimate: 1d
 confidence: medium                 # how much you trust the estimate
 created: 2026-11-01
 updated: 2026-11-01
-blocked_by: [TL-501]                     # ids of tasks that MUST be closed before this one starts
+blocked_by: [TL-501, TL-502]                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: [docs/release-tracking.md] # paths relative to the repository root
 verification:
@@ -33,7 +33,7 @@ This is Jira's fixVersion: the INTENT, which is legitimately versioned data (Law
 
 Proposed shape: a `release:` frontmatter field drawing from a `releases:` list in config.yaml, closed like boards, so a typo fails instead of creating a release nobody plans. `epic` was considered and rejected as the carrier: an epic is WHAT is delivered and spans releases; a release is WHEN it ships. Labels were rejected because they are open by default and would let a misspelt release silently drop tasks from the readiness report.
 
-Open question for the owner before implementation: whether a release should also carry a target date, and whether P0 tasks planned for a release block `check --release` for production.
+**Decided 2026-11-01 by the owner:** an open P0 task planned for a release blocks the release check for the last stage of its targets (a gap even under `report`, failing under `require`). A release carries no target date.
 
 ## Steps
 

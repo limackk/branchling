@@ -15,7 +15,7 @@ estimate: 1d
 confidence: medium                 # how much you trust the estimate
 created: 2026-11-01
 updated: 2026-11-01
-blocked_by: [TL-501]                     # ids of tasks that MUST be closed before this one starts
+blocked_by: [TL-501, TL-502, TL-503]                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: [docs/release-tracking.md] # paths relative to the repository root
 verification:
@@ -32,6 +32,8 @@ The viewer has a Release view: one lane per deploy target and one column per sta
 Depends on scripts/environments.mjs and the gap detectors from the same epic. The owner asked for boards in the viewer to control what goes to the test environment and what to production before a launch. A `board:` in this tool is a PARTITION of the backlog (boards.yaml: who or which working context), so environments must NOT become boards: a task moves through environments, it does not belong to one. The Release view is a third axis beside the Tasks and Execution views in scripts/build-viewer.mjs.
 
 The environment state is computed at build time, so the view carries the time of the build and the resolved SHA of each ref in its header; a stale view must say how stale it is. The view respects the existing board, epic and release filters and URL view state. Follow the branchling-viewer skill for palette, dark mode and URL state.
+
+**Decided 2026-11-01 by the owner:** implement against main now. The unmerged branches tl-450-inline-editing and tl-451-dashboard also change scripts/build-viewer.mjs; do NOT touch them — they absorb the conflict when they rebase. Keep the Release view's code in its own functions and, where practical, its own module so that rebase stays small.
 
 ## Steps
 
