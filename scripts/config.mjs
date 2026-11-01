@@ -37,7 +37,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { backlogPaths } from "./paths.mjs";
 import { PRODUCT_NAME } from "./product.mjs";
 import { DEFAULT_TASK_ID_PREFIX, PREFIX_SHAPE, inferPrefix, taskIdPatterns } from "./task-id.mjs";
-import { ACTOR_NAMESPACES, CONFLICT_GROUP_SOURCES, ROLE_SHAPE, isValidActor, unquote } from "./task-fields.mjs";
+import { ACTOR_NAMESPACES, CONFLICT_GROUP_SOURCES, RELEASE_SHAPE, ROLE_SHAPE, isValidActor, unquote } from "./task-fields.mjs";
 import { LINK_POLICIES, parseVerification } from "./criteria.mjs";
 import { DEFAULT_LOCK_TTL_MINUTES } from "./lock.mjs";
 import { estimateHours } from "./estimate.mjs";
@@ -67,6 +67,14 @@ export const DEFAULTS = Object.freeze({
   // accepting one would create a phantom role no dispatcher serves, and the task
   // would leave every specialised queue without a word.
   roles: [],
+  // The releases a task may be PLANNED for (TL-505) — the intent half of
+  // release tracking, as opposed to deployment, which is observed in git
+  // (`docs/release-tracking.md` §1). A CLOSED vocabulary, like boards: a
+  // misspelt `release:` would otherwise create a release nobody plans and drop
+  // the task silently from `release status --release`. Empty — the default —
+  // means this project plans no releases, and a task naming one FAILS. Order is
+  // the project's own; the tool reads no date or sequence from it.
+  releases: [],
   label_axis_timing: [],      // the "Phase" axis in the viewer filters; empty removes the facet
   label_axis_env: [],         // the "Environment" axis; empty removes the facet
   owners: ["unassigned"],
@@ -289,7 +297,7 @@ const KNOWN_KEYS = Object.keys(DEFAULTS);
 
 const LIST_KEYS = new Set([
   "statuses", "archived_statuses", "priorities", "types", "confidence",
-  "labels", "label_axis_timing", "label_axis_env", "owners", "estimates", "actors", "roles",
+  "labels", "label_axis_timing", "label_axis_env", "owners", "estimates", "actors", "roles", "releases",
   "dashboard_open_statuses", "status_strikethrough", "reason_required_statuses",
   "docs_status_pending_patterns", "contract_programs", "release_gate_accept",
 ]);
@@ -682,6 +690,7 @@ export function loadConfig(root, opts = {}) {
     labels: values.labels,
     labelsClosed: values.labels_closed,
     roles: values.roles,
+    releases: values.releases,
     auditStaleDays: values.audit_stale_days,
     // The cap stays a string here and is parsed where it is validated and used:
     // `null` from an unparseable value has to reach `validateConfig` as a
@@ -950,6 +959,22 @@ export function validateConfig(config) {
     }
     if (seenRoles.has(r)) problems.push("duplicate role `" + r + "` in `roles`");
     seenRoles.add(r);
+  }
+
+  // A release is typed after `--release` and compared verbatim with `release:`
+  // in a task, so a name with whitespace or a duplicate entry is a comparison
+  // that can never succeed. Dots are allowed: version numbers are the common
+  // case (`2026.11`, `v1.4`). The shape is `RELEASE_SHAPE` in task-fields.mjs.
+  const seenReleases = new Set();
+  for (const r of config.releases || []) {
+    if (!RELEASE_SHAPE.test(String(r))) {
+      problems.push(
+        "`releases` contains `" + r + "` — expecting a lowercase slug: a letter or digit, " +
+          "then letters/digits/`.`/`_`/`-`"
+      );
+    }
+    if (seenReleases.has(r)) problems.push("duplicate release `" + r + "` in `releases`");
+    seenReleases.add(r);
   }
 
   // Documentation drift (TL-100). `docs_role` names a role a DISPATCHER has to

@@ -35,7 +35,36 @@
  * the newest across parallel refs. An archived task off the trunk waits from the
  * day its history records it closed, else its `updated:` date.
  *
- * Tests: `node --test scripts/tests/release-status.test.mjs`
+ * PLANNED SCOPE (`--release <name>`, TL-505). A task names the release it is
+ * planned for in `release:`, a value from the closed `releases:` list — the
+ * intent, written by a person, as opposed to the deployment, which is observed.
+ * The comparison has four lists, each answering one question a release
+ * manager asks:
+ *
+ *   planned, not shipped   planned and not yet in full in the LAST stage of
+ *                          every target it touched — the launch blockers. A
+ *                          planned task with no commit on the trunk is here,
+ *                          named as such: "not started" is not "deployed"
+ *   planned, still open    planned and in an open status, whether or not some of
+ *                          its commits already travel
+ *   unplanned              on the trunk or in an earlier stage, not yet in the
+ *                          last one, and NOT planned for this release: the scope
+ *                          the next promotion carries without anybody having
+ *                          planned it. Bounded by the pipeline on purpose — what
+ *                          already reached the last stage is the project's whole
+ *                          history, and listing it as "unplanned" would bury the
+ *                          answer
+ *   dropped                planned and closed in an archived status other than
+ *                          the one `done` writes (the first of
+ *                          `archived_statuses:`): planned, then deliberately not
+ *                          delivered. Never a blocker
+ *
+ * Shipped planned tasks are COUNTED, like the last bucket of the pipeline. A
+ * planned task whose last stage did not resolve is `unknown`, never shipped and
+ * never absent.
+ *
+ * Tests: `node --test scripts/tests/release-status.test.mjs`,
+ *        `node --test scripts/tests/release-scope.test.mjs`
  */
 
 import { spawnSync } from "node:child_process";
@@ -61,8 +90,8 @@ import { MARK, color, failure, refusal } from "./ui.mjs";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DAY = 86_400_000;
 
-export const STATUS_FLAGS = ["--target", "--env", "--count", "--json"];
-const VALUE_FLAGS = ["--target", "--env"];
+export const STATUS_FLAGS = ["--target", "--env", "--release", "--count", "--json"];
+const VALUE_FLAGS = ["--target", "--env", "--release"];
 
 /** The bucket kinds, in pipeline order. */
 export const BUCKET_KINDS = Object.freeze(["closed-off-trunk", "waiting", "reached"]);
@@ -76,7 +105,7 @@ function git(run, root, args) {
 /** PURE — the flags of `release status`. Throws with the available set on the
  *  second line, which is the shape `refusal()` prints. */
 export function parseStatusArgs(argv) {
-  const opts = { target: null, env: null, count: false, json: false };
+  const opts = { target: null, env: null, release: null, count: false, json: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--count") { opts.count = true; continue; }
@@ -123,6 +152,123 @@ export function resolveFilter({ target, env }, targets) {
     }
   }
   return { ok: true, target: t, stage: sel.stage };
+}
+
+/**
+ * PURE — `--release` checked against `releases:` and the other flags. An
+ * undeclared release FAILS: a typo would otherwise list every planned task as
+ * missing and every travelling one as unplanned, which reads exactly like an
+ * answer. `--env` is refused beside it, because the comparison is with the
+ * LAST stage by definition, and narrowing it to another would answer a
+ * different question under the same heading.
+ *
+ * @returns {{ok: true} | {ok: false, message: string}}
+ */
+export function checkReleaseFlag({ release, env }, releases) {
+  if (release === null) return { ok: true };
+  const declared = releases || [];
+  if (declared.indexOf(release) < 0) {
+    return {
+      ok: false,
+      message: declared.length
+        ? "`" + release + "` is not a declared release (declared: " + declared.join(", ") + ")"
+        : "this project declares no `releases` in config.yaml, so it plans no release `" + release + "`",
+    };
+  }
+  if (env !== null) {
+    return { ok: false, message: "`--release` compares the plan with the LAST stage of each target; `--env` cannot narrow it to another" };
+  }
+  return { ok: true };
+}
+
+/**
+ * Where a task stands on one target: the first stage that does not hold it in
+ * full, read the same way the pipeline places it.
+ */
+function standingOn(te) {
+  const k = te.stages.findIndex((s) => s.state !== "full");
+  if (k < 0) return { target: te.target, at: te.stages[te.stages.length - 1].stage, waitingFor: null, state: "full" };
+  return {
+    target: te.target,
+    at: k === 0 ? null : te.stages[k - 1].stage,
+    waitingFor: te.stages[k].stage,
+    state: te.stages[k].state,
+  };
+}
+
+/**
+ * PURE — the planned scope of one release against what the stages hold. The
+ * four lists are described in the header.
+ *
+ * @param {object} opts
+ * @param {object} opts.state  `deploymentState()`
+ * @param {readonly object[]} opts.targets  `config.deployTargets`
+ * @param {object[]} opts.tasks  every task: `{id, title, status, priority, release}`
+ * @param {string} opts.release  a declared release
+ * @param {readonly string[]} opts.archived  `archived_statuses`
+ * @param {string|null} [opts.target]  `--target`
+ * @param {boolean} [opts.count]  drop the lists, keep the counts
+ */
+export function releaseScope({ state, targets, tasks, release, archived, target = null, count = false }) {
+  const done = archived[0] || null;
+  const known = new Map(tasks.map((t) => [t.id, t]));
+  const inScope = (te) => target === null || te.target === target;
+  const scoped = (t) => targets.some((x) => x.name === t && (target === null || x.name === target));
+  const row = (id, standing, note) => {
+    const t = known.get(id) || { id, title: null, status: null, priority: null, release: "" };
+    const entry = state.byTask.get(id);
+    return {
+      id, title: t.title, status: t.status, priority: t.priority, release: t.release || "",
+      commits: entry ? entry.commits.length : 0, standing, note,
+    };
+  };
+
+  const planned = tasks.filter((t) => t.release === release);
+  const notShipped = [];
+  const open = [];
+  const dropped = [];
+  let shipped = 0;
+  for (const t of planned) {
+    const isArchived = archived.indexOf(t.status) >= 0;
+    if (isArchived && t.status !== done) { dropped.push(row(t.id, [], null)); continue; }
+    if (!isArchived) open.push(row(t.id, [], null));
+    if (!state.scanned) { notShipped.push(row(t.id, [], "unscanned")); continue; }
+    const entry = state.byTask.get(t.id);
+    if (!entry || !entry.commits.length) { notShipped.push(row(t.id, [], "no-commits")); continue; }
+    const tes = entry.targets.filter(inScope);
+    if (!tes.length) {
+      // Commits that touch no selected target: outside this answer when
+      // `--target` excluded them, and otherwise nothing that can ship anywhere.
+      if (target === null) notShipped.push(row(t.id, [], "no-target"));
+      continue;
+    }
+    const standing = tes.map(standingOn);
+    if (standing.every((s) => s.state === "full")) { shipped++; continue; }
+    notShipped.push(row(t.id, standing.filter((s) => s.state !== "full"),
+      standing.some((s) => s.state === "unknown") ? "unknown" : null));
+  }
+
+  const unplanned = [];
+  for (const [id, entry] of state.byTask) {
+    const t = known.get(id);
+    if (t && t.release === release) continue;
+    const standing = entry.targets.filter((te) => inScope(te) && scoped(te.target)).map(standingOn)
+      .filter((s) => s.state !== "full");
+    if (!standing.length) continue;
+    unplanned.push(row(id, standing, t ? null : "no-task-file"));
+  }
+
+  const byId = (a, b) => String(a.id).localeCompare(String(b.id), undefined, { numeric: true });
+  const list = (rows) => ({ count: rows.length, tasks: count ? [] : rows.sort(byId) });
+  return {
+    name: release,
+    planned: planned.length,
+    shipped: { count: shipped },
+    notShipped: list(notShipped),
+    open: list(open),
+    unplanned: list(unplanned),
+    dropped: list(dropped),
+  };
 }
 
 /** The date an archived task closed: its last recorded move into an archived
@@ -318,6 +464,11 @@ export function renderStatus(report, paint = color) {
     const where = (r.target + "/" + r.stage).padEnd(refWidth);
     lines.push("  " + where + "  " + refName(r).padEnd(nameWidth) + "  " + (r.sha ? shortSha(r.sha) : paint.warn("unknown") + " — " + r.why));
   }
+  if (report.release) {
+    lines.push("");
+    lines.push(...renderScope(report.release, report.archived, paint));
+    return lines.join("\n");
+  }
   for (const t of report.targets) {
     lines.push("");
     lines.push(paint.bold(t.target));
@@ -349,8 +500,45 @@ export function renderStatus(report, paint = color) {
   return lines.join("\n");
 }
 
+/** Where one row stands, in words. */
+function describeStanding(task) {
+  if (task.note === "unscanned") return ["deployment not read"];
+  if (task.note === "no-commits") return ["no commit on the trunk names it"];
+  if (task.note === "no-target") return ["its commits touch no deploy target's paths"];
+  return task.standing.map((s) => {
+    if (s.state === "unknown") return s.target + ": unknown — a ref of " + s.waitingFor + " does not resolve";
+    const where = s.at === null ? "on the trunk" : "in " + s.at;
+    return s.target + ": " + where + ", waiting for " + s.waitingFor + (s.state === "partial" ? " (partial)" : "");
+  });
+}
+
+/** The text answer of `--release`. */
+export function renderScope(scope, archived, paint = color) {
+  const lines = [];
+  lines.push(paint.bold("release " + scope.name) + "  " + scope.planned + " planned · " +
+    scope.shipped.count + " shipped (counted, not listed) · " + scope.dropped.count + " dropped");
+  const sections = [
+    ["planned, not shipped", scope.notShipped, true],
+    ["planned, still open", scope.open, false],
+    ["unplanned, carried by the next promotion", scope.unplanned, true],
+    ["planned, then dropped", scope.dropped, false],
+  ];
+  const width = Math.max(...sections.map(([label]) => label.length));
+  for (const [label, part, where] of sections) {
+    lines.push("  " + label.padEnd(width) + "  " + part.count);
+    for (const task of part.tasks) {
+      const parts = [task.status === null ? "no task file" : task.status];
+      if (task.priority) parts.push(task.priority);
+      if (part === scope.unplanned && task.release) parts.push("planned for " + task.release);
+      if (where) parts.push(...describeStanding(task));
+      lines.push("    " + paint.id(task.id) + "  " + (task.title === null ? "" : task.title) + "  " + paint.dim(parts.join(" · ")));
+    }
+  }
+  return lines;
+}
+
 /** The whole computation, for a resolved backlog. */
-export function computeStatus({ root, config, filter, count, now = Date.now(), run = spawnSync }) {
+export function computeStatus({ root, config, filter, count, release = null, now = Date.now(), run = spawnSync }) {
   const targets = config.deployTargets;
   const repo = repoRoot(root);
   const trunk = defaultTrunk(repo, run);
@@ -363,8 +551,21 @@ export function computeStatus({ root, config, filter, count, now = Date.now(), r
     archived: config.archivedStatuses,
     targets: [],
     unplaced: { count: 0, ids: [] },
+    release: null,
   };
-  if (!state.scanned) return { report, state };
+  // The plan is read even when git could not be: which planned tasks are open
+  // is still an answer. Every other planned task is marked `unscanned` rather
+  // than placed — "not shipped" there would be a verdict nobody measured.
+  if (!state.scanned) {
+    if (release !== null) {
+      const metas = readTaskMetas(backlogPaths(root).tasksDir, config).filter((m) => m.id);
+      report.release = releaseScope({
+        state, targets, tasks: metas.map(scopeRecord), release, archived: config.archivedStatuses,
+        target: filter.target, count,
+      });
+    }
+    return { report, state };
+  }
 
   const metas = readTaskMetas(backlogPaths(root).tasksDir, config);
   const archived = config.archivedStatuses;
@@ -407,7 +608,17 @@ export function computeStatus({ root, config, filter, count, now = Date.now(), r
   }
   report.targets = pipeline;
   report.unplaced = { count: off.unplaced.length, ids: count ? [] : off.unplaced };
+  if (release !== null) {
+    report.release = releaseScope({
+      state, targets, tasks: metas.filter((m) => m.id).map(scopeRecord), release,
+      archived, target: filter.target, count,
+    });
+  }
   return { report, state };
+}
+
+function scopeRecord(m) {
+  return { id: m.id, title: m.title, status: m.status, priority: m.priority || null, release: m.release || "" };
 }
 
 export function run(argv) {
@@ -427,15 +638,21 @@ export function run(argv) {
   const config = loadConfigOrExit(root);
   const filter = resolveFilter(opts, config.deployTargets);
   if (!filter.ok) { console.error(failure(cmd, filter.message, [], [cmd + " --help"])); return 2; }
+  const planned = checkReleaseFlag(opts, config.releases);
+  if (!planned.ok) { console.error(failure(cmd, planned.message, [], [cmd + " --help"])); return 2; }
 
-  const { report, state } = computeStatus({ root, config, filter: { target: filter.target, stage: filter.stage }, count: opts.count });
+  const { report, state } = computeStatus({
+    root, config, filter: { target: filter.target, stage: filter.stage }, count: opts.count, release: opts.release,
+  });
   if (wantsJson) {
     printJson("release-status", {
       trunk: report.trunk, scan: report.scan, explanation: report.explanation,
-      filter: report.filter, targets: report.targets, unplaced: report.unplaced,
+      filter: report.filter, targets: report.targets, unplaced: report.unplaced, release: report.release,
     });
   } else if (!state.scanned) {
     console.log(color.ok(MARK.ok) + " nothing to report — " + report.explanation);
+    // The plan is still an answer without git: which planned tasks are open.
+    if (report.release) console.log(renderScope(report.release, report.archived).join("\n"));
   } else {
     if (report.explanation) console.error(color.warn(MARK.warn) + " " + report.explanation);
     console.log(renderStatus(report));

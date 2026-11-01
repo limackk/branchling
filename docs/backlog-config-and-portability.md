@@ -83,6 +83,7 @@ does not know it is two files. No `config.yaml` = generic `DEFAULTS` (no
 | `labels`, `labels_closed` | the label vocabulary and whether it is closed |
 | `label_axis_timing`, `label_axis_env` | the axes the viewer builds the "Phase" and "Environment" facets from; **an empty axis makes the facet disappear** |
 | `roles` | WHO MAY take a task (`role:`), as distinct from `owner:` — who holds it NOW. **An empty vocabulary is an ANSWER**, not missing configuration: the project doesn't use roles, so a non-empty `role:` anywhere in the tree fails the build instead of creating a phantom role no dispatcher serves |
+| `releases` | the releases a task may be PLANNED for (`release:`, TL-505) — the intent, as opposed to deployment, which is computed. CLOSED like boards and, like `roles`, an empty list is an answer: the project plans no releases, so any `release:` value fails. Lowercase slugs; dots admit version numbers. No date and no order is read from it. `release status --release <name>` compares the plan with what shipped: [`manual.md`](manual.md#deployment-stages) |
 | `owners`, `estimates` | text-field suggestions (not a closed vocabulary) |
 | `actors` | suggestions for the "Editing as" switch in the change history |
 | `title_max_length` | title validation |
@@ -93,7 +94,7 @@ does not know it is two files. No `config.yaml` = generic `DEFAULTS` (no
 | `closing_contract` | verification entries `done` appends to every task's own contract and runs after it — the shape of a task's `verification:` entries (`- id:` then `bash:` or `manual:`). For the repository-wide guard a module's tests do not reach. It never stands in for a missing task contract, and an id a task's own entry also uses refuses that closing before anything runs. `take --probe`, `next --probe` and `check --proofs` run the same contract (TL-495) |
 | `deploy_targets` | the deployables of the project and, for each, its promotion stages as an ordered list of git refs (`ref:`, or `refs:` for refs deployed in parallel). Which stage a task has reached is COMPUTED from those refs, never typed — `query --env`/`--not-env` and `query --json` (TL-501). Absent means the project tracks no environments. Shapes and examples: [`manual.md`](manual.md#deployment-stages), design: [`release-tracking.md`](release-tracking.md) |
 | `release_gate` | how hard `check --release` judges a gap in release traceability: `report` (the default) prints the gaps and exits 0, `require` exits non-zero on any gap not accepted below (TL-503). Mirrors `contract_capability`. [`manual.md`](manual.md#the-release-gate) |
-| `release_gate_accept` | gap names this project knowingly accepts — `untracked-commit`, `open-task-deployed`, `partial-task`, `stage-only-commit`, `done-not-on-trunk`, `unknown-task-id`, `untargeted-commit`. An accepted gap is still printed and stops blocking; an unknown name fails |
+| `release_gate_accept` | gap names this project knowingly accepts — `untracked-commit`, `open-task-deployed`, `partial-task`, `stage-only-commit`, `done-not-on-trunk`, `unknown-task-id`, `untargeted-commit`, `planned-blocker-open`. An accepted gap is still printed and stops blocking; an unknown name fails |
 
 `roles` is the only vocabulary whose EMPTY value means something. Every other
 enum with no vocabulary degrades, in `buildFieldSpecs`, to free text — a

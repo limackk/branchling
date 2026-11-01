@@ -3,8 +3,9 @@
  *
  * WHAT "NO GAPS" MEANS. The set of changes a stage holds and the set of tasks
  * the backlog calls finished agree in both directions. Seven ways they can
- * disagree, each detectable from git plus the task files, each reported with
- * the commit or task that proves it (`docs/release-tracking.md` §7):
+ * disagree, each detectable from git plus the task files, and one way the plan
+ * disagrees with a promotion; each is reported with the commit or task that
+ * proves it (`docs/release-tracking.md` §7):
  *
  *   untracked-commit    a deployed commit names no task id
  *   open-task-deployed  a deployed commit names a task that is still open
@@ -18,6 +19,10 @@
  *                       trunk: finished on a branch nobody merged
  *   unknown-task-id     a deployed commit names an id no task file carries
  *   untargeted-commit   a deployed commit touches no declared target's paths
+ *   planned-blocker-open
+ *                       a task of the HIGHEST priority, planned for a release
+ *                       (`release:`, TL-505), is still open: the last stage of
+ *                       each of its targets is not ready to receive the release
  *
  * WHICH COMMITS ARE "DEPLOYED". For each stage ref, the trunk commits it holds
  * (by reachability or patch identity — the same judgement `environments.mjs`
@@ -41,6 +46,19 @@
  * the trunk never received, and none on the trunk. A squash merge leaves the
  * branch commits off the trunk but puts a commit naming the task on it, so it
  * is not reported.
+ *
+ * WHY `planned-blocker-open` JUDGES INTENT, NOT GIT. Every other gap compares
+ * what a ref holds with what the backlog says. This one is the owner's decision
+ * of 2026-11-01: an open task at the top of `priorities:` that a person planned
+ * for a release blocks the promotion to the LAST stage of its targets — the
+ * stage where the release reaches users — and no other. The priority is read as
+ * the first entry of `priorities:`, never as a literal, because the scale is
+ * the project's. Its targets are the ones its trunk commits touched; a task with
+ * no commit on the trunk yet has touched nothing that could narrow it, so it
+ * holds back the last stage of EVERY target rather than none — "not started"
+ * is the strongest form of "not ready". Releases carry no date or sequence, so
+ * a task planned for any declared release counts; a project that promotes one
+ * release while planning the next accepts the gap by name.
  *
  * MODE AND ACCEPTED GAPS come from config.yaml: `release_gate` (`report`, the
  * default, or `require`) and `release_gate_accept` (gap names this project
@@ -67,6 +85,7 @@ export const GAP_NAMES = Object.freeze([
   "done-not-on-trunk",
   "unknown-task-id",
   "untargeted-commit",
+  "planned-blocker-open",
 ]);
 
 /** The values of `release_gate`, mirroring `contract_capability`. */
@@ -92,7 +111,7 @@ function place(target, stage, spec, parallel) {
  * @param {object} opts
  * @param {string|null} opts.root the repository root
  * @param {object} opts.config the loaded configuration
- * @param {{id: string, status: string}[]} opts.tasks every task file
+ * @param {{id: string, status: string, priority?: string, release?: string}[]} opts.tasks every task file
  * @param {{target: string|null, stage: string}|null} [opts.selector] `--env`
  * @param {{spec: string, source: string}} opts.trunk from `defaultTrunk()` or `--trunk`
  * @returns {{
@@ -275,6 +294,26 @@ export function releaseGaps({ root, config, tasks, selector = null, trunk, run =
           note("done-not-on-trunk", t.id, ["trunk " + trunk.spec], elsewhere.get(t.id),
             "closed as `" + doneStatus + "`, and no commit on the trunk names it; the listed commits are on a branch or remote only");
         }
+      }
+    }
+
+    // Open top-priority tasks planned for a release, against the last stage of
+    // their targets (see the header). Read from the task files, not from git.
+    const top = (config.priorities || [])[0];
+    if (top) {
+      for (const task of tasks) {
+        if (!task.release || task.priority !== top || archived.has(task.status)) continue;
+        const entry = state.byTask.get(task.id);
+        const own = entry && entry.targets.length ? entry.targets.map((x) => x.target) : targets.map((t) => t.name);
+        const where = [];
+        for (const t of targets) {
+          if (own.indexOf(t.name) < 0) continue;
+          const last = t.stages[t.stages.length - 1];
+          if (selected(t, last)) where.push(t.name + "/" + last.name);
+        }
+        if (!where.length) continue;
+        note("planned-blocker-open", task.id, where, entry ? entry.commits : [],
+          "a `" + top + "` task planned for release `" + task.release + "` is still `" + task.status + "`");
       }
     }
   } catch (e) {

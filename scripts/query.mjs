@@ -18,6 +18,7 @@
  *   query --status blocked --board main
  *   query --role analyst          (--role "" = the tasks open to anybody)
  *   query --executor human        (what an agent may not be handed)
+ *   query --release 2026.11       (--release "" = planned for no release)
  *   query --epic "Legal compliance" --priority P0,P1
  *   query --text sync --limit 10
  *   query --blocked-by TASK-003 --files | xargs code
@@ -28,6 +29,7 @@
  *
  * Filters (AND between axes, OR inside an axis — comma-separated values):
  *   --status --priority --board --label --epic --owner --type --role --executor
+ *   --release
  *   --blocked-by
  *   --modified-file  which task touched this file — COMPUTED from commit
  *                    messages naming the task id, so there is nothing to keep
@@ -83,7 +85,7 @@ function collectBacklog(root, opts = {}) {
 
 const VALUE_FLAGS = new Set([
   "--status", "--priority", "--board", "--label", "--epic", "--owner", "--type",
-  "--role", "--executor", "--blocked-by", "--text", "--limit", "--sort", "--tasks", "--dir",
+  "--role", "--executor", "--release", "--blocked-by", "--text", "--limit", "--sort", "--tasks", "--dir",
   "--modified-file", "--env", "--not-env",
 ]);
 const BOOL_FLAGS = new Set(["--json", "--files", "--count", "--help", "-h"]);
@@ -202,6 +204,7 @@ const f = {
   // the values a task can carry, so the flag being PRESENT is what decides.
   role: opts.role === undefined ? null : (splitList(opts.role) || [""]),
   executor: opts.executor === undefined ? null : (splitList(opts.executor) || [""]),
+  release: opts.release === undefined ? null : (splitList(opts.release) || [""]),
   blockedBy: splitList(opts["blocked-by"]),
   text: opts.text,
 };
@@ -401,6 +404,7 @@ for (const t of shown) {
   if (t.role) cells.push(`role: ${t.role}`);
   if (t.executor) cells.push(`executor: ${t.executor}`);
   if (t.epic) cells.push(`epic: ${q(t.epic)}`);
+  if (t.release) cells.push(`release: ${t.release}`);
   // The disagreement is NEVER resolved into one status — both values stand, and
   // each is named with the branch it came from (TL-73).
   if (t.elsewhere.length) {

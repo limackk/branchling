@@ -55,6 +55,12 @@
 // and unequal in the next one.
 export const ROLE_SHAPE = /^[a-z0-9][a-z0-9._-]{0,62}$/;
 
+// The release a task is PLANNED for (TL-505), from `releases:` in config.yaml.
+// The same shape as a role, for the same reason: it is typed as a flag value and
+// matched case-insensitively by `query`, so `V1.4` and `v1.4` must not be two
+// entries. Dots admit version numbers.
+export const RELEASE_SHAPE = ROLE_SHAPE;
+
 // ──────────────────────────────────────────────────────────────────────────
 // Actor identity (BL-1404 step 4)
 // ──────────────────────────────────────────────────────────────────────────
@@ -505,6 +511,11 @@ export const FIELD_SHAPES = [
   { key: "confidence", label: "Confidence", kind: "enum", dictionary: "confidence", allowEmpty: true },
   { key: "board", label: "Board", kind: "enum", dynamic: "boards" },
   { key: "epic", label: "Epic", kind: "text", dynamic: "epics", allowEmpty: true },
+  // WHEN it is meant to ship, as opposed to `epic` — WHAT it delivers, which
+  // spans releases (TL-505). Closed and `dictionaryRequired` like `role`: an
+  // empty `releases:` says the project plans none, and a value typed anyway is a
+  // release nobody's readiness report will ever list.
+  { key: "release", label: "Release", kind: "enum", dictionary: "releases", allowEmpty: true, dictionaryRequired: true },
   { key: "labels", label: "Labels", kind: "list", style: "inline", dictionary: "labels", closedFrom: "labelsClosed" },
   // `itemPattern` is closed with the configured prefix in buildFieldSpecs
   // (BL-1452); `TASK` is only a fallback for calls made without a configuration.
@@ -547,7 +558,7 @@ export const CONFLICT_GROUP_SOURCES = Object.freeze(["epic", "board", "labels", 
  * editing one field into a diff of the whole file.
  */
 export const FRONTMATTER_ORDER = [
-  "id", "title", "type", "labels", "board", "epic", "priority", "status",
+  "id", "title", "type", "labels", "board", "epic", "release", "priority", "status",
   "owner", "role", "conflict_group", "estimate", "confidence", "created", "updated",
   "blocked_by", "blocks", "related_docs", "verification",
 ];
@@ -777,6 +788,7 @@ export function extractMeta(frontmatter) {
     labels: getInlineList("labels"),
     board: get("board") || "",
     epic: get("epic") || "",
+    release: get("release") || "",
     priority: get("priority"),
     status: get("status"),
     owner: get("owner"),
