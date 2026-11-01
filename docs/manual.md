@@ -304,6 +304,46 @@ branchling release status --target web --count  # counts only, inside a context 
 branchling release status --json                # the same buckets, kind `release-status`
 ```
 
+**What a release planned, against what shipped.** A task names the release it
+is planned for in `release:`, a value from the closed `releases:` list in
+config.yaml — the intent, written by a person, as opposed to deployment, which
+is observed. A value outside the list fails `new --release`, `query --release`
+and `check --vocabulary`; an empty list means the project plans no releases.
+`release status --release <name>` compares the plan with the last stage of
+each target:
+
+```text
+release 2026.11  4 planned · 1 shipped (counted, not listed) · 1 dropped
+  planned, not shipped                      2
+    TASK-21  Checkout redesign  done · P1 · web: in test, waiting for production
+    TASK-24  Fraud check        pending · P0 · no commit on the trunk names it
+  planned, still open                       1
+    TASK-24  Fraud check        pending · P0
+  unplanned, carried by the next promotion  1
+    TASK-30  Logging tweak      done · P2 · web: in test, waiting for production
+  planned, then dropped                     1
+    TASK-22  Gift cards         cancelled · P2
+```
+
+- **Not shipped** is a planned task not yet in full in the last stage of every
+  target its commits touched — a task with no commit yet included, named as
+  such. These are the launch blockers.
+- **Unplanned** is a task on the trunk or in an earlier stage, not yet in the
+  last one, that this release did not plan — the scope the next promotion
+  carries without anybody having planned it. What already reached the last
+  stage is not listed: it is the project's whole history.
+- **Dropped** is a planned task closed in an archived status other than the
+  first of `archived_statuses:`; it never blocks.
+- A release carries no date and no order: `releases:` is a vocabulary, not a
+  schedule. `--env` is refused beside `--release`, because the comparison is
+  with the last stage by definition.
+
+```bash
+branchling release status --release 2026.11 --count   # counts only
+branchling query --release 2026.11                     # every task planned for it
+branchling query --release ""                          # open tasks planned for none
+```
+
 One declaration per product shape:
 
 ```yaml
@@ -405,6 +445,7 @@ names the commit or task that proves each one:
 | `done-not-on-trunk` | a task closed as done whose commits exist only on a branch or remote the trunk never received |
 | `unknown-task-id` | a deployed commit names an id no task file carries |
 | `untargeted-commit` | a deployed commit touches no declared target's paths |
+| `planned-blocker-open` | a task at the top of `priorities:`, planned for a release, is still open — reported against the last stage of the targets its commits touched, or of every target when it has no commit yet |
 
 In CI it is one line before the deploy step:
 
@@ -930,7 +971,7 @@ implementation detail. Every reading command answers in the same envelope:
 | `take`, `next` | `task-take` | `ok`, `taken`, `id`, `file`, `task`, `from`, `text`, `decisions`, `probe`, `warnings`, `reclaimed`, `tookOver`, `lock`, `refusalKind`, `refusal`, `details`, and — filled in by next — `passedOver`, `considered`, `searchedStatuses`, `skippedBlocked`, `skippedElsewhere`, `closedElsewhere`, `skippedExecutor`, `skippedHandedBack`, `skippedDeadlocked`, `skippedSize`, `skippedByRecord`, `skippedConflict`, `scan`, `plan` |
 | `handoff` | `task-handoff` | `ok`, `id`, `file`, `task`, `role`, `owner`, `status` (each a from/to pair), `comment`, `released`, `warnings`, `refusalKind`, `refusal`, `details` |
 | `release` | `task-release` | `ok`, `id`, `status`, `owner`, `released`, `comment`, `refusalKind`, `refusal`, `details` |
-| `release status` | `release-status` | `trunk` (the ref whose commits count, its SHA, and whether it is the remote's default branch or HEAD), `scan` (every ref read, with its SHA), `explanation` (why an empty answer is empty), `filter`, `targets` (per target its buckets in pipeline order — each with its kind, stage, label, count, whether it is unknown and which refs made it so, whether it is listed — the last stage is counted, not listed — and its tasks, each with the status, the day it closed, the wait in days, its state in the stage and the parallel refs holding it), `unplaced` (closed tasks no commit names) |
+| `release status` | `release-status` | `trunk` (the ref whose commits count, its SHA, and whether it is the remote's default branch or HEAD), `scan` (every ref read, with its SHA), `explanation` (why an empty answer is empty), `filter`, `targets` (per target its buckets in pipeline order — each with its kind, stage, label, count, whether it is unknown and which refs made it so, whether it is listed — the last stage is counted, not listed — and its tasks, each with the status, the day it closed, the wait in days, its state in the stage and the parallel refs holding it), `unplaced` (closed tasks no commit names), `release` (with `--release`: the release name, how many tasks it plans, how many shipped — counted, not listed — and four lists, notShipped, open, unplanned and dropped, each a count and its tasks; every task carries its status, priority, release, commit count, where it stands per target, and a note such as no-commits or unknown. Null without the flag) |
 | `ask` | `task-ask` | `ok`, `id`, `file`, `question` (its event id, timestamp, text and asker), `changes`, `blockedReason`, `refusalKind`, `refusal`, `details` |
 | `done` | `verification-run` | `ok`, `task`, `dryRun`, `closed`, `entries` (one per `verification:` entry, with its exit code), `status`, `wouldBe`, `ticked`, `capability`, `refusalKind`, `refusal`, `details` |
 | `resume` | `resume` | `ok`, `id`, `file`, `actor`, `owner`, `base`, `mergeBase`, `verified` (false under --no-verify: the contract was not re-run, which is not the same as a contract with no entries), `decisions`, `goal`, `history`, `diff` (the merge-base range: what this branch COMMITTED), `uncommitted` (what it left on disk in no commit: a patch of tracked edits, a list of untracked paths, and a reason — a null in any of the three means the working tree could not be read, not that it is clean), `verification` — the parts in the order the briefing fixes them — `refusalKind`, `refusal`, `details` |

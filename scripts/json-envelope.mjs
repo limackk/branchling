@@ -277,8 +277,9 @@ export const KINDS = {
   // answer can be dated; `explanation` why an empty answer is empty. Each
   // target carries its buckets in pipeline order, a bucket whose stage could
   // not be read is `unknown` rather than zero, and `listed: false` marks the
-  // last stage, which is counted and never listed.
-  "release-status": { trunk: null, scan: null, explanation: null, filter: null, targets: [], unplaced: null },
+  // last stage, which is counted and never listed. `release` is the planned
+  // scope of `--release <name>` (TL-505), null without the flag.
+  "release-status": { trunk: null, scan: null, explanation: null, filter: null, targets: [], unplaced: null, release: null },
   // `ask --json` (TL-148). The question's EVENT ID is the payload that matters:
   // it is what a later `decide --resolves` has to name, and the reason the task
   // now carries names it too — so a consumer never has to parse a sentence.

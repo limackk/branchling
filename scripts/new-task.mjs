@@ -130,6 +130,9 @@ function nextId(root, tasksDir, numberPattern) {
 const FLAGS = {
   "--title": "title", "--board": "board", "--priority": "priority", "--type": "type",
   "--epic": "epic", "--estimate": "estimate", "--owner": "owner", "--status": "status",
+  // The release the task is PLANNED for (TL-505), from `releases:` — closed, so
+  // checked below like the board.
+  "--release": "release",
   // NOT a frontmatter field: it schedules the task in `plan.yaml` (TL-213). The
   // value is checked against the waves that exist BEFORE anything is written.
   "--wave": "wave",
@@ -375,6 +378,16 @@ function createTaskUnlocked({ root, config, board, slug, fields, body }) {
     if (opts[key]) text = text.replace(new RegExp("^" + key + ": .*$", "m"), key + ": " + opts[key]);
   }
   if (opts.epic) text = text.replace(/^epic: .*$/m, "epic: " + quoted(opts.epic));
+  // A template written before TL-505 has no `release:` line, and it is a file in
+  // somebody else's repository that this command does not get to rewrite. The
+  // value is then INSERTED after `epic:` (else `board:`), where the current
+  // template keeps it; a replace that matched nothing would drop the caller's
+  // value and still exit 0.
+  if (opts.release) {
+    if (/^release:.*$/m.test(text)) text = text.replace(/^release:.*$/m, "release: " + opts.release);
+    else if (/^epic:.*$/m.test(text)) text = text.replace(/^(epic:.*)$/m, "$1\nrelease: " + opts.release);
+    else text = text.replace(/^(board:.*)$/m, "$1\nrelease: " + opts.release);
+  }
   // A LIST, so it is set as a block rather than by the scalar loop above. An
   // empty list leaves the template's `labels: []` exactly as it is, which is
   // already the right answer.
@@ -553,6 +566,15 @@ export async function main(argv) {
     if (opts[key] && allowed && allowed.length && allowed.indexOf(opts[key]) < 0) {
       return fail("`" + opts[key] + "` is not an allowed value for the field `" + key + "`",
         "allowed: " + allowed.join(" | "));
+    }
+  }
+  // `releases:` is CLOSED even when it is empty (TL-505): an empty list says this
+  // project plans no releases, so any value is a release nobody will look for.
+  if (opts.release) {
+    const releases = config.releases || [];
+    if (releases.indexOf(opts.release) < 0) {
+      return fail("`" + opts.release + "` is not a release this project plans",
+        releases.length ? "allowed: " + releases.join(" | ") : "`releases:` is not declared in config.yaml, so this backlog plans no releases");
     }
   }
   const boardSlugs = (config.boards || []).map((b) => b.slug);

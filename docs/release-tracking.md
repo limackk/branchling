@@ -155,7 +155,10 @@ The release mode of `check` (`check --release`, TL-503), run by CI before a
 promotion, reports: a deployed commit naming no task; a deployed task that is still open; a
 partially deployed task; a commit in a later stage missing from the trunk or
 an earlier stage; a `done` task whose commits never reached the trunk; a
-task id that does not exist; a commit touching no target's paths. A project
+task id that does not exist; a commit touching no target's paths; and, from
+the plan side (TL-505), an open task at the top of `priorities:` planned for a
+release, against the last stage of its targets (decided by the owner on
+2026-11-01). A project
 that knowingly accepts one of these names it in configuration
 (`release_gate_accept`); an unknown gap name fails. Whether a gap blocks is
 `release_gate`: `report`, the default, prints and exits 0; `require` exits

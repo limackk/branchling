@@ -33,7 +33,7 @@ export const SORT_KEYS = ["priority", "id", "id-desc"];
 
 /** The filter axes. AND between axes, OR inside one. */
 export const FILTER_AXES = [
-  "status", "priority", "board", "label", "epic", "owner", "type", "role", "blockedBy",
+  "status", "priority", "board", "label", "epic", "owner", "type", "role", "release", "blockedBy",
 ];
 
 /**
@@ -82,17 +82,22 @@ export function unknownFilterValues(f, config) {
     { axis: "board", where: "the board registry, boards.yaml", allowed: boards },
     { axis: "role", where: "`roles` in config.yaml", allowed: config.roles },
     { axis: "executor", where: "the tool's own vocabulary, not a project's", allowed: executorValues(config) },
+    // `required`: an EMPTY `releases:` is an answer — this project plans no
+    // releases — so a value asked for is refused rather than answered with zero
+    // rows (TL-505). The other axes treat an undeclared vocabulary as nothing to
+    // check against.
+    { axis: "release", where: "`releases` in config.yaml", allowed: config.releases || [], required: true },
   ];
   // A label vocabulary is OPEN unless the project says otherwise, and an open
   // one has nothing to be outside of.
   if (config.labelsClosed) axes.push({ axis: "label", where: "`labels` in config.yaml, closed by `labels_closed`", allowed: config.labels });
 
   const problems = [];
-  for (const { axis, where, allowed } of axes) {
+  for (const { axis, where, allowed, required } of axes) {
     const values = f[axis];
     // An axis nobody filtered on, and a vocabulary the project never declared,
     // are the same answer: there is nothing to be wrong about.
-    if (!values || !allowed || !allowed.length) continue;
+    if (!values || !allowed || (!allowed.length && !required)) continue;
     for (const value of values) {
       if (value === "") continue;
       if (allowed.indexOf(value) < 0) problems.push({ axis, value, allowed, where });
@@ -143,6 +148,8 @@ export function parseTaskRecord(raw, file) {
     // WHICH SPECIES may take it (TL-113) — a different axis from `role`, which
     // is a competence. Empty means anybody.
     executor: str(meta.executor),
+    // WHEN it is planned to ship (TL-505). Empty means planned for none.
+    release: str(meta.release),
     type: str(meta.type),
     labels: meta.labels,
     blocked_by: meta.blocked_by,
@@ -232,6 +239,8 @@ export function filterTasks(tasks, f, archived) {
     // Same treatment as `role`: `--executor ""` asks "what is open to either",
     // so the flag being present is what decides, not its value.
     if (f.executor && !anyOf(f.executor, t.executor)) return false;
+    // `--release ""` asks "what is planned for no release" — the same rule.
+    if (f.release && !anyOf(f.release, t.release)) return false;
     if (f.label && !f.label.some((l) => t.labels.includes(l))) return false;
     if (f.epic && !f.epic.some((e) => String(t.epic || "").toLowerCase().includes(e.toLowerCase()))) return false;
     if (f.blockedBy && !f.blockedBy.some((b) => t.blocked_by.includes(b))) return false;

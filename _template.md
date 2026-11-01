@@ -12,6 +12,7 @@ type: task
 labels: []
 board: main                        # a CLOSED vocabulary (boards.yaml); do not guess: `branchling board <file>`
 epic: ""                           # free text — the group this task counts towards
+release: ""                        # the release it is PLANNED for (a value from `releases:` in config.yaml). Empty = none
 priority: P1
 status: pending
 owner: unassigned

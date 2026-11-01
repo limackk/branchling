@@ -4,10 +4,10 @@
  * WHAT HAS TO BE PROVED, against real fixture repositories, because every gap
  * is a claim about what git holds:
  *
- *   1. POSITIVE CONTROL: one fixture carrying all seven gaps, and each is
+ *   1. POSITIVE CONTROL: one fixture carrying every gap, and each is
  *      reported with the commit or task that proves it.
- *   2. A clean fixture reports nothing — and the same code path reported seven
- *      gap kinds a moment earlier, so the silence has evidential force.
+ *   2. A clean fixture reports nothing — and the same code path reported every
+ *      gap kind a moment earlier, so the silence has evidential force.
  *   3. Commits older than the first one naming a task id are not judged.
  *   4. A hotfix cherry-picked back onto the trunk is no longer a gap (patch
  *      identity), and `--env` narrows the stage-bound gaps to one stage.
@@ -77,6 +77,7 @@ function config(extra = {}) {
     taskIdPrefix: "PROJ",
     deployTargets: parsed.values.deploy_targets,
     archivedStatuses: ["done", "cancelled"],
+    priorities: ["P0", "P1"],
     releaseGateAccept: [],
     ...extra,
   };
@@ -98,7 +99,9 @@ const TRUNK = { spec: "main", source: "flag" };
  *   c8  PROJ-4 part two                 → PROJ-4 partial-task in prod-eu
  *
  * plus a hotfix PROJ-6 on prod-eu only (stage-only-commit, missing from the
- * trunk) and PROJ-7 done on an unmerged branch (done-not-on-trunk).
+ * trunk) and PROJ-7 done on an unmerged branch (done-not-on-trunk), plus
+ * PROJ-8, open at the top priority and planned for a release with no commit
+ * yet (planned-blocker-open, TL-505).
  */
 function everyGap() {
   const dir = repo();
@@ -131,6 +134,7 @@ const TASKS = [
   { id: "PROJ-5", status: "done" },
   { id: "PROJ-6", status: "done" },
   { id: "PROJ-7", status: "done" },
+  { id: "PROJ-8", status: "pending", priority: "P0", release: "r1" },
 ];
 
 function byGap(result) {
@@ -141,7 +145,7 @@ function byGap(result) {
 
 // ── 1. The positive control ─────────────────────────────────────────────
 
-test("every one of the seven gaps is detected, each with the commit or task that proves it", () => {
+test("every gap is detected, each with the commit or task that proves it", () => {
   const { dir, c } = everyGap();
   const result = releaseGaps({ root: dir, config: config(), tasks: TASKS, trunk: TRUNK });
   assert.equal(result.reason, "ok");
@@ -172,6 +176,9 @@ test("every one of the seven gaps is detected, each with the commit or task that
   // revert risk, seen from the task's side.
   assert.deepEqual(gaps["done-not-on-trunk"].map((g) => [g.subject, g.commits]),
     [["PROJ-6", [c.hotfix]], ["PROJ-7", [c.unmerged]]]);
+
+  // No commit yet, so it holds back the last stage of every target.
+  assert.deepEqual(gaps["planned-blocker-open"].map((g) => [g.subject, g.where]), [["PROJ-8", ["app/production"]]]);
 
   // The adoption boundary: the import before the first id is not judged.
   assert.equal(result.excludedBeforeAdoption, 1);

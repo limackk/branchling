@@ -323,7 +323,7 @@ deploy_targets:
 // ── Pure parts ────────────────────────────────────────────────────────────
 
 test("pure: flags, filters, and a pipeline with no tasks still has every bucket at zero", () => {
-  assert.deepEqual(parseStatusArgs(["--count", "--target", "web"]), { target: "web", env: null, count: true, json: false });
+  assert.deepEqual(parseStatusArgs(["--count", "--target", "web"]), { target: "web", env: null, release: null, count: true, json: false });
   assert.throws(() => parseStatusArgs(["web"]), /unexpected argument/);
   const targets = [{ name: "web", paths: [], stages: [{ name: "test", refs: ["test"] }, { name: "prod", refs: ["prod"] }] }];
   assert.deepEqual(resolveFilter({ target: null, env: "web/prod" }, targets), { ok: true, target: "web", stage: "prod" });
