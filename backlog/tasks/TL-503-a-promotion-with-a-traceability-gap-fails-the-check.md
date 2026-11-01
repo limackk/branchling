@@ -39,6 +39,8 @@ Depends on scripts/environments.mjs from the same epic. 'No gaps' in release tra
 6. A task id that does not exist in the backlog.
 7. A deployed commit touching no declared target's paths, when targets declare paths.
 
+A stage with parallel refs (`refs:`) is checked per ref: a task in one region and missing from another is gap 3, partial, and the report names the ref.
+
 Each gap is reported with the commit or task that proves it. Gaps that a project knowingly accepts (for example merge commits without an id) are configured, not hard-coded; an unknown gap name in that configuration fails. A positive control is required: the test must show the gate failing on a fixture with every gap, not only passing on a clean one.
 
 ## Steps

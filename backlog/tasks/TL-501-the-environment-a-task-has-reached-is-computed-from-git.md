@@ -16,7 +16,7 @@ confidence: medium                 # how much you trust the estimate
 created: 2026-11-01
 updated: 2026-11-01
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
-blocks: [TL-502, TL-503, TL-504, TL-505, TL-506, TL-507]                         # ids this task will unblock
+blocks: [TL-502, TL-503, TL-504, TL-505, TL-506, TL-507, TL-508]                         # ids this task will unblock
 related_docs: [docs/release-tracking.md] # paths relative to the repository root
 verification:
   - id: env-tests
@@ -54,8 +54,9 @@ A project with one deployable omits `paths`. The ORDER of stages is the promotio
 
 1. Validate an optional `deploy_targets:` key in scripts/config.mjs: a non-empty list of {name, paths?, stages: [{name, ref | refs}]}, exactly one of `ref` and `refs`, unique names, unknown sub-keys fail.
 2. Write scripts/environments.mjs: resolve each ref, compute each task's targets from the paths of its trunk commits, then classify the task as full, partial or absent per target and stage using `git rev-list` reachability plus patch identity, reusing the scanner from scripts/task-id.mjs.
-3. Expose the per-task answer in `branchling show <ID>` and in `query --json`, and add `query --env <name>` / `--not-env <name>`.
-4. Write scripts/tests/environments.test.mjs against fixture repositories covering a branch per environment, release tags, two targets selected by paths, a stage with two parallel refs of which only one holds the task, a squash merge, a cherry-picked hotfix, a partial task, a rollback (ref moved back) and an unresolvable ref.
+3. Document `deploy_targets` in docs/manual.md beside the other config.yaml keys, with one example per product shape from docs/release-tracking.md §2.
+4. Expose the per-task answer in `branchling show <ID>` and in `query --json`, and add `query --env <name>` / `--not-env <name>`.
+5. Write scripts/tests/environments.test.mjs against fixture repositories covering a branch per environment, release tags, two targets selected by paths, a stage with two parallel refs of which only one holds the task, a squash merge, a cherry-picked hotfix, a partial task, a rollback (ref moved back) and an unresolvable ref.
 
 ## Acceptance criteria
 

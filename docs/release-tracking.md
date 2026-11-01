@@ -1,6 +1,6 @@
 # Release tracking across environments
 
-**Status:** PLANNED 2026-11-01 (TL-501, TL-502, TL-503, TL-504, TL-505, TL-506, TL-507)
+**Status:** PLANNED 2026-11-01 (TL-501, TL-502, TL-503, TL-504, TL-505, TL-506, TL-507, TL-508)
 
 The question this answers: of the tasks that are finished, which are waiting
 for the test environment, which are waiting for production, and which have
@@ -95,6 +95,13 @@ deploy_targets:
   state of its own, never rounded either way.
 - **A ref that does not resolve is unknown, never empty.** An unresolvable
   production ref must not read as "nothing is deployed".
+- **The answer is only as fresh as the refs it read.** A remote-tracking
+  branch moves only on `git fetch`, and the default refspec fetches
+  `refs/heads/*` and tags only, so `refs/deploys/*` written by CI or by a
+  recorded stage reaches no other clone until the remote's fetch refspec
+  includes it. Every report therefore names the SHA of each ref it resolved,
+  and `doctor` reports a declared ref namespace the remote does not fetch
+  (TL-508).
 
 ## 4. Recorded stages
 

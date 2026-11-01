@@ -25,7 +25,7 @@ verification:
 
 ## Goal
 
-The viewer has a Release view: one lane per deploy target and one column per stage of that target (closed but not merged, trunk, then each stage from `deploy_targets` in config.yaml), task cards in the stage they have fully reached, a PARTIAL marker on cards split across stages, and a gap panel listing what `check --release` would fail on.
+The viewer has a Release view: one lane per deploy target and one column per stage of that target (closed but not merged, trunk, then each stage from `deploy_targets` in config.yaml), task cards in the stage they have fully reached, a PARTIAL marker on cards split across stages or across the parallel refs of one stage (naming which regions, tenants or release lines hold it), and a gap panel listing what `check --release` would fail on.
 
 ## Context
 
@@ -41,4 +41,4 @@ The environment state is computed at build time, so the view carries the time of
 
 ## Acceptance criteria
 
-- [ ] The Release view model places each fixture task in the right stage, marks partial tasks, lists the gaps and records the resolved SHA of every ref. [proof: viewer-tests]
+- [ ] The Release view model places each fixture task in the right stage, marks partial tasks including a task held by only one of two parallel refs, lists the gaps and records the resolved SHA of every ref. [proof: viewer-tests]
