@@ -803,19 +803,37 @@ export function extractMeta(frontmatter) {
  * a frontmatter line owes the value the same treatment. Five readers each had
  * their own `.replace(/^["\']|["\']$/g, "")` instead, and each returned the
  * comment as part of the value (TL-70).
+ *
  */
 export function stripComment(raw) {
+  const i = commentStart(raw);
+  return (i < 0 ? raw : raw.slice(0, i)).trimEnd();
+}
+
+/**
+ * Where the comment on this line begins, or -1 — the one scan behind both
+ * `stripComment()` and `trailingComment()`, so the reader and the writer cannot
+ * disagree about where a value ends.
+ *
+ * Inside double quotes a backslash escapes the next character (TL-500), the
+ * same pair `unquote()` expands. Read as a closing quote, the `\"` in
+ * `"echo \\\" #literal"` ended the value early and the rest of the command
+ * became a comment. Single quotes need no rule: their escape `''` closes and
+ * reopens the quote, which leaves the hash inside either way.
+ */
+function commentStart(raw) {
   let quote = null;
   for (let i = 0; i < raw.length; i++) {
     const c = raw[i];
     if (quote) {
-      if (c === quote) quote = null;
+      if (quote === '"' && c === "\\") i++;
+      else if (c === quote) quote = null;
       continue;
     }
     if (c === '"' || c === "'") { quote = c; continue; }
-    if (c === "#" && (i === 0 || /\s/.test(raw[i - 1]))) return raw.slice(0, i).trimEnd();
+    if (c === "#" && (i === 0 || /\s/.test(raw[i - 1]))) return i;
   }
-  return raw.trimEnd();
+  return -1;
 }
 
 /** The value without its surrounding quotes. Exported for the same reason as
@@ -1008,15 +1026,11 @@ export function withLineEnding(text, eol) {
   return eol === "\r\n" ? lf.replace(/\n/g, "\r\n") : lf;
 }
 
+/** The comment beside a field, kept when `setFrontmatterField` rewrites the
+ *  value. A whole line is passed, so column 0 is the key and never a comment. */
 function trailingComment(line) {
-  let quote = null;
-  for (let i = 0; i < line.length; i++) {
-    const c = line[i];
-    if (quote) { if (c === quote) quote = null; continue; }
-    if (c === '"' || c === "'") { quote = c; continue; }
-    if (c === "#" && i > 0 && /\s/.test(line[i - 1])) return line.slice(i).trimEnd();
-  }
-  return "";
+  const i = commentStart(line);
+  return i > 0 ? line.slice(i).trimEnd() : "";
 }
 
 // ──────────────────────────────────────────────────────────────────────────

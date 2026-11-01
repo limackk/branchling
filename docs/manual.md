@@ -366,7 +366,7 @@ my-planner spec.md | branchling seed --dir ./backlog --json
 | `context` | optional | what the next person needs before their first edit |
 | `steps` | optional | array of strings |
 | `blocked_by` | optional | `plan_id` values from **this** plan; a cycle fails |
-| `verification` | required | non-empty; a command string, or `{ "id", "bash" \| "manual", "proves" }` |
+| `verification` | required | non-empty; a command string, or `{ "id", "bash" \| "manual", "proves" }`. Any character is written as itself except a line break or other control character, which is refused: an entry is one line |
 | `estimate` | optional | free text, e.g. `"2h"` |
 | `priority` | optional | a value from *your* `config.yaml` |
 | `epic` | optional | free text, the group the task counts towards |

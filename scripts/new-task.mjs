@@ -277,13 +277,20 @@ export function driftMessage(divergences, { templatePath, fields, command }) {
  * One `verification:` entry, as YAML. A plain string is the short form (a bash
  * command with no id); an object may carry `id` — the handle a criterion points
  * at with `[proof: <id>]` (TL-86) — and either `bash` or `manual`.
+ *
+ * The command goes through `quoted()`, never between two bare quotes (TL-500).
+ * A string carrying `"` or `\` came out as invalid YAML, and the tool's own
+ * reader did not notice: `unquote()` strips the first and last quote whatever
+ * stands between them, so the damage surfaced only in a parser that reads YAML
+ * as YAML. A line break is refused before this point (`validateVerification`),
+ * because no spelling of one survives the line-based readers.
  */
 function verificationEntry(v) {
-  if (typeof v === "string") return '  - bash: "' + v + '"\n';
+  if (typeof v === "string") return "  - bash: " + quoted(v) + "\n";
   const kind = v.manual ? "manual" : "bash";
-  const command = v.manual || v.bash;
-  if (!v.id) return "  - " + kind + ': "' + command + '"\n';
-  return "  - id: " + v.id + "\n    " + kind + ': "' + command + '"\n';
+  const command = quoted(v.manual || v.bash);
+  if (!v.id) return "  - " + kind + ": " + command + "\n";
+  return "  - id: " + v.id + "\n    " + kind + ": " + command + "\n";
 }
 
 /**
