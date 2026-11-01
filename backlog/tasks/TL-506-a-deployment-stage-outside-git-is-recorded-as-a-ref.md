@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Release tracking across environments"
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 conflict_group: []                 # the AREA it touches (e.g. a module): `next` and `run` hold it back while a task of the same group is in progress. Empty = `conflict_group_from`, or none
@@ -43,4 +43,4 @@ A stage is declared `recorded: true` in `deploy_targets`, with a ref in the `ref
 
 ## Acceptance criteria
 
-- [ ] A record moves only a declared recorded stage, requires a reason, refuses a commit missing from the previous stage, stores actor, time and reason in an annotated tag, and a backwards move is accepted with a reason. [proof: record-tests]
+- [x] A record moves only a declared recorded stage, requires a reason, refuses a commit missing from the previous stage, stores actor, time and reason in an annotated tag, and a backwards move is accepted with a reason. [proof: record-tests]
