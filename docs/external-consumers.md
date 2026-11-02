@@ -97,6 +97,7 @@ table and the code disagree in either direction.
 | `task-log` | `log <ID> --json` | read |
 | `resume` | `resume <ID> --json` | read — composes reads, writes nothing |
 | `release-status` | `deploy status --json` | read |
+| `where` | `where --json` | read — the directories this run resolves |
 | `serve-list` | `serve --list --json` | read — machine-local state |
 | `agent-profiles` | `profile list --json`, `profile show --json` | read — machine-local state |
 | `profile-check` | `profile check --json` | read — machine-local state |
@@ -108,6 +109,7 @@ table and the code disagree in either direction.
 | `task-set` | `set <ID> <field> <value> --json` | write |
 | `task-body` | `body <ID> --json` | write |
 | `task-ask` | `ask <ID> --json` | write |
+| `task-decide` | `decide <ID> --json` | write |
 | `verification-run` | `done <ID> --json` | write |
 | `vocabulary-declare` | `declare <key> <name> --json` | write — `config.yaml` |
 | `release-record` | `deploy record --json` | write — a git ref, never the tree |
@@ -117,11 +119,16 @@ table and the code disagree in either direction.
 | `run-stop` | `run --stop --json` | write — the state directory, never the tree |
 | `serve-stop` | `serve --stop <port> --json` | write — stops a local process |
 
-**Outside the envelope today.** `decide --json` and `where --json` print a bare
-object with no `schemaVersion` or `kind`, and `new` has no `--json` at all.
-Treat their output as unstable until they move into the envelope; until then,
-an interface that creates a task reads the new id with `query --json` after
-`new` returns.
+**Outside the envelope today.** `new` has no `--json` at all; an interface that
+creates a task reads the new id with `query --json` after `new` returns.
+
+**Moved into the envelope by TL-528.** `decide --json` and `where --json` used
+to print a bare object. Their payload keys are unchanged, and the root now
+carries `schemaVersion` and `kind` beside them. One shape did change: a
+`decide` REFUSAL carried its name under `kind` and its sentence under
+`message`; `kind` now belongs to the envelope, so they are `refusalKind` and
+`refusal`, as in every other writing kind. A consumer that branched on the
+old refusal `kind` reads `refusalKind` instead.
 
 ## The writing commands
 
@@ -157,7 +164,7 @@ Common to all of them:
 | `handoff <ID>` | `--to-role` and `--reason` | `task-handoff` |
 | `release <ID>` | `--reason` | `task-release` |
 | `ask <ID>` | `--question`; `--recommend` once `--option` is given | `task-ask` |
-| `decide <ID>` | `--reason`, or `--resolves <event id> --choose <n>` | none (bare object) |
+| `decide <ID>` | `--reason`, or `--resolves <event id> --choose <n>` | `task-decide` |
 | `done <ID>` | nothing — the verification contract runs; `--reason` for an archived status that requires one | `verification-run` |
 | `declare releases <name>` | `--reason` | `vocabulary-declare` |
 | `declare deploy_targets <name>` | `--reason`, and `--repository` or at least one `--stage` | `vocabulary-declare` |

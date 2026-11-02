@@ -329,6 +329,24 @@ export const KINDS = {
     ok: null, id: null, file: null, question: null, changes: [], blockedReason: null,
     refusalKind: null, refusal: null, details: [],
   },
+  // `decide --json` (TL-528) — the other half of `task-ask`. Until TL-528 it
+  // printed a bare object whose refusal carried the refusal's name under
+  // `kind` and its sentence under `message`; inside the envelope `kind` is
+  // the envelope's, so the refusal moved to `refusalKind` and `refusal`, the
+  // names every other writing kind already uses. `chosen` is null when the
+  // answer was typed, `lifted` null when nothing was blocked on it.
+  "task-decide": {
+    ok: null, id: null, decision: null, chosen: null, openQuestions: [], lifted: null,
+    refusalKind: null, refusal: null, details: [],
+  },
+  // `where --json` (TL-34, in the envelope since TL-528). `backlog` is null
+  // and `error` says why when no backlog was found — outside a repository that
+  // is an answer, not a failure, so the keys stay rather than the answer
+  // turning into a refusal.
+  where: {
+    home: null, homeSource: null, config: null, data: null,
+    preferences: null, agentProfiles: null, backlog: null, error: null,
+  },
   // `resume --json` (TL-151). The parts are declared in the ORDER the
   // briefing fixes them, because the order IS the product: a consumer rendering
   // it would otherwise have to re-derive a sequence this tool already knows.
@@ -462,6 +480,9 @@ export const KIND_EXERCISE = {
   "task-list": { args: ["query", "--json"] },
   stats: { args: ["stats", "--json"] },
   doctor: { args: ["doctor", "--json"] },
+  // Which directories the run uses. It writes nothing; the harness's `--dir`
+  // makes the backlog half non-null, the case with the most keys filled in.
+  where: { args: ["where", "--json"] },
   // The register is machine-local state beside the locks, not a question about
   // the fixture backlog (TL-266) — hence `noDir`, the same boundary the profile
   // rows prove. It writes nothing and starts nothing: an empty `servers` on an
@@ -596,6 +617,12 @@ export const KIND_EXERCISE = {
   // and `--question` is required before the refusal is reached, so it is given.
   "task-ask": {
     args: ["ask", ABSENT_TASK, "--question", "which of the two?", "--actor", "agent:test", "--json"],
+    refuses: true, writes: true,
+  },
+  // A decision about a task that is not there: the refusal path, reached only
+  // after the reason and the actor pass, so both are given.
+  "task-decide": {
+    args: ["decide", ABSENT_TASK, "--reason", "a fixture", "--actor", "agent:test", "--json"],
     refuses: true, writes: true,
   },
   seed: {

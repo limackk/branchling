@@ -74,6 +74,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 
 import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
+import { printJson } from "./json-envelope.mjs";
 import { ACTOR_NAMESPACES, appendEntries, currentSession, EVENT_ID_RE, eventId, FIELD_DECISION, isValidActor, normalizeReason, openQuestions, questionIdFromReason, readHistory, reasonRefusal, recordEdit } from "./history.mjs";
 import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
@@ -462,10 +463,9 @@ export function run(argv) {
   });
   if (!result.ok) {
     if (plan.json) {
-      console.log(JSON.stringify(
-        { ok: false, kind: result.kind, id: result.id || plan.id, message: result.message, details: result.details || [] },
-        null, 2
-      ));
+      printJson("task-decide", {
+        ok: false, id: result.id || plan.id, refusalKind: result.kind, refusal: result.message, details: result.details || [],
+      });
     } else {
       console.error(failure(N + " decide", result.message, result.details || []));
     }
@@ -474,7 +474,7 @@ export function run(argv) {
 
   // No `build` here, unlike `handoff`: nothing in the frontmatter moved, so the
   // generated views say exactly what they said before.
-  if (plan.json) console.log(JSON.stringify(decideJson(result), null, 2));
+  if (plan.json) printJson("task-decide", decideJson(result));
   else console.log(renderDecision(result));
   return 0;
 }
