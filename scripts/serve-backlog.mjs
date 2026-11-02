@@ -32,26 +32,17 @@
 import { createServer, get } from "node:http";
 import { hostname } from "node:os";
 import { spawn } from "node:child_process";
-import { createHash, randomBytes } from "node:crypto";
-import { existsSync, readFileSync, renameSync, unlinkSync, watch, writeFileSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import { readFileSync, watch } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { readTasks, computeStats, buildHtml } from "./build-viewer.mjs";
-import {
-  buildFieldSpecs,
-  extractMeta,
-  isValidActor,
-  isValidReason,
-  normalizeValue,
-  setFrontmatterField,
-  splitFrontmatter,
-} from "./task-fields.mjs";
+import { fileForTaskId as fileInTasks, taskRevision, writeTaskField } from "./field-write.mjs";
 import { loadConfig, loadConfigOrExit } from "./config.mjs";
 import { PLAN_FILENAME, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { loadPlan } from "./plan.mjs";
 import { crossBranchState } from "./branch-scan.mjs";
-import { ANY_TASK_ID } from "./task-id.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { printLine } from "./stdout.mjs";
 import { refusal } from "./ui.mjs";
@@ -64,14 +55,7 @@ import {
   unregisterServer,
 } from "./serve-registry.mjs";
 import { printJson } from "./json-envelope.mjs";
-import { todayStamp } from "./today.mjs";
-import {
-  listTaskFiles,
-  readAllHistory,
-  reconcile,
-  recordEdit,
-  requiresReason,
-} from "./history.mjs";
+import { listTaskFiles, readAllHistory, reconcile } from "./history.mjs";
 import { canonicalPath } from "./canonical-path.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -217,7 +201,6 @@ if (argv.includes("--stop")) {
 const BACKLOG_DIR = resolveBacklogDirOrExit({ dir: cliArgs.dir, moduleDir: __dirname }, N + " serve").root;
 const TASKS_DIR = join(BACKLOG_DIR, "tasks");
 const CONFIG = loadConfigOrExit(BACKLOG_DIR);
-const FIELDS = buildFieldSpecs(CONFIG);
 const CAPABILITY_TTL_MS = Math.max(1, Number(process.env.VIEWER_WRITE_CAPABILITY_TTL_MS) || 15 * 60 * 1000);
 // A page load is unauthenticated, so expiry alone is not a memory bound: a
 // foreign page can make opaque GET requests to a guessed loopback port. Keep a
@@ -325,35 +308,11 @@ function hasWriteCapability(req) {
   return true;
 }
 
-function fileForTaskId(id) {
-  if (!ANY_TASK_ID.test(String(id || ""))) return null;
-  return listTaskFiles(TASKS_DIR).find((file) => file.startsWith(id + "-")) || null;
-}
-
-function taskRevision(text) {
-  return createHash("sha256").update(text).digest("base64url");
-}
-
 function tasksWithRevisions() {
   return readTasks(BACKLOG_DIR, CONFIG).map((task) => {
-    const file = fileForTaskId(task.id);
+    const file = fileInTasks(TASKS_DIR, task.id);
     return { ...task, revision: file ? taskRevision(readFileSync(join(TASKS_DIR, file), "utf8")) : "" };
   });
-}
-
-function fieldOptions() {
-  const tasks = readTasks(BACKLOG_DIR, CONFIG);
-  const values = (key) => [...new Set(tasks.map((task) => String(task[key] || "").trim()).filter(Boolean))].sort();
-  return { boards: CONFIG.boards.map((board) => board.slug), epics: values("epic"), owners: values("owner") };
-}
-
-function atomicReplace(file, text) {
-  const staged = file + `.viewer-${process.pid}-${randomBytes(6).toString("hex")}`;
-  writeFileSync(staged, text, { encoding: "utf8", flag: "wx" });
-  try { renameSync(staged, file); } catch (error) {
-    try { unlinkSync(staged); } catch { /* the rename may already have consumed it */ }
-    throw error;
-  }
 }
 
 function serializeEdit(fn) {
@@ -586,45 +545,23 @@ function planPayload(dir = BACKLOG_DIR) {
 
 async function handleFieldEdit(payload) {
   return serializeEdit(async () => {
-    const id = String(payload?.id || "");
-    const field = String(payload?.field || "");
-    const actor = String(payload?.actor || "");
-    const reason = typeof payload?.reason === "string" ? payload.reason.trim() : "";
-    if (!isValidActor(actor)) throw Object.assign(new Error("actor must use a declared namespace"), { status: 400 });
-
-    const spec = FIELDS.find((candidate) => candidate.key === field);
-    if (!spec) throw Object.assign(new Error("This field is not editable: " + field), { status: 400 });
-    const normalized = normalizeValue(field, payload?.value, { fields: FIELDS, options: fieldOptions() });
-    if (!normalized.ok) throw Object.assign(new Error(normalized.error), { status: 400 });
-    if (requiresReason(CONFIG, { field, to: normalized.value }) && !isValidReason(reason)) {
-      throw Object.assign(new Error("This status requires a non-reserved reason"), { status: 422, needsReason: true });
-    }
-
-    const taskFile = fileForTaskId(id);
-    if (!taskFile) throw Object.assign(new Error("Task not found: " + id), { status: 404 });
-    const full = join(TASKS_DIR, taskFile);
-    const original = readFileSync(full, "utf8");
-    const revision = taskRevision(original);
-    if (typeof payload?.revision !== "string" || payload.revision !== revision) {
-      throw Object.assign(new Error("The task changed after this page read it; refresh before editing"), {
-        status: 409, revision,
-      });
-    }
-    const before = extractMeta(splitFrontmatter(original).frontmatter);
-    let text = setFrontmatterField(original, field, normalized.value, spec);
-    text = setFrontmatterField(text, "updated", todayStamp());
-    const after = extractMeta(splitFrontmatter(text).frontmatter);
-
+    // The validation, the write and the history record are the shared core's
+    // (TL-521), so this route and `set` cannot drift. What stays here is what
+    // only a server has: the page's revision proof, the echo suppression and
+    // the push to open tabs.
     suppressUntil = Date.now() + 1500;
-    atomicReplace(full, text);
-    let entries;
-    try {
-      entries = recordEdit(BACKLOG_DIR, {
-        taskId: after.id || id, before, after, actor, source: "viewer", reason,
+    const result = writeTaskField({
+      root: BACKLOG_DIR, config: CONFIG, source: "viewer",
+      id: payload?.id, field: payload?.field, value: payload?.value,
+      actor: payload?.actor, reason: payload?.reason,
+      revision: typeof payload?.revision === "string" ? payload.revision : null,
+    });
+    if (!result.ok) {
+      throw Object.assign(new Error(result.message), {
+        status: result.status,
+        ...(result.needsReason ? { needsReason: true } : {}),
+        ...(result.revision ? { revision: result.revision } : {}),
       });
-    } catch (error) {
-      atomicReplace(full, original);
-      throw Object.assign(new Error("History could not be recorded; the task was restored: " + error.message), { status: 500 });
     }
 
     const regenerated = await regenerateViews();
@@ -633,8 +570,8 @@ async function handleFieldEdit(payload) {
       try { client.write("event: tasks-changed\ndata: {}\n\n"); } catch { sseClients.delete(client); }
     }
     return {
-      ok: true, id, field, value: normalized.value, actor, entries, regenerated,
-      revision: taskRevision(text),
+      ok: true, id: result.id, field: result.field, value: result.value, actor: result.actor,
+      entries: result.entries, regenerated, revision: result.revision,
     };
   });
 }
