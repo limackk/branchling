@@ -1,6 +1,6 @@
 # Release tracking across environments
 
-**Status:** PLANNED 2026-11-01 (TL-501, TL-502, TL-503, TL-504, TL-505, TL-506, TL-507, TL-508)
+**Status:** IMPLEMENTED 2026-11-02 (TL-501, TL-502, TL-503, TL-504, TL-505, TL-506, TL-507, TL-508)
 
 The question this answers: of the tasks that are finished, which are waiting
 for the test environment, which are waiting for production, and which have
