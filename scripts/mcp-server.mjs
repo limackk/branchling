@@ -67,6 +67,7 @@ export const NOT_EXPOSED = {
   mcp: "this server itself — a client would be starting a second copy of what it is already talking to",
   run: "drives an agent per task — a dispatcher inside a dispatcher, and it never returns quickly",
   "regen-hook": "reads an editor hook's JSON on stdin, which is this server's transport",
+  follow: "streams changes until it is stopped — a stream is not one tool result, and a call that never returns blocks every later request",
 };
 
 /** `next-id` becomes `<product>_next_id`: the character set MCP tool names use. */

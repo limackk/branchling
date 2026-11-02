@@ -43,9 +43,9 @@ stdout followed by stderr, so parse the first JSON value rather than the whole
 string. A tool call has no stdin, so a write whose input arrives on stdin uses
 its file form instead (`body --body-file`, `new --body-file`). The process is
 long-lived, but every call is request and response: MCP is not a change stream,
-and `serve`, `run`, `mcp` and `regen-hook` are deliberately not exposed as
-tools. An interface that needs changes pushed to it runs `follow --json`
-beside it.
+and `serve`, `run`, `mcp`, `regen-hook` and `follow` are deliberately not
+exposed as tools. An interface that needs changes pushed to it runs
+`follow --json` beside it.
 
 ## The envelope
 
