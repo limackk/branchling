@@ -8,8 +8,8 @@ epic: "External UI contract"
 release: ""                        # the release it is PLANNED for (a value from `releases:` in config.yaml). Empty = none
 target: []                         # the deploy targets in ANOTHER repository it ships from (`deploy_targets` with `repository:`). Empty = none
 priority: P3
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: cancelled  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 conflict_group: []                 # the AREA it touches (e.g. a module): `next` and `run` hold it back while a task of the same group is in progress. Empty = `conflict_group_from`, or none
@@ -21,8 +21,8 @@ blocked_by: []                     # ids of tasks that MUST be closed before thi
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
 verification:
-  - id: viewer-body-entry
-    bash: "node --test scripts/tests/viewer-body-history.test.mjs"
+  - id: viewer-renders-no-history
+    bash: "! grep -nE 'historyEntryKind|describeBodyChange\\(|renderTaskGraph\\(' scripts/build-viewer.mjs"
 ---
 
 ## Goal
@@ -41,4 +41,39 @@ TL-523 added `branchling body` (scripts/body-task.mjs), which records a `__body_
 
 ## Acceptance criteria
 
-- [ ] The viewer renders a body rewrite by its line counts and not by its hashes. [proof: viewer-body-entry]
+- [x] The viewer has no history-entry renderer through which a body rewrite could show its hashes — the premise of this task does not hold (see Decision). [proof: viewer-renders-no-history]
+
+## Decision (2026-11-02): cancelled, because the premise does not hold
+
+The Context above says the viewer renders a `__body__` entry through
+`historyEntryKind` as a from/to transition. It does not, and it cannot: the
+viewer renders no history entry of any kind. TL-379 ("The viewer is a window
+onto current work, not a second backlog") deliberately removed the per-task
+history panel together with `/api/history`, and nothing in
+`scripts/build-viewer.mjs` calls `historyEntryKind` today. Measured on this
+tree: `branchling viewer` over a backlog whose history carries `__body__`
+entries (TL-523, TL-524, TL-525) produces a page in which `sha256:` occurs only
+inside the embedded `HISTORY` data and the pasted source of
+`describeBodyChange` — never in rendered text. The decision panel reads only
+questions and manual vouches from `HISTORY`, and `renderTaskGraph` is pasted but
+never called.
+
+Options considered:
+
+1. Restore a history list in the detail panel so that it can render body
+   rewrites with `describeBodyChange`. Rejected: it reverses TL-379's recorded
+   decision as a side effect of a P3 wording fix. If the viewer should show
+   history again, that is its own task with its own thesis, not this one.
+2. Write the requested test anyway, asserting the hash is absent from rendered
+   text. Rejected: it would pass against a page that renders no history at all,
+   which is a guard green on a zero sample, and it could not satisfy the
+   positive half ("names the line counts").
+3. Cancel, and file the residue the investigation found. Chosen. The
+   original verification (a test file that was never written) is replaced by
+   the check that establishes the premise is false: no history-entry
+   renderer is referenced from `scripts/build-viewer.mjs`.
+
+The residue — `HISTORY_FIELD_LABELS` (whose `__body__` label prompted this
+task), `historyOpen` / `historyField` state, `historyLoaded`, `histTime`, and
+two document listeners calling an `openHistory` that no longer exists — is
+filed as its own task.
