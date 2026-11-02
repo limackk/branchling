@@ -360,6 +360,18 @@ export const KINDS = {
   // log answered it (TL-396): `total` is every exchange, `matched` the ones the
   // filter kept, and without both a consumer cannot tell a filtered answer from
   // a short log.
+  // `show --json` (TL-509): what is COMPUTED about one task, never its body.
+  // `deploy` is `null` when the project declares no `deploy_targets` — nobody
+  // computed it, which is not "deployed nowhere" — and otherwise names the
+  // trunk and every ref read with its SHA beside the task's own answer per
+  // target and stage. `scan` keeps an empty `elsewhere` readable, as it does in
+  // `task-list`. `blocked` is the verdict over `blockers`, by the rule `next`
+  // dispatches on, so a consumer does not re-derive which statuses count.
+  "task-show": {
+    ok: null, id: null, title: null, status: null, priority: null, file: null,
+    deploy: null, elsewhere: [], scan: null, blockers: [], blocked: null,
+    refusalKind: null, refusal: null, details: [],
+  },
   "task-log": {
     ok: null, id: null, title: null, file: null, path: null,
     records: null, total: null, matched: null, decisions: null, limit: null, exchanges: [],
@@ -490,6 +502,10 @@ export const KIND_EXERCISE = {
   // `--no-verify` because this row asks about the ENVELOPE. Left out, it would
   // run the fixture task's `verification:` command, and the shape of the answer
   // would start depending on the observer's shell.
+  // One task's computed facts (TL-509). It writes nothing, so like `log` one
+  // row answers twice: the populated fixture shows a real task, and on the
+  // empty one the same call is the "no such task" refusal in a full envelope.
+  "task-show": { args: ["show", FIRST_TASK, "--json"] },
   resume: { args: ["resume", FIRST_TASK, "--actor", "agent:test", "--no-verify", "--json"] },
   run: { args: ["run", "--dry-run", "--json"] },
   // ── The rows that WRITE (TL-119) ─────────────────────────────────────────

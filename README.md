@@ -73,6 +73,7 @@ branchling init --dir ./backlog                     # config, template, one exam
 branchling new --title "Write a README for a new user" --priority P1
 branchling query --status pending --priority P0,P1  # ask; reads the task files directly
 branchling next --actor agent:claude                # take the next task, reserved
+branchling show TASK-2                              # deployment, other branches, blockers
 branchling done TASK-2                              # runs its verification, or refuses
 branchling                                          # open the viewer in your browser
 ```

@@ -160,10 +160,21 @@ export function isExecutable(task, byId, archived) {
   // the task can name in `blocked_by`. A closed dependency therefore cannot
   // discharge it; only the decision event `openQuestions` recognises can.
   if (openQuestions(task.history || []).length) return false;
-  return (task.blocked_by || []).every((id) => {
-    const blocker = byId.get(String(id).toUpperCase());
-    return blocker && archived.has(blocker.status);
-  });
+  return (task.blocked_by || []).every((id) => blockerResolved(byId.get(String(id).toUpperCase()), archived));
+}
+
+/**
+ * Has ONE blocker stopped blocking? PURE — the rule `isExecutable` applies to
+ * every entry of `blocked_by`, exported so `show` (TL-509) answers "is this
+ * task still blocked" with the dispatcher's own definition rather than a
+ * second one that could drift from it.
+ *
+ * @param {{status: string}|undefined|null} blocker the record, or nothing when
+ *        the id names no task in this tree — which counts as unresolved
+ * @param {Set<string>} archived the project's `archived_statuses`
+ */
+export function blockerResolved(blocker, archived) {
+  return Boolean(blocker) && archived.has(blocker.status);
 }
 
 /**

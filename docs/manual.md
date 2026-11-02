@@ -344,6 +344,39 @@ branchling query --release 2026.11                     # every task planned for 
 branchling query --release ""                          # open tasks planned for none
 ```
 
+**One task at a time** is `show <ID>`. It prints the facts computed about a
+task that its file does not hold — the deployment state per target and stage,
+the task's status on other branches and worktrees where it differs from this
+tree, and each `blocked_by` task with its status — under a one-line header. The
+body is never reprinted; the file is one `cat` away.
+
+```text
+TASK-14  Retry failed uploads  done · P1
+
+deploy
+  trunk      refs/remotes/origin/main 3f1c2a9b0d4e  (the remote's default branch)
+  web        test full, production partial (refs/deploys/web/production-eu)
+  frontend   unobservable — deployed from `acme-frontend`, which is not read here
+  refs read  web/test  origin/main  3f1c2a9b0d4e
+             web/production  refs/deploys/web/production-eu  9a0b1c2d3e4f
+             web/production  refs/deploys/web/production-us  1b2c3d4e5f6a
+
+elsewhere
+  feature/retry-backoff: in_progress
+
+blockers  not blocked — every blocker is closed
+  ✓  TASK-9  done  Upload queue persists across restarts
+```
+
+- **The trunk is chosen as in `release status`**: the remote's default branch,
+  else `HEAD`, and the line says which.
+- **A task no commit names says so**, and a target in another repository is
+  `unobservable` — neither reads as "deployed nowhere".
+- **A blocker is resolved when its status is archived**, the rule `next`
+  dispatches on; an id that names no task in this tree still blocks.
+- **An unknown id exits 1**; `--json` carries the same three sections, kind
+  `task-show`.
+
 One declaration per product shape:
 
 ```yaml
@@ -1080,6 +1113,7 @@ implementation detail. Every reading command answers in the same envelope:
 | `ask` | `task-ask` | `ok`, `id`, `file`, `question` (its event id, timestamp, text and asker), `changes`, `blockedReason`, `refusalKind`, `refusal`, `details` |
 | `done` | `verification-run` | `ok`, `task`, `dryRun`, `closed`, `entries` (one per `verification:` entry, with its exit code), `status`, `wouldBe`, `ticked`, `capability`, `refusalKind`, `refusal`, `details` |
 | `resume` | `resume` | `ok`, `id`, `file`, `actor`, `owner`, `base`, `mergeBase`, `verified` (false under --no-verify: the contract was not re-run, which is not the same as a contract with no entries), `decisions`, `goal`, `history`, `diff` (the merge-base range: what this branch COMMITTED), `uncommitted` (what it left on disk in no commit: a patch of tracked edits, a list of untracked paths, and a reason — a null in any of the three means the working tree could not be read, not that it is clean), `verification` — the parts in the order the briefing fixes them — `refusalKind`, `refusal`, `details` |
+| `show` | `task-show` | `ok`, `id`, `title`, `status`, `priority`, `file`, `deploy` (null when the project declares no deploy targets; otherwise whether the scan ran, its reason and explanation, the trunk with its SHA and whether it is the remote's default branch or HEAD, every ref read with its SHA, and the task's own answer: its commit count, the commits touching no target, the targets in another repository it belongs to as an unobservable list, and per target each stage's state with the refs behind it), `elsewhere` (the task's status on other branches and worktrees where it differs), `scan` (whether that scan ran and what it read), `blockers` (each blocked-by task with its title, status, whether it is resolved, whether it exists in this tree, and its own elsewhere), `blocked` (the verdict, by the rule next dispatches on), `refusalKind`, `refusal`, `details` |
 | `log` | `task-log` | `ok`, `id`, `title`, `file`, `path` (the log the answer came from), `records` (raw entries) and `total` (the exchanges they fold into — the ratio is what the fold is worth), `matched` (the exchanges left after the filter — equal to `total` when there is none) and `decisions` (whether `--decisions` narrowed the answer to what was settled and what is still open), `limit`, `exchanges` (one per write: its time, actor, source, session, role, the reason ONCE, the changes that moved, its events and its messages — a message whose text is null is that reason again, kept for its event id), `modifiedFile` and `tasks` (the computed area and its matching tasks when `--modified-file` selects decisions by path; otherwise null and empty), `refusalKind`, `refusal`, `details` |
 | `red` | `red-owners` | `command`, `ran` (a report nobody gave is not an empty one), `reason`, `exitCode`, `files` (each failing test file with the task its commits name and, with `--repairs`, open sibling-branch repairers), `mine`, `tally`, `repairScan` (null unless requested; then whether the cross-branch scan ran and which branches it read) |
 | `docs-drift` | `docs-drift` | `documents`, `minSignals`, `flagged`, `tooLittle`, `seeded` (absent unless `--seed-tasks` ran) |
