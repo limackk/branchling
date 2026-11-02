@@ -148,8 +148,10 @@ inspectable. A CI step or a person calls it; the tool never polls (TL-506).
   the target a lane of one bucket naming them, and no gap detector reports
   them on its account — `done-not-on-trunk` and the every-target fallback of
   `planned-blocker-open` skip them, and the gate states how many tasks each
-  such target holds. Commits this repository does hold are judged as
-  everywhere else. Reading the other repository's refs — a local clone or a
+  such target holds. `query` names them as well (TL-512): on each task's
+  `deploy` in `--json`, and as the reason `--env` / `--not-env` hold a task out
+  when the other repository's half would decide the answer. Commits this
+  repository does hold are judged as everywhere else. Reading the other repository's refs — a local clone or a
   remote fetched read-only — was weighed and deliberately deferred: Law 1
   keeps the task here either way, and only the evidence would move.
 

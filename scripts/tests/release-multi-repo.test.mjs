@@ -22,6 +22,12 @@
  *   4. The declaration's shape: `paths`, `stages`, a missing `labels`, a
  *      malformed `repository` and `labels` on an ordinary target all fail,
  *      each beside a valid declaration that passes.
+ *   5. `query` (TL-512): `--json` names a frontend task's target as
+ *      unobservable on the task's own `deploy`, an unlabelled task carries
+ *      `[]`, and `--env` / `--not-env` hold out — and name — the tasks whose
+ *      answer the frontend's half would decide, while a selector naming a
+ *      target of this repository is unaffected. Each beside the reading
+ *      without the declaration.
  *
  * The fixture backlogs are created by `init` with the generic prefix, and every
  * vocabulary value (priorities, archived statuses) is read back from the
@@ -35,6 +41,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { externalTargetsOf, observedTargets, pathInTarget, readDeployTargets } from "../deploy-targets.mjs";
+import { stageMatches } from "../environments.mjs";
 import { loadConfig } from "../config.mjs";
 import { releaseViewData } from "../release-view.mjs";
 import { releaseViewModel, renderRelease, UNOBSERVABLE_COLUMN } from "../viewer-release.mjs";
@@ -368,4 +375,137 @@ test("under a closed label vocabulary, a target's label outside it fails the con
   writeFileSync(file, text + "\ndeploy_targets:\n  - name: frontend\n    repository: acme-frontend\n    labels: [frontend]\n", "utf8");
   const good = run(dir, ["release", "status", "--dir", "backlog"]);
   assert.equal(good.status, 0, good.stderr);
+});
+
+// ─── query (TL-512) ─────────────────────────────────────────────────────────
+
+/**
+ * Its own fixture, so the counts the tests above assert are not moved: the
+ * two repositories of `twoRepos()`, plus two tasks split across both — each
+ * labelled `frontend` AND named by an api commit here.
+ *
+ *   splitShipped  done, frontend, api commit in production  → unobservable for `production`
+ *   splitWaiting  done, frontend, api commit not deployed   → not in production, whatever the frontend holds
+ */
+function queryRepos() {
+  const base = twoRepos();
+  const { dir, done } = base;
+  const ids = {
+    ...base.ids,
+    splitShipped: newTask(dir, "Split shipped"),
+    splitWaiting: newTask(dir, "Split waiting"),
+  };
+  for (const name of ["splitShipped", "splitWaiting"]) {
+    setField(dir, ids[name], "status", done);
+    setField(dir, ids[name], "labels", "[frontend]");
+  }
+  commit(dir, "the split tasks", {});
+  commit(dir, ids.splitShipped + " api half", { "src/b.js": "b\n" });
+  git(dir, ["branch", "-f", "test"]);
+  git(dir, ["branch", "-f", "prod"]);
+  commit(dir, ids.splitWaiting + " api half", { "src/c.js": "c\n" });
+  return { ...base, ids };
+}
+
+const qx = queryRepos();
+
+function queryJson(dir, ...args) {
+  const r = run(dir, ["query", "--dir", "backlog", "--json", ...args]);
+  assert.equal(r.status, 0, r.stderr);
+  const parsed = JSON.parse(r.stdout);
+  assert.equal(parsed.kind, "task-list");
+  return parsed;
+}
+
+function rowsById(parsed) {
+  return new Map(parsed.tasks.map((t) => [t.id, t]));
+}
+
+const FRONTEND_AWAY = [{ target: "frontend", repository: "acme-frontend" }];
+
+test("query --json names a frontend task's target as unobservable; an unlabelled task is unaffected", () => {
+  setConfig(qx.dir, API + FRONTEND);
+  const rows = rowsById(queryJson(qx.dir, "--status", configList(qx.dir, "statuses").join(",")));
+  const fe = rows.get(qx.ids.feDone).deploy;
+  assert.deepEqual(fe.unobservable, FRONTEND_AWAY);
+  assert.equal(fe.commits, 0, "no commit here names it — and the field says why that is not \"undeployed\"");
+  assert.deepEqual(rows.get(qx.ids.feOpen).deploy.unobservable, FRONTEND_AWAY);
+  const split = rows.get(qx.ids.splitShipped).deploy;
+  assert.deepEqual(split.unobservable, FRONTEND_AWAY);
+  assert.deepEqual(split.targets.map((t) => t.target), ["api"], "the half here is still read");
+  // Positive control: the unlabelled tasks are read as before, with the key
+  // present and empty.
+  const shipped = rows.get(qx.ids.shipped).deploy;
+  assert.deepEqual(shipped.unobservable, []);
+  assert.equal(shipped.targets[0].reached, "production");
+  assert.deepEqual(rows.get(qx.ids.unstarted).deploy.unobservable, []);
+});
+
+test("without the declaration, a frontend task reads as no commits and no target (positive control)", () => {
+  setConfig(qx.dir, API);
+  const rows = rowsById(queryJson(qx.dir, "--status", qx.done));
+  const fe = rows.get(qx.ids.feDone).deploy;
+  assert.deepEqual(fe, { commits: 0, untargeted: 0, unobservable: [], targets: [] });
+});
+
+test("--not-env and --env hold out the tasks the frontend's half would decide, and name them", () => {
+  setConfig(qx.dir, API + FRONTEND);
+  const held = [{ ...FRONTEND_AWAY[0], tasks: [qx.ids.feDone, qx.ids.splitShipped] }];
+
+  const notEnv = queryJson(qx.dir, "--status", qx.done, "--not-env", "production");
+  assert.deepEqual(notEnv.tasks.map((t) => t.id), [qx.ids.splitWaiting],
+    "a half here that is not in production settles the answer whatever the frontend holds");
+  assert.deepEqual(notEnv.deploy.unobservable, held);
+
+  const env = queryJson(qx.dir, "--status", qx.done, "--env", "production");
+  assert.deepEqual(env.tasks.map((t) => t.id), [qx.ids.shipped],
+    "a split task in production here is not called deployed: its other half was not looked at");
+  assert.deepEqual(env.deploy.unobservable, held);
+
+  // A selector naming a target of this repository asks about that target only.
+  const api = queryJson(qx.dir, "--status", qx.done, "--env", "api/production");
+  assert.deepEqual(api.tasks.map((t) => t.id).sort(), [qx.ids.shipped, qx.ids.splitShipped].sort());
+  assert.deepEqual(api.deploy.unobservable, []);
+
+  // Without a stage filter nothing is held out, and the key is still present.
+  assert.deepEqual(queryJson(qx.dir, "--status", qx.done).deploy.unobservable, []);
+});
+
+test("the text and --count outputs say why a frontend task is missing", () => {
+  setConfig(qx.dir, API + FRONTEND);
+  const text = run(qx.dir, ["query", "--dir", "backlog", "--status", qx.done, "--not-env", "production"]);
+  assert.equal(text.status, 0, text.stderr);
+  const why = "# frontend: unobservable — deployed from `acme-frontend`, which is not read here, so " +
+    qx.ids.feDone + ", " + qx.ids.splitShipped + " match neither --env nor --not-env";
+  assert.ok(text.stdout.includes(why), text.stdout);
+  const count = run(qx.dir, ["query", "--dir", "backlog", "--status", qx.done, "--not-env", "production", "--count"]);
+  assert.equal(count.status, 0, count.stderr);
+  assert.equal(count.stdout.trim(), "1");
+  assert.ok(count.stderr.includes(why), count.stderr);
+});
+
+test("without the declaration, --env reads the split task as deployed and names nothing (positive control)", () => {
+  setConfig(qx.dir, API);
+  const env = queryJson(qx.dir, "--status", qx.done, "--env", "production");
+  assert.deepEqual(env.tasks.map((t) => t.id).sort(), [qx.ids.shipped, qx.ids.splitShipped].sort());
+  assert.deepEqual(env.deploy.unobservable, []);
+  const notEnv = queryJson(qx.dir, "--status", qx.done, "--not-env", "production");
+  assert.ok(!notEnv.tasks.some((t) => t.id === qx.ids.feDone), "matched by nothing, and nothing says why");
+  const text = run(qx.dir, ["query", "--dir", "backlog", "--status", qx.done, "--not-env", "production"]);
+  assert.doesNotMatch(text.stdout, /unobservable/);
+});
+
+test("stageMatches: the other repository decides only what this one cannot", () => {
+  const away = [{ name: "frontend", repository: "acme-frontend" }];
+  const task = (state) => ({ targets: [{ target: "api", stages: [{ stage: "production", state }] }] });
+  const any = { target: null, stage: "production" };
+  const api = { target: "api", stage: "production" };
+  assert.equal(stageMatches(task("full"), any, away), "unobservable");
+  assert.equal(stageMatches({ targets: [] }, any, away), "unobservable");
+  assert.equal(stageMatches(task("absent"), any, away), "not-full");
+  assert.equal(stageMatches(task("unknown"), any, away), "unknown");
+  assert.equal(stageMatches(task("full"), api, away), "full");
+  // Positive control: with no target elsewhere the answers are the old ones.
+  assert.equal(stageMatches(task("full"), any), "full");
+  assert.equal(stageMatches({ targets: [] }, any), "none");
 });

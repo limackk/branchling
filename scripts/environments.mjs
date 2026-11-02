@@ -47,7 +47,8 @@
  * THE API, for the tasks built on it (TL-502 to TL-508):
  *   deploymentState(opts)          the whole computation, one pass
  *   taskDeployment(state, id)      one task's answer, empty when it has no commits
- *   stageMatches(task, selector)   `full` / `not-full` / `unknown` / `none` for `--env`
+ *   stageMatches(task, selector, away)  `full` / `not-full` / `unknown` / `none` /
+ *                                  `unobservable` for `--env`
  *   parseStageSelector(text, targets)  `stage` or `target/stage`, validated
  *   explain(reason)                why an empty answer is empty
  *   defaultTrunk(root)             the remote's default branch, else `HEAD`
@@ -325,22 +326,45 @@ export function parseStageSelector(text, targets) {
  * - `unknown`   a ref the answer depends on did not resolve
  * - `full`      every selected target of the task holds it in that stage in full
  * - `not-full`  at least one holds it partially or not at all
+ * - `unobservable`  the task belongs to a target in another repository
+ *               (`away`, from `externalTargetsOf()`, TL-507), the selector
+ *               names no target, and what this repository holds of the task
+ *               is either nothing or the stage in full (TL-512)
+ *
+ * WHY `full` TURNS INTO `unobservable` and `not-full` does not. A stage typed
+ * without a target asks about every target the task belongs to, and the half
+ * in the other repository cannot be read: "in production" would be a claim
+ * about code nobody looked at — `release status` refuses to call such a task
+ * shipped for the same reason. A half here that is NOT in the stage settles
+ * the answer whatever the other half holds, so it stays `not-full`. A selector
+ * naming a target of this repository asks about that target alone, and the
+ * other repository has nothing to say about it.
  */
-export function stageMatches(task, selector) {
+export function stageMatches(task, selector, away = []) {
   const relevant = task.targets
     .filter((t) => selector.target === null || t.target === selector.target)
     .map((t) => t.stages.find((s) => s.stage === selector.stage))
     .filter(Boolean);
-  if (!relevant.length) return "none";
+  const unobservable = selector.target === null && away.length > 0;
+  if (!relevant.length) return unobservable ? "unobservable" : "none";
   if (relevant.some((s) => s.state === "unknown")) return "unknown";
-  return relevant.every((s) => s.state === "full") ? "full" : "not-full";
+  if (relevant.every((s) => s.state === "full")) return unobservable ? "unobservable" : "full";
+  return "not-full";
 }
 
-/** The answer as data: plain JSON, for `query --json` and every report. */
-export function taskDeploymentJson(task) {
+/**
+ * The answer as data: plain JSON, for `query --json` and every report.
+ *
+ * `unobservable` names the targets in another repository the task belongs to
+ * (`away`, from `externalTargetsOf()`), always present and `[]` for a task of
+ * none: without it, a task implemented elsewhere reads `commits: 0, targets:
+ * []`, which is exactly what "never started, deployed nowhere" looks like.
+ */
+export function taskDeploymentJson(task, away = []) {
   return {
     commits: task.commits.length,
     untargeted: task.untargeted.length,
+    unobservable: away.map((t) => ({ target: t.name, repository: t.repository })),
     targets: task.targets.map((t) => ({
       target: t.target,
       commits: t.commits.length,
