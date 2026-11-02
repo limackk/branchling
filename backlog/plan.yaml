@@ -13,7 +13,7 @@
 # means something first, outward claims last — and adds one: a human gate is
 # closed by a vouch, so the vouch has to be recorded under the right name
 # before any gate is closed with one.
-updated: 2026-11-01
+updated: 2026-11-02
 rationale: "The package is already public, so what remains is making each later claim true before it is made. Branchling first makes its suite answer the same way twice, then records a person's vouch as that person's and reads a CRLF checkout like an LF one; the viewer runs alongside, on files neither of those touches. Only then the human gates, and last the release evidence and the announcement that point at all of it."
 waves:
   # A SUITE THAT IS RED BY CHANCE CLOSES NOTHING. `done` runs the suite, so a
@@ -83,3 +83,7 @@ waves:
   # Small and last: it teaches the gap detectors to skip targets whose code lives in another repository, so it follows the gate and the scope check that it changes.
   - name: "Unobservable targets"
     tasks: [TL-507]
+
+  # Three small gaps the implementation loops found and filed: a short deploy ref that doctor misses, the release field missing from the viewer's filters, and query not naming tasks of another repository as unobservable. They touch doctor, the viewer and query respectively, so they run side by side.
+  - name: "Release tracking follow-ups"
+    tasks: [TL-510, TL-511, TL-512]
