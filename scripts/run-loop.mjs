@@ -99,7 +99,7 @@ import { todayStamp } from "./today.mjs";
 import { ACTOR_NAMESPACES, buildFieldSpecs, extractMeta, fieldSpec, isValidActor, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
 import { readTaskRecords, splitList, unknownFilterValues } from "./task-select.mjs";
 import { printJson } from "./json-envelope.mjs";
-import { MARK, color, failure, ok, warn } from "./ui.mjs";
+import { MARK, color, failure, ok, plainChildEnv, warn } from "./ui.mjs";
 import { processTreeDetached, stopProcessTree } from "./process-tree.mjs";
 import { executableInvocation, posixShell } from "./posix-shell.mjs";
 import { processEssentials } from "./process-env.mjs";
@@ -716,7 +716,7 @@ export function logPathFor(root, id, opts = {}) {
 function cli(args, opts = {}) {
   return spawnSync(process.execPath, [CLI].concat(args), {
     encoding: "utf8",
-    env: { ...process.env, NO_COLOR: "1", ...(opts.env || {}) },
+    env: { ...plainChildEnv(), ...(opts.env || {}) },
     timeout: opts.timeout,
     maxBuffer: 64 * 1024 * 1024,
   });

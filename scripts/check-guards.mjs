@@ -14,6 +14,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { PRODUCT_NAME as N } from "./product.mjs";
+import { plainChildEnv } from "./ui.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -197,7 +198,7 @@ export function collectAdvisories(root, config, table = CHECK_GUARDS) {
   return advisoryRuns(config, table).map((guard) => {
     const r = spawnSync(process.execPath, [join(HERE, guard.script)].concat(guard.args(root)), {
       encoding: "utf8",
-      env: { ...process.env, NO_COLOR: "1" },
+      env: plainChildEnv(),
     });
     const output = r.error
       ? "could not start " + guard.script + ": " + r.error.message

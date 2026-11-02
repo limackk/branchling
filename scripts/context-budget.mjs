@@ -46,7 +46,7 @@ import { queueStatuses } from "./next-task.mjs";
 import { backlogPaths } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { extractMeta, splitFrontmatter } from "./task-fields.mjs";
-import { MARK, color, heading, table } from "./ui.mjs";
+import { MARK, color, heading, plainChildEnv, table } from "./ui.mjs";
 
 /**
  * The window every share in the report is a share OF.
@@ -121,7 +121,7 @@ export function median(numbers) {
 export function commandRunner(cliPath, root) {
   return (args) => {
     const r = spawnSync(process.execPath, [cliPath, ...args, "--dir", root], {
-      encoding: "utf8", timeout: 60_000, env: { ...process.env, NO_COLOR: "1" },
+      encoding: "utf8", timeout: 60_000, env: plainChildEnv(),
     });
     return String(r.stdout || "");
   };

@@ -45,7 +45,7 @@ import { COMMANDS, describeFlags } from "./cli.mjs";
 import { TOPIC_NAMES } from "./instructions.mjs";
 import { PRODUCT_NAME as N, PRODUCT_VERSION } from "./product.mjs";
 import { printLine, writeOut } from "./stdout.mjs";
-import { refusal } from "./ui.mjs";
+import { plainChildEnv, refusal } from "./ui.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CLI = join(HERE, "cli.mjs");
@@ -161,7 +161,7 @@ export function buildArgv(command, input) {
  */
 export function callCli(command, input, opts = {}) {
   const argv = buildArgv(command, input);
-  const env = { ...process.env, NO_COLOR: "1" };
+  const env = plainChildEnv();
   if (opts.dir) env.BACKLOG_DIR = opts.dir;
   const r = spawnSync(process.execPath, [CLI].concat(argv), {
     encoding: "utf8",

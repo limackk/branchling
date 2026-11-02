@@ -37,7 +37,7 @@ import { fileURLToPath } from "node:url";
 import { PRODUCT_NAME as N, PRODUCT_VERSION } from "./product.mjs";
 import { ConfigError, formatConfigError, loadConfig } from "./config.mjs";
 import { printJson } from "./json-envelope.mjs";
-import { MARK, color, failure } from "./ui.mjs";
+import { MARK, color, failure, plainChildEnv } from "./ui.mjs";
 import { CHECK_GUARDS, effectiveSeverity, guardsForRun } from "./check-guards.mjs";
 import { resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { FIELD_SHAPES, REASON_MAX_LENGTH } from "./task-fields.mjs";
@@ -1949,9 +1949,12 @@ export function takeColorFlags(argv) {
 
 function childEnv(force) {
   if (force === null) return process.env;
+  if (force === false) return plainChildEnv();
+  // Each direction removes the other variable: both at once is a contradiction
+  // Node reports on the child's stderr (TL-538).
   const env = { ...process.env };
-  if (force === false) env.NO_COLOR = "1";
-  else { delete env.NO_COLOR; env.FORCE_COLOR = "1"; }
+  delete env.NO_COLOR;
+  env.FORCE_COLOR = "1";
   return env;
 }
 
@@ -1985,7 +1988,7 @@ function runScript(script, args, colorForce = null) {
 function captureScript(script, args) {
   const r = spawnSync(process.execPath, [join(HERE, script)].concat(args), {
     encoding: "utf8",
-    env: { ...childEnv(false), NO_COLOR: "1" },
+    env: childEnv(false),
   });
   if (r.error) {
     return { exit: 1, output: "could not start " + script + ": " + r.error.message };
