@@ -98,4 +98,4 @@ waves:
 
   # It builds on the chronological releases: list the current-release task introduces, so it comes last.
   - name: "Shipped releases are in the scope report"
-    tasks: [TL-516]
+    tasks: [TL-516, TL-518]
