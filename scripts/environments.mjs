@@ -160,6 +160,16 @@ export function defaultTrunk(root, run = spawnSync) {
   return { spec: "HEAD", source: "head" };
 }
 
+/**
+ * How a reader names where its trunk came from, keyed by `defaultTrunk().source`.
+ * One wording, so two commands reporting the same trunk cannot describe it
+ * differently.
+ */
+export const TRUNK_SOURCE_TEXT = Object.freeze({
+  "remote-default": "the remote's default branch",
+  head: "HEAD — this clone has no `origin/HEAD`",
+});
+
 function combine(states) {
   if (states.some((s) => s === "unknown")) return "unknown";
   if (states.every((s) => s === "full")) return "full";
