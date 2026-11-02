@@ -41,7 +41,9 @@
  *                    declared in `deploy_targets:` (TL-501). A task of a
  *                    target in another repository matches neither when that
  *                    repository's half would decide the answer, and the
- *                    output names it as unobservable (TL-512)
+ *                    output names it as unobservable (TL-512). Counted from
+ *                    the remote's default branch, else HEAD — the trunk
+ *                    `show` and `deploy status` use — and named (TL-517)
  * By default only ACTIVE ones (status not in archived_statuses); passing
  * --status explicitly lifts that restriction, so `--status done` searches the
  * closed ones.
@@ -63,8 +65,8 @@ import { printJson } from "./json-envelope.mjs";
 import { printLine } from "./stdout.mjs";
 import { explain as explainIndex, modifiedFiles, repoRoot, touches } from "./modified-files.mjs";
 import {
-  deploymentScanJson, deploymentState, describeUnknownRefs, explain as explainDeploy,
-  parseStageSelector, stageMatches, taskDeployment, taskDeploymentJson,
+  TRUNK_SOURCE_TEXT, defaultTrunk, deploymentScanJson, deploymentState, describeUnknownRefs,
+  explain as explainDeploy, parseStageSelector, stageMatches, taskDeployment, taskDeploymentJson,
 } from "./environments.mjs";
 import { backlogPaths, resolveBacklogDir, resolveBacklogDirOrExit } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
@@ -244,12 +246,21 @@ for (const [flag, want] of [["env", "full"], ["not-env", "not-full"]]) {
   }
   ENV_SELECTORS.push({ ...sel, want });
 }
+//
+// THE SAME TRUNK AS `show` AND `deploy status` (TL-517): the remote's default
+// branch, else `HEAD`. Counting from `HEAD` made a task worked on an unmerged
+// feature branch read as deployed here and not there, and the difference was
+// visible only to somebody who compared both headers. The trunk and its source
+// are named in every output that shows deployment.
 let DEPLOY = null;
+let TRUNK = null;
 {
   const one = COLLECTED[0];
   if (one.config && (ENV_SELECTORS.length || (opts.json && one.config.deployTargets.length))) {
+    const repo = repoRoot(one.root);
+    TRUNK = defaultTrunk(repo);
     DEPLOY = deploymentState({
-      root: repoRoot(one.root), prefix: one.config.taskIdPrefix, targets: one.config.deployTargets,
+      root: repo, prefix: one.config.taskIdPrefix, targets: one.config.deployTargets, trunk: TRUNK.spec,
     });
     for (const t of one.tasks) {
       t.deploy = taskDeploymentJson(taskDeployment(DEPLOY, t.id), externalTargetsOf(one.config.deployTargets, t));
@@ -391,7 +402,9 @@ if (opts.json) {
     // `unobservable` beside it lists, per target in another repository, the
     // tasks `--env`/`--not-env` held out because that repository's half would
     // decide the answer (TL-512) — `[]` when no such filter ran.
-    deploy: DEPLOY ? { ...deploymentScanJson(DEPLOY), unobservable: heldUnobservable() } : null,
+    // `trunk.source` says whether it is the remote's default branch or the
+    // `HEAD` fallback, as in `show --json` (TL-517).
+    deploy: DEPLOY ? deployEnvelope() : null,
     // WHAT THE PASS COULD NOT REACH (TL-36). In the RESULT and not only on
     // stderr: a consumer reading this envelope would otherwise count an
     // incomplete set as complete, and "you moved the repository" would arrive
@@ -475,9 +488,18 @@ if (INDEX) {
 // empty answer says which empty it is.
 for (const line of deployNotes()) printLine("# " + line);
 
+function deployEnvelope() {
+  const scan = deploymentScanJson(DEPLOY);
+  return { ...scan, trunk: { ...scan.trunk, source: TRUNK.source }, unobservable: heldUnobservable() };
+}
+
 function deployNotes() {
   if (!DEPLOY || !ENV_SELECTORS.length) return [];
   const lines = [];
+  // Named on every answer that filtered by deployment, so a reader comparing it
+  // with `show` or `deploy status` can see it was counted from the same place.
+  lines.push("deployment counted from trunk " + DEPLOY.trunk.spec + " " +
+    (DEPLOY.trunk.sha ? DEPLOY.trunk.sha.slice(0, 12) : "unresolved") + " (" + TRUNK_SOURCE_TEXT[TRUNK.source] + ")");
   const why = explainDeploy(DEPLOY.reason);
   if (why) lines.push(why);
   for (const l of describeUnknownRefs(DEPLOY)) lines.push(l + " — tasks that depend on it match neither --env nor --not-env");

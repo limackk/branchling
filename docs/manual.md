@@ -227,9 +227,11 @@ deploy_targets:
 ```
 
 - **A commit belongs to a task through the task id in its message**, anywhere
-  in it. Only commits reachable from the trunk (`HEAD`) count, so a squash
-  merge, a merge commit and a rebase give the same answer; merge commits
-  themselves are skipped.
+  in it. Only commits reachable from the trunk count, so a squash merge, a
+  merge commit and a rebase give the same answer; merge commits themselves are
+  skipped. The trunk is the remote's default branch (`origin/HEAD`) when the
+  clone has one, otherwise `HEAD` — the same trunk `show` and `deploy status`
+  read — and `query` names it, with its source, in its output.
 - **A task's targets are the ones whose `paths` its commits touched.** A path
   ending in `/` selects a directory; any other entry selects that file, or the
   directory of that name. There are no globs in `paths`.
@@ -1085,7 +1087,7 @@ implementation detail. Every reading command answers in the same envelope:
 
 | Command | `kind` | Payload |
 |---|---|---|
-| `query` | `task-list` | `tasks`, `total` (matches BEFORE `--limit`), `limit`, `scan`, `modifiedFile`, `deploy` (null unless deployment state was computed — then the trunk and every ref read, with its SHA, and an unobservable list: per target in another repository, the tasks `--env`/`--not-env` held out because that repository would decide them, empty without such a filter; each task then carries its own `deploy` per target and stage, whose unobservable list names the targets in another repository it belongs to), `elsewhereOnly` (the tasks only another branch has) |
+| `query` | `task-list` | `tasks`, `total` (matches BEFORE `--limit`), `limit`, `scan`, `modifiedFile`, `deploy` (null unless deployment state was computed — then the trunk with its SHA and its source, remote-default or head, and every ref read, each with its SHA, and an unobservable list: per target in another repository, the tasks `--env`/`--not-env` held out because that repository would decide them, empty without such a filter; each task then carries its own `deploy` per target and stage, whose unobservable list names the targets in another repository it belongs to), `elsewhereOnly` (the tasks only another branch has) |
 | `stats` | `stats` | `root`, `stats` (the tallies), `scan`, `divergent` (one row per task another branch disagrees with), `elsewhereOnly` (the tasks only another branch has), `context` (null unless `--context`: the measured cost rows), `agentTime` (null unless `--agent-time`: per-estimate buckets from the ledger, the verdict, and what could not be measured) |
 | `doctor` | `doctor` | `ok`, `root`, `next`, `checks` |
 | `serve --list` | `serve-list` | `servers` (one row per registered viewer, each carrying its own state: running, stale — the entry outlived its process — or elsewhere, meaning another host wrote it and this one may not judge it), `stateDir`, `host` |
