@@ -87,3 +87,15 @@ waves:
   # Three small gaps the implementation loops found and filed: a short deploy ref that doctor misses, the release field missing from the viewer's filters, and query not naming tasks of another repository as unobservable. They touch doctor, the viewer and query respectively, so they run side by side.
   - name: "Release tracking follow-ups"
     tasks: [TL-510, TL-511, TL-512, TL-509]
+
+  # The owner's 2026-11-02 review: the deployment commands move under deploy, and every deployment reader counts from the same trunk. Both rename behaviour already merged and touch disjoint files, so they run side by side before anything is built on the new names.
+  - name: "The release surface says one thing per word"
+    tasks: [TL-513, TL-517]
+
+  # Two corrections of merged behaviour that read the renamed commands: a dedicated target: field for external targets, and only the current release blocking shipping.
+  - name: "Planned scope and external targets follow the owner's review"
+    tasks: [TL-514, TL-515]
+
+  # It builds on the chronological releases: list the current-release task introduces, so it comes last.
+  - name: "Shipped releases are in the scope report"
+    tasks: [TL-516]
