@@ -305,6 +305,15 @@ export const KINDS = {
     actor: null, reason: null, recordedAt: null, remote: null, push: null, fetchFix: null,
     refusalKind: null, refusal: null, details: [],
   },
+  // `declare --json` (TL-522): the entry appended to `releases:` or
+  // `deploy_targets:`, or the refusal. `refusalKind` names which refusal —
+  // `undeclared-key` for a key no command writes, `duplicate`, `malformed`,
+  // `form` for a list written in a shape the writer does not edit — so a
+  // consumer branches on a word rather than parsing the sentence.
+  "vocabulary-declare": {
+    ok: null, key: null, name: null, entry: null, reason: null, file: null,
+    refusalKind: null, refusal: null, details: [],
+  },
   // `ask --json` (TL-148). The question's EVENT ID is the payload that matters:
   // it is what a later `decide --resolves` has to name, and the reason the task
   // now carries names it too — so a consumer never has to parse a sentence.
@@ -552,6 +561,12 @@ export const KIND_EXERCISE = {
   "task-body": {
     args: ["body", ABSENT_TASK, "--reason", "a fixture", "--actor", "agent:test", "--json"],
     refuses: true, writes: true, input: "## Goal\n\nA fixture.\n",
+  },
+  // The success path: the fixture's config.yaml gains one release, which is
+  // the write a release-management interface needs.
+  "vocabulary-declare": {
+    args: ["declare", "releases", "9.9", "--reason", "a fixture", "--json"],
+    writes: true,
   },
   "task-release": {
     args: ["release", ABSENT_TASK, "--actor", "agent:test", "--reason", "a fixture", "--json"],

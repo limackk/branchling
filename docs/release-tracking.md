@@ -1,6 +1,6 @@
 # Release tracking across environments
 
-**Status:** IMPLEMENTED 2026-11-02 (TL-501, TL-502, TL-503, TL-504, TL-505, TL-506, TL-507, TL-508, TL-516)
+**Status:** IMPLEMENTED 2026-11-02 (TL-501, TL-502, TL-503, TL-504, TL-505, TL-506, TL-507, TL-508, TL-516, TL-522)
 
 The question this answers: of the tasks that are finished, which are waiting
 for the test environment, which are waiting for production, and which have
@@ -106,6 +106,47 @@ deploy_targets:
   in the clone: one that reads a ref outside `refs/heads/`, `refs/remotes/` and
   `refs/tags/` is checked under that full name, and one that resolves to
   nothing while naming no remote is a warning (TL-510).
+
+### Declaring a release or a target
+
+`releases:` and `deploy_targets:` grow with a project's life, so each has a
+writing command (TL-522); the rest of config.yaml does not:
+
+```
+branchling declare releases 1.4 --reason "the spring cut"
+branchling declare releases 1.3 --ref v1.3 --reason "shipped before it was declared"
+branchling declare deploy_targets web --paths web/,api/ \
+  --stage test=origin/main --stage production=refs/deploys/eu,refs/deploys/us \
+  --reason "the public site"
+branchling declare deploy_targets ui --repository web-ui --reason "its own repository"
+```
+
+The command appends ONE entry and edits config.yaml line by line, so every
+comment and every other line stays as written; a release is appended last,
+because the order is chronological. The result is read back by the
+configuration reader and refused, with nothing written, unless every other key
+reads as before and the edited one reads as before plus that entry. A name
+already declared, a malformed target and a list written in a form the writer
+does not edit (a flow list over several lines, a scalar) are refused too. The
+reason is required and is written as a comment above the entry: a release is
+not a task, so `backlog/history/` has no place for it, and — as with
+`plan.yaml` (TL-213) — the record of a configuration change is the diff of that
+one file. `--json` answers in the `vocabulary-declare` kind, whose
+`refusalKind` names which refusal it was.
+
+**Why these two keys and nothing else.** The code knows the shape of a field
+and config.yaml knows the values (the third law); that does not require a text
+editor for every value, but it does separate two kinds of value. Planning a
+release and adding a deployable are acts repeated through a project's life.
+The statuses, priorities, boards and policies are its grammar: changing one
+reshapes every task already written in it, and a renamed status strands the
+tasks still carrying the old word. A general configuration editor would make
+that grammar as cheap to change as a release is to plan. So another key is
+refused by name, and changing an existing entry stays a hand edit somebody
+reviews: renaming or reordering releases (the position decides which release
+is current, TL-515), marking a declared release shipped with `ref:`, and a
+`recorded: true` stage, whose refs the tool itself moves under the rules of
+§4.
 
 ## 4. Recorded stages
 
