@@ -75,7 +75,7 @@ import { printJson } from "./json-envelope.mjs";
 import { backlogPaths, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import {
-  FIELD_COMMENT, FIELD_DECISION, extractMeta, historyEntryKind, isQuestion, openQuestions, splitFrontmatter,
+  FIELD_BODY, FIELD_COMMENT, FIELD_DECISION, describeBodyChange, extractMeta, historyEntryKind, isQuestion, openQuestions, splitFrontmatter,
 } from "./task-fields.mjs";
 import { MARK, failure, plain } from "./ui.mjs";
 
@@ -308,6 +308,7 @@ export function describeEntry(e) {
   const text = (s) => String(s == null ? "" : s).split("\n").map((l) => l.trim()).filter(Boolean).join(" · ");
   if (e.field === FIELD_DECISION) return "decision: " + text(e.to);
   if (e.field === FIELD_COMMENT) return "comment: " + text(e.to);
+  if (e.field === FIELD_BODY) return describeBodyChange(e, MARK.arrow);
   if (historyEntryKind(e) === "event") return e.field.replace(/^__|__$/g, "") + (e.to ? ": " + text(e.to) : "");
   return e.field + ": " + (text(e.from) || "(none)") + " " + MARK.arrow + " " + (text(e.to) || "(none)");
 }

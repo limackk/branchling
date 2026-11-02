@@ -268,6 +268,12 @@ export const KINDS = {
     warnings: [],
     refusalKind: null, refusal: null, details: [],
   },
+  // `body --json` (TL-523). `body` is the pair of base-version hashes, so a
+  // caller can pass `body.to` as the next write's `--base`.
+  "task-body": {
+    ok: null, id: null, file: null, changed: null, body: null, lines: null, entry: null,
+    refusalKind: null, refusal: null, details: [],
+  },
   "task-release": {
     ok: null, id: null, status: null, owner: null, released: null, comment: null,
     refusalKind: null, refusal: null, details: [],
@@ -533,6 +539,12 @@ export const KIND_EXERCISE = {
   "release-record": {
     args: ["deploy", "record", "--target", "web", "--stage", "production", "HEAD", "--actor", "agent:test", "--reason", "a fixture", "--json"],
     refuses: true, writes: true,
+  },
+  // A body for a task that is not there: the refusal path, reached only after
+  // the reason passes and the body has been read from stdin.
+  "task-body": {
+    args: ["body", ABSENT_TASK, "--reason", "a fixture", "--actor", "agent:test", "--json"],
+    refuses: true, writes: true, input: "## Goal\n\nA fixture.\n",
   },
   "task-release": {
     args: ["release", ABSENT_TASK, "--actor", "agent:test", "--reason", "a fixture", "--json"],

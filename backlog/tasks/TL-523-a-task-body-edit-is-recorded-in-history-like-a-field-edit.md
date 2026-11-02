@@ -8,8 +8,8 @@ epic: "External UI contract"
 release: ""                        # the release it is PLANNED for (a value from `releases:` in config.yaml). Empty = none
 target: []                         # the deploy targets in ANOTHER repository it ships from (`deploy_targets` with `repository:`). Empty = none
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 conflict_group: []                 # the AREA it touches (e.g. a module): `next` and `run` hold it back while a task of the same group is in progress. Empty = `conflict_group_from`, or none
@@ -40,6 +40,15 @@ FIELD_BODY (`__body__`) is reserved in scripts/task-fields.mjs but not implement
 3. Make `branchling log` render body changes legibly without printing whole bodies.
 4. Keep the frontmatter untouched by a body write, and refuse a body that would break the required sections.
 
+## Decisions
+
+- **The record holds hashes, not text.** docs/branchling-state-and-sync.md section 5.3 guards a body write with a base-version hash, so a `__body__` entry records exactly that: `from` and `to` are `sha256:<hex>` of the body before and after, plus `lines: {added, removed}` for a reader. The body text is already in the file and in git; copying every revision into an append-only log would make it grow with the prose instead of with the number of edits. The design document needed no amendment.
+- **`--base` is optional.** An interface that read the body passes the hash it read and is refused (exit 1, `stale-base`) when the file has moved; a person writing a whole body from a file has no earlier read to protect.
+- **"Required sections" means the acceptance-criteria contract.** It is the only section the tool proves (`criteria.mjs`, used by `done` and `check --criteria`). A body is refused on any criteria error, or on a warning the current body does not already carry, so a body write cannot be the quiet way to delete what `done` proves, yet is not refused for a weakness it did not introduce. Also refused: an empty body and a body opening with a `---` fence.
+- **`updated:` is not bumped.** The frontmatter stays byte-identical; bumping it would be a second change inside an act about prose.
+- **No ownership gate.** A body edit by somebody other than the owner is guarded by the base hash, which is the content-class rule of section 5.1, not by the claim.
+- **Not done here:** the viewer still renders a `__body__` entry as a hash transition; that is a separate task.
+
 ## Acceptance criteria
 
-- [ ] A body written through the tool leaves the frontmatter byte-identical, appends exactly one __body__ record with actor and reason, and `branchling log` shows it. [proof: body-history]
+- [x] A body written through the tool leaves the frontmatter byte-identical, appends exactly one __body__ record with actor and reason, and `branchling log` shows it. [proof: body-history]

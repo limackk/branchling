@@ -239,13 +239,18 @@ export function actorParts(actor) {
 // viewer had its own hand-copied version — exactly the class of "the same
 // decision in two places".
 //
-// __body__ is RESERVED, not implemented (BL-1404 step 5) — body history is the
-// plan in docs/branchling-state-and-sync.md §5.2-5.3; // product-name: allow
-// the schema admits it today so that adding it is an append rather than a
-// migration of somebody's existing data. __comment__ was reserved the same way
-// and is now WRITTEN, first by `handoff` (TL-99).
+// __body__ was reserved in BL-1404 so that adding it would be an append rather
+// than a migration of somebody's existing data, and it is WRITTEN since TL-523
+// by `body` (scripts/body-task.mjs). __comment__ was reserved the same way and
+// is written first by `handoff` (TL-99).
 export const FIELD_CREATED = "__created__";
 export const FIELD_DELETED = "__deleted__";
+// A rewrite of the task's prose (TL-523). `from` and `to` are the base-version
+// hashes of docs/branchling-state-and-sync.md §5.3 — `sha256:<hex>` of the // product-name: allow
+// body before and after — and NOT the bodies: the text is in the task file and
+// in git, and a log that copied every revision would grow with the prose rather
+// than with the number of edits. `lines` ({added, removed}) is what a reader is
+// shown instead of two hashes; see `describeBodyChange`.
 export const FIELD_BODY = "__body__";
 // A message about the task rather than a change to it (TL-99). The whole
 // content is `to`; `from` is empty, because a comment replaces nothing. Unlike
@@ -490,6 +495,25 @@ export function historyEntryKind(entry) {
   if (field === FIELD_COMMENT || field === FIELD_DECISION) return "message";
   if (isPseudoField(field)) return entry.from && entry.to ? "transition" : "event";
   return "transition";
+}
+
+/**
+ * How a `__body__` entry reads in one line (TL-523). PURE, and here rather than
+ * in each reader for the reason `historyEntryKind` gives: `log` and `resume`
+ * both print history, and a second wording would be a second definition.
+ *
+ * The hashes are kept short for READING only; the record holds them whole,
+ * because a base-version comparison against eight characters is a comparison
+ * against a prefix. The arrow is a parameter because this file is pasted into
+ * the viewer and cannot import the terminal's symbols from `ui.mjs`.
+ */
+export function describeBodyChange(entry, arrow = "->") {
+  const lines = (entry && entry.lines) || {};
+  const short = (h) => String(h || "").replace(/^sha256:/, "").slice(0, 8) || "(none)";
+  const counts = Number.isInteger(lines.added) && Number.isInteger(lines.removed)
+    ? "+" + lines.added + " -" + lines.removed + " line(s)"
+    : "rewritten";
+  return "body " + counts + " (" + short(entry && entry.from) + " " + arrow + " " + short(entry && entry.to) + ")";
 }
 
 export const FIELD_SHAPES = [

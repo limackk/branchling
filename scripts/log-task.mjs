@@ -52,8 +52,8 @@ import { explain, modifiedFiles, repoRoot, touches } from "./modified-files.mjs"
 import { backlogPaths, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import {
-  FIELD_COMMENT, FIELD_DECISION, REASON_SENTINELS,
-  extractMeta, historyEntryKind, isPseudoField, isQuestion, openQuestions, splitFrontmatter,
+  FIELD_BODY, FIELD_COMMENT, FIELD_DECISION, REASON_SENTINELS,
+  describeBodyChange, extractMeta, historyEntryKind, isPseudoField, isQuestion, openQuestions, splitFrontmatter,
 } from "./task-fields.mjs";
 import { readTaskRecords } from "./task-select.mjs";
 import { MARK, color, failure, heading, table } from "./ui.mjs";
@@ -130,6 +130,11 @@ export function foldExchanges(entries) {
       // expose the structured record without parsing the reason.
       if (Array.isArray(e.files) && e.files.length) message.files = e.files.slice();
       current.messages.push(message);
+    } else if (e.field === FIELD_BODY) {
+      // A body rewrite (TL-523) is shown by its size, never by its text, and
+      // not as a field transition: two 71-character hashes with an arrow
+      // between them say nothing a reader can use.
+      current.events.push(describeBodyChange(e, MARK.arrow));
     } else if (isPseudoField(e.field) && kind !== "transition") {
       current.events.push(String(e.field).replace(/^__|__$/g, "") +
         (e.to ? ": " + String(e.to) : ""));
