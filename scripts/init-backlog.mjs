@@ -128,6 +128,13 @@ labels_closed: false
 # dispatcher serves. Lowercase slugs.
 # roles: [analyst, developer, reviewer]
 
+# [tree] The releases a task may be PLANNED for (\`release:\`). Commented out
+# for the same reason as roles: an empty list means this project plans no
+# releases. The ORDER is chronological, oldest first: the CURRENT release is the
+# first one not yet fully shipped, and only its open top-priority tasks block
+# the last stage. Append the next release; do not reorder the shipped ones.
+# releases: [1.0, 1.1]
+
 # [free] with respect to the tree — a task may have any owner; but \`${N} new\n# --owner X\` checks this list, so a new owner has to be added here.
 owners: [unassigned]
 estimates: [30m, 2h, 1d, 1w]       # [free] suggestions in the viewer

@@ -61,7 +61,10 @@
  *
  * Shipped planned tasks are COUNTED, like the last bucket of the pipeline. A
  * planned task whose last stage did not resolve is `unknown`, never shipped and
- * never absent.
+ * never absent. The report also names the CURRENT release (`current`, TL-515),
+ * the first of `releases:` not fully shipped — see `currentRelease()`; when git
+ * was not read, `currentJudged` is false and `current` is null for want of a
+ * judgement, not because every release has shipped.
  *
  * A TARGET IN ANOTHER REPOSITORY (`repository:`, TL-507) has no stage this
  * repository can read. Its lane is one bucket, `unobservable`, holding the
@@ -308,6 +311,100 @@ export function releaseScope({ state, targets, tasks, release, archived, target 
     dropped: list(dropped),
     unobservable: list(unobservable),
   };
+}
+
+/**
+ * THE CURRENT RELEASE (TL-515): the first entry of `releases:` not yet fully
+ * shipped.
+ *
+ * WHY IT IS COMPUTED. `planned-blocker-open` used to count an open task at the
+ * top of `priorities:` planned for ANY declared release, because releases had
+ * no order; a project shipping one release while planning the next was blocked
+ * by the next one's work and had to accept the gap wholesale, which silenced
+ * the blockers that mattered as well. An explicit `current_release:` key was
+ * rejected by the owner on 2026-11-02: it is a pointer somebody must move after
+ * every release, and a forgotten move reads like a fact. The order of
+ * `releases:` — a list the project already maintains — is read as
+ * chronological instead, and the current release is derived from it (Law 2).
+ *
+ * WHAT "FULLY SHIPPED" MEANS. Every task planned for the release that is not
+ * dropped (closed in an archived status other than the first) is closed, and in
+ * full in the last stage of every target it touched. The judgement is
+ * `releaseScope()`'s, read row by row, so `deploy status --release` and
+ * `releaseShipped()` work from the same placement and cannot disagree about a
+ * task. In particular:
+ *
+ *   - a last stage that does not resolve is `unknown`, and unknown is never
+ *     shipped: the release stays current;
+ *   - deployment that was not read at all (`unscanned`) is not shipped either;
+ *   - an OPEN planned task keeps the release current even when every commit it
+ *     has so far is in the last stage — the work is not finished, and letting
+ *     the release go past it would release its blocker with it;
+ *   - a CLOSED task of a target in another repository (TL-507) does not keep
+ *     it current. That half is unobservable by design, not by accident, so
+ *     holding the release until it is observed would pin it forever; while
+ *     such a task is open it holds the release like any other open task;
+ *   - a CLOSED task whose trunk commits touch no deploy target's paths (a
+ *     docs-only or backlog-only task, `no-target`) does not keep it current.
+ *     It touched no target, so "in the last stage of every target it touched"
+ *     holds vacuously, and no promotion could ever change that — counting it
+ *     would pin the release forever. `releaseScope()` still LISTS it under
+ *     "planned, not shipped", which is TL-505's answer to "where is it", not a
+ *     claim that the release is waiting for it;
+ *   - a CLOSED task that no trunk commit names (`no-commits`) DOES keep it
+ *     current. Unlike `no-target`, nothing was measured: the work may sit on
+ *     a branch nobody merged (`done-not-on-trunk` reports that case), and a
+ *     release that skipped past it would call unmerged work shipped. It stops
+ *     holding the release once a trunk commit names it, or once it is dropped
+ *     or planned elsewhere;
+ *   - a release with no planned task left to ship is shipped: an empty entry
+ *     at the head of the list does not hold back the ones after it.
+ *
+ * If every release is shipped there is no current release (`null`), and no
+ * planned task blocks anything.
+ *
+ * WHEN GIT WAS NOT READ there is no answer at all, not `null`: every planned
+ * task would be `unscanned`, and the first release with any plan would be
+ * named current on no measurement. `currentRelease()` refuses an unscanned
+ * state; its callers carry "not judged" as a separate flag (`currentJudged` in
+ * `deploy status`, `currentReleaseJudged` in the gate), so that "every
+ * release has shipped" and "nothing was read" never share one value.
+ */
+
+/**
+ * PURE — whether a release is fully shipped, from its scope. A `no-target` row
+ * does not hold it (see above), so the rows are needed, not only the counts.
+ *
+ * @param {ReturnType<typeof releaseScope>} scope  computed with no `--target`
+ *   and without `count`
+ */
+export function releaseShipped(scope) {
+  if (scope.notShipped.tasks.length !== scope.notShipped.count) {
+    throw new Error("releaseShipped() reads the rows of `notShipped` — compute the scope without `count`");
+  }
+  return scope.open.count === 0 && scope.notShipped.tasks.every((row) => row.note === "no-target");
+}
+
+/**
+ * PURE — the current release: the first of `releases` that is not fully
+ * shipped, or `null` when every one is. Throws on a state git was not read
+ * into: there, no release can be judged at all.
+ *
+ * @param {object} opts
+ * @param {object} opts.state  `deploymentState()`
+ * @param {readonly object[]} opts.targets  `config.deployTargets`
+ * @param {object[]} opts.tasks  every task: `{id, status, priority, release, labels}`
+ * @param {readonly string[]} opts.releases  `config.releases`, in the project's order
+ * @param {readonly string[]} opts.archived  `archived_statuses`
+ * @returns {string|null}
+ */
+export function currentRelease({ state, targets, tasks, releases, archived }) {
+  if (!state.scanned) throw new Error("currentRelease() needs deployment that was read — check `state.scanned` first");
+  for (const release of releases || []) {
+    const scope = releaseScope({ state, targets: targets || [], tasks, release, archived: archived || [] });
+    if (!releaseShipped(scope)) return release;
+  }
+  return null;
 }
 
 /** The date an archived task closed: its last recorded move into an archived
@@ -628,11 +725,20 @@ function describeStanding(task) {
   });
 }
 
+/** Which release is current, in words, from the point of view of `scope`. */
+export function describeCurrent(scope) {
+  if (scope.currentJudged === false) return "which release is current was not judged — deployment was not read";
+  if (scope.current === null) return "no current release — every release in `releases:` has shipped, so none of its tasks blocks";
+  if (scope.current === scope.name) return "the current release — the first in `releases:` not fully shipped";
+  return "not the current release, which is " + scope.current + " — the first in `releases:` not fully shipped";
+}
+
 /** The text answer of `--release`. */
 export function renderScope(scope, archived, paint = color) {
   const lines = [];
   lines.push(paint.bold("release " + scope.name) + "  " + scope.planned + " planned · " +
     scope.shipped.count + " shipped (counted, not listed) · " + scope.dropped.count + " dropped");
+  if (scope.current !== undefined) lines.push("  " + describeCurrent(scope));
   const sections = [
     ["planned, not shipped", scope.notShipped, true],
     ["planned, still open", scope.open, false],
@@ -691,10 +797,10 @@ export function computeStatus({ root, config, filter, count, release = null, now
       }
     }
     if (release !== null) {
-      report.release = releaseScope({
+      report.release = withCurrent(releaseScope({
         state, targets, tasks: metas.map(scopeRecord), release, archived: config.archivedStatuses,
         target: filter.target, count,
-      });
+      }), { state, targets, tasks: metas.map(scopeRecord), releases: config.releases, archived: config.archivedStatuses });
     }
     return { report, state };
   }
@@ -747,12 +853,22 @@ export function computeStatus({ root, config, filter, count, release = null, now
   report.targets = pipeline;
   report.unplaced = { count: off.unplaced.length, ids: count ? [] : off.unplaced };
   if (release !== null) {
-    report.release = releaseScope({
-      state, targets, tasks: metas.filter((m) => m.id).map(scopeRecord), release,
-      archived, target: filter.target, count,
-    });
+    const records = metas.filter((m) => m.id).map(scopeRecord);
+    report.release = withCurrent(releaseScope({
+      state, targets, tasks: records, release, archived, target: filter.target, count,
+    }), { state, targets, tasks: records, releases: config.releases, archived });
   }
   return { report, state };
+}
+
+/** The scope, naming the current release — computed over every target, never
+ *  the one `--target` narrowed the scope to, because which release is current
+ *  is a fact about the project, not about one deployable. With git unread it is
+ *  not judged: `current: null` with `currentJudged: false`, which is not the
+ *  `null` of "every release has shipped". */
+function withCurrent(scope, opts) {
+  if (!opts.state.scanned) return { ...scope, current: null, currentJudged: false };
+  return { ...scope, current: currentRelease(opts), currentJudged: true };
 }
 
 function scopeRecord(m) {

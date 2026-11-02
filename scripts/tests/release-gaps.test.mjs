@@ -78,6 +78,9 @@ function config(extra = {}) {
     deployTargets: parsed.values.deploy_targets,
     archivedStatuses: ["done", "cancelled"],
     priorities: ["P0", "P1"],
+    // PROJ-8 is planned for `r1`, the only release and therefore the current
+    // one (TL-515): only the current release's blockers are judged.
+    releases: ["r1"],
     releaseGateAccept: [],
     ...extra,
   };
