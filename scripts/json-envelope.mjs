@@ -278,6 +278,13 @@ export const KINDS = {
     ok: null, id: null, status: null, owner: null, released: null, comment: null,
     refusalKind: null, refusal: null, details: [],
   },
+  // `set --json` (TL-521). `changes` are the history entries the write
+  // appended, so a consumer reads the attribution without opening the log; an
+  // unchanged value appends none beyond `updated`.
+  "task-set": {
+    ok: null, id: null, file: null, field: null, value: null, actor: null, changes: [],
+    refusalKind: null, refusal: null, details: [],
+  },
   // `deploy status --json` (TL-502). `trunk` names the ref whose commits count
   // and where that choice came from; `scan` every ref read with its SHA, so the
   // answer can be dated; `explanation` why an empty answer is empty. Each
@@ -548,6 +555,12 @@ export const KIND_EXERCISE = {
   },
   "task-release": {
     args: ["release", ABSENT_TASK, "--actor", "agent:test", "--reason", "a fixture", "--json"],
+    refuses: true, writes: true,
+  },
+  // A task that is not there: the refusal path, reached only after the field
+  // and its value are judged valid, so a real field and value are given.
+  "task-set": {
+    args: ["set", ABSENT_TASK, "title", "A title", "--actor", "agent:test", "--json"],
     refuses: true, writes: true,
   },
   // A task that is not there: same reason as above — the refusal path.
