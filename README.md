@@ -180,6 +180,9 @@ provider through an adapter you own; see [the guide](docs/guide.md#a-queue-not-j
   seeding, the dispatcher, guards, the viewer and the `--json` contract.
 - **[`docs/branchling-global-tool.md`](docs/branchling-global-tool.md)** — the
   four rules every other design decision follows from.
+- **[Building on top of it](docs/external-consumers.md)** — the stable
+  contract for a separate interface: the `--json` kinds, the writing commands,
+  version pinning, and where the built-in viewer stops.
 - **[`LINEAGE.md`](LINEAGE.md)** — where this came from. The tool tracks itself
   with itself: its own backlog is in `backlog/`.
 
