@@ -76,6 +76,46 @@ export function isReleaseHash(route) {
   return route === RELEASE_HASH_ROUTE;
 }
 
+// ── The PLANNED release facet (TL-511) ──────────────────────────────────
+//
+// Deployment is observed in git; the release a task is PLANNED for is intent,
+// typed into `release:` from the closed `releases:` list in config.yaml
+// (TL-505, `docs/release-tracking.md` §1). The filter bar narrows by it, and
+// since this view is narrowed by the same filters, "what of release 2.0 has
+// reached production" is one facet away. The facet lives here, not in the
+// page template, so that `node --test` runs the options and the predicate the
+// browser runs.
+
+/** The facet's name in the link: `#tasks?release=…`, `#release?release=…`. */
+export const RELEASE_FILTER_PARAM = "release";
+
+/** The value of the "planned for no release" option. A declared release is a
+ *  slug that starts with a letter or a digit (`config.mjs` refuses any other),
+ *  so this can never be one of them. */
+export const NO_RELEASE = "__none__";
+export const NO_RELEASE_LABEL = "(no release)";
+
+/**
+ * The facet's options: the declared releases in their declared order, then
+ * the tasks planned for none. A project that declares no releases gets NONE —
+ * not a lone "(no release)" that every task would match — and the filter bar
+ * drops a facet with no options, so the facet is not drawn at all.
+ *
+ * @param {string[]} releases  `releases:` from config.yaml
+ * @returns {Array<{value: string, label: string}>}
+ */
+export function releaseFacetOptions(releases) {
+  const declared = Array.isArray(releases) ? releases : [];
+  if (!declared.length) return [];
+  return declared.map((value) => ({ value, label: value })).concat([{ value: NO_RELEASE, label: NO_RELEASE_LABEL }]);
+}
+
+/** Whether a task is planned for this facet value. */
+export function releaseFacetMatch(task, value) {
+  const planned = String((task && task.release) || "").trim();
+  return value === NO_RELEASE ? !planned : planned === value;
+}
+
 /** How long ago the view was built, in the largest whole unit. */
 export function releaseAgeLabel(ms) {
   if (!Number.isFinite(ms) || ms < 60_000) return "less than a minute ago";
@@ -157,6 +197,10 @@ const TRUNK_SOURCE = {
  *        has no task file is shown too, because hiding it would hide the gap
  * @param {string} [opts.search]  the search the page applies; this view has no
  *        search field of its own, so a link that carries one must say so
+ * @param {string[]} [opts.planned]  the planned-release facet values selected
+ *        (TL-511); the cards are already narrowed by them through `visible`,
+ *        and the heading names them, because "planned for 2.0" is the question
+ *        the reader asked and "the filters above" does not repeat it
  * @param {number} [opts.now]
  */
 export function releaseViewModel(data, opts = {}) {
@@ -177,6 +221,7 @@ export function releaseViewModel(data, opts = {}) {
     refs: ((data && data.refs) || []).map((r) => ({ ...r, short: relShort(r.sha) })),
     narrowed: visible !== null,
     search: opts.search || "",
+    planned: (opts.planned || []).map((v) => (v === NO_RELEASE ? NO_RELEASE_LABEL : v)),
     lanes: [],
     unplaced: (data && data.unplaced) || { count: 0, ids: [] },
     gaps: null,
@@ -318,6 +363,10 @@ export function renderRelease(vm) {
   if (vm.trunk) {
     head.push('<p class="rel-trunk">Trunk <code>' + relEsc(vm.trunk.spec) + "</code> " +
       (vm.trunk.short ? '<code class="rel-sha">' + relEsc(vm.trunk.short) + "</code>" : "unresolved") + " — " + relEsc(vm.trunk.source) + "</p>");
+  }
+  if (vm.planned.length) {
+    head.push('<p class="rel-hint" data-release-planned>Planned for ' + vm.planned.map((r) => "<strong>" + relEsc(r) + "</strong>").join(" or ") +
+      " — where the tasks planned for it stand now.</p>");
   }
   if (vm.narrowed) {
     head.push('<p class="rel-hint">Narrowed by the board and the filters above' +
