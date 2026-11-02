@@ -20,7 +20,7 @@ blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
 verification:
   - id: show-tests
-    bash: "node --test scripts/tests/environments.test.mjs"
+    bash: "node --test scripts/tests/show.test.mjs"
 ---
 
 ## Goal
