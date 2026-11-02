@@ -138,6 +138,14 @@ export const KINDS = {
   // as a release blocker is the failure mode TL-383 removed from the terminal,
   // and it must not be reintroduced through the JSON.
   check: { ok: null, root: null, failed: [], guards: [] },
+  // `follow --json` (TL-524): ONE envelope per line, a stream rather than an
+  // answer. `event` says which keys carry a value: `ready` (the watch is armed;
+  // changes after this line are reported), `change` (`id`, `file`, `change` —
+  // created / modified / deleted — and the `fields` that moved, `__body__` for
+  // the markdown body), `heartbeat` (nothing changed; the stream is alive).
+  // `root` is on every line so a consumer reading several streams knows which
+  // backlog each came from.
+  "change-stream": { event: null, at: null, root: null, id: null, file: null, change: null, fields: [] },
   // `doctor --json`. `ok` is the answer CI reads; `checks` is why.
   doctor: { ok: null, root: null, next: null, checks: [] },
   // `serve --list --json` and `serve --stop --json` (TL-266). Each entry in
@@ -527,6 +535,10 @@ export const KIND_EXERCISE = {
   // One task's computed facts (TL-509). It writes nothing, so like `log` one
   // row answers twice: the populated fixture shows a real task, and on the
   // empty one the same call is the "no such task" refusal in a full envelope.
+  // A stream, bounded: `--max-events 0` arms the watch, prints the `ready`
+  // envelope and exits, so one row exercises the shape without a process that
+  // waits forever. The stream itself is `scripts/tests/watch-stream.test.mjs`.
+  "change-stream": { args: ["follow", "--json", "--max-events", "0"] },
   "task-show": { args: ["show", FIRST_TASK, "--json"] },
   resume: { args: ["resume", FIRST_TASK, "--actor", "agent:test", "--no-verify", "--json"] },
   run: { args: ["run", "--dry-run", "--json"] },
@@ -669,6 +681,15 @@ export function envelope(kind, payload) {
     out[key] = value === undefined ? shape[key] : value;
   }
   return out;
+}
+
+/**
+ * Print one envelope as ONE line — newline-delimited JSON, for a stream (TL-524).
+ * A pretty-printed envelope spans lines, and a consumer splitting on newlines
+ * would read a fragment. Returns false when the reader went away.
+ */
+export function printJsonLine(kind, payload) {
+  return printLine(JSON.stringify(envelope(kind, payload)));
 }
 
 /** Print one answer on stdout. No colour, no ornament: this is for a program. */
