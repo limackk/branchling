@@ -20,9 +20,10 @@
  *   unknown-task-id     a deployed commit names an id no task file carries
  *   untargeted-commit   a deployed commit touches no declared target's paths
  *   planned-blocker-open
- *                       a task of the HIGHEST priority, planned for a release
- *                       (`release:`, TL-505), is still open: the last stage of
- *                       each of its targets is not ready to receive the release
+ *                       a task of the HIGHEST priority, planned for the CURRENT
+ *                       release (`release:`, TL-505, TL-515), is still open: the
+ *                       last stage of each of its targets is not ready to
+ *                       receive the release
  *
  * WHICH COMMITS ARE "DEPLOYED". For each stage ref, the trunk commits it holds
  * (by reachability or patch identity — the same judgement `environments.mjs`
@@ -56,9 +57,16 @@
  * the project's. Its targets are the ones its trunk commits touched; a task with
  * no commit on the trunk yet has touched nothing that could narrow it, so it
  * holds back the last stage of EVERY target rather than none — "not started"
- * is the strongest form of "not ready". Releases carry no date or sequence, so
- * a task planned for any declared release counts; a project that promotes one
- * release while planning the next accepts the gap by name.
+ * is the strongest form of "not ready". Only the CURRENT release counts — the
+ * first entry of `releases:` not yet fully shipped, the list being read as
+ * chronological (`currentRelease()` in release-status.mjs, decided by the owner
+ * on 2026-11-02, TL-515). A project shipping one release while planning the
+ * next is not held back by the next one's work, and does not have to accept
+ * the gap wholesale to get past it, which would silence the blockers that
+ * matter as well. When every release has shipped there is no current release,
+ * and nothing planned blocks. The result names the current release in
+ * `currentRelease`, so a reader can see which plan was judged, and says in
+ * `currentReleaseJudged` whether one was judged at all.
  *
  * A TARGET IN ANOTHER REPOSITORY (`repository:`, TL-507) is never judged: its
  * commits and refs are not in this git, so every detector here would read the
@@ -85,6 +93,7 @@ import { spawnSync } from "node:child_process";
 import { deploymentState, parseCherry, parseTrunkLog } from "./environments.mjs";
 import { externalTargetsOf, isExternalTarget, observedTargets, pathInTarget } from "./deploy-targets.mjs";
 import { gitDiscoveryEnv } from "./git-env.mjs";
+import { currentRelease } from "./release-status.mjs";
 import { taskIdScanner } from "./task-id.mjs";
 
 /** The gap names, in the order a report lists them. `release_gate_accept`
@@ -133,6 +142,7 @@ function place(target, stage, spec, parallel) {
  * @returns {{
  *   scanned: boolean, reason: string, trunk: {spec: string, sha: string|null, source: string},
  *   refs: object[], unknownRefs: object[], excludedBeforeAdoption: number,
+ *   currentRelease: string|null, currentReleaseJudged: boolean,
  *   unobservable: {target: string, repository: string, count: number}[],
  *   gaps: {gap: string, accepted: boolean, subject: string, where: string[], commits: string[], detail: string}[],
  * }}
@@ -146,6 +156,13 @@ export function releaseGaps({ root, config, tasks, selector = null, trunk, state
     scanned: state.scanned, reason: state.reason,
     trunk: { spec: trunk.spec, sha: state.trunk.sha, source: trunk.source },
     refs: [], unknownRefs: [], excludedBeforeAdoption: 0, gaps: [],
+    // Judged only once git was read: before that, every planned task would be
+    // "not shipped" for want of evidence, and the first release with any plan
+    // would be named current on no measurement at all. `currentRelease: null`
+    // means "every release has shipped" ONLY with `currentReleaseJudged: true`;
+    // unjudged, it means nothing was read, and the flag says which.
+    currentRelease: null,
+    currentReleaseJudged: false,
     unobservable: declared.filter(isExternalTarget).map((t) => ({
       target: t.name, repository: t.repository,
       count: tasks.filter((task) => externalTargetsOf([t], task).length).length,
@@ -323,9 +340,14 @@ export function releaseGaps({ root, config, tasks, selector = null, trunk, state
     // Open top-priority tasks planned for a release, against the last stage of
     // their targets (see the header). Read from the task files, not from git.
     const top = (config.priorities || [])[0];
-    if (top) {
+    base.currentRelease = currentRelease({
+      state, targets: declared, tasks, releases: config.releases, archived: config.archivedStatuses,
+    });
+    base.currentReleaseJudged = true;
+    const current = base.currentRelease;
+    if (top && current !== null) {
       for (const task of tasks) {
-        if (!task.release || task.priority !== top || archived.has(task.status)) continue;
+        if (task.release !== current || task.priority !== top || archived.has(task.status)) continue;
         const entry = state.byTask.get(task.id);
         // A task of a target in another repository with no target here has
         // nothing this repository could hold back.
@@ -339,11 +361,11 @@ export function releaseGaps({ root, config, tasks, selector = null, trunk, state
         }
         if (!where.length) continue;
         note("planned-blocker-open", task.id, where, entry ? entry.commits : [],
-          "a `" + top + "` task planned for release `" + task.release + "` is still `" + task.status + "`");
+          "a `" + top + "` task planned for the current release `" + current + "` is still `" + task.status + "`");
       }
     }
   } catch (e) {
-    return { ...base, scanned: false, reason: "git-failed", gaps: [] };
+    return { ...base, scanned: false, reason: "git-failed", gaps: [], currentRelease: null, currentReleaseJudged: false };
   }
 
   base.gaps = [...found.values()].sort((a, b) =>

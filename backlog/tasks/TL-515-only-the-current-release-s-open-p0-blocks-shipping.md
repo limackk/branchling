@@ -7,8 +7,8 @@ board: main
 epic: "Release tracking across environments"
 release: ""                        # the release it is PLANNED for (a value from `releases:` in config.yaml). Empty = none
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 conflict_group: []                 # the AREA it touches (e.g. a module): `next` and `run` hold it back while a task of the same group is in progress. Empty = `conflict_group_from`, or none
@@ -42,4 +42,4 @@ Decided 2026-11-02 by the owner. TL-505's `planned-blocker-open` gap counts an o
 
 ## Acceptance criteria
 
-- [ ] The current release is the first not fully shipped, an open P0 of a later release does not block, one of the current release does, an unknown last stage keeps a release current, and no current release means no blocker gap. [proof: current-release]
+- [x] The current release is the first not fully shipped, an open P0 of a later release does not block, one of the current release does, an unknown last stage keeps a release current, and no current release means no blocker gap. [proof: current-release]

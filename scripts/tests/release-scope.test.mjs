@@ -318,7 +318,7 @@ test("an open top-priority task planned for a release blocks the last stage of i
   const report = gateJson(dir);
   assert.equal(report.status, 0, report.stderr);
   assert.deepEqual(blockers(report.result).map((g) => [g.subject, g.where]), [[t.unstarted, ["web/production"]]]);
-  assert.match(blockers(report.result)[0].detail, new RegExp("`" + top + "` task planned for release `r1`"));
+  assert.match(blockers(report.result)[0].detail, new RegExp("`" + top + "` task planned for the current release `r1`"));
   // Only the last stage: judging `test` alone finds no blocker.
   assert.deepEqual(blockers(gateJson(dir, "--env", "web/test").result), []);
 

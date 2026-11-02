@@ -72,8 +72,10 @@ export const DEFAULTS = Object.freeze({
   // (`docs/release-tracking.md` §1). A CLOSED vocabulary, like boards: a
   // misspelt `release:` would otherwise create a release nobody plans and drop
   // the task silently from `deploy status --release`. Empty — the default —
-  // means this project plans no releases, and a task naming one FAILS. Order is
-  // the project's own; the tool reads no date or sequence from it.
+  // means this project plans no releases, and a task naming one FAILS. The
+  // ORDER is chronological (TL-515): the current release is computed as the
+  // first entry not yet fully shipped, and only its open top-priority tasks
+  // block the last stage (`planned-blocker-open`). No date is read from it.
   releases: [],
   label_axis_timing: [],      // the "Phase" axis in the viewer filters; empty removes the facet
   label_axis_env: [],         // the "Environment" axis; empty removes the facet

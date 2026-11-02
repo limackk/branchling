@@ -316,6 +316,7 @@ each target:
 
 ```text
 release 2026.11  4 planned · 1 shipped (counted, not listed) · 1 dropped
+  the current release — the first in `releases:` not fully shipped
   planned, not shipped                      2
     TASK-21  Checkout redesign  done · P1 · web: in test, waiting for production
     TASK-24  Fraud check        pending · P0 · no commit on the trunk names it
@@ -336,9 +337,22 @@ release 2026.11  4 planned · 1 shipped (counted, not listed) · 1 dropped
   stage is not listed: it is the project's whole history.
 - **Dropped** is a planned task closed in an archived status other than the
   first of `archived_statuses:`; it never blocks.
-- A release carries no date and no order: `releases:` is a vocabulary, not a
-  schedule. `--env` is refused beside `--release`, because the comparison is
-  with the last stage by definition.
+- **`releases:` is chronological**, oldest first. The **current release** is
+  computed, never configured: the first entry not yet fully shipped — every
+  planned task that is not dropped is closed and in full in the last stage of
+  every target it touched. A last stage that does not resolve keeps a release
+  current, because unknown is never shipped; a release with nothing left to
+  ship does not. A closed task whose commits touch no target's paths (docs or
+  backlog only) touched no target, so it does not hold its release, although
+  the report still lists it; a closed task no trunk commit names does hold it,
+  because nothing was measured. The report names it on the line under the
+  header (`the current release`, `not the current release, which is …`, or
+  `no current release` once every one has shipped). When deployment was not
+  read — outside git, or with an unresolved trunk — nothing is judged and the
+  line says so instead. Append the next release to the list; reordering it
+  changes which release is current. No date is read from it.
+- `--env` is refused beside `--release`, because the comparison is with the
+  last stage by definition.
 
 ```bash
 branchling deploy status --release 2026.11 --count   # counts only
@@ -582,7 +596,7 @@ names the commit or task that proves each one:
 | `done-not-on-trunk` | a task closed as done whose commits exist only on a branch or remote the trunk never received |
 | `unknown-task-id` | a deployed commit names an id no task file carries |
 | `untargeted-commit` | a deployed commit touches no declared target's paths |
-| `planned-blocker-open` | a task at the top of `priorities:`, planned for a release, is still open — reported against the last stage of the targets its commits touched, or of every target when it has no commit yet (unless it belongs to a target in another repository) |
+| `planned-blocker-open` | a task at the top of `priorities:`, planned for the current release (the first in `releases:` not fully shipped), is still open — reported against the last stage of the targets its commits touched, or of every target when it has no commit yet (unless it belongs to a target in another repository) |
 
 In CI it is one line before the deploy step:
 

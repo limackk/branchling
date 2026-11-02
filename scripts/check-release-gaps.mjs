@@ -114,6 +114,8 @@ function main(argv) {
   const why = explain(result.reason);
   if (!result.scanned) {
     for (const line of unobservableLines(result)) console.log(line);
+    const unread = currentReleaseLine(result, config.releases);
+    if (unread) console.log(unread);
     console.log(summaryLine(result, mode, verdict));
     return verdict.exit;
   }
@@ -130,6 +132,8 @@ function main(argv) {
       " trunk commit(s) older than the first one naming a task id were not judged");
   }
   for (const line of unobservableLines(result)) console.log(line);
+  const current = currentReleaseLine(result, config.releases);
+  if (current) console.log(current);
   for (const g of result.gaps) {
     const mark = g.accepted ? MARK.bullet : (mode === "require" ? color.err(MARK.err) : color.warn(MARK.warn));
     console.log(mark + " " + g.gap + (g.accepted ? " (accepted)" : "") + "  " + (/^[0-9a-f]{40}$/.test(g.subject) ? short(g.subject) : g.subject) +
@@ -150,6 +154,20 @@ export function unobservableLines(result) {
   return (result.unobservable || []).map((u) =>
     MARK.bullet + " " + u.target + ": deployed from the repository `" + u.repository + "`, which this one cannot observe — " +
     u.count + " task(s) carry its labels and none of them is judged on its account");
+}
+
+/** Which release's plan was judged (TL-515). Nothing for a project that
+ *  declares no releases: naming a concept nobody declared would be noise. */
+export function currentReleaseLine(result, releases) {
+  if (!(releases || []).length) return null;
+  if (!result.currentReleaseJudged) {
+    return MARK.bullet + " which release is current was not judged — deployment was not read";
+  }
+  if (result.currentRelease === null) {
+    return MARK.bullet + " no current release — every release in `releases:` has shipped, so no planned task blocks";
+  }
+  return MARK.bullet + " current release: " + result.currentRelease +
+    " — the first in `releases:` not fully shipped; only its planned tasks can block";
 }
 
 /** Why nothing was judged, for the reasons this guard adds to `explain()`. */
