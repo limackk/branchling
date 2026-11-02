@@ -368,29 +368,36 @@ function createTaskUnlocked({ root, config, board, slug, fields, body }) {
   const raw = readFileSync(join(root, "_template.md"), "utf8");
   const eol = lineEnding(raw);
   const template = stripTemplateBanner(withLineEnding(raw, "\n"));
+  // Every rewrite below inserts its value through a replacer FUNCTION, never a
+  // replacement STRING (TL-527). A string is not literal in JavaScript: `$'`,
+  // `` $` ``, `$&`, `$1` and `$$` are expanded, and a shell command anchored at
+  // the end of a line (`grep -q x$' f`) spliced the template body into the
+  // frontmatter while `new` and `check` both stayed green. A function's return
+  // value is inserted as it is.
+  const literal = (value) => () => value;
   let text = template
-    .replace(/^id: .*$/m, "id: " + taskId)
-    .replace(/^title: .*$/m, "title: " + quoted(opts.title))
-    .replace(/^board: .*$/m, "board: " + board)
-    .replace(/^created: .*$/m, "created: " + day)
-    .replace(/^updated: .*$/m, "updated: " + day);
+    .replace(/^id: .*$/m, literal("id: " + taskId))
+    .replace(/^title: .*$/m, literal("title: " + quoted(opts.title)))
+    .replace(/^board: .*$/m, literal("board: " + board))
+    .replace(/^created: .*$/m, literal("created: " + day))
+    .replace(/^updated: .*$/m, literal("updated: " + day));
   // `role` joins the scalar fields rather than getting a branch of its own: it
   // is one more enum from the configuration, and `docs-drift --seed-tasks`
   // (TL-100) is the first caller that has to set it programmatically. `executor`
   // is the same kind of field, and `seed` (TL-493) the caller that sets it.
   for (const key of ["priority", "status", "type", "estimate", "owner", "role", "executor"]) {
-    if (opts[key]) text = text.replace(new RegExp("^" + key + ": .*$", "m"), key + ": " + opts[key]);
+    if (opts[key]) text = text.replace(new RegExp("^" + key + ": .*$", "m"), literal(key + ": " + opts[key]));
   }
-  if (opts.epic) text = text.replace(/^epic: .*$/m, "epic: " + quoted(opts.epic));
+  if (opts.epic) text = text.replace(/^epic: .*$/m, literal("epic: " + quoted(opts.epic)));
   // A template written before TL-505 has no `release:` line, and it is a file in
   // somebody else's repository that this command does not get to rewrite. The
   // value is then INSERTED after `epic:` (else `board:`), where the current
   // template keeps it; a replace that matched nothing would drop the caller's
   // value and still exit 0.
   if (opts.release) {
-    if (/^release:.*$/m.test(text)) text = text.replace(/^release:.*$/m, "release: " + opts.release);
-    else if (/^epic:.*$/m.test(text)) text = text.replace(/^(epic:.*)$/m, "$1\nrelease: " + opts.release);
-    else text = text.replace(/^(board:.*)$/m, "$1\nrelease: " + opts.release);
+    if (/^release:.*$/m.test(text)) text = text.replace(/^release:.*$/m, literal("release: " + opts.release));
+    else if (/^epic:.*$/m.test(text)) text = text.replace(/^epic:.*$/m, (m) => m + "\nrelease: " + opts.release);
+    else text = text.replace(/^board:.*$/m, (m) => m + "\nrelease: " + opts.release);
   }
   // `target:` (TL-514) is an inline list like `labels`. A template written
   // before it has no line for it, and — as with `release:` above — the value is
@@ -398,17 +405,17 @@ function createTaskUnlocked({ root, config, board, slug, fields, body }) {
   // rather than dropped.
   if (Array.isArray(opts.target) && opts.target.length) {
     const line = "target: [" + opts.target.join(", ") + "]";
-    if (/^target:.*$/m.test(text)) text = text.replace(/^target:.*$/m, line);
+    if (/^target:.*$/m.test(text)) text = text.replace(/^target:.*$/m, literal(line));
     else {
       const after = ["release", "epic", "board"].find((k) => new RegExp("^" + k + ":.*$", "m").test(text));
-      text = after ? text.replace(new RegExp("^(" + after + ":.*)$", "m"), "$1\n" + line) : text;
+      text = after ? text.replace(new RegExp("^" + after + ":.*$", "m"), (m) => m + "\n" + line) : text;
     }
   }
   // A LIST, so it is set as a block rather than by the scalar loop above. An
   // empty list leaves the template's `labels: []` exactly as it is, which is
   // already the right answer.
   if (Array.isArray(opts.labels) && opts.labels.length) {
-    text = text.replace(/^labels: .*$/m, "labels: [" + opts.labels.join(", ") + "]");
+    text = text.replace(/^labels: .*$/m, literal("labels: [" + opts.labels.join(", ") + "]"));
   }
   // A BLOCK list, like `verification` below and unlike `labels`: the template
   // carries `related_docs: []` on one line, and the tree's convention — the one
@@ -416,7 +423,7 @@ function createTaskUnlocked({ root, config, board, slug, fields, body }) {
   if (Array.isArray(opts.related_docs) && opts.related_docs.length) {
     text = text.replace(
       /^related_docs:.*\n(?:[ \t]+[^\n]*\n)*/m,
-      "related_docs:\n" + opts.related_docs.map((d) => "  - " + d + "\n").join("")
+      literal("related_docs:\n" + opts.related_docs.map((d) => "  - " + d + "\n").join(""))
     );
   }
   if (Array.isArray(opts.verification)) {
@@ -432,9 +439,9 @@ function createTaskUnlocked({ root, config, board, slug, fields, body }) {
       // An EMPTY list is a deliberate answer, not a missing one (TL-67): `import`
       // has no contract to write and must not leave the template's placeholder,
       // because a field filled in by the template was filled in by nobody.
-      opts.verification.length
+      literal(opts.verification.length
         ? "verification:\n" + opts.verification.map(verificationEntry).join("")
-        : "verification: []\n"
+        : "verification: []\n")
     );
   }
 

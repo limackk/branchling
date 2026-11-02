@@ -8,8 +8,8 @@ epic: ""                           # free text — the group this task counts to
 release: ""                        # the release it is PLANNED for (a value from `releases:` in config.yaml). Empty = none
 target: []                         # the deploy targets in ANOTHER repository it ships from (`deploy_targets` with `repository:`). Empty = none
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 conflict_group: []                 # the AREA it touches (e.g. a module): `next` and `run` hold it back while a task of the same group is in progress. Empty = `conflict_group_from`, or none
@@ -41,4 +41,11 @@ Found by branchling-ui (its task UI-15). `scripts/new-task.mjs` writes each call
 
 ## Acceptance criteria
 
-- [ ] Caller text containing JavaScript replacement tokens is written to the task file literally, in every field `new` fills. [proof: literal-text]
+- [x] Caller text containing JavaScript replacement tokens is written to the task file literally, in every field `new` fills. [proof: literal-text]
+
+## Findings
+
+- Every rewrite in `createTaskUnlocked()` now inserts through a replacer function (`literal(value)` returns `() => value`); the two insertions that kept the matched line (`release:` and `target:` into an older template) now take the match as the function's argument instead of `$1`.
+- `seed` writes through `createTask()`, so it shares the fix; no other script fills `_template.md`.
+- `release`, `target` and `owner` reach the template only after the vocabulary check, so a token there needs a project that declares such a value; the test establishes that vocabulary in its fixture rather than skipping the fields.
+- Not covered here: `renderPrompt()` in `scripts/seed-adapter.mjs` fills its prompt the same way, but it writes a prompt, not a task file — filed as TL-531.
