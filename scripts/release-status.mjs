@@ -66,6 +66,16 @@
  * was not read, `currentJudged` is false and `current` is null for want of a
  * judgement, not because every release has shipped.
  *
+ * A SHIPPED RELEASE (TL-516) names the ref where it ends in its entry of
+ * `releases:` (`{name, ref}`). Its scope is measured against that ref instead
+ * of the pipeline (`shippedScope()`, `scripts/release-shipped.mjs`): a planned
+ * task the ref does not hold in full is "planned, not shipped", and a task a
+ * commit between the previous release's ref and this one's names, planned for
+ * another release or none, is "shipped, unplanned". The pipeline's
+ * "unplanned, carried by the next promotion" does not apply to a release that
+ * has gone out and is `null` there. A ref that does not resolve is unknown,
+ * never an empty release.
+ *
  * A TARGET IN ANOTHER REPOSITORY (`repository:`, TL-507) has no stage this
  * repository can read. Its lane is one bucket, `unobservable`, holding the
  * tasks that name it in `target:` — named, with their status, and never placed
@@ -81,7 +91,8 @@
  * stage moved on somebody's word is only as good as the word.
  *
  * Tests: `node --test scripts/tests/release-status.test.mjs`,
- *        `node --test scripts/tests/release-scope.test.mjs`
+ *        `node --test scripts/tests/release-scope.test.mjs`,
+ *        `node --test scripts/tests/release-shipped-scope.test.mjs`
  */
 
 import { spawnSync } from "node:child_process";
@@ -96,7 +107,9 @@ import {
 } from "./environments.mjs";
 import { gitDiscoveryEnv } from "./git-env.mjs";
 import { readHistory } from "./history.mjs";
+import { releaseEntriesOf } from "./release-entries.mjs";
 import { readRecord } from "./release-record.mjs";
+import { readShipments } from "./release-shipped.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { repoRoot } from "./modified-files.mjs";
 import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
@@ -229,8 +242,12 @@ function standingOn(te) {
  * @param {readonly string[]} opts.archived  `archived_statuses`
  * @param {string|null} [opts.target]  `--target`
  * @param {boolean} [opts.count]  drop the lists, keep the counts
+ * @param {object|null} [opts.shipment]  this release's entry of `readShipments()`
+ *   when `releases:` names a ref for it — the scope is then judged against
+ *   that ref (`shippedScope()`), not against the pipeline
  */
-export function releaseScope({ state, targets, tasks, release, archived, target = null, count = false }) {
+export function releaseScope({ state, targets, tasks, release, archived, target = null, count = false, shipment = null }) {
+  if (shipment) return shippedScope({ targets, tasks, release, archived, target, count, shipment });
   const done = archived[0] || null;
   const known = new Map(tasks.map((t) => [t.id, t]));
   const inScope = (te) => target === null || te.target === target;
@@ -310,6 +327,111 @@ export function releaseScope({ state, targets, tasks, release, archived, target 
     unplanned: list(unplanned),
     dropped: list(dropped),
     unobservable: list(unobservable),
+    shippedAt: null,
+    shippedUnplanned: null,
+  };
+}
+
+/**
+ * PURE — the scope of a release that names the ref where it ends (TL-516). The
+ * lists keep their meaning, measured against that ref instead of the pipeline:
+ *
+ *   planned, not shipped   planned, not dropped, and not held in full by the
+ *                          ref: some or none of its trunk commits are in it,
+ *                          or no commit names it at all
+ *   shipped, unplanned     named by a commit the release carried — between the
+ *                          previous release's ref and this one's — and planned
+ *                          for another release or none
+ *
+ * `unplanned` ("carried by the next promotion") is `null` here: a release that
+ * has gone out is not what the next promotion carries. A ref that does not
+ * resolve makes every planned task that is not dropped `release-ref-unknown`
+ * and `shippedUnplanned` unknown (`count: null`); a beginning that does not
+ * resolve makes only `shippedUnplanned` unknown. Unknown is never empty.
+ */
+export function shippedScope({ targets, tasks, release, archived, target = null, count = false, shipment }) {
+  const done = archived[0] || null;
+  const known = new Map(tasks.map((t) => [t.id, t]));
+  const spec = target === null ? null : targets.find((x) => x.name === target) || null;
+  const local = spec !== null && !isExternalTarget(spec);
+  // The commits of `--target` only; every commit without it.
+  const inTarget = (c) => target === null || (local && c.files.some((f) => pathInTarget(spec, f)));
+  const row = (id, standing, note, commits) => {
+    const t = known.get(id) || { id, title: null, status: null, priority: null, release: "" };
+    return { id, title: t.title, status: t.status, priority: t.priority, release: t.release || "", commits, standing, note };
+  };
+  const resolved = shipment.status === "resolved";
+  const rangeKnown = resolved && shipment.rangeKnown;
+  const carried = new Map();
+  for (const c of rangeKnown ? shipment.range : []) {
+    if (!inTarget(c)) continue;
+    for (const id of c.ids) carried.set(id, (carried.get(id) || 0) + 1);
+  }
+  const allCarried = new Set(rangeKnown ? shipment.range.flatMap((c) => c.ids) : []);
+
+  const planned = tasks.filter((t) => t.release === release);
+  const notShipped = [];
+  const open = [];
+  const dropped = [];
+  const unobservable = [];
+  let shipped = 0;
+  for (const t of planned) {
+    const isArchived = archived.indexOf(t.status) >= 0;
+    if (isArchived && t.status !== done) { dropped.push(row(t.id, [], null, 0)); continue; }
+    if (!isArchived) open.push(row(t.id, [], null, 0));
+    const away = externalTargetsOf(targets, t).filter((x) => target === null || x.name === target);
+    const elsewhere = away.length
+      ? row(t.id, away.map((x) => ({ target: x.name, repository: x.repository, at: null, waitingFor: null, state: "unobservable" })), "unobservable", 0)
+      : null;
+    if (!resolved) { notShipped.push(row(t.id, [], "release-ref-unknown", 0)); continue; }
+    const everyTrunk = shipment.trunkByTask.get(t.id) || [];
+    const trunk = everyTrunk.filter(inTarget);
+    const onRelease = carried.get(t.id) || 0;
+    if (!everyTrunk.length && !allCarried.has(t.id)) {
+      if (elsewhere) unobservable.push(elsewhere);
+      else if (!externalTargetsOf(targets, t).length) notShipped.push(row(t.id, [], "no-commits", 0));
+      continue;
+    }
+    // Commits outside `--target`: outside this answer.
+    if (!trunk.length && !onRelease) {
+      if (elsewhere) unobservable.push(elsewhere);
+      continue;
+    }
+    const held = trunk.filter((c) => !shipment.missing.has(c.sha)).length;
+    const full = trunk.length ? held === trunk.length : onRelease > 0;
+    if (full) {
+      if (elsewhere) unobservable.push(elsewhere);
+      else shipped++;
+      continue;
+    }
+    const state = held > 0 || onRelease > 0 ? "partial" : "absent";
+    notShipped.push(row(t.id, [{ release, ref: shipment.ref, state, held, of: trunk.length }]
+      .concat(elsewhere ? elsewhere.standing : []), null, trunk.length));
+  }
+
+  const shippedUnplanned = [];
+  for (const [id, n] of carried) {
+    const t = known.get(id);
+    if (t && t.release === release) continue;
+    shippedUnplanned.push(row(id, [{ release, ref: shipment.ref, state: "full", held: n, of: n }], t ? null : "no-task-file", n));
+  }
+
+  const byId = (a, b) => String(a.id).localeCompare(String(b.id), undefined, { numeric: true });
+  const list = (rows) => ({ count: rows.length, tasks: count ? [] : rows.sort(byId) });
+  return {
+    name: release,
+    planned: planned.length,
+    shipped: { count: shipped },
+    notShipped: list(notShipped),
+    open: list(open),
+    unplanned: null,
+    dropped: list(dropped),
+    unobservable: list(unobservable),
+    shippedAt: {
+      ref: shipment.ref, sha: shipment.sha, status: shipment.status, why: shipment.why,
+      since: shipment.since, rangeKnown,
+    },
+    shippedUnplanned: rangeKnown ? list(shippedUnplanned) : { count: null, unknown: true, tasks: [] },
   };
 }
 
@@ -358,7 +480,16 @@ export function releaseScope({ state, targets, tasks, release, archived, target 
  *     holding the release once a trunk commit names it, or once it is dropped
  *     or planned elsewhere;
  *   - a release with no planned task left to ship is shipped: an empty entry
- *     at the head of the list does not hold back the ones after it.
+ *     at the head of the list does not hold back the ones after it;
+ *   - a release whose entry names a `ref` (TL-516) is judged against that ref,
+ *     not the pipeline: it is shipped when the ref resolves, every planned task
+ *     that is not dropped is closed and held in full by it, and none is missing
+ *     a commit. A ref that does not resolve keeps it current (unknown is never
+ *     shipped), and so does a planned task the ref does not hold: the release
+ *     went out without it, and until somebody plans it for a later release or
+ *     drops it, that gap is what the gate has to keep naming. Deployment still
+ *     has to have been read for any release to be judged, so that one rule
+ *     governs "not judged" whatever the shape of the entries.
  *
  * If every release is shipped there is no current release (`null`), and no
  * planned task blocks anything.
@@ -396,12 +527,16 @@ export function releaseShipped(scope) {
  * @param {object[]} opts.tasks  every task: `{id, status, priority, release, labels}`
  * @param {readonly string[]} opts.releases  `config.releases`, in the project's order
  * @param {readonly string[]} opts.archived  `archived_statuses`
+ * @param {Map<string, object>} [opts.shipments]  `readShipments()`, for the
+ *   releases that name a ref
  * @returns {string|null}
  */
-export function currentRelease({ state, targets, tasks, releases, archived }) {
+export function currentRelease({ state, targets, tasks, releases, archived, shipments = new Map() }) {
   if (!state.scanned) throw new Error("currentRelease() needs deployment that was read — check `state.scanned` first");
   for (const release of releases || []) {
-    const scope = releaseScope({ state, targets: targets || [], tasks, release, archived: archived || [] });
+    const scope = releaseScope({
+      state, targets: targets || [], tasks, release, archived: archived || [], shipment: shipments.get(release) || null,
+    });
     if (!releaseShipped(scope)) return release;
   }
   return null;
@@ -717,7 +852,13 @@ function describeStanding(task) {
   if (task.note === "unscanned") return ["deployment not read"];
   if (task.note === "no-commits") return ["no commit on the trunk names it"];
   if (task.note === "no-target") return ["its commits touch no deploy target's paths"];
+  if (task.note === "release-ref-unknown") return ["unknown — the release's ref does not resolve"];
   return task.standing.map((s) => {
+    if (s.ref !== undefined) {
+      if (s.state === "full") return "in " + s.ref;
+      if (s.state === "absent") return "not in " + s.ref;
+      return "partly in " + s.ref + (s.of ? " (" + s.held + " of " + s.of + " trunk commit(s))" : "");
+    }
     if (s.state === "unobservable") return s.target + ": unobservable — deployed from `" + s.repository + "`";
     if (s.state === "unknown") return s.target + ": unknown — a ref of " + s.waitingFor + " does not resolve";
     const where = s.at === null ? "on the trunk" : "in " + s.at;
@@ -733,16 +874,30 @@ export function describeCurrent(scope) {
   return "not the current release, which is " + scope.current + " — the first in `releases:` not fully shipped";
 }
 
+/** Where a release that names a ref ends and began, in words (TL-516). */
+export function describeShippedAt(at, paint = color) {
+  if (at.status !== "resolved") return "shipped at " + at.ref + " — " + paint.warn("unknown") + ": " + (at.why || "the ref does not resolve");
+  let since = "since the root — the first release that names a ref";
+  if (at.since) {
+    since = "since " + at.since.release + " at " + at.since.ref + " " +
+      (at.since.sha ? shortSha(at.since.sha) : paint.warn("unknown") + " — " + (at.since.why || "the ref does not resolve"));
+  }
+  return "shipped at " + at.ref + " " + shortSha(at.sha) + ", " + since;
+}
+
 /** The text answer of `--release`. */
 export function renderScope(scope, archived, paint = color) {
   const lines = [];
   lines.push(paint.bold("release " + scope.name) + "  " + scope.planned + " planned · " +
     scope.shipped.count + " shipped (counted, not listed) · " + scope.dropped.count + " dropped");
   if (scope.current !== undefined) lines.push("  " + describeCurrent(scope));
+  if (scope.shippedAt) lines.push("  " + describeShippedAt(scope.shippedAt, paint));
   const sections = [
     ["planned, not shipped", scope.notShipped, true],
     ["planned, still open", scope.open, false],
-    ["unplanned, carried by the next promotion", scope.unplanned, true],
+    scope.shippedAt
+      ? ["shipped, unplanned", scope.shippedUnplanned, true]
+      : ["unplanned, carried by the next promotion", scope.unplanned, true],
     ["planned, then dropped", scope.dropped, false],
   ];
   // Only a project with a target in another repository can have this list;
@@ -750,11 +905,11 @@ export function renderScope(scope, archived, paint = color) {
   if (scope.unobservable.count) sections.splice(1, 0, ["planned, unobservable here", scope.unobservable, true]);
   const width = Math.max(...sections.map(([label]) => label.length));
   for (const [label, part, where] of sections) {
-    lines.push("  " + label.padEnd(width) + "  " + part.count);
+    lines.push("  " + label.padEnd(width) + "  " + (part.count === null ? "? " + paint.warn("unknown") : part.count));
     for (const task of part.tasks) {
       const parts = [task.status === null ? "no task file" : task.status];
       if (task.priority) parts.push(task.priority);
-      if (part === scope.unplanned && task.release) parts.push("planned for " + task.release);
+      if ((part === scope.unplanned || part === scope.shippedUnplanned) && task.release) parts.push("planned for " + task.release);
       if (where) parts.push(...describeStanding(task));
       lines.push("    " + paint.id(task.id) + "  " + (task.title === null ? "" : task.title) + "  " + paint.dim(parts.join(" · ")));
     }
@@ -769,6 +924,12 @@ export function computeStatus({ root, config, filter, count, release = null, now
   const repo = repoRoot(root);
   const trunk = defaultTrunk(repo, run);
   const state = deploymentState({ root: repo, prefix: config.taskIdPrefix, targets, trunk: trunk.spec, run });
+  // Read only for `--release`, and only for entries naming a ref (TL-516).
+  const shipments = release === null ? new Map() : readShipments({
+    root: repo, prefix: config.taskIdPrefix, entries: releaseEntriesOf(config),
+    trunkSha: state.scanned ? state.trunk.sha : resolveTrunkSha(run, repo, trunk.spec),
+    trunkCommits: state.scanned ? state.commits : null, run,
+  });
   const report = {
     trunk: { spec: trunk.spec, sha: state.trunk.sha, source: trunk.source },
     scan: deploymentScanJson(state),
@@ -799,8 +960,8 @@ export function computeStatus({ root, config, filter, count, release = null, now
     if (release !== null) {
       report.release = withCurrent(releaseScope({
         state, targets, tasks: metas.map(scopeRecord), release, archived: config.archivedStatuses,
-        target: filter.target, count,
-      }), { state, targets, tasks: metas.map(scopeRecord), releases: config.releases, archived: config.archivedStatuses });
+        target: filter.target, count, shipment: shipments.get(release) || null,
+      }), { state, targets, tasks: metas.map(scopeRecord), releases: config.releases, archived: config.archivedStatuses, shipments });
     }
     return { report, state };
   }
@@ -856,9 +1017,17 @@ export function computeStatus({ root, config, filter, count, release = null, now
     const records = metas.filter((m) => m.id).map(scopeRecord);
     report.release = withCurrent(releaseScope({
       state, targets, tasks: records, release, archived, target: filter.target, count,
-    }), { state, targets, tasks: records, releases: config.releases, archived });
+      shipment: shipments.get(release) || null,
+    }), { state, targets, tasks: records, releases: config.releases, archived, shipments });
   }
   return { report, state };
+}
+
+/** The trunk's SHA when `deploymentState()` did not read it (no targets). */
+function resolveTrunkSha(run, root, spec) {
+  if (!root) return null;
+  const r = git(run, root, ["rev-parse", "--verify", "--quiet", spec + "^{commit}"]);
+  return r.status === 0 ? String(r.stdout || "").trim() || null : null;
 }
 
 /** The scope, naming the current release — computed over every target, never

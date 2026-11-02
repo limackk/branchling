@@ -7,8 +7,8 @@ board: main
 epic: "Release tracking across environments"
 release: ""                        # the release it is PLANNED for (a value from `releases:` in config.yaml). Empty = none
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 conflict_group: []                 # the AREA it touches (e.g. a module): `next` and `run` hold it back while a task of the same group is in progress. Empty = `conflict_group_from`, or none
@@ -42,4 +42,4 @@ A release with a `ref` that resolves is reported as shipped up to that commit: p
 
 ## Acceptance criteria
 
-- [ ] A release with a resolving ref lists the unplanned tasks it shipped and the planned tasks it did not, the range starts at the previous release's ref, a release without ref behaves as before, and an unresolvable ref reads as unknown. [proof: shipped-scope]
+- [x] A release with a resolving ref lists the unplanned tasks it shipped and the planned tasks it did not, the range starts at the previous release's ref, a release without ref behaves as before, and an unresolvable ref reads as unknown. [proof: shipped-scope]

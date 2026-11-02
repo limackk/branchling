@@ -133,6 +133,8 @@ labels_closed: false
 # releases. The ORDER is chronological, oldest first: the CURRENT release is the
 # first one not yet fully shipped, and only its open top-priority tasks block
 # the last stage. Append the next release; do not reorder the shipped ones.
+# A shipped release may name the ref that marks it, so the scope report can
+# say what it carried: \`{ name: 1.0, ref: v1.0 }\` beside a plain name.
 # releases: [1.0, 1.1]
 
 # [free] with respect to the tree — a task may have any owner; but \`${N} new\n# --owner X\` checks this list, so a new owner has to be added here.

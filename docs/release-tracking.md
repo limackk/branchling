@@ -1,6 +1,6 @@
 # Release tracking across environments
 
-**Status:** IMPLEMENTED 2026-11-02 (TL-501, TL-502, TL-503, TL-504, TL-505, TL-506, TL-507, TL-508)
+**Status:** IMPLEMENTED 2026-11-02 (TL-501, TL-502, TL-503, TL-504, TL-505, TL-506, TL-507, TL-508, TL-516)
 
 The question this answers: of the tasks that are finished, which are waiting
 for the test environment, which are waiting for production, and which have
@@ -128,6 +128,39 @@ published version; `release status` and `release record` fail and name the new
 command. `release:` (the release a task is planned for), `releases:`,
 `check --release` and the `--json` kinds `release-status` and `release-record`
 keep their names.
+
+### A release that has shipped
+
+TL-505 bounded the unplanned list to work still in the pipeline, so once a
+release went out, the unplanned work that went with it disappeared from the
+report. Decided by the owner on 2026-11-02 (TL-516): an entry of `releases:`
+may be `{name, ref}` beside the plain slug, `ref` naming the ref or tag where
+the release ends — one point, so a glob is refused. Both shapes are accepted in
+one list; `config.releases` stays the list of names, normalised once in
+`scripts/release-entries.mjs`, so every reader of the vocabulary works on both,
+and only the scope report and the current release read `releaseEntries`.
+
+- **The range** of a release with a ref begins at the ref of the nearest earlier
+  entry that names one, and at the root for the first. An earlier entry without
+  a ref is skipped rather than read as the root, which would hand that release's
+  work to this one. The commits carried are `<begin>...<end>` with
+  `--cherry-pick --right-only`, so a patch the previous release already carried
+  is not counted again (§5).
+- **The scope** (`shippedScope()` in `scripts/release-status.mjs`, read by
+  `scripts/release-shipped.mjs`): a planned task not held in full by the ref —
+  every trunk commit naming it reachable from it or present by patch, or, for a
+  task with no trunk commit, a commit the release carried — is "planned, not
+  shipped"; a task named by a commit in the range and planned for another
+  release or none is "shipped, unplanned". The pipeline's "carried by the next
+  promotion" is `null` for such a release.
+- **Unknown is not empty.** An end that does not resolve leaves the release
+  unknown; a beginning that does not resolve leaves only the range unknown.
+- **The current release** treats a release with a ref as shipped when the ref
+  resolves and holds every planned task that is not dropped, and every one is
+  closed. A task the release went out without keeps it current until it is
+  planned for a later release or dropped — a person's decision, which the gate
+  keeps asking for. A release without `ref` is judged by the pipeline, as
+  before.
 
 ## 5. How commits are matched to tasks
 

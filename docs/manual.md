@@ -351,6 +351,40 @@ release 2026.11  4 planned · 1 shipped (counted, not listed) · 1 dropped
   read — outside git, or with an unresolved trunk — nothing is judged and the
   line says so instead. Append the next release to the list; reordering it
   changes which release is current. No date is read from it.
+- **A release that has shipped names the ref that marks it.** An entry of
+  `releases:` may be `{name, ref}` beside the plain slug — `ref` is a ref name
+  or tag, never a pattern, because a release ends at one point — and both
+  shapes live in one list:
+
+  ```yaml
+  releases: [{ name: 1.0, ref: v1.0 }, { name: 1.1, ref: v1.1 }, 1.2]
+  ```
+
+  Such a release is compared with its ref instead of the pipeline. **Planned,
+  not shipped** is then a planned task the ref does not hold in full; **shipped,
+  unplanned** replaces "carried by the next promotion" and lists the tasks named
+  by a commit the release carried — reachable from its ref and not from the
+  previous release's ref, the first one beginning at the root — that were
+  planned for another release or none. A patch the previous release already
+  carried is not counted again. The header names the ref, its SHA and where the
+  release began. A ref that does not resolve is unknown, never an empty release;
+  an unresolvable beginning leaves only the shipped-unplanned list unknown. For
+  the current release such a release is shipped when its ref resolves and holds
+  every planned task that is not dropped: a task it went out without keeps it
+  current until somebody plans that task for a later release or drops it. A
+  release without `ref` behaves exactly as above. The name keeps the slug rules
+  of every release, and `new`, `query`, `check --vocabulary` and the viewer read
+  the names alone.
+
+  ```text
+  release 1.0  3 planned · 1 shipped (counted, not listed) · 0 dropped
+    the current release — the first in `releases:` not fully shipped
+    shipped at v1.0 4f2a9c1e07b3, since the root — the first release that names a ref
+    planned, not shipped   1
+      TASK-12  Export to CSV  done · P2 · not in v1.0
+    shipped, unplanned     1
+      TASK-15  Retry banner   done · P3 · in v1.0
+  ```
 - `--env` is refused beside `--release`, because the comparison is with the
   last stage by definition.
 

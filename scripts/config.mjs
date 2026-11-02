@@ -43,6 +43,7 @@ import { DEFAULT_LOCK_TTL_MINUTES } from "./lock.mjs";
 import { estimateHours } from "./estimate.mjs";
 import { USER_KEYS, loadUserConfig } from "./home.mjs";
 import { externalTargetNames, readDeployTargets } from "./deploy-targets.mjs";
+import { readReleases, releaseNames } from "./release-entries.mjs";
 import { GAP_NAMES, RELEASE_GATE_MODES } from "./release-gaps.mjs";
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -76,6 +77,9 @@ export const DEFAULTS = Object.freeze({
   // ORDER is chronological (TL-515): the current release is computed as the
   // first entry not yet fully shipped, and only its open top-priority tasks
   // block the last stage (`planned-blocker-open`). No date is read from it.
+  // An entry is a slug, or `{name, ref}` once the release has shipped (TL-516):
+  // `ref` names the ref or tag where it ends, and `deploy status --release`
+  // then reports what it carried (`scripts/release-entries.mjs`).
   releases: [],
   label_axis_timing: [],      // the "Phase" axis in the viewer filters; empty removes the facet
   label_axis_env: [],         // the "Environment" axis; empty removes the facet
@@ -299,7 +303,7 @@ const KNOWN_KEYS = Object.keys(DEFAULTS);
 
 const LIST_KEYS = new Set([
   "statuses", "archived_statuses", "priorities", "types", "confidence",
-  "labels", "label_axis_timing", "label_axis_env", "owners", "estimates", "actors", "roles", "releases",
+  "labels", "label_axis_timing", "label_axis_env", "owners", "estimates", "actors", "roles",
   "dashboard_open_statuses", "status_strikethrough", "reason_required_statuses",
   "docs_status_pending_patterns", "contract_programs", "release_gate_accept",
 ]);
@@ -426,6 +430,17 @@ export function parseConfigYaml(text) {
       const read = readDeployTargets(inline, lines.slice(i + 1, j).map(stripComment));
       for (const p of read.problems) problems.push(p);
       values[key] = read.targets;
+      i = j - 1;
+      continue;
+    }
+
+    // Two shapes in one list (TL-516): a slug, or `{name, ref}` naming the ref
+    // where a shipped release ends. Read as ENTRIES here; `loadConfig` hands
+    // every other reader the names alone (`scripts/release-entries.mjs`).
+    if (key === "releases") {
+      const read = readReleases(inline, lines.slice(i + 1, j).map(stripComment));
+      for (const p of read.problems) problems.push(p);
+      values[key] = read.entries;
       i = j - 1;
       continue;
     }
@@ -602,6 +617,11 @@ export function loadConfigOrExit(root, opts = {}) {
   }
 }
 
+/** `releases` as entries: the parsed file gives `{name, ref}`, DEFAULTS names. */
+function toEntries(list) {
+  return (list || []).map((e) => (typeof e === "string" ? { name: e, ref: null } : e));
+}
+
 /**
  * @param {string} root the backlog directory (from paths.mjs)
  * @param {{strict?: boolean, boardsPath?: string}} opts
@@ -692,7 +712,11 @@ export function loadConfig(root, opts = {}) {
     labels: values.labels,
     labelsClosed: values.labels_closed,
     roles: values.roles,
-    releases: values.releases,
+    // The NAMES, whatever shape each entry was written in, so every reader of
+    // the vocabulary works on both; the ref of a shipped release is in
+    // `releaseEntries` (TL-516). DEFAULTS holds names, a parsed file entries.
+    releases: releaseNames(toEntries(values.releases)),
+    releaseEntries: Object.freeze(toEntries(values.releases).map((e) => Object.freeze({ ...e }))),
     auditStaleDays: values.audit_stale_days,
     // The cap stays a string here and is parsed where it is validated and used:
     // `null` from an unparseable value has to reach `validateConfig` as a

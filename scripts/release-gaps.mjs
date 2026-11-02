@@ -93,6 +93,8 @@ import { spawnSync } from "node:child_process";
 import { deploymentState, parseCherry, parseTrunkLog } from "./environments.mjs";
 import { externalTargetsOf, isExternalTarget, observedTargets, pathInTarget } from "./deploy-targets.mjs";
 import { gitDiscoveryEnv } from "./git-env.mjs";
+import { releaseEntriesOf } from "./release-entries.mjs";
+import { readShipments } from "./release-shipped.mjs";
 import { currentRelease } from "./release-status.mjs";
 import { taskIdScanner } from "./task-id.mjs";
 
@@ -340,8 +342,12 @@ export function releaseGaps({ root, config, tasks, selector = null, trunk, state
     // Open top-priority tasks planned for a release, against the last stage of
     // their targets (see the header). Read from the task files, not from git.
     const top = (config.priorities || [])[0];
+    // A release naming a ref is judged against that ref (TL-516).
+    const shipments = readShipments({
+      root, prefix: config.taskIdPrefix, entries: releaseEntriesOf(config), trunkSha, trunkCommits: state.commits, run,
+    });
     base.currentRelease = currentRelease({
-      state, targets: declared, tasks, releases: config.releases, archived: config.archivedStatuses,
+      state, targets: declared, tasks, releases: config.releases, archived: config.archivedStatuses, shipments,
     });
     base.currentReleaseJudged = true;
     const current = base.currentRelease;
