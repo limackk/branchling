@@ -1955,6 +1955,7 @@ const state = {
   filterLabel: new Set(),
   filterEnv: new Set(),   // the values of the label_axis_env axis plus "n/a"
   filterEpic: new Set(),  // values: epic name | NO_EPIC constant
+  filterRelease: new Set(), // values: a planned release | NO_RELEASE (TL-511)
   sortBy: "priority",     // "priority" | "id_asc" | "id_desc"
   view: "tasks",          // "tasks" | "execution" | "decisions" | "release"
   // The panel's own filter: "" = everything, "mine" = rows naming this actor.
@@ -2487,6 +2488,14 @@ const FILTER_SPECS = [
       if (none) opts.push({ value: NO_EPIC, label: EPIC_NONE_LABEL });
       return opts;
     },
+  },
+  {
+    // The release a task is PLANNED for (TL-511), from \`releases:\` in
+    // config.yaml. Options and predicate live in viewer-release.mjs, pasted
+    // above; no releases declared means no options, so no facet.
+    key: "filterRelease", param: RELEASE_FILTER_PARAM, label: "Release",
+    match: releaseFacetMatch,
+    options: () => releaseFacetOptions(CONFIG.releases),
   },
 ];
 
@@ -3556,7 +3565,7 @@ function releaseVisible() {
 }
 
 function renderRelease_() {
-  const vm = releaseViewModel(RELEASE, { tasks: ALL_TASKS, visible: releaseVisible(), search: state.search, now: Date.now() });
+  const vm = releaseViewModel(RELEASE, { tasks: ALL_TASKS, visible: releaseVisible(), search: state.search, planned: [...state.filterRelease], now: Date.now() });
   document.getElementById("releaseView").innerHTML = renderRelease(vm);
   releaseSyncHash();
 }
