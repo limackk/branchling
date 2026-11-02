@@ -38,7 +38,10 @@
  *   --text
  *   --env / --not-env  a deployment stage (`stage` or `target/stage`) the task
  *                    has reached in full, or has not — COMPUTED from git refs
- *                    declared in `deploy_targets:` (TL-501)
+ *                    declared in `deploy_targets:` (TL-501). A task of a
+ *                    target in another repository matches neither when that
+ *                    repository's half would decide the answer, and the
+ *                    output names it as unobservable (TL-512)
  * By default only ACTIVE ones (status not in archived_statuses); passing
  * --status explicitly lifts that restriction, so `--status done` searches the
  * closed ones.
@@ -55,6 +58,7 @@ import { fileURLToPath } from "node:url";
 
 import { absentHere, crossBranchState, describeDivergence, divergences, scanNote } from "./branch-scan.mjs";
 import { DEFAULTS, loadConfigOrExit } from "./config.mjs";
+import { externalTargetsOf } from "./deploy-targets.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { printLine } from "./stdout.mjs";
 import { explain as explainIndex, modifiedFiles, repoRoot, touches } from "./modified-files.mjs";
@@ -247,7 +251,9 @@ let DEPLOY = null;
     DEPLOY = deploymentState({
       root: repoRoot(one.root), prefix: one.config.taskIdPrefix, targets: one.config.deployTargets,
     });
-    for (const t of one.tasks) t.deploy = taskDeploymentJson(taskDeployment(DEPLOY, t.id));
+    for (const t of one.tasks) {
+      t.deploy = taskDeploymentJson(taskDeployment(DEPLOY, t.id), externalTargetsOf(one.config.deployTargets, t));
+    }
   }
 }
 if (opts.json) {
@@ -275,6 +281,11 @@ if (opts.json) {
 }
 
 let hits = [];
+// The tasks `--env`/`--not-env` held out because the half that would decide
+// the answer lives in another repository (TL-512), per target. Collected so
+// the output can say why they are missing: dropped silently they read as "not
+// deployed anywhere", which is the false answer TL-507 exists to prevent.
+const HELD_UNOBSERVABLE = new Map();
 for (const one of COLLECTED) {
   const archived = new Set(one.config ? one.config.archivedStatuses : ["done", "cancelled"]);
   let some = filterTasks(one.tasks, f, archived);
@@ -285,9 +296,24 @@ for (const one of COLLECTED) {
   // A task that touched no target declaring the stage, or whose answer hangs
   // on a ref that did not resolve, matches NEITHER filter: it is not "in
   // production" and it is not "missing from production" either.
+  //
+  // A task the other repository's half would decide is named, but only when
+  // that is the reason it is missing: a selector it fails outright excludes it
+  // on its own, whatever the other repository holds.
   if (DEPLOY && ENV_SELECTORS.length) {
-    some = some.filter((t) => ENV_SELECTORS.every((sel) =>
-      stageMatches(taskDeployment(DEPLOY, t.id), sel) === sel.want));
+    some = some.filter((t) => {
+      const away = externalTargetsOf(one.config.deployTargets, t);
+      const answers = ENV_SELECTORS.map((sel) => stageMatches(taskDeployment(DEPLOY, t.id), sel, away));
+      if (answers.every((a, i) => a === ENV_SELECTORS[i].want)) return true;
+      if (answers.some((a) => a === "unobservable") &&
+          answers.every((a, i) => a === "unobservable" || a === ENV_SELECTORS[i].want)) {
+        for (const x of away) {
+          if (!HELD_UNOBSERVABLE.has(x.name)) HELD_UNOBSERVABLE.set(x.name, { target: x.name, repository: x.repository, tasks: [] });
+          HELD_UNOBSERVABLE.get(x.name).tasks.push(t.id);
+        }
+      }
+      return false;
+    });
   }
   hits = hits.concat(some);
 }
@@ -362,7 +388,10 @@ if (opts.json) {
     // `null` unless deployment state was computed (TL-501), and then whether it
     // could be, from which trunk, and EVERY ref it read with its SHA: the answer
     // is only as fresh as those refs, and an unresolved one is `unknown`.
-    deploy: DEPLOY ? deploymentScanJson(DEPLOY) : null,
+    // `unobservable` beside it lists, per target in another repository, the
+    // tasks `--env`/`--not-env` held out because that repository's half would
+    // decide the answer (TL-512) — `[]` when no such filter ran.
+    deploy: DEPLOY ? { ...deploymentScanJson(DEPLOY), unobservable: heldUnobservable() } : null,
     // WHAT THE PASS COULD NOT REACH (TL-36). In the RESULT and not only on
     // stderr: a consumer reading this envelope would otherwise count an
     // incomplete set as complete, and "you moved the repository" would arrive
@@ -452,5 +481,16 @@ function deployNotes() {
   const why = explainDeploy(DEPLOY.reason);
   if (why) lines.push(why);
   for (const l of describeUnknownRefs(DEPLOY)) lines.push(l + " — tasks that depend on it match neither --env nor --not-env");
+  for (const u of heldUnobservable()) {
+    lines.push(u.target + ": unobservable — deployed from `" + u.repository + "`, which is not read here, so " +
+      u.tasks.join(", ") + (u.tasks.length === 1 ? " matches" : " match") + " neither --env nor --not-env");
+  }
   return lines;
+}
+
+function heldUnobservable() {
+  const byId = (a, b) => String(a).localeCompare(String(b), undefined, { numeric: true });
+  return [...HELD_UNOBSERVABLE.values()]
+    .sort((a, b) => a.target.localeCompare(b.target))
+    .map((u) => ({ target: u.target, repository: u.repository, tasks: [...u.tasks].sort(byId) }));
 }
