@@ -608,7 +608,8 @@ export const COMMANDS = {
     summary: "create a task from the template — numbered across every branch, not max+1",
     usage: [
       `${N} new --title "<text>" [--board <b>] [--priority <p>] [--status <s>] [--type <t>]`,
-      `          [--owner <o>] [--epic <e>] [--release <r>] [--estimate <2h>] [--wave "<name>"]`,
+      `          [--owner <o>] [--epic <e>] [--release <r>] [--target <t,…>] [--estimate <2h>]`,
+      `          [--wave "<name>"]`,
       `          [--body-file <path>] [--dir <path>]   < task.json`,
       "",
       "  THE TASK ITSELF ARRIVES ON STDIN, as one JSON document — the callable input",
@@ -638,6 +639,9 @@ export const COMMANDS = {
       "  --board <b>     from the board registry; the default is used when omitted",
       "  --release <r>   from `releases:` — the release the task is PLANNED for. Closed",
       "                  even when empty: a project that declares none plans none",
+      "  --target <t,…>  from `deploy_targets` — the targets in ANOTHER repository",
+      "                  (`repository:`) the task ships from, comma-separated. A target",
+      "                  of this repository fails: its tasks come from commit paths",
       "",
       "  --wave <name>   create the task AND schedule it in that wave of plan.yaml, in one",
       "                  act. An unknown wave fails and names the ones that exist, before",
@@ -1636,9 +1640,19 @@ for (const shape of FIELD_SHAPES) {
  * array, the two would be indistinguishable and an agent would be wrong about
  * one of them every time.
  */
-function vocabulary(dictionary, config) {
+function vocabulary(dictionary, config, command) {
   if (!config) return { values: null, closed: null };
   if (dictionary === "boards") return { values: (config.boards || []).map((b) => b.slug), closed: true };
+  // `--target` names a deploy target on every command, but on `new` it writes
+  // the task's `target:` field, which admits only the targets in another
+  // repository (TL-514). Listing a local one there would hand an agent a value
+  // the command refuses.
+  if (dictionary === "deploy_targets") {
+    return {
+      values: command === "new" ? (config.externalTargets || []).slice() : (config.deployTargets || []).map((t) => t.name),
+      closed: true,
+    };
+  }
   if (dictionary === "labels") return { values: config.labels || [], closed: !!config.labelsClosed };
   return { values: config[dictionary] || [], closed: true };
 }
@@ -1660,7 +1674,7 @@ function vocabulary(dictionary, config) {
 export function commandHelpJson(name, spec, config) {
   const flags = describeFlags(spec.usage).map((f) => {
     const dictionary = FLAG_DICTIONARY[f.flag] || null;
-    const { values, closed } = dictionary ? vocabulary(dictionary, config) : { values: null, closed: null };
+    const { values, closed } = dictionary ? vocabulary(dictionary, config, name) : { values: null, closed: null };
     return { ...f, dictionary, values, closed };
   });
   return {

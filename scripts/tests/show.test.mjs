@@ -119,7 +119,7 @@ function fixture() {
   const away = newTask(dir, "Implemented in the mobile repository");
   const blocker = newTask(dir, "A blocker still open");
   setField(dir, shipped, "status", closed);
-  setField(dir, away, "labels", "[mobile]");
+  setField(dir, away, "target", "[mobile]");
   setField(dir, waiting, "blocked_by", "[" + blocker + ", " + shipped + "]");
   appendFileSync(join(dir, "backlog", "config.yaml"), `
 deploy_targets:
@@ -131,7 +131,6 @@ deploy_targets:
         refs: [production, refs/deploys/app/production-us]
   - name: mobile
     repository: mobile-app
-    labels: [mobile]
 `);
   git(dir, "add", "-A");
   git(dir, "commit", "-q", "-m", "the tasks and the targets");
@@ -209,7 +208,7 @@ test("a task of a target in another repository is unobservable, named with that 
   const json = showJson(dir, away);
   assert.deepEqual(json.deploy.unobservable, [{ target: "mobile", repository: "mobile-app" }]);
   assert.match(show(dir, away).stdout, /mobile\s+unobservable — deployed from `mobile-app`/);
-  // POSITIVE CONTROL: a task without the label is not claimed by that target.
+  // POSITIVE CONTROL: a task naming no target is not claimed by that target.
   assert.doesNotMatch(show(dir, never).stdout, /unobservable/);
 });
 

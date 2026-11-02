@@ -149,7 +149,7 @@ function main(argv) {
 export function unobservableLines(result) {
   return (result.unobservable || []).map((u) =>
     MARK.bullet + " " + u.target + ": deployed from the repository `" + u.repository + "`, which this one cannot observe — " +
-    u.count + " task(s) carry its labels and none of them is judged on its account");
+    u.count + " task(s) name it in `target:` and none of them is judged on its account");
 }
 
 /** Why nothing was judged, for the reasons this guard adds to `explain()`. */

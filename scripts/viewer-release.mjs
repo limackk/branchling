@@ -21,7 +21,7 @@
  *
  * A TARGET IN ANOTHER REPOSITORY (TL-507) is a lane of one column, "Unobservable
  * here", naming the repository its code lives in. Its cards are the tasks that
- * carry its labels; none is drawn in a stage, because none of its stages can be
+ * name it in `target:`; none is drawn in a stage, because none of its stages can be
  * read from this repository, and an empty stage column there would read as
  * "nothing deployed".
  *
@@ -174,7 +174,7 @@ function columnLabel(col) {
 }
 
 function columnHint(col, lastStage) {
-  if (col.key === UNOBSERVABLE_COLUMN) return "tasks carrying this target's labels; its commits and stages live in another repository";
+  if (col.key === UNOBSERVABLE_COLUMN) return "tasks naming this target in `target:`; its commits and stages live in another repository";
   if (col.key === CLOSED_COLUMN) return "closed, with commits only on a branch the trunk never received";
   if (col.key === TRUNK_COLUMN) return "merged, not yet in full in the first stage";
   if (col.stage === lastStage) return "reached the last stage";

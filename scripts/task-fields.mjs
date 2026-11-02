@@ -517,6 +517,17 @@ export const FIELD_SHAPES = [
   // release nobody's readiness report will ever list.
   { key: "release", label: "Release", kind: "enum", dictionary: "releases", allowEmpty: true, dictionaryRequired: true },
   { key: "labels", label: "Labels", kind: "list", style: "inline", dictionary: "labels", closedFrom: "labelsClosed" },
+  // WHICH TARGET IN ANOTHER REPOSITORY it ships from (TL-514). A task of such
+  // a target has no commit here whose paths could assign it, so the link is
+  // written on the task. The vocabulary is DERIVED from `deploy_targets` — the
+  // names of the targets carrying `repository:` — and is closed even when
+  // empty: a project with no such target has nothing a task could name. A
+  // LOCAL target is outside it on purpose, because its tasks are computed from
+  // their commits' paths and a hand-typed membership would contradict that
+  // (law 2). A list, because one task may span two other repositories.
+  { key: "target", label: "Target", kind: "list", style: "inline", dictionary: "deploy_targets",
+    optionsFrom: "externalTargets", alwaysClosed: true,
+    note: "only a target that declares `repository:` — a target of this repository takes its tasks from the paths their commits touch" },
   // `itemPattern` is closed with the configured prefix in buildFieldSpecs
   // (BL-1452); `TASK` is only a fallback for calls made without a configuration.
   { key: "blocked_by", label: "Blocked by", kind: "list", style: "inline", prefixed: true, itemPattern: "^TASK-[0-9]+$", itemHint: "TASK-123" },
@@ -558,7 +569,7 @@ export const CONFLICT_GROUP_SOURCES = Object.freeze(["epic", "board", "labels", 
  * editing one field into a diff of the whole file.
  */
 export const FRONTMATTER_ORDER = [
-  "id", "title", "type", "labels", "board", "epic", "release", "priority", "status",
+  "id", "title", "type", "labels", "board", "epic", "release", "target", "priority", "status",
   "owner", "role", "conflict_group", "estimate", "confidence", "created", "updated",
   "blocked_by", "blocks", "related_docs", "verification",
 ];
@@ -604,7 +615,10 @@ export function buildFieldSpecs(config) {
     }
     if (shape.dynamic) spec.dynamic = shape.dynamic;
     if (shape.dictionary) {
-      spec.options = cfg[shape.dictionary] || [];
+      // `optionsFrom` when the vocabulary is DERIVED from the key `dictionary`
+      // names rather than being that key's list (`target`, TL-514); the key is
+      // still what a message points the reader at.
+      spec.options = cfg[shape.optionsFrom || shape.dictionary] || [];
       // The configuration KEY name, not guessed from the field name (TL-50):
       // `status` lives under `statuses`, `priority` under `priorities`. Appending
       // A naive "add an s" produced `statuss:` in the hint — a message pointing
@@ -613,6 +627,8 @@ export function buildFieldSpecs(config) {
     }
     if (shape.suggestFrom) spec.suggest = cfg[shape.suggestFrom] || [];
     if (shape.closedFrom) spec.closed = !!cfg[shape.closedFrom];
+    if (shape.alwaysClosed) spec.closed = true;
+    if (shape.note) spec.note = shape.note;
     if (shape.maxLengthFrom && cfg[shape.maxLengthFrom]) spec.maxLength = cfg[shape.maxLengthFrom];
     // An enum with neither a vocabulary nor a dynamic set would be a field that
     // cannot be set to anything. Such a case behaves like text.
@@ -727,6 +743,7 @@ export function vocabularyUsage(metas, config) {
         field: spec.key,
         fixed: !!spec.fixed,
         dictionary: spec.dictionary || spec.key,
+        note: spec.note || null,
         label: spec.label,
         allowed: spec.options.slice(),
         found: [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([value, count]) => ({ value, count })),
@@ -789,6 +806,7 @@ export function extractMeta(frontmatter) {
     board: get("board") || "",
     epic: get("epic") || "",
     release: get("release") || "",
+    target: getInlineList("target"),
     priority: get("priority"),
     status: get("status"),
     owner: get("owner"),
@@ -894,7 +912,12 @@ export function normalizeValue(key, value, ctx) {
     for (const item of items) {
       if (item.indexOf("\n") >= 0) return { ok: false, error: "A value cannot contain a newline" };
       if (spec.closed && spec.options && spec.options.indexOf(item) < 0) {
-        return { ok: false, error: "Unknown value \"" + item + "\" — allowed: " + spec.options.join(", ") };
+        // An empty closed vocabulary would print "allowed: " and nothing after
+        // it; the key to declare is the honest answer there.
+        const allowed = spec.options.length
+          ? "allowed: " + spec.options.join(", ")
+          : "`" + (spec.dictionary || spec.key) + ":` in config.yaml declares nothing this field may name";
+        return { ok: false, error: "Unknown value \"" + item + "\" — " + allowed + (spec.note ? " (" + spec.note + ")" : "") };
       }
       if (spec.itemPattern && !new RegExp(spec.itemPattern).test(item)) {
         return { ok: false, error: "\"" + item + "\" does not match the format " + (spec.itemHint || spec.itemPattern) };

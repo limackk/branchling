@@ -42,7 +42,7 @@ import { LINK_POLICIES, parseVerification } from "./criteria.mjs";
 import { DEFAULT_LOCK_TTL_MINUTES } from "./lock.mjs";
 import { estimateHours } from "./estimate.mjs";
 import { USER_KEYS, loadUserConfig } from "./home.mjs";
-import { readDeployTargets } from "./deploy-targets.mjs";
+import { externalTargetNames, readDeployTargets } from "./deploy-targets.mjs";
 import { GAP_NAMES, RELEASE_GATE_MODES } from "./release-gaps.mjs";
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -739,6 +739,10 @@ export function loadConfig(root, opts = {}) {
     // Normalised by the reader: every stage carries `refs`, even one written
     // with `ref:`. Read by `scripts/environments.mjs`.
     deployTargets: values.deploy_targets,
+    // The vocabulary of a task's `target:` field (TL-514): the names of the
+    // targets in another repository. DERIVED from `deploy_targets`, never a key
+    // of its own, so the field and the targets cannot name different things.
+    externalTargets: externalTargetNames(values.deploy_targets),
     releaseGate: values.release_gate,
     releaseGateAccept: values.release_gate_accept,
     // Resolved here rather than in DEFAULTS, because the fallback is another
@@ -925,17 +929,6 @@ export function validateConfig(config) {
     for (const l of config.labelAxes[axis]) {
       if (config.labelsClosed && config.labels.indexOf(l) < 0) {
         problems.push(`the \`${axis}\` axis uses the label \`${l}\`, which is outside the closed \`labels\` vocabulary`);
-      }
-    }
-  }
-  // A target in another repository selects its tasks by label (TL-507); a
-  // label outside a closed vocabulary is one no task can carry, so the target
-  // would select nothing and every task meant for it would read as having no
-  // commits instead of as unobservable.
-  for (const t of config.deployTargets || []) {
-    for (const l of t.labels || []) {
-      if (config.labelsClosed && config.labels.indexOf(l) < 0) {
-        problems.push(`deploy_targets: target \`${t.name}\` selects the label \`${l}\`, which is outside the closed \`labels\` vocabulary`);
       }
     }
   }

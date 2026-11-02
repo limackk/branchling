@@ -54,11 +54,17 @@
  *   - `repository:` names the other repository, in the shape of the `<repo>`
  *     half of a `<repo>#<path>` reference. It is a label for the reader; the
  *     tool never resolves, clones or fetches it;
- *   - `labels:` says which tasks belong to the target. A task's targets are
- *     otherwise computed from the paths its commits touched, and such a task
- *     has no commit here to compute them from; the label is the one thing a
- *     person writes on the task that can carry the link. Required, because a
- *     target that selects no task would declare nothing anybody could see;
+ *   - a task says it belongs to the target in its OWN `target:` field
+ *     (TL-514), a value from the names of the targets carrying `repository:`.
+ *     A task's targets are otherwise computed from the paths its commits
+ *     touched, and such a task has no commit here to compute them from, so the
+ *     link has to be written by a person — on the task, where it travels with
+ *     the branch and goes through review. TL-507 carried it in the task's
+ *     labels, with `labels:` on the target; the owner's decision of 2026-11-02
+ *     moved it to a field of its own, because a label is a category and
+ *     letting it also mean "this task ships from that repository" gave one
+ *     value two roles. `labels:` on a target is therefore refused, with a hint
+ *     naming `target:`;
  *   - `paths:` and `stages:` are refused: both are read against THIS
  *     repository's git, so a path would assign this repository's commits to the
  *     other one, and a stage ref would be resolved in the wrong repository and
@@ -70,7 +76,9 @@
  */
 
 /** The keys a target may carry. */
-export const TARGET_KEYS = Object.freeze(["name", "paths", "stages", "repository", "labels"]);
+export const TARGET_KEYS = Object.freeze(["name", "paths", "stages", "repository"]);
+/** The key TL-507 put on a target and TL-514 retired, refused by name. */
+const LABELS_KEY = "labels";
 /** The keys a stage may carry. Exactly one of `ref` and `refs`. */
 export const STAGE_KEYS = Object.freeze(["name", "ref", "refs", "recorded"]);
 
@@ -104,16 +112,36 @@ export function observedTargets(targets) {
 }
 
 /**
- * PURE — the external targets a task belongs to, by its labels.
+ * The names a task's `target:` may take: the targets in another repository,
+ * in declaration order (TL-514). A local target is deliberately absent — its
+ * tasks are computed from the paths their commits touch, and a membership
+ * typed by hand would contradict that computation (law 2).
  *
  * @param {readonly object[]} targets  `config.deployTargets`
- * @param {{labels?: string[]}} task
- * @returns {object[]}
+ * @returns {string[]}
+ */
+export function externalTargetNames(targets) {
+  return (targets || []).filter(isExternalTarget).map((t) => t.name);
+}
+
+/**
+ * PURE — the external targets a task belongs to, by its `target:` field
+ * (TL-514). THE one place the rule lives: deploy status's unobservable lane,
+ * the gate's exemptions, planned-blocker-open, the viewer's Release view,
+ * `query` and `show` all ask this function, so a second reading of "which
+ * tasks belong to that repository" cannot appear beside it.
+ *
+ * A name that is not a declared external target selects nothing here; the
+ * vocabulary check (`check --vocabulary`, `new --target`) is what refuses it.
+ *
+ * @param {readonly object[]} targets  `config.deployTargets`
+ * @param {{target?: string[]}} task
+ * @returns {object[]} the targets, in declaration order
  */
 export function externalTargetsOf(targets, task) {
-  const labels = (task && Array.isArray(task.labels)) ? task.labels : [];
-  if (!labels.length) return [];
-  return (targets || []).filter((t) => isExternalTarget(t) && t.labels.some((l) => labels.indexOf(l) >= 0));
+  const named = (task && Array.isArray(task.target)) ? task.target : [];
+  if (!named.length) return [];
+  return (targets || []).filter((t) => isExternalTarget(t) && named.indexOf(t.name) >= 0);
 }
 
 /** A ref spec is a glob when it carries a glob character. */
@@ -301,10 +329,9 @@ function nonEmptyString(v) {
  * where the configuration said so.
  *
  * A target in another repository normalises to `stages: []`, `paths: null`,
- * and carries `repository` and `labels`; every other target carries
- * `repository: null` and `labels: null`.
+ * and carries `repository`; every other target carries `repository: null`.
  *
- * @returns {{targets: {name: string, paths: string[]|null, repository: string|null, labels: string[]|null,
+ * @returns {{targets: {name: string, paths: string[]|null, repository: string|null,
  *   stages: {name: string, refs: string[], parallel: boolean, recorded: boolean}[]}[], problems: string[]}}
  */
 export function validateDeployTargets(raw) {
@@ -321,7 +348,13 @@ export function validateDeployTargets(raw) {
     const where = "target " + (ti + 1);
     if (!isMap(t)) { problems.push(where + ": expecting a mapping with `name` and `stages`"); return; }
     for (const k of Object.keys(t)) {
-      if (TARGET_KEYS.indexOf(k) < 0) {
+      if (k === LABELS_KEY) {
+        // A specific refusal rather than "unknown key": the key was valid
+        // under TL-507, and the reader needs to know where the link went.
+        problems.push(where + ": `labels` no longer selects a target's tasks — a task names the target in another " +
+          "repository in its own `target:` field (for example `target: [" + (nonEmptyString(t.name) ? t.name : "<target>") +
+          "]`); remove `labels` from the target");
+      } else if (TARGET_KEYS.indexOf(k) < 0) {
         problems.push(where + ": unknown key `" + k + "` (allowed: " + TARGET_KEYS.join(", ") + ")");
       }
     }
@@ -340,16 +373,6 @@ export function validateDeployTargets(raw) {
         problems.push(label + ": `repository` = `" + (t.repository ?? "") +
           "` — expecting the other repository's name (letters, digits, `.`, `_`, `-`; no slash), as in a `<repo>#<path>` reference");
       }
-      let labels = null;
-      if (!has("labels")) {
-        problems.push(label + ": a target in another repository needs `labels` — the labels of the tasks implemented there; " +
-          "they have no commit in this repository to assign them by paths");
-      } else if (!Array.isArray(t.labels) || t.labels.length === 0 || !t.labels.every(nonEmptyString)) {
-        problems.push(label + ": `labels` — expecting a non-empty list of task labels");
-      } else {
-        labels = t.labels.map((l) => l.trim());
-        if (new Set(labels).size !== labels.length) problems.push(label + ": `labels` names the same label twice");
-      }
       for (const k of ["paths", "stages"]) {
         if (has(k)) {
           problems.push(label + ": `" + k + "` cannot be declared on a target in another repository — it would be read against " +
@@ -359,15 +382,9 @@ export function validateDeployTargets(raw) {
       targets.push(Object.freeze({
         name: t.name, paths: null, stages: Object.freeze([]),
         repository: nonEmptyString(t.repository) ? t.repository.trim() : null,
-        labels: labels && Object.freeze(labels),
       }));
       return;
     }
-    if (has("labels")) {
-      problems.push(label + ": `labels` selects tasks only for a target in another repository (`repository:`); " +
-        "this target's tasks are the ones whose commits touch its `paths`");
-    }
-
     let paths = null;
     if (Object.prototype.hasOwnProperty.call(t, "paths")) {
       if (!Array.isArray(t.paths) || t.paths.length === 0 || !t.paths.every(nonEmptyString)) {
@@ -440,7 +457,7 @@ export function validateDeployTargets(raw) {
       });
     }
     targets.push(Object.freeze({
-      name: t.name, paths: paths && Object.freeze(paths), stages: Object.freeze(stages), repository: null, labels: null,
+      name: t.name, paths: paths && Object.freeze(paths), stages: Object.freeze(stages), repository: null,
     }));
   });
   return { targets: Object.freeze(targets), problems };

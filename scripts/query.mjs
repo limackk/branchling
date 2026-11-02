@@ -447,6 +447,7 @@ for (const t of shown) {
   if (t.executor) cells.push(`executor: ${t.executor}`);
   if (t.epic) cells.push(`epic: ${q(t.epic)}`);
   if (t.release) cells.push(`release: ${t.release}`);
+  if (t.target && t.target.length) cells.push(`target: [${t.target.join(", ")}]`);
   // The disagreement is NEVER resolved into one status — both values stand, and
   // each is named with the branch it came from (TL-73).
   if (t.elsewhere.length) {

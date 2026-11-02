@@ -65,7 +65,7 @@
  *
  * A TARGET IN ANOTHER REPOSITORY (`repository:`, TL-507) has no stage this
  * repository can read. Its lane is one bucket, `unobservable`, holding the
- * tasks that carry its `labels` — named, with their status, and never placed
+ * tasks that name it in `target:` — named, with their status, and never placed
  * in a stage or counted as waiting for one. A closed task of such a target is
  * not "named by no commit" either: it is left out of that note, because the
  * reason no commit here names it is known. With `--release`, a planned task of
@@ -221,7 +221,7 @@ function standingOn(te) {
  * @param {object} opts
  * @param {object} opts.state  `deploymentState()`
  * @param {readonly object[]} opts.targets  `config.deployTargets`
- * @param {object[]} opts.tasks  every task: `{id, title, status, priority, release, labels}`
+ * @param {object[]} opts.tasks  every task: `{id, title, status, priority, release, target}`
  * @param {string} opts.release  a declared release
  * @param {readonly string[]} opts.archived  `archived_statuses`
  * @param {string|null} [opts.target]  `--target`
@@ -447,8 +447,8 @@ export function unobservableLane(t, tasks, count) {
 }
 
 /**
- * PURE — the tasks of each target in another repository, by label: every task
- * carrying one of its labels except those closed in an archived status other
+ * PURE — the tasks of each target in another repository, by `target:`: every
+ * task naming it except those closed in an archived status other
  * than the one `done` writes, which were deliberately not delivered and have
  * nothing to deploy.
  *
@@ -680,8 +680,8 @@ export function computeStatus({ root, config, filter, count, release = null, now
   if (!state.scanned) {
     const metas = readTaskMetas(backlogPaths(root).tasksDir, config).filter((m) => m.id);
     // A target in another repository is answered without git: which tasks are
-    // its, by label. A project whose every target lives elsewhere has nothing
-    // else to show.
+    // its, by their `target:` field. A project whose every target lives
+    // elsewhere has nothing else to show.
     if (filter.stage === null) {
       const away = unobservableTasks(targets, metas, config.archivedStatuses);
       const describe = new Map(metas.map((m) => [m.id, { id: m.id, title: m.title, status: m.status, closed: null }]));
@@ -756,7 +756,7 @@ export function computeStatus({ root, config, filter, count, release = null, now
 }
 
 function scopeRecord(m) {
-  return { id: m.id, title: m.title, status: m.status, priority: m.priority || null, release: m.release || "", labels: m.labels || [] };
+  return { id: m.id, title: m.title, status: m.status, priority: m.priority || null, release: m.release || "", target: m.target || [] };
 }
 
 export function run(argv) {

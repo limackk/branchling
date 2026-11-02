@@ -13,6 +13,7 @@ labels: []
 board: main                        # a CLOSED vocabulary (boards.yaml); do not guess: `branchling board <file>`
 epic: ""                           # free text — the group this task counts towards
 release: ""                        # the release it is PLANNED for (a value from `releases:` in config.yaml). Empty = none
+target: []                         # the deploy targets in ANOTHER repository it ships from (`deploy_targets` with `repository:`). Empty = none
 priority: P1                       # P0 blocker | P1 critical | P2 nice | P3 backlog
 status: pending                    # pending | in_progress | blocked | done | cancelled
 owner: unassigned

@@ -467,8 +467,8 @@ A project with no environments omits the key, and nothing changes.
 backlog in one repository whose tasks are partly implemented in another — a
 separate frontend repository, a desktop client in its own — cannot see those
 commits from its own git, and the tool does not read the other repository.
-Declare such a target with `repository:` and the task labels that select its
-tasks:
+Declare such a target with `repository:`, and name it on each task implemented
+there in the task's own `target:` field:
 
 ```yaml
 deploy_targets:
@@ -478,13 +478,23 @@ deploy_targets:
       - { name: production, ref: refs/deploys/api/production }
   - name: frontend
     repository: acme-frontend     # the other repository's name, as in `acme-frontend#src/app.ts`
-    labels: [frontend]            # the tasks implemented there
 ```
 
-- **Its tasks are the ones carrying one of its `labels`**, because a task
-  implemented elsewhere has no commit here whose paths could assign it.
-  `labels` is required; under `labels_closed: true` a label outside `labels:`
-  fails the configuration, since it would select nothing.
+```yaml
+# in the task's frontmatter
+target: [frontend]                # or `new --target frontend`
+```
+
+- **Its tasks are the ones naming it in `target:`**, because a task
+  implemented elsewhere has no commit here whose paths could assign it. The
+  field is a list (a task may span two other repositories) and its vocabulary
+  is the names of the targets carrying `repository:`, closed even when empty:
+  an undeclared name or a target of THIS repository fails `new --target`,
+  `check --vocabulary` and the viewer — a local target's tasks are computed
+  from the paths their commits touch, and a membership typed by hand would
+  contradict that. A label never selects a target's tasks: a label is a
+  category. `labels:` on a target fails the configuration with a hint naming
+  `target:`.
 - **`paths` and `stages` are refused on it**: both are read against THIS
   repository's git, so a path would hand this repository's commits to the
   other one, and a stage ref would resolve in the wrong repository and read
@@ -1009,7 +1019,7 @@ scope and the filters narrow the cards here exactly as they narrow the list, and
 the link carries them (`viewer.html#release?board=main&epic=Payments`). A project
 with no `deploy_targets` sees no tab. A target whose code lives in another
 repository (`repository:`) is a lane of one column, **Unobservable here**,
-holding the tasks that carry its labels — never placed in a stage.
+holding the tasks that name it in `target:` — never placed in a stage.
 
 **The dashboard contract** reserves a URL-addressable view of throughput, queue
 health, epics and plan waves. The current page does not expose that tab yet; its

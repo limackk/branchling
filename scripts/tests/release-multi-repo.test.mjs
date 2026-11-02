@@ -12,18 +12,19 @@
  *      a release holds back the `api` target's last stage. This is the
  *      positive control: without it, the green result of (2) could be a gate
  *      that judges nothing.
- *   2. With `repository:` and `labels:` declared, neither is reported; the
+ *   2. With `repository:` declared and the tasks naming it in `target:`
+ *      (TL-514), neither is reported; the
  *      gate names the target and how many tasks it holds instead, and tasks
  *      that are NOT the frontend's are still reported in the same run.
  *   3. `deploy status` names the frontend's tasks in a lane of one
  *      `unobservable` bucket, keeps them out of the "named by no commit" note,
  *      and `--release` lists a planned one as unobservable rather than as not
  *      shipped. The viewer's Release view draws the same lane.
- *   4. The declaration's shape: `paths`, `stages`, a missing `labels`, a
- *      malformed `repository` and `labels` on an ordinary target all fail,
- *      each beside a valid declaration that passes.
+ *   4. The declaration's shape: `paths`, `stages`, a malformed `repository`
+ *      and `labels` on any target all fail, each beside a valid declaration
+ *      that passes.
  *   5. `query` (TL-512): `--json` names a frontend task's target as
- *      unobservable on the task's own `deploy`, an unlabelled task carries
+ *      unobservable on the task's own `deploy`, a task naming no target carries
  *      `[]`, and `--env` / `--not-env` hold out — and name — the tasks whose
  *      answer the frontend's half would decide, while a selector naming a
  *      target of this repository is unaffected. Each beside the reading
@@ -110,7 +111,6 @@ deploy_targets:
 
 const FRONTEND = `  - name: frontend
     repository: acme-frontend
-    labels: [frontend]
 `;
 
 /**
@@ -120,11 +120,11 @@ const FRONTEND = `  - name: frontend
  * — which is what makes the false gap observable at all.
  *
  *   shipped    done, api, in production                   → counted
- *   fe-done    done, label frontend, commits in frontend   → unobservable
- *   fe-open    open, top priority, r1, label frontend      → unobservable
- *   fe-cancel  cancelled, label frontend                   → not listed anywhere
- *   unstarted  open, top priority, r1, no label, no commit → still a blocker
- *   stranded   done, no label, commits on a branch only    → still done-not-on-trunk
+ *   fe-done    done, target frontend, commits in frontend   → unobservable
+ *   fe-open    open, top priority, r1, target frontend      → unobservable
+ *   fe-cancel  cancelled, target frontend                   → not listed anywhere
+ *   unstarted  open, top priority, r1, no target, no commit → still a blocker
+ *   stranded   done, no target, commits on a branch only    → still done-not-on-trunk
  */
 function twoRepos() {
   const dir = mkdtempSync(join(tmpdir(), "branchling-multi-repo-" + counter++ + "-"));
@@ -145,7 +145,7 @@ function twoRepos() {
   };
   for (const name of ["shipped", "feDone", "stranded"]) setField(dir, ids[name], "status", done);
   setField(dir, ids.feCancel, "status", cancelled);
-  for (const name of ["feDone", "feOpen", "feCancel"]) setField(dir, ids[name], "labels", "[frontend]");
+  for (const name of ["feDone", "feOpen", "feCancel"]) setField(dir, ids[name], "target", "[frontend]");
   commit(dir, "the tasks", {});
   commit(dir, ids.shipped + " api change", { "src/a.js": "a\n" });
   git(dir, ["branch", "test"]);
@@ -205,7 +205,7 @@ test("with `repository:` declared, no gap detector reports the frontend's tasks"
   // Tasks that are not the frontend's are still judged in the same run.
   assert.ok(subjects(report, "done-not-on-trunk").includes(fx.ids.stranded));
   const blocker = report.gaps.find((g) => g.gap === "planned-blocker-open" && g.subject === fx.ids.unstarted);
-  assert.ok(blocker, "a task with no commit and no label still blocks");
+  assert.ok(blocker, "a task with no commit and no target still blocks");
   assert.deepEqual(blocker.where, ["api/production"], "and only the targets of this repository");
   assert.deepEqual(report.unobservable, [{ target: "frontend", repository: "acme-frontend", count: 3 }]);
   assert.ok(!report.refs.some((r) => r.target === "frontend"), "no ref of the frontend is resolved here");
@@ -248,7 +248,7 @@ test("--release lists a planned frontend task as unobservable, not as not shippe
   assert.equal(scope.unobservable.tasks[0].note, "unobservable");
   const notShipped = scope.notShipped.tasks.map((t) => t.id);
   assert.ok(!notShipped.includes(fx.ids.feOpen));
-  assert.ok(notShipped.includes(fx.ids.unstarted), "positive control: an unlabelled task with no commit is still not shipped");
+  assert.ok(notShipped.includes(fx.ids.unstarted), "positive control: a task with no target and no commit is still not shipped");
 
   // Without the declaration the same task reads as not shipped — the reading
   // this task exists to replace.
@@ -276,7 +276,8 @@ test("the viewer's Release view draws the frontend as one unobservable column", 
   setConfig(fx.dir, API + FRONTEND);
   const root = join(fx.dir, "backlog");
   const config = loadConfig(root);
-  const tasks = [fx.ids.feDone, fx.ids.feOpen, fx.ids.unstarted].map((id) => ({ id, status: "x", labels: [] }));
+  const tasks = [fx.ids.feDone, fx.ids.feOpen, fx.ids.unstarted]
+    .map((id) => ({ id, status: "x", target: id === fx.ids.unstarted ? [] : ["frontend"] }));
   const data = releaseViewData({ root, config, tasks });
   assert.equal(data.available, true, data.explanation);
   const lane = data.lanes.find((l) => l.target === "frontend");
@@ -322,18 +323,24 @@ test("a valid declaration passes and normalises (positive control)", () => {
       - { name: production, ref: prod }
   - name: frontend
     repository: acme-frontend
-    labels: [frontend, web-ui]
+  - name: desktop
+    repository: acme-desktop
 `);
   assert.deepEqual(r.problems, []);
   const fe = r.targets.find((t) => t.name === "frontend");
   assert.equal(fe.repository, "acme-frontend");
-  assert.deepEqual([...fe.labels], ["frontend", "web-ui"]);
   assert.deepEqual([...fe.stages], []);
   assert.equal(r.targets.find((t) => t.name === "api").repository, null);
   assert.deepEqual(observedTargets(r.targets).map((t) => t.name), ["api"]);
+  assert.equal("labels" in fe, false, "a target no longer carries labels");
   assert.equal(pathInTarget(fe, "app/view.ts"), false, "no paths must not read as the whole repository");
-  assert.deepEqual(externalTargetsOf(r.targets, { labels: ["web-ui"] }).map((t) => t.name), ["frontend"]);
-  assert.deepEqual(externalTargetsOf(r.targets, { labels: ["other"] }), []);
+  assert.deepEqual(externalTargetsOf(r.targets, { target: ["frontend"] }).map((t) => t.name), ["frontend"]);
+  assert.deepEqual(externalTargetsOf(r.targets, { target: ["desktop", "frontend"] }).map((t) => t.name), ["frontend", "desktop"],
+    "a task may span two other repositories; the answer is in declaration order");
+  // The label match is gone: a label equal to the target's name selects nothing.
+  assert.deepEqual(externalTargetsOf(r.targets, { labels: ["frontend"] }), []);
+  // A local target named in `target:` is not an external target of the task.
+  assert.deepEqual(externalTargetsOf(r.targets, { target: ["api"] }), []);
 });
 
 for (const [name, yaml, pattern] of [
@@ -341,40 +348,23 @@ for (const [name, yaml, pattern] of [
   ["stages", "    stages:\n      - { name: production, ref: prod }\n", /`stages` cannot be declared on a target in another repository/],
 ]) {
   test("a target in another repository refuses `" + name + "`", () => {
-    const r = shape("  - name: frontend\n    repository: acme-frontend\n    labels: [frontend]\n" + yaml);
+    const r = shape("  - name: frontend\n    repository: acme-frontend\n" + yaml);
     assert.ok(r.problems.some((p) => pattern.test(p)), r.problems.join("\n"));
   });
 }
 
-test("a target in another repository needs labels, and a repository name without a slash", () => {
-  const noLabels = shape("  - name: frontend\n    repository: acme-frontend\n");
-  assert.ok(noLabels.problems.some((p) => /needs `labels`/.test(p)), noLabels.problems.join("\n"));
-  const empty = shape("  - name: frontend\n    repository: acme-frontend\n    labels: []\n");
-  assert.ok(empty.problems.some((p) => /`labels` — expecting a non-empty list/.test(p)), empty.problems.join("\n"));
-  const slash = shape("  - name: frontend\n    repository: acme/frontend\n    labels: [frontend]\n");
+test("a repository name without a slash; `labels` is refused on every target with a hint naming `target:`", () => {
+  const slash = shape("  - name: frontend\n    repository: acme/frontend\n");
   assert.ok(slash.problems.some((p) => /`repository` = `acme\/frontend`/.test(p)), slash.problems.join("\n"));
+  const hint = /`labels` no longer selects a target's tasks — a task names the target in another repository in its own `target:` field \(for example `target: \[frontend\]`\)/;
+  const external = shape("  - name: frontend\n    repository: acme-frontend\n    labels: [frontend]\n");
+  assert.ok(external.problems.some((p) => hint.test(p)), external.problems.join("\n"));
   const local = shape("  - name: api\n    labels: [api]\n    stages:\n      - { name: production, ref: prod }\n");
-  assert.ok(local.problems.some((p) => /`labels` selects tasks only for a target in another repository/.test(p)), local.problems.join("\n"));
-  const typo = shape("  - name: frontend\n    repositry: acme-frontend\n    labels: [frontend]\n");
+  assert.ok(local.problems.some((p) => /`labels` no longer selects a target's tasks/.test(p)), local.problems.join("\n"));
+  const typo = shape("  - name: frontend\n    repositry: acme-frontend\n");
   assert.ok(typo.problems.some((p) => /unknown key `repositry`/.test(p)), typo.problems.join("\n"));
-});
-
-test("under a closed label vocabulary, a target's label outside it fails the configuration", () => {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-multi-repo-labels-" + counter++ + "-"));
-  git(dir, ["init", "-q", "-b", "main", "."]);
-  assert.equal(run(dir, ["init", "--dir", "backlog", "--no-example"]).status, 0);
-  const file = join(dir, "backlog", "config.yaml");
-  const text = readFileSync(file, "utf8")
-    .replace(/^labels:.*$/m, "labels: [frontend]")
-    .replace(/^labels_closed:.*$/m, "labels_closed: true");
-  writeFileSync(file, text + "\ndeploy_targets:\n  - name: frontend\n    repository: acme-frontend\n    labels: [frontned]\n", "utf8");
-  const bad = run(dir, ["deploy", "status", "--dir", "backlog"]);
-  assert.notEqual(bad.status, 0);
-  assert.match(bad.stderr + bad.stdout, /selects the label `frontned`, which is outside the closed `labels` vocabulary/);
-  // Positive control: the declared label passes.
-  writeFileSync(file, text + "\ndeploy_targets:\n  - name: frontend\n    repository: acme-frontend\n    labels: [frontend]\n", "utf8");
-  const good = run(dir, ["deploy", "status", "--dir", "backlog"]);
-  assert.equal(good.status, 0, good.stderr);
+  // Positive control: the same target without `labels` passes.
+  assert.deepEqual(shape("  - name: frontend\n    repository: acme-frontend\n").problems, []);
 });
 
 // ─── query (TL-512) ─────────────────────────────────────────────────────────
@@ -382,7 +372,7 @@ test("under a closed label vocabulary, a target's label outside it fails the con
 /**
  * Its own fixture, so the counts the tests above assert are not moved: the
  * two repositories of `twoRepos()`, plus two tasks split across both — each
- * labelled `frontend` AND named by an api commit here.
+ * naming `frontend` in `target:` AND named by an api commit here.
  *
  *   splitShipped  done, frontend, api commit in production  → unobservable for `production`
  *   splitWaiting  done, frontend, api commit not deployed   → not in production, whatever the frontend holds
@@ -397,7 +387,7 @@ function queryRepos() {
   };
   for (const name of ["splitShipped", "splitWaiting"]) {
     setField(dir, ids[name], "status", done);
-    setField(dir, ids[name], "labels", "[frontend]");
+    setField(dir, ids[name], "target", "[frontend]");
   }
   commit(dir, "the split tasks", {});
   commit(dir, ids.splitShipped + " api half", { "src/b.js": "b\n" });
@@ -423,7 +413,7 @@ function rowsById(parsed) {
 
 const FRONTEND_AWAY = [{ target: "frontend", repository: "acme-frontend" }];
 
-test("query --json names a frontend task's target as unobservable; an unlabelled task is unaffected", () => {
+test("query --json names a frontend task's target as unobservable; a task naming no target is unaffected", () => {
   setConfig(qx.dir, API + FRONTEND);
   const rows = rowsById(queryJson(qx.dir, "--status", configList(qx.dir, "statuses").join(",")));
   const fe = rows.get(qx.ids.feDone).deploy;
@@ -433,7 +423,7 @@ test("query --json names a frontend task's target as unobservable; an unlabelled
   const split = rows.get(qx.ids.splitShipped).deploy;
   assert.deepEqual(split.unobservable, FRONTEND_AWAY);
   assert.deepEqual(split.targets.map((t) => t.target), ["api"], "the half here is still read");
-  // Positive control: the unlabelled tasks are read as before, with the key
+  // Positive control: the tasks naming no target are read as before, with the key
   // present and empty.
   const shipped = rows.get(qx.ids.shipped).deploy;
   assert.deepEqual(shipped.unobservable, []);

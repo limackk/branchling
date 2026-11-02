@@ -62,7 +62,7 @@
  *
  * A TARGET IN ANOTHER REPOSITORY (`repository:`, TL-507) is never judged: its
  * commits and refs are not in this git, so every detector here would read the
- * absence of evidence as evidence. Its tasks — the ones carrying its `labels`
+ * absence of evidence as evidence. Its tasks — the ones naming it in `target:`
  * — are exempt from the two detectors that judge a task by what this
  * repository LACKS: `done-not-on-trunk` (commits naming such a task may be the
  * other repository's, fetched here as a remote) and the every-target fallback
@@ -123,7 +123,7 @@ function place(target, stage, spec, parallel) {
  * @param {object} opts
  * @param {string|null} opts.root the repository root
  * @param {object} opts.config the loaded configuration
- * @param {{id: string, status: string, priority?: string, release?: string, labels?: string[]}[]} opts.tasks every task file
+ * @param {{id: string, status: string, priority?: string, release?: string, target?: string[]}[]} opts.tasks every task file
  * @param {{target: string|null, stage: string}|null} [opts.selector] `--env`
  * @param {{spec: string, source: string}} opts.trunk from `defaultTrunk()` or `--trunk`
  * @param {object} [opts.state] a `deploymentState()` the caller already computed

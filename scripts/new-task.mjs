@@ -133,6 +133,10 @@ const FLAGS = {
   // The release the task is PLANNED for (TL-505), from `releases:` — closed, so
   // checked below like the board.
   "--release": "release",
+  // The targets in another repository the task ships from (TL-514), from the
+  // `deploy_targets` that carry `repository:` — a comma-separated list, checked
+  // below. A local target is refused: its tasks are computed from commit paths.
+  "--target": "target",
   // NOT a frontmatter field: it schedules the task in `plan.yaml` (TL-213). The
   // value is checked against the waves that exist BEFORE anything is written.
   "--wave": "wave",
@@ -388,6 +392,18 @@ function createTaskUnlocked({ root, config, board, slug, fields, body }) {
     else if (/^epic:.*$/m.test(text)) text = text.replace(/^(epic:.*)$/m, "$1\nrelease: " + opts.release);
     else text = text.replace(/^(board:.*)$/m, "$1\nrelease: " + opts.release);
   }
+  // `target:` (TL-514) is an inline list like `labels`. A template written
+  // before it has no line for it, and — as with `release:` above — the value is
+  // then INSERTED after `release:`, `epic:` or `board:`, whichever comes first,
+  // rather than dropped.
+  if (Array.isArray(opts.target) && opts.target.length) {
+    const line = "target: [" + opts.target.join(", ") + "]";
+    if (/^target:.*$/m.test(text)) text = text.replace(/^target:.*$/m, line);
+    else {
+      const after = ["release", "epic", "board"].find((k) => new RegExp("^" + k + ":.*$", "m").test(text));
+      text = after ? text.replace(new RegExp("^(" + after + ":.*)$", "m"), "$1\n" + line) : text;
+    }
+  }
   // A LIST, so it is set as a block rather than by the scalar loop above. An
   // empty list leaves the template's `labels: []` exactly as it is, which is
   // already the right answer.
@@ -576,6 +592,28 @@ export async function main(argv) {
       return fail("`" + opts.release + "` is not a release this project plans",
         releases.length ? "allowed: " + releases.join(" | ") : "`releases:` is not declared in config.yaml, so this backlog plans no releases");
     }
+  }
+  // `target:` is CLOSED even when it is empty (TL-514), like `releases:`. A
+  // local target gets its own message, because the name IS declared — the
+  // reader would otherwise go looking for a typo that is not there.
+  if (opts.target !== undefined) {
+    const named = String(opts.target).split(",").map((v) => v.trim()).filter(Boolean);
+    if (!named.length) return fail("--target requires a value", "one or more target names, comma-separated");
+    const external = config.externalTargets || [];
+    for (const name of named) {
+      if (external.indexOf(name) >= 0) continue;
+      const local = (config.deployTargets || []).some((t) => t.name === name);
+      return fail(local
+        ? "`" + name + "` is a target of this repository, and a task cannot name it in `target:`"
+        : "`" + name + "` is not a declared target in another repository",
+      local
+        ? "its tasks are computed from the paths their commits touch; `target:` takes only a target that declares `repository:`" +
+          (external.length ? " (" + external.join(" | ") + ")" : "")
+        : external.length
+          ? "allowed: " + external.join(" | ")
+          : "no target in `deploy_targets` declares `repository:`, so this backlog has none a task could name");
+    }
+    opts.target = [...new Set(named)];
   }
   const boardSlugs = (config.boards || []).map((b) => b.slug);
   const board = opts.board || config.defaultBoard || boardSlugs[0];

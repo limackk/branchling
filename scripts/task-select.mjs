@@ -150,6 +150,9 @@ export function parseTaskRecord(raw, file) {
     executor: str(meta.executor),
     // WHEN it is planned to ship (TL-505). Empty means planned for none.
     release: str(meta.release),
+    // WHICH TARGETS IN ANOTHER REPOSITORY it ships from (TL-514), read by
+    // `externalTargetsOf()` for `query` and `show`. Empty means none.
+    target: meta.target || [],
     type: str(meta.type),
     labels: meta.labels,
     blocked_by: meta.blocked_by,

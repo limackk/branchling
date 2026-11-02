@@ -20,7 +20,7 @@
  *
  * A TARGET IN ANOTHER REPOSITORY (`repository:`, TL-507) gets a lane of one
  * column, `unobservable`: the command's bucket of the same name, holding the
- * tasks that carry the target's labels. Nothing in it is placed in a stage,
+ * tasks that name the target in `target:`. Nothing in it is placed in a stage,
  * because no stage of it can be read from this repository. A project whose
  * every target lives elsewhere still gets the view — those lanes are answered
  * from the task files, without git.
@@ -162,7 +162,7 @@ export function releaseViewData({ root, config, tasks, now = Date.now(), run = s
 
     const gaps = releaseGaps({
       root: repoRoot(root), config,
-      tasks: (tasks || []).filter((t) => t && t.id).map((t) => ({ id: t.id, status: t.status, labels: t.labels || [] })),
+      tasks: (tasks || []).filter((t) => t && t.id).map((t) => ({ id: t.id, status: t.status, target: t.target || [] })),
       trunk: { spec: report.trunk.spec, source: report.trunk.source },
       state, run,
     });
