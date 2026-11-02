@@ -18,6 +18,13 @@
  * that put them there. The gap panel is `releaseGaps()` from release-gaps.mjs,
  * handed the same `deploymentState()` so one build reads the refs once.
  *
+ * A TARGET IN ANOTHER REPOSITORY (`repository:`, TL-507) gets a lane of one
+ * column, `unobservable`: the command's bucket of the same name, holding the
+ * tasks that carry the target's labels. Nothing in it is placed in a stage,
+ * because no stage of it can be read from this repository. A project whose
+ * every target lives elsewhere still gets the view — those lanes are answered
+ * from the task files, without git.
+ *
  * NO TASK TEXT TRAVELS IN IT. Cards carry ids; the page takes titles and
  * statuses from the tasks it already embeds, so a status edited in the browser
  * shows on the card without a rebuild and the backlog is not embedded twice.
@@ -35,7 +42,7 @@ import { explain, taskDeployment } from "./environments.mjs";
 import { repoRoot } from "./modified-files.mjs";
 import { gateVerdict, releaseGaps } from "./release-gaps.mjs";
 import { computeStatus } from "./release-status.mjs";
-import { CLOSED_COLUMN, TRUNK_COLUMN } from "./viewer-release.mjs";
+import { CLOSED_COLUMN, TRUNK_COLUMN, UNOBSERVABLE_COLUMN } from "./viewer-release.mjs";
 
 function cardOf(task, nextStage) {
   return {
@@ -63,6 +70,18 @@ export function releaseLanes({ pipeline, state, targets, trunk }) {
   const lanes = [];
   for (const p of pipeline) {
     const spec = targets.find((t) => t.name === p.target);
+    if (p.repository) {
+      const bucket = p.buckets.find((b) => b.kind === "unobservable");
+      lanes.push({
+        target: p.target,
+        repository: p.repository,
+        columns: [{
+          key: UNOBSERVABLE_COLUMN, stage: null, refs: [], unknown: false, unknownRefs: [],
+          cards: bucket.tasks.map((t) => cardOf(t, null)),
+        }],
+      });
+      continue;
+    }
     const stages = spec.stages.map((s) => s.name);
     const closed = p.buckets.find((b) => b.kind === "closed-off-trunk");
     const waiting = p.buckets.filter((b) => b.kind === "waiting");
@@ -98,7 +117,7 @@ export function releaseLanes({ pipeline, state, targets, trunk }) {
       unknown: reached.unknown, unknownRefs: reached.unknownRefs,
       cards: done.map((id) => cardOf({ id }, null)),
     });
-    lanes.push({ target: p.target, columns });
+    lanes.push({ target: p.target, repository: null, columns });
   }
   return lanes;
 }
@@ -135,14 +154,15 @@ export function releaseViewData({ root, config, tasks, now = Date.now(), run = s
     data.explanation = state.reason === "ok" ? null : explain(state.reason);
     data.trunk = report.trunk;
     data.refs = report.scan.refs;
-    if (!state.scanned) return data;
+    if (!state.scanned && state.reason !== "only-external-targets") return data;
     data.available = true;
     data.unplaced = report.unplaced;
     data.lanes = releaseLanes({ pipeline: report.targets, state, targets, trunk: report.trunk });
+    if (!state.scanned) return data;
 
     const gaps = releaseGaps({
       root: repoRoot(root), config,
-      tasks: (tasks || []).filter((t) => t && t.id).map((t) => ({ id: t.id, status: t.status })),
+      tasks: (tasks || []).filter((t) => t && t.id).map((t) => ({ id: t.id, status: t.status, labels: t.labels || [] })),
       trunk: { spec: report.trunk.spec, source: report.trunk.source },
       state, run,
     });

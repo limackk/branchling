@@ -49,6 +49,7 @@ moves on somebody's word — cover all of them:
 | Several maintained release lines (1.x and 2.x both patched) | per line | one stage with several refs (§3), one per line |
 | Self-hosted installations run by customers | … → published → installed per customer | published is a ref; installed per customer is a recorded stage with one ref per customer, or not tracked at all |
 | Several deployables in one repository (web plus desktop, API plus worker) | per deployable | one `deploy_targets` entry each, selected by paths |
+| A deployable whose code lives in another repository | its own, not observable here | `repository:` and `labels:` instead of `paths` and `stages`; its tasks are unobservable (§6) |
 | A project with no environments at all | — | the key is absent and nothing changes |
 
 Continuous delivery and scheduled release trains need no separate mechanism:
@@ -136,9 +137,21 @@ inspectable. A CI step or a person calls it; the tool never polls (TL-506).
   unit there.
 - **Commits that live in another repository.** A backlog in one repository
   whose tasks are implemented in another (a separate frontend repository, for
-  instance) cannot see those commits from its own git; until TL-507 decides
-  how, such a task reads as having no commits, and the report says so rather
-  than calling it undeployed.
+  instance) cannot see those commits from its own git. Decided by the owner on
+  2026-11-01 (TL-507): such a deployable is declared as a target with
+  `repository:` — the other repository's name, in the shape of the `<repo>`
+  half of a `<repo>#<path>` reference — and `labels:`, the task labels that
+  select its tasks, because those tasks have no commit here whose paths could
+  assign them. It may declare neither `paths` nor `stages`, both of which
+  would be read against this repository's git. Its tasks are reported as
+  **unobservable**, never as undeployed: `release status` and the viewer give
+  the target a lane of one bucket naming them, and no gap detector reports
+  them on its account — `done-not-on-trunk` and the every-target fallback of
+  `planned-blocker-open` skip them, and the gate states how many tasks each
+  such target holds. Commits this repository does hold are judged as
+  everywhere else. Reading the other repository's refs — a local clone or a
+  remote fetched read-only — was weighed and deliberately deferred: Law 1
+  keeps the task here either way, and only the evidence would move.
 
 - **Whether a feature flag is on.** Code being deployed is not the feature
   being live. If a project needs that stage, it is a recorded stage; the tool

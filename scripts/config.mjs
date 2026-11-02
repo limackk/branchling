@@ -928,6 +928,17 @@ export function validateConfig(config) {
       }
     }
   }
+  // A target in another repository selects its tasks by label (TL-507); a
+  // label outside a closed vocabulary is one no task can carry, so the target
+  // would select nothing and every task meant for it would read as having no
+  // commits instead of as unobservable.
+  for (const t of config.deployTargets || []) {
+    for (const l of t.labels || []) {
+      if (config.labelsClosed && config.labels.indexOf(l) < 0) {
+        problems.push(`deploy_targets: target \`${t.name}\` selects the label \`${l}\`, which is outside the closed \`labels\` vocabulary`);
+      }
+    }
+  }
   if (config.boards.length && config.defaultBoard) {
     if (!config.boards.some((b) => b.slug === config.defaultBoard)) {
       problems.push(`\`default: ${config.defaultBoard}\` in boards.yaml points at no board in the list`);

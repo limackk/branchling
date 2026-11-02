@@ -113,6 +113,7 @@ function main(argv) {
   console.log("trunk: " + result.trunk.spec + " " + trunkSha + " (" + trunkNote + ")");
   const why = explain(result.reason);
   if (!result.scanned) {
+    for (const line of unobservableLines(result)) console.log(line);
     console.log(summaryLine(result, mode, verdict));
     return verdict.exit;
   }
@@ -128,6 +129,7 @@ function main(argv) {
     console.log(MARK.bullet + " " + result.excludedBeforeAdoption +
       " trunk commit(s) older than the first one naming a task id were not judged");
   }
+  for (const line of unobservableLines(result)) console.log(line);
   for (const g of result.gaps) {
     const mark = g.accepted ? MARK.bullet : (mode === "require" ? color.err(MARK.err) : color.warn(MARK.warn));
     console.log(mark + " " + g.gap + (g.accepted ? " (accepted)" : "") + "  " + (/^[0-9a-f]{40}$/.test(g.subject) ? short(g.subject) : g.subject) +
@@ -139,6 +141,15 @@ function main(argv) {
   }
   console.log(summaryLine(result, mode, verdict));
   return verdict.exit;
+}
+
+/** What was deliberately not looked at: the tasks of each target in another
+ *  repository (TL-507). Printed even at zero tasks, because a target the gate
+ *  cannot see is a fact about every run, not about this one's findings. */
+export function unobservableLines(result) {
+  return (result.unobservable || []).map((u) =>
+    MARK.bullet + " " + u.target + ": deployed from the repository `" + u.repository + "`, which this one cannot observe — " +
+    u.count + " task(s) carry its labels and none of them is judged on its account");
 }
 
 /** Why nothing was judged, for the reasons this guard adds to `explain()`. */

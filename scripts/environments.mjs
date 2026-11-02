@@ -37,6 +37,13 @@
  * THE ANSWER IS ONLY AS FRESH AS THE REFS IT READ, so every resolved ref is
  * reported with its SHA (`refs`), and a report built on this module names them.
  *
+ * A TARGET IN ANOTHER REPOSITORY (`repository:`, TL-507) is not read at all:
+ * its commits are not in this git and its refs would resolve in the wrong
+ * repository. Only the targets `observedTargets()` keeps are scanned, and a
+ * project whose every target lives elsewhere gets the reason
+ * `only-external-targets`, never `no-targets` — it declared targets, and saying
+ * otherwise would be false.
+ *
  * THE API, for the tasks built on it (TL-502 to TL-508):
  *   deploymentState(opts)          the whole computation, one pass
  *   taskDeployment(state, id)      one task's answer, empty when it has no commits
@@ -50,7 +57,7 @@
 
 import { spawnSync } from "node:child_process";
 
-import { isGlob, pathInTarget } from "./deploy-targets.mjs";
+import { isGlob, observedTargets, pathInTarget } from "./deploy-targets.mjs";
 import { gitDiscoveryEnv } from "./git-env.mjs";
 import { taskIdScanner } from "./task-id.mjs";
 
@@ -170,7 +177,7 @@ function combine(states) {
  * @param {string} [opts.trunk] the ref whose commits count; `HEAD` by default
  * @returns {{
  *   scanned: boolean,
- *   reason: "ok"|"no-targets"|"no-git"|"no-trunk"|"git-failed"|"no-task-ids-in-commits",
+ *   reason: "ok"|"no-targets"|"only-external-targets"|"no-git"|"no-trunk"|"git-failed"|"no-task-ids-in-commits",
  *   trunk: {spec: string, sha: string|null},
  *   refs: {target: string, stage: string, spec: string, ref: string|null, sha: string|null,
  *          status: "resolved"|"unknown", why: string|null}[],
@@ -182,12 +189,14 @@ function combine(states) {
  *   `missing` maps a resolved ref's SHA to the trunk commits it does not hold,
  *   so a reader can judge commits that name no task without another pass.
  */
-export function deploymentState({ root, prefix, targets, trunk = "HEAD", run = spawnSync }) {
+export function deploymentState({ root, prefix, targets: declared, trunk = "HEAD", run = spawnSync }) {
   const empty = (reason, extra = {}) => ({
     scanned: false, reason, trunk: { spec: trunk, sha: null }, refs: [], unknownRefs: [],
     commits: [], missing: new Map(), byTask: new Map(), ...extra,
   });
-  if (!targets || !targets.length) return empty("no-targets");
+  if (!declared || !declared.length) return empty("no-targets");
+  const targets = observedTargets(declared);
+  if (!targets.length) return empty("only-external-targets");
   if (!root) return empty("no-git");
 
   const head = git(run, root, ["rev-parse", "--verify", "--quiet", trunk + "^{commit}"]);
@@ -374,6 +383,9 @@ export function describeTaskDeployment(task) {
 /** Why an empty answer is empty. */
 export function explain(reason) {
   if (reason === "no-targets") return "this project declares no `deploy_targets` in config.yaml";
+  if (reason === "only-external-targets") {
+    return "every deploy target declares `repository:` — its code lives in another repository, so this one has no commit or ref to read, and its tasks are unobservable here";
+  }
   if (reason === "no-git") return "not a git repository — deployment state is computed from git, so there is nothing to read";
   if (reason === "no-trunk") return "the trunk has no commits yet, so nothing can have been deployed";
   if (reason === "git-failed") return "a git command failed — deployment state could not be computed";

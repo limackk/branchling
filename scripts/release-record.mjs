@@ -124,6 +124,11 @@ export function selectRecordedRef({ targets, target, stage, ref }) {
       ? "`" + target + "` is not a declared deploy target (declared: " + declared.join(", ") + ")"
       : "this project declares no `deploy_targets` in config.yaml, so it has no target `" + target + "`");
   }
+  // A target in another repository (TL-507) has no stage here: a ref moved in
+  // THIS repository would record a deployment of code it does not hold.
+  if (t.repository) {
+    return no("target `" + t.name + "` is deployed from the repository `" + t.repository + "` and has no stage to record here");
+  }
   const i = t.stages.findIndex((s) => s.name === stage);
   if (i < 0) return no("target `" + t.name + "` declares no stage `" + stage + "` (declared: " + t.stages.map((s) => s.name).join(", ") + ")");
   const s = t.stages[i];

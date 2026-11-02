@@ -60,6 +60,18 @@
  * a task planned for any declared release counts; a project that promotes one
  * release while planning the next accepts the gap by name.
  *
+ * A TARGET IN ANOTHER REPOSITORY (`repository:`, TL-507) is never judged: its
+ * commits and refs are not in this git, so every detector here would read the
+ * absence of evidence as evidence. Its tasks — the ones carrying its `labels`
+ * — are exempt from the two detectors that judge a task by what this
+ * repository LACKS: `done-not-on-trunk` (commits naming such a task may be the
+ * other repository's, fetched here as a remote) and the every-target fallback
+ * of `planned-blocker-open` (a task with no commit here is not "not started"
+ * there). Commits this repository does hold are judged as everywhere else, so
+ * a task split across both repositories is still judged on this one's half.
+ * The result counts the tasks per such target in `unobservable`, so the report
+ * says what it did not look at instead of reading as a clean answer.
+ *
  * MODE AND ACCEPTED GAPS come from config.yaml: `release_gate` (`report`, the
  * default, or `require`) and `release_gate_accept` (gap names this project
  * knowingly accepts). This module computes; the caller decides the exit code
@@ -71,7 +83,7 @@
 import { spawnSync } from "node:child_process";
 
 import { deploymentState, parseCherry, parseTrunkLog } from "./environments.mjs";
-import { pathInTarget } from "./deploy-targets.mjs";
+import { externalTargetsOf, isExternalTarget, observedTargets, pathInTarget } from "./deploy-targets.mjs";
 import { gitDiscoveryEnv } from "./git-env.mjs";
 import { taskIdScanner } from "./task-id.mjs";
 
@@ -111,7 +123,7 @@ function place(target, stage, spec, parallel) {
  * @param {object} opts
  * @param {string|null} opts.root the repository root
  * @param {object} opts.config the loaded configuration
- * @param {{id: string, status: string, priority?: string, release?: string}[]} opts.tasks every task file
+ * @param {{id: string, status: string, priority?: string, release?: string, labels?: string[]}[]} opts.tasks every task file
  * @param {{target: string|null, stage: string}|null} [opts.selector] `--env`
  * @param {{spec: string, source: string}} opts.trunk from `defaultTrunk()` or `--trunk`
  * @param {object} [opts.state] a `deploymentState()` the caller already computed
@@ -121,16 +133,23 @@ function place(target, stage, spec, parallel) {
  * @returns {{
  *   scanned: boolean, reason: string, trunk: {spec: string, sha: string|null, source: string},
  *   refs: object[], unknownRefs: object[], excludedBeforeAdoption: number,
+ *   unobservable: {target: string, repository: string, count: number}[],
  *   gaps: {gap: string, accepted: boolean, subject: string, where: string[], commits: string[], detail: string}[],
  * }}
  */
 export function releaseGaps({ root, config, tasks, selector = null, trunk, state: given = null, run = spawnSync }) {
-  const targets = config.deployTargets || [];
-  const state = given || deploymentState({ root, prefix: config.taskIdPrefix, targets, trunk: trunk.spec, run });
+  const declared = config.deployTargets || [];
+  const targets = observedTargets(declared);
+  const state = given || deploymentState({ root, prefix: config.taskIdPrefix, targets: declared, trunk: trunk.spec, run });
+  const external = (task) => externalTargetsOf(declared, task).length > 0;
   const base = {
     scanned: state.scanned, reason: state.reason,
     trunk: { spec: trunk.spec, sha: state.trunk.sha, source: trunk.source },
     refs: [], unknownRefs: [], excludedBeforeAdoption: 0, gaps: [],
+    unobservable: declared.filter(isExternalTarget).map((t) => ({
+      target: t.name, repository: t.repository,
+      count: tasks.filter((task) => externalTargetsOf([t], task).length).length,
+    })),
   };
   // `no-trunk` from `deploymentState()` means only that the trunk spec named no
   // commit. That is an empty repository ONLY if no ref holds a commit and the
@@ -145,7 +164,7 @@ export function releaseGaps({ root, config, tasks, selector = null, trunk, state
   // `deploymentState()` returns `no-targets` before it reads the trunk, so its
   // SHA is null there for a trunk that may well resolve. The report names the
   // trunk on every run, and a null would print as a trunk that does not exist.
-  if (state.reason === "no-targets" && root) {
+  if ((state.reason === "no-targets" || state.reason === "only-external-targets") && root) {
     const r = git(run, root, ["rev-parse", "--verify", "--quiet", trunk.spec + "^{commit}"]);
     if (r.status === 0) base.trunk.sha = String(r.stdout || "").trim() || null;
   }
@@ -282,7 +301,7 @@ export function releaseGaps({ root, config, tasks, selector = null, trunk, state
     // Done tasks whose commits never reached the trunk. Independent of `--env`:
     // it is a question about the trunk, not about a stage.
     if (doneStatus) {
-      const done = tasks.filter((t) => t.status === doneStatus && !state.byTask.has(t.id));
+      const done = tasks.filter((t) => t.status === doneStatus && !state.byTask.has(t.id) && !external(t));
       if (done.length) {
         const log = git(run, root, ["log", "--no-merges", "--format=" + RS + "%H" + US + "%B" + US, "--branches", "--remotes", "--not", trunkSha, "--"]);
         if (log.status !== 0) throw new Error("git failed while reading the branches off the trunk");
@@ -308,6 +327,9 @@ export function releaseGaps({ root, config, tasks, selector = null, trunk, state
       for (const task of tasks) {
         if (!task.release || task.priority !== top || archived.has(task.status)) continue;
         const entry = state.byTask.get(task.id);
+        // A task of a target in another repository with no target here has
+        // nothing this repository could hold back.
+        if (!(entry && entry.targets.length) && external(task)) continue;
         const own = entry && entry.targets.length ? entry.targets.map((x) => x.target) : targets.map((t) => t.name);
         const where = [];
         for (const t of targets) {

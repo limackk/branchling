@@ -44,10 +44,33 @@
  * The last rule is also what puts every recorded ref in front of `doctor`'s
  * fetch-refspec row (TL-508), which judges exactly the full names outside those
  * namespaces: a recorded stage cannot be declared where that check is blind.
+ *
+ * A TARGET IN ANOTHER REPOSITORY (`repository:`, TL-507) is a deployable whose
+ * code lives outside the repository holding the backlog — a separate frontend
+ * repository, a desktop client in its own. Its commits are invisible to this
+ * git, so nothing about its deployment can be observed here, and the decision
+ * of 2026-11-01 is to say so rather than to read the other repository:
+ *
+ *   - `repository:` names the other repository, in the shape of the `<repo>`
+ *     half of a `<repo>#<path>` reference. It is a label for the reader; the
+ *     tool never resolves, clones or fetches it;
+ *   - `labels:` says which tasks belong to the target. A task's targets are
+ *     otherwise computed from the paths its commits touched, and such a task
+ *     has no commit here to compute them from; the label is the one thing a
+ *     person writes on the task that can carry the link. Required, because a
+ *     target that selects no task would declare nothing anybody could see;
+ *   - `paths:` and `stages:` are refused: both are read against THIS
+ *     repository's git, so a path would assign this repository's commits to the
+ *     other one, and a stage ref would be resolved in the wrong repository and
+ *     read like an answer about the right one.
+ *
+ * The tasks such a target selects are reported as UNOBSERVABLE there, never as
+ * undeployed, and no gap detector reports them on its account
+ * (`docs/release-tracking.md` §6).
  */
 
 /** The keys a target may carry. */
-export const TARGET_KEYS = Object.freeze(["name", "paths", "stages"]);
+export const TARGET_KEYS = Object.freeze(["name", "paths", "stages", "repository", "labels"]);
 /** The keys a stage may carry. Exactly one of `ref` and `refs`. */
 export const STAGE_KEYS = Object.freeze(["name", "ref", "refs", "recorded"]);
 
@@ -63,6 +86,35 @@ export const GIT_NAMESPACES = Object.freeze(["refs/heads/", "refs/remotes/", "re
 /** A target or stage name: it is typed as a flag value (`query --env`) and
  *  joined with `/` as `target/stage`, so it may not contain a slash or a space. */
 export const NAME_SHAPE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+/** A repository name in `repository:` — the `<repo>` half of a `<repo>#<path>`
+ *  reference (`check-docs-links.mjs`): no slash, so it cannot be mistaken for a
+ *  path or a URL the tool might be expected to open. */
+export const REPOSITORY_SHAPE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+/** Is this normalised target deployed from another repository? */
+export function isExternalTarget(target) {
+  return !!(target && target.repository);
+}
+
+/** The targets whose code lives in THIS repository — the only ones git can
+ *  observe. Every reader of commits and refs goes through this. */
+export function observedTargets(targets) {
+  return (targets || []).filter((t) => !isExternalTarget(t));
+}
+
+/**
+ * PURE — the external targets a task belongs to, by its labels.
+ *
+ * @param {readonly object[]} targets  `config.deployTargets`
+ * @param {{labels?: string[]}} task
+ * @returns {object[]}
+ */
+export function externalTargetsOf(targets, task) {
+  const labels = (task && Array.isArray(task.labels)) ? task.labels : [];
+  if (!labels.length) return [];
+  return (targets || []).filter((t) => isExternalTarget(t) && t.labels.some((l) => labels.indexOf(l) >= 0));
+}
 
 /** A ref spec is a glob when it carries a glob character. */
 export function isGlob(spec) {
@@ -248,7 +300,11 @@ function nonEmptyString(v) {
  * two spellings — and a report can still say "every one of these refs" only
  * where the configuration said so.
  *
- * @returns {{targets: {name: string, paths: string[]|null,
+ * A target in another repository normalises to `stages: []`, `paths: null`,
+ * and carries `repository` and `labels`; every other target carries
+ * `repository: null` and `labels: null`.
+ *
+ * @returns {{targets: {name: string, paths: string[]|null, repository: string|null, labels: string[]|null,
  *   stages: {name: string, refs: string[], parallel: boolean, recorded: boolean}[]}[], problems: string[]}}
  */
 export function validateDeployTargets(raw) {
@@ -276,6 +332,40 @@ export function validateDeployTargets(raw) {
       problems.push("duplicate target name `" + t.name + "`");
     } else {
       names.add(t.name);
+    }
+
+    const has = (k) => Object.prototype.hasOwnProperty.call(t, k);
+    if (has("repository")) {
+      if (!nonEmptyString(t.repository) || !REPOSITORY_SHAPE.test(t.repository.trim())) {
+        problems.push(label + ": `repository` = `" + (t.repository ?? "") +
+          "` — expecting the other repository's name (letters, digits, `.`, `_`, `-`; no slash), as in a `<repo>#<path>` reference");
+      }
+      let labels = null;
+      if (!has("labels")) {
+        problems.push(label + ": a target in another repository needs `labels` — the labels of the tasks implemented there; " +
+          "they have no commit in this repository to assign them by paths");
+      } else if (!Array.isArray(t.labels) || t.labels.length === 0 || !t.labels.every(nonEmptyString)) {
+        problems.push(label + ": `labels` — expecting a non-empty list of task labels");
+      } else {
+        labels = t.labels.map((l) => l.trim());
+        if (new Set(labels).size !== labels.length) problems.push(label + ": `labels` names the same label twice");
+      }
+      for (const k of ["paths", "stages"]) {
+        if (has(k)) {
+          problems.push(label + ": `" + k + "` cannot be declared on a target in another repository — it would be read against " +
+            "this repository's git; its tasks are reported as unobservable instead");
+        }
+      }
+      targets.push(Object.freeze({
+        name: t.name, paths: null, stages: Object.freeze([]),
+        repository: nonEmptyString(t.repository) ? t.repository.trim() : null,
+        labels: labels && Object.freeze(labels),
+      }));
+      return;
+    }
+    if (has("labels")) {
+      problems.push(label + ": `labels` selects tasks only for a target in another repository (`repository:`); " +
+        "this target's tasks are the ones whose commits touch its `paths`");
     }
 
     let paths = null;
@@ -349,7 +439,9 @@ export function validateDeployTargets(raw) {
         stages.push(Object.freeze({ name: s.name, refs: Object.freeze(refs), parallel: hasRefs, recorded }));
       });
     }
-    targets.push(Object.freeze({ name: t.name, paths: paths && Object.freeze(paths), stages: Object.freeze(stages) }));
+    targets.push(Object.freeze({
+      name: t.name, paths: paths && Object.freeze(paths), stages: Object.freeze(stages), repository: null, labels: null,
+    }));
   });
   return { targets: Object.freeze(targets), problems };
 }
@@ -370,8 +462,12 @@ export function readDeployTargets(inline, bodyLines) {
  * A path ending in `/` selects a directory; any other entry selects that exact
  * file or, if it names a directory, everything below it. No globs: a selector
  * that silently matches more than was meant moves commits between targets.
+ *
+ * A target in another repository holds no file of this one: its commits are
+ * elsewhere, and "no paths" there must not read as "the whole repository".
  */
 export function pathInTarget(target, file) {
+  if (isExternalTarget(target)) return false;
   if (!target.paths) return true;
   return target.paths.some((p) =>
     p.endsWith("/") ? file.startsWith(p) : file === p || file.startsWith(p + "/"));

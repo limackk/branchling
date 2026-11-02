@@ -63,6 +63,16 @@
  * planned task whose last stage did not resolve is `unknown`, never shipped and
  * never absent.
  *
+ * A TARGET IN ANOTHER REPOSITORY (`repository:`, TL-507) has no stage this
+ * repository can read. Its lane is one bucket, `unobservable`, holding the
+ * tasks that carry its `labels` — named, with their status, and never placed
+ * in a stage or counted as waiting for one. A closed task of such a target is
+ * not "named by no commit" either: it is left out of that note, because the
+ * reason no commit here names it is known. With `--release`, a planned task of
+ * such a target lands in `unobservable` rather than in "planned, not shipped",
+ * unless a target of THIS repository it touched still lacks it — that half is
+ * observed, and is a blocker like any other.
+ *
  * A RECORDED STAGE (TL-506) is a ref `release record` moved onto an annotated
  * tag. The report names who recorded it, when and why (`records`), because a
  * stage moved on somebody's word is only as good as the word.
@@ -76,7 +86,7 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadConfigOrExit } from "./config.mjs";
-import { pathInTarget } from "./deploy-targets.mjs";
+import { externalTargetsOf, isExternalTarget, observedTargets, pathInTarget } from "./deploy-targets.mjs";
 import {
   defaultTrunk, deploymentScanJson, deploymentState, explain, parseStageSelector,
   parseTrunkLog, taskDeployment, trunkLogArgs,
@@ -99,7 +109,7 @@ export const STATUS_FLAGS = ["--target", "--env", "--release", "--count", "--jso
 const VALUE_FLAGS = ["--target", "--env", "--release"];
 
 /** The bucket kinds, in pipeline order. */
-export const BUCKET_KINDS = Object.freeze(["closed-off-trunk", "waiting", "reached"]);
+export const BUCKET_KINDS = Object.freeze(["closed-off-trunk", "waiting", "reached", "unobservable"]);
 
 function git(run, root, args) {
   return run("git", args, {
@@ -152,6 +162,9 @@ export function resolveFilter({ target, env }, targets) {
   const t = sel.target !== null ? sel.target : target;
   if (t !== null) {
     const spec = targets.find((x) => x.name === t);
+    if (isExternalTarget(spec)) {
+      return { ok: false, message: "target `" + t + "` is deployed from the repository `" + spec.repository + "` and has no stage this one can read" };
+    }
     if (!spec.stages.some((s) => s.name === sel.stage)) {
       return { ok: false, message: "target `" + t + "` declares no stage `" + sel.stage + "` (declared: " + spec.stages.map((s) => s.name).join(", ") + ")" };
     }
@@ -208,7 +221,7 @@ function standingOn(te) {
  * @param {object} opts
  * @param {object} opts.state  `deploymentState()`
  * @param {readonly object[]} opts.targets  `config.deployTargets`
- * @param {object[]} opts.tasks  every task: `{id, title, status, priority, release}`
+ * @param {object[]} opts.tasks  every task: `{id, title, status, priority, release, labels}`
  * @param {string} opts.release  a declared release
  * @param {readonly string[]} opts.archived  `archived_statuses`
  * @param {string|null} [opts.target]  `--target`
@@ -232,24 +245,44 @@ export function releaseScope({ state, targets, tasks, release, archived, target 
   const notShipped = [];
   const open = [];
   const dropped = [];
+  const unobservable = [];
   let shipped = 0;
   for (const t of planned) {
     const isArchived = archived.indexOf(t.status) >= 0;
     if (isArchived && t.status !== done) { dropped.push(row(t.id, [], null)); continue; }
     if (!isArchived) open.push(row(t.id, [], null));
-    if (!state.scanned) { notShipped.push(row(t.id, [], "unscanned")); continue; }
+    // The targets in another repository this task belongs to, within `--target`.
+    const away = externalTargetsOf(targets, t).filter((x) => target === null || x.name === target);
+    const elsewhere = away.length
+      ? row(t.id, away.map((x) => ({ target: x.name, repository: x.repository, at: null, waitingFor: null, state: "unobservable" })), "unobservable")
+      : null;
+    if (!state.scanned) {
+      // With no target in this repository there is no half to read; otherwise
+      // the half here was not read, and that is what the row has to say.
+      if (elsewhere && !observedTargets(targets).length) unobservable.push(elsewhere);
+      else notShipped.push(row(t.id, [], "unscanned"));
+      continue;
+    }
     const entry = state.byTask.get(t.id);
-    if (!entry || !entry.commits.length) { notShipped.push(row(t.id, [], "no-commits")); continue; }
+    if (!entry || !entry.commits.length) {
+      if (elsewhere) unobservable.push(elsewhere);
+      else if (!externalTargetsOf(targets, t).length) notShipped.push(row(t.id, [], "no-commits"));
+      continue;
+    }
     const tes = entry.targets.filter(inScope);
     if (!tes.length) {
+      if (elsewhere) { unobservable.push(elsewhere); continue; }
       // Commits that touch no selected target: outside this answer when
       // `--target` excluded them, and otherwise nothing that can ship anywhere.
       if (target === null) notShipped.push(row(t.id, [], "no-target"));
       continue;
     }
     const standing = tes.map(standingOn);
+    // Observed in full here, and unobservable in the other repository: never
+    // "shipped", because half of it could not be looked at.
+    if (standing.every((s) => s.state === "full") && elsewhere) { unobservable.push(elsewhere); continue; }
     if (standing.every((s) => s.state === "full")) { shipped++; continue; }
-    notShipped.push(row(t.id, standing.filter((s) => s.state !== "full"),
+    notShipped.push(row(t.id, standing.filter((s) => s.state !== "full").concat(elsewhere ? elsewhere.standing : []),
       standing.some((s) => s.state === "unknown") ? "unknown" : null));
   }
 
@@ -273,6 +306,7 @@ export function releaseScope({ state, targets, tasks, release, archived, target 
     open: list(open),
     unplanned: list(unplanned),
     dropped: list(dropped),
+    unobservable: list(unobservable),
   };
 }
 
@@ -304,15 +338,22 @@ function waitedDays(since, now) {
  * @param {Map<string, number>} opts.commitTimes  commit SHA → epoch ms
  * @param {Map<string, number>} opts.tagTimes  resolved ref SHA spec → epoch ms of an annotated tag
  * @param {object[]} opts.offTrunk  archived tasks with no trunk commit: `{id, targets: string[]}`
+ * @param {Map<string, string[]>} [opts.unobservable]  target in another repository → the ids of its tasks
  * @param {number} opts.now
  * @param {{target: string|null, stage: string|null}} [opts.filter]
  * @param {boolean} [opts.count]  drop the task lists, keep the counts
  */
-export function releasePipeline({ state, targets, tasks, commitTimes, tagTimes, offTrunk, now, filter = { target: null, stage: null }, count = false }) {
+export function releasePipeline({ state, targets, tasks, commitTimes, tagTimes, offTrunk, now, filter = { target: null, stage: null }, count = false, unobservable = new Map() }) {
   const describe = (id) => tasks.get(id) || { id, title: null, status: null, closed: null };
   const out = [];
   for (const t of targets) {
     if (filter.target !== null && t.name !== filter.target) continue;
+    if (isExternalTarget(t)) {
+      // It declares no stage, so a stage filter selects nothing in it.
+      if (filter.stage !== null) continue;
+      out.push(unobservableLane(t, (unobservable.get(t.name) || []).map(describe), count));
+      continue;
+    }
     // A target that does not declare the stage has nothing waiting for it.
     if (filter.stage !== null && !t.stages.some((s) => s.name === filter.stage)) continue;
     // Any unresolved ref at stage i makes buckets i..n unknown — see the header.
@@ -373,6 +414,7 @@ export function releasePipeline({ state, targets, tasks, commitTimes, tagTimes, 
     const selected = buckets.filter((b) => filter.stage === null || (b.kind === "waiting" && b.stage === filter.stage));
     out.push({
       target: t.name,
+      repository: null,
       buckets: selected.map((b) => {
         const listed = b.listed && !count;
         return {
@@ -382,6 +424,45 @@ export function releasePipeline({ state, targets, tasks, commitTimes, tagTimes, 
         };
       }),
     });
+  }
+  return out;
+}
+
+/** PURE — the lane of a target in another repository: one bucket, its tasks. */
+export function unobservableLane(t, tasks, count) {
+  const byId = (a, b) => String(a.id).localeCompare(String(b.id), undefined, { numeric: true });
+  const listed = !count;
+  return {
+    target: t.name,
+    repository: t.repository,
+    buckets: [{
+      kind: "unobservable", stage: null, after: null,
+      label: "unobservable here",
+      count: tasks.length, unknown: false, unknownRefs: [], listed,
+      tasks: listed
+        ? tasks.map((d) => ({ ...d, since: null, waitedDays: null, state: null, holding: [], refs: [] })).sort(byId)
+        : [],
+    }],
+  };
+}
+
+/**
+ * PURE — the tasks of each target in another repository, by label: every task
+ * carrying one of its labels except those closed in an archived status other
+ * than the one `done` writes, which were deliberately not delivered and have
+ * nothing to deploy.
+ *
+ * @returns {Map<string, string[]>}
+ */
+export function unobservableTasks(targets, metas, archived) {
+  const out = new Map();
+  const done = archived[0] || null;
+  for (const t of targets || []) if (isExternalTarget(t)) out.set(t.name, []);
+  if (!out.size) return out;
+  for (const m of metas) {
+    if (!m.id) continue;
+    if (archived.indexOf(m.status) >= 0 && m.status !== done) continue;
+    for (const t of externalTargetsOf(targets, m)) out.get(t.name).push(m.id);
   }
   return out;
 }
@@ -496,9 +577,20 @@ export function renderStatus(report, paint = color) {
     lines.push(...renderScope(report.release, report.archived, paint));
     return lines.join("\n");
   }
-  for (const t of report.targets) {
+  lines.push(...renderLanes(report.targets, report.archived, paint));
+  if (report.unplaced.count) {
     lines.push("");
-    lines.push(paint.bold(t.target));
+    lines.push(paint.dim(MARK.bullet + " " + report.unplaced.count + " closed task(s) are named by no commit on any ref, so no target can be given to them"));
+  }
+  return lines.join("\n");
+}
+
+/** The lanes, one per target, each a column of buckets. */
+export function renderLanes(targets, archived, paint = color) {
+  const lines = [];
+  for (const t of targets) {
+    lines.push("");
+    lines.push(paint.bold(t.target) + (t.repository ? "  " + paint.dim("deployed from the repository `" + t.repository + "` — its commits and refs are not read here") : ""));
     const width = Math.max(...t.buckets.map((b) => b.label.length));
     for (const b of t.buckets) {
       let tally = String(b.count);
@@ -508,7 +600,7 @@ export function renderStatus(report, paint = color) {
       for (const task of b.tasks) {
         const parts = [];
         if (task.status === null) parts.push("no task file");
-        else if (task.closed && report.archived.indexOf(task.status) >= 0) parts.push(task.status + " " + task.closed);
+        else if (task.closed && archived.indexOf(task.status) >= 0) parts.push(task.status + " " + task.closed);
         else parts.push(task.status);
         if (task.waitedDays !== null) parts.push("waiting " + task.waitedDays + "d");
         if (task.state && task.state !== "absent") {
@@ -520,11 +612,7 @@ export function renderStatus(report, paint = color) {
       }
     }
   }
-  if (report.unplaced.count) {
-    lines.push("");
-    lines.push(paint.dim(MARK.bullet + " " + report.unplaced.count + " closed task(s) are named by no commit on any ref, so no target can be given to them"));
-  }
-  return lines.join("\n");
+  return lines;
 }
 
 /** Where one row stands, in words. */
@@ -533,6 +621,7 @@ function describeStanding(task) {
   if (task.note === "no-commits") return ["no commit on the trunk names it"];
   if (task.note === "no-target") return ["its commits touch no deploy target's paths"];
   return task.standing.map((s) => {
+    if (s.state === "unobservable") return s.target + ": unobservable — deployed from `" + s.repository + "`";
     if (s.state === "unknown") return s.target + ": unknown — a ref of " + s.waitingFor + " does not resolve";
     const where = s.at === null ? "on the trunk" : "in " + s.at;
     return s.target + ": " + where + ", waiting for " + s.waitingFor + (s.state === "partial" ? " (partial)" : "");
@@ -550,6 +639,9 @@ export function renderScope(scope, archived, paint = color) {
     ["unplanned, carried by the next promotion", scope.unplanned, true],
     ["planned, then dropped", scope.dropped, false],
   ];
+  // Only a project with a target in another repository can have this list;
+  // printing it at zero everywhere else would name a concept nobody declared.
+  if (scope.unobservable.count) sections.splice(1, 0, ["planned, unobservable here", scope.unobservable, true]);
   const width = Math.max(...sections.map(([label]) => label.length));
   for (const [label, part, where] of sections) {
     lines.push("  " + label.padEnd(width) + "  " + part.count);
@@ -567,6 +659,7 @@ export function renderScope(scope, archived, paint = color) {
 /** The whole computation, for a resolved backlog. */
 export function computeStatus({ root, config, filter, count, release = null, now = Date.now(), run = spawnSync }) {
   const targets = config.deployTargets;
+  const observed = observedTargets(targets);
   const repo = repoRoot(root);
   const trunk = defaultTrunk(repo, run);
   const state = deploymentState({ root: repo, prefix: config.taskIdPrefix, targets, trunk: trunk.spec, run });
@@ -585,8 +678,19 @@ export function computeStatus({ root, config, filter, count, release = null, now
   // is still an answer. Every other planned task is marked `unscanned` rather
   // than placed — "not shipped" there would be a verdict nobody measured.
   if (!state.scanned) {
+    const metas = readTaskMetas(backlogPaths(root).tasksDir, config).filter((m) => m.id);
+    // A target in another repository is answered without git: which tasks are
+    // its, by label. A project whose every target lives elsewhere has nothing
+    // else to show.
+    if (filter.stage === null) {
+      const away = unobservableTasks(targets, metas, config.archivedStatuses);
+      const describe = new Map(metas.map((m) => [m.id, { id: m.id, title: m.title, status: m.status, closed: null }]));
+      for (const t of targets) {
+        if (!isExternalTarget(t) || (filter.target !== null && t.name !== filter.target)) continue;
+        report.targets.push(unobservableLane(t, away.get(t.name).map((id) => describe.get(id)), count));
+      }
+    }
     if (release !== null) {
-      const metas = readTaskMetas(backlogPaths(root).tasksDir, config).filter((m) => m.id);
       report.release = releaseScope({
         state, targets, tasks: metas.map(scopeRecord), release, archived: config.archivedStatuses,
         target: filter.target, count,
@@ -612,7 +716,12 @@ export function computeStatus({ root, config, filter, count, release = null, now
     return closedDate(readHistory(root, id), t.meta, archived);
   };
 
-  const off = readOffTrunk({ run, root: repo, state, targets, prefix: config.taskIdPrefix, archivedIds });
+  const away = unobservableTasks(targets, metas, archived);
+  const awayIds = new Set([...away.values()].flat());
+  const off = readOffTrunk({ run, root: repo, state, targets: observed, prefix: config.taskIdPrefix, archivedIds });
+  // A closed task of a target in another repository is named in that target's
+  // lane; "named by no commit here" is not news about it.
+  off.unplaced = off.unplaced.filter((id) => !awayIds.has(id));
   const pipeline = releasePipeline({
     state, targets,
     tasks: new Map([...tasks].map(([id, t]) => [id, { id, title: t.title, status: t.status, closed: null }])),
@@ -622,6 +731,7 @@ export function computeStatus({ root, config, filter, count, release = null, now
     now,
     filter,
     count,
+    unobservable: away,
   });
   for (const t of pipeline) {
     for (const b of t.buckets) {
@@ -646,7 +756,7 @@ export function computeStatus({ root, config, filter, count, release = null, now
 }
 
 function scopeRecord(m) {
-  return { id: m.id, title: m.title, status: m.status, priority: m.priority || null, release: m.release || "" };
+  return { id: m.id, title: m.title, status: m.status, priority: m.priority || null, release: m.release || "", labels: m.labels || [] };
 }
 
 export function run(argv) {
@@ -680,6 +790,8 @@ export function run(argv) {
     });
   } else if (!state.scanned) {
     console.log(color.ok(MARK.ok) + " nothing to report — " + report.explanation);
+    // A target in another repository is answered from the task files alone.
+    if (report.targets.length) console.log(renderLanes(report.targets, report.archived).join("\n"));
     // The plan is still an answer without git: which planned tasks are open.
     if (report.release) console.log(renderScope(report.release, report.archived).join("\n"));
   } else {

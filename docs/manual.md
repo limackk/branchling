@@ -428,6 +428,47 @@ deploy_targets:
 
 A project with no environments omits the key, and nothing changes.
 
+**A deployable whose code lives in another repository is unobservable.** A
+backlog in one repository whose tasks are partly implemented in another — a
+separate frontend repository, a desktop client in its own — cannot see those
+commits from its own git, and the tool does not read the other repository.
+Declare such a target with `repository:` and the task labels that select its
+tasks:
+
+```yaml
+deploy_targets:
+  - name: api
+    stages:
+      - { name: test, ref: origin/main }
+      - { name: production, ref: refs/deploys/api/production }
+  - name: frontend
+    repository: acme-frontend     # the other repository's name, as in `acme-frontend#src/app.ts`
+    labels: [frontend]            # the tasks implemented there
+```
+
+- **Its tasks are the ones carrying one of its `labels`**, because a task
+  implemented elsewhere has no commit here whose paths could assign it.
+  `labels` is required; under `labels_closed: true` a label outside `labels:`
+  fails the configuration, since it would select nothing.
+- **`paths` and `stages` are refused on it**: both are read against THIS
+  repository's git, so a path would hand this repository's commits to the
+  other one, and a stage ref would resolve in the wrong repository and read
+  like an answer about the right one.
+- **`release status` gives it a lane of one bucket, `unobservable here`**,
+  naming the repository and listing its tasks with their status — never in a
+  stage, never as waiting for one. A closed task of such a target is not
+  counted among the closed tasks no commit names. With `--release`, a planned
+  task of it is listed under `planned, unobservable here` rather than as not
+  shipped, unless a target of this repository it also touched still lacks it.
+- **The gate reports no gap on its account.** `done-not-on-trunk` and the
+  every-target fallback of `planned-blocker-open` skip its tasks; commits this
+  repository does hold are judged as always, so a task split across both
+  repositories is still judged on this half. The report says how many tasks
+  each such target holds, so what was not looked at is named.
+- **`--env`, `--target … --env` and `release record` refuse it**: it has no
+  stage that can be read or moved here. Reading the other repository's refs is
+  deliberately not done.
+
 **A stage git cannot observe is recorded.** Store review, an update channel, a
 staged rollout reaching 100%, a customer's installation, a sign-off on the test
 environment: nothing in git moves when they happen, and the tool does not query
@@ -495,7 +536,7 @@ names the commit or task that proves each one:
 | `done-not-on-trunk` | a task closed as done whose commits exist only on a branch or remote the trunk never received |
 | `unknown-task-id` | a deployed commit names an id no task file carries |
 | `untargeted-commit` | a deployed commit touches no declared target's paths |
-| `planned-blocker-open` | a task at the top of `priorities:`, planned for a release, is still open — reported against the last stage of the targets its commits touched, or of every target when it has no commit yet |
+| `planned-blocker-open` | a task at the top of `priorities:`, planned for a release, is still open — reported against the last stage of the targets its commits touched, or of every target when it has no commit yet (unless it belongs to a target in another repository) |
 
 In CI it is one line before the deploy step:
 
@@ -920,7 +961,9 @@ built, so the tab prints the build time and the SHA of every ref it read —
 rebuild to see where the refs are now. Environments are not boards: the board
 scope and the filters narrow the cards here exactly as they narrow the list, and
 the link carries them (`viewer.html#release?board=main&epic=Payments`). A project
-with no `deploy_targets` sees no tab.
+with no `deploy_targets` sees no tab. A target whose code lives in another
+repository (`repository:`) is a lane of one column, **Unobservable here**,
+holding the tasks that carry its labels — never placed in a stage.
 
 **The dashboard contract** reserves a URL-addressable view of throughput, queue
 health, epics and plan waves. The current page does not expose that tab yet; its
@@ -1021,7 +1064,7 @@ implementation detail. Every reading command answers in the same envelope:
 | `take`, `next` | `task-take` | `ok`, `taken`, `id`, `file`, `task`, `from`, `text`, `decisions`, `probe`, `warnings`, `reclaimed`, `tookOver`, `lock`, `refusalKind`, `refusal`, `details`, and — filled in by next — `passedOver`, `considered`, `searchedStatuses`, `skippedBlocked`, `skippedElsewhere`, `closedElsewhere`, `skippedExecutor`, `skippedHandedBack`, `skippedDeadlocked`, `skippedSize`, `skippedByRecord`, `skippedConflict`, `scan`, `plan` |
 | `handoff` | `task-handoff` | `ok`, `id`, `file`, `task`, `role`, `owner`, `status` (each a from/to pair), `comment`, `released`, `warnings`, `refusalKind`, `refusal`, `details` |
 | `release` | `task-release` | `ok`, `id`, `status`, `owner`, `released`, `comment`, `refusalKind`, `refusal`, `details` |
-| `release status` | `release-status` | `trunk` (the ref whose commits count, its SHA, and whether it is the remote's default branch or HEAD), `scan` (every ref read, with its SHA), `explanation` (why an empty answer is empty), `filter`, `targets` (per target its buckets in pipeline order — each with its kind, stage, label, count, whether it is unknown and which refs made it so, whether it is listed — the last stage is counted, not listed — and its tasks, each with the status, the day it closed, the wait in days, its state in the stage and the parallel refs holding it), `unplaced` (closed tasks no commit names), `release` (with `--release`: the release name, how many tasks it plans, how many shipped — counted, not listed — and four lists, notShipped, open, unplanned and dropped, each a count and its tasks; every task carries its status, priority, release, commit count, where it stands per target, and a note such as no-commits or unknown. Null without the flag), `records` (per recorded stage ref: who recorded it, when and why) |
+| `release status` | `release-status` | `trunk` (the ref whose commits count, its SHA, and whether it is the remote's default branch or HEAD), `scan` (every ref read, with its SHA), `explanation` (why an empty answer is empty), `filter`, `targets` (per target its repository — null unless its code lives in another repository, whose lane is one unobservable bucket — and its buckets in pipeline order — each with its kind, stage, label, count, whether it is unknown and which refs made it so, whether it is listed — the last stage is counted, not listed — and its tasks, each with the status, the day it closed, the wait in days, its state in the stage and the parallel refs holding it), `unplaced` (closed tasks no commit names, other than those of a target in another repository), `release` (with `--release`: the release name, how many tasks it plans, how many shipped — counted, not listed — and five lists, notShipped, open, unplanned, dropped and unobservable, each a count and its tasks; every task carries its status, priority, release, commit count, where it stands per target, and a note such as no-commits, unknown or unobservable. Null without the flag), `records` (per recorded stage ref: who recorded it, when and why) |
 | `release record` | `release-record` | `ok`, `target`, `stage`, `ref`, `commit`, `tag` (the annotated tag object the ref now points at), `previous` (the commit it stood at before, null on the first record), `direction` (first, unchanged, forward, backward or diverged), `actor`, `reason`, `recordedAt`, `remote`, `push` (the command that shares the record — printed, never run), `fetchFix` (the refspec other clones need, null when the remote fetches the ref), `refusalKind`, `refusal`, `details` |
 | `ask` | `task-ask` | `ok`, `id`, `file`, `question` (its event id, timestamp, text and asker), `changes`, `blockedReason`, `refusalKind`, `refusal`, `details` |
 | `done` | `verification-run` | `ok`, `task`, `dryRun`, `closed`, `entries` (one per `verification:` entry, with its exit code), `status`, `wouldBe`, `ticked`, `capability`, `refusalKind`, `refusal`, `details` |

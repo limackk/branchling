@@ -19,6 +19,12 @@
  * filters NARROW the cards here exactly as they narrow the list, and the
  * columns are never boards.
  *
+ * A TARGET IN ANOTHER REPOSITORY (TL-507) is a lane of one column, "Unobservable
+ * here", naming the repository its code lives in. Its cards are the tasks that
+ * carry its labels; none is drawn in a stage, because none of its stages can be
+ * read from this repository, and an empty stage column there would read as
+ * "nothing deployed".
+ *
  * WHAT MAY BE IMPORTED. Only a module pasted BEFORE this one in the page:
  * `viewer-url.mjs`, for the link format.
  *
@@ -31,6 +37,8 @@ import { encodeTasksHash, TASKS_HASH_ROUTE } from "./viewer-url.mjs";
  *  name. Shared with `release-view.mjs`, which builds the columns. */
 export const CLOSED_COLUMN = "closed-off-trunk";
 export const TRUNK_COLUMN = "trunk";
+/** The single column of a target in another repository (TL-507). */
+export const UNOBSERVABLE_COLUMN = "unobservable";
 
 /** The hash route of this view: `#release?board=…&epic=…`. */
 export const RELEASE_HASH_ROUTE = "release";
@@ -119,12 +127,14 @@ export function releaseMarker(card) {
 }
 
 function columnLabel(col) {
+  if (col.key === UNOBSERVABLE_COLUMN) return "Unobservable here";
   if (col.key === CLOSED_COLUMN) return "Closed, not merged";
   if (col.key === TRUNK_COLUMN) return "On the trunk";
   return col.stage;
 }
 
 function columnHint(col, lastStage) {
+  if (col.key === UNOBSERVABLE_COLUMN) return "tasks carrying this target's labels; its commits and stages live in another repository";
   if (col.key === CLOSED_COLUMN) return "closed, with commits only on a branch the trunk never received";
   if (col.key === TRUNK_COLUMN) return "merged, not yet in full in the first stage";
   if (col.stage === lastStage) return "reached the last stage";
@@ -176,6 +186,7 @@ export function releaseViewModel(data, opts = {}) {
     const lastStage = stages[stages.length - 1];
     vm.lanes.push({
       target: lane.target,
+      repository: lane.repository || null,
       columns: lane.columns.map((col) => {
         const shown = col.cards.filter((c) => (visible ? visible.has(c.id) : true));
         return {
@@ -315,6 +326,10 @@ export function renderRelease(vm) {
   head.push("</div>");
   const lanes = vm.lanes.map((lane) =>
     '<section class="rel-lane" data-release-lane="' + relEsc(lane.target) + '"><h3>' + relEsc(lane.target) + "</h3>" +
+    (lane.repository
+      ? '<p class="rel-hint" data-release-repository="' + relEsc(lane.repository) + '">Deployed from the repository <code>' + relEsc(lane.repository) +
+        "</code>. Its commits and refs are not read here, so its tasks are unobservable — never undeployed — and no gap is reported on its account.</p>"
+      : "") +
     '<div class="rel-columns">' + lane.columns.map(renderColumn).join("") + "</div></section>").join("");
   const unplaced = vm.unplaced.count
     ? '<p class="rel-hint">' + vm.unplaced.count + " closed task(s) are named by no commit on any ref, so no target can be given to them.</p>"
