@@ -344,7 +344,7 @@ export function parseStageSelector(text, targets) {
  * WHY `full` TURNS INTO `unobservable` and `not-full` does not. A stage typed
  * without a target asks about every target the task belongs to, and the half
  * in the other repository cannot be read: "in production" would be a claim
- * about code nobody looked at — `release status` refuses to call such a task
+ * about code nobody looked at — `deploy status` refuses to call such a task
  * shipped for the same reason. A half here that is NOT in the stage settles
  * the answer whatever the other half holds, so it stays `not-full`. A selector
  * naming a target of this repository asks about that target alone, and the

@@ -47,14 +47,19 @@ file words the `head` case differently and adds a third source, `flag`
 (`--trunk`). Decide there whether the gate reuses `TRUNK_SOURCE_TEXT` for the
 two shared sources and keeps only the `flag` and CI wording of its own.
 
+A fifth copy sits in `scripts/viewer-release.mjs` (near lines 185-186), the
+viewer's Release view, worded `origin/HEAD` without backticks. The
+verification grep for `this clone has no` catches it, so the task cannot pass
+until that copy is replaced as well.
+
 ## Pre-flight reading
 
 1. `scripts/environments.mjs` — `defaultTrunk()` and `TRUNK_SOURCE_TEXT`
-2. `scripts/show-task.mjs`, `scripts/release-status.mjs` — the local copies
+2. `scripts/show-task.mjs`, `scripts/release-status.mjs`, `scripts/viewer-release.mjs` — the local copies
 
 ## Steps
 
-1. Import `TRUNK_SOURCE_TEXT` in both files and delete the local maps.
+1. Import `TRUNK_SOURCE_TEXT` in all three files and delete the local maps.
 
 ## Acceptance criteria
 
