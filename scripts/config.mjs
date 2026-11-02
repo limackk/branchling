@@ -71,7 +71,7 @@ export const DEFAULTS = Object.freeze({
   // release tracking, as opposed to deployment, which is observed in git
   // (`docs/release-tracking.md` §1). A CLOSED vocabulary, like boards: a
   // misspelt `release:` would otherwise create a release nobody plans and drop
-  // the task silently from `release status --release`. Empty — the default —
+  // the task silently from `deploy status --release`. Empty — the default —
   // means this project plans no releases, and a task naming one FAILS. Order is
   // the project's own; the tool reads no date or sequence from it.
   releases: [],

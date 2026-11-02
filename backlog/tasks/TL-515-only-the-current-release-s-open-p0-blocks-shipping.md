@@ -32,7 +32,7 @@ Only the CURRENT release's open top-priority tasks block the last stage: the ord
 
 Decided 2026-11-02 by the owner. TL-505's `planned-blocker-open` gap counts an open task at the first priority planned for ANY declared release, because releases had no order; so a project shipping 1.0 while planning 1.1 is blocked by a P0 of 1.1 and has to accept the gap wholesale in `release_gate_accept`, which also silences the blockers that matter. An explicit `current_release:` key was rejected: it is a pointer somebody must move after every release, and a forgotten move reads like a fact. The order of a list the project already maintains costs nothing and the current release is derived from it (Law 2).
 
-'Fully shipped' means every task planned for the release that is not dropped (closed in an archived status other than the first) is in full in the last stage of every target it touched; an unknown last stage means not shipped, never shipped. If every release is shipped there is no current release and the gap has nothing to report. Releases after the current one never block. `deploy status --release` (or `release status --release` until the rename task lands) names which release is current.
+'Fully shipped' means every task planned for the release that is not dropped (closed in an archived status other than the first) is in full in the last stage of every target it touched; an unknown last stage means not shipped, never shipped. If every release is shipped there is no current release and the gap has nothing to report. Releases after the current one never block. `deploy status --release` names which release is current.
 
 ## Steps
 

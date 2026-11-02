@@ -57,7 +57,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const COMMAND = N + " show";
 const KNOWN = ["--json"];
 
-/** The wording `release status` uses for where the trunk came from. */
+/** The wording `deploy status` uses for where the trunk came from. */
 const TRUNK_SOURCE_TEXT = {
   "remote-default": "the remote's default branch",
   head: "HEAD — this clone has no `origin/HEAD`",
@@ -172,7 +172,7 @@ function computeDeploy({ root, config, task }) {
   const targets = config.deployTargets;
   if (!targets || !targets.length) return { deploy: null, deployLines: [] };
   const repo = repoRoot(root);
-  // The remote's default branch, as `release status` reads it: on a feature
+  // The remote's default branch, as `deploy status` reads it: on a feature
   // branch `HEAD` holds that branch's own commits, and a task worked there
   // would read as merged.
   const trunk = defaultTrunk(repo);

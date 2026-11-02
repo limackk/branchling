@@ -34,7 +34,7 @@ Decided 2026-11-02 by the owner. TL-507 linked a task to an external target (a t
 
 `target:` takes a value from the names of the targets declared in `deploy_targets` that carry `repository:` — a closed vocabulary drawn from config, like `board:` from boards.yaml — and is a list, because a task may span two external repositories. It is optional; empty means the task belongs to no external target. A value naming a local target (one with paths) fails: a local target is computed from commit paths, and a hand-typed membership would contradict that computation (Law 2). Remove `labels:` from external targets: an external target that still declares it fails with a message naming `target:` on the task, since nothing has been published that uses it.
 
-Everything TL-507 and TL-512 built on the label match — release status's unobservable lane, the gate's exemptions, planned-blocker-open, the viewer's Release view, query --json/--env, show — must read the field instead, through ONE helper so the rule lives in one place.
+Everything TL-507 and TL-512 built on the label match — deploy status's unobservable lane, the gate's exemptions, planned-blocker-open, the viewer's Release view, query --json/--env, show — must read the field instead, through ONE helper so the rule lives in one place.
 
 ## Steps
 

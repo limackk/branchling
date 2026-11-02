@@ -260,7 +260,7 @@ branchling query --env backend/test                    # in test, for one target
 branchling query --text checkout --json                # each task's `deploy` per target and stage
 ```
 
-**What waits for which environment** is one command, `release status`. For each
+**What waits for which environment** is one command, `deploy status`. For each
 target it prints the promotion pipeline as buckets, each holding the tasks
 between two adjacent steps:
 
@@ -298,10 +298,10 @@ web
   SHA, because the answer is only as fresh as the refs it read.
 
 ```bash
-branchling release status                       # every target, every bucket
-branchling release status --env production      # only what waits for production
-branchling release status --target web --count  # counts only, inside a context budget
-branchling release status --json                # the same buckets, kind `release-status`
+branchling deploy status                       # every target, every bucket
+branchling deploy status --env production      # only what waits for production
+branchling deploy status --target web --count  # counts only, inside a context budget
+branchling deploy status --json                # the same buckets, kind `release-status`
 ```
 
 **What a release planned, against what shipped.** A task names the release it
@@ -309,7 +309,7 @@ is planned for in `release:`, a value from the closed `releases:` list in
 config.yaml — the intent, written by a person, as opposed to deployment, which
 is observed. A value outside the list fails `new --release`, `query --release`
 and `check --vocabulary`; an empty list means the project plans no releases.
-`release status --release <name>` compares the plan with the last stage of
+`deploy status --release <name>` compares the plan with the last stage of
 each target:
 
 ```text
@@ -339,7 +339,7 @@ release 2026.11  4 planned · 1 shipped (counted, not listed) · 1 dropped
   with the last stage by definition.
 
 ```bash
-branchling release status --release 2026.11 --count   # counts only
+branchling deploy status --release 2026.11 --count   # counts only
 branchling query --release 2026.11                     # every task planned for it
 branchling query --release ""                          # open tasks planned for none
 ```
@@ -368,7 +368,7 @@ blockers  not blocked — every blocker is closed
   ✓  TASK-9  done  Upload queue persists across restarts
 ```
 
-- **The trunk is chosen as in `release status`**: the remote's default branch,
+- **The trunk is chosen as in `deploy status`**: the remote's default branch,
   else `HEAD`, and the line says which.
 - **A task no commit names says so**, and a target in another repository is
   `unobservable` — neither reads as "deployed nowhere".
@@ -487,7 +487,7 @@ deploy_targets:
   repository's git, so a path would hand this repository's commits to the
   other one, and a stage ref would resolve in the wrong repository and read
   like an answer about the right one.
-- **`release status` gives it a lane of one bucket, `unobservable here`**,
+- **`deploy status` gives it a lane of one bucket, `unobservable here`**,
   naming the repository and listing its tasks with their status — never in a
   stage, never as waiting for one. A closed task of such a target is not
   counted among the closed tasks no commit names. With `--release`, a planned
@@ -498,7 +498,7 @@ deploy_targets:
   repository does hold are judged as always, so a task split across both
   repositories is still judged on this half. The report says how many tasks
   each such target holds, so what was not looked at is named.
-- **`--env`, `--target … --env` and `release record` refuse it**: it has no
+- **`--env`, `--target … --env` and `deploy record` refuse it**: it has no
   stage that can be read or moved here. Reading the other repository's refs is
   deliberately not done.
 - **`query` names it.** In `--json` every task's `deploy` carries
@@ -517,7 +517,7 @@ deploy_targets:
 staged rollout reaching 100%, a customer's installation, a sign-off on the test
 environment: nothing in git moves when they happen, and the tool does not query
 stores, flag systems or CI providers. Declare the stage `recorded: true`, and
-whoever knows — a CI step or a person — calls `release record`:
+whoever knows — a CI step or a person — calls `deploy record`:
 
 ```yaml
 deploy_targets:
@@ -536,10 +536,10 @@ deploy_targets:
 ```
 
 ```bash
-branchling release record --target mobile --stage review mobile-v2.4.0 --reason "approved by the store"
-branchling release record --target mobile --stage rollout mobile-v2.4.0 --reason "staged rollout at 100%"
-branchling release record --target mobile --stage rollout mobile-v2.3.1 --reason "rollout halted: crash on start"
-branchling release record --target server --stage installed --ref acme v1.8.0 --reason "Acme upgraded"
+branchling deploy record --target mobile --stage review mobile-v2.4.0 --reason "approved by the store"
+branchling deploy record --target mobile --stage rollout mobile-v2.4.0 --reason "staged rollout at 100%"
+branchling deploy record --target mobile --stage rollout mobile-v2.3.1 --reason "rollout halted: crash on start"
+branchling deploy record --target server --stage installed --ref acme v1.8.0 --reason "Acme upgraded"
 ```
 
 - **The ref moves onto an annotated tag object** whose tagger is the actor,
@@ -547,7 +547,7 @@ branchling release record --target server --stage installed --ref acme v1.8.0 --
   and the commit the ref stood at before. So a recorded stage is still a git
   ref: every reader sees the commit, `git push` shares it, and `git cat-file
   tag <ref>` reads the record back. No `refs/tags/` entry is created.
-- **`release status` names who recorded each stage, when and why**, under the
+- **`deploy status` names who recorded each stage, when and why**, under the
   ref's line, and in `records` with `--json`.
 - **It prints the push command and never pushes.** Another clone sees the
   record only once its fetch refspec carries `refs/deploys/*`; the output and
@@ -994,7 +994,7 @@ filters. A parameter that is absent from the link means "the default", not
 "keep whatever you had": otherwise a recipient with their own filters would get
 a different set and the link would have lied.
 
-**The Release tab** shows the same answer as `release status`, drawn as a
+**The Release tab** shows the same answer as `deploy status`, drawn as a
 board: one lane per deploy target, and one column per step of its promotion —
 closed but not merged, on the trunk, then each stage from `deploy_targets`. A
 card sits in the last step it has fully reached; a card whose next stage holds
@@ -1108,8 +1108,8 @@ implementation detail. Every reading command answers in the same envelope:
 | `take`, `next` | `task-take` | `ok`, `taken`, `id`, `file`, `task`, `from`, `text`, `decisions`, `probe`, `warnings`, `reclaimed`, `tookOver`, `lock`, `refusalKind`, `refusal`, `details`, and — filled in by next — `passedOver`, `considered`, `searchedStatuses`, `skippedBlocked`, `skippedElsewhere`, `closedElsewhere`, `skippedExecutor`, `skippedHandedBack`, `skippedDeadlocked`, `skippedSize`, `skippedByRecord`, `skippedConflict`, `scan`, `plan` |
 | `handoff` | `task-handoff` | `ok`, `id`, `file`, `task`, `role`, `owner`, `status` (each a from/to pair), `comment`, `released`, `warnings`, `refusalKind`, `refusal`, `details` |
 | `release` | `task-release` | `ok`, `id`, `status`, `owner`, `released`, `comment`, `refusalKind`, `refusal`, `details` |
-| `release status` | `release-status` | `trunk` (the ref whose commits count, its SHA, and whether it is the remote's default branch or HEAD), `scan` (every ref read, with its SHA), `explanation` (why an empty answer is empty), `filter`, `targets` (per target its repository — null unless its code lives in another repository, whose lane is one unobservable bucket — and its buckets in pipeline order — each with its kind, stage, label, count, whether it is unknown and which refs made it so, whether it is listed — the last stage is counted, not listed — and its tasks, each with the status, the day it closed, the wait in days, its state in the stage and the parallel refs holding it), `unplaced` (closed tasks no commit names, other than those of a target in another repository), `release` (with `--release`: the release name, how many tasks it plans, how many shipped — counted, not listed — and five lists, notShipped, open, unplanned, dropped and unobservable, each a count and its tasks; every task carries its status, priority, release, commit count, where it stands per target, and a note such as no-commits, unknown or unobservable. Null without the flag), `records` (per recorded stage ref: who recorded it, when and why) |
-| `release record` | `release-record` | `ok`, `target`, `stage`, `ref`, `commit`, `tag` (the annotated tag object the ref now points at), `previous` (the commit it stood at before, null on the first record), `direction` (first, unchanged, forward, backward or diverged), `actor`, `reason`, `recordedAt`, `remote`, `push` (the command that shares the record — printed, never run), `fetchFix` (the refspec other clones need, null when the remote fetches the ref), `refusalKind`, `refusal`, `details` |
+| `deploy status` | `release-status` | `trunk` (the ref whose commits count, its SHA, and whether it is the remote's default branch or HEAD), `scan` (every ref read, with its SHA), `explanation` (why an empty answer is empty), `filter`, `targets` (per target its repository — null unless its code lives in another repository, whose lane is one unobservable bucket — and its buckets in pipeline order — each with its kind, stage, label, count, whether it is unknown and which refs made it so, whether it is listed — the last stage is counted, not listed — and its tasks, each with the status, the day it closed, the wait in days, its state in the stage and the parallel refs holding it), `unplaced` (closed tasks no commit names, other than those of a target in another repository), `release` (with `--release`: the release name, how many tasks it plans, how many shipped — counted, not listed — and five lists, notShipped, open, unplanned, dropped and unobservable, each a count and its tasks; every task carries its status, priority, release, commit count, where it stands per target, and a note such as no-commits, unknown or unobservable. Null without the flag), `records` (per recorded stage ref: who recorded it, when and why) |
+| `deploy record` | `release-record` | `ok`, `target`, `stage`, `ref`, `commit`, `tag` (the annotated tag object the ref now points at), `previous` (the commit it stood at before, null on the first record), `direction` (first, unchanged, forward, backward or diverged), `actor`, `reason`, `recordedAt`, `remote`, `push` (the command that shares the record — printed, never run), `fetchFix` (the refspec other clones need, null when the remote fetches the ref), `refusalKind`, `refusal`, `details` |
 | `ask` | `task-ask` | `ok`, `id`, `file`, `question` (its event id, timestamp, text and asker), `changes`, `blockedReason`, `refusalKind`, `refusal`, `details` |
 | `done` | `verification-run` | `ok`, `task`, `dryRun`, `closed`, `entries` (one per `verification:` entry, with its exit code), `status`, `wouldBe`, `ticked`, `capability`, `refusalKind`, `refusal`, `details` |
 | `resume` | `resume` | `ok`, `id`, `file`, `actor`, `owner`, `base`, `mergeBase`, `verified` (false under --no-verify: the contract was not re-run, which is not the same as a contract with no entries), `decisions`, `goal`, `history`, `diff` (the merge-base range: what this branch COMMITTED), `uncommitted` (what it left on disk in no commit: a patch of tracked edits, a list of untracked paths, and a reason — a null in any of the three means the working tree could not be read, not that it is clean), `verification` — the parts in the order the briefing fixes them — `refusalKind`, `refusal`, `details` |

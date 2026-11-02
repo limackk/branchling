@@ -1,5 +1,5 @@
 /**
- * `release status` — what waits for which environment (TL-502).
+ * `deploy status` — what waits for which environment (TL-502).
  *
  * WHAT HAS TO BE PROVED, against real fixture repositories, because the claim
  * is about what git and the task files say together:
@@ -83,7 +83,7 @@ function close(dir, id) {
 }
 
 function statusJson(dir, ...args) {
-  const r = run(dir, ["release", "status", "--dir", "backlog", "--json", ...args]);
+  const r = run(dir, ["deploy", "status", "--dir", "backlog", "--json", ...args]);
   assert.equal(r.status, 0, r.stderr);
   const parsed = JSON.parse(r.stdout);
   assert.equal(parsed.kind, "release-status");
@@ -184,7 +184,7 @@ test("a parallel stage places a task only when every ref holds it, and names the
 
 test("the text answer carries the same buckets, prints zero, and names the trunk and every ref", () => {
   const { dir, ids } = pipelineRepo();
-  const r = run(dir, ["release", "status", "--dir", "backlog"]);
+  const r = run(dir, ["deploy", "status", "--dir", "backlog"]);
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /^trunk {2}HEAD [0-9a-f]{12} {2}\(HEAD/m);
   assert.match(r.stdout, /web\/production +prod-us +[0-9a-f]{12}/);
@@ -214,7 +214,7 @@ deploy_targets:
   assert.deepEqual(inTest.unknownRefs, ["origin/production"]);
   assert.deepEqual(inTest.tasks.map((t) => [t.id, t.state]), [[id, "unknown"]]);
   assert.equal(reached.unknown, true);
-  const text = run(dir, ["release", "status", "--dir", "backlog"]);
+  const text = run(dir, ["deploy", "status", "--dir", "backlog"]);
   assert.match(text.stdout, /in test, waiting for production +\? unknown — origin\/production does not resolve/);
   assert.match(text.stdout, /in production +\? unknown/);
 });
@@ -234,7 +234,7 @@ test("--target, --env and --count narrow the answer, and an undeclared name fail
 
   const counted = statusJson(dir, "--count");
   assert.deepEqual(counted.targets[0].buckets.map((b) => [b.count, b.tasks.length]), [[1, 0], [1, 0], [1, 0], [1, 0]]);
-  const text = run(dir, ["release", "status", "--dir", "backlog", "--count"]);
+  const text = run(dir, ["deploy", "status", "--dir", "backlog", "--count"]);
   assert.doesNotMatch(text.stdout, new RegExp(ids.merged));
 
   for (const [args, message] of [
@@ -245,7 +245,7 @@ test("--target, --env and --count narrow the answer, and an undeclared name fail
     [["--frobnicate"], /unknown flag: --frobnicate/],
     [["--env"], /with no value/],
   ]) {
-    const r = run(dir, ["release", "status", "--dir", "backlog", ...args]);
+    const r = run(dir, ["deploy", "status", "--dir", "backlog", ...args]);
     assert.equal(r.status, 2, args.join(" "));
     assert.match(r.stderr, message);
   }
@@ -253,7 +253,7 @@ test("--target, --env and --count narrow the answer, and an undeclared name fail
 
 test("without deploy_targets the command says why the answer is empty, and exits 0", () => {
   const dir = backlogRepo();
-  const r = run(dir, ["release", "status", "--dir", "backlog"]);
+  const r = run(dir, ["deploy", "status", "--dir", "backlog"]);
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /declares no `deploy_targets`/);
   const json = statusJson(dir);
@@ -261,7 +261,7 @@ test("without deploy_targets the command says why the answer is empty, and exits
   assert.deepEqual(json.targets, []);
 });
 
-test("release <ID> still releases: the subcommand word does not take the write path over", () => {
+test("release <ID> still releases: moving the subcommands to deploy left the write path alone", () => {
   const dir = backlogRepo();
   const id = newTask(dir, "Held");
   assert.equal(run(dir, ["take", id, "--dir", "backlog", "--actor", "agent:a"]).status, 0);
@@ -282,7 +282,7 @@ test("the trunk is the remote's default branch, so a feature branch's closed tas
   assert.equal(report.trunk.source, "remote-default");
   assert.equal(report.trunk.sha, git(dir, ["rev-parse", "main"]));
   assert.deepEqual(buckets(report, "web")["closed, not on the trunk"], [ids.branched]);
-  const text = run(dir, ["release", "status", "--dir", "backlog"]);
+  const text = run(dir, ["deploy", "status", "--dir", "backlog"]);
   assert.match(text.stdout, /^trunk {2}refs\/remotes\/origin\/main [0-9a-f]{12} {2}\(the remote's default branch\)/m);
   // The positive control: with no origin/HEAD the fallback is HEAD — and on
   // this branch HEAD holds the task, so it is no longer off the trunk.

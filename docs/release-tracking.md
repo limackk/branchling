@@ -113,11 +113,21 @@ Some stages have no git event: a store approves a build, an update channel
 is promoted, a staged rollout reaches 100%, a customer installs a version,
 somebody signs off a feature on the test environment. Querying
 those systems would make the tool depend on each of them; Law 4 points the
-other way — a callable input. The `release record` command, given a
+other way — a callable input. The `deploy record` command, given a
 target, a stage, a commit or tag and a reason, moves the stage's ref and
 writes an annotated tag object carrying the actor, the time and the reason, so a
 recorded stage is still a ref, is shared by `git push`, and its history is
 inspectable. A CI step or a person calls it; the tool never polls (TL-506).
+
+The two commands are `deploy status` and `deploy record`, not subcommands of
+`release` (decided by the owner on 2026-11-02, TL-513): `release <ID>` already
+returns a claimed task to the queue, and one word naming both that and
+shipping software was an ambiguity, while the configuration key was already
+`deploy_targets`. No alias was kept, because neither old spelling shipped in a
+published version; `release status` and `release record` fail and name the new
+command. `release:` (the release a task is planned for), `releases:`,
+`check --release` and the `--json` kinds `release-status` and `release-record`
+keep their names.
 
 ## 5. How commits are matched to tasks
 
@@ -147,7 +157,7 @@ inspectable. A CI step or a person calls it; the tool never polls (TL-506).
   select its tasks, because those tasks have no commit here whose paths could
   assign them. It may declare neither `paths` nor `stages`, both of which
   would be read against this repository's git. Its tasks are reported as
-  **unobservable**, never as undeployed: `release status` and the viewer give
+  **unobservable**, never as undeployed: `deploy status` and the viewer give
   the target a lane of one bucket naming them, and no gap detector reports
   them on its account — `done-not-on-trunk` and the every-target fallback of
   `planned-blocker-open` skip them, and the gate states how many tasks each

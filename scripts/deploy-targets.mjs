@@ -30,7 +30,7 @@
  * value, without loosening anything else.
  *
  * A RECORDED STAGE (`recorded: true`, TL-506) is one git cannot observe — store
- * review, an update channel, a sign-off — so `release record` moves its ref on
+ * review, an update channel, a sign-off — so `deploy record` moves its ref on
  * somebody's word (`scripts/release-record.mjs`). The tool WRITES that ref, so
  * every ref of such a stage must be one it can write and nothing else moves:
  *

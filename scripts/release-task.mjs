@@ -8,12 +8,7 @@ import { printJson } from "./json-envelope.mjs";
 import { resolveBacklogDir } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { failure } from "./ui.mjs";
-import { run as runStatus } from "./release-status.mjs";
-import { run as runRecord } from "./release-record.mjs";
-
-/** The words after `release` that name a subcommand rather than a task. A task
- *  id always carries its prefix and a number, so such a word is never one. */
-export const RELEASE_SUBCOMMANDS = Object.freeze(["status", "record"]);
+import { DEPLOY_SUBCOMMANDS } from "./deploy-command.mjs";
 
 export const RELEASE_FLAGS = ["--dir", "--actor", "--reason", "--status", "--json"];
 
@@ -28,9 +23,7 @@ export function parseReleaseArgs(args) {
       plan[arg.slice(2)] = value;
       continue;
     }
-    // The subcommand is named in the same line, so a reader of the refusal —
-    // and the guard that reads it — learns that `release status` exists.
-    if (arg.startsWith("-")) throw new Error("unknown flag: " + arg + "\navailable: " + RELEASE_FLAGS.join(" ") + ", " + RELEASE_SUBCOMMANDS.join(", ") + " (subcommand)");
+    if (arg.startsWith("-")) throw new Error("unknown flag: " + arg + "\navailable: " + RELEASE_FLAGS.join(" "));
     if (plan.id) throw new Error("two task ids: " + plan.id + ", " + arg);
     plan.id = arg;
   }
@@ -39,13 +32,21 @@ export function parseReleaseArgs(args) {
   return plan;
 }
 
+/**
+ * The positional word of a `release` line, skipping the values of its flags —
+ * so `--reason status` is a reason and not a misplaced subcommand. PURE.
+ */
+export function releaseSubject(args) {
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === "--json") continue;
+    if (RELEASE_FLAGS.indexOf(arg) >= 0) { i++; continue; }
+    if (!arg.startsWith("-")) return arg;
+  }
+  return null;
+}
+
 export function run(argv) {
-  // `release status` (TL-502) reads where finished work stands; `release <ID>`
-  // writes. One word, two verbs, because the design names the group `release`
-  // (`docs/release-tracking.md`); `release record` (TL-506) writes a stage git
-  // cannot observe.
-  if (argv[0] === "status") return runStatus(argv.slice(1));
-  if (argv[0] === "record") return runRecord(argv.slice(1));
   let plan;
   const wantsJson = argv.includes("--json");
   const refuse = (message, details = [], code = 1, refusalKind = "refused") => {
@@ -53,6 +54,17 @@ export function run(argv) {
     else console.error(failure(N + " release", message, details, [N + " release --help"]));
     return code;
   };
+  // `release` returns a task to the queue and means nothing else (TL-513). The
+  // deployment subcommands moved to `deploy` before any version shipped them,
+  // so there is no alias: a word that would keep working would keep `release`
+  // naming two unrelated acts. It fails as an id that names no task would —
+  // before `--reason` is demanded, which would send the reader the wrong way —
+  // and says where the command went.
+  const subject = releaseSubject(argv);
+  if (subject && DEPLOY_SUBCOMMANDS.indexOf(subject) >= 0) {
+    return refuse("no task " + subject + " — `release` only returns a claimed task to the queue",
+      ["what was `release " + subject + "` is `" + N + " deploy " + subject + "`"], 2, "not-found");
+  }
   try { plan = parseReleaseArgs(argv); }
   catch (e) {
     // The message's SECOND line is the available set, and it belongs in the

@@ -272,7 +272,7 @@ export const KINDS = {
     ok: null, id: null, status: null, owner: null, released: null, comment: null,
     refusalKind: null, refusal: null, details: [],
   },
-  // `release status --json` (TL-502). `trunk` names the ref whose commits count
+  // `deploy status --json` (TL-502). `trunk` names the ref whose commits count
   // and where that choice came from; `scan` every ref read with its SHA, so the
   // answer can be dated; `explanation` why an empty answer is empty. Each
   // target carries its buckets in pipeline order, a bucket whose stage could
@@ -281,7 +281,7 @@ export const KINDS = {
   // scope of `--release <name>` (TL-505), null without the flag. `records`
   // names who recorded each recorded stage, when and why (TL-506).
   "release-status": { trunk: null, scan: null, explanation: null, filter: null, targets: [], unplaced: null, release: null, records: [] },
-  // `release record --json` (TL-506). `tag` is the annotated tag object the
+  // `deploy record --json` (TL-506). `tag` is the annotated tag object the
   // ref now points at; `previous` the commit it stood at before, null on the
   // first record; `direction` one of first, unchanged, forward, backward,
   // diverged. `push` is the command that shares the record — it is printed,
@@ -526,12 +526,12 @@ export const KIND_EXERCISE = {
     args: ["handoff", ABSENT_TASK, "--to-owner", "unassigned", "--reason", "a fixture", "--actor", "agent:test", "--json"],
     refuses: true, writes: true,
   },
-  "release-status": { args: ["release", "status", "--json"] },
+  "release-status": { args: ["deploy", "status", "--json"] },
   // The fixture declares no `deploy_targets`, so this is the refusal path: an
   // undeclared target. It is reached only after the reason and the actor pass,
   // so both are given; nothing is written.
   "release-record": {
-    args: ["release", "record", "--target", "web", "--stage", "production", "HEAD", "--actor", "agent:test", "--reason", "a fixture", "--json"],
+    args: ["deploy", "record", "--target", "web", "--stage", "production", "HEAD", "--actor", "agent:test", "--reason", "a fixture", "--json"],
     refuses: true, writes: true,
   },
   "task-release": {

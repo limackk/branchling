@@ -15,7 +15,7 @@
  *   2. With `repository:` and `labels:` declared, neither is reported; the
  *      gate names the target and how many tasks it holds instead, and tasks
  *      that are NOT the frontend's are still reported in the same run.
- *   3. `release status` names the frontend's tasks in a lane of one
+ *   3. `deploy status` names the frontend's tasks in a lane of one
  *      `unobservable` bucket, keeps them out of the "named by no commit" note,
  *      and `--release` lists a planned one as unobservable rather than as not
  *      shipped. The viewer's Release view draws the same lane.
@@ -174,7 +174,7 @@ function subjects(report, gap) {
 }
 
 function statusJson(dir, ...args) {
-  const r = run(dir, ["release", "status", "--dir", "backlog", "--json", ...args]);
+  const r = run(dir, ["deploy", "status", "--dir", "backlog", "--json", ...args]);
   assert.equal(r.status, 0, r.stderr);
   const parsed = JSON.parse(r.stdout);
   assert.equal(parsed.kind, "release-status");
@@ -218,7 +218,7 @@ test("the gate's text names what it did not look at", () => {
   assert.match(r.stdout, /frontend: deployed from the repository `acme-frontend`, which this one cannot observe — 3 task\(s\)/);
 });
 
-test("release status names the frontend's tasks as unobservable, in their own lane", () => {
+test("deploy status names the frontend's tasks as unobservable, in their own lane", () => {
   setConfig(fx.dir, API + FRONTEND);
   const data = statusJson(fx.dir);
   const lane = data.targets.find((t) => t.target === "frontend");
@@ -235,7 +235,7 @@ test("release status names the frontend's tasks as unobservable, in their own la
     assert.ok(![fx.ids.feDone, fx.ids.feOpen].includes(t.id), t.id + " is in an api bucket");
   }
 
-  const text = run(fx.dir, ["release", "status", "--dir", "backlog"]);
+  const text = run(fx.dir, ["deploy", "status", "--dir", "backlog"]);
   assert.equal(text.status, 0, text.stderr);
   assert.match(text.stdout, /frontend {2}deployed from the repository `acme-frontend`/);
   assert.match(text.stdout, /unobservable here {2}2/);
@@ -260,16 +260,16 @@ test("--release lists a planned frontend task as unobservable, not as not shippe
 
 test("a target in another repository has no stage to select or record", () => {
   setConfig(fx.dir, API + FRONTEND);
-  const env = run(fx.dir, ["release", "status", "--dir", "backlog", "--target", "frontend", "--env", "production"]);
+  const env = run(fx.dir, ["deploy", "status", "--dir", "backlog", "--target", "frontend", "--env", "production"]);
   assert.equal(env.status, 2);
   assert.match(env.stderr, /deployed from the repository `acme-frontend`/);
   const q = run(fx.dir, ["query", "--dir", "backlog", "--env", "frontend/production"]);
   assert.equal(q.status, 2, q.stdout);
-  const rec = run(fx.dir, ["release", "record", "--dir", "backlog", "--target", "frontend", "--stage", "production", "HEAD", "--reason", "shipped"]);
+  const rec = run(fx.dir, ["deploy", "record", "--dir", "backlog", "--target", "frontend", "--stage", "production", "HEAD", "--reason", "shipped"]);
   assert.notEqual(rec.status, 0);
   assert.match(rec.stderr, /acme-frontend/);
   // Positive control: the api target's stage is still selectable.
-  assert.equal(run(fx.dir, ["release", "status", "--dir", "backlog", "--env", "api/production"]).status, 0);
+  assert.equal(run(fx.dir, ["deploy", "status", "--dir", "backlog", "--env", "api/production"]).status, 0);
 });
 
 test("the viewer's Release view draws the frontend as one unobservable column", () => {
@@ -297,7 +297,7 @@ test("a project whose every target lives elsewhere still names its tasks", () =>
   assert.equal(data.scan.reason, "only-external-targets");
   assert.deepEqual(data.targets.map((t) => t.target), ["frontend"]);
   assert.equal(data.targets[0].buckets[0].count, 2);
-  const text = run(fx.dir, ["release", "status", "--dir", "backlog"]);
+  const text = run(fx.dir, ["deploy", "status", "--dir", "backlog"]);
   assert.equal(text.status, 0, text.stderr);
   assert.match(text.stdout, /every deploy target declares `repository:`/);
   assert.match(text.stdout, /unobservable here {2}2/);
@@ -368,12 +368,12 @@ test("under a closed label vocabulary, a target's label outside it fails the con
     .replace(/^labels:.*$/m, "labels: [frontend]")
     .replace(/^labels_closed:.*$/m, "labels_closed: true");
   writeFileSync(file, text + "\ndeploy_targets:\n  - name: frontend\n    repository: acme-frontend\n    labels: [frontned]\n", "utf8");
-  const bad = run(dir, ["release", "status", "--dir", "backlog"]);
+  const bad = run(dir, ["deploy", "status", "--dir", "backlog"]);
   assert.notEqual(bad.status, 0);
   assert.match(bad.stderr + bad.stdout, /selects the label `frontned`, which is outside the closed `labels` vocabulary/);
   // Positive control: the declared label passes.
   writeFileSync(file, text + "\ndeploy_targets:\n  - name: frontend\n    repository: acme-frontend\n    labels: [frontend]\n", "utf8");
-  const good = run(dir, ["release", "status", "--dir", "backlog"]);
+  const good = run(dir, ["deploy", "status", "--dir", "backlog"]);
   assert.equal(good.status, 0, good.stderr);
 });
 

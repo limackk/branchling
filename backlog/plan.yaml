@@ -72,7 +72,7 @@ waves:
   - name: "Deploy stages are computed from git"
     tasks: [TL-501]
 
-  # Three readers of the same computation that touch different commands: release status, check --release and doctor. They run side by side.
+  # Three readers of the same computation that touch different commands: deploy status, check --release and doctor. They run side by side.
   - name: "The report, the gate and the fetch check"
     tasks: [TL-502, TL-503, TL-508]
 

@@ -7,8 +7,8 @@ board: main
 epic: "Release tracking across environments"
 release: ""                        # the release it is PLANNED for (a value from `releases:` in config.yaml). Empty = none
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 conflict_group: []                 # the AREA it touches (e.g. a module): `next` and `run` hold it back while a task of the same group is in progress. Empty = `conflict_group_from`, or none
@@ -38,6 +38,8 @@ Rename the COMMAND WORDS only. The module files (scripts/release-status.mjs, scr
 
 After the change `release status` and `release record` fail as an unknown task id would, with a hint pointing at `deploy`.
 
+Deliberately left for the merge of this wave: the comment in scripts/environments.mjs near line 337 still says `release status`. TL-517 edits that file in parallel, so changing one comment here would only manufacture a conflict; whoever merges TL-513 and TL-517 changes it to `deploy status` then.
+
 ## Steps
 
 1. Add a `deploy` command to the command table in scripts/cli.mjs with `status` and `record` subcommands, routed to the existing modules; remove those subcommands from `release`.
@@ -46,5 +48,5 @@ After the change `release status` and `release record` fail as an unknown task i
 
 ## Acceptance criteria
 
-- [ ] `deploy status` and `deploy record` answer as `release status` and `release record` did, `release <ID>` still returns a task, and the old subcommand words fail with a hint naming `deploy`. [proof: deploy-command]
-- [ ] No other test or documented invocation still uses the old words. [proof: suite]
+- [x] `deploy status` and `deploy record` answer as `release status` and `release record` did, `release <ID>` still returns a task, and the old subcommand words fail with a hint naming `deploy`. [proof: deploy-command]
+- [x] No other test or documented invocation still uses the old words. [proof: suite]

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * `release record` — a deployment stage git cannot observe, recorded as a ref
+ * `deploy record` — a deployment stage git cannot observe, recorded as a ref
  * (TL-506).
  *
  * WHAT IT IS FOR. Some stages have no git event: a store approves a build, an
@@ -64,7 +64,7 @@ const VALUE_FLAGS = ["--target", "--stage", "--ref", "--reason", "--actor"];
 /** The directions a record can move a ref, named in the output. */
 export const DIRECTIONS = Object.freeze(["first", "unchanged", "forward", "backward", "diverged"]);
 
-/** The trailer keys of the tag message. A frozen format: `release status` and
+/** The trailer keys of the tag message. A frozen format: `deploy status` and
  *  anybody's `git cat-file tag` read them back. */
 const TRAILER = Object.freeze({
   reason: "Reason", actor: "Actor", target: "Target", stage: "Stage",
@@ -274,7 +274,7 @@ export function recordStage({ root, selection, commitArg, actor, reason, now = D
   if (!tag) return no("git could not write the tag object", [String(made.stderr || "").trim()].filter(Boolean));
   // Compare-and-swap: the ref must still be what it was when the direction was
   // judged. An empty old value means "must not exist yet".
-  const moved = git(run, root, ["update-ref", "-m", N + " release record: " + reason, ref, tag, oldObject || ""]);
+  const moved = git(run, root, ["update-ref", "-m", N + " deploy record: " + reason, ref, tag, oldObject || ""]);
   if (moved.status !== 0) {
     return no("`" + ref + "` moved while this record was being written — nothing was changed", [String(moved.stderr || "").trim()].filter(Boolean));
   }
@@ -300,7 +300,7 @@ export function recordStage({ root, selection, commitArg, actor, reason, now = D
 }
 
 export function run(argv) {
-  const cmd = N + " release record";
+  const cmd = N + " deploy record";
   const dirFlag = takeDirFlag(argv);
   const wantsJson = dirFlag.argv.includes("--json");
   const refuse = (message, details, code, kind) => {

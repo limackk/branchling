@@ -1,5 +1,5 @@
 /**
- * `release record` — a deployment stage git cannot observe, recorded as a ref
+ * `deploy record` — a deployment stage git cannot observe, recorded as a ref
  * (TL-506).
  *
  * WHAT HAS TO BE PROVED, against real fixture repositories, because the claim
@@ -15,7 +15,7 @@
  *      reason; a backwards move is accepted and named, and the tag says where
  *      the ref stood before.
  *   5. A stage of parallel refs needs `--ref`.
- *   6. `release status` shows who recorded a stage, when and why.
+ *   6. `deploy status` shows who recorded a stage, when and why.
  *   7. The record prints the push command, and the ref it wrote is one the
  *      fetch-refspec row of `doctor` (TL-508) judges.
  *
@@ -32,7 +32,7 @@ import { join } from "node:path";
 import { readDeployTargets } from "../deploy-targets.mjs";
 import { declaredForeignRefs } from "../deploy-fetch.mjs";
 import { parseRecordArgs, parseRecordTag, recordTagObject, selectRecordedRef } from "../release-record.mjs";
-import { RELEASE_SUBCOMMANDS } from "../release-task.mjs";
+import { DEPLOY_SUBCOMMANDS } from "../deploy-command.mjs";
 
 import { SCRIPTS_DIR, isolateHome } from "./_repo.mjs";
 
@@ -91,7 +91,7 @@ function recordRepo(dir = null) {
 }
 
 function record(dir, ...args) {
-  return run(dir, ["release", "record", "--dir", "backlog", "--actor", ACTOR, "--json", ...args]);
+  return run(dir, ["deploy", "record", "--dir", "backlog", "--actor", ACTOR, "--json", ...args]);
 }
 
 function recordOk(dir, ...args) {
@@ -153,11 +153,11 @@ test("every ref a recorded stage may declare is one the doctor's fetch-refspec r
 
 // ── 2. What may be recorded ──────────────────────────────────────────────
 
-test("`record` is a subcommand of `release`, never read as a task id", () => {
-  assert.ok(RELEASE_SUBCOMMANDS.includes("record"));
-  const r = run(tmpdir(), ["release", "--frobnicate"]);
+test("`record` is a subcommand of `deploy`, and its flags are its own", () => {
+  assert.ok(DEPLOY_SUBCOMMANDS.includes("record"));
+  const r = run(tmpdir(), ["deploy", "--frobnicate"]);
   assert.equal(r.status, 2);
-  assert.match(r.stderr, /record \(subcommand\)|status, record/);
+  assert.match(r.stderr, /available: status, record/);
   assert.throws(() => parseRecordArgs(["--stage", "s", "abc"]), /`--target` is required/);
   assert.throws(() => parseRecordArgs(["--target", "t", "--stage", "s"]), /no commit or tag/);
   assert.throws(() => parseRecordArgs(["--target", "t", "--stage", "s", "a", "b"]), /two commits/);
@@ -240,7 +240,7 @@ test("the ref points at an annotated tag object with actor, time and reason; a b
   assert.equal(backRec.reason, "rollout halted, crash on start");
 
   // The text answer names the direction too.
-  const text = run(dir, ["release", "record", "--dir", "backlog", "--actor", ACTOR, "--target", "app", "--stage", "review", "--reason", "re-approved", c2]);
+  const text = run(dir, ["deploy", "record", "--dir", "backlog", "--actor", ACTOR, "--target", "app", "--stage", "review", "--reason", "re-approved", c2]);
   assert.equal(text.status, 0, text.stderr);
   assert.match(text.stdout, /app\/review recorded at [0-9a-f]{12} \(forward from [0-9a-f]{12}\)/);
   assert.match(text.stdout, /reason: re-approved/);
@@ -275,25 +275,25 @@ test("a stage of parallel refs needs `--ref`, which moves exactly one of them", 
   assert.equal(sel.previous.name, "tagged");
 });
 
-// ── 6. release status ────────────────────────────────────────────────────
+// ── 6. deploy status ────────────────────────────────────────────────────
 
-test("`release status` names who recorded a stage, when and why", () => {
+test("`deploy status` names who recorded a stage, when and why", () => {
   const { dir, c1 } = recordRepo();
   const rec = recordOk(dir, "--target", "app", "--stage", "review", "--reason", "store approved build 1", c1);
-  const r = run(dir, ["release", "status", "--dir", "backlog", "--json"]);
+  const r = run(dir, ["deploy", "status", "--dir", "backlog", "--json"]);
   assert.equal(r.status, 0, r.stderr);
   const report = JSON.parse(r.stdout);
   assert.deepEqual(report.records, [{
     target: "app", stage: "review", spec: "refs/deploys/app/review", sha: c1,
     actor: ACTOR, at: rec.recordedAt, reason: "store approved build 1",
   }]);
-  const text = run(dir, ["release", "status", "--dir", "backlog"]);
+  const text = run(dir, ["deploy", "status", "--dir", "backlog"]);
   assert.equal(text.status, 0, text.stderr);
   assert.match(text.stdout, new RegExp("recorded by " + ACTOR + " at " + rec.recordedAt.replace(/[.]/g, "\\.") + " — store approved build 1"));
   // A ref of a recorded stage moved by something else carries no record and is
   // not described as one.
   git(dir, ["update-ref", "refs/deploys/app/review", c1]);
-  const plain = JSON.parse(run(dir, ["release", "status", "--dir", "backlog", "--json"]).stdout);
+  const plain = JSON.parse(run(dir, ["deploy", "status", "--dir", "backlog", "--json"]).stdout);
   assert.deepEqual(plain.records, []);
 });
 

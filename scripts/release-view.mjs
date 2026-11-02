@@ -8,7 +8,7 @@
  * where a partial deployment shows. The page narrows and draws this with
  * `viewer-release.mjs`; this module only reads git.
  *
- * NOTHING HERE IS A SECOND DEFINITION. The buckets are the ones `release
+ * NOTHING HERE IS A SECOND DEFINITION. The buckets are the ones `deploy
  * status` prints (`computeStatus()` in release-status.mjs): the column "in S"
  * is that command's bucket "in S, waiting for the next stage", the trunk column
  * is "on the trunk, waiting for the first stage", and the last stage is its

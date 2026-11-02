@@ -4,7 +4,7 @@
  * WHAT HAS TO BE PROVED, against real fixture repositories, because the claim
  * is about what the task files PLAN and what git HOLDS, together:
  *
- *   1. `release status --release <name>` reports both directions: planned tasks
+ *   1. `deploy status --release <name>` reports both directions: planned tasks
  *      not yet in the last stage (a task with no commit among them), and tasks
  *      the next promotion carries that the release did not plan. Planned tasks
  *      still open and planned tasks dropped are listed; shipped ones counted.
@@ -135,7 +135,7 @@ function scopeRepo() {
 }
 
 function scopeJson(dir, ...args) {
-  const r = run(dir, ["release", "status", "--dir", "backlog", "--json", "--release", "r1", ...args]);
+  const r = run(dir, ["deploy", "status", "--dir", "backlog", "--json", "--release", "r1", ...args]);
   assert.equal(r.status, 0, r.stderr);
   const parsed = JSON.parse(r.stdout);
   assert.equal(parsed.kind, "release-status");
@@ -168,7 +168,7 @@ test("planned-but-undeployed and deployed-but-unplanned tasks are both reported"
 
   // The positive control on the other release: what was unplanned for r1 is
   // planned for r2, and r1's planned work is unplanned there.
-  const r2 = JSON.parse(run(dir, ["release", "status", "--dir", "backlog", "--json", "--release", "r2"]).stdout).release;
+  const r2 = JSON.parse(run(dir, ["deploy", "status", "--dir", "backlog", "--json", "--release", "r2"]).stdout).release;
   assert.deepEqual(ids(r2.notShipped), [t.other]);
   assert.deepEqual(ids(r2.unplanned), [t.staged, t.rider]);
 
@@ -183,7 +183,7 @@ test("planned-but-undeployed and deployed-but-unplanned tasks are both reported"
 
 test("the text answer names every list, where each task stands, and counts what shipped", () => {
   const { dir, ids: t } = scopeRepo();
-  const r = run(dir, ["release", "status", "--dir", "backlog", "--release", "r1"]);
+  const r = run(dir, ["deploy", "status", "--dir", "backlog", "--release", "r1"]);
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /^trunk {2}HEAD [0-9a-f]{12}/m);
   assert.match(r.stdout, /release r1 {2}4 planned · 1 shipped \(counted, not listed\) · 1 dropped/);
@@ -214,19 +214,19 @@ test("--count keeps the counts, --target narrows, and an unresolved last stage i
 
 // ── 2. An undeclared release fails everywhere ───────────────────────────
 
-test("release status refuses an undeclared release, a backlog with none, and --env beside it", () => {
+test("deploy status refuses an undeclared release, a backlog with none, and --env beside it", () => {
   const { dir } = scopeRepo();
   for (const [args, message] of [
     [["--release", "r9"], /`r9` is not a declared release \(declared: r1, r2\)/],
     [["--release", "r1", "--env", "test"], /compares the plan with the LAST stage/],
     [["--release"], /with no value/],
   ]) {
-    const r = run(dir, ["release", "status", "--dir", "backlog", ...args]);
+    const r = run(dir, ["deploy", "status", "--dir", "backlog", ...args]);
     assert.equal(r.status, 2, args.join(" "));
     assert.match(r.stderr, message);
   }
   const none = backlogRepo(TARGETS);
-  const r = run(none, ["release", "status", "--dir", "backlog", "--release", "r1"]);
+  const r = run(none, ["deploy", "status", "--dir", "backlog", "--release", "r1"]);
   assert.equal(r.status, 2);
   assert.match(r.stderr, /declares no `releases`/);
   assert.equal(checkReleaseFlag({ release: "r1", env: null }, ["r1"]).ok, true);

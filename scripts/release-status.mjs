@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * `release status` — what waits for which environment (TL-502).
+ * `deploy status` — what waits for which environment (TL-502).
  *
  * WHAT IT ANSWERS. For every deploy target, the promotion pipeline as a row of
  * buckets, each holding the tasks that stand between two adjacent steps:
@@ -73,7 +73,7 @@
  * unless a target of THIS repository it touched still lacks it — that half is
  * observed, and is a blocker like any other.
  *
- * A RECORDED STAGE (TL-506) is a ref `release record` moved onto an annotated
+ * A RECORDED STAGE (TL-506) is a ref `deploy record` moved onto an annotated
  * tag. The report names who recorded it, when and why (`records`), because a
  * stage moved on somebody's word is only as good as the word.
  *
@@ -117,7 +117,7 @@ function git(run, root, args) {
   });
 }
 
-/** PURE — the flags of `release status`. Throws with the available set on the
+/** PURE — the flags of `deploy status`. Throws with the available set on the
  *  second line, which is the shape `refusal()` prints. */
 export function parseStatusArgs(argv) {
   const opts = { target: null, env: null, release: null, count: false, json: false };
@@ -760,7 +760,7 @@ function scopeRecord(m) {
 }
 
 export function run(argv) {
-  const cmd = N + " release status";
+  const cmd = N + " deploy status";
   const dirFlag = takeDirFlag(argv);
   const wantsJson = dirFlag.argv.includes("--json");
   let opts;
