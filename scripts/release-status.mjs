@@ -102,7 +102,7 @@ import { fileURLToPath } from "node:url";
 import { loadConfigOrExit } from "./config.mjs";
 import { externalTargetsOf, isExternalTarget, observedTargets, pathInTarget } from "./deploy-targets.mjs";
 import {
-  defaultTrunk, deploymentScanJson, deploymentState, explain, parseStageSelector,
+  TRUNK_SOURCE_TEXT, defaultTrunk, deploymentScanJson, deploymentState, explain, parseStageSelector,
   parseTrunkLog, taskDeployment, trunkLogArgs,
 } from "./environments.mjs";
 import { gitDiscoveryEnv } from "./git-env.mjs";
@@ -783,11 +783,6 @@ function readRecords({ run, root, targets, refs }) {
 }
 
 function shortSha(sha) { return sha ? sha.slice(0, 12) : null; }
-
-const TRUNK_SOURCE_TEXT = {
-  "remote-default": "the remote's default branch",
-  head: "HEAD — this clone has no `origin/HEAD`",
-};
 
 /** The text answer. */
 export function renderStatus(report, paint = color) {

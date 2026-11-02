@@ -30,6 +30,7 @@ import vm from "node:vm";
 
 import { buildHtml, computeStats, readTasks } from "../build-viewer.mjs";
 import { loadConfig } from "../config.mjs";
+import { TRUNK_SOURCE_TEXT } from "../environments.mjs";
 import { releaseViewData } from "../release-view.mjs";
 import {
   CLOSED_COLUMN, RELEASE_FOLD_AT, TRUNK_COLUMN, encodeReleaseHash, isReleaseHash,
@@ -307,6 +308,26 @@ test("the board and filters narrow the cards, and say how many they hid", () => 
   // Not narrowed: every card, with its title from the task file.
   const all = releaseViewModel(data, { tasks, visible: null });
   assert.equal(all.lanes[0].columns.find((c) => c.key === "test").cards[0].title, "Task halfway");
+});
+
+test("the trunk's source travels with the data in the one shared wording, and its code span renders as code", () => {
+  const { backlog, dir } = pipelineRepo();
+  const head = dataFor(backlog);
+  assert.equal(head.trunk.source, "head");
+  assert.equal(head.trunk.sourceText, TRUNK_SOURCE_TEXT.head);
+  // The wording carries a backtick span; the page draws it as code, never as
+  // a literal backtick. The control: the shared text really has one.
+  assert.match(TRUNK_SOURCE_TEXT.head, /`origin\/HEAD`/);
+  const html = renderRelease(releaseViewModel(head, {}));
+  const trunk = html.match(/<p class="rel-trunk">.*?<\/p>/)[0];
+  assert.match(trunk, /— HEAD — this clone has no <code>origin\/HEAD<\/code><\/p>$/);
+  assert.doesNotMatch(trunk, /`/);
+
+  git(dir, ["update-ref", "refs/remotes/origin/main", "main"]);
+  git(dir, ["symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"]);
+  const remote = dataFor(backlog);
+  assert.equal(remote.trunk.sourceText, TRUNK_SOURCE_TEXT["remote-default"]);
+  assert.equal(releaseViewModel(remote, {}).trunk.source, TRUNK_SOURCE_TEXT["remote-default"]);
 });
 
 test("a long column is folded, and a short one is not", () => {

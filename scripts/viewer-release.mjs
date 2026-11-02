@@ -48,6 +48,11 @@ export const RELEASE_HASH_ROUTE = "release";
 export const RELEASE_FOLD_AT = 12;
 
 /** HTML escaping, local on purpose: see WHAT MAY BE IMPORTED above. */
+/** Escaped text whose `backtick spans` render as code, as in the terminal. */
+function relCodeSpans(s) {
+  return relEsc(s).replace(/`([^`]+)`/g, "<code>$1</code>");
+}
+
 function relEsc(s) {
   return String(s == null ? "" : s)
     .replace(/&/g, "&amp;")
@@ -181,11 +186,6 @@ function columnHint(col, lastStage) {
   return "in full here, not yet in full in the next stage";
 }
 
-const TRUNK_SOURCE = {
-  "remote-default": "the remote's default branch",
-  head: "HEAD — this clone has no origin/HEAD",
-};
-
 /**
  * PURE — the view model.
  *
@@ -216,7 +216,7 @@ export function releaseViewModel(data, opts = {}) {
     age: Number.isFinite(builtMs) ? releaseAgeLabel(now - builtMs) : null,
     trunk: data && data.trunk ? {
       spec: data.trunk.spec, sha: data.trunk.sha, short: relShort(data.trunk.sha),
-      source: TRUNK_SOURCE[data.trunk.source] || data.trunk.source,
+      source: data.trunk.sourceText || data.trunk.source,
     } : null,
     refs: ((data && data.refs) || []).map((r) => ({ ...r, short: relShort(r.sha) })),
     narrowed: visible !== null,
@@ -362,7 +362,7 @@ export function renderRelease(vm) {
   if (vm.explanation) head.push('<p class="rel-unknown">' + relEsc(vm.explanation) + "</p>");
   if (vm.trunk) {
     head.push('<p class="rel-trunk">Trunk <code>' + relEsc(vm.trunk.spec) + "</code> " +
-      (vm.trunk.short ? '<code class="rel-sha">' + relEsc(vm.trunk.short) + "</code>" : "unresolved") + " — " + relEsc(vm.trunk.source) + "</p>");
+      (vm.trunk.short ? '<code class="rel-sha">' + relEsc(vm.trunk.short) + "</code>" : "unresolved") + " — " + relCodeSpans(vm.trunk.source) + "</p>");
   }
   if (vm.planned.length) {
     head.push('<p class="rel-hint" data-release-planned>Planned for ' + vm.planned.map((r) => "<strong>" + relEsc(r) + "</strong>").join(" or ") +

@@ -27,7 +27,7 @@ import { appendFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writ
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { defaultTrunk } from "../environments.mjs";
+import { TRUNK_SOURCE_TEXT, defaultTrunk } from "../environments.mjs";
 import { parseStatusArgs, releasePipeline, resolveFilter } from "../release-status.mjs";
 
 import { SCRIPTS_DIR, isolateHome } from "./_repo.mjs";
@@ -36,6 +36,10 @@ isolateHome("release-status");
 
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
 let counter = 0;
+
+function escapeRe(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 function git(dir, args, env = {}) {
   return execFileSync("git", args, { cwd: dir, encoding: "utf8", env: { ...process.env, ...env } }).trim();
@@ -289,6 +293,31 @@ test("the trunk is the remote's default branch, so a feature branch's closed tas
   git(dir, ["symbolic-ref", "--delete", "refs/remotes/origin/HEAD"]);
   assert.deepEqual(defaultTrunk(dir), { spec: "HEAD", source: "head" });
   assert.deepEqual(buckets(statusJson(dir), "web")["closed, not on the trunk"], []);
+});
+
+test("deploy status words the trunk's source from the one shared map, for both sources", () => {
+  const { dir } = pipelineRepo();
+  const line = (source) => new RegExp("^trunk {2}\\S+ [0-9a-f]{12} {2}\\(" + escapeRe(TRUNK_SOURCE_TEXT[source]) + "\\)$", "m");
+  assert.match(run(dir, ["deploy", "status", "--dir", "backlog"]).stdout, line("head"));
+  git(dir, ["update-ref", "refs/remotes/origin/main", "main"]);
+  git(dir, ["symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"]);
+  assert.match(run(dir, ["deploy", "status", "--dir", "backlog"]).stdout, line("remote-default"));
+});
+
+/**
+ * TL-518. Three readers once kept a private copy of this wording and one had
+ * already drifted (the viewer's lacked its backticks). The scan is the guard;
+ * environments.mjs, which must match, is its positive control — a pattern that
+ * matched nothing anywhere would pass on every tree.
+ */
+test("no script but environments.mjs defines the wording of the trunk's source", () => {
+  const signatures = [/this clone has no/, /["']the remote's default branch["']/];
+  const owners = readdirSync(SCRIPTS_DIR).filter((f) => f.endsWith(".mjs"))
+    .filter((f) => signatures.some((re) => re.test(readFileSync(join(SCRIPTS_DIR, f), "utf8"))));
+  assert.deepEqual(owners, ["environments.mjs"]);
+  const source = readFileSync(join(SCRIPTS_DIR, "environments.mjs"), "utf8");
+  for (const re of signatures) assert.match(source, re);
+  for (const text of Object.values(TRUNK_SOURCE_TEXT)) assert.ok(source.includes(text), text);
 });
 
 // ── 6. How long it has waited ─────────────────────────────────────────────
