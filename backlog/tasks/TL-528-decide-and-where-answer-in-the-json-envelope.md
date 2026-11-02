@@ -31,7 +31,7 @@ verification:
 
 ## Context
 
-scripts/decide-task.mjs prints `JSON.stringify(decideJson(result), null, 2)` (around line 477) and `where --json` prints a bare object with `home`, `homeSource`, `config`, `data`; neither carries `schemaVersion` or `kind`, and neither kind is declared in scripts/json-envelope.mjs. docs/external-consumers.md (TL-525) lists both under 'Outside the envelope today' and its writing-commands table marks `decide` as 'none (bare object)'. Moving a bare object into the envelope changes its root shape, so the change has to be stated as such for any consumer already reading it.
+scripts/decide-task.mjs prints `JSON.stringify(decideJson(result), null, 2)` (around line 477) and `where --json` prints a bare object with `home`, `homeSource`, `config`, `data`; neither carries `schemaVersion` or `kind`, and neither kind is declared in scripts/json-envelope.mjs. docs/external-consumers.md (TL-525) lists both under 'Outside the envelope today' and its writing-commands table marks `decide` as 'none (bare object)'. Moving a bare object into the envelope changes its root shape, so the change has to be stated as such for any consumer already reading it. Two more differences a consumer meets today (found by branchling-ui UI-23 against 7d76538 and still true at 86b6209): a decide refusal puts its kind in `kind` rather than `refusalKind`/`refusal`, and an unknown task exits 2 where other refusals exit 1; the envelope should carry the refusal the way every other command does, with exit 1. Who recorded the answer and any-text answers are TL-537.
 
 ## Steps
 
