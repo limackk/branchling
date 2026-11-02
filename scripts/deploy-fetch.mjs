@@ -85,14 +85,8 @@ export function refNamespace(spec) {
  * PURE — the declared ref specs a fetch refspec has to carry: every ref of every
  * stage that is a full `refs/…` name outside git's own namespaces.
  *
- * A SHORT NAME IS NOT JUDGED, and that is a limitation, not a proof. git's
- * rev-parse, which resolves a stage, tries `refs/<name>` before tags, heads and
- * remotes, so a stage declared as `deploys/web/production` resolves to
- * `refs/deploys/web/production` wherever that ref exists — and in a clone where
- * it does not, nothing tells `origin/main` (a remote-tracking branch) apart from
- * `deploys/web/production` (a ref no default refspec fetches). This check
- * assumes a short name lives in git's own namespaces and shows no row for it.
- * Declare a deploy ref by its full `refs/…` name to have it checked.
+ * A short name is not judged HERE, because what it means depends on the refs of
+ * the clone it is read in: see `declaredShortRefs` and `classifyShortRef`.
  *
  * @returns {{target: string, stage: string, spec: string, namespace: string|null}[]}
  */
@@ -108,6 +102,73 @@ export function declaredForeignRefs(targets) {
     }
   }
   return out;
+}
+
+/**
+ * PURE — every declared ref written as a short name (no `refs/` prefix). A glob
+ * cannot be one: validation requires a glob to be a full name.
+ *
+ * @returns {{target: string, stage: string, spec: string}[]}
+ */
+export function declaredShortRefs(targets) {
+  const out = [];
+  for (const t of targets || []) {
+    for (const s of t.stages || []) {
+      for (const spec of s.refs || []) {
+        if (spec.startsWith("refs/") || isGlob(spec)) continue;
+        out.push({ target: t.name, stage: s.name, spec });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * PURE — what a short name means in a clone whose refs are `refs` and whose
+ * remotes are `remotes` (TL-510).
+ *
+ * THE GAP. git's rev-parse, which resolves a stage, tries `refs/<name>` before
+ * tags, heads and remotes. So `deploys/web/production` reads
+ * `refs/deploys/web/production` in the clone that has that ref, and resolves to
+ * nothing in a fresh one, where nothing tells it apart from a remote-tracking
+ * branch like `origin/main`. Skipping every short name would let exactly the
+ * stage this check exists for pass unnoticed.
+ *
+ * WHY HERE AND NOT IN VALIDATION. Validation reads `config.yaml` only, and the
+ * same text — `origin/main`, `deploys/web/production` — is a remote-tracking
+ * branch in one repository and a deploy ref in another. Only the clone can say
+ * which, so the question is asked where the clone is: in `doctor`. Asking the
+ * remote (`git ls-remote`) was rejected for the reason fetching was: a read that
+ * contacts the network.
+ *
+ *   - "git":        the first candidate in git's order lies in git's own
+ *                   namespaces, or none exists and the first component names a
+ *                   remote — a remote-tracking branch the default refspec
+ *                   writes on fetch. Nothing to check.
+ *   - "foreign":    the first existing candidate is a ref outside git's own
+ *                   namespaces; `full` is its name, judged like a declared
+ *                   full name.
+ *   - "unresolved": no candidate exists and the first component is not a
+ *                   remote. It reads as unknown here, and this clone cannot
+ *                   tell a deploy ref no refspec brings in from a mistyped
+ *                   branch — reported, never assumed.
+ *
+ * @returns {{kind: "git"|"foreign"|"unresolved", full: string|null}}
+ */
+export function classifyShortRef(name, refs, remotes) {
+  const have = refs instanceof Set ? refs : new Set(refs || []);
+  // A pseudo-ref (`HEAD`, `FETCH_HEAD`) lives outside `refs/` altogether.
+  if (/^[A-Z_]*HEAD$/.test(name)) return { kind: "git", full: null };
+  const candidates = ["refs/" + name, "refs/tags/" + name, "refs/heads/" + name,
+    "refs/remotes/" + name, "refs/remotes/" + name + "/HEAD"];
+  const full = candidates.find((c) => have.has(c));
+  if (full) {
+    return GIT_NAMESPACES.some((ns) => full.startsWith(ns))
+      ? { kind: "git", full } : { kind: "foreign", full };
+  }
+  const first = name.split("/")[0];
+  if (name.includes("/") && (remotes || []).includes(first)) return { kind: "git", full: null };
+  return { kind: "unresolved", full: null };
 }
 
 /** PURE — git's refspec pattern: at most one `*`, matching any run of
@@ -239,15 +300,39 @@ export function chooseRemote({ root, run = spawnSync }) {
 /**
  * The whole question for one repository.
  *
- * @returns {{declared: ReturnType<typeof declaredForeignRefs>,
+ * A short name that resolves outside git's own namespaces joins `declared`
+ * under its full name, with `short` set to the name as written; one that
+ * resolves to nothing is listed in `unresolved`.
+ *
+ * @returns {{declared: (ReturnType<typeof declaredForeignRefs>[number] & {short?: string})[],
+ *   unresolved: ReturnType<typeof declaredShortRefs>,
  *   remote: string|null, why: string, remotes: string[], refspecs: string[],
  *   missing: {namespace: string, specs: string[], fix: string}[]}}
  */
 export function deployFetchState({ root, targets, run = spawnSync }) {
   const declared = declaredForeignRefs(targets);
-  if (!declared.length) return { declared, remote: null, why: "nothing-declared", remotes: [], refspecs: [], missing: [] };
+  const short = declaredShortRefs(targets);
+  if (!declared.length && !short.length) {
+    return { declared, unresolved: [], remote: null, why: "nothing-declared", remotes: [], refspecs: [], missing: [] };
+  }
+  const unresolved = [];
+  if (short.length) {
+    const refs = new Set(lines(git(run, root, ["for-each-ref", "--format=%(refname)"])));
+    const remotes = lines(git(run, root, ["remote"]));
+    for (const d of short) {
+      const c = classifyShortRef(d.spec, refs, remotes);
+      if (c.kind === "foreign") {
+        if (!declared.some((x) => x.spec === c.full)) {
+          declared.push({ target: d.target, stage: d.stage, spec: c.full, namespace: refNamespace(c.full), short: d.spec });
+        }
+      } else if (c.kind === "unresolved") unresolved.push(d);
+    }
+  }
+  if (!declared.length && !unresolved.length) {
+    return { declared, unresolved, remote: null, why: "nothing-declared", remotes: [], refspecs: [], missing: [] };
+  }
   const chosen = chooseRemote({ root, run });
-  if (!chosen.remote) return { declared, ...chosen, refspecs: [], missing: [] };
+  if (!chosen.remote) return { declared, unresolved, ...chosen, refspecs: [], missing: [] };
   const refspecs = lines(git(run, root, ["config", "--get-all", "remote." + chosen.remote + ".fetch"]));
   const byNamespace = new Map();
   for (const d of declared) {
@@ -258,5 +343,5 @@ export function deployFetchState({ root, targets, run = spawnSync }) {
   }
   const missing = [...byNamespace].map(([namespace, specs]) =>
     ({ namespace, specs, fix: fixCommand(chosen.remote, namespace) }));
-  return { declared, ...chosen, refspecs, missing };
+  return { declared, unresolved, ...chosen, refspecs, missing };
 }

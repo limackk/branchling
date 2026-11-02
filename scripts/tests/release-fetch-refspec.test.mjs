@@ -13,6 +13,10 @@
  *   3. Doctor fixes nothing: the remote's configuration is unchanged by a run.
  *   4. A project that declares nothing outside git's own namespaces gets no
  *      row, and a clone with no remote gets INFO, not a false verdict.
+ *   5. A SHORT name (TL-510) is judged by what it resolves to in the clone:
+ *      `deploys/web/production` warns in a fresh clone, where it resolves to
+ *      nothing, and is checked as `refs/deploys/web/production` in a clone
+ *      that has that ref; `origin/main` beside it is never reported.
  *
  * The deploy namespace in the fixtures is `refs/deploys/`, the shape
  * `docs/release-tracking.md` §2 uses; it is a fixture value, not something the
@@ -27,7 +31,8 @@ import { join } from "node:path";
 
 import { parseConfigYaml } from "../config.mjs";
 import {
-  declaredForeignRefs, fixCommand, fixRefspec, refNamespace, refspecsCover,
+  classifyShortRef, declaredForeignRefs, declaredShortRefs, fixCommand, fixRefspec, refNamespace,
+  refspecsCover,
 } from "../deploy-fetch.mjs";
 
 import { SCRIPTS_DIR, isolateHome } from "./_repo.mjs";
@@ -117,12 +122,36 @@ test("a glob is covered only when EVERY ref it matches is, not when a sample is"
   assert.equal(refspecsCover(["+refs/*:refs/*", "^refs/other/*"], "refs/release-v*"), true);
 });
 
-test("a short name is not judged, as the comment on declaredForeignRefs says", () => {
-  const declared = declaredForeignRefs([{ name: "web", stages: [
+test("a short name is left to the clone: declaredForeignRefs skips it, declaredShortRefs lists it", () => {
+  const t = [{ name: "web", stages: [
     { name: "production", refs: ["deploys/web/production"] },
     { name: "test", refs: ["origin/main"] },
-  ] }]);
-  assert.deepEqual(declared, []);
+    { name: "tagged", refs: ["refs/tags/v*"] },
+  ] }];
+  assert.deepEqual(declaredForeignRefs(t), []);
+  assert.deepEqual(declaredShortRefs(t).map((d) => d.spec), ["deploys/web/production", "origin/main"]);
+});
+
+test("a short name is classified in git's own resolution order", () => {
+  const remotes = ["origin"];
+  // The defect: in a fresh clone nothing exists under either name, and only
+  // the first component tells a remote-tracking branch from a deploy ref.
+  assert.deepEqual(classifyShortRef("deploys/web/production", [], remotes), { kind: "unresolved", full: null });
+  assert.deepEqual(classifyShortRef("origin/main", [], remotes), { kind: "git", full: null });
+  // Where the ref exists, refs/<name> wins over every git namespace, as in rev-parse.
+  assert.deepEqual(classifyShortRef("deploys/web/production",
+    ["refs/deploys/web/production", "refs/heads/deploys/web/production"], remotes),
+  { kind: "foreign", full: "refs/deploys/web/production" });
+  // Positive controls: a branch, a tag, a remote-tracking branch, a pseudo-ref.
+  assert.deepEqual(classifyShortRef("main", ["refs/heads/main"], remotes), { kind: "git", full: "refs/heads/main" });
+  assert.deepEqual(classifyShortRef("v1", ["refs/tags/v1"], remotes), { kind: "git", full: "refs/tags/v1" });
+  assert.deepEqual(classifyShortRef("origin/main", ["refs/remotes/origin/main"], remotes),
+    { kind: "git", full: "refs/remotes/origin/main" });
+  assert.deepEqual(classifyShortRef("origin", ["refs/remotes/origin/HEAD"], remotes),
+    { kind: "git", full: "refs/remotes/origin/HEAD" });
+  assert.deepEqual(classifyShortRef("HEAD", [], remotes), { kind: "git", full: null });
+  // A bare name that exists nowhere is not excused by happening to equal a remote.
+  assert.deepEqual(classifyShortRef("release", [], remotes), { kind: "unresolved", full: null });
 });
 
 test("a refspec covers a ref only when it maps the ref onto its own name", () => {
@@ -274,4 +303,54 @@ test("several remotes and no upstream: a warning that names the choice, not a gu
   assert.equal(r.row.status, "warn");
   assert.match(r.row.detail, /alpha, beta/);
   assert.match(r.row.fix, /set-upstream-to/);
+});
+
+// ── 5. A short name (TL-510) ─────────────────────────────────────────────
+
+const SHORT = `deploy_targets:
+  - name: web
+    stages:
+      - { name: test, ref: origin/main }
+      - { name: production, ref: deploys/web/production }
+`;
+
+test("a short deploy ref that resolves to nothing in a fresh clone warns, naming it and not origin/main", () => {
+  const dir = cloneWithBacklog(SHORT);
+  const remote = git(dir, "config", "--get", "remote.origin.url");
+  // CI pushed the deploy ref to the remote; the default refspec never brings it here.
+  git(remote, "update-ref", "refs/deploys/web/production", git(remote, "rev-parse", "main"));
+
+  const r = doctorRow(dir);
+  assert.ok(r.row, "no deploy-fetch row although a short deploy ref is declared");
+  assert.equal(r.row.status, "warn");
+  assert.match(r.row.detail, /deploys\/web\/production \(web\/production\)/);
+  assert.doesNotMatch(r.row.detail, /origin\/main/);
+  assert.match(r.row.fix, /`refs\/deploys\/web\/production`/);
+
+  // Once a refspec brings the ref in under its own name, the short name reads
+  // it — and the row is green, judged against that full name.
+  git(dir, "config", "--add", "remote.origin.fetch", fixRefspec("refs/deploys/*"));
+  git(dir, "fetch", "-q");
+  const green = doctorRow(dir);
+  assert.equal(green.row.status, "ok", JSON.stringify(green.row));
+  assert.match(green.row.detail, /refs\/deploys\/\*/);
+});
+
+test("a short name that reads a ref no refspec fetches is red, with the same fix as its full name", () => {
+  const dir = cloneWithBacklog(SHORT);
+  // The clone that wrote the ref: it resolves here, and only here.
+  git(dir, "update-ref", "refs/deploys/web/production", git(dir, "rev-parse", "HEAD"));
+  const r = doctorRow(dir);
+  assert.equal(r.row.status, "error");
+  assert.match(r.row.detail, /refs\/deploys\/web\/production/);
+  assert.equal(r.row.fix, "git config --add remote.origin.fetch '+refs/deploys/*:refs/deploys/*'");
+});
+
+test("positive control: origin/main as the only short name gives no row", () => {
+  assert.equal(doctorRow(cloneWithBacklog(`deploy_targets:
+  - name: web
+    stages:
+      - { name: test, ref: origin/main }
+      - { name: trunk, ref: main }
+`)).row, undefined);
 });

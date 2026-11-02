@@ -102,7 +102,10 @@ deploy_targets:
   recorded stage reaches no other clone until the remote's fetch refspec
   includes it. Every report therefore names the SHA of each ref it resolved,
   and `doctor` reports a declared ref namespace the remote does not fetch
-  (TL-508).
+  (TL-508). A stage declared by a short name is judged by what it resolves to
+  in the clone: one that reads a ref outside `refs/heads/`, `refs/remotes/` and
+  `refs/tags/` is checked under that full name, and one that resolves to
+  nothing while naming no remote is a warning (TL-510).
 
 ## 4. Recorded stages
 

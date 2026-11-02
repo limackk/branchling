@@ -329,6 +329,31 @@ test("a well-formed deploy_targets loads, with both stage spellings normalised (
   ]);
 });
 
+test("a short deploy ref is valid config and resolves the way git's search order says (TL-510)", () => {
+  // Validation cannot tell `origin/main` from `deploys/web/production`: both are
+  // short names, and which namespace each lives in is a property of the clone.
+  // So both load, and `doctor` judges them (release-fetch-refspec.test.mjs).
+  const t = targets(`deploy_targets:
+  - name: web
+    stages:
+      - { name: test, ref: origin/main }
+      - { name: production, ref: deploys/web/production }
+`);
+  assert.deepEqual(t[0].stages.map((s) => s.refs[0]), ["origin/main", "deploys/web/production"]);
+
+  // And what doctor assumes about that search order holds: where the deploy
+  // ref exists, the short name reads it, not a branch of the same name.
+  const repo = mkdtempSync(join(tmpdir(), "branchling-short-ref-"));
+  execFileSync("git", ["init", "-q", "-b", "main", repo]);
+  execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "--allow-empty", "-m", "a"], { cwd: repo });
+  const first = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repo, encoding: "utf8" }).trim();
+  execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "--allow-empty", "-m", "b"], { cwd: repo });
+  execFileSync("git", ["update-ref", "refs/deploys/web/production", first], { cwd: repo });
+  execFileSync("git", ["branch", "deploys/web/production", "HEAD"], { cwd: repo });
+  const read = spawnSync("git", ["rev-parse", "--verify", "-q", "deploys/web/production"], { cwd: repo, encoding: "utf8" });
+  assert.equal(read.stdout.trim(), first);
+});
+
 test("every malformed form of deploy_targets fails", () => {
   const cases = [
     ["deploy_targets: []", /non-empty list of targets/],

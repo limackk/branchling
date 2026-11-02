@@ -387,6 +387,14 @@ function checkHooks(root) {
  * git configuration; doctor prints it and never applies it, for the same
  * reason the tool never pushes.
  *
+ * A SHORT NAME is judged by what it resolves to in this clone (TL-510): one
+ * that reads a ref outside git's own namespaces is checked under that full
+ * name, and one that resolves to nothing — while its first component names no
+ * remote — is a WARNING. In a fresh clone `deploys/web/production` is exactly
+ * that, and skipping it would let the stage this row exists for pass
+ * unnoticed. A warning rather than an error, because this clone cannot tell a
+ * deploy ref no refspec brings in from a branch that was never fetched.
+ *
  * NO ROW when nothing is declared outside git's own namespaces: a project
  * without `deploy_targets`, or one whose stages are branches and tags, has
  * nothing to ask here, and a tick about it would be green with no evidentiary
@@ -396,13 +404,25 @@ function checkDeployFetch(root, config) {
   if (!insideGitRepo(root)) return [];
   const title = "deploy refs reach every clone";
   const st = deployFetchState({ root, targets: config.deployTargets });
-  if (!st.declared.length) return [];
+  if (!st.declared.length && !st.unresolved.length) return [];
   // A glob whose first component under refs/ starts with a glob character has
   // no namespace narrower than `refs/*`; it is named by its spec instead.
   const namespaces = [...new Set(st.declared.map((d) => d.namespace || d.spec))];
+  const unresolvedNote = st.unresolved.length
+    ? "short ref name" + (st.unresolved.length === 1 ? " " : "s ") +
+      st.unresolved.map((u) => u.spec + " (" + u.target + "/" + u.stage + ")").join(", ") +
+      " resolve" + (st.unresolved.length === 1 ? "s" : "") +
+      " to no ref here and name" + (st.unresolved.length === 1 ? "s" : "") +
+      " no remote — a ref such as refs/" + st.unresolved[0].spec + " that the remote's refspec does not fetch reads as unknown"
+    : null;
+  const unresolvedFix = st.unresolved.length
+    ? "declare " + st.unresolved.map((u) => "`refs/" + u.spec + "`").join(", ") +
+      " by its full refs/ name in deploy_targets (or the branch or tag it is meant to be)   # then " + N + " doctor"
+    : null;
   if (st.why === "no-remote") {
     return [check("deploy-fetch", title, INFO,
-      "no remote — " + namespaces.join(", ") + " can reach no other clone from here")];
+      "no remote — " + (namespaces.length ? namespaces.join(", ") : st.unresolved.map((u) => u.spec).join(", ")) +
+        " can reach no other clone from here")];
   }
   if (st.why === "ambiguous") {
     return [check("deploy-fetch", title, WARN,
@@ -418,8 +438,11 @@ function checkDeployFetch(root, config) {
     return [check("deploy-fetch", title, ERR,
       "remote `" + st.remote + "` does not fetch " +
         st.missing.map((m) => (m.namespace || "any refspec narrower than refs/*") + " (" + m.specs.join(", ") + ")").join("; ") +
-        " — another clone reads those stages as unknown or stale",
+        " — another clone reads those stages as unknown or stale" + (unresolvedNote ? "; " + unresolvedNote : ""),
       commands.length ? commands.join(" && ") + (note ? "   # then " + note : "") : note)];
+  }
+  if (st.unresolved.length) {
+    return [check("deploy-fetch", title, WARN, unresolvedNote, unresolvedFix)];
   }
   return [check("deploy-fetch", title, OK,
     "remote `" + st.remote + "` fetches " + namespaces.join(", ") + " under the same names")];
