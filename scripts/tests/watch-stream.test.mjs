@@ -127,7 +127,11 @@ test("one edit produces exactly one envelope naming the task and field; closing 
   }
 });
 
-test("SIGINT stops the watch with exit 0", async () => {
+// Windows has no SIGINT to deliver: kill("SIGINT") terminates the process
+// outright, so the exit code is null whatever the handler would have done.
+test("SIGINT stops the watch with exit 0", {
+  skip: process.platform === "win32" ? "POSIX signal contract" : false,
+}, async () => {
   const fx = fixture();
   try {
     const w = startWatch([SCRIPT, "--json", "--dir", "backlog"], fx.dir);
