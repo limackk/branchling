@@ -33,7 +33,7 @@ import { createServer, get } from "node:http";
 import { hostname } from "node:os";
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { readFileSync, watch } from "node:fs";
+import { readFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -57,6 +57,7 @@ import {
 import { printJson } from "./json-envelope.mjs";
 import { listTaskFiles, readAllHistory, reconcile } from "./history.mjs";
 import { canonicalPath } from "./canonical-path.mjs";
+import { WATCH_DEBOUNCE_MS, watchBacklog } from "./backlog-watch.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BUILD_BACKLOG = join(__dirname, "build-backlog.mjs");
@@ -339,15 +340,22 @@ let notifyTimer = null;
 /** `selfWrite` suppresses the echo of a write this server just performed. */
 let suppressUntil = 0;
 
-function notifyClients() {
+/** Push now. The filesystem watcher calls this already debounced (TL-524). */
+function pushTasksChanged() {
   clearTimeout(notifyTimer);
-  notifyTimer = setTimeout(() => {
-    if (Date.now() < suppressUntil) return;
+  if (Date.now() >= suppressUntil) {
     for (const res of sseClients) {
       try { res.write("event: tasks-changed\ndata: {}\n\n"); } catch { sseClients.delete(res); }
     }
-  }, 150);
+  }
   scheduleReconcile();
+}
+
+/** Push after the same debounce the watcher applies, for callers that are not
+ *  the watcher — the cross-branch poll. */
+function notifyClients() {
+  clearTimeout(notifyTimer);
+  notifyTimer = setTimeout(pushTasksChanged, WATCH_DEBOUNCE_MS);
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -386,20 +394,14 @@ function scheduleReconcile() {
   }, RECONCILE_DELAY_MS);
 }
 
+// The watcher and its debounce are shared with `follow` (TL-524), so the page
+// and the JSON stream agree on which filenames count and how long a burst
+// lasts. plan.yaml is watched beside tasks/: the Execution view (TL-109) is
+// drawn from it, and the page answers the same `tasks-changed` by re-reading
+// /api/tasks, which carries the plan — a second event would be a second name
+// for one refresh.
 try {
-  watch(TASKS_DIR, { persistent: false }, (_event, filename) => {
-    if (filename && !/\.md$/.test(filename)) return;
-    notifyClients();
-  });
-  // plan.yaml sits BESIDE tasks/, not inside it, so the watch above never sees
-  // it — and the Execution view (TL-109) is drawn from it. The same
-  // `tasks-changed` signal on purpose: the page answers it by re-reading
-  // /api/tasks, which carries the plan, so a second event would be a second name
-  // for one refresh.
-  watch(BACKLOG_DIR, { persistent: false }, (_event, filename) => {
-    if (filename && filename !== PLAN_FILENAME) return;
-    notifyClients();
-  });
+  watchBacklog(BACKLOG_DIR, { onChange: pushTasksChanged });
 } catch (e) {
   console.warn(`${N} serve: fs.watch unavailable — live push disabled:`, e.message);
 }
