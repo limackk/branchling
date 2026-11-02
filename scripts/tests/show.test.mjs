@@ -28,6 +28,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { loadConfig } from "../config.mjs";
+import { TRUNK_SOURCE_TEXT } from "../environments.mjs";
 
 import { SCRIPTS_DIR, isolateHome, isolateState } from "./_repo.mjs";
 
@@ -180,6 +181,21 @@ test("one task's deployment state per target and stage is printed in text and JS
   assert.match(text.stdout, /trunk\s+HEAD [0-9a-f]{12}/);
   assert.match(text.stdout, /app\s+test full, production unknown/);
   assert.match(text.stdout, new RegExp("app/production  production  " + git(dir, "rev-parse", "production").slice(0, 12)));
+});
+
+test("the trunk's source is worded as every other reader words it, for both sources", () => {
+  const { dir, waiting } = FX;
+  const line = (source) => new RegExp("^\\s*trunk\\s+\\S+ [0-9a-f]{12}\\s+\\(" +
+    TRUNK_SOURCE_TEXT[source].replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\)$", "m");
+  assert.match(show(dir, waiting).stdout, line("head"));
+  git(dir, "update-ref", "refs/remotes/origin/main", "main");
+  git(dir, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main");
+  try {
+    assert.match(show(dir, waiting).stdout, line("remote-default"));
+  } finally {
+    git(dir, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD");
+    git(dir, "update-ref", "-d", "refs/remotes/origin/main");
+  }
 });
 
 test("a ref that does not resolve reads as unknown, never as empty", () => {

@@ -40,7 +40,7 @@ import { absentHere, crossBranchState, describeDivergence, divergences, scanNote
 import { loadConfigOrExit } from "./config.mjs";
 import { externalTargetsOf } from "./deploy-targets.mjs";
 import {
-  defaultTrunk, deploymentScanJson, deploymentState, describeTaskDeployment, explain,
+  TRUNK_SOURCE_TEXT, defaultTrunk, deploymentScanJson, deploymentState, describeTaskDeployment, explain,
   taskDeployment, taskDeploymentJson,
 } from "./environments.mjs";
 import { printJson } from "./json-envelope.mjs";
@@ -56,12 +56,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const COMMAND = N + " show";
 const KNOWN = ["--json"];
-
-/** The wording `deploy status` uses for where the trunk came from. */
-const TRUNK_SOURCE_TEXT = {
-  "remote-default": "the remote's default branch",
-  head: "HEAD — this clone has no `origin/HEAD`",
-};
 
 function shortSha(sha) { return sha ? sha.slice(0, 12) : null; }
 

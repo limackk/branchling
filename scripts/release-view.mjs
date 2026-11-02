@@ -38,7 +38,7 @@
 
 import { spawnSync } from "node:child_process";
 
-import { explain, taskDeployment } from "./environments.mjs";
+import { TRUNK_SOURCE_TEXT, explain, taskDeployment } from "./environments.mjs";
 import { repoRoot } from "./modified-files.mjs";
 import { gateVerdict, releaseGaps } from "./release-gaps.mjs";
 import { computeStatus } from "./release-status.mjs";
@@ -152,7 +152,9 @@ export function releaseViewData({ root, config, tasks, now = Date.now(), run = s
     });
     data.reason = state.reason;
     data.explanation = state.reason === "ok" ? null : explain(state.reason);
-    data.trunk = report.trunk;
+    // The page cannot import environments.mjs (it reads git), so the wording
+    // of the trunk's source travels with the data, not as a copy in the view.
+    data.trunk = { ...report.trunk, sourceText: TRUNK_SOURCE_TEXT[report.trunk.source] || null };
     data.refs = report.scan.refs;
     if (!state.scanned && state.reason !== "only-external-targets") return data;
     data.available = true;

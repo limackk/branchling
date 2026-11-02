@@ -406,7 +406,7 @@ test("check --release on a clean fixture passes under require, and the default t
   appendFileSync(join(dir, "backlog", "config.yaml"), "\nrelease_gate: require\n");
   const r = run(dir, ["check", "--dir", "backlog", "--release"]);
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.match(r.stdout, /trunk: HEAD [0-9a-f]{12} \(HEAD — the clone records no remote default branch/);
+  assert.match(r.stdout, /trunk: HEAD [0-9a-f]{12} \(HEAD — this clone has no `origin\/HEAD`, so pass --trunk in CI\)/);
   assert.match(r.stdout, /0 gap\(s\)/);
 });
 

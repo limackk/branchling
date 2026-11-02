@@ -7,8 +7,8 @@ board: main
 epic: "Release tracking across environments"                           # free text — the group this task counts towards
 release: ""                        # the release it is PLANNED for (a value from `releases:` in config.yaml). Empty = none
 priority: P3                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 conflict_group: []                 # the AREA it touches (e.g. a module): `next` and `run` hold it back while a task of the same group is in progress. Empty = `conflict_group_from`, or none
@@ -63,5 +63,5 @@ until that copy is replaced as well.
 
 ## Acceptance criteria
 
-- [ ] No file under `scripts/` other than `environments.mjs` defines the
+- [x] No file under `scripts/` other than `environments.mjs` defines the
   trunk-source wording, and the readers' tests stay green. [proof: one-wording]

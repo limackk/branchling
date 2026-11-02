@@ -29,7 +29,7 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadConfigOrExit } from "./config.mjs";
-import { defaultTrunk, explain, parseStageSelector } from "./environments.mjs";
+import { TRUNK_SOURCE_TEXT, defaultTrunk, explain, parseStageSelector } from "./environments.mjs";
 import { repoRoot } from "./modified-files.mjs";
 import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
@@ -104,9 +104,12 @@ function main(argv) {
     return verdict.exit;
   }
 
-  const trunkNote = result.trunk.source === "remote-default" ? "the remote's default branch"
-    : result.trunk.source === "flag" ? "named by --trunk"
-      : "HEAD — the clone records no remote default branch, so pass --trunk in CI";
+  // The two sources every reader shares are worded where `defaultTrunk()` is;
+  // only `--trunk` and the advice to CI, which no other reader gives, are the
+  // gate's own.
+  const trunkNote = result.trunk.source === "flag" ? "named by --trunk"
+    : result.trunk.source === "head" ? TRUNK_SOURCE_TEXT.head + ", so pass --trunk in CI"
+      : TRUNK_SOURCE_TEXT[result.trunk.source];
   // Outside a git repository the trunk was never read; "unresolved" there would
   // read exactly like the `trunk-unresolved` failure.
   const trunkSha = result.reason === "no-git" ? "not read" : short(result.trunk.sha);
