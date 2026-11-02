@@ -86,4 +86,4 @@ waves:
 
   # Three small gaps the implementation loops found and filed: a short deploy ref that doctor misses, the release field missing from the viewer's filters, and query not naming tasks of another repository as unobservable. They touch doctor, the viewer and query respectively, so they run side by side.
   - name: "Release tracking follow-ups"
-    tasks: [TL-510, TL-511, TL-512]
+    tasks: [TL-510, TL-511, TL-512, TL-509]

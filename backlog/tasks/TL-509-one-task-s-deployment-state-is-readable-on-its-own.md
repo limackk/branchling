@@ -31,11 +31,13 @@ One task's computed deployment state can be read without a list query: a single-
 
 TL-501's step 4 asked to expose the per-task deployment answer in `branchling show <ID>`, but no `show` command exists in scripts/cli.mjs (there is no single-task reading command at all). TL-501 exposed the answer in `query --json` (a `deploy` key per task, and an envelope-level `deploy` naming the trunk and every ref with its SHA) and in `query --env` / `--not-env`, and did not invent a new command inside a task about computing deployment state. Today the per-task answer is reachable as `query --text <ID> --status <all statuses> --json`, which is clumsy for a person. `scripts/environments.mjs` already exports `describeTaskDeployment(task)` (one line per target) and `taskDeploymentJson(task)` for this purpose. Decide whether a `show <ID>` command is wanted at all (it would also be the natural place for the task's frontmatter, its modified files from scripts/modified-files.mjs and its cross-branch state) or whether `query` gains a text rendering of `deploy` instead; then implement the chosen one following the branchling-cli skill (allow-listed flags, --help, --json, exit codes, README command table).
 
+**Decided 2026-11-02 by the owner:** implement a new `show <ID>` command (not a `query` rendering). It prints the facts COMPUTED about one task that its file does not hold: (1) the deployment state per target and stage, with the trunk and every ref read and its SHA, unknown for an unresolvable ref, an explicit line for a task with no commits, and the unobservable state for targets in another repository (TL-507/TL-512); (2) the task's status on other branches and worktrees (the `elsewhere` computation `query` already uses); (3) each `blocked_by` task with its current status, saying whether the task is still blocked. A one-line header gives id, title, status and priority; the markdown body is NOT reprinted. `--json` carries the same three sections. An unknown id fails.
+
 ## Steps
 
-1. Decide between a new `show <ID>` command and a text rendering of the deploy state in `query`, and record the decision in this task.
-2. Implement it with --json carrying taskDeploymentJson() and the refs read with their SHAs.
-3. Add tests against a fixture repository with deploy_targets declared, including a task with no commits and an unresolvable ref.
+1. Add the `show` command per the decision above, following the branchling-cli skill (command table, allow-listed flags, --help, README command table, docs/manual.md).
+2. Its --json carries taskDeploymentJson() with the refs read and their SHAs, the elsewhere states and the blockers with their statuses, as a new envelope kind.
+3. Add tests against a fixture repository with deploy_targets declared, including a task with no commits, an unresolvable ref, a task with a different status on another branch, and an open and a closed blocker.
 
 ## Acceptance criteria
 
