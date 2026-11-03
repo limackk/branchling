@@ -301,8 +301,13 @@ export const KINDS = {
   // last stage, which is counted and never listed. `release` is the planned
   // scope of `--release <name>` (TL-505), null without the flag. `records`
   // names who recorded each recorded stage, when and why (TL-506).
-  "release-status": { trunk: null, scan: null, explanation: null, filter: null, targets: [], unplaced: null, release: null, records: [] },
-
+  // A `--release`, `--target` or `--env` naming nothing declared (TL-533) is
+  // `ok: false` with `refusalKind: "unknown-name"`, `rejected` the flag and the
+  // value, and `declared` what the flag accepts — empty when nothing is.
+  "release-status": {
+    ok: null, trunk: null, scan: null, explanation: null, filter: null, targets: [], unplaced: null, release: null, records: [],
+    refusalKind: null, refusal: null, rejected: null, declared: [],
+  },
   // `deploy record --json` (TL-506). `tag` is the annotated tag object the
   // ref now points at; `previous` the commit it stood at before, null on the
   // first record; `direction` one of first, unchanged, forward, backward,

@@ -157,7 +157,10 @@ export function parseStatusArgs(argv) {
  * PURE — narrows the declared targets to what `--target` and `--env` select.
  * An unknown name FAILS: zero tasks caused by a typo read exactly like an answer.
  *
- * @returns {{ok: true, target: string|null, stage: string|null} | {ok: false, message: string}}
+ * `unknown` names the flag, the value and what is declared when the failure is
+ * a name nobody declared (TL-533), as opposed to flags that contradict each other.
+ *
+ * @returns {{ok: true, target: string|null, stage: string|null} | {ok: false, message: string, unknown?: object}}
  */
 export function resolveFilter({ target, env }, targets) {
   const declared = (targets || []).map((t) => t.name);
@@ -167,6 +170,7 @@ export function resolveFilter({ target, env }, targets) {
       message: declared.length
         ? "`" + target + "` is not a declared deploy target (declared: " + declared.join(", ") + ")"
         : "this project declares no `deploy_targets` in config.yaml, so it has no target `" + target + "`",
+      unknown: { flag: "--target", value: target, declared },
     };
   }
   if (env === null) return { ok: true, target, stage: null };
@@ -182,7 +186,12 @@ export function resolveFilter({ target, env }, targets) {
       return { ok: false, message: "target `" + t + "` is deployed from the repository `" + spec.repository + "` and has no stage this one can read" };
     }
     if (!spec.stages.some((s) => s.name === sel.stage)) {
-      return { ok: false, message: "target `" + t + "` declares no stage `" + sel.stage + "` (declared: " + spec.stages.map((s) => s.name).join(", ") + ")" };
+      const stages = spec.stages.map((s) => s.name);
+      return {
+        ok: false,
+        message: "target `" + t + "` declares no stage `" + sel.stage + "` (declared: " + stages.join(", ") + ")",
+        unknown: { flag: "--env", value: env, declared: stages },
+      };
     }
   }
   return { ok: true, target: t, stage: sel.stage };
@@ -207,6 +216,7 @@ export function checkReleaseFlag({ release, env }, releases) {
       message: declared.length
         ? "`" + release + "` is not a declared release (declared: " + declared.join(", ") + ")"
         : "this project declares no `releases` in config.yaml, so it plans no release `" + release + "`",
+      unknown: { flag: "--release", value: release, declared: declared.slice() },
     };
   }
   if (env !== null) {
@@ -1039,6 +1049,26 @@ function scopeRecord(m) {
   return { id: m.id, title: m.title, status: m.status, priority: m.priority || null, release: m.release || "", target: m.target || [] };
 }
 
+/**
+ * A selector the command cannot answer. A NAME nobody declared is a value a
+ * person typed, so it is a refusal with exit 1 and, under `--json`, an
+ * `unknown-name` envelope naming the value and the declared set (TL-533) — a
+ * consumer tells a typo from its own wrongly built call without parsing stderr.
+ * Flags that contradict each other remain a usage error, exit 2.
+ */
+function refuse(cmd, result, wantsJson) {
+  console.error(failure(cmd, result.message, [], [cmd + " --help"]));
+  if (!result.unknown) return 2;
+  if (wantsJson) {
+    printJson("release-status", {
+      ok: false, refusalKind: "unknown-name", refusal: result.message,
+      rejected: { flag: result.unknown.flag, value: result.unknown.value },
+      declared: result.unknown.declared,
+    });
+  }
+  return 1;
+}
+
 export function run(argv) {
   const cmd = N + " deploy status";
   const dirFlag = takeDirFlag(argv);
@@ -1055,16 +1085,16 @@ export function run(argv) {
   catch (e) { console.error(failure(cmd, e.message, [], [cmd + " --help"])); return 2; }
   const config = loadConfigOrExit(root);
   const filter = resolveFilter(opts, config.deployTargets);
-  if (!filter.ok) { console.error(failure(cmd, filter.message, [], [cmd + " --help"])); return 2; }
+  if (!filter.ok) return refuse(cmd, filter, wantsJson);
   const planned = checkReleaseFlag(opts, config.releases);
-  if (!planned.ok) { console.error(failure(cmd, planned.message, [], [cmd + " --help"])); return 2; }
+  if (!planned.ok) return refuse(cmd, planned, wantsJson);
 
   const { report, state } = computeStatus({
     root, config, filter: { target: filter.target, stage: filter.stage }, count: opts.count, release: opts.release,
   });
   if (wantsJson) {
     printJson("release-status", {
-      trunk: report.trunk, scan: report.scan, explanation: report.explanation,
+      ok: true, trunk: report.trunk, scan: report.scan, explanation: report.explanation,
       filter: report.filter, targets: report.targets, unplaced: report.unplaced, release: report.release,
       records: report.records,
     });

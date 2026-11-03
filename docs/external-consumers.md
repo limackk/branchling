@@ -157,6 +157,21 @@ and group by `role`, never by `name`: a backlog may rename every status.
 role by declaring it; `closed` and `cancelled` may only be given to an
 archived status, the other three only to an active one.
 
+## When a reading command refuses
+
+A reading command that cannot answer the question it was asked still answers
+an envelope of its own kind, with `ok: false`, a `refusalKind` to branch on and
+a `refusal` sentence for a person — the shape the writing commands use. Exit
+`1` means the question named something this backlog does not have; exit `2`
+remains a wrongly built call (an unknown flag, a missing value, flags that
+contradict each other), and then stdout is empty.
+
+| Command | `refusalKind` | Extra keys | Exit |
+|---|---|---|---|
+| `deploy status` | `unknown-name` — `--release`, `--target` or `--env` names nothing declared | `rejected` (`{ flag, value }`), `declared` (what that flag accepts; `[]` when nothing is) | 1 |
+
+A successful `deploy status --json` carries `ok: true`.
+
 ## The writing commands
 
 Every write goes through a command, so it is validated against the project's

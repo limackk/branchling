@@ -305,7 +305,8 @@ export function taskDeployment(state, id) {
  * `stage` or `target/stage`, as typed after `--env`. An unknown name FAILS:
  * zero matches caused by a typo read exactly like an answer.
  *
- * @returns {{ok: true, target: string|null, stage: string} | {ok: false, message: string}}
+ * @returns {{ok: true, target: string|null, stage: string} |
+ *   {ok: false, message: string, unknown: {flag: string, value: string, declared: string[]}}}
  */
 export function parseStageSelector(text, targets) {
   const raw = String(text || "").trim();
@@ -315,15 +316,18 @@ export function parseStageSelector(text, targets) {
   const known = [];
   for (const t of targets || []) for (const s of t.stages) known.push(t.name + "/" + s.name);
   const stageNames = [...new Set((targets || []).flatMap((t) => t.stages.map((s) => s.name)))];
+  // `unknown` travels beside the sentence (TL-533): a caller answering in JSON
+  // names the rejected value and what it could have been without parsing it.
+  const unknown = { flag: "--env", value: raw, declared: stageNames.concat(known) };
   if (!targets || !targets.length) {
-    return { ok: false, message: "this project declares no `deploy_targets` in config.yaml, so it has no stage `" + raw + "`" };
+    return { ok: false, message: "this project declares no `deploy_targets` in config.yaml, so it has no stage `" + raw + "`", unknown };
   }
   if (target !== null) {
-    if (known.indexOf(raw) < 0) return { ok: false, message: "`" + raw + "` is not a declared stage (declared: " + known.join(", ") + ")" };
+    if (known.indexOf(raw) < 0) return { ok: false, message: "`" + raw + "` is not a declared stage (declared: " + known.join(", ") + ")", unknown };
     return { ok: true, target, stage };
   }
   if (stageNames.indexOf(stage) < 0) {
-    return { ok: false, message: "`" + raw + "` is not a declared stage (declared: " + stageNames.join(", ") + ", or target/stage: " + known.join(", ") + ")" };
+    return { ok: false, message: "`" + raw + "` is not a declared stage (declared: " + stageNames.join(", ") + ", or target/stage: " + known.join(", ") + ")", unknown };
   }
   return { ok: true, target: null, stage };
 }

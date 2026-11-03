@@ -241,16 +241,18 @@ test("--target, --env and --count narrow the answer, and an undeclared name fail
   const text = run(dir, ["deploy", "status", "--dir", "backlog", "--count"]);
   assert.doesNotMatch(text.stdout, new RegExp(ids.merged));
 
-  for (const [args, message] of [
-    [["--target", "mobile"], /not a declared deploy target/],
-    [["--env", "staging"], /not a declared stage/],
-    [["--target", "docs", "--env", "web/test"], /names target `web`/],
-    [["--target", "docs", "--env", "test"], /declares no stage `test`/],
-    [["--frobnicate"], /unknown flag: --frobnicate/],
-    [["--env"], /with no value/],
+  // An undeclared NAME is a refusal (1), contradicting or malformed flags a
+  // usage error (2) — TL-533.
+  for (const [args, message, exit] of [
+    [["--target", "mobile"], /not a declared deploy target/, 1],
+    [["--env", "staging"], /not a declared stage/, 1],
+    [["--target", "docs", "--env", "web/test"], /names target `web`/, 2],
+    [["--target", "docs", "--env", "test"], /declares no stage `test`/, 1],
+    [["--frobnicate"], /unknown flag: --frobnicate/, 2],
+    [["--env"], /with no value/, 2],
   ]) {
     const r = run(dir, ["deploy", "status", "--dir", "backlog", ...args]);
-    assert.equal(r.status, 2, args.join(" "));
+    assert.equal(r.status, exit, args.join(" "));
     assert.match(r.stderr, message);
   }
 });

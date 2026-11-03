@@ -216,18 +216,20 @@ test("--count keeps the counts, --target narrows, and an unresolved last stage i
 
 test("deploy status refuses an undeclared release, a backlog with none, and --env beside it", () => {
   const { dir } = scopeRepo();
-  for (const [args, message] of [
-    [["--release", "r9"], /`r9` is not a declared release \(declared: r1, r2\)/],
-    [["--release", "r1", "--env", "test"], /compares the plan with the LAST stage/],
-    [["--release"], /with no value/],
+  // An undeclared NAME is a refusal (1), contradicting or malformed flags a
+  // usage error (2) — TL-533.
+  for (const [args, message, exit] of [
+    [["--release", "r9"], /`r9` is not a declared release \(declared: r1, r2\)/, 1],
+    [["--release", "r1", "--env", "test"], /compares the plan with the LAST stage/, 2],
+    [["--release"], /with no value/, 2],
   ]) {
     const r = run(dir, ["deploy", "status", "--dir", "backlog", ...args]);
-    assert.equal(r.status, 2, args.join(" "));
+    assert.equal(r.status, exit, args.join(" "));
     assert.match(r.stderr, message);
   }
   const none = backlogRepo(TARGETS);
   const r = run(none, ["deploy", "status", "--dir", "backlog", "--release", "r1"]);
-  assert.equal(r.status, 2);
+  assert.equal(r.status, 1);
   assert.match(r.stderr, /declares no `releases`/);
   assert.equal(checkReleaseFlag({ release: "r1", env: null }, ["r1"]).ok, true);
   assert.equal(parseStatusArgs(["--release", "r1"]).release, "r1");

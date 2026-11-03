@@ -182,3 +182,43 @@ test("`release` names no subcommand in its help or its refusal", () => {
   assert.ok(available, "positive control: the refusal names its accepted set");
   assert.doesNotMatch(available[1], /(?<![-\w])(status|record)\b/);
 });
+
+// ── 6. An undeclared name is a refusal envelope (TL-533) ───────────────────
+
+test("an undeclared release, target and env each answer the unknown-name envelope with exit 1", () => {
+  const dir = backlogRepo();
+  for (const [flag, value] of [["--release", "nope"], ["--target", "web"], ["--env", "prod"]]) {
+    const r = run(dir, ["deploy", "status", "--dir", "backlog", flag, value, "--json"]);
+    assert.equal(r.status, 1, flag + ": " + r.stderr);
+    const answer = JSON.parse(r.stdout);
+    assert.equal(answer.kind, "release-status");
+    assert.equal(answer.ok, false);
+    assert.equal(answer.refusalKind, "unknown-name");
+    assert.deepEqual(answer.rejected, { flag, value });
+    // The fixture declares neither releases nor targets: nothing to offer.
+    assert.deepEqual(answer.declared, []);
+    assert.match(answer.refusal, new RegExp("`" + value + "`"));
+  }
+});
+
+test("the declared set is named when there is one, and an answer carries ok: true", () => {
+  const dir = backlogRepo();
+  for (const [key, name] of [["releases", "r1"], ["releases", "r2"]]) {
+    const r = run(dir, ["declare", key, name, "--dir", "backlog", "--reason", "a fixture"]);
+    assert.equal(r.status, 0, r.stderr);
+  }
+  const refused = JSON.parse(run(dir, ["deploy", "status", "--dir", "backlog", "--release", "r9", "--json"]).stdout);
+  assert.deepEqual(refused.declared, ["r1", "r2"]);
+  const answered = run(dir, ["deploy", "status", "--dir", "backlog", "--release", "r1", "--json"]);
+  assert.equal(answered.status, 0, answered.stderr);
+  assert.equal(JSON.parse(answered.stdout).ok, true);
+});
+
+test("a misspelt flag and a missing value are still usage errors (exit 2)", () => {
+  const dir = backlogRepo();
+  for (const args of [["--relase", "r1"], ["--release"]]) {
+    const r = run(dir, ["deploy", "status", "--dir", "backlog", ...args, "--json"]);
+    assert.equal(r.status, 2, args.join(" "));
+    assert.equal(r.stdout, "");
+  }
+});
