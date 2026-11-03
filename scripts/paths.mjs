@@ -99,7 +99,7 @@ export function resolveBacklogDir(opts = {}) {
     // A directory named EXPLICITLY that does not look like a backlog is a usage
     // error — not a silent fall-through to the next source.
     if (strict) {
-      throw new Error(
+      throw new NotABacklogError(
         "That directory does not look like a backlog: " + abs +
           " (expecting a tasks/ subdirectory and one of: " +
           [BOARDS_FILENAME, CONFIG_FILENAME, TEMPLATE_FILENAME].join(", ") + ")"
@@ -133,6 +133,13 @@ export function resolveBacklogDir(opts = {}) {
   // must get an answer about that filesystem, not about the real one.
   throw new BacklogNotFoundError(cwd, exists);
 }
+
+/**
+ * A directory NAMED explicitly (`--dir`, `BACKLOG_DIR`) that is not a backlog.
+ * A type of its own so a caller answering in JSON (`check --json`, TL-541) can
+ * tell it from a programmer error without matching the sentence.
+ */
+export class NotABacklogError extends Error {}
 
 /**
  * "There is no backlog here" — a FORESEEN state with a name (TL-47).

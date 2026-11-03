@@ -1152,7 +1152,7 @@ implementation detail. Every reading command answers in the same envelope:
 | `where` | `where` | `home`, `homeSource`, `config`, `data`, `preferences` (path and whether it exists), `agentProfiles` (path and whether it exists), `backlog` (the root and the rule that found it; null when none was found), `error` (why none was found) |
 | `serve --list` | `serve-list` | `servers` (one row per registered viewer, each carrying its own state: running, stale — the entry outlived its process — or elsewhere, meaning another host wrote it and this one may not judge it), `stateDir`, `host` |
 | `serve --stop` | `serve-stop` | `stopped` (one result per port asked about, each naming an outcome: stopped, already-gone, not-registered, not-ours, elsewhere or would-not-stop), `requested` |
-| `check` | `check` | `ok`, `root`, `failed` (the guards that failed), `guards` |
+| `check` | `check` | `ok`, `root` (null when no backlog was found — then `failed` is backlog and `guards` holds that one entry, whose output is the sentence the human form prints; exit 1), `failed` (the guards that failed), `guards` |
 | `board` | `board` | `board`, `rule`, `matched`, `isDefault`, `reason` |
 | `next-id` | `next-id` | `nextId`, `id`, `prefix`, `max`, `source`, `trees`, `branches`, `known` |
 | `instructions` | `instructions` | `topics`, `topic`, `role`, `text`, `version` |

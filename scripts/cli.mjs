@@ -39,7 +39,7 @@ import { ConfigError, formatConfigError, loadConfig } from "./config.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { MARK, color, failure, plainChildEnv } from "./ui.mjs";
 import { CHECK_GUARDS, effectiveSeverity, guardsForRun } from "./check-guards.mjs";
-import { resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
+import { BacklogNotFoundError, NotABacklogError, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { FIELD_SHAPES, REASON_MAX_LENGTH } from "./task-fields.mjs";
 import { DELEGATION_POLICIES } from "./agent-contract.mjs";
 import { dropInferredGitDir } from "./git-env.mjs";
@@ -2249,7 +2249,28 @@ function runCheck(args) {
   // BL-1445: the same fix as in build-backlog.mjs — `join(HERE, "..")` is
   // co-location that says nothing about being an assumption. The resolver keeps
   // it as the last of four sources, so nothing changes where it used to work.
-  const root = resolveBacklogDirOrExit({ dir: plan.dir || undefined, moduleDir: HERE }, N + " check").root;
+  // NO BACKLOG IS A VERDICT, and under `--json` it is an envelope (TL-541):
+  // `root: null` and the failed pseudo-guard `backlog`, whose `output` is the
+  // sentence the human form prints — as `doctor --json` answers the same
+  // directory. An empty stdout could not be told from a crash. Exit 1 either
+  // way; 2 stays for a wrongly built invocation.
+  let root;
+  if (plan.json) {
+    try {
+      root = resolveBacklogDir({ dir: plan.dir || undefined, moduleDir: HERE }).root;
+    } catch (e) {
+      if (!(e instanceof BacklogNotFoundError) && !(e instanceof NotABacklogError)) throw e;
+      const output = [e.message].concat(e.details || []).join("\n");
+      console.error(failure(N + " check", e.message, e.details || []));
+      printJson("check", {
+        ok: false, root: null, failed: ["backlog"],
+        guards: [{ name: "backlog", severity: "gate", ok: false, exit: 1, output }],
+      });
+      return 1;
+    }
+  } else {
+    root = resolveBacklogDirOrExit({ dir: plan.dir || undefined, moduleDir: HERE }, N + " check").root;
+  }
   const tasksDir = join(root, "tasks");
 
   // The configuration is checked ONCE, here (TL-60). Every guard is a separate

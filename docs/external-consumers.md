@@ -201,6 +201,14 @@ contradict each other), and then stdout is empty.
 
 A successful `deploy status --json` or `plan --json` carries `ok: true`.
 
+**No backlog is a verdict, not a refusal.** `doctor --json` and `check --json`
+over a directory that holds no backlog — none found, or a `--dir` that is not
+one — both answer their own kind with `ok: false`, `root: null` and exit 1.
+`doctor` names the failed check `backlog` in `checks`; `check` names the
+failed guard `backlog` in `failed`, and `guards` holds that one entry
+(`{ name: "backlog", severity: "gate", ok: false, exit: 1, output }`) with the
+sentence the human form prints as its `output`. No other guard ran.
+
 **`plan --json` wave tasks are objects** `{ id, title, status, blocked_by,
 known, open, executor }`. They were objects before TL-534 as well — `title`
 and `blocked_by` are added keys, so the root shape did not change. A task file
