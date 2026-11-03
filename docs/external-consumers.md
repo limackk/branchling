@@ -231,7 +231,7 @@ Common to all of them:
 | `handoff <ID>` | `--to-role` and `--reason` | `task-handoff` |
 | `release <ID>` | `--reason` | `task-release` |
 | `ask <ID>` | `--question`; `--recommend` once `--option` is given | `task-ask` |
-| `decide <ID>` | `--reason`, or `--resolves <event id> --choose <n>` | `task-decide` |
+| `decide <ID>` | `--reason` (any text: `--reason=<text>` or `--reason -- <text>` for one starting with `-`), or `--resolves <event id> --choose <n>`; `--require-actor` refuses (`actor-required`, exit 1) rather than record the default actor; `actorSource` says where the actor came from | `task-decide` |
 | `done <ID>` | nothing — the verification contract runs; `--reason` for an archived status that requires one | `verification-run` |
 | `declare releases <name>` | `--reason` | `vocabulary-declare` |
 | `declare deploy_targets <name>` | `--reason`, and `--repository` or at least one `--stage` | `vocabulary-declare` |

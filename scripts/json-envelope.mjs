@@ -347,8 +347,11 @@ export const KINDS = {
   // the envelope's, so the refusal moved to `refusalKind` and `refusal`, the
   // names every other writing kind already uses. `chosen` is null when the
   // answer was typed, `lifted` null when nothing was blocked on it.
+  // `actorSource` (TL-537) says which rung named the actor: `flag`, `env`,
+  // `config` (the user configuration's `actor:`) or `default` — the agent
+  // fallback nobody stated.
   "task-decide": {
-    ok: null, id: null, decision: null, chosen: null, openQuestions: [], lifted: null,
+    ok: null, id: null, decision: null, chosen: null, openQuestions: [], lifted: null, actorSource: null,
     refusalKind: null, refusal: null, details: [],
   },
   // `vocabulary --json` (TL-532): what config.yaml declares, in declared order.
