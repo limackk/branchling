@@ -158,6 +158,17 @@ and group by `role`, never by `name`: a backlog may rename every status.
 role by declaring it; `closed` and `cancelled` may only be given to an
 archived status, the other three only to an active one.
 
+## Listing the archive
+
+`query --json` searches the ACTIVE tasks unless told otherwise.
+`--scope archived` searches the statuses `archived_statuses` names, and
+`--scope all` every task file, whatever its status — including one whose
+status the vocabulary does not declare. `--scope active` is the default. The
+envelope's `scope` says which was searched, and is `null` when `--status`
+chose the statuses itself; giving both flags is a usage error (exit 2). An
+Open / Archived / All switch is these three calls, with no status name in the
+consumer.
+
 ## Questions waiting on a person
 
 `log --open-questions --json` lists, in one call, every question still waiting

@@ -92,7 +92,7 @@ function collectBacklog(root, opts = {}) {
 const VALUE_FLAGS = new Set([
   "--status", "--priority", "--board", "--label", "--epic", "--owner", "--type",
   "--role", "--executor", "--release", "--blocked-by", "--text", "--limit", "--sort", "--tasks", "--dir",
-  "--modified-file", "--env", "--not-env",
+  "--modified-file", "--env", "--not-env", "--scope",
 ]);
 const BOOL_FLAGS = new Set(["--json", "--files", "--count", "--help", "-h"]);
 
@@ -139,6 +139,26 @@ if (opts.help || opts.h) {
   printLine("\nexit code: 0 = the query ran (including on zero matches), 2 = a usage error.");
   process.exit(0);
 }
+
+// WHICH TASKS a query searches before any criterion narrows them (TL-540):
+// `active` — today's default — `archived`, the statuses `archived_statuses`
+// names, or `all`. A consumer building an Open / Archived / All switch would
+// otherwise have to name every status, hard-coding the vocabulary and missing
+// a task whose status is outside it. `--status` already chooses the statuses
+// explicitly, so both together would let one silently override the other.
+const SCOPES = ["active", "archived", "all"];
+if (opts.scope !== undefined) {
+  if (SCOPES.indexOf(opts.scope) < 0) {
+    console.error(refusal(`${N} query`, `--scope ${opts.scope} is not a scope`, SCOPES.join(" | ")));
+    process.exit(2);
+  }
+  if (opts.status !== undefined) {
+    console.error(refusal(`${N} query`, "--scope and --status both choose which statuses are searched",
+      "--scope " + SCOPES.join("|") + ", or --status <s> — not both"));
+    process.exit(2);
+  }
+}
+const SCOPE = opts.status !== undefined ? null : (opts.scope || "active");
 
 // The data directory: --tasks (pointing straight at tasks/), otherwise the same
 // backlog directory resolution as in every other script (BL-1399).
@@ -299,7 +319,10 @@ let hits = [];
 const HELD_UNOBSERVABLE = new Map();
 for (const one of COLLECTED) {
   const archived = new Set(one.config ? one.config.archivedStatuses : ["done", "cancelled"]);
-  let some = filterTasks(one.tasks, f, archived);
+  // `archived` and `all` lift the active-only default; `archived` then keeps
+  // the closed ones by this tree's own status, the same test that default uses.
+  let some = filterTasks(one.tasks, f, SCOPE === "active" ? archived : new Set());
+  if (SCOPE === "archived") some = some.filter((t) => archived.has(t.status));
   // APPLIED AFTER the shared filters, and deliberately not inside `filterTasks`:
   // that module is the one `next` also uses to choose work, and a criterion that
   // needs a git process has no business in the dispatcher's hot path.
@@ -387,6 +410,9 @@ if (opts.json) {
     tasks: shown,
     total,
     limit,
+    // Which tasks were searched (TL-540): `active`, `archived` or `all`, and
+    // null when `--status` named the statuses itself.
+    scope: SCOPE,
     scan: { scanned: SCAN.scanned, reason: SCAN.reason, branches: SCAN.branches, trees: SCAN.trees.length },
     // Beside `tasks`, never inside it: a consumer that treats these as ordinary
     // rows would be reporting work this checkout cannot open (TL-145).
