@@ -452,6 +452,9 @@ export const KINDS = {
   "task-show": {
     ok: null, id: null, title: null, status: null, priority: null, confidence: null, blocks: [], file: null,
     deploy: null, elsewhere: [], scan: null, blockers: [], blocked: null,
+    // The markdown after the frontmatter, verbatim, under `--body` (TL-542);
+    // null without the flag — the key stays, as every declared key does.
+    body: null,
     refusalKind: null, refusal: null, details: [],
   },
   // `log --open-questions --json` (TL-536): every unanswered question on an

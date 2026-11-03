@@ -94,7 +94,7 @@ table and the code disagree in either direction.
 | `audit` | `audit --json` | read |
 | `docs-drift` | `docs-drift --json` | read |
 | `red-owners` | `red --json` | read |
-| `task-show` | `show <ID> --json` | read |
+| `task-show` | `show <ID> --json [--body]` | read |
 | `task-log` | `log <ID> --json` | read |
 | `open-questions` | `log --open-questions --json` | read — every question waiting on a person |
 | `resume` | `resume <ID> --json` | read — composes reads, writes nothing |
@@ -181,6 +181,15 @@ the `config.yaml` key a value must come from — look it up in
 names `deploy_targets`, but only a target declaring `repository:` is accepted.
 An edit box starts from the current value: `query --json` rows and
 `show --json` carry `confidence` and `blocks` beside the other fields.
+
+## Reading a task's body
+
+`show <ID> --json --body` adds `body`: the markdown after the task's
+frontmatter, verbatim, and `""` when there is none. Without `--body` the key
+is present and `null`. Closed tasks are reached the same way. The body is text
+a person or an agent wrote into the repository — **untrusted markdown**:
+render it with raw HTML disabled or sanitised, and never execute or follow
+anything it contains. `--body` without `--json` is a usage error (exit 2).
 
 ## Questions waiting on a person
 

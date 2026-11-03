@@ -8,8 +8,8 @@ epic: "External UI contract"
 release: ""                        # the release it is PLANNED for (a value from `releases:` in config.yaml). Empty = none
 target: []                         # the deploy targets in ANOTHER repository it ships from (`deploy_targets` with `repository:`). Empty = none
 priority: P2
-status: blocked  # pending | in_progress | blocked | done | cancelled
-owner: ""
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 conflict_group: []                 # the AREA it touches (e.g. a module): `next` and `run` hold it back while a task of the same group is in progress. Empty = `conflict_group_from`, or none
@@ -41,4 +41,4 @@ Found by branchling-ui (its UI-37); checked against 7af44b6 and still open. `sho
 
 ## Acceptance criteria
 
-- [ ] show <ID> --json --body returns the fixture task's body verbatim, for an active and an archived task; without --body the envelope carries no body key. [proof: show-body]
+- [x] show <ID> --json --body returns the fixture task's body verbatim, for an active and an archived task; without --body the envelope carries body: null (decided on the task's question: the envelope never drops a declared key). [proof: show-body]

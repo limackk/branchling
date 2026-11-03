@@ -323,3 +323,44 @@ test("the task's body is not reprinted — only the one-line header and the comp
   assert.match(out.split("\n")[0], new RegExp("^" + waiting + "  Waiting for production  "));
   assert.doesNotMatch(out, /## Goal|## Acceptance criteria|verification:/);
 });
+
+// ── TL-542: the body, through --json --body ─────────────────────────────────
+
+/** Replace everything after the frontmatter, so the expected body is known. */
+function setBody(dir, id, body) {
+  const path = taskFile(dir, id);
+  const text = readFileSync(path, "utf8");
+  const end = text.indexOf("\n---\n", 4) + 5;
+  writeFileSync(path, text.slice(0, end) + body, "utf8");
+}
+
+test("show --json --body returns the body verbatim, for an active and an archived task", () => {
+  const dir = backlogRepo();
+  const open = newTask(dir, "Open work");
+  const closed = newTask(dir, "Finished work");
+  const bodies = {
+    [open]: "\n## Goal\n\nKeep `<script>` as text — and the *markdown*.\n\n---\n\nA rule above stays.\n",
+    [closed]: "\n## Goal\n\nDone already.\n",
+  };
+  for (const [id, body] of Object.entries(bodies)) setBody(dir, id, body);
+  setField(dir, closed, "status", "done");
+  for (const [id, body] of Object.entries(bodies)) {
+    const r = show(dir, id, "--json", "--body");
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(JSON.parse(r.stdout).body, body, id);
+  }
+  // A task with nothing after its frontmatter answers "".
+  setBody(dir, open, "");
+  assert.equal(JSON.parse(show(dir, open, "--json", "--body").stdout).body, "");
+});
+
+test("without --body the key is null, and --body without --json is a usage error", () => {
+  const dir = backlogRepo();
+  const id = newTask(dir, "Plain");
+  const json = showJson(dir, id);
+  assert.ok("body" in json);
+  assert.equal(json.body, null);
+  const r = show(dir, id, "--body");
+  assert.equal(r.status, 2);
+  assert.equal(r.stdout, "");
+});

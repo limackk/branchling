@@ -33,7 +33,8 @@
  * Tests: `node --test scripts/tests/show.test.mjs`
  */
 
-import { dirname } from "node:path";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { absentHere, crossBranchState, describeDivergence, divergences, scanNote } from "./branch-scan.mjs";
@@ -55,7 +56,7 @@ import { MARK, color, failure, priorityPaint, refusal, statusPaint, table } from
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const COMMAND = N + " show";
-const KNOWN = ["--json"];
+const KNOWN = ["--json", "--body"];
 
 function shortSha(sha) { return sha ? sha.slice(0, 12) : null; }
 
@@ -76,10 +77,12 @@ export function parseShowArgs(argv) {
   }
   let id = null;
   let json = false;
+  let body = false;
   let literal = false;
   for (const a of taken.argv) {
     if (!literal && a === "--") { literal = true; continue; }
     if (!literal && a === "--json") { json = true; continue; }
+    if (!literal && a === "--body") { body = true; continue; }
     if (!literal && a.startsWith("-")) {
       throw { code: 2, problem: "unknown flag: " + a, available: KNOWN.concat(["--dir"]).join(" ") };
     }
@@ -87,7 +90,10 @@ export function parseShowArgs(argv) {
     id = a;
   }
   if (!id) throw { code: 2, problem: "no task id — usage: " + N + " show <ID> [--json]", available: KNOWN.concat(["--dir"]).join(" ") };
-  return { id, json, dir: taken.dir };
+  // The body is printed for a PROGRAM only: the text form answers what the
+  // file does not hold, and a person reads the file itself.
+  if (body && !json) throw { code: 2, problem: "--body is a key of the --json answer, and needs --json", available: KNOWN.concat(["--dir"]).join(" ") };
+  return { id, json, body, dir: taken.dir };
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -273,6 +279,18 @@ export function renderShow(model, config, paint = color) {
 // The command
 // ──────────────────────────────────────────────────────────────────────────
 
+/**
+ * The markdown after a task's frontmatter, verbatim (TL-542) — "" when there is
+ * none. Closed tasks live in `tasks/` too, so this reaches them alike. The text
+ * is the task author's and UNTRUSTED: a consumer renders it as markdown it
+ * did not write.
+ */
+export function taskBody(root, file) {
+  const text = readFileSync(join(root, file), "utf8");
+  const m = text.match(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/);
+  return m ? text.slice(m[0].length) : text;
+}
+
 export function run(argv) {
   let plan;
   try {
@@ -291,7 +309,7 @@ export function run(argv) {
     else console.error(failure(COMMAND, model.refusal, model.details, [N + " query --text " + plan.id + " --status " + config.statuses.join(",")]));
     return 1;
   }
-  if (plan.json) printJson("task-show", showJson(model));
+  if (plan.json) printJson("task-show", { ...showJson(model), body: plan.body ? taskBody(root, model.file) : null });
   else printLine(renderShow(model, config));
   return 0;
 }
