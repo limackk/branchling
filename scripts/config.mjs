@@ -37,7 +37,10 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { backlogPaths } from "./paths.mjs";
 import { PRODUCT_NAME } from "./product.mjs";
 import { DEFAULT_TASK_ID_PREFIX, PREFIX_SHAPE, inferPrefix, taskIdPatterns } from "./task-id.mjs";
-import { ACTOR_NAMESPACES, CONFLICT_GROUP_SOURCES, RELEASE_SHAPE, ROLE_SHAPE, isValidActor, unquote } from "./task-fields.mjs";
+import {
+  ACTOR_NAMESPACES, ARCHIVED_STATUS_ROLES, CONFLICT_GROUP_SOURCES, RELEASE_SHAPE, ROLE_SHAPE, STATUS_ROLES,
+  isValidActor, unquote,
+} from "./task-fields.mjs";
 import { LINK_POLICIES, parseVerification } from "./criteria.mjs";
 import { DEFAULT_LOCK_TTL_MINUTES } from "./lock.mjs";
 import { estimateHours } from "./estimate.mjs";
@@ -112,6 +115,13 @@ export const DEFAULTS = Object.freeze({
   status_colors: {},
   // Statuses drawn struck through (the convention: "this will not happen").
   status_strikethrough: [],
+  // What each status MEANS to a consumer that cannot know its name (TL-532):
+  // `status: role`, the role one of `STATUS_ROLES`. A status with no entry has
+  // its role DERIVED from the keys that already say it (`archived_statuses`,
+  // `in_progress_status`, `awaiting_vouch_status`, `reason_required_statuses`),
+  // so the key is needed only where the derivation guesses wrong — an archived
+  // status other than the first that still means "finished", say.
+  status_roles: {},
   priority_colors: {},
   label_colors: {},
   dashboard_open_statuses: ["pending", "in_progress", "blocked"],
@@ -307,7 +317,7 @@ const LIST_KEYS = new Set([
   "dashboard_open_statuses", "status_strikethrough", "reason_required_statuses",
   "docs_status_pending_patterns", "contract_programs", "release_gate_accept",
 ]);
-const MAP_KEYS = new Set(["epic_aliases", "status_colors", "priority_colors", "label_colors"]);
+const MAP_KEYS = new Set(["epic_aliases", "status_colors", "priority_colors", "label_colors", "status_roles"]);
 const NUMBER_KEYS = new Set([
   "title_max_length", "lock_ttl_minutes", "active_branch_days", "abandoned_after_days",
   "cross_branch_poll_seconds",
@@ -747,6 +757,7 @@ export function loadConfig(root, opts = {}) {
     titleMaxLength: values.title_max_length,
     epicAliases: values.epic_aliases,
     statusStrikethrough: values.status_strikethrough,
+    statusRoles: values.status_roles,
     colors: {
       status: values.status_colors,
       priority: values.priority_colors,
@@ -949,6 +960,24 @@ export function validateConfig(config) {
   for (const s of config.reasonRequiredStatuses) {
     if (config.statuses.indexOf(s) < 0) {
       problems.push(`\`reason_required_statuses\` contains \`${s}\`, which is not in \`statuses\``);
+    }
+  }
+  for (const [s, role] of Object.entries(config.statusRoles || {})) {
+    if (config.statuses.indexOf(s) < 0) {
+      problems.push(`\`status_roles\` names \`${s}\`, which is not in \`statuses\``);
+      continue;
+    }
+    if (STATUS_ROLES.indexOf(role) < 0) {
+      problems.push(`\`status_roles\` gives \`${s}\` the role \`${role}\` — expecting one of ` + STATUS_ROLES.join(", "));
+      continue;
+    }
+    const archived = config.archivedStatuses.indexOf(s) >= 0;
+    if (archived !== (ARCHIVED_STATUS_ROLES.indexOf(role) >= 0)) {
+      problems.push(
+        `\`status_roles\` gives \`${s}\` the role \`${role}\`, but \`${s}\` is ` +
+          (archived ? "archived — expecting " : "active — expecting ") +
+          STATUS_ROLES.filter((r) => (ARCHIVED_STATUS_ROLES.indexOf(r) >= 0) === archived).join(", ")
+      );
     }
   }
   for (const axis of ["timing", "env"]) {

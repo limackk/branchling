@@ -302,6 +302,7 @@ export const KINDS = {
   // scope of `--release <name>` (TL-505), null without the flag. `records`
   // names who recorded each recorded stage, when and why (TL-506).
   "release-status": { trunk: null, scan: null, explanation: null, filter: null, targets: [], unplaced: null, release: null, records: [] },
+
   // `deploy record --json` (TL-506). `tag` is the annotated tag object the
   // ref now points at; `previous` the commit it stood at before, null on the
   // first record; `direction` one of first, unchanged, forward, backward,
@@ -338,6 +339,15 @@ export const KINDS = {
   "task-decide": {
     ok: null, id: null, decision: null, chosen: null, openQuestions: [], lifted: null,
     refusalKind: null, refusal: null, details: [],
+  },
+  // `vocabulary --json` (TL-532): what config.yaml declares, in declared order.
+  // Every key is named after the config.yaml key it comes from — `set --fields
+  // --json` names those keys, and a consumer reads this envelope at them. Each
+  // status carries its `role` and the `roleSource` that gave it, so a role the
+  // tool derived is never mistaken for one the project declared.
+  vocabulary: {
+    root: null, statuses: [], priorities: [], types: [], confidence: [], estimates: [],
+    labels: [], labels_closed: null, boards: [], roles: [], releases: [], deploy_targets: [],
   },
   // `where --json` (TL-34, in the envelope since TL-528). `backlog` is null
   // and `error` says why when no backlog was found — outside a repository that
@@ -480,6 +490,7 @@ export const KIND_EXERCISE = {
   "task-list": { args: ["query", "--json"] },
   stats: { args: ["stats", "--json"] },
   doctor: { args: ["doctor", "--json"] },
+  vocabulary: { args: ["vocabulary", "--json"] },
   // Which directories the run uses. It writes nothing; the harness's `--dir`
   // makes the backlog half non-null, the case with the most keys filled in.
   where: { args: ["where", "--json"] },

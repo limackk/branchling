@@ -89,6 +89,7 @@ does not know it is two files. No `config.yaml` = generic `DEFAULTS` (no
 | `title_max_length` | title validation |
 | `epic_aliases` | merging spelling variants of an epic |
 | `status_colors`, `priority_colors`, `label_colors`, `status_strikethrough` | presentation; no entry = a color from the cyclic palette |
+| `status_roles` | what each status MEANS to a program that cannot know its name: `status: role`, the role one of `open`, `active`, `waiting`, `closed`, `cancelled`. A status with no entry has its role derived (TL-532); `vocabulary --json` reports both and says which. `closed` and `cancelled` belong to archived statuses only |
 | `dashboard_open_statuses`, `dashboard_burndown_kind/value` | what "open" means and what the burndown burns down |
 | `contract_programs` | additional bare executable names a verification contract may invoke when their subcommands overlap this tool's commands; values add to the generic defaults rather than replacing them |
 | `closing_contract` | verification entries `done` appends to every task's own contract and runs after it — the shape of a task's `verification:` entries (`- id:` then `bash:` or `manual:`). For the repository-wide guard a module's tests do not reach. It never stands in for a missing task contract, and an id a task's own entry also uses refuses that closing before anything runs. `take --probe`, `next --probe` and `check --proofs` run the same contract (TL-495) |

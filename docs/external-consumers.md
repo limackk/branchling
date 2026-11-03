@@ -70,6 +70,7 @@ The rules a consumer may rely on, stated in `scripts/json-envelope.mjs`:
   reworded. Read `kind`, `ok`, `id` and `refusalKind`.
 - Task fields carry THE PROJECT'S vocabulary. Statuses, priorities, labels,
   boards and roles come from that repository's `config.yaml`; read them from
+  `vocabulary --json` (all of them at once, in declared order) or from
   `<command> --help --json` (each flag's `values`), never hard-code them.
 
 ## The declared kinds
@@ -97,6 +98,7 @@ table and the code disagree in either direction.
 | `task-log` | `log <ID> --json` | read |
 | `resume` | `resume <ID> --json` | read — composes reads, writes nothing |
 | `release-status` | `deploy status --json` | read |
+| `vocabulary` | `vocabulary --json` | read — the vocabularies `config.yaml` declares |
 | `where` | `where --json` | read — the directories this run resolves |
 | `serve-list` | `serve --list --json` | read — machine-local state |
 | `agent-profiles` | `profile list --json`, `profile show --json` | read — machine-local state |
@@ -129,6 +131,31 @@ carries `schemaVersion` and `kind` beside them. One shape did change: a
 `message`; `kind` now belongs to the envelope, so they are `refusalKind` and
 `refusal`, as in every other writing kind. A consumer that branched on the
 old refusal `kind` reads `refusalKind` instead.
+
+## Reading the vocabulary
+
+`vocabulary --json` answers every vocabulary the backlog declares, in the
+order `config.yaml` declares it — `statuses`, `priorities`, `types`,
+`confidence`, `estimates`, `labels` with `labels_closed`, `boards`, `roles`,
+`releases` and `deploy_targets`. Each key is named after the `config.yaml` key
+it comes from, so a field description that names a key (`set --fields --json`)
+is looked up here without a translation table.
+
+Each status is `{ name, archived, reasonRequired, role, roleSource }`. Colour
+and group by `role`, never by `name`: a backlog may rename every status.
+
+| `role` | Meaning | Derived, when `status_roles:` does not name the status, from |
+|---|---|---|
+| `open` | waiting to be taken | every other active status |
+| `active` | somebody holds it | `in_progress_status` |
+| `waiting` | stopped on somebody else | `awaiting_vouch_status`, and an active status listed in `reason_required_statuses` |
+| `closed` | finished | the first of `archived_statuses` — the one `done` writes |
+| `cancelled` | ended without being done | every other archived status |
+
+`roleSource` is `status_roles` when the project declared the role and
+`derived` when the tool applied the rule above. A project corrects a derived
+role by declaring it; `closed` and `cancelled` may only be given to an
+archived status, the other three only to an active one.
 
 ## The writing commands
 

@@ -61,6 +61,15 @@ export const ROLE_SHAPE = /^[a-z0-9][a-z0-9._-]{0,62}$/;
 // entries. Dots admit version numbers.
 export const RELEASE_SHAPE = ROLE_SHAPE;
 
+// What a status MEANS, for a reader that cannot know this project's words
+// (TL-532). A consumer colours and groups by the role, never by the name, so a
+// backlog that renamed `blocked` to `on_hold` is still drawn as waiting. The
+// order is the lifecycle order. `closed` and `cancelled` are roles of archived
+// statuses only, the other three of active ones: a role that contradicted
+// `archived_statuses` would make a consumer hide a task the tool still serves.
+export const STATUS_ROLES = Object.freeze(["open", "active", "waiting", "closed", "cancelled"]);
+export const ARCHIVED_STATUS_ROLES = Object.freeze(["closed", "cancelled"]);
+
 // ──────────────────────────────────────────────────────────────────────────
 // Actor identity (BL-1404 step 4)
 // ──────────────────────────────────────────────────────────────────────────
