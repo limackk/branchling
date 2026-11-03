@@ -168,9 +168,19 @@ contradict each other), and then stdout is empty.
 
 | Command | `refusalKind` | Extra keys | Exit |
 |---|---|---|---|
+| `plan` | `plan-unparsable` — `plan.yaml` cannot be read; each problem names its line | `problems` | 1 |
+| `plan` | `plan-contradicts-blocked-by` — the order puts a task before what it is blocked by | `problems` | 1 |
+| `plan` | `plan-contradicts-tree` — the plan names an unknown task, one task twice, or a `together` group across waves | `problems` | 1 |
 | `deploy status` | `unknown-name` — `--release`, `--target` or `--env` names nothing declared | `rejected` (`{ flag, value }`), `declared` (what that flag accepts; `[]` when nothing is) | 1 |
 
-A successful `deploy status --json` carries `ok: true`.
+A successful `deploy status --json` or `plan --json` carries `ok: true`.
+
+**`plan --json` wave tasks are objects** `{ id, title, status, blocked_by,
+known, open, executor }`. They were objects before TL-534 as well — `title`
+and `blocked_by` are added keys, so the root shape did not change. A task file
+that is closed still lives under `tasks/`, so a finished wave keeps its titles;
+`known: false` (and `title: null`) means the plan names an id no task file
+has.
 
 ## The writing commands
 

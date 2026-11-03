@@ -171,7 +171,7 @@ test("stale = a plan task already closed in a wave AFTER the active one", () => 
 test("a plan naming a task that is not in the tree marks it, rather than dropping it", () => {
   const s = state(THREE_WAVES, [t("TL-1", "done"), t("TL-2"), t("TL-3")]);
   const missing = s.waves[2].tasks[0];
-  assert.deepEqual(missing, { id: "TL-4", status: null, known: false, open: false, executor: "" });
+  assert.deepEqual(missing, { id: "TL-4", title: null, status: null, blocked_by: [], known: false, open: false, executor: "" });
 });
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -336,6 +336,91 @@ test("a plan that does not parse is refused too, and never half-reported", () =>
       const r = run(["--dir", dir]);
       assert.equal(r.code, 1, r.out + r.err);
       assert.match(r.err, /unknown key `sprint`/);
+    },
+  );
+});
+
+// ── TL-534: under --json a refusal is an envelope, and wave tasks carry titles ──
+
+test("a contradicting plan answers the plan-contradicts-blocked-by envelope with exit 1", () => {
+  withSandbox(
+    (d) => {
+      task(d, "TL-1");
+      task(d, "TL-2", { blocked_by: ["TL-1"] });
+      writeFileSync(
+        join(d, "plan.yaml"),
+        ["waves:", '  - name: "First"', "    tasks: [TL-2]", '  - name: "Second"', "    tasks: [TL-1]", ""].join("\n"),
+        "utf8",
+      );
+    },
+    (dir) => {
+      const j = run(["--dir", dir, "--json"]);
+      assert.equal(j.code, 1, j.err);
+      const answer = JSON.parse(j.out);
+      assert.equal(answer.kind, "plan");
+      assert.equal(answer.ok, false);
+      assert.equal(answer.refusalKind, "plan-contradicts-blocked-by");
+      assert.ok(answer.refusal);
+      assert.equal(answer.problems.length, 1);
+      assert.match(answer.problems[0], /TL-2 is in wave 1 \(First\) but is blocked by TL-1/);
+      assert.deepEqual(answer.waves, []);
+    },
+  );
+});
+
+test("an unparsable plan answers plan-unparsable with its line numbers, never an empty plan", () => {
+  withSandbox(
+    (d) => {
+      task(d, "TL-1");
+      writeFileSync(join(d, "plan.yaml"), "waves: [oops\n", "utf8");
+    },
+    (dir) => {
+      const j = run(["--dir", dir, "--json"]);
+      assert.equal(j.code, 1, j.err);
+      const answer = JSON.parse(j.out);
+      assert.equal(answer.ok, false);
+      assert.equal(answer.exists, true);
+      assert.equal(answer.refusalKind, "plan-unparsable");
+      assert.deepEqual(answer.problems.map((p) => p.match(/^line \d+/)[0]), ["line 1"]);
+      // POSITIVE CONTROL: the empty inline list is still a plan with no waves.
+      writeFileSync(join(dir, "plan.yaml"), "waves: []\n", "utf8");
+      const empty = run(["--dir", dir, "--json"]);
+      assert.equal(empty.code, 0, empty.err);
+      assert.equal(JSON.parse(empty.out).ok, true);
+    },
+  );
+});
+
+test("a plan naming an unknown task is plan-contradicts-tree", () => {
+  withSandbox(
+    (d) => {
+      task(d, "TL-1");
+      writeFileSync(join(d, "plan.yaml"), ["waves:", '  - name: "A"', "    tasks: [TL-1, TL-7]", ""].join("\n"), "utf8");
+    },
+    (dir) => {
+      const answer = JSON.parse(run(["--dir", dir, "--json"]).out);
+      assert.equal(answer.refusalKind, "plan-contradicts-tree");
+      assert.match(answer.problems[0], /TL-7/);
+    },
+  );
+});
+
+test("every planned task carries its title, status and blockers — a closed one included", () => {
+  withSandbox(
+    (d) => {
+      task(d, "TL-1", { status: "done" });
+      task(d, "TL-2", { blocked_by: ["TL-1"] });
+      writeFileSync(join(d, "plan.yaml"), ["waves:", '  - name: "A"', "    tasks: [TL-1, TL-2]", ""].join("\n"), "utf8");
+    },
+    (dir) => {
+      const answer = JSON.parse(run(["--dir", dir, "--json"]).out);
+      assert.equal(answer.ok, true);
+      const [closed, open] = answer.waves[0].tasks;
+      assert.equal(closed.id, "TL-1");
+      assert.equal(closed.title, "T");
+      assert.equal(closed.status, "done");
+      assert.deepEqual(closed.blocked_by, []);
+      assert.deepEqual(open.blocked_by, ["TL-1"]);
     },
   );
 });

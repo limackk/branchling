@@ -200,10 +200,16 @@ export const KINDS = {
   // so its absence is an answer and not an error to be told apart from one.
   // `unplanned` and `stale` are lists rather than counts on purpose: a plan rots
   // by accumulating work nobody scheduled, and a number cannot be acted on.
+  // A plan that cannot be read or executed is `ok: false` (TL-534) with
+  // `refusalKind` `plan-unparsable` or `plan-contradicts-blocked-by` (or
+  // `plan-contradicts-tree` for an unknown, duplicated or misgrouped id) and
+  // every problem in `problems`. Each wave task is `{ id, title, status,
+  // blocked_by, known, open, executor }`, closed tasks included.
   plan: {
-    root: null, exists: null, updated: null, rationale: null, waves: [],
+    ok: null, root: null, exists: null, updated: null, rationale: null, waves: [],
     activeWave: null, nextUp: [], inProgress: [], unplanned: [], coverage: null, stale: [],
     inProgressStatus: null,
+    refusalKind: null, refusal: null, problems: [],
   },
   // ── The WRITING commands (TL-119) ──────────────────────────────────────
   //
