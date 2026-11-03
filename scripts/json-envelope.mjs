@@ -297,10 +297,18 @@ export const KINDS = {
   // `set --json` (TL-521). `changes` are the history entries the write
   // appended, so a consumer reads the attribution without opening the log; an
   // unchanged value appends none beyond `updated`.
+  // A value outside the field's vocabulary is `refusalKind: "unknown-value"`
+  // (TL-543) with `rejected` `{ field, value }` and `declared`, the values the
+  // field accepts; `usage` stays for an unknown field or a malformed value.
   "task-set": {
     ok: null, id: null, file: null, field: null, value: null, actor: null, changes: [],
-    refusalKind: null, refusal: null, details: [],
+    refusalKind: null, refusal: null, details: [], rejected: null, declared: [],
   },
+  // `set --fields --json` (TL-543): the fields `set` edits, each with whether
+  // it is a list, whether it may be cleared, the config.yaml key its value must
+  // come from (`vocabulary`, as `vocabulary --json` names it), the key its
+  // values are only suggested from, and a vocabulary the tool fixes itself.
+  "task-set-fields": { root: null, fields: [] },
   // `deploy status --json` (TL-502). `trunk` names the ref whose commits count
   // and where that choice came from; `scan` every ref read with its SHA, so the
   // answer can be dated; `explanation` why an empty answer is empty. Each
@@ -442,7 +450,7 @@ export const KINDS = {
   // `task-list`. `blocked` is the verdict over `blockers`, by the rule `next`
   // dispatches on, so a consumer does not re-derive which statuses count.
   "task-show": {
-    ok: null, id: null, title: null, status: null, priority: null, file: null,
+    ok: null, id: null, title: null, status: null, priority: null, confidence: null, blocks: [], file: null,
     deploy: null, elsewhere: [], scan: null, blockers: [], blocked: null,
     refusalKind: null, refusal: null, details: [],
   },
@@ -644,6 +652,7 @@ export const KIND_EXERCISE = {
     args: ["set", ABSENT_TASK, "title", "A title", "--actor", "agent:test", "--json"],
     refuses: true, writes: true,
   },
+  "task-set-fields": { args: ["set", "--fields", "--json"] },
   // A task that is not there: same reason as above — the refusal path.
   "verification-run": { args: ["done", ABSENT_TASK, "--json"], refuses: true, writes: true },
   // A question about a task that is not there (TL-148): the refusal path again,

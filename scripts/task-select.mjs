@@ -156,6 +156,10 @@ export function parseTaskRecord(raw, file) {
     type: str(meta.type),
     labels: meta.labels,
     blocked_by: meta.blocked_by,
+    // The declared reverse links and how much the estimate is trusted (TL-543):
+    // read so an interface's edit box for them starts from the current value.
+    blocks: meta.blocks,
+    confidence: str(meta.confidence),
     // The day the task was created. Read here because the time report needs the
     // start of a lead time (TL-27), and a report re-parsing the files a second
     // time would be a second answer to "what does this task say".

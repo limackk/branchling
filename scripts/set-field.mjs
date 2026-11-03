@@ -14,18 +14,19 @@
  */
 import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { DEDICATED_FIELDS, writeTaskField } from "./field-write.mjs";
+import { DEDICATED_FIELDS, writableFields, writeTaskField } from "./field-write.mjs";
+import { FIELD_SHAPES } from "./task-fields.mjs";
 import { rebuildViews } from "./handoff-task.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { resolveBacklogDir } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { failure } from "./ui.mjs";
 
-export const SET_FLAGS = ["--dir", "--actor", "--reason", "--json"];
+export const SET_FLAGS = ["--dir", "--actor", "--reason", "--json", "--fields"];
 
 /** PURE: the invocation, or an Error whose second line onward is the detail. */
 export function parseSetArgs(args) {
-  const plan = { id: null, field: null, value: null, dir: null, actor: null, reason: null, json: false };
+  const plan = { id: null, field: null, value: null, dir: null, actor: null, reason: null, json: false, fields: false };
   const positional = [];
   let literal = false;
   for (let i = 0; i < args.length; i++) {
@@ -33,6 +34,7 @@ export function parseSetArgs(args) {
     if (literal) { positional.push(arg); continue; }
     if (arg === "--") { literal = true; continue; }
     if (arg === "--json") { plan.json = true; continue; }
+    if (arg === "--fields") { plan.fields = true; continue; }
     if (SET_FLAGS.indexOf(arg) >= 0) {
       const value = args[++i];
       if (value === undefined) throw new Error("`" + arg + "` with no value");
@@ -41,6 +43,12 @@ export function parseSetArgs(args) {
     }
     if (arg.startsWith("-") && arg !== "-") throw new Error("unknown flag: " + arg + "\navailable: " + SET_FLAGS.join(" "));
     positional.push(arg);
+  }
+  if (plan.fields) {
+    if (positional.length || plan.actor !== null || plan.reason !== null) {
+      throw new Error("`--fields` describes what `set` edits, and takes no task, field, value, --actor or --reason");
+    }
+    return plan;
   }
   // The value may legitimately be empty (`epic ""` clears it), so the count is
   // what is checked, not truthiness.
@@ -52,10 +60,44 @@ export function parseSetArgs(args) {
   return plan;
 }
 
+/**
+ * The fields `set` edits, as data (TL-543). PURE.
+ *
+ * `vocabulary` is the config.yaml key a value MUST come from — the key
+ * `vocabulary --json` answers under — or null when the field takes free text,
+ * task ids or a vocabulary the tool fixes; `values` carries such a fixed one.
+ * `suggestions` names a key whose values are offered but not enforced. A
+ * consumer that hard-coded this list could only compare it, in a test, with a
+ * sentence in a usage refusal.
+ *
+ * @returns {{name: string, list: boolean, clearable: boolean, vocabulary: string|null,
+ *            suggestions: string|null, values: string[]|null}[]}
+ */
+export function setFieldDescriptions(config) {
+  const shapes = new Map(FIELD_SHAPES.map((shape) => [shape.key, shape]));
+  return writableFields(config, Object.keys(DEDICATED_FIELDS)).map((spec) => {
+    const shape = shapes.get(spec.key) || {};
+    const list = spec.kind === "list";
+    let vocabulary = null;
+    if (spec.dynamic === "boards") vocabulary = "boards";
+    else if (spec.dictionary && (list ? spec.closed : (spec.kind === "enum" && !spec.fixed))) vocabulary = spec.dictionary;
+    let suggestions = shape.suggestFrom || null;
+    if (!suggestions && list && spec.dictionary && !spec.closed) suggestions = spec.dictionary;
+    return {
+      name: spec.key,
+      list,
+      clearable: list || !!spec.allowEmpty,
+      vocabulary,
+      suggestions,
+      values: spec.fixed ? spec.options.slice() : null,
+    };
+  });
+}
+
 export function run(argv) {
   const wantsJson = argv.includes("--json");
-  const refuse = (message, details = [], code = 1, refusalKind = "refused") => {
-    if (wantsJson) printJson("task-set", { ok: false, refusalKind, refusal: message, details });
+  const refuse = (message, details = [], code = 1, refusalKind = "refused", extra = {}) => {
+    if (wantsJson) printJson("task-set", { ok: false, refusalKind, refusal: message, details, ...extra });
     else console.error(failure(N + " set", message, details, [N + " set --help"]));
     return code;
   };
@@ -69,6 +111,18 @@ export function run(argv) {
   try { root = resolveBacklogDir({ dir: plan.dir || undefined }).root; }
   catch (e) { return refuse(e.message, [], 2, "usage"); }
   const config = loadConfigOrExit(root);
+  if (plan.fields) {
+    const fields = setFieldDescriptions(config);
+    if (plan.json) printJson("task-set-fields", { root, fields });
+    else {
+      for (const f of fields) {
+        console.log(f.name.padEnd(16) + (f.list ? "list" : "value").padEnd(7) +
+          (f.vocabulary ? "from " + f.vocabulary : f.values ? "one of " + f.values.join(", ") : "free") +
+          (f.suggestions ? " · suggested from " + f.suggestions : "") + (f.clearable ? " · clearable" : ""));
+      }
+    }
+    return 0;
+  }
   const result = writeTaskField({
     root, config, source: "set",
     id: plan.id, field: plan.field, value: plan.value,
@@ -79,7 +133,10 @@ export function run(argv) {
     // An invocation that names nothing writable, or no task, is the caller's to
     // fix (2); a reason the status demands, or a failed record, is a refusal (1).
     const code = result.kind === "usage" || result.kind === "dedicated" || result.kind === "not-found" ? 2 : 1;
-    return refuse(result.message, result.details || [], code, result.kind);
+    // An `unknown-value` is a refusal (1): a value a person typed, answered
+    // with what was rejected and what is declared (TL-543).
+    const extra = result.kind === "unknown-value" ? { rejected: result.rejected, declared: result.declared } : {};
+    return refuse(result.message, result.details || [], code, result.kind, extra);
   }
   rebuildViews(root);
   if (plan.json) {

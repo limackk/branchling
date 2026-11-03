@@ -219,3 +219,83 @@ test("status, owner, an unknown field, a bad value and a reserved reason are ref
     assert.notDeepEqual(snapshot(fx.root, fx.id), before);
   } finally { rmSync(fx.dir, { recursive: true, force: true }); }
 });
+
+// ── TL-543: the fields as data, an unknown value, and the fields read back ──
+
+test("set --fields --json lists every editable field with its vocabulary key", () => {
+  const fx = fixture();
+  try {
+    const r = set(fx.root, ["--fields", "--json"]);
+    assert.equal(r.status, 0, r.stderr);
+    const answer = JSON.parse(r.stdout);
+    assert.equal(answer.kind, "task-set-fields");
+    const byName = Object.fromEntries(answer.fields.map((f) => [f.name, f]));
+    // The dedicated fields are not here: `set` refuses them.
+    assert.ok(!byName.status && !byName.owner);
+    assert.deepEqual(byName.priority, { name: "priority", list: false, clearable: false, vocabulary: "priorities", suggestions: null, values: null });
+    assert.equal(byName.confidence.vocabulary, "confidence");
+    assert.equal(byName.board.vocabulary, "boards");
+    assert.equal(byName.release.vocabulary, "releases");
+    assert.equal(byName.target.vocabulary, "deploy_targets");
+    assert.equal(byName.title.vocabulary, null);
+    assert.equal(byName.estimate.suggestions, "estimates");
+    assert.deepEqual(byName.executor.values, ["human", "agent"]);
+    assert.equal(byName.blocks.list, true);
+    // POSITIVE CONTROL: every name is a field the writer really accepts.
+    for (const name of Object.keys(byName)) {
+      const probe = set(fx.root, ["T-0", name, "x", "--json"]);
+      assert.notEqual(JSON.parse(probe.stdout).refusalKind, "dedicated", name);
+      assert.doesNotMatch(probe.stdout, /This field is not editable/, name);
+    }
+    // Every vocabulary key is one `vocabulary --json` answers under.
+    const vocab = JSON.parse(spawnSync(process.execPath, [CLI, "vocabulary", "--dir", fx.root, "--json"], { encoding: "utf8" }).stdout);
+    for (const f of answer.fields) if (f.vocabulary) assert.ok(f.vocabulary in vocab, f.vocabulary);
+    assert.equal(set(fx.root, ["--fields", fx.id, "--json"]).status, 2);
+  } finally {
+    rmSync(fx.dir, { recursive: true, force: true });
+  }
+});
+
+test("a value outside the vocabulary answers refusalKind unknown-value with the declared values", () => {
+  const fx = fixture();
+  try {
+    const before = snapshot(fx.root, fx.id);
+    const r = set(fx.root, [fx.id, "priority", "P9", "--json"]);
+    assert.equal(r.status, 1, r.stderr);
+    const answer = JSON.parse(r.stdout);
+    assert.equal(answer.ok, false);
+    assert.equal(answer.refusalKind, "unknown-value");
+    assert.deepEqual(answer.rejected, { field: "priority", value: "P9" });
+    assert.deepEqual(answer.declared, ["P0", "P1", "P2", "P3"]);
+    // A field that requires an undeclared vocabulary declares nothing.
+    const role = JSON.parse(set(fx.root, [fx.id, "role", "analyst", "--json"]).stdout);
+    assert.equal(role.refusalKind, "unknown-value");
+    assert.deepEqual(role.declared, []);
+    // An unknown FIELD stays a usage error.
+    const field = set(fx.root, [fx.id, "frobnicate", "x", "--json"]);
+    assert.equal(field.status, 2);
+    assert.equal(JSON.parse(field.stdout).refusalKind, "usage");
+    assert.deepEqual(snapshot(fx.root, fx.id), before);
+  } finally {
+    rmSync(fx.dir, { recursive: true, force: true });
+  }
+});
+
+test("query rows and show --json carry confidence and blocks", () => {
+  const fx = fixture();
+  try {
+    assert.equal(set(fx.root, [fx.id, "confidence", "low"]).status, 0);
+    const other = spawnSync(process.execPath, [CLI, "new", "--dir", fx.root, "--title", "Waits"], { encoding: "utf8" });
+    const waiting = other.stdout.match(/[A-Z]+-\d+/)[0];
+    assert.equal(set(fx.root, [fx.id, "blocks", waiting]).status, 0);
+    const query = JSON.parse(spawnSync(process.execPath, [CLI, "query", "--dir", fx.root, "--json"], { encoding: "utf8" }).stdout);
+    const row = query.tasks.find((t) => t.id === fx.id);
+    assert.equal(row.confidence, "low");
+    assert.deepEqual(row.blocks, [waiting]);
+    const show = JSON.parse(spawnSync(process.execPath, [CLI, "show", fx.id, "--dir", fx.root, "--json"], { encoding: "utf8" }).stdout);
+    assert.equal(show.confidence, "low");
+    assert.deepEqual(show.blocks, [waiting]);
+  } finally {
+    rmSync(fx.dir, { recursive: true, force: true });
+  }
+});

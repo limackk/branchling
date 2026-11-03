@@ -123,7 +123,16 @@ export function writeTaskField(opts) {
       { details: ["editable: " + fields.map((f) => f.key).join(", ")] });
   }
   const normalized = normalizeValue(field, opts.value, { fields, options: fieldOptions(root, config) });
-  if (!normalized.ok) return refused("usage", 400, normalized.error);
+  if (!normalized.ok) {
+    // A value outside the vocabulary is a kind of its own (TL-543): the fix is
+    // one of `declared`, which a caller can offer instead of a usage message.
+    if (normalized.unknown) {
+      return refused("unknown-value", 400, normalized.error, {
+        rejected: { field, value: normalized.unknown.value }, declared: normalized.unknown.declared,
+      });
+    }
+    return refused("usage", 400, normalized.error);
+  }
   // A reason that IS given has to be a sentence somebody wrote: the reserved
   // values are what the tool writes when nobody stated one.
   if (reason && !isValidReason(reason)) {

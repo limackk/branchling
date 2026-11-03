@@ -148,6 +148,8 @@ export function computeShow({ root, config, id }) {
     title: task.title,
     status: task.status,
     priority: task.priority,
+    confidence: task.confidence,
+    blocks: task.blocks || [],
     file: task.file,
     ...computeDeploy({ root, config, task }),
     elsewhere: divergences(task.status, scan.byId.get(task.id)),

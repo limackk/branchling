@@ -110,6 +110,7 @@ table and the code disagree in either direction.
 | `task-handoff` | `handoff <ID> --json` | write |
 | `task-release` | `release <ID> --json` | write |
 | `task-set` | `set <ID> <field> <value> --json` | write |
+| `task-set-fields` | `set --fields --json` | read — the fields `set` edits |
 | `task-body` | `body <ID> --json` | write |
 | `task-ask` | `ask <ID> --json` | write |
 | `task-decide` | `decide <ID> --json` | write |
@@ -169,6 +170,18 @@ chose the statuses itself; giving both flags is a usage error (exit 2). An
 Open / Archived / All switch is these three calls, with no status name in the
 consumer.
 
+## Editing a field
+
+`set --fields --json` describes every field `set` edits:
+`{ name, list, clearable, vocabulary, suggestions, values }`. `vocabulary` is
+the `config.yaml` key a value must come from — look it up in
+`vocabulary --json` under the same name — or `null` for free text and task ids;
+`values` carries a vocabulary the tool fixes itself (`executor`), and
+`suggestions` a key whose values are offered without being enforced. `target`
+names `deploy_targets`, but only a target declaring `repository:` is accepted.
+An edit box starts from the current value: `query --json` rows and
+`show --json` carry `confidence` and `blocks` beside the other fields.
+
 ## Questions waiting on a person
 
 `log --open-questions --json` lists, in one call, every question still waiting
@@ -197,6 +210,7 @@ contradict each other), and then stdout is empty.
 | `plan` | `plan-unparsable` — `plan.yaml` cannot be read; each problem names its line | `problems` | 1 |
 | `plan` | `plan-contradicts-blocked-by` — the order puts a task before what it is blocked by | `problems` | 1 |
 | `plan` | `plan-contradicts-tree` — the plan names an unknown task, one task twice, or a `together` group across waves | `problems` | 1 |
+| `set` (a write) | `unknown-value` — the value is outside the field's vocabulary; `usage` stays for an unknown field or a malformed value | `rejected` (`{ field, value }`), `declared` | 1 |
 | `deploy status` | `unknown-name` — `--release`, `--target` or `--env` names nothing declared | `rejected` (`{ flag, value }`), `declared` (what that flag accepts; `[]` when nothing is) | 1 |
 
 A successful `deploy status --json` or `plan --json` carries `ok: true`.

@@ -930,7 +930,11 @@ export function unquote(s) {
  *        A dynamic field with no supplied set is NOT validated against a
  *        dictionary — better an unchecked board than a viewer that refuses a
  *        board added after it was built.
- * @returns {{ok: boolean, value?: string|string[], error?: string}}
+ * `unknown` names the rejected value and the declared set when the value is
+ * outside the field's vocabulary (TL-543), as opposed to a malformed one.
+ *
+ * @returns {{ok: boolean, value?: string|string[], error?: string,
+ *            unknown?: {value: string, declared: string[]}}}
  */
 export function normalizeValue(key, value, ctx) {
   const spec = fieldSpec(key, (ctx && ctx.fields) || []);
@@ -950,7 +954,10 @@ export function normalizeValue(key, value, ctx) {
         const allowed = spec.options.length
           ? "allowed: " + spec.options.join(", ")
           : "`" + (spec.dictionary || spec.key) + ":` in config.yaml declares nothing this field may name";
-        return { ok: false, error: "Unknown value \"" + item + "\" — " + allowed + (spec.note ? " (" + spec.note + ")" : "") };
+        return {
+          ok: false, error: "Unknown value \"" + item + "\" — " + allowed + (spec.note ? " (" + spec.note + ")" : ""),
+          unknown: { value: item, declared: spec.options.slice() },
+        };
       }
       if (spec.itemPattern && !new RegExp(spec.itemPattern).test(item)) {
         return { ok: false, error: "\"" + item + "\" does not match the format " + (spec.itemHint || spec.itemPattern) };
@@ -977,12 +984,13 @@ export function normalizeValue(key, value, ctx) {
       error: "Unknown value \"" + raw + "\" — `" + (spec.dictionary || spec.key) +
         ":` is not declared in config.yaml, so this backlog does not use " +
         (spec.label || spec.key).toLowerCase() + "s",
+      unknown: { value: raw, declared: [] },
     };
   }
   if (spec.kind === "enum" && dictionary && dictionary.length) {
     if (raw === "" && spec.allowEmpty) return { ok: true, value: raw };
     if (dictionary.indexOf(raw) < 0) {
-      return { ok: false, error: "Unknown value \"" + raw + "\" — allowed: " + dictionary.join(", ") };
+      return { ok: false, error: "Unknown value \"" + raw + "\" — allowed: " + dictionary.join(", "), unknown: { value: raw, declared: dictionary.slice() } };
     }
   }
   return { ok: true, value: raw };
