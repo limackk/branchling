@@ -89,7 +89,7 @@ table and the code disagree in either direction.
 | `next-id` | `next-id --json` | read |
 | `instructions` | `instructions [topic] --json` | read |
 | `command-help` | `<command> --help --json` | read — the input surface of a command |
-| `plan` | `plan --json` | read |
+| `plan` | `plan --json`, `plan init --json` | read; `plan init` writes `plan.yaml` |
 | `pr-summary` | `pr-summary --json` | read |
 | `audit` | `audit --json` | read |
 | `docs-drift` | `docs-drift --json` | read |
@@ -168,6 +168,7 @@ contradict each other), and then stdout is empty.
 
 | Command | `refusalKind` | Extra keys | Exit |
 |---|---|---|---|
+| `plan init` | `plan-exists` — `plan.yaml` already exists; nothing was written | `problems` (empty) | 1 |
 | `plan` | `plan-unparsable` — `plan.yaml` cannot be read; each problem names its line | `problems` | 1 |
 | `plan` | `plan-contradicts-blocked-by` — the order puts a task before what it is blocked by | `problems` | 1 |
 | `plan` | `plan-contradicts-tree` — the plan names an unknown task, one task twice, or a `together` group across waves | `problems` | 1 |
@@ -221,6 +222,8 @@ Common to all of them:
 | `declare releases <name>` | `--reason` | `vocabulary-declare` |
 | `declare deploy_targets <name>` | `--reason`, and `--repository` or at least one `--stage` | `vocabulary-declare` |
 | `deploy record` | `--target`, `--stage`, a commit or tag, `--reason` | `release-record` |
+| `plan init` | `--rationale` (one line); refused with `plan-exists` where a plan exists | `plan` |
+| `plan add <ID>... --wave` | `--why` to create the wave; no `--json` | none (text) |
 | `seed` | a plan as JSON on stdin | `seed` |
 | `import --from github` | issues as JSON on stdin | `import` |
 

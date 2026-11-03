@@ -731,3 +731,53 @@ test("an id named twice, and several ids for `move` or `remove`, are usage error
     assert.equal(remove.code, 2, remove.out + remove.err);
     assert.equal(planOf(dir), before);
   }));
+
+// ── `plan init` (TL-535) ───────────────────────────────────────────────────
+
+test("init on a backlog without a plan, then add --why, gives a plan that plan --json reads", () =>
+  withSandbox((dir) => {
+    rmSync(join(dir, "plan.yaml"));
+    // POSITIVE CONTROL: without init, add still refuses — there is no plan.
+    assert.equal(run(["plan", "add", "TL-1", "--wave", "First", "--why", "x", "--dir", dir]).code, 1);
+
+    const init = run(["plan", "init", "--rationale", "Foundations first: the rest builds on them", "--json", "--dir", dir]);
+    assert.equal(init.code, 0, init.err);
+    const answer = JSON.parse(init.out);
+    assert.equal(answer.kind, "plan");
+    assert.equal(answer.ok, true);
+    assert.equal(answer.exists, true);
+    assert.equal(answer.rationale, "Foundations first: the rest builds on them");
+    assert.deepEqual(answer.waves, []);
+    assert.match(planOf(dir), /^updated: \d{4}-\d{2}-\d{2}$/m);
+
+    const add = run(["plan", "add", "TL-1", "--wave", "First", "--why", "it starts here", "--dir", dir]);
+    assert.equal(add.code, 0, add.out + add.err);
+    const read = run(["plan", "--json", "--dir", dir]);
+    assert.equal(read.code, 0, read.err);
+    const plan = JSON.parse(read.out);
+    assert.equal(plan.ok, true);
+    assert.deepEqual(plan.waves.map((w) => [w.name, w.tasks.map((t) => t.id)]), [["First", ["TL-1"]]]);
+    assert.equal(plan.rationale, "Foundations first: the rest builds on them");
+  }));
+
+test("init on an existing plan is refused and changes nothing", () =>
+  withSandbox((dir) => {
+    const before = planOf(dir);
+    const r = run(["plan", "init", "--rationale", "a second start", "--json", "--dir", dir]);
+    assert.equal(r.code, 1);
+    const answer = JSON.parse(r.out);
+    assert.equal(answer.ok, false);
+    assert.equal(answer.refusalKind, "plan-exists");
+    assert.equal(planOf(dir), before);
+  }));
+
+test("init without a rationale, or with a line break in it, is a usage error and writes nothing", () =>
+  withSandbox((dir) => {
+    rmSync(join(dir, "plan.yaml"));
+    for (const args of [[], ["--rationale", "  "], ["--rationale", "one\ntwo"], ["--rationale", "x", "--bogus"]]) {
+      const r = run(["plan", "init", ...args, "--dir", dir]);
+      assert.equal(r.code, 2, args.join(" "));
+      assert.equal(r.out, "");
+      assert.equal(existsSync(join(dir, "plan.yaml")), false);
+    }
+  }));

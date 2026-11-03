@@ -54,7 +54,8 @@ import { fileURLToPath } from "node:url";
 import { reportPlanErrors } from "./check-backlog-plan.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { backlogPaths, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
-import { parsePlanYaml, validatePlan } from "./plan.mjs";
+import { parsePlanYaml, planState, validatePlan } from "./plan.mjs";
+import { printJson } from "./json-envelope.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { printLine } from "./stdout.mjs";
 import { todayStamp } from "./today.mjs";
@@ -637,6 +638,80 @@ export function runPlanEdit(op, argv) {
   }
   if (parsed.values.why) printLine("  the wave was created, with your sentence above it");
   printLine("  " + paths.planPath + " — the change is the diff of this one file, and of nothing else");
+  return 0;
+}
+
+/**
+ * The text of a plan with no waves yet (TL-535). PURE.
+ *
+ * The rationale is the argument for the order, written by the caller — the
+ * reason `plan add` refused to create the file is that a plan with no argument
+ * is an order nobody can review. It is one line, quoted, so a `#` or a colon in
+ * the sentence cannot change what the parser reads.
+ */
+export function initialPlanText(rationale, today) {
+  const quoted = '"' + String(rationale).replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
+  return ["updated: " + today, "rationale: " + quoted, "waves:", ""].join("\n");
+}
+
+/**
+ * `plan init --rationale "<why>"` — write plan.yaml where there is none.
+ *
+ * Exit: 0 written · 1 a plan already exists (nothing is touched) · 2 usage.
+ * Under `--json` both the answer and the refusal are a `plan` envelope; the
+ * refusal's `refusalKind` is `plan-exists`.
+ */
+export function runPlanInit(argv) {
+  const command = N + " plan init";
+  const cli = takeDirFlag(argv);
+  const usage = ["usage: " + N + " plan init --rationale \"<why this order>\" [--json]"];
+  let rationale;
+  let asJson = false;
+  for (let i = 0; i < cli.argv.length; i++) {
+    const a = cli.argv[i];
+    if (a === "--json") { asJson = true; continue; }
+    if (a === "--rationale") {
+      rationale = cli.argv[++i];
+      if (rationale === undefined) return fail(command, "--rationale requires a value", usage, [N + " plan --help"]);
+      continue;
+    }
+    return fail(command, (a.startsWith("-") ? "unknown flag: " : "unexpected argument: ") + a, usage, [N + " plan --help"]);
+  }
+  const why = String(rationale == null ? "" : rationale).trim();
+  if (!why) {
+    return fail(command, "--rationale is required, and it may not be empty", usage.concat([
+      "The plan is an order somebody argued for; the file starts with that argument.",
+    ]), [N + " plan --help"]);
+  }
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f\u007f]/.test(why)) {
+    return fail(command, "--rationale is one line — a line break or control character cannot be written", usage, [N + " plan --help"]);
+  }
+
+  const root = resolveBacklogDirOrExit({ dir: cli.dir, moduleDir: HERE }, command).root;
+  const config = loadConfigOrExit(root);
+  const paths = backlogPaths(root);
+  if (existsSync(paths.planPath)) {
+    const sentence = "there is already a plan — " + paths.planPath;
+    if (asJson) {
+      printJson("plan", {
+        ok: false, root, exists: true, inProgressStatus: config.inProgressStatus || null,
+        refusalKind: "plan-exists", refusal: sentence, problems: [],
+      });
+    }
+    return fail(command, sentence, [
+      "init starts an order; it never replaces one. Edit it with `plan add`, `move` or `remove`.",
+    ], [N + " plan"], 1);
+  }
+  const text = initialPlanText(why, todayStamp());
+  writeFileSync(paths.planPath, text, "utf8");
+  if (asJson) {
+    const tasks = readTaskMetas(paths.tasksDir, config);
+    printJson("plan", { ok: true, root, exists: true, ...planState(parsePlanYaml(text).plan, tasks, config) });
+    return 0;
+  }
+  printLine(color.ok(MARK.ok) + " plan: " + paths.planPath + " written, with your rationale and no waves");
+  printLine("  schedule the first task with: " + N + " plan add <ID> --wave \"<name>\" --why \"<sentence>\"");
   return 0;
 }
 

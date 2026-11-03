@@ -40,7 +40,7 @@ import { printJson } from "./json-envelope.mjs";
 import { backlogPaths, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { loadPlan, planState, validatePlan } from "./plan.mjs";
 import { readHistory } from "./history.mjs";
-import { EDIT_SUBCOMMANDS, runPlanEdit } from "./plan-write.mjs";
+import { EDIT_SUBCOMMANDS, runPlanEdit, runPlanInit } from "./plan-write.mjs";
 import { reportPlanErrors } from "./check-backlog-plan.mjs";
 import { readTaskMetas } from "./task-io.mjs";
 import { MARK, color, failure, heading, refusal, statusPaint, table, width } from "./ui.mjs";
@@ -175,9 +175,10 @@ function main(argv) {
   // An unknown word FAILS — a silent no-op looks like it worked.
   const first = argv[0];
   if (first !== undefined && !first.startsWith("-")) {
+    if (first === "init") return runPlanInit(argv.slice(1));
     if (EDIT_SUBCOMMANDS.indexOf(first) < 0) {
       console.error(failure(N + " plan", "unknown subcommand: " + first,
-        ["available: " + EDIT_SUBCOMMANDS.join(", ") + ", or no subcommand at all to READ the plan"],
+        ["available: init, " + EDIT_SUBCOMMANDS.join(", ") + ", or no subcommand at all to READ the plan"],
         [N + " plan --help"]));
       return 2;
     }
