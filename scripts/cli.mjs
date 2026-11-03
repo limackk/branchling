@@ -318,6 +318,7 @@ export const COMMANDS = {
     usage: [
       `${N} log <ID> [--limit <n>] [--decisions] [--json] [--dir <path>]`,
       `${N} log --modified-file <path> --decisions [--limit <n>] [--json] [--dir <path>]`,
+      `${N} log --open-questions [--json] [--dir <path>]`,
       "",
       "  The read side of `history`. A task file carries only the CURRENT value of a",
       "  field; the reason it got there lives in `history/<ID>.jsonl`, and until this",
@@ -333,6 +334,9 @@ export const COMMANDS = {
       "                     decisions carried by every task whose commits touched this",
       "                     file. A trailing `/` selects a directory. Paths are relative",
       "                     to the repository root. This area form requires --decisions",
+      "  --open-questions   every question still waiting on an answer, across the",
+      "                     active tasks, with its options and recommendation — one",
+      "                     call instead of one per task. Takes no task id",
       "  --json             the same exchanges for a program",
       "",
       "  ONE ROW PER EXCHANGE, NOT PER FIELD. The log is written one entry per field,",

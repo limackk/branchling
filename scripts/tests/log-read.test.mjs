@@ -135,7 +135,7 @@ test("a message that is NOT the reason keeps its text", () => {
   const [x] = foldExchanges([
     { ts: "T", actor: "user:a", source: "ask", reason: "waiting for an answer", id: "Q", field: "__comment__", from: "", to: "which of the two?" },
   ]);
-  assert.deepEqual(x.messages, [{ id: "Q", kind: "question", text: "which of the two?" }]);
+  assert.deepEqual(x.messages, [{ id: "Q", kind: "question", text: "which of the two?", options: [], recommend: null }]);
 });
 
 test("a reserved reason is marked as one, so nobody quotes a machine's word", () => {
@@ -248,4 +248,64 @@ test("reading the log WRITES NOTHING — the tree is byte-identical afterwards",
   assert.equal(run(["log", fx.id, "--dir", fx.dir]).status, 0);
   assert.equal(run(["log", fx.id, "--dir", fx.dir, "--json"]).status, 0);
   assert.deepEqual(snapshot(fx.dir), before, "reading the log changed the backlog");
+});
+
+// ── `log --open-questions` (TL-536) ────────────────────────────────────────
+
+function ask(dir, id, question, extra = []) {
+  const r = run(["ask", id, "--dir", dir, "--question", question, "--actor", "agent:asker", "--json", ...extra]);
+  assert.equal(r.status, 0, r.stderr);
+  return JSON.parse(r.stdout).question.id;
+}
+
+test("open questions across the backlog are listed by one call, with their options", () => {
+  const fx = fixture();
+  const more = ["Second task with a question", "Third task, answered"].map((title) => {
+    const r = run(["new", "--dir", fx.dir, "--title", title]);
+    assert.equal(r.status, 0, r.stderr);
+    return r.stdout.match(/[A-Z]+-\d+/)[0];
+  });
+  const withMenu = ask(fx.dir, fx.id, "Which store?", ["--option", "files — no service", "--option", "sqlite", "--recommend", "1"]);
+  const plain = ask(fx.dir, more[0], "Is the title right?");
+  const answered = ask(fx.dir, more[1], "Ship it?", ["--option", "yes", "--option", "no", "--recommend", "2"]);
+  const decided = run(["decide", more[1], "--dir", fx.dir, "--resolves", answered, "--choose", "2", "--actor", "user:person"]);
+  assert.equal(decided.status, 0, decided.stderr);
+
+  const r = run(["log", "--open-questions", "--dir", fx.dir, "--json"]);
+  assert.equal(r.status, 0, r.stderr);
+  const answer = JSON.parse(r.stdout);
+  assert.equal(answer.kind, "open-questions");
+  assert.equal(answer.total, 2);
+  assert.deepEqual(answer.questions.map((q) => q.event), [withMenu, plain]);
+  const [first, second] = answer.questions;
+  assert.equal(first.task, fx.id);
+  assert.equal(first.title, "A task that changes hands");
+  assert.equal(first.question, "Which store?");
+  assert.equal(first.askedBy, "agent:asker");
+  assert.match(first.askedAt, /^\d{4}-\d{2}-\d{2}T/);
+  assert.deepEqual(first.options, ["files — no service", "sqlite"]);
+  assert.equal(first.recommend, 1);
+  assert.deepEqual(second.options, []);
+  assert.equal(second.recommend, null);
+  assert.ok(!answer.questions.some((q) => q.task === more[1]), "an answered question was listed");
+
+  // The per-task read carries the same menu on the question message.
+  const log = JSON.parse(run(["log", fx.id, "--decisions", "--dir", fx.dir, "--json"]).stdout);
+  const message = log.exchanges.flatMap((x) => x.messages).find((m) => m.id === withMenu);
+  assert.deepEqual(message.options, ["files — no service", "sqlite"]);
+  assert.equal(message.recommend, 1);
+
+  const text = run(["log", "--open-questions", "--dir", fx.dir]);
+  assert.equal(text.status, 0, text.stderr);
+  assert.match(text.stdout, /2 open questions/);
+});
+
+test("--open-questions takes no task id and no other narrowing flag", () => {
+  const fx = fixture();
+  for (const extra of [[fx.id], ["--decisions"], ["--limit", "2"]]) {
+    const r = run(["log", "--open-questions", ...extra, "--dir", fx.dir, "--json"]);
+    assert.equal(r.status, 2, extra.join(" "));
+  }
+  const empty = JSON.parse(run(["log", "--open-questions", "--dir", fx.dir, "--json"]).stdout);
+  assert.deepEqual([empty.total, empty.questions], [0, []]);
 });

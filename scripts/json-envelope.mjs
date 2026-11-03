@@ -441,6 +441,11 @@ export const KINDS = {
     deploy: null, elsewhere: [], scan: null, blockers: [], blocked: null,
     refusalKind: null, refusal: null, details: [],
   },
+  // `log --open-questions --json` (TL-536): every unanswered question on an
+  // active task, oldest first, each with what a person needs to answer it —
+  // the question, who asked and when, the options and the recommendation —
+  // and the `event` id `decide --resolves` takes.
+  "open-questions": { root: null, total: null, questions: [] },
   "task-log": {
     ok: null, id: null, title: null, file: null, path: null,
     records: null, total: null, matched: null, decisions: null, limit: null, exchanges: [],
@@ -566,6 +571,7 @@ export const KIND_EXERCISE = {
   // task" refusal — each a complete envelope, and neither a usage error. The id
   // is the sentinel, never typed.
   "task-log": { args: ["log", FIRST_TASK, "--json"] },
+  "open-questions": { args: ["log", "--open-questions", "--json"] },
   // `resume` composes reads and writes nothing (TL-151), so it is NOT a
   // `writes` row: asking it twice of one tree is safe, and
   // `scripts/tests/resume-briefing.test.mjs` proves the tree is byte-identical

@@ -96,6 +96,7 @@ table and the code disagree in either direction.
 | `red-owners` | `red --json` | read |
 | `task-show` | `show <ID> --json` | read |
 | `task-log` | `log <ID> --json` | read |
+| `open-questions` | `log --open-questions --json` | read — every question waiting on a person |
 | `resume` | `resume <ID> --json` | read — composes reads, writes nothing |
 | `release-status` | `deploy status --json` | read |
 | `vocabulary` | `vocabulary --json` | read — the vocabularies `config.yaml` declares |
@@ -156,6 +157,19 @@ and group by `role`, never by `name`: a backlog may rename every status.
 `derived` when the tool applied the rule above. A project corrects a derived
 role by declaring it; `closed` and `cancelled` may only be given to an
 archived status, the other three only to an active one.
+
+## Questions waiting on a person
+
+`log --open-questions --json` lists, in one call, every question still waiting
+on an answer across the active tasks, oldest first. Each entry is
+`{ task, title, status, event, question, askedBy, askedAt, options, recommend }`:
+`options` is the menu the asker offered (`[]` when none), `recommend` the
+1-based number of the option they recommended (`null` when none), and `event`
+is the id `decide <task> --resolves <event>` answers — with `--choose <n>` when
+there are options, or `--reason "…"` for a typed answer. An answered question
+is not listed, nor is one on an archived task. The question messages in
+`log <ID> --json` (and `--decisions`) carry the same `options` and
+`recommend`.
 
 ## When a reading command refuses
 
