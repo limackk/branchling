@@ -168,7 +168,13 @@ export function renderPrompt(template, { spec, errors }) {
     ? "The previous answer was REJECTED for these reasons. Fix them and answer again:\n\n" +
       errors.map((e) => "- " + e).join("\n")
     : "";
-  return body.replace(/\{\{spec\}\}/g, String(spec || "")).replace(/\{\{errors\}\}/g, complaints).trim() + "\n";
+  // One pass with a replacer function, for two reasons. A replacement STRING
+  // expands `$&`, `$'`, `` $` ``, `$1` and `$$`, and a spec that quotes a
+  // shell command carries exactly those (TL-531). Two chained passes would
+  // also substitute a literal `{{errors}}` written INSIDE the spec. A
+  // function's return value is inserted verbatim and is never rescanned.
+  const values = { spec: String(spec || ""), errors: complaints };
+  return body.replace(/\{\{(spec|errors)\}\}/g, (_, key) => values[key]).trim() + "\n";
 }
 
 /**
