@@ -249,7 +249,8 @@ test("POSITIVE CONTROL: check --proofs fails a proven closing once a project ent
     setContract(dir, 'closing_contract:\n  - id: repo-guard\n    bash: "exit 3"\n');
     const r = checkProofs(dir);
     assert.equal(r.code, 1, r.out);
-    assert.match(r.out, /TASK-1 .*`exit 3` exits 3/);
+    // Reported once as the project's finding, naming the closing it fails (TL-497).
+    assert.match(r.out, /- repo-guard: `exit 3` exits 3\n\s+would fail: TASK-1/);
   });
 });
 

@@ -71,6 +71,18 @@
  * `runContract` stops at the first failure, so a sound contract costs the
  * commands up to its first red line and no more.
  *
+ * THE PROJECT'S ENTRIES RUN ONCE PER AUDIT (TL-497). Since TL-495 every proven
+ * closing's contract ends in the project `closing_contract`, as `done` runs it.
+ * Against one tree those entries give one answer, so re-running them for each
+ * closing bought nothing but their cost multiplied by the archive — a
+ * repository-wide suite run hundreds of times — and turned one red project
+ * entry into hundreds of "broken proofs" that were really one finding. They now
+ * run once, after the first closing whose own entries all pass (the position
+ * `done` gives them, so an entry that depends on a task's own work still sees
+ * it), and the result is reused by id and command for every later closing. A
+ * red one is reported ONCE, as a project finding, with the closings it would
+ * have failed: the repair is in `config.yaml`, not in any of those tasks.
+ *
  * Usage:
  *   node scripts/check-backlog-proofs.mjs [--dir <backlog>] [--since <sha>] [--quiet]
  *
@@ -81,7 +93,8 @@
  * Tests: `node --test scripts/tests/proofs.test.mjs`,
  *        `node --test scripts/tests/proofs-progress.test.mjs`,
  *        `node --test scripts/tests/check-contract-falsifiable.test.mjs`,
- *        `node --test scripts/tests/done-closing-contract.test.mjs`
+ *        `node --test scripts/tests/done-closing-contract.test.mjs`,
+ *        `node --test scripts/tests/proofs-project-once.test.mjs`
  */
 
 import { spawnSync } from "node:child_process";
@@ -230,7 +243,11 @@ async function main(argv) {
       collided.push({ id: t.id, file: t.file, collisions: contract.collisions });
       continue;
     }
-    candidates.push({ id: t.id, file: t.file, closing, entries: contract.entries });
+    candidates.push({
+      id: t.id, file: t.file, closing, entries: contract.entries,
+      own: contract.entries.filter((e) => !e.project),
+      project: contract.entries.filter((e) => e.project),
+    });
   }
 
   let selected = candidates;
@@ -276,7 +293,13 @@ async function main(argv) {
   process.on("SIGINT", onSignal);
   process.on("SIGTERM", onSignal);
 
-  const commandsTotal = selected.reduce((n, c) => n + c.entries.length, 0);
+  // The project's entries are counted ONCE (TL-497), because that is how many
+  // times they run: a cost line that still multiplied them by the closings
+  // would overstate the run it announces.
+  const projectKey = (e) => (e.id || "") + "\0" + (e.bash != null ? "bash:" + e.bash : "manual:" + e.manual);
+  const projectUnique = new Set();
+  for (const c of selected) for (const e of c.project) projectUnique.add(projectKey(e));
+  const commandsTotal = selected.reduce((n, c) => n + c.own.length, 0) + projectUnique.size;
   if (progress) {
     // THE COST, BEFORE THE FIRST COMMAND. Each of these is somebody's contract
     // and some of them are whole test suites; an operator who learns the size
@@ -292,9 +315,17 @@ async function main(argv) {
   const started = Date.now();
   const broken = [];
   const vouched = [];
+  // One outcome per project entry, keyed by id and command (TL-497). `failing`
+  // collects, per red project entry, the closings whose own entries all passed
+  // and which `done` would therefore have refused on it.
+  const projectCache = new Map();
+  const failing = new Map();
+  let reachedProject = 0;
   let ran = 0;
   let walked = 0;
   let commandsLeft = commandsTotal;
+  const before = progress ? (e) => progress(`      ${MARK.arrow} ${e.bash}`) : undefined;
+  const after = progress ? (e, r) => progress(`      ${MARK.ok} ${(r.ms / 1000).toFixed(1)}s`) : undefined;
   for (const c of selected) {
     // Keep a boundary between tasks as well as the abortable boundary inside
     // each command. A signal arriving after one contract closes must not start
@@ -304,25 +335,49 @@ async function main(argv) {
     walked++;
     if (progress) {
       progress(
-        `  [${walked}/${selected.length}] ${c.id}: ${c.entries.length} entr(ies), ` +
+        `  [${walked}/${selected.length}] ${c.id}: ${c.own.length} entr(ies), ` +
           `${commandsLeft} command(s) left`
       );
     }
-    const { results, failed, interrupted } = await runContract(c.entries, repoRoot, {
-      capture: true,
-      signal: cancellation.signal,
-      // Named BEFORE it runs, not after: the line an operator needs while the
-      // command hangs is the one that says which command is hanging.
-      before: progress ? (e) => progress(`      ${MARK.arrow} ${e.bash}`) : undefined,
-      after: progress ? (e, r) => progress(`      ${MARK.ok} ${(r.ms / 1000).toFixed(1)}s`) : undefined,
-    });
-    if (interrupted) break;
-    commandsLeft -= c.entries.length;
-    for (const r of results) {
+    // Named BEFORE it runs, not after: the line an operator needs while the
+    // command hangs is the one that says which command is hanging.
+    const own = await runContract(c.own, repoRoot, { capture: true, signal: cancellation.signal, before, after });
+    if (own.interrupted) break;
+    commandsLeft -= c.own.length;
+    for (const r of own.results) {
       if (r.kind === "manual") vouched.push({ id: c.id, entry: r.id || r.command });
       else ran++;
     }
-    if (failed) broken.push({ ...c, failed });
+    // `runContract` stops at the first red line, and so does `done`: a closing
+    // whose own entry fails never reaches the project's, and must not be named
+    // as one the project entry would have failed.
+    if (own.failed) { broken.push({ ...c, failed: own.failed }); continue; }
+    if (!c.project.length) continue;
+    reachedProject++;
+    let interrupted = false;
+    let reused = 0;
+    for (const e of c.project) {
+      const key = projectKey(e);
+      let hit = projectCache.get(key);
+      if (hit) {
+        reused++;
+      } else {
+        const r = await runContract([e], repoRoot, { capture: true, signal: cancellation.signal, before, after });
+        if (r.interrupted) { interrupted = true; break; }
+        hit = { row: r.results[0], failed: r.failed };
+        projectCache.set(key, hit);
+        commandsLeft--;
+        if (hit.row.kind === "manual") vouched.push({ id: "project `closing_contract`", entry: e.id || e.manual });
+        else ran++;
+      }
+      if (hit.failed) {
+        if (!failing.has(key)) failing.set(key, { entry: e, failed: hit.failed, closings: [] });
+        failing.get(key).closings.push(c);
+        break;
+      }
+    }
+    if (interrupted) break;
+    if (progress && reused) progress(`      ${MARK.ok} ${reused} project entr(ies) already run in this audit — result reused`);
   }
   // THE SECOND HALF (TL-260), after the first and never instead of it: a broken
   // proof is a defect in the tree and outranks a defect in a sentence nobody has
@@ -360,6 +415,14 @@ async function main(argv) {
 
   const lines = [];
   if (narrowedNote) lines.push("  " + narrowedNote);
+  if (projectCache.size && reachedProject > 1) {
+    // Said, not left implicit: a reader comparing this count with the archive
+    // must be able to tell a reused result from a command nobody ran.
+    lines.push(
+      `  ${MARK.bullet} ${projectCache.size} project \`closing_contract\` entr(ies) run once ` +
+        `and applied to ${reachedProject} proven closing(s)`
+    );
+  }
   if (vouched.length) {
     lines.push(
       `  ${WARNM} ${vouched.length} manual entr(ies) were vouched for by a person and cannot be re-run`
@@ -393,7 +456,8 @@ async function main(argv) {
     );
   }
 
-  if (!broken.length && !collided.length) {
+  const projectFailures = [...failing.values()];
+  if (!broken.length && !collided.length && !projectFailures.length) {
     console.log(
       `${OKM} proofs: ${ran} verification command(s) re-run across ${selected.length} proven closing(s), ` +
         `each still passing (${seconds}s)`
@@ -413,6 +477,22 @@ async function main(argv) {
     );
     console.error(`    ${b.file}`);
   }
+  if (projectFailures.length) {
+    // ONE finding per red project entry (TL-497), not one per closing: the
+    // repair is in the project's configuration, and a list of every closing as
+    // a broken proof would send readers to task files that hold no part of it.
+    const affected = projectFailures.reduce((n, f) => n + f.closings.length, 0);
+    console.error(
+      `${ERRM} proofs: ${projectFailures.length} project \`closing_contract\` entr(ies) no longer pass ` +
+        `— ${affected} proven closing(s) would fail on them`
+    );
+    for (const f of projectFailures) {
+      console.error(
+        `  - ${f.entry.id || "(no id)"}: \`${f.entry.bash || f.entry.manual}\` exits ${f.failed.exitCode}`
+      );
+      console.error(`    would fail: ${f.closings.map((c) => c.id).join(", ")}`);
+    }
+  }
   if (collided.length) {
     console.error(`${ERRM} proofs: ${collided.length} closed task(s) whose proof cannot be re-run as written`);
     for (const c of collided) {
@@ -422,15 +502,13 @@ async function main(argv) {
     console.error("    A proof id names ONE entry; rename the task's entry or the project's. Nothing was run for these.");
   }
   for (const l of lines) console.error(l);
-  if (!broken.length) return 1;
+  if (!broken.length && !projectFailures.length) return 1;
   console.error("");
   console.error("Nothing was changed and no task was reopened: a broken proof is a finding for a");
   console.error("person. The task file says why the work was done and what it decided — start there,");
   console.error("and use the range since the closing to find what moved:");
-  for (const b of broken) {
-    console.error(`  git log --oneline --since='${(b.closing.ts || "").slice(0, 10)}'`);
-    break;
-  }
+  const first = broken[0] || projectFailures[0].closings[0];
+  console.error(`  git log --oneline --since='${(first.closing.ts || "").slice(0, 10)}'`);
   return 1;
 }
 
