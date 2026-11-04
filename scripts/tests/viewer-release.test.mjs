@@ -243,6 +243,24 @@ test("a gap accepted in configuration is listed apart, and require says the gate
   assert.match(renderRelease(model), /The release gate fails on these \(release_gate: require\)/);
 });
 
+test("a gap's backtick span renders as code, and no gap keeps a literal backtick", () => {
+  const { backlog, ids } = pipelineRepo();
+  const model = releaseViewModel(dataFor(backlog), { tasks: readTasks(backlog) });
+  // Positive control: the fixture must carry a gap whose text has a span, or
+  // the absence of backticks below would hold on an empty sample.
+  const spanned = model.gaps.blocking.find((g) => g.gap === "open-task-deployed" && g.subject === ids.shipped);
+  assert.ok(spanned, "the fixture has no open-task-deployed gap for " + ids.shipped);
+  const span = spanned.detail.match(/`([^`]+)`/);
+  assert.ok(span, "the gap text carries no backtick span: " + spanned.detail);
+  const list = renderRelease(model).match(/<ul class="rel-gap-list">[\s\S]*?<\/ul>/g) || [];
+  assert.ok(list.length > 0, "the gap panel rendered no list");
+  const rows = list.join("").match(/<li class="rel-gap">[\s\S]*?<\/li>/g);
+  assert.equal(rows.length, model.gaps.blocking.length);
+  const row = rows.find((r) => r.includes(ids.shipped) && r.includes("open-task-deployed"));
+  assert.ok(row.includes("<code>" + span[1] + "</code>"), row);
+  for (const r of rows) assert.ok(!r.includes("`"), "a literal backtick in: " + r);
+});
+
 /** The top of `priorities:` in the fixture's own config.yaml, read back. */
 function topPriority(dir) {
   const config = readFileSync(join(dir, "backlog", "config.yaml"), "utf8");

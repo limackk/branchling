@@ -314,8 +314,10 @@ function renderColumn(col) {
 
 function renderGaps(g) {
   if (!g) return "";
+  // The detail is written for the terminal by release-gaps.mjs and marks values
+  // with backticks; rendering the spans keeps one wording for both readers.
   const row = (x) => '<li class="rel-gap"><code>' + relEsc(x.gap) + "</code> <strong>" + relEsc(x.subject.length === 40 ? x.subject.slice(0, 12) : x.subject) +
-    "</strong> — " + relEsc(x.detail) + (x.where.length ? ' <span class="rel-where">(' + relEsc(x.where.join(", ")) + ")</span>" : "") + "</li>";
+    "</strong> — " + relCodeSpans(x.detail) + (x.where.length ? ' <span class="rel-where">(' + relEsc(x.where.join(", ")) + ")</span>" : "") + "</li>";
   const verdict = g.mode === "require"
     ? (g.fails ? "The release gate fails on these (release_gate: require)." : "The release gate passes (release_gate: require).")
     : "The release gate reports these and does not fail (release_gate: " + relEsc(g.mode) + ").";
