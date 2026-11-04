@@ -37,7 +37,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { ACTOR_ENV, resolveActorSource } from "./actor.mjs";
+import { ACTOR_ENV, reportedActorSource, resolveActorSource } from "./actor.mjs";
 import { userConfigPath } from "./home.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { backlogPaths, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
@@ -743,7 +743,7 @@ function refuse(plan, headline, details, results, reason) {
   console.error(failure(N + " done", headline, details));
   if (plan.json) {
     printJson("verification-run", {
-      task: plan.id, ok: false, closed: false, dryRun: plan.dryRun,
+      task: plan.id, ok: false, closed: false, dryRun: plan.dryRun, actorSource: plan.actorSource || null,
       refusalKind: reason, refusal: headline, details: details || [],
       entries: results || [],
     });
@@ -786,6 +786,12 @@ async function run(argv, io = {}) {
     return 2;
   }
   const { actor, source: actorSource } = resolveActorSource(plan.actor, { env });
+  // WHERE THE ACTOR CAME FROM travels with every answer from here on (TL-544),
+  // as `decide` reports it. No `--require-actor`: the act a person performs in
+  // `done` is the `manual:` vouch, and `vouchNeedsStatedActor` below already
+  // refuses the default for it; a closure proved by commands is evidence, and
+  // the default actor is honest for it.
+  plan.actorSource = reportedActorSource(actorSource);
   if (!isValidActor(actor)) {
     console.error(
       failure(N + " done", "the actor `" + actor + "` has no valid namespace", [
@@ -1267,6 +1273,7 @@ function answer(plan, results, extra) {
     task: plan.id,
     ok: results.every((r) => r.ok),
     dryRun: plan.dryRun,
+    actorSource: plan.actorSource || null,
     entries: results.map(({ coverageObserved, executedFiles, ...entry }) => entry),
     ...extra,
   });

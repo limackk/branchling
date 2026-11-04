@@ -72,7 +72,7 @@ import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readFileSync, writeFileSync } from "node:fs";
 
-import { ACTOR_ENV, resolveActorSource } from "./actor.mjs";
+import { actorRequiredRefusal, resolveActorReport } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { ACTOR_NAMESPACES, appendEntries, currentSession, EVENT_ID_RE, eventId, FIELD_DECISION, isValidActor, normalizeReason, openQuestions, questionIdFromReason, readHistory, reasonRefusal, recordEdit } from "./history.mjs";
@@ -469,22 +469,12 @@ export function run(argv) {
   // the agent fallback nobody stated; the user configuration's `actor:` is
   // reported as `config`. A person's answer given through an interface must
   // not land in history as an agent's without the caller being able to see it.
-  const resolved = resolveActorSource(plan.actor);
-  const actor = resolved.actor;
-  const actorSource = resolved.source === "user" ? "config" : resolved.source;
-  if (plan.requireActor && actorSource === "default") {
-    const problem = "no actor was stated, and `--require-actor` refuses the default `" + actor + "`";
-    const details = [
-      "State who answers: --actor <ns:name>, the " + ACTOR_ENV + " environment variable,",
-      "or `actor:` in the user configuration. Nothing was recorded.",
-    ];
-    if (plan.json) {
-      printJson("task-decide", {
-        ok: false, id: plan.id, actorSource, refusalKind: "actor-required", refusal: problem, details,
-      });
-    } else {
-      console.error(failure(N + " decide", problem, details));
-    }
+  const resolved = resolveActorReport(plan.actor);
+  const { actor, actorSource } = resolved;
+  const required = actorRequiredRefusal(plan.requireActor, resolved, "answers");
+  if (required) {
+    if (plan.json) printJson("task-decide", { ok: false, id: plan.id, actorSource, ...required });
+    else console.error(failure(N + " decide", required.refusal, required.details));
     return 1;
   }
   if (!isValidActor(actor)) {

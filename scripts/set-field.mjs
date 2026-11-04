@@ -12,7 +12,7 @@
  * than written: a status change here would skip the verification `done` runs
  * and the reservation `take` makes.
  */
-import { resolveActor } from "./actor.mjs";
+import { actorRequiredRefusal, resolveActorReport } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { DEDICATED_FIELDS, writableFields, writeTaskField } from "./field-write.mjs";
 import { FIELD_SHAPES } from "./task-fields.mjs";
@@ -22,11 +22,11 @@ import { BACKLOG_DIR_REFUSAL_EXIT, BACKLOG_DIR_REFUSAL_KIND, isBacklogDirRefusal
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { failure } from "./ui.mjs";
 
-export const SET_FLAGS = ["--dir", "--actor", "--reason", "--json", "--fields"];
+export const SET_FLAGS = ["--dir", "--actor", "--reason", "--json", "--fields", "--require-actor"];
 
 /** PURE: the invocation, or an Error whose second line onward is the detail. */
 export function parseSetArgs(args) {
-  const plan = { id: null, field: null, value: null, dir: null, actor: null, reason: null, json: false, fields: false };
+  const plan = { id: null, field: null, value: null, dir: null, actor: null, reason: null, json: false, fields: false, requireActor: false };
   const positional = [];
   let literal = false;
   for (let i = 0; i < args.length; i++) {
@@ -35,6 +35,7 @@ export function parseSetArgs(args) {
     if (arg === "--") { literal = true; continue; }
     if (arg === "--json") { plan.json = true; continue; }
     if (arg === "--fields") { plan.fields = true; continue; }
+    if (arg === "--require-actor") { plan.requireActor = true; continue; }
     if (SET_FLAGS.indexOf(arg) >= 0) {
       const value = args[++i];
       if (value === undefined) throw new Error("`" + arg + "` with no value");
@@ -45,8 +46,8 @@ export function parseSetArgs(args) {
     positional.push(arg);
   }
   if (plan.fields) {
-    if (positional.length || plan.actor !== null || plan.reason !== null) {
-      throw new Error("`--fields` describes what `set` edits, and takes no task, field, value, --actor or --reason");
+    if (positional.length || plan.actor !== null || plan.reason !== null || plan.requireActor) {
+      throw new Error("`--fields` describes what `set` edits, and takes no task, field, value, --actor, --reason or --require-actor");
     }
     return plan;
   }
@@ -96,8 +97,11 @@ export function setFieldDescriptions(config) {
 
 export function run(argv) {
   const wantsJson = argv.includes("--json");
+  // Null until the actor is resolved: a usage refusal has no actor to report a
+  // source for.
+  let actorSource = null;
   const refuse = (message, details = [], code = 1, refusalKind = "refused", extra = {}) => {
-    if (wantsJson) printJson("task-set", { ok: false, refusalKind, refusal: message, details, ...extra });
+    if (wantsJson) printJson("task-set", { ok: false, actorSource, refusalKind, refusal: message, details, ...extra });
     else console.error(failure(N + " set", message, details, [N + " set --help"]));
     return code;
   };
@@ -106,6 +110,17 @@ export function run(argv) {
   catch (e) {
     const [head, ...rest] = e.message.split("\n");
     return refuse(head, rest, 2, "usage");
+  }
+  // WHERE THE ACTOR CAME FROM travels with the answer (TL-544). `--fields`
+  // writes nothing and so has no actor. A field a person edits through an
+  // interface refuses the default under `--require-actor`.
+  let actor = null;
+  if (!plan.fields) {
+    const resolved = resolveActorReport(plan.actor);
+    actor = resolved.actor;
+    actorSource = resolved.actorSource;
+    const required = actorRequiredRefusal(plan.requireActor, resolved, "sets the field");
+    if (required) return refuse(required.refusal, required.details, 1, required.refusalKind);
   }
   let root;
   try { root = resolveBacklogDir({ dir: plan.dir || undefined }).root; }
@@ -129,7 +144,7 @@ export function run(argv) {
   const result = writeTaskField({
     root, config, source: "set",
     id: plan.id, field: plan.field, value: plan.value,
-    actor: resolveActor(plan.actor), reason: plan.reason || "",
+    actor, reason: plan.reason || "",
     refusedFields: Object.keys(DEDICATED_FIELDS),
   });
   if (!result.ok) {
@@ -145,7 +160,7 @@ export function run(argv) {
   if (plan.json) {
     printJson("task-set", {
       ok: true, id: result.id, file: result.file, field: result.field, value: result.value,
-      actor: result.actor, changes: result.entries,
+      actor: result.actor, actorSource, changes: result.entries,
     });
   } else {
     const shown = Array.isArray(result.value) ? "[" + result.value.join(", ") + "]" : JSON.stringify(result.value);

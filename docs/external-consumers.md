@@ -278,6 +278,16 @@ Common to all of them:
   one, is `1` from every command (`refusalKind: "no-backlog"` where an
   envelope is printed). Each command's `--help` ends with its own `exit:`
   line; branch on `ok` in the envelope rather than on the number alone.
+- **`actorSource`** is in the answer of every writing command below (TL-544):
+  `flag`, `env`, `config` (the user configuration's `actor:`) or `default`,
+  the agent fallback nobody stated — null on a refusal given before the actor
+  was resolved. An interface acting for a person passes `--require-actor` to
+  `take`, `set`, `body`, `handoff`, `release` and `decide`, which then refuse
+  (`refusalKind: "actor-required"`, exit 1) rather than record the person's
+  act under the default agent actor. `next` and `ask` do not take it: both
+  are an agent's act far more often than a person's. `done` does not either:
+  its person's act is a `manual:` vouch, which already refuses an unstated
+  actor (`unstated-actor`).
 
 | Command | Required input | Kind |
 |---|---|---|

@@ -247,6 +247,10 @@ export const KINDS = {
     // report whose reservation it took without parsing a warning.
     tookOver: [],
     lock: null,
+    // Which source named the actor (TL-544), as `task-decide` reports it: flag,
+    // env, config or default. `--require-actor` on `take` refuses the default
+    // as `refusalKind: "actor-required"`.
+    actorSource: null,
     refusalKind: null, refusal: null, details: [],
     // `next` only, and the reason each is here rather than in prose on stderr:
     // a loop must be able to tell an empty queue from a queue it was not allowed
@@ -275,23 +279,28 @@ export const KINDS = {
     // flag was not given — a wave number of 0 would say a plan was consulted.
     plan: null,
   },
+  // Every writing kind below carries `actorSource` (TL-544): which rung of the
+  // actor chain named the actor — `flag`, `env`, `config` or `default` — and
+  // null on a refusal given before the actor was resolved. Where a person's act
+  // is recorded (`take`, `handoff`, `release`, `set`, `body`, `decide`),
+  // `--require-actor` refuses the default as `refusalKind: "actor-required"`.
   // `handoff --json` (TL-99). Three from/to pairs and the comment that carries
   // the reason: a handoff is not a task being performed, it is a task changing
   // hands, and a consumer wants both ends of every field that moved.
   "task-handoff": {
     ok: null, id: null, file: null, task: null,
     role: null, owner: null, status: null, comment: null, released: null,
-    warnings: [],
+    warnings: [], actorSource: null,
     refusalKind: null, refusal: null, details: [],
   },
   // `body --json` (TL-523). `body` is the pair of base-version hashes, so a
   // caller can pass `body.to` as the next write's `--base`.
   "task-body": {
-    ok: null, id: null, file: null, changed: null, body: null, lines: null, entry: null,
+    ok: null, id: null, file: null, changed: null, body: null, lines: null, entry: null, actorSource: null,
     refusalKind: null, refusal: null, details: [],
   },
   "task-release": {
-    ok: null, id: null, status: null, owner: null, released: null, comment: null,
+    ok: null, id: null, status: null, owner: null, released: null, comment: null, actorSource: null,
     refusalKind: null, refusal: null, details: [],
   },
   // `set --json` (TL-521). `changes` are the history entries the write
@@ -301,7 +310,7 @@ export const KINDS = {
   // (TL-543) with `rejected` `{ field, value }` and `declared`, the values the
   // field accepts; `usage` stays for an unknown field or a malformed value.
   "task-set": {
-    ok: null, id: null, file: null, field: null, value: null, actor: null, changes: [],
+    ok: null, id: null, file: null, field: null, value: null, actor: null, actorSource: null, changes: [],
     refusalKind: null, refusal: null, details: [], rejected: null, declared: [],
   },
   // `set --fields --json` (TL-543): the fields `set` edits, each with whether
@@ -348,7 +357,7 @@ export const KINDS = {
   // it is what a later `decide --resolves` has to name, and the reason the task
   // now carries names it too — so a consumer never has to parse a sentence.
   "task-ask": {
-    ok: null, id: null, file: null, question: null, changes: [], blockedReason: null,
+    ok: null, id: null, file: null, question: null, changes: [], blockedReason: null, actorSource: null,
     refusalKind: null, refusal: null, details: [],
   },
   // `decide --json` (TL-528) — the other half of `task-ask`. Until TL-528 it
@@ -404,7 +413,7 @@ export const KINDS = {
   // moved, which `--dry-run` makes a different answer from `ok`.
   "verification-run": {
     ok: null, task: null, dryRun: null, closed: null, entries: [],
-    status: null, wouldBe: null, ticked: [], capability: null,
+    status: null, wouldBe: null, ticked: [], capability: null, actorSource: null,
     refusalKind: null, refusal: null, details: [],
   },
   // `docs-drift --json` (TL-100). `flagged` and `tooLittle` are both LISTS of

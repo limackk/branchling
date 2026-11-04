@@ -59,7 +59,7 @@ import { chmodSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSyn
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { resolveActor } from "./actor.mjs";
+import { actorRequiredRefusal, resolveActorReport } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { auditTask } from "./criteria.mjs";
 import { ACTOR_NAMESPACES, appendEntries, currentSession, eventId, isValidActor, normalizeReason, reasonRefusal } from "./history.mjs";
@@ -74,16 +74,17 @@ import { MARK, color, failure, refusal } from "./ui.mjs";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const COMMAND = N + " body";
 
-export const BODY_FLAGS = ["--reason", "--body-file", "--base", "--actor", "--json"];
+export const BODY_FLAGS = ["--reason", "--body-file", "--base", "--actor", "--json", "--require-actor"];
 
 /** PURE — resolves `body`'s arguments. Throws on a usage error; an error whose
  *  message starts `unknown flag` is printed with the accepted set. */
 export function parseBodyArgs(args) {
-  const plan = { id: null, reason: null, bodyFile: null, base: null, actor: null, json: false };
+  const plan = { id: null, reason: null, bodyFile: null, base: null, actor: null, json: false, requireActor: false };
   const key = { "--body-file": "bodyFile" };
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === "--json") { plan.json = true; continue; }
+    if (a === "--require-actor") { plan.requireActor = true; continue; }
     if (BODY_FLAGS.indexOf(a) >= 0) {
       const value = args[++i];
       if (value === undefined) throw new Error("`" + a + "` with no value");
@@ -353,7 +354,17 @@ export async function run(argv) {
     return fail2(head, rest);
   }
 
-  const actor = resolveActor(plan.actor);
+  // WHERE THE ACTOR CAME FROM travels with the answer (TL-544); a body a
+  // person rewrites through an interface refuses the default under
+  // `--require-actor` — before stdin is read, so nothing is consumed either.
+  const resolved = resolveActorReport(plan.actor);
+  const { actor, actorSource } = resolved;
+  const required = actorRequiredRefusal(plan.requireActor, resolved, "rewrites the body");
+  if (required) {
+    if (plan.json) printJson("task-body", { ok: false, id: plan.id, actorSource, ...required });
+    else console.error(failure(COMMAND, required.refusal, required.details));
+    return 1;
+  }
   if (!isValidActor(actor)) {
     return fail2("the actor `" + actor + "` has no valid namespace", [
       "Use one of: " + ACTOR_NAMESPACES.map((n) => n + ":<name>").join(" | "),
@@ -377,7 +388,7 @@ export async function run(argv) {
   if (!result.ok) {
     if (plan.json) {
       printJson("task-body", {
-        ok: false, id: result.id || plan.id, refusalKind: result.kind,
+        ok: false, id: result.id || plan.id, actorSource, refusalKind: result.kind,
         refusal: result.message, details: result.details || [],
       });
     } else {
@@ -388,7 +399,7 @@ export async function run(argv) {
   if (result.changed && !rebuildViews(root)) {
     console.error(failure(COMMAND, "the views were not rebuilt — run `" + N + " build` yourself", []));
   }
-  if (plan.json) printJson("task-body", bodyJson(result));
+  if (plan.json) printJson("task-body", { ...bodyJson(result), actorSource });
   else console.log(renderBody(result));
   return 0;
 }

@@ -53,7 +53,7 @@
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { resolveActor } from "./actor.mjs";
+import { resolveActorReport } from "./actor.mjs";
 import { handedBackAcross } from "./audit.mjs";
 import { archivedElsewhereBySource, crossBranchState, describeDivergence, divergences, scanNote } from "./branch-scan.mjs";
 import { loadConfigOrExit } from "./config.mjs";
@@ -814,7 +814,10 @@ export function run(argv) {
     return 2;
   }
 
-  const actor = resolveActor(plan.actor);
+  // WHERE THE ACTOR CAME FROM travels with every answer (TL-544). No
+  // `--require-actor` here: `next` is the automated draw from the queue, and a
+  // person choosing a task names it with `take`, which accepts the flag.
+  const { actor, actorSource } = resolveActorReport(plan.actor);
   if (!isValidActor(actor)) {
     console.error(failure(N + " next", "the actor `" + actor + "` has no valid namespace", [
       "Use one of: " + ACTOR_NAMESPACES.map((n) => n + ":<name>").join(" | "),
@@ -1029,6 +1032,7 @@ export function run(argv) {
         const handover = takeJson(result, root);
         printJson("task-take", {
           ...handover, task: handover.task ? { ...handover.task, agent_estimate: agentField } : handover.task,
+          actorSource,
           passedOver, considered: candidates.length,
           skippedElsewhere, skippedExecutor, skippedHandedBack, skippedDeadlocked, skippedSize, skippedByRecord,
           skippedConflict, closedElsewhere,
@@ -1060,7 +1064,7 @@ export function run(argv) {
       continue;
     }
     if (plan.json) {
-      printJson("task-take", { ...refusalPayload(result), considered: candidates.length, passedOver });
+      printJson("task-take", { ...refusalPayload(result), considered: candidates.length, passedOver, actorSource });
     } else {
       console.error(failure(N + " next", result.message, result.details || []));
     }
@@ -1170,7 +1174,7 @@ export function run(argv) {
     // `skipped*` lists are the only place that distinction lives.
     printJson("task-take", {
       ok: false, taken: false, refusalKind: "nothing-to-take", refusal: "nothing to take",
-      details,
+      details, actorSource,
       searchedStatuses: searched, skippedBlocked, passedOver, skippedElsewhere, skippedExecutor,
       closedElsewhere,
       skippedHandedBack, skippedDeadlocked, skippedSize, skippedByRecord, skippedConflict, plan: planJson,

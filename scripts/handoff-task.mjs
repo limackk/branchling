@@ -57,7 +57,7 @@ import { chmodSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSyn
 import { dirname, isAbsolute, join, relative, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { resolveActor } from "./actor.mjs";
+import { actorRequiredRefusal, resolveActorReport } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { ACTOR_NAMESPACES, appendEntries, currentSession, eventId, FIELD_COMMENT, isValidActor, normalizeReason, openQuestions, questionIdFromReason, readHistory, reasonRefusal, recordEdit } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
@@ -73,7 +73,7 @@ import { MARK, color, failure } from "./ui.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-export const HANDOFF_FLAGS = ["--dir", "--actor", "--to-role", "--to-owner", "--reason", "--with", "--status", "--json"];
+export const HANDOFF_FLAGS = ["--dir", "--actor", "--to-role", "--to-owner", "--reason", "--with", "--status", "--json", "--require-actor"];
 
 /**
  * Exact repository-relative files the receiving hand may change. PURE.
@@ -123,12 +123,13 @@ export function resolveHandoffFiles(rawFiles) {
 export function parseHandoffArgs(args) {
   const plan = {
     id: null, dir: null, actor: null, toRole: null, toOwner: null,
-    reason: null, files: [], status: null, json: false,
+    reason: null, files: [], status: null, json: false, requireActor: false,
   };
   const key = { "--to-role": "toRole", "--to-owner": "toOwner" };
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === "--json") { plan.json = true; continue; }
+    if (a === "--require-actor") { plan.requireActor = true; continue; }
     if (a === "--with") {
       const value = args[++i];
       if (value === undefined) throw new Error("`--with` with no value");
@@ -556,7 +557,17 @@ export function run(argv) {
     return 2;
   }
 
-  const actor = resolveActor(plan.actor);
+  // WHERE THE ACTOR CAME FROM travels with the answer (TL-544); a handoff a
+  // person makes through an interface refuses the default under
+  // `--require-actor`, before anything is written.
+  const resolved = resolveActorReport(plan.actor);
+  const { actor, actorSource } = resolved;
+  const required = actorRequiredRefusal(plan.requireActor, resolved, "hands the task off");
+  if (required) {
+    if (plan.json) printJson("task-handoff", { ok: false, id: plan.id, actorSource, ...required });
+    else console.error(failure(N + " handoff", required.refusal, required.details));
+    return 1;
+  }
   if (!isValidActor(actor)) {
     return fail2("the actor `" + actor + "` has no valid namespace", [
       "Use one of: " + ACTOR_NAMESPACES.map((n) => n + ":<name>").join(" | "),
@@ -611,7 +622,7 @@ export function run(argv) {
   if (!result.ok) {
     if (plan.json) {
       printJson("task-handoff", {
-        ok: false, id: result.id || plan.id, refusalKind: result.kind,
+        ok: false, id: result.id || plan.id, actorSource, refusalKind: result.kind,
         refusal: result.message, details: result.details || [],
       });
     } else {
@@ -623,7 +634,7 @@ export function run(argv) {
   if (!rebuildViews(root)) {
     console.error(failure(N + " handoff", "the views were not rebuilt — run `" + N + " build` yourself", []));
   }
-  if (plan.json) printJson("task-handoff", handoffJson(result));
+  if (plan.json) printJson("task-handoff", { ...handoffJson(result), actorSource });
   else console.log(renderHandoff(result));
   return 0;
 }
