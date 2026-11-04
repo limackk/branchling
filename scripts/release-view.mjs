@@ -40,7 +40,7 @@ import { spawnSync } from "node:child_process";
 
 import { TRUNK_SOURCE_TEXT, explain, taskDeployment } from "./environments.mjs";
 import { repoRoot } from "./modified-files.mjs";
-import { gateVerdict, releaseGaps } from "./release-gaps.mjs";
+import { currentReleaseText, gateVerdict, releaseGaps } from "./release-gaps.mjs";
 import { computeStatus } from "./release-status.mjs";
 import { CLOSED_COLUMN, TRUNK_COLUMN, UNOBSERVABLE_COLUMN } from "./viewer-release.mjs";
 
@@ -123,13 +123,35 @@ export function releaseLanes({ pipeline, state, targets, trunk }) {
 }
 
 /**
+ * PURE — a task as `releaseGaps()` reads it: every field its `tasks` parameter
+ * documents, in the shape `readTaskRecords()` gives `check --release` (TL-519).
+ * Dropping `priority` and `release` here once made the current release always
+ * null in the viewer, so `planned-blocker-open` could never appear while the
+ * gate reported it on the same commit — and the silence read as a clean answer.
+ * A missing scalar is "" there, so it is "" here.
+ */
+export function gapTaskOf(t) {
+  const str = (v) => (v == null ? "" : v);
+  return {
+    id: t.id,
+    title: str(t.title),
+    status: str(t.status),
+    priority: str(t.priority),
+    release: str(t.release),
+    labels: t.labels || [],
+    target: Array.isArray(t.target) ? t.target : [],
+  };
+}
+
+/**
  * The whole computation for one backlog. Never throws: a page that could not
  * read git still has to render, and says why this view is empty.
  *
  * @param {object} opts
  * @param {string} opts.root the backlog directory
  * @param {object} opts.config the loaded configuration
- * @param {{id: string, status: string}[]} opts.tasks every task the page embeds
+ * @param {object[]} opts.tasks every task the page embeds, as its frontmatter
+ *        reads; `gapTaskOf()` takes what the gap panel needs from each
  * @param {number} [opts.now]
  */
 export function releaseViewData({ root, config, tasks, now = Date.now(), run = spawnSync }) {
@@ -164,7 +186,7 @@ export function releaseViewData({ root, config, tasks, now = Date.now(), run = s
 
     const gaps = releaseGaps({
       root: repoRoot(root), config,
-      tasks: (tasks || []).filter((t) => t && t.id).map((t) => ({ id: t.id, status: t.status, target: t.target || [] })),
+      tasks: (tasks || []).filter((t) => t && t.id).map(gapTaskOf),
       trunk: { spec: report.trunk.spec, source: report.trunk.source },
       state, run,
     });
@@ -179,6 +201,11 @@ export function releaseViewData({ root, config, tasks, now = Date.now(), run = s
       unknownRefs: gaps.unknownRefs,
       exit: verdict.exit,
       items: gaps.gaps,
+      currentRelease: gaps.currentRelease,
+      currentReleaseJudged: gaps.currentReleaseJudged,
+      // Worded where `check --release` words it; the page cannot import
+      // release-gaps.mjs (it reads git), so the sentence travels with the data.
+      currentReleaseText: currentReleaseText(gaps, config.releases),
     };
   } catch (e) {
     data.available = false;

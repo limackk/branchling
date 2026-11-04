@@ -380,6 +380,28 @@ export function releaseGaps({ root, config, tasks, selector = null, trunk, state
 }
 
 /**
+ * PURE — which release's plan was judged (TL-515), as a sentence, or null for a
+ * project that declares no releases: naming a concept nobody declared would be
+ * noise. One wording for `check --release` and the viewer's gap panel (TL-519),
+ * so the two readers of one result cannot describe it differently.
+ *
+ * @param {{currentRelease: string|null, currentReleaseJudged: boolean}} result
+ * @param {readonly string[]} releases  `config.releases`
+ * @returns {string|null}
+ */
+export function currentReleaseText(result, releases) {
+  if (!(releases || []).length) return null;
+  if (!result.currentReleaseJudged) {
+    return "which release is current was not judged — deployment was not read";
+  }
+  if (result.currentRelease === null) {
+    return "no current release — every release in `releases:` has shipped, so no planned task blocks";
+  }
+  return "current release: " + result.currentRelease +
+    " — the first in `releases:` not fully shipped; only its planned tasks can block";
+}
+
+/**
  * The exit decision, separate from the computation so the two modes can be
  * tested on one result.
  *

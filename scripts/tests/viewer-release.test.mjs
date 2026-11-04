@@ -243,6 +243,50 @@ test("a gap accepted in configuration is listed apart, and require says the gate
   assert.match(renderRelease(model), /The release gate fails on these \(release_gate: require\)/);
 });
 
+/** The top of `priorities:` in the fixture's own config.yaml, read back. */
+function topPriority(dir) {
+  const config = readFileSync(join(dir, "backlog", "config.yaml"), "utf8");
+  return config.match(/^priorities:\s*\[([^\]]*)\]/m)[1].split(",")[0].trim();
+}
+
+test("the gap panel reports a planned open top-priority task and the current release as check --release does", () => {
+  // TL-519: the panel once handed `releaseGaps()` tasks without `priority` and
+  // `release`, so no task was ever planned, the current release was always
+  // null, and this gap could not appear while the gate reported it.
+  const { backlog, ids, dir } = pipelineRepo("releases: [r1]\n");
+  setField(dir, ids.merged, "release", "r1");
+  setField(dir, ids.merged, "priority", topPriority(dir));
+  const data = dataFor(backlog);
+  assert.equal(data.gaps.currentRelease, "r1");
+  assert.equal(data.gaps.currentReleaseJudged, true);
+  const blockers = data.gaps.items.filter((g) => g.gap === "planned-blocker-open");
+  assert.deepEqual(blockers.map((g) => [g.subject, g.where]), [[ids.merged, ["web/production"]]]);
+
+  // Positive control: the gate on the same tree names the same subject and the
+  // same current release, so agreement is not two empty answers.
+  const r = spawnSync(process.execPath, [join(SCRIPTS_DIR, "check-release-gaps.mjs"), "--dir", backlog, "--json"], {
+    encoding: "utf8", cwd: dirname(backlog),
+  });
+  const cli = JSON.parse(r.stdout);
+  assert.equal(cli.currentRelease, "r1");
+  assert.deepEqual(cli.gaps.filter((g) => g.gap === "planned-blocker-open").map((g) => g.subject), [ids.merged]);
+  assert.deepEqual(data.gaps.items.map((g) => g.gap + " " + g.subject), cli.gaps.map((g) => g.gap + " " + g.subject));
+
+  // The panel names the current release in the gate's own sentence.
+  const text = spawnSync(process.execPath, [join(SCRIPTS_DIR, "check-release-gaps.mjs"), "--dir", backlog], {
+    encoding: "utf8", cwd: dirname(backlog), env: { ...process.env, NO_COLOR: "1" },
+  }).stdout;
+  assert.ok(text.includes(data.gaps.currentReleaseText), text);
+  const html = renderRelease(releaseViewModel(data, { tasks: readTasks(backlog) }));
+  assert.match(html, /<p class="rel-current-release">current release: r1 — the first in <code>releases:<\/code> not fully shipped/);
+  assert.match(html, new RegExp("<code>planned-blocker-open</code> <strong>" + ids.merged + "</strong>"));
+
+  // A project declaring no releases gets no line, as the gate prints none.
+  const plain = dataFor(pipelineRepo().backlog);
+  assert.equal(plain.gaps.currentReleaseText, null);
+  assert.doesNotMatch(renderRelease(releaseViewModel(plain, { tasks: [] })), /rel-current-release/);
+});
+
 // ── 4. SHAs, build time, unknown refs ────────────────────────────────────
 
 test("the resolved SHA of every ref and of the trunk, and the build time, travel with the view", () => {

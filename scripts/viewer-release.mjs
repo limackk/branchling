@@ -269,6 +269,8 @@ export function releaseViewModel(data, opts = {}) {
       unknownRefs: g.unknownRefs || [],
       blocking: (g.items || []).filter((x) => !x.accepted),
       accepted: (g.items || []).filter((x) => x.accepted),
+      currentRelease: g.currentRelease === undefined ? null : g.currentRelease,
+      currentReleaseText: g.currentReleaseText || null,
     };
   }
   return vm;
@@ -319,6 +321,10 @@ function renderGaps(g) {
     : "The release gate reports these and does not fail (release_gate: " + relEsc(g.mode) + ").";
   const parts = ['<section class="rel-gaps"><h3>Gaps <code>check --release</code> reports</h3>', "<p>" + verdict + "</p>"];
   if (g.explanation) parts.push('<p class="rel-unknown">' + relEsc(g.explanation) + "</p>");
+  // Which release's plan was judged, as `check --release` prints it (TL-519):
+  // without it an absent `planned-blocker-open` cannot be told from "no release
+  // was judged at all".
+  if (g.currentReleaseText) parts.push('<p class="rel-current-release">' + relCodeSpans(g.currentReleaseText) + "</p>");
   if (g.unknownRefs.length) {
     parts.push('<p class="rel-unknown">Unknown, never empty: ' + relEsc(g.unknownRefs.map((r) => r.target + "/" + r.stage + " " + r.spec).join(", ")) + " did not resolve.</p>");
   }

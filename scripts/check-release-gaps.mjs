@@ -33,7 +33,7 @@ import { TRUNK_SOURCE_TEXT, defaultTrunk, explain, parseStageSelector } from "./
 import { repoRoot } from "./modified-files.mjs";
 import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
-import { gateVerdict, releaseGaps } from "./release-gaps.mjs";
+import { currentReleaseText, gateVerdict, releaseGaps } from "./release-gaps.mjs";
 import { readTaskRecords } from "./task-select.mjs";
 import { MARK, color, errColor, plain, refusal } from "./ui.mjs";
 
@@ -159,18 +159,11 @@ export function unobservableLines(result) {
     u.count + " task(s) name it in `target:` and none of them is judged on its account");
 }
 
-/** Which release's plan was judged (TL-515). Nothing for a project that
- *  declares no releases: naming a concept nobody declared would be noise. */
+/** Which release's plan was judged (TL-515), worded once in release-gaps.mjs
+ *  so the viewer's gap panel prints the same sentence (TL-519). */
 export function currentReleaseLine(result, releases) {
-  if (!(releases || []).length) return null;
-  if (!result.currentReleaseJudged) {
-    return MARK.bullet + " which release is current was not judged — deployment was not read";
-  }
-  if (result.currentRelease === null) {
-    return MARK.bullet + " no current release — every release in `releases:` has shipped, so no planned task blocks";
-  }
-  return MARK.bullet + " current release: " + result.currentRelease +
-    " — the first in `releases:` not fully shipped; only its planned tasks can block";
+  const text = currentReleaseText(result, releases);
+  return text === null ? null : MARK.bullet + " " + text;
 }
 
 /** Why nothing was judged, for the reasons this guard adds to `explain()`. */
