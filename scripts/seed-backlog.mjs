@@ -56,7 +56,7 @@ import {
   VERIFICATION_KEYS, contractFor, isNonEmptyString, isPlainObject, renderBody, taskContent,
   validateVerification,
 } from "./task-input.mjs";
-import { backlogPaths, looksLikeBacklogDir, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { backlogPaths, looksLikeBacklogDir, BACKLOG_DIR_REFUSAL_EXIT, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { editPlanTextMany, newPlanErrors, waveTargetProblem } from "./plan-write.mjs";
 import { buildFieldSpecs, fieldSpec, normalizeValue, setFrontmatterField } from "./task-fields.mjs";
@@ -507,8 +507,9 @@ function seedFromText(input, cli, opts) {
     try {
       root = resolveBacklogDir({ dir: cli.dir, moduleDir: HERE }).root;
     } catch (e) {
-      console.error(failure(N + " seed", e.message, [], [N + " seed --dir <path> < plan.json"]));
-      return 2;
+      if (!isBacklogDirRefusal(e)) throw e;
+      console.error(failure(N + " seed", e.message, e.details || [], [N + " seed --dir <path> < plan.json"]));
+      return BACKLOG_DIR_REFUSAL_EXIT;
     }
   }
 

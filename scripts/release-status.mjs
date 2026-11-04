@@ -112,7 +112,7 @@ import { readRecord } from "./release-record.mjs";
 import { readShipments } from "./release-shipped.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { repoRoot } from "./modified-files.mjs";
-import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { backlogPaths, BACKLOG_DIR_REFUSAL_EXIT, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { readTaskMetas } from "./task-io.mjs";
 import { taskIdScanner } from "./task-id.mjs";
@@ -1082,7 +1082,11 @@ export function run(argv) {
   }
   let root;
   try { root = resolveBacklogDir({ dir: dirFlag.dir || undefined, moduleDir: HERE }).root; }
-  catch (e) { console.error(failure(cmd, e.message, [], [cmd + " --help"])); return 2; }
+  catch (e) {
+    if (!isBacklogDirRefusal(e)) throw e;
+    console.error(failure(cmd, e.message, e.details || [], [cmd + " --help"]));
+    return BACKLOG_DIR_REFUSAL_EXIT;
+  }
   const config = loadConfigOrExit(root);
   const filter = resolveFilter(opts, config.deployTargets);
   if (!filter.ok) return refuse(cmd, filter, wantsJson);

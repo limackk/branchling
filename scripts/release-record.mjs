@@ -51,7 +51,7 @@ import { gitDiscoveryEnv } from "./git-env.mjs";
 import { ACTOR_NAMESPACES, isValidActor } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { repoRoot } from "./modified-files.mjs";
-import { resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { BACKLOG_DIR_REFUSAL_EXIT, BACKLOG_DIR_REFUSAL_KIND, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { normalizeReason, reasonRefusal } from "./task-fields.mjs";
 import { MARK, color, failure, refusal } from "./ui.mjs";
@@ -329,7 +329,10 @@ export function run(argv) {
   }
   let root;
   try { root = resolveBacklogDir({ dir: dirFlag.dir || undefined, moduleDir: HERE }).root; }
-  catch (e) { return refuse(e.message, [], 2, "usage"); }
+  catch (e) {
+    if (!isBacklogDirRefusal(e)) throw e;
+    return refuse(e.message, e.details || [], BACKLOG_DIR_REFUSAL_EXIT, BACKLOG_DIR_REFUSAL_KIND);
+  }
   const config = loadConfigOrExit(root);
   const selection = selectRecordedRef({ targets: config.deployTargets, target: opts.target, stage: opts.stage, ref: opts.ref });
   if (!selection.ok) return refuse(selection.message, selection.details, selection.code, selection.kind);

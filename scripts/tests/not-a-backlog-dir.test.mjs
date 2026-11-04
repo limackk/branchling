@@ -16,15 +16,18 @@
  *   resolver and prints the named refusal, so a usage error cannot pass for
  *   one.
  *
- * The exit code is 1 wherever `resolveBacklogDirOrExit` answers, the code
- * `check --json` gave this state in TL-541 and the code "no backlog here"
- * exits with there: the invocation is well built, the directory it names is
- * not usable. 2 stays for a wrongly built invocation.
+ * The exit code is 1 from EVERY command (TL-546): the code `check --json`
+ * gave this state in TL-541 and the code "no backlog here" exits with: the
+ * invocation is well built, the directory it names is not usable. 2 stays for
+ * a wrongly built invocation. The sweeps hold every command that prints the
+ * refusal to that code, so a command added tomorrow with an exit of its own
+ * fails here the day it is written; the case lists prove each command reaches
+ * the resolver at all.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -42,6 +45,11 @@ const SERVERS = new Set(["serve", "mcp"]);
 const STACK = /^\s+at .+:\d+:\d+\)?$/m;
 const SOURCE = /^file:\/\//m;
 const REFUSAL = /does not look like a backlog/;
+
+/** `where` REPORTS where the backlog resolves and prints the refusal as part of
+ *  its answer; under `BACKLOG_DIR` that answer exits 0 by its own contract
+ *  (where-command.mjs), so it is not a refusal for the exit-code sweep. */
+const REPORTERS = new Set(["where"]);
 
 const base = mkdtempSync(join(tmpdir(), "branchling-not-a-backlog-"));
 const cwd = join(base, "cwd");
@@ -61,9 +69,13 @@ function notABacklog() {
   return dir;
 }
 
+/** Commands that validate stdin before resolving the backlog, so an empty
+ *  stdin would stop them at the input instead of at the resolver. */
+const STDIN = { import: "[]" };
+
 function run(args, env = {}) {
   return spawnSync(process.execPath, [CLI, ...args], {
-    cwd, encoding: "utf8", timeout: 60_000, input: "",
+    cwd, encoding: "utf8", timeout: 60_000, input: STDIN[args[0]] || "",
     env: { ...process.env, BACKLOG_STATE_DIR: join(base, ".state"), ...env },
   });
 }
@@ -82,6 +94,35 @@ test("no command dumps a stack trace for a --dir that is not a backlog", () => {
     if (STACK.test(out) || SOURCE.test(out)) offenders.push(name + " (exit " + r.status + ")");
   }
   assert.deepEqual(offenders, [], "a stack trace reached the user from: " + offenders.join(", "));
+});
+
+/** Every command whose output carries the refusal exits 1 with it (TL-546).
+ *  A bare `<command> --dir` stops at flag validation for many commands, so
+ *  the sweep also counts how many reached the resolver: a sweep in which none
+ *  did would pass with no evidentiary force. */
+function sweepCodes(invoke) {
+  const wrong = [];
+  let refused = 0;
+  for (const name of Object.keys(COMMANDS)) {
+    if (SERVERS.has(name) || REPORTERS.has(name)) continue;
+    const r = invoke(name);
+    if (!REFUSAL.test(r.stdout + r.stderr)) continue;
+    refused++;
+    if (r.status !== 1) wrong.push(name + " (exit " + r.status + ")");
+  }
+  return { wrong, refused };
+}
+
+test("every command refusing a --dir that is not a backlog exits 1", () => {
+  const { wrong, refused } = sweepCodes((name) => run([name, "--dir", notABacklog()]));
+  assert.ok(refused >= 10, "only " + refused + " commands reached the resolver: the sweep proves nothing");
+  assert.deepEqual(wrong, [], "a refusal with another exit code from: " + wrong.join(", "));
+});
+
+test("every command refusing a BACKLOG_DIR that is not a backlog exits 1", () => {
+  const { wrong, refused } = sweepCodes((name) => run([name], { BACKLOG_DIR: notABacklog() }));
+  assert.ok(refused >= 10, "only " + refused + " commands reached the resolver: the sweep proves nothing");
+  assert.deepEqual(wrong, [], "a refusal with another exit code from: " + wrong.join(", "));
 });
 
 test("no command dumps a stack trace for a BACKLOG_DIR that is not a backlog", () => {
@@ -112,11 +153,12 @@ const RESOLVER_CASES = [
   ["check"],
 ];
 
-/** Commands that resolve with the bare resolver and already refused in their
- *  own shape before TL-545, with exit 2 for this state and for "no backlog
- *  here" alike. Whether they move to 1 is a contract question for JSON
- *  consumers, tracked as its own task; here they are held to the part TL-545
- *  is about — a refusal that names the directory, never a stack. */
+const spec = join(base, "spec.md");
+writeFileSync(spec, "# A project\n");
+
+/** Commands that resolve with the bare resolver and refuse in their own shape.
+ *  Before TL-546 they exited 2 for this state and for "no backlog here" alike,
+ *  while the commands above exited 1; they now exit 1 too. */
 const DIRECT_CASES = [
   ["take", "X-1", "--actor", "agent:a"],
   ["next", "--actor", "agent:a"],
@@ -124,6 +166,28 @@ const DIRECT_CASES = [
   ["release", "X-1", "--actor", "agent:a", "--reason", "r"],
   ["handoff", "X-1", "--to-role", "dev", "--reason", "r", "--actor", "agent:a"],
   ["ask", "X-1", "--question", "q", "--actor", "agent:a"],
+  ["decide", "X-1", "--reason", "r", "--actor", "agent:a"],
+  ["body", "X-1", "--reason", "r", "--actor", "agent:a"],
+  ["deploy", "status"],
+  ["deploy", "record", "--target", "t", "--stage", "s", "HEAD", "--reason", "r", "--actor", "agent:a"],
+  ["declare", "releases", "v1", "--reason", "r"],
+  ["import", "--from", "github", "--dry-run"],
+  ["plan-from", spec],
+  ["audit"],
+  ["docs-drift"],
+  ["pr-summary"],
+  ["skills", "install", "--dry-run"],
+  ["run", "--dry-run"],
+];
+
+/** The writing commands that answer this state with an envelope under
+ *  `--json`: the same exit, and `refusalKind` `no-backlog` — not `usage`,
+ *  which is a wrongly built call. */
+const JSON_CASES = [
+  ["set", "X-1", "priority", "P1", "--json"],
+  ["release", "X-1", "--actor", "agent:a", "--reason", "r", "--json"],
+  ["deploy", "record", "--target", "t", "--stage", "s", "HEAD", "--reason", "r", "--actor", "agent:a", "--json"],
+  ["declare", "releases", "v1", "--reason", "r", "--json"],
 ];
 
 function refusal(args) {
@@ -143,8 +207,20 @@ for (const args of RESOLVER_CASES) {
 }
 
 for (const args of DIRECT_CASES) {
-  test("`" + args.join(" ") + " --dir <not a backlog>` refuses with the named message", () => {
+  test("`" + args.join(" ") + " --dir <not a backlog>` refuses with exit 1 and the named message", () => {
     const { r, all } = refusal(args);
-    assert.notEqual(r.status, 0, "it succeeded against a directory that is not a backlog:\n" + all);
+    assert.equal(r.status, 1, "exit " + r.status + ":\n" + all);
+  });
+}
+
+for (const args of JSON_CASES) {
+  test("`" + args.join(" ") + " --dir <not a backlog>` answers refusalKind no-backlog with exit 1", () => {
+    const r = run([...args, "--dir", notABacklog()]);
+    const all = r.stdout + r.stderr;
+    assert.equal(r.status, 1, "exit " + r.status + ":\n" + all);
+    const envelope = JSON.parse(r.stdout);
+    assert.equal(envelope.ok, false, all);
+    assert.equal(envelope.refusalKind, "no-backlog", all);
+    assert.match(envelope.refusal, REFUSAL, all);
   });
 }

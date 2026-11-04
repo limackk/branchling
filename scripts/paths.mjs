@@ -215,6 +215,20 @@ export function isBacklogDirRefusal(e) {
   return e instanceof BacklogNotFoundError || e instanceof NotABacklogError;
 }
 
+/**
+ * The exit code and the `refusalKind` of both states above, from EVERY command
+ * (TL-546). Until then the commands resolving through `resolveBacklogDirOrExit`
+ * exited 1 and the ones answering in their own shape exited 2 with
+ * `refusalKind: "usage"`, so a script testing `$?` depended on which command
+ * it ran. 1 won because the invocation is well built and the directory is not
+ * usable — a verdict about data, the same reason given above — and because
+ * `doctor` and `check`, the commands most likely to be scripted, already said 1.
+ * One constant per value, so a command that answers in its own shape cannot
+ * drift back to a number of its own.
+ */
+export const BACKLOG_DIR_REFUSAL_EXIT = 1;
+export const BACKLOG_DIR_REFUSAL_KIND = "no-backlog";
+
 /** A shortcut for scripts: returns the full set of paths at once. */
 export function resolveBacklogPaths(opts = {}) {
   const resolved = resolveBacklogDir(opts);

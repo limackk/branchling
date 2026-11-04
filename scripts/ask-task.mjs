@@ -60,7 +60,7 @@ import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { ACTOR_NAMESPACES, appendEntries, currentSession, eventId, FIELD_COMMENT, isValidActor, questionBlockReason, reasonRefusal, recordEdit } from "./history.mjs";
 import { releaseLock } from "./lock.mjs";
-import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
+import { backlogPaths, BACKLOG_DIR_REFUSAL_EXIT, isBacklogDirRefusal, resolveBacklogDir } from "./paths.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { buildFieldSpecs, extractMeta, fieldSpec, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
@@ -404,8 +404,9 @@ export function run(argv) {
   try {
     root = resolveBacklogDir({ dir: plan.dir || undefined, moduleDir: __dirname }).root;
   } catch (e) {
-    console.error(failure(N + " ask", e.message, []));
-    return 2;
+    if (!isBacklogDirRefusal(e)) throw e;
+    console.error(failure(N + " ask", e.message, e.details || []));
+    return BACKLOG_DIR_REFUSAL_EXIT;
   }
   const config = loadConfigOrExit(root);
   const result = askTask({

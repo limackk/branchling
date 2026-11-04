@@ -5,7 +5,7 @@ import { loadConfigOrExit } from "./config.mjs";
 import { handoffTask, rebuildViews } from "./handoff-task.mjs";
 import { ACTOR_NAMESPACES, isValidActor } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
-import { resolveBacklogDir } from "./paths.mjs";
+import { BACKLOG_DIR_REFUSAL_EXIT, BACKLOG_DIR_REFUSAL_KIND, isBacklogDirRefusal, resolveBacklogDir } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { failure } from "./ui.mjs";
 import { DEPLOY_SUBCOMMANDS } from "./deploy-command.mjs";
@@ -77,7 +77,10 @@ export function run(argv) {
   if (!isValidActor(actor)) return refuse("the actor `" + actor + "` has no valid namespace", ["Use one of: " + ACTOR_NAMESPACES.map((n) => n + ":<name>").join(" | ")], 2, "usage");
   let root;
   try { root = resolveBacklogDir({ dir: plan.dir || undefined }).root; }
-  catch (e) { return refuse(e.message, [], 2, "usage"); }
+  catch (e) {
+    if (!isBacklogDirRefusal(e)) throw e;
+    return refuse(e.message, e.details || [], BACKLOG_DIR_REFUSAL_EXIT, BACKLOG_DIR_REFUSAL_KIND);
+  }
   const config = loadConfigOrExit(root);
   if (plan.status && (config.statuses.indexOf(plan.status) < 0 || config.archivedStatuses.indexOf(plan.status) >= 0)) {
     return refuse("`--status` must name an open status in this backlog", [], 2, "usage");

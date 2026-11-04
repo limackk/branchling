@@ -58,7 +58,7 @@ import { handedBackAcross } from "./audit.mjs";
 import { archivedElsewhereBySource, crossBranchState, describeDivergence, divergences, scanNote } from "./branch-scan.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { ACTOR_NAMESPACES, FIELD_COMMENT, isValidActor, openQuestions, readAllHistory, readHistory, reasonRefusal } from "./history.mjs";
-import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
+import { backlogPaths, BACKLOG_DIR_REFUSAL_EXIT, isBacklogDirRefusal, resolveBacklogDir } from "./paths.mjs";
 import { dispatchWave, loadPlanForDispatch, scheduledIds } from "./plan.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { printJson } from "./json-envelope.mjs";
@@ -828,8 +828,9 @@ export function run(argv) {
   try {
     root = resolveBacklogDir({ dir: plan.dir || undefined, moduleDir: __dirname }).root;
   } catch (e) {
-    console.error(failure(N + " next", e.message, []));
-    return 2;
+    if (!isBacklogDirRefusal(e)) throw e;
+    console.error(failure(N + " next", e.message, e.details || []));
+    return BACKLOG_DIR_REFUSAL_EXIT;
   }
   const config = loadConfigOrExit(root);
 

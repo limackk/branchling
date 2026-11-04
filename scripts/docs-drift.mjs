@@ -60,7 +60,7 @@ import { classifyTarget, documentsToCheck, linksIn, relatedDocsIn } from "./chec
 import { loadConfigOrExit } from "./config.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { createTask } from "./new-task.mjs";
-import { backlogPaths, repositoryRoot, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { backlogPaths, repositoryRoot, BACKLOG_DIR_REFUSAL_EXIT, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { splitFrontmatter } from "./task-fields.mjs";
 import { readTaskRecords } from "./task-select.mjs";
@@ -503,8 +503,9 @@ export function main(argv) {
   try {
     backlog = resolveBacklogDir({ dir: cli.dir, moduleDir: HERE }).root;
   } catch (e) {
-    console.error(failure(N + " docs-drift", e.message, [], [`${N} docs-drift --dir <path>`]));
-    return 2;
+    if (!isBacklogDirRefusal(e)) throw e;
+    console.error(failure(N + " docs-drift", e.message, e.details || [], [`${N} docs-drift --dir <path>`]));
+    return BACKLOG_DIR_REFUSAL_EXIT;
   }
   const config = loadConfigOrExit(backlog);
   const paths = backlogPaths(backlog);

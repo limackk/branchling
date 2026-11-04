@@ -18,7 +18,7 @@ import { DEDICATED_FIELDS, writableFields, writeTaskField } from "./field-write.
 import { FIELD_SHAPES } from "./task-fields.mjs";
 import { rebuildViews } from "./handoff-task.mjs";
 import { printJson } from "./json-envelope.mjs";
-import { resolveBacklogDir } from "./paths.mjs";
+import { BACKLOG_DIR_REFUSAL_EXIT, BACKLOG_DIR_REFUSAL_KIND, isBacklogDirRefusal, resolveBacklogDir } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { failure } from "./ui.mjs";
 
@@ -109,7 +109,10 @@ export function run(argv) {
   }
   let root;
   try { root = resolveBacklogDir({ dir: plan.dir || undefined }).root; }
-  catch (e) { return refuse(e.message, [], 2, "usage"); }
+  catch (e) {
+    if (!isBacklogDirRefusal(e)) throw e;
+    return refuse(e.message, e.details || [], BACKLOG_DIR_REFUSAL_EXIT, BACKLOG_DIR_REFUSAL_KIND);
+  }
   const config = loadConfigOrExit(root);
   if (plan.fields) {
     const fields = setFieldDescriptions(config);

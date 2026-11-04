@@ -64,7 +64,7 @@ import { fileURLToPath } from "node:url";
 import { ConfigError, loadConfig, parseConfigYaml } from "./config.mjs";
 import { NAME_SHAPE, REPOSITORY_SHAPE, isGlob } from "./deploy-targets.mjs";
 import { printJson } from "./json-envelope.mjs";
-import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { backlogPaths, BACKLOG_DIR_REFUSAL_EXIT, BACKLOG_DIR_REFUSAL_KIND, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { RELEASE_SHAPE, normalizeReason, reasonRefusal, stripComment } from "./task-fields.mjs";
 import { MARK, color, failure, refusal } from "./ui.mjs";
@@ -366,7 +366,10 @@ export function run(argv) {
 
   let root;
   try { root = resolveBacklogDir({ dir: dirFlag.dir || undefined, moduleDir: HERE }).root; }
-  catch (e) { return refuse(e.message, [], 2, "usage", { key, name, reason }); }
+  catch (e) {
+    if (!isBacklogDirRefusal(e)) throw e;
+    return refuse(e.message, e.details || [], BACKLOG_DIR_REFUSAL_EXIT, BACKLOG_DIR_REFUSAL_KIND, { key, name, reason });
+  }
   const file = backlogPaths(root).configPath;
   const original = existsSync(file) ? readFileSync(file, "utf8") : "";
 

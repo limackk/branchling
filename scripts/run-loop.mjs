@@ -91,7 +91,7 @@ import { userConfigPath } from "./home.mjs";
 import { lockScope, releaseLock, stateRoot } from "./lock.mjs";
 import { requestStop, stopRequestedSince } from "./run-stop.mjs";
 import { callerSpecies, deadlockIdentity, describeConflict, describeDeadlock, isOverSized, parkedByRun, queueStatuses, readDispatchRecords, selectCandidates, servesExecutor } from "./next-task.mjs";
-import { backlogPaths, repositoryRoot, resolveBacklogDir } from "./paths.mjs";
+import { backlogPaths, repositoryRoot, BACKLOG_DIR_REFUSAL_EXIT, isBacklogDirRefusal, resolveBacklogDir } from "./paths.mjs";
 import { loadPlanForDispatch, planState, projectionWall } from "./plan.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { inProgressStatus, rebuildViews } from "./take-task.mjs";
@@ -1644,8 +1644,9 @@ export async function run(argv) {
   try {
     root = resolveBacklogDir({ dir: plan.dir || undefined, moduleDir: __dirname }).root;
   } catch (e) {
-    console.error(failure(N + " run", e.message, []));
-    return 2;
+    if (!isBacklogDirRefusal(e)) throw e;
+    console.error(failure(N + " run", e.message, e.details || []));
+    return BACKLOG_DIR_REFUSAL_EXIT;
   }
   // A REQUEST, NOT A RUN (TL-485). It needs the clone and nothing else — no
   // configuration, no profile, no agent — so it is answered before any of them

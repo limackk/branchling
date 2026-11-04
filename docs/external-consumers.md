@@ -232,6 +232,20 @@ failed guard `backlog` in `failed`, and `guards` holds that one entry
 (`{ name: "backlog", severity: "gate", ok: false, exit: 1, output }`) with the
 sentence the human form prints as its `output`. No other guard ran.
 
+**Every command gives that state the same exit code: 1** (TL-546). No backlog
+found, and a `--dir` or `BACKLOG_DIR` naming a directory that is not a
+backlog, exit `1` from every command, reading or writing; `2` never means
+either state, so a consumer may map `2` to "the call was built wrong" without
+asking which command it ran. Until TL-546 the writing commands (`take`,
+`next`, `set`, `release`, `handoff`, `ask`, `decide`, `body`, `run`, `deploy`,
+`declare`, `seed`, `import` and others) exited `2` here and labelled it
+`refusalKind: "usage"`. A writing command that answers this state in an
+envelope under `--json` — `set`, `release`, `declare`, `deploy record` — now
+carries `ok: false` and `refusalKind: "no-backlog"`; `doctor` and `check`
+answer their own kind as described above; the others print the refusal on
+stderr and leave stdout empty. `where` reports this state rather than refusing
+on it, and its exit code follows its own `--help`.
+
 **`plan --json` wave tasks are objects** `{ id, title, status, blocked_by,
 known, open, executor }`. They were objects before TL-534 as well — `title`
 and `blocked_by` are added keys, so the root shape did not change. A task file
@@ -260,7 +274,9 @@ Common to all of them:
 - **Exit codes:** `0` the write happened (or was a no-op), and otherwise
   non-zero — for most commands `1` refused and `2` a usage error; `next` adds
   `3` for an empty queue, and `seed` and `import` use `2` for a refused input
-  and `1` for a failed write. Each command's `--help` ends with its own `exit:`
+  and `1` for a failed write. No backlog, or a directory named that is not
+  one, is `1` from every command (`refusalKind: "no-backlog"` where an
+  envelope is printed). Each command's `--help` ends with its own `exit:`
   line; branch on `ok` in the envelope rather than on the number alone.
 
 | Command | Required input | Kind |

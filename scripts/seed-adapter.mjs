@@ -49,7 +49,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadConfigOrExit } from "./config.mjs";
-import { resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { BACKLOG_DIR_REFUSAL_EXIT, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { failure } from "./ui.mjs";
 
@@ -375,8 +375,9 @@ export async function main(argv) {
   try {
     root = resolveBacklogDir({ dir: cli.dir, moduleDir: HERE }).root;
   } catch (e) {
-    console.error(failure(N + " plan-from", e.message, [], [`${N} plan-from spec.md --dir <path>`]));
-    return 2;
+    if (!isBacklogDirRefusal(e)) throw e;
+    console.error(failure(N + " plan-from", e.message, e.details || [], [`${N} plan-from spec.md --dir <path>`]));
+    return BACKLOG_DIR_REFUSAL_EXIT;
   }
   const config = loadConfigOrExit(root);
   const settings = modelSettings(config.user, config.user.path);

@@ -1187,6 +1187,17 @@ implementation detail. Every reading command answers in the same envelope:
 | `red` | `red-owners` | `command`, `ran` (a report nobody gave is not an empty one), `reason`, `exitCode`, `files` (each failing test file with the task its commits name and, with `--repairs`, open sibling-branch repairers), `mine`, `tally`, `repairScan` (null unless requested; then whether the cross-branch scan ran and which branches it read) |
 | `docs-drift` | `docs-drift` | `documents`, `minSignals`, `flagged`, `tooLittle`, `seeded` (absent unless `--seed-tasks` ran) |
 
+**No backlog exits 1 from every command** (TL-546). Run where no backlog is
+found, or with a `--dir` or `BACKLOG_DIR` naming a directory that is not one,
+every command refuses with exit **1** — the invocation is well built, the
+directory it names is not usable; **2** stays for a wrongly built invocation.
+A writing command that answers in an envelope under `--json` (`set`,
+`release`, `declare`, `deploy record`) gives this state `ok: false` and
+`refusalKind: "no-backlog"`; `doctor --json` and `check --json` answer their
+own kind with `root: null`; every other command prints the refusal on stderr
+and leaves stdout empty. `where` is the one command that REPORTS this state
+instead of refusing on it, and keeps its own exit.
+
 **`agent_estimate` is a computed field, not a stored one** (TL-482). Every task
 row in `query --json` and the `task` that `next --json` hands over carry it:
 what agents took on closed tasks with the same `estimate`, read from

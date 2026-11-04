@@ -22,7 +22,7 @@ import { printJson } from "./json-envelope.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { isValidActor, stripComment, unquote } from "./task-fields.mjs";
 import { failure, heading, refusal, table } from "./ui.mjs";
-import { resolveBacklogDir } from "./paths.mjs";
+import { isBacklogDirRefusal, resolveBacklogDir } from "./paths.mjs";
 import { executableInvocation } from "./posix-shell.mjs";
 import { processEssentials } from "./process-env.mjs";
 
@@ -393,7 +393,9 @@ export async function run(argv, env = process.env) {
     return 2;
   }
   let projectRoot = null;
-  try { projectRoot = resolveBacklogDir({ moduleDir: HERE }).root; } catch { /* A global profile command is valid outside a backlog. */ }
+  // A global profile command is valid outside a backlog; any OTHER error is a
+  // defect and keeps its stack instead of passing for that absence.
+  try { projectRoot = resolveBacklogDir({ moduleDir: HERE }).root; } catch (e) { if (!isBacklogDirRefusal(e)) throw e; }
   const store = projectRoot ? readAvailableAgentProfiles(projectRoot, env) : readAgentProfiles(env);
   if (plan.subcommand === "check") return checkAnswer(plan, checkAgentProfiles(plan.name ? [plan.name] : [], env, projectRoot), env);
   if (store.problems.length) {
