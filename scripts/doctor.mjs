@@ -45,7 +45,7 @@ import { USER_SKILLS, skillsTarget } from "./install-skills.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { MARK as UI_MARK, color, errColor, heading, refusal } from "./ui.mjs";
-import { backlogPaths, repositoryRoot, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { backlogPaths, isBacklogDirRefusal, NotABacklogError, repositoryRoot, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { summarize } from "./stats.mjs";
 import { vocabularyUsage } from "./task-fields.mjs";
 import { detectPrefixMismatch, taskIdPatterns } from "./task-id.mjs";
@@ -608,12 +608,22 @@ export function main(argv) {
   let root;
   try {
     root = resolveBacklogDir({ dir: cli.dir, moduleDir: HERE }).root;
-  } catch {
+  } catch (e) {
+    if (!isBacklogDirRefusal(e)) throw e;
     // A missing backlog is an ANSWER here, not a crash — this is the command
     // somebody who has just installed the tool will reach for by reflex.
-    const rows = [check("backlog", "backlog", ERR, "no backlog directory found", N + " init --dir ./backlog")];
+    //
+    // A directory NAMED with --dir or BACKLOG_DIR that is not a backlog gets
+    // its own sentence (TL-545): "no backlog here" plus "point at one with
+    // --dir" answers somebody who has just done exactly that.
+    const named = e instanceof NotABacklogError;
+    const detail = named ? e.message : "no backlog directory found";
+    const rows = [check("backlog", "backlog", ERR, detail, N + " init --dir ./backlog")];
     if (asJson) printJson("doctor", { ok: false, root: null, next: nextStep(rows), checks: rows });
-    else {
+    else if (named) {
+      console.error(errColor.err(UI_MARK.err) + " " + errColor.bold(N + " doctor") + ": " + e.message);
+      console.error("  → create one there:       " + N + " init --dir <path>");
+    } else {
       console.error(errColor.err(UI_MARK.err) + " " + errColor.bold(N + " doctor") + ": no backlog here");
       console.error("  → create one:            " + N + " init --dir ./backlog");
       console.error("  → or point at an existing one: " + N + " doctor --dir <path>");

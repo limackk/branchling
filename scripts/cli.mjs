@@ -39,7 +39,7 @@ import { ConfigError, formatConfigError, loadConfig } from "./config.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { MARK, color, failure, plainChildEnv } from "./ui.mjs";
 import { CHECK_GUARDS, effectiveSeverity, guardsForRun } from "./check-guards.mjs";
-import { BacklogNotFoundError, NotABacklogError, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
+import { isBacklogDirRefusal, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { FIELD_SHAPES, REASON_MAX_LENGTH } from "./task-fields.mjs";
 import { DELEGATION_POLICIES } from "./agent-contract.mjs";
 import { dropInferredGitDir } from "./git-env.mjs";
@@ -2269,7 +2269,7 @@ function runCheck(args) {
     try {
       root = resolveBacklogDir({ dir: plan.dir || undefined, moduleDir: HERE }).root;
     } catch (e) {
-      if (!(e instanceof BacklogNotFoundError) && !(e instanceof NotABacklogError)) throw e;
+      if (!isBacklogDirRefusal(e)) throw e;
       const output = [e.message].concat(e.details || []).join("\n");
       console.error(failure(N + " check", e.message, e.details || []));
       printJson("check", {

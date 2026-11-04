@@ -185,17 +185,34 @@ export class BacklogNotFoundError extends Error {
  * side effect would reach the child, and hiding a process-wide behaviour change
  * inside an import is worse than 10 call sites a test enforces.
  *
- * A GENUINE PROGRAMMER ERROR IS RE-THROWN, stack and all. Only the named type
- * is turned into a message.
+ * A GENUINE PROGRAMMER ERROR IS RE-THROWN, stack and all. Only the two named
+ * types are turned into a message.
+ *
+ * A DIRECTORY NAMED EXPLICITLY THAT IS NOT A BACKLOG EXITS 1, like no backlog
+ * at all (TL-545). The invocation is well built — the flag exists and carries a
+ * value — and the directory it names is not usable, which is a verdict about
+ * data, not about the command line; 2 stays for a wrongly built invocation.
+ * `check --json` gave this state 1 in TL-541, and two codes for one state
+ * would make a script that tests `$?` depend on which command it ran.
  */
 export function resolveBacklogDirOrExit(opts = {}, command = N) {
   try {
     return resolveBacklogDir(opts);
   } catch (e) {
-    if (!(e instanceof BacklogNotFoundError)) throw e;
-    console.error(failure(command, e.message, e.details));
+    if (!isBacklogDirRefusal(e)) throw e;
+    console.error(failure(command, e.message, e.details || []));
     process.exit(1);
   }
+}
+
+/**
+ * True for the two foreseen states of backlog resolution — none found, or one
+ * named that is not a backlog. A command that resolves with the bare
+ * `resolveBacklogDir()` to answer in its own shape (an envelope under `--json`)
+ * asks this, so a third state added later is recognised in one place.
+ */
+export function isBacklogDirRefusal(e) {
+  return e instanceof BacklogNotFoundError || e instanceof NotABacklogError;
 }
 
 /** A shortcut for scripts: returns the full set of paths at once. */
