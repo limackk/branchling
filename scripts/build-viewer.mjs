@@ -409,7 +409,6 @@ export function buildHtml(
   const viewerPlanModuleSrc = readModuleSource("viewer-plan.mjs");
   // The decision panel reads `openQuestions` from task-fields.mjs, pasted above.
   const decisionPanelModuleSrc = readModuleSource("decision-panel.mjs");
-  const taskGraphModuleSrc = readModuleSource("task-graph.mjs");
   const historyJson = JSON.stringify(history).replace(/</g, "\\u003c");
   // THE RELEASE VIEW (TL-504): where each task stands in each deploy target's
   // promotion, read from git NOW and carried with the time it was read. Ids
@@ -1897,13 +1896,6 @@ ${viewerReleaseModuleSrc}
 ${decisionPanelModuleSrc}
 // ─── end of the pasted module ─────────────────────────────────────────
 
-// ─── Pasted source of scripts/task-graph.mjs (TL-116) ────────────────
-// One task's history folded into a graph, and the SVG for it. Nothing is
-// stored — delete it and a rebuild brings it back. Tested by
-// node --test scripts/tests/task-graph.test.mjs.
-${taskGraphModuleSrc}
-// ─── end of the pasted module ─────────────────────────────────────────
-
 
 // TASKS / STATS are mutable — live mode replaces them after reading from disk.
 // ALL_TASKS is the full set; TASKS is its narrowing to the selected board.
@@ -1972,11 +1964,6 @@ const state = {
   // Who is editing (BL-1397). The entry goes into the history, so the default
   // value has to be the one that IS true in typical use of the viewer.
   actor: "founder",
-  historyOpen: false,
-  // The change graph (TL-116) is closed by default: a reader who opened a task
-  // to change a field must not have to scroll past a picture to reach it.
-  graphOpen: false,
-  historyField: null,     // narrows the history list to one field
   // The scope, not a filter: BOARD_ALL or a board slug. Kept apart from
   // the filter* fields, because clearing the filters must not clear it — this is
   // the context of the work, not a narrowing inside that context.
@@ -2997,31 +2984,6 @@ function selectTask(id) {
 //
 // Every field is text. Nothing here writes (TL-379).
 
-
-const HISTORY_FIELD_LABELS = {
-  __created__: "task created",
-  __deleted__: "task deleted",
-  __body__: "task body",
-  __comment__: "comment",
-  __decision__: "decision",
-  __verified__: "manual verification vouched for",
-  // TL-130: somebody claiming a change the log had recorded as nobody's. The
-  // earlier row still says "unknown", and this one stands beside it.
-  __attributed__: "claimed as their own change",
-  // TL-387: the fields a reconciliation absorbed with no reference point to
-  // compare them against. The entry's "to" is the list of those fields.
-  __adopted__: "adopted with no reference point",
-  __role_override__: "taken outside its role",
-  __takeover__: "claim taken over",
-  updated: "Updated",
-  created: "Created",
-};
-
-// ─── History ──────────────────────────────────────────────────────────
-// The history is fetched ONCE per task and redrawn only when it really changed.
-// An unconditional renderDetail() after every fetch made a loop
-// (render → fetch → render) that wiped an open editor while somebody was typing.
-const historyLoaded = {};
 // ─── The live signal (TL-189) ──────────────────────────────────────
 //
 // The server holds the raw log; this side holds only the reduced signal and the
@@ -3032,30 +2994,7 @@ const historyLoaded = {};
 // exists instead of. The tick only re-reads a clock.
 const IN_FLIGHT_TICK_MS = 30000;
 
-function histTime(ts) {
-  const m = String(ts || "").match(/T(\\d{2}:\\d{2})/);
-  return m ? m[1] : "";
-}
-
-// ─── Field editors ──────────────────────────────────────────────
 // ─── Detail render ────────────────────────────────────────────────────
-// ONE listener rather than one per node: the detail panel is re-rendered
-// wholesale on every edit and every SSE refresh, so per-node handlers would be
-// re-bound each time. A click narrows the history list to that node's field —
-// the filter mechanism the list already has, rather than a second one.
-document.addEventListener("click", function (e) {
-  const node = e.target.closest && e.target.closest("[data-graph-node]");
-  if (!node || !state.selectedId) return;
-  openHistory(state.selectedId, node.dataset.graphField);
-});
-document.addEventListener("keydown", function (e) {
-  if (e.key !== "Enter" && e.key !== " ") return;
-  const node = e.target.closest && e.target.closest("[data-graph-node]");
-  if (!node || !state.selectedId) return;
-  e.preventDefault();
-  openHistory(state.selectedId, node.dataset.graphField);
-});
-
 function renderDetail() {
   const el = document.getElementById("taskDetail");
   const t = TASKS.find(function (x) { return x.id === state.selectedId; });
