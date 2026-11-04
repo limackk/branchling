@@ -82,8 +82,7 @@ import { resolveActor } from "./actor.mjs";
 import { checkAgentProfiles, resolveAgentProfile, secretEnvironmentNames } from "./agent-profiles.mjs";
 import { DELEGATION_ENFORCEMENT, DELEGATION_POLICIES, executionReceipt } from "./agent-contract.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { probeContract, repoRootFor } from "./done-task.mjs";
-import { parseVerification } from "./criteria.mjs";
+import { closingContractOf, collisionHeadline, probeContract, repoRootFor } from "./done-task.mjs";
 import { gitDiscoveryEnv } from "./git-env.mjs";
 import { historyPath, readHistory, recordEdit } from "./history.mjs";
 import { roleBrief } from "./instructions.mjs";
@@ -1057,10 +1056,25 @@ export function baselineFailure(baseline, current) {
   return introduced ? null : failed[0];
 }
 
-function contractProbe(file, cwd) {
+/**
+ * Every entry of the contract `done` will run, probed (TL-496). It reads
+ * through `closingContractOf()`, the one reader `done` uses, because the
+ * baseline exists to recognise a refusal from `done` as inherited: a baseline
+ * of the task's own entries alone has no row for a project `closing_contract`
+ * entry, so a repository guard that was red before the hand started looked
+ * like the hand's own failure and parked finished work.
+ *
+ * A shared id is refused with no rows, as `probeTask` refuses it: `done`
+ * refuses it before running anything, so there is no red to inherit.
+ */
+export function contractProbe(file, cwd, config) {
   const { frontmatter } = splitFrontmatter(readFileSync(file, "utf8"));
-  const { entries, problems } = parseVerification(frontmatter);
-  return problems.length ? { rows: [] } : probeContract(entries, cwd);
+  const { entries, problems, collisions } = closingContractOf(frontmatter, config);
+  if (problems.length) return { rows: [], problems };
+  if (collisions.length) {
+    return { rows: [], problems: collisions.map((id) => collisionHeadline("`id: " + id + "`")) };
+  }
+  return { ...probeContract(entries, cwd), problems: [] };
 }
 
 /**
@@ -1290,7 +1304,7 @@ async function workOne(ctx, task) {
   // red entry, while a probe records every entry so a later suite red can be
   // recognised as belonging to the tree the task inherited (TL-242).
   const contractCwd = repositoryRoot(ctx.root);
-  const contractAtTake = contractProbe(task.file, contractCwd);
+  const contractAtTake = contractProbe(task.file, contractCwd, ctx.config);
   // ONE reading, taken at the CLAIM and never refreshed (TL-184). Comparing an
   // attempt against the start of that same attempt looked equivalent and is not:
   // an agent whose second attempt writes the same bytes as its first leaves
@@ -1463,7 +1477,7 @@ async function workOne(ctx, task) {
         detail: verdict.refusal || "`" + N + " done` refused: " + kind,
       });
     }
-    const inherited = baselineFailure(contractAtTake, contractProbe(task.file, contractCwd));
+    const inherited = baselineFailure(contractAtTake, contractProbe(task.file, contractCwd, ctx.config));
     if (inherited) {
       const entry = failedEntry(verdict) || "an unnamed verification entry";
       appendFileSync(logPath, "\n=== inherited baseline red: " + entry + "\n", "utf8");
