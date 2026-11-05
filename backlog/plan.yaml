@@ -13,7 +13,7 @@
 # means something first, outward claims last — and adds one: a human gate is
 # closed by a vouch, so the vouch has to be recorded under the right name
 # before any gate is closed with one.
-updated: 2026-11-02
+updated: 2026-11-05
 rationale: "The package is already public, so what remains is making each later claim true before it is made. Branchling first makes its suite answer the same way twice, then records a person's vouch as that person's and reads a CRLF checkout like an LF one; the viewer runs alongside, on files neither of those touches. Only then the human gates, and last the release evidence and the announcement that point at all of it."
 waves:
   # A SUITE THAT IS RED BY CHANCE CLOSES NOTHING. `done` runs the suite, so a
@@ -31,6 +31,17 @@ waves:
   # differently would be a claim the tool does not keep.
   - name: "A vouch and a checkout say what is true"
     tasks: [TL-460, TL-479]
+
+  # THE FOLLOW-UPS FROM THE SUPERVISED LOOPS, AND THE TWO FROM THE TL-450
+  # REVIEW. Every pending task an agent can take without a person and
+  # without an open blocker, worked by four parallel loops. It comes before
+  # the viewer wave because that wave's only open task is already claimed
+  # and the waves after it wait on people. Tasks that edit one module share
+  # a `conflict_group` (proofs, serve, json-envelope, log-task, viewer), so
+  # `next` never hands two of them out at once; the rest touch disjoint
+  # files. TL-473 stays in the wave that judges responsiveness.
+  - name: "The supervised-loop follow-ups close"
+    tasks: [TL-565, TL-563, TL-564, TL-498, TL-548, TL-550, TL-551, TL-556, TL-559, TL-561, TL-562, TL-547, TL-549, TL-552, TL-553, TL-554, TL-557, TL-558, TL-560]
 
   # The viewer touches build-viewer.mjs and serve-backlog.mjs only, so it can
   # run beside the two waves above rather than after them. Both halves exist

@@ -1,1 +1,2 @@
 {"id":"01M6KBBCGAS47DMYPJSWKEH7FS","ts":"2026-11-04T13:18:07.882Z","task":"TL-556","field":"__created__","from":"","to":"check --proofs --since narrows by a task's own entries","actor":"agent:claude","source":"new","reason":"unknown"}
+{"id":"01M6P1QKY73552N157VK59A1P7","ts":"2026-11-05T14:27:46.247Z","task":"TL-556","field":"conflict_group","from":[],"to":["proofs"],"actor":"agent:claude-coordinator","source":"set","reason":"Parallel loops in the supervised-loop wave must not take two tasks that edit the same module at once"}

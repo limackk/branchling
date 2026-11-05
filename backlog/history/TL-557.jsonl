@@ -1,1 +1,2 @@
 {"id":"01M6KBBCTZ3JWMBV0WEZTD7G3B","ts":"2026-11-04T13:18:08.223Z","task":"TL-557","field":"__created__","from":"","to":"One task's own proofs can be audited without the project entries","actor":"agent:claude","source":"new","reason":"unknown"}
+{"id":"01M6P1QM99JMG10BZG8A45MK82","ts":"2026-11-05T14:27:46.601Z","task":"TL-557","field":"conflict_group","from":[],"to":["proofs"],"actor":"agent:claude-coordinator","source":"set","reason":"Parallel loops in the supervised-loop wave must not take two tasks that edit the same module at once"}

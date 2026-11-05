@@ -1,1 +1,2 @@
 {"id":"01M6KBBBVK4E6K4FA0PW7SABQX","ts":"2026-11-04T13:18:07.219Z","task":"TL-554","field":"__created__","from":"","to":"The read-only viewer carries no editing or actor state","actor":"agent:claude","source":"new","reason":"unknown"}
+{"id":"01M6P1QQFGH6YT8R8MQA15P8FE","ts":"2026-11-05T14:27:49.872Z","task":"TL-554","field":"conflict_group","from":[],"to":["viewer"],"actor":"agent:claude-coordinator","source":"set","reason":"Parallel loops in the supervised-loop wave must not take two tasks that edit the same module at once"}

@@ -1,1 +1,2 @@
 {"id":"01M6KBWCNDDF4J1AAQJHAGYJ7Z","ts":"2026-11-04T13:27:25.101Z","task":"TL-560","field":"__created__","from":"","to":"Each open question carries its task's priority","actor":"agent:claude","source":"new","reason":"unknown"}
+{"id":"01M6P1QPS8BBGFPDEPXRKG43R9","ts":"2026-11-05T14:27:49.160Z","task":"TL-560","field":"conflict_group","from":[],"to":["log-task"],"actor":"agent:claude-coordinator","source":"set","reason":"Parallel loops in the supervised-loop wave must not take two tasks that edit the same module at once"}

@@ -1,1 +1,2 @@
 {"id":"01M6KBB9XGHVKJN376PW1D7ZMJ","ts":"2026-11-04T13:18:05.232Z","task":"TL-548","field":"__created__","from":"","to":"Every command under --json answers a missing backlog with an envelope","actor":"agent:claude","source":"new","reason":"unknown"}
+{"id":"01M6P1QNER71TJVY98WWST7V5P","ts":"2026-11-05T14:27:47.800Z","task":"TL-548","field":"conflict_group","from":[],"to":["json-envelope"],"actor":"agent:claude-coordinator","source":"set","reason":"Parallel loops in the supervised-loop wave must not take two tasks that edit the same module at once"}

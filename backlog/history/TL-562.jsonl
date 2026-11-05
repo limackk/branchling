@@ -1,1 +1,2 @@
 {"id":"01M6KD8WF7YXZ8AN83E72KKZWD","ts":"2026-11-04T13:51:43.079Z","task":"TL-562","field":"__created__","from":"","to":"Every ledger record of a task is readable as JSON","actor":"agent:claude","source":"new","reason":"unknown"}
+{"id":"01M6P1QPDS9H7EAHNKACYEQMTP","ts":"2026-11-05T14:27:48.793Z","task":"TL-562","field":"conflict_group","from":[],"to":["log-task"],"actor":"agent:claude-coordinator","source":"set","reason":"Parallel loops in the supervised-loop wave must not take two tasks that edit the same module at once"}
