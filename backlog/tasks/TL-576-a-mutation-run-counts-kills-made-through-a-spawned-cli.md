@@ -8,8 +8,8 @@ epic: ""                           # free text — the group this task counts to
 release: ""                        # the release it is PLANNED for (a value from `releases:` in config.yaml). Empty = none
 target: []                         # the deploy targets in ANOTHER repository it ships from (`deploy_targets` with `repository:`). Empty = none
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 conflict_group: []                 # the AREA it touches (e.g. a module): `next` and `run` hold it back while a task of the same group is in progress. Empty = `conflict_group_from`, or none
@@ -22,7 +22,7 @@ blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
 verification:
   - id: subprocess-kill-counted
-    bash: "node --test scripts/tests/mutation-run.test.mjs"
+    bash: "node --test scripts/tests/mutation/subprocess-kill.test.mjs"
   - id: changed-files-scope
     bash: "node --test scripts/tests/mutation-run.test.mjs"
 ---
@@ -58,5 +58,5 @@ Deliberately open: whether Stryker becomes a devDependency (the package has none
 
 ## Acceptance criteria
 
-- [ ] A mutant reachable only through a spawned CLI is reported Killed by the mutation run, so the score does not undercount the suite [proof: subprocess-kill-counted]
-- [ ] The run mutates only files changed against the base branch and fails, rather than reporting a score, when that set is empty [proof: changed-files-scope]
+- [x] A mutant reachable only through a spawned CLI is reported Killed by the mutation run, so the score does not undercount the suite [proof: subprocess-kill-counted]
+- [x] The run mutates only files changed against the base branch and fails, rather than reporting a score, when that set is empty [proof: changed-files-scope]

@@ -135,6 +135,33 @@ Two rules keep it that way:
   thresholds computed from its size are DATA, not the tool's contract. If a test
   needs a specific value, it has to establish it with a fixture.
 
+### Mutation runs: whether the assertions would notice
+
+A green suite says the assertions held; it does not say they would fail if
+the code were wrong. `npm run mutation` (`scripts/mutation-run.mjs`, TL-576)
+injects small defects into the modules changed against `main` and reports
+each one the suite did NOT notice. It needs `npm install` (Stryker is a
+pinned devDependency); the default suite and CI do not.
+
+- **Run it before committing code whose tests you wrote in the same pass.**
+  That is the case where test and code share every assumption. Start with
+  `--named-only`: a fast lower bound from the test files that name the
+  module. Without it, a module that `cli.mjs` imports selects most of the
+  suite, which is the honest set and can take an hour.
+- **A surviving mutant is a missing assertion, not a number to raise.** Write
+  the test that fails on that mutant, and check that it does. Never make a
+  survivor disappear (a narrower `--files`, a weaker selection) without saying
+  in the commit why the behaviour does not matter. Some survivors are
+  equivalent mutants that no test can kill; name them, do not chase 100%.
+- **Three results are not scores.** `NoCoverage` fails the run: this setup
+  cannot lose coverage, so it means the runner changed. A `Timeout` is counted
+  as detected by Stryker and is usually an overloaded machine here, so the run
+  warns; lower `--concurrency` and rerun. An empty change set fails rather
+  than score nothing.
+- **The run itself is proved by** `node --test
+  scripts/tests/mutation/subprocess-kill.test.mjs`, deliberately outside the
+  default glob. Run it after touching `mutation-run.mjs`.
+
 ## Language: everything in this repository is English
 
 **Every file is written in English. There is no directory-shaped exception.**
