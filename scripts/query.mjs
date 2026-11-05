@@ -68,7 +68,7 @@ import {
   TRUNK_SOURCE_TEXT, defaultTrunk, deploymentScanJson, deploymentState, describeUnknownRefs,
   explain as explainDeploy, parseStageSelector, stageMatches, taskDeployment, taskDeploymentJson,
 } from "./environments.mjs";
-import { backlogPaths, resolveBacklogDir, resolveBacklogDirOrExit } from "./paths.mjs";
+import { BACKLOG_DIR_REFUSAL_EXIT, BACKLOG_DIR_REFUSAL_PHRASE, backlogPaths, resolveBacklogDir, resolveBacklogDirOrExit } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { SORT_KEYS, filterTasks, readTaskRecords, sortTasks, splitList, unknownFilterValues } from "./task-select.mjs";
 import { refusal } from "./ui.mjs";
@@ -136,7 +136,8 @@ if (opts.help || opts.h) {
   printLine("  " + [...VALUE_FLAGS].sort().join(" "));
   printLine("\nswitches:");
   printLine("  " + [...BOOL_FLAGS].filter((f) => f !== "--help" && f !== "-h").sort().join(" "));
-  printLine("\nexit code: 0 = the query ran (including on zero matches), 2 = a usage error.");
+  printLine("\nexit code: 0 = the query ran (including on zero matches), " + BACKLOG_DIR_REFUSAL_EXIT + " = " +
+    BACKLOG_DIR_REFUSAL_PHRASE + ", 2 = a usage error.");
   process.exit(0);
 }
 

@@ -39,12 +39,22 @@ import { ConfigError, formatConfigError, loadConfig } from "./config.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { MARK, color, failure, plainChildEnv } from "./ui.mjs";
 import { CHECK_GUARDS, effectiveSeverity, guardsForRun } from "./check-guards.mjs";
-import { isBacklogDirRefusal, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
+import { BACKLOG_DIR_REFUSAL_HELP, isBacklogDirRefusal, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { FIELD_SHAPES, REASON_MAX_LENGTH } from "./task-fields.mjs";
 import { DELEGATION_POLICIES } from "./agent-contract.mjs";
 import { dropInferredGitDir } from "./git-env.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+
+/**
+ * The continuation every `exit:` line ends with when its command resolves a
+ * backlog (TL-549): the command's own outcomes say nothing about the state
+ * every command shares, and since TL-546 that state is the same 1 everywhere.
+ * One constant, so the clause cannot be reworded in one help text and not the
+ * next. A command that never resolves a backlog does not carry it, and
+ * `scripts/tests/help-exit-lines.test.mjs` names those and proves each one.
+ */
+const NO_BACKLOG_EXIT_LINE = "        · " + BACKLOG_DIR_REFUSAL_HELP;
 
 const CHECK_USAGE = [
   `${N} check [--dir <path>] [--id-collisions] [--boards] [--refs] [--criteria] [--contracts] [--reasons] [--log-status] [--task-state] [--vocabulary] [--plan] [--product-name] [--proofs] [--since <sha>] [--release [--env <stage>] [--trunk <ref>]] [--actor <ns:name>] [task-file.md …]`,
@@ -320,6 +330,7 @@ export const COMMANDS = {
       "  before writing and prints the event ids; pass one back through `--event`.",
       "",
       "  exit: 0 · 2 the invocation was wrong",
+      NO_BACKLOG_EXIT_LINE,
     ].join("\n"),
   },
   log: {
@@ -364,7 +375,8 @@ export const COMMANDS = {
       "  It does not run reviews, call a model, or judge whether a decision was right.",
       "",
       "  exit: 0 read, including a task whose log is empty · 1 no such task anywhere",
-      "        2 usage error",
+      "        · 2 usage error",
+      NO_BACKLOG_EXIT_LINE,
     ].join("\n"),
   },
   show: {
@@ -392,6 +404,7 @@ export const COMMANDS = {
       "             (null without the flag). Untrusted text: render it safely",
       "",
       "  exit: 0 answered · 1 no such task in this tree · 2 usage error",
+      NO_BACKLOG_EXIT_LINE,
     ].join("\n"),
   },
   follow: {
@@ -429,6 +442,7 @@ export const COMMANDS = {
       "",
       "  exit: 0 stopped (signal, reader gone, --max-events reached) · 1 the watch",
       "        could not be set up · 2 usage error",
+      NO_BACKLOG_EXIT_LINE,
     ].join("\n"),
   },
   take: {
@@ -459,6 +473,7 @@ export const COMMANDS = {
       "  still both take one task and will find out when they merge.",
       "",
       "  exit: 0 taken · 1 refused (held, closed, somebody else's, actor-required) · 2 usage error",
+      NO_BACKLOG_EXIT_LINE,
     ].join("\n"),
   },
   next: {
@@ -505,6 +520,7 @@ export const COMMANDS = {
       "  naming the branch or tree. `cross_branch_state: false` turns that off.",
       "",
       "  exit: 0 taken · 3 nothing to take · 1 refused · 2 usage error",
+      NO_BACKLOG_EXIT_LINE,
     ].join("\n"),
   },
   handoff: {
@@ -535,6 +551,7 @@ export const COMMANDS = {
       "",
       "  exit: 0 handed off · 1 refused (held, closed, somebody else's, `--status` on a task",
       "        not in progress) · 2 usage error",
+      NO_BACKLOG_EXIT_LINE,
     ].join("\n"),
   },
   body: {
@@ -560,6 +577,7 @@ export const COMMANDS = {
       "  A body that breaks the acceptance-criteria contract is refused.",
       "",
       "  exit: 0 written or unchanged · 1 refused (stale base, invalid body, closed) · 2 usage error",
+      NO_BACKLOG_EXIT_LINE,
     ].join("\n"),
   },
   release: {
@@ -583,6 +601,7 @@ export const COMMANDS = {
       "  and `deploy record`: `release status` and `release record` fail and say so.",
       "",
       "  exit: 0 released · 1 refused · 2 usage error, or no such task",
+      NO_BACKLOG_EXIT_LINE,
     ].join("\n"),
   },
   set: {
@@ -616,6 +635,7 @@ export const COMMANDS = {
       "",
       "  exit: 0 set · 1 refused, including a value outside the vocabulary",
       "        · 2 usage error, a field it does not set, or no such task",
+      NO_BACKLOG_EXIT_LINE,
     ].join("\n"),
   },
   deploy: {
@@ -672,6 +692,7 @@ export const COMMANDS = {
       "                     as `actorSource`",
       "",
       "  exit: 0 answered or recorded · 1 refused, or git failed · 2 usage error",
+      NO_BACKLOG_EXIT_LINE,
     ].join("\n"),
   },
   declare: {
@@ -706,6 +727,7 @@ export const COMMANDS = {
       "",
       "  exit: 0 written · 1 refused by config.yaml · 2 usage error, malformed entry,",
       "        or a key no command writes",
+      NO_BACKLOG_EXIT_LINE,
     ].join("\n"),
   },
   resume: {
@@ -735,6 +757,7 @@ export const COMMANDS = {
       "",
       "  exit: 0 briefed, whatever the contract says · 1 refused (no such task, somebody",
       "        else's) · 2 usage error",
+      NO_BACKLOG_EXIT_LINE,
     ].join("\n"),
   },
   decide: {
@@ -775,7 +798,8 @@ export const COMMANDS = {
       "  decision` — computed from the log, with no second file to keep in step.",
       "",
       "  exit: 0 recorded · 1 refused (no such task, no such event, no such option)",
-      "        2 usage error",
+      "        · 2 usage error",
+      NO_BACKLOG_EXIT_LINE,
     ].join("\n"),
   },
   new: {
@@ -884,6 +908,7 @@ export const COMMANDS = {
       "  and every complaint is reported at once with nothing written.",
       "",
       "  exit: 0 seeded · 2 the plan (or the invocation) was refused · 1 the write failed",
+      NO_BACKLOG_EXIT_LINE,
     ].join("\n"),
   },
   import: {
@@ -924,6 +949,7 @@ export const COMMANDS = {
       "  same issues creates nothing, recognised by the source link in the task body.",
       "",
       "  exit: 0 imported · 2 the invocation or the input was refused · 1 the write failed",
+      NO_BACKLOG_EXIT_LINE,
     ].join("\n"),
   },
   "plan-from": {
@@ -958,6 +984,7 @@ export const COMMANDS = {
       "  a plan this command edited into shape would be one nobody wrote.",
       "",
       "  exit: 0 a plan · 1 no plan survived the retries · 2 the invocation was wrong",
+      NO_BACKLOG_EXIT_LINE,
     ].join("\n"),
   },
   audit: {
@@ -992,6 +1019,7 @@ export const COMMANDS = {
       "  command that gets switched off and another that gets ignored.",
       "",
       "  exit: 0 nothing found · 1 findings · 2 the invocation was wrong",
+      NO_BACKLOG_EXIT_LINE,
     ].join("\n"),
   },
   "docs-drift": {
@@ -1025,6 +1053,7 @@ export const COMMANDS = {
       "  `too little signal` rather than flagged — one dead link is a typo.",
       "",
       "  exit: 0 nothing to report · 1 documents flagged · 2 the invocation was wrong",
+      NO_BACKLOG_EXIT_LINE,
     ].join("\n"),
   },
   "pr-summary": {
@@ -1095,6 +1124,7 @@ export const COMMANDS = {
       "  --json     the same as one `vocabulary` envelope",
       "",
       "  exit: 0 answered · 1 the configuration cannot be read · 2 usage error",
+      NO_BACKLOG_EXIT_LINE,
     ].join("\n"),
   },
   hooks: {
@@ -1166,6 +1196,7 @@ export const COMMANDS = {
       `  \`${N} init --skills\` does the same thing while creating a backlog.`,
       "",
       "  exit: 0 installed or nothing to do · 1 the packaged skill is missing · 2 usage error",
+      NO_BACKLOG_EXIT_LINE,
     ].join("\n"),
   },
   init: {
@@ -1209,6 +1240,7 @@ export const COMMANDS = {
       "  no status, priority or id prefix of ours reaches somebody else's project.",
       "",
       "  exit: 0 printed · 2 unknown topic or flag",
+      NO_BACKLOG_EXIT_LINE,
     ].join("\n"),
   },
   profile: {
@@ -1269,6 +1301,7 @@ export const COMMANDS = {
       "                     collected for it; the ledger already holds every record.",
       "",
       "  exit: 0 read · 2 usage error",
+      NO_BACKLOG_EXIT_LINE,
     ].join("\n"),
   },
   plan: {
@@ -1317,6 +1350,7 @@ export const COMMANDS = {
       "",
       "  exit: 0 read or written · 1 unreadable, contradictory, or refused by the tree",
       "        · 2 usage error",
+      NO_BACKLOG_EXIT_LINE,
     ].join("\n"),
   },
   run: {
@@ -1470,6 +1504,7 @@ export const COMMANDS = {
       "",
       "  exit: 0 the run finished (blocked tasks included) · 1 the agent never ran ·",
       "        2 usage error",
+      NO_BACKLOG_EXIT_LINE,
     ].join("\n"),
   },
   done: {
@@ -1544,6 +1579,7 @@ export const COMMANDS = {
       "  exit: 0 the question was answered — a red suite is an ANSWER, so the exit code",
       "        never reports the suite's own verdict · 1 the report could not be read ·",
       "        2 usage error",
+      NO_BACKLOG_EXIT_LINE,
     ].join("\n"),
   },
   "migrate-prefix": {
@@ -1573,6 +1609,7 @@ export const COMMANDS = {
       "  Commit messages are out of reach and stay as written.",
       "",
       "  exit: 0 renumbered (or nothing to do) · 1 refused · 2 usage error",
+      NO_BACKLOG_EXIT_LINE,
     ].join("\n"),
   },
   mcp: {
@@ -1627,6 +1664,7 @@ export const COMMANDS = {
       "    none were offered, so a review can see how often it happens.",
       "",
       "    exit: 0 asked · 1 refused (closed, no such task) · 2 usage error",
+      "  " + NO_BACKLOG_EXIT_LINE,
     ].join("\n"),
   },
   "regen-hook": {
