@@ -278,7 +278,7 @@ test("the viewer's Release view draws the frontend as one unobservable column", 
   const config = loadConfig(root);
   const tasks = [fx.ids.feDone, fx.ids.feOpen, fx.ids.unstarted]
     .map((id) => ({ id, status: "x", target: id === fx.ids.unstarted ? [] : ["frontend"] }));
-  const data = releaseViewData({ root, config, tasks });
+  const data = releaseViewData({ root, config });
   assert.equal(data.available, true, data.explanation);
   const lane = data.lanes.find((l) => l.target === "frontend");
   assert.equal(lane.repository, "acme-frontend");

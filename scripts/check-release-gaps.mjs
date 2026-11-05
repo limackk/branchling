@@ -31,10 +31,9 @@ import { fileURLToPath } from "node:url";
 import { loadConfigOrExit } from "./config.mjs";
 import { TRUNK_SOURCE_TEXT, defaultTrunk, explain, parseStageSelector } from "./environments.mjs";
 import { repoRoot } from "./modified-files.mjs";
-import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
-import { currentReleaseText, gateVerdict, releaseGaps } from "./release-gaps.mjs";
-import { readTaskRecords } from "./task-select.mjs";
+import { currentReleaseText, gateVerdict, releaseGaps, releaseTaskRecords } from "./release-gaps.mjs";
 import { MARK, color, errColor, plain, refusal } from "./ui.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -88,7 +87,7 @@ function main(argv) {
 
   const repo = repoRoot(root);
   const trunk = trunkFlag ? { spec: trunkFlag, source: "flag" } : defaultTrunk(repo);
-  const tasks = readTaskRecords(backlogPaths(root).tasksDir, config.taskId.file);
+  const tasks = releaseTaskRecords(root, config);
   const result = releaseGaps({ root: repo, config, tasks, selector, trunk });
   const mode = config.releaseGate;
   const verdict = gateVerdict(result, mode);

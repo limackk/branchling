@@ -141,7 +141,7 @@ ${extraConfig}`);
 function dataFor(backlog, now) {
   const config = loadConfig(backlog);
   assert.deepEqual(config.problems || [], []);
-  return releaseViewData({ root: backlog, config, tasks: readTasks(backlog, config), now });
+  return releaseViewData({ root: backlog, config, now });
 }
 
 /** `column key → [ids]` for one lane. */
@@ -446,7 +446,7 @@ test("the built page carries the Release tab and its data only when targets are 
   const ptasks = readTasks(join(plain, "backlog"), pconfig);
   const phtml = buildHtml(ptasks, computeStats(ptasks), pconfig, {});
   assert.match(phtml, /id="tabRelease" hidden>Release</);
-  const pdata = releaseViewData({ root: join(plain, "backlog"), config: pconfig, tasks: ptasks });
+  const pdata = releaseViewData({ root: join(plain, "backlog"), config: pconfig });
   assert.equal(pdata.available, false);
   assert.equal(pdata.reason, "no-targets");
   assert.match(renderRelease(releaseViewModel(pdata)), /deploy_targets:/);
