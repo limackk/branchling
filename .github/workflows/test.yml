@@ -18,6 +18,30 @@ on:
   push:
   pull_request:
 
+# A RUN SUPERSEDED BY A NEWER PUSH TO THE SAME REF IS CANCELLED (TL-498).
+# Nobody reads the verdict on a commit that a later push replaced, and on
+# 2026-10-30 such runs held the few macOS runners for more than an hour while
+# the run on the newest `main` commit waited behind them.
+#
+# A pull request is keyed by its NUMBER, so a new push to it replaces its older
+# run; every other event is keyed by its ref, `main` included, so a newer push
+# to a branch replaces the older run of that branch. A `pr-N` group and a ref
+# such as `refs/heads/main` can never be equal, so a pull request run cannot
+# cancel a run on `main`.
+#
+# On the default branch only QUEUED runs are replaced; a run that has started
+# finishes. The trade-off is deliberate: a run already holding runners may
+# delay the newest commit's run by one run's length, but under a stream of
+# merges `main` still reaches a verdict, where cancelling in progress could
+# cancel every run before it finished and leave `main` with none.
+#
+# `github.workflow` leads the key because groups are shared by every workflow
+# in the repository. `release.yml` declares no group, so a tag's release run
+# cannot be cancelled by anything here.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}
+  cancel-in-progress: ${{ github.ref != format('refs/heads/{0}', github.event.repository.default_branch) }}
+
 jobs:
   test:
     # THE MATRIX MATCHES `engines` IN package.json, and that is not decoration.
