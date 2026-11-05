@@ -464,6 +464,12 @@ export const KINDS = {
     // The markdown after the frontmatter, verbatim, under `--body` (TL-542);
     // null without the flag — the key stays, as every declared key does.
     body: null,
+    // The task's own `verification:` entries (TL-561), each `{ id, bash,
+    // manual, criteria }` — `bash` or `manual` null when the entry has the
+    // other, `criteria` the acceptance criteria naming it by `[proof: <id>]`
+    // — and what the parser could not read, so a contract `done` would refuse
+    // does not read like one it would run.
+    verification: [], verificationProblems: [],
     refusalKind: null, refusal: null, details: [],
   },
   // `log --open-questions --json` (TL-536): every unanswered question on an
