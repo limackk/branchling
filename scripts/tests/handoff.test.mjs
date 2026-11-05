@@ -544,6 +544,62 @@ test("with two queue statuses the command refuses and names them; `--status` set
   assert.equal(field(read(dir, id), "status"), "review");
 });
 
+// TL-564. Two queue statuses, so the positive control can ask for the one the
+// history would NOT have chosen: a `--status` that was dropped and a `--status`
+// that was applied would otherwise end in the same file.
+const TWO_QUEUES = [
+  "statuses: [todo, review, doing, shipped, dropped]",
+  "archived_statuses: [shipped, dropped]",
+  "reason_required_statuses: [dropped]",
+  "in_progress_status: doing",
+  "dashboard_open_statuses: [todo, review, doing]",
+  ROLES,
+].join("\n");
+
+test("`--status` on a task that is not in progress is refused and writes nothing", () => {
+  const dir = repo(TWO_QUEUES);
+  const id = newTask(dir, "Sort the deeds");
+  writeFileSync(taskFile(dir, id), read(dir, id).replace(/^status: .*$/m, "status: review"), "utf8");
+  const before = read(dir, id);
+  const rows = history(dir, id).length;
+
+  const r = run(dir, ["handoff", id, "--dir", ".", "--actor", "local:me",
+    "--to-role", "archivist", "--reason", "Back to the queue.", "--status", "todo"]);
+  assert.equal(r.status, 1, "an explicit `--status` was ignored with exit " + r.status + ": " + r.stdout);
+  assert.match(r.stderr, /review/, "the refusal does not name the current status");
+  assert.match(r.stderr, /doing/, "the refusal does not name the in-progress status it applies to");
+  assert.equal(read(dir, id), before, "the refusal wrote the task file");
+  assert.equal(history(dir, id).length, rows, "the refusal wrote history");
+
+  // `release` goes through the same write path and refuses alike.
+  const rel = run(dir, ["release", id, "--dir", ".", "--actor", "local:me",
+    "--reason", "Back to the queue.", "--status", "todo"]);
+  assert.equal(rel.status, 1, "`release --status` was ignored with exit " + rel.status + ": " + rel.stdout);
+  assert.match(rel.stderr, /review/);
+  assert.equal(read(dir, id), before, "the release refusal wrote the task file");
+  assert.equal(history(dir, id).length, rows, "the release refusal wrote history");
+});
+
+test("`--status` on a task in progress is applied, over the status it was taken from", () => {
+  const dir = repo(TWO_QUEUES);
+  const id = newTask(dir, "Sort the deeds");
+  assert.equal(field(read(dir, id), "status"), "todo");
+  assert.equal(run(dir, ["take", id, "--dir", ".", "--actor", "local:me"]).status, 0);
+  // POSITIVE CONTROL for the refusal above: without the flag the history would
+  // send it back to `todo`, so `review` here is the flag speaking.
+  const r = run(dir, ["handoff", id, "--dir", ".", "--actor", "local:me",
+    "--to-role", "archivist", "--reason", "Ready for review.", "--status", "review"]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(field(read(dir, id), "status"), "review");
+
+  const again = newTask(dir, "Sort the seals");
+  assert.equal(run(dir, ["take", again, "--dir", ".", "--actor", "local:me"]).status, 0);
+  const rel = run(dir, ["release", again, "--dir", ".", "--actor", "local:me",
+    "--reason", "Ready for review.", "--status", "review"]);
+  assert.equal(rel.status, 0, rel.stderr);
+  assert.equal(field(read(dir, again), "status"), "review");
+});
+
 test("`--status` cannot be used to close a task behind `done`'s back", () => {
   const dir = repo(ROLES);
   const id = newTask(dir, "Sort the deeds");

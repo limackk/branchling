@@ -370,6 +370,28 @@ export function handoffTask(opts) {
       }
       nextStatus = queue.status;
     }
+  } else if (opts.status) {
+    // An explicit `--status` this command will not apply is refused, not
+    // dropped (TL-564): exiting 0 with the flag ignored told the caller the task
+    // was back in a queue it never re-entered. Applying it instead would let a
+    // handoff reopen a decision — `blocked`, a status awaiting somebody's
+    // verdict — that it deliberately does not make.
+    return {
+      ok: false, kind: "status-not-applicable", id,
+      message: inProgress
+        ? id + " is " + record.status + ", not " + inProgress + " — `--status " + opts.status + "` would not be applied"
+        : "`in_progress_status` is not declared — `--status " + opts.status + "` would not be applied",
+      details: [
+        inProgress
+          ? "`--status` only says where a task in progress goes back to. `" + record.status + "` was"
+          : "`--status` only says where a task in progress goes back to, and without that",
+        inProgress
+          ? "entered by a decision this command does not make, so a handoff leaves it alone."
+          : "key in config.yaml no task is in progress, so a handoff leaves every status alone.",
+        "Nothing was written. Run it again without `--status`, or change the status first",
+        "with the command that owns that decision.",
+      ],
+    };
   } else if (!inProgress) {
     // Not a refusal: the status is a side effect here, and the role change — the
     // point of the command — does not depend on it.
