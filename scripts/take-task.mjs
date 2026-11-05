@@ -51,7 +51,7 @@ import { ACTOR_NAMESPACES, changesRequiringReason, currentSession, eventId, FIEL
 import { decisionsOf, withDecisions } from "./decisions.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { acquireLock, isExpired, lockDir, readLock, releaseLock } from "./lock.mjs";
-import { backlogPaths, BACKLOG_DIR_REFUSAL_EXIT, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { answerBacklogDirRefusal, backlogPaths, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { buildFieldSpecs, extractMeta, fieldSpec, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
 import { readTaskRecords } from "./task-select.mjs";
@@ -657,8 +657,7 @@ export function run(argv) {
     root = resolveBacklogDir({ dir: plan.dir || undefined, moduleDir: __dirname }).root;
   } catch (e) {
     if (!isBacklogDirRefusal(e)) throw e;
-    console.error(failure(N + " take", e.message, e.details || [], [N + " take --help"]));
-    return BACKLOG_DIR_REFUSAL_EXIT;
+    return answerBacklogDirRefusal(e, { command: N + " take", jsonKind: plan.json ? "task-take" : null, hints: [N + " take --help"], payload: { taken: false, id: plan.id, actorSource } });
   }
   const config = loadConfigOrExit(root);
 

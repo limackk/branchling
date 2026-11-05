@@ -1039,7 +1039,7 @@ export function run(argv) {
     return 2;
   }
 
-  const root = resolveBacklogDirOrExit({ dir: cli.dir || undefined, moduleDir: HERE }, N + " instructions").root;
+  const root = resolveBacklogDirOrExit({ dir: cli.dir || undefined, moduleDir: HERE, jsonKind: plan.json ? "instructions" : null }, N + " instructions").root;
   const config = loadConfigOrExit(root);
 
   if (plan.updateNudge) {

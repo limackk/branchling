@@ -44,7 +44,7 @@ for (const a of argv) {
   }
 }
 
-const ROOT = resolveBacklogDirOrExit({ dir: cli.dir, moduleDir: __dirname }, N + " stats").root;
+const ROOT = resolveBacklogDirOrExit({ dir: cli.dir, moduleDir: __dirname, jsonKind: argv.includes("--json") ? "stats" : null }, N + " stats").root;
 // A message instead of a stack trace (TL-60) — `stats` was one of the commands
 // that failed correctly but looked like a crash of the tool while doing it.
 const CONFIG = loadConfigOrExit(ROOT);

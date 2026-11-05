@@ -64,7 +64,7 @@ import { loadConfigOrExit } from "./config.mjs";
 import { auditTask } from "./criteria.mjs";
 import { ACTOR_NAMESPACES, appendEntries, currentSession, eventId, isValidActor, normalizeReason, reasonRefusal } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
-import { BACKLOG_DIR_REFUSAL_EXIT, isBacklogDirRefusal, resolveBacklogDir, backlogPaths, takeDirFlag } from "./paths.mjs";
+import { answerBacklogDirRefusal, backlogPaths, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { readStdinText } from "./stdin.mjs";
 import { FIELD_BODY, describeBodyChange, lineEnding, splitFrontmatter, withLineEnding } from "./task-fields.mjs";
@@ -379,8 +379,7 @@ export async function run(argv) {
     root = resolveBacklogDir({ dir: cli.dir || undefined, moduleDir: __dirname }).root;
   } catch (e) {
     if (!isBacklogDirRefusal(e)) throw e;
-    console.error(failure(COMMAND, e.message, e.details || [], [COMMAND + " --help"]));
-    return BACKLOG_DIR_REFUSAL_EXIT;
+    return answerBacklogDirRefusal(e, { command: COMMAND, jsonKind: plan.json ? "task-body" : null, hints: [COMMAND + " --help"], payload: { id: plan.id, actorSource } });
   }
   const config = loadConfigOrExit(root);
 

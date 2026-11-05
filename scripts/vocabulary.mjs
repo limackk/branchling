@@ -134,7 +134,7 @@ export function main(argv) {
       "--json --dir <path>"));
     return 2;
   }
-  const root = resolveBacklogDirOrExit({ dir: cli.dir || undefined, moduleDir: __dirname }, COMMAND).root;
+  const root = resolveBacklogDirOrExit({ dir: cli.dir || undefined, moduleDir: __dirname, jsonKind: cli.argv.includes("--json") ? "vocabulary" : null }, COMMAND).root;
   const report = vocabularyReport(loadConfigOrExit(root));
   if (cli.argv.includes("--json")) printJson("vocabulary", report);
   else printLine(renderVocabulary(report));

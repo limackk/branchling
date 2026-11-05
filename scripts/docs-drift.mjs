@@ -60,7 +60,7 @@ import { classifyTarget, documentsToCheck, linksIn, relatedDocsIn } from "./chec
 import { loadConfigOrExit } from "./config.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { createTask } from "./new-task.mjs";
-import { backlogPaths, repositoryRoot, BACKLOG_DIR_REFUSAL_EXIT, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { answerBacklogDirRefusal, backlogPaths, isBacklogDirRefusal, repositoryRoot, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { splitFrontmatter } from "./task-fields.mjs";
 import { readTaskRecords } from "./task-select.mjs";
@@ -504,8 +504,7 @@ export function main(argv) {
     backlog = resolveBacklogDir({ dir: cli.dir, moduleDir: HERE }).root;
   } catch (e) {
     if (!isBacklogDirRefusal(e)) throw e;
-    console.error(failure(N + " docs-drift", e.message, e.details || [], [`${N} docs-drift --dir <path>`]));
-    return BACKLOG_DIR_REFUSAL_EXIT;
+    return answerBacklogDirRefusal(e, { command: N + " docs-drift", jsonKind: opts.json ? "docs-drift" : null, hints: [`${N} docs-drift --dir <path>`] });
   }
   const config = loadConfigOrExit(backlog);
   const paths = backlogPaths(backlog);
@@ -573,6 +572,9 @@ export function main(argv) {
 
   if (opts.json) {
     printJson("docs-drift", {
+      // Stated rather than derived (TL-548), so that `ok` agrees with the exit
+      // code: a flagged document exits 1 and is not a pass.
+      ok: !report.flagged.length,
       documents: report.documents,
       minSignals: report.minSignals,
       flagged: report.flagged,

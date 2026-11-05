@@ -45,7 +45,7 @@ import { USER_SKILLS, skillsTarget } from "./install-skills.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { MARK as UI_MARK, color, errColor, heading, refusal } from "./ui.mjs";
-import { backlogPaths, isBacklogDirRefusal, NotABacklogError, repositoryRoot, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { backlogPaths, BACKLOG_DIR_REFUSAL_KIND, isBacklogDirRefusal, NotABacklogError, repositoryRoot, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { summarize } from "./stats.mjs";
 import { vocabularyUsage } from "./task-fields.mjs";
 import { detectPrefixMismatch, taskIdPatterns } from "./task-id.mjs";
@@ -619,7 +619,12 @@ export function main(argv) {
     const named = e instanceof NotABacklogError;
     const detail = named ? e.message : "no backlog directory found";
     const rows = [check("backlog", "backlog", ERR, detail, N + " init --dir ./backlog")];
-    if (asJson) printJson("doctor", { ok: false, root: null, next: nextStep(rows), checks: rows });
+    if (asJson) {
+      printJson("doctor", {
+        ok: false, root: null, next: nextStep(rows), checks: rows,
+        refusalKind: BACKLOG_DIR_REFUSAL_KIND, refusal: e.message, details: e.details || [],
+      });
+    }
     else if (named) {
       console.error(errColor.err(UI_MARK.err) + " " + errColor.bold(N + " doctor") + ": " + e.message);
       console.error("  → create one there:       " + N + " init --dir <path>");

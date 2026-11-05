@@ -480,6 +480,40 @@ export const KINDS = {
 };
 
 /**
+ * The keys of a refusal, carried by EVERY kind (TL-548).
+ *
+ * A reading command used to have one shape, its success, and so nowhere to say
+ * "there is no backlog here": it printed the refusal on stderr and left stdout
+ * empty, which a consumer cannot tell from a crash. A refusal is the same kind
+ * with `ok: false` — the rule the writing commands already follow — so the four
+ * keys are declared once and merged into every kind that does not declare them
+ * itself, rather than copied into every row, where one would be forgotten.
+ */
+export const REFUSAL_KEYS = Object.freeze({ ok: null, refusalKind: null, refusal: null, details: [] });
+
+/**
+ * The kinds that gained `ok` from the merge above. Their emitters were written
+ * when the only answer was a success and never name it, so an answer that is
+ * not a refusal is `ok: true` — `null` would read as "nobody decided", and a
+ * consumer branching on `ok` would have to special-case each of these kinds. A
+ * kind that declared `ok` itself keeps whatever its emitter says.
+ *
+ * The default holds only for a command whose success always exits 0. One whose
+ * exit code is a VERDICT — `audit` exits 1 on a finding, `docs-drift` on a
+ * flagged document — states `ok` itself, because a derived `ok: true` beside
+ * exit 1 tells a consumer that branches on `ok` the opposite of the exit code.
+ * `scripts/tests/json-envelope.test.mjs` holds every one of these kinds to
+ * `ok === (exit === 0)`.
+ */
+export const OK_BY_DEFAULT = new Set();
+for (const [kind, shape] of Object.entries(KINDS)) {
+  if (!("ok" in shape)) OK_BY_DEFAULT.add(kind);
+  for (const [key, empty] of Object.entries(REFUSAL_KEYS)) {
+    if (!(key in shape)) shape[key] = empty;
+  }
+}
+
+/**
  * WHERE A KIND IS REGISTERED (TL-285).
  *
  * A kind is not proved by being declared. The suite runs one invocation per
@@ -761,6 +795,7 @@ export function envelope(kind, payload) {
     // a dropped key is the one thing the contract promises never to do.
     out[key] = value === undefined ? shape[key] : value;
   }
+  if (OK_BY_DEFAULT.has(kind) && given.ok === undefined) out.ok = out.refusalKind === null;
   return out;
 }
 

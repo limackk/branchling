@@ -688,7 +688,7 @@ export function runPlanInit(argv) {
     return fail(command, "--rationale is one line — a line break or control character cannot be written", usage, [N + " plan --help"]);
   }
 
-  const root = resolveBacklogDirOrExit({ dir: cli.dir, moduleDir: HERE }, command).root;
+  const root = resolveBacklogDirOrExit({ dir: cli.dir, moduleDir: HERE, jsonKind: asJson ? "plan" : null }, command).root;
   const config = loadConfigOrExit(root);
   const paths = backlogPaths(root);
   if (existsSync(paths.planPath)) {

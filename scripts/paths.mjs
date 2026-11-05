@@ -38,6 +38,7 @@ import { PRODUCT_NAME as N } from "./product.mjs";
 import { failure } from "./ui.mjs";
 import { canonicalPath } from "./canonical-path.mjs";
 import { gitDiscoveryEnv } from "./git-env.mjs";
+import { printJson, printJsonLine } from "./json-envelope.mjs";
 
 export const CONFIG_FILENAME = "config.yaml";
 export const BOARDS_FILENAME = "boards.yaml";
@@ -200,9 +201,35 @@ export function resolveBacklogDirOrExit(opts = {}, command = N) {
     return resolveBacklogDir(opts);
   } catch (e) {
     if (!isBacklogDirRefusal(e)) throw e;
-    console.error(failure(command, e.message, e.details || []));
-    process.exit(1);
+    process.exit(answerBacklogDirRefusal(e, { command, jsonKind: opts.jsonKind, jsonLine: opts.jsonLine }));
   }
+}
+
+/**
+ * Say one of the two foreseen states in the shape the caller was asked for, and
+ * return the exit code (TL-548).
+ *
+ * Under `--json` (`jsonKind` set) the answer is the command's OWN kind with
+ * `ok: false` and `refusalKind: "no-backlog"` on stdout, and nothing on stderr
+ * — the shape every writing refusal already had. Without it, the refusal goes
+ * to stderr as before. Before this, most commands printed the refusal on stderr
+ * even under `--json`, and a consumer saw an empty stdout it could not tell from
+ * a crash. One function, so the two shapes and the exit code cannot drift apart
+ * between thirty commands.
+ *
+ * `payload` carries keys the kind declares beyond the refusal — an actor source
+ * that was resolved before the backlog was. `jsonLine` prints the envelope on
+ * one line, for a command whose `--json` is a newline-delimited stream.
+ */
+export function answerBacklogDirRefusal(e, { command = N, jsonKind = null, jsonLine = false, hints = [], payload = {} } = {}) {
+  if (jsonKind) {
+    (jsonLine ? printJsonLine : printJson)(jsonKind, {
+      ...payload, ok: false, refusalKind: BACKLOG_DIR_REFUSAL_KIND, refusal: e.message, details: e.details || [],
+    });
+  } else {
+    console.error(failure(command, e.message, e.details || [], hints));
+  }
+  return BACKLOG_DIR_REFUSAL_EXIT;
 }
 
 /**

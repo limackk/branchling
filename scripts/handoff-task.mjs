@@ -63,7 +63,7 @@ import { ACTOR_NAMESPACES, appendEntries, currentSession, eventId, FIELD_COMMENT
 import { printJson } from "./json-envelope.mjs";
 import { isExpired, lockDir, readLock, releaseLock } from "./lock.mjs";
 import { queueStatuses } from "./next-task.mjs";
-import { backlogPaths, BACKLOG_DIR_REFUSAL_EXIT, isBacklogDirRefusal, resolveBacklogDir } from "./paths.mjs";
+import { answerBacklogDirRefusal, backlogPaths, isBacklogDirRefusal, resolveBacklogDir } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { inProgressStatus } from "./take-task.mjs";
 import { todayStamp } from "./today.mjs";
@@ -603,8 +603,7 @@ export function run(argv) {
     root = resolveBacklogDir({ dir: plan.dir || undefined, moduleDir: __dirname }).root;
   } catch (e) {
     if (!isBacklogDirRefusal(e)) throw e;
-    console.error(failure(N + " handoff", e.message, e.details || [], [N + " handoff --help"]));
-    return BACKLOG_DIR_REFUSAL_EXIT;
+    return answerBacklogDirRefusal(e, { command: N + " handoff", jsonKind: plan.json ? "task-handoff" : null, hints: [N + " handoff --help"], payload: { id: plan.id, actorSource } });
   }
   const config = loadConfigOrExit(root);
 

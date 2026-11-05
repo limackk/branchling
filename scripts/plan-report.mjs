@@ -195,7 +195,7 @@ function main(argv) {
   }
   const asJson = cli.argv.includes("--json");
 
-  const root = resolveBacklogDirOrExit({ dir: cli.dir, moduleDir: __dirname }, N + " plan").root;
+  const root = resolveBacklogDirOrExit({ dir: cli.dir, moduleDir: __dirname, jsonKind: asJson ? "plan" : null }, N + " plan").root;
   const config = loadConfigOrExit(root);
   const loaded = loadPlan(backlogPaths(root).planPath);
 

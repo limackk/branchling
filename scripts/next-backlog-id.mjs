@@ -56,6 +56,7 @@ import { refusal } from "./ui.mjs";
 const OWN_ROOT = resolveBacklogDirOrExit({
   dir: takeDirFlag(process.argv.slice(2)).dir,
   moduleDir: dirname(fileURLToPath(import.meta.url)),
+  jsonKind: process.argv.includes("--json") ? "next-id" : null,
 }, N + " next-id").root;
 // STRICT (TL-60): this is OUR OWN configuration, not another branch's — the
 // branch scan reads filenames, not their configurations.

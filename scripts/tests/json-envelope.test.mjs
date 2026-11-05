@@ -25,13 +25,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  ABSENT_TASK, FIRST_TASK, KINDS, KIND_EXERCISE, SCHEMA_VERSION, envelope, registrationGaps,
+  ABSENT_TASK, FIRST_TASK, KINDS, KIND_EXERCISE, OK_BY_DEFAULT, SCHEMA_VERSION, envelope, registrationGaps,
 } from "../json-envelope.mjs";
 import { isolateHome, REPO_ROOT, SCRIPTS_DIR, plainOutput } from "./_repo.mjs";
 
@@ -131,7 +131,8 @@ function resolveArgs(args, fx) {
   });
 }
 
-function ask(kind, fx) {
+/** The row's answer together with its exit code. */
+function askWithStatus(kind, fx) {
   const spec = KIND_EXERCISE[kind];
   assert.ok(spec, kind + ": no invocation registered in scripts/json-envelope.mjs");
   const args = resolveArgs(spec.args, fx);
@@ -143,7 +144,11 @@ function ask(kind, fx) {
   let parsed;
   assert.doesNotThrow(() => { parsed = JSON.parse(r.stdout); },
     kind + ": the output does not parse as JSON: " + r.stdout.slice(0, 200));
-  return parsed;
+  return { answer: parsed, status: r.status };
+}
+
+function ask(kind, fx) {
+  return askWithStatus(kind, fx).answer;
 }
 
 // ── The envelope itself ───────────────────────────────────────────────────
@@ -220,6 +225,9 @@ test("a declared key is never MISSING — an absent scalar is null, an absent co
     const e = envelope(kind, {});
     for (const [key, empty] of Object.entries(shape)) {
       assert.ok(key in e, kind + ": the key `" + key + "` is missing, not empty");
+      // The one derived value (TL-548): a kind that gained `ok` from the shared
+      // refusal keys answers `ok: true` unless it is refusing.
+      if (key === "ok" && OK_BY_DEFAULT.has(kind)) { assert.equal(e.ok, true, kind + ".ok"); continue; }
       assert.deepEqual(e[key], empty, kind + "." + key + ": the wrong empty value");
       assert.ok(empty === null || Array.isArray(empty),
         kind + "." + key + ": an empty value that is neither null nor [] states no rule");
@@ -380,6 +388,94 @@ test("every command with a kind answers in the envelope — on an empty backlog 
       }
     }
   }
+});
+
+// ── A derived `ok` agrees with the exit code (TL-548) ─────────────────────
+//
+// A kind in OK_BY_DEFAULT never named `ok` before the refusal keys were merged
+// into every kind, so the envelope derives it. A derived `ok: true` beside exit
+// 1 is the defect this section exists for: `audit` and `docs-drift` exit 1 on
+// what they find, and a consumer told to branch on `ok` read a failing audit as
+// a pass. The sweep alone could not show it — on a clean fixture every one of
+// these commands exits 0 — so each half has a control that exits 1.
+
+/** `ok` is the exit code's verdict, whatever the command found. */
+function assertOkAgreesWithExit(kind, { answer, status }, where) {
+  assert.equal(answer.kind, kind, where + ": the wrong kind");
+  assert.equal(answer.ok, status === 0,
+    where + ": exit " + status + " but ok " + JSON.stringify(answer.ok));
+}
+
+test("every kind that derives `ok` answers ok exactly when it exits 0", () => {
+  const empty = backlog({ tasks: 0, rule: true });
+  const full = backlog({ tasks: 3, rule: true });
+
+  // POSITIVE CONTROL on the sample: an empty set would make the loop green
+  // without running anything, and the two kinds whose exit is a verdict have
+  // to be among the ones measured.
+  assert.ok(OK_BY_DEFAULT.size > 0, "no kind derives `ok`; the sweep measures nothing");
+  for (const kind of ["audit", "docs-drift"]) {
+    assert.ok(OK_BY_DEFAULT.has(kind), kind + " no longer derives `ok`; move its control");
+  }
+
+  let measured = 0;
+  for (const kind of OK_BY_DEFAULT) {
+    assert.ok(KIND_EXERCISE[kind], kind + ": no invocation registered");
+    for (const [label, fx] of [["empty", empty], ["populated", full]]) {
+      const on = KIND_EXERCISE[kind].writes ? backlog({ tasks: label === "empty" ? 0 : 3, rule: true }) : fx;
+      assertOkAgreesWithExit(kind, askWithStatus(kind, on), kind + " (" + label + " backlog)");
+      measured++;
+    }
+  }
+  assert.equal(measured, OK_BY_DEFAULT.size * 2, "a kind was skipped");
+});
+
+test("control: an audit with a finding exits 1 and answers ok:false, not a refusal", () => {
+  const fx = backlog({ tasks: 1 });
+  const before = askWithStatus("audit", fx);
+  assert.equal(before.status, 0, "the fixture already had a finding: " + JSON.stringify(before.answer.findings));
+  assertOkAgreesWithExit("audit", before, "audit (clean)");
+
+  // A status written by hand, past the tool: closed with no trace in history,
+  // which is the finding `closedWithoutTrace` exists for.
+  const file = readdirSync(join(fx.dir, "tasks")).find((f) => f.startsWith(fx.ids[0] + "-"));
+  assert.ok(file, "the fixture's task file is not where it was created");
+  const path = join(fx.dir, "tasks", file);
+  const text = readFileSync(path, "utf8");
+  const closed = text.replace(/^status: pending\b/m, "status: done");
+  assert.notEqual(closed, text, "the fixture's status line was not rewritten");
+  writeFileSync(path, closed, "utf8");
+
+  const after = askWithStatus("audit", fx);
+  assert.equal(after.status, 1, "a finding did not reach the exit code");
+  assert.ok(after.answer.findings > 0, "the control produced no finding");
+  assert.equal(after.answer.ok, false, "a failing audit answered ok:true");
+  assert.equal(after.answer.refusalKind, null, "a finding was reported as a refusal");
+  assertOkAgreesWithExit("audit", after, "audit (finding)");
+});
+
+test("control: docs-drift with a flagged document exits 1 and answers ok:false, not a refusal", () => {
+  const fx = backlog({ tasks: 0 });
+  const before = askWithStatus("docs-drift", fx);
+  assert.equal(before.status, 0, "the fixture already flagged a document");
+  assertOkAgreesWithExit("docs-drift", before, "docs-drift (clean)");
+
+  // Two dead targets reach the template's `docs_drift_min_signals`. The
+  // document is committed so the git-based detector does not report that it
+  // cannot run instead.
+  mkdirSync(join(fx.repo, "docs"), { recursive: true });
+  writeFileSync(join(fx.repo, "docs", "atlas.md"),
+    "# Atlas\n\nsee [the legend](legend.md) and [the key](key.md)\n", "utf8");
+  const identity = ["-c", "user.email=fixture@example.invalid", "-c", "user.name=Fixture"];
+  execFileSync("git", identity.concat(["add", "-A"]), { cwd: fx.repo, stdio: "ignore" });
+  execFileSync("git", identity.concat(["commit", "-q", "-m", "fixture"]), { cwd: fx.repo, stdio: "ignore" });
+
+  const after = askWithStatus("docs-drift", fx);
+  assert.equal(after.status, 1, "a flagged document did not reach the exit code");
+  assert.ok(after.answer.flagged.length > 0, "the control flagged nothing");
+  assert.equal(after.answer.ok, false, "a flagged docs-drift answered ok:true");
+  assert.equal(after.answer.refusalKind, null, "a flagged document was reported as a refusal");
+  assertOkAgreesWithExit("docs-drift", after, "docs-drift (flagged)");
 });
 
 test("the answers DIFFER between an empty backlog and a populated one", () => {

@@ -239,12 +239,29 @@ either state, so a consumer may map `2` to "the call was built wrong" without
 asking which command it ran. Until TL-546 the writing commands (`take`,
 `next`, `set`, `release`, `handoff`, `ask`, `decide`, `body`, `run`, `deploy`,
 `declare`, `seed`, `import` and others) exited `2` here and labelled it
-`refusalKind: "usage"`. A writing command that answers this state in an
-envelope under `--json` — `set`, `release`, `declare`, `deploy record` — now
-carries `ok: false` and `refusalKind: "no-backlog"`; `doctor` and `check`
-answer their own kind as described above; the others print the refusal on
-stderr and leave stdout empty. `where` reports this state rather than refusing
-on it, and its exit code follows its own `--help`.
+`refusalKind: "usage"`.
+
+**Under `--json` every command answers that state with an envelope of its own
+kind** (TL-548) — `take --json` a `task-take`, `query --json` a `task-list`,
+`log --open-questions --json` an `open-questions` — with `ok: false`,
+`refusalKind: "no-backlog"`, the sentence in `refusal` and the hints in
+`details`, on stdout; stderr stays empty. Branch on `refusalKind`, not on the
+sentence, which says either "no backlog here" or that the named directory does
+not look like a backlog. `doctor` and `check` keep the verdict shape described
+above and carry the same three keys beside it. `where` and `<command> --help
+--json` report this state rather than refusing on it, and their exit code
+follows their own `--help`. Until TL-548 only `set`, `release`, `declare` and
+`deploy record` printed this envelope; the rest printed the refusal on stderr
+and left stdout empty, which a consumer could not tell from a crash.
+
+**`ok`, `refusalKind`, `refusal` and `details` are declared for every kind.**
+A kind that had no `ok` of its own (`task-list`, `stats`, `vocabulary` and the
+other reading kinds) answers `ok: true` exactly when the command exits 0, and
+the three refusal keys are `null`, `null` and `[]` — added keys, so
+`schemaVersion` did not move. Where the exit code is a verdict, `ok` is that
+verdict: `audit` with a finding and `docs-drift` with a flagged document exit
+1 and answer `ok: false` with `refusalKind: null`, which is a finding, not a
+refusal.
 
 **`plan --json` wave tasks are objects** `{ id, title, status, blocked_by,
 known, open, executor }`. They were objects before TL-534 as well — `title`

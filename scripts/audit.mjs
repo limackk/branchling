@@ -44,7 +44,7 @@ import { collectAdvisories } from "./check-guards.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { FIELD_VERIFIED, outstandingVouches, readAllHistory } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
-import { backlogPaths, BACKLOG_DIR_REFUSAL_EXIT, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { answerBacklogDirRefusal, backlogPaths, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { readTaskRecords } from "./task-select.mjs";
 import { MARK, color, failure, heading, table } from "./ui.mjs";
@@ -555,8 +555,7 @@ export function main(argv, today = todayStamp()) {
     root = resolveBacklogDir({ dir: cli.dir, moduleDir: HERE }).root;
   } catch (e) {
     if (!isBacklogDirRefusal(e)) throw e;
-    console.error(failure(N + " audit", e.message, e.details || [], [`${N} audit --dir <path>`]));
-    return BACKLOG_DIR_REFUSAL_EXIT;
+    return answerBacklogDirRefusal(e, { command: N + " audit", jsonKind: opts.json ? "audit" : null, hints: [`${N} audit --dir <path>`] });
   }
   const config = loadConfigOrExit(root);
   const tasks = readTaskRecords(backlogPaths(root).tasksDir, config.taskId.file);
@@ -569,6 +568,10 @@ export function main(argv, today = todayStamp()) {
 
   if (opts.json) {
     printJson("audit", {
+      // Stated rather than derived (TL-548): the envelope would answer `ok: true`
+      // for any answer that is not a refusal, and a finding exits 1 — so a
+      // consumer branching on `ok` would read a failing audit as a pass.
+      ok: !report.findings,
       since: report.since,
       dayZero: report.dayZero,
       tasks: report.tasks,

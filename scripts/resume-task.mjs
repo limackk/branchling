@@ -586,7 +586,7 @@ export async function run(argv) {
     return 2;
   }
 
-  const root = resolveBacklogDirOrExit({ dir: plan.dir || undefined, moduleDir: __dirname }, N + " resume").root;
+  const root = resolveBacklogDirOrExit({ dir: plan.dir || undefined, moduleDir: __dirname, jsonKind: plan.json ? "resume" : null }, N + " resume").root;
   const config = loadConfigOrExit(root);
   const paths = backlogPaths(root);
 

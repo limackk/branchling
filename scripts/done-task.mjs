@@ -770,7 +770,7 @@ async function run(argv, io = {}) {
     return 2;
   }
 
-  const root = resolveBacklogDirOrExit({ dir: plan.dir || undefined, moduleDir: __dirname }, N + " done").root;
+  const root = resolveBacklogDirOrExit({ dir: plan.dir || undefined, moduleDir: __dirname, jsonKind: plan.json ? "verification-run" : null }, N + " done").root;
   const config = loadConfigOrExit(root);
   const tasksDir = backlogPaths(root).tasksDir;
 

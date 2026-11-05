@@ -162,7 +162,7 @@ const SCOPE = opts.status !== undefined ? null : (opts.scope || "active");
 
 // The data directory: --tasks (pointing straight at tasks/), otherwise the same
 // backlog directory resolution as in every other script (BL-1399).
-const ROOT = opts.tasks ? null : resolveBacklogDirOrExit({ dir: opts.dir, moduleDir: __dirname }, N + " query").root;
+const ROOT = opts.tasks ? null : resolveBacklogDirOrExit({ dir: opts.dir, moduleDir: __dirname, jsonKind: opts.json ? "task-list" : null }, N + " query").root;
 const TASKS_DIR = opts.tasks || (ROOT ? backlogPaths(ROOT).tasksDir : null);
 
 // `--tasks <dir>` is the third case and stays apart: it points straight at a

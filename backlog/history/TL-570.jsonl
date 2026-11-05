@@ -1,0 +1,1 @@
+{"id":"01M6P3JWV3VVZ3XG6VA2TR21PW","ts":"2026-11-05T15:00:08.675Z","task":"TL-570","field":"__created__","from":"","to":"suggest-board.mjs holds no raw NUL byte, so git diffs it as text","actor":"agent:claude","source":"new","reason":"unknown"}

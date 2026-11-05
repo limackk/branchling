@@ -86,7 +86,7 @@ export function run(argv) {
     console.error(refusal(COMMAND, e.problem, AVAILABLE));
     return e.code;
   }
-  const root = resolveBacklogDirOrExit({ dir: plan.dir || undefined, moduleDir: __dirname }, COMMAND).root;
+  const root = resolveBacklogDirOrExit({ dir: plan.dir || undefined, moduleDir: __dirname, jsonKind: plan.json ? "change-stream" : null, jsonLine: true }, COMMAND).root;
   const config = loadConfigOrExit(root);
   const tasksDir = backlogPaths(root).tasksDir;
   const taskFile = config.taskId.file;

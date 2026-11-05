@@ -18,7 +18,7 @@ import { DEDICATED_FIELDS, writableFields, writeTaskField } from "./field-write.
 import { FIELD_SHAPES } from "./task-fields.mjs";
 import { rebuildViews } from "./handoff-task.mjs";
 import { printJson } from "./json-envelope.mjs";
-import { BACKLOG_DIR_REFUSAL_EXIT, BACKLOG_DIR_REFUSAL_KIND, isBacklogDirRefusal, resolveBacklogDir } from "./paths.mjs";
+import { answerBacklogDirRefusal, BACKLOG_DIR_REFUSAL_EXIT, BACKLOG_DIR_REFUSAL_KIND, isBacklogDirRefusal, resolveBacklogDir } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { failure } from "./ui.mjs";
 
@@ -126,6 +126,8 @@ export function run(argv) {
   try { root = resolveBacklogDir({ dir: plan.dir || undefined }).root; }
   catch (e) {
     if (!isBacklogDirRefusal(e)) throw e;
+    // `--fields` answers in a kind of its own, and so does its refusal (TL-548).
+    if (plan.fields) return answerBacklogDirRefusal(e, { command: N + " set", jsonKind: plan.json ? "task-set-fields" : null, hints: [N + " set --help"] });
     return refuse(e.message, e.details || [], BACKLOG_DIR_REFUSAL_EXIT, BACKLOG_DIR_REFUSAL_KIND);
   }
   const config = loadConfigOrExit(root);

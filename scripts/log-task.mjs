@@ -472,7 +472,10 @@ export function run(argv) {
     return 2;
   }
 
-  const root = resolveBacklogDirOrExit({ dir: plan.dir || undefined, moduleDir: __dirname }, COMMAND).root;
+  const root = resolveBacklogDirOrExit({
+    dir: plan.dir || undefined, moduleDir: __dirname,
+    jsonKind: plan.json ? (plan.openQuestions ? "open-questions" : "task-log") : null,
+  }, COMMAND).root;
   const config = loadConfigOrExit(root);
   const paths = backlogPaths(root);
 

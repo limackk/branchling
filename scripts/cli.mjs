@@ -39,7 +39,7 @@ import { ConfigError, formatConfigError, loadConfig } from "./config.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { MARK, color, failure, plainChildEnv } from "./ui.mjs";
 import { CHECK_GUARDS, effectiveSeverity, guardsForRun } from "./check-guards.mjs";
-import { isBacklogDirRefusal, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
+import { BACKLOG_DIR_REFUSAL_KIND, isBacklogDirRefusal, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { FIELD_SHAPES, REASON_MAX_LENGTH } from "./task-fields.mjs";
 import { DELEGATION_POLICIES } from "./agent-contract.mjs";
 import { dropInferredGitDir } from "./git-env.mjs";
@@ -2290,6 +2290,7 @@ function runCheck(args) {
       printJson("check", {
         ok: false, root: null, failed: ["backlog"],
         guards: [{ name: "backlog", severity: "gate", ok: false, exit: 1, output }],
+        refusalKind: BACKLOG_DIR_REFUSAL_KIND, refusal: e.message, details: e.details || [],
       });
       return 1;
     }

@@ -300,7 +300,7 @@ export function run(argv) {
     console.error(refusal(COMMAND, e.problem, e.available));
     return e.code;
   }
-  const root = resolveBacklogDirOrExit({ dir: plan.dir || undefined, moduleDir: __dirname }, COMMAND).root;
+  const root = resolveBacklogDirOrExit({ dir: plan.dir || undefined, moduleDir: __dirname, jsonKind: plan.json ? "task-show" : null }, COMMAND).root;
   const config = loadConfigOrExit(root);
   const model = computeShow({ root, config, id: plan.id });
 

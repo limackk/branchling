@@ -343,7 +343,7 @@ export function main(argv, io = {}) {
 
   const asJson = rest.includes("--json");
   const withRepairs = rest.includes("--repairs");
-  const root = resolveBacklogDirOrExit({ dir: cli.dir }, N + " red").root;
+  const root = resolveBacklogDirOrExit({ dir: cli.dir, jsonKind: asJson ? "red-owners" : null }, N + " red").root;
   const config = loadConfigOrExit(root);
   const repo = repoRoot(root);
 
