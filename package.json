@@ -30,6 +30,7 @@
     ".agents/skills/backlog-workflow/",
     "!scripts/tests/",
     "!scripts/check-publish-metadata.mjs",
+    "!scripts/mutation-run.mjs",
     "templates/",
     "_template.md",
     "README.md",
@@ -40,6 +41,10 @@
   },
   "scripts": {
     "test": "node --test scripts/tests/*.test.mjs",
-    "prepublishOnly": "node scripts/check-publish-metadata.mjs"
+    "prepublishOnly": "node scripts/check-publish-metadata.mjs",
+    "mutation": "node scripts/mutation-run.mjs"
+  },
+  "devDependencies": {
+    "@stryker-mutator/core": "10.1.1"
   }
 }
