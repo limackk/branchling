@@ -240,6 +240,11 @@ export function closingContractOf(frontmatter, config) {
   return { own: entries, entries: merged.entries, problems: [], collisions: merged.collisions };
 }
 
+/** The word that marks a row as the project's `closing_contract` entry rather
+ *  than the task's own. Spelled once, because `done` and `resume` both print
+ *  the same contract and a reader must recognise the mark in either. */
+export const PROJECT_ENTRY_TAG = "closing_contract";
+
 /** The sentence every reader of the contract refuses a shared id with. */
 export function collisionHeadline(id) {
   return id + ": a verification id is also an id in the project's `closing_contract`";
@@ -978,7 +983,7 @@ async function run(argv, io = {}) {
   // A project entry is named as one, so a red line nobody wrote into the task
   // file is not hunted for there.
   const tagOf = (e, i) => "  " + (i + 1) + "/" + entries.length + "  " +
-    (e.project ? "closing_contract  " : "") + (e.id ? e.id + "  " : "");
+    (e.project ? PROJECT_ENTRY_TAG + "  " : "") + (e.id ? e.id + "  " : "");
   let stop = null;
   const { results, failed } = await runContract(entries, cwd, {
     capture,
