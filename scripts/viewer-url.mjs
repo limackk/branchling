@@ -32,7 +32,7 @@ export const SORT_DEFAULT = "priority";
 
 /**
  * @param {{board: string, filters: Array<{param: string, values: string[]}>,
- *          search: string, sortBy: string, selectedId: ?string}} view
+ *          search: string, sortBy: string, selectedId: ?string, taskIds?: string[]}} view
  * @returns {string} e.g. "tasks?board=main&status=blocked"
  */
 export function encodeTasksHash(view) {
@@ -45,6 +45,7 @@ export function encodeTasksHash(view) {
     for (const value of f.values || []) p.append(f.param, value);
   }
   if (view.search) p.set("q", view.search);
+  for (const id of view.taskIds || []) p.append("task", id);
   if (view.sortBy && view.sortBy !== SORT_DEFAULT) p.set("sort", view.sortBy);
   if (view.selectedId) p.set("id", view.selectedId);
   return TASKS_HASH_ROUTE + "?" + p.toString();
@@ -54,7 +55,7 @@ export function encodeTasksHash(view) {
  * @param {string} query    the part of the hash after "?"
  * @param {string[]} paramNames  the filter parameter names (order does not matter)
  * @returns {{board: ?string, filters: Object<string, string[]>, search: string,
- *            sortBy: string, selectedId: ?string}}
+ *            sortBy: string, selectedId: ?string, taskIds: string[]}}
  */
 export function parseTasksHash(query, paramNames) {
   const p = new URLSearchParams(query || "");
@@ -69,6 +70,7 @@ export function parseTasksHash(query, paramNames) {
     board: p.has("board") ? p.get("board") : null,
     filters,
     search: p.get("q") || "",
+    taskIds: p.getAll("task"),
     // An unknown ordering would sort the list in a way no button displays.
     sortBy: SORT_KEYS.indexOf(sort) >= 0 ? sort : SORT_DEFAULT,
     selectedId: p.get("id") || null,

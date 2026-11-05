@@ -91,6 +91,13 @@ test("no board= leaves the scope untouched (null) rather than clearing it silent
   assert.equal(parseTasksHash("board=main", PARAMS).board, "main");
 });
 
+test("an aggregate drill-down carries its exact task set in the link", () => {
+  const hash = encodeTasksHash({ ...view(), taskIds: ["BL-1", "BL-9"] });
+  assert.match(hash, /task=BL-1/);
+  assert.match(hash, /task=BL-9/);
+  assert.deepEqual(parseTasksHash(hash.split("?")[1], PARAMS).taskIds, ["BL-1", "BL-9"]);
+});
+
 test("an unknown sort falls back to the default instead of an order no button shows", () => {
   assert.equal(parseTasksHash("sort=eyes_closed", PARAMS).sortBy, SORT_DEFAULT);
 });
