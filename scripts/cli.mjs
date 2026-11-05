@@ -37,9 +37,9 @@ import { fileURLToPath } from "node:url";
 import { PRODUCT_NAME as N, PRODUCT_VERSION } from "./product.mjs";
 import { ConfigError, formatConfigError, loadConfig } from "./config.mjs";
 import { printJson } from "./json-envelope.mjs";
-import { MARK, color, failure } from "./ui.mjs";
+import { MARK, color, failure, plainChildEnv } from "./ui.mjs";
 import { CHECK_GUARDS, effectiveSeverity, guardsForRun } from "./check-guards.mjs";
-import { resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
+import { isBacklogDirRefusal, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { FIELD_SHAPES, REASON_MAX_LENGTH } from "./task-fields.mjs";
 import { DELEGATION_POLICIES } from "./agent-contract.mjs";
 import { dropInferredGitDir } from "./git-env.mjs";
@@ -47,7 +47,7 @@ import { dropInferredGitDir } from "./git-env.mjs";
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 const CHECK_USAGE = [
-  `${N} check [--dir <path>] [--id-collisions] [--boards] [--refs] [--criteria] [--contracts] [--reasons] [--log-status] [--task-state] [--vocabulary] [--plan] [--product-name] [--proofs] [--since <sha>] [--actor <ns:name>] [task-file.md …]`,
+  `${N} check [--dir <path>] [--id-collisions] [--boards] [--refs] [--criteria] [--contracts] [--reasons] [--log-status] [--task-state] [--vocabulary] [--plan] [--product-name] [--proofs] [--since <sha>] [--release [--env <stage>] [--trunk <ref>]] [--actor <ns:name>] [task-file.md …]`,
   "",
   "  no selector          A RELEASE VERDICT: the guards that can FAIL one, and only those.",
   "                       Exit code = the WORST of them. Guards that report and never",
@@ -129,6 +129,22 @@ const CHECK_USAGE = [
   "                       Then the opposite question of the tasks nobody has started yet: a",
   "                       contract that ALREADY passes is named, because no work can make it",
   "                       red. That finding reports and leaves the exit code alone",
+  "  --release            whether a promotion has a gap in its traceability: a deployed",
+  "                       commit naming no task, or a task that is open or unknown; a task",
+  "                       partially in a stage or in one parallel ref and not another; a",
+  "                       commit a stage holds that the trunk or an earlier stage lacks; a",
+  "                       done task whose commits are only off the trunk; a commit touching",
+  "                       no target's paths; an open task of the top priority planned for a",
+  "                       release, against the last stage of its targets. Every finding",
+  "                       names its commit or task. Under `release_gate: report` (the",
+  "                       default) it exits 0; under `require` any gap",
+  "                       `release_gate_accept` does not name, any stage ref that does",
+  "                       not resolve, and a trunk that does not resolve in a repository",
+  "                       with commits, exits 1. NEVER part of a bare `check`: CI runs it",
+  "                       as the step before a deploy",
+  "  --env <stage>        with --release, judge one stage (`stage` or `target/stage`)",
+  "  --trunk <ref>        with --release, the trunk; by default the remote's default",
+  "                       branch, else HEAD — the report names which",
   "  --since <sha>        with --proofs, keep the closings the range could plausibly have",
   "                       broken — a file the task changed, or a path its contract names",
 ].join("\n");
@@ -164,14 +180,22 @@ export const COMMANDS = {
     summary: "ask about tasks — reads tasks/*.md, so it sees changes before a rebuild",
     usage: [
       `${N} query [--status s] [--priority p] [--board b] [--label l] [--epic e]`,
-      `            [--type t] [--owner o] [--role r] [--executor x] [--blocked-by <id>]`,
+      `            [--type t] [--owner o] [--role r] [--executor x] [--release r]`,
+      `            [--blocked-by <id>] [--modified-file <path>] [--env <stage>] [--not-env <stage>]`,
       `            [--text <substring>] [--sort <key>] [--limit <n>] [--tasks <path>]`,
-      `            [--modified-file <path>] [--json|--files|--count]`,
+      `            [--scope active|archived|all]`,
+      `            [--json|--files|--count]`,
       "",
       "  Each criterion is an axis: AND between axes, OR inside one, values separated",
-      "  by commas. `--role \"\"` asks for the tasks open to anybody. Without an explicit",
-      "  --status only ACTIVE tasks are searched, which is how `--status done` reaches",
-      "  the closed ones.",
+      "  by commas. `--role \"\"` asks for the tasks open to anybody, `--release \"\"` for",
+      "  the tasks planned for no release; any other `--release` value outside",
+      "  `releases:` fails. Without an explicit --status only ACTIVE tasks are searched,",
+      "  which is how `--status done` reaches the closed ones.",
+      "",
+      "  --scope <s>             which tasks are searched before any criterion: active",
+      "                          (the default), archived (the statuses archived_statuses",
+      "                          names) or all. Refused beside --status, which chooses",
+      "                          the statuses itself",
       "",
       "  --text <substring>      a case-insensitive substring of \"<id> <title>\", NOT of",
       "                          the body. It answers `what was that task called`, never",
@@ -200,7 +224,16 @@ export const COMMANDS = {
       "                          directory. Remember the default filter still hides closed",
       "                          work, and most files were touched by tasks that are closed",
       "",
+      "  --env <stage>           tasks every deploy target of which holds them in full in",
+      "                          that stage; `target/stage` narrows to one target. COMPUTED",
+      "                          from the git refs `deploy_targets:` in config.yaml declares,",
+      "                          never typed. A stage name outside it fails",
+      "  --not-env <stage>       tasks some target of which holds them partially or not at",
+      "                          all in that stage. A task with no commits in that target,",
+      "                          or whose ref did not resolve, matches neither flag",
+      "",
       `  ${N} query --modified-file scripts/cli.mjs --status done`,
+      `  ${N} query --status done --not-env production`,
     ].join("\n"),
   },
   build: {
@@ -291,6 +324,7 @@ export const COMMANDS = {
     usage: [
       `${N} log <ID> [--limit <n>] [--decisions] [--json] [--dir <path>]`,
       `${N} log --modified-file <path> --decisions [--limit <n>] [--json] [--dir <path>]`,
+      `${N} log --open-questions [--json] [--dir <path>]`,
       "",
       "  The read side of `history`. A task file carries only the CURRENT value of a",
       "  field; the reason it got there lives in `history/<ID>.jsonl`, and until this",
@@ -306,6 +340,9 @@ export const COMMANDS = {
       "                     decisions carried by every task whose commits touched this",
       "                     file. A trailing `/` selects a directory. Paths are relative",
       "                     to the repository root. This area form requires --decisions",
+      "  --open-questions   every question still waiting on an answer, across the",
+      "                     active tasks, with its options and recommendation — one",
+      "                     call instead of one per task. Takes no task id",
       "  --json             the same exchanges for a program",
       "",
       "  ONE ROW PER EXCHANGE, NOT PER FIELD. The log is written one entry per field,",
@@ -321,11 +358,75 @@ export const COMMANDS = {
       "        2 usage error",
     ].join("\n"),
   },
+  show: {
+    script: "show-task.mjs",
+    summary: "what is computed about one task — deployment, other branches, blockers",
+    usage: [
+      `${N} show <ID> [--json [--body]] [--dir <path>]`,
+      "",
+      "  The facts about one task that its file does NOT hold, so the text form never",
+      "  reprints the body — read the file for what was written, ask this for what is",
+      "  true now. A program that may not read task files asks for it with --body.",
+      "",
+      "  deploy     per deploy target and stage, full, partial, absent or unknown —",
+      "             COMPUTED from the git refs `deploy_targets:` declares, against the",
+      "             remote's default branch (else HEAD). Every ref read is named with its",
+      "             SHA; a ref that does not resolve is unknown, never empty; a task no",
+      "             commit names says so; a target in another repository is unobservable",
+      "  elsewhere  the task's status on other branches and worktrees, where it differs",
+      "             from this tree",
+      "  blockers   each `blocked_by` task with its status, and whether the task is",
+      "             still blocked — by the rule `next` dispatches on",
+      "",
+      "  --json     the same three sections for a program",
+      "  --body     with --json: the markdown after the frontmatter, verbatim, as `body`",
+      "             (null without the flag). Untrusted text: render it safely",
+      "",
+      "  exit: 0 answered · 1 no such task in this tree · 2 usage error",
+    ].join("\n"),
+  },
+  follow: {
+    script: "follow-changes.mjs",
+    summary: "follow task changes as they happen — one line, or one JSON envelope, per change",
+    usage: [
+      `${N} follow [--json] [--heartbeat <seconds>] [--max-events <n>] [--dir <path>]`,
+      "",
+      "  Prints one line per task whose fields or body changed on disk in THIS tree —",
+      "  by any hand: a command, an editor, the served page, a `git checkout`.",
+      "",
+      "  --json               one `change-stream` envelope per LINE (newline-delimited):",
+      "                       `ready` once the watch is armed, then `change` with the",
+      "                       task id, file, created / modified / deleted and the",
+      "                       fields that moved (`__body__` for the markdown body), and",
+      "                       `heartbeat` when nothing did",
+      "  --heartbeat <s>      seconds between heartbeats (default 30; 0 turns them off).",
+      "                       A reader that went away is noticed at the next write, so",
+      "                       this also bounds how long the process outlives it",
+      "  --max-events <n>     exit after n changes; 0 arms the watch, confirms it and exits",
+      "",
+      "  What it does NOT promise:",
+      "  - other worktrees and other branches. It watches the files of this tree;",
+      "    `take` in a second worktree changes nothing here. `query` answers about",
+      "    branches, by scanning on request",
+      "  - an order across worktrees, or between two streams watching different trees",
+      "  - every intermediate state. Writes inside one short burst are folded into",
+      "    one comparison, and a change that is undone within it reports nothing",
+      "  - `updated:`, `plan.yaml`, history records and the generated views; only",
+      "    the tracked task fields and the body are compared",
+      "  - changes made while it was not running. It starts from what the files say",
+      "    at `ready`; `log` and `query` answer about the past",
+      "",
+      "  It writes nothing and does not reconcile the history, unlike `serve`.",
+      "",
+      "  exit: 0 stopped (signal, reader gone, --max-events reached) · 1 the watch",
+      "        could not be set up · 2 usage error",
+    ].join("\n"),
+  },
   take: {
     script: "take-task.mjs",
     summary: "claim ONE named task — reserve it, set it in progress, print it",
     usage: [
-      `${N} take <ID> [--actor <ns:name>] [--role <r>] [--reason "…"] [--json] [--dir <path>] [--probe] [--take-over]`,
+      `${N} take <ID> [--actor <ns:name>] [--role <r>] [--reason "…"] [--json] [--dir <path>] [--probe] [--take-over] [--require-actor]`,
       "",
       "  --take-over        claim it although somebody else holds it. Crosses BOTH halves",
       "                     of their claim — the `owner:` field and the live reservation,",
@@ -333,7 +434,10 @@ export const COMMANDS = {
       "                     `__takeover__` event naming them. Refused without `--reason`",
       "  --probe            run the `verification:` contract now and print each entry's",
       "                     result after the file — the target, before any work (TL-268)",
-      "  --actor <ns:name>  who is claiming it; becomes `owner:` and goes into the history",
+      "  --actor <ns:name>  who is claiming it; becomes `owner:` and goes into the history.",
+      "                     `--json` says where it came from, as `actorSource`",
+      "  --require-actor    refuse rather than fall back to the default actor: an act",
+      "                     a person performed must not be recorded as an agent's",
       "  --role <r>         the role you are acting as. It NEVER blocks the take — an",
       "                     explicit instruction outranks the task's `role:` — but a",
       "                     mismatch is recorded in the history",
@@ -345,7 +449,7 @@ export const COMMANDS = {
       "  of this repository ON THIS MACHINE. Two machines connected only by git can",
       "  still both take one task and will find out when they merge.",
       "",
-      "  exit: 0 taken · 1 refused (held, closed, somebody else's) · 2 usage error",
+      "  exit: 0 taken · 1 refused (held, closed, somebody else's, actor-required) · 2 usage error",
     ].join("\n"),
   },
   next: {
@@ -399,7 +503,7 @@ export const COMMANDS = {
     summary: "hand a task to another role — with the reason, and a trace of the exchange",
     usage: [
       `${N} handoff <ID> --to-role <r> --reason "…" [--with <path> …] [--to-owner <o>] [--actor <ns:name>]`,
-      `${N} handoff <ID> [--status <s>] [--json] [--dir <path>]`,
+      `${N} handoff <ID> [--status <s>] [--require-actor] [--json] [--dir <path>]`,
       "",
       "  --to-role <r>      the role the task now asks for. Its vocabulary is `roles` in",
       "                     config.yaml; a backlog that declares none has nothing to hand to",
@@ -410,6 +514,9 @@ export const COMMANDS = {
       "                     repeatable, recorded on the handoff event, not enforced later",
       "  --status <s>       which status it goes back to. Only needed when more than one of",
       "                     this backlog's statuses means `waiting for somebody`",
+      "  --actor <ns:name>  who hands it off; `--json` says where it came from, as `actorSource`",
+      "  --require-actor    refuse rather than fall back to the default actor: an act",
+      "                     a person performed must not be recorded as an agent's",
       "  --json             the task, the changed fields and the comment, for a program",
       "",
       "  A task in progress stops being in progress and returns to the queue; every other",
@@ -419,10 +526,174 @@ export const COMMANDS = {
       "  exit: 0 handed off · 1 refused (held, closed, somebody else's) · 2 usage error",
     ].join("\n"),
   },
+  body: {
+    script: "body-task.mjs",
+    summary: "rewrite a task's body — the frontmatter untouched, the change recorded with its reason",
+    usage: [
+      `${N} body <ID> --reason "…" [--body-file <f>] [--base <hash>] [--actor <ns:name>] [--require-actor] [--json] [--dir <path>]`,
+      "",
+      "  The new body arrives on stdin, or from `--body-file`. Everything after the",
+      "  frontmatter's closing `---` is replaced; the frontmatter stays byte-identical.",
+      "",
+      "  --reason \"…\"       REQUIRED: recorded on the `__body__` history entry",
+      "  --body-file <f>    read the new body from a file instead of stdin",
+      "  --base <hash>      the body hash the edit was made against (`sha256:<hex>`);",
+      "                     a body that has changed since is refused and nothing is written",
+      "  --actor <ns:name>  who acts; `--json` says where it came from, as `actorSource`",
+      "  --require-actor    refuse rather than fall back to the default actor: an act",
+      "                     a person performed must not be recorded as an agent's",
+      "  --json             the body hashes before and after and the entry, for a program",
+      "",
+      "  The history keeps the two hashes and the lines added and removed, never the",
+      "  text: the text is in the file and in git. `" + N + " log <ID>` shows the change.",
+      "  A body that breaks the acceptance-criteria contract is refused.",
+      "",
+      "  exit: 0 written or unchanged · 1 refused (stale base, invalid body, closed) · 2 usage error",
+    ].join("\n"),
+  },
   release: {
     script: "release-task.mjs",
-    summary: "return your claimed task to the queue, with a reason",
-    usage: `${N} release <ID> --reason "…" [--status <s>] [--actor <ns:name>] [--json] [--dir <path>]\n\n  Clears the owner and this actor's reservation through the handoff write path.\n  A release has no receiver; use handoff when work is assigned to one.\n\n  exit: 0 released · 1 refused · 2 usage error`,
+    summary: "return your claimed task to the queue",
+    usage: [
+      `${N} release <ID> --reason "…" [--status <s>] [--actor <ns:name>] [--require-actor] [--json] [--dir <path>]`,
+      "",
+      "  Clears the owner and this actor's reservation through the handoff write path.",
+      "  A release has no receiver; use handoff when work is assigned to one.",
+      "",
+      "  --reason \"…\"       REQUIRED: a task put down without why is abandoned",
+      "  --status <s>       which open status it goes back to",
+      "  --actor <ns:name>  who acts; `--json` says where it came from, as `actorSource`",
+      "  --require-actor    refuse rather than fall back to the default actor: an act",
+      "                     a person performed must not be recorded as an agent's",
+      "  --json             the task's new status and owner, for a program (`task-release`)",
+      "",
+      "  What waits for each environment, and recording a stage, are `deploy status`",
+      "  and `deploy record`: `release status` and `release record` fail and say so.",
+      "",
+      "  exit: 0 released · 1 refused · 2 usage error, or no such task",
+    ].join("\n"),
+  },
+  set: {
+    script: "set-field.mjs",
+    summary: "set one task field — the same validation and history record as the viewer's edit",
+    usage: [
+      `${N} set <ID> <field> <value> [--reason "…"] [--actor <ns:name>] [--require-actor] [--json] [--dir <path>]`,
+      `${N} set --fields [--json] [--dir <path>]`,
+      "",
+      "  The callable form of the served viewer's field edit: one field of one task,",
+      "  validated against config.yaml, attributed and recorded in history/<ID>.jsonl.",
+      "  A list field takes its items comma-separated; an empty value clears a field",
+      "  that may be empty.",
+      "",
+      "  status and owner are refused: take, done, handoff, release and ask own them,",
+      "  because each records more than the new value.",
+      "",
+      "  --reason \"…\"       why — required where reason_required_statuses demands it;",
+      "                     `unknown` and `proven` are reserved and refused",
+      "  --actor <ns:name>  who acts; `--json` says where it came from, as `actorSource`",
+      "  --require-actor    refuse rather than fall back to the default actor: an act",
+      "                     a person performed must not be recorded as an agent's",
+      "  --json             the field's new value and the history entries (`task-set`)",
+      "  --fields           the fields this command edits, as data: list or value,",
+      "                     clearable, and the config.yaml key a value must come from",
+      "",
+      "  A value outside the field's vocabulary is refused as `unknown-value` and",
+      "  names the declared values.",
+      "",
+      `  example: ${N} set TASK-12 priority P1 --reason "the release depends on it"`,
+      "",
+      "  exit: 0 set · 1 refused, including a value outside the vocabulary",
+      "        · 2 usage error, a field it does not set, or no such task",
+    ].join("\n"),
+  },
+  deploy: {
+    script: "deploy-command.mjs",
+    summary: "list what waits for each environment (`status`), or record a stage git cannot observe (`record`)",
+    usage: [
+      `${N} deploy status [--target <name>] [--env <stage>] [--count] [--json] [--dir <path>]`,
+      `${N} deploy status --release <name> [--target <name>] [--count] [--json] [--dir <path>]`,
+      `${N} deploy record --target <name> --stage <name> <commit-or-tag> --reason "…" [--ref <name>] [--actor <ns:name>] [--json] [--dir <path>]`,
+      "",
+      "  deploy status      for each target in `deploy_targets`, the promotion pipeline",
+      "                     as buckets: closed but not on the trunk, on the trunk but not",
+      "                     in the first stage, then in each stage but not the next. Each",
+      "                     task shows its status, the day it closed and how long it has",
+      "                     waited. The last stage is counted, never listed — it grows",
+      "                     with the project's whole history. Computed from git on every",
+      "                     call, and the header names the trunk and the SHA of every ref",
+      "                     read, because the answer is only as fresh as they are",
+      "  --target <name>    one deploy target. An undeclared name FAILS",
+      "  --env <stage>      only the tasks waiting for that stage (`stage` or",
+      "                     `target/stage`). An undeclared stage FAILS",
+      "  --release <name>   compare the PLAN of one release (`release:` in the tasks, a",
+      "                     value from `releases:`) with the last stage of each target:",
+      "                     planned tasks not shipped there yet, planned tasks still",
+      "                     open, tasks the next promotion carries that the release",
+      "                     did not plan, and planned tasks dropped. Shipped ones are",
+      "                     counted. An undeclared release FAILS; `--env` beside it",
+      "                     fails too, because the comparison is with the last stage.",
+      "                     A release whose entry is `{name, ref}` has shipped: it is",
+      "                     compared with that ref instead, listing the planned tasks",
+      "                     the ref lacks and the unplanned ones it carried since the",
+      "                     previous release's ref. A ref that does not resolve is",
+      "                     unknown, never an empty release",
+      "  --count            the counts only, without the task lists",
+      "  --json             the same buckets as data (`release-status`); with",
+      "                     --release, the comparison is its `release` field",
+      "",
+      "  The trunk is the remote's default branch (`origin/HEAD`), else HEAD, and the",
+      "  header says which. A stage whose ref does not resolve is `unknown`, and so is",
+      "  every bucket after it: zero there would read as nothing deployed.",
+      "",
+      "  deploy record      moves the ref of a stage declared `recorded: true` — store",
+      "                     review, an update channel, a sign-off — onto an annotated tag",
+      "                     object carrying the actor, the time and the reason. Refused on",
+      "                     a stage git observes, and for a commit the previous stage does",
+      "                     not hold. A move backwards is accepted and named. It prints",
+      "                     the push command and never pushes; with --json, the record",
+      "                     as data (`release-record`)",
+      "  --stage <name>     the recorded stage to move",
+      "  --ref <name>       which of a stage's parallel refs moves (full name or its last",
+      "                     component). Required on a stage with `refs:`",
+      "  --reason \"…\"       with record, why the stage moved. Required",
+      "  --actor <ns:name>  with record, who acts",
+      "",
+      "  exit: 0 answered or recorded · 1 refused, or git failed · 2 usage error",
+    ].join("\n"),
+  },
+  declare: {
+    script: "declare-vocabulary.mjs",
+    summary: "add a release to `releases:` or a target to `deploy_targets:` in config.yaml, comments kept",
+    usage: [
+      `${N} declare releases <name> --reason "…" [--ref <ref>] [--json] [--dir <path>]`,
+      `${N} declare deploy_targets <name> --repository <repo> --reason "…" [--json] [--dir <path>]`,
+      `${N} declare deploy_targets <name> --stage <name>=<ref>[,<ref>] [--paths <p>[,<p>]] --reason "…" [--json] [--dir <path>]`,
+      "",
+      "  Appends ONE entry to one of the two vocabularies that grow with a project's",
+      "  life, and edits config.yaml line by line: every comment and every other line",
+      "  stays as written. The result is read back by the configuration reader and",
+      "  refused, with nothing written, unless it reads as before plus that entry.",
+      "",
+      "  releases           the newest release, appended last (the order is",
+      "                     chronological). A name already declared FAILS",
+      "  deploy_targets     a deployable and its promotion stages, in the order given",
+      "  --reason \"…\"       REQUIRED: why the entry exists. Written as a comment above it,",
+      "                     because the record of a configuration change is that file's diff",
+      "  --ref <ref>        a release that has already shipped: the ref or tag where it ends",
+      "  --repository <r>   a target whose code lives in another repository",
+      "  --paths <p>,…      the paths of THIS repository the target is built from;",
+      "                     without it the whole repository is the one target",
+      "  --stage <n>=<ref>  one promotion stage, repeatable, in order; several refs",
+      "                     separated by commas are deployed in parallel",
+      "  --json             the entry written, or the refusal (`vocabulary-declare`)",
+      "",
+      "  Every other key is the project's grammar and stays a hand edit, and so does",
+      "  changing an entry that exists — renaming, reordering, marking a release",
+      "  shipped, a `recorded: true` stage. Another key FAILS and says so.",
+      "",
+      "  exit: 0 written · 1 refused by config.yaml · 2 usage error, malformed entry,",
+      "        or a key no command writes",
+    ].join("\n"),
   },
   resume: {
     script: "resume-task.mjs",
@@ -457,12 +728,19 @@ export const COMMANDS = {
     script: "decide-task.mjs",
     summary: "record a decision as an event — and answer the question that waited for it",
     usage: [
-      `${N} decide <ID> --reason "…" [--resolves <event id>] [--actor <ns:name>] [--json] [--dir <path>]`,
+      `${N} decide <ID> --reason "…" [--resolves <event id>] [--actor <ns:name>] [--require-actor] [--json] [--dir <path>]`,
       `${N} decide <ID> --resolves <event id> --choose <n> [--actor <ns:name>] [--json] [--dir <path>]`,
       "",
       "  --reason \"…\"       the decision itself. REQUIRED unless a menu row is chosen —",
       "                     a record that something was settled with the settling left out",
-      "                     is the one thing a later reader cannot reconstruct",
+      "                     is the one thing a later reader cannot reconstruct. Any text is",
+      "                     taken, one starting with `-` included; `--reason=<text>` and",
+      "                     `--reason -- <text>` say the same",
+      "  --actor <ns:name>  who decides. Without it the actor comes from the environment,",
+      "                     the user configuration, or the agent default — `--json` says",
+      "                     which, as `actorSource`",
+      "  --require-actor    refuse rather than fall back to the default actor: an answer",
+      "                     a person gave must not be recorded as an agent's",
       "  --resolves <id>    the `id` of the event this answers, usually the `__comment__`",
       "                     a handoff left behind. Optional: deciding unprompted is legal.",
       "                     An id that is not in this task's history fails before the write",
@@ -492,7 +770,8 @@ export const COMMANDS = {
     summary: "create a task from the template — numbered across every branch, not max+1",
     usage: [
       `${N} new --title "<text>" [--board <b>] [--priority <p>] [--status <s>] [--type <t>]`,
-      `          [--owner <o>] [--epic <e>] [--estimate <2h>] [--wave "<name>"]`,
+      `          [--owner <o>] [--epic <e>] [--release <r>] [--target <t,…>] [--estimate <2h>]`,
+      `          [--wave "<name>"]`,
       `          [--body-file <path>] [--dir <path>]   < task.json`,
       "",
       "  THE TASK ITSELF ARRIVES ON STDIN, as one JSON document — the callable input",
@@ -520,6 +799,11 @@ export const COMMANDS = {
       "  --type <t>      from `types:`",
       "  --owner <o>     from `owners:`",
       "  --board <b>     from the board registry; the default is used when omitted",
+      "  --release <r>   from `releases:` — the release the task is PLANNED for. Closed",
+      "                  even when empty: a project that declares none plans none",
+      "  --target <t,…>  from `deploy_targets` — the targets in ANOTHER repository",
+      "                  (`repository:`) the task ships from, comma-separated. A target",
+      "                  of this repository fails: its tasks come from commit paths",
       "",
       "  --wave <name>   create the task AND schedule it in that wave of plan.yaml, in one",
       "                  act. An unknown wave fails and names the ones that exist, before",
@@ -568,6 +852,14 @@ export const COMMANDS = {
       "                  acceptance criterion that points back at the entry",
       "    estimate      optional · free text, e.g. \"2h\"",
       "    priority      optional · a value from YOUR config.yaml",
+      "    epic          optional · free text, the group the task counts towards",
+      "    role          optional · a value from YOUR `roles:`",
+      "    executor      optional · human | agent",
+      "    labels        optional · array; values from YOUR `labels:` when it is closed",
+      "    related_docs  optional · array of paths relative to the repository root",
+      "    wave          optional · an existing wave of plan.yaml; the task is scheduled",
+      "                  there as `new --wave` does, and an order the plan guard rejects",
+      "                  rolls the whole seed back",
       "",
       "  An unknown key FAILS, a task with no runnable verification FAILS THE WHOLE PLAN,",
       "  and every complaint is reported at once with nothing written.",
@@ -767,6 +1059,24 @@ export const COMMANDS = {
       "  exit: 0 reported · 2 usage error",
     ].join("\n"),
   },
+  vocabulary: {
+    script: "vocabulary.mjs",
+    summary: "the vocabularies config.yaml declares — statuses with their meaning, priorities, releases",
+    usage: [
+      `${N} vocabulary [--json] [--dir <path>]`,
+      "",
+      "  The words this backlog declares, in their declared order, so a program can",
+      "  order, group and colour tasks without hard-coding a status name or reading",
+      "  config.yaml. Each status carries whether it is archived, whether entering it",
+      "  needs a reason, and its ROLE — open, active, waiting, closed or cancelled —",
+      "  taken from `status_roles:` where declared and otherwise derived, and says",
+      "  which. The JSON keys are the config.yaml keys they come from.",
+      "",
+      "  --json     the same as one `vocabulary` envelope",
+      "",
+      "  exit: 0 answered · 1 the configuration cannot be read · 2 usage error",
+    ].join("\n"),
+  },
   hooks: {
     script: "hooks-command.mjs",
     summary: "the Git gates: print them, install them, take them back out",
@@ -961,9 +1271,16 @@ export const COMMANDS = {
       "",
       "  WRITING the order — one act, and the comments in the file survive it:",
       "",
-      `    ${N} plan add <ID> --wave "<name>" [--why "<sentence>"]`,
+      `    ${N} plan init --rationale "<why this order>" [--json]`,
+      `    ${N} plan add <ID>... --wave "<name>" [--why "<sentence>"]`,
       `    ${N} plan move <ID> --wave "<name>" [--why "<sentence>"]`,
       `    ${N} plan remove <ID>`,
+      "",
+      "  `init` writes plan.yaml with today's `updated`, your rationale and no waves, and",
+      "  is refused where a plan exists; `add --why` then creates the first wave.",
+      "  `add` takes several ids: one diff of the file, and one refused id writes none.",
+      "",
+      "  --rationale <why>  the argument for the order, one line — required by `init`",
       "",
       "  --wave <name>      the wave the id joins or moves to. The name is this file's",
       "                     own vocabulary, so an unknown one FAILS and names the waves",
@@ -992,6 +1309,7 @@ export const COMMANDS = {
       `${N} run [--board b] [--label l] [--priority p] [--epic e] [--log-dir <path>]`,
       `${N} run [--agent-for <role>=<command>] [--profile-for <role>=<name>]`,
       `${N} run [--delegation <policy>] [--allow-uncontrolled-delegation]`,
+      `${N} run [--before-next "<command>"] [--commit-state] [--wait <s> [--wait-max <s>]]`,
       `${N} run --stop [--dir <path>] [--actor <ns:name>] [--json]`,
       "",
       "  The loop is `next` → your agent → `done`, repeated until the queue is empty.",
@@ -1031,7 +1349,8 @@ export const COMMANDS = {
       "  finding about work nobody measured.",
       "",
       "  WHATEVER THE HAND WROTE BEFORE STOPPING STAYS IN YOUR TREE, uncommitted, and it",
-      "  is yours. This command never commits, reverts or cleans, so a half-written",
+      "  is yours. This command never commits it, reverts or cleans (`--commit-state`",
+      "  commits the task's own state, never the work), so a half-written",
       "  deliverable left by an agent that stopped is one `git add -A` away from an",
       "  unrelated commit. `resume <ID>` lists a task's uncommitted work.",
       "",
@@ -1090,6 +1409,29 @@ export const COMMANDS = {
       "  the loop, and Ctrl-C reaches every foreground child — a `done` mid-contract",
       "  included.",
       "",
+      "  --before-next \"<command>\" runs your command through your shell, from the",
+      "  repository root, before every `next`. A non-zero exit ends the run BEFORE",
+      "  anything is claimed — the report says `stopped: --before-next exited N —",
+      "  nothing was claimed` and `--json` carries `beforeNextRefused`. It is the",
+      "  place for a wrapper's merge of the base branch or its pause file: a pause",
+      "  noticed after `next` costs a claim and its give-back in the tree.",
+      "",
+      "  --commit-state commits the task file and its `history/<ID>.jsonl` after each",
+      "  outcome, and nothing else: what the hand changed stays yours, as without the",
+      "  flag. It refuses — the run stops, with the reason — when other paths are",
+      "  already staged, and asks that before every `next` too, so nothing is claimed",
+      "  over them. Opt-in: commits and branch topology stay with the caller.",
+      "",
+      "  WORK HELD IN ANOTHER TREE IS NOT AN EMPTY QUEUE. When every eligible task is",
+      "  claimed in another worktree of this clone, the run ends with `stopped: every",
+      "  eligible task is held in another tree of this clone — N task(s): <ids>`, and",
+      "  `--json` carries `heldInOtherTrees`. --wait <s> keeps the run in the",
+      "  foreground instead: while a task is held elsewhere, or a `--plan` wave is",
+      "  still in flight, it asks `next` again every <s> seconds and resumes on the",
+      "  first task freed. --wait-max <s> bounds one stretch of waiting (default 3600s);",
+      "  then the run stops and says it gave up. One loop, one task at a time:",
+      "  `--stop` and `--before-next` are asked before every poll as before.",
+      "",
       "  --agent-for <role>=<command>  one hand for one role, repeatable — the same",
       "                  command template as --agent, serving only tasks asking for that role",
       "  --profile-for <role>=<name>   the same, with a profile instead of a command",
@@ -1117,7 +1459,9 @@ export const COMMANDS = {
       "  --verbose          stream each entry's output as it runs. By default a PASSING",
       "                     entry's output is not printed — the verdict line says how many",
       "                     lines were withheld — and a failing entry's is printed whole",
-      "  --actor <ns:name>  who is closing it; goes into the history (local: / agent: / user:)",
+      "  --actor <ns:name>  who is closing it; goes into the history (local: / agent: / user:).",
+      "                     A vouch typed at the prompt needs one stated — here, in the",
+      "                     environment or in the user config; the fallback is refused",
       "  --role <r>         the role you are closing as, from `roles` in config.yaml. It",
       "                     never changes what runs; it goes into the history, so a queue",
       "                     served by several hands can be read back into stages",
@@ -1481,9 +1825,19 @@ for (const shape of FIELD_SHAPES) {
  * array, the two would be indistinguishable and an agent would be wrong about
  * one of them every time.
  */
-function vocabulary(dictionary, config) {
+function vocabulary(dictionary, config, command) {
   if (!config) return { values: null, closed: null };
   if (dictionary === "boards") return { values: (config.boards || []).map((b) => b.slug), closed: true };
+  // `--target` names a deploy target on every command, but on `new` it writes
+  // the task's `target:` field, which admits only the targets in another
+  // repository (TL-514). Listing a local one there would hand an agent a value
+  // the command refuses.
+  if (dictionary === "deploy_targets") {
+    return {
+      values: command === "new" ? (config.externalTargets || []).slice() : (config.deployTargets || []).map((t) => t.name),
+      closed: true,
+    };
+  }
   if (dictionary === "labels") return { values: config.labels || [], closed: !!config.labelsClosed };
   return { values: config[dictionary] || [], closed: true };
 }
@@ -1505,7 +1859,7 @@ function vocabulary(dictionary, config) {
 export function commandHelpJson(name, spec, config) {
   const flags = describeFlags(spec.usage).map((f) => {
     const dictionary = FLAG_DICTIONARY[f.flag] || null;
-    const { values, closed } = dictionary ? vocabulary(dictionary, config) : { values: null, closed: null };
+    const { values, closed } = dictionary ? vocabulary(dictionary, config, name) : { values: null, closed: null };
     return { ...f, dictionary, values, closed };
   });
   return {
@@ -1657,9 +2011,12 @@ export function takeColorFlags(argv) {
 
 function childEnv(force) {
   if (force === null) return process.env;
+  if (force === false) return plainChildEnv();
+  // Each direction removes the other variable: both at once is a contradiction
+  // Node reports on the child's stderr (TL-538).
   const env = { ...process.env };
-  if (force === false) env.NO_COLOR = "1";
-  else { delete env.NO_COLOR; env.FORCE_COLOR = "1"; }
+  delete env.NO_COLOR;
+  env.FORCE_COLOR = "1";
   return env;
 }
 
@@ -1693,7 +2050,7 @@ function runScript(script, args, colorForce = null) {
 function captureScript(script, args) {
   const r = spawnSync(process.execPath, [join(HERE, script)].concat(args), {
     encoding: "utf8",
-    env: { ...childEnv(false), NO_COLOR: "1" },
+    env: childEnv(false),
   });
   if (r.error) {
     return { exit: 1, output: "could not start " + script + ": " + r.error.message };
@@ -1722,7 +2079,7 @@ function captureScript(script, args) {
  * evidential force. The dispatcher supplies the mode so that nobody has to
  * remember it.
  */
-const CHECK_FLAGS = ["--dir", "--json", "--id-collisions", "--boards", "--refs", "--criteria", "--contracts", "--reasons", "--log-status", "--history", "--task-state", "--docs", "--vocabulary", "--plan", "--product-name", "--foreign-context", "--proofs", "--since", "--actor"];
+const CHECK_FLAGS = ["--dir", "--json", "--id-collisions", "--boards", "--refs", "--criteria", "--contracts", "--reasons", "--log-status", "--history", "--task-state", "--docs", "--vocabulary", "--plan", "--product-name", "--foreign-context", "--proofs", "--since", "--release", "--env", "--trunk", "--actor"];
 
 /** PURE — resolves `check`'s arguments. Throws on a usage error. */
 export function parseCheckArgs(args) {
@@ -1743,6 +2100,9 @@ export function parseCheckArgs(args) {
   let wantForeignContext = false;
   let wantProofs = false;
   let since = null;
+  let wantRelease = false;
+  let env = null;
+  let trunk = null;
   // WHOSE run is this? Only `--task-state` reads it — it separates the task
   // this actor is holding right now from a closing somebody abandoned (TL-261).
   // Unstated, the guard falls back on the same chain every writing command
@@ -1774,6 +2134,13 @@ export function parseCheckArgs(args) {
     if (a === "--product-name") { wantProductName = true; continue; }
     if (a === "--foreign-context") { wantForeignContext = true; continue; }
     if (a === "--proofs") { wantProofs = true; continue; }
+    if (a === "--release") { wantRelease = true; continue; }
+    if (a === "--env" || a === "--trunk") {
+      const v = args[++i] || null;
+      if (!v || v.startsWith("-")) throw new Error("`" + a + "` with no value");
+      if (a === "--env") env = v; else trunk = v;
+      continue;
+    }
     if (a === "--actor") {
       actor = args[++i] || null;
       if (!actor) throw new Error("`--actor` with no name, e.g. `--actor agent:claude`");
@@ -1807,14 +2174,14 @@ export function parseCheckArgs(args) {
   // question, and gets answered whatever its severity (TL-383).
   const explicit = wantIds || wantBoards || wantRefs || wantCriteria || wantContracts || wantReasons || wantLogStatus ||
     wantHistory || wantTaskState || wantDocs || wantVocabulary || wantPlan ||
-    wantProductName || wantForeignContext || wantProofs;
+    wantProductName || wantForeignContext || wantProofs || wantRelease;
 
   // No selector means all of them. A new guard joins the default run on purpose
   // (BL-1451): a dangling reference passed `check`, because `check` checked only
   // what somebody had once written into it.
   if (!wantIds && !wantBoards && !wantRefs && !wantCriteria && !wantContracts && !wantReasons && !wantLogStatus &&
       !wantHistory && !wantTaskState && !wantDocs && !wantVocabulary && !wantPlan &&
-      !wantProductName && !wantForeignContext && !wantProofs) {
+      !wantProductName && !wantForeignContext && !wantProofs && !wantRelease) {
     wantIds = true; wantBoards = true; wantRefs = true; wantCriteria = true; wantContracts = true;
     wantReasons = true;
     wantLogStatus = true; wantHistory = true; wantTaskState = true; wantDocs = true;
@@ -1833,7 +2200,13 @@ export function parseCheckArgs(args) {
         "It narrows which proven closings are re-run; on its own there is nothing for it to narrow."
     );
   }
-  return { dir, json, explicit, wantIds, wantBoards, wantRefs, wantCriteria, wantContracts, wantReasons, wantLogStatus, wantHistory, wantTaskState, wantDocs, wantVocabulary, wantPlan, wantProductName, wantForeignContext, wantProofs, since, actor, files };
+  if ((env !== null || trunk !== null) && !wantRelease) {
+    throw new Error(
+      "`" + (env !== null ? "--env" : "--trunk") + "` with no `--release`\n" +
+        "It narrows which stage, or which trunk, the release gate judges; on its own there is nothing for it to narrow."
+    );
+  }
+  return { dir, json, explicit, wantIds, wantBoards, wantRefs, wantCriteria, wantContracts, wantReasons, wantLogStatus, wantHistory, wantTaskState, wantDocs, wantVocabulary, wantPlan, wantProductName, wantForeignContext, wantProofs, since, wantRelease, env, trunk, actor, files };
 }
 
 // The guard table and its severity axis live in `check-guards.mjs`, because
@@ -1898,7 +2271,28 @@ function runCheck(args) {
   // BL-1445: the same fix as in build-backlog.mjs — `join(HERE, "..")` is
   // co-location that says nothing about being an assumption. The resolver keeps
   // it as the last of four sources, so nothing changes where it used to work.
-  const root = resolveBacklogDirOrExit({ dir: plan.dir || undefined, moduleDir: HERE }, N + " check").root;
+  // NO BACKLOG IS A VERDICT, and under `--json` it is an envelope (TL-541):
+  // `root: null` and the failed pseudo-guard `backlog`, whose `output` is the
+  // sentence the human form prints — as `doctor --json` answers the same
+  // directory. An empty stdout could not be told from a crash. Exit 1 either
+  // way; 2 stays for a wrongly built invocation.
+  let root;
+  if (plan.json) {
+    try {
+      root = resolveBacklogDir({ dir: plan.dir || undefined, moduleDir: HERE }).root;
+    } catch (e) {
+      if (!isBacklogDirRefusal(e)) throw e;
+      const output = [e.message].concat(e.details || []).join("\n");
+      console.error(failure(N + " check", e.message, e.details || []));
+      printJson("check", {
+        ok: false, root: null, failed: ["backlog"],
+        guards: [{ name: "backlog", severity: "gate", ok: false, exit: 1, output }],
+      });
+      return 1;
+    }
+  } else {
+    root = resolveBacklogDirOrExit({ dir: plan.dir || undefined, moduleDir: HERE }, N + " check").root;
+  }
   const tasksDir = join(root, "tasks");
 
   // The configuration is checked ONCE, here (TL-60). Every guard is a separate
@@ -1945,7 +2339,18 @@ function runCheck(args) {
       }
       const { exit, output } = captureScript(guard.script, guard.args(root, tasksDir, plan.files, plan));
       worstJson = Math.max(worstJson, exit);
-      results.push({ name: guard.name, severity: effectiveSeverity(guard, config), ok: exit === 0, exit, output });
+      const entry = { name: guard.name, severity: effectiveSeverity(guard, config), ok: exit === 0, exit, output };
+      // A guard that answers `--json` with a document of its own: the document
+      // is the `report`, and `output` stays the one line a person reads.
+      if (guard.jsonReport) {
+        try {
+          entry.report = JSON.parse(output);
+          entry.output = entry.report.summary || "";
+        } catch {
+          entry.report = null;
+        }
+      }
+      results.push(entry);
     }
     printJson("check", {
       ok: worstJson === 0,

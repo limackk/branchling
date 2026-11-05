@@ -298,6 +298,123 @@ test("a priority outside this project's vocabulary is refused, and nothing is wr
   assert.equal(taskFiles(dir).length, before, "a refused plan added a task anyway");
 });
 
+// ── The fields a module backlog needs (TL-493) ────────────────────────────
+
+/** A seeded backlog whose vocabularies come from THIS fixture: one role and a
+ *  closed label list, plus a plan with one wave. Nothing here is read from the
+ *  repository's own configuration. */
+function moduleBacklog(prefix) {
+  const dir = join(tmp(prefix), "backlog");
+  assert.equal(run(["init", "--dir", dir, "--no-example"], tmp(prefix + "-cwd")).status, 0);
+  writeFileSync(join(dir, "config.yaml"),
+    readFileSync(join(dir, "config.yaml"), "utf8") + "\nroles: [fixture-role]\n", "utf8");
+  writeFileSync(join(dir, "config.yaml"),
+    readFileSync(join(dir, "config.yaml"), "utf8")
+      .replace(/^labels: .*$/m, "labels: [fixture-label]")
+      .replace(/^labels_closed: .*$/m, "labels_closed: true"),
+    "utf8");
+  writeFileSync(join(dir, "plan.yaml"), 'waves:\n  # the fixture wave\n  - name: "fixture-wave"\n    tasks: []\n', "utf8");
+  return dir;
+}
+
+function modulePlan() {
+  const plan = goodPlan();
+  Object.assign(plan.tasks[0], {
+    epic: "Fixture epic", role: "fixture-role", executor: "agent",
+    labels: ["fixture-label"], related_docs: ["docs/fixture.md"], wave: "fixture-wave",
+  });
+  plan.tasks[1].wave = "fixture-wave";
+  return plan;
+}
+
+function waveTasks(dir) {
+  const m = readFileSync(join(dir, "plan.yaml"), "utf8").match(/tasks: \[(.*)\]/);
+  return m ? m[1].split(",").map((s) => s.trim()).filter(Boolean) : null;
+}
+
+test("epic, role, executor, labels and related_docs land in the task file", () => {
+  const dir = moduleBacklog("module-fields");
+  const r = seed(dir, modulePlan(), ["--json"]);
+  assert.equal(r.status, 0, r.stderr);
+  const [first, second] = createdIds(r.stdout);
+  const text = taskText(dir, first);
+  assert.equal(field(text, "epic"), '"Fixture epic"');
+  assert.equal(field(text, "role"), "fixture-role");
+  assert.equal(field(text, "executor"), "agent");
+  assert.equal(field(text, "labels"), "[fixture-label]");
+  assert.match(text, /^related_docs:\n  - docs\/fixture\.md\n/m);
+  // The control: an item that names none of them keeps the template's values,
+  // so the assertions above are about the plan and not about the template.
+  assert.equal(field(taskText(dir, second), "role"), '""');
+  assert.equal(field(taskText(dir, second), "labels"), "[]");
+});
+
+test("`wave` schedules every seeded task into plan.yaml in one act", () => {
+  const dir = moduleBacklog("module-wave");
+  assert.deepEqual(waveTasks(dir), [], "the fixture wave starts empty");
+  const r = seed(dir, modulePlan(), ["--json"]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(waveTasks(dir), createdIds(r.stdout));
+  assert.match(readFileSync(join(dir, "plan.yaml"), "utf8"), /# the fixture wave/, "the wave's comment was lost");
+  assert.equal(run(["check", "--plan", "--dir", dir], dir).status, 0);
+});
+
+test("a role, label, executor or wave outside the vocabulary refuses the plan and writes nothing", () => {
+  const cases = [
+    ["role", "another-role", /`role`: Unknown value "another-role"/],
+    ["labels", ["another-label"], /`labels`: Unknown value "another-label"/],
+    ["executor", "robot", /`executor`: Unknown value "robot"/],
+    ["wave", "another-wave", /there is no wave `another-wave`/],
+  ];
+  for (const [key, value, message] of cases) {
+    const dir = moduleBacklog("module-bad-" + key);
+    const plan = modulePlan();
+    plan.tasks[0][key] = value;
+    const r = seed(dir, plan);
+    assert.equal(r.status, 2, key + ": " + r.stderr);
+    assert.match(r.stderr, message);
+    assert.equal(taskFiles(dir).length, 0, key + ": a refused plan wrote a task");
+    assert.deepEqual(waveTasks(dir), [], key + ": a refused plan scheduled a task");
+  }
+  // The control: the same backlog accepts the unmodified plan, so each refusal
+  // above was caused by the one value that differed.
+  const dir = moduleBacklog("module-bad-control");
+  assert.equal(seed(dir, modulePlan()).status, 0);
+  assert.equal(taskFiles(dir).length, 2);
+});
+
+test("a field of the wrong shape is refused before the directory is touched", () => {
+  const { errors } = parsePlan(JSON.stringify({
+    tasks: [{ ...goodPlan().tasks[0], labels: "fixture-label", related_docs: [""], wave: 3 }],
+  }));
+  assert.ok(errors.some((e) => /`labels` must be an array/.test(e)), errors.join("\n"));
+  assert.ok(errors.some((e) => /`related_docs\[0\]` is not a non-empty string/.test(e)), errors.join("\n"));
+  assert.ok(errors.some((e) => /`wave` must be a non-empty string/.test(e)), errors.join("\n"));
+});
+
+test("an order the plan guard rejects rolls back every seeded task and leaves plan.yaml alone", () => {
+  const dir = moduleBacklog("module-order");
+  // The second task waits on the first, and is put in an EARLIER wave than it:
+  // an order nobody can execute, knowable only once the ids exist.
+  writeFileSync(join(dir, "plan.yaml"),
+    'waves:\n  - name: "early"\n    tasks: []\n  - name: "late"\n    tasks: []\n', "utf8");
+  const before = readFileSync(join(dir, "plan.yaml"), "utf8");
+  const plan = modulePlan();
+  plan.tasks[0].wave = "late";
+  plan.tasks[1].wave = "early";
+  const r = seed(dir, plan);
+  assert.equal(r.status, 1, r.stderr);
+  assert.match(r.stderr, /rolled back/);
+  assert.equal(taskFiles(dir).length, 0, "the tasks of a refused schedule are still on disk");
+  assert.equal(readFileSync(join(dir, "plan.yaml"), "utf8"), before);
+
+  // The control: the executable order is accepted by the same backlog.
+  plan.tasks[0].wave = "early";
+  plan.tasks[1].wave = "late";
+  assert.equal(seed(dir, plan).status, 0);
+  assert.equal(taskFiles(dir).length, 2);
+});
+
 // ── --dry-run ─────────────────────────────────────────────────────────────
 
 test("--dry-run names the numbers and writes nothing", () => {

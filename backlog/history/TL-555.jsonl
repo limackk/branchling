@@ -1,0 +1,2 @@
+{"id":"01M6KBBC5PTTM2HWJENY02K8Z3","ts":"2026-11-04T13:18:07.542Z","task":"TL-555","field":"__created__","from":"","to":"Whether task-graph.mjs stays is decided","actor":"agent:claude","source":"new","reason":"unknown"}
+{"id":"01M6KBBNX9Z31V3851RDFXC3K8","ts":"2026-11-04T13:18:17.513Z","task":"TL-555","field":"executor","from":"","to":"human","actor":"agent:coordinator","source":"set","reason":"unknown"}

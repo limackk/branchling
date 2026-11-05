@@ -37,10 +37,11 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { resolveActor } from "./actor.mjs";
+import { ACTOR_ENV, reportedActorSource, resolveActorSource } from "./actor.mjs";
+import { userConfigPath } from "./home.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { backlogPaths, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
-import { loadConfigOrExit } from "./config.mjs";
+import { loadConfig, loadConfigOrExit } from "./config.mjs";
 import { applyProofs, auditTask, parseCriteria, parseVerification } from "./criteria.mjs";
 import { buildFieldSpecs, extractMeta, fieldSpec, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
 import { ACTOR_NAMESPACES, appendEntries, currentSession, eventId, FIELD_UNVERIFIED, FIELD_VERIFIED, isValidActor, REASON_PROVEN, reasonRefusal, recordEdit, requiresReason } from "./history.mjs";
@@ -196,6 +197,52 @@ export function contractProblem(entries, problems) {
     }
   }
   return null;
+}
+
+/**
+ * The task's contract followed by the project's `closing_contract` (TL-493).
+ *
+ * APPENDED, not prepended: the task's own entries are the cheaper, narrower
+ * question, and a module test that fails should say so before a repository-wide
+ * guard spends its minutes. An id the two share is returned as a collision
+ * rather than resolved, because which entry a `[proof: id]` meant is a decision
+ * only the author of the task can make.
+ *
+ * @returns {{entries: Array<object>, collisions: string[]}}
+ */
+export function withClosingContract(entries, closing) {
+  const project = (closing || []).map((e) => ({ ...e, project: true }));
+  const own = new Set(entries.filter((e) => e.id).map((e) => e.id));
+  const collisions = project.filter((e) => e.id && own.has(e.id)).map((e) => e.id);
+  return { entries: entries.concat(project), collisions };
+}
+
+/**
+ * The contract a closing of this task would run, read from its frontmatter
+ * (TL-495). ONE reader for `done`, the probe and the proofs audit: each of them
+ * used to parse `verification:` on its own, and the two that did not append the
+ * project's entries reported green where `done` would refuse.
+ *
+ * `own` is the task's contract alone, because `done` judges it BEFORE the
+ * project's entries exist for it — an empty or unreadable one is a task nobody
+ * finished writing, however many project entries would run. Neither of those
+ * gets the project's entries appended, so no caller can mistake a contract made
+ * entirely of somebody else's lines for this task's proof.
+ *
+ * @returns {{own: Array<object>, entries: Array<object>, problems: string[], collisions: string[]}}
+ */
+export function closingContractOf(frontmatter, config) {
+  const { entries, problems } = parseVerification(frontmatter);
+  if ((problems && problems.length) || !entries.length) {
+    return { own: entries, entries, problems: problems || [], collisions: [] };
+  }
+  const merged = withClosingContract(entries, (config || {}).closingContract);
+  return { own: entries, entries: merged.entries, problems: [], collisions: merged.collisions };
+}
+
+/** The sentence every reader of the contract refuses a shared id with. */
+export function collisionHeadline(id) {
+  return id + ": a verification id is also an id in the project's `closing_contract`";
 }
 
 /**
@@ -533,13 +580,16 @@ export function probeContract(entries, cwd) {
   let failed = 0;
   for (const e of entries || []) {
     if (e.manual) {
-      rows.push({ id: e.id || null, kind: "manual", command: e.manual, ok: null, exitCode: null, ms: 0, output: null });
+      rows.push({ id: e.id || null, kind: "manual", command: e.manual, ok: null, exitCode: null, ms: 0, output: null,
+        ...(e.project ? { project: true } : {}) });
       continue;
     }
     const r = runBash(e.bash, cwd, true);
     ran++;
     if (!r.ok) failed++;
-    rows.push({ id: e.id || null, kind: "bash", command: e.bash, ok: r.ok, exitCode: r.exitCode, ms: r.ms, output: r.output });
+    const row = { id: e.id || null, kind: "bash", command: e.bash, ok: r.ok, exitCode: r.exitCode, ms: r.ms, output: r.output };
+    if (e.project) row.project = true;
+    rows.push(row);
   }
   return { rows, ran, failed, allPassed: ran > 0 && failed === 0 };
 }
@@ -553,11 +603,21 @@ export function probeContract(entries, cwd) {
  *
  * @returns {{rows: Array<object>, ran: number, failed: number, allPassed: boolean, problems: string[]}}
  */
-export function probeTask(root, taskFile) {
+export function probeTask(root, taskFile, config) {
   const raw = readFileSync(taskFile, "utf8");
   const { frontmatter } = splitFrontmatter(raw);
-  const { entries, problems } = parseVerification(frontmatter);
-  if (problems && problems.length) return { rows: [], ran: 0, failed: 0, allPassed: false, problems };
+  // THE CONTRACT `done` WILL RUN, not the task's half of it (TL-495): a probe
+  // that leaves out the project's entries answers "is my module green" while
+  // the closing asks "is the repository green", and the hand learns the
+  // difference only when `done` refuses.
+  const { entries, problems, collisions } = closingContractOf(frontmatter, config || loadConfig(root));
+  if (problems.length) return { rows: [], ran: 0, failed: 0, allPassed: false, problems };
+  // Refused before anything runs, as `done` refuses it: which of the two
+  // entries a `[proof: id]` meant is the author's decision, not the probe's.
+  if (collisions.length) {
+    return { rows: [], ran: 0, failed: 0, allPassed: false,
+      problems: collisions.map((id) => collisionHeadline("`id: " + id + "`")) };
+  }
   const probe = probeContract(entries, repoRootFor(root));
   return { ...probe, problems: [] };
 }
@@ -602,6 +662,38 @@ export function manualPrompt(entry, actor) {
   lines.push("");
   lines.push("  Vouching is recorded in the history as " + actor + " and does not go away.");
   return lines.join("\n");
+}
+
+/**
+ * Would this run ask a person to type `confirm` while nobody has said who that
+ * person is? (TL-460)
+ *
+ * The fallback actor is `agent:claude`, and `scripts/actor.mjs` explains why
+ * that is the right answer for an automated write. It is the wrong one for a
+ * typed vouch: the prompt is reached only with a terminal attached, the entry
+ * exists because a PERSON looked, and `agent:` is the namespace that means
+ * automated and unverified. So the decision is made here, for this act alone —
+ * the default and the resolution order stay what they are for every other
+ * write.
+ *
+ * Only the TYPED path is judged. `--confirm-manual` is a stated act whoever
+ * runs it, `--json` already refuses to ask, and with no terminal nobody is
+ * asked, so in all three the record says what it always said.
+ *
+ * @returns {boolean} true when the run must stop before anything runs
+ */
+export function vouchNeedsStatedActor({ entries, source, confirmManual, json, terminal }) {
+  if (source !== "default" || confirmManual || json || !terminal) return false;
+  return (entries || []).some((e) => e.manual);
+}
+
+/** How to state an actor — the three sources above the fallback, by name. */
+function statedActorOptions(env) {
+  return [
+    "  · `--actor user:<name>` on this command;",
+    "  · `" + ACTOR_ENV + "=user:<name>` in this shell;",
+    "  · `actor: user:<name>` in " + userConfigPath(env) + ", stated once and kept.",
+  ];
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -651,7 +743,7 @@ function refuse(plan, headline, details, results, reason) {
   console.error(failure(N + " done", headline, details));
   if (plan.json) {
     printJson("verification-run", {
-      task: plan.id, ok: false, closed: false, dryRun: plan.dryRun,
+      task: plan.id, ok: false, closed: false, dryRun: plan.dryRun, actorSource: plan.actorSource || null,
       refusalKind: reason, refusal: headline, details: details || [],
       entries: results || [],
     });
@@ -659,7 +751,16 @@ function refuse(plan, headline, details, results, reason) {
   return 1;
 }
 
-async function run(argv) {
+/**
+ * @param {string[]} argv
+ * @param {{env?: object, terminal?: boolean, ask?: (prompt: string) => string | null}} io
+ *        injected so a test can stand in for a person at a terminal without
+ *        one, and never resolves the actor of the session running it.
+ */
+async function run(argv, io = {}) {
+  const env = io.env || process.env;
+  const terminal = io.terminal === undefined ? !!process.stdin.isTTY : io.terminal;
+  const ask = io.ask || askLine;
   let plan;
   try {
     plan = parseDoneArgs(argv);
@@ -684,7 +785,13 @@ async function run(argv) {
       [N + " done --help"]));
     return 2;
   }
-  const actor = resolveActor(plan.actor);
+  const { actor, source: actorSource } = resolveActorSource(plan.actor, { env });
+  // WHERE THE ACTOR CAME FROM travels with every answer from here on (TL-544),
+  // as `decide` reports it. No `--require-actor`: the act a person performs in
+  // `done` is the `manual:` vouch, and `vouchNeedsStatedActor` below already
+  // refuses the default for it; a closure proved by commands is evidence, and
+  // the default actor is honest for it.
+  plan.actorSource = reportedActorSource(actorSource);
   if (!isValidActor(actor)) {
     console.error(
       failure(N + " done", "the actor `" + actor + "` has no valid namespace", [
@@ -753,7 +860,8 @@ async function run(argv) {
   // An actual `done` keeps refusing here — a moved tree must not be closed a
   // second time merely because its old contract still happens to pass.
 
-  const { entries, problems } = parseVerification(frontmatter);
+  const closingContract = closingContractOf(frontmatter, config);
+  let { own: entries, problems } = closingContract;
   const contract = contractProblem(entries, problems);
   if (contract) {
     // TWO DEFECTS, TWO DIAGNOSES (TL-173). "has no closing contract" is the
@@ -773,6 +881,19 @@ async function run(argv) {
     }
     return refuse(plan, plan.id + " has no closing contract", contract.split("\n"), [], "no-contract");
   }
+
+  // AFTER the task's own contract is judged, never in place of it: a task with
+  // no `verification:` is still a task nobody finished writing, however many
+  // project entries would run for it.
+  if (closingContract.collisions.length) {
+    return refuse(plan, collisionHeadline(plan.id),
+      closingContract.collisions.map((id) => "`id: " + id + "`").concat([
+        "",
+        "A proof id names ONE entry, and a criterion pointing at it would be ambiguous.",
+        "Rename the task's entry; nothing was run and the file is untouched.",
+      ]), [], "closing-contract-collision");
+  }
+  entries = closingContract.entries;
 
   const cwd = repoRootFor(root);
   const missingTest = missingNodeTestFile(entries, cwd);
@@ -811,6 +932,25 @@ async function run(argv) {
     );
   }
 
+  // BEFORE the contract runs, and before anything is written (TL-460). Asking at
+  // the `manual:` entry itself would spend the whole run first, and stopping
+  // there leaves the `__unverified__` record of TL-170 — signed by the very
+  // fallback this refusal exists to keep off a person's act. Nobody was asked
+  // here, so there is no refusal of a vouch to record.
+  if (vouchNeedsStatedActor({ entries, source: actorSource, confirmManual: plan.confirmManual, json: plan.json, terminal })) {
+    return refuse(
+      plan,
+      plan.id + ": a `manual:` entry is vouched for by a person, and nobody said who",
+      [
+        "With no actor stated the vouch would be recorded as " + actor + " — the namespace",
+        "for an automated, unverified write, which is the opposite of what typing `" + CONFIRM_WORD + "`",
+        "means. Nothing was run and nothing was written. State who you are:",
+      ].concat(statedActorOptions(env)),
+      [],
+      "unstated-actor"
+    );
+  }
+
   log(plan.json, "");
   log(plan.json, "  " + plan.id + " — " + entries.length + " verification entr" +
     (entries.length === 1 ? "y" : "ies") + ", run in " + cwd);
@@ -830,7 +970,10 @@ async function run(argv) {
   // the transcript is the answer. `--verbose` streams everything as it runs,
   // for the person watching a slow contract who wants to see it move.
   const capture = plan.json || !plan.verbose;
-  const tagOf = (e, i) => "  " + (i + 1) + "/" + entries.length + "  " + (e.id ? e.id + "  " : "");
+  // A project entry is named as one, so a red line nobody wrote into the task
+  // file is not hunted for there.
+  const tagOf = (e, i) => "  " + (i + 1) + "/" + entries.length + "  " +
+    (e.project ? "closing_contract  " : "") + (e.id ? e.id + "  " : "");
   let stop = null;
   const { results, failed } = await runContract(entries, cwd, {
     capture,
@@ -866,7 +1009,7 @@ async function run(argv) {
         return { ok: false };
       }
       if (!confirmed) {
-        const answer = askLine("  type `" + CONFIRM_WORD + "` to vouch, anything else to stop: ");
+        const answer = ask("  type `" + CONFIRM_WORD + "` to vouch, anything else to stop: ");
         confirmed = answer === CONFIRM_WORD;
         if (answer === null) {
           stop = {
@@ -1130,6 +1273,7 @@ function answer(plan, results, extra) {
     task: plan.id,
     ok: results.every((r) => r.ok),
     dryRun: plan.dryRun,
+    actorSource: plan.actorSource || null,
     entries: results.map(({ coverageObserved, executedFiles, ...entry }) => entry),
     ...extra,
   });

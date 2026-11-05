@@ -14,6 +14,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { PRODUCT_NAME as N } from "./product.mjs";
+import { plainChildEnv } from "./ui.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -123,6 +124,18 @@ export const CHECK_GUARDS = [
     args: (root, tasksDir, files, plan) => ["--dir", root]
       .concat(plan && plan.since ? ["--since", plan.since] : [])
       .concat(plan && plan.json ? ["--quiet"] : []) },
+  // OPT-IN ONLY, like `proofs` (TL-503). It judges a PROMOTION — git refs CI is
+  // about to move — rather than the backlog, so it answers when CI asks before a
+  // deploy and not as part of the publication verdict a bare `check` gives. It
+  // reads `release_gate` itself: under `report` it exits 0 whatever it finds.
+  { key: "release", severity: "gate", want: "wantRelease", name: "release", script: "check-release-gaps.mjs",
+    optIn: true,
+    // Its `--json` is a document of its own, carried as the guard's `report`.
+    jsonReport: true,
+    args: (root, tasksDir, files, plan) => ["--dir", root]
+      .concat(plan && plan.env ? ["--env", plan.env] : [])
+      .concat(plan && plan.trunk ? ["--trunk", plan.trunk] : [])
+      .concat(plan && plan.json ? ["--json"] : []) },
 ];
 
 /**
@@ -185,7 +198,7 @@ export function collectAdvisories(root, config, table = CHECK_GUARDS) {
   return advisoryRuns(config, table).map((guard) => {
     const r = spawnSync(process.execPath, [join(HERE, guard.script)].concat(guard.args(root)), {
       encoding: "utf8",
-      env: { ...process.env, NO_COLOR: "1" },
+      env: plainChildEnv(),
     });
     const output = r.error
       ? "could not start " + guard.script + ": " + r.error.message

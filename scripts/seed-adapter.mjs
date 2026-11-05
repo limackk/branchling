@@ -49,7 +49,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadConfigOrExit } from "./config.mjs";
-import { resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { BACKLOG_DIR_REFUSAL_EXIT, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { failure } from "./ui.mjs";
 
@@ -168,7 +168,13 @@ export function renderPrompt(template, { spec, errors }) {
     ? "The previous answer was REJECTED for these reasons. Fix them and answer again:\n\n" +
       errors.map((e) => "- " + e).join("\n")
     : "";
-  return body.replace(/\{\{spec\}\}/g, String(spec || "")).replace(/\{\{errors\}\}/g, complaints).trim() + "\n";
+  // One pass with a replacer function, for two reasons. A replacement STRING
+  // expands `$&`, `$'`, `` $` ``, `$1` and `$$`, and a spec that quotes a
+  // shell command carries exactly those (TL-531). Two chained passes would
+  // also substitute a literal `{{errors}}` written INSIDE the spec. A
+  // function's return value is inserted verbatim and is never rescanned.
+  const values = { spec: String(spec || ""), errors: complaints };
+  return body.replace(/\{\{(spec|errors)\}\}/g, (_, key) => values[key]).trim() + "\n";
 }
 
 /**
@@ -375,8 +381,9 @@ export async function main(argv) {
   try {
     root = resolveBacklogDir({ dir: cli.dir, moduleDir: HERE }).root;
   } catch (e) {
-    console.error(failure(N + " plan-from", e.message, [], [`${N} plan-from spec.md --dir <path>`]));
-    return 2;
+    if (!isBacklogDirRefusal(e)) throw e;
+    console.error(failure(N + " plan-from", e.message, e.details || [], [`${N} plan-from spec.md --dir <path>`]));
+    return BACKLOG_DIR_REFUSAL_EXIT;
   }
   const config = loadConfigOrExit(root);
   const settings = modelSettings(config.user, config.user.path);

@@ -45,7 +45,7 @@ import { fileURLToPath } from "node:url";
 import { loadConfigOrExit } from "./config.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { repoRoot } from "./modified-files.mjs";
-import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { backlogPaths, BACKLOG_DIR_REFUSAL_EXIT, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { actorParts } from "./task-fields.mjs";
 import { taskIdPatterns } from "./task-id.mjs";
@@ -421,8 +421,9 @@ export function main(argv) {
   try {
     root = resolveBacklogDir({ dir: cli.dir, moduleDir: HERE }).root;
   } catch (e) {
-    console.error(failure(N + " pr-summary", e.message, [], [`${N} pr-summary --dir <path>`]));
-    return 2;
+    if (!isBacklogDirRefusal(e)) throw e;
+    console.error(failure(N + " pr-summary", e.message, e.details || [], [`${N} pr-summary --dir <path>`]));
+    return BACKLOG_DIR_REFUSAL_EXIT;
   }
   const config = loadConfigOrExit(root);
   const model = buildSummary({ root, config, base: opts.base, cost: opts.cost });

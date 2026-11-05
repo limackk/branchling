@@ -97,6 +97,29 @@ Three things it deliberately does:
   server, not the editor hook. A task arriving in a pull request carries a shell
   command, and it runs only when a person deliberately closes that task.
 
+**A project contract runs after every task's own.** `closing_contract:` in
+`config.yaml` holds entries of the same shape as `verification:`, and `done`
+appends them to each task's contract — for the repository-wide guard a module's
+tests never reach, stated once instead of in every task file:
+
+```yaml
+closing_contract:
+  - id: repo-guards
+    bash: "npm run check"
+```
+
+It never stands in for a task's own contract: a task with an empty
+`verification:` is still refused. An `id` a task's own entry also uses refuses
+that closing before anything runs, because a `[proof: id]` naming it would be
+ambiguous.
+
+`take --probe`, `next --probe` and `check --proofs` read the same contract
+through the same function, so a probe before the work and an audit after it see
+the red lines the closing will. The one exception is the half of `check
+--proofs` that looks for unfalsifiable contracts in tasks nobody has started: it
+judges a task by its own entries, because the project's are not the work's to
+turn red.
+
 **The limit, stated rather than left to be discovered.** A task file is a text
 file and anybody can set `status: done` in an editor. This gate raises the *cost*
 of a lie — it does not make one impossible, and there is no `--force` flag,
@@ -184,6 +207,466 @@ The migration **does not touch references inside task prose**, and it tells you
 how many it left alone. A number in prose may point at a task in another
 repository, and a bulk replace would silently repoint it. On an empty backlog
 the change is free: fix the line in `config.yaml` and you are done.
+
+### Deployment stages
+
+Whether a task is FINISHED is its status. Whether it has REACHED the test
+environment or production is a different question, and it is answered from git
+rather than typed: `deploy_targets:` declares what the project deploys and, for
+each deployable, its promotion stages as an ordered list of git refs. The
+design, and the reasons a hand-kept `environment:` field was rejected, are in
+[`release-tracking.md`](release-tracking.md).
+
+```yaml
+deploy_targets:
+  - name: backend                 # something deployed on its own
+    paths: [backend/]             # which commits belong to it; omit for the whole repository
+    stages:                       # in promotion order
+      - { name: test, ref: origin/main }
+      - { name: production, ref: origin/production }
+```
+
+- **A commit belongs to a task through the task id in its message**, anywhere
+  in it. Only commits reachable from the trunk count, so a squash merge, a
+  merge commit and a rebase give the same answer; merge commits themselves are
+  skipped. The trunk is the remote's default branch (`origin/HEAD`) when the
+  clone has one, otherwise `HEAD` — the same trunk `show` and `deploy status`
+  read — and `query` names it, with its source, in its output.
+- **A task's targets are the ones whose `paths` its commits touched.** A path
+  ending in `/` selects a directory; any other entry selects that file, or the
+  directory of that name. There are no globs in `paths`.
+- **Per target and stage the answer is `full`, `partial` or `absent`** — all,
+  some or none of the task's commits for that target are in the stage. A
+  commit cherry-picked onto a stage counts by patch identity (`git cherry`),
+  not by SHA.
+- **A ref is a ref name or a `refs/…` glob**, and a glob resolves to the newest
+  match by version sort, so `refs/tags/v*` picks `v1.10` over `v1.9`.
+- **`refs:` instead of `ref:` declares refs deployed in parallel** — regions,
+  tenants, maintained release lines. The stage is reached only when every one
+  of them holds the task; until then the answer names which ones do.
+- **A ref that does not resolve is `unknown`, never empty.** A task whose answer
+  depends on it matches neither `--env` nor `--not-env`, and the output says
+  which ref it was. Every answer also names each ref it read with its SHA:
+  a remote-tracking branch moves only on `git fetch`, and the default refspec
+  does not fetch `refs/deploys/*`.
+- **A rollback needs no edit.** Move the ref back and the tasks leave the stage.
+- **An unknown key fails** at every level, and so do a stage with both or
+  neither of `ref` and `refs`, a duplicated name, and a glob that is not a full
+  ref name.
+
+Asking:
+
+```bash
+branchling query --status done --not-env production   # finished, not yet in production
+branchling query --env backend/test                    # in test, for one target
+branchling query --text checkout --json                # each task's `deploy` per target and stage
+```
+
+**What waits for which environment** is one command, `deploy status`. For each
+target it prints the promotion pipeline as buckets, each holding the tasks
+between two adjacent steps:
+
+```text
+trunk  refs/remotes/origin/main 3f1c2a9b0d4e  (the remote's default branch)
+  web/test        origin/main                     3f1c2a9b0d4e
+  web/production  refs/deploys/web/production-eu  9a0b1c2d3e4f
+  web/production  refs/deploys/web/production-us  9a0b1c2d3e4f
+
+web
+  closed, not on the trunk         1
+    TASK-12  Export to CSV  done 2026-10-30 · waiting 2d
+  on the trunk, waiting for test   0
+  in test, waiting for production  1
+    TASK-14  Retry failed uploads  done 2026-10-29 · waiting 3d · partial (held by refs/deploys/web/production-eu)
+  in production                    41  (counted, not listed)
+```
+
+- **A task is placed by the first stage that does not hold it in full**, so
+  each bucket answers "what does the next promotion carry". The last stage is
+  counted and never listed: it grows with the project's whole history.
+- **Closed but not on the trunk** is an archived task whose commits exist only
+  off the trunk; its target comes from the paths those commits touched. A
+  closed task that no commit names at all cannot be given a target and is
+  counted on its own line.
+- **The trunk is the remote's default branch** (`origin/HEAD`) when the clone
+  knows one, else `HEAD`, and the header says which: on a feature branch `HEAD`
+  holds that branch's commits, and a task closed there would read as merged.
+- **The wait is measured from the newest commit** of the task for that target,
+  because git records no deploy time — or, when the stage the task already
+  stands in is an annotated tag, from the tag's date.
+- **A ref that does not resolve makes its bucket and every later one
+  `unknown`**, never zero: no task can be placed past a stage nobody could read.
+- **An empty bucket prints as `0`**, and the header names every ref with its
+  SHA, because the answer is only as fresh as the refs it read.
+
+```bash
+branchling deploy status                       # every target, every bucket
+branchling deploy status --env production      # only what waits for production
+branchling deploy status --target web --count  # counts only, inside a context budget
+branchling deploy status --json                # the same buckets, kind `release-status`
+```
+
+**What a release planned, against what shipped.** A task names the release it
+is planned for in `release:`, a value from the closed `releases:` list in
+config.yaml — the intent, written by a person, as opposed to deployment, which
+is observed. A value outside the list fails `new --release`, `query --release`
+and `check --vocabulary`; an empty list means the project plans no releases.
+`deploy status --release <name>` compares the plan with the last stage of
+each target:
+
+```text
+release 2026.11  4 planned · 1 shipped (counted, not listed) · 1 dropped
+  the current release — the first in `releases:` not fully shipped
+  planned, not shipped                      2
+    TASK-21  Checkout redesign  done · P1 · web: in test, waiting for production
+    TASK-24  Fraud check        pending · P0 · no commit on the trunk names it
+  planned, still open                       1
+    TASK-24  Fraud check        pending · P0
+  unplanned, carried by the next promotion  1
+    TASK-30  Logging tweak      done · P2 · web: in test, waiting for production
+  planned, then dropped                     1
+    TASK-22  Gift cards         cancelled · P2
+```
+
+- **Not shipped** is a planned task not yet in full in the last stage of every
+  target its commits touched — a task with no commit yet included, named as
+  such. These are the launch blockers.
+- **Unplanned** is a task on the trunk or in an earlier stage, not yet in the
+  last one, that this release did not plan — the scope the next promotion
+  carries without anybody having planned it. What already reached the last
+  stage is not listed: it is the project's whole history.
+- **Dropped** is a planned task closed in an archived status other than the
+  first of `archived_statuses:`; it never blocks.
+- **`releases:` is chronological**, oldest first. The **current release** is
+  computed, never configured: the first entry not yet fully shipped — every
+  planned task that is not dropped is closed and in full in the last stage of
+  every target it touched. A last stage that does not resolve keeps a release
+  current, because unknown is never shipped; a release with nothing left to
+  ship does not. A closed task whose commits touch no target's paths (docs or
+  backlog only) touched no target, so it does not hold its release, although
+  the report still lists it; a closed task no trunk commit names does hold it,
+  because nothing was measured. The report names it on the line under the
+  header (`the current release`, `not the current release, which is …`, or
+  `no current release` once every one has shipped). When deployment was not
+  read — outside git, or with an unresolved trunk — nothing is judged and the
+  line says so instead. Append the next release to the list; reordering it
+  changes which release is current. No date is read from it.
+- **A release that has shipped names the ref that marks it.** An entry of
+  `releases:` may be `{name, ref}` beside the plain slug — `ref` is a ref name
+  or tag, never a pattern, because a release ends at one point — and both
+  shapes live in one list:
+
+  ```yaml
+  releases: [{ name: 1.0, ref: v1.0 }, { name: 1.1, ref: v1.1 }, 1.2]
+  ```
+
+  Such a release is compared with its ref instead of the pipeline. **Planned,
+  not shipped** is then a planned task the ref does not hold in full; **shipped,
+  unplanned** replaces "carried by the next promotion" and lists the tasks named
+  by a commit the release carried — reachable from its ref and not from the
+  previous release's ref, the first one beginning at the root — that were
+  planned for another release or none. A patch the previous release already
+  carried is not counted again. The header names the ref, its SHA and where the
+  release began. A ref that does not resolve is unknown, never an empty release;
+  an unresolvable beginning leaves only the shipped-unplanned list unknown. For
+  the current release such a release is shipped when its ref resolves and holds
+  every planned task that is not dropped: a task it went out without keeps it
+  current until somebody plans that task for a later release or drops it. A
+  release without `ref` behaves exactly as above. The name keeps the slug rules
+  of every release, and `new`, `query`, `check --vocabulary` and the viewer read
+  the names alone.
+
+  ```text
+  release 1.0  3 planned · 1 shipped (counted, not listed) · 0 dropped
+    the current release — the first in `releases:` not fully shipped
+    shipped at v1.0 4f2a9c1e07b3, since the root — the first release that names a ref
+    planned, not shipped   1
+      TASK-12  Export to CSV  done · P2 · not in v1.0
+    shipped, unplanned     1
+      TASK-15  Retry banner   done · P3 · in v1.0
+  ```
+- `--env` is refused beside `--release`, because the comparison is with the
+  last stage by definition.
+
+```bash
+branchling deploy status --release 2026.11 --count   # counts only
+branchling query --release 2026.11                     # every task planned for it
+branchling query --release ""                          # open tasks planned for none
+```
+
+**One task at a time** is `show <ID>`. It prints the facts computed about a
+task that its file does not hold — the deployment state per target and stage,
+the task's status on other branches and worktrees where it differs from this
+tree, and each `blocked_by` task with its status — under a one-line header. The
+body is never reprinted; the file is one `cat` away.
+
+```text
+TASK-14  Retry failed uploads  done · P1
+
+deploy
+  trunk      refs/remotes/origin/main 3f1c2a9b0d4e  (the remote's default branch)
+  web        test full, production partial (refs/deploys/web/production-eu)
+  frontend   unobservable — deployed from `acme-frontend`, which is not read here
+  refs read  web/test  origin/main  3f1c2a9b0d4e
+             web/production  refs/deploys/web/production-eu  9a0b1c2d3e4f
+             web/production  refs/deploys/web/production-us  1b2c3d4e5f6a
+
+elsewhere
+  feature/retry-backoff: in_progress
+
+blockers  not blocked — every blocker is closed
+  ✓  TASK-9  done  Upload queue persists across restarts
+```
+
+- **The trunk is chosen as in `deploy status`**: the remote's default branch,
+  else `HEAD`, and the line says which.
+- **A task no commit names says so**, and a target in another repository is
+  `unobservable` — neither reads as "deployed nowhere".
+- **A blocker is resolved when its status is archived**, the rule `next`
+  dispatches on; an id that names no task in this tree still blocks.
+- **An unknown id exits 1**; `--json` carries the same three sections, kind
+  `task-show`.
+
+One declaration per product shape:
+
+```yaml
+# Web application or API, a branch per environment
+deploy_targets:
+  - name: web
+    stages:
+      - { name: test, ref: origin/main }
+      - { name: production, ref: origin/production }
+```
+
+```yaml
+# Web application, trunk-based: CI moves a ref after each deploy, e.g.
+#   git push --force origin <sha>:refs/deploys/web/production
+deploy_targets:
+  - name: web
+    stages:
+      - { name: trunk, ref: origin/main }
+      - { name: staging, ref: refs/deploys/web/staging }
+      - { name: canary, ref: refs/deploys/web/canary }
+      - { name: production, ref: refs/deploys/web/production }
+```
+
+```yaml
+# Desktop or mobile application: releases are tags
+deploy_targets:
+  - name: desktop
+    paths: [desktop/]
+    stages:
+      - { name: tagged, ref: "refs/tags/desktop-v*" }
+  - name: mobile
+    paths: [app/]
+    stages:
+      - { name: tagged, ref: "refs/tags/mobile-v*" }
+```
+
+```yaml
+# Library or CLI published to a registry, where CI publishes every tag
+deploy_targets:
+  - name: package
+    stages:
+      - { name: published, ref: "refs/tags/v*" }
+```
+
+```yaml
+# GitFlow: release branches, newest by version
+deploy_targets:
+  - name: app
+    stages:
+      - { name: trunk, ref: origin/develop }
+      - { name: release, ref: "refs/remotes/origin/release/*" }
+      - { name: production, ref: origin/main }
+```
+
+```yaml
+# Regions deployed separately, or maintained release lines patched in parallel
+deploy_targets:
+  - name: api
+    stages:
+      - { name: test, ref: origin/main }
+      - name: production
+        refs: [refs/deploys/api/production-eu, refs/deploys/api/production-us]
+  - name: lib
+    paths: [lib/]
+    stages:
+      - name: maintained
+        refs: [origin/release-1.x, origin/release-2.x]
+```
+
+```yaml
+# Several deployables in one repository
+deploy_targets:
+  - name: api
+    paths: [api/]
+    stages:
+      - { name: production, ref: refs/deploys/api/production }
+  - name: worker
+    paths: [worker/, shared/]
+    stages:
+      - { name: production, ref: refs/deploys/worker/production }
+```
+
+A project with no environments omits the key, and nothing changes.
+
+**A deployable whose code lives in another repository is unobservable.** A
+backlog in one repository whose tasks are partly implemented in another — a
+separate frontend repository, a desktop client in its own — cannot see those
+commits from its own git, and the tool does not read the other repository.
+Declare such a target with `repository:`, and name it on each task implemented
+there in the task's own `target:` field:
+
+```yaml
+deploy_targets:
+  - name: api
+    stages:
+      - { name: test, ref: origin/main }
+      - { name: production, ref: refs/deploys/api/production }
+  - name: frontend
+    repository: acme-frontend     # the other repository's name, as in `acme-frontend#src/app.ts`
+```
+
+```yaml
+# in the task's frontmatter
+target: [frontend]                # or `new --target frontend`
+```
+
+- **Its tasks are the ones naming it in `target:`**, because a task
+  implemented elsewhere has no commit here whose paths could assign it. The
+  field is a list (a task may span two other repositories) and its vocabulary
+  is the names of the targets carrying `repository:`, closed even when empty:
+  an undeclared name or a target of THIS repository fails `new --target`,
+  `check --vocabulary` and the viewer — a local target's tasks are computed
+  from the paths their commits touch, and a membership typed by hand would
+  contradict that. A label never selects a target's tasks: a label is a
+  category. `labels:` on a target fails the configuration with a hint naming
+  `target:`.
+- **`paths` and `stages` are refused on it**: both are read against THIS
+  repository's git, so a path would hand this repository's commits to the
+  other one, and a stage ref would resolve in the wrong repository and read
+  like an answer about the right one.
+- **`deploy status` gives it a lane of one bucket, `unobservable here`**,
+  naming the repository and listing its tasks with their status — never in a
+  stage, never as waiting for one. A closed task of such a target is not
+  counted among the closed tasks no commit names. With `--release`, a planned
+  task of it is listed under `planned, unobservable here` rather than as not
+  shipped, unless a target of this repository it also touched still lacks it.
+- **The gate reports no gap on its account.** `done-not-on-trunk` and the
+  every-target fallback of `planned-blocker-open` skip its tasks; commits this
+  repository does hold are judged as always, so a task split across both
+  repositories is still judged on this half. The report says how many tasks
+  each such target holds, so what was not looked at is named.
+- **`--env`, `--target … --env` and `deploy record` refuse it**: it has no
+  stage that can be read or moved here. Reading the other repository's refs is
+  deliberately not done.
+- **`query` names it.** In `--json` every task's `deploy` carries
+  `unobservable`, the targets in another repository it belongs to (`[]` for
+  none), so a task implemented elsewhere does not read as "no commits, deployed
+  nowhere". A stage typed without a target (`--env production`) asks about every
+  target the task belongs to, so such a task matches neither `--env` nor
+  `--not-env` when the other repository's half would decide the answer: when
+  this repository holds nothing of it, or holds it in that stage in full. A half
+  here that is not in the stage still matches `--not-env`, and `target/stage`
+  for a target of this repository is unaffected. The tasks held out are named
+  per target — in the text output, on stderr beside `--count` and `--files`, and
+  in `--json` as `deploy.unobservable`.
+
+**A stage git cannot observe is recorded.** Store review, an update channel, a
+staged rollout reaching 100%, a customer's installation, a sign-off on the test
+environment: nothing in git moves when they happen, and the tool does not query
+stores, flag systems or CI providers. Declare the stage `recorded: true`, and
+whoever knows — a CI step or a person — calls `deploy record`:
+
+```yaml
+deploy_targets:
+  - name: mobile
+    paths: [app/]
+    stages:
+      - { name: tagged, ref: "refs/tags/mobile-v*" }
+      - { name: review, ref: refs/deploys/mobile/review, recorded: true }
+      - { name: rollout, ref: refs/deploys/mobile/rollout, recorded: true }
+  - name: server
+    stages:
+      - { name: published, ref: "refs/tags/v*" }
+      - name: installed                       # one ref per customer
+        refs: [refs/deploys/server/acme, refs/deploys/server/globex]
+        recorded: true
+```
+
+```bash
+branchling deploy record --target mobile --stage review mobile-v2.4.0 --reason "approved by the store"
+branchling deploy record --target mobile --stage rollout mobile-v2.4.0 --reason "staged rollout at 100%"
+branchling deploy record --target mobile --stage rollout mobile-v2.3.1 --reason "rollout halted: crash on start"
+branchling deploy record --target server --stage installed --ref acme v1.8.0 --reason "Acme upgraded"
+```
+
+- **The ref moves onto an annotated tag object** whose tagger is the actor,
+  whose date is the moment of the record, and whose message carries the reason
+  and the commit the ref stood at before. So a recorded stage is still a git
+  ref: every reader sees the commit, `git push` shares it, and `git cat-file
+  tag <ref>` reads the record back. No `refs/tags/` entry is created.
+- **`deploy status` names who recorded each stage, when and why**, under the
+  ref's line, and in `records` with `--json`.
+- **It prints the push command and never pushes.** Another clone sees the
+  record only once its fetch refspec carries `refs/deploys/*`; the output and
+  `doctor` print the line that adds it.
+- **It refuses** a stage not declared `recorded` (moving a ref git observes by
+  hand would assert a deployment nobody made), a missing or reserved
+  `--reason`, a stage of parallel refs without `--ref`, and a commit the
+  previous stage does not hold — or a previous stage that does not resolve,
+  because "cannot tell" is not "yes". The first stage has no previous stage to
+  ask.
+- **A move backwards is accepted** — it is how a halted rollout is recorded —
+  and the output names the direction: `first`, `unchanged`, `forward`,
+  `backward` or `diverged`.
+- **A recorded stage's refs are full names outside `refs/heads/`,
+  `refs/remotes/` and `refs/tags/`, never globs**: the tool writes them, and a
+  branch, a remote-tracking ref or a tag is moved by something else. By
+  convention they live under `refs/deploys/<target>/`.
+
+#### The release gate
+
+`check --release` asks whether a promotion has a gap in its traceability, and
+names the commit or task that proves each one:
+
+| Gap | What it means |
+|---|---|
+| `untracked-commit` | a deployed commit names no task id |
+| `open-task-deployed` | a deployed commit names a task that is still open |
+| `partial-task` | some of a task's commits are in a ref and later ones are not, or one parallel ref holds it and another does not |
+| `stage-only-commit` | a stage holds a commit the trunk or an earlier stage lacks — the next ordinary promotion reverts it |
+| `done-not-on-trunk` | a task closed as done whose commits exist only on a branch or remote the trunk never received |
+| `unknown-task-id` | a deployed commit names an id no task file carries |
+| `untargeted-commit` | a deployed commit touches no declared target's paths |
+| `planned-blocker-open` | a task at the top of `priorities:`, planned for the current release (the first in `releases:` not fully shipped), is still open — reported against the last stage of the targets its commits touched, or of every target when it has no commit yet (unless it belongs to a target in another repository) |
+
+In CI it is one line before the deploy step:
+
+```bash
+branchling check --release --env production --trunk origin/main
+```
+
+- **`release_gate: report`** (the default) prints the gaps and exits 0;
+  **`release_gate: require`** exits 1 on any gap `release_gate_accept` does
+  not name, on any stage ref that does not resolve, and on a trunk that does
+  not resolve in a repository that has commits (a mistyped `--trunk`, a CI
+  clone that never fetched the remote default branch) — a gate that could
+  not look must not read as one that found nothing. An accepted gap is still
+  printed, marked `(accepted)`; an unknown gap name in `release_gate_accept`
+  fails the configuration.
+- **The trunk is named in every report.** Without `--trunk` it is the remote's
+  default branch (`refs/remotes/origin/HEAD`), else `HEAD`. A CI checkout
+  often records no remote default, so pass `--trunk` there.
+- **Commits older than the first one naming a task id are not judged** — the
+  history before a project adopted ids cannot be repaired by any future
+  commit — and the report says how many were left out.
+- **`--env`** judges one stage (`stage` or `target/stage`); `done-not-on-trunk`
+  is a question about the trunk and is asked either way. `--json` carries the
+  whole report as the `report` of the `release` guard.
+- **It is never part of a bare `check`**, which is the verdict on publishing
+  the backlog, not on promoting a deployment.
 
 ## The execution order (`plan.yaml`)
 
@@ -343,9 +826,15 @@ my-planner spec.md | branchling seed --dir ./backlog --json
 | `context` | optional | what the next person needs before their first edit |
 | `steps` | optional | array of strings |
 | `blocked_by` | optional | `plan_id` values from **this** plan; a cycle fails |
-| `verification` | required | non-empty; a command string, or `{ "id", "bash" \| "manual", "proves" }` |
+| `verification` | required | non-empty; a command string, or `{ "id", "bash" \| "manual", "proves" }`. Any character is written as itself except a line break or other control character, which is refused: an entry is one line |
 | `estimate` | optional | free text, e.g. `"2h"` |
 | `priority` | optional | a value from *your* `config.yaml` |
+| `epic` | optional | free text, the group the task counts towards |
+| `role` | optional | a value from *your* `roles:` |
+| `executor` | optional | `human` or `agent` |
+| `labels` | optional | array; under `labels_closed: true`, values from *your* `labels:` |
+| `related_docs` | optional | array of paths relative to the repository root |
+| `wave` | optional | an existing wave of `plan.yaml`; the task is scheduled there as `new --wave` does, and an order the plan guard rejects rolls the whole seed back |
 
 `proves` becomes the acceptance criterion that points back at the entry, so a
 seeded task already has the criterion→proof link `check --criteria` asks for. An
@@ -398,6 +887,19 @@ at all. Like `executor:`, it gates the DISPATCHER only: the skipped tasks are
 counted and named (`skippedSize` in `next --json`, `waitingForSize` in `run
 --json`), and `take <ID>` still works — naming a task is the deliberate decision
 the threshold asks for.
+
+**Two loops in one area collide even on two different tasks.** `conflict_group:`
+on a task names the area it touches — a module, a migration sequence, any value
+your project chooses — as a list. `next` and `run` do not hand a task out while
+another task sharing one of its groups is in progress in this tree, or is
+reported in progress by another worktree or branch through the same scan that
+keeps two sessions off one task. For a backlog that will not acquire a new field
+by hand, `conflict_group_from: <field>` in `config.yaml` reads the group from
+`epic`, `board`, `labels`, `type` or `role` for every task that names none; a
+task's own `conflict_group:` replaces that default rather than adding to it,
+and without the key there is no default at all. The skipped tasks are named
+with the group and the task holding it (`skippedConflict` in `next --json` and
+`run --json`, each `{id, group, heldBy}`); `take <ID>` still works.
 
 **One queue, several hands.** A task may ask for a competence in `role:`, and a
 run can serve more than one of them: `--agent-for <role>=<command>`, repeatable,
@@ -552,6 +1054,21 @@ filters. A parameter that is absent from the link means "the default", not
 "keep whatever you had": otherwise a recipient with their own filters would get
 a different set and the link would have lied.
 
+**The Release tab** shows the same answer as `deploy status`, drawn as a
+board: one lane per deploy target, and one column per step of its promotion —
+closed but not merged, on the trunk, then each stage from `deploy_targets`. A
+card sits in the last step it has fully reached; a card whose next stage holds
+only some of its commits, or only some of a stage's parallel refs, carries a
+**PARTIAL** marker naming which refs hold it. Below the lanes, a panel lists
+the gaps `check --release` reports. The state is read from git when the page is
+built, so the tab prints the build time and the SHA of every ref it read —
+rebuild to see where the refs are now. Environments are not boards: the board
+scope and the filters narrow the cards here exactly as they narrow the list, and
+the link carries them (`viewer.html#release?board=main&epic=Payments`). A project
+with no `deploy_targets` sees no tab. A target whose code lives in another
+repository (`repository:`) is a lane of one column, **Unobservable here**,
+holding the tasks that name it in `target:` — never placed in a stage.
+
 **The dashboard contract** reserves a URL-addressable view of throughput, queue
 health, epics and plan waves. The current page does not expose that tab yet; its
 restoration follows the same rule as every other viewer control: state that a
@@ -628,35 +1145,58 @@ implementation detail. Every reading command answers in the same envelope:
 
 | Command | `kind` | Payload |
 |---|---|---|
-| `query` | `task-list` | `tasks`, `total` (matches BEFORE `--limit`), `limit`, `scan`, `modifiedFile`, `elsewhereOnly` (the tasks only another branch has) |
+| `query` | `task-list` | `tasks`, `total` (matches BEFORE `--limit`), `limit`, `scope` (active, archived or all — which tasks `--scope` searched; null when `--status` chose the statuses), `scan`, `modifiedFile`, `deploy` (null unless deployment state was computed — then the trunk with its SHA and its source, remote-default or head, and every ref read, each with its SHA, and an unobservable list: per target in another repository, the tasks `--env`/`--not-env` held out because that repository would decide them, empty without such a filter; each task then carries its own `deploy` per target and stage, whose unobservable list names the targets in another repository it belongs to), `elsewhereOnly` (the tasks only another branch has) |
 | `stats` | `stats` | `root`, `stats` (the tallies), `scan`, `divergent` (one row per task another branch disagrees with), `elsewhereOnly` (the tasks only another branch has), `context` (null unless `--context`: the measured cost rows), `agentTime` (null unless `--agent-time`: per-estimate buckets from the ledger, the verdict, and what could not be measured) |
 | `doctor` | `doctor` | `ok`, `root`, `next`, `checks` |
+| `vocabulary` | `vocabulary` | `root`, `statuses` (in declared order, each with its name, whether it is archived, whether entering it requires a reason, its role — open, active, waiting, closed or cancelled — and the role's source: status_roles when declared, derived otherwise), `priorities`, `types`, `confidence`, `estimates` (each in declared order), `labels`, `labels_closed`, `boards` (each with its slug, name and whether it is the default), `roles`, `releases` (each with its name and the ref it ended at, null until shipped), `deploy_targets` (each with its name, its repository — null unless it lives in another one — its paths and its stages, each with its name, refs, whether they are parallel and whether the stage is recorded). Every key is the config.yaml key it comes from |
+| `where` | `where` | `home`, `homeSource`, `config`, `data`, `preferences` (path and whether it exists), `agentProfiles` (path and whether it exists), `backlog` (the root and the rule that found it; null when none was found), `error` (why none was found) |
 | `serve --list` | `serve-list` | `servers` (one row per registered viewer, each carrying its own state: running, stale — the entry outlived its process — or elsewhere, meaning another host wrote it and this one may not judge it), `stateDir`, `host` |
 | `serve --stop` | `serve-stop` | `stopped` (one result per port asked about, each naming an outcome: stopped, already-gone, not-registered, not-ours, elsewhere or would-not-stop), `requested` |
-| `check` | `check` | `ok`, `root`, `failed` (the guards that failed), `guards` |
+| `check` | `check` | `ok`, `root` (null when no backlog was found — then `failed` is backlog and `guards` holds that one entry, whose output is the sentence the human form prints; exit 1), `failed` (the guards that failed), `guards` |
 | `board` | `board` | `board`, `rule`, `matched`, `isDefault`, `reason` |
 | `next-id` | `next-id` | `nextId`, `id`, `prefix`, `max`, `source`, `trees`, `branches`, `known` |
 | `instructions` | `instructions` | `topics`, `topic`, `role`, `text`, `version` |
 | `profile list/show` | `agent-profiles` | `path`, `exists`, `profiles`, `profile` |
 | `profile check` | `profile-check` | `ok`, `path`, `live`, `results` |
 | `conformance` | `adapter-conformance` | `ok`, `version`, `adapter`, `results`, `failures` |
-| `plan` | `plan` | `root`, `exists`, `updated`, `rationale`, `waves`, `activeWave`, `nextUp`, `inProgress`, `unplanned`, `coverage`, `stale`, `inProgressStatus` |
+| `plan` | `plan` | `ok` (false only on a refusal), `root`, `exists`, `updated`, `rationale`, `waves` (each with its index, name, tasks — each task with its id, title, status and blocked-by list, read from closed task files as well, and whether it is known, open and for which executor — together groups, open and closed counts, whether it ends on a person, whether it is active), `activeWave`, `nextUp`, `inProgress`, `unplanned`, `coverage`, `stale`, `inProgressStatus`, `refusalKind` (plan-unparsable, plan-contradicts-blocked-by or plan-contradicts-tree — exit 1; plan-exists from `plan init`), `refusal`, `problems` (every problem, unparsable ones with their line numbers) |
 | `seed` | `seed` | `ok`, `root`, `dryRun`, `created`, `errors` |
 | `import` | `import` | `ok`, `root`, `dryRun`, `created`, `wouldCreate`, `skipped`, `droppedLabels`, `withoutVerification`, `errors` |
 | `<command> --help` | `command-help` | `command`, `summary`, `usage`, `configured`, `flags` |
 | `pr-summary` | `pr-summary` | `base`, `scanned`, `reason`, `tasks`, `engaged`, `cost` |
 | `audit` | `audit` | `since`, `dayZero`, `tasks`, `findings`, `closedWithoutTrace`, `skippedBeforeSince`, `reopened`, `parked`, `withoutPremise`, `awaitingVouch`, `handedBack`, `vouches`, `contractCapability`, `advisories` |
-| `run` | `run` | `ok`, `dryRun`, `agent`, `profile`, `agentFor`, `profileFor`, `delegation`, `allowUncontrolledDelegation`, `plan`, `order`, `considered`, `stoppedAt`, `stopped`, `agentNeverRan`, `waitingForRole`, `waitingForExecutor`, `waitingForSize`, `tally`, `sharedState`, `ms`, `tasks`, `skippedHandedBack`, `skippedDeadlocked`, `spinGuard`, `stopRequested` |
+| `run` | `run` | `ok`, `dryRun`, `agent`, `profile`, `agentFor`, `profileFor`, `delegation`, `allowUncontrolledDelegation`, `plan`, `order`, `considered`, `stoppedAt`, `stopped`, `agentNeverRan`, `waitingForRole`, `waitingForExecutor`, `waitingForSize`, `tally`, `sharedState`, `ms`, `tasks`, `skippedHandedBack`, `skippedDeadlocked`, `skippedConflict`, `spinGuard`, `stopRequested`, `beforeNextRefused`, `stateCommitRefused`, `heldInOtherTrees`, `waited` |
 | `run --stop` | `run-stop` | `ok`, `requestedAt`, `by`, `origin` (the clone the request reaches), `path` |
-| `take`, `next` | `task-take` | `ok`, `taken`, `id`, `file`, `task`, `from`, `text`, `decisions`, `probe`, `warnings`, `reclaimed`, `tookOver`, `lock`, `refusalKind`, `refusal`, `details`, and — filled in by next — `passedOver`, `considered`, `searchedStatuses`, `skippedBlocked`, `skippedElsewhere`, `closedElsewhere`, `skippedExecutor`, `skippedHandedBack`, `skippedDeadlocked`, `skippedSize`, `skippedByRecord`, `scan`, `plan` |
-| `handoff` | `task-handoff` | `ok`, `id`, `file`, `task`, `role`, `owner`, `status` (each a from/to pair), `comment`, `released`, `warnings`, `refusalKind`, `refusal`, `details` |
-| `release` | `task-release` | `ok`, `id`, `status`, `owner`, `released`, `comment`, `refusalKind`, `refusal`, `details` |
-| `ask` | `task-ask` | `ok`, `id`, `file`, `question` (its event id, timestamp, text and asker), `changes`, `blockedReason`, `refusalKind`, `refusal`, `details` |
-| `done` | `verification-run` | `ok`, `task`, `dryRun`, `closed`, `entries` (one per `verification:` entry, with its exit code), `status`, `wouldBe`, `ticked`, `capability`, `refusalKind`, `refusal`, `details` |
+| `take`, `next` | `task-take` | `ok`, `taken`, `id`, `file`, `task`, `from`, `text`, `decisions`, `probe`, `warnings`, `reclaimed`, `tookOver`, `lock`, `actorSource` (TL-544: flag, env, config or default, as for decide; null on a refusal before the actor was resolved), `refusalKind`, `refusal`, `details`, and — filled in by next — `passedOver`, `considered`, `searchedStatuses`, `skippedBlocked`, `skippedElsewhere`, `closedElsewhere`, `skippedExecutor`, `skippedHandedBack`, `skippedDeadlocked`, `skippedSize`, `skippedByRecord`, `skippedConflict`, `scan`, `plan` |
+| `handoff` | `task-handoff` | `ok`, `id`, `file`, `task`, `role`, `owner`, `status` (each a from/to pair), `comment`, `released`, `warnings`, `actorSource` (TL-544: flag, env, config or default, as for decide; null on a refusal before the actor was resolved), `refusalKind`, `refusal`, `details` |
+| `body` | `task-body` | `ok`, `id`, `file`, `changed`, `body` (the from/to pair of `sha256:` body hashes), `lines` (added, removed), `entry` (the history entry's id, ts, actor and reason; null when unchanged), `actorSource` (TL-544: flag, env, config or default, as for decide; null on a refusal before the actor was resolved), `refusalKind`, `refusal`, `details` |
+| `release` | `task-release` | `ok`, `id`, `status`, `owner`, `released`, `comment`, `actorSource` (TL-544: flag, env, config or default, as for decide; null on a refusal before the actor was resolved), `refusalKind`, `refusal`, `details` |
+| `set` | `task-set` | `ok`, `id`, `file`, `field`, `value`, `actor`, `changes` (the history entries the write appended), `actorSource` (TL-544: flag, env, config or default, as for decide; null on a refusal before the actor was resolved), `refusalKind` (unknown-value for a value outside the field's vocabulary — exit 1; usage for an unknown field or a malformed value), `refusal`, `details`, `rejected` (the field and the value refused as unknown-value), `declared` (the values that field accepts) |
+| `set --fields` | `task-set-fields` | `root`, `fields` (each field set edits: its name, whether it is a list, whether it may be cleared, the config.yaml key a value must come from — the key vocabulary answers under, null for free text, task ids or a fixed vocabulary — the key its values are only suggested from, and the values of a vocabulary the tool fixes) |
+| `deploy status` | `release-status` | `ok` (false only on a refusal), `trunk` (the ref whose commits count, its SHA, and whether it is the remote's default branch or HEAD), `scan` (every ref read, with its SHA), `explanation` (why an empty answer is empty), `filter`, `targets` (per target its repository — null unless its code lives in another repository, whose lane is one unobservable bucket — and its buckets in pipeline order — each with its kind, stage, label, count, whether it is unknown and which refs made it so, whether it is listed — the last stage is counted, not listed — and its tasks, each with the status, the day it closed, the wait in days, its state in the stage and the parallel refs holding it), `unplaced` (closed tasks no commit names, other than those of a target in another repository), `release` (with `--release`: the release name, how many tasks it plans, how many shipped — counted, not listed — and five lists, notShipped, open, unplanned, dropped and unobservable, each a count and its tasks; every task carries its status, priority, release, commit count, where it stands per target, and a note such as no-commits, unknown or unobservable. Null without the flag), `records` (per recorded stage ref: who recorded it, when and why), `refusalKind` (unknown-name when `--release`, `--target` or `--env` names nothing declared — exit 1), `refusal`, `rejected` (the flag and the value it was given), `declared` (what that flag accepts; empty when nothing is declared) |
+| `deploy record` | `release-record` | `ok`, `target`, `stage`, `ref`, `commit`, `tag` (the annotated tag object the ref now points at), `previous` (the commit it stood at before, null on the first record), `direction` (first, unchanged, forward, backward or diverged), `actor`, `reason`, `recordedAt`, `remote`, `push` (the command that shares the record — printed, never run), `fetchFix` (the refspec other clones need, null when the remote fetches the ref), `refusalKind`, `refusal`, `details` |
+| `declare` | `vocabulary-declare` | `ok`, `key` (releases or deploy_targets), `name`, `entry` (the entry as written: name and ref for a release; name and repository, or name, paths and stages, for a target; null on a refusal), `reason`, `file` (the config.yaml written, null before one was found), `refusalKind` (usage, undeclared-key, malformed, duplicate, form, unreadable, invalid or disturbed), `refusal`, `details` |
+| `ask` | `task-ask` | `ok`, `id`, `file`, `question` (its event id, timestamp, text and asker), `changes`, `blockedReason`, `actorSource` (TL-544: flag, env, config or default, as for decide; null on a refusal before the actor was resolved), `refusalKind`, `refusal`, `details` |
+| `decide` | `task-decide` | `ok`, `id`, `decision` (its event id, timestamp, text, actor, the question it resolves and the option it chose), `chosen` (the option number, the menu's size and its recommendation; null when the answer was typed), `openQuestions` (what is still unanswered, each with its options), `lifted` (the status the decision unblocked, null when nothing waited on it), `actorSource` (which source named the actor: flag, env, config — the user configuration — or default, the agent fallback nobody stated), `refusalKind` (actor-required under `--require-actor` when the actor would be the default), `refusal`, `details` |
+| `done` | `verification-run` | `ok`, `task`, `dryRun`, `closed`, `entries` (one per `verification:` entry, with its exit code), `status`, `wouldBe`, `ticked`, `capability`, `actorSource` (TL-544: flag, env, config or default, as for decide; null on a refusal before the actor was resolved), `refusalKind`, `refusal`, `details` |
 | `resume` | `resume` | `ok`, `id`, `file`, `actor`, `owner`, `base`, `mergeBase`, `verified` (false under --no-verify: the contract was not re-run, which is not the same as a contract with no entries), `decisions`, `goal`, `history`, `diff` (the merge-base range: what this branch COMMITTED), `uncommitted` (what it left on disk in no commit: a patch of tracked edits, a list of untracked paths, and a reason — a null in any of the three means the working tree could not be read, not that it is clean), `verification` — the parts in the order the briefing fixes them — `refusalKind`, `refusal`, `details` |
-| `log` | `task-log` | `ok`, `id`, `title`, `file`, `path` (the log the answer came from), `records` (raw entries) and `total` (the exchanges they fold into — the ratio is what the fold is worth), `matched` (the exchanges left after the filter — equal to `total` when there is none) and `decisions` (whether `--decisions` narrowed the answer to what was settled and what is still open), `limit`, `exchanges` (one per write: its time, actor, source, session, role, the reason ONCE, the changes that moved, its events and its messages — a message whose text is null is that reason again, kept for its event id), `modifiedFile` and `tasks` (the computed area and its matching tasks when `--modified-file` selects decisions by path; otherwise null and empty), `refusalKind`, `refusal`, `details` |
+| `show` | `task-show` | `ok`, `id`, `title`, `status`, `priority`, `confidence`, `blocks` (the declared reverse links), `file`, `deploy` (null when the project declares no deploy targets; otherwise whether the scan ran, its reason and explanation, the trunk with its SHA and whether it is the remote's default branch or HEAD, every ref read with its SHA, and the task's own answer: its commit count, the commits touching no target, the targets in another repository it belongs to as an unobservable list, and per target each stage's state with the refs behind it), `elsewhere` (the task's status on other branches and worktrees where it differs), `scan` (whether that scan ran and what it read), `blockers` (each blocked-by task with its title, status, whether it is resolved, whether it exists in this tree, and its own elsewhere), `blocked` (the verdict, by the rule next dispatches on), `body` (with `--body`: the markdown after the frontmatter, verbatim, "" when there is none; null without the flag), `refusalKind`, `refusal`, `details` |
+| `follow` | `change-stream` | ONE envelope per line, not one per run: `event` (ready once the watch is armed, then change or heartbeat), `at`, `root` (on every line, so several streams can be told apart), `id`, `file`, `change` (created, modified or deleted), `fields` (the tracked fields that moved, with the history name for the body when it moved; the updated date is never reported) |
+| `log --open-questions` | `open-questions` | `root`, `total`, `questions` (every unanswered question on an active task, oldest first, each with the task, its title and status, the event id decide resolves, the question, who asked and when, the options and the recommendation) |
+| `log` | `task-log` | `ok`, `id`, `title`, `file`, `path` (the log the answer came from), `records` (raw entries) and `total` (the exchanges they fold into — the ratio is what the fold is worth), `matched` (the exchanges left after the filter — equal to `total` when there is none) and `decisions` (whether `--decisions` narrowed the answer to what was settled and what is still open), `limit`, `exchanges` (one per write: its time, actor, source, session, role, the reason ONCE, the changes that moved, its events and its messages — a message whose text is null is that reason again, kept for its event id; a question carries its options and recommendation), `modifiedFile` and `tasks` (the computed area and its matching tasks when `--modified-file` selects decisions by path; otherwise null and empty), `refusalKind`, `refusal`, `details` |
 | `red` | `red-owners` | `command`, `ran` (a report nobody gave is not an empty one), `reason`, `exitCode`, `files` (each failing test file with the task its commits name and, with `--repairs`, open sibling-branch repairers), `mine`, `tally`, `repairScan` (null unless requested; then whether the cross-branch scan ran and which branches it read) |
 | `docs-drift` | `docs-drift` | `documents`, `minSignals`, `flagged`, `tooLittle`, `seeded` (absent unless `--seed-tasks` ran) |
+
+**No backlog exits 1 from every command** (TL-546). Run where no backlog is
+found, or with a `--dir` or `BACKLOG_DIR` naming a directory that is not one,
+every command refuses with exit **1** — the invocation is well built, the
+directory it names is not usable; **2** stays for a wrongly built invocation.
+A writing command that answers in an envelope under `--json` (`set`,
+`release`, `declare`, `deploy record`) gives this state `ok: false` and
+`refusalKind: "no-backlog"`; `doctor --json` and `check --json` answer their
+own kind with `root: null`; every other command prints the refusal on stderr
+and leaves stdout empty. `where` is the one command that REPORTS this state
+instead of refusing on it, and keeps its own exit.
 
 **`agent_estimate` is a computed field, not a stored one** (TL-482). Every task
 row in `query --json` and the `task` that `next --json` hands over carry it:

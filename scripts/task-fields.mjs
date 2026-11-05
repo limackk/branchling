@@ -55,6 +55,21 @@
 // and unequal in the next one.
 export const ROLE_SHAPE = /^[a-z0-9][a-z0-9._-]{0,62}$/;
 
+// The release a task is PLANNED for (TL-505), from `releases:` in config.yaml.
+// The same shape as a role, for the same reason: it is typed as a flag value and
+// matched case-insensitively by `query`, so `V1.4` and `v1.4` must not be two
+// entries. Dots admit version numbers.
+export const RELEASE_SHAPE = ROLE_SHAPE;
+
+// What a status MEANS, for a reader that cannot know this project's words
+// (TL-532). A consumer colours and groups by the role, never by the name, so a
+// backlog that renamed `blocked` to `on_hold` is still drawn as waiting. The
+// order is the lifecycle order. `closed` and `cancelled` are roles of archived
+// statuses only, the other three of active ones: a role that contradicted
+// `archived_statuses` would make a consumer hide a task the tool still serves.
+export const STATUS_ROLES = Object.freeze(["open", "active", "waiting", "closed", "cancelled"]);
+export const ARCHIVED_STATUS_ROLES = Object.freeze(["closed", "cancelled"]);
+
 // ──────────────────────────────────────────────────────────────────────────
 // Actor identity (BL-1404 step 4)
 // ──────────────────────────────────────────────────────────────────────────
@@ -233,13 +248,18 @@ export function actorParts(actor) {
 // viewer had its own hand-copied version — exactly the class of "the same
 // decision in two places".
 //
-// __body__ is RESERVED, not implemented (BL-1404 step 5) — body history is the
-// plan in docs/branchling-state-and-sync.md §5.2-5.3; // product-name: allow
-// the schema admits it today so that adding it is an append rather than a
-// migration of somebody's existing data. __comment__ was reserved the same way
-// and is now WRITTEN, first by `handoff` (TL-99).
+// __body__ was reserved in BL-1404 so that adding it would be an append rather
+// than a migration of somebody's existing data, and it is WRITTEN since TL-523
+// by `body` (scripts/body-task.mjs). __comment__ was reserved the same way and
+// is written first by `handoff` (TL-99).
 export const FIELD_CREATED = "__created__";
 export const FIELD_DELETED = "__deleted__";
+// A rewrite of the task's prose (TL-523). `from` and `to` are the base-version
+// hashes of docs/branchling-state-and-sync.md §5.3 — `sha256:<hex>` of the // product-name: allow
+// body before and after — and NOT the bodies: the text is in the task file and
+// in git, and a log that copied every revision would grow with the prose rather
+// than with the number of edits. `lines` ({added, removed}) is what a reader is
+// shown instead of two hashes; see `describeBodyChange`.
 export const FIELD_BODY = "__body__";
 // A message about the task rather than a change to it (TL-99). The whole
 // content is `to`; `from` is empty, because a comment replaces nothing. Unlike
@@ -486,6 +506,25 @@ export function historyEntryKind(entry) {
   return "transition";
 }
 
+/**
+ * How a `__body__` entry reads in one line (TL-523). PURE, and here rather than
+ * in each reader for the reason `historyEntryKind` gives: `log` and `resume`
+ * both print history, and a second wording would be a second definition.
+ *
+ * The hashes are kept short for READING only; the record holds them whole,
+ * because a base-version comparison against eight characters is a comparison
+ * against a prefix. The arrow is a parameter because this file is pasted into
+ * the viewer and cannot import the terminal's symbols from `ui.mjs`.
+ */
+export function describeBodyChange(entry, arrow = "->") {
+  const lines = (entry && entry.lines) || {};
+  const short = (h) => String(h || "").replace(/^sha256:/, "").slice(0, 8) || "(none)";
+  const counts = Number.isInteger(lines.added) && Number.isInteger(lines.removed)
+    ? "+" + lines.added + " -" + lines.removed + " line(s)"
+    : "rewritten";
+  return "body " + counts + " (" + short(entry && entry.from) + " " + arrow + " " + short(entry && entry.to) + ")";
+}
+
 export const FIELD_SHAPES = [
   { key: "title", label: "Title", kind: "text", maxLengthFrom: "titleMaxLength" },
   { key: "status", label: "Status", kind: "enum", dictionary: "statuses" },
@@ -505,7 +544,23 @@ export const FIELD_SHAPES = [
   { key: "confidence", label: "Confidence", kind: "enum", dictionary: "confidence", allowEmpty: true },
   { key: "board", label: "Board", kind: "enum", dynamic: "boards" },
   { key: "epic", label: "Epic", kind: "text", dynamic: "epics", allowEmpty: true },
+  // WHEN it is meant to ship, as opposed to `epic` — WHAT it delivers, which
+  // spans releases (TL-505). Closed and `dictionaryRequired` like `role`: an
+  // empty `releases:` says the project plans none, and a value typed anyway is a
+  // release nobody's readiness report will ever list.
+  { key: "release", label: "Release", kind: "enum", dictionary: "releases", allowEmpty: true, dictionaryRequired: true },
   { key: "labels", label: "Labels", kind: "list", style: "inline", dictionary: "labels", closedFrom: "labelsClosed" },
+  // WHICH TARGET IN ANOTHER REPOSITORY it ships from (TL-514). A task of such
+  // a target has no commit here whose paths could assign it, so the link is
+  // written on the task. The vocabulary is DERIVED from `deploy_targets` — the
+  // names of the targets carrying `repository:` — and is closed even when
+  // empty: a project with no such target has nothing a task could name. A
+  // LOCAL target is outside it on purpose, because its tasks are computed from
+  // their commits' paths and a hand-typed membership would contradict that
+  // (law 2). A list, because one task may span two other repositories.
+  { key: "target", label: "Target", kind: "list", style: "inline", dictionary: "deploy_targets",
+    optionsFrom: "externalTargets", alwaysClosed: true,
+    note: "only a target that declares `repository:` — a target of this repository takes its tasks from the paths their commits touch" },
   // `itemPattern` is closed with the configured prefix in buildFieldSpecs
   // (BL-1452); `TASK` is only a fallback for calls made without a configuration.
   { key: "blocked_by", label: "Blocked by", kind: "list", style: "inline", prefixed: true, itemPattern: "^TASK-[0-9]+$", itemHint: "TASK-123" },
@@ -523,7 +578,22 @@ export const FIELD_SHAPES = [
   // decision no agent may take, whatever its role.
   { key: "executor", label: "Executor", kind: "enum", values: ["human", "agent"], allowEmpty: true, dictionaryRequired: true },
   { key: "related_docs", label: "Related docs", kind: "list", style: "block", itemHint: "docs/x.md" },
+  // WHAT AREA OF THE CODE IT TOUCHES, as the dispatcher reads it (TL-492): a
+  // task is not handed out while another task naming one of the same values is
+  // in progress here or in another tree. The values are free text and belong to
+  // the project — a module name, a migration sequence — so there is no
+  // dictionary; `conflict_group_from` in config.yaml supplies one for the
+  // tasks that name none.
+  { key: "conflict_group", label: "Conflict group", kind: "list", style: "inline", itemHint: "module" },
 ];
+
+/**
+ * The fields `conflict_group_from` may name (TL-492). Each one says WHERE the
+ * work lands rather than what state it is in or who holds it, and each is
+ * carried by the dispatcher's record, so a group read from it cannot be a
+ * silent empty value.
+ */
+export const CONFLICT_GROUP_SOURCES = Object.freeze(["epic", "board", "labels", "type", "role"]);
 
 /**
  * The canonical key order, used ONLY when a key is missing and has to be
@@ -532,8 +602,8 @@ export const FIELD_SHAPES = [
  * editing one field into a diff of the whole file.
  */
 export const FRONTMATTER_ORDER = [
-  "id", "title", "type", "labels", "board", "epic", "priority", "status",
-  "owner", "role", "estimate", "confidence", "created", "updated",
+  "id", "title", "type", "labels", "board", "epic", "release", "target", "priority", "status",
+  "owner", "role", "conflict_group", "estimate", "confidence", "created", "updated",
   "blocked_by", "blocks", "related_docs", "verification",
 ];
 
@@ -578,7 +648,10 @@ export function buildFieldSpecs(config) {
     }
     if (shape.dynamic) spec.dynamic = shape.dynamic;
     if (shape.dictionary) {
-      spec.options = cfg[shape.dictionary] || [];
+      // `optionsFrom` when the vocabulary is DERIVED from the key `dictionary`
+      // names rather than being that key's list (`target`, TL-514); the key is
+      // still what a message points the reader at.
+      spec.options = cfg[shape.optionsFrom || shape.dictionary] || [];
       // The configuration KEY name, not guessed from the field name (TL-50):
       // `status` lives under `statuses`, `priority` under `priorities`. Appending
       // A naive "add an s" produced `statuss:` in the hint — a message pointing
@@ -587,6 +660,8 @@ export function buildFieldSpecs(config) {
     }
     if (shape.suggestFrom) spec.suggest = cfg[shape.suggestFrom] || [];
     if (shape.closedFrom) spec.closed = !!cfg[shape.closedFrom];
+    if (shape.alwaysClosed) spec.closed = true;
+    if (shape.note) spec.note = shape.note;
     if (shape.maxLengthFrom && cfg[shape.maxLengthFrom]) spec.maxLength = cfg[shape.maxLengthFrom];
     // An enum with neither a vocabulary nor a dynamic set would be a field that
     // cannot be set to anything. Such a case behaves like text.
@@ -701,6 +776,7 @@ export function vocabularyUsage(metas, config) {
         field: spec.key,
         fixed: !!spec.fixed,
         dictionary: spec.dictionary || spec.key,
+        note: spec.note || null,
         label: spec.label,
         allowed: spec.options.slice(),
         found: [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([value, count]) => ({ value, count })),
@@ -762,6 +838,8 @@ export function extractMeta(frontmatter) {
     labels: getInlineList("labels"),
     board: get("board") || "",
     epic: get("epic") || "",
+    release: get("release") || "",
+    target: getInlineList("target"),
     priority: get("priority"),
     status: get("status"),
     owner: get("owner"),
@@ -774,6 +852,7 @@ export function extractMeta(frontmatter) {
     blocked_by: getInlineList("blocked_by"),
     blocks: getInlineList("blocks"),
     related_docs: getBlockList("related_docs"),
+    conflict_group: getInlineList("conflict_group"),
   };
 }
 
@@ -787,19 +866,37 @@ export function extractMeta(frontmatter) {
  * a frontmatter line owes the value the same treatment. Five readers each had
  * their own `.replace(/^["\']|["\']$/g, "")` instead, and each returned the
  * comment as part of the value (TL-70).
+ *
  */
 export function stripComment(raw) {
+  const i = commentStart(raw);
+  return (i < 0 ? raw : raw.slice(0, i)).trimEnd();
+}
+
+/**
+ * Where the comment on this line begins, or -1 — the one scan behind both
+ * `stripComment()` and `trailingComment()`, so the reader and the writer cannot
+ * disagree about where a value ends.
+ *
+ * Inside double quotes a backslash escapes the next character (TL-500), the
+ * same pair `unquote()` expands. Read as a closing quote, the `\"` in
+ * `"echo \\\" #literal"` ended the value early and the rest of the command
+ * became a comment. Single quotes need no rule: their escape `''` closes and
+ * reopens the quote, which leaves the hash inside either way.
+ */
+function commentStart(raw) {
   let quote = null;
   for (let i = 0; i < raw.length; i++) {
     const c = raw[i];
     if (quote) {
-      if (c === quote) quote = null;
+      if (quote === '"' && c === "\\") i++;
+      else if (c === quote) quote = null;
       continue;
     }
     if (c === '"' || c === "'") { quote = c; continue; }
-    if (c === "#" && (i === 0 || /\s/.test(raw[i - 1]))) return raw.slice(0, i).trimEnd();
+    if (c === "#" && (i === 0 || /\s/.test(raw[i - 1]))) return i;
   }
-  return raw.trimEnd();
+  return -1;
 }
 
 /** The value without its surrounding quotes. Exported for the same reason as
@@ -833,7 +930,11 @@ export function unquote(s) {
  *        A dynamic field with no supplied set is NOT validated against a
  *        dictionary — better an unchecked board than a viewer that refuses a
  *        board added after it was built.
- * @returns {{ok: boolean, value?: string|string[], error?: string}}
+ * `unknown` names the rejected value and the declared set when the value is
+ * outside the field's vocabulary (TL-543), as opposed to a malformed one.
+ *
+ * @returns {{ok: boolean, value?: string|string[], error?: string,
+ *            unknown?: {value: string, declared: string[]}}}
  */
 export function normalizeValue(key, value, ctx) {
   const spec = fieldSpec(key, (ctx && ctx.fields) || []);
@@ -848,7 +949,15 @@ export function normalizeValue(key, value, ctx) {
     for (const item of items) {
       if (item.indexOf("\n") >= 0) return { ok: false, error: "A value cannot contain a newline" };
       if (spec.closed && spec.options && spec.options.indexOf(item) < 0) {
-        return { ok: false, error: "Unknown value \"" + item + "\" — allowed: " + spec.options.join(", ") };
+        // An empty closed vocabulary would print "allowed: " and nothing after
+        // it; the key to declare is the honest answer there.
+        const allowed = spec.options.length
+          ? "allowed: " + spec.options.join(", ")
+          : "`" + (spec.dictionary || spec.key) + ":` in config.yaml declares nothing this field may name";
+        return {
+          ok: false, error: "Unknown value \"" + item + "\" — " + allowed + (spec.note ? " (" + spec.note + ")" : ""),
+          unknown: { value: item, declared: spec.options.slice() },
+        };
       }
       if (spec.itemPattern && !new RegExp(spec.itemPattern).test(item)) {
         return { ok: false, error: "\"" + item + "\" does not match the format " + (spec.itemHint || spec.itemPattern) };
@@ -875,12 +984,13 @@ export function normalizeValue(key, value, ctx) {
       error: "Unknown value \"" + raw + "\" — `" + (spec.dictionary || spec.key) +
         ":` is not declared in config.yaml, so this backlog does not use " +
         (spec.label || spec.key).toLowerCase() + "s",
+      unknown: { value: raw, declared: [] },
     };
   }
   if (spec.kind === "enum" && dictionary && dictionary.length) {
     if (raw === "" && spec.allowEmpty) return { ok: true, value: raw };
     if (dictionary.indexOf(raw) < 0) {
-      return { ok: false, error: "Unknown value \"" + raw + "\" — allowed: " + dictionary.join(", ") };
+      return { ok: false, error: "Unknown value \"" + raw + "\" — allowed: " + dictionary.join(", "), unknown: { value: raw, declared: dictionary.slice() } };
     }
   }
   return { ok: true, value: raw };
@@ -934,7 +1044,11 @@ export function setFrontmatterField(text, key, value, spec) {
   if (!match) throw new Error("The file has no YAML frontmatter");
   const [, open, fm, close, body] = match;
 
-  const lines = fm.split("\n");
+  // The edited lines are joined with the ending the file opens with (TL-479).
+  // Splitting on "\n" alone kept a `\r` on every untouched line and none on the
+  // rewritten one, so a CRLF checkout came back with mixed endings.
+  const eol = lineEnding(open);
+  const lines = fm.split(/\r?\n/);
   const topLevelKey = (line) => {
     const m = line.match(/^([A-Za-z_][A-Za-z0-9_-]*):/);
     return m ? m[1] : null;
@@ -968,18 +1082,31 @@ export function setFrontmatterField(text, key, value, spec) {
     lines.splice(insertAt, 0, ...newLines);
   }
 
-  return open + lines.join("\n") + close + body;
+  return open + lines.join(eol) + close + body;
 }
 
+/**
+ * The line ending a text uses, judged by its FIRST line break: `"\r\n"` or
+ * `"\n"` (TL-479). Git with `core.autocrlf=true` checks a whole file out in one
+ * ending, so the first break speaks for the rest; a text with no break at all
+ * answers LF, which is what the tool writes when nothing says otherwise.
+ */
+export function lineEnding(text) {
+  const i = String(text == null ? "" : text).indexOf("\n");
+  return i > 0 && text[i - 1] === "\r" ? "\r\n" : "\n";
+}
+
+/** Every line break of `text` written as `eol`, whatever it was before. */
+export function withLineEnding(text, eol) {
+  const lf = String(text == null ? "" : text).replace(/\r\n/g, "\n");
+  return eol === "\r\n" ? lf.replace(/\n/g, "\r\n") : lf;
+}
+
+/** The comment beside a field, kept when `setFrontmatterField` rewrites the
+ *  value. A whole line is passed, so column 0 is the key and never a comment. */
 function trailingComment(line) {
-  let quote = null;
-  for (let i = 0; i < line.length; i++) {
-    const c = line[i];
-    if (quote) { if (c === quote) quote = null; continue; }
-    if (c === '"' || c === "'") { quote = c; continue; }
-    if (c === "#" && i > 0 && /\s/.test(line[i - 1])) return line.slice(i).trimEnd();
-  }
-  return "";
+  const i = commentStart(line);
+  return i > 0 ? line.slice(i).trimEnd() : "";
 }
 
 // ──────────────────────────────────────────────────────────────────────────

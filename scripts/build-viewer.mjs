@@ -32,6 +32,8 @@ import { PRODUCT_NAME as N, STORAGE_KEY_PREFIX } from "./product.mjs";
 import { printLine } from "./stdout.mjs";
 import { faviconDataUri, headerMarkSvg } from "./brand-mark.mjs";
 import { refusal } from "./ui.mjs";
+import { releaseViewData } from "./release-view.mjs";
+import { RELEASE_CSS } from "./viewer-release.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -407,8 +409,16 @@ export function buildHtml(
   const viewerPlanModuleSrc = readModuleSource("viewer-plan.mjs");
   // The decision panel reads `openQuestions` from task-fields.mjs, pasted above.
   const decisionPanelModuleSrc = readModuleSource("decision-panel.mjs");
-  const taskGraphModuleSrc = readModuleSource("task-graph.mjs");
   const historyJson = JSON.stringify(history).replace(/</g, "\\u003c");
+  // THE RELEASE VIEW (TL-504): where each task stands in each deploy target's
+  // promotion, read from git NOW and carried with the time it was read. Ids
+  // only — the page takes titles from ALL_TASKS. A project with no
+  // `deploy_targets` reads nothing and shows no tab.
+  const release = config.root
+    ? releaseViewData({ root: config.root, config, tasks })
+    : releaseViewData({ root: null, config: { ...config, deployTargets: [] }, tasks });
+  const releaseJson = JSON.stringify(release).replace(/</g, "\\u003c");
+  const viewerReleaseModuleSrc = readModuleSource("viewer-release.mjs");
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -1570,6 +1580,7 @@ ${paletteBadgeCss}
     overflow-x: auto;
   }
 
+${RELEASE_CSS}
   /* ─── Waiting on you (TL-115) ────────────────────────────────────── */
   .decisions-view { display: none; }
   body.view-decisions main.app-main { display: none; }
@@ -1818,6 +1829,7 @@ ${paletteBadgeCss}
       <button type="button" class="view-tab is-active" data-view="tasks">Tasks</button>
       <button type="button" class="view-tab" data-view="execution">Execution</button>
       <button type="button" class="view-tab" data-view="decisions" id="tabDecisions">Waiting on you</button>
+      <button type="button" class="view-tab" data-view="release" id="tabRelease"${release.reason === "no-targets" ? " hidden" : ""}>Release</button>
       <button type="button" class="copy-link-btn" id="btnCopyLink"
               title="Copies the address of this view — filters, search, sort, board and the selected task">⧉ Copy link</button>
     </nav>
@@ -1866,6 +1878,7 @@ ${paletteBadgeCss}
 
 <section class="execution-view" id="executionView"></section>
 <section class="decisions-view" id="decisionsView"></section>
+<section class="release-view" id="releaseView"></section>
 
 <script>
 // EVERY KEY THIS PAGE WRITES INTO THE BROWSER (TL-178). One prefix, injected
@@ -1915,18 +1928,17 @@ ${planModuleSrc}
 ${viewerPlanModuleSrc}
 // ─── end of the pasted module ─────────────────────────────────────────
 
+// ─── Pasted source of scripts/viewer-release.mjs (TL-504) ────────────
+// The Release view: the model and the HTML, tested by
+// node --test scripts/tests/viewer-release.test.mjs.
+${viewerReleaseModuleSrc}
+// ─── end of the pasted module ─────────────────────────────────────────
+
 // ─── Pasted source of scripts/decision-panel.mjs (TL-115) ────────────
 // What hangs on a person's decision — computed from the tasks and the history,
 // with no stored state of its own. Tested by
 // node --test scripts/tests/decision-panel.test.mjs.
 ${decisionPanelModuleSrc}
-// ─── end of the pasted module ─────────────────────────────────────────
-
-// ─── Pasted source of scripts/task-graph.mjs (TL-116) ────────────────
-// One task's history folded into a graph, and the SVG for it. Nothing is
-// stored — delete it and a rebuild brings it back. Tested by
-// node --test scripts/tests/task-graph.test.mjs.
-${taskGraphModuleSrc}
 // ─── end of the pasted module ─────────────────────────────────────────
 
 
@@ -1958,6 +1970,9 @@ const CONFIG = ${configJson};
 // The plan file as it was read from disk. Mutable: the server hands a fresh copy
 // back on /api/tasks, so an edit to plan.yaml reaches an open tab.
 let PLAN = ${planJson};
+// Deployment state as git showed it at build time (TL-504). Not refreshed by
+// /api/tasks: it is read from refs, not task files, and the view prints when.
+const RELEASE = ${releaseJson};
 
 // The id prefix is a PROJECT value (BL-1452), and the client had it hardcoded in
 // three places (TL-44): the file filter when reading from disk and two sorts by
@@ -1977,8 +1992,9 @@ const state = {
   filterLabel: new Set(),
   filterEnv: new Set(),   // the values of the label_axis_env axis plus "n/a"
   filterEpic: new Set(),  // values: epic name | NO_EPIC constant
+  filterRelease: new Set(), // values: a planned release | NO_RELEASE (TL-511)
   sortBy: "priority",     // "priority" | "id_asc" | "id_desc"
-  view: "tasks",          // "tasks" | "execution" | "decisions"
+  view: "tasks",          // "tasks" | "execution" | "decisions" | "release"
   // The panel's own filter: "" = everything, "mine" = rows naming this actor.
   // The moment the replay is showing (TL-91): an ISO instant, or null for the
   // last one the log covers. A moment and not a day — everything within one day
@@ -1996,11 +2012,6 @@ const state = {
   reasonAsk: null,
   editMessage: "",
   editError: false,
-  historyOpen: false,
-  // The change graph (TL-116) is closed by default: a reader who opened a task
-  // to change a field must not have to scroll past a picture to reach it.
-  graphOpen: false,
-  historyField: null,     // narrows the history list to one field
   // The scope, not a filter: BOARD_ALL or a board slug. Kept apart from
   // the filter* fields, because clearing the filters must not clear it — this is
   // the context of the work, not a narrowing inside that context.
@@ -2524,6 +2535,14 @@ const FILTER_SPECS = [
       return opts;
     },
   },
+  {
+    // The release a task is PLANNED for (TL-511), from \`releases:\` in
+    // config.yaml. Options and predicate live in viewer-release.mjs, pasted
+    // above; no releases declared means no options, so no facet.
+    key: "filterRelease", param: RELEASE_FILTER_PARAM, label: "Release",
+    match: releaseFacetMatch,
+    options: () => releaseFacetOptions(CONFIG.releases),
+  },
 ];
 
 const FILTER_KEYS = FILTER_SPECS.map(s => s.key);
@@ -3022,33 +3041,9 @@ function selectTask(id) {
 
 // ─── Task detail ──────────────────────────────────────────────────────
 //
-// Every field is text. Nothing here writes (TL-379).
+// Every field is text. The static page writes nothing (TL-379); the live
+// server grants writes through the field editors below (TL-450).
 
-
-const HISTORY_FIELD_LABELS = {
-  __created__: "task created",
-  __deleted__: "task deleted",
-  __body__: "task body",
-  __comment__: "comment",
-  __decision__: "decision",
-  __verified__: "manual verification vouched for",
-  // TL-130: somebody claiming a change the log had recorded as nobody's. The
-  // earlier row still says "unknown", and this one stands beside it.
-  __attributed__: "claimed as their own change",
-  // TL-387: the fields a reconciliation absorbed with no reference point to
-  // compare them against. The entry's "to" is the list of those fields.
-  __adopted__: "adopted with no reference point",
-  __role_override__: "taken outside its role",
-  __takeover__: "claim taken over",
-  updated: "Updated",
-  created: "Created",
-};
-
-// ─── History ──────────────────────────────────────────────────────────
-// The history is fetched ONCE per task and redrawn only when it really changed.
-// An unconditional renderDetail() after every fetch made a loop
-// (render → fetch → render) that wiped an open editor while somebody was typing.
-const historyLoaded = {};
 // ─── The live signal (TL-189) ──────────────────────────────────────
 //
 // The server holds the raw log; this side holds only the reduced signal and the
@@ -3059,11 +3054,6 @@ const historyLoaded = {};
 // exists instead of. The tick only re-reads a clock.
 const IN_FLIGHT_TICK_MS = 30000;
 
-function histTime(ts) {
-  const m = String(ts || "").match(/T(\\d{2}:\\d{2})/);
-  return m ? m[1] : "";
-}
-
 // ─── Field editors ──────────────────────────────────────────────
 const CAN_EDIT = SERVER_MODE && !!window.VIEWER_WRITE;
 
@@ -3073,7 +3063,7 @@ function reasonRequiredFor(field, value) {
 
 function fieldLabel(key) {
   const spec = fieldSpec(key, FIELDS);
-  return spec ? spec.label : (HISTORY_FIELD_LABELS[key] || key);
+  return spec ? spec.label : key;
 }
 
 function dynamicOptions() {
@@ -3213,23 +3203,6 @@ function metaRowHtml(t, spec) {
 }
 
 // ─── Detail render ────────────────────────────────────────────────────
-// ONE listener rather than one per node: the detail panel is re-rendered
-// wholesale on every edit and every SSE refresh, so per-node handlers would be
-// re-bound each time. A click narrows the history list to that node's field —
-// the filter mechanism the list already has, rather than a second one.
-document.addEventListener("click", function (e) {
-  const node = e.target.closest && e.target.closest("[data-graph-node]");
-  if (!node || !state.selectedId) return;
-  openHistory(state.selectedId, node.dataset.graphField);
-});
-document.addEventListener("keydown", function (e) {
-  if (e.key !== "Enter" && e.key !== " ") return;
-  const node = e.target.closest && e.target.closest("[data-graph-node]");
-  if (!node || !state.selectedId) return;
-  e.preventDefault();
-  openHistory(state.selectedId, node.dataset.graphField);
-});
-
 function renderDetail() {
   const el = document.getElementById("taskDetail");
   const t = TASKS.find(function (x) { return x.id === state.selectedId; });
@@ -3730,15 +3703,40 @@ document.getElementById("decisionsView").addEventListener("keydown", (e) => {
 // every task that has always sat where it sits — and the missing cards would
 // look exactly like a quiet week.
 
+// ─── Release view (TL-504) ────────────────────────────────────────────
+// Unlike Execution, this view IS narrowed by the board and the filters: a
+// release question is asked about a slice ("what of the Legal epic is in
+// production"), and a task's columns do not depend on the other tasks.
+function releaseVisible() {
+  const narrowed = state.board !== BOARD_ALL || !!state.search || FILTER_SPECS.some((s) => state[s.key].size);
+  return narrowed ? new Set(getFilteredTasks().map((t) => t.id)) : null;
+}
+
+function renderRelease_() {
+  const vm = releaseViewModel(RELEASE, { tasks: ALL_TASKS, visible: releaseVisible(), search: state.search, planned: [...state.filterRelease], now: Date.now() });
+  document.getElementById("releaseView").innerHTML = renderRelease(vm);
+  releaseSyncHash();
+}
+
+function releaseSyncHash() {
+  if (!hashRouted || state.view !== "release") return;
+  const v = tasksViewState();
+  const next = "#" + encodeReleaseHash({ board: v.board, filters: v.filters, search: v.search });
+  if (window.location.hash === next) return;
+  history.replaceState(null, "", window.location.pathname + window.location.search + next);
+}
+
 function setView(view) {
   state.view = view;
   document.body.classList.toggle("view-execution", view === "execution");
   document.body.classList.toggle("view-decisions", view === "decisions");
+  document.body.classList.toggle("view-release", view === "release");
   for (const btn of document.querySelectorAll(".view-tab")) {
     btn.classList.toggle("is-active", btn.dataset.view === view);
   }
   if (view === "execution") renderExecution_();
   if (view === "decisions") renderDecisions();
+  if (view === "release") renderRelease_();
 }
 
 // ─── Render all ───────────────────────────────────────────────────────
@@ -3756,6 +3754,7 @@ function render() {
   // shows.
   if (state.view === "execution") renderExecution_();
   else if (state.view === "decisions") renderDecisions();
+  else if (state.view === "release") renderRelease_();
   // The one place where the list rewrites the URL: every change of a filter, a
   // chip, the sorting and the scope ends up here anyway, so there is no route by
   // which the state changes without a link (except the search — that renders cards only).
@@ -3782,6 +3781,13 @@ function handleHash() {
   if (id === "execution") {
     if (state.view !== "execution") setView("execution");
     else renderExecution_();
+    return;
+  }
+  if (isReleaseHash(id)) {
+    // The same parameters as the tasks link, so a filter means one thing on both tabs.
+    tasksApplyHash(qi < 0 ? "" : raw.slice(qi + 1));
+    if (state.view !== "release") setView("release");
+    render();
     return;
   }
   if (isTasksHash(id)) {
@@ -3869,6 +3875,7 @@ for (const btn of document.querySelectorAll(".view-tab")) {
     setView(v);
     if (v === "execution") window.location.hash = "execution";
     else if (v === "decisions") window.location.hash = "decisions";
+    else if (v === "release") releaseSyncHash();
     else tasksSyncHash();
   });
 }
@@ -3903,6 +3910,7 @@ handleHash();
 // form that can be copied from the address bar and sent.
 hashRouted = true;
 tasksSyncHash();
+releaseSyncHash();
 updateConnectionBar();
 
 // Server mode: already live at first paint (the page is rendered from a fresh

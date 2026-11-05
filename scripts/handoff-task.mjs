@@ -57,13 +57,13 @@ import { chmodSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSyn
 import { dirname, isAbsolute, join, relative, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { resolveActor } from "./actor.mjs";
+import { actorRequiredRefusal, resolveActorReport } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { ACTOR_NAMESPACES, appendEntries, currentSession, eventId, FIELD_COMMENT, isValidActor, normalizeReason, readHistory, reasonRefusal, recordEdit } from "./history.mjs";
+import { ACTOR_NAMESPACES, appendEntries, currentSession, eventId, FIELD_COMMENT, isValidActor, normalizeReason, openQuestions, questionIdFromReason, readHistory, reasonRefusal, recordEdit } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { isExpired, lockDir, readLock, releaseLock } from "./lock.mjs";
 import { queueStatuses } from "./next-task.mjs";
-import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
+import { backlogPaths, BACKLOG_DIR_REFUSAL_EXIT, isBacklogDirRefusal, resolveBacklogDir } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { inProgressStatus } from "./take-task.mjs";
 import { todayStamp } from "./today.mjs";
@@ -73,7 +73,7 @@ import { MARK, color, failure } from "./ui.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-export const HANDOFF_FLAGS = ["--dir", "--actor", "--to-role", "--to-owner", "--reason", "--with", "--status", "--json"];
+export const HANDOFF_FLAGS = ["--dir", "--actor", "--to-role", "--to-owner", "--reason", "--with", "--status", "--json", "--require-actor"];
 
 /**
  * Exact repository-relative files the receiving hand may change. PURE.
@@ -123,12 +123,13 @@ export function resolveHandoffFiles(rawFiles) {
 export function parseHandoffArgs(args) {
   const plan = {
     id: null, dir: null, actor: null, toRole: null, toOwner: null,
-    reason: null, files: [], status: null, json: false,
+    reason: null, files: [], status: null, json: false, requireActor: false,
   };
   const key = { "--to-role": "toRole", "--to-owner": "toOwner" };
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === "--json") { plan.json = true; continue; }
+    if (a === "--require-actor") { plan.requireActor = true; continue; }
     if (a === "--with") {
       const value = args[++i];
       if (value === undefined) throw new Error("`--with` with no value");
@@ -175,14 +176,24 @@ export function parseHandoffArgs(args) {
 }
 
 /**
- * Which status a task goes back to when it stops being in progress. PURE.
+ * Which status a task goes back to when it leaves `leaving` — the in-progress
+ * status for `handoff` and `release`, the blocking status for `decide`. PURE.
  *
  * FIRST, WHERE IT CAME FROM. `take` recorded the transition it made, so the
  * history already holds the answer for this exact task: the `from` of the most
- * recent change INTO the in-progress status. Restoring it is not a choice the
- * tool is making — it is undoing one, which is the whole of what putting a task
- * down means. A `blocked` task that somebody took goes back to `blocked`, and
+ * recent change INTO `leaving`. Restoring it is not a choice the tool is
+ * making — it is undoing one, which is the whole of what putting a task down
+ * means. A `blocked` task that somebody took goes back to `blocked`, and
  * nothing has to decide whether that was a good idea.
+ *
+ * TWO `from` VALUES ARE NOT SOMEWHERE TO GO BACK TO (TL-490). The in-progress
+ * status is never one: `ask` clears the owner as it blocks, so restoring
+ * in-progress after the answer leaves a task claimed by nobody, which neither
+ * `next` nor `run` will ever hand out. Nor is a protected status entered for
+ * a question that has since been answered: the stop it recorded is over, and
+ * restoring it would re-block the task on nothing. Both fall through to the
+ * vocabulary below. A protected status entered for any OTHER reason is still
+ * restored — nothing here knows that the reason has passed.
  *
  * ONLY THEN THE VOCABULARY. With no such record — a task set in progress by hand
  * before anybody ran `history` — we fall back to the statuses `next` is willing
@@ -192,17 +203,22 @@ export function parseHandoffArgs(args) {
  *
  * @param {object} config
  * @param {object[]} entries this task's history, oldest first
- * @param {string} inProgress the status the task is leaving
+ * @param {string} leaving the status the task is leaving
  * @returns {{status: string, from: string}|{ambiguous: string[]}}
  */
-export function requeueStatus(config, entries, inProgress) {
+export function requeueStatus(config, entries, leaving) {
+  const list = entries || [];
   const active = new Set(config.activeStatuses || []);
-  for (let i = (entries || []).length - 1; i >= 0; i--) {
-    const e = entries[i];
-    if (!e || e.field !== "status" || e.to !== inProgress) continue;
+  const inProgress = inProgressStatus(config);
+  for (let i = list.length - 1; i >= 0; i--) {
+    const e = list[i];
+    if (!e || e.field !== "status" || e.to !== leaving) continue;
     // A status renamed since the entry was written is no longer somewhere a task
     // can be put; the vocabulary decides, not a value frozen in an old row.
-    if (typeof e.from === "string" && e.from !== inProgress && active.has(e.from)) {
+    if (
+      typeof e.from === "string" && e.from !== leaving && e.from !== inProgress &&
+      active.has(e.from) && !answeredBlock(config, list, i, e.from)
+    ) {
       return { status: e.from, from: "history" };
     }
     break;
@@ -210,6 +226,24 @@ export function requeueStatus(config, entries, inProgress) {
   const queue = queueStatuses(config);
   if (queue.length === 1) return { status: queue[0], from: "vocabulary" };
   return { ambiguous: queue };
+}
+
+/**
+ * Whether `status` is a protected one whose stop, as of entry `before`, was a
+ * question that nothing in the log leaves open any more. "Nothing open" rather
+ * than "the named question is answered" for the reason `liftQuestionBlock` in
+ * decide-task.mjs gives: a second `ask` changes no status, so the reason in
+ * force still names the first question.
+ */
+function answeredBlock(config, entries, before, status) {
+  const archived = config.archivedStatuses || [];
+  if ((config.reasonRequiredStatuses || []).indexOf(status) < 0 || archived.indexOf(status) >= 0) return false;
+  for (let i = before - 1; i >= 0; i--) {
+    const e = entries[i];
+    if (!e || e.field !== "status" || e.to !== status) continue;
+    return !!questionIdFromReason(e.reason) && openQuestions(entries).length === 0;
+  }
+  return false;
 }
 
 /**
@@ -523,7 +557,17 @@ export function run(argv) {
     return 2;
   }
 
-  const actor = resolveActor(plan.actor);
+  // WHERE THE ACTOR CAME FROM travels with the answer (TL-544); a handoff a
+  // person makes through an interface refuses the default under
+  // `--require-actor`, before anything is written.
+  const resolved = resolveActorReport(plan.actor);
+  const { actor, actorSource } = resolved;
+  const required = actorRequiredRefusal(plan.requireActor, resolved, "hands the task off");
+  if (required) {
+    if (plan.json) printJson("task-handoff", { ok: false, id: plan.id, actorSource, ...required });
+    else console.error(failure(N + " handoff", required.refusal, required.details));
+    return 1;
+  }
   if (!isValidActor(actor)) {
     return fail2("the actor `" + actor + "` has no valid namespace", [
       "Use one of: " + ACTOR_NAMESPACES.map((n) => n + ":<name>").join(" | "),
@@ -536,7 +580,9 @@ export function run(argv) {
   try {
     root = resolveBacklogDir({ dir: plan.dir || undefined, moduleDir: __dirname }).root;
   } catch (e) {
-    return fail2(e.message, []);
+    if (!isBacklogDirRefusal(e)) throw e;
+    console.error(failure(N + " handoff", e.message, e.details || [], [N + " handoff --help"]));
+    return BACKLOG_DIR_REFUSAL_EXIT;
   }
   const config = loadConfigOrExit(root);
 
@@ -576,7 +622,7 @@ export function run(argv) {
   if (!result.ok) {
     if (plan.json) {
       printJson("task-handoff", {
-        ok: false, id: result.id || plan.id, refusalKind: result.kind,
+        ok: false, id: result.id || plan.id, actorSource, refusalKind: result.kind,
         refusal: result.message, details: result.details || [],
       });
     } else {
@@ -588,7 +634,7 @@ export function run(argv) {
   if (!rebuildViews(root)) {
     console.error(failure(N + " handoff", "the views were not rebuilt — run `" + N + " build` yourself", []));
   }
-  if (plan.json) printJson("task-handoff", handoffJson(result));
+  if (plan.json) printJson("task-handoff", { ...handoffJson(result), actorSource });
   else console.log(renderHandoff(result));
   return 0;
 }

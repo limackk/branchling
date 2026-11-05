@@ -37,7 +37,7 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, statSync } from "node
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { repositoryRoot, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { repositoryRoot, BACKLOG_DIR_REFUSAL_EXIT, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { MARK, color, failure, refusal } from "./ui.mjs";
 
@@ -160,8 +160,9 @@ export function main(argv) {
   try {
     backlog = resolveBacklogDir({ dir: cli.dir || undefined, moduleDir: HERE }).root;
   } catch (e) {
-    console.error(failure(N + " skills install", e.message, []));
-    return 2;
+    if (!isBacklogDirRefusal(e)) throw e;
+    console.error(failure(N + " skills install", e.message, e.details || []));
+    return BACKLOG_DIR_REFUSAL_EXIT;
   }
 
   const result = installSkills(repositoryRoot(backlog), {

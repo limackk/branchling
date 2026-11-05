@@ -32,7 +32,7 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } fro
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { FIELD_COMMENT, historyEntryKind } from "../task-fields.mjs";
+import { FIELD_COMMENT, FIELD_DECISION, historyEntryKind } from "../task-fields.mjs";
 import { appendEntries, eventId, readHistory } from "../history.mjs";
 import { requeueStatus } from "../handoff-task.mjs";
 import { SCRIPTS_DIR, alignTemplate, isolateHome } from "./_repo.mjs";
@@ -412,6 +412,106 @@ test("the requeue status comes from where the task was TAKEN from", () => {
   // With one candidate the vocabulary answers on its own, history or not.
   const narrow = { ...config, reasonRequiredStatuses: ["blocked", "done"] };
   assert.deepEqual(requeueStatus(narrow, [], "in_progress"), { status: "pending", from: "vocabulary" });
+});
+
+// ── An answered question returns the task to the queue (TL-490) ───────────
+
+/** A vocabulary of the fixture's own, so the queue, the in-progress and the
+ *  blocking status are three values no project's config happens to share. */
+const QUEUE_VOCABULARY = [
+  "statuses: [queued, working, held, finished, dropped]",
+  "archived_statuses: [finished, dropped]",
+  "reason_required_statuses: [held, dropped]",
+  "in_progress_status: working",
+  "dashboard_open_statuses: [queued, working, held]",
+  ROLES,
+].join("\n");
+
+function askQuestion(dir, id) {
+  const r = run(dir, ["ask", id, "--dir", ".", "--actor", "agent:worker",
+    "--question", "which of the two layouts?", "--json"]);
+  assert.equal(r.status, 0, r.stderr);
+  return JSON.parse(r.stdout).question.id;
+}
+
+function decideQuestion(dir, id, qid) {
+  const r = run(dir, ["decide", id, "--dir", ".", "--actor", "user:reviewer",
+    "--resolves", qid, "--reason", "the second layout"]);
+  assert.equal(r.status, 0, r.stderr);
+}
+
+/** Queued AND handed out: the status alone would pass against a dispatcher
+ *  that skipped the task for some other reason, such as a stale owner. */
+function assertHandedOutAgain(dir, id) {
+  const text = read(dir, id);
+  assert.equal(field(text, "status"), "queued", "the task did not return to the queue");
+  const next = run(dir, ["next", "--dir", ".", "--actor", "agent:second", "--json"]);
+  assert.equal(next.status, 0, next.stderr);
+  assert.equal(JSON.parse(next.stdout).id, id, "the requeued task is not handed out again");
+}
+
+test("the requeue status is never in progress, nor a block whose question is answered", () => {
+  const config = {
+    statuses: ["queued", "working", "held", "finished"],
+    activeStatuses: ["queued", "working", "held"],
+    archivedStatuses: ["finished"], reasonRequiredStatuses: ["held", "finished"], inProgressStatus: "working",
+  };
+  const question = { id: "01JQ0000000000000000000000", field: FIELD_COMMENT, source: "ask", to: "which?" };
+  const blockedOn = { field: "status", from: "working", to: "held", reason: "waiting for an answer to " + question.id };
+
+  // Leaving the block `ask` entered from in progress: in progress is skipped.
+  const asked = [{ field: "status", from: "queued", to: "working" }, question, blockedOn];
+  assert.deepEqual(requeueStatus(config, asked, "held"), { status: "queued", from: "vocabulary" });
+
+  // Leaving in progress after taking an answered block: the block is skipped…
+  const answered = [
+    { field: "status", from: "queued", to: "held", reason: blockedOn.reason }, question,
+    { field: "status", from: "held", to: "working" },
+    { field: FIELD_DECISION, resolves: question.id, to: "the second" },
+  ];
+  assert.deepEqual(requeueStatus(config, answered, "working"), { status: "queued", from: "vocabulary" });
+
+  // …but not while the question is still open, and not for a block that was
+  // never a question — nothing says those stops are over.
+  assert.deepEqual(requeueStatus(config, answered.slice(0, 3), "working"), { status: "held", from: "history" });
+  const byHand = [{ field: "status", from: "queued", to: "held", reason: "the vendor is late" },
+    { field: "status", from: "held", to: "working" }];
+  assert.deepEqual(requeueStatus(config, byHand, "working"), { status: "held", from: "history" });
+});
+
+test("take, ask, decide: the task is queued with no owner, and handed out again", () => {
+  const dir = repo(QUEUE_VOCABULARY);
+  const id = newTask(dir, "Sort the deeds");
+  assert.equal(run(dir, ["take", id, "--dir", ".", "--actor", "agent:worker"]).status, 0);
+  decideQuestion(dir, id, askQuestion(dir, id));
+  assert.match(field(read(dir, id), "owner"), /^(""|unassigned)?$/, "an owner survived the question");
+  assertHandedOutAgain(dir, id);
+});
+
+test("take, ask, decide, take, release: the release returns it to the queue", () => {
+  const dir = repo(QUEUE_VOCABULARY);
+  const id = newTask(dir, "Sort the deeds");
+  assert.equal(run(dir, ["take", id, "--dir", ".", "--actor", "agent:worker"]).status, 0);
+  decideQuestion(dir, id, askQuestion(dir, id));
+  assert.equal(run(dir, ["take", id, "--dir", ".", "--actor", "agent:worker"]).status, 0);
+  const r = run(dir, ["release", id, "--dir", ".", "--actor", "agent:worker", "--reason", "Out of time."]);
+  assert.equal(r.status, 0, r.stderr);
+  assertHandedOutAgain(dir, id);
+});
+
+test("a task blocked by a question before it was taken is released to the queue once answered", () => {
+  const dir = repo(QUEUE_VOCABULARY);
+  const id = newTask(dir, "Sort the deeds");
+  const qid = askQuestion(dir, id);
+  const taken = run(dir, ["take", id, "--dir", ".", "--actor", "agent:worker"]);
+  assert.equal(taken.status, 0, taken.stderr);
+  // POSITIVE CONTROL: the history's own answer here is `held`, so a queue
+  // result below is the rule speaking, not an empty log.
+  assert.equal(history(dir, id).filter((e) => e.field === "status" && e.to === "working").pop().from, "held");
+  decideQuestion(dir, id, qid);
+  const r = run(dir, ["release", id, "--dir", ".", "--actor", "agent:worker", "--reason", "Out of time."]);
+  assert.equal(r.status, 0, r.stderr);
+  assertHandedOutAgain(dir, id);
 });
 
 test("with two queue statuses the command refuses and names them; `--status` settles it", () => {

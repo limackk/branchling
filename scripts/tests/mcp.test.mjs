@@ -290,6 +290,27 @@ test("the commands that must not be tools are not tools, and say why", () => {
   assert.ok(exposedCommands().length > Object.keys(NOT_EXPOSED).length * 3);
 });
 
+test("`follow` is not a tool, so a call to it cannot block the server", () => {
+  // TL-529: every call runs under spawnSync with no timeout, and `follow`
+  // without --max-events never exits. Exposed, one call would hang the stdio
+  // server and leave every later request unanswered. Asserted by name, not
+  // only through the loop above, so removing it from NOT_EXPOSED fails here.
+  assert.ok(Object.prototype.hasOwnProperty.call(COMMANDS, "follow"), "follow is not a command any more");
+  assert.ok(!toolsList().map((t) => t.name).includes(toolName("follow")), "follow is exposed as a tool");
+  // A call to it is refused as an unknown tool and the server keeps answering.
+  // rpc() carries its own timeout, so a regression fails instead of hanging.
+  const fx = fixture();
+  try {
+    const out = rpc([call(toolName("follow"), {}, 1), { jsonrpc: "2.0", id: 2, method: "tools/list" }], fx);
+    assert.equal(out.length, 2, "the server stopped answering after the follow call");
+    assert.equal(out[0].error.code, -32602, "a call to follow was not refused as an unknown tool");
+    // POSITIVE CONTROL: the request after it is answered with the real list.
+    assert.ok(out[1].result.tools.some((t) => t.name === toolName("query")));
+  } finally {
+    rmSync(fx.dir, { recursive: true, force: true });
+  }
+});
+
 // ── The reservation ───────────────────────────────────────────────────────
 
 test("`take` over MCP leaves the same lock, and a bare actor is refused", () => {

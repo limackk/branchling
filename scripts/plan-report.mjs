@@ -40,7 +40,7 @@ import { printJson } from "./json-envelope.mjs";
 import { backlogPaths, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { loadPlan, planState, validatePlan } from "./plan.mjs";
 import { readHistory } from "./history.mjs";
-import { EDIT_SUBCOMMANDS, runPlanEdit } from "./plan-write.mjs";
+import { EDIT_SUBCOMMANDS, runPlanEdit, runPlanInit } from "./plan-write.mjs";
 import { reportPlanErrors } from "./check-backlog-plan.mjs";
 import { readTaskMetas } from "./task-io.mjs";
 import { MARK, color, failure, heading, refusal, statusPaint, table, width } from "./ui.mjs";
@@ -175,9 +175,10 @@ function main(argv) {
   // An unknown word FAILS — a silent no-op looks like it worked.
   const first = argv[0];
   if (first !== undefined && !first.startsWith("-")) {
+    if (first === "init") return runPlanInit(argv.slice(1));
     if (EDIT_SUBCOMMANDS.indexOf(first) < 0) {
       console.error(failure(N + " plan", "unknown subcommand: " + first,
-        ["available: " + EDIT_SUBCOMMANDS.join(", ") + ", or no subcommand at all to READ the plan"],
+        ["available: init, " + EDIT_SUBCOMMANDS.join(", ") + ", or no subcommand at all to READ the plan"],
         [N + " plan --help"]));
       return 2;
     }
@@ -203,7 +204,7 @@ function main(argv) {
     // made it is in a legitimate state, and exit 1 here would turn "we have no
     // plan" into something a CI job fails on.
     if (asJson) {
-      printJson("plan", { root, exists: false, inProgressStatus: config.inProgressStatus || null });
+      printJson("plan", { ok: true, root, exists: false, inProgressStatus: config.inProgressStatus || null });
       return 0;
     }
     console.log(
@@ -213,23 +214,38 @@ function main(argv) {
     return 0;
   }
 
-  if (loaded.problems.length) {
-    reportPlanErrors(loaded.problems);
+  // A plan that cannot be read or cannot be executed is a REFUSAL, and under
+  // `--json` it is still an envelope (TL-534): an empty stdout read as the
+  // consumer's own error, and an unreadable file used to answer an empty plan.
+  const refuse = (refusalKind, problems, sentence) => {
+    reportPlanErrors(problems);
+    if (asJson) {
+      printJson("plan", {
+        ok: false, root, exists: true, inProgressStatus: config.inProgressStatus || null,
+        refusalKind, refusal: sentence, problems,
+      });
+    }
     return 1;
+  };
+
+  if (loaded.problems.length) {
+    return refuse("plan-unparsable", loaded.problems,
+      backlogPaths(root).planPath + " cannot be read as a plan");
   }
 
   const tasks = readTaskMetas(backlogPaths(root).tasksDir, config);
   for (const task of tasks) task.history = readHistory(root, task.id);
   const audit = validatePlan(loaded.plan, tasks, config);
   if (audit.errors.length) {
-    reportPlanErrors(audit.errors);
-    return 1;
+    return audit.blockedBy.length
+      ? refuse("plan-contradicts-blocked-by", audit.errors, "the plan puts a task before what it is blocked by, so the order cannot be executed")
+      : refuse("plan-contradicts-tree", audit.errors, "the plan names tasks the tree does not hold as it says");
   }
 
   const state = planState(loaded.plan, tasks, config);
 
   if (asJson) {
-    printJson("plan", { root, exists: true, ...state });
+    printJson("plan", { ok: true, root, exists: true, ...state });
     return 0;
   }
   console.log(renderPlan(state, config));

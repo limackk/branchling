@@ -28,6 +28,7 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { agentProfilesPath, homePaths, loadUserConfig, userConfigPath } from "./home.mjs";
+import { printJson } from "./json-envelope.mjs";
 import { resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { MARK, color, failure, heading, refusal, table } from "./ui.mjs";
@@ -118,7 +119,7 @@ export function main(argv) {
 
   const report = whereReport({ dir: cli.dir });
   if (asJson) {
-    console.log(JSON.stringify(report, null, 2));
+    printJson("where", report);
     return 0;
   }
   console.log(renderWhere(report));

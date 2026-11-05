@@ -41,7 +41,8 @@ authority outside the branch without improving the evidence attached to a task.
 One command produces one answer about one resolved backlog. The answer can be
 reviewed, committed and reconstructed from the repository that owns it. A
 person who needs a portfolio view may use a tracker or a reporting system that
-is explicitly responsible for aggregating repositories.
+is explicitly responsible for aggregating repositories. What such a system may
+build against is stated in [`external-consumers.md`](external-consumers.md).
 
 The global tool is therefore a distribution boundary, not a data boundary:
 code may be installed globally, while project truth remains local to git.

@@ -26,7 +26,7 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -34,11 +34,10 @@ import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { recordCreation } from "./history.mjs";
 import { withBacklogMutex } from "./lock.mjs";
-import { parsePlanYaml } from "./plan.mjs";
-import { editPlanText, newPlanErrors } from "./plan-write.mjs";
+import { editPlanText, newPlanErrors, waveTargetProblem } from "./plan-write.mjs";
 import { detectPrefixMismatch, prefixMismatchMessage, taskIdPatterns } from "./task-id.mjs";
 import { backlogPaths, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
-import { auditVocabulary, extractMeta, splitFrontmatter } from "./task-fields.mjs";
+import { auditVocabulary, extractMeta, lineEnding, splitFrontmatter, withLineEnding } from "./task-fields.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { readStdinText } from "./stdin.mjs";
 import { parseTaskDocument, taskContent } from "./task-input.mjs";
@@ -131,6 +130,13 @@ function nextId(root, tasksDir, numberPattern) {
 const FLAGS = {
   "--title": "title", "--board": "board", "--priority": "priority", "--type": "type",
   "--epic": "epic", "--estimate": "estimate", "--owner": "owner", "--status": "status",
+  // The release the task is PLANNED for (TL-505), from `releases:` — closed, so
+  // checked below like the board.
+  "--release": "release",
+  // The targets in another repository the task ships from (TL-514), from the
+  // `deploy_targets` that carry `repository:` — a comma-separated list, checked
+  // below. A local target is refused: its tasks are computed from commit paths.
+  "--target": "target",
   // NOT a frontmatter field: it schedules the task in `plan.yaml` (TL-213). The
   // value is checked against the waves that exist BEFORE anything is written.
   "--wave": "wave",
@@ -278,13 +284,20 @@ export function driftMessage(divergences, { templatePath, fields, command }) {
  * One `verification:` entry, as YAML. A plain string is the short form (a bash
  * command with no id); an object may carry `id` — the handle a criterion points
  * at with `[proof: <id>]` (TL-86) — and either `bash` or `manual`.
+ *
+ * The command goes through `quoted()`, never between two bare quotes (TL-500).
+ * A string carrying `"` or `\` came out as invalid YAML, and the tool's own
+ * reader did not notice: `unquote()` strips the first and last quote whatever
+ * stands between them, so the damage surfaced only in a parser that reads YAML
+ * as YAML. A line break is refused before this point (`validateVerification`),
+ * because no spelling of one survives the line-based readers.
  */
 function verificationEntry(v) {
-  if (typeof v === "string") return '  - bash: "' + v + '"\n';
+  if (typeof v === "string") return "  - bash: " + quoted(v) + "\n";
   const kind = v.manual ? "manual" : "bash";
-  const command = v.manual || v.bash;
-  if (!v.id) return "  - " + kind + ': "' + command + '"\n';
-  return "  - id: " + v.id + "\n    " + kind + ': "' + command + '"\n';
+  const command = quoted(v.manual || v.bash);
+  if (!v.id) return "  - " + kind + ": " + command + "\n";
+  return "  - id: " + v.id + "\n    " + kind + ": " + command + "\n";
 }
 
 /**
@@ -346,25 +359,63 @@ function createTaskUnlocked({ root, config, board, slug, fields, body }) {
   // The banner is dropped BEFORE the rewrites, not after: every `^key:` pattern
   // below is anchored per line, and a comment line that happened to start with
   // one of those words would otherwise be a rewrite target.
-  const template = stripTemplateBanner(readFileSync(join(root, "_template.md"), "utf8"));
+  //
+  // The rewrites below are written against LF, so a template checked out with
+  // CRLF is read as LF and the task is written back in the template's ending
+  // (TL-479). Matched against `\r\n` directly, the banner, the verification
+  // block and the body boundary all missed, and `new` exited 0 with the
+  // template's placeholders standing in for the caller's task.
+  const raw = readFileSync(join(root, "_template.md"), "utf8");
+  const eol = lineEnding(raw);
+  const template = stripTemplateBanner(withLineEnding(raw, "\n"));
+  // Every rewrite below inserts its value through a replacer FUNCTION, never a
+  // replacement STRING (TL-527). A string is not literal in JavaScript: `$'`,
+  // `` $` ``, `$&`, `$1` and `$$` are expanded, and a shell command anchored at
+  // the end of a line (`grep -q x$' f`) spliced the template body into the
+  // frontmatter while `new` and `check` both stayed green. A function's return
+  // value is inserted as it is.
+  const literal = (value) => () => value;
   let text = template
-    .replace(/^id: .*$/m, "id: " + taskId)
-    .replace(/^title: .*$/m, "title: " + quoted(opts.title))
-    .replace(/^board: .*$/m, "board: " + board)
-    .replace(/^created: .*$/m, "created: " + day)
-    .replace(/^updated: .*$/m, "updated: " + day);
+    .replace(/^id: .*$/m, literal("id: " + taskId))
+    .replace(/^title: .*$/m, literal("title: " + quoted(opts.title)))
+    .replace(/^board: .*$/m, literal("board: " + board))
+    .replace(/^created: .*$/m, literal("created: " + day))
+    .replace(/^updated: .*$/m, literal("updated: " + day));
   // `role` joins the scalar fields rather than getting a branch of its own: it
   // is one more enum from the configuration, and `docs-drift --seed-tasks`
-  // (TL-100) is the first caller that has to set it programmatically.
-  for (const key of ["priority", "status", "type", "estimate", "owner", "role"]) {
-    if (opts[key]) text = text.replace(new RegExp("^" + key + ": .*$", "m"), key + ": " + opts[key]);
+  // (TL-100) is the first caller that has to set it programmatically. `executor`
+  // is the same kind of field, and `seed` (TL-493) the caller that sets it.
+  for (const key of ["priority", "status", "type", "estimate", "owner", "role", "executor"]) {
+    if (opts[key]) text = text.replace(new RegExp("^" + key + ": .*$", "m"), literal(key + ": " + opts[key]));
   }
-  if (opts.epic) text = text.replace(/^epic: .*$/m, "epic: " + quoted(opts.epic));
+  if (opts.epic) text = text.replace(/^epic: .*$/m, literal("epic: " + quoted(opts.epic)));
+  // A template written before TL-505 has no `release:` line, and it is a file in
+  // somebody else's repository that this command does not get to rewrite. The
+  // value is then INSERTED after `epic:` (else `board:`), where the current
+  // template keeps it; a replace that matched nothing would drop the caller's
+  // value and still exit 0.
+  if (opts.release) {
+    if (/^release:.*$/m.test(text)) text = text.replace(/^release:.*$/m, literal("release: " + opts.release));
+    else if (/^epic:.*$/m.test(text)) text = text.replace(/^epic:.*$/m, (m) => m + "\nrelease: " + opts.release);
+    else text = text.replace(/^board:.*$/m, (m) => m + "\nrelease: " + opts.release);
+  }
+  // `target:` (TL-514) is an inline list like `labels`. A template written
+  // before it has no line for it, and — as with `release:` above — the value is
+  // then INSERTED after `release:`, `epic:` or `board:`, whichever comes first,
+  // rather than dropped.
+  if (Array.isArray(opts.target) && opts.target.length) {
+    const line = "target: [" + opts.target.join(", ") + "]";
+    if (/^target:.*$/m.test(text)) text = text.replace(/^target:.*$/m, literal(line));
+    else {
+      const after = ["release", "epic", "board"].find((k) => new RegExp("^" + k + ":.*$", "m").test(text));
+      text = after ? text.replace(new RegExp("^" + after + ":.*$", "m"), (m) => m + "\n" + line) : text;
+    }
+  }
   // A LIST, so it is set as a block rather than by the scalar loop above. An
   // empty list leaves the template's `labels: []` exactly as it is, which is
   // already the right answer.
   if (Array.isArray(opts.labels) && opts.labels.length) {
-    text = text.replace(/^labels: .*$/m, "labels: [" + opts.labels.join(", ") + "]");
+    text = text.replace(/^labels: .*$/m, literal("labels: [" + opts.labels.join(", ") + "]"));
   }
   // A BLOCK list, like `verification` below and unlike `labels`: the template
   // carries `related_docs: []` on one line, and the tree's convention — the one
@@ -372,7 +423,7 @@ function createTaskUnlocked({ root, config, board, slug, fields, body }) {
   if (Array.isArray(opts.related_docs) && opts.related_docs.length) {
     text = text.replace(
       /^related_docs:.*\n(?:[ \t]+[^\n]*\n)*/m,
-      "related_docs:\n" + opts.related_docs.map((d) => "  - " + d + "\n").join("")
+      literal("related_docs:\n" + opts.related_docs.map((d) => "  - " + d + "\n").join(""))
     );
   }
   if (Array.isArray(opts.verification)) {
@@ -388,9 +439,9 @@ function createTaskUnlocked({ root, config, board, slug, fields, body }) {
       // An EMPTY list is a deliberate answer, not a missing one (TL-67): `import`
       // has no contract to write and must not leave the template's placeholder,
       // because a field filled in by the template was filled in by nobody.
-      opts.verification.length
+      literal(opts.verification.length
         ? "verification:\n" + opts.verification.map(verificationEntry).join("")
-        : "verification: []\n"
+        : "verification: []\n")
     );
   }
 
@@ -401,6 +452,7 @@ function createTaskUnlocked({ root, config, board, slug, fields, body }) {
     const end = text.indexOf("\n---\n", 3);
     if (end >= 0) text = text.slice(0, end + 5) + body;
   }
+  text = withLineEnding(text, eol);
 
   // BEFORE the write, not after (TL-69). A file already on disk is a value the
   // tree now carries, and every reader downstream — the views, `next`, the
@@ -539,6 +591,37 @@ export async function main(argv) {
         "allowed: " + allowed.join(" | "));
     }
   }
+  // `releases:` is CLOSED even when it is empty (TL-505): an empty list says this
+  // project plans no releases, so any value is a release nobody will look for.
+  if (opts.release) {
+    const releases = config.releases || [];
+    if (releases.indexOf(opts.release) < 0) {
+      return fail("`" + opts.release + "` is not a release this project plans",
+        releases.length ? "allowed: " + releases.join(" | ") : "`releases:` is not declared in config.yaml, so this backlog plans no releases");
+    }
+  }
+  // `target:` is CLOSED even when it is empty (TL-514), like `releases:`. A
+  // local target gets its own message, because the name IS declared — the
+  // reader would otherwise go looking for a typo that is not there.
+  if (opts.target !== undefined) {
+    const named = String(opts.target).split(",").map((v) => v.trim()).filter(Boolean);
+    if (!named.length) return fail("--target requires a value", "one or more target names, comma-separated");
+    const external = config.externalTargets || [];
+    for (const name of named) {
+      if (external.indexOf(name) >= 0) continue;
+      const local = (config.deployTargets || []).some((t) => t.name === name);
+      return fail(local
+        ? "`" + name + "` is a target of this repository, and a task cannot name it in `target:`"
+        : "`" + name + "` is not a declared target in another repository",
+      local
+        ? "its tasks are computed from the paths their commits touch; `target:` takes only a target that declares `repository:`" +
+          (external.length ? " (" + external.join(" | ") + ")" : "")
+        : external.length
+          ? "allowed: " + external.join(" | ")
+          : "no target in `deploy_targets` declares `repository:`, so this backlog has none a task could name");
+    }
+    opts.target = [...new Set(named)];
+  }
   const boardSlugs = (config.boards || []).map((b) => b.slug);
   const board = opts.board || config.defaultBoard || boardSlugs[0];
   if (boardSlugs.length && boardSlugs.indexOf(board) < 0) {
@@ -554,23 +637,9 @@ export async function main(argv) {
   // argument and this command has nowhere to ask for one.
   let scheduling = null;
   if (opts.wave) {
-    if (!existsSync(paths.planPath)) {
-      return fail("`--wave` was given and this backlog has no plan to schedule into",
-        "expected: " + paths.planPath + " — the execution order is an optional decision, and this backlog has not made it");
-    }
-    const text = readFileSync(paths.planPath, "utf8");
-    const read = parsePlanYaml(text);
-    if (read.problems.length) {
-      return fail("the plan cannot be read, so nothing can be scheduled in it",
-        paths.planPath + ": " + read.problems[0]);
-    }
-    const waves = read.plan.waves.map((w) => w.name);
-    if (waves.indexOf(opts.wave) < 0) {
-      return fail("there is no wave `" + opts.wave + "` in " + paths.planPath,
-        (waves.length ? "the waves it has: " + waves.join(" | ") : "the plan has no waves yet") +
-          ` — a wave is created by \`${N} plan add <ID> --wave "…" --why "…"\`, never by a typo here`);
-    }
-    scheduling = { text };
+    const target = waveTargetProblem(paths.planPath, [opts.wave]);
+    if (target.problem) return fail(target.problem, target.hint);
+    scheduling = { text: target.text };
   }
 
   const pat = taskIdPatterns(config.taskIdPrefix);
