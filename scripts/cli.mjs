@@ -327,6 +327,7 @@ export const COMMANDS = {
     summary: "read a task's recorded exchanges back — one row per handoff, the reason once",
     usage: [
       `${N} log <ID> [--limit <n>] [--decisions] [--json] [--dir <path>]`,
+      `${N} log <ID> --records [--limit <n>] [--json] [--dir <path>]`,
       `${N} log --modified-file <path> --decisions [--limit <n>] [--json] [--dir <path>]`,
       `${N} log --open-questions [--json] [--dir <path>]`,
       "",
@@ -340,6 +341,10 @@ export const COMMANDS = {
       `                     a task's decisions is a mode of \`${N} log\`, not of`,
       "                     `decide` — that one records them, and a read inferred from",
       "                     a MISSING `--reason` would print where it now refuses",
+      "  --records          every ledger record of the task, unfolded, in recorded order",
+      "                     and with every key it carries — a closing's reason and",
+      "                     contractCapability, a vouch, a refusal. With --limit, the",
+      "                     newest <n> records, and the answer says how many it left out",
       "  --modified-file <path>",
       "                     decisions carried by every task whose commits touched this",
       "                     file. A trailing `/` selects a directory. Paths are relative",
