@@ -238,6 +238,10 @@ export const COMMANDS = {
       "",
       `  ${N} query --modified-file scripts/cli.mjs --status done`,
       `  ${N} query --status done --not-env production`,
+      "",
+      "  exit: 0 answered, including zero matches · 1 a filter value outside this",
+      "        backlog's vocabulary (`unknown-value` under --json, naming what is",
+      "        declared) · 2 usage error",
     ].join("\n"),
   },
   build: {
@@ -529,7 +533,8 @@ export const COMMANDS = {
       "  The owner is cleared and this session's reservation is released.",
       "",
       "  exit: 0 handed off · 1 refused (held, closed, somebody else's, `--status` on a task",
-      "        not in progress) · 2 usage error",
+      "        not in progress, a `--to-role` outside `roles:` — `unknown-value` under",
+      "        --json) · 2 usage error",
     ].join("\n"),
   },
   body: {

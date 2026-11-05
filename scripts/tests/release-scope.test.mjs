@@ -272,11 +272,11 @@ test("query filters by release, asks for the unplanned with an empty value, and 
   assert.match(text.stdout, new RegExp("id: " + t.unstarted + ",.*release: r1"));
 
   const bad = run(dir, ["query", "--dir", "backlog", "--release", "r9"]);
-  assert.equal(bad.status, 2);
+  assert.equal(bad.status, 1);
   assert.match(bad.stderr, /`r9` is not an allowed value for the field `release`/);
   // Closed even when empty: a backlog that declares none refuses any value.
   const none = backlogRepo();
-  assert.equal(run(none, ["query", "--dir", "backlog", "--release", "r1"]).status, 2);
+  assert.equal(run(none, ["query", "--dir", "backlog", "--release", "r1"]).status, 1);
 });
 
 test("a release outside `releases:` fails the vocabulary check; a declared one passes", () => {

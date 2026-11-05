@@ -287,7 +287,8 @@ test("the handoff the guide teaches works in a backlog that declares no roles", 
   // And the command really does refuse there, which is what makes the above
   // matter rather than being a style rule about the prose.
   const r = run(["handoff", "ZZ-1", "--to-role", "reviewer", "--reason", "x", "--dir", fx.dir], fx.repo);
-  assert.equal(r.status, 2, "handoff --to-role no longer fails without roles: " + r.stdout + r.stderr);
+  // A refusal (1) since TL-559: the role is a value, not a malformed call.
+  assert.equal(r.status, 1, "handoff --to-role no longer fails without roles: " + r.stdout + r.stderr);
   assert.match(r.stderr + r.stdout, /roles/);
 });
 

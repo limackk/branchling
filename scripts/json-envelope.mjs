@@ -59,7 +59,15 @@ export const KINDS = {
   // names the trunk and every ref read, with its SHA, so the answer can be dated.
   // `scope` (TL-540) is `active`, `archived` or `all` — which tasks were
   // searched — and null when `--status` chose the statuses itself.
-  "task-list": { tasks: [], total: null, limit: null, scope: null, scan: null, modifiedFile: null, deploy: null, elsewhereOnly: [] },
+  // A filter value outside the project's vocabulary (TL-559) is `ok: false`
+  // with `refusalKind: "unknown-value"`, `rejected` `{ field, value }` and
+  // `declared`, the values that field accepts — the shape `set` refuses with
+  // since TL-543. `details` names every rejected value when more than one was.
+  // A query that answered carries `ok: true`.
+  "task-list": {
+    ok: null, tasks: [], total: null, limit: null, scope: null, scan: null, modifiedFile: null, deploy: null, elsewhereOnly: [],
+    refusalKind: null, refusal: null, details: [], rejected: null, declared: [],
+  },
   // `<command> --help --json` (TL-83). `flags` describes the input surface, and
   // a flag drawing on a vocabulary carries THIS project's values in `values` —
   // so an agent narrows its input instead of guessing and retrying. `configured`
@@ -305,11 +313,14 @@ export const KINDS = {
   // `handoff --json` (TL-99). Three from/to pairs and the comment that carries
   // the reason: a handoff is not a task being performed, it is a task changing
   // hands, and a consumer wants both ends of every field that moved.
+  // A `--to-role` outside `roles:` (TL-559) is `refusalKind: "unknown-value"`
+  // with `rejected` `{ field: "role", value }` and `declared`, the roles this
+  // backlog declares — `[]` when it declares none.
   "task-handoff": {
     ok: null, id: null, file: null, task: null,
     role: null, owner: null, status: null, comment: null, released: null,
     warnings: [], actorSource: null,
-    refusalKind: null, refusal: null, details: [],
+    refusalKind: null, refusal: null, details: [], rejected: null, declared: [],
   },
   // `body --json` (TL-523). `body` is the pair of base-version hashes, so a
   // caller can pass `body.to` as the next write's `--base`.
