@@ -18,9 +18,18 @@
  * into existence — otherwise the first `where` on a machine leaves a trail of
  * empty folders and the second one reports a different, now-true answer.
  *
- * Exit: 0 reported · 1 no backlog found · 2 the invocation was wrong.
+ * Exit: 0 reported, including no backlog found · 1 a directory named by
+ * `--dir` or `BACKLOG_DIR` is not a backlog · 2 the invocation was wrong.
  *
- * Tests: `node --test scripts/tests/home.test.mjs`
+ * WHY "NONE FOUND" IS 0 AND "NOT A BACKLOG" IS 1 (TL-547). `where` run outside
+ * every repository is the question this command exists for, so finding nothing
+ * there is an answer. A directory NAMED explicitly is another state: the caller
+ * asserted a backlog is there, and every other command exits 1 for that state
+ * (TL-546). `BACKLOG_DIR` names a directory exactly as `--dir` does — the
+ * resolver is strict about both — so the code is decided by what the resolver
+ * threw, never by which of the two carried the path, and never by `--json`.
+ *
+ * Tests: `node --test scripts/tests/home.test.mjs scripts/tests/where-exit-codes.test.mjs`
  */
 
 import { existsSync } from "node:fs";
@@ -29,7 +38,7 @@ import { fileURLToPath } from "node:url";
 
 import { agentProfilesPath, homePaths, loadUserConfig, userConfigPath } from "./home.mjs";
 import { printJson } from "./json-envelope.mjs";
-import { resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { BACKLOG_DIR_REFUSAL_EXIT, NotABacklogError, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { MARK, color, failure, heading, refusal, table } from "./ui.mjs";
 
@@ -45,12 +54,22 @@ const KNOWN_FLAGS = ["--json", "--dir"];
  * home directory matters most.
  */
 export function whereReport(opts = {}) {
+  return whereAnswer(opts).report;
+}
+
+/**
+ * The report and the exit code it carries. The code needs the TYPE of what the
+ * resolver threw, which the report holds only as a sentence; matching the
+ * sentence is what `NotABacklogError` exists to avoid (TL-541).
+ */
+export function whereAnswer(opts = {}) {
   const env = opts.env || process.env;
   const home = homePaths(env);
   const user = loadUserConfig(env);
 
   let backlog = null;
   let error = null;
+  let exit = 0;
   try {
     const resolved = resolveBacklogDir({
       dir: opts.dir || undefined, cwd: opts.cwd, moduleDir: opts.moduleDir || __dirname,
@@ -61,9 +80,10 @@ export function whereReport(opts = {}) {
     };
   } catch (e) {
     error = e.message;
+    if (e instanceof NotABacklogError) exit = BACKLOG_DIR_REFUSAL_EXIT;
   }
 
-  return {
+  const report = {
     home: home.home,
     homeSource: home.source,
     config: home.config,
@@ -73,6 +93,7 @@ export function whereReport(opts = {}) {
     backlog,
     error,
   };
+  return { report, exit };
 }
 
 const yesNo = (b) => (b ? "yes" : "no");
@@ -117,17 +138,10 @@ export function main(argv) {
     return 2;
   }
 
-  const report = whereReport({ dir: cli.dir });
-  if (asJson) {
-    printJson("where", report);
-    return 0;
-  }
-  console.log(renderWhere(report));
-  // A missing backlog is an ANSWER here, not a failure: "where" outside a
-  // repository is exactly the question this command exists for. The non-zero
-  // exit is reserved for a `--dir` that names something that is not a backlog,
-  // which `resolveBacklogDir` throws on and which is a usage error.
-  return report.backlog || !cli.dir ? 0 : 1;
+  const { report, exit } = whereAnswer({ dir: cli.dir });
+  if (asJson) printJson("where", report);
+  else console.log(renderWhere(report));
+  return exit;
 }
 
 if (process.argv[1] && process.argv[1].endsWith("where-command.mjs")) {
