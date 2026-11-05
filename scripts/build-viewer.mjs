@@ -466,6 +466,10 @@ export function buildHtml(
        one, which is the whole difference. */
     --vouch: #0F766E;
     --vouch-bg: rgba(15, 118, 110, 0.10);
+    /* "This write was refused" (TL-450). Borrowing a status colour made the
+       refusal take whatever this project gave its blocked status — green in a
+       fresh backlog — so a refusal read as a success. */
+    --refusal: #B91C1C;
 ${paletteVarCss}
   }
   @media (prefers-color-scheme: dark) {
@@ -491,6 +495,7 @@ ${paletteVarCss}
       --in-flight-bg: rgba(52, 211, 153, 0.15);
       --vouch: #5EEAD4;
       --vouch-bg: rgba(94, 234, 212, 0.11);
+      --refusal: #F87171;
     }
   }
   html, body { margin: 0; padding: 0; height: 100%; }
@@ -1128,7 +1133,7 @@ ${paletteBadgeCss}
   }
   .editor-actions button:first-child, .reason-actions button:first-child { border-color: var(--accent); }
   .read-only-note, .edit-result { margin-top: 10px; font-size: 12px; color: var(--fg-muted); }
-  .edit-result[role="alert"] { color: var(--status-blocked); }
+  .edit-result[role="alert"], .reason-ask [role="alert"] { color: var(--refusal); font-weight: 600; }
   .reason-ask { margin-top: 12px; padding: 12px; border: 1px solid var(--accent); border-radius: 8px; background: var(--bg-card); }
   .reason-ask textarea { width: 100%; margin-top: 8px; }
   .reason-actions { display: flex; gap: 6px; margin-top: 8px; }
@@ -1150,7 +1155,7 @@ ${paletteBadgeCss}
     max-width: 380px;
   }
   .toast.success { border-left: 3px solid var(--status-done); }
-  .toast.error { border-left: 3px solid var(--status-blocked); }
+  .toast.error { border-left: 3px solid var(--refusal); }
   .toast.info { border-left: 3px solid var(--accent); }
   @keyframes slideIn {
     from { transform: translateX(20px); opacity: 0; }
@@ -2379,10 +2384,6 @@ async function refreshFromServer(quiet) {
     applyScope();
     renderBoardScope();
     render();
-    // A status write moves the take, and the take is the window the events are
-    // counted in — so the signal is recomputed with the tasks, not only when a
-    // heartbeat arrives.
-    refreshInFlight();
     if (!quiet) toast("Refreshed " + TASKS.length + " tasks from disk", "success");
   } catch (e) {
     console.error(e);
@@ -3220,8 +3221,9 @@ async function saveField(taskId, field, value, reason) {
   if (sameValue(task[field], normalized.value)) { cancelEdit(); return; }
   if (reasonRequiredFor(field, normalized.value) && !isValidReason(reason)) {
     state.editing = null;
-    state.reasonAsk = { id: taskId, field: field, value: normalized.value, error: reason === undefined ? "" : "Enter a specific reason; reserved words are not accepted." };
+    state.reasonAsk = { id: taskId, field: field, value: normalized.value, draft: reason || "", error: reason === undefined ? "" : "Enter a specific reason; reserved words are not accepted." };
     renderDetail();
+    focusReasonAsk();
     return;
   }
   state.reasonAsk = null;
@@ -3242,7 +3244,7 @@ async function saveField(taskId, field, value, reason) {
     if (!res.ok) {
       if (res.status === 409) await refreshFromServer(true);
       if (data.needsReason) {
-        state.reasonAsk = { id: taskId, field: field, value: normalized.value, error: data.error || "A reason is required." };
+        state.reasonAsk = { id: taskId, field: field, value: normalized.value, draft: reason || "", error: data.error || "A reason is required." };
       }
       throw new Error(data.error || "HTTP " + res.status);
     }
@@ -3255,7 +3257,18 @@ async function saveField(taskId, field, value, reason) {
     state.editMessage = "Not saved: " + error.message;
     state.editError = true;
     renderDetail();
+    if (state.reasonAsk) focusReasonAsk();
   }
+}
+
+// The prompt is rendered directly under the title, which renderDetail scrolls
+// to, so it is in view; focus is what tells a keyboard or screen-reader user
+// that pressing Save opened a question rather than closing the editor.
+function focusReasonAsk() {
+  const input = document.getElementById("reasonAskInput");
+  if (!input) return;
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
 }
 
 function submitReason() {
@@ -3270,7 +3283,7 @@ function reasonAskHtml(t) {
   if (!ask || ask.id !== t.id) return "";
   return '<section class="reason-ask"><strong>Why ' + escape(fieldLabel(ask.field)) + ' → ' + escape(formatValue(ask.value)) + '?</strong><p>This protected transition must carry a reason in history.</p>' +
     (ask.error ? '<p role="alert">' + escape(ask.error) + '</p>' : '') +
-    '<textarea class="field-input" id="reasonAskInput" rows="2" maxlength="' + REASON_MAX_LENGTH + '" placeholder="One sentence about this change"></textarea><div class="reason-actions"><button type="button" onclick="submitReason()">Save with reason</button><button type="button" onclick="cancelReason()">Cancel</button></div></section>';
+    '<textarea class="field-input" id="reasonAskInput" rows="2" maxlength="' + REASON_MAX_LENGTH + '" placeholder="One sentence about this change">' + escape(ask.draft || "") + '</textarea><div class="reason-actions"><button type="button" onclick="submitReason()">Save with reason</button><button type="button" onclick="cancelReason()">Cancel</button></div></section>';
 }
 
 function valueHtml(t, key) {
@@ -3328,7 +3341,7 @@ function renderDetail() {
   const titleHtml = titleEditing ? '<h1>' + editorHtml(t, fieldSpec("title", FIELDS)) + '</h1>' : '<h1' + (CAN_EDIT ? ' class="is-editable" tabindex="0" role="button" onclick="startEdit(\\'' + escape(t.id) + '\\',\\'title\\')"' : '') + '>' + escape(t.title) + (CAN_EDIT ? '<span class="edit-pen" aria-hidden="true">edit</span>' : '') + '</h1>';
   const history = HISTORY[t.id] || [];
   const last = history[history.length - 1];
-  const historySummary = last ? '<div class="history-summary">Latest recorded change: ' + escape(fieldLabel(last.field)) + ' by ' + escape(last.actor) + (last.reason && last.reason !== "unknown" ? ' — ' + escape(last.reason) : '') + '</div>' : '<div class="history-summary">No recorded field changes yet.</div>';
+  const historySummary = last ? '<div class="history-summary">Latest recorded change by ' + escape(last.actor) + ': ' + escape(fieldLabel(last.field)) + (last.reason && last.reason !== "unknown" ? ' — ' + escape(last.reason) : '') + '</div>' : '<div class="history-summary">No recorded field changes yet.</div>';
   const readOnlyNote = CAN_EDIT ? '' : '<div class="read-only-note">This snapshot is read-only. Start the local server to edit this repository.</div>';
   const editResult = state.editMessage ? '<div class="edit-result" role="' + (state.editError ? 'alert' : 'status') + '" aria-live="polite">' + escape(state.editMessage) + '</div>' : '';
 
@@ -3344,8 +3357,12 @@ function renderDetail() {
         (t.epic ? '<span class="badge badge-epic">' + escape(t.epic) + "</span>" : "") +
       "</div>" +
       titleHtml +
+      // Directly under the title, not after the field grid: renderDetail
+      // scrolls to the top, so a result or a question rendered below a long
+      // grid was out of sight and a save looked like nothing happened.
+      editResult + reasonAskHtml(t) +
       '<div class="detail-meta-grid">' + rows + readOnlyRows + "</div>" +
-      readOnlyNote + editResult + reasonAskHtml(t) + historySummary +
+      readOnlyNote + historySummary +
     "</div>" +
     '<div class="markdown-content">' + t.bodyHtml + "</div>";
 

@@ -6,8 +6,8 @@ labels: []
 board: main
 epic: "Backlog viewer"
 priority: P1
-status: awaiting_vouch  # pending | in_progress | blocked | done | cancelled
-owner: ""
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: dev  # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 1w
@@ -52,7 +52,9 @@ The `visual-editing` check was run against a fixture backlog served by `branchli
 
 Done when: a save shows its confirmation or refusal where the user is looking, the reason prompt receives focus, no server refresh raises a ReferenceError, and the `visual-editing` check is repeated.
 
+**Second review, same day, after the repair.** The same fixture flow passed in both themes: each confirmation, the reason prompt and its refusal render directly under the title and inside the viewport, the prompt takes focus and keeps a refused draft, the refusal uses the `--refusal` token rather than a status colour, and a task changed from the CLI refreshed the open page with no error and no console message. `viewer-editing.test.mjs` now resolves every call in the edit flow against the functions the page declares, and fails on the code before the repair.
+
 ## Acceptance criteria
 
-- [ ] The live page exposes configuration-derived editors, reason handling and honest success or refusal states without making snapshot mode writable. [proof: editing-ui]
-- [ ] A real user can understand and complete the editing flow in both themes. [proof: visual-editing]
+- [x] The live page exposes configuration-derived editors, reason handling and honest success or refusal states without making snapshot mode writable. [proof: editing-ui]
+- [x] A real user can understand and complete the editing flow in both themes. [proof: visual-editing]
