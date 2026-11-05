@@ -47,7 +47,7 @@ import { readFileSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { resolveActor } from "./actor.mjs";
+import { resolveActorReport } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { ACTOR_NAMESPACES, isValidActor, reasonRefusal, recordCreation, reconcile } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
@@ -419,9 +419,9 @@ function peekNextId(root) {
 // main
 // ──────────────────────────────────────────────────────────────────────────
 
-function refused(problems, json, extra) {
-  if (json) {
-    printJson("seed", { ok: false, errors: problems, ...(extra || {}) });
+function refused(problems, opts) {
+  if (opts.json) {
+    printJson("seed", { ok: false, errors: problems, actorSource: opts.resolved.actorSource });
   } else {
     console.error(failure(
       N + " seed", "the plan was refused — nothing was written",
@@ -442,6 +442,10 @@ export function main(argv) {
     console.error(failure(N + " seed", head, rest, [N + " seed --help"]));
     return 2;
   }
+  // Resolved ONCE, before the plan is read (TL-550): the creations are recorded
+  // under this actor, and `--json` names the rung that answered, so a seed run
+  // attributed to the default agent is never attributed unseen.
+  opts.resolved = resolveActorReport(opts.actor);
 
   if (opts.from) {
     // Composition, not a special case: the adapter is spawned exactly as a
@@ -483,7 +487,7 @@ function seedFromText(input, cli, opts) {
   // FIRST, and against nothing on disk: a plan judged before the directory is
   // touched is a plan whose refusal costs nothing to undo.
   const { plan, errors } = parsePlan(input);
-  if (errors.length) return refused(errors, opts.json);
+  if (errors.length) return refused(errors, opts);
 
   // The directory. An explicit `--dir` that is not a backlog yet is the "seed a
   // fresh project" case and goes through `init`; anything else is resolved the
@@ -495,6 +499,7 @@ function seedFromText(input, cli, opts) {
     if (opts.dryRun) {
       return reportDryRun(plan, {
         root: explicit, prefix: DEFAULT_TASK_ID_PREFIX, firstId: 1, json: opts.json, fresh: true,
+        actorSource: opts.resolved.actorSource,
       });
     }
     if (!runInit(explicit, opts.json)) {
@@ -559,11 +564,13 @@ function seedFromText(input, cli, opts) {
     const target = waveTargetProblem(paths.planPath, waves, "wave");
     if (target.problem) vocabulary.push(target.problem + " — " + target.hint);
   }
-  if (vocabulary.length) return refused(vocabulary, opts.json);
+  if (vocabulary.length) return refused(vocabulary, opts);
 
   if (opts.dryRun) {
     const firstId = peekNextId(root);
-    return reportDryRun(plan, { root, prefix: config.taskIdPrefix, firstId, json: opts.json, fresh: false });
+    return reportDryRun(plan, {
+      root, prefix: config.taskIdPrefix, firstId, json: opts.json, fresh: false, actorSource: opts.resolved.actorSource,
+    });
   }
 
   const board = config.defaultBoard || (config.boards || []).map((b) => b.slug)[0] || "main";
@@ -594,6 +601,7 @@ function seedFromText(input, cli, opts) {
     printJson("seed", {
       ok: true, root, dryRun: false,
       created: written.map((w) => ({ planId: w.planId, id: w.id, file: w.file, title: w.title })),
+      actorSource: opts.resolved.actorSource,
     });
     return 0;
   }
@@ -736,7 +744,7 @@ function linkDependencies(plan, written, config) {
  */
 function recordCreations(root, written, opts) {
   if (!written.length) return;
-  const actor = resolveActor(opts.actor);
+  const { actor } = opts.resolved;
   const ts = new Date().toISOString();
   // ONE SHAPE FOR A CREATION, in `history.mjs` (TL-187): `new` writes this
   // entry too now, and three hand-built copies of it would drift.
@@ -757,7 +765,7 @@ function recordCreations(root, written, opts) {
 /** `--dry-run`: what would be created, with the numbers it would be created
  *  under. They are PROVISIONAL and said to be — nothing is reserved, so another
  *  session allocating in between moves them. */
-function reportDryRun(plan, { root, prefix, firstId, json, fresh }) {
+function reportDryRun(plan, { root, prefix, firstId, json, fresh, actorSource }) {
   const base = Number.isFinite(firstId) ? firstId : 1;
   const ids = new Map();
   plan.tasks.forEach((item, i) => ids.set(item.plan_id, prefix + "-" + (base + i)));
@@ -766,7 +774,7 @@ function reportDryRun(plan, { root, prefix, firstId, json, fresh }) {
   }));
 
   if (json) {
-    printJson("seed", { ok: true, root, dryRun: true, created });
+    printJson("seed", { ok: true, root, dryRun: true, created, actorSource });
     return 0;
   }
   console.log(N + " seed --dry-run: " + plan.tasks.length + " task(s) would be created in " + root);

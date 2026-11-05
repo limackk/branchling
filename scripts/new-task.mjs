@@ -30,9 +30,9 @@ import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { resolveActor } from "./actor.mjs";
+import { resolveActorReport } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { recordCreation } from "./history.mjs";
+import { ACTOR_NAMESPACES, isValidActor, recordCreation } from "./history.mjs";
 import { withBacklogMutex } from "./lock.mjs";
 import { editPlanText, newPlanErrors, waveTargetProblem } from "./plan-write.mjs";
 import { detectPrefixMismatch, prefixMismatchMessage, taskIdPatterns } from "./task-id.mjs";
@@ -42,6 +42,7 @@ import { PRODUCT_NAME as N } from "./product.mjs";
 import { readStdinText } from "./stdin.mjs";
 import { parseTaskDocument, taskContent } from "./task-input.mjs";
 import { failure, refusal } from "./ui.mjs";
+import { printJson } from "./json-envelope.mjs";
 import { readTaskMetas } from "./task-io.mjs";
 import { agentEstimate, agentEstimateText } from "./agent-time.mjs";
 import { readAgentTime } from "./agent-time-read.mjs";
@@ -143,7 +144,15 @@ const FLAGS = {
   // NOT a frontmatter field either: it names the file the task DOCUMENT is read
   // from, in place of stdin (TL-237).
   "--body-file": "bodyFile",
+  // Who records the creation (TL-550). Not `owner:` — a task created by one
+  // actor is routinely held by another, or by nobody.
+  "--actor": "actor",
 };
+
+/** Flags that take NO value. Kept apart from FLAGS, because there every flag
+ *  consumes the next argument, and `--json --title x` must not read `--title`
+ *  as the value of `--json`. */
+const SWITCHES = { "--json": "json" };
 
 /**
  * `--` ENDS FLAG READING (TL-58).
@@ -176,6 +185,7 @@ function parseArgs(argv) {
       if (i > 0 && FLAGS[flags[i - 1]]) continue; // the previous flag's value
       return { error: "unexpected argument: " + a, available: true };
     }
+    if (SWITCHES[a]) { values[SWITCHES[a]] = true; continue; }
     if (!FLAGS[a]) return { error: "unknown flag: " + a, available: true };
     // Only the LAST flag before the separator reaches past it, and only that
     // one is exempt from the dash heuristic.
@@ -557,7 +567,7 @@ export async function main(argv) {
     // `new` takes. `--dir` is taken off by takeDirFlag before this point, so it
     // is named here rather than read out of FLAGS.
     if (parsed.available) {
-      console.error(refusal(N + " new", parsed.error, Object.keys(FLAGS).join(" ") + " --dir <path>"));
+      console.error(refusal(N + " new", parsed.error, Object.keys(FLAGS).concat(Object.keys(SWITCHES)).join(" ") + " --dir <path>"));
       return 2;
     }
     return fail(parsed.error, `usage: ${N} new --title "…" [--board b] [--priority P1] [--epic e] [--estimate 2h] [--body-file f]`);
@@ -568,6 +578,15 @@ export async function main(argv) {
 
   const slug = slugify(opts.title);
   if (!slug) return fail("no filename can be made from this title: " + JSON.stringify(opts.title), "at least one letter or digit is needed");
+
+  // The actor is judged BEFORE anything is written (TL-550), as every other
+  // writing command judges it: a creation recorded under an actor with no
+  // namespace would be a history row nobody can weigh.
+  const { actor, actorSource } = resolveActorReport(opts.actor);
+  if (!isValidActor(actor)) {
+    return fail("the actor `" + actor + "` has no valid namespace",
+      "use one of: " + ACTOR_NAMESPACES.map((n) => n + ":<name>").join(" | "));
+  }
 
   // BEFORE the directory is even resolved: a refused document must leave a tree
   // that looks exactly like the one before the command ran.
@@ -700,14 +719,14 @@ export async function main(argv) {
   // the `__created__` entry is written by whichever tree diffs the tasks
   // directory first, under THAT tree's actor — and on a backlog with no snapshot
   // yet it is never written at all. The actor comes from the one chain in
-  // `actor.mjs`; `new` has no `--actor` flag, so it is the environment, the user
-  // layer, then the default.
+  // `actor.mjs` — `--actor`, the environment, the user layer, then the default —
+  // and `--json` names which of them answered (TL-550).
   //
   // The failure is NOT fatal: the task file is already on disk, and a command
   // that wrote the task and then exited non-zero would read as "nothing
   // happened". The log is the record of the write, not the write itself.
   try {
-    recordCreation(root, { id: taskId, title: opts.title }, { actor: resolveActor(""), source: "new" });
+    recordCreation(root, { id: taskId, title: opts.title }, { actor, source: "new" });
   } catch (e) {
     console.error("  NOTE: the creation could not be recorded in the history: " + (e && e.message));
   }
@@ -729,6 +748,13 @@ export async function main(argv) {
       return 1;
     }
     writeFileSync(paths.planPath, edit.text, "utf8");
+  }
+
+  if (opts.json) {
+    printJson("task-new", {
+      ok: true, id: taskId, file: full, board, wave: scheduling ? opts.wave : null, idSource: source, actorSource,
+    });
+    return 0;
   }
 
   console.log(`${N} new: ` + full);
