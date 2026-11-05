@@ -1,0 +1,2 @@
+{"id":"01M6NVRNPJ5VFSQAZ7P1E6S182","ts":"2026-11-05T12:43:29.362Z","task":"TL-563","field":"__created__","from":"","to":"The served viewer cannot skip the commands that own status and owner","actor":"agent:claude","source":"new","reason":"unknown"}
+{"id":"01M6NVRXENME45QXG3F4WE1DXX","ts":"2026-11-05T12:43:37.301Z","task":"TL-563","field":"role","from":"","to":"spec","actor":"agent:claude","source":"set","reason":"The route policy is a decision between three alternatives before any code changes."}

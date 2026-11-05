@@ -1,0 +1,2 @@
+{"id":"01M6NVRNYMVTBS9S5YTZTW5HA9","ts":"2026-11-05T12:43:29.620Z","task":"TL-564","field":"__created__","from":"","to":"handoff refuses --status on a task that is not in progress","actor":"agent:claude","source":"new","reason":"unknown"}
+{"id":"01M6NVRXNNJBF8CP61DW7ENC14","ts":"2026-11-05T12:43:37.525Z","task":"TL-564","field":"role","from":"","to":"dev","actor":"agent:claude","source":"set","reason":"The policy is settled in the task; what remains is implementation."}
