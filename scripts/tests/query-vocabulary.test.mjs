@@ -78,7 +78,8 @@ function newTask(dir, args) {
 test("a status outside the vocabulary is refused, and the vocabulary is named", () => {
   const dir = repo(OWN_STATUSES);
   const r = run(dir, ["query", "--dir", ".", "--status", "opne"]);
-  assert.equal(r.status, 2, "a typo must not answer");
+  // A refusal (1), not a usage error (2): the call was built right (TL-559).
+  assert.equal(r.status, 1, "a typo must not answer");
   assert.match(r.stderr, /`opne` is not an allowed value for the field `status`/);
   // The permitted values are the FIXTURE's, which is the whole point: a message
   // listing this repository's statuses would be the tool answering about itself.
@@ -97,14 +98,14 @@ test("every axis with a declared vocabulary is checked, not only the status", ()
   const dir = repo();
   for (const [flag, value] of [["--priority", "P9"], ["--type", "epic"], ["--board", "nowhere"]]) {
     const r = run(dir, ["query", "--dir", ".", flag, value]);
-    assert.equal(r.status, 2, flag + " " + value + " was accepted");
+    assert.equal(r.status, 1, flag + " " + value + " was accepted");
     assert.match(r.stderr, new RegExp("`" + value + "` is not an allowed value"));
   }
 });
 
 test("a closed label vocabulary is checked; an open one has nothing to be outside of", () => {
   const closed = repo("labels: [ops, docs]\nlabels_closed: true\n");
-  assert.equal(run(closed, ["query", "--dir", ".", "--label", "opz"]).status, 2);
+  assert.equal(run(closed, ["query", "--dir", ".", "--label", "opz"]).status, 1);
   assert.equal(run(closed, ["query", "--dir", ".", "--label", "ops"]).status, 0);
 
   // The default vocabulary is open: any word is a label somebody may add, so
@@ -145,7 +146,7 @@ test("an empty --role or --executor is a QUESTION, not a typo", () => {
   const dir = repo("roles: [analyst]\n");
   assert.equal(run(dir, ["query", "--dir", ".", "--role", ""]).status, 0);
   assert.equal(run(dir, ["query", "--dir", ".", "--executor", ""]).status, 0);
-  assert.equal(run(dir, ["query", "--dir", ".", "--role", "analyzt"]).status, 2);
+  assert.equal(run(dir, ["query", "--dir", ".", "--role", "analyzt"]).status, 1);
 });
 
 // ── the dispatcher gets the same rule ─────────────────────────────────────

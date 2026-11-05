@@ -16,7 +16,8 @@
  * members are recovered here as the complement — every task with commits for
  * the target that no other bucket placed — rather than by restating the rule
  * that put them there. The gap panel is `releaseGaps()` from release-gaps.mjs,
- * handed the same `deploymentState()` so one build reads the refs once.
+ * handed the same `deploymentState()` so one build reads the refs once, and the
+ * same task records `check --release` reads (`releaseTaskRecords()`, TL-552).
  *
  * A TARGET IN ANOTHER REPOSITORY (`repository:`, TL-507) gets a lane of one
  * column, `unobservable`: the command's bucket of the same name, holding the
@@ -40,7 +41,7 @@ import { spawnSync } from "node:child_process";
 
 import { TRUNK_SOURCE_TEXT, explain, taskDeployment } from "./environments.mjs";
 import { repoRoot } from "./modified-files.mjs";
-import { currentReleaseText, gateVerdict, releaseGaps } from "./release-gaps.mjs";
+import { currentReleaseText, gateVerdict, releaseGaps, releaseTaskRecords } from "./release-gaps.mjs";
 import { computeStatus } from "./release-status.mjs";
 import { CLOSED_COLUMN, TRUNK_COLUMN, UNOBSERVABLE_COLUMN } from "./viewer-release.mjs";
 
@@ -123,38 +124,20 @@ export function releaseLanes({ pipeline, state, targets, trunk }) {
 }
 
 /**
- * PURE — a task as `releaseGaps()` reads it: every field its `tasks` parameter
- * documents, in the shape `readTaskRecords()` gives `check --release` (TL-519).
- * Dropping `priority` and `release` here once made the current release always
- * null in the viewer, so `planned-blocker-open` could never appear while the
- * gate reported it on the same commit — and the silence read as a clean answer.
- * A missing scalar is "" there, so it is "" here.
- */
-export function gapTaskOf(t) {
-  const str = (v) => (v == null ? "" : v);
-  return {
-    id: t.id,
-    title: str(t.title),
-    status: str(t.status),
-    priority: str(t.priority),
-    release: str(t.release),
-    labels: t.labels || [],
-    target: Array.isArray(t.target) ? t.target : [],
-  };
-}
-
-/**
  * The whole computation for one backlog. Never throws: a page that could not
  * read git still has to render, and says why this view is empty.
  *
  * @param {object} opts
  * @param {string} opts.root the backlog directory
  * @param {object} opts.config the loaded configuration
- * @param {object[]} opts.tasks every task the page embeds, as its frontmatter
- *        reads; `gapTaskOf()` takes what the gap panel needs from each
  * @param {number} [opts.now]
+ *
+ * It takes no tasks from the caller. The gap panel reads its records with
+ * `releaseTaskRecords()`, the reader `check --release` uses (TL-552): the
+ * page's own task objects come from a different parse, and a panel fed from
+ * them could disagree with the gate about the same file.
  */
-export function releaseViewData({ root, config, tasks, now = Date.now(), run = spawnSync }) {
+export function releaseViewData({ root, config, now = Date.now(), run = spawnSync }) {
   const targets = config.deployTargets || [];
   const data = {
     available: false,
@@ -186,7 +169,7 @@ export function releaseViewData({ root, config, tasks, now = Date.now(), run = s
 
     const gaps = releaseGaps({
       root: repoRoot(root), config,
-      tasks: (tasks || []).filter((t) => t && t.id).map(gapTaskOf),
+      tasks: releaseTaskRecords(root, config),
       trunk: { spec: report.trunk.spec, source: report.trunk.source },
       state, run,
     });

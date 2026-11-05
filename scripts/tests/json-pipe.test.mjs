@@ -138,11 +138,11 @@ test("POSITIVE CONTROL: the old pattern truncates over the same number of bytes"
 
 test("the fix keeps the exit codes: a refusal is still non-zero", () => {
   const dir = bigBacklog();
-  // A usage error, a vocabulary refusal and a successful read, each with the
-  // code it had before. A fix that made everything exit 0 would be far worse
-  // than the bug it replaced.
+  // A usage error, a vocabulary refusal and a successful read, each with its
+  // own code — the vocabulary refusal is 1 since TL-559, a usage error 2. A fix
+  // that made everything exit 0 would be far worse than the bug it replaced.
   assert.equal(run(["query", "--dir", dir, "--nonsense"]).status, 2);
-  assert.equal(run(["query", "--dir", dir, "--status", "in-progress"]).status, 2);
+  assert.equal(run(["query", "--dir", dir, "--status", "in-progress"]).status, 1);
   assert.equal(run(["query", "--dir", dir, "--json"]).status, 0);
   assert.equal(run(["profile", "check", "does-not-exist", "--json"]).status, 1);
 });

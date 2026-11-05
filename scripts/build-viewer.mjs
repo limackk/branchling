@@ -417,8 +417,8 @@ export function buildHtml(
   // only — the page takes titles from ALL_TASKS. A project with no
   // `deploy_targets` reads nothing and shows no tab.
   const release = config.root
-    ? releaseViewData({ root: config.root, config, tasks })
-    : releaseViewData({ root: null, config: { ...config, deployTargets: [] }, tasks });
+    ? releaseViewData({ root: config.root, config })
+    : releaseViewData({ root: null, config: { ...config, deployTargets: [] } });
   const releaseJson = JSON.stringify(release).replace(/</g, "\\u003c");
   const viewerReleaseModuleSrc = readModuleSource("viewer-release.mjs");
 

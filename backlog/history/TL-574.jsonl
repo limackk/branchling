@@ -1,0 +1,3 @@
+{"id":"01M6P66CFDNZS4G3DH20J7GGN8","ts":"2026-11-05T15:45:44.429Z","task":"TL-574","field":"__created__","from":"","to":"next, run and handoff refuse an undeclared value as unknown-value","actor":"agent:loop-2","source":"new","reason":"unknown"}
+{"id":"01M6P66JNBMF6AFJJMCSAXN4NZ","ts":"2026-11-05T15:45:50.763Z","task":"TL-574","field":"conflict_group","from":[],"to":["json-envelope"],"actor":"agent:loop-2","source":"set","reason":"unknown"}
+{"id":"01M6P66KVK81B8Y6XBEBR06X3S","ts":"2026-11-05T15:45:51.987Z","task":"TL-574","field":"blocked_by","from":[],"to":["TL-559"],"actor":"agent:loop-2","source":"set","reason":"unknown"}

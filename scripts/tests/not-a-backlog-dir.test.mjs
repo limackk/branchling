@@ -46,11 +46,6 @@ const STACK = /^\s+at .+:\d+:\d+\)?$/m;
 const SOURCE = /^file:\/\//m;
 const REFUSAL = /does not look like a backlog/;
 
-/** `where` REPORTS where the backlog resolves and prints the refusal as part of
- *  its answer; under `BACKLOG_DIR` that answer exits 0 by its own contract
- *  (where-command.mjs), so it is not a refusal for the exit-code sweep. */
-const REPORTERS = new Set(["where"]);
-
 const base = mkdtempSync(join(tmpdir(), "branchling-not-a-backlog-"));
 const cwd = join(base, "cwd");
 mkdirSync(cwd);
@@ -104,7 +99,7 @@ function sweepCodes(invoke) {
   const wrong = [];
   let refused = 0;
   for (const name of Object.keys(COMMANDS)) {
-    if (SERVERS.has(name) || REPORTERS.has(name)) continue;
+    if (SERVERS.has(name)) continue;
     const r = invoke(name);
     if (!REFUSAL.test(r.stdout + r.stderr)) continue;
     refused++;

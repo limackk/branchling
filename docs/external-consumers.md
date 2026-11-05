@@ -268,9 +268,11 @@ contradict each other), and then stdout is empty.
 | `plan` | `plan-contradicts-blocked-by` — the order puts a task before what it is blocked by | `problems` | 1 |
 | `plan` | `plan-contradicts-tree` — the plan names an unknown task, one task twice, or a `together` group across waves | `problems` | 1 |
 | `set` (a write) | `unknown-value` — the value is outside the field's vocabulary; `usage` stays for an unknown field or a malformed value | `rejected` (`{ field, value }`), `declared` | 1 |
+| `query` | `unknown-value` — a `--status`, `--priority`, `--board` (or any other filter with a declared vocabulary) value outside it; an unknown flag or a missing value stays exit `2` | `rejected` (`{ field, value }`, the first one refused), `declared` (what that field accepts), `details` (one sentence per refused value) | 1 |
+| `handoff` (a write) | `unknown-value` — `--to-role` names a role outside `roles:`; a missing `--reason` or an unknown flag stays exit `2` | `rejected` (`{ field: "role", value }`), `declared` (the declared roles; `[]` when none are) | 1 |
 | `deploy status` | `unknown-name` — `--release`, `--target` or `--env` names nothing declared | `rejected` (`{ flag, value }`), `declared` (what that flag accepts; `[]` when nothing is) | 1 |
 
-A successful `deploy status --json` or `plan --json` carries `ok: true`.
+A successful `deploy status --json`, `plan --json` or `query --json` carries `ok: true`.
 
 **No backlog is a verdict, not a refusal.** `doctor --json` and `check --json`
 over a directory that holds no backlog — none found, or a `--dir` that is not

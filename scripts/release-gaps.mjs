@@ -93,10 +93,12 @@ import { spawnSync } from "node:child_process";
 import { deploymentState, parseCherry, parseTrunkLog } from "./environments.mjs";
 import { externalTargetsOf, isExternalTarget, observedTargets, pathInTarget } from "./deploy-targets.mjs";
 import { gitDiscoveryEnv } from "./git-env.mjs";
+import { backlogPaths } from "./paths.mjs";
 import { releaseEntriesOf } from "./release-entries.mjs";
 import { readShipments } from "./release-shipped.mjs";
 import { currentRelease } from "./release-status.mjs";
 import { taskIdScanner } from "./task-id.mjs";
+import { readTaskRecords } from "./task-select.mjs";
 
 /** The gap names, in the order a report lists them. `release_gate_accept`
  *  takes values from this list and nothing else. */
@@ -113,6 +115,23 @@ export const GAP_NAMES = Object.freeze([
 
 /** The values of `release_gate`, mirroring `contract_capability`. */
 export const RELEASE_GATE_MODES = Object.freeze(["report", "require"]);
+
+/**
+ * The task records `releaseGaps()` judges, read from the backlog directory.
+ *
+ * ONE READER FOR BOTH CALLERS (TL-552). `check --release` and the viewer's gap
+ * panel take their records from here. The panel used to project the page's own
+ * task objects, which a different parser produced, through a shim that
+ * restated this reader's defaults field by field; a field that shim forgot was
+ * a gap the gate reported and the panel could not show (TL-519), with no
+ * failure anywhere to say so.
+ *
+ * @param {string} backlogRoot the backlog directory, not the repository root
+ * @param {object} config the loaded configuration
+ */
+export function releaseTaskRecords(backlogRoot, config) {
+  return readTaskRecords(backlogPaths(backlogRoot).tasksDir, config.taskId.file);
+}
 
 const RS = String.fromCharCode(30);
 const US = String.fromCharCode(31);

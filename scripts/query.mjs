@@ -52,7 +52,8 @@
  * xargs, --count just the number. --limit N cuts the list, but SAYS how much it
  * cut off — in the text output as a note, in --json as `total`.
  *
- * Exit: 0 = the query ran (including when nothing matched), 2 = a usage error.
+ * Exit: 0 = the query ran (including when nothing matched), 1 = a filter value
+ * outside the backlog's vocabulary (TL-559), 2 = a usage error.
  */
 
 import { dirname } from "node:path";
@@ -136,8 +137,9 @@ if (opts.help || opts.h) {
   printLine("  " + [...VALUE_FLAGS].sort().join(" "));
   printLine("\nswitches:");
   printLine("  " + [...BOOL_FLAGS].filter((f) => f !== "--help" && f !== "-h").sort().join(" "));
-  printLine("\nexit code: 0 = the query ran (including on zero matches), " + BACKLOG_DIR_REFUSAL_EXIT + " = " +
-    BACKLOG_DIR_REFUSAL_PHRASE + ", 2 = a usage error.");
+  printLine("\nexit code: 0 = the query ran (including on zero matches), 1 = a filter value outside");
+  printLine("the backlog's vocabulary (an `unknown-value` envelope under --json),");
+  printLine(BACKLOG_DIR_REFUSAL_EXIT + " = " + BACKLOG_DIR_REFUSAL_PHRASE + ", 2 = a usage error.");
   process.exit(0);
 }
 
@@ -207,7 +209,7 @@ if (opts.tasks) {
   COLLECTED = [one];
 }
 
-// A FILTER VALUE OUTSIDE THE VOCABULARY FAILS, exactly as an unknown flag does
+// A FILTER VALUE OUTSIDE THE VOCABULARY FAILS, as an unknown flag does
 // (TL-161). Zero matches caused by a typo are indistinguishable from "there is
 // nothing like that", and they read like an answer — an agent asking for
 // `--status in-progress` is told there is no work in progress and stops.
@@ -236,11 +238,18 @@ const f = {
   text: opts.text,
 };
 
+// A REFUSAL, NOT A USAGE ERROR (TL-559): exit 1, and under `--json` an
+// `unknown-value` envelope naming the field, the value and what is declared.
+// The value is one a person typed into a correctly built call; exit 2 and an
+// empty stdout made it indistinguishable from the consumer's own malformed
+// invocation, which is the split `set` (TL-543) and `deploy status` (TL-533)
+// already draw.
 const withConfig = COLLECTED.filter((c) => c.config);
 const unknownValues = unknownFilterValues(f, withConfig.length ? withConfig[0].config : null);
 if (unknownValues.length) {
+  const sentence = (p) => "`" + p.value + "` is not an allowed value for the field `" + p.axis + "`";
   for (const p of unknownValues) {
-    console.error("✗ `" + p.value + "` is not an allowed value for the field `" + p.axis + "`");
+    console.error("✗ " + sentence(p));
     console.error("  allowed: " + p.allowed.join(" | ") + "   (" + p.where + ")");
   }
   // Said because the refusal would otherwise look like the archive being closed
@@ -249,7 +258,15 @@ if (unknownValues.length) {
   if (unknownValues.some((p) => p.axis === "status")) {
     console.error("  `--status` is also how you search the archive — with a value from that list.");
   }
-  process.exit(2);
+  if (opts.json) {
+    const [first] = unknownValues;
+    printJson("task-list", {
+      ok: false, refusalKind: "unknown-value", refusal: sentence(first),
+      details: unknownValues.map((p) => sentence(p) + "; allowed: " + p.allowed.join(" | ")),
+      rejected: { field: first.axis, value: first.value }, declared: first.allowed.slice(),
+    });
+  }
+  process.exit(1);
 }
 
 // DEPLOYMENT STATE (TL-501), computed only when something asks for it: a
@@ -408,6 +425,7 @@ if (opts.json) {
   // `scan` travels with it for the same reason (TL-73): a consumer must be
   // able to tell "no task differs across branches" from "nobody looked".
   printJson("task-list", {
+    ok: true,
     tasks: shown,
     total,
     limit,
