@@ -27,6 +27,7 @@ import { ANY_TASK_ID } from "./task-id.mjs";
 import {
   ACTOR_NAMESPACES,
   buildFieldSpecs,
+  DEDICATED_FIELDS,
   extractMeta,
   isValidActor,
   isValidReason,
@@ -37,18 +38,10 @@ import {
 } from "./task-fields.mjs";
 import { todayStamp } from "./today.mjs";
 
-/**
- * The fields a general write refuses because a dedicated command owns them,
- * with the commands that do. A status change is not a field edit: `done` runs
- * the verification, `take` reserves, `handoff` and `release` record the
- * exchange, `ask` records the question. A second path that only rewrote the
- * value would skip every one of those, and the owner moves with the same
- * commands for the same reason.
- */
-export const DEDICATED_FIELDS = Object.freeze({
-  status: ["take", "done", "handoff", "release", "ask"],
-  owner: ["take", "handoff", "release"],
-});
+// The fields a general write refuses, with the commands that own them. Defined
+// in `task-fields.mjs` so the page reads the same list (TL-563); re-exported
+// here for the callers of this module.
+export { DEDICATED_FIELDS };
 
 /** The optimistic revision of a task's text — what a reader proves it saw. */
 export function taskRevision(text) {

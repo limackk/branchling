@@ -180,11 +180,15 @@ test("stale tokens, traversal, invalid actors and oversized input are refused", 
     const current = await revision(port, fx.id);
     assert.equal((await call(port, "/api/task", { ...live, body: { id: "../config", field: "title", value: "No", actor: "local:owner", revision: current } })).status, 404);
     assert.equal((await call(port, "/api/task", { ...live, body: { id: fx.id, field: "title", value: "No", actor: "owner", revision: current } })).status, 400);
-    const needsReason = await call(port, "/api/task", {
+    // A status is owned by its commands (TL-563): the route refuses the field
+    // before it would ask for a reason. viewer-dedicated-fields.test.mjs holds
+    // the whole contract; this line keeps the refusal in the boundary's list.
+    const dedicated = await call(port, "/api/task", {
       ...live, body: { id: fx.id, field: "status", value: "blocked", actor: "local:owner", revision: current },
     });
-    assert.equal(needsReason.status, 422);
-    assert.equal(needsReason.json().needsReason, true);
+    assert.equal(dedicated.status, 400);
+    assert.match(dedicated.json().error, /`status` has dedicated commands/);
+    assert.notEqual(dedicated.json().needsReason, true);
     const latest = await capability(port);
     const huge = "x".repeat(17 * 1024);
     const oversized = await call(port, "/api/task", {

@@ -61,7 +61,7 @@ import { readFileSync, readdirSync, unlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { resolveActor } from "./actor.mjs";
+import { resolveActorReport } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { ACTOR_NAMESPACES, isValidActor, reasonRefusal, recordCreation, reconcile } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
@@ -98,7 +98,8 @@ export const USAGE = [
   "                       that file holds the project's vocabulary and this instruction",
   "                       is over when the run is",
   "  --label-map <file>   the same mapping as a JSON object, for more than a handful",
-  "  --actor <ns:name>    who is importing; goes into the history beside every task",
+  "  --actor <ns:name>    who is importing; goes into the history beside every task.",
+  "                       `--json` says where it came from, as `actorSource`",
   "",
   "  WHAT IT DOES NOT BRING OVER: comments, attachments, status history, assignees.",
   "  Those are the conversation around a task, not the task — the link to the source",
@@ -400,7 +401,7 @@ export function writeImport({ root, config, board, items, createOne = createTask
 
 function recordCreations(root, written, opts) {
   if (!written.length) return;
-  const actor = resolveActor(opts.actor);
+  const { actor } = opts.resolved;
   const ts = new Date().toISOString();
   // ONE SHAPE FOR A CREATION, in `history.mjs` (TL-187): `new` writes this
   // entry too now, and three hand-built copies of it would drift.
@@ -428,9 +429,9 @@ function droppedSummary(dropped) {
   return [...counts.entries()].map(([label, n]) => label + " ×" + n);
 }
 
-function refused(problems, json) {
-  if (json) {
-    printJson("import", { ok: false, errors: problems });
+function refused(problems, opts) {
+  if (opts.json) {
+    printJson("import", { ok: false, errors: problems, actorSource: opts.resolved.actorSource });
   } else {
     const [head, ...rest] = problems;
     console.error(failure(N + " import", head, rest, [`${N} import --help`]));
@@ -448,6 +449,9 @@ export function main(argv) {
     console.error(failure(N + " import", head, rest, [`${N} import --help`]));
     return 2;
   }
+  // Resolved ONCE, before the input is read (TL-550): the creations are
+  // recorded under this actor, and `--json` names the rung that answered.
+  opts.resolved = resolveActorReport(opts.actor);
 
   if (process.stdin.isTTY) {
     console.error(failure(
@@ -471,7 +475,7 @@ export function main(argv) {
   // The SHAPE of the input, judged before the backlog is even resolved: a
   // refusal that costs nothing to undo.
   const { issues, errors: shapeErrors } = parseIssues(input);
-  if (shapeErrors.length) return refused(shapeErrors, opts.json);
+  if (shapeErrors.length) return refused(shapeErrors, opts);
 
   let root;
   try {
@@ -499,7 +503,7 @@ export function main(argv) {
 
   const alreadyImported = importedSources(paths.tasksDir);
   const plan = planImport({ issues, config, labelMap: opts.labelMap, alreadyImported });
-  if (plan.errors.length) return refused(plan.errors, opts.json);
+  if (plan.errors.length) return refused(plan.errors, opts);
 
   const board = config.defaultBoard || (config.boards || []).map((b) => b.slug)[0] || "main";
 
@@ -510,6 +514,7 @@ export function main(argv) {
         wouldCreate: plan.items.map((i) => ({ title: i.title, status: i.status, labels: i.labels, source: i.issue.url })),
         skipped: plan.skipped.map((i) => i.url),
         droppedLabels: droppedSummary(plan.dropped),
+        actorSource: opts.resolved.actorSource,
       });
       return 0;
     }
@@ -555,6 +560,7 @@ export function main(argv) {
       skipped: plan.skipped.map((i) => i.url),
       droppedLabels: droppedSummary(plan.dropped),
       withoutVerification: written.length,
+      actorSource: opts.resolved.actorSource,
     });
     return 0;
   }

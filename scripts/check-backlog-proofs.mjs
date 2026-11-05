@@ -32,6 +32,14 @@
  * narrowed and by what rule — a narrowing nobody can see is a narrowing nobody
  * can trust.
  *
+ * THE RANGE IS JUDGED AGAINST A TASK'S OWN ENTRIES (TL-556). Every proven
+ * contract ends in the project's `closing_contract` (TL-495), so a project
+ * entry naming a path the range touched used to keep EVERY closing, and
+ * `--since` narrowed nothing. A project entry says nothing about which task a
+ * range concerns — it is the same line in all of them. It is still run, once,
+ * whenever at least one closing is kept (TL-497), because the closings kept are
+ * proved by the contract `done` runs, which includes it.
+ *
  * THE DEFAULT SCOPE STAYS UNNARROWED, AND THE COST IS MADE VISIBLE INSTEAD
  * (TL-265). Defaulting to a range would make a green report mean "the proofs
  * this range touches still hold" while it READS as "the proofs still hold", and
@@ -83,6 +91,29 @@
  * red one is reported ONCE, as a project finding, with the closings it would
  * have failed: the repair is in `config.yaml`, not in any of those tasks.
  *
+ * A PROOFS RUN INSIDE A PROOFS RUN RE-RUNS NOTHING (TL-565). "Every earlier
+ * contract still passes" is a reasonable entry to write, and `check --proofs`
+ * is the command that says it. Closing such a task works, because the task is
+ * open while `done` runs it and the inner run skips it; from then on every
+ * proofs run re-runs that contract, which starts a proofs run, which re-runs it
+ * again — without end, since every entry leads its own process group and a kill
+ * of the outermost group leaves the nested runs recursing. So every command
+ * this run starts carries a mark in its environment naming the backlog it
+ * covers. A run that finds its own backlog in that mark prints that it is
+ * nested and exits 0: the enclosing run already re-runs every closed contract,
+ * this one included, and a failure here would report a task broken that
+ * nothing in the tree broke. The enclosing run names each entry that hit the
+ * guard, so an entry whose only effect was the nested call does not read as a
+ * pass that proved something.
+ *
+ * Rejected: a depth limit, which stays exponential in the number of closed
+ * contracts carrying the entry; refusing the entry in `check --contracts`,
+ * which judges open tasks and not the closed ones that recurse. The mark names
+ * the BACKLOG and not merely "a run": this repository's own suite starts
+ * proofs runs over temporary fixtures, whose contracts no enclosing run covers,
+ * and those have to run for real. A `check --proofs` started by `done` outside
+ * any proofs run carries no mark, so it runs for real as well.
+ *
  * Usage:
  *   node scripts/check-backlog-proofs.mjs [--dir <backlog>] [--since <sha>] [--quiet]
  *
@@ -94,14 +125,17 @@
  *        `node --test scripts/tests/proofs-progress.test.mjs`,
  *        `node --test scripts/tests/check-contract-falsifiable.test.mjs`,
  *        `node --test scripts/tests/done-closing-contract.test.mjs`,
- *        `node --test scripts/tests/proofs-project-once.test.mjs`
+ *        `node --test scripts/tests/proofs-project-once.test.mjs`,
+ *        `node --test scripts/tests/proofs-reentrance.test.mjs`
  */
 
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { appendFileSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { canonicalPath } from "./canonical-path.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { REASON_PROVEN, readHistory } from "./history.mjs";
 import { modifiedFiles } from "./modified-files.mjs";
@@ -117,6 +151,45 @@ const OKM = color.ok(MARK.ok);
 const ERRM = errColor.err(MARK.err);
 const WARNM = errColor.warn(MARK.warn);
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+/**
+ * The environment variable that marks every command a proofs run starts
+ * (TL-565). Its value is JSON: `roots`, the canonical backlog roots of every
+ * enclosing proofs run; `report`, the file the nearest one reads back; and
+ * `entry`, which of its entries started this process.
+ */
+export const PROOFS_RUN_ENV = "BACKLOG_PROOFS_RUN";
+
+/**
+ * The enclosing proofs run this one is nested in, or null. PURE.
+ *
+ * Nested means: an enclosing run covers THIS backlog. A mark naming only other
+ * backlogs is not a reason to skip anything, and a malformed mark is no mark —
+ * running for real is the reading that cannot silently skip a proof.
+ */
+export function nestedRun(env, root) {
+  const mark = readMark(env);
+  return mark.roots.includes(root) ? mark : null;
+}
+
+/** The mark as read, with an empty chain for an absent or malformed one. PURE. */
+function readMark(env) {
+  const none = { roots: [], report: null, entry: "" };
+  const raw = env && env[PROOFS_RUN_ENV];
+  if (!raw) return none;
+  let mark;
+  try {
+    mark = JSON.parse(raw);
+  } catch {
+    return none;
+  }
+  if (!mark || !Array.isArray(mark.roots)) return none;
+  return {
+    roots: mark.roots.filter((r) => typeof r === "string"),
+    report: typeof mark.report === "string" ? mark.report : null,
+    entry: typeof mark.entry === "string" ? mark.entry : "",
+  };
+}
 
 /**
  * The closing this tool PROVED, or null. PURE.
@@ -163,12 +236,16 @@ function changedPaths(repoRoot, since) {
  *
  * Two ways in, both stated rather than guessed: a file the task itself touched
  * (which is what `modified_files` knows), or a path named literally in one of
- * its contract commands. Everything else is left out, and the caller reports the
- * count so that nobody mistakes a narrowed run for a complete one.
+ * its OWN contract commands. A project `closing_contract` entry is skipped even
+ * when a caller passes it (TL-556): it is identical in every contract, so a
+ * path it names would keep every task and narrow nothing. Everything else is
+ * left out, and the caller reports the count so that nobody mistakes a
+ * narrowed run for a complete one.
  */
 export function touchedByRange(task, entries, changed, touchedFiles) {
   for (const f of touchedFiles || []) if (changed.has(f)) return true;
   for (const e of entries || []) {
+    if (e && e.project) continue;
     const text = String(e.bash || "");
     for (const path of changed) if (path && text.indexOf(path) >= 0) return true;
   }
@@ -196,6 +273,20 @@ async function main(argv) {
   }
 
   const root = resolveBacklogDir({ dir: dir || undefined, moduleDir: __dirname }).root;
+  const here = canonicalPath(root);
+  const enclosing = nestedRun(process.env, here);
+  if (enclosing) {
+    // Reported back BEFORE the notice, and a report that cannot be written is
+    // not a reason to fail: the enclosing run's verdict does not depend on it.
+    if (enclosing.report) {
+      try { appendFileSync(enclosing.report, enclosing.entry + "\n", "utf8"); } catch { /* the enclosing run is gone */ }
+    }
+    console.log(
+      `${MARK.bullet} proofs: nested inside a \`check --proofs\` run over this backlog, which already ` +
+        "re-runs every closed contract — nothing was re-run here"
+    );
+    return 0;
+  }
   const config = loadConfigOrExit(root);
   const paths = backlogPaths(root);
   const repoRoot = repoRootFor(root);
@@ -260,8 +351,11 @@ async function main(argv) {
       return 2;
     }
     const index = modifiedFiles({ root: repoRoot, prefix: config.taskIdPrefix });
+    // `own`, not `entries`: the project's half is the same in every contract
+    // and says nothing about which task the range concerns (TL-556). An open
+    // task carries its own entries only, so the one rule serves both halves.
     const keep = (c) =>
-      touchedByRange(c, c.entries, changed, (index.byTask && index.byTask.get(c.id)) || []);
+      touchedByRange(c, c.own || c.entries, changed, (index.byTask && index.byTask.get(c.id)) || []);
     selected = candidates.filter(keep);
     // The SAME rule over the open half, for the same reason: a range is a
     // statement about which questions are worth asking again, and asking it of
@@ -270,7 +364,7 @@ async function main(argv) {
     narrowedNote =
       `narrowed to ${selected.length} of ${candidates.length} closing(s) and ` +
       `${openSelected.length} of ${open.length} open contract(s) by ${since}..HEAD ` +
-      "— a task is kept when the range touched a file it changed, or a path its contract names";
+      "— a task is kept when the range touched a file it changed, or a path its own contract names";
   }
 
   // PROGRESS GOES TO STDERR (TL-265). stdout carries the report, and a consumer
@@ -312,6 +406,18 @@ async function main(argv) {
     progress(`  in ${repoRoot} — narrow the run with \`--since <sha>\`, stop it with one interrupt`);
   }
 
+  // THE MARK (TL-565): every command below learns that this run covers this
+  // backlog, and which entry started it; a nested `check --proofs` writes that
+  // entry into `report` instead of re-running the archive.
+  const reportDir = mkdtempSync(join(tmpdir(), "proofs-nested-"));
+  const report = join(reportDir, "entries");
+  // The chain keeps the roots of runs further out: a cycle across backlogs
+  // stops at the first one that comes round again.
+  const roots = [...readMark(process.env).roots, here];
+  const markFor = (label) => (e) => ({
+    [PROOFS_RUN_ENV]: JSON.stringify({ roots, report, entry: label + ": " + (e.id || e.bash) }),
+  });
+
   const started = Date.now();
   const broken = [];
   const vouched = [];
@@ -341,7 +447,8 @@ async function main(argv) {
     }
     // Named BEFORE it runs, not after: the line an operator needs while the
     // command hangs is the one that says which command is hanging.
-    const own = await runContract(c.own, repoRoot, { capture: true, signal: cancellation.signal, before, after });
+    const own = await runContract(c.own, repoRoot,
+      { capture: true, signal: cancellation.signal, before, after, env: markFor(c.id) });
     if (own.interrupted) break;
     commandsLeft -= c.own.length;
     for (const r of own.results) {
@@ -362,7 +469,8 @@ async function main(argv) {
       if (hit) {
         reused++;
       } else {
-        const r = await runContract([e], repoRoot, { capture: true, signal: cancellation.signal, before, after });
+        const r = await runContract([e], repoRoot,
+          { capture: true, signal: cancellation.signal, before, after, env: markFor("project `closing_contract`") });
         if (r.interrupted) { interrupted = true; break; }
         hit = { row: r.results[0], failed: r.failed };
         projectCache.set(key, hit);
@@ -395,11 +503,22 @@ async function main(argv) {
     const { results, interrupted } = await runContract(c.entries, repoRoot, {
       capture: true,
       signal: cancellation.signal,
+      env: markFor(c.id + " (" + c.status + ")"),
       before: progress ? (e) => progress(`      ${MARK.arrow} ${e.bash}`) : undefined,
     });
     if (interrupted) break;
     if (greenFromBirth(results)) unfalsifiable.push({ ...c, results });
   }
+
+  // Each entry once, in the order it was reached: a contract run twice (a
+  // project entry reused, say) is one entry that hit the guard, not two.
+  let nested = [];
+  try {
+    nested = [...new Set(readFileSync(report, "utf8").split("\n").filter(Boolean))];
+  } catch {
+    // No nested run wrote anything, so the file was never created.
+  }
+  rmSync(reportDir, { recursive: true, force: true });
 
   const seconds = ((Date.now() - started) / 1000).toFixed(1);
   process.removeListener("SIGINT", onSignal);
@@ -422,6 +541,15 @@ async function main(argv) {
       `  ${MARK.bullet} ${projectCache.size} project \`closing_contract\` entr(ies) run once ` +
         `and applied to ${reachedProject} proven closing(s)`
     );
+  }
+  if (nested.length) {
+    // NAMED, because a pass here proved nothing by itself: the nested run
+    // re-ran nothing, and this run's own verdict is what covers those contracts.
+    lines.push(
+      `  ${WARNM} ${nested.length} entr(ies) started a nested \`check --proofs\`, which re-ran nothing ` +
+        "— this run re-runs every closed contract itself"
+    );
+    for (const n of nested) lines.push(`    ${MARK.bullet} ${n}`);
   }
   if (vouched.length) {
     lines.push(

@@ -108,6 +108,13 @@ export const KINDS = {
     heldInOtherTrees: null,
     // `{polls, seconds, gaveUp}` under `--wait` (TL-491).
     waited: null,
+    // Which rung named the run's actor (TL-550): `flag`, `env`, `config`,
+    // `profile` — the identity of the one local profile the run starts, or
+    // `agent:fleet` for several — or `default`. Every task the run claims is
+    // claimed under that actor with an explicit `--actor`, so the claim's own
+    // `actorSource` always says `flag`; this is the only place the real rung
+    // is visible.
+    actorSource: null,
   },
   // `run --stop --json` (TL-485): the request as written, and where. `origin`
   // is the clone it reaches — every run of it, from any of its worktrees.
@@ -189,14 +196,26 @@ export const KINDS = {
   // it wrote, `id` is the number the tool allocated. `errors` is what the plan
   // was refused for, in full — an adapter retrying with the model (TL-95) needs
   // every complaint, not the first.
-  seed: { ok: null, root: null, dryRun: null, created: [], errors: [] },
+  // `actorSource` (TL-550) on seed, import, new, deploy record and run: which
+  // rung of the actor chain named the actor the write was recorded under —
+  // `flag`, `env`, `config` or `default`, as for the kinds TL-544 covered. It
+  // is null where the actor was never resolved: a refusal before it, or a
+  // refusal of the invocation itself.
+  seed: { ok: null, root: null, dryRun: null, created: [], errors: [], actorSource: null },
   // `import --json`. A dry run reports `wouldCreate`; a real import reports
   // `created` and `withoutVerification`. Both paths share one kind, so the
   // other path's keys stay present with their declared empty values.
   import: {
     ok: null, root: null, dryRun: null, created: [], wouldCreate: [],
-    skipped: [], droppedLabels: [], withoutVerification: null, errors: [],
+    skipped: [], droppedLabels: [], withoutVerification: null, errors: [], actorSource: null,
   },
+  // `new --json` (TL-550). `idSource` is where the number came from — `repo`,
+  // a scan of every branch and worktree, or `local`, this directory alone, the
+  // known risk the text output says out loud. `wave` is null unless `--wave`
+  // scheduled the task. A missing backlog answers in this kind with `ok: false`
+  // and `refusalKind: "no-backlog"` (TL-548); every other refusal is still a
+  // sentence on stderr and a non-zero exit, as before the flag existed.
+  "task-new": { ok: null, id: null, file: null, board: null, wave: null, idSource: null, actorSource: null },
   // `plan --json`. `exists` is false for a backlog with no `plan.yaml`, and then
   // every other key carries its empty value — the execution order is optional,
   // so its absence is an answer and not an error to be told apart from one.
@@ -341,7 +360,7 @@ export const KINDS = {
   // remote already fetches the ref.
   "release-record": {
     ok: null, target: null, stage: null, ref: null, commit: null, tag: null, previous: null, direction: null,
-    actor: null, reason: null, recordedAt: null, remote: null, push: null, fetchFix: null,
+    actor: null, reason: null, recordedAt: null, remote: null, push: null, fetchFix: null, actorSource: null,
     refusalKind: null, refusal: null, details: [],
   },
   // `declare --json` (TL-522): the entry appended to `releases:` or
@@ -713,6 +732,9 @@ export const KIND_EXERCISE = {
     args: ["decide", ABSENT_TASK, "--reason", "a fixture", "--actor", "agent:test", "--json"],
     refuses: true, writes: true,
   },
+  // A task created for real: `new` has no refusal envelope to exercise, and
+  // the fixture is a throwaway tree.
+  "task-new": { args: ["new", "--title", "A fixture task", "--actor", "agent:test", "--json"], writes: true },
   seed: {
     args: ["seed", "--json"],
     writes: true,

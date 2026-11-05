@@ -1120,6 +1120,7 @@ ${paletteBadgeCss}
     border-color: var(--accent); background: var(--accent-soft); outline: none;
   }
   .edit-pen { margin-left: 6px; color: var(--accent); }
+  .meta-commands { display: block; margin-top: 3px; font-size: 12px; color: var(--fg-muted); }
   .meta-row.is-editing { background: var(--accent-soft); border-radius: 8px; padding: 6px; margin: -6px; }
   .meta-row-wide { grid-column: 1 / -1; }
   select.field-editor, .field-input { width: 100%; }
@@ -3162,7 +3163,7 @@ function dynamicOptions() {
 }
 
 function startEdit(id, field) {
-  if (!CAN_EDIT) return;
+  if (!CAN_EDIT || DEDICATED_FIELDS[field]) return;
   if (!isValidActor(state.actor) || !state.actor.startsWith("user:")) {
     state.editMessage = "Enter a user:name identity before editing.";
     state.editError = true;
@@ -3231,6 +3232,7 @@ async function saveField(taskId, field, value, reason) {
   state.editMessage = "Saving…";
   state.editError = false;
   renderDetail();
+  let actorRefused = false;
   try {
     const res = await fetch("api/task", {
       method: "POST",
@@ -3246,11 +3248,14 @@ async function saveField(taskId, field, value, reason) {
       if (data.needsReason) {
         state.reasonAsk = { id: taskId, field: field, value: normalized.value, draft: reason || "", error: data.error || "A reason is required." };
       }
+      // The server refused to record the edit under a default nobody named
+      // (TL-551): the fix is the identity field, so that is where focus goes.
+      if (data.refusalKind === "actor-required") actorRefused = true;
       throw new Error(data.error || "HTTP " + res.status);
     }
     if (data.entries) HISTORY[taskId] = (HISTORY[taskId] || []).concat(data.entries);
     await refreshFromServer(true);
-    state.editMessage = fieldLabel(field) + " saved to Markdown and history as " + state.actor + ".";
+    state.editMessage = fieldLabel(field) + " saved to Markdown and history as " + (data.actor || state.actor) + ".";
     state.editError = false;
     renderDetail();
   } catch (error) {
@@ -3258,6 +3263,7 @@ async function saveField(taskId, field, value, reason) {
     state.editError = true;
     renderDetail();
     if (state.reasonAsk) focusReasonAsk();
+    if (actorRefused) document.getElementById("editingActor").focus();
   }
 }
 
@@ -3293,10 +3299,22 @@ function valueHtml(t, key) {
   return escape(formatValue(value) || "—");
 }
 
+// A field a dedicated command owns (TL-563) is shown, never edited: the route
+// refuses it, so an editor would be a promise the page cannot keep. The row
+// names the commands instead, which is where that change is made.
+function dedicatedCommandsHtml(key) {
+  const commands = DEDICATED_FIELDS[key];
+  if (!CAN_EDIT || !commands) return "";
+  return '<span class="meta-commands">Changed in the terminal: ' + commands.map(function (command) {
+    return "<code>${N} " + escape(command) + "</code>";
+  }).join(", ") + '</span>';
+}
+
 function metaRowHtml(t, spec) {
-  const editing = state.editing && state.editing.id === t.id && state.editing.field === spec.key;
-  const editable = CAN_EDIT;
-  const body = editing ? editorHtml(t, spec) : '<div class="meta-value' + (editable ? ' is-editable' : '') + '"' + (editable ? ' tabindex="0" role="button" onclick="startEdit(\\'' + escape(t.id) + '\\',\\'' + escape(spec.key) + '\\')" onkeydown="if(event.key===\\'Enter\\'||event.key===\\' \\'){event.preventDefault();startEdit(\\'' + escape(t.id) + '\\',\\'' + escape(spec.key) + '\\')}"' : '') + '>' + valueHtml(t, spec.key) + (editable ? '<span class="edit-pen" aria-hidden="true">edit</span>' : '') + '</div>';
+  const dedicated = !!DEDICATED_FIELDS[spec.key];
+  const editing = !dedicated && state.editing && state.editing.id === t.id && state.editing.field === spec.key;
+  const editable = CAN_EDIT && !dedicated;
+  const body = editing ? editorHtml(t, spec) : '<div class="meta-value' + (editable ? ' is-editable' : '') + '"' + (editable ? ' tabindex="0" role="button" onclick="startEdit(\\'' + escape(t.id) + '\\',\\'' + escape(spec.key) + '\\')" onkeydown="if(event.key===\\'Enter\\'||event.key===\\' \\'){event.preventDefault();startEdit(\\'' + escape(t.id) + '\\',\\'' + escape(spec.key) + '\\')}"' : '') + '>' + valueHtml(t, spec.key) + (editable ? '<span class="edit-pen" aria-hidden="true">edit</span>' : '') + dedicatedCommandsHtml(spec.key) + '</div>';
   return '<div class="meta-row' + ((spec.kind === "list") ? ' meta-row-wide' : '') + (editing ? ' is-editing' : '') + '"><div class="meta-label">' + escape(spec.label) + '</div>' + body + '</div>';
 }
 

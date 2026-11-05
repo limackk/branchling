@@ -37,8 +37,9 @@ import { readFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { ACTOR_ENV, actorRequiredRefusal, resolveActorReport } from "./actor.mjs";
 import { readTasks, computeStats, buildHtml } from "./build-viewer.mjs";
-import { fileForTaskId as fileInTasks, taskRevision, writeTaskField } from "./field-write.mjs";
+import { DEDICATED_FIELDS, fileForTaskId as fileInTasks, taskRevision, writeTaskField } from "./field-write.mjs";
 import { loadConfig, loadConfigOrExit } from "./config.mjs";
 import { PLAN_FILENAME, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { loadPlan } from "./plan.mjs";
@@ -527,8 +528,9 @@ function planPayload(dir = BACKLOG_DIR) {
  * and the refusal existed because the switcher made it possible to believe an
  * edit had landed somewhere it had not.
  *
- * With no write path left there is nothing to refuse, and with no switcher
- * there is nothing to resolve. A reader who wants another worktree's backlog
+ * With no switcher there is nothing to resolve, and the one write route can
+ * only land in the tree this process reads, so there is no other tree to
+ * refuse. A reader who wants another worktree's backlog
  * starts a server in it — which is also the only arrangement in which the
  * answer and the tree it describes cannot drift apart.
  *
@@ -545,17 +547,59 @@ function planPayload(dir = BACKLOG_DIR) {
  * it; a handler that asks git again is how the 404 comes back.
  */
 
+/**
+ * The actor of one edit from the page, or the refusal to make it (TL-551).
+ *
+ * The page acts for a PERSON, so this route is the caller `--require-actor`
+ * exists for: the request's `actor` is the flag, the server's own environment
+ * and user configuration are the rungs below it exactly as they are for the
+ * CLI, and the default `agent:` actor is refused rather than taken — a
+ * person's edit recorded under a program nobody named is indistinguishable
+ * from that program's own write. The sentence names the page's way of stating
+ * an actor first, because the person reading it is at the page, not at the
+ * terminal that started this server.
+ */
+function editActor(payload) {
+  const resolved = resolveActorReport(typeof payload?.actor === "string" ? payload.actor : "");
+  const required = actorRequiredRefusal(true, resolved, "edits the task");
+  if (!required) return { ok: true, ...resolved };
+  return {
+    ok: false,
+    status: 422,
+    message: "No actor was stated, so nothing was saved. Enter who you are under \u201cEditing as\u201d"
+      + " (user:<name>) and save again.",
+    refusalKind: required.refusalKind,
+    details: [
+      "The default `" + resolved.actor + "` names a program, not the person editing.",
+      "A caller other than the page states one as `actor` in the request; the server also accepts the "
+        + ACTOR_ENV + " environment variable or `actor:` in the user configuration of whoever started it.",
+    ],
+    actorSource: resolved.actorSource,
+  };
+}
+
 async function handleFieldEdit(payload) {
   return serializeEdit(async () => {
+    // Before the echo suppression and before the file is read: a refused
+    // actor writes nothing, so it must not mute the watcher either.
+    const stated = editActor(payload);
+    if (!stated.ok) {
+      throw Object.assign(new Error(stated.message), {
+        status: stated.status, refusalKind: stated.refusalKind, details: stated.details, actorSource: stated.actorSource,
+      });
+    }
     // The validation, the write and the history record are the shared core's
-    // (TL-521), so this route and `set` cannot drift. What stays here is what
-    // only a server has: the page's revision proof, the echo suppression and
-    // the push to open tabs.
+    // (TL-521), so this route and `set` cannot drift — and that includes WHICH
+    // fields it refuses (TL-563): status and owner belong to the commands that
+    // run their checks, so the route refuses them exactly as `set` does. What
+    // stays here is what only a server has: the page's revision proof, the
+    // echo suppression and the push to open tabs.
     suppressUntil = Date.now() + 1500;
     const result = writeTaskField({
       root: BACKLOG_DIR, config: CONFIG, source: "viewer",
+      refusedFields: Object.keys(DEDICATED_FIELDS),
       id: payload?.id, field: payload?.field, value: payload?.value,
-      actor: payload?.actor, reason: payload?.reason,
+      actor: stated.actor, reason: payload?.reason,
       revision: typeof payload?.revision === "string" ? payload.revision : null,
     });
     if (!result.ok) {
@@ -573,7 +617,7 @@ async function handleFieldEdit(payload) {
     }
     return {
       ok: true, id: result.id, field: result.field, value: result.value, actor: result.actor,
-      entries: result.entries, regenerated, revision: result.revision,
+      actorSource: stated.actorSource, entries: result.entries, regenerated, revision: result.revision,
     };
   });
 }
@@ -653,6 +697,7 @@ async function handle(req, res) {
         error: error.message,
         needsReason: error.needsReason === true,
         ...(error.revision ? { revision: error.revision } : {}),
+        ...(error.refusalKind ? { refusalKind: error.refusalKind, details: error.details || [], actorSource: error.actorSource } : {}),
       });
     }
     return;
@@ -662,21 +707,27 @@ async function handle(req, res) {
   // the short-lived capability injected only into a served page. Snapshot mode
   // has neither the route nor the capability and remains read-only.
   //
-  // This server used to answer `/api/field`, `/api/status` and `/api/decision`
-  // with a POST, and to serve `/api/fields`, `/api/history` and
-  // `/api/worktrees` for the editor those three needed. All six are gone.
+  // WHAT THAT ROUTE MAY WRITE is exactly what `set` may write (TL-521,
+  // TL-563). Both call `writeTaskField()` with the same refused fields, so the
+  // validation, the reason rule, the history record and the refusal of
+  // `status` and `owner` are one definition with two callers rather than two
+  // policies kept in step. Those two fields are refused because a command owns
+  // each change to them — `done` runs the verification, `take` reserves,
+  // `handoff` and `release` record the exchange, `ask` records the question —
+  // and a route that only rewrote the value would skip every one of those
+  // checks. The page therefore offers no editor for them and names the
+  // commands instead, as the decisions view names `decide`.
   //
-  // The product's authoritative write surface is Markdown, the CLI and git
-  // review. A second write path beside it does not strengthen that boundary: it
-  // adds an actor to establish, a validation to keep in step with the CLI's,
-  // and a server lifetime during which somebody else's tasks are reachable on a
-  // socket — and the only thing defending any of it was the page choosing not
-  // to render a button. A route is what a stranger with `curl` reaches, which
-  // is why the guard for this calls them rather than looking for the button.
+  // The refusal is the route's, not the page's. A route is what a stranger
+  // with `curl` reaches, so the guard for this posts to it rather than looking
+  // for a missing button (`scripts/tests/viewer-dedicated-fields.test.mjs`).
   //
-  // What a reader still gets is the whole point of the viewer and needs no
-  // write: `/api/tasks` carries the tasks, the stats and the plan, `/api/events`
-  // says when they changed, and `/api/ping` says whose backlog this is.
+  // The routes this server answered before TL-379 — POSTs to `/api/field`,
+  // `/api/status` and `/api/decision`, and `/api/fields`, `/api/history` and
+  // `/api/worktrees` for their editor — are gone, and nothing here answers
+  // them. Reading needs no write: `/api/tasks` carries the tasks, the stats and
+  // the plan, `/api/events` says when they changed, and `/api/ping` says whose
+  // backlog this is.
   sendJson(res, 404, { error: "Not found" });
 }
 

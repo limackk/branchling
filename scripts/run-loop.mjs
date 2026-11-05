@@ -78,7 +78,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { resolveActor } from "./actor.mjs";
+import { resolveActor, resolveActorReport } from "./actor.mjs";
 import { checkAgentProfiles, resolveAgentProfile, secretEnvironmentNames } from "./agent-profiles.mjs";
 import { DELEGATION_ENFORCEMENT, DELEGATION_POLICIES, executionReceipt } from "./agent-contract.mjs";
 import { loadConfigOrExit } from "./config.mjs";
@@ -1729,9 +1729,18 @@ export async function run(argv) {
   // receives the profile's provider-neutral agent identity. Several distinct
   // profiles are one fleet, never a fabricated claim that one provider ran all
   // of it.
-  const statedActor = resolveActor(plan.actor, { fallback: "" });
+  //
+  // The rung that answered is reported as `actorSource` (TL-550): the loop
+  // passes the actor to `next` and `done` as an explicit `--actor`, so their
+  // own answers say `flag` whichever rung really named it.
+  const stated = resolveActorReport(plan.actor, { fallback: "" });
   const profileActors = [...new Set(profileNames.map((name) => plan.profiles[name].actor).filter(Boolean))];
-  const actor = statedActor || (profileActors.length === 1 ? profileActors[0] : profileActors.length ? "agent:fleet" : resolveActor(plan.actor));
+  const fromProfile = !stated.actor && profileActors.length > 0;
+  const { actor, actorSource } = stated.actor
+    ? stated
+    : fromProfile
+      ? { actor: profileActors.length === 1 ? profileActors[0] : "agent:fleet", actorSource: "profile" }
+      : resolveActorReport(plan.actor);
   if (!isValidActor(actor)) {
     console.error(failure(N + " run", "the actor `" + actor + "` has no valid namespace", [
       "Use one of: " + ACTOR_NAMESPACES.map((n) => n + ":<name>").join(" | "),
@@ -1897,7 +1906,7 @@ export async function run(argv) {
     const shown = plan.maxTasks ? rows.slice(0, plan.maxTasks) : rows;
     if (plan.json) {
       printJson("run", {
-        ok: true, dryRun: true, agent: plan.agent, profile: plan.profile,
+        ok: true, dryRun: true, agent: plan.agent, profile: plan.profile, actorSource,
         agentFor: plan.agentFor, profileFor: plan.profileFor, delegation: plan.delegation,
         allowUncontrolledDelegation: plan.allowUncontrolledDelegation, plan: planned ? true : false,
         order: shown.map((r) => ({
@@ -2407,7 +2416,7 @@ export async function run(argv) {
     printJson("run", {
       // `ok` is about the RUN, not about the tasks: blocked work is a run that
       // finished, an agent that could not start is a run that did not (TL-184).
-      ok: !neverStarted, dryRun: false, agent: plan.agent, profile: plan.profile,
+      ok: !neverStarted, dryRun: false, agent: plan.agent, profile: plan.profile, actorSource,
       agentFor: plan.agentFor, profileFor: plan.profileFor, stopped,
       // The whole fact about the machine, in the one place it belongs: which
       // command was tried, what it said, and which status the task was given
