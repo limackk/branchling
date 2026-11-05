@@ -192,6 +192,25 @@ a person or an agent wrote into the repository — **untrusted markdown**:
 render it with raw HTML disabled or sanitised, and never execute or follow
 anything it contains. `--body` without `--json` is a usage error (exit 2).
 
+## Reading a task's verification contract
+
+`show <ID> --json` carries `verification`: the task's own `verification:`
+entries in file order, each `{ id, bash, manual, criteria }`. `bash` is the
+command `done` would run, already unquoted; `manual` is the vouch text of an
+entry a person attests; whichever the entry does not have is `null`, and `id`
+is `null` for an entry without one. `criteria` lists the acceptance criteria
+that name the entry through `[proof: <id>]`, each `{ text, checked }` — a
+criterion naming two entries appears under both, and an entry with no id has
+none. A task with no contract answers `[]`. The project's `closing_contract`
+is not folded in; it is configuration, read as such.
+
+`verificationProblems` is what the parser could not read — an unknown key, an
+entry with nothing to run, a duplicate id. The entries are still reported, so
+a consumer can show what is wrong, but a non-empty list means `done` would
+refuse this contract: do not present it as one that will run. The command is
+text a person or an agent wrote into the repository — display it, never
+execute it on the reader's behalf.
+
 ## Questions waiting on a person
 
 `log --open-questions --json` lists, in one call, every question still waiting

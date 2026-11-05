@@ -20,6 +20,11 @@
  *   3. each `blocked_by` task with its current status, and whether the task is
  *      still blocked — by the dispatcher's own rule (`blockerResolved`).
  *
+ * UNDER `--json` ONLY, the task's verification contract (TL-561): a consumer
+ * reaches the tool only through `--json`, and parsing the file to find the
+ * contract is exactly what the consumer contract forbids it. A person reads
+ * the frontmatter, so the text form does not repeat it.
+ *
  * WHAT IT DOES NOT PRINT: the markdown body or the frontmatter beyond a
  * one-line header. The file is read directly; reprinting it would make this a
  * second, more expensive way to read what is already one `cat` away, and the
@@ -39,6 +44,7 @@ import { fileURLToPath } from "node:url";
 
 import { absentHere, crossBranchState, describeDivergence, divergences, scanNote } from "./branch-scan.mjs";
 import { loadConfigOrExit } from "./config.mjs";
+import { parseCriteria, parseVerification } from "./criteria.mjs";
 import { externalTargetsOf } from "./deploy-targets.mjs";
 import {
   TRUNK_SOURCE_TEXT, defaultTrunk, deploymentScanJson, deploymentState, describeTaskDeployment, explain,
@@ -50,6 +56,7 @@ import { blockerResolved } from "./next-task.mjs";
 import { backlogPaths, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { printLine } from "./stdout.mjs";
+import { splitFrontmatter } from "./task-fields.mjs";
 import { readTaskRecords } from "./task-select.mjs";
 import { MARK, color, failure, priorityPaint, refusal, statusPaint, table } from "./ui.mjs";
 
@@ -162,6 +169,38 @@ export function computeShow({ root, config, id }) {
     scan: { scanned: scan.scanned, reason: scan.reason, branches: scan.branches, trees: scan.trees.length },
     blockers,
     blocked: blockers.some((b) => !b.resolved),
+    ...verificationContract(root, task.file),
+  };
+}
+
+/**
+ * The task's own `verification:` entries, each with the acceptance criteria
+ * that name it through `[proof: <id>]` (TL-561), read by the parsers `done`
+ * closes with — a second reader here could disagree with the one that decides.
+ *
+ * The task's OWN contract, not the project's `closing_contract` appended to
+ * it: that is configuration, already readable as such, and folding it in would
+ * make a task with no contract look like one that has one.
+ *
+ * `verificationProblems` is what `parseVerification` could not read. The
+ * entries are reported anyway, so a consumer sees what is wrong; without the
+ * problems beside them a contract `done` would refuse reads exactly like one
+ * it would run.
+ */
+export function verificationContract(root, file) {
+  const { frontmatter, body } = splitFrontmatter(readFileSync(join(root, file), "utf8"));
+  const { entries, problems } = parseVerification(frontmatter);
+  const { items } = parseCriteria(body);
+  return {
+    verification: entries.map((e) => ({
+      id: e.id,
+      bash: e.bash,
+      manual: e.manual,
+      criteria: e.id === null ? [] : items
+        .filter((c) => c.proofs.includes(e.id))
+        .map((c) => ({ text: c.text, checked: c.checked })),
+    })),
+    verificationProblems: problems,
   };
 }
 
