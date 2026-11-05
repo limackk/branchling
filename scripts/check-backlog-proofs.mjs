@@ -32,6 +32,14 @@
  * narrowed and by what rule — a narrowing nobody can see is a narrowing nobody
  * can trust.
  *
+ * THE RANGE IS JUDGED AGAINST A TASK'S OWN ENTRIES (TL-556). Every proven
+ * contract ends in the project's `closing_contract` (TL-495), so a project
+ * entry naming a path the range touched used to keep EVERY closing, and
+ * `--since` narrowed nothing. A project entry says nothing about which task a
+ * range concerns — it is the same line in all of them. It is still run, once,
+ * whenever at least one closing is kept (TL-497), because the closings kept are
+ * proved by the contract `done` runs, which includes it.
+ *
  * THE DEFAULT SCOPE STAYS UNNARROWED, AND THE COST IS MADE VISIBLE INSTEAD
  * (TL-265). Defaulting to a range would make a green report mean "the proofs
  * this range touches still hold" while it READS as "the proofs still hold", and
@@ -228,12 +236,16 @@ function changedPaths(repoRoot, since) {
  *
  * Two ways in, both stated rather than guessed: a file the task itself touched
  * (which is what `modified_files` knows), or a path named literally in one of
- * its contract commands. Everything else is left out, and the caller reports the
- * count so that nobody mistakes a narrowed run for a complete one.
+ * its OWN contract commands. A project `closing_contract` entry is skipped even
+ * when a caller passes it (TL-556): it is identical in every contract, so a
+ * path it names would keep every task and narrow nothing. Everything else is
+ * left out, and the caller reports the count so that nobody mistakes a
+ * narrowed run for a complete one.
  */
 export function touchedByRange(task, entries, changed, touchedFiles) {
   for (const f of touchedFiles || []) if (changed.has(f)) return true;
   for (const e of entries || []) {
+    if (e && e.project) continue;
     const text = String(e.bash || "");
     for (const path of changed) if (path && text.indexOf(path) >= 0) return true;
   }
@@ -339,8 +351,11 @@ async function main(argv) {
       return 2;
     }
     const index = modifiedFiles({ root: repoRoot, prefix: config.taskIdPrefix });
+    // `own`, not `entries`: the project's half is the same in every contract
+    // and says nothing about which task the range concerns (TL-556). An open
+    // task carries its own entries only, so the one rule serves both halves.
     const keep = (c) =>
-      touchedByRange(c, c.entries, changed, (index.byTask && index.byTask.get(c.id)) || []);
+      touchedByRange(c, c.own || c.entries, changed, (index.byTask && index.byTask.get(c.id)) || []);
     selected = candidates.filter(keep);
     // The SAME rule over the open half, for the same reason: a range is a
     // statement about which questions are worth asking again, and asking it of
@@ -349,7 +364,7 @@ async function main(argv) {
     narrowedNote =
       `narrowed to ${selected.length} of ${candidates.length} closing(s) and ` +
       `${openSelected.length} of ${open.length} open contract(s) by ${since}..HEAD ` +
-      "— a task is kept when the range touched a file it changed, or a path its contract names";
+      "— a task is kept when the range touched a file it changed, or a path its own contract names";
   }
 
   // PROGRESS GOES TO STDERR (TL-265). stdout carries the report, and a consumer

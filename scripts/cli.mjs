@@ -150,7 +150,7 @@ const CHECK_USAGE = [
   "  --trunk <ref>        with --release, the trunk; by default the remote's default",
   "                       branch, else HEAD — the report names which",
   "  --since <sha>        with --proofs, keep the closings the range could plausibly have",
-  "                       broken — a file the task changed, or a path its contract names",
+  "                       broken — a file the task changed, or a path its own contract names",
 ].join("\n");
 
 /**
