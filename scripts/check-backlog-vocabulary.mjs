@@ -111,6 +111,9 @@ export function report(divergent, names, metas) {
     lines.push(d.fixed
       ? `  \`${d.field}\` — a fixed set, not a vocabulary of this project: [${d.allowed.join(", ")}]`
       : `  \`${d.field}\` — allowed by \`${d.dictionary}:\` [${d.allowed.join(", ")}]`);
+    // What the vocabulary admits, when its list alone does not say it: the
+    // targets a task may name are a SUBSET of `deploy_targets` (TL-514).
+    if (d.note) lines.push(`    ${d.note}`);
     for (const f of d.found) {
       const carriers = filesCarrying(names, metas, d.field, f.value);
       lines.push(`    ${f.value} ×${f.count} in ${carriers.length} file(s):`);

@@ -55,7 +55,11 @@ export const KINDS = {
   // `modifiedFile` is `null` unless `--modified-file` was asked for, and then it
   // says whether the git index could be computed at all (TL-75): zero matches
   // and an unscanned repository are otherwise the same empty `tasks`.
-  "task-list": { tasks: [], total: null, limit: null, scan: null, modifiedFile: null, elsewhereOnly: [] },
+  // `deploy` is `null` unless deployment state was computed (TL-501), and then
+  // names the trunk and every ref read, with its SHA, so the answer can be dated.
+  // `scope` (TL-540) is `active`, `archived` or `all` — which tasks were
+  // searched — and null when `--status` chose the statuses itself.
+  "task-list": { tasks: [], total: null, limit: null, scope: null, scan: null, modifiedFile: null, deploy: null, elsewhereOnly: [] },
   // `<command> --help --json` (TL-83). `flags` describes the input surface, and
   // a flag drawing on a vocabulary carries THIS project's values in `values` —
   // so an agent narrows its input instead of guessing and retrying. `configured`
@@ -82,12 +86,28 @@ export const KINDS = {
     // directions over one role boundary (TL-417). The full finding travels so
     // a consumer gets the pair and both hands' reasons without parsing prose.
     skippedDeadlocked: [],
+    // The conflict-group skips of the run's LAST `next` answer (TL-492), under
+    // the name `next --json` gives them. The last, not every one: a group is
+    // held only while its task is in progress, so an earlier skip may since
+    // have been handed out by this very run.
+    skippedConflict: [],
     // `{id, role, eligible}` when the spin guard ended the run (TL-484): the
     // stop is a fact about one task, and `eligible` counts the OTHER tasks the
     // dispatcher would still hand out, so it never reads as an empty queue.
     spinGuard: null,
     // `{requestedAt, by, after}` when `run --stop` ended the run (TL-485).
     stopRequested: null,
+    // `{command, exit, timedOut, output}` when `--before-next` refused before
+    // a claim (TL-489).
+    beforeNextRefused: null,
+    // `{id, message}` when `--commit-state` ended the run; `id` is null when
+    // it refused to claim over paths somebody else staged (TL-489).
+    stateCommitRefused: null,
+    // `{count, ids}` of the tasks another tree of this clone holds open, read
+    // from the last "nothing to take" answer (TL-491).
+    heldInOtherTrees: null,
+    // `{polls, seconds, gaveUp}` under `--wait` (TL-491).
+    waited: null,
   },
   // `run --stop --json` (TL-485): the request as written, and where. `origin`
   // is the clone it reaches — every run of it, from any of its worktrees.
@@ -120,6 +140,14 @@ export const KINDS = {
   // as a release blocker is the failure mode TL-383 removed from the terminal,
   // and it must not be reintroduced through the JSON.
   check: { ok: null, root: null, failed: [], guards: [] },
+  // `follow --json` (TL-524): ONE envelope per line, a stream rather than an
+  // answer. `event` says which keys carry a value: `ready` (the watch is armed;
+  // changes after this line are reported), `change` (`id`, `file`, `change` —
+  // created / modified / deleted — and the `fields` that moved, `__body__` for
+  // the markdown body), `heartbeat` (nothing changed; the stream is alive).
+  // `root` is on every line so a consumer reading several streams knows which
+  // backlog each came from.
+  "change-stream": { event: null, at: null, root: null, id: null, file: null, change: null, fields: [] },
   // `doctor --json`. `ok` is the answer CI reads; `checks` is why.
   doctor: { ok: null, root: null, next: null, checks: [] },
   // `serve --list --json` and `serve --stop --json` (TL-266). Each entry in
@@ -174,10 +202,16 @@ export const KINDS = {
   // so its absence is an answer and not an error to be told apart from one.
   // `unplanned` and `stale` are lists rather than counts on purpose: a plan rots
   // by accumulating work nobody scheduled, and a number cannot be acted on.
+  // A plan that cannot be read or executed is `ok: false` (TL-534) with
+  // `refusalKind` `plan-unparsable` or `plan-contradicts-blocked-by` (or
+  // `plan-contradicts-tree` for an unknown, duplicated or misgrouped id) and
+  // every problem in `problems`. Each wave task is `{ id, title, status,
+  // blocked_by, known, open, executor }`, closed tasks included.
   plan: {
-    root: null, exists: null, updated: null, rationale: null, waves: [],
+    ok: null, root: null, exists: null, updated: null, rationale: null, waves: [],
     activeWave: null, nextUp: [], inProgress: [], unplanned: [], coverage: null, stale: [],
     inProgressStatus: null,
+    refusalKind: null, refusal: null, problems: [],
   },
   // ── The WRITING commands (TL-119) ──────────────────────────────────────
   //
@@ -213,6 +247,10 @@ export const KINDS = {
     // report whose reservation it took without parsing a warning.
     tookOver: [],
     lock: null,
+    // Which source named the actor (TL-544), as `task-decide` reports it: flag,
+    // env, config or default. `--require-actor` on `take` refuses the default
+    // as `refusalKind: "actor-required"`.
+    actorSource: null,
     refusalKind: null, refusal: null, details: [],
     // `next` only, and the reason each is here rather than in prose on stderr:
     // a loop must be able to tell an empty queue from a queue it was not allowed
@@ -233,30 +271,124 @@ export const KINDS = {
     // where no project declared an `actor_policy_*`: a loop must be able to tell
     // an empty queue from a queue it was not allowed to draw from.
     skippedByRecord: [],
+    // Candidates held back because a task of the same conflict group is in
+    // progress here or in another tree (TL-492), each `{id, group, heldBy}`.
+    skippedConflict: [],
     // `--plan` only (TL-183): which wave was followed, and how many open tasks
     // were left alone because the plan does not schedule them. `null` when the
     // flag was not given — a wave number of 0 would say a plan was consulted.
     plan: null,
   },
+  // Every writing kind below carries `actorSource` (TL-544): which rung of the
+  // actor chain named the actor — `flag`, `env`, `config` or `default` — and
+  // null on a refusal given before the actor was resolved. Where a person's act
+  // is recorded (`take`, `handoff`, `release`, `set`, `body`, `decide`),
+  // `--require-actor` refuses the default as `refusalKind: "actor-required"`.
   // `handoff --json` (TL-99). Three from/to pairs and the comment that carries
   // the reason: a handoff is not a task being performed, it is a task changing
   // hands, and a consumer wants both ends of every field that moved.
   "task-handoff": {
     ok: null, id: null, file: null, task: null,
     role: null, owner: null, status: null, comment: null, released: null,
-    warnings: [],
+    warnings: [], actorSource: null,
+    refusalKind: null, refusal: null, details: [],
+  },
+  // `body --json` (TL-523). `body` is the pair of base-version hashes, so a
+  // caller can pass `body.to` as the next write's `--base`.
+  "task-body": {
+    ok: null, id: null, file: null, changed: null, body: null, lines: null, entry: null, actorSource: null,
     refusalKind: null, refusal: null, details: [],
   },
   "task-release": {
-    ok: null, id: null, status: null, owner: null, released: null, comment: null,
+    ok: null, id: null, status: null, owner: null, released: null, comment: null, actorSource: null,
+    refusalKind: null, refusal: null, details: [],
+  },
+  // `set --json` (TL-521). `changes` are the history entries the write
+  // appended, so a consumer reads the attribution without opening the log; an
+  // unchanged value appends none beyond `updated`.
+  // A value outside the field's vocabulary is `refusalKind: "unknown-value"`
+  // (TL-543) with `rejected` `{ field, value }` and `declared`, the values the
+  // field accepts; `usage` stays for an unknown field or a malformed value.
+  "task-set": {
+    ok: null, id: null, file: null, field: null, value: null, actor: null, actorSource: null, changes: [],
+    refusalKind: null, refusal: null, details: [], rejected: null, declared: [],
+  },
+  // `set --fields --json` (TL-543): the fields `set` edits, each with whether
+  // it is a list, whether it may be cleared, the config.yaml key its value must
+  // come from (`vocabulary`, as `vocabulary --json` names it), the key its
+  // values are only suggested from, and a vocabulary the tool fixes itself.
+  "task-set-fields": { root: null, fields: [] },
+  // `deploy status --json` (TL-502). `trunk` names the ref whose commits count
+  // and where that choice came from; `scan` every ref read with its SHA, so the
+  // answer can be dated; `explanation` why an empty answer is empty. Each
+  // target carries its buckets in pipeline order, a bucket whose stage could
+  // not be read is `unknown` rather than zero, and `listed: false` marks the
+  // last stage, which is counted and never listed. `release` is the planned
+  // scope of `--release <name>` (TL-505), null without the flag. `records`
+  // names who recorded each recorded stage, when and why (TL-506).
+  // A `--release`, `--target` or `--env` naming nothing declared (TL-533) is
+  // `ok: false` with `refusalKind: "unknown-name"`, `rejected` the flag and the
+  // value, and `declared` what the flag accepts — empty when nothing is.
+  "release-status": {
+    ok: null, trunk: null, scan: null, explanation: null, filter: null, targets: [], unplaced: null, release: null, records: [],
+    refusalKind: null, refusal: null, rejected: null, declared: [],
+  },
+  // `deploy record --json` (TL-506). `tag` is the annotated tag object the
+  // ref now points at; `previous` the commit it stood at before, null on the
+  // first record; `direction` one of first, unchanged, forward, backward,
+  // diverged. `push` is the command that shares the record — it is printed,
+  // never run — and `fetchFix` the refspec other clones need, null when the
+  // remote already fetches the ref.
+  "release-record": {
+    ok: null, target: null, stage: null, ref: null, commit: null, tag: null, previous: null, direction: null,
+    actor: null, reason: null, recordedAt: null, remote: null, push: null, fetchFix: null,
+    refusalKind: null, refusal: null, details: [],
+  },
+  // `declare --json` (TL-522): the entry appended to `releases:` or
+  // `deploy_targets:`, or the refusal. `refusalKind` names which refusal —
+  // `undeclared-key` for a key no command writes, `duplicate`, `malformed`,
+  // `form` for a list written in a shape the writer does not edit — so a
+  // consumer branches on a word rather than parsing the sentence.
+  "vocabulary-declare": {
+    ok: null, key: null, name: null, entry: null, reason: null, file: null,
     refusalKind: null, refusal: null, details: [],
   },
   // `ask --json` (TL-148). The question's EVENT ID is the payload that matters:
   // it is what a later `decide --resolves` has to name, and the reason the task
   // now carries names it too — so a consumer never has to parse a sentence.
   "task-ask": {
-    ok: null, id: null, file: null, question: null, changes: [], blockedReason: null,
+    ok: null, id: null, file: null, question: null, changes: [], blockedReason: null, actorSource: null,
     refusalKind: null, refusal: null, details: [],
+  },
+  // `decide --json` (TL-528) — the other half of `task-ask`. Until TL-528 it
+  // printed a bare object whose refusal carried the refusal's name under
+  // `kind` and its sentence under `message`; inside the envelope `kind` is
+  // the envelope's, so the refusal moved to `refusalKind` and `refusal`, the
+  // names every other writing kind already uses. `chosen` is null when the
+  // answer was typed, `lifted` null when nothing was blocked on it.
+  // `actorSource` (TL-537) says which rung named the actor: `flag`, `env`,
+  // `config` (the user configuration's `actor:`) or `default` — the agent
+  // fallback nobody stated.
+  "task-decide": {
+    ok: null, id: null, decision: null, chosen: null, openQuestions: [], lifted: null, actorSource: null,
+    refusalKind: null, refusal: null, details: [],
+  },
+  // `vocabulary --json` (TL-532): what config.yaml declares, in declared order.
+  // Every key is named after the config.yaml key it comes from — `set --fields
+  // --json` names those keys, and a consumer reads this envelope at them. Each
+  // status carries its `role` and the `roleSource` that gave it, so a role the
+  // tool derived is never mistaken for one the project declared.
+  vocabulary: {
+    root: null, statuses: [], priorities: [], types: [], confidence: [], estimates: [],
+    labels: [], labels_closed: null, boards: [], roles: [], releases: [], deploy_targets: [],
+  },
+  // `where --json` (TL-34, in the envelope since TL-528). `backlog` is null
+  // and `error` says why when no backlog was found — outside a repository that
+  // is an answer, not a failure, so the keys stay rather than the answer
+  // turning into a refusal.
+  where: {
+    home: null, homeSource: null, config: null, data: null,
+    preferences: null, agentProfiles: null, backlog: null, error: null,
   },
   // `resume --json` (TL-151). The parts are declared in the ORDER the
   // briefing fixes them, because the order IS the product: a consumer rendering
@@ -281,7 +413,7 @@ export const KINDS = {
   // moved, which `--dry-run` makes a different answer from `ok`.
   "verification-run": {
     ok: null, task: null, dryRun: null, closed: null, entries: [],
-    status: null, wouldBe: null, ticked: [], capability: null,
+    status: null, wouldBe: null, ticked: [], capability: null, actorSource: null,
     refusalKind: null, refusal: null, details: [],
   },
   // `docs-drift --json` (TL-100). `flagged` and `tooLittle` are both LISTS of
@@ -319,6 +451,26 @@ export const KINDS = {
   // log answered it (TL-396): `total` is every exchange, `matched` the ones the
   // filter kept, and without both a consumer cannot tell a filtered answer from
   // a short log.
+  // `show --json` (TL-509): what is COMPUTED about one task, never its body.
+  // `deploy` is `null` when the project declares no `deploy_targets` — nobody
+  // computed it, which is not "deployed nowhere" — and otherwise names the
+  // trunk and every ref read with its SHA beside the task's own answer per
+  // target and stage. `scan` keeps an empty `elsewhere` readable, as it does in
+  // `task-list`. `blocked` is the verdict over `blockers`, by the rule `next`
+  // dispatches on, so a consumer does not re-derive which statuses count.
+  "task-show": {
+    ok: null, id: null, title: null, status: null, priority: null, confidence: null, blocks: [], file: null,
+    deploy: null, elsewhere: [], scan: null, blockers: [], blocked: null,
+    // The markdown after the frontmatter, verbatim, under `--body` (TL-542);
+    // null without the flag — the key stays, as every declared key does.
+    body: null,
+    refusalKind: null, refusal: null, details: [],
+  },
+  // `log --open-questions --json` (TL-536): every unanswered question on an
+  // active task, oldest first, each with what a person needs to answer it —
+  // the question, who asked and when, the options and the recommendation —
+  // and the `event` id `decide --resolves` takes.
+  "open-questions": { root: null, total: null, questions: [] },
   "task-log": {
     ok: null, id: null, title: null, file: null, path: null,
     records: null, total: null, matched: null, decisions: null, limit: null, exchanges: [],
@@ -379,6 +531,10 @@ export const KIND_EXERCISE = {
   "task-list": { args: ["query", "--json"] },
   stats: { args: ["stats", "--json"] },
   doctor: { args: ["doctor", "--json"] },
+  vocabulary: { args: ["vocabulary", "--json"] },
+  // Which directories the run uses. It writes nothing; the harness's `--dir`
+  // makes the backlog half non-null, the case with the most keys filled in.
+  where: { args: ["where", "--json"] },
   // The register is machine-local state beside the locks, not a question about
   // the fixture backlog (TL-266) — hence `noDir`, the same boundary the profile
   // rows prove. It writes nothing and starts nothing: an empty `servers` on an
@@ -440,6 +596,7 @@ export const KIND_EXERCISE = {
   // task" refusal — each a complete envelope, and neither a usage error. The id
   // is the sentinel, never typed.
   "task-log": { args: ["log", FIRST_TASK, "--json"] },
+  "open-questions": { args: ["log", "--open-questions", "--json"] },
   // `resume` composes reads and writes nothing (TL-151), so it is NOT a
   // `writes` row: asking it twice of one tree is safe, and
   // `scripts/tests/resume-briefing.test.mjs` proves the tree is byte-identical
@@ -449,6 +606,14 @@ export const KIND_EXERCISE = {
   // `--no-verify` because this row asks about the ENVELOPE. Left out, it would
   // run the fixture task's `verification:` command, and the shape of the answer
   // would start depending on the observer's shell.
+  // One task's computed facts (TL-509). It writes nothing, so like `log` one
+  // row answers twice: the populated fixture shows a real task, and on the
+  // empty one the same call is the "no such task" refusal in a full envelope.
+  // A stream, bounded: `--max-events 0` arms the watch, prints the `ready`
+  // envelope and exits, so one row exercises the shape without a process that
+  // waits forever. The stream itself is `scripts/tests/watch-stream.test.mjs`.
+  "change-stream": { args: ["follow", "--json", "--max-events", "0"] },
+  "task-show": { args: ["show", FIRST_TASK, "--json"] },
   resume: { args: ["resume", FIRST_TASK, "--actor", "agent:test", "--no-verify", "--json"] },
   run: { args: ["run", "--dry-run", "--json"] },
   // ── The rows that WRITE (TL-119) ─────────────────────────────────────────
@@ -469,16 +634,49 @@ export const KIND_EXERCISE = {
     args: ["handoff", ABSENT_TASK, "--to-owner", "unassigned", "--reason", "a fixture", "--actor", "agent:test", "--json"],
     refuses: true, writes: true,
   },
+  "release-status": { args: ["deploy", "status", "--json"] },
+  // The fixture declares no `deploy_targets`, so this is the refusal path: an
+  // undeclared target. It is reached only after the reason and the actor pass,
+  // so both are given; nothing is written.
+  "release-record": {
+    args: ["deploy", "record", "--target", "web", "--stage", "production", "HEAD", "--actor", "agent:test", "--reason", "a fixture", "--json"],
+    refuses: true, writes: true,
+  },
+  // A body for a task that is not there: the refusal path, reached only after
+  // the reason passes and the body has been read from stdin.
+  "task-body": {
+    args: ["body", ABSENT_TASK, "--reason", "a fixture", "--actor", "agent:test", "--json"],
+    refuses: true, writes: true, input: "## Goal\n\nA fixture.\n",
+  },
+  // The success path: the fixture's config.yaml gains one release, which is
+  // the write a release-management interface needs.
+  "vocabulary-declare": {
+    args: ["declare", "releases", "9.9", "--reason", "a fixture", "--json"],
+    writes: true,
+  },
   "task-release": {
     args: ["release", ABSENT_TASK, "--actor", "agent:test", "--reason", "a fixture", "--json"],
     refuses: true, writes: true,
   },
+  // A task that is not there: the refusal path, reached only after the field
+  // and its value are judged valid, so a real field and value are given.
+  "task-set": {
+    args: ["set", ABSENT_TASK, "title", "A title", "--actor", "agent:test", "--json"],
+    refuses: true, writes: true,
+  },
+  "task-set-fields": { args: ["set", "--fields", "--json"] },
   // A task that is not there: same reason as above — the refusal path.
   "verification-run": { args: ["done", ABSENT_TASK, "--json"], refuses: true, writes: true },
   // A question about a task that is not there (TL-148): the refusal path again,
   // and `--question` is required before the refusal is reached, so it is given.
   "task-ask": {
     args: ["ask", ABSENT_TASK, "--question", "which of the two?", "--actor", "agent:test", "--json"],
+    refuses: true, writes: true,
+  },
+  // A decision about a task that is not there: the refusal path, reached only
+  // after the reason and the actor pass, so both are given.
+  "task-decide": {
+    args: ["decide", ABSENT_TASK, "--reason", "a fixture", "--actor", "agent:test", "--json"],
     refuses: true, writes: true,
   },
   seed: {
@@ -564,6 +762,15 @@ export function envelope(kind, payload) {
     out[key] = value === undefined ? shape[key] : value;
   }
   return out;
+}
+
+/**
+ * Print one envelope as ONE line — newline-delimited JSON, for a stream (TL-524).
+ * A pretty-printed envelope spans lines, and a consumer splitting on newlines
+ * would read a fragment. Returns false when the reader went away.
+ */
+export function printJsonLine(kind, payload) {
+  return printLine(JSON.stringify(envelope(kind, payload)));
 }
 
 /** Print one answer on stdout. No colour, no ornament: this is for a program. */

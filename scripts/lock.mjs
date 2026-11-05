@@ -36,7 +36,10 @@
 
 import { spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
-import { closeSync, existsSync, linkSync, mkdirSync, openSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
+import {
+  closeSync, existsSync, fstatSync, linkSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync,
+  statSync, unlinkSync, writeFileSync,
+} from "node:fs";
 import { homedir, hostname } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -186,7 +189,8 @@ export function isExpired(lock, ttlMinutes, now = Date.now()) {
  * Take the lock, or say who is holding it.
  *
  * @param {{root: string, taskId: string, actor: string, ttlMinutes?: number,
- *          now?: number, env?: object, scope?: object}} opts
+ *          now?: number, env?: object, scope?: object,
+ *          interleave?: (step: string) => void}} opts
  * @returns {{ok: boolean, lock?: object, holder?: object, tookOver?: object,
  *            path: string}}
  */
@@ -206,12 +210,25 @@ export function acquireLock(opts) {
     ts: new Date(now).toISOString(),
   };
 
-  for (let attempt = 0; attempt < 2; attempt++) {
+  // A test seam, as in `withMutex`: it runs at the two points where another
+  // session can change the file under this one.
+  const interleave = opts.interleave || (() => {});
+
+  // Three passes: one may be spent on a reservation released under this one,
+  // one on removing an expired reservation, and the last decides.
+  for (let attempt = 0; attempt < 3; attempt++) {
     if (createExclusively(path, JSON.stringify(record) + "\n")) {
       return { ok: true, lock: record, path };
     }
+    interleave("contended");
 
-    const held = readLock(dir, opts.taskId);
+    // Absence is not an expired reservation (TL-487, the shape TL-481 found in
+    // the mutex): the holder released between the failed create and this read,
+    // and removing whatever stands under the name by the time the removal runs
+    // could take another session's fresh reservation.
+    const seen = readHolder(path);
+    if (!seen) continue;
+    const held = seen.record;
     // The same session asking again is not a collision: `take` on a task you are
     // already holding has to be idempotent, otherwise a retried command refuses
     // on the strength of its own first run.
@@ -220,14 +237,12 @@ export function acquireLock(opts) {
     }
     if (!isExpired(held, ttl, now)) return { ok: false, holder: held, path };
 
-    // Stale. Remove it and try ONCE more — the `wx` create below is what decides
-    // between two processes that both saw the same stale lock; whoever loses the
-    // race reads the winner's fresh record on the next pass and steps aside.
-    try {
-      unlinkSync(path);
-    } catch (e) {
-      if (e.code !== "ENOENT") throw e;
-    }
+    // Stale. Remove it — but only if it is still the file judged expired — and
+    // try again. The exclusive create is what decides between two sessions that
+    // both saw the same stale lock; whoever loses the race reads the winner's
+    // fresh record on the next pass and steps aside.
+    interleave("judged-expired");
+    removeIfUnchanged(path, seen);
     record.tookOver = held || null;
   }
 
@@ -298,6 +313,13 @@ export const MUTEX_STALE_MS = 30_000;
  *  records it, whereas proceeding unlocked is the one outcome that loses it. */
 export const MUTEX_WAIT_MS = 10_000;
 
+/** How long a holder whose process is still alive ON THIS HOST keeps a section
+ *  past `MUTEX_STALE_MS` (TL-488). The id mutex spans a scanner run allowed 60
+ *  seconds, so a slow but living holder outlived the stale limit and was taken
+ *  over just before it wrote. A pid can be reused by an unrelated process once
+ *  its holder dies, and this ceiling is what bounds the wait that costs. */
+export const MUTEX_LIVE_HOLDER_MAX_MS = 300_000;
+
 /** Sections this process is already inside. Reconcile and `recordEdit` are both
  *  synchronous, so nothing interleaves within one process — but a caller that
  *  nests them would otherwise wait for a lock it holds itself. */
@@ -321,12 +343,110 @@ function readRecord(path) {
 }
 
 /**
+ * The holder's record together with the identity of the FILE it was read from,
+ * or null when there is no file. Read through one descriptor, so the record and
+ * the inode describe the same file even if the name is replaced meanwhile.
+ *
+ * WHY ABSENCE IS NOT A CORRUPT RECORD (TL-481). Both used to read as "names no
+ * holder" and both led to removing the file — but a file that is ABSENT was
+ * released between this writer's failed create and its read, and by the time
+ * the removal ran a third writer could have created a fresh one. Unlinking that
+ * fresh file let two writers into the section; sixteen processes contending for
+ * one mutex measured it 3 to 8 times in 4800 entries, with no load beyond the
+ * contention itself.
+ */
+function readHolder(path) {
+  let fd;
+  try {
+    fd = openSync(path, "r");
+  } catch (e) {
+    if (e.code === "ENOENT") return null;
+    throw e;
+  }
+  try {
+    const { dev, ino } = fstatSync(fd);
+    const raw = readFileSync(fd, "utf8");
+    let record = null;
+    try {
+      const rec = JSON.parse(raw);
+      record = rec && typeof rec === "object" ? rec : null;
+    } catch {
+      // Corrupt, as in `readRecord`: present, but naming nobody.
+    }
+    return { record, raw, dev, ino };
+  } finally {
+    closeSync(fd);
+  }
+}
+
+/**
+ * Remove a mutex or reservation file only if it is still the file that was
+ * judged stale.
+ *
+ * There is no compare-and-unlink, so the file is first RENAMED out of the way —
+ * atomic, and from then on nobody else can remove it — and its identity is
+ * compared afterwards. A file that turns out to be a different one was created
+ * by a live writer after the judgement and is linked back under its name. The
+ * one interleaving this cannot settle needs a fourth writer to create the name in
+ * the instant between the rename and the link back; it is reported by `link`
+ * failing rather than hidden.
+ *
+ * Identity is the inode AND the bytes (TL-494). Linux hands a freed inode number
+ * to the next file created in the directory, so a live writer's mutex created
+ * right after the stale one was unlinked commonly has the same `(dev, ino)`;
+ * only its content, which carries the holder's token, tells the two apart.
+ */
+function removeIfUnchanged(path, judged) {
+  const aside = path + "." + process.pid + "." + randomBytes(4).toString("hex") + ".stale";
+  try {
+    renameSync(path, aside);
+  } catch (e) {
+    if (e.code === "ENOENT") return;
+    throw e;
+  }
+  const moved = statSync(aside);
+  if (moved.dev === judged.dev && moved.ino === judged.ino && readFileSync(aside, "utf8") === judged.raw) {
+    unlinkSync(aside);
+    return;
+  }
+  try {
+    linkSync(aside, path);
+  } finally {
+    unlinkSync(aside);
+  }
+}
+
+/**
+ * Is this pid still a process?
+ *
+ * `EPERM` means it exists and is not ours to signal, which is still ALIVE —
+ * answering "gone" there would report a running server as stale and invite a
+ * second one onto the same tree.
+ *
+ * WHAT IT CANNOT SEE, stated because `--stop` was written wrong once on the
+ * strength of it: a ZOMBIE — a process that has exited and whose parent has not
+ * reaped it — still accepts signal 0, so for that window an entry reads
+ * `running` although nothing is being served. That is why `stopServer` decides
+ * at the PORT and not here: a corpse cannot answer `/api/ping`.
+ */
+export function pidAlive(pid, kill = process.kill.bind(process)) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    kill(pid, 0);
+    return true;
+  } catch (e) {
+    return e.code === "EPERM";
+  }
+}
+
+/**
  * Run `fn` with no other process on this machine inside the section `name`.
  *
  * @param {string} name  identifies the RESOURCE, not the caller — every writer
  *        of one file has to compute the same string for any of this to hold.
  * @param {Function} fn
- * @param {{env?: object, waitMs?: number, staleMs?: number, now?: () => number}} opts
+ * @param {{env?: object, waitMs?: number, staleMs?: number, liveMaxMs?: number,
+ *          now?: () => number, interleave?: (step: string) => void}} opts
  * @returns whatever `fn` returns
  * @throws {Error} with `code: "EBUSY"` when the wait ran out
  */
@@ -335,6 +455,7 @@ export function withMutex(name, fn, opts = {}) {
   const now = opts.now || Date.now;
   const waitMs = opts.waitMs === undefined ? MUTEX_WAIT_MS : opts.waitMs;
   const staleMs = opts.staleMs === undefined ? MUTEX_STALE_MS : opts.staleMs;
+  const liveMaxMs = opts.liveMaxMs === undefined ? MUTEX_LIVE_HOLDER_MAX_MS : opts.liveMaxMs;
   const dir = join(stateRoot(opts.env), "mutex");
   mkdirSync(dir, { recursive: true });
   const path = join(dir, createHash("sha256").update(name).digest("hex").slice(0, 16) + ".mutex");
@@ -342,20 +463,37 @@ export function withMutex(name, fn, opts = {}) {
   // as two different processes. PID alone is not ownership: a section may be
   // judged stale and taken over while its original process is still alive.
   const token = randomBytes(16).toString("hex");
-  const record = {
-    section: name, token, pid: process.pid, host: hostname(),
-    ts: new Date(now()).toISOString(),
-  };
+  const record = { section: name, token, pid: process.pid, host: hostname() };
+  // A test seam, like `now`: it runs at the two points where another process
+  // can change the file under this one, so a test can force the interleaving
+  // instead of waiting for a loaded machine to produce it.
+  const interleave = opts.interleave || (() => {});
 
   const deadline = now() + Math.max(0, waitMs);
   for (;;) {
+    // Stamped at every attempt, not once before the wait: the stamp says since
+    // when the section is HELD, and a stamp taken before waiting made a holder
+    // look up to `waitMs` older than it was.
+    record.ts = new Date(now()).toISOString();
     if (createExclusively(path, JSON.stringify(record) + "\n")) break;
-    const holder = readRecord(path);
+    interleave("contended");
+    const seen = readHolder(path);
+    // Released since the create failed: try again, and remove nothing.
+    if (!seen) continue;
+    const holder = seen.record;
     const heldSince = holder ? Date.parse(holder.ts || "") : NaN;
-    if (!Number.isFinite(heldSince) || now() - heldSince > staleMs) {
+    const age = now() - heldSince;
+    // A holder on this host whose process still answers is working, not dead,
+    // however long its section takes — up to the ceiling. A holder on another
+    // host cannot be signalled, and this process's own pid in the file is a
+    // leftover, since a live section of ours would have been re-entered above.
+    const living = holder && holder.host === hostname() && holder.pid !== process.pid &&
+      pidAlive(holder.pid) && age <= liveMaxMs;
+    if (!Number.isFinite(heldSince) || (age > staleMs && !living)) {
+      interleave("judged-stale");
       // Whoever loses this removal finds the winner's fresh record on the next
-      // pass and waits for it, the same way `acquireLock` settles a stale lock.
-      try { unlinkSync(path); } catch (e) { if (e.code !== "ENOENT") throw e; }
+      // pass and waits for it.
+      removeIfUnchanged(path, seen);
       continue;
     }
     if (now() >= deadline) {

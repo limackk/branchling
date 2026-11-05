@@ -66,7 +66,7 @@ import { loadConfigOrExit } from "./config.mjs";
 import { ACTOR_NAMESPACES, isValidActor, reasonRefusal, recordCreation, reconcile } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { createTask, driftMessage, slugify } from "./new-task.mjs";
-import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { backlogPaths, BACKLOG_DIR_REFUSAL_EXIT, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { detectPrefixMismatch, prefixMismatchMessage } from "./task-id.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { MARK, color, failure, warn } from "./ui.mjs";
@@ -477,8 +477,9 @@ export function main(argv) {
   try {
     root = resolveBacklogDir({ dir: cli.dir, moduleDir: HERE }).root;
   } catch (e) {
-    console.error(failure(N + " import", e.message, [], [`${N} import --from github --dir <path> < issues.json`]));
-    return 2;
+    if (!isBacklogDirRefusal(e)) throw e;
+    console.error(failure(N + " import", e.message, e.details || [], [`${N} import --from github --dir <path> < issues.json`]));
+    return BACKLOG_DIR_REFUSAL_EXIT;
   }
   const config = loadConfigOrExit(root);
   const paths = backlogPaths(root);

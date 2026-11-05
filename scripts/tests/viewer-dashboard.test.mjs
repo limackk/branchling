@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { dashboardModel, renderDashboard } from "../viewer-dashboard.mjs";
+import { isolateHome } from "./_repo.mjs";
+
+isolateHome("viewer-dashboard");
 
 const DAY = 86400000;
 const NOW = Date.parse("2026-09-26T12:00:00Z");

@@ -99,7 +99,7 @@ export function resolveBacklogDir(opts = {}) {
     // A directory named EXPLICITLY that does not look like a backlog is a usage
     // error — not a silent fall-through to the next source.
     if (strict) {
-      throw new Error(
+      throw new NotABacklogError(
         "That directory does not look like a backlog: " + abs +
           " (expecting a tasks/ subdirectory and one of: " +
           [BOARDS_FILENAME, CONFIG_FILENAME, TEMPLATE_FILENAME].join(", ") + ")"
@@ -133,6 +133,13 @@ export function resolveBacklogDir(opts = {}) {
   // must get an answer about that filesystem, not about the real one.
   throw new BacklogNotFoundError(cwd, exists);
 }
+
+/**
+ * A directory NAMED explicitly (`--dir`, `BACKLOG_DIR`) that is not a backlog.
+ * A type of its own so a caller answering in JSON (`check --json`, TL-541) can
+ * tell it from a programmer error without matching the sentence.
+ */
+export class NotABacklogError extends Error {}
 
 /**
  * "There is no backlog here" — a FORESEEN state with a name (TL-47).
@@ -178,18 +185,49 @@ export class BacklogNotFoundError extends Error {
  * side effect would reach the child, and hiding a process-wide behaviour change
  * inside an import is worse than 10 call sites a test enforces.
  *
- * A GENUINE PROGRAMMER ERROR IS RE-THROWN, stack and all. Only the named type
- * is turned into a message.
+ * A GENUINE PROGRAMMER ERROR IS RE-THROWN, stack and all. Only the two named
+ * types are turned into a message.
+ *
+ * A DIRECTORY NAMED EXPLICITLY THAT IS NOT A BACKLOG EXITS 1, like no backlog
+ * at all (TL-545). The invocation is well built — the flag exists and carries a
+ * value — and the directory it names is not usable, which is a verdict about
+ * data, not about the command line; 2 stays for a wrongly built invocation.
+ * `check --json` gave this state 1 in TL-541, and two codes for one state
+ * would make a script that tests `$?` depend on which command it ran.
  */
 export function resolveBacklogDirOrExit(opts = {}, command = N) {
   try {
     return resolveBacklogDir(opts);
   } catch (e) {
-    if (!(e instanceof BacklogNotFoundError)) throw e;
-    console.error(failure(command, e.message, e.details));
+    if (!isBacklogDirRefusal(e)) throw e;
+    console.error(failure(command, e.message, e.details || []));
     process.exit(1);
   }
 }
+
+/**
+ * True for the two foreseen states of backlog resolution — none found, or one
+ * named that is not a backlog. A command that resolves with the bare
+ * `resolveBacklogDir()` to answer in its own shape (an envelope under `--json`)
+ * asks this, so a third state added later is recognised in one place.
+ */
+export function isBacklogDirRefusal(e) {
+  return e instanceof BacklogNotFoundError || e instanceof NotABacklogError;
+}
+
+/**
+ * The exit code and the `refusalKind` of both states above, from EVERY command
+ * (TL-546). Until then the commands resolving through `resolveBacklogDirOrExit`
+ * exited 1 and the ones answering in their own shape exited 2 with
+ * `refusalKind: "usage"`, so a script testing `$?` depended on which command
+ * it ran. 1 won because the invocation is well built and the directory is not
+ * usable — a verdict about data, the same reason given above — and because
+ * `doctor` and `check`, the commands most likely to be scripted, already said 1.
+ * One constant per value, so a command that answers in its own shape cannot
+ * drift back to a number of its own.
+ */
+export const BACKLOG_DIR_REFUSAL_EXIT = 1;
+export const BACKLOG_DIR_REFUSAL_KIND = "no-backlog";
 
 /** A shortcut for scripts: returns the full set of paths at once. */
 export function resolveBacklogPaths(opts = {}) {

@@ -291,3 +291,64 @@ test("the parser refuses two ids, and keeps every flag it is given", () => {
 test("a flag with no value is a usage error, not a silently empty value", () => {
   assert.throws(() => parseDecideArgs(["A-1", "--reason"]), /with no value/);
 });
+
+// ── TL-537: any answer text, and where the actor came from ─────────────────
+
+/** The environment with no actor stated anywhere: the home is isolated, so
+ *  only the variable has to go. */
+function runUnattributed(cwd, args) {
+  const env = { ...process.env, NO_COLOR: "1", BACKLOG_STATE_DIR: join(cwd, ".state") };
+  delete env.BACKLOG_ACTOR;
+  return spawnSync(process.execPath, [CLI].concat(args), { cwd, encoding: "utf8", timeout: 60_000, env });
+}
+
+test("a reason starting with '-' is recorded verbatim, in every spelling", () => {
+  const dir = repo();
+  const id = newTask(dir, "Answers that look like flags");
+  for (const args of [
+    ["--reason", "-1 for this"],
+    ["--reason=--no, keep it"],
+    ["--reason", "--", "-- a dash first"],
+  ]) {
+    const r = run(dir, ["decide", id, "--dir", ".", "--actor", "user:person", "--json", ...args]);
+    assert.equal(r.status, 0, args.join(" ") + ": " + r.stderr);
+  }
+  assert.deepEqual(decisions(dir, id).map((e) => e.to), ["-1 for this", "--no, keep it", "-- a dash first"]);
+  // The id after `--` is still read as the id.
+  const late = run(dir, ["decide", "--dir", ".", "--actor", "user:person", "--reason=x", "--", id]);
+  assert.equal(late.status, 0, late.stderr);
+  // POSITIVE CONTROL: an unknown flag in the `=` form is still refused.
+  assert.equal(run(dir, ["decide", id, "--dir", ".", "--reasn=x"]).status, 2);
+});
+
+test("with no actor configured the JSON says actorSource default, and a stated one says flag", () => {
+  const dir = repo();
+  const id = newTask(dir, "Whose answer");
+  const fallen = runUnattributed(dir, ["decide", id, "--dir", ".", "--reason", "nobody said", "--json"]);
+  assert.equal(fallen.status, 0, fallen.stderr);
+  assert.equal(JSON.parse(fallen.stdout).actorSource, "default");
+  const stated = runUnattributed(dir, ["decide", id, "--dir", ".", "--reason", "I said", "--actor", "user:person", "--json"]);
+  assert.equal(JSON.parse(stated.stdout).actorSource, "flag");
+  const fromEnv = spawnSync(process.execPath, [CLI, "decide", id, "--dir", ".", "--reason", "env said", "--json"], {
+    cwd: dir, encoding: "utf8", timeout: 60_000,
+    env: { ...process.env, NO_COLOR: "1", BACKLOG_STATE_DIR: join(dir, ".state"), BACKLOG_ACTOR: "user:from-env" },
+  });
+  assert.equal(JSON.parse(fromEnv.stdout).actorSource, "env");
+});
+
+test("--require-actor refuses the default actor and records nothing", () => {
+  const dir = repo();
+  const id = newTask(dir, "A person must answer");
+  const before = decisions(dir, id).length;
+  const r = runUnattributed(dir, ["decide", id, "--dir", ".", "--reason", "an answer", "--require-actor", "--json"]);
+  assert.equal(r.status, 1);
+  const answer = JSON.parse(r.stdout);
+  assert.equal(answer.ok, false);
+  assert.equal(answer.refusalKind, "actor-required");
+  assert.equal(answer.actorSource, "default");
+  assert.equal(decisions(dir, id).length, before);
+  // POSITIVE CONTROL: a stated actor passes the same flag.
+  const ok = runUnattributed(dir, ["decide", id, "--dir", ".", "--reason", "an answer", "--require-actor", "--actor", "user:person"]);
+  assert.equal(ok.status, 0, ok.stderr);
+  assert.equal(decisions(dir, id).length, before + 1);
+});

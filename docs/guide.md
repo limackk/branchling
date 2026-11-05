@@ -400,6 +400,16 @@ branchling done TASK-42 --json | jq '.entries[] | select(.ok | not)'
 branchling next --actor agent:worker --json | jq -r '.refusalKind // .id'
 ```
 
+**A program that needs to follow changes does not have to poll.** `follow
+--json` prints one envelope per line — `ready`, then one `change` per task
+whose fields or body moved, naming the fields, and a `heartbeat` while nothing
+does. It watches the files of one tree, by the same watcher `serve` uses; other
+worktrees and branches are not part of the stream.
+
+```bash
+branchling follow --json | jq -c 'select(.event == "change") | {id, fields}'
+```
+
 ### One description, a whole backlog
 
 ```bash

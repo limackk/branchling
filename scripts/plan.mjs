@@ -133,6 +133,12 @@ export function parsePlanYaml(text) {
         continue;
       }
       if (key === "waves") {
+        // The waves follow as a block. Anything after the colon but `[]` was
+        // silently dropped until TL-534, so `waves: [oops` read as a plan with
+        // no waves — an answer indistinguishable from an empty plan.
+        if (value && value !== "[]") {
+          problems.push(`${where}: \`waves\` takes a block of \`- name:\` waves, or \`[]\` — not \`${value}\``);
+        }
         inWaves = true;
         wave = null;
         continue;
@@ -240,10 +246,13 @@ export function loadPlan(planPath, read = readFileSync, exists = existsSync) {
  * @param {object} plan  as returned by `parsePlanYaml`
  * @param {Array<{id: string, status: string, blocked_by: string[]}>} tasks
  * @param {{archivedStatuses?: string[]}} config
- * @returns {{errors: string[], warnings: string[], planned: number, waves: number}}
+ * @returns {{errors: string[], blockedBy: string[], warnings: string[], planned: number, waves: number}}
  */
 export function validatePlan(plan, tasks, config = {}) {
   const errors = [];
+  // The subset of `errors` that contradicts `blocked_by` (TL-534): `plan
+  // --json` names that refusal apart from a plan naming the wrong tasks.
+  const blockedBy = [];
   const warnings = [];
   const archived = new Set(config.archivedStatuses || []);
 
@@ -301,11 +310,13 @@ export function validatePlan(plan, tasks, config = {}) {
             `${id} is in wave ${waveName(i)} but is blocked by ${blocker}, which the plan puts in ` +
               `wave ${waveName(j)} — the order cannot be executed`
           );
+          blockedBy.push(errors[errors.length - 1]);
         } else if (j === i && positionInWave.get(id) < positionInWave.get(blocker)) {
           errors.push(
             `${id} appears before its blocker ${blocker} inside wave ${waveName(i)} — ` +
               `the authored order cannot be executed`
           );
+          blockedBy.push(errors[errors.length - 1]);
         }
         continue;
       }
@@ -314,11 +325,12 @@ export function validatePlan(plan, tasks, config = {}) {
           `${id} is in wave ${waveName(i)} but is blocked by ${blocker}, which is still open and ` +
             `is not in the plan at all — nothing schedules the work this wave waits for`
         );
+        blockedBy.push(errors[errors.length - 1]);
       }
     }
   }
 
-  return { errors, warnings, planned, waves: plan.waves.length };
+  return { errors, blockedBy, warnings, planned, waves: plan.waves.length };
 }
 
 /**
@@ -389,7 +401,13 @@ export function planState(plan, tasks, config = {}) {
     const entries = w.tasks.map((id) => {
       if (!waveOf.has(id)) waveOf.set(id, i);
       const t = byId.get(id);
-      return { id, status: t ? t.status : null, known: !!t, open: isOpen(t), executor: executorOf(t) };
+      // `title` and `blocked_by` (TL-534) so a consumer draws the wave without
+      // a second call; `tasks` holds closed task files too, so a finished
+      // wave keeps its titles.
+      return {
+        id, title: t ? t.title : null, status: t ? t.status : null, blocked_by: t ? (t.blocked_by || []).slice() : [],
+        known: !!t, open: isOpen(t), executor: executorOf(t),
+      };
     });
     return {
       index: i,

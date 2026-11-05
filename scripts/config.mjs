@@ -37,11 +37,17 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { backlogPaths } from "./paths.mjs";
 import { PRODUCT_NAME } from "./product.mjs";
 import { DEFAULT_TASK_ID_PREFIX, PREFIX_SHAPE, inferPrefix, taskIdPatterns } from "./task-id.mjs";
-import { ACTOR_NAMESPACES, ROLE_SHAPE, isValidActor, unquote } from "./task-fields.mjs";
-import { LINK_POLICIES } from "./criteria.mjs";
+import {
+  ACTOR_NAMESPACES, ARCHIVED_STATUS_ROLES, CONFLICT_GROUP_SOURCES, RELEASE_SHAPE, ROLE_SHAPE, STATUS_ROLES,
+  isValidActor, unquote,
+} from "./task-fields.mjs";
+import { LINK_POLICIES, parseVerification } from "./criteria.mjs";
 import { DEFAULT_LOCK_TTL_MINUTES } from "./lock.mjs";
 import { estimateHours } from "./estimate.mjs";
 import { USER_KEYS, loadUserConfig } from "./home.mjs";
+import { externalTargetNames, readDeployTargets } from "./deploy-targets.mjs";
+import { readReleases, releaseNames } from "./release-entries.mjs";
+import { GAP_NAMES, RELEASE_GATE_MODES } from "./release-gaps.mjs";
 
 // ──────────────────────────────────────────────────────────────────────────
 // Default values — generic, for a fresh repository
@@ -65,6 +71,19 @@ export const DEFAULTS = Object.freeze({
   // accepting one would create a phantom role no dispatcher serves, and the task
   // would leave every specialised queue without a word.
   roles: [],
+  // The releases a task may be PLANNED for (TL-505) — the intent half of
+  // release tracking, as opposed to deployment, which is observed in git
+  // (`docs/release-tracking.md` §1). A CLOSED vocabulary, like boards: a
+  // misspelt `release:` would otherwise create a release nobody plans and drop
+  // the task silently from `deploy status --release`. Empty — the default —
+  // means this project plans no releases, and a task naming one FAILS. The
+  // ORDER is chronological (TL-515): the current release is computed as the
+  // first entry not yet fully shipped, and only its open top-priority tasks
+  // block the last stage (`planned-blocker-open`). No date is read from it.
+  // An entry is a slug, or `{name, ref}` once the release has shipped (TL-516):
+  // `ref` names the ref or tag where it ends, and `deploy status --release`
+  // then reports what it carried (`scripts/release-entries.mjs`).
+  releases: [],
   label_axis_timing: [],      // the "Phase" axis in the viewer filters; empty removes the facet
   label_axis_env: [],         // the "Environment" axis; empty removes the facet
   owners: ["unassigned"],
@@ -80,6 +99,13 @@ export const DEFAULTS = Object.freeze({
   // A word outside the list is refused where it is read, rather than silently
   // gate nothing.
   max_unattended_estimate: "",
+  // The field a task's CONFLICT GROUP is read from when it names no
+  // `conflict_group:` of its own (TL-492). Empty, the default, means no
+  // fallback: only the tasks that name a group are held apart. A backlog of
+  // several hundred tasks will not acquire a new field by hand, and a project
+  // that keeps one epic per module already wrote the groups down, so `epic`
+  // makes the rule work on the first day. One of `CONFLICT_GROUP_SOURCES`.
+  conflict_group_from: "",
   actors: ["unknown"],   // namespaces: local: / agent: / user: (BL-1404)
   title_max_length: 60,
   epic_aliases: {},
@@ -89,6 +115,13 @@ export const DEFAULTS = Object.freeze({
   status_colors: {},
   // Statuses drawn struck through (the convention: "this will not happen").
   status_strikethrough: [],
+  // What each status MEANS to a consumer that cannot know its name (TL-532):
+  // `status: role`, the role one of `STATUS_ROLES`. A status with no entry has
+  // its role DERIVED from the keys that already say it (`archived_statuses`,
+  // `in_progress_status`, `awaiting_vouch_status`, `reason_required_statuses`),
+  // so the key is needed only where the derivation guesses wrong — an archived
+  // status other than the first that still means "finished", say.
+  status_roles: {},
   priority_colors: {},
   label_colors: {},
   dashboard_open_statuses: ["pending", "in_progress", "blocked"],
@@ -113,6 +146,27 @@ export const DEFAULTS = Object.freeze({
   contract_programs: Object.freeze([
     "git", "npm", "npx", "pnpm", "yarn", "cargo", "docker", "gh", "go", "pip", "brew", "make",
   ]),
+  // Verification entries `done` appends to EVERY task's own contract (TL-493),
+  // in the shape a task's `verification:` entries have. A module's tests can be
+  // green while a repository-wide guard fails after the merge; a project states
+  // that guard once here rather than in every task file. Empty — the default —
+  // adds nothing.
+  closing_contract: Object.freeze([]),
+  // The deployables of the project and, for each, its promotion stages as an
+  // ordered list of git refs (TL-501, `docs/release-tracking.md`). Empty — the
+  // default, written by omitting the key — means the project tracks no
+  // environments and nothing that reads deployment state has anything to say.
+  // The shape is validated by `scripts/deploy-targets.mjs`.
+  deploy_targets: Object.freeze([]),
+  // How hard `check --release` judges a gap in release traceability (TL-503),
+  // mirroring `contract_capability`: `report` prints the gaps and exits 0,
+  // `require` exits non-zero on any gap `release_gate_accept` does not name.
+  // `report` is the default by the owner's decision of 2026-11-01 — a blocking
+  // default would fail every repository whose version-bump commits carry no id.
+  release_gate: "report",
+  // Gap names (`GAP_NAMES` in release-gaps.mjs) this project knowingly accepts.
+  // An accepted gap is still printed; it only stops blocking under `require`.
+  release_gate_accept: Object.freeze([]),
   // Which statuses may not be entered without a stated reason (TL-105). A
   // VOCABULARY, so it belongs here and not in the code: `blocked` and
   // `cancelled` are this project's words, and a list of literals in a script
@@ -261,9 +315,9 @@ const LIST_KEYS = new Set([
   "statuses", "archived_statuses", "priorities", "types", "confidence",
   "labels", "label_axis_timing", "label_axis_env", "owners", "estimates", "actors", "roles",
   "dashboard_open_statuses", "status_strikethrough", "reason_required_statuses",
-  "docs_status_pending_patterns", "contract_programs",
+  "docs_status_pending_patterns", "contract_programs", "release_gate_accept",
 ]);
-const MAP_KEYS = new Set(["epic_aliases", "status_colors", "priority_colors", "label_colors"]);
+const MAP_KEYS = new Set(["epic_aliases", "status_colors", "priority_colors", "label_colors", "status_roles"]);
 const NUMBER_KEYS = new Set([
   "title_max_length", "lock_ttl_minutes", "active_branch_days", "abandoned_after_days",
   "cross_branch_poll_seconds",
@@ -319,6 +373,25 @@ function nearestKey(key) {
 }
 
 /**
+ * `closing_contract:` — a list of verification entries, the one key whose items
+ * are objects rather than scalars.
+ *
+ * READ BY THE TASK'S OWN PARSER. The block is handed to `parseVerification`
+ * under the header it reads, so an entry here has exactly the shape, the keys
+ * and the refusals of an entry in a task file; a second reader of that shape
+ * would let the two contracts drift apart in what they accept.
+ */
+function readClosingContract(inline, rawBody, problems) {
+  if (inline && inline !== "[]") {
+    problems.push("closing_contract: expecting a block list of verification entries or `[]`, got `" + inline + "`");
+    return [];
+  }
+  const parsed = parseVerification("verification:\n" + rawBody.join("\n"));
+  for (const p of parsed.problems) problems.push("closing_contract: " + p.replace(/^verification: /, ""));
+  return Object.freeze(parsed.entries.map((e) => Object.freeze({ id: e.id, bash: e.bash, manual: e.manual })));
+}
+
+/**
  * @returns {{values: Record<string, unknown>, problems: string[]}}
  */
 export function parseConfigYaml(text) {
@@ -361,6 +434,31 @@ export function parseConfigYaml(text) {
       if (!next.trim()) continue;
       if (!/^\s/.test(next)) break;
       body.push(next.trim());
+    }
+
+    if (key === "deploy_targets") {
+      const read = readDeployTargets(inline, lines.slice(i + 1, j).map(stripComment));
+      for (const p of read.problems) problems.push(p);
+      values[key] = read.targets;
+      i = j - 1;
+      continue;
+    }
+
+    // Two shapes in one list (TL-516): a slug, or `{name, ref}` naming the ref
+    // where a shipped release ends. Read as ENTRIES here; `loadConfig` hands
+    // every other reader the names alone (`scripts/release-entries.mjs`).
+    if (key === "releases") {
+      const read = readReleases(inline, lines.slice(i + 1, j).map(stripComment));
+      for (const p of read.problems) problems.push(p);
+      values[key] = read.entries;
+      i = j - 1;
+      continue;
+    }
+
+    if (key === "closing_contract") {
+      values[key] = readClosingContract(inline, lines.slice(i + 1, j), problems);
+      i = j - 1;
+      continue;
     }
 
     if (MAP_KEYS.has(key)) {
@@ -529,6 +627,11 @@ export function loadConfigOrExit(root, opts = {}) {
   }
 }
 
+/** `releases` as entries: the parsed file gives `{name, ref}`, DEFAULTS names. */
+function toEntries(list) {
+  return (list || []).map((e) => (typeof e === "string" ? { name: e, ref: null } : e));
+}
+
 /**
  * @param {string} root the backlog directory (from paths.mjs)
  * @param {{strict?: boolean, boardsPath?: string}} opts
@@ -619,6 +722,11 @@ export function loadConfig(root, opts = {}) {
     labels: values.labels,
     labelsClosed: values.labels_closed,
     roles: values.roles,
+    // The NAMES, whatever shape each entry was written in, so every reader of
+    // the vocabulary works on both; the ref of a shipped release is in
+    // `releaseEntries` (TL-516). DEFAULTS holds names, a parsed file entries.
+    releases: releaseNames(toEntries(values.releases)),
+    releaseEntries: Object.freeze(toEntries(values.releases).map((e) => Object.freeze({ ...e }))),
     auditStaleDays: values.audit_stale_days,
     // The cap stays a string here and is parsed where it is validated and used:
     // `null` from an unparseable value has to reach `validateConfig` as a
@@ -643,10 +751,13 @@ export function loadConfig(root, opts = {}) {
     // Empty reaches the code as `null`, so the one test the dispatcher makes is
     // "did this project state a threshold" and not "is this string non-empty".
     maxUnattendedEstimate: values.max_unattended_estimate || null,
+    // `null` when unset, for the same reason as the threshold above.
+    conflictGroupFrom: values.conflict_group_from || null,
     actors: values.actors,
     titleMaxLength: values.title_max_length,
     epicAliases: values.epic_aliases,
     statusStrikethrough: values.status_strikethrough,
+    statusRoles: values.status_roles,
     colors: {
       status: values.status_colors,
       priority: values.priority_colors,
@@ -661,6 +772,16 @@ export function loadConfig(root, opts = {}) {
     contractPrograms: Object.freeze([
       ...new Set([...DEFAULTS.contract_programs, ...(parsedValues.contract_programs || [])]),
     ]),
+    closingContract: values.closing_contract,
+    // Normalised by the reader: every stage carries `refs`, even one written
+    // with `ref:`. Read by `scripts/environments.mjs`.
+    deployTargets: values.deploy_targets,
+    // The vocabulary of a task's `target:` field (TL-514): the names of the
+    // targets in another repository. DERIVED from `deploy_targets`, never a key
+    // of its own, so the field and the targets cannot name different things.
+    externalTargets: externalTargetNames(values.deploy_targets),
+    releaseGate: values.release_gate,
+    releaseGateAccept: values.release_gate_accept,
     // Resolved here rather than in DEFAULTS, because the fallback is another
     // key's value and DEFAULTS is a flat literal.
     reasonRequiredStatuses: values.reason_required_statuses || values.archived_statuses,
@@ -725,6 +846,18 @@ export function validateConfig(config) {
     problems.push(
       "`contract_capability` = `" + config.contractCapability + "` — expecting one of: report, require"
     );
+  }
+  if (RELEASE_GATE_MODES.indexOf(config.releaseGate) < 0) {
+    problems.push(
+      "`release_gate` = `" + config.releaseGate + "` — expecting one of: " + RELEASE_GATE_MODES.join(", ")
+    );
+  }
+  for (const gap of config.releaseGateAccept || []) {
+    if (GAP_NAMES.indexOf(gap) < 0) {
+      problems.push(
+        "`release_gate_accept` contains `" + gap + "` — expecting gap names from: " + GAP_NAMES.join(", ")
+      );
+    }
   }
   for (const program of config.contractPrograms || []) {
     if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(String(program))) {
@@ -816,9 +949,35 @@ export function validateConfig(config) {
         "` — expecting a number of days, 0 for no window"
     );
   }
+  // A field the dispatcher's record does not carry would group nothing and read
+  // exactly like the absent key that means "no fallback".
+  if (config.conflictGroupFrom && CONFLICT_GROUP_SOURCES.indexOf(config.conflictGroupFrom) < 0) {
+    problems.push(
+      "`conflict_group_from` = `" + config.conflictGroupFrom + "` — expecting one of " +
+        CONFLICT_GROUP_SOURCES.join(", ")
+    );
+  }
   for (const s of config.reasonRequiredStatuses) {
     if (config.statuses.indexOf(s) < 0) {
       problems.push(`\`reason_required_statuses\` contains \`${s}\`, which is not in \`statuses\``);
+    }
+  }
+  for (const [s, role] of Object.entries(config.statusRoles || {})) {
+    if (config.statuses.indexOf(s) < 0) {
+      problems.push(`\`status_roles\` names \`${s}\`, which is not in \`statuses\``);
+      continue;
+    }
+    if (STATUS_ROLES.indexOf(role) < 0) {
+      problems.push(`\`status_roles\` gives \`${s}\` the role \`${role}\` — expecting one of ` + STATUS_ROLES.join(", "));
+      continue;
+    }
+    const archived = config.archivedStatuses.indexOf(s) >= 0;
+    if (archived !== (ARCHIVED_STATUS_ROLES.indexOf(role) >= 0)) {
+      problems.push(
+        `\`status_roles\` gives \`${s}\` the role \`${role}\`, but \`${s}\` is ` +
+          (archived ? "archived — expecting " : "active — expecting ") +
+          STATUS_ROLES.filter((r) => (ARCHIVED_STATUS_ROLES.indexOf(r) >= 0) === archived).join(", ")
+      );
     }
   }
   for (const axis of ["timing", "env"]) {
@@ -859,6 +1018,22 @@ export function validateConfig(config) {
     }
     if (seenRoles.has(r)) problems.push("duplicate role `" + r + "` in `roles`");
     seenRoles.add(r);
+  }
+
+  // A release is typed after `--release` and compared verbatim with `release:`
+  // in a task, so a name with whitespace or a duplicate entry is a comparison
+  // that can never succeed. Dots are allowed: version numbers are the common
+  // case (`2026.11`, `v1.4`). The shape is `RELEASE_SHAPE` in task-fields.mjs.
+  const seenReleases = new Set();
+  for (const r of config.releases || []) {
+    if (!RELEASE_SHAPE.test(String(r))) {
+      problems.push(
+        "`releases` contains `" + r + "` — expecting a lowercase slug: a letter or digit, " +
+          "then letters/digits/`.`/`_`/`-`"
+      );
+    }
+    if (seenReleases.has(r)) problems.push("duplicate release `" + r + "` in `releases`");
+    seenReleases.add(r);
   }
 
   // Documentation drift (TL-100). `docs_role` names a role a DISPATCHER has to

@@ -52,10 +52,11 @@ import { explain, modifiedFiles, repoRoot, touches } from "./modified-files.mjs"
 import { backlogPaths, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import {
-  FIELD_COMMENT, FIELD_DECISION, REASON_SENTINELS,
-  extractMeta, historyEntryKind, isPseudoField, isQuestion, openQuestions, splitFrontmatter,
+  FIELD_BODY, FIELD_COMMENT, FIELD_DECISION, REASON_SENTINELS,
+  describeBodyChange, extractMeta, historyEntryKind, isPseudoField, isQuestion, openQuestions, splitFrontmatter,
 } from "./task-fields.mjs";
 import { readTaskRecords } from "./task-select.mjs";
+import { decisionsOf } from "./decisions.mjs";
 import { MARK, color, failure, heading, table } from "./ui.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -129,7 +130,19 @@ export function foldExchanges(entries) {
       // happened to move. Keep it beside that message so both log renderings
       // expose the structured record without parsing the reason.
       if (Array.isArray(e.files) && e.files.length) message.files = e.files.slice();
+      // A question carries the menu its asker offered (TL-536), as `ask --json`
+      // and `resume --json` already do: a reader offering the choices must not
+      // have to open the raw log to find them.
+      if (message.kind === "question") {
+        message.options = Array.isArray(e.options) ? e.options.map(String) : [];
+        message.recommend = Number.isInteger(e.recommend) ? e.recommend : null;
+      }
       current.messages.push(message);
+    } else if (e.field === FIELD_BODY) {
+      // A body rewrite (TL-523) is shown by its size, never by its text, and
+      // not as a field transition: two 71-character hashes with an arrow
+      // between them say nothing a reader can use.
+      current.events.push(describeBodyChange(e, MARK.arrow));
     } else if (isPseudoField(e.field) && kind !== "transition") {
       current.events.push(String(e.field).replace(/^__|__$/g, "") +
         (e.to ? ": " + String(e.to) : ""));
@@ -321,7 +334,7 @@ export function renderAreaLog(model) {
 // ──────────────────────────────────────────────────────────────────────────
 
 const KNOWN_WITH_VALUE = ["--limit", "--modified-file"];
-const KNOWN_BARE = ["--json", "--decisions"];
+const KNOWN_BARE = ["--json", "--decisions", "--open-questions"];
 
 export function parseLogArgs(argv) {
   const taken = takeDirFlag(argv, { missing: "--dir needs a value" });
@@ -332,6 +345,7 @@ export function parseLogArgs(argv) {
   let json = false;
   let decisions = false;
   let modifiedFile = null;
+  let openQuestionsWanted = false;
   let literal = false;
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
@@ -343,6 +357,7 @@ export function parseLogArgs(argv) {
     }
     if (a === "--json") { json = true; continue; }
     if (a === "--decisions") { decisions = true; continue; }
+    if (a === "--open-questions") { openQuestionsWanted = true; continue; }
     if (KNOWN_WITH_VALUE.indexOf(a) !== -1) {
       const value = rest[++i];
       if (value === undefined) throw new Error(a + " needs a value");
@@ -356,7 +371,16 @@ export function parseLogArgs(argv) {
       continue;
     }
     throw new Error("unknown flag: " + a +
-      "\navailable: --limit <n> --decisions --modified-file <path> --json --dir <path>");
+      "\navailable: --limit <n> --decisions --modified-file <path> --open-questions --json --dir <path>");
+  }
+  // The backlog-wide listing is its own question (TL-536): a task id, an area
+  // or a slice would each narrow it to a different one, so none is accepted.
+  if (openQuestionsWanted) {
+    if (id || modifiedFile || decisions || limit !== null) {
+      throw new Error("`--open-questions` lists every open question in the backlog, and takes no task id, " +
+        "--modified-file, --decisions or --limit");
+    }
+    return { id: null, dir, limit: null, json, decisions: false, modifiedFile: null, openQuestions: true };
   }
   if (id && modifiedFile) throw new Error("a task id and `--modified-file` select two different scopes");
   if (!id && !modifiedFile) throw new Error("no task id or modified file\nusage: " + N + " log <ID> [--limit <n>] [--decisions] [--json]");
@@ -364,7 +388,48 @@ export function parseLogArgs(argv) {
   if (modifiedFile && !decisions) {
     throw new Error("`--modified-file` reads decisions by area and requires `--decisions`");
   }
-  return { id, dir, limit, json, decisions, modifiedFile };
+  return { id, dir, limit, json, decisions, modifiedFile, openQuestions: false };
+}
+
+/**
+ * Every question still waiting on a person, across the ACTIVE tasks, oldest
+ * first (TL-536). An archived task's unanswered question is waiting on nobody:
+ * the work it was asked about has ended.
+ *
+ * One call instead of `query` plus one `log --decisions` per task — the screen
+ * a person opens to answer questions must not slow down as the backlog grows.
+ */
+export function openQuestionsAcross(root, config) {
+  const archived = new Set(config.archivedStatuses || []);
+  const questions = [];
+  for (const task of readTaskRecords(backlogPaths(root).tasksDir, config.taskId.file)) {
+    if (archived.has(task.status)) continue;
+    for (const q of decisionsOf(readHistory(root, task.id))) {
+      if (q.answered) continue;
+      questions.push({
+        task: task.id, title: task.title || null, status: task.status || null,
+        event: q.id, question: q.question, askedBy: q.askedBy, askedAt: q.askedAt,
+        options: q.options, recommend: q.recommend,
+      });
+    }
+  }
+  questions.sort((a, b) => a.askedAt.localeCompare(b.askedAt) || a.task.localeCompare(b.task));
+  return { root, total: questions.length, questions };
+}
+
+/** The text form of the listing. PURE. */
+export function renderOpenQuestions(model) {
+  if (!model.questions.length) return color.ok(MARK.ok) + " no open questions — nothing in this backlog is waiting on an answer";
+  const out = [model.questions.length + " open question" + (model.questions.length === 1 ? "" : "s") + ":", ""];
+  for (const q of model.questions) {
+    out.push("  " + q.task + "  " + (q.title || "") );
+    out.push("    " + q.question);
+    q.options.forEach((o, i) => out.push("      " + (i + 1) + ". " + o + (q.recommend === i + 1 ? "  (recommended)" : "")));
+    out.push("    asked by " + q.askedBy + " at " + whenever(q.askedAt) + " — answer with: " +
+      N + " decide " + q.task + " --resolves " + q.event + (q.options.length ? " --choose <n>" : " --reason \"…\""));
+    out.push("");
+  }
+  return out.join("\n").replace(/\n$/, "");
 }
 
 function areaLog(root, config, plan) {
@@ -410,6 +475,13 @@ export function run(argv) {
   const root = resolveBacklogDirOrExit({ dir: plan.dir || undefined, moduleDir: __dirname }, COMMAND).root;
   const config = loadConfigOrExit(root);
   const paths = backlogPaths(root);
+
+  if (plan.openQuestions) {
+    const model = openQuestionsAcross(root, config);
+    if (plan.json) printJson("open-questions", model);
+    else console.log(renderOpenQuestions(model));
+    return 0;
+  }
 
   if (plan.modifiedFile) {
     const model = areaLog(root, config, plan);

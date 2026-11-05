@@ -102,6 +102,16 @@ export function validateVerification(list, at) {
       errors.push(spot + ": `" + (hasBash ? "bash" : "manual") + "` is empty — there is nothing to check");
       return;
     }
+    // One line, because every reader of the frontmatter is line-based and
+    // `unquote()` leaves `\n` literal: a line break written any way at all would
+    // read back as a different command (TL-500). Other control characters are
+    // not printable YAML and are refused with it.
+    if (/[\x00-\x08\x0a-\x1f\x7f]/.test(text)) {
+      errors.push(
+        spot + ": `" + (hasBash ? "bash" : "manual") + "` contains a line break or a control character — " +
+          "a verification entry is one line; join commands with `&&`, or put a longer script in a file and run that"
+      );
+    }
     if (text.trim() === TEMPLATE_PLACEHOLDER) {
       errors.push(
         spot + ": still the template placeholder (`" + TEMPLATE_PLACEHOLDER + "`) — " +

@@ -72,10 +72,11 @@ import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readFileSync, writeFileSync } from "node:fs";
 
-import { resolveActor } from "./actor.mjs";
+import { actorRequiredRefusal, resolveActorReport } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
+import { printJson } from "./json-envelope.mjs";
 import { ACTOR_NAMESPACES, appendEntries, currentSession, EVENT_ID_RE, eventId, FIELD_DECISION, isValidActor, normalizeReason, openQuestions, questionIdFromReason, readHistory, reasonRefusal, recordEdit } from "./history.mjs";
-import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
+import { backlogPaths, BACKLOG_DIR_REFUSAL_EXIT, isBacklogDirRefusal, resolveBacklogDir } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { todayStamp } from "./today.mjs";
 import { requeueStatus } from "./handoff-task.mjs";
@@ -85,25 +86,50 @@ import { MARK, color, failure } from "./ui.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-export const DECIDE_FLAGS = ["--dir", "--actor", "--reason", "--resolves", "--choose", "--json"];
+export const DECIDE_FLAGS = ["--dir", "--actor", "--reason", "--resolves", "--choose", "--json", "--require-actor"];
+const BARE_FLAGS = ["--json", "--require-actor"];
 
-/** PURE — resolves `decide`'s arguments. Throws on a usage error. */
+/**
+ * PURE — resolves `decide`'s arguments. Throws on a usage error.
+ *
+ * ANY ANSWER TEXT CAN BE PASSED (TL-537). A value flag takes the next word
+ * whatever it starts with, `--reason=<text>` carries it in one word, and `--`
+ * ends flag reading: a value flag standing right before it takes the first word
+ * after it, and every later word is the task id. An interface passing a
+ * person's answer must not have to guess which texts this parser would read as
+ * a flag.
+ */
 export function parseDecideArgs(args) {
-  const plan = { id: null, dir: null, actor: null, reason: null, resolves: null, choose: null, json: false };
+  const plan = {
+    id: null, dir: null, actor: null, reason: null, resolves: null, choose: null, json: false, requireActor: false,
+  };
+  const positional = (a) => {
+    if (plan.id) throw new Error("two task ids given: " + plan.id + " and " + a + " — one decision belongs to one task");
+    plan.id = a;
+  };
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
+    if (a === "--") {
+      for (const rest of args.slice(i + 1)) positional(rest);
+      break;
+    }
     if (a === "--json") { plan.json = true; continue; }
-    if (DECIDE_FLAGS.indexOf(a) >= 0) {
-      const value = args[++i];
-      if (value === undefined) throw new Error("`" + a + "` with no value");
-      plan[a.slice(2)] = value;
+    if (a === "--require-actor") { plan.requireActor = true; continue; }
+    const eq = a.startsWith("--") ? a.indexOf("=") : -1;
+    const name = eq > 0 ? a.slice(0, eq) : a;
+    if (DECIDE_FLAGS.indexOf(name) >= 0 && BARE_FLAGS.indexOf(name) < 0) {
+      let value;
+      if (eq > 0) value = a.slice(eq + 1);
+      else if (args[i + 1] === "--") { value = args[i + 2]; i += 2; }
+      else value = args[++i];
+      if (value === undefined) throw new Error("`" + name + "` with no value");
+      plan[name.slice(2)] = value;
       continue;
     }
     if (a.startsWith("-")) {
       throw new Error("unknown flag: " + a + "\navailable: " + DECIDE_FLAGS.join(" "));
     }
-    if (plan.id) throw new Error("two task ids given: " + plan.id + " and " + a + " — one decision belongs to one task");
-    plan.id = a;
+    positional(a);
   }
   if (!plan.id) {
     throw new Error("no task id\nusage: " + N + " decide <ID> --reason \"…\" [--resolves <id>]");
@@ -300,7 +326,9 @@ export function decideTask(opts) {
  *
  * WHERE IT GOES BACK TO is read from the history, never chosen: `requeueStatus`
  * finds the `from` of the change that entered the blocking status. Restoring it
- * is undoing a transition, not making one.
+ * is undoing a transition, not making one — except when that `from` is the
+ * in-progress status, which `ask` left with no owner: the task goes to the
+ * queue instead, where `next` can hand it out again (TL-490).
  */
 function liftQuestionBlock(ctx) {
   const { root, config, id, actor, entries, decision, now, paths } = ctx;
@@ -437,7 +465,18 @@ export function run(argv) {
     return 2;
   }
 
-  const actor = resolveActor(plan.actor);
+  // WHERE THE ACTOR CAME FROM travels with the answer (TL-537). `default` is
+  // the agent fallback nobody stated; the user configuration's `actor:` is
+  // reported as `config`. A person's answer given through an interface must
+  // not land in history as an agent's without the caller being able to see it.
+  const resolved = resolveActorReport(plan.actor);
+  const { actor, actorSource } = resolved;
+  const required = actorRequiredRefusal(plan.requireActor, resolved, "answers");
+  if (required) {
+    if (plan.json) printJson("task-decide", { ok: false, id: plan.id, actorSource, ...required });
+    else console.error(failure(N + " decide", required.refusal, required.details));
+    return 1;
+  }
   if (!isValidActor(actor)) {
     return fail2("the actor `" + actor + "` has no valid namespace", [
       "Use one of: " + ACTOR_NAMESPACES.map((n) => n + ":<name>").join(" | "),
@@ -450,7 +489,9 @@ export function run(argv) {
   try {
     root = resolveBacklogDir({ dir: plan.dir || undefined, moduleDir: __dirname }).root;
   } catch (e) {
-    return fail2(e.message, []);
+    if (!isBacklogDirRefusal(e)) throw e;
+    console.error(failure(N + " decide", e.message, e.details || [], [N + " decide --help"]));
+    return BACKLOG_DIR_REFUSAL_EXIT;
   }
   const config = loadConfigOrExit(root);
 
@@ -460,10 +501,9 @@ export function run(argv) {
   });
   if (!result.ok) {
     if (plan.json) {
-      console.log(JSON.stringify(
-        { ok: false, kind: result.kind, id: result.id || plan.id, message: result.message, details: result.details || [] },
-        null, 2
-      ));
+      printJson("task-decide", {
+        ok: false, id: result.id || plan.id, actorSource, refusalKind: result.kind, refusal: result.message, details: result.details || [],
+      });
     } else {
       console.error(failure(N + " decide", result.message, result.details || []));
     }
@@ -472,7 +512,7 @@ export function run(argv) {
 
   // No `build` here, unlike `handoff`: nothing in the frontmatter moved, so the
   // generated views say exactly what they said before.
-  if (plan.json) console.log(JSON.stringify(decideJson(result), null, 2));
+  if (plan.json) printJson("task-decide", { ...decideJson(result), actorSource });
   else console.log(renderDecision(result));
   return 0;
 }

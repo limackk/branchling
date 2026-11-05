@@ -6,14 +6,14 @@ labels: []
 board: main
 epic: ""                           # free text — the group this task counts towards
 priority: P2                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 estimate: 2h                       # 30m | 1h | 2h | 3h | 4h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-10-15
-updated: 2026-10-15
+updated: 2026-10-30
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
@@ -70,7 +70,7 @@ the decision is local to the interactive vouch in `done`.
 
 ## Acceptance criteria
 
-- [ ] An interactive vouch with no stated actor writes no history record signed
+- [x] An interactive vouch with no stated actor writes no history record signed
   by the fallback actor, and says how to state one. [proof: suite]
-- [ ] A vouch with `--actor`, `BACKLOG_ACTOR` or the user-layer key is recorded
+- [x] A vouch with `--actor`, `BACKLOG_ACTOR` or the user-layer key is recorded
   under that actor, as before. [proof: suite]

@@ -44,7 +44,7 @@ import { collectAdvisories } from "./check-guards.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { FIELD_VERIFIED, outstandingVouches, readAllHistory } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
-import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { backlogPaths, BACKLOG_DIR_REFUSAL_EXIT, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { readTaskRecords } from "./task-select.mjs";
 import { MARK, color, failure, heading, table } from "./ui.mjs";
@@ -554,8 +554,9 @@ export function main(argv, today = todayStamp()) {
   try {
     root = resolveBacklogDir({ dir: cli.dir, moduleDir: HERE }).root;
   } catch (e) {
-    console.error(failure(N + " audit", e.message, [], [`${N} audit --dir <path>`]));
-    return 2;
+    if (!isBacklogDirRefusal(e)) throw e;
+    console.error(failure(N + " audit", e.message, e.details || [], [`${N} audit --dir <path>`]));
+    return BACKLOG_DIR_REFUSAL_EXIT;
   }
   const config = loadConfigOrExit(root);
   const tasks = readTaskRecords(backlogPaths(root).tasksDir, config.taskId.file);

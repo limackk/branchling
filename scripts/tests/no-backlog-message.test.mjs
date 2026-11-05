@@ -27,7 +27,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { COMMANDS } from "../cli.mjs";
-import { BacklogNotFoundError, resolveBacklogDirOrExit } from "../paths.mjs";
+import { BacklogNotFoundError } from "../paths.mjs";
 import { isolateHome } from "./_repo.mjs";
 
 isolateHome("no-backlog-message");
@@ -74,7 +74,7 @@ test("the message says how to point at a backlog AND how to create one", () => {
 
 test("POSITIVE CONTROL: a genuine programmer error STILL shows its stack", () => {
   // Silencing everything would be a worse cure than the disease. Only the named
-  // type becomes a message; a TypeError stays a TypeError, with the trace that
+  // types become a message; a TypeError stays a TypeError, with the trace that
   // makes it findable.
   const dir = mkdtempSync(join(tmpdir(), "branchling-boom-"));
   const script = join(dir, "boom.mjs");
@@ -87,9 +87,20 @@ test("POSITIVE CONTROL: a genuine programmer error STILL shows its stack", () =>
   assert.match(r.stderr, /^\s+at /m, "a programmer error with no stack is a bug nobody can find");
 });
 
-test("the helper turns only the named type into a message", () => {
-  assert.throws(() => resolveBacklogDirOrExit({ dir: "/definitely/not/a/backlog" }),
-    /does not look like a backlog/,
-    "naming a directory that is not one is a USAGE error, not `there is none here`");
+test("a named directory that is not a backlog is its own message, not `there is none here`", () => {
+  // Until TL-545 the helper RE-THREW this type, and every command printed it
+  // with a stack. It is a foreseen state like the missing backlog, so it exits
+  // the same way — but the sentence names the directory, because "no backlog
+  // here, point at one with --dir" answers somebody who has just done that.
+  const dir = mkdtempSync(join(tmpdir(), "branchling-named-"));
+  const script = join(dir, "named.mjs");
+  writeFileSync(script,
+    'import { resolveBacklogDirOrExit } from ' + JSON.stringify(pathToFileURL(join(dirname(CLI), "paths.mjs")).href) + ';\n' +
+    "resolveBacklogDirOrExit({ dir: " + JSON.stringify(dir) + " });\n", "utf8");
+  const r = spawnSync(process.execPath, [script], { cwd: dir, encoding: "utf8", timeout: 30_000 });
+  assert.equal(r.status, 1, r.stderr);
+  assert.match(r.stderr, /does not look like a backlog/);
+  assert.doesNotMatch(r.stderr, /no backlog here/);
+  assert.doesNotMatch(r.stderr, /^\s+at /m, "a stack trace reached the user");
   assert.ok(new BacklogNotFoundError("/nowhere").details.length >= 2);
 });

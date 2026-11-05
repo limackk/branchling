@@ -68,14 +68,13 @@ import { fileURLToPath } from "node:url";
 
 import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { parseVerification } from "./criteria.mjs";
-import { contractProblem, findTaskFile, repoRootFor, runContract, transcriptBlock } from "./done-task.mjs";
+import { closingContractOf, collisionHeadline, contractProblem, findTaskFile, repoRootFor, runContract, transcriptBlock } from "./done-task.mjs";
 import { ACTOR_NAMESPACES, isValidActor, readHistory } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { backlogPaths, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import {
-  FIELD_COMMENT, FIELD_DECISION, extractMeta, historyEntryKind, isQuestion, openQuestions, splitFrontmatter,
+  FIELD_BODY, FIELD_COMMENT, FIELD_DECISION, describeBodyChange, extractMeta, historyEntryKind, isQuestion, openQuestions, splitFrontmatter,
 } from "./task-fields.mjs";
 import { MARK, failure, plain } from "./ui.mjs";
 
@@ -308,6 +307,7 @@ export function describeEntry(e) {
   const text = (s) => String(s == null ? "" : s).split("\n").map((l) => l.trim()).filter(Boolean).join(" · ");
   if (e.field === FIELD_DECISION) return "decision: " + text(e.to);
   if (e.field === FIELD_COMMENT) return "comment: " + text(e.to);
+  if (e.field === FIELD_BODY) return describeBodyChange(e, MARK.arrow);
   if (historyEntryKind(e) === "event") return e.field.replace(/^__|__$/g, "") + (e.to ? ": " + text(e.to) : "");
   return e.field + ": " + (text(e.from) || "(none)") + " " + MARK.arrow + " " + (text(e.to) || "(none)");
 }
@@ -348,16 +348,25 @@ export function decisionsOf(entries) {
  * Run the closing contract NOW. Nothing is recorded: this is a reading of the
  * tree, not a closing, and `done` remains the only thing that writes a verdict.
  */
-export async function runVerification(frontmatter, cwd) {
-  const { entries, problems } = parseVerification(frontmatter);
-  const problem = contractProblem(entries, problems);
+export async function runVerification(frontmatter, cwd, config) {
+  // THE CONTRACT `done` WILL RUN (TL-496), read through the same function
+  // `done` reads it with. A briefing that ran only the task's own entries
+  // reported green to a successor whose `done` would then refuse on a project
+  // `closing_contract` entry it was never shown.
+  const { own, entries, problems, collisions } = closingContractOf(frontmatter, config);
+  const problem = contractProblem(own, problems) ||
+    (collisions.length ? collisions.map((id) => collisionHeadline("`id: " + id + "`")).join("\n") : null);
   if (problem) return { entries: [], problem, failed: null };
   const { results, failed } = await runContract(entries, cwd, { capture: true });
+  // Marked as `probeContract` marks it, so a reader can tell the project's
+  // guard from the task's own proof without re-reading config.yaml.
+  results.forEach((row, i) => { if (entries[i] && entries[i].project) row.project = true; });
   // The entries the stop-at-first-failure never reached. Named, because a
   // contract of four whose second entry broke has told the reader nothing about
   // the other two, and a briefing that listed only what ran would look complete.
   for (const e of entries.slice(results.length)) {
-    results.push({ id: e.id, kind: e.manual ? "manual" : "bash", command: e.bash || e.manual, ok: null, exitCode: null, ms: 0, ran: false });
+    results.push({ id: e.id, kind: e.manual ? "manual" : "bash", command: e.bash || e.manual, ok: null, exitCode: null, ms: 0, ran: false,
+      ...(e.project ? { project: true } : {}) });
   }
   return { entries: results, problem: null, failed };
 }
@@ -624,7 +633,7 @@ export async function run(argv) {
   };
 
   if (plan.verify) {
-    const contract = await runVerification(frontmatter, cwd);
+    const contract = await runVerification(frontmatter, cwd, config);
     model.verification = contract.entries;
     model.contractProblem = contract.problem;
     model.failedOutput = contract.failed && contract.failed.output ? contract.failed.output : null;

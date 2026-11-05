@@ -643,3 +643,141 @@ test("`plan add`: an argument past the separator's value is refused by name, not
     assert.match(r.err, /TL-6/, "the message does not name the argument that was refused");
     assert.equal(planOf(dir), before, "a refused command wrote to the file anyway");
   }));
+
+// ──────────────────────────────────────────────────────────────────────────
+// Several ids in one `plan add` (TL-493) — one diff, all or nothing
+// ──────────────────────────────────────────────────────────────────────────
+
+test("editPlanTextMany applies every edit, or returns the input byte for byte", () => {
+  const ok = writer.editPlanTextMany(PLAN, [
+    { op: "add", id: "TL-5", wave: "Consumers" },
+    { op: "add", id: "TL-6", wave: "Foundation" },
+  ]);
+  assert.deepEqual(ok.problems, []);
+  assert.deepEqual(ids(parsed(ok.text)), [["TL-1", "TL-2", "TL-6"], ["TL-3", "TL-4", "TL-5"]]);
+  assert.deepEqual(comments(ok.text), comments(PLAN));
+
+  // The second edit is refused (TL-1 is already scheduled), so the first one —
+  // which on its own succeeds, as the case above shows — is not applied either.
+  const refused = writer.editPlanTextMany(PLAN, [
+    { op: "add", id: "TL-5", wave: "Consumers" },
+    { op: "add", id: "TL-1", wave: "Consumers" },
+  ]);
+  assert.equal(refused.text, PLAN);
+  assert.match(refused.problems[0], /^TL-1: /, "the refusal does not say which id it is about");
+});
+
+test("`plan add` takes several ids and schedules them in ONE write", () =>
+  withSandbox((dir) => {
+    task(dir, "TL-5");
+    task(dir, "TL-6");
+    const before = planOf(dir);
+    const r = run(["plan", "add", "TL-5", "TL-6", "--wave", "Consumers", "--dir", dir]);
+    assert.equal(r.code, 0, r.out + r.err);
+    assert.deepEqual(ids(parsed(planOf(dir))), [["TL-1", "TL-2"], ["TL-3", "TL-4", "TL-5", "TL-6"]]);
+    assert.deepEqual(comments(planOf(dir)), comments(before));
+    assert.match(r.out, /TL-5 is scheduled in wave 2/);
+    assert.match(r.out, /TL-6 is scheduled in wave 2/);
+    assert.equal(run(["check", "--plan", "--dir", dir]).code, 0);
+  }));
+
+test("`plan add` with several ids is all or nothing: one refused id writes none", () =>
+  withSandbox((dir) => {
+    task(dir, "TL-5");
+    const before = planOf(dir);
+
+    // An id with no task file: refused before the plan is edited.
+    const missing = run(["plan", "add", "TL-5", "TL-99", "--wave", "Consumers", "--dir", dir]);
+    assert.equal(missing.code, 1, missing.out + missing.err);
+    assert.match(missing.err, /TL-99/);
+    assert.equal(planOf(dir), before, "TL-5 was scheduled although TL-99 was refused");
+
+    // An id already scheduled: refused by the edit itself, after TL-5's edit
+    // had been made in memory.
+    const taken = run(["plan", "add", "TL-5", "TL-1", "--wave", "Consumers", "--dir", dir]);
+    assert.equal(taken.code, 1, taken.out + taken.err);
+    assert.match(taken.err, /TL-1/);
+    assert.match(taken.err, /nothing was scheduled/);
+    assert.equal(planOf(dir), before, "TL-5 was scheduled although TL-1 was refused");
+
+    // The control: TL-5 alone is schedulable, so the refusals above were about
+    // the other id and not about TL-5.
+    assert.equal(run(["plan", "add", "TL-5", "--wave", "Consumers", "--dir", dir]).code, 0);
+    assert.notEqual(planOf(dir), before);
+  }));
+
+test("`plan add` with several ids and `--why` creates ONE wave holding all of them", () =>
+  withSandbox((dir) => {
+    task(dir, "TL-5");
+    task(dir, "TL-6");
+    const r = run(["plan", "add", "TL-5", "TL-6", "--wave", "Module", "--why", "the module, seeded at once", "--dir", dir]);
+    assert.equal(r.code, 0, r.out + r.err);
+    const plan = parsed(planOf(dir));
+    assert.deepEqual(names(plan), ["Foundation", "Consumers", "Module"]);
+    assert.deepEqual(plan.waves[2].tasks, ["TL-5", "TL-6"]);
+    assert.equal(planOf(dir).split("the module, seeded at once").length, 2, "the sentence was written more than once");
+  }));
+
+test("an id named twice, and several ids for `move` or `remove`, are usage errors", () =>
+  withSandbox((dir) => {
+    task(dir, "TL-5");
+    const before = planOf(dir);
+    const twice = run(["plan", "add", "TL-5", "TL-5", "--wave", "Consumers", "--dir", dir]);
+    assert.equal(twice.code, 2, twice.out + twice.err);
+    assert.match(twice.err, /TL-5 is named twice/);
+    const move = run(["plan", "move", "TL-1", "TL-2", "--wave", "Consumers", "--dir", dir]);
+    assert.equal(move.code, 2, move.out + move.err);
+    const remove = run(["plan", "remove", "TL-1", "TL-2", "--dir", dir]);
+    assert.equal(remove.code, 2, remove.out + remove.err);
+    assert.equal(planOf(dir), before);
+  }));
+
+// ── `plan init` (TL-535) ───────────────────────────────────────────────────
+
+test("init on a backlog without a plan, then add --why, gives a plan that plan --json reads", () =>
+  withSandbox((dir) => {
+    rmSync(join(dir, "plan.yaml"));
+    // POSITIVE CONTROL: without init, add still refuses — there is no plan.
+    assert.equal(run(["plan", "add", "TL-1", "--wave", "First", "--why", "x", "--dir", dir]).code, 1);
+
+    const init = run(["plan", "init", "--rationale", "Foundations first: the rest builds on them", "--json", "--dir", dir]);
+    assert.equal(init.code, 0, init.err);
+    const answer = JSON.parse(init.out);
+    assert.equal(answer.kind, "plan");
+    assert.equal(answer.ok, true);
+    assert.equal(answer.exists, true);
+    assert.equal(answer.rationale, "Foundations first: the rest builds on them");
+    assert.deepEqual(answer.waves, []);
+    assert.match(planOf(dir), /^updated: \d{4}-\d{2}-\d{2}$/m);
+
+    const add = run(["plan", "add", "TL-1", "--wave", "First", "--why", "it starts here", "--dir", dir]);
+    assert.equal(add.code, 0, add.out + add.err);
+    const read = run(["plan", "--json", "--dir", dir]);
+    assert.equal(read.code, 0, read.err);
+    const plan = JSON.parse(read.out);
+    assert.equal(plan.ok, true);
+    assert.deepEqual(plan.waves.map((w) => [w.name, w.tasks.map((t) => t.id)]), [["First", ["TL-1"]]]);
+    assert.equal(plan.rationale, "Foundations first: the rest builds on them");
+  }));
+
+test("init on an existing plan is refused and changes nothing", () =>
+  withSandbox((dir) => {
+    const before = planOf(dir);
+    const r = run(["plan", "init", "--rationale", "a second start", "--json", "--dir", dir]);
+    assert.equal(r.code, 1);
+    const answer = JSON.parse(r.out);
+    assert.equal(answer.ok, false);
+    assert.equal(answer.refusalKind, "plan-exists");
+    assert.equal(planOf(dir), before);
+  }));
+
+test("init without a rationale, or with a line break in it, is a usage error and writes nothing", () =>
+  withSandbox((dir) => {
+    rmSync(join(dir, "plan.yaml"));
+    for (const args of [[], ["--rationale", "  "], ["--rationale", "one\ntwo"], ["--rationale", "x", "--bogus"]]) {
+      const r = run(["plan", "init", ...args, "--dir", dir]);
+      assert.equal(r.code, 2, args.join(" "));
+      assert.equal(r.out, "");
+      assert.equal(existsSync(join(dir, "plan.yaml")), false);
+    }
+  }));

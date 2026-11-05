@@ -5,6 +5,8 @@
  * project vocabulary: every status and priority decision arrives in `options`.
  */
 
+import { todayStamp } from "./today.mjs";
+
 const DAY_MS = 86400000;
 
 function dashboardEscape(value) {
@@ -39,7 +41,7 @@ function median(values) {
 }
 
 function dayKey(time) {
-  return new Date(time).toISOString().slice(0, 10);
+  return todayStamp(time);
 }
 
 function dashboardTaskLink(ids, label, className = "dash-link") {

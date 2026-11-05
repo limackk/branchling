@@ -15,8 +15,18 @@
  * WHY THE FOLD IS A MODULE AND NOT PAGE CODE. Written inside the viewer's
  * template it would be unreachable from `node --test`, and the strongest
  * assertion left would be a regular expression over the finished HTML — which
- * passes just as well for a fold that returns the wrong answer. This file is
- * pasted into the page BY SOURCE, so the browser and the test run the same code.
+ * passes just as well for a fold that returns the wrong answer. This file was
+ * pasted into the page BY SOURCE, so the browser and the test ran the same code.
+ *
+ * NO PAGE CALLS IT NOW (TL-530). TL-379 removed the per-task history panel
+ * that hosted the graph, and TL-530 stopped pasting this module into the
+ * viewer, because a pasted module with no caller is residue a reader has to
+ * re-establish as dead. The module itself stays: `task-graph.test.mjs` is the
+ * `verification:` contract of closed tasks (TL-116, TL-280, TL-311, TL-414)
+ * that `check --proofs` re-runs, and deleting it would turn those proofs red
+ * without anything they proved having become false. A viewer that renders a
+ * task's history again pastes this module back rather than writing a second
+ * fold.
  *
  * FOUR RULES THE SHAPE OF THE GRAPH FOLLOWS:
  *

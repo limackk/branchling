@@ -90,15 +90,89 @@ export function userActor(env = process.env) {
  *        an unstated actor comes back unstated.
  */
 export function resolveActor(flag, opts = {}) {
+  return resolveActorSource(flag, opts).actor;
+}
+
+/**
+ * The actor, and WHICH of the four sources named it (TL-460): `flag`, `env`,
+ * `user` or `default`.
+ *
+ * The value alone cannot say whether anybody stated it — `agent:claude` passed
+ * on purpose and `agent:claude` reached by falling through are the same string.
+ * A caller recording a person's act needs the difference: the default is honest
+ * for an automated write and false for a vouch somebody typed by hand. The
+ * order and the default are the ones in the header; this only reports which
+ * rung answered.
+ *
+ * @param {string} flag  the value of `--actor`, or anything falsy
+ * @param {{env?: object, fallback?: string}} opts  as for `resolveActor`
+ * @returns {{actor: string, source: "flag" | "env" | "user" | "default"}}
+ */
+export function resolveActorSource(flag, opts = {}) {
   const env = opts.env || process.env;
   const stated = typeof flag === "string" ? flag.trim() : "";
-  if (stated) return stated;
+  if (stated) return { actor: stated, source: "flag" };
 
   const fromEnv = String(env[ACTOR_ENV] || "").trim();
-  if (fromEnv) return fromEnv;
+  if (fromEnv) return { actor: fromEnv, source: "env" };
 
   const fromUser = userActor(env);
-  if (fromUser) return fromUser;
+  if (fromUser) return { actor: fromUser, source: "user" };
 
-  return opts.fallback === undefined ? DEFAULT_ACTOR : opts.fallback;
+  return { actor: opts.fallback === undefined ? DEFAULT_ACTOR : opts.fallback, source: "default" };
+}
+
+/**
+ * The source as a `--json` answer names it (TL-537, TL-544): `user` is
+ * reported as `config`, because a consumer reads "the user configuration's
+ * `actor:`" there, and `user:` is also an actor NAMESPACE — the same word in
+ * two roles would let a reader take a source for an attribution.
+ *
+ * @param {"flag" | "env" | "user" | "default"} source
+ * @returns {"flag" | "env" | "config" | "default"}
+ */
+export function reportedActorSource(source) {
+  return source === "user" ? "config" : source;
+}
+
+/**
+ * The actor and its REPORTED source, for a writing command (TL-544). One call
+ * rather than two at each of nine call sites, so the `user` → `config` mapping
+ * cannot be forgotten by the tenth.
+ *
+ * @returns {{actor: string, actorSource: "flag" | "env" | "config" | "default"}}
+ */
+export function resolveActorReport(flag, opts = {}) {
+  const { actor, source } = resolveActorSource(flag, opts);
+  return { actor, actorSource: reportedActorSource(source) };
+}
+
+/** The refusal kind `--require-actor` answers with, spelled once. */
+export const ACTOR_REQUIRED = "actor-required";
+
+/**
+ * The refusal `--require-actor` gives when the actor would be the default, or
+ * null when it may proceed (TL-537, shared since TL-544).
+ *
+ * WHY A FLAG AND NOT A RULE. The default is honest for an automated write and
+ * false for an act a person performed through an interface; the tool cannot
+ * tell the two callers apart, so the caller that KNOWS it acts for a person
+ * says so, and the write is refused rather than attributed to an agent nobody
+ * named. Nothing is written before this check.
+ *
+ * @param {boolean} required  whether `--require-actor` was given
+ * @param {{actor: string, actorSource: string}} resolved  from `resolveActorReport`
+ * @param {string} verb  what was not recorded, for the sentence ("answers", "takes")
+ * @returns {null | {refusalKind: string, refusal: string, details: string[]}}
+ */
+export function actorRequiredRefusal(required, resolved, verb) {
+  if (!required || resolved.actorSource !== "default") return null;
+  return {
+    refusalKind: ACTOR_REQUIRED,
+    refusal: "no actor was stated, and `--require-actor` refuses the default `" + resolved.actor + "`",
+    details: [
+      "State who " + verb + ": --actor <ns:name>, the " + ACTOR_ENV + " environment variable,",
+      "or `actor:` in the user configuration. Nothing was recorded.",
+    ],
+  };
 }

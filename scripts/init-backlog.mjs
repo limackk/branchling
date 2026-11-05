@@ -107,6 +107,12 @@ contract_capability: report
 # defaults (git, npm, cargo, docker and peers); do not restate the defaults just
 # to admit one project-specific program. Bare program names only, never paths.
 contract_programs: []
+
+# [free] Verification entries \`done\` appends to EVERY task's own contract, in
+# the shape of a task's \`verification:\` entries (\`- id:\` then \`bash:\` or
+# \`manual:\`). For the repository-wide guard a module's own tests do not run.
+# An id here that a task's own entry also uses refuses that closing.
+closing_contract: []
 types: [task]                      # [tree]
 
 # [tree] Labels. \`labels_closed: true\` turns a typo into a build error instead
@@ -121,6 +127,15 @@ labels_closed: false
 # carrying a non-empty \`role:\` fails the build rather than inventing a role no
 # dispatcher serves. Lowercase slugs.
 # roles: [analyst, developer, reviewer]
+
+# [tree] The releases a task may be PLANNED for (\`release:\`). Commented out
+# for the same reason as roles: an empty list means this project plans no
+# releases. The ORDER is chronological, oldest first: the CURRENT release is the
+# first one not yet fully shipped, and only its open top-priority tasks block
+# the last stage. Append the next release; do not reorder the shipped ones.
+# A shipped release may name the ref that marks it, so the scope report can
+# say what it carried: \`{ name: 1.0, ref: v1.0 }\` beside a plain name.
+# releases: [1.0, 1.1]
 
 # [free] with respect to the tree — a task may have any owner; but \`${N} new\n# --owner X\` checks this list, so a new owner has to be added here.
 owners: [unassigned]

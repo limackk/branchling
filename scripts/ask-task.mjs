@@ -56,11 +56,11 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readFileSync, writeFileSync } from "node:fs";
 
-import { resolveActor } from "./actor.mjs";
+import { resolveActorReport } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { ACTOR_NAMESPACES, appendEntries, currentSession, eventId, FIELD_COMMENT, isValidActor, questionBlockReason, reasonRefusal, recordEdit } from "./history.mjs";
 import { releaseLock } from "./lock.mjs";
-import { backlogPaths, resolveBacklogDir } from "./paths.mjs";
+import { backlogPaths, BACKLOG_DIR_REFUSAL_EXIT, isBacklogDirRefusal, resolveBacklogDir } from "./paths.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { buildFieldSpecs, extractMeta, fieldSpec, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
@@ -391,7 +391,11 @@ export function run(argv) {
     return 2;
   }
 
-  const actor = resolveActor(plan.actor);
+  // WHERE THE ACTOR CAME FROM travels with the answer (TL-544). No
+  // `--require-actor` here: a question is the act of whoever stopped, which is
+  // an agent far more often than a person, and the default actor is honest for
+  // it. The answer is the person's act, and `decide` accepts the flag.
+  const { actor, actorSource } = resolveActorReport(plan.actor);
   if (!isValidActor(actor)) {
     console.error(failure(N + " ask", "the actor `" + actor + "` has no valid namespace", [
       "Use one of: " + ACTOR_NAMESPACES.map((n) => n + ":<name>").join(" | "),
@@ -404,8 +408,9 @@ export function run(argv) {
   try {
     root = resolveBacklogDir({ dir: plan.dir || undefined, moduleDir: __dirname }).root;
   } catch (e) {
-    console.error(failure(N + " ask", e.message, []));
-    return 2;
+    if (!isBacklogDirRefusal(e)) throw e;
+    console.error(failure(N + " ask", e.message, e.details || []));
+    return BACKLOG_DIR_REFUSAL_EXIT;
   }
   const config = loadConfigOrExit(root);
   const result = askTask({
@@ -415,14 +420,14 @@ export function run(argv) {
 
   if (!result.ok) {
     if (plan.json) {
-      printJson("task-ask", { ok: false, refusalKind: result.kind, refusal: result.message, details: result.details || [] });
+      printJson("task-ask", { ok: false, actorSource, refusalKind: result.kind, refusal: result.message, details: result.details || [] });
     } else {
       console.error(failure(N + " ask", result.message, result.details || []));
     }
     return result.kind === "not-found" || result.kind === "closed" ? 1 : 2;
   }
 
-  if (plan.json) printJson("task-ask", askJson(result));
+  if (plan.json) printJson("task-ask", { ...askJson(result), actorSource });
   else console.log(renderAsk(result));
   return 0;
 }

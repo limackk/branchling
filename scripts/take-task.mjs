@@ -43,7 +43,7 @@ import { chmodSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSyn
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { resolveActor } from "./actor.mjs";
+import { actorRequiredRefusal, resolveActorReport } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { probeTask } from "./done-task.mjs";
 import { withProbe } from "./probe.mjs";
@@ -51,7 +51,7 @@ import { ACTOR_NAMESPACES, changesRequiringReason, currentSession, eventId, FIEL
 import { decisionsOf, withDecisions } from "./decisions.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { acquireLock, isExpired, lockDir, readLock, releaseLock } from "./lock.mjs";
-import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { backlogPaths, BACKLOG_DIR_REFUSAL_EXIT, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { buildFieldSpecs, extractMeta, fieldSpec, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
 import { readTaskRecords } from "./task-select.mjs";
@@ -60,7 +60,7 @@ import { todayStamp } from "./today.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-export const TAKE_FLAGS = ["--dir", "--actor", "--role", "--reason", "--json", "--probe", "--take-over"];
+export const TAKE_FLAGS = ["--dir", "--actor", "--role", "--reason", "--json", "--probe", "--take-over", "--require-actor"];
 
 /**
  * Replace a task without exposing the truncate-and-write interval to another
@@ -91,7 +91,7 @@ function discardStaged(staged) {
 export function parseTakeArgs(args) {
   const taken = takeDirFlag(args, { missing: "`--dir` with no value" });
   args = taken.argv;
-  const plan = { id: null, dir: taken.dir, actor: null, role: null, reason: null, json: false, probe: false, takeOver: false };
+  const plan = { id: null, dir: taken.dir, actor: null, role: null, reason: null, json: false, probe: false, takeOver: false, requireActor: false };
   let literal = false;
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -99,6 +99,7 @@ export function parseTakeArgs(args) {
     if (!literal && a === "--json") { plan.json = true; continue; }
     if (!literal && a === "--probe") { plan.probe = true; continue; }
     if (!literal && a === "--take-over") { plan.takeOver = true; continue; }
+    if (!literal && a === "--require-actor") { plan.requireActor = true; continue; }
     if (!literal && (a === "--actor" || a === "--role" || a === "--reason")) {
       const value = args[++i] || null;
       if (!value) throw new Error("`" + a + "` with no value");
@@ -629,7 +630,17 @@ export function run(argv) {
     return 2;
   }
 
-  const actor = resolveActor(plan.actor);
+  // WHERE THE ACTOR CAME FROM travels with the answer (TL-544), and
+  // `--require-actor` refuses the default for a person's claim made through
+  // an interface — before the reservation or the file is touched.
+  const resolved = resolveActorReport(plan.actor);
+  const { actor, actorSource } = resolved;
+  const required = actorRequiredRefusal(plan.requireActor, resolved, "takes the task");
+  if (required) {
+    if (plan.json) printJson("task-take", { ok: false, taken: false, id: plan.id, actorSource, ...required });
+    else console.error(failure(N + " take", required.refusal, required.details));
+    return 1;
+  }
   if (!isValidActor(actor)) {
     return fail2(
       "the actor `" + actor + "` has no valid namespace",
@@ -645,7 +656,9 @@ export function run(argv) {
   try {
     root = resolveBacklogDir({ dir: plan.dir || undefined, moduleDir: __dirname }).root;
   } catch (e) {
-    return fail2(e.message, []);
+    if (!isBacklogDirRefusal(e)) throw e;
+    console.error(failure(N + " take", e.message, e.details || [], [N + " take --help"]));
+    return BACKLOG_DIR_REFUSAL_EXIT;
   }
   const config = loadConfigOrExit(root);
 
@@ -669,10 +682,10 @@ export function run(argv) {
   // THE CONTRACT'S LIVE STATE TRAVELS WITH THE HANDOVER when asked (TL-268).
   // Opt-in: a contract may cost the whole suite, and a loop wanting the task
   // in a second is not made to wait for it.
-  if (result.ok && plan.probe) result.probe = probeTask(root, result.file);
+  if (result.ok && plan.probe) result.probe = probeTask(root, result.file, config);
   if (!result.ok) {
     if (plan.json) {
-      printJson("task-take", refusalPayload(result, plan.id));
+      printJson("task-take", { ...refusalPayload(result, plan.id), actorSource });
     } else {
       console.error(failure(N + " take", result.message, result.details || []));
     }
@@ -682,7 +695,7 @@ export function run(argv) {
   if (!result.alreadyOwned && !rebuildViews(root)) {
     console.error(warn("the views were not rebuilt — run `" + N + " build` yourself"));
   }
-  if (plan.json) printJson("task-take", takeJson(result, root));
+  if (plan.json) printJson("task-take", { ...takeJson(result, root), actorSource });
   else console.log(renderTake(result, root));
   return 0;
 }

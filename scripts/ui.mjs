@@ -45,6 +45,18 @@ export function colorAllowed(stream, env = process.env) {
   return !!(stream && stream.isTTY);
 }
 
+/**
+ * The environment for a child process whose output is captured and must carry
+ * no colour. FORCE_COLOR is removed rather than outvoted: with both set, Node
+ * prints "The 'NO_COLOR' env is ignored" on the child's stderr, and a caller
+ * that joins stderr to stdout can no longer parse a `--json` document (TL-538).
+ */
+export function plainChildEnv(base = process.env) {
+  const env = { ...base, NO_COLOR: "1" };
+  delete env.FORCE_COLOR;
+  return env;
+}
+
 const CONTROL = "\u001b";
 const ESC = CONTROL + "[";
 const SGR = {

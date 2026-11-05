@@ -180,11 +180,16 @@ test("the guard table is the one source both modes read", () => {
   // that re-ran other tasks' contracts would take minutes instead of a second,
   // and — since a contract in this backlog runs `check` — would call itself. A
   // second opt-in guard is a decision somebody has to come here to make.
-  assert.deepEqual(CHECK_GUARDS.filter((g) => g.optIn).map((g) => g.name), ["proofs"]);
-  // …and it is still reachable, which is what makes the exception an exception
+  // TL-503 made it: `release` judges a PROMOTION — git refs CI is about to move
+  // — and a bare `check` is the verdict on publishing the backlog, so folding
+  // the deploy gate into it would fail a publication on a deployment question.
+  assert.deepEqual(CHECK_GUARDS.filter((g) => g.optIn).map((g) => g.name), ["proofs", "release"]);
+  // …and each is still reachable, which is what makes the exception an exception
   // rather than a guard wired to nothing.
   assert.equal(parseCheckArgs(["--proofs"]).wantProofs, true);
   assert.equal(parseCheckArgs(["--proofs"]).wantIds, false, "asking for one guard ran them all");
+  assert.equal(parseCheckArgs(["--release"]).wantRelease, true);
+  assert.equal(parseCheckArgs(["--release"]).wantIds, false, "asking for one guard ran them all");
 
   const narrowed = parseCheckArgs(["--refs"]);
   assert.deepEqual(CHECK_GUARDS.filter((g) => narrowed[g.want]).map((g) => g.name), ["refs"]);

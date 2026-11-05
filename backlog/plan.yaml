@@ -13,7 +13,7 @@
 # means something first, outward claims last — and adds one: a human gate is
 # closed by a vouch, so the vouch has to be recorded under the right name
 # before any gate is closed with one.
-updated: 2026-10-26
+updated: 2026-11-02
 rationale: "The package is already public, so what remains is making each later claim true before it is made. Branchling first makes its suite answer the same way twice, then records a person's vouch as that person's and reads a CRLF checkout like an LF one; the viewer runs alongside, on files neither of those touches. Only then the human gates, and last the release evidence and the announcement that point at all of it."
 waves:
   # A SUITE THAT IS RED BY CHANCE CLOSES NOTHING. `done` runs the suite, so a
@@ -57,3 +57,45 @@ waves:
   # it points at the demo, the front door and that release together.
   - name: "The release is repeatable and announced"
     tasks: [TL-455, TL-468]
+
+  # Three run loops in worktrees of one clone paused on four separate causes.
+  # A decided question that strands its task comes first because it is a plain
+  # bug; then the dispatch rule behind every real code conflict, conflict
+  # groups; then the opt-in gate and state commit that end the bookkeeping
+  # cascade, a run that waits for work held in other trees instead of exiting,
+  # and last the seeding, multi-id plan and closing contract that a module
+  # backlog needs at intake.
+  - name: "Parallel worktree loops stop colliding"
+    tasks: [TL-490, TL-492, TL-489, TL-491, TL-493]
+
+  # Every other release-tracking task reads the stage a task has reached, so the computation and the deploy_targets key land first and alone.
+  - name: "Deploy stages are computed from git"
+    tasks: [TL-501]
+
+  # Three readers of the same computation that touch different commands: deploy status, check --release and doctor. They run side by side.
+  - name: "The report, the gate and the fetch check"
+    tasks: [TL-502, TL-503, TL-508]
+
+  # The viewer needs the report and the gap detectors; planned scope and recorded stages extend the report. The owner chose to land the viewer before the unmerged viewer branches.
+  - name: "Views and declarations on top of the report"
+    tasks: [TL-504, TL-505, TL-506]
+
+  # Small and last: it teaches the gap detectors to skip targets whose code lives in another repository, so it follows the gate and the scope check that it changes.
+  - name: "Unobservable targets"
+    tasks: [TL-507]
+
+  # Three small gaps the implementation loops found and filed: a short deploy ref that doctor misses, the release field missing from the viewer's filters, and query not naming tasks of another repository as unobservable. They touch doctor, the viewer and query respectively, so they run side by side.
+  - name: "Release tracking follow-ups"
+    tasks: [TL-510, TL-511, TL-512, TL-509]
+
+  # The owner's 2026-11-02 review: the deployment commands move under deploy, and every deployment reader counts from the same trunk. Both rename behaviour already merged and touch disjoint files, so they run side by side before anything is built on the new names.
+  - name: "The release surface says one thing per word"
+    tasks: [TL-513, TL-517]
+
+  # Two corrections of merged behaviour that read the renamed commands: a dedicated target: field for external targets, and only the current release blocking shipping.
+  - name: "Planned scope and external targets follow the owner's review"
+    tasks: [TL-514, TL-515]
+
+  # It builds on the chronological releases: list the current-release task introduces, so it comes last.
+  - name: "Shipped releases are in the scope report"
+    tasks: [TL-516, TL-518]
