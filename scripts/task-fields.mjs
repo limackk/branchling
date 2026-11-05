@@ -611,6 +611,23 @@ export const FRONTMATTER_ORDER = [
 export const TRACKED_FIELDS = FIELD_SHAPES.map((f) => f.key).concat(["created"]);
 
 /**
+ * The fields a general write refuses because a dedicated command owns them,
+ * with the commands that do. A status change is not a field edit: `done` runs
+ * the verification, `take` reserves, `handoff` and `release` record the
+ * exchange, `ask` records the question. A second path that only rewrote the
+ * value would skip every one of those, and the owner moves with the same
+ * commands for the same reason.
+ *
+ * It lives HERE, not in `field-write.mjs`, because the viewer needs the same
+ * list (TL-563): this module is inlined into the page, so the row that offers
+ * no editor and the route that refuses the write read one definition.
+ */
+export const DEDICATED_FIELDS = Object.freeze({
+  status: Object.freeze(["take", "done", "handoff", "release", "ask"]),
+  owner: Object.freeze(["take", "handoff", "release"]),
+});
+
+/**
  * Shape plus values from the configuration make the concrete field specs the
  * server validates against and the viewer draws editors from.
  *

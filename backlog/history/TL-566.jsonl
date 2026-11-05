@@ -1,0 +1,2 @@
+{"id":"01M6P23AWE19CHQ4G5PVHJ8XZE","ts":"2026-11-05T14:34:10.190Z","task":"TL-566","field":"__created__","from":"","to":"The viewer carries no reason prompt that no write can reach","actor":"agent:claude","source":"new","reason":"unknown"}
+{"id":"01M6P23GK2MSPYECHYJ54P3H24","ts":"2026-11-05T14:34:16.034Z","task":"TL-566","field":"blocked_by","from":[],"to":["TL-563"],"actor":"agent:loop-3","source":"set","reason":"The reason prompt becomes unreachable only once TL-563 refuses status on the route"}

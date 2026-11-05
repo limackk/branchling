@@ -38,7 +38,7 @@ import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { readTasks, computeStats, buildHtml } from "./build-viewer.mjs";
-import { fileForTaskId as fileInTasks, taskRevision, writeTaskField } from "./field-write.mjs";
+import { DEDICATED_FIELDS, fileForTaskId as fileInTasks, taskRevision, writeTaskField } from "./field-write.mjs";
 import { loadConfig, loadConfigOrExit } from "./config.mjs";
 import { PLAN_FILENAME, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { loadPlan } from "./plan.mjs";
@@ -527,8 +527,9 @@ function planPayload(dir = BACKLOG_DIR) {
  * and the refusal existed because the switcher made it possible to believe an
  * edit had landed somewhere it had not.
  *
- * With no write path left there is nothing to refuse, and with no switcher
- * there is nothing to resolve. A reader who wants another worktree's backlog
+ * With no switcher there is nothing to resolve, and the one write route can
+ * only land in the tree this process reads, so there is no other tree to
+ * refuse. A reader who wants another worktree's backlog
  * starts a server in it — which is also the only arrangement in which the
  * answer and the tree it describes cannot drift apart.
  *
@@ -548,12 +549,15 @@ function planPayload(dir = BACKLOG_DIR) {
 async function handleFieldEdit(payload) {
   return serializeEdit(async () => {
     // The validation, the write and the history record are the shared core's
-    // (TL-521), so this route and `set` cannot drift. What stays here is what
-    // only a server has: the page's revision proof, the echo suppression and
-    // the push to open tabs.
+    // (TL-521), so this route and `set` cannot drift — and that includes WHICH
+    // fields it refuses (TL-563): status and owner belong to the commands that
+    // run their checks, so the route refuses them exactly as `set` does. What
+    // stays here is what only a server has: the page's revision proof, the
+    // echo suppression and the push to open tabs.
     suppressUntil = Date.now() + 1500;
     const result = writeTaskField({
       root: BACKLOG_DIR, config: CONFIG, source: "viewer",
+      refusedFields: Object.keys(DEDICATED_FIELDS),
       id: payload?.id, field: payload?.field, value: payload?.value,
       actor: payload?.actor, reason: payload?.reason,
       revision: typeof payload?.revision === "string" ? payload.revision : null,
@@ -662,21 +666,27 @@ async function handle(req, res) {
   // the short-lived capability injected only into a served page. Snapshot mode
   // has neither the route nor the capability and remains read-only.
   //
-  // This server used to answer `/api/field`, `/api/status` and `/api/decision`
-  // with a POST, and to serve `/api/fields`, `/api/history` and
-  // `/api/worktrees` for the editor those three needed. All six are gone.
+  // WHAT THAT ROUTE MAY WRITE is exactly what `set` may write (TL-521,
+  // TL-563). Both call `writeTaskField()` with the same refused fields, so the
+  // validation, the reason rule, the history record and the refusal of
+  // `status` and `owner` are one definition with two callers rather than two
+  // policies kept in step. Those two fields are refused because a command owns
+  // each change to them — `done` runs the verification, `take` reserves,
+  // `handoff` and `release` record the exchange, `ask` records the question —
+  // and a route that only rewrote the value would skip every one of those
+  // checks. The page therefore offers no editor for them and names the
+  // commands instead, as the decisions view names `decide`.
   //
-  // The product's authoritative write surface is Markdown, the CLI and git
-  // review. A second write path beside it does not strengthen that boundary: it
-  // adds an actor to establish, a validation to keep in step with the CLI's,
-  // and a server lifetime during which somebody else's tasks are reachable on a
-  // socket — and the only thing defending any of it was the page choosing not
-  // to render a button. A route is what a stranger with `curl` reaches, which
-  // is why the guard for this calls them rather than looking for the button.
+  // The refusal is the route's, not the page's. A route is what a stranger
+  // with `curl` reaches, so the guard for this posts to it rather than looking
+  // for a missing button (`scripts/tests/viewer-dedicated-fields.test.mjs`).
   //
-  // What a reader still gets is the whole point of the viewer and needs no
-  // write: `/api/tasks` carries the tasks, the stats and the plan, `/api/events`
-  // says when they changed, and `/api/ping` says whose backlog this is.
+  // The routes this server answered before TL-379 — POSTs to `/api/field`,
+  // `/api/status` and `/api/decision`, and `/api/fields`, `/api/history` and
+  // `/api/worktrees` for their editor — are gone, and nothing here answers
+  // them. Reading needs no write: `/api/tasks` carries the tasks, the stats and
+  // the plan, `/api/events` says when they changed, and `/api/ping` says whose
+  // backlog this is.
   sendJson(res, 404, { error: "Not found" });
 }
 
