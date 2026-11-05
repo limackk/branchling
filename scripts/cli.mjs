@@ -1076,7 +1076,8 @@ export const COMMANDS = {
       "  It creates nothing. Asking where a directory would be must not bring it",
       "  into existence.",
       "",
-      "  exit: 0 reported · 2 usage error",
+      "  exit: 0 reported, including no backlog found · 1 --dir or BACKLOG_DIR names",
+      "  a directory that is not a backlog · 2 usage error",
     ].join("\n"),
   },
   vocabulary: {
