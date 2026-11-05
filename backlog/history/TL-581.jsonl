@@ -1,0 +1,2 @@
+{"id":"01M6PS8YBE9201D2QKQVT7CX1M","ts":"2026-11-05T21:19:11.214Z","task":"TL-581","field":"__created__","from":"","to":"Jira issues import from stdin like GitHub issues","actor":"agent:claude","source":"new","reason":"unknown"}
+{"id":"01M6PS94NCKX3V3ZS4G7T3TKSP","ts":"2026-11-05T21:19:17.676Z","task":"TL-581","field":"blocks","from":[],"to":["TL-582"],"actor":"agent:claude","source":"set","reason":"unknown"}
