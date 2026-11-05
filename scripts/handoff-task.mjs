@@ -611,14 +611,30 @@ export function run(argv) {
   // Every vocabulary check happens here, before the task is even looked up: a
   // typo in a role is wrong whatever the task says, and a handoff to a role
   // nobody serves is the phantom `role:` TL-97 exists to keep out of files.
+  //
+  // A REFUSAL (1), NOT A USAGE ERROR (TL-559): the role is a value a person
+  // chose, inside a correctly built call, so `--json` answers an
+  // `unknown-value` envelope naming the declared roles — `[]` when there are
+  // none — as `set` does for a field's vocabulary (TL-543).
   if (plan.toRole !== null && (config.roles || []).indexOf(plan.toRole) < 0) {
-    return fail2("unknown role `" + plan.toRole + "`", (config.roles || []).length
-      ? ["`roles` in config.yaml holds: " + config.roles.join(", ")]
+    const declared = (config.roles || []).slice();
+    const message = "unknown role `" + plan.toRole + "`";
+    const details = declared.length
+      ? ["`roles` in config.yaml holds: " + declared.join(", ")]
       : [
           "This backlog declares no `roles:` in config.yaml, so there is no role to hand to.",
           "Declare the vocabulary there first — a handoff to a role nobody serves is a",
           "task that leaves every queue without a word.",
-        ]);
+        ];
+    if (plan.json) {
+      printJson("task-handoff", {
+        ok: false, id: plan.id, actorSource, refusalKind: "unknown-value", refusal: message, details,
+        rejected: { field: "role", value: plan.toRole }, declared,
+      });
+    } else {
+      console.error(failure(N + " handoff", message, details, [N + " handoff --help"]));
+    }
+    return 1;
   }
   if (plan.toOwner !== null && (config.owners || []).length && config.owners.indexOf(plan.toOwner) < 0) {
     return fail2("`" + plan.toOwner + "` is not an allowed value for the field `owner`",
