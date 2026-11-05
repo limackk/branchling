@@ -43,7 +43,7 @@ import { spawnSync } from "node:child_process";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { resolveActor } from "./actor.mjs";
+import { resolveActorReport } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { chooseRemote, refspecsCover, fixCommand, refNamespace } from "./deploy-fetch.mjs";
 import { resolveRef } from "./environments.mjs";
@@ -303,8 +303,11 @@ export function run(argv) {
   const cmd = N + " deploy record";
   const dirFlag = takeDirFlag(argv);
   const wantsJson = dirFlag.argv.includes("--json");
+  // Null until the actor is resolved, so a refusal before it never names a
+  // rung nobody consulted (TL-550).
+  let actorSource = null;
   const refuse = (message, details, code, kind) => {
-    if (wantsJson) printJson("release-record", { ok: false, refusalKind: kind, refusal: message, details });
+    if (wantsJson) printJson("release-record", { ok: false, actorSource, refusalKind: kind, refusal: message, details });
     else console.error(failure(cmd, message, details, [cmd + " --help"]));
     return code;
   };
@@ -323,7 +326,9 @@ export function run(argv) {
     const [head, ...rest] = why.split("\n");
     return refuse(head, rest, 2, "usage");
   }
-  const actor = resolveActor(opts.actor);
+  const resolved = resolveActorReport(opts.actor);
+  const { actor } = resolved;
+  actorSource = resolved.actorSource;
   if (!isValidActor(actor)) {
     return refuse("the actor `" + actor + "` has no valid namespace", ["Use one of: " + ACTOR_NAMESPACES.map((n) => n + ":<name>").join(" | ")], 2, "usage");
   }
@@ -343,7 +348,7 @@ export function run(argv) {
   if (!result.ok) return refuse(result.message, result.details, result.code, result.kind);
 
   if (wantsJson) {
-    printJson("release-record", result);
+    printJson("release-record", { ...result, actorSource });
     return 0;
   }
   const short = (s) => (s ? s.slice(0, 12) : "nothing");

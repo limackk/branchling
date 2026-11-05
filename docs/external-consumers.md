@@ -117,6 +117,7 @@ table and the code disagree in either direction.
 | `verification-run` | `done <ID> --json` | write |
 | `vocabulary-declare` | `declare <key> <name> --json` | write — `config.yaml` |
 | `release-record` | `deploy record --json` | write — a git ref, never the tree |
+| `task-new` | `new --title "…" --json` | write |
 | `seed` | `seed --json` | write |
 | `import` | `import --from github --json` | write |
 | `run` | `run --json` | write — dispatches agents |
@@ -287,11 +288,15 @@ Common to all of them:
   act under the default agent actor. `next` and `ask` do not take it: both
   are an agent's act far more often than a person's. `done` does not either:
   its person's act is a `manual:` vouch, which already refuses an unstated
-  actor (`unstated-actor`).
+  actor (`unstated-actor`). `new`, `seed`, `import` and `deploy record`
+  report it too (TL-550), as does `run --json`, whose rung may also be
+  `profile` — a local profile's identity, or `agent:fleet` for several. The
+  claims a run makes pass its actor as an explicit `--actor`, so the run's own
+  answer is the only place that rung shows.
 
 | Command | Required input | Kind |
 |---|---|---|
-| `new --title "…"` | the title; the body as one JSON document on stdin (`goal`, non-empty `verification`) or the template is written | none (text) |
+| `new --title "…"` | the title; the body as one JSON document on stdin (`goal`, non-empty `verification`) or the template is written; `--actor` names who records the creation | `task-new` with `--json`; a refusal stays text on stderr |
 | `take <ID>` | the id; `--reason` when the target status requires one, and with `--take-over` | `task-take` |
 | `next` | nothing; the same filters `query` takes narrow the choice | `task-take` |
 | `set <ID> <field> <value>` | a field `set` writes (not `status` or `owner`) and a value from the vocabulary; `--reason` where required | `task-set` |
