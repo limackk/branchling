@@ -96,6 +96,7 @@ table and the code disagree in either direction.
 | `red-owners` | `red --json` | read |
 | `task-show` | `show <ID> --json [--body]` | read |
 | `task-log` | `log <ID> --json` | read |
+| `task-ledger` | `log <ID> --records --json` | read — every ledger record of one task, unfolded |
 | `open-questions` | `log --open-questions --json` | read — every question waiting on a person |
 | `resume` | `resume <ID> --json` | read — composes reads, writes nothing |
 | `release-status` | `deploy status --json` | read |
@@ -223,6 +224,33 @@ there are options, or `--reason "…"` for a typed answer. An answered question
 is not listed, nor is one on an archived task. The question messages in
 `log <ID> --json` (and `--decisions`) carry the same `options` and
 `recommend`.
+
+## Every ledger record of a task
+
+`log <ID> --json` answers in exchanges — one row per write, the reason once —
+which is what a reader wants and what an audit cannot use: a fold renders only
+what it was built to show. `log <ID> --records --json` answers the ledger
+itself, kind `task-ledger`, so a program never has to read
+`history/<ID>.jsonl`.
+
+`records` holds every record in the order the ledger holds it. Each one
+carries `id`, `ts`, `field`, `from`, `to`, `actor`, `source` and `reason`
+(`null` when an older line lacks one), followed by every other key that record
+was written with, unchanged: `contractCapability` on the status transition that
+closed a task (beside `reason: proven`), `vouch` on a `__verified__` record,
+`refusal` on an `__unverified__` one, `session`, `role`, and whatever a later
+writer adds. A record whose id appears twice in the file — the same event
+merged in from two branches — is answered once, as is a repeated observation
+of the same creation or deletion; every reading command reads the ledger that
+way.
+
+`total` is the number of records in the ledger. `--limit <n>` keeps the newest
+`n`; `limit` echoes it and `omitted` says how many older records the slice left
+out, so a slice never reads as the whole ledger. A task with no history answers
+`total: 0` and `records: []`, exit 0; a task that exists neither as a file nor
+as a ledger is the `no-such-task` refusal, exit 1. `--records` beside
+`--decisions`, `--modified-file` or `--open-questions` is a usage error (exit
+2): each selects a different question.
 
 ## When a reading command refuses
 

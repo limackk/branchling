@@ -501,6 +501,16 @@ export const KINDS = {
     modifiedFile: null, tasks: [],
     refusalKind: null, refusal: null, details: [],
   },
+  // `log <ID> --records --json` (TL-562): the ledger unfolded — every record in
+  // recorded order with every key it carries, so a program reading a closing's
+  // `reason`, its `contractCapability`, a vouch or a refusal never parses
+  // `history/<ID>.jsonl` itself. `total` is the ledger's size BEFORE `--limit`,
+  // and `omitted` how many older records the slice left out.
+  "task-ledger": {
+    ok: null, id: null, title: null, file: null, path: null,
+    total: null, limit: null, omitted: null, records: [],
+    refusalKind: null, refusal: null, details: [],
+  },
 };
 
 /**
@@ -620,6 +630,7 @@ export const KIND_EXERCISE = {
   // task" refusal — each a complete envelope, and neither a usage error. The id
   // is the sentinel, never typed.
   "task-log": { args: ["log", FIRST_TASK, "--json"] },
+  "task-ledger": { args: ["log", FIRST_TASK, "--records", "--json"] },
   "open-questions": { args: ["log", "--open-questions", "--json"] },
   // `resume` composes reads and writes nothing (TL-151), so it is NOT a
   // `writes` row: asking it twice of one tree is safe, and
