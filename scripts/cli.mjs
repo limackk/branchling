@@ -47,7 +47,7 @@ import { dropInferredGitDir } from "./git-env.mjs";
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 const CHECK_USAGE = [
-  `${N} check [--dir <path>] [--id-collisions] [--boards] [--refs] [--criteria] [--contracts] [--reasons] [--log-status] [--task-state] [--vocabulary] [--plan] [--product-name] [--proofs] [--since <sha>] [--release [--env <stage>] [--trunk <ref>]] [--actor <ns:name>] [task-file.md …]`,
+  `${N} check [--dir <path>] [--id-collisions] [--boards] [--refs] [--criteria] [--contracts] [--reasons] [--log-status] [--task-state] [--vocabulary] [--plan] [--product-name] [--proofs [--since <sha>] [--task <ID>] [--own-only]] [--release [--env <stage>] [--trunk <ref>]] [--actor <ns:name>] [task-file.md …]`,
   "",
   "  no selector          A RELEASE VERDICT: the guards that can FAIL one, and only those.",
   "                       Exit code = the WORST of them. Guards that report and never",
@@ -151,6 +151,14 @@ const CHECK_USAGE = [
   "                       branch, else HEAD — the report names which",
   "  --since <sha>        with --proofs, keep the closings the range could plausibly have",
   "                       broken — a file the task changed, or a path its own contract names",
+  "  --task <ID>          with --proofs, audit that one task alone: its proven closing, or",
+  "                       its contract if nobody has started it. A task in neither half",
+  "                       has nothing to re-run, and that exits 1 rather than passing",
+  "  --own-only           with --proofs, run no project `closing_contract` entry — only",
+  "                       each task's own `verification:`. Where the project contract is",
+  "                       the whole suite, `--task <ID> --own-only` re-runs one task's",
+  "                       proofs without starting it. The report says what it left out:",
+  "                       `done` still runs the project's entries before it closes a task",
 ].join("\n");
 
 /**
@@ -2111,7 +2119,7 @@ function captureScript(script, args) {
  * evidential force. The dispatcher supplies the mode so that nobody has to
  * remember it.
  */
-const CHECK_FLAGS = ["--dir", "--json", "--id-collisions", "--boards", "--refs", "--criteria", "--contracts", "--reasons", "--log-status", "--history", "--task-state", "--docs", "--vocabulary", "--plan", "--product-name", "--foreign-context", "--proofs", "--since", "--release", "--env", "--trunk", "--actor"];
+const CHECK_FLAGS = ["--dir", "--json", "--id-collisions", "--boards", "--refs", "--criteria", "--contracts", "--reasons", "--log-status", "--history", "--task-state", "--docs", "--vocabulary", "--plan", "--product-name", "--foreign-context", "--proofs", "--since", "--task", "--own-only", "--release", "--env", "--trunk", "--actor"];
 
 /** PURE — resolves `check`'s arguments. Throws on a usage error. */
 export function parseCheckArgs(args) {
@@ -2132,6 +2140,8 @@ export function parseCheckArgs(args) {
   let wantForeignContext = false;
   let wantProofs = false;
   let since = null;
+  let task = null;
+  let ownOnly = false;
   let wantRelease = false;
   let env = null;
   let trunk = null;
@@ -2183,6 +2193,12 @@ export function parseCheckArgs(args) {
       if (!since) throw new Error("`--since` with no commit");
       continue;
     }
+    if (a === "--task") {
+      task = args[++i] || null;
+      if (!task || task.startsWith("-")) throw new Error("`--task` with no task id");
+      continue;
+    }
+    if (a === "--own-only") { ownOnly = true; continue; }
     if (a.startsWith("-")) {
       // The full `usage` is NO LONGER repeated here (TL-52): since `check
       // --help` works (TL-51), the error's job is to name the flag and point
@@ -2232,13 +2248,19 @@ export function parseCheckArgs(args) {
         "It narrows which proven closings are re-run; on its own there is nothing for it to narrow."
     );
   }
+  if ((task !== null || ownOnly) && !wantProofs) {
+    throw new Error(
+      "`" + (task !== null ? "--task" : "--own-only") + "` with no `--proofs`\n" +
+        "It narrows what the proofs audit re-runs; on its own there is nothing for it to narrow."
+    );
+  }
   if ((env !== null || trunk !== null) && !wantRelease) {
     throw new Error(
       "`" + (env !== null ? "--env" : "--trunk") + "` with no `--release`\n" +
         "It narrows which stage, or which trunk, the release gate judges; on its own there is nothing for it to narrow."
     );
   }
-  return { dir, json, explicit, wantIds, wantBoards, wantRefs, wantCriteria, wantContracts, wantReasons, wantLogStatus, wantHistory, wantTaskState, wantDocs, wantVocabulary, wantPlan, wantProductName, wantForeignContext, wantProofs, since, wantRelease, env, trunk, actor, files };
+  return { dir, json, explicit, wantIds, wantBoards, wantRefs, wantCriteria, wantContracts, wantReasons, wantLogStatus, wantHistory, wantTaskState, wantDocs, wantVocabulary, wantPlan, wantProductName, wantForeignContext, wantProofs, since, task, ownOnly, wantRelease, env, trunk, actor, files };
 }
 
 // The guard table and its severity axis live in `check-guards.mjs`, because

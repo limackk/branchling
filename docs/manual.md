@@ -120,6 +120,17 @@ the red lines the closing will. The one exception is the half of `check
 judges a task by its own entries, because the project's are not the work's to
 turn red.
 
+**One task's own proofs, without the project's.** Where the project contract is
+the whole test suite, `check --proofs` starts that suite. `check --proofs --task
+<ID> --own-only` audits that one task and runs no project entry — the call for a
+session held to targeted tests, such as one of several parallel loops. Either
+flag works alone: `--task` narrows the audit to one task, `--own-only` drops the
+project's entries from every closing it re-runs. The report says what it left
+out, because that green covers less than `done` would, and `done` still runs
+the project's entries before it closes anything. A named task that is neither a
+proven closing nor one nobody has started has nothing to re-run, and the audit
+exits 1 rather than reporting a pass over zero commands.
+
 **A nested `check --proofs` re-runs nothing.** "Every earlier contract still
 passes" is a reasonable entry, and `check --proofs` is the command that says it.
 Every command a proofs run executes carries a mark naming the backlog it covers,
