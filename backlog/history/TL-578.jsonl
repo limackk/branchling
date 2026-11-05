@@ -1,0 +1,4 @@
+{"id":"01M6PRA5B36Q66A9PNJQAVKFPQ","ts":"2026-11-05T21:02:22.563Z","task":"TL-578","field":"__created__","from":"","to":"Sprints are recorded as deliberately not built","actor":"agent:claude","source":"new","reason":"unknown"}
+{"id":"01M6PRAD412KPK1P82XY5YCHDK","ts":"2026-11-05T21:02:30.529Z","task":"TL-578","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M6PRAD41NBW9FAQM0KG4YRFX","ts":"2026-11-05T21:02:30.529Z","task":"TL-578","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M6PRB0NN4R6M4DRDRBNMK4V5","ts":"2026-11-05T21:02:50.549Z","task":"TL-578","field":"status","from":"in_progress","to":"done","actor":"agent:claude","source":"done","reason":"proven","contractCapability":{"verdict":"undetermined","statement":"whether the run executed a file this task changed was not determined","changedFilesExecuted":[]}}

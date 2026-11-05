@@ -298,8 +298,8 @@ invisible, and a project in this category grows from one good launch.
 
 ## 4. What deliberately will not happen
 
-Rejected during the Backlog.md analysis (2026-08-31) and earlier. Recorded so
-they don't come back as "maybe after all".
+Rejected during the Backlog.md analysis (2026-08-31) and earlier, unless a row
+names a later date. Recorded so they don't come back as "maybe after all".
 
 | Thing | Why not |
 |---|---|
@@ -309,6 +309,7 @@ they don't come back as "maybe after all".
 | **Milestones as files with their own IDs** | `epic:` as free text within a board is enough and removes the cost of operating on someone else's IDs. |
 | **A plugin API** | Law IV: extensibility through composition. `--json` and callable inputs instead of a hook registry. |
 | **An external tracker as source of truth** | Law I: state divorced from the branch is the defect this project exists to fix. |
+| **Sprints as an entity** (2026-11-05, TL-578) | Of the five things a sprint bundles, four are already here or deliberately absent. Committed scope is `release:`, a wave in `plan.yaml`, `epic:` or a label; the goal is a wave's name and the plan's `rationale`; progress is `plan` and the viewer's burndown. Velocity is the productivity analytics TL-377 put outside the product and TL-378 removed. What remains, a time window, serves a team of people; work handed out by `next` is bounded by a person's vouch, not by a session's time. This repository's own plan on 2026-11-05 had 25 tasks closed in waves after the active one and 12 of 22 open tasks outside every wave, so an order without dates did not hold for three weeks. A team that plans in sprints keeps them in its tracker, which this tool composes with, or labels them and asks `query --label <sprint>`. Not as a release either: `check --release` gates shipping on the current release's scope (TL-515), and a sprint read as a release would change what that gate means. Reopen only as a filter computed from `backlog/history/` (what closed between two dates), never as stored state. |
 
 ---
 
