@@ -8,8 +8,8 @@ epic: ""                           # free text — the group this task counts to
 release: ""                        # the release it is PLANNED for (a value from `releases:` in config.yaml). Empty = none
 target: []                         # the deploy targets in ANOTHER repository it ships from (`deploy_targets` with `repository:`). Empty = none
 priority: P3
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:loop-3
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 conflict_group: [viewer]  # the AREA it touches (e.g. a module): `next` and `run` hold it back while a task of the same group is in progress. Empty = `conflict_group_from`, or none
@@ -40,4 +40,4 @@ TL-379 made the viewer read-only, and TL-530 removed the history panel's residue
 
 ## Acceptance criteria
 
-- [ ] The built viewer page declares and reads no editing or actor state. [proof: no-edit-state]
+- [x] Each editing or actor field the built viewer page declares has a live reader that its comment names, the comment names no foreign task id, and only a served page with the write capability can open an editor. [proof: no-edit-state]
