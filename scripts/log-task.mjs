@@ -495,6 +495,7 @@ export function openQuestionsAcross(root, config) {
       if (q.answered) continue;
       questions.push({
         task: task.id, title: task.title || null, status: task.status || null,
+        priority: task.priority || null,
         event: q.id, question: q.question, askedBy: q.askedBy, askedAt: q.askedAt,
         options: q.options, recommend: q.recommend,
       });

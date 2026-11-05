@@ -216,9 +216,12 @@ execute it on the reader's behalf.
 
 `log --open-questions --json` lists, in one call, every question still waiting
 on an answer across the active tasks, oldest first. Each entry is
-`{ task, title, status, event, question, askedBy, askedAt, options, recommend }`:
-`options` is the menu the asker offered (`[]` when none), `recommend` the
-1-based number of the option they recommended (`null` when none), and `event`
+`{ task, title, status, priority, event, question, askedBy, askedAt, options, recommend }`:
+`priority` is the priority of the task the question belongs to, read from its
+file at the moment of the call (`null` when the task sets none), so a screen
+can rank questions without one more read per task. `options` is the menu the
+asker offered (`[]` when none), `recommend` the 1-based number of the option
+they recommended (`null` when none), and `event`
 is the id `decide <task> --resolves <event>` answers — with `--choose <n>` when
 there are options, or `--reason "…"` for a typed answer. An answered question
 is not listed, nor is one on an archived task. The question messages in
