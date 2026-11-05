@@ -428,10 +428,10 @@ function runBash(command, cwd, capture, observeCoverage = false) {
  * is deliberate: a descendant that catches SIGTERM must not outlive the audit
  * whose operator just stopped it.
  */
-function runBashAsync(command, cwd, capture, observeCoverage = false, signal = null) {
+function runBashAsync(command, cwd, capture, observeCoverage = false, signal = null, extraEnv = null) {
   return new Promise((resolve) => {
     const started = Date.now();
-    const env = { ...process.env };
+    const env = { ...process.env, ...(extraEnv || {}) };
     delete env.NODE_TEST_CONTEXT;
     const coverageDir = observeCoverage ? mkdtempSync(join(tmpdir(), "contract-coverage-")) : null;
     if (coverageDir) env.NODE_V8_COVERAGE = coverageDir;
@@ -525,7 +525,11 @@ function runBashAsync(command, cwd, capture, observeCoverage = false, signal = n
  *
  * @param {Array<object>} entries parsed `verification:` entries
  * @param {string} cwd where the commands run — the repository root
- * @param {{capture?: boolean, manual?: function, before?: function, after?: function, signal?: AbortSignal}} opts
+ * `env(entry)` returns variables added to that entry's environment. A proofs
+ * run uses it to mark every command it starts, so that a `check --proofs`
+ * inside one of them knows it is nested (TL-565).
+ *
+ * @param {{capture?: boolean, manual?: function, before?: function, after?: function, signal?: AbortSignal, env?: function}} opts
  * @returns {Promise<{results: Array<object>, failed: object|null, interrupted: boolean}>}
  */
 export async function runContract(entries, cwd, opts = {}) {
@@ -543,7 +547,8 @@ export async function runContract(entries, cwd, opts = {}) {
     }
     if (opts.before) opts.before(e, i);
     const r = await runBashAsync(e.bash, cwd, opts.capture,
-      Boolean(opts.observeCoverage && nodeTestFiles(e).length), opts.signal || null);
+      Boolean(opts.observeCoverage && nodeTestFiles(e).length), opts.signal || null,
+      opts.env ? opts.env(e) : null);
     const row = { id: e.id, kind: "bash", command: e.bash, ok: r.ok, exitCode: r.exitCode, ms: r.ms };
     // Coverage is private runner evidence. It feeds the compact capability
     // reading below rather than inflating `done --json` with every loaded file.
