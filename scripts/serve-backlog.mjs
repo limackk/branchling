@@ -37,6 +37,7 @@ import { readFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { ACTOR_ENV, actorRequiredRefusal, resolveActorReport } from "./actor.mjs";
 import { readTasks, computeStats, buildHtml } from "./build-viewer.mjs";
 import { DEDICATED_FIELDS, fileForTaskId as fileInTasks, taskRevision, writeTaskField } from "./field-write.mjs";
 import { loadConfig, loadConfigOrExit } from "./config.mjs";
@@ -546,8 +547,47 @@ function planPayload(dir = BACKLOG_DIR) {
  * it; a handler that asks git again is how the 404 comes back.
  */
 
+/**
+ * The actor of one edit from the page, or the refusal to make it (TL-551).
+ *
+ * The page acts for a PERSON, so this route is the caller `--require-actor`
+ * exists for: the request's `actor` is the flag, the server's own environment
+ * and user configuration are the rungs below it exactly as they are for the
+ * CLI, and the default `agent:` actor is refused rather than taken — a
+ * person's edit recorded under a program nobody named is indistinguishable
+ * from that program's own write. The sentence names the page's way of stating
+ * an actor first, because the person reading it is at the page, not at the
+ * terminal that started this server.
+ */
+function editActor(payload) {
+  const resolved = resolveActorReport(typeof payload?.actor === "string" ? payload.actor : "");
+  const required = actorRequiredRefusal(true, resolved, "edits the task");
+  if (!required) return { ok: true, ...resolved };
+  return {
+    ok: false,
+    status: 422,
+    message: "No actor was stated, so nothing was saved. Enter who you are under \u201cEditing as\u201d"
+      + " (user:<name>) and save again.",
+    refusalKind: required.refusalKind,
+    details: [
+      "The default `" + resolved.actor + "` names a program, not the person editing.",
+      "A caller other than the page states one as `actor` in the request; the server also accepts the "
+        + ACTOR_ENV + " environment variable or `actor:` in the user configuration of whoever started it.",
+    ],
+    actorSource: resolved.actorSource,
+  };
+}
+
 async function handleFieldEdit(payload) {
   return serializeEdit(async () => {
+    // Before the echo suppression and before the file is read: a refused
+    // actor writes nothing, so it must not mute the watcher either.
+    const stated = editActor(payload);
+    if (!stated.ok) {
+      throw Object.assign(new Error(stated.message), {
+        status: stated.status, refusalKind: stated.refusalKind, details: stated.details, actorSource: stated.actorSource,
+      });
+    }
     // The validation, the write and the history record are the shared core's
     // (TL-521), so this route and `set` cannot drift — and that includes WHICH
     // fields it refuses (TL-563): status and owner belong to the commands that
@@ -559,7 +599,7 @@ async function handleFieldEdit(payload) {
       root: BACKLOG_DIR, config: CONFIG, source: "viewer",
       refusedFields: Object.keys(DEDICATED_FIELDS),
       id: payload?.id, field: payload?.field, value: payload?.value,
-      actor: payload?.actor, reason: payload?.reason,
+      actor: stated.actor, reason: payload?.reason,
       revision: typeof payload?.revision === "string" ? payload.revision : null,
     });
     if (!result.ok) {
@@ -577,7 +617,7 @@ async function handleFieldEdit(payload) {
     }
     return {
       ok: true, id: result.id, field: result.field, value: result.value, actor: result.actor,
-      entries: result.entries, regenerated, revision: result.revision,
+      actorSource: stated.actorSource, entries: result.entries, regenerated, revision: result.revision,
     };
   });
 }
@@ -657,6 +697,7 @@ async function handle(req, res) {
         error: error.message,
         needsReason: error.needsReason === true,
         ...(error.revision ? { revision: error.revision } : {}),
+        ...(error.refusalKind ? { refusalKind: error.refusalKind, details: error.details || [], actorSource: error.actorSource } : {}),
       });
     }
     return;

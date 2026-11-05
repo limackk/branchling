@@ -3232,6 +3232,7 @@ async function saveField(taskId, field, value, reason) {
   state.editMessage = "Saving…";
   state.editError = false;
   renderDetail();
+  let actorRefused = false;
   try {
     const res = await fetch("api/task", {
       method: "POST",
@@ -3247,11 +3248,14 @@ async function saveField(taskId, field, value, reason) {
       if (data.needsReason) {
         state.reasonAsk = { id: taskId, field: field, value: normalized.value, draft: reason || "", error: data.error || "A reason is required." };
       }
+      // The server refused to record the edit under a default nobody named
+      // (TL-551): the fix is the identity field, so that is where focus goes.
+      if (data.refusalKind === "actor-required") actorRefused = true;
       throw new Error(data.error || "HTTP " + res.status);
     }
     if (data.entries) HISTORY[taskId] = (HISTORY[taskId] || []).concat(data.entries);
     await refreshFromServer(true);
-    state.editMessage = fieldLabel(field) + " saved to Markdown and history as " + state.actor + ".";
+    state.editMessage = fieldLabel(field) + " saved to Markdown and history as " + (data.actor || state.actor) + ".";
     state.editError = false;
     renderDetail();
   } catch (error) {
@@ -3259,6 +3263,7 @@ async function saveField(taskId, field, value, reason) {
     state.editError = true;
     renderDetail();
     if (state.reasonAsk) focusReasonAsk();
+    if (actorRefused) document.getElementById("editingActor").focus();
   }
 }
 
