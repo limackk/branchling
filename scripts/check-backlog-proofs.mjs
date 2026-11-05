@@ -114,11 +114,27 @@
  * and those have to run for real. A `check --proofs` started by `done` outside
  * any proofs run carries no mark, so it runs for real as well.
  *
+ * ONE TASK'S OWN PROOFS, WITHOUT THE PROJECT'S (TL-557). Since TL-497 a proofs
+ * run ends in the project `closing_contract`, which in a repository like this
+ * one is the whole test suite. A session held to targeted tests — one loop of
+ * several sharing a machine — had no way to ask "does this task's proof still
+ * hold" without starting that suite, and one did start it by accident through
+ * this command. `--task <ID>` keeps that one task, in whichever half it
+ * belongs to; `--own-only` runs no project entry at all. Both are SAID in the
+ * report, because a green that skipped the project's half reads exactly like
+ * one that did not, and `done` still runs that half before it closes anything.
+ *
+ * A NAMED TASK THE AUDIT DOES NOT COVER IS A REFUSAL, NOT A GREEN. A task that
+ * is neither a proven closing nor an unstarted contract has nothing here to
+ * re-run, and "0 commands re-run, each still passing" is a zero sample that
+ * would read as a pass. So it exits 1 and says which of the two it is not.
+ *
  * Usage:
- *   node scripts/check-backlog-proofs.mjs [--dir <backlog>] [--since <sha>] [--quiet]
+ *   node scripts/check-backlog-proofs.mjs [--dir <backlog>] [--since <sha>] [--task <ID>] [--own-only] [--quiet]
  *
  * Exit 0 = every proof still holds (and it says how many it ran).
- * Exit 1 = at least one proof no longer holds.
+ * Exit 1 = at least one proof no longer holds, or the task `--task` names has
+ *          no proof this audit can re-run.
  * Exit 130 = interrupted; it says how far it got and proved nothing beyond that.
  *
  * Tests: `node --test scripts/tests/proofs.test.mjs`,
@@ -126,7 +142,8 @@
  *        `node --test scripts/tests/check-contract-falsifiable.test.mjs`,
  *        `node --test scripts/tests/done-closing-contract.test.mjs`,
  *        `node --test scripts/tests/proofs-project-once.test.mjs`,
- *        `node --test scripts/tests/proofs-reentrance.test.mjs`
+ *        `node --test scripts/tests/proofs-reentrance.test.mjs`,
+ *        `node --test scripts/tests/proofs-own-only.test.mjs`
  */
 
 import { spawnSync } from "node:child_process";
@@ -255,20 +272,28 @@ export function touchedByRange(task, entries, changed, touchedFiles) {
 async function main(argv) {
   const { dir, argv: afterDir } = takeDirFlag(argv);
   let since = null;
+  let taskId = null;
+  let ownOnly = false;
   let quiet = false;
   const rest = [];
   for (let i = 0; i < afterDir.length; i++) {
     if (afterDir[i] === "--since") { since = afterDir[++i] || null; continue; }
+    if (afterDir[i] === "--task") { taskId = afterDir[++i] || null; continue; }
+    if (afterDir[i] === "--own-only") { ownOnly = true; continue; }
     if (afterDir[i] === "--quiet") { quiet = true; continue; }
     rest.push(afterDir[i]);
   }
   if (rest.length) {
     console.error(`${N} check: unknown argument: ` + rest.join(" "));
-    console.error("  usage: check-backlog-proofs.mjs [--dir <backlog>] [--since <sha>] [--quiet]");
+    console.error("  usage: check-backlog-proofs.mjs [--dir <backlog>] [--since <sha>] [--task <ID>] [--own-only] [--quiet]");
     return 2;
   }
   if (since === null && afterDir.includes("--since")) {
     console.error(`${N} check: --since needs a commit`);
+    return 2;
+  }
+  if ((taskId === null || taskId.startsWith("-")) && afterDir.includes("--task")) {
+    console.error(`${N} check: --task needs a task id`);
     return 2;
   }
 
@@ -306,12 +331,29 @@ async function main(argv) {
   // for "nobody has started" is its vocabulary and not the code's (law 3).
   const queue = new Set(queueStatuses(config));
 
+  // `--task` narrows the walk to one record, before anything is read from its
+  // history or run: the other tasks' files are never opened.
+  let named = null;
+  if (taskId !== null) {
+    named = records.find((t) => t.id === taskId) || null;
+    if (!named) {
+      console.error(`${ERRM} proofs: no task \`${taskId}\` in ${paths.tasksDir} — nothing was run`);
+      return 1;
+    }
+  }
+  const walk = named ? [named] : records;
+
   const candidates = [];
   const collided = [];
   const open = [];
-  for (const t of records) {
+  // Why the named task is in neither half, for the refusal below.
+  let notCovered = null;
+  for (const t of walk) {
     if ((config.archivedStatuses || []).indexOf(t.status) < 0) {
-      if (!queue.has(t.status)) continue;
+      if (!queue.has(t.status)) {
+        notCovered = `it is \`${t.status}\`: neither a proven closing, nor a task nobody has started`;
+        continue;
+      }
       // The task's OWN entries only. This half asks whether the work could turn
       // the contract red, and the project's entries are not the work's to turn:
       // a red repository guard would hide an unfalsifiable contract here, and a
@@ -321,12 +363,19 @@ async function main(argv) {
       // --criteria` already reports that. Two guards on one finding would say
       // the same problem twice.
       if (entries.length) open.push({ id: t.id, file: t.file, status: t.status, entries });
+      else notCovered = "it carries no `verification:` entries of its own";
       continue;
     }
     const closing = provenClosing(readHistory(root, t.id), config.archivedStatuses);
-    if (!closing) continue;
+    if (!closing) {
+      notCovered = `it is \`${t.status}\`, but no closing of it was proven by a contract run`;
+      continue;
+    }
     const contract = contractOf(t);
-    if (!contract.own.length) continue;
+    if (!contract.own.length) {
+      notCovered = "it carries no `verification:` entries of its own";
+      continue;
+    }
     // A shared id is refused as `done` refuses it, before anything runs: the
     // proof can no longer be re-run as it was written, which is a finding about
     // this closing and not a pass.
@@ -334,11 +383,20 @@ async function main(argv) {
       collided.push({ id: t.id, file: t.file, collisions: contract.collisions });
       continue;
     }
+    // `--own-only` drops the project's half here, so the cost line, the walk
+    // and the report all count what actually runs.
+    const projectEntries = contract.entries.filter((e) => e.project);
     candidates.push({
       id: t.id, file: t.file, closing, entries: contract.entries,
       own: contract.entries.filter((e) => !e.project),
-      project: contract.entries.filter((e) => e.project),
+      project: ownOnly ? [] : projectEntries,
+      projectSkipped: ownOnly ? projectEntries : [],
     });
+  }
+  if (named && !candidates.length && !collided.length && !open.length) {
+    console.error(`${ERRM} proofs: ${named.id} has no proof this audit can re-run — ${notCovered} — nothing was run`);
+    console.error(`    ${named.file}`);
+    return 1;
   }
 
   let selected = candidates;
@@ -393,6 +451,8 @@ async function main(argv) {
   const projectKey = (e) => (e.id || "") + "\0" + (e.bash != null ? "bash:" + e.bash : "manual:" + e.manual);
   const projectUnique = new Set();
   for (const c of selected) for (const e of c.project) projectUnique.add(projectKey(e));
+  const projectSkipped = new Set();
+  for (const c of selected) for (const e of c.projectSkipped) projectSkipped.add(projectKey(e));
   const commandsTotal = selected.reduce((n, c) => n + c.own.length, 0) + projectUnique.size;
   if (progress) {
     // THE COST, BEFORE THE FIRST COMMAND. Each of these is somebody's contract
@@ -403,7 +463,10 @@ async function main(argv) {
         `${selected.length} proven closing(s), then the contract of ${openSelected.length} ` +
         "task(s) nobody has started"
     );
-    progress(`  in ${repoRoot} — narrow the run with \`--since <sha>\`, stop it with one interrupt`);
+    progress(
+      `  in ${repoRoot} — narrow the run with \`--since <sha>\` or \`--task <ID> --own-only\`, ` +
+        "stop it with one interrupt"
+    );
   }
 
   // THE MARK (TL-565): every command below learns that this run covers this
@@ -534,6 +597,17 @@ async function main(argv) {
 
   const lines = [];
   if (narrowedNote) lines.push("  " + narrowedNote);
+  if (named) lines.push(`  ${MARK.bullet} narrowed to ${named.id} by \`--task\` — no other task was re-run`);
+  if (ownOnly && !projectSkipped.size) {
+    lines.push(`  ${MARK.bullet} own entries only (\`--own-only\`): no project \`closing_contract\` entry would have run here`);
+  } else if (ownOnly) {
+    // SAID, because this green covers less than `done` would: the project's
+    // half is what a closing still has to pass, and nothing here ran it.
+    lines.push(
+      `  ${WARNM} own entries only (\`--own-only\`): ${projectSkipped.size} project \`closing_contract\` ` +
+        `entr(ies) not run — \`${N} done\` still runs them before it closes anything`
+    );
+  }
   if (projectCache.size && reachedProject > 1) {
     // Said, not left implicit: a reader comparing this count with the archive
     // must be able to tell a reused result from a command nobody ran.

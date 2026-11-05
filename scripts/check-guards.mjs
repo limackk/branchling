@@ -123,6 +123,8 @@ export const CHECK_GUARDS = [
     // reader and would bury the verdict it was meant to accompany.
     args: (root, tasksDir, files, plan) => ["--dir", root]
       .concat(plan && plan.since ? ["--since", plan.since] : [])
+      .concat(plan && plan.task ? ["--task", plan.task] : [])
+      .concat(plan && plan.ownOnly ? ["--own-only"] : [])
       .concat(plan && plan.json ? ["--quiet"] : []) },
   // OPT-IN ONLY, like `proofs` (TL-503). It judges a PROMOTION — git refs CI is
   // about to move — rather than the backlog, so it answers when CI asks before a
