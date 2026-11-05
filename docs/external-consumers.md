@@ -296,6 +296,13 @@ answer their own kind as described above; the others print the refusal on
 stderr and leave stdout empty. `where` reports this state rather than refusing
 on it, and its exit code follows its own `--help`.
 
+**`--help` says so too** (TL-549). Every `exit:` line that lists `2` ends with
+`· 1 no backlog, or a directory named that is not one`, so a reader of one
+command's help learns that `1` is not only that command's own refusal. The
+lines that leave it out belong to the commands that never resolve a backlog
+and so never meet this state — `hooks`, `commit-message`, `profile` and
+`conformance` — and to `where`, which reports it.
+
 **`plan --json` wave tasks are objects** `{ id, title, status, blocked_by,
 known, open, executor }`. They were objects before TL-534 as well — `title`
 and `blocked_by` are added keys, so the root shape did not change. A task file

@@ -54,7 +54,7 @@ import { fileURLToPath } from "node:url";
 import { loadConfigOrExit } from "./config.mjs";
 import { ACTOR_NAMESPACES, MIGRATIONS_FILE, appendRenumberMigration, applyIdMigrations, isValidActor, loadSnapshot, saveSnapshot } from "./history.mjs";
 import { withHistoryLogMutex } from "./history-log-mutex.mjs";
-import { backlogPaths, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
+import { BACKLOG_DIR_REFUSAL_HELP, backlogPaths, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { withSnapshotMutex } from "./snapshot-mutex.mjs";
 import { taskIdPatterns, taskIdScanner } from "./task-id.mjs";
 import { MARK, color, errColor, refusal } from "./ui.mjs";
@@ -94,6 +94,7 @@ const USAGE = [
   "  `renumber: allow` in a comment beside it and every id on it is left alone.",
   "",
   "  exit: 0 renumbered (or nothing to do) · 1 refused · 2 usage error",
+  "        · " + BACKLOG_DIR_REFUSAL_HELP,
 ].join("\n");
 
 // ──────────────────────────────────────────────────────────────────────────

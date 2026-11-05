@@ -69,7 +69,7 @@ import {
   TRUNK_SOURCE_TEXT, defaultTrunk, deploymentScanJson, deploymentState, describeUnknownRefs,
   explain as explainDeploy, parseStageSelector, stageMatches, taskDeployment, taskDeploymentJson,
 } from "./environments.mjs";
-import { backlogPaths, resolveBacklogDir, resolveBacklogDirOrExit } from "./paths.mjs";
+import { BACKLOG_DIR_REFUSAL_EXIT, BACKLOG_DIR_REFUSAL_PHRASE, backlogPaths, resolveBacklogDir, resolveBacklogDirOrExit } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { SORT_KEYS, filterTasks, readTaskRecords, sortTasks, splitList, unknownFilterValues } from "./task-select.mjs";
 import { refusal } from "./ui.mjs";
@@ -138,7 +138,8 @@ if (opts.help || opts.h) {
   printLine("\nswitches:");
   printLine("  " + [...BOOL_FLAGS].filter((f) => f !== "--help" && f !== "-h").sort().join(" "));
   printLine("\nexit code: 0 = the query ran (including on zero matches), 1 = a filter value outside");
-  printLine("the backlog's vocabulary (an `unknown-value` envelope under --json), 2 = a usage error.");
+  printLine("the backlog's vocabulary (an `unknown-value` envelope under --json),");
+  printLine(BACKLOG_DIR_REFUSAL_EXIT + " = " + BACKLOG_DIR_REFUSAL_PHRASE + ", 2 = a usage error.");
   process.exit(0);
 }
 
