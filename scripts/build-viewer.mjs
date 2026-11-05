@@ -417,8 +417,8 @@ export function buildHtml(
   // only — the page takes titles from ALL_TASKS. A project with no
   // `deploy_targets` reads nothing and shows no tab.
   const release = config.root
-    ? releaseViewData({ root: config.root, config, tasks })
-    : releaseViewData({ root: null, config: { ...config, deployTargets: [] }, tasks });
+    ? releaseViewData({ root: config.root, config })
+    : releaseViewData({ root: null, config: { ...config, deployTargets: [] } });
   const releaseJson = JSON.stringify(release).replace(/</g, "\\u003c");
   const viewerReleaseModuleSrc = readModuleSource("viewer-release.mjs");
 
@@ -2077,11 +2077,17 @@ const state = {
   selectedId: null,
   liveMode: false,        // true after successful File System Access pick
   dirHandle: null,        // FileSystemDirectoryHandle for backlog/
-  // Field editing (BL-1396): { id, field } or null. One field at a time — an open
-  // an editor is a state of the view, not a state of the task.
+  // The open field editor: { id, field } or null. One field at a time — an open
+  // editor is a state of the view, not of the task. Only startEdit() sets it,
+  // and startEdit() returns at once unless CAN_EDIT (a served page holding the
+  // write capability), so in a snapshot it stays null. Read by renderDetail()
+  // and metaRowHtml(), which swap the value of that one field for its editor.
   editing: null,
-  // Identity never travels in a shared URL or local storage. The user must name
-  // the actor for this server session before the first write.
+  // The identity a served page writes as. Set only from the "Editing as" input;
+  // startEdit() reads it to refuse an editor until it is a user: identity, and
+  // saveField() sends it as the actor field to api/task, which records it in
+  // history. It never travels in a shared URL or local storage, so it is named
+  // again for every server session before the first write.
   actor: "user:",
   reasonAsk: null,
   editMessage: "",

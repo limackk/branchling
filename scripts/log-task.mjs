@@ -187,6 +187,31 @@ export function onlyDecisions(exchanges, entries) {
     (x.messages || []).some((m) => m.kind === "decision" || (m.kind === "question" && open.has(m.id))));
 }
 
+/**
+ * The keys every ledger record is answered with, in this order (TL-562). A
+ * record written before one of them existed answers it as `null`, so a program
+ * never has to tell "no value" from "an older line".
+ */
+export const LEDGER_KEYS = ["id", "ts", "field", "from", "to", "actor", "source", "reason"];
+
+/**
+ * One ledger record as `--records` answers it. PURE.
+ *
+ * NOTHING IS DROPPED OR RENAMED. The point of the mode is the keys no fold
+ * renders — `contractCapability` on a closing transition, `vouch` on a
+ * `__verified__` entry, `refusal` on an `__unverified__` one, and whatever a
+ * later writer adds — so every key the line carries comes back with its value,
+ * after the common ones.
+ */
+export function ledgerRecord(entry) {
+  const out = {};
+  for (const key of LEDGER_KEYS) out[key] = entry && entry[key] !== undefined ? entry[key] : null;
+  for (const [key, value] of Object.entries(entry || {})) {
+    if (!(key in out)) out[key] = value;
+  }
+  return out;
+}
+
 // ──────────────────────────────────────────────────────────────────────────
 // Rendering
 // ──────────────────────────────────────────────────────────────────────────
@@ -292,6 +317,55 @@ export function renderLog(model) {
   return out.join("\n");
 }
 
+/** One value on one line, cut where it would push the row off a terminal. */
+function oneLine(value, max = 60) {
+  // A list field records its value as an array; `String([])` is the empty
+  // string, which would print a transition from nothing.
+  const shown = Array.isArray(value) ? "[" + value.join(", ") + "]"
+    : value !== null && typeof value === "object" ? JSON.stringify(value)
+    : value;
+  const text = String(shown === null || shown === undefined ? "" : shown).replace(/\s*\n\s*/g, " ");
+  return text.length > max ? text.slice(0, max - 1) + "…" : text;
+}
+
+/**
+ * The ledger, record by record (TL-562). Unlike `renderLog` this does NOT fold:
+ * it is the mode a reader asks for when the fold is what is in the way, so every
+ * record has its own row, named by its id. The keys beyond the common ones are
+ * NAMED here and given whole by `--json` — a verdict object printed inline
+ * would bury the rows it belongs to.
+ */
+export function renderLedger(model) {
+  const out = [heading(model.id + (model.title ? " — " + model.title : ""))];
+  if (!model.total) {
+    out.push("  " + model.id + " has no recorded history — nothing has been written to " +
+      model.path + " yet.");
+    return out.join("\n");
+  }
+  out.push("  " + color.dim(
+    model.total + " record(s)" +
+    (model.omitted ? ", the newest " + model.records.length + " shown" : "") +
+    " — " + model.path
+  ));
+  out.push("");
+  const rows = table(model.records.map((r) => [
+    "  ", color.dim(whenever(r.ts)), color.id(String(r.id || "(no id)")), color.id(String(r.actor || "")),
+    String(r.source || ""),
+    String(r.field || "") + ": " + (oneLine(r.from) ? oneLine(r.from) + " " + MARK.arrow + " " : "") + (oneLine(r.to) || "(empty)"),
+  ])).split("\n");
+  model.records.forEach((r, i) => {
+    out.push(rows[i]);
+    if (r.reason) out.push("      reason: " + oneLine(r.reason, 160));
+    const extra = Object.keys(r).filter((k) => LEDGER_KEYS.indexOf(k) === -1 && k !== "task");
+    if (extra.length) out.push("      " + color.dim("also: " + extra.join(", ")));
+  });
+  if (model.omitted) {
+    out.push("");
+    out.push("  " + color.dim("earlier records: " + model.omitted + " — drop `--limit` to read them"));
+  }
+  return out.join("\n");
+}
+
 /** Decisions carried by every task whose commits touched one file or directory. */
 export function renderAreaLog(model) {
   const out = [heading("decisions for " + model.modifiedFile.path)];
@@ -334,7 +408,7 @@ export function renderAreaLog(model) {
 // ──────────────────────────────────────────────────────────────────────────
 
 const KNOWN_WITH_VALUE = ["--limit", "--modified-file"];
-const KNOWN_BARE = ["--json", "--decisions", "--open-questions"];
+const KNOWN_BARE = ["--json", "--decisions", "--open-questions", "--records"];
 
 export function parseLogArgs(argv) {
   const taken = takeDirFlag(argv, { missing: "--dir needs a value" });
@@ -346,6 +420,7 @@ export function parseLogArgs(argv) {
   let decisions = false;
   let modifiedFile = null;
   let openQuestionsWanted = false;
+  let recordsWanted = false;
   let literal = false;
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
@@ -358,6 +433,7 @@ export function parseLogArgs(argv) {
     if (a === "--json") { json = true; continue; }
     if (a === "--decisions") { decisions = true; continue; }
     if (a === "--open-questions") { openQuestionsWanted = true; continue; }
+    if (a === "--records") { recordsWanted = true; continue; }
     if (KNOWN_WITH_VALUE.indexOf(a) !== -1) {
       const value = rest[++i];
       if (value === undefined) throw new Error(a + " needs a value");
@@ -365,22 +441,33 @@ export function parseLogArgs(argv) {
       else {
         limit = Number(value);
         if (!Number.isInteger(limit) || limit < 1) {
-          throw new Error("--limit takes a whole number of exchanges, not `" + value + "`");
+          throw new Error("--limit takes a whole number of " + (rest.indexOf("--records") !== -1 ? "records" : "exchanges") +
+            ", not `" + value + "`");
         }
       }
       continue;
     }
     throw new Error("unknown flag: " + a +
-      "\navailable: --limit <n> --decisions --modified-file <path> --open-questions --json --dir <path>");
+      "\navailable: --limit <n> --decisions --records --modified-file <path> --open-questions --json --dir <path>");
   }
   // The backlog-wide listing is its own question (TL-536): a task id, an area
   // or a slice would each narrow it to a different one, so none is accepted.
   if (openQuestionsWanted) {
-    if (id || modifiedFile || decisions || limit !== null) {
+    if (id || modifiedFile || decisions || recordsWanted || limit !== null) {
       throw new Error("`--open-questions` lists every open question in the backlog, and takes no task id, " +
-        "--modified-file, --decisions or --limit");
+        "--modified-file, --decisions, --records or --limit");
     }
-    return { id: null, dir, limit: null, json, decisions: false, modifiedFile: null, openQuestions: true };
+    return { id: null, dir, limit: null, json, decisions: false, modifiedFile: null, openQuestions: true, records: false };
+  }
+  // The raw ledger is one task's records unfolded (TL-562). A filter that
+  // keeps only decisions, or an area spanning several tasks, would each make it
+  // a different answer that still looked like the whole ledger.
+  if (recordsWanted) {
+    if (decisions || modifiedFile) {
+      throw new Error("`--records` returns every record of one task, and takes neither --decisions nor --modified-file");
+    }
+    if (!id) throw new Error("no task id\nusage: " + N + " log <ID> --records [--limit <n>] [--json]");
+    return { id, dir, limit, json, decisions: false, modifiedFile: null, openQuestions: false, records: true };
   }
   if (id && modifiedFile) throw new Error("a task id and `--modified-file` select two different scopes");
   if (!id && !modifiedFile) throw new Error("no task id or modified file\nusage: " + N + " log <ID> [--limit <n>] [--decisions] [--json]");
@@ -388,7 +475,7 @@ export function parseLogArgs(argv) {
   if (modifiedFile && !decisions) {
     throw new Error("`--modified-file` reads decisions by area and requires `--decisions`");
   }
-  return { id, dir, limit, json, decisions, modifiedFile, openQuestions: false };
+  return { id, dir, limit, json, decisions, modifiedFile, openQuestions: false, records: false };
 }
 
 /**
@@ -408,6 +495,7 @@ export function openQuestionsAcross(root, config) {
       if (q.answered) continue;
       questions.push({
         task: task.id, title: task.title || null, status: task.status || null,
+        priority: task.priority || null,
         event: q.id, question: q.question, askedBy: q.askedBy, askedAt: q.askedAt,
         options: q.options, recommend: q.recommend,
       });
@@ -474,7 +562,7 @@ export function run(argv) {
 
   const root = resolveBacklogDirOrExit({
     dir: plan.dir || undefined, moduleDir: __dirname,
-    jsonKind: plan.json ? (plan.openQuestions ? "open-questions" : "task-log") : null,
+    jsonKind: plan.json ? (plan.openQuestions ? "open-questions" : plan.records ? "task-ledger" : "task-log") : null,
   }, COMMAND).root;
   const config = loadConfigOrExit(root);
   const paths = backlogPaths(root);
@@ -503,7 +591,7 @@ export function run(argv) {
     const problem = "there is no task " + plan.id + " in " + paths.tasksDir +
       ", and no history under " + relative(root, logFile);
     if (plan.json) {
-      printJson("task-log", {
+      printJson(plan.records ? "task-ledger" : "task-log", {
         ok: false, id: plan.id, refusalKind: "no-such-task", refusal: problem, details: [],
       });
     } else {
@@ -521,6 +609,19 @@ export function run(argv) {
   }
 
   const entries = readHistory(root, id);
+  if (plan.records) {
+    // THE NEWEST ARE KEPT, as for exchanges, and the count left behind is part
+    // of the answer: a slice must never read as the whole ledger.
+    const shown = plan.limit ? entries.slice(Math.max(0, entries.length - plan.limit)) : entries;
+    const ledger = {
+      ok: true, id, title, file, path: relative(root, logFile),
+      total: entries.length, limit: plan.limit, omitted: entries.length - shown.length,
+      records: shown.map(ledgerRecord),
+    };
+    if (plan.json) printJson("task-ledger", ledger);
+    else console.log(renderLedger(ledger));
+    return 0;
+  }
   const all = foldExchanges(entries);
   // THE FILTER RUNS BEFORE THE SLICE. `--limit 3 --decisions` means the three
   // newest DECISIONS; slicing first would hand back three exchanges of which

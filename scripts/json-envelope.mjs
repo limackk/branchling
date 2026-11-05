@@ -59,7 +59,15 @@ export const KINDS = {
   // names the trunk and every ref read, with its SHA, so the answer can be dated.
   // `scope` (TL-540) is `active`, `archived` or `all` — which tasks were
   // searched — and null when `--status` chose the statuses itself.
-  "task-list": { tasks: [], total: null, limit: null, scope: null, scan: null, modifiedFile: null, deploy: null, elsewhereOnly: [] },
+  // A filter value outside the project's vocabulary (TL-559) is `ok: false`
+  // with `refusalKind: "unknown-value"`, `rejected` `{ field, value }` and
+  // `declared`, the values that field accepts — the shape `set` refuses with
+  // since TL-543. `details` names every rejected value when more than one was.
+  // A query that answered carries `ok: true`.
+  "task-list": {
+    ok: null, tasks: [], total: null, limit: null, scope: null, scan: null, modifiedFile: null, deploy: null, elsewhereOnly: [],
+    refusalKind: null, refusal: null, details: [], rejected: null, declared: [],
+  },
   // `<command> --help --json` (TL-83). `flags` describes the input surface, and
   // a flag drawing on a vocabulary carries THIS project's values in `values` —
   // so an agent narrows its input instead of guessing and retrying. `configured`
@@ -306,11 +314,14 @@ export const KINDS = {
   // `handoff --json` (TL-99). Three from/to pairs and the comment that carries
   // the reason: a handoff is not a task being performed, it is a task changing
   // hands, and a consumer wants both ends of every field that moved.
+  // A `--to-role` outside `roles:` (TL-559) is `refusalKind: "unknown-value"`
+  // with `rejected` `{ field: "role", value }` and `declared`, the roles this
+  // backlog declares — `[]` when it declares none.
   "task-handoff": {
     ok: null, id: null, file: null, task: null,
     role: null, owner: null, status: null, comment: null, released: null,
     warnings: [], actorSource: null,
-    refusalKind: null, refusal: null, details: [],
+    refusalKind: null, refusal: null, details: [], rejected: null, declared: [],
   },
   // `body --json` (TL-523). `body` is the pair of base-version hashes, so a
   // caller can pass `body.to` as the next write's `--base`.
@@ -483,6 +494,12 @@ export const KINDS = {
     // The markdown after the frontmatter, verbatim, under `--body` (TL-542);
     // null without the flag — the key stays, as every declared key does.
     body: null,
+    // The task's own `verification:` entries (TL-561), each `{ id, bash,
+    // manual, criteria }` — `bash` or `manual` null when the entry has the
+    // other, `criteria` the acceptance criteria naming it by `[proof: <id>]`
+    // — and what the parser could not read, so a contract `done` would refuse
+    // does not read like one it would run.
+    verification: [], verificationProblems: [],
     refusalKind: null, refusal: null, details: [],
   },
   // `log --open-questions --json` (TL-536): every unanswered question on an
@@ -494,6 +511,16 @@ export const KINDS = {
     ok: null, id: null, title: null, file: null, path: null,
     records: null, total: null, matched: null, decisions: null, limit: null, exchanges: [],
     modifiedFile: null, tasks: [],
+    refusalKind: null, refusal: null, details: [],
+  },
+  // `log <ID> --records --json` (TL-562): the ledger unfolded — every record in
+  // recorded order with every key it carries, so a program reading a closing's
+  // `reason`, its `contractCapability`, a vouch or a refusal never parses
+  // `history/<ID>.jsonl` itself. `total` is the ledger's size BEFORE `--limit`,
+  // and `omitted` how many older records the slice left out.
+  "task-ledger": {
+    ok: null, id: null, title: null, file: null, path: null,
+    total: null, limit: null, omitted: null, records: [],
     refusalKind: null, refusal: null, details: [],
   },
 };
@@ -649,6 +676,7 @@ export const KIND_EXERCISE = {
   // task" refusal — each a complete envelope, and neither a usage error. The id
   // is the sentinel, never typed.
   "task-log": { args: ["log", FIRST_TASK, "--json"] },
+  "task-ledger": { args: ["log", FIRST_TASK, "--records", "--json"] },
   "open-questions": { args: ["log", "--open-questions", "--json"] },
   // `resume` composes reads and writes nothing (TL-151), so it is NOT a
   // `writes` row: asking it twice of one tree is safe, and

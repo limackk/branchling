@@ -377,6 +377,16 @@ WHILE YOU WORK.
                        <name> --reason "…"\`, which returns it to the queue with
                        the exchange recorded. Where this backlog declares
                        \`roles:\`, \`--to-role\` hands it to one of those.
+  An earlier proof     Re-checking a closed task's proof while you are held to
+                       targeted tests:
+
+                         {{tool}} check --proofs --task <ID> --own-only
+
+                       runs that task's own \`verification:\` and no project
+                       \`closing_contract\` entry. A bare \`check --proofs\`
+                       runs those as well, and where the project contract is
+                       the whole suite, so is the run. The report says what it
+                       left out; \`{{tool}} done\` still runs it.
   Frontmatter changed  Run \`{{tool}} build\`. It is idempotent and near-instant;
                        skipping it leaves the views disagreeing with the file you
                        just edited.
@@ -537,6 +547,18 @@ way; commits and branch topology stay the wrapper's.
                   itself, in the status it was taken from, and exits 1. Do not
                   release the task and do not kill the loop; either leaves a
                   claim nobody is working.
+
+ONE TASK'S OWN PROOFS, NOT THE PROJECT'S. A loop held to targeted tests
+re-checks an earlier task's proof with
+
+  {{tool}} check --proofs --task <ID> --own-only
+
+which runs that one task's own \`verification:\` entries and no project
+\`closing_contract\` entry. A bare \`check --proofs\` re-runs every proven
+closing AND the project's entries; where the project contract is the whole
+suite, that starts the suite in every loop that asks. \`{{tool}} done\` still
+runs the project's entries before it closes a task, so the narrowed green is a
+progress check, never a closing.
 
 THE TWO ENDS OF A SESSION.
 

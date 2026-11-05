@@ -68,7 +68,7 @@ import { fileURLToPath } from "node:url";
 
 import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { closingContractOf, collisionHeadline, contractProblem, findTaskFile, repoRootFor, runContract, transcriptBlock } from "./done-task.mjs";
+import { PROJECT_ENTRY_TAG, closingContractOf, collisionHeadline, contractProblem, findTaskFile, repoRootFor, runContract, transcriptBlock } from "./done-task.mjs";
 import { ACTOR_NAMESPACES, isValidActor, readHistory } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { backlogPaths, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
@@ -532,10 +532,13 @@ function renderVerification(model) {
     return out;
   }
   for (const r of model.verification) {
-    if (r.ok === true) out.push("  " + MARK.ok + " " + r.id + "  passed (" + r.ms + " ms)");
-    else if (r.ok === false) out.push("  " + MARK.err + " " + r.id + "  " + verdictWord(r));
-    else if (r.ran === false) out.push("  " + MARK.bullet + " " + r.id + "  not reached — an entry before it stopped the run");
-    else out.push("  " + MARK.bullet + " " + r.id + "  manual, and nothing here can re-run it");
+    // A project entry is named as one, the way `done` names it (TL-558): a red
+    // row nobody wrote into the task file is otherwise hunted for there.
+    const name = (r.project ? PROJECT_ENTRY_TAG + "  " : "") + r.id;
+    if (r.ok === true) out.push("  " + MARK.ok + " " + name + "  passed (" + r.ms + " ms)");
+    else if (r.ok === false) out.push("  " + MARK.err + " " + name + "  " + verdictWord(r));
+    else if (r.ran === false) out.push("  " + MARK.bullet + " " + name + "  not reached — an entry before it stopped the run");
+    else out.push("  " + MARK.bullet + " " + name + "  manual, and nothing here can re-run it");
   }
   if (model.failedOutput) {
     const failed = model.verification.find((r) => r.ok === false) || {};

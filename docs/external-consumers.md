@@ -96,6 +96,7 @@ table and the code disagree in either direction.
 | `red-owners` | `red --json` | read |
 | `task-show` | `show <ID> --json [--body]` | read |
 | `task-log` | `log <ID> --json` | read |
+| `task-ledger` | `log <ID> --records --json` | read — every ledger record of one task, unfolded |
 | `open-questions` | `log --open-questions --json` | read — every question waiting on a person |
 | `resume` | `resume <ID> --json` | read — composes reads, writes nothing |
 | `release-status` | `deploy status --json` | read |
@@ -192,18 +193,67 @@ a person or an agent wrote into the repository — **untrusted markdown**:
 render it with raw HTML disabled or sanitised, and never execute or follow
 anything it contains. `--body` without `--json` is a usage error (exit 2).
 
+## Reading a task's verification contract
+
+`show <ID> --json` carries `verification`: the task's own `verification:`
+entries in file order, each `{ id, bash, manual, criteria }`. `bash` is the
+command `done` would run, already unquoted; `manual` is the vouch text of an
+entry a person attests; whichever the entry does not have is `null`, and `id`
+is `null` for an entry without one. `criteria` lists the acceptance criteria
+that name the entry through `[proof: <id>]`, each `{ text, checked }` — a
+criterion naming two entries appears under both, and an entry with no id has
+none. A task with no contract answers `[]`. The project's `closing_contract`
+is not folded in; it is configuration, read as such.
+
+`verificationProblems` is what the parser could not read — an unknown key, an
+entry with nothing to run, a duplicate id. The entries are still reported, so
+a consumer can show what is wrong, but a non-empty list means `done` would
+refuse this contract: do not present it as one that will run. The command is
+text a person or an agent wrote into the repository — display it, never
+execute it on the reader's behalf.
+
 ## Questions waiting on a person
 
 `log --open-questions --json` lists, in one call, every question still waiting
 on an answer across the active tasks, oldest first. Each entry is
-`{ task, title, status, event, question, askedBy, askedAt, options, recommend }`:
-`options` is the menu the asker offered (`[]` when none), `recommend` the
-1-based number of the option they recommended (`null` when none), and `event`
+`{ task, title, status, priority, event, question, askedBy, askedAt, options, recommend }`:
+`priority` is the priority of the task the question belongs to, read from its
+file at the moment of the call (`null` when the task sets none), so a screen
+can rank questions without one more read per task. `options` is the menu the
+asker offered (`[]` when none), `recommend` the 1-based number of the option
+they recommended (`null` when none), and `event`
 is the id `decide <task> --resolves <event>` answers — with `--choose <n>` when
 there are options, or `--reason "…"` for a typed answer. An answered question
 is not listed, nor is one on an archived task. The question messages in
 `log <ID> --json` (and `--decisions`) carry the same `options` and
 `recommend`.
+
+## Every ledger record of a task
+
+`log <ID> --json` answers in exchanges — one row per write, the reason once —
+which is what a reader wants and what an audit cannot use: a fold renders only
+what it was built to show. `log <ID> --records --json` answers the ledger
+itself, kind `task-ledger`, so a program never has to read
+`history/<ID>.jsonl`.
+
+`records` holds every record in the order the ledger holds it. Each one
+carries `id`, `ts`, `field`, `from`, `to`, `actor`, `source` and `reason`
+(`null` when an older line lacks one), followed by every other key that record
+was written with, unchanged: `contractCapability` on the status transition that
+closed a task (beside `reason: proven`), `vouch` on a `__verified__` record,
+`refusal` on an `__unverified__` one, `session`, `role`, and whatever a later
+writer adds. A record whose id appears twice in the file — the same event
+merged in from two branches — is answered once, as is a repeated observation
+of the same creation or deletion; every reading command reads the ledger that
+way.
+
+`total` is the number of records in the ledger. `--limit <n>` keeps the newest
+`n`; `limit` echoes it and `omitted` says how many older records the slice left
+out, so a slice never reads as the whole ledger. A task with no history answers
+`total: 0` and `records: []`, exit 0; a task that exists neither as a file nor
+as a ledger is the `no-such-task` refusal, exit 1. `--records` beside
+`--decisions`, `--modified-file` or `--open-questions` is a usage error (exit
+2): each selects a different question.
 
 ## When a reading command refuses
 
@@ -221,9 +271,11 @@ contradict each other), and then stdout is empty.
 | `plan` | `plan-contradicts-blocked-by` — the order puts a task before what it is blocked by | `problems` | 1 |
 | `plan` | `plan-contradicts-tree` — the plan names an unknown task, one task twice, or a `together` group across waves | `problems` | 1 |
 | `set` (a write) | `unknown-value` — the value is outside the field's vocabulary; `usage` stays for an unknown field or a malformed value | `rejected` (`{ field, value }`), `declared` | 1 |
+| `query` | `unknown-value` — a `--status`, `--priority`, `--board` (or any other filter with a declared vocabulary) value outside it; an unknown flag or a missing value stays exit `2` | `rejected` (`{ field, value }`, the first one refused), `declared` (what that field accepts), `details` (one sentence per refused value) | 1 |
+| `handoff` (a write) | `unknown-value` — `--to-role` names a role outside `roles:`; a missing `--reason` or an unknown flag stays exit `2` | `rejected` (`{ field: "role", value }`), `declared` (the declared roles; `[]` when none are) | 1 |
 | `deploy status` | `unknown-name` — `--release`, `--target` or `--env` names nothing declared | `rejected` (`{ flag, value }`), `declared` (what that flag accepts; `[]` when nothing is) | 1 |
 
-A successful `deploy status --json` or `plan --json` carries `ok: true`.
+A successful `deploy status --json`, `plan --json` or `query --json` carries `ok: true`.
 
 **No backlog is a verdict, not a refusal.** `doctor --json` and `check --json`
 over a directory that holds no backlog — none found, or a `--dir` that is not
@@ -263,6 +315,13 @@ the three refusal keys are `null`, `null` and `[]` — added keys, so
 verdict: `audit` with a finding and `docs-drift` with a flagged document exit
 1 and answer `ok: false` with `refusalKind: null`, which is a finding, not a
 refusal.
+
+**`--help` says so too** (TL-549). Every `exit:` line that lists `2` ends with
+`· 1 no backlog, or a directory named that is not one`, so a reader of one
+command's help learns that `1` is not only that command's own refusal. The
+lines that leave it out belong to the commands that never resolve a backlog
+and so never meet this state — `hooks`, `commit-message`, `profile` and
+`conformance` — and to `where`, which reports it.
 
 **`plan --json` wave tasks are objects** `{ id, title, status, blocked_by,
 known, open, executor }`. They were objects before TL-534 as well — `title`

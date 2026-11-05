@@ -44,7 +44,7 @@ import { collectAdvisories } from "./check-guards.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { FIELD_VERIFIED, outstandingVouches, readAllHistory } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
-import { answerBacklogDirRefusal, backlogPaths, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { answerBacklogDirRefusal, backlogPaths, BACKLOG_DIR_REFUSAL_HELP, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { readTaskRecords } from "./task-select.mjs";
 import { MARK, color, failure, heading, table } from "./ui.mjs";
@@ -89,7 +89,10 @@ export const USAGE = [
   "",
   "  It is not `check`: that one is the gate a release has to pass, this one is",
   "  read by a person — which is why the findings that cannot fail a release live",
-  "  here. exit: 0 clean · 1 findings · 2 usage.",
+  "  here.",
+  "",
+  "  exit: 0 clean · 1 findings · 2 usage error",
+  "        · " + BACKLOG_DIR_REFUSAL_HELP,
 ].join("\n");
 
 // ──────────────────────────────────────────────────────────────────────────

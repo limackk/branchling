@@ -321,7 +321,8 @@ test("a role outside the vocabulary fails BEFORE anything is written", () => {
   const before = read(dir, id);
 
   const r = run(dir, ["handoff", id, "--dir", ".", "--to-role", "archvist", "--reason", "A typo."]);
-  const after = refusedCleanly(dir, id, r, 2);
+  // A refusal (1), not a usage error (2): the call was built right (TL-559).
+  const after = refusedCleanly(dir, id, r, 1);
   assert.match(r.stderr, /archvist/, "the message does not name the value");
   assert.match(r.stderr, /archivist, stonemason/, "the message does not say what is allowed");
   assert.equal(after.text, before);
@@ -335,7 +336,7 @@ test("a backlog that declares no roles says so, and where to declare them", () =
   const before = read(dir, id);
 
   const r = run(dir, ["handoff", id, "--dir", ".", "--to-role", "archivist", "--reason", "Anybody?"]);
-  assert.equal(r.status, 2);
+  assert.equal(r.status, 1);
   assert.match(r.stderr, /roles:/);
   assert.match(r.stderr, /config\.yaml/);
   assert.equal(read(dir, id), before);

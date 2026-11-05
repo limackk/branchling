@@ -60,7 +60,7 @@ import { classifyTarget, documentsToCheck, linksIn, relatedDocsIn } from "./chec
 import { loadConfigOrExit } from "./config.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { createTask } from "./new-task.mjs";
-import { answerBacklogDirRefusal, backlogPaths, isBacklogDirRefusal, repositoryRoot, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { answerBacklogDirRefusal, backlogPaths, BACKLOG_DIR_REFUSAL_HELP, isBacklogDirRefusal, repositoryRoot, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { splitFrontmatter } from "./task-fields.mjs";
 import { readTaskRecords } from "./task-select.mjs";
@@ -101,6 +101,7 @@ export const USAGE = [
   "  it drift is one nobody reads twice.",
   "",
   "  exit: 0 nothing to report · 1 documents flagged · 2 the invocation was wrong",
+  "        · " + BACKLOG_DIR_REFUSAL_HELP,
 ].join("\n");
 
 // ──────────────────────────────────────────────────────────────────────────

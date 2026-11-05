@@ -256,6 +256,19 @@ export function isBacklogDirRefusal(e) {
 export const BACKLOG_DIR_REFUSAL_EXIT = 1;
 export const BACKLOG_DIR_REFUSAL_KIND = "no-backlog";
 
+/**
+ * How an `exit:` line in `--help` names that state (TL-549). TL-546 settled
+ * the code, but every help text still listed only its command's own outcomes,
+ * so `1 refused · 2 usage error` left a reader of `--help` no way to learn
+ * that 1 also means "no backlog". The wording is the clause
+ * docs/external-consumers.md states the contract in, and the number is the
+ * constant above, so a help line, the contract and the process cannot name
+ * three different codes; `scripts/tests/help-exit-lines.test.mjs` compares
+ * all three.
+ */
+export const BACKLOG_DIR_REFUSAL_PHRASE = "no backlog, or a directory named that is not one";
+export const BACKLOG_DIR_REFUSAL_HELP = BACKLOG_DIR_REFUSAL_EXIT + " " + BACKLOG_DIR_REFUSAL_PHRASE;
+
 /** A shortcut for scripts: returns the full set of paths at once. */
 export function resolveBacklogPaths(opts = {}) {
   const resolved = resolveBacklogDir(opts);

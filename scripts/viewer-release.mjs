@@ -48,17 +48,17 @@ export const RELEASE_HASH_ROUTE = "release";
 export const RELEASE_FOLD_AT = 12;
 
 /** HTML escaping, local on purpose: see WHAT MAY BE IMPORTED above. */
-/** Escaped text whose `backtick spans` render as code, as in the terminal. */
-function relCodeSpans(s) {
-  return relEsc(s).replace(/`([^`]+)`/g, "<code>$1</code>");
-}
-
 function relEsc(s) {
   return String(s == null ? "" : s)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+/** Escaped text whose `backtick spans` render as code, as in the terminal. */
+function relCodeSpans(s) {
+  return relEsc(s).replace(/`([^`]+)`/g, "<code>$1</code>");
 }
 
 function relShort(sha) {
