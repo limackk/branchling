@@ -8,9 +8,9 @@ epic: "Backlog viewer"
 release: ""                        # the release it is PLANNED for (a value from `releases:` in config.yaml). Empty = none
 target: []                         # the deploy targets in ANOTHER repository it ships from (`deploy_targets` with `repository:`). Empty = none
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
-role: spec  # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:loop-3
+role: dev  # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 conflict_group: [serve]  # the AREA it touches (e.g. a module): `next` and `run` hold it back while a task of the same group is in progress. Empty = `conflict_group_from`, or none
 estimate: 1d
@@ -18,7 +18,7 @@ confidence: medium                 # how much you trust the estimate
 created: 2026-11-05
 updated: 2026-11-05
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
-blocks: []                         # ids this task will unblock
+blocks: [TL-566]  # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
 verification:
   - id: route-refuses
@@ -39,6 +39,18 @@ Alternatives to weigh: (a) refuse `status` and `owner` on the route as `set` doe
 
 Separately, the comment beneath the route (the block beginning 'This server used to answer `/api/field`') still argues, from TL-379, that a second write path should not exist at all. It must be rewritten to state whichever policy is chosen.
 
+## Decision
+
+Settled in the spec stage on 2026-11-05: **alternative (a).** The route refuses `status` and `owner` exactly as `set` does, by passing `refusedFields: Object.keys(DEDICATED_FIELDS)` to `writeTaskField`, so the refusal, its message and the list of refused fields are the shared core's and cannot drift between the two callers. The viewer keeps showing both values but offers no editor for them; in place of the edit affordance the row names the commands that change the field (`DEDICATED_FIELDS[key]`), as the decisions view already names `decide`.
+
+Why not (b). The non-archived statuses have owning commands too: `in_progress` is entered through `take`, which reserves the task under the session lock (TL-87); `blocked` through `ask`, which records the question; a return to `pending` through `release` or `handoff`, which record the exchange. A viewer write between them skips each of those checks, so (b) narrows the defect without closing it, and a transition table kept beside the route is a second policy that drifts from the commands. `owner` would be refused under (b) anyway.
+
+Why not (c). Running `done`'s verification inside the server executes arbitrary `bash:` entries on a request of a long-lived process, still cannot answer a `manual:` entry, and re-implements five commands behind HTTP — a second write surface for exactly the decisions the CLI exists to own.
+
+Where the rule lives. The page needs the same list the route uses, and the page is built from inlined modules (`readModuleSource`), not from `field-write.mjs`, which imports `build-viewer.mjs`. `DEDICATED_FIELDS` therefore moves to `scripts/task-fields.mjs` — already inlined into the page and already the source of the field specs — and `field-write.mjs` re-exports it, so `set` and every existing import keep working.
+
+Consequence, deliberately not handled here. Every value in `reason_required_statuses` is a status, so after this change no viewer write can require a reason: the page's reason prompt and the route's `needsReason` answer stay wired but unreachable. Removing or repurposing them is TL-566.
+
 ## Steps
 
 1. Decide between the alternatives in Context and record the decision in this task's body before changing code.
@@ -49,4 +61,4 @@ Separately, the comment beneath the route (the block beginning 'This server used
 
 ## Acceptance criteria
 
-- [ ] No viewer write archives a task or changes its owner without the checks of the command that owns that field, and plain fields are still written. [proof: route-refuses]
+- [x] No viewer write archives a task or changes its owner without the checks of the command that owns that field, and plain fields are still written. [proof: route-refuses]
