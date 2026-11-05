@@ -120,6 +120,17 @@ the red lines the closing will. The one exception is the half of `check
 judges a task by its own entries, because the project's are not the work's to
 turn red.
 
+**A nested `check --proofs` re-runs nothing.** "Every earlier contract still
+passes" is a reasonable entry, and `check --proofs` is the command that says it.
+Every command a proofs run executes carries a mark naming the backlog it covers,
+so a `check --proofs` over that same backlog, started from inside one of those
+commands, prints that it is nested, re-runs nothing and exits 0 — the enclosing
+run already re-runs every closed contract, this one included. The enclosing run
+names each entry that started a nested run, so an entry whose only effect was
+that call does not read as a pass that proved something. A `check --proofs` over
+a different backlog, or one that `done` runs outside any proofs run, runs for
+real.
+
 **The limit, stated rather than left to be discovered.** A task file is a text
 file and anybody can set `status: done` in an editor. This gate raises the *cost*
 of a lie — it does not make one impossible, and there is no `--force` flag,
