@@ -26,13 +26,32 @@ memory (TL-455).
    From the release that introduces `requires_version` on,
    `release-notes.test.mjs` fails a bump whose notes do not name it and do
    not say that teams upgrade together (TL-586).
+   Independently of `KEY_SINCE`, the same test fails when `## Upgrade notes`
+   does not name, in backticks, a key missing from the previous release's
+   captured key list (step 4), so a key dated wrongly in `KEY_SINCE` is
+   still owed by the notes (TL-587).
 3. **Set `version` in `package.json`.** `scripts/tests/release-notes.test.mjs`
    fails until the notes file for that version exists and its install command
    names it, so the bump and the notes travel in one commit.
-4. **Run the publication gate** — the `branchling-release` skill, in order, on
+4. **Capture the backlog this release's `init` writes**, in the same commit:
+
+   ```bash
+   node scripts/tests/fixtures/released/capture.mjs <version>
+   ```
+
+   It runs this checkout's `init` in a throwaway repository and freezes the
+   files a team would commit, with the list of `config.yaml` keys the release
+   knows, under `scripts/tests/fixtures/released/<version>/`.
+   `scripts/tests/released-backlogs.test.mjs` then runs the current `build`,
+   `check`, `doctor`, `query`, `stats` and `new` against every captured
+   release, so a later change that stops reading a backlog this release wrote
+   fails the suite. The fixture is committed rather than rebuilt from the tag
+   because a shallow checkout has no tags, and it is never edited afterwards.
+   The same test fails while a notes file has no fixture beside it.
+5. **Run the publication gate** — the `branchling-release` skill, in order, on
    the commit that will be tagged. Its findings are reported, not fixed
    silently; some of them are the owner's decisions.
-5. **Wait for the `test` workflow on that exact commit** to be green on every
+6. **Wait for the `test` workflow on that exact commit** to be green on every
    job of the matrix. A local green run is not a substitute: the matrix exists
    because Linux, macOS and Windows disagree about files.
 

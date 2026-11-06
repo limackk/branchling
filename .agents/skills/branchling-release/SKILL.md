@@ -91,6 +91,23 @@ branchling check
 
 Both green, and the test count in `AGENTS.md` updated if it moved.
 
+## 5b. Does it still read what earlier releases wrote
+
+Every published release leaves a frozen copy of the backlog its `init` writes,
+and the suite runs the current commands against each one. A release being
+prepared captures its own, in the commit that bumps the version:
+
+```bash
+node scripts/tests/fixtures/released/capture.mjs <version>
+node --test scripts/tests/released-backlogs.test.mjs scripts/tests/release-notes.test.mjs
+```
+
+The first test fails while a notes file has no fixture, or when a key some
+release knew is no longer known. The second fails when `## Upgrade notes` does
+not name a `config.yaml` key the previous release's captured list lacks. A
+fixture is never edited after capture: a failure here is the code, or the
+notes, disagreeing with a release that already shipped.
+
 ## 6. A stranger's first five minutes
 
 Run these from a directory that is not this repository — that is the situation
