@@ -379,8 +379,10 @@ export const KINDS = {
   // `undeclared-key` for a key no command writes, `duplicate`, `malformed`,
   // `form` for a list written in a shape the writer does not edit — so a
   // consumer branches on a word rather than parsing the sentence.
+  // `requiresVersion` (TL-586) is `{from, to}` when the write raised the
+  // file's floor, null when the floor stayed as it was.
   "vocabulary-declare": {
-    ok: null, key: null, name: null, entry: null, reason: null, file: null,
+    ok: null, key: null, name: null, entry: null, reason: null, file: null, requiresVersion: null,
     refusalKind: null, refusal: null, details: [],
   },
   // `ask --json` (TL-148). The question's EVENT ID is the payload that matters:

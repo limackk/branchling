@@ -35,7 +35,11 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 
 import { backlogPaths } from "./paths.mjs";
-import { PRODUCT_NAME } from "./product.mjs";
+import { PRODUCT_NAME, PRODUCT_VERSION } from "./product.mjs";
+import {
+  REQUIRES_VERSION_KEY, VERSION_SHAPE, compareVersions, findRequirement, readableVersion,
+  requirementRefusal, shownVersion, upgradeCommand,
+} from "./config-version.mjs";
 import { DEFAULT_TASK_ID_PREFIX, PREFIX_SHAPE, inferPrefix, taskIdPatterns } from "./task-id.mjs";
 import {
   ACTOR_NAMESPACES, ARCHIVED_STATUS_ROLES, CONFLICT_GROUP_SOURCES, RELEASE_SHAPE, ROLE_SHAPE, STATUS_ROLES,
@@ -300,7 +304,42 @@ export const DEFAULTS = Object.freeze({
   // exactly like a live one. `cross_branch_state: false` switches this off with
   // it: there is no scan left to repeat.
   cross_branch_poll_seconds: 3,
+  // The oldest release that can read this file (TL-586), as `major.minor.patch`.
+  // Read BEFORE any other key: a release older than it refuses once and names
+  // the upgrade, instead of calling a newer release's keys typos. Empty — the
+  // default — states no floor. `declare` raises it when it writes a key newer
+  // than this one (`scripts/config-version.mjs`); nothing ever lowers it.
+  requires_version: "",
 });
+
+/**
+ * The release that introduced each key of DEFAULTS (TL-586) — what a writer
+ * reads to know which floor a key implies. Measured from the `DEFAULTS` of each
+ * release tag. A key not yet in any release names the NEXT one, and the next is
+ * a minor release because adding a key is (`docs/releasing.md`), so a key added
+ * after `package.json` names 0.N+1.0. A test fails when a key of DEFAULTS has no
+ * entry here, or an entry names a release that is neither published nor next.
+ */
+export const KEY_SINCE = Object.freeze(Object.fromEntries([
+  ["0.1.0", [
+    "project_name", "task_id_prefix", "statuses", "archived_statuses", "priorities", "types",
+    "confidence", "labels", "labels_closed", "roles", "label_axis_timing", "label_axis_env",
+    "owners", "estimates", "max_unattended_estimate", "actors", "title_max_length",
+    "epic_aliases", "status_colors", "status_strikethrough", "priority_colors", "label_colors",
+    "dashboard_open_statuses", "dashboard_burndown_kind", "dashboard_burndown_value",
+    "criteria_links", "contract_capability", "contract_programs", "reason_required_statuses",
+    "in_progress_status", "awaiting_vouch_status", "audit_stale_days", "agent_time_min_n",
+    "agent_time_segment_cap", "docs_drift_task_threshold", "docs_drift_min_signals",
+    "docs_status_pending_patterns", "docs_role", "lock_ttl_minutes", "abandoned_after_days",
+    "cross_branch_state", "active_branch_days", "cross_branch_poll_seconds",
+  ]],
+  ["0.2.0", ["conflict_group_from", "closing_contract"]],
+  ["0.3.0", ["releases", "deploy_targets", "release_gate", "release_gate_accept"]],
+  ["0.4.0", ["status_roles", REQUIRES_VERSION_KEY]],
+].flatMap(([version, keys]) => keys.map((key) => [key, version]))));
+
+/** The newest floor this build reads — see `readableVersion`. */
+export const READABLE_VERSION = readableVersion(PRODUCT_VERSION, KEY_SINCE);
 
 /** The word the DEFAULT vocabulary uses for work in progress. Not a fact about
  *  any project — see `in_progress_status`. */
@@ -392,12 +431,40 @@ function readClosingContract(inline, rawBody, problems) {
 }
 
 /**
- * @returns {{values: Record<string, unknown>, problems: string[]}}
+ * @param {string} text
+ * @param {{readable?: string, running?: string|null}} opts the newest floor
+ *        this build reads and its manifest version; both default to this
+ *        build's, and a test passes others to stand in for an older release
+ * @returns {{values: Record<string, unknown>, problems: string[],
+ *            requirement: {required: string, running: string|null, headline: string, remedy: string[]}|null,
+ *            newerKeys: string[]}}
+ *          `requirement` is set when the file's floor is above this build, and
+ *          then `problems` is that one refusal; `newerKeys` are the unknown
+ *          keys a newer release may have written
  */
-export function parseConfigYaml(text) {
+export function parseConfigYaml(text, opts = {}) {
   const values = {};
   const problems = [];
+  const newerKeys = [];
   const lines = String(text || "").split(/\r?\n/);
+  const readable = opts.readable === undefined ? READABLE_VERSION : opts.readable;
+  const running = opts.running === undefined ? PRODUCT_VERSION : opts.running;
+
+  // THE FLOOR FIRST (TL-586). A release older than the file cannot tell its
+  // typos from the keys a newer release added, so it judges nothing else: one
+  // refusal naming both versions replaces a list of "unknown" keys that are
+  // correct. A malformed floor is not a refusal of this kind; the loop below
+  // reports it as a problem of its own line.
+  const floor = findRequirement(lines.map(stripComment));
+  if (floor && VERSION_SHAPE.test(floor.value) && compareVersions(floor.value, readable) > 0) {
+    const refusal = requirementRefusal(floor.value, running, PRODUCT_NAME);
+    return {
+      values: {},
+      problems: refusal.problems.map((p) => `line ${floor.line}: ${p}`),
+      requirement: { required: floor.value, running, headline: refusal.headline, remedy: refusal.remedy },
+      newerKeys,
+    };
+  }
 
   for (let i = 0; i < lines.length; i++) {
     const raw = stripComment(lines[i]);
@@ -417,12 +484,31 @@ export function parseConfigYaml(text) {
       // cause, and `statusess` next to `statuses` answers the question at once.
       // The full list is printed only when nothing is similar — at that point the
       // user really is looking for a name, not for their own mistake.
+      //
+      // A key with no near match in a file that states no floor may be one a
+      // newer release added (TL-586), and then the file is right and this
+      // build is old — so the message says which build is reading it. A file
+      // that states a floor this build satisfies has no such excuse.
       const near = nearestKey(key);
+      if (!near && !floor) newerKeys.push(key);
       problems.push(
         near
           ? `line ${i + 1}: unknown key \`${key}\` — did you mean \`${near}\`?`
-          : `line ${i + 1}: unknown key \`${key}\` (allowed: ${KNOWN_KEYS.join(", ")})`
+          : !floor
+            ? `line ${i + 1}: unknown key \`${key}\` — not a key of ${PRODUCT_NAME} ${shownVersion(running)}, ` +
+              `so a newer release may have written it (allowed: ${KNOWN_KEYS.join(", ")})`
+            : `line ${i + 1}: unknown key \`${key}\` (allowed: ${KNOWN_KEYS.join(", ")})`
       );
+      continue;
+    }
+
+    if (key === REQUIRES_VERSION_KEY) {
+      const v = unquote(inline);
+      if (v && !VERSION_SHAPE.test(v)) {
+        problems.push(`line ${i + 1}: ${key}: expecting a release as major.minor.patch, got \`${inline}\``);
+      } else {
+        values[key] = v;
+      }
       continue;
     }
 
@@ -506,7 +592,7 @@ export function parseConfigYaml(text) {
     values[key] = unquote(inline);
   }
 
-  return { values, problems };
+  return { values, problems, requirement: null, newerKeys };
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -595,6 +681,14 @@ const VOCABULARY_REMEDY = [
   "    key is a typo, not a new capability.",
 ];
 
+/** For a file that states no floor and carries a key with no near match: the
+ *  key may be a typo, or this build may be older than the one that wrote it
+ *  (TL-586). Both ways out, because the file cannot say which. */
+const NEWER_KEY_REMEDY = [
+  "  → fix the file if the key is a typo. If a newer release wrote it, upgrade:",
+  "    " + upgradeCommand(PRODUCT_NAME) + " — a team that shares one backlog upgrades together.",
+];
+
 /** The message for a human: headline, file, the list of problems, a way out. */
 export function formatConfigError(err, product = PRODUCT_NAME) {
   return [
@@ -649,9 +743,15 @@ export function loadConfig(root, opts = {}) {
   if (existsSync(paths.configPath)) {
     const parsed = parseConfigYaml(readFileSync(paths.configPath, "utf8"));
     if (parsed.problems.length && strict) {
+      const req = parsed.requirement;
       throw new ConfigError(
         paths.configPath + ":\n  " + parsed.problems.join("\n  "),
-        { configPath: paths.configPath, problems: parsed.problems, headline: "cannot read the backlog configuration" }
+        {
+          configPath: paths.configPath,
+          problems: parsed.problems,
+          headline: req ? req.headline : "cannot read the backlog configuration",
+          remedy: req ? req.remedy : parsed.newerKeys.length ? NEWER_KEY_REMEDY : null,
+        }
       );
     }
     parsedValues = parsed.values;
@@ -709,6 +809,9 @@ export function loadConfig(root, opts = {}) {
   const config = {
     root,
     paths,
+    // The file's floor, `null` when it states none (TL-586). A floor above
+    // this build never reaches here: the parser refuses the file first.
+    requiresVersion: values.requires_version || null,
     projectName: values.project_name,
     taskIdPrefix,
     taskIdPrefixExplicit: explicitPrefix,
