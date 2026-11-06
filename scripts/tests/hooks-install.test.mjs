@@ -260,6 +260,61 @@ test("replaceBlock swaps only the lines between the markers", () => {
   assert.deepEqual(replaceBlock(above, hookBlock()), { text: above, replaced: false });
 });
 
+// A stale block keeps the shape it was pasted in (TL-601). `installedBlock`
+// recognises an indented or CRLF block, so writing its successor flush-left
+// with LF would leave mixed endings in a CRLF file.
+const STALE = hookBlock().replace("check || exit 1", "check --old || exit 1");
+const shaped = (block, indent, eol) => block.split("\n").map((l) => indent + l).join(eol);
+
+test("replaceBlock writes a CRLF block back in CRLF, the rest byte for byte", () => {
+  const above = "#!/bin/sh\r\n# theirs, above\r\nnpm test\r\n";
+  const below = "\r\n# theirs, below\r\n";
+  const r = replaceBlock(above + shaped(STALE, "", "\r\n") + below, hookBlock());
+  assert.equal(r.replaced, true);
+  assert.equal(r.text, above + shaped(hookBlock(), "", "\r\n") + below);
+  assert.equal(/[^\r]\n/.test(r.text), false, "a lone LF in a CRLF file is a mixed ending");
+  assert.equal(installedBlock(r.text), hookBlock(), "the replacement is read back as current");
+});
+
+test("replaceBlock keeps the indentation of the opening marker, the rest byte for byte", () => {
+  const above = "#!/bin/sh\nif true; then\n";
+  const below = "\nfi\n";
+  for (const indent of ["  ", "\t", " \t "]) {
+    const r = replaceBlock(above + shaped(STALE, indent, "\n") + below, hookBlock());
+    assert.equal(r.text, above + shaped(hookBlock(), indent, "\n") + below, JSON.stringify(indent));
+  }
+  // Both at once, and an LF block stays LF: the CR is read, not assumed.
+  const both = replaceBlock("x\r\n" + shaped(STALE, "    ", "\r\n") + "\r\ny\r\n", hookBlock());
+  assert.equal(both.text, "x\r\n" + shaped(hookBlock(), "    ", "\r\n") + "\r\ny\r\n");
+  assert.equal(replaceBlock("x\n" + STALE + "\ny\n", hookBlock()).text, "x\n" + hookBlock() + "\ny\n");
+});
+
+test("replaceBlock gives the closing marker its own ending, so a file with no final newline gains no byte", () => {
+  // The last line of a file has no CR to keep; giving it the opening marker's
+  // would add a byte after the block.
+  const above = "#!/bin/sh\r\n";
+  assert.equal(replaceBlock(above + shaped(STALE, "  ", "\r\n"), hookBlock()).text,
+    above + shaped(hookBlock(), "  ", "\r\n"));
+});
+
+test("install rewrites a stale CRLF, indented block in its own shape and is then current", () => {
+  const dir = repo();
+  assert.equal(run(dir, ["hooks", "install"]).status, 0);
+  const path = hookPath(dir);
+  const above = "#!/bin/sh\r\nif true; then\r\n";
+  const below = "\r\nfi\r\n";
+  writeFileSync(path, above + shaped(STALE, "  ", "\r\n") + below, "utf8");
+
+  const r = run(dir, ["hooks", "install"]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /^\S+ pre-commit updated — /m);
+  const after = readFileSync(path, "utf8");
+  assert.equal(after, above + shaped(hookBlock(), "  ", "\r\n") + below);
+  const again = run(dir, ["hooks", "install"]);
+  assert.match(again.stdout, /already installed — .*pre-commit/);
+  assert.equal(readFileSync(path, "utf8"), after);
+});
+
 test("install replaces a stale block of its own and leaves the rest of the file byte for byte", () => {
   const dir = repo();
   assert.equal(run(dir, ["hooks", "install"]).status, 0);
