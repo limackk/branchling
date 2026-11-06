@@ -28,13 +28,26 @@
  * takes a flag, it skips what exists, and it says what it skipped — the same
  * contract `init` holds to for every file it creates.
  *
- * Exit: 0 installed or nothing to do · 1 the source is missing · 2 a usage error.
+ * REFRESHING IS A SECOND, NAMED ACT (TL-585). Never overwriting has a cost: the
+ * skill's DESCRIPTION is what decides whether an editor loads it at all, and a
+ * copy that is never replaced freezes that description on the day of the
+ * install. The procedure stays current regardless — it lives in `instructions`
+ * — but an improved trigger would reach nobody who upgrades. `--refresh` closes
+ * that gap without reopening the first one: it replaces a file only when the
+ * file is byte-for-byte a version this package once shipped (so nobody's edit
+ * can be in it), or when the user names that file on the command line. A file
+ * that matches no shipped version is the user's until they say otherwise, and
+ * the refresh says that it left it alone and how to replace it.
+ *
+ * Exit: 0 installed or nothing to do · 1 the source is missing · 2 a usage
+ * error, including a named file the package does not ship.
  *
  * Tests: `node --test scripts/tests/skills-install.test.mjs`
  */
 
-import { copyFileSync, existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
-import { dirname, join, relative } from "node:path";
+import { createHash } from "node:crypto";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { repositoryRoot, BACKLOG_DIR_REFUSAL_EXIT, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
@@ -60,6 +73,37 @@ export function skillsTarget(repoRoot) {
   return join(repoRoot, ".claude", "skills");
 }
 
+/**
+ * Every version of a packaged file that this package has ever shipped, as the
+ * SHA-256 of its content with CRLF read as LF, keyed by its path under the
+ * skills directory. A file in a user's repository that matches one of these is
+ * known to carry no edit of theirs, so `--refresh` may replace it unasked.
+ *
+ * A HAND-KEPT LIST, BECAUSE AN INSTALLATION HAS NO GIT HISTORY. The versions
+ * could be read out of `git log` here, but a user runs this from a tarball. The
+ * current packaged content MUST be on the list, so that the NEXT release still
+ * recognises it as shipped; `skills-install.test.mjs` fails with the line to
+ * add when it is not.
+ */
+export const SHIPPED_VERSIONS = {
+  "backlog-workflow/SKILL.md": [
+    "afe1203969835a456a04760e20b966f47bbb74b14962db298fb6c1fc1ee28702", // 2026-08-30, before the rename
+    "f52e6b78cb0e44f6416c82f1cc0484382a2231dd08a542ed8b8ca0de347b2761", // 2026-09-03, TL-20
+  ],
+};
+
+/** The hash `SHIPPED_VERSIONS` is written in. Line endings are normalised so a
+ *  checkout with `core.autocrlf` does not turn a shipped copy into an "edit". */
+export function contentHash(path) {
+  const text = readFileSync(path, "utf8").replace(/\r\n/g, "\n");
+  return createHash("sha256").update(text, "utf8").digest("hex");
+}
+
+/** A path as `SHIPPED_VERSIONS` and the command line spell it, on any platform. */
+function posix(path) {
+  return path.split(sep).join("/");
+}
+
 function filesUnder(dir, base = dir, out = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
@@ -73,49 +117,101 @@ function filesUnder(dir, base = dir, out = []) {
 }
 
 /**
+ * How each installed packaged file compares with the one this installation
+ * ships. Only PACKAGED paths are examined — a file the user added beside the
+ * skill is not ours to judge, let alone to replace.
+ *
+ *   missing  not installed
+ *   current  identical to the packaged file
+ *   shipped  identical to an OLDER shipped version: safe to refresh
+ *   edited   matches no shipped version: presumed to be the user's edit
+ *
+ * @returns {{ok: boolean, files: {file: string, state: string}[], target: string}}
+ */
+export function compareInstalled(repoRoot, opts = {}) {
+  const source = opts.source || PACKAGED_SKILLS;
+  const wanted = opts.skills || USER_SKILLS;
+  const shipped = opts.shipped || SHIPPED_VERSIONS;
+  const target = skillsTarget(repoRoot);
+  if (!existsSync(source)) {
+    return {
+      ok: false, kind: "no-source", target, files: [],
+      message: "the packaged skills are not in this installation: " + source,
+      details: ["A tarball built without `skills/` in `files` produces exactly this."],
+    };
+  }
+  const files = [];
+  for (const name of wanted) {
+    const from = join(source, name);
+    if (!existsSync(from)) {
+      return { ok: false, kind: "no-skill", target, files, message: "no packaged skill called `" + name + "` in " + source };
+    }
+    for (const file of filesUnder(from)) {
+      const key = join(name, file);
+      const installed = join(target, key);
+      let state;
+      if (!existsSync(installed)) state = "missing";
+      else {
+        const hash = contentHash(installed);
+        if (hash === contentHash(join(from, file))) state = "current";
+        else if ((shipped[posix(key)] || []).includes(hash)) state = "shipped";
+        else state = "edited";
+      }
+      files.push({ file: key, state });
+    }
+  }
+  return { ok: true, files, target };
+}
+
+/**
  * Copy the user-facing skills into a repository.
  *
  * @param {string} repoRoot  the repository the skills are for
- * @param {{source?: string, skills?: string[], dryRun?: boolean}} opts
- * @returns {{ok: boolean, created: string[], skipped: string[], target: string}}
+ * @param {{source?: string, skills?: string[], dryRun?: boolean, refresh?: boolean,
+ *          named?: string[], shipped?: object}} opts
+ *   `refresh` replaces files that are an older shipped version; `named` (with
+ *   `refresh`) also replaces those files whatever they hold.
+ * @returns {{ok: boolean, created: string[], skipped: string[], replaced: string[],
+ *            kept: string[], target: string}}
  */
 export function installSkills(repoRoot, opts = {}) {
   const source = opts.source || PACKAGED_SKILLS;
-  const wanted = opts.skills || USER_SKILLS;
-  const target = skillsTarget(repoRoot);
+  const named = (opts.named || []).map(posix);
+  const state = compareInstalled(repoRoot, opts);
+  const target = state.target;
+  if (!state.ok) return { ...state, created: [], skipped: [], replaced: [], kept: [] };
 
-  if (!existsSync(source)) {
+  const known = state.files.map((f) => posix(f.file));
+  const unknownName = named.find((f) => !known.includes(f));
+  if (unknownName !== undefined) {
     return {
-      ok: false, kind: "no-source", target, created: [], skipped: [],
-      message: "the packaged skills are not in this installation: " + source,
-      details: ["A tarball built without `skills/` in `files` produces exactly this."],
+      ok: false, kind: "unknown-file", target, created: [], skipped: [], replaced: [], kept: [],
+      message: "`" + unknownName + "` is not a packaged skill file",
+      details: ["Name a path under " + target + " as the package ships it: " + known.join(", ")],
     };
   }
 
   const created = [];
   const skipped = [];
-  for (const name of wanted) {
-    const from = join(source, name);
-    if (!existsSync(from)) {
-      return {
-        ok: false, kind: "no-skill", target, created, skipped,
-        message: "no packaged skill called `" + name + "` in " + source,
-      };
-    }
-    for (const file of filesUnder(from)) {
-      const destination = join(target, name, file);
-      // SKIPPED, NEVER OVERWRITTEN. The file may be the user's own edit of this
-      // very skill, and replacing it silently would take back a decision they
-      // made in their own repository.
-      if (existsSync(destination)) { skipped.push(join(name, file)); continue; }
-      if (!opts.dryRun) {
-        mkdirSync(dirname(destination), { recursive: true });
-        copyFileSync(join(from, file), destination);
-      }
-      created.push(join(name, file));
-    }
+  const replaced = [];
+  const kept = [];
+  for (const { file, state: now } of state.files) {
+    const write = () => {
+      if (opts.dryRun) return;
+      const destination = join(target, file);
+      mkdirSync(dirname(destination), { recursive: true });
+      copyFileSync(join(source, file), destination);
+    };
+    if (now === "missing") { write(); created.push(file); continue; }
+    // SKIPPED, NEVER OVERWRITTEN, unless the refresh can prove the file holds
+    // no edit or the user named it. The file may be the user's own edit of this
+    // very skill, and replacing it silently would take back a decision they
+    // made in their own repository.
+    if (!opts.refresh || now === "current") { skipped.push(file); continue; }
+    if (now === "shipped" || named.includes(posix(file))) { write(); replaced.push(file); continue; }
+    kept.push(file);
   }
-  return { ok: true, created, skipped, target, dryRun: Boolean(opts.dryRun) };
+  return { ok: true, created, skipped, replaced, kept, target, dryRun: Boolean(opts.dryRun) };
 }
 
 /** The lines `init` prints when it installs them, so the two commands say the
@@ -127,10 +223,19 @@ export function renderInstall(result, opts = {}) {
     out.push(paint.ok(MARK.ok) + " skills: " + result.created.length + " file(s) → " + result.target);
     for (const file of result.created) out.push("    " + file);
   }
+  if (result.replaced.length) {
+    out.push(paint.ok(MARK.ok) + " refreshed: " + result.replaced.length + " file(s) → " + result.target);
+    for (const file of result.replaced) out.push("    " + file);
+  }
   if (result.skipped.length) {
     out.push(paint.dim(MARK.bullet + " skipped (already there, left alone): " + result.skipped.join(", ")));
   }
-  if (!result.created.length && !result.skipped.length) {
+  if (result.kept.length) {
+    out.push(paint.warn(MARK.warn) + " kept (matches no shipped version — your edit?): " + result.kept.join(", "));
+    out.push("  " + paint.dim("To replace it anyway, discarding what it holds, name it:"));
+    out.push("  " + paint.dim("`" + N + " skills install --refresh " + result.kept.join(" ") + "`"));
+  }
+  if (!result.created.length && !result.skipped.length && !result.replaced.length && !result.kept.length) {
     out.push(paint.dim(MARK.bullet + " skills: nothing to install"));
   }
   if (result.created.length) {
@@ -140,7 +245,7 @@ export function renderInstall(result, opts = {}) {
   return out.join("\n");
 }
 
-const KNOWN_FLAGS = ["--dry-run", "--json", "--dir"];
+const KNOWN_FLAGS = ["--dry-run", "--json", "--dir", "--refresh"];
 
 export function main(argv) {
   const sub = argv[0];
@@ -149,12 +254,16 @@ export function main(argv) {
     return 2;
   }
   const cli = takeDirFlag(argv.slice(1));
-  const unknown = cli.argv.filter((a) => !KNOWN_FLAGS.includes(a));
+  const refresh = cli.argv.includes("--refresh");
+  const unknown = cli.argv.filter((a) => !KNOWN_FLAGS.includes(a) && (a.startsWith("-") || !refresh));
   if (unknown.length) {
     const problem = unknown[0].startsWith("-") ? "unknown flag: " : "unexpected argument: ";
-    console.error(refusal(N + " skills install", problem + unknown.join(" "), KNOWN_FLAGS.join(" ")));
+    console.error(refusal(N + " skills install", problem + unknown.join(" "), KNOWN_FLAGS.join(" ") + " [<file>...]"));
     return 2;
   }
+  // A file argument means "replace this one whatever it holds", which only
+  // makes sense as part of a refresh — without one it is refused above.
+  const named = cli.argv.filter((a) => !a.startsWith("-"));
 
   let backlog;
   try {
@@ -167,10 +276,12 @@ export function main(argv) {
 
   const result = installSkills(repositoryRoot(backlog), {
     dryRun: cli.argv.includes("--dry-run"),
+    refresh,
+    named,
   });
   if (!result.ok) {
     console.error(failure(N + " skills install", result.message, result.details || []));
-    return 1;
+    return result.kind === "unknown-file" ? 2 : 1;
   }
   if (cli.argv.includes("--json")) {
     console.log(JSON.stringify(result, null, 2));
