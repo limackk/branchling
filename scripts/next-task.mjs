@@ -57,7 +57,7 @@ import { resolveActorReport } from "./actor.mjs";
 import { handedBackAcross } from "./audit.mjs";
 import { archivedElsewhereBySource, crossBranchState, describeDivergence, divergences, scanNote } from "./branch-scan.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { ACTOR_NAMESPACES, FIELD_COMMENT, isValidActor, openQuestions, readAllHistory, readHistory, reasonRefusal } from "./history.mjs";
+import { actorRefusal, FIELD_COMMENT, openQuestions, readAllHistory, readHistory, reasonRefusal } from "./history.mjs";
 import { answerBacklogDirRefusal, backlogPaths, isBacklogDirRefusal, resolveBacklogDir } from "./paths.mjs";
 import { dispatchWave, loadPlanForDispatch, scheduledIds } from "./plan.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
@@ -818,12 +818,12 @@ export function run(argv) {
   // `--require-actor` here: `next` is the automated draw from the queue, and a
   // person choosing a task names it with `take`, which accepts the flag.
   const { actor, actorSource } = resolveActorReport(plan.actor);
-  if (!isValidActor(actor)) {
-    console.error(failure(N + " next", "the actor `" + actor + "` has no valid namespace", [
-      "Use one of: " + ACTOR_NAMESPACES.map((n) => n + ":<name>").join(" | "),
+  const badActor = actorRefusal(actor);
+  if (badActor) {
+    console.error(failure(N + " next", badActor.refusal, [badActor.hint].concat(badActor.namespace ? [
       "The namespace says how much the attribution is worth — local: declared,",
       "agent: automated, user: an authenticated account. BL-1404.",
-    ], [N + " next --help"]));
+    ] : []), [N + " next --help"]));
     return 2;
   }
 

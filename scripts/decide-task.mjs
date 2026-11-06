@@ -75,7 +75,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { actorRequiredRefusal, resolveActorReport } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { printJson } from "./json-envelope.mjs";
-import { ACTOR_NAMESPACES, appendEntries, currentSession, EVENT_ID_RE, eventId, FIELD_DECISION, isValidActor, normalizeReason, openQuestions, questionIdFromReason, readHistory, reasonRefusal, recordEdit } from "./history.mjs";
+import { actorRefusal, appendEntries, currentSession, EVENT_ID_RE, eventId, FIELD_DECISION, normalizeReason, openQuestions, questionIdFromReason, readHistory, reasonRefusal, recordEdit } from "./history.mjs";
 import { answerBacklogDirRefusal, backlogPaths, isBacklogDirRefusal, resolveBacklogDir } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { todayStamp } from "./today.mjs";
@@ -477,12 +477,12 @@ export function run(argv) {
     else console.error(failure(N + " decide", required.refusal, required.details));
     return 1;
   }
-  if (!isValidActor(actor)) {
-    return fail2("the actor `" + actor + "` has no valid namespace", [
-      "Use one of: " + ACTOR_NAMESPACES.map((n) => n + ":<name>").join(" | "),
+  const badActor = actorRefusal(actor);
+  if (badActor) {
+    return fail2(badActor.refusal, [badActor.hint].concat(badActor.namespace ? [
       "A decision is the one row where WHO decided is the point — an agent's and a",
       "person's are the same shape, and only the namespace tells them apart.",
-    ]);
+    ] : []));
   }
 
   let root;

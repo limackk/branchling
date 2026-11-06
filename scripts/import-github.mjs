@@ -63,7 +63,7 @@ import { fileURLToPath } from "node:url";
 
 import { resolveActorReport } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { ACTOR_NAMESPACES, isValidActor, reasonRefusal, recordCreation, reconcile } from "./history.mjs";
+import { actorRefusal, reasonRefusal, recordCreation, reconcile } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { createTask, driftMessage, slugify } from "./new-task.mjs";
 import { answerBacklogDirRefusal, backlogPaths, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
@@ -180,12 +180,8 @@ export function parseImportArgs(args) {
         "from an abstraction nobody needs yet. A second source is a second task."
     );
   }
-  if (actor && !isValidActor(actor)) {
-    throw new Error(
-      "the actor `" + actor + "` has no valid namespace\n" +
-        "use one of: " + ACTOR_NAMESPACES.map((n) => n + ":<name>").join(" | ")
-    );
-  }
+  const badActor = actor ? actorRefusal(actor) : null;
+  if (badActor) throw new Error(badActor.refusal + "\n" + badActor.hint);
   return { from, dryRun, json, actor, reason, labelMap };
 }
 

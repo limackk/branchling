@@ -3,7 +3,7 @@
 import { actorRequiredRefusal, resolveActorReport } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { handoffTask, rebuildViews } from "./handoff-task.mjs";
-import { ACTOR_NAMESPACES, isValidActor } from "./history.mjs";
+import { actorRefusal } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { BACKLOG_DIR_REFUSAL_EXIT, BACKLOG_DIR_REFUSAL_KIND, isBacklogDirRefusal, resolveBacklogDir } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
@@ -87,7 +87,8 @@ export function run(argv) {
   actorSource = resolved.actorSource;
   const required = actorRequiredRefusal(plan.requireActor, resolved, "releases the task");
   if (required) return refuse(required.refusal, required.details, 1, required.refusalKind);
-  if (!isValidActor(actor)) return refuse("the actor `" + actor + "` has no valid namespace", ["Use one of: " + ACTOR_NAMESPACES.map((n) => n + ":<name>").join(" | ")], 2, "usage");
+  const badActor = actorRefusal(actor);
+  if (badActor) return refuse(badActor.refusal, [badActor.hint], 2, "usage");
   let root;
   try { root = resolveBacklogDir({ dir: plan.dir || undefined }).root; }
   catch (e) {

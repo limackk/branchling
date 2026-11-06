@@ -32,7 +32,7 @@ import { fileURLToPath } from "node:url";
 
 import { resolveActorReport } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { ACTOR_NAMESPACES, isValidActor, recordCreation } from "./history.mjs";
+import { actorRefusal, recordCreation } from "./history.mjs";
 import { withBacklogMutex } from "./lock.mjs";
 import { editPlanText, newPlanErrors, waveTargetProblem } from "./plan-write.mjs";
 import { detectPrefixMismatch, prefixMismatchMessage, taskIdPatterns } from "./task-id.mjs";
@@ -583,10 +583,8 @@ export async function main(argv) {
   // writing command judges it: a creation recorded under an actor with no
   // namespace would be a history row nobody can weigh.
   const { actor, actorSource } = resolveActorReport(opts.actor);
-  if (!isValidActor(actor)) {
-    return fail("the actor `" + actor + "` has no valid namespace",
-      "use one of: " + ACTOR_NAMESPACES.map((n) => n + ":<name>").join(" | "));
-  }
+  const badActor = actorRefusal(actor);
+  if (badActor) return fail(badActor.refusal, badActor.hint);
 
   // BEFORE the directory is even resolved: a refused document must leave a tree
   // that looks exactly like the one before the command ran.

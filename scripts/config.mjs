@@ -43,7 +43,7 @@ import {
 import { DEFAULT_TASK_ID_PREFIX, PREFIX_SHAPE, inferPrefix, taskIdPatterns } from "./task-id.mjs";
 import {
   ACTOR_NAMESPACES, ARCHIVED_STATUS_ROLES, CONFLICT_GROUP_SOURCES, RELEASE_SHAPE, ROLE_SHAPE, STATUS_ROLES,
-  isValidActor, unquote,
+  actorRefusal, unquote,
 } from "./task-fields.mjs";
 import { LINK_POLICIES, parseVerification } from "./criteria.mjs";
 import { DEFAULT_LOCK_TTL_MINUTES } from "./lock.mjs";
@@ -1099,12 +1099,14 @@ export function validateConfig(config) {
   // degrade to `unknown` on write — the configuration would be promising an
   // author the log will never see. Loud here, instead of silent there.
   for (const a of config.actors || []) {
-    if (!isValidActor(a)) {
-      problems.push(
-        `\`actors\` contains \`${a}\` with no valid namespace — use ` +
+    const bad = actorRefusal(a);
+    if (!bad) continue;
+    // A right namespace with a wrong name is a different repair (TL-590):
+    // suggesting the three namespaces again would point at the half that is fine.
+    problems.push(bad.namespace
+      ? `\`actors\` contains \`${a}\` with no valid namespace — use ` +
           ACTOR_NAMESPACES.map((n) => n + ":" + a.replace(/^[a-z]+:/, "")).join(" / ")
-      );
-    }
+      : "`actors` contains " + bad.refusal + " — " + bad.hint);
   }
 
   // A role is an identifier a dispatcher MATCHES ON and that a caller types as a

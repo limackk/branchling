@@ -25,11 +25,10 @@ import { listTaskFiles, recordEdit, requiresReason } from "./history.mjs";
 import { backlogPaths } from "./paths.mjs";
 import { ANY_TASK_ID } from "./task-id.mjs";
 import {
-  ACTOR_NAMESPACES,
+  actorRefusal,
   buildFieldSpecs,
   DEDICATED_FIELDS,
   extractMeta,
-  isValidActor,
   isValidReason,
   normalizeValue,
   reasonRefusal,
@@ -101,10 +100,8 @@ export function writeTaskField(opts) {
   const reason = typeof opts.reason === "string" ? opts.reason.trim() : "";
   const refusedFields = opts.refusedFields || [];
 
-  if (!isValidActor(actor)) {
-    return refused("usage", 400, "actor must use a declared namespace",
-      { details: ["Use one of: " + ACTOR_NAMESPACES.map((n) => n + ":<name>").join(" | ")] });
-  }
+  const badActor = actorRefusal(actor);
+  if (badActor) return refused("usage", 400, badActor.refusal, { details: [badActor.hint] });
   if (refusedFields.indexOf(field) >= 0 && DEDICATED_FIELDS[field]) {
     return refused("dedicated", 400, "`" + field + "` has dedicated commands and is not set here",
       { details: ["use: " + DEDICATED_FIELDS[field].join(", ")] });

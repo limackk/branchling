@@ -43,7 +43,7 @@ import { fileURLToPath } from "node:url";
 
 import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { ACTOR_NAMESPACES, MIGRATIONS_FILE, SNAPSHOT_FILE, appendMigration, applyIdMigrations, isValidActor, loadSnapshot, saveSnapshot } from "./history.mjs";
+import { actorRefusal, MIGRATIONS_FILE, SNAPSHOT_FILE, appendMigration, applyIdMigrations, loadSnapshot, saveSnapshot } from "./history.mjs";
 import { withHistoryLogMutex } from "./history-log-mutex.mjs";
 import { backlogPaths, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { withSnapshotMutex } from "./snapshot-mutex.mjs";
@@ -277,8 +277,9 @@ export function main(argv) {
     console.error(`${N} migrate-prefix: \`--actor\` with no name\n` + USAGE);
     return 2;
   }
-  if (actor && !isValidActor(actor)) {
-    console.error(`${N} migrate-prefix: the actor \`${actor}\` has no valid namespace — expected ${ACTOR_NAMESPACES.map((ns) => ns + ":<name>").join(", ")}`);
+  const badActor = actor ? actorRefusal(actor) : null;
+  if (badActor) {
+    console.error(`${N} migrate-prefix: ${badActor.refusal}\n  ${badActor.hint}`);
     return 2;
   }
   if (!PREFIX_SHAPE.test(to)) {

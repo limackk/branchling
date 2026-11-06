@@ -48,7 +48,7 @@ import { loadConfigOrExit } from "./config.mjs";
 import { chooseRemote, refspecsCover, fixCommand, refNamespace } from "./deploy-fetch.mjs";
 import { resolveRef } from "./environments.mjs";
 import { gitDiscoveryEnv } from "./git-env.mjs";
-import { ACTOR_NAMESPACES, isValidActor } from "./history.mjs";
+import { actorRefusal } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { repoRoot } from "./modified-files.mjs";
 import { BACKLOG_DIR_REFUSAL_EXIT, BACKLOG_DIR_REFUSAL_KIND, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
@@ -329,9 +329,8 @@ export function run(argv) {
   const resolved = resolveActorReport(opts.actor);
   const { actor } = resolved;
   actorSource = resolved.actorSource;
-  if (!isValidActor(actor)) {
-    return refuse("the actor `" + actor + "` has no valid namespace", ["Use one of: " + ACTOR_NAMESPACES.map((n) => n + ":<name>").join(" | ")], 2, "usage");
-  }
+  const badActor = actorRefusal(actor);
+  if (badActor) return refuse(badActor.refusal, [badActor.hint], 2, "usage");
   let root;
   try { root = resolveBacklogDir({ dir: dirFlag.dir || undefined, moduleDir: HERE }).root; }
   catch (e) {
