@@ -154,7 +154,7 @@ test("a missing packaged directory is a refusal, not a silent success", () => {
   assert.equal(result.kind, "no-source");
   assert.match(result.message, /not in this installation/);
   assert.match(result.details.join("\n"), /tarball/);
-  for (const key of ["created", "skipped", "replaced", "kept"]) assert.deepEqual(result[key], [], key);
+  for (const key of ["created", "skipped", "replaced", "kept", "blocked"]) assert.deepEqual(result[key], [], key);
   assert.deepEqual(compareInstalled(fx.dir, { source: join(fx.dir, "nowhere") }).files, []);
 });
 
@@ -290,6 +290,53 @@ test("compareInstalled tells missing, current, shipped and edited apart", () => 
   ]);
 });
 
+// ── something other than a file at a packaged path (TL-594) ──
+//
+// Hashing a directory throws EISDIR, and that throw took `doctor` and `skills
+// install` down together. Each case keeps a regular file beside the directory
+// as its control, so a state reported for EVERY path would fail too.
+
+function blockWithDirectory(fx, file) {
+  const path = installed(fx, file);
+  rmSync(path, { force: true });
+  mkdirSync(join(path, "inside"), { recursive: true });
+  writeFileSync(join(path, "inside", "theirs.md"), "theirs\n", "utf8");
+  return path;
+}
+
+test("compareInstalled reports a directory at a packaged path as blocked, beside a regular file", () => {
+  const fx = fixture();
+  const opts = source(fx);
+  installSkills(fx.dir, opts);
+  blockWithDirectory(fx, DEMO);
+  assert.deepEqual(compareInstalled(fx.dir, opts).files, [
+    { file: DEMO, state: "blocked" }, { file: NOTES, state: "current" },
+  ]);
+});
+
+test("a blocked path is left alone by install, by --refresh, and even when named", () => {
+  const fx = fixture();
+  const opts = source(fx);
+  installSkills(fx.dir, opts);
+  const path = blockWithDirectory(fx, DEMO);
+  rmSync(installed(fx, NOTES));
+
+  const plain = installSkills(fx.dir, opts);
+  assert.equal(plain.ok, true);
+  assert.deepEqual(plain.blocked, [DEMO]);
+  assert.deepEqual(plain.created, [NOTES], "the regular file beside it was not installed");
+  assert.deepEqual(plain.skipped, [], "a blocked path is not something that is already there");
+
+  const named = installSkills(fx.dir, { ...opts, refresh: true, named: ["demo/SKILL.md"] });
+  assert.equal(named.ok, true);
+  assert.deepEqual(named.blocked, [DEMO]);
+  assert.deepEqual(named.replaced, []);
+  assert.deepEqual(named.kept, []);
+  assert.deepEqual(named.skipped, [NOTES]);
+  assert.equal(lstatSync(path).isDirectory(), true);
+  assert.equal(readFileSync(join(path, "inside", "theirs.md"), "utf8"), "theirs\n", "what the directory held was touched");
+});
+
 test("a skill directory reached through a symlink is read through it", () => {
   // The repository's own `.claude/skills/*` are symlinks; a packaged skill
   // laid out the same way must not lose the files behind one.
@@ -399,16 +446,16 @@ test("naming a file the package does not ship is a refusal", () => {
   assert.deepEqual(result.details, [
     "Name a path under " + skillsTarget(fx.dir) + " as the package ships it: demo/SKILL.md, demo/refs/notes.md",
   ]);
-  for (const key of ["created", "skipped", "replaced", "kept"]) assert.deepEqual(result[key], [], key);
+  for (const key of ["created", "skipped", "replaced", "kept", "blocked"]) assert.deepEqual(result[key], [], key);
 });
 
 test("what the install prints names each outcome, and only the ones that happened", () => {
   const plain = { color: { ok: (s) => s, dim: (s) => s, warn: (s) => s } };
-  const base = { target: "/t", created: [], skipped: [], replaced: [], kept: [] };
+  const base = { target: "/t", created: [], skipped: [], replaced: [], kept: [], blocked: [] };
   const say = (over) => renderInstall({ ...base, ...over }, plain);
 
   assert.match(say({}), /skills: nothing to install/);
-  for (const over of [{ created: ["a"] }, { skipped: ["a"] }, { replaced: ["a"] }, { kept: ["a"] }]) {
+  for (const over of [{ created: ["a"] }, { skipped: ["a"] }, { replaced: ["a"] }, { kept: ["a"] }, { blocked: ["a"] }]) {
     assert.doesNotMatch(say(over), /nothing to install/, JSON.stringify(over));
   }
 
@@ -419,6 +466,11 @@ test("what the install prints names each outcome, and only the ones that happene
     "! kept (matches no shipped version — your edit?): demo/SKILL.md, demo/b.md",
     "  To replace it anyway, discarding what it holds, name it:",
     "  `" + CLI_NAME + " skills install --refresh demo/SKILL.md demo/b.md`",
+  ].join("\n"));
+  assert.equal(say({ blocked: ["demo/SKILL.md", "demo/b.md"] }), [
+    "! not a file, left alone: demo/SKILL.md, demo/b.md",
+    "  Something other than a file stands at that path, so the editor cannot read it.",
+    "  Move it aside, then run `" + CLI_NAME + " skills install` again.",
   ].join("\n"));
   assert.equal(say({ skipped: ["demo/SKILL.md", "demo/b.md"] }),
     "· skipped (already there, left alone): demo/SKILL.md, demo/b.md");
@@ -545,4 +597,27 @@ test("the README says the skill exists — otherwise nobody will know", () => {
   const readme = readFileSync(join(REPO_ROOT, "README.md"), "utf8");
   assert.match(readme, /skills install/);
   assert.match(readme, /never overwrites?/i);
+});
+
+test("`skills install` through the CLI names a directory at the skill path instead of crashing", () => {
+  const fx = fixture();
+  assert.equal(run(["init", "--dir", fx.backlog, "--no-example"], fx.dir, fx.env).status, 0);
+  const path = join(fx.dir, ".claude", "skills", SKILL);
+  mkdirSync(path, { recursive: true });
+
+  for (const args of [[], ["--refresh"], ["--refresh", "backlog-workflow/SKILL.md"]]) {
+    const text = run(["skills", "install", ...args, "--dir", fx.backlog], fx.dir, fx.env);
+    assert.equal(text.status, 0, args.join(" ") + ": " + text.stderr);
+    assert.ok(text.stdout.includes("not a file, left alone: " + SKILL), text.stdout);
+  }
+  const json = run(["skills", "install", "--json", "--dir", fx.backlog], fx.dir, fx.env);
+  assert.equal(json.status, 0, json.stderr);
+  assert.deepEqual(JSON.parse(json.stdout).blocked, [SKILL]);
+  assert.equal(lstatSync(path).isDirectory(), true);
+
+  // Positive control: the remedy it prints works.
+  rmSync(path, { recursive: true });
+  const after = run(["skills", "install", "--json", "--dir", fx.backlog], fx.dir, fx.env);
+  assert.deepEqual(JSON.parse(after.stdout).created, [SKILL]);
+  assert.deepEqual(JSON.parse(after.stdout).blocked, []);
 });

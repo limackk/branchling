@@ -10,7 +10,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -175,6 +175,46 @@ test("a skill directory without its SKILL.md counts as not installed", () => {
   assert.equal(row.status, "info");
   assert.equal(row.title, "packaged skill");
   assert.match(row.detail, /^not installed: demo — an editor that loads skills will not know a backlog is here$/);
+});
+
+// ── something other than a file at the skill path (TL-594) ──
+
+test("a directory in place of the installed SKILL.md is a warning that names it, not a crash", () => {
+  const dir = repo({}, "--skills");
+  const path = join(dir, ".claude", "skills", "backlog-workflow", "SKILL.md");
+  rmSync(path);
+  mkdirSync(path);
+  const row = rows(dir)["agent-skill"];
+  assert.equal(row.status, "warn", JSON.stringify(row));
+  assert.equal(row.detail, join("backlog-workflow", "SKILL.md") + " is not a regular file — an editor cannot read the skill from it");
+  assert.match(row.fix, / skills install {3}# after moving .*backlog-workflow\/SKILL\.md aside$/);
+
+  // Positive control: once the directory is gone, the command it names makes the row green.
+  rmSync(path, { recursive: true });
+  const r = run(dir, ["skills", "install", "--dir", "backlog"]);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.equal(rows(dir)["agent-skill"].status, "ok");
+});
+
+test("only the paths that are not files are named, and a regular file beside them is not", () => {
+  const dir = repo();
+  const opts = { source: join(dir, "pkg"), skills: ["demo", "other", "plain"], shipped: {} };
+  for (const name of opts.skills) {
+    mkdirSync(join(dir, "pkg", name), { recursive: true });
+    writeFileSync(join(dir, "pkg", name, "SKILL.md"), "new\n", "utf8");
+    mkdirSync(join(dir, ".claude", "skills", name), { recursive: true });
+  }
+  mkdirSync(join(dir, ".claude", "skills", "demo", "SKILL.md"));
+  mkdirSync(join(dir, ".claude", "skills", "other", "SKILL.md"));
+  writeFileSync(join(dir, ".claude", "skills", "plain", "SKILL.md"), "new\n", "utf8");
+  const row = checkSkill(join(dir, "backlog"), opts);
+  assert.equal(row.status, "warn");
+  assert.equal(row.title, "packaged skill");
+  assert.equal(row.detail, join("demo", "SKILL.md") + ", " + join("other", "SKILL.md") +
+    " are not regular files — an editor cannot read the skill from them");
+  const target = join(realpathSync(dir), ".claude", "skills");
+  assert.ok(row.fix.endsWith("skills install   # after moving " + join(target, "demo", "SKILL.md") + " " +
+    join(target, "other", "SKILL.md") + " aside"), row.fix);
 });
 
 test("the git gates: absent names `hooks print`, installed is green", () => {

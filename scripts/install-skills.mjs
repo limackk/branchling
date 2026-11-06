@@ -126,6 +126,13 @@ function filesUnder(dir, base = dir, out = []) {
  *   current  identical to the packaged file
  *   shipped  identical to an OLDER shipped version: safe to refresh
  *   edited   matches no shipped version: presumed to be the user's edit
+ *   blocked  something that is not a regular file (a directory, a socket)
+ *            stands at the path: it cannot be read, compared or replaced
+ *
+ * BLOCKED IS A STATE, NOT AN EXCEPTION (TL-594). Hashing a directory throws
+ * EISDIR, and an uncaught throw here took `doctor` and `skills install` down
+ * together, naming no path. Whatever stands there is the user's, and removing
+ * it is not ours to do — so both commands name it and leave it alone.
  *
  * @returns {{ok: boolean, files: {file: string, state: string}[], target: string}}
  */
@@ -152,6 +159,7 @@ export function compareInstalled(repoRoot, opts = {}) {
       const installed = join(target, key);
       let state;
       if (!existsSync(installed)) state = "missing";
+      else if (!statSync(installed).isFile()) state = "blocked";
       else {
         const hash = contentHash(installed);
         if (hash === contentHash(join(from, file))) state = "current";
@@ -173,20 +181,20 @@ export function compareInstalled(repoRoot, opts = {}) {
  *   `refresh` replaces files that are an older shipped version; `named` (with
  *   `refresh`) also replaces those files whatever they hold.
  * @returns {{ok: boolean, created: string[], skipped: string[], replaced: string[],
- *            kept: string[], target: string}}
+ *            kept: string[], blocked: string[], target: string}}
  */
 export function installSkills(repoRoot, opts = {}) {
   const source = opts.source || PACKAGED_SKILLS;
   const named = (opts.named || []).map(posix);
   const state = compareInstalled(repoRoot, opts);
   const target = state.target;
-  if (!state.ok) return { ...state, created: [], skipped: [], replaced: [], kept: [] };
+  if (!state.ok) return { ...state, created: [], skipped: [], replaced: [], kept: [], blocked: [] };
 
   const known = state.files.map((f) => posix(f.file));
   const unknownName = named.find((f) => !known.includes(f));
   if (unknownName !== undefined) {
     return {
-      ok: false, kind: "unknown-file", target, created: [], skipped: [], replaced: [], kept: [],
+      ok: false, kind: "unknown-file", target, created: [], skipped: [], replaced: [], kept: [], blocked: [],
       message: "`" + unknownName + "` is not a packaged skill file",
       details: ["Name a path under " + target + " as the package ships it: " + known.join(", ")],
     };
@@ -196,6 +204,7 @@ export function installSkills(repoRoot, opts = {}) {
   const skipped = [];
   const replaced = [];
   const kept = [];
+  const blocked = [];
   for (const { file, state: now } of state.files) {
     const write = () => {
       if (opts.dryRun) return;
@@ -204,6 +213,9 @@ export function installSkills(repoRoot, opts = {}) {
       copyFileSync(join(source, file), destination);
     };
     if (now === "missing") { write(); created.push(file); continue; }
+    // Not even when named: naming a file says "discard what it holds", and a
+    // directory holds files nobody named.
+    if (now === "blocked") { blocked.push(file); continue; }
     // SKIPPED, NEVER OVERWRITTEN, unless the refresh can prove the file holds
     // no edit or the user named it. The file may be the user's own edit of this
     // very skill, and replacing it silently would take back a decision they
@@ -212,7 +224,7 @@ export function installSkills(repoRoot, opts = {}) {
     if (now === "shipped" || named.includes(posix(file))) { write(); replaced.push(file); continue; }
     kept.push(file);
   }
-  return { ok: true, created, skipped, replaced, kept, target, dryRun: Boolean(opts.dryRun) };
+  return { ok: true, created, skipped, replaced, kept, blocked, target, dryRun: Boolean(opts.dryRun) };
 }
 
 /** The lines `init` prints when it installs them, so the two commands say the
@@ -236,7 +248,13 @@ export function renderInstall(result, opts = {}) {
     out.push("  " + paint.dim("To replace it anyway, discarding what it holds, name it:"));
     out.push("  " + paint.dim("`" + N + " skills install --refresh " + result.kept.join(" ") + "`"));
   }
-  if (!result.created.length && !result.skipped.length && !result.replaced.length && !result.kept.length) {
+  const blocked = result.blocked || [];
+  if (blocked.length) {
+    out.push(paint.warn(MARK.warn) + " not a file, left alone: " + blocked.join(", "));
+    out.push("  " + paint.dim("Something other than a file stands at that path, so the editor cannot read it."));
+    out.push("  " + paint.dim("Move it aside, then run `" + N + " skills install` again."));
+  }
+  if (!result.created.length && !result.skipped.length && !result.replaced.length && !result.kept.length && !blocked.length) {
     out.push(paint.dim(MARK.bullet + " skills: nothing to install"));
   }
   if (result.created.length) {
