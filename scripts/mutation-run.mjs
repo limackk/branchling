@@ -56,7 +56,7 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import os, { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
@@ -239,20 +239,62 @@ function defaultConcurrency() {
   return Math.max(1, Math.floor(cores / 2));
 }
 
+const WALK_SKIP = new Set(["node_modules", ".git"]);
+
+/**
+ * Every symbolic link to a directory in the tree, with the target as written.
+ *
+ * Stryker copies the tree into its sandbox file by file and fails with
+ * `ENOTSUP copyfile` on a link to a directory. Ignoring the directory that
+ * holds such links instead (TL-576 ignored `.claude`) removed files a test
+ * reads through them, and Stryker's initial run went red (TL-583).
+ */
+export function directorySymlinks(root, rel = "") {
+  const found = [];
+  for (const entry of readdirSync(join(root, rel), { withFileTypes: true })) {
+    if (WALK_SKIP.has(entry.name)) continue;
+    const path = rel ? rel + "/" + entry.name : entry.name;
+    if (entry.isSymbolicLink()) {
+      let isDir = false;
+      try { isDir = statSync(join(root, path)).isDirectory(); } catch { /* a dangling link is copied as nothing */ }
+      if (isDir) found.push({ path, target: readlinkSync(join(root, path)) });
+    } else if (entry.isDirectory()) {
+      found.push(...directorySymlinks(root, path));
+    }
+  }
+  return found;
+}
+
+/**
+ * The command the runner executes in the sandbox: recreate each ignored link
+ * with its own relative target, then run the tests. Every worker shares one
+ * sandbox, so a link another worker made first is not an error; the check
+ * after `ln` is what decides.
+ */
+export function sandboxCommand(links, testFiles) {
+  const steps = links.map((l) => {
+    const p = shellQuote(l.path);
+    const parent = shellQuote(dirname(l.path));
+    return "{ mkdir -p " + parent + " && { ln -s " + shellQuote(l.target) + " " + p + " 2>/dev/null; [ -L " + p + " ]; }; }";
+  });
+  steps.push("node --test " + testFiles.map(shellQuote).join(" "));
+  return steps.join(" && ");
+}
+
 function runStryker(root, p, opts) {
   const bin = strykerBin();
   if (!bin) return { code: 2, problem: STRYKER_PIN + " is not installed", next: ["npm install"] };
+  const links = directorySymlinks(root);
   const work = mkdtempSync(join(tmpdir(), "mutation-run-"));
   try {
     const reportPath = join(work, "mutation.json");
     const config = {
       testRunner: "command",
-      commandRunner: { command: "node --test " + p.tests.map((t) => shellQuote(t.file)).join(" ") },
+      commandRunner: { command: sandboxCommand(links, p.tests.map((t) => t.file)) },
       coverageAnalysis: "off",
       mutate: p.modules,
-      // Directory symlinks under .claude/skills/ make the sandbox copy fail
-      // with ENOTSUP; nothing in them is code under test.
-      ignorePatterns: [".claude"],
+      // Exactly the links, anchored, never their parent: see directorySymlinks.
+      ignorePatterns: links.map((l) => "/" + l.path),
       plugins: [],
       reporters: ["json", "clear-text", "progress"],
       jsonReporter: { fileName: reportPath },
