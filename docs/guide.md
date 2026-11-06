@@ -72,6 +72,12 @@ verification:               # HOW to check the task is actually done
 carries the rest — `type`, `labels`, `epic`, `confidence`, `created`,
 `updated`, `blocks`, `related_docs` — each annotated in place.
 
+`branchling init` copies that file into your backlog once and never again, so
+a backlog started on an earlier release lacks the fields added since.
+`branchling doctor` names them, and `branchling template refresh` inserts the
+line of each one, with its comment, after the nearest field your template still
+has. It never rewrites a line of yours; `--dry-run` shows what it would add.
+
 The body sections are `## Goal` (what will be true once it is done),
 `## Context` (what the next person has to know before starting — they were not
 in the conversation this task came out of), `## Pre-flight reading` (files to
