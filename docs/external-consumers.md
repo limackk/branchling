@@ -117,6 +117,7 @@ table and the code disagree in either direction.
 | `task-decide` | `decide <ID> --json` | write |
 | `verification-run` | `done <ID> --json` | write |
 | `vocabulary-declare` | `declare <key> <name> --json` | write — `config.yaml` |
+| `template-refresh` | `template refresh --json` | write — `_template.md`, inserting lines only |
 | `release-record` | `deploy record --json` | write — a git ref, never the tree |
 | `task-new` | `new --title "…" --json` | write |
 | `seed` | `seed --json` | write |

@@ -42,6 +42,7 @@ import { SNAPSHOT_FILE, loadSnapshot, readMigrations, reconcile } from "./histor
 import { HOOK_NAMES, hooksTarget, inspect } from "./hooks-command.mjs";
 import { CLAUDE_AGENT_FILE, CLAUDE_IMPORT_LINE, NEUTRAL_AGENT_FILE, NUDGE_VERSION, nudgeState } from "./instructions.mjs";
 import { USER_SKILLS, compareInstalled, skillsTarget } from "./install-skills.mjs";
+import { SHIPPED_TEMPLATE, planRefresh, templateFields } from "./template-command.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { MARK as UI_MARK, color, errColor, heading, refusal } from "./ui.mjs";
@@ -314,29 +315,9 @@ function checkGitIgnore(root) {
   return rows;
 }
 
-/** The template this release would write into a new backlog. */
-const SHIPPED_TEMPLATE = join(HERE, "..", TEMPLATE_FILENAME);
-
-/**
- * The top-level frontmatter keys of a template, each with its one-line comment.
- * Read by line, not by a YAML parser, because the comment IS the payload: it is
- * the only explanation of the field a person editing a task by hand ever sees,
- * and a parser discards it. Indented lines belong to a nested value. PURE.
- */
-export function templateFields(text) {
-  const lines = String(text).split(/\r?\n/);
-  if (lines[0].trim() !== "---") return [];
-  const fields = [];
-  for (const line of lines.slice(1)) {
-    if (line.trim() === "---") break;
-    // A quoted value is skipped whole, so a `#` inside it is not a comment.
-    const m = /^([A-Za-z_][\w-]*):\s*(?:"(?:[^"\\]|\\.)*"|'(?:[^']|'')*')?(.*)$/.exec(line);
-    if (!m) continue;
-    const comment = /(?:^|\s)#\s*(.*)$/.exec(m[2]);
-    fields.push({ key: m[1], comment: comment ? comment[1].trim() : "" });
-  }
-  return fields;
-}
+// The reader moved beside the command that writes the file (TL-595); it is
+// re-exported so that what imported it from here keeps working.
+export { templateFields };
 
 /**
  * Does the backlog's template carry every field this release ships? (TL-588)
@@ -358,9 +339,14 @@ export function checkTemplate(root, { shipped = SHIPPED_TEMPLATE } = {}) {
   if (!existsSync(shipped)) {
     return check("template", title, INFO, "not checked — the packaged template is missing: " + shipped);
   }
-  const present = new Set(templateFields(readFileSync(own, "utf8")).map((f) => f.key));
-  const expected = templateFields(readFileSync(shipped, "utf8"));
-  const missing = expected.filter((f) => !present.has(f.key));
+  // The command's own planner, so the row cannot promise what the command
+  // would not do (TL-595).
+  const plan = planRefresh(readFileSync(own, "utf8"), readFileSync(shipped, "utf8"));
+  if (!plan.ok) {
+    return check("template", title, INFO, "not checked — " + plan.message,
+      "make " + own + " open and close its frontmatter with `---` lines");
+  }
+  const missing = plan.added;
   if (!missing.length) {
     return check("template", title, OK, "every field this release ships is in " + TEMPLATE_FILENAME);
   }
@@ -369,8 +355,7 @@ export function checkTemplate(root, { shipped = SHIPPED_TEMPLATE } = {}) {
     // themselves carry parentheses and commas.
     "missing " + missing.map((f) => "`" + f.key + "`" + (f.comment ? ": " + f.comment : "")).join("; ") +
       ". The writing commands add " + plural(missing.length, "it", "them") + " on demand, so only a task edited by hand goes without",
-    "copy the " + plural(missing.length, "line", "lines") + " for " + missing.map((f) => f.key).join(", ") +
-      " from " + shipped + " into " + own);
+    N + " template refresh   # inserts " + plural(missing.length, "that line", "those lines") + " and changes none of yours");
 }
 
 /**

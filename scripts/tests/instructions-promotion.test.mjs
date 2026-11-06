@@ -23,6 +23,17 @@
  *      says what `deploy status` reports instead (TL-597). A backlog with a
  *      local target — alone or beside a foreign one — is the positive control
  *      that the same predicate still finds the claim where it is true.
+ *   7. task-creation names `target:` and `new --target` exactly where a target
+ *      declares `repository:`, listing only those targets, and the offered
+ *      call succeeds there (TL-598). With only local targets, or none, the
+ *      paragraph is absent, and the refusal it would teach there is shown to
+ *      be real.
+ *   8. overview names `check --release` exactly where a target of THIS
+ *      repository is declared, with the gate's own mode, and `deploy record`
+ *      exactly where a stage is `recorded: true`, listing those stages
+ *      (TL-596). Both offered calls succeed in their fixtures; where every
+ *      target is foreign, or none is declared, the gate is shown to judge
+ *      nothing, and `deploy record` on a stage git observes is shown to refuse.
  *
  * Release and target names are deliberately unlike this repository's
  * vocabulary, so a literal in the source is the only way they could match.
@@ -30,13 +41,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { appendFileSync, mkdtempSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { loadConfig } from "../config.mjs";
 import { PRODUCT_NAME } from "../product.mjs";
-import { TOPIC_NAMES, promotionState, releasePlanning, topicText } from "../instructions.mjs";
+import { TOPIC_NAMES, promotionGate, promotionState, releasePlanning, targetPlanning, topicText } from "../instructions.mjs";
 import { SCRIPTS_DIR, isolateHome } from "./_repo.mjs";
 
 isolateHome("instructions-promotion");
@@ -71,6 +82,27 @@ const MIXED_YAML = `deploy_targets:
       - { name: quay, ref: main }
   - name: ${TARGETS[1]}
     repository: jetty-repo
+`;
+const STAGES = ["dry-dock", "sea-trial", "sea-trial-port", "sea-trial-starboard"];
+/** A local target with a stage git cannot observe, beside a foreign target:
+ *  the foreign one must not suppress the gate, nor lend it a stage. */
+const RECORDED_YAML = `deploy_targets:
+  - name: ${TARGETS[0]}
+    stages:
+      - { name: quay, ref: main }
+      - { name: ${STAGES[0]}, ref: refs/deploys/${STAGES[0]}, recorded: true }
+  - name: ${TARGETS[1]}
+    repository: jetty-repo
+`;
+/** A recorded stage of parallel refs, under the strict gate. */
+const PARALLEL_YAML = `release_gate: require
+deploy_targets:
+  - name: ${TARGETS[0]}
+    stages:
+      - { name: quay, ref: main }
+      - name: ${STAGES[1]}
+        recorded: true
+        refs: [refs/deploys/${STAGES[2]}, refs/deploys/${STAGES[3]}]
 `;
 
 function run(cwd, args) {
@@ -203,7 +235,10 @@ test("the paragraph vanishes without a gap, and where it renders the next one st
 
   const both = topicText("overview", BOTH.config);
   assert.match(both, /what an answer costs a session\n\nWHAT IS WAITING/);
-  assert.match(both, /`\n\nTHIS BACKLOG'S OWN WORDS/);
+  // The two promotion paragraphs follow each other, each after a blank line,
+  // and the configuration's own words still start a paragraph of their own.
+  assert.match(both, /`\n\nWHETHER A PROMOTION IS SAFE/);
+  assert.match(both, /the exit is 0\n\nTHIS BACKLOG'S OWN WORDS/);
   // The command table and the name list are two blocks, not one run of lines.
   assert.match(both, /what shipped\n\n {2}deploy targets/);
   const creation = topicText("task-creation", BOTH.config);
@@ -292,4 +327,186 @@ test("POSITIVE CONTROL, then the guard: with every target in another repository,
   // half of the paragraph that stays true without git.
   assert.match(releasesOnly, /is a question\nfor the tool, not for the task files\. The answer is computed on every call, so\nit is current/,
     "releases alone: the paragraph lost the reason to ask rather than read");
+});
+
+/** Where task-creation teaches `target:`. PURE, so it is shown to find the
+ *  paragraph in a foreign fixture before its silence elsewhere is trusted. */
+function targetTeaching(text) {
+  const hits = [];
+  if (text.includes("`target:` names the deploy targets")) hits.push("field");
+  if (text.includes(" new --title \"…\" --target ")) hits.push("command");
+  if (text.includes("  foreign targets  ")) hits.push("names");
+  return hits;
+}
+
+test("POSITIVE CONTROL, then the guard: task-creation names `target:` only where a target declares `repository:`", () => {
+  const foreign = fixture(FOREIGN_YAML);
+  const mixed = fixture(MIXED_YAML + RELEASES_YAML);
+  const localOnly = fixture(DEPLOY_YAML);
+
+  // Foreign only: the field, the command and every foreign name, as a table
+  // set apart from the prose and followed by a blank line.
+  const creation = topicText("task-creation", foreign.config);
+  assert.deepEqual(targetTeaching(creation), ["field", "command", "names"], "foreign: the paragraph is not rendered");
+  const flat = creation.replace(/\s+/g, " ");
+  assert.match(flat, /when their code lives in another repository \(`repository:`\)\. Git here holds no commit of them, so the field is the only thing that joins the task to them\. Name them when the task is created:/,
+    "foreign: the paragraph does not say why the field is needed");
+  assert.ok(!flat.includes("A target of this repository"), "foreign: the local-target sentence is printed with no local target");
+  assert.match(creation, /Name them when the task is created:\n\n {2}\S/, "foreign: the command table is not set apart");
+  assert.ok(creation.includes("\n  " + PRODUCT_NAME + " new --title \"…\" --target <name,…>   a task that ships from there\n"),
+    "foreign: the `new --target` line is not a line of the command table");
+  assert.ok(creation.includes("\n  foreign targets  `" + TARGETS[0] + "`, `" + TARGETS[1] + "`\n\nBefore you commit:"),
+    "foreign: the foreign targets are not listed on a line of their own before the next paragraph");
+  // The command table and the name list are two blocks, not one run of lines.
+  assert.match(creation, /ships from there\n\n {2}foreign targets {2}`/, "foreign: the name list runs into the command table");
+  assert.ok(!/\n\n\n/.test(creation), "foreign: the paragraph left an empty one behind");
+
+  // Mixed: only the foreign name, and the reason the local one is missing.
+  const mixedText = topicText("task-creation", mixed.config);
+  assert.deepEqual(targetTeaching(mixedText), ["field", "command", "names"], "mixed: the paragraph is not rendered");
+  assert.ok(mixedText.includes("\n  foreign targets  `" + TARGETS[1] + "`\n\n"), "mixed: the list is not the foreign target alone");
+  assert.ok(!mixedText.includes("`" + TARGETS[0] + "`"), "mixed: the local target is offered for `target:`");
+  const mixedFlat = mixedText.replace(/\s+/g, " ");
+  assert.match(mixedFlat, /joins the task to them\. A target of this repository is not named there: its tasks are computed from the paths their commits touch, and `new --target` refuses it\. Name the others when the task is created:/,
+    "mixed: the paragraph does not say why the local target is not listed");
+  assert.match(mixedText, /Name the others when the task is created:\n\n {2}\S/, "mixed: the command table is not set apart");
+  // Beside releases both paragraphs stand, each followed by a blank line.
+  assert.match(mixedText, /`\n\nPLANNING IT FOR A RELEASE/, "mixed: the release paragraph does not follow after a blank line");
+  assert.ok(!/\n\n\n/.test(mixedText), "mixed: a paragraph left an empty one behind");
+
+  // Only local targets, or none at all: silent, in every topic.
+  for (const [label, config] of [["local only", localOnly.config], ["local with releases", BOTH.config], ["neither", NEITHER.config]]) {
+    for (const [name, text] of Object.entries(guides(config))) {
+      assert.deepEqual(targetTeaching(text), [], label + " / " + name + ": `target:` is taught where `new --target` refuses");
+    }
+    assert.equal(targetPlanning(config), "", label + ": the paragraph is not empty");
+  }
+  assert.equal(targetPlanning({}), "", "a partial configuration is not the same as declaring nothing");
+
+  // What the guide offers is what the command does. A NEW fixture per call:
+  // `new` writes a task into it.
+  for (const [label, fx] of [["foreign", fixture(FOREIGN_YAML)], ["mixed", fixture(MIXED_YAML)]]) {
+    const names = fx.config.deployTargets.filter((t) => t.repository).map((t) => t.name);
+    const r = run(fx.repo, ["new", "--title", "Ships elsewhere", "--target", names.join(","), "--dir", fx.dir, "--json"]);
+    assert.equal(r.status, 0, label + ": `new --target` refuses where the guide offers it: " + r.stderr);
+    const written = readFileSync(JSON.parse(r.stdout).file, "utf8");
+    assert.match(written, new RegExp("^target: \\[" + names.join(", ") + "\\]", "m"),
+      label + ": the task does not carry the target it was created with");
+  }
+  // The other direction is why the paragraph is conditional: where every target
+  // is local, the call it would offer is a refusal.
+  const refused = run(localOnly.repo, ["new", "--title", "Ships here", "--target", TARGETS[0], "--dir", localOnly.dir]);
+  assert.notEqual(refused.status, 0, "`new --target` accepts a local target — the condition may be obsolete");
+});
+
+/** Where the guides teach the release gate and recorded stages. PURE, so it
+ *  is shown to find both halves before its silence elsewhere is trusted. */
+function gateTeaching(text) {
+  const hits = [];
+  if (text.includes(" " + PRODUCT_NAME + " check --release")) hits.push("gate");
+  if (text.includes("  release gate  ")) hits.push("mode");
+  if (text.includes(" deploy record ")) hits.push("record");
+  if (text.includes("  recorded stages  ")) hits.push("stages");
+  return hits;
+}
+
+test("POSITIVE CONTROL, then the guard: overview names `check --release` where a target is local, and `deploy record` only with a recorded stage", () => {
+  const recorded = fixture(RECORDED_YAML);
+  const parallel = fixture(PARALLEL_YAML);
+  const foreign = fixture(FOREIGN_YAML + RELEASES_YAML);
+  const releasesOnly = fixture(RELEASES_YAML);
+
+  // Recorded beside foreign: both halves, and only the recorded stage — not
+  // the observed `quay`, and nothing of the foreign target.
+  const overview = topicText("overview", recorded.config);
+  assert.deepEqual(gateTeaching(overview), ["gate", "mode", "record", "stages"], "recorded: the paragraph is not rendered");
+  assert.ok(overview.includes("\n  " + PRODUCT_NAME + " check --release [--env <stage>]   a promotion's gaps, read from git\n"),
+    "recorded: the gate is not a line of the command table");
+  assert.ok(overview.includes("\n  " + PRODUCT_NAME + " deploy record --target <name> --stage <name> <commit-or-tag> --reason \"…\"\n\n"),
+    "recorded: `deploy record` is not the last line of the command table");
+  assert.ok(overview.includes("\n  release gate     `report` — the gaps are printed and the exit is 0\n  recorded stages  `" +
+    TARGETS[0] + "/" + STAGES[0] + "`\n\nTHIS BACKLOG'S OWN WORDS"),
+    "recorded: the mode and the recorded stage are not listed, aligned, before the next paragraph");
+  assert.ok(!overview.includes(TARGETS[0] + "/quay"), "recorded: a stage git observes is offered to `deploy record`");
+  assert.ok(!overview.includes("`" + TARGETS[1] + "/"), "recorded: a foreign target lends the list a stage");
+  const flat = overview.replace(/\s+/g, " ");
+  assert.match(flat, /never for a bare `check`: CI runs it as the step before a deploy/, "recorded: the paragraph does not say when the gate runs");
+  assert.match(flat, /declared `recorded: true`, and only `deploy record` moves its ref, on a stated reason\. It refuses every other stage:/,
+    "recorded: the paragraph does not say which stages `deploy record` takes");
+  assert.ok(!flat.includes("--ref <name>"), "recorded: `--ref` is offered where no recorded stage has parallel refs");
+  assert.ok(!/\n\n\n/.test(overview), "recorded: the paragraph left an empty one behind");
+  assert.match(overview, /It refuses every other stage:\n\n {2}\S/, "recorded: the command table is not set apart");
+  // Each half is a paragraph of the overview, not of a phase guide.
+  for (const name of TOPIC_NAMES.filter((n) => n !== "overview")) {
+    assert.deepEqual(gateTeaching(topicText(name, recorded.config)), [], "recorded / " + name + ": the gate is taught outside overview");
+  }
+
+  // A local target without a recorded stage: the gate, its mode, no record.
+  const both = topicText("overview", BOTH.config);
+  assert.deepEqual(gateTeaching(both), ["gate", "mode"], "local: the gate is not offered, or `deploy record` is");
+  assert.ok(both.includes("\n  release gate  `report` — the gaps are printed and the exit is 0\n\n"), "local: the mode is not named on a line of its own");
+  assert.match(both, /an earlier stage lacks:\n\n {2}\S/, "local: the command table is not set apart");
+  assert.ok(!both.includes("recorded: true"), "local: recorded stages are explained where none is declared");
+
+  // Parallel refs under `require`: `--ref` is named, and so is what the exit means.
+  const par = topicText("overview", parallel.config);
+  assert.deepEqual(gateTeaching(par), ["gate", "mode", "record", "stages"], "parallel: the paragraph is not rendered");
+  assert.ok(par.includes("\n  release gate     `require` — a gap `release_gate_accept` does not name exits 1\n"),
+    "parallel: the strict mode is not named");
+  assert.ok(par.includes("\n  recorded stages  `" + TARGETS[0] + "/" + STAGES[1] + "`\n"), "parallel: the recorded stage is not listed");
+  assert.match(par.replace(/\s+/g, " "), /It refuses every other stage, and a stage of parallel refs also takes `--ref <name>`, the one ref that moves:/,
+    "parallel: `--ref` is not named for a stage of parallel refs");
+  assert.ok(!/\n\n\n/.test(par), "parallel: the paragraph left an empty one behind");
+
+  // Foreign only, releases only, or nothing: silent in every topic.
+  for (const [label, config] of [["foreign with releases", foreign.config], ["releases only", releasesOnly.config], ["neither", NEITHER.config]]) {
+    for (const [name, text] of Object.entries(guides(config))) {
+      assert.deepEqual(gateTeaching(text), [], label + " / " + name + ": the gate is taught where it judges nothing");
+    }
+    assert.equal(promotionGate(config), "", label + ": the paragraph is not empty");
+  }
+  assert.equal(promotionGate({}), "", "a partial configuration is not the same as declaring nothing");
+  // A partial configuration with a target and no mode names the mode the
+  // loader would have given it, not an empty one.
+  assert.ok(promotionGate({ deployTargets: [{ name: TARGETS[0], stages: [] }] }).includes("`report` — the gaps are printed"),
+    "a configuration without `release_gate` does not name the default mode");
+});
+
+test("the gate and `deploy record` are callable where the guide offers them, and are not where it is silent", () => {
+  // The gate judges in every backlog that offers it ...
+  const recorded = fixture(RECORDED_YAML);
+  for (const [label, fx] of [["local", BOTH], ["recorded", recorded]]) {
+    assert.ok(topicText("overview", fx.config).includes(" check --release"), label + ": not offered");
+    const r = run(fx.repo, ["check", "--release", "--dir", fx.dir]);
+    assert.equal(r.status, 0, label + ": `check --release` refuses where the guide offers it: " + r.stderr);
+    assert.match(r.stdout, /release: 0 gap\(s\)/, label + ": `check --release` did not judge the promotion");
+  }
+  // ... and judges nothing where the guide is silent: offering it would teach a no-op.
+  for (const [label, fx] of [["foreign", fixture(FOREIGN_YAML)], ["neither", NEITHER]]) {
+    const r = run(fx.repo, ["check", "--release", "--dir", fx.dir]);
+    assert.match(r.stdout, /release: nothing judged/, label + ": `check --release` judges something — the condition may be obsolete");
+  }
+
+  // Every recorded stage the guide lists moves, as offered.
+  const r = run(recorded.repo, ["deploy", "record", "--target", TARGETS[0], "--stage", STAGES[0], "main",
+    "--reason", "fixture", "--actor", "agent:test", "--dir", recorded.dir]);
+  assert.equal(r.status, 0, "`deploy record` refuses a stage the guide lists: " + r.stderr);
+  const ref = execFileSync("git", ["for-each-ref", "--format=%(refname)", "refs/deploys/"], { cwd: recorded.repo, encoding: "utf8" });
+  assert.equal(ref.trim(), "refs/deploys/" + STAGES[0], "`deploy record` did not move the listed stage's ref");
+
+  // A stage of parallel refs needs `--ref`, which is why the guide names it.
+  const parallel = fixture(PARALLEL_YAML);
+  const bare = run(parallel.repo, ["deploy", "record", "--target", TARGETS[0], "--stage", STAGES[1], "main",
+    "--reason", "fixture", "--actor", "agent:test", "--dir", parallel.dir]);
+  assert.notEqual(bare.status, 0, "`deploy record` moves a parallel stage without `--ref` — the sentence may be obsolete");
+  const withRef = run(parallel.repo, ["deploy", "record", "--target", TARGETS[0], "--stage", STAGES[1], "main", "--ref", STAGES[2],
+    "--reason", "fixture", "--actor", "agent:test", "--dir", parallel.dir]);
+  assert.equal(withRef.status, 0, "`deploy record --ref` refuses where the guide offers it: " + withRef.stderr);
+
+  // The other direction: on a stage git observes the call is a refusal, which
+  // is why the record half is absent where no stage is recorded.
+  const refused = run(BOTH.repo, ["deploy", "record", "--target", TARGETS[0], "--stage", "quay", "main",
+    "--reason", "fixture", "--actor", "agent:test", "--dir", BOTH.dir]);
+  assert.notEqual(refused.status, 0, "`deploy record` accepts an observed stage — the condition may be obsolete");
+  assert.match(refused.stderr, /not a recorded stage/, "`deploy record` refused an observed stage for another reason");
 });
