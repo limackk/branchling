@@ -49,7 +49,7 @@ import { fileURLToPath } from "node:url";
 
 import { resolveActorReport } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { ACTOR_NAMESPACES, isValidActor, reasonRefusal, recordCreation, reconcile } from "./history.mjs";
+import { actorRefusal, reasonRefusal, recordCreation, reconcile } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { createTask, driftMessage, slugify } from "./new-task.mjs";
 import {
@@ -155,12 +155,13 @@ export function parseSeedArgs(args) {
       "unexpected argument: " + a + "\nthe plan comes in on stdin: `" + N + " seed --dir <path> < plan.json`"
     );
   }
-  if (actor && !isValidActor(actor)) {
+  const badActor = actor ? actorRefusal(actor) : null;
+  if (badActor) {
     throw new Error(
-      "the actor `" + actor + "` has no valid namespace\n" +
-        "use one of: " + ACTOR_NAMESPACES.map((n) => n + ":<name>").join(" | ") + "\n" +
+      badActor.refusal + "\n" + badActor.hint +
+        (!badActor.namespace ? "" : "\n" +
         "the namespace says how much the attribution is worth — local: declared,\n" +
-        "agent: automated, user: an authenticated account."
+        "agent: automated, user: an authenticated account.")
     );
   }
   return { dryRun, json, actor, reason, from };

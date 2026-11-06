@@ -44,7 +44,7 @@ import { backlogPaths, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs"
 import { loadConfig, loadConfigOrExit } from "./config.mjs";
 import { applyProofs, auditTask, parseCriteria, parseVerification } from "./criteria.mjs";
 import { buildFieldSpecs, extractMeta, fieldSpec, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
-import { ACTOR_NAMESPACES, appendEntries, currentSession, eventId, FIELD_UNVERIFIED, FIELD_VERIFIED, isValidActor, REASON_PROVEN, reasonRefusal, recordEdit, requiresReason } from "./history.mjs";
+import { actorRefusal, appendEntries, currentSession, eventId, FIELD_UNVERIFIED, FIELD_VERIFIED, REASON_PROVEN, reasonRefusal, recordEdit, requiresReason } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { releaseLock } from "./lock.mjs";
 import { MARK, color, errColor, failure } from "./ui.mjs";
@@ -802,13 +802,13 @@ async function run(argv, io = {}) {
   // refuses the default for it; a closure proved by commands is evidence, and
   // the default actor is honest for it.
   plan.actorSource = reportedActorSource(actorSource);
-  if (!isValidActor(actor)) {
+  const badActor = actorRefusal(actor);
+  if (badActor) {
     console.error(
-      failure(N + " done", "the actor `" + actor + "` has no valid namespace", [
-        "use one of: " + ACTOR_NAMESPACES.map((n) => n + ":<name>").join(" | "),
+      failure(N + " done", badActor.refusal, [badActor.hint].concat(badActor.namespace ? [
         "the namespace says how much a vouching is worth, and vouching is the only",
         "thing `manual:` can offer instead of a command.",
-      ])
+      ] : []))
     );
     return 2;
   }

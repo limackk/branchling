@@ -62,7 +62,7 @@ import { fileURLToPath } from "node:url";
 import { actorRequiredRefusal, resolveActorReport } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { auditTask } from "./criteria.mjs";
-import { ACTOR_NAMESPACES, appendEntries, currentSession, eventId, isValidActor, normalizeReason, reasonRefusal } from "./history.mjs";
+import { actorRefusal, appendEntries, currentSession, eventId, normalizeReason, reasonRefusal } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { answerBacklogDirRefusal, backlogPaths, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
@@ -365,11 +365,8 @@ export async function run(argv) {
     else console.error(failure(COMMAND, required.refusal, required.details));
     return 1;
   }
-  if (!isValidActor(actor)) {
-    return fail2("the actor `" + actor + "` has no valid namespace", [
-      "Use one of: " + ACTOR_NAMESPACES.map((n) => n + ":<name>").join(" | "),
-    ]);
-  }
+  const badActor = actorRefusal(actor);
+  if (badActor) return fail2(badActor.refusal, [badActor.hint]);
 
   const input = await readNewBody(plan);
   if (input.error) return fail2(input.error, []);

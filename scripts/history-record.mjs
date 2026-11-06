@@ -26,7 +26,7 @@ import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { resolveActor } from "./actor.mjs";
-import { ACTOR_NAMESPACES, BulkAdoptionError, FIELD_ADOPTED, FIELD_ATTRIBUTED, attributeChanges, historyEntryIdentity, isValidActor, readHistory, reasonRefusal, reconcile, taskIdFromFile, unattributedChanges } from "./history.mjs";
+import { actorRefusal, BulkAdoptionError, FIELD_ADOPTED, FIELD_ATTRIBUTED, attributeChanges, historyEntryIdentity, readHistory, reasonRefusal, reconcile, taskIdFromFile, unattributedChanges } from "./history.mjs";
 import { resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { printLine } from "./stdout.mjs";
@@ -93,13 +93,14 @@ if (reasonFlag) {
 // An actor with no namespace would quietly degrade to `unknown` while the
 // message still said "recorded changes (name)" — the output would be lying about
 // the author, which is the one thing this history exists for. Loud, and early.
-if (!isValidActor(actor)) {
+const badActor = actorRefusal(actor);
+if (badActor) {
   console.error(
-    `${N} history: the actor \`` + actor + "` has no valid namespace.\n" +
-      "  Use one of: " + ACTOR_NAMESPACES.map((n) => n + ":<name>").join(" | ") +
-      "  (or `unknown`, when the author really is not known).\n" +
+    `${N} history: ` + badActor.refusal + ".\n" +
+      "  " + badActor.hint +
+      (!badActor.namespace ? "" : "  (or `unknown`, when the author really is not known).\n" +
       "  The namespace says how much the attribution is worth — local: declared,\n" +
-      "  agent: automated, user: an authenticated account. BL-1404."
+      "  agent: automated, user: an authenticated account. BL-1404.")
   );
   process.exit(2);
 }

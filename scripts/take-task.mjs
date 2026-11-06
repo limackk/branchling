@@ -47,7 +47,7 @@ import { actorRequiredRefusal, resolveActorReport } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { probeTask } from "./done-task.mjs";
 import { withProbe } from "./probe.mjs";
-import { ACTOR_NAMESPACES, changesRequiringReason, currentSession, eventId, FIELD_ROLE_OVERRIDE, FIELD_TAKEOVER, isValidActor, isValidReason, normalizeReason, readHistory, reasonRefusal, recordEdit } from "./history.mjs";
+import { actorRefusal, changesRequiringReason, currentSession, eventId, FIELD_ROLE_OVERRIDE, FIELD_TAKEOVER, isValidReason, normalizeReason, readHistory, reasonRefusal, recordEdit } from "./history.mjs";
 import { decisionsOf, withDecisions } from "./decisions.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { acquireLock, isExpired, lockDir, readLock, releaseLock } from "./lock.mjs";
@@ -641,15 +641,12 @@ export function run(argv) {
     else console.error(failure(N + " take", required.refusal, required.details));
     return 1;
   }
-  if (!isValidActor(actor)) {
-    return fail2(
-      "the actor `" + actor + "` has no valid namespace",
-      [
-        "Use one of: " + ACTOR_NAMESPACES.map((n) => n + ":<name>").join(" | "),
-        "The namespace says how much the attribution is worth — local: declared,",
-        "agent: automated, user: an authenticated account. BL-1404.",
-      ]
-    );
+  const badActor = actorRefusal(actor);
+  if (badActor) {
+    return fail2(badActor.refusal, [badActor.hint].concat(badActor.namespace ? [
+      "The namespace says how much the attribution is worth — local: declared,",
+      "agent: automated, user: an authenticated account. BL-1404.",
+    ] : []));
   }
 
   let root;

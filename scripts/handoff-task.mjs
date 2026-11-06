@@ -59,7 +59,7 @@ import { fileURLToPath } from "node:url";
 
 import { actorRequiredRefusal, resolveActorReport } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { ACTOR_NAMESPACES, appendEntries, currentSession, eventId, FIELD_COMMENT, isValidActor, normalizeReason, openQuestions, questionIdFromReason, readHistory, reasonRefusal, recordEdit } from "./history.mjs";
+import { actorRefusal, appendEntries, currentSession, eventId, FIELD_COMMENT, normalizeReason, openQuestions, questionIdFromReason, readHistory, reasonRefusal, recordEdit } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { isExpired, lockDir, readLock, releaseLock } from "./lock.mjs";
 import { queueStatuses } from "./next-task.mjs";
@@ -590,12 +590,12 @@ export function run(argv) {
     else console.error(failure(N + " handoff", required.refusal, required.details));
     return 1;
   }
-  if (!isValidActor(actor)) {
-    return fail2("the actor `" + actor + "` has no valid namespace", [
-      "Use one of: " + ACTOR_NAMESPACES.map((n) => n + ":<name>").join(" | "),
+  const badActor = actorRefusal(actor);
+  if (badActor) {
+    return fail2(badActor.refusal, [badActor.hint].concat(badActor.namespace ? [
       "The namespace says how much the attribution is worth — local: declared,",
       "agent: automated, user: an authenticated account. BL-1404.",
-    ]);
+    ] : []));
   }
 
   let root;

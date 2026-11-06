@@ -103,6 +103,91 @@ export function normalizeActor(actor) {
   return isValidActor(actor) ? actor : ACTOR_UNKNOWN;
 }
 
+// ── Which half of a refused actor is wrong (TL-590) ──────────────────────
+//
+// WHY ONE DIAGNOSIS AND NOT A MESSAGE PER COMMAND. Every writer used to report
+// any mismatch with `ACTOR_RE` as "has no valid namespace", hand-copied into a
+// dozen files. An agent actor with uppercase letters in its name was refused
+// that way although its namespace was right, so the reader was sent to fix the
+// half that needed no fixing. The cause is decided here, once; a writer only
+// chooses how to print it.
+//
+// The namespace causes keep the old words "has no valid namespace", because
+// for them the sentence was always true; only the name causes say something
+// new.
+export const ACTOR_CAUSE_NO_NAMESPACE = "no-namespace";
+export const ACTOR_CAUSE_UNKNOWN_NAMESPACE = "unknown-namespace";
+export const ACTOR_CAUSE_EMPTY_NAME = "empty-name";
+export const ACTOR_CAUSE_LONG_NAME = "long-name";
+export const ACTOR_CAUSE_NAME_CHARACTERS = "name-characters";
+export const ACTOR_CAUSE_NAME_START = "name-start";
+const ACTOR_NAME_MAX = 63;
+// Tested one code point at a time, so it needs no anchors.
+const ACTOR_NAME_CHAR_RE = /[a-z0-9._-]/;
+
+/**
+ * Why `actor` is not a valid actor, or null when it is.
+ *
+ * `refusal` is the sentence a writer prints as its summary; `hint` is the one
+ * remedy line. `namespace` says whether the namespace half is the fault, so a
+ * writer that explains what a namespace is worth prints that only when it is.
+ *
+ * @returns {null | {cause: string, namespace: boolean, refusal: string, hint: string}}
+ */
+export function actorRefusal(actor) {
+  if (isValidActor(actor)) return null;
+  const raw = actor == null ? "" : String(actor);
+  const shown = "the actor `" + raw + "`";
+  const useOneOf = "Use one of: " + ACTOR_NAMESPACES.map(function (n) { return n + ":<name>"; }).join(" | ");
+  const i = raw.indexOf(":");
+  if (i <= 0) {
+    return { cause: ACTOR_CAUSE_NO_NAMESPACE, namespace: true,
+      refusal: shown + " has no valid namespace — no `<namespace>:` comes before the name",
+      hint: useOneOf };
+  }
+  const namespace = raw.slice(0, i);
+  if (ACTOR_NAMESPACES.indexOf(namespace) === -1) {
+    return { cause: ACTOR_CAUSE_UNKNOWN_NAMESPACE, namespace: true,
+      refusal: shown + " has no valid namespace — `" + namespace + "` is not one of " +
+        ACTOR_NAMESPACES.join(", "),
+      hint: useOneOf };
+  }
+  const name = raw.slice(i + 1);
+  const rule = "The namespace `" + namespace + ":` is right; the name after it is 1 to " +
+    ACTOR_NAME_MAX + " characters of a-z, 0-9, `.`, `_` and `-`, beginning with a letter or digit";
+  // A lowered name that passes can only differ from the refused one, so the
+  // example is offered exactly when lowercasing is the whole repair.
+  const lowered = name.toLowerCase();
+  const hint = ACTOR_NAME_RE.test(lowered)
+    ? rule + " — for example `" + namespace + ":" + lowered + "`"
+    : rule;
+  if (!name) {
+    return { cause: ACTOR_CAUSE_EMPTY_NAME, namespace: false,
+      refusal: shown + " has an empty name after `" + namespace + ":`", hint };
+  }
+  if (name.length > ACTOR_NAME_MAX) {
+    return { cause: ACTOR_CAUSE_LONG_NAME, namespace: false,
+      refusal: shown + " has a name of " + name.length + " characters, and at most " +
+        ACTOR_NAME_MAX + " are allowed",
+      hint };
+  }
+  const outside = [];
+  for (const ch of name) {
+    if (!ACTOR_NAME_CHAR_RE.test(ch) && outside.indexOf(ch) === -1) outside.push(ch);
+  }
+  if (outside.length) {
+    return { cause: ACTOR_CAUSE_NAME_CHARACTERS, namespace: false,
+      refusal: shown + " has an invalid name — `" + name + "` carries " +
+        outside.map(function (ch) { return "`" + ch + "`"; }).join(", ") +
+        ", outside a-z, 0-9, `.`, `_` and `-`",
+      hint };
+  }
+  return { cause: ACTOR_CAUSE_NAME_START, namespace: false,
+    refusal: shown + " has an invalid name — `" + name + "` begins with `" + name[0] +
+      "`, not a letter or digit",
+    hint };
+}
+
 // ── The reason for a change (TL-105) ─────────────────────────────────────
 //
 // WHY A FIELD AND NOT PROSE IN THE TASK FILE. The record says WHAT changed —

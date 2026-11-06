@@ -95,7 +95,7 @@ import { loadPlanForDispatch, planState, projectionWall } from "./plan.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { inProgressStatus, rebuildViews } from "./take-task.mjs";
 import { todayStamp } from "./today.mjs";
-import { ACTOR_NAMESPACES, buildFieldSpecs, extractMeta, fieldSpec, isValidActor, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
+import { actorRefusal, buildFieldSpecs, extractMeta, fieldSpec, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
 import { readTaskRecords, splitList, unknownFilterValues } from "./task-select.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { MARK, color, failure, ok, plainChildEnv, warn } from "./ui.mjs";
@@ -1741,9 +1741,10 @@ export async function run(argv) {
     : fromProfile
       ? { actor: profileActors.length === 1 ? profileActors[0] : "agent:fleet", actorSource: "profile" }
       : resolveActorReport(plan.actor);
-  if (!isValidActor(actor)) {
-    console.error(failure(N + " run", "the actor `" + actor + "` has no valid namespace", [
-      "Use one of: " + ACTOR_NAMESPACES.map((n) => n + ":<name>").join(" | "),
+  const badActor = actorRefusal(actor);
+  if (badActor) {
+    console.error(failure(N + " run", badActor.refusal, [
+      badActor.hint,
     ], [N + " run --help"]));
     return 2;
   }
