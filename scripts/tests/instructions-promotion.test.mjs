@@ -23,6 +23,11 @@
  *      says what `deploy status` reports instead (TL-597). A backlog with a
  *      local target — alone or beside a foreign one — is the positive control
  *      that the same predicate still finds the claim where it is true.
+ *   7. task-creation names `target:` and `new --target` exactly where a target
+ *      declares `repository:`, listing only those targets, and the offered
+ *      call succeeds there (TL-598). With only local targets, or none, the
+ *      paragraph is absent, and the refusal it would teach there is shown to
+ *      be real.
  *
  * Release and target names are deliberately unlike this repository's
  * vocabulary, so a literal in the source is the only way they could match.
@@ -30,13 +35,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { appendFileSync, mkdtempSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { loadConfig } from "../config.mjs";
 import { PRODUCT_NAME } from "../product.mjs";
-import { TOPIC_NAMES, promotionState, releasePlanning, topicText } from "../instructions.mjs";
+import { TOPIC_NAMES, promotionState, releasePlanning, targetPlanning, topicText } from "../instructions.mjs";
 import { SCRIPTS_DIR, isolateHome } from "./_repo.mjs";
 
 isolateHome("instructions-promotion");
@@ -292,4 +297,74 @@ test("POSITIVE CONTROL, then the guard: with every target in another repository,
   // half of the paragraph that stays true without git.
   assert.match(releasesOnly, /is a question\nfor the tool, not for the task files\. The answer is computed on every call, so\nit is current/,
     "releases alone: the paragraph lost the reason to ask rather than read");
+});
+
+/** Where task-creation teaches `target:`. PURE, so it is shown to find the
+ *  paragraph in a foreign fixture before its silence elsewhere is trusted. */
+function targetTeaching(text) {
+  const hits = [];
+  if (text.includes("`target:` names the deploy targets")) hits.push("field");
+  if (text.includes(" new --title \"…\" --target ")) hits.push("command");
+  if (text.includes("  foreign targets  ")) hits.push("names");
+  return hits;
+}
+
+test("POSITIVE CONTROL, then the guard: task-creation names `target:` only where a target declares `repository:`", () => {
+  const foreign = fixture(FOREIGN_YAML);
+  const mixed = fixture(MIXED_YAML + RELEASES_YAML);
+  const localOnly = fixture(DEPLOY_YAML);
+
+  // Foreign only: the field, the command and every foreign name, as a table
+  // set apart from the prose and followed by a blank line.
+  const creation = topicText("task-creation", foreign.config);
+  assert.deepEqual(targetTeaching(creation), ["field", "command", "names"], "foreign: the paragraph is not rendered");
+  const flat = creation.replace(/\s+/g, " ");
+  assert.match(flat, /when their code lives in another repository \(`repository:`\)\. Git here holds no commit of them, so the field is the only thing that joins the task to them\. Name them when the task is created:/,
+    "foreign: the paragraph does not say why the field is needed");
+  assert.ok(!flat.includes("A target of this repository"), "foreign: the local-target sentence is printed with no local target");
+  assert.match(creation, /Name them when the task is created:\n\n {2}\S/, "foreign: the command table is not set apart");
+  assert.ok(creation.includes("\n  " + PRODUCT_NAME + " new --title \"…\" --target <name,…>   a task that ships from there\n"),
+    "foreign: the `new --target` line is not a line of the command table");
+  assert.ok(creation.includes("\n  foreign targets  `" + TARGETS[0] + "`, `" + TARGETS[1] + "`\n\nBefore you commit:"),
+    "foreign: the foreign targets are not listed on a line of their own before the next paragraph");
+  // The command table and the name list are two blocks, not one run of lines.
+  assert.match(creation, /ships from there\n\n {2}foreign targets {2}`/, "foreign: the name list runs into the command table");
+  assert.ok(!/\n\n\n/.test(creation), "foreign: the paragraph left an empty one behind");
+
+  // Mixed: only the foreign name, and the reason the local one is missing.
+  const mixedText = topicText("task-creation", mixed.config);
+  assert.deepEqual(targetTeaching(mixedText), ["field", "command", "names"], "mixed: the paragraph is not rendered");
+  assert.ok(mixedText.includes("\n  foreign targets  `" + TARGETS[1] + "`\n\n"), "mixed: the list is not the foreign target alone");
+  assert.ok(!mixedText.includes("`" + TARGETS[0] + "`"), "mixed: the local target is offered for `target:`");
+  const mixedFlat = mixedText.replace(/\s+/g, " ");
+  assert.match(mixedFlat, /joins the task to them\. A target of this repository is not named there: its tasks are computed from the paths their commits touch, and `new --target` refuses it\. Name the others when the task is created:/,
+    "mixed: the paragraph does not say why the local target is not listed");
+  assert.match(mixedText, /Name the others when the task is created:\n\n {2}\S/, "mixed: the command table is not set apart");
+  // Beside releases both paragraphs stand, each followed by a blank line.
+  assert.match(mixedText, /`\n\nPLANNING IT FOR A RELEASE/, "mixed: the release paragraph does not follow after a blank line");
+  assert.ok(!/\n\n\n/.test(mixedText), "mixed: a paragraph left an empty one behind");
+
+  // Only local targets, or none at all: silent, in every topic.
+  for (const [label, config] of [["local only", localOnly.config], ["local with releases", BOTH.config], ["neither", NEITHER.config]]) {
+    for (const [name, text] of Object.entries(guides(config))) {
+      assert.deepEqual(targetTeaching(text), [], label + " / " + name + ": `target:` is taught where `new --target` refuses");
+    }
+    assert.equal(targetPlanning(config), "", label + ": the paragraph is not empty");
+  }
+  assert.equal(targetPlanning({}), "", "a partial configuration is not the same as declaring nothing");
+
+  // What the guide offers is what the command does. A NEW fixture per call:
+  // `new` writes a task into it.
+  for (const [label, fx] of [["foreign", fixture(FOREIGN_YAML)], ["mixed", fixture(MIXED_YAML)]]) {
+    const names = fx.config.deployTargets.filter((t) => t.repository).map((t) => t.name);
+    const r = run(fx.repo, ["new", "--title", "Ships elsewhere", "--target", names.join(","), "--dir", fx.dir, "--json"]);
+    assert.equal(r.status, 0, label + ": `new --target` refuses where the guide offers it: " + r.stderr);
+    const written = readFileSync(JSON.parse(r.stdout).file, "utf8");
+    assert.match(written, new RegExp("^target: \\[" + names.join(", ") + "\\]", "m"),
+      label + ": the task does not carry the target it was created with");
+  }
+  // The other direction is why the paragraph is conditional: where every target
+  // is local, the call it would offer is a refusal.
+  const refused = run(localOnly.repo, ["new", "--title", "Ships here", "--target", TARGETS[0], "--dir", localOnly.dir]);
+  assert.notEqual(refused.status, 0, "`new --target` accepts a local target — the condition may be obsolete");
 });

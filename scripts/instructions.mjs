@@ -52,7 +52,7 @@ import { printJson } from "./json-envelope.mjs";
 import { resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { BLOCK_MARKER_NAME as MARKER, PRODUCT_NAME as N } from "./product.mjs";
 import { inProgressStatus } from "./take-task.mjs";
-import { observedTargets } from "./deploy-targets.mjs";
+import { externalTargetNames, observedTargets } from "./deploy-targets.mjs";
 import { failure } from "./ui.mjs";
 import { writeOut } from "./stdout.mjs";
 import { canonicalPath } from "./canonical-path.mjs";
@@ -177,6 +177,46 @@ export function releasePlanning(config) {
   ].join("\n") + "\n\n";
 }
 
+/**
+ * The paragraph `task-creation` prints about naming a deploy target in another
+ * repository (TL-598), or "" for a backlog where no target declares
+ * `repository:`.
+ *
+ * WHY CONDITIONAL ON A FOREIGN TARGET, NOT ON `deploy_targets`. `target:` takes
+ * only a target that declares `repository:`; a target of THIS repository gets
+ * its tasks from the paths their commits touch, and `new --target` refuses it.
+ * Offered where every target is local, or where none is declared, the line
+ * would teach that refusal. Only the foreign names are listed for the same
+ * reason, and where a local target stands beside them the paragraph says why
+ * it is missing, so its absence is not read as an oversight.
+ */
+export function targetPlanning(config) {
+  const foreign = externalTargetNames(config.deployTargets);
+  if (!foreign.length) return "";
+  const local = observedTargets(config.deployTargets).length > 0;
+  const out = [
+    "SHIPPING FROM ANOTHER REPOSITORY. `target:` names the deploy targets a task",
+    "ships from when their code lives in another repository (`repository:`). Git",
+    "here holds no commit of them, so the field is the only thing that joins the",
+  ];
+  if (local) {
+    out.push(
+      "task to them. A target of this repository is not named there: its tasks are",
+      "computed from the paths their commits touch, and `new --target` refuses it.",
+      "Name the others when the task is created:",
+    );
+  } else {
+    out.push("task to them. Name them when the task is created:");
+  }
+  out.push(
+    "",
+    "  " + N + " new --title \"…\" --target <name,…>   a task that ships from there",
+    "",
+    "  foreign targets  " + list(foreign),
+  );
+  return out.join("\n") + "\n\n";
+}
+
 /** @see vocabulary — the environment names a hand is launched with. */
 export const ENV_PREFIX = String(N).toUpperCase().replace(/[^A-Z0-9]+/g, "_");
 
@@ -228,6 +268,7 @@ export function vocabulary(config) {
     // commands that would refuse it (TL-584).
     promotion_state: promotionState(config),
     release_planning: releasePlanning(config),
+    target_planning: targetPlanning(config),
   };
 }
 
@@ -381,7 +422,7 @@ REASONS RIDE WITH THE WRITE, not with prose in the file. There is no log section
 to append to: \`{{tool}} history\` records an edit made by hand, and the statuses
 that may not be entered without a stated reason are {{reason_statuses}}.
 
-{{release_planning}}Before you commit:  \`{{tool}} check\` — id collisions, the board partition,
+{{target_planning}}{{release_planning}}Before you commit:  \`{{tool}} check\` — id collisions, the board partition,
 dangling references and the link from each acceptance criterion to the entry
 that proves it.`;
 
