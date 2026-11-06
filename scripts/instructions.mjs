@@ -52,6 +52,7 @@ import { printJson } from "./json-envelope.mjs";
 import { resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { BLOCK_MARKER_NAME as MARKER, PRODUCT_NAME as N } from "./product.mjs";
 import { inProgressStatus } from "./take-task.mjs";
+import { observedTargets } from "./deploy-targets.mjs";
 import { failure } from "./ui.mjs";
 import { writeOut } from "./stdout.mjs";
 import { canonicalPath } from "./canonical-path.mjs";
@@ -98,6 +99,14 @@ function targetNames(config) {
  * switchboard is the page read at session start. It routes to the command; the
  * command's `--help` carries the buckets and the flags.
  *
+ * WHY "FROM GIT" IS CONDITIONAL (TL-597). Only a target whose code lives in
+ * THIS repository has commits and stage refs here to read. When every target
+ * declares `repository:`, `deploy status` still answers, but from the tasks'
+ * `target:` field, and reports them as unobservable; a guide promising stages
+ * computed from git would describe an answer that backlog never gets. With no
+ * target at all there is nothing in git to read either, so the claim follows
+ * the same predicate rather than the presence of `releases:`.
+ *
  * The text ends with a blank line so the placeholder can stand at the start of
  * the paragraph that follows it and vanish without leaving a gap.
  */
@@ -105,14 +114,34 @@ export function promotionState(config) {
   const targets = targetNames(config);
   const releases = config.releases || [];
   if (!targets.length && !releases.length) return "";
+  const observed = observedTargets(config.deployTargets).length > 0;
   const out = [
     "WHAT IS WAITING FOR AN ENVIRONMENT, OR WHAT SHIPS IN A RELEASE, is a question",
-    "for the tool, not for the task files. The answer is computed from git on every",
-    "call, so it is current where a board is not:",
-    "",
   ];
-  if (targets.length) {
+  if (observed) {
+    out.push(
+      "for the tool, not for the task files. The answer is computed from git on every",
+      "call, so it is current where a board is not:",
+    );
+  } else if (targets.length) {
+    out.push(
+      "for the tool, not for the task files. The answer is computed on every call, so",
+      "it is current where a board is not. It is not computed from git: every deploy",
+      "target here declares `repository:`, so its code lives in another repository",
+      "and this one holds no commit or ref of it. A task joins such a target by its",
+      "own `target:` field and is reported as unobservable here, never as deployed:",
+    );
+  } else {
+    out.push(
+      "for the tool, not for the task files. The answer is computed on every call, so",
+      "it is current where a board is not:",
+    );
+  }
+  out.push("");
+  if (observed) {
     out.push("  " + N + " deploy status                    what each stage does not hold yet");
+  } else if (targets.length) {
+    out.push("  " + N + " deploy status                    each target's tasks, unobservable here");
   }
   if (releases.length) {
     out.push("  " + N + " deploy status --release <name>   a release's plan against what shipped");

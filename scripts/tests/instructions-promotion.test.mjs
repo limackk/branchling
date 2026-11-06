@@ -18,6 +18,11 @@
  *      paragraph still starts after a blank line.
  *   5. The commands the guide offers are callable in the backlog it was
  *      rendered for — otherwise the guide teaches a refusal.
+ *   6. Where every target declares `repository:`, the guide does not promise
+ *      stages computed from git, which that backlog can never observe, and
+ *      says what `deploy status` reports instead (TL-597). A backlog with a
+ *      local target — alone or beside a foreign one — is the positive control
+ *      that the same predicate still finds the claim where it is true.
  *
  * Release and target names are deliberately unlike this repository's
  * vocabulary, so a literal in the source is the only way they could match.
@@ -52,6 +57,21 @@ const DEPLOY_YAML = `deploy_targets:
       - { name: quay, ref: main }
 `;
 const RELEASES_YAML = `releases: [${RELEASES.join(", ")}]\n`;
+/** Every target in another repository: nothing about them is in this git. */
+const FOREIGN_YAML = `deploy_targets:
+  - name: ${TARGETS[0]}
+    repository: beacon-repo
+  - name: ${TARGETS[1]}
+    repository: jetty-repo
+`;
+/** One target here, one elsewhere: the local one makes the git claim true. */
+const MIXED_YAML = `deploy_targets:
+  - name: ${TARGETS[0]}
+    stages:
+      - { name: quay, ref: main }
+  - name: ${TARGETS[1]}
+    repository: jetty-repo
+`;
 
 function run(cwd, args) {
   return spawnSync(process.execPath, [CLI].concat(args), {
@@ -216,4 +236,60 @@ test("the commands the guides offer are callable in the backlog they were render
   // backlog the flag the guide would have offered is a refusal.
   const silent = run(NEITHER.repo, ["deploy", "status", "--release", RELEASES[0], "--dir", NEITHER.dir]);
   assert.notEqual(silent.status, 0, "`--release` no longer refuses without `releases:` — the condition may be obsolete");
+});
+
+/** What the paragraph claims about where its answer comes from. PURE, so the
+ *  same predicate is shown to find the claim before its absence is trusted. */
+function gitClaims(text) {
+  const flat = text.replace(/\s+/g, " ");
+  const hits = [];
+  if (/computed from git on every call/.test(flat)) hits.push("computed from git");
+  if (flat.includes("what each stage does not hold yet")) hits.push("per-stage line");
+  return hits;
+}
+
+test("POSITIVE CONTROL, then the guard: with every target in another repository, overview claims no stages computed from git", () => {
+  const mixed = fixture(MIXED_YAML);
+  for (const [label, config] of [["both", BOTH.config], ["mixed", mixed.config]]) {
+    assert.deepEqual(gitClaims(topicText("overview", config)), ["computed from git", "per-stage line"],
+      label + ": the predicate does not find the claim where a local target makes it true");
+  }
+
+  for (const [label, extra] of [["foreign only", FOREIGN_YAML], ["foreign with releases", FOREIGN_YAML + RELEASES_YAML]]) {
+    const fx = fixture(extra);
+    assert.equal(fx.config.deployTargets.length, 2, label + ": the fixture lost its targets");
+    assert.ok(fx.config.deployTargets.every((t) => t.repository), label + ": a fixture target stopped being foreign");
+    const overview = topicText("overview", fx.config);
+    assert.deepEqual(gitClaims(overview), [], label + ": overview promises what this backlog cannot observe");
+    // The command stays offered — it answers there — with what it does answer.
+    assert.ok(overview.includes("\n  " + PRODUCT_NAME + " deploy status                    each target's tasks, unobservable here\n"),
+      label + ": the `deploy status` line does not say what it reports for foreign targets");
+    const flat = overview.replace(/\s+/g, " ");
+    assert.match(flat, /It is not computed from git: every deploy target here declares `repository:`/,
+      label + ": the paragraph does not say why git is not read");
+    assert.match(flat, /joins such a target by its own `target:` field and is reported as unobservable here/,
+      label + ": the paragraph does not name the field a task uses instead");
+    assert.match(flat, /computed on every call, so it is current where a board is not/,
+      label + ": the paragraph lost the reason to ask rather than read");
+    assert.ok(overview.includes("  deploy targets  `" + TARGETS[0] + "`, `" + TARGETS[1] + "`"),
+      label + ": the declared targets are no longer listed");
+    assert.ok(!/\n\n\n/.test(overview), label + ": the paragraph left an empty one behind");
+    assert.match(overview, /unobservable here, never as deployed:\n\n {2}\S/, label + ": the command table is not set apart");
+    // What the guide says is what the command does: it answers, and says why.
+    const r = run(fx.repo, ["deploy", "status", "--dir", fx.dir]);
+    assert.equal(r.status, 0, label + ": `deploy status` refuses where the guide offers it: " + r.stderr);
+    assert.match(r.stdout, /unobservable here/, label + ": `deploy status` no longer reports foreign targets as unobservable");
+  }
+
+  // Releases alone hold no target either, so the git claim follows the same
+  // predicate; the foreign explanation is not offered where nothing is foreign.
+  const releasesOnly = topicText("overview", fixture(RELEASES_YAML).config);
+  assert.deepEqual(gitClaims(releasesOnly), [], "releases alone: overview claims git where no target is declared");
+  assert.ok(!releasesOnly.includes("`repository:`"), "releases alone: the foreign-target explanation is printed");
+  assert.ok(!releasesOnly.includes("unobservable here"), "releases alone: a foreign-target line is printed");
+  assert.match(releasesOnly, /current where a board is not:\n\n {2}\S/, "releases alone: the command table is not set apart");
+  // Whole sentence, across the wrap: the reason to ask rather than read is the
+  // half of the paragraph that stays true without git.
+  assert.match(releasesOnly, /is a question\nfor the tool, not for the task files\. The answer is computed on every call, so\nit is current/,
+    "releases alone: the paragraph lost the reason to ask rather than read");
 });
