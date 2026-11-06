@@ -165,6 +165,11 @@ export const KINDS = {
   "change-stream": { event: null, at: null, root: null, id: null, file: null, change: null, fields: [] },
   // `doctor --json`. `ok` is the answer CI reads; `checks` is why.
   doctor: { ok: null, root: null, next: null, checks: [] },
+  // `template refresh --json` (TL-595). `added` lists each inserted field with
+  // its comment, the key it follows (null: at the end of the frontmatter) and
+  // its lines; `changed` says whether the file was, or under `dryRun` would be,
+  // written. `path` and `shipped` name the two templates compared.
+  "template-refresh": { ok: null, path: null, shipped: null, dryRun: null, changed: null, added: [] },
   // `serve --list --json` and `serve --stop --json` (TL-266). Each entry in
   // `servers` carries its own `state`, and that word is the whole point: a
   // register cannot know that a process SIGKILLed behind its back is gone until
@@ -704,6 +709,10 @@ export const KIND_EXERCISE = {
   // A stop request is written to the state directory, never to the tree, and
   // reaches only a run started before it — none is running here.
   "run-stop": { args: ["run", "--stop", "--json"], writes: true },
+  // A fresh `init` writes a current template, so the fixture exercises the
+  // "nothing to add" answer; it is a `writes` row because the command writes
+  // whenever something is missing.
+  "template-refresh": { args: ["template", "refresh", "--json"], writes: true },
   //
   //
   // `take` and `next` share ONE kind, because they answer the same question.

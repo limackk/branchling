@@ -23,6 +23,7 @@ import { checkTemplate, templateFields } from "../doctor.mjs";
 import { HOOK_NAME, COMMIT_MESSAGE_HOOK_NAME, hookBlock, hooksTarget } from "../hooks-command.mjs";
 import { BLOCK_OPEN } from "../git-rules.mjs";
 import { canonicalPath } from "../canonical-path.mjs";
+import { PRODUCT_NAME } from "../product.mjs";
 
 // THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
 // file in its own process, so one call covers every case in it. Without this a
@@ -176,7 +177,7 @@ function dropTemplateKeys(dir, keys) {
   writeFileSync(p, after, "utf8");
 }
 
-test("a template missing shipped fields is INFO naming each with its comment, and the lines to copy", () => {
+test("a template missing shipped fields is INFO naming each with its comment, and the command that adds them", () => {
   const dir = repo();
   dropTemplateKeys(dir, ["release", "target"]);
   const d = rows(dir);
@@ -186,7 +187,7 @@ test("a template missing shipped fields is INFO naming each with its comment, an
   assert.match(row.detail, /^missing `release`: the release it is PLANNED for \(a value from `releases:` in config\.yaml\)\. Empty = none; `target`: the deploy targets in ANOTHER repository [^;]*\. The writing/);
   assert.doesNotMatch(row.detail, /conflict_group|`title`/, "a field the template still has is not missing");
   assert.match(row.detail, /add them on demand/);
-  assert.match(row.fix, /^copy the lines for release, target from .*_template\.md into .*_template\.md$/);
+  assert.equal(row.fix, PRODUCT_NAME + " template refresh   # inserts those lines and changes none of yours");
   assert.equal(d.status, 0, "a lagging template must not fail doctor");
 });
 
@@ -195,7 +196,7 @@ test("one missing field is named in the singular", () => {
   dropTemplateKeys(dir, ["conflict_group"]);
   const row = rows(dir).byId.template;
   assert.match(row.detail, /^missing `conflict_group`: the AREA it touches [^;]*\. The writing commands add it on demand/);
-  assert.match(row.fix, /^copy the line for conflict_group from /);
+  assert.match(row.fix, / template refresh {3}# inserts that line and changes none of yours$/);
 });
 
 test("a missing field without a comment is named bare", () => {
@@ -212,6 +213,69 @@ test("a template that cannot be compared says so instead of passing", () => {
   rmSync(join(dir, "_template.md"));
   const missingOwn = checkTemplate(dir);
   assert.deepEqual([missingOwn.id, missingOwn.status, missingOwn.detail], ["template", "info", "not checked — this backlog has no _template.md"]);
+});
+
+/** The lines of one top-level key in the shipped template, its nested value
+ *  included — read here by hand, not with the module under test. */
+function shippedBlock(key) {
+  const lines = readFileSync(SHIPPED_TEMPLATE, "utf8").split("\n");
+  const start = lines.findIndex((l) => l.startsWith(key + ":"));
+  assert.ok(start > 0, "the shipped template no longer has " + key);
+  let end = start + 1;
+  while (/^\s+\S/.test(lines[end])) end++;
+  return lines.slice(start, end);
+}
+
+test("running the printed fix adds exactly the missing lines, in shipped order, and turns the row OK (TL-595)", () => {
+  const dir = repo();
+  const p = join(dir, "_template.md");
+  const fresh = readFileSync(p, "utf8").split("\n");
+  // An earlier release's template, edited by its project: two consecutive
+  // fields, one alone, and one with a nested value are gone; a default, a
+  // comment and a field of the project's own are not the shipped ones.
+  const drop = new Set(["release", "target", "conflict_group", "verification"]);
+  const lagging = [];
+  let skipping = false;
+  for (const line of fresh) {
+    const key = /^([a-z_]+):/.exec(line);
+    if (key) skipping = drop.has(key[1]);
+    else if (!/^\s/.test(line)) skipping = false;
+    if (!skipping) lagging.push(line);
+  }
+  const edited = lagging.map((l) => (l.startsWith("priority:") ? "priority: P3   # OUR default" : l));
+  edited.splice(edited.findIndex((l) => l.startsWith("type:")) + 1, 0, "squad: \"\"   # our own field");
+  writeFileSync(p, edited.join("\n"), "utf8");
+
+  const before = rows(dir).byId.template;
+  assert.equal(before.status, "info");
+  assert.match(before.detail, /^missing `release`: [^;]*; `target`: [^;]*; `conflict_group`: [^;]*; `verification`: /);
+  const [command, ...args] = before.fix.split("#")[0].trim().split(/\s+/);
+  assert.equal(command, PRODUCT_NAME);
+  const r = run(dir, args);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+
+  // The expected text, built by inserting each shipped block after the line
+  // it must follow — every other line is the edited template's, unchanged.
+  const expected = edited.slice();
+  const insertAfter = (anchor, lines) => expected.splice(expected.findIndex((l) => l.startsWith(anchor + ":")) + 1, 0, ...lines);
+  insertAfter("epic", shippedBlock("release").concat(shippedBlock("target")));
+  insertAfter("executor", shippedBlock("conflict_group"));
+  insertAfter("related_docs", shippedBlock("verification"));
+  assert.equal(shippedBlock("verification").length, 3, "the nested value of verification is part of what is copied");
+  assert.equal(readFileSync(p, "utf8"), expected.join("\n"));
+
+  const after = rows(dir).byId.template;
+  assert.equal(after.status, "ok", after.detail);
+  assert.equal(after.fix, null);
+});
+
+test("a template without a closed frontmatter is reported as not checked, not as missing every field", () => {
+  const dir = repo();
+  writeFileSync(join(dir, "_template.md"), "## Goal\n", "utf8");
+  const row = rows(dir).byId.template;
+  assert.equal(row.status, "info");
+  assert.equal(row.detail, "not checked — the template has no frontmatter: its first line is not `---`");
+  assert.match(row.fix, /^make .*_template\.md open and close its frontmatter with `---` lines$/);
 });
 
 test("positive control: a fresh template, or one with a field of the project's own, is current", () => {
