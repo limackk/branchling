@@ -89,6 +89,7 @@ export const SHIPPED_VERSIONS = {
   "backlog-workflow/SKILL.md": [
     "afe1203969835a456a04760e20b966f47bbb74b14962db298fb6c1fc1ee28702", // 2026-08-30, before the rename
     "f52e6b78cb0e44f6416c82f1cc0484382a2231dd08a542ed8b8ca0de347b2761", // 2026-09-03, TL-20
+    "8c871371c6e6d86d9efcb0276b7850dbd71f28e24af4d416916254aef389cfd3", // 2026-11-06, the description states what the skill does
   ],
 };
 
