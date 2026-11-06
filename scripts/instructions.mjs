@@ -76,6 +76,78 @@ function one(value) {
   return value ? String(value) : "(none declared)";
 }
 
+/** The names of the declared deploy targets, in declaration order. Every
+ *  entry has one: config.yaml refuses a target without a valid `name`. */
+function targetNames(config) {
+  return (config.deployTargets || []).map((t) => t.name);
+}
+
+/**
+ * The paragraph `overview` prints about the promotion state (TL-584), or ""
+ * for a backlog that declares neither `deploy_targets` nor `releases:`.
+ *
+ * WHY CONDITIONAL. The packaged skill holds no procedure and sends the agent
+ * here, so these guides are the only channel through which an agent learns
+ * that `deploy status` exists. But a command line that cannot answer anything
+ * in THIS backlog is worse than silence: `--target` and `--release` FAIL where
+ * nothing is declared, and a guide that offers them teaches a refusal. So each
+ * line appears exactly when the configuration gives it something to answer.
+ *
+ * WHY overview AND NOT A PHASE GUIDE. "What is waiting for production" and
+ * "what ships in 1.2" arrive at any moment, not at a phase of one task, and the
+ * switchboard is the page read at session start. It routes to the command; the
+ * command's `--help` carries the buckets and the flags.
+ *
+ * The text ends with a blank line so the placeholder can stand at the start of
+ * the paragraph that follows it and vanish without leaving a gap.
+ */
+export function promotionState(config) {
+  const targets = targetNames(config);
+  const releases = config.releases || [];
+  if (!targets.length && !releases.length) return "";
+  const out = [
+    "WHAT IS WAITING FOR AN ENVIRONMENT, OR WHAT SHIPS IN A RELEASE, is a question",
+    "for the tool, not for the task files. The answer is computed from git on every",
+    "call, so it is current where a board is not:",
+    "",
+  ];
+  if (targets.length) {
+    out.push("  " + N + " deploy status                    what each stage does not hold yet");
+  }
+  if (releases.length) {
+    out.push("  " + N + " deploy status --release <name>   a release's plan against what shipped");
+  }
+  out.push("");
+  if (targets.length) out.push("  deploy targets  " + list(targets));
+  if (releases.length) out.push("  releases        " + list(releases));
+  return out.join("\n") + "\n\n";
+}
+
+/**
+ * The paragraph `task-creation` prints about planning a task for a release
+ * (TL-584), or "" for a backlog that declares no `releases:` — there a task
+ * naming one FAILS, so the field is not something to offer.
+ *
+ * The names stand on a line of their own, as in `overview`: spliced into the
+ * sentence, a list of any length other than the one the prose was wrapped for
+ * breaks the paragraph mid-line. `declare` is named beside the refusal because
+ * a refusal without the way out sends the agent to edit config.yaml by hand.
+ */
+export function releasePlanning(config) {
+  const releases = config.releases || [];
+  if (!releases.length) return "";
+  return [
+    "PLANNING IT FOR A RELEASE. `release:` names the release a task is planned for.",
+    "An undeclared name FAILS rather than creating a release nobody plans, so a new",
+    "one is declared first. The plan is then a question, not a reading:",
+    "",
+    "  " + N + " declare releases <name> --reason \"…\"   add a release to plan for",
+    "  " + N + " deploy status --release <name>         what that release still lacks",
+    "",
+    "  releases  " + list(releases),
+  ].join("\n") + "\n\n";
+}
+
 /** @see vocabulary — the environment names a hand is launched with. */
 export const ENV_PREFIX = String(N).toUpperCase().replace(/[^A-Z0-9]+/g, "_");
 
@@ -122,6 +194,11 @@ export function vocabulary(config) {
     // cannot be imported from there — run-loop reads THIS module for role
     // briefs — so a guard asserts the two still agree.
     env_prefix: ENV_PREFIX,
+    // Whole paragraphs, not words: each is "" where the configuration gives it
+    // nothing to answer, so a backlog without promotion tracking is not shown
+    // commands that would refuse it (TL-584).
+    promotion_state: promotionState(config),
+    release_planning: releasePlanning(config),
   };
 }
 
@@ -199,7 +276,7 @@ it alone: open the guide that matches what you are about to do.
                                            one hand or one per role
   {{tool}} instructions context-budget     what an answer costs a session
 
-THIS BACKLOG'S OWN WORDS, read from its configuration. Do not carry values over
+{{promotion_state}}THIS BACKLOG'S OWN WORDS, read from its configuration. Do not carry values over
 from another backlog and do not assume these:
 
   statuses    {{statuses}}
@@ -274,7 +351,7 @@ REASONS RIDE WITH THE WRITE, not with prose in the file. There is no log section
 to append to: \`{{tool}} history\` records an edit made by hand, and the statuses
 that may not be entered without a stated reason are {{reason_statuses}}.
 
-Before you commit:  \`{{tool}} check\` — id collisions, the board partition,
+{{release_planning}}Before you commit:  \`{{tool}} check\` — id collisions, the board partition,
 dangling references and the link from each acceptance criterion to the entry
 that proves it.`;
 
