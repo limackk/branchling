@@ -21,7 +21,8 @@
  *      bare fixture shows that without them exactly those two go unnamed.
  *   4. REMOVING ONE SUCH LINE FAILS. For the commands this task gave a line,
  *      the line is deleted from the guide's source and the guard reports that
- *      command and no other.
+ *      command and no other. An invocation wrapped across two source lines
+ *      loses both (TL-602), and a fixture proves the helper does that.
  *
  * The command name is matched as `<product> <command>`, which is how every
  * guide invokes one; a bare word such as `set` or `plan` is ordinary English
@@ -97,6 +98,28 @@ function names(text, command) {
 function unnamedAgentCommands(commands, texts) {
   const all = texts.join("\n");
   return Object.keys(commands).filter((c) => commands[c].audience === "agent" && !names(all, c));
+}
+
+/**
+ * `text` without every line that invokes `{{tool}} <command>`, and how many
+ * lines went. PURE. The match runs on the whole text rather than line by line,
+ * because a guide paragraph wraps where its width says, not where an
+ * invocation ends: `{{tool}}` closing one line and the command name opening
+ * the next is still one invocation, and both lines go. A single-line needle
+ * left `resume` out of the deletion control for exactly that reason (TL-602).
+ */
+function withoutInvocations(text, command) {
+  const needle = new RegExp("\\{\\{tool\\}\\}(?:[ \\t]+|[ \\t]*\\n[ \\t]*)" + escape(command) + "(?![\\w-])", "g");
+  const lines = text.split("\n");
+  const lineAt = [];
+  lines.forEach((line, i) => { for (let k = 0; k <= line.length; k++) lineAt.push(i); });
+  const doomed = new Set();
+  for (const match of text.matchAll(needle)) {
+    const first = lineAt[match.index];
+    const last = lineAt[match.index + match[0].length - 1];
+    for (let i = first; i <= last; i++) doomed.add(i);
+  }
+  return { text: lines.filter((_, i) => !doomed.has(i)).join("\n"), removed: doomed.size };
 }
 
 /** The entries that do not say who they are for. PURE. */
@@ -179,17 +202,44 @@ test("the two paragraphs the configuration switches on are what name `deploy` an
 
 // ── 4. Removing one such line fails ────────────────────────────────────────
 
+test("positive control: the deletion helper removes a wrapped invocation's two lines and nothing else", () => {
+  const guide = [
+    "keep: an opening line",
+    "a sentence that ends with `{{tool}}",
+    "resume <ID>`: and goes on here",
+    "  {{tool}} resume --json   a single-line invocation",
+    "keep: {{tool}} resume-all is another command",
+    "keep: {{tool}}resume, with no space, is not an invocation",
+    "keep: {{tool}}",
+    "resumed is a word, not the command",
+    "keep: {{tool}} next, then resume by hand",
+    "keep: a closing line",
+  ].join("\n");
+  const result = withoutInvocations(guide, "resume");
+  assert.deepEqual(result.text.split("\n"), [
+    "keep: an opening line",
+    "keep: {{tool}} resume-all is another command",
+    "keep: {{tool}}resume, with no space, is not an invocation",
+    "keep: {{tool}}",
+    "resumed is a word, not the command",
+    "keep: {{tool}} next, then resume by hand",
+    "keep: a closing line",
+  ]);
+  assert.equal(result.removed, 3);
+  // A command no line invokes leaves the text exactly as it was.
+  assert.deepEqual(withoutInvocations(guide, "plan"), { text: guide, removed: 0 });
+});
+
 test("deleting a command's line from its guide makes the guard report that command, and only it", () => {
-  const added = ["show", "log", "set", "body", "release", "plan", "vocabulary", "pr-summary", "follow"];
+  // `resume` is the one whose only invocation wraps across two source lines.
+  const added = ["show", "log", "set", "body", "release", "plan", "vocabulary", "pr-summary", "follow", "resume"];
   for (const command of added) {
-    const needle = new RegExp("\\{\\{tool\\}\\} " + escape(command) + "(?![\\w-])");
     const texts = {};
     let removed = 0;
     for (const name of TOPIC_NAMES) {
-      const lines = TOPICS[name].text.split("\n");
-      const kept = lines.filter((line) => !needle.test(line));
-      removed += lines.length - kept.length;
-      texts[name] = kept.join("\n");
+      const result = withoutInvocations(TOPICS[name].text, command);
+      removed += result.removed;
+      texts[name] = result.text;
     }
     assert.ok(removed > 0, command + ": no guide line names it, so there was nothing to remove");
     assert.deepEqual(unnamedAgentCommands(COMMANDS, rendered(DECLARED, texts)), [command],
