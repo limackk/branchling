@@ -172,11 +172,31 @@ const CHECK_USAGE = [
 ].join("\n");
 
 /**
+ * Who a command is FOR, which every entry of the table below has to say
+ * (TL-589). The packaged skill and the agent pointer send an agent to
+ * `instructions`, and a command no guide names is a command an agent never
+ * uses — so `scripts/tests/instructions-coverage.test.mjs` fails for every
+ * `agent` command that no rendered guide names, and for an entry that says
+ * nothing. Adding a command is therefore a decision about whether agents learn
+ * of it, made in the entry, not discovered later.
+ *
+ * Three values rather than a boolean, because "not for agents" covers two
+ * different readers, and the reason a guide is silent differs between them.
+ */
+export const COMMAND_AUDIENCES = Object.freeze({
+  agent: "a session working the backlog — a guide must name it",
+  person: "a person setting the backlog up, maintaining it, or reading it in a browser",
+  program: "another program — a Git or editor hook, an MCP client",
+});
+
+/**
  * The command table. `script` is relative to this directory; `passthrough`
- * means the remaining arguments go to the script untranslated.
+ * means the remaining arguments go to the script untranslated; `audience` is
+ * one key of `COMMAND_AUDIENCES`.
  */
 export const COMMANDS = {
   serve: {
+    audience: "person",
     script: "serve-backlog.mjs",
     summary: "run the viewer on 127.0.0.1 (the default command)",
     // The reading and stopping forms are part of the same command on purpose
@@ -198,6 +218,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   query: {
+    audience: "agent",
     script: "query.mjs",
     summary: "ask about tasks — reads tasks/*.md, so it sees changes before a rebuild",
     usage: [
@@ -264,6 +285,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   build: {
+    audience: "agent",
     script: "build-backlog.mjs",
     summary: "rebuild the views (INDEX / NOW / archive / boards) from tasks/*.md",
     usage: [
@@ -276,16 +298,19 @@ export const COMMANDS = {
     ].join("\n"),
   },
   viewer: {
+    audience: "person",
     script: "build-viewer.mjs",
     summary: "rebuild viewer.html without starting the server",
     usage: `${N} viewer [--dir <path>]`,
   },
   "next-id": {
+    audience: "person",
     script: "next-backlog-id.mjs",
     summary: "the next free task number (computed across ALL branches and worktrees)",
     usage: `${N} next-id [--explain] [--json]`,
   },
   board: {
+    audience: "agent",
     script: "suggest-board.mjs",
     summary: "which board a task belongs to — from path rules, not from guessing",
     usage: [
@@ -302,6 +327,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   history: {
+    audience: "agent",
     script: "history-record.mjs",
     summary: "record changes made outside the tool — and claim the ones already logged as nobody's",
     usage: [
@@ -347,6 +373,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   log: {
+    audience: "agent",
     script: "log-task.mjs",
     summary: "read a task's recorded exchanges back — one row per handoff, the reason once",
     usage: [
@@ -393,6 +420,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   show: {
+    audience: "agent",
     script: "show-task.mjs",
     summary: "what is computed about one task — deployment, other branches, blockers",
     usage: [
@@ -421,6 +449,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   follow: {
+    audience: "agent",
     script: "follow-changes.mjs",
     summary: "follow task changes as they happen — one line, or one JSON envelope, per change",
     usage: [
@@ -459,6 +488,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   take: {
+    audience: "agent",
     script: "take-task.mjs",
     summary: "claim ONE named task — reserve it, set it in progress, print it",
     usage: [
@@ -490,6 +520,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   next: {
+    audience: "agent",
     script: "next-task.mjs",
     summary: "take the closest executable task — the queue for a fleet of agents",
     usage: [
@@ -537,6 +568,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   handoff: {
+    audience: "agent",
     script: "handoff-task.mjs",
     summary: "hand a task to another role — with the reason, and a trace of the exchange",
     usage: [
@@ -569,6 +601,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   body: {
+    audience: "agent",
     script: "body-task.mjs",
     summary: "rewrite a task's body — the frontmatter untouched, the change recorded with its reason",
     usage: [
@@ -595,6 +628,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   release: {
+    audience: "agent",
     script: "release-task.mjs",
     summary: "return your claimed task to the queue",
     usage: [
@@ -619,6 +653,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   set: {
+    audience: "agent",
     script: "set-field.mjs",
     summary: "set one task field — the same validation and history record as the viewer's edit",
     usage: [
@@ -653,6 +688,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   deploy: {
+    audience: "agent",
     script: "deploy-command.mjs",
     summary: "list what waits for each environment (`status`), or record a stage git cannot observe (`record`)",
     usage: [
@@ -710,6 +746,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   declare: {
+    audience: "agent",
     script: "declare-vocabulary.mjs",
     summary: "add a release to `releases:` or a target to `deploy_targets:` in config.yaml, comments kept",
     usage: [
@@ -745,6 +782,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   resume: {
+    audience: "agent",
     script: "resume-task.mjs",
     summary: "brief a successor on a task a dead session left behind — one document, in order",
     usage: [
@@ -775,6 +813,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   decide: {
+    audience: "agent",
     script: "decide-task.mjs",
     summary: "record a decision as an event — and answer the question that waited for it",
     usage: [
@@ -817,6 +856,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   new: {
+    audience: "agent",
     script: "new-task.mjs",
     summary: "create a task from the template — numbered across every branch, not max+1",
     usage: [
@@ -870,6 +910,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   seed: {
+    audience: "person",
     script: "seed-backlog.mjs",
     summary: "create a whole backlog from a structured plan on stdin — no model involved",
     usage: [
@@ -926,6 +967,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   import: {
+    audience: "person",
     script: "import-github.mjs",
     summary: "bring an existing GitHub Issues backlog over ONCE, from stdin — no network",
     usage: [
@@ -967,6 +1009,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   "plan-from": {
+    audience: "person",
     script: "seed-adapter.mjs",
     summary: "turn a project description into a `seed` plan, using YOUR model — prints JSON",
     usage: [
@@ -1002,6 +1045,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   audit: {
+    audience: "agent",
     script: "audit.mjs",
     summary: "the declarations, against the traces they left — a report, not a gate",
     usage: [
@@ -1037,6 +1081,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   "docs-drift": {
+    audience: "person",
     script: "docs-drift.mjs",
     summary: "which documents have gone stale, with the signals that say so — and, on request, tasks for them",
     usage: [
@@ -1071,6 +1116,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   "pr-summary": {
+    audience: "agent",
     script: "pr-summary.mjs",
     summary: "what this branch did to the backlog, as markdown for a pull-request comment",
     usage: [
@@ -1103,6 +1149,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   where: {
+    audience: "person",
     script: "where-command.mjs",
     summary: "which directories this run uses, and WHICH RULE chose each one",
     usage: [
@@ -1124,6 +1171,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   vocabulary: {
+    audience: "agent",
     script: "vocabulary.mjs",
     summary: "the vocabularies config.yaml declares — statuses with their meaning, priorities, releases",
     usage: [
@@ -1143,6 +1191,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   hooks: {
+    audience: "person",
     script: "hooks-command.mjs",
     summary: "the Git gates: print them, install them, take them back out",
     usage: [
@@ -1178,6 +1227,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   "commit-message": {
+    audience: "program",
     script: "commit-message.mjs",
     summary: "reject literal paragraph-break escapes before Git records a message",
     usage: [
@@ -1192,6 +1242,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   skills: {
+    audience: "person",
     script: "install-skills.mjs",
     summary: "install the agent instructions into this repository's .claude/skills/",
     usage: [
@@ -1223,6 +1274,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   init: {
+    audience: "person",
     script: "init-backlog.mjs",
     summary: "create a new backlog in an empty directory (--dir is mandatory)",
     usage: [
@@ -1240,6 +1292,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   instructions: {
+    audience: "agent",
     script: "instructions.mjs",
     summary: "the workflow, printed by the tool — the guide to read before touching a task",
     usage: [
@@ -1267,6 +1320,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   profile: {
+    audience: "person",
     script: "agent-profiles.mjs",
     summary: "maintain this machine's provider-neutral agent profiles",
     usage: [
@@ -1290,6 +1344,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   conformance: {
+    audience: "person",
     script: "adapter-conformance.mjs",
     summary: "prove one profile adapter offline against the public process contract",
     usage: [
@@ -1303,11 +1358,13 @@ export const COMMANDS = {
     ].join("\n"),
   },
   doctor: {
+    audience: "person",
     script: "doctor.mjs",
     summary: "is the backlog set up correctly — configuration, tree, git, guards",
     usage: `${N} doctor [--dir <path>] [--json]`,
   },
   stats: {
+    audience: "agent",
     script: "stats-report.mjs",
     summary: "the state of the backlog in the terminal: statuses, priorities, blockers, hours",
     usage: [
@@ -1328,6 +1385,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   plan: {
+    audience: "agent",
     script: "plan-report.mjs",
     summary: "where the execution order has got to: the active wave, what is next up, what is unplanned",
     usage: [
@@ -1377,6 +1435,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   run: {
+    audience: "agent",
     script: "run-loop.mjs",
     summary: "run one foreground agent through eligible tasks in this working tree",
     usage: [
@@ -1531,6 +1590,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   done: {
+    audience: "agent",
     script: "done-task.mjs",
     summary: "close a task by RUNNING its verification — the only command that runs it",
     usage: [
@@ -1561,6 +1621,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   check: {
+    audience: "agent",
     composite: [
       "check-backlog-id-collisions.mjs", "check-backlog-boards.mjs",
       "check-backlog-refs.mjs", "check-backlog-criteria.mjs",
@@ -1570,6 +1631,7 @@ export const COMMANDS = {
     usage: CHECK_USAGE,
   },
   red: {
+    audience: "agent",
     script: "red-owners.mjs",
     summary: "whose failure is this — attribute each failing test file to the task that made it red",
     usage: [
@@ -1606,11 +1668,13 @@ export const COMMANDS = {
     ].join("\n"),
   },
   "migrate-prefix": {
+    audience: "person",
     script: "migrate-prefix.mjs",
     summary: "renumber the backlog onto a different id prefix (names, ids, dependencies, history)",
     usage: `${N} migrate-prefix --to <NEW> [--actor <ns:name>] [--dry-run]`,
   },
   renumber: {
+    audience: "person",
     script: "renumber.mjs",
     summary: "close the gaps: renumber every task into a contiguous range, keeping the prefix",
     usage: [
@@ -1636,6 +1700,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   mcp: {
+    audience: "program",
     script: "mcp-server.mjs",
     summary: "speak the Model Context Protocol on stdio, so a non-shell agent can use this backlog",
     usage: [
@@ -1654,6 +1719,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   ask: {
+    audience: "agent",
     script: "ask-task.mjs",
     summary: "stop a task on an open question, and wait for a person to decide it",
     usage: [
@@ -1691,6 +1757,7 @@ export const COMMANDS = {
     ].join("\n"),
   },
   "regen-hook": {
+    audience: "program",
     script: "regen-hook.mjs",
     summary: "entry point for an editor hook: rebuild the views after a task edit (stdin: JSON)",
     usage: `${N} regen-hook   # the hook's JSON on stdin`,

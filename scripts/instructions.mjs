@@ -327,7 +327,8 @@ THE VALUES COME FROM THIS BACKLOG'S CONFIGURATION, not from habit:
   estimates   {{estimates}}
   boards      {{boards}}
 
-An unknown value FAILS the build instead of quietly creating a new category. Do
+An unknown value FAILS the build instead of quietly creating a new category.
+\`{{tool}} vocabulary\` prints the same words with what each status means. Do
 not guess the board either — \`{{tool}} board <task-file.md>\` derives it from the
 path rules, and the board vocabulary is closed.
 
@@ -365,6 +366,7 @@ ago; a generated view does not.
   {{tool}} query --text "…" --limit 10        has this been discussed already
   {{tool}} query --count                      a number instead of hundreds of lines
   {{tool}} stats                              the whole backlog on one screen
+  {{tool}} plan                               the active wave and what may start now
 
 ASK; DO NOT READ. \`query\` and \`stats\` cost what the answer is worth; reading
 \`tasks/*.md\` in bulk spends most of a context window before any work starts,
@@ -398,7 +400,11 @@ automated, \`user:\` authenticated. An actor without a namespace is refused.
 THEN READ THE WHOLE FILE — the context section and every path under its
 pre-flight reading. It was written for somebody with none of your conversation.
 Ask \`{{tool}} query --blocked-by <ID>\` as well: if something is waiting on this
-task, that changes how much you can safely defer.
+task, that changes how much you can safely defer. What the file cannot hold —
+where its commits are deployed, what another branch says about it, what still
+blocks it — is \`{{tool}} show <ID>\`, computed on every call. Why its fields
+hold what they hold — each handoff, question and decision with its reason — is
+\`{{tool}} log <ID> --decisions\`, not a raw read of the history file.
 
 WHILE YOU WORK.
 
@@ -464,6 +470,15 @@ WHILE YOU WORK.
                        runs those as well, and where the project contract is
                        the whole suite, so is the run. The report says what it
                        left out; \`{{tool}} done\` still runs it.
+  Changing a field     \`{{tool}} set <ID> <field> <value> --reason "…"\` checks
+                       one field against this backlog's configuration and
+                       records it; \`{{tool}} body <ID> --reason "…"\` replaces
+                       the body from stdin and leaves the frontmatter byte for
+                       byte. Status and owner are not fields here: the commands
+                       that claim, close and hand over own them.
+  Putting it down      \`{{tool}} release <ID> --reason "…"\` returns a task you
+                       will not finish to the queue, clearing the owner and the
+                       reservation. With a receiver it is \`handoff\` instead.
   Frontmatter changed  Run \`{{tool}} build\`. It is idempotent and near-instant;
                        skipping it leaves the views disagreeing with the file you
                        just edited.
@@ -536,7 +551,9 @@ re-run the contract to find out what a task is waiting for.
 
 AFTERWARDS. Look at \`blocks:\` — a task you have just unblocked has a reader who
 needs to know why it became actionable. Then \`{{tool}} check\` before the commit,
-because the guards judge the SET and your change joined it.`;
+because the guards judge the SET and your change joined it. For a pull request,
+\`{{tool}} pr-summary\` prints what this branch did to the backlog as markdown
+for the comment.`;
 
 const AUTONOMOUS_LOOP = `{{tool}} — one task, one session, in a loop
 
@@ -580,6 +597,7 @@ a report of what closed, what did not and where the run stopped.
 
   {{tool}} run --agent "claude -p @{task_file}" --max-attempts 2
   {{tool}} run --dry-run     # the order it would work in, claiming nothing
+  {{tool}} follow --json     # one envelope per task change, by any hand
 
 It changes nothing about the two commands at the ends: it calls \`{{tool}} next\`
 and \`{{tool}} done\` exactly as your shell would, and the agent is a template
@@ -714,6 +732,10 @@ before one, and never quietly: the takeover names the previous owner in the
 history entry and warns on stdout. Left at \`0\`, the default, a dead session's
 task stays claimed until a person looks. Neither answer is safe in the abstract;
 the number is yours to state.
+
+The owner picking such a task back up in a fresh session starts from \`{{tool}}
+resume <ID>\`: one document, in order, with what the dead session changed on its
+branch and the contract run against it.
 
   {{tool}} query --status {{progress}} --json   what is claimed, and by whom
 
