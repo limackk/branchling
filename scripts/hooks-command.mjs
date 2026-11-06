@@ -136,12 +136,17 @@ export function hooksTarget(root, name = HOOK_NAME) {
  * then never reach an installed hook while `doctor` said OK. Ownership and
  * currency are two questions, so they are two fields — `state` keeps meaning
  * what it meant to every caller that only asks the first.
+ *
+ * `closed` SAYS WHETHER `install` CAN REPAIR IT (TL-600). A block whose opening
+ * marker has no closing one is never current, but `install` refuses it rather
+ * than guess its edge, so a caller naming a repair has to tell the two apart.
  */
 export function inspect(target) {
   if (!existsSync(target.path)) return { state: "absent", text: null };
   const text = readFileSync(target.path, "utf8");
   if (text.includes(BLOCK_OPEN)) {
-    return { state: "ours", text, current: installedBlock(text) === hookBlock(target.name) };
+    const installed = installedBlock(text);
+    return { state: "ours", text, current: installed === hookBlock(target.name), closed: installed !== null };
   }
   return { state: "foreign", text };
 }
