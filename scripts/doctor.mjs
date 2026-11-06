@@ -28,7 +28,7 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -45,7 +45,7 @@ import { USER_SKILLS, compareInstalled, skillsTarget } from "./install-skills.mj
 import { printJson } from "./json-envelope.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { MARK as UI_MARK, color, errColor, heading, refusal } from "./ui.mjs";
-import { backlogPaths, BACKLOG_DIR_REFUSAL_KIND, isBacklogDirRefusal, NotABacklogError, repositoryRoot, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { backlogPaths, TEMPLATE_FILENAME, BACKLOG_DIR_REFUSAL_KIND, isBacklogDirRefusal, NotABacklogError, repositoryRoot, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { summarize } from "./stats.mjs";
 import { vocabularyUsage } from "./task-fields.mjs";
 import { detectPrefixMismatch, taskIdPatterns } from "./task-id.mjs";
@@ -314,6 +314,65 @@ function checkGitIgnore(root) {
   return rows;
 }
 
+/** The template this release would write into a new backlog. */
+const SHIPPED_TEMPLATE = join(HERE, "..", TEMPLATE_FILENAME);
+
+/**
+ * The top-level frontmatter keys of a template, each with its one-line comment.
+ * Read by line, not by a YAML parser, because the comment IS the payload: it is
+ * the only explanation of the field a person editing a task by hand ever sees,
+ * and a parser discards it. Indented lines belong to a nested value. PURE.
+ */
+export function templateFields(text) {
+  const lines = String(text).split(/\r?\n/);
+  if (lines[0].trim() !== "---") return [];
+  const fields = [];
+  for (const line of lines.slice(1)) {
+    if (line.trim() === "---") break;
+    // A quoted value is skipped whole, so a `#` inside it is not a comment.
+    const m = /^([A-Za-z_][\w-]*):\s*(?:"(?:[^"\\]|\\.)*"|'(?:[^']|'')*')?(.*)$/.exec(line);
+    if (!m) continue;
+    const comment = /(?:^|\s)#\s*(.*)$/.exec(m[2]);
+    fields.push({ key: m[1], comment: comment ? comment[1].trim() : "" });
+  }
+  return fields;
+}
+
+/**
+ * Does the backlog's template carry every field this release ships? (TL-588)
+ *
+ * `init` copies `_template.md` once and never again, so a backlog started on an
+ * earlier release keeps that release's field list. Nothing breaks — the writing
+ * commands add a missing field on demand — which is exactly why nothing said
+ * so: a person editing a task by hand never learns the field exists. INFO, not
+ * a warning: the template is the project's own file, and a field it leaves out
+ * may be one it decided against. A field the project ADDED is not reported;
+ * only the shipped ones it lacks are. `shipped` is for the tests.
+ */
+export function checkTemplate(root, { shipped = SHIPPED_TEMPLATE } = {}) {
+  const title = "task template fields";
+  const own = backlogPaths(root).templatePath;
+  if (!existsSync(own)) {
+    return check("template", title, INFO, "not checked — this backlog has no " + TEMPLATE_FILENAME);
+  }
+  if (!existsSync(shipped)) {
+    return check("template", title, INFO, "not checked — the packaged template is missing: " + shipped);
+  }
+  const present = new Set(templateFields(readFileSync(own, "utf8")).map((f) => f.key));
+  const expected = templateFields(readFileSync(shipped, "utf8"));
+  const missing = expected.filter((f) => !present.has(f.key));
+  if (!missing.length) {
+    return check("template", title, OK, "every field this release ships is in " + TEMPLATE_FILENAME);
+  }
+  return check("template", title, INFO,
+    // `; ` between fields and `: ` before a comment, because the comments
+    // themselves carry parentheses and commas.
+    "missing " + missing.map((f) => "`" + f.key + "`" + (f.comment ? ": " + f.comment : "")).join("; ") +
+      ". The writing commands add " + plural(missing.length, "it", "them") + " on demand, so only a task edited by hand goes without",
+    "copy the " + plural(missing.length, "line", "lines") + " for " + missing.map((f) => f.key).join(", ") +
+      " from " + shipped + " into " + own);
+}
+
 /**
  * The agent-facing setup (TL-475): the pointer to `instructions`, the packaged
  * skill, the git gates. Each one is OPTIONAL — `init --no-nudge`, an editor
@@ -385,16 +444,39 @@ function checkHooks(root) {
   if (!insideGitRepo(root)) return [];
   const states = HOOK_NAMES.map((name) => {
     const target = hooksTarget(root, name);
-    return { name, state: target.ok ? inspect(target).state : "unknown" };
+    const found = target.ok ? inspect(target) : { state: "unknown" };
+    return { name, state: found.state, current: found.current === true };
   });
   const missing = states.filter((s) => s.state !== "ours");
-  if (missing.length) {
-    return [check("git-hooks", "git gates on commit", INFO,
-      missing.map((s) => s.name + (s.state === "foreign" ? " (a hook of your own, without ours)" : " (none)")).join(", ") +
-        " — the guards run only when somebody remembers",
-      N + " hooks print")];
-  }
-  return [check("git-hooks", "git gates on commit", OK, HOOK_NAMES.join(", ") + " run the guards")];
+  const rows = [missing.length
+    ? check("git-hooks", "git gates on commit", INFO,
+        missing.map((s) => s.name + (s.state === "foreign" ? " (a hook of your own, without ours)" : " (none)")).join(", ") +
+          " — the guards run only when somebody remembers",
+        N + " hooks print")
+    : check("git-hooks", "git gates on commit", OK, HOOK_NAMES.join(", ") + " run the guards")];
+  rows.push(...staleHooksRow(states));
+  return rows;
+}
+
+/**
+ * Our block, but not the text this release writes (TL-588). A WARNING, unlike
+ * an absent gate: the person chose to install it, and what runs on their commit
+ * is no longer what they chose. No row while every installed block is current —
+ * the presence row above already says so. `hooks install` refuses outright
+ * while any hook is somebody else's, so then the repair it names is the paste
+ * that `hooks print` shows, not a command that would fail.
+ */
+function staleHooksRow(states) {
+  const stale = states.filter((s) => s.state === "ours" && !s.current).map((s) => s.name);
+  if (!stale.length) return [];
+  const foreign = states.filter((s) => s.state === "foreign").map((s) => s.name);
+  return [check("git-hooks-current", "git gates are current", WARN,
+    stale.join(", ") + " carr" + plural(stale.length, "ies a block", "y blocks") +
+      " that differ" + plural(stale.length, "s", "") + " from the one this release writes — a change to the gate never reached " +
+      plural(stale.length, "it", "them"),
+    foreign.length
+      ? N + " hooks print   # " + foreign.join(", ") + " is your own hook, so `hooks install` refuses; replace our block in " + stale.join(", ") + " by hand"
+      : N + " hooks install   # replaces only the lines between its markers")];
 }
 
 /**
@@ -573,6 +655,7 @@ export function diagnose(root) {
   rows.push(...checkClosedElsewhere(root, config, metas));
   rows.push(checkVolume(metas, config));
   rows.push(checkContextBudget(root, config));
+  rows.push(checkTemplate(root));
   rows.push(checkAgentPointer(root), checkSkill(root), ...checkHooks(root));
   return rows;
 }

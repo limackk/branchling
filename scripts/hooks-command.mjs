@@ -126,24 +126,68 @@ export function hooksTarget(root, name = HOOK_NAME) {
   return { ok: true, name, dir, path: join(dir, name), custom: custom || null };
 }
 
-/** What is already there, in the terms this command has to decide by. */
+/**
+ * What is already there, in the terms this command has to decide by.
+ *
+ * `current` SAYS WHETHER OUR BLOCK IS THE ONE THIS RELEASE WRITES (TL-588).
+ * The marker alone proves ownership, not content: a block installed by an
+ * earlier release keeps that release's gate line for good, because `install`
+ * used to skip any file that carried the marker. A change to the gate would
+ * then never reach an installed hook while `doctor` said OK. Ownership and
+ * currency are two questions, so they are two fields — `state` keeps meaning
+ * what it meant to every caller that only asks the first.
+ */
 export function inspect(target) {
   if (!existsSync(target.path)) return { state: "absent", text: null };
   const text = readFileSync(target.path, "utf8");
-  if (text.includes(BLOCK_OPEN)) return { state: "ours", text };
+  if (text.includes(BLOCK_OPEN)) {
+    return { state: "ours", text, current: installedBlock(text) === hookBlock(target.name) };
+  }
   return { state: "foreign", text };
+}
+
+/** The line range of our block, markers included, or null when the opening
+ *  marker has no closing one. Matched by trimmed line, as `withoutBlock` does. */
+function blockRange(lines) {
+  const open = lines.findIndex((l) => l.trim() === BLOCK_OPEN);
+  if (open < 0) return null;
+  let close = open;
+  while (close < lines.length && lines[close].trim() !== BLOCK_CLOSE) close++;
+  if (close >= lines.length) return null;
+  return { open, close };
+}
+
+/**
+ * The installed block, normalised for comparison with `hookBlock()`: each line
+ * trimmed, so an indented paste and a CRLF checkout read as the text they
+ * carry. Null when there is no complete block. PURE.
+ */
+export function installedBlock(text) {
+  const lines = String(text).split("\n");
+  const range = blockRange(lines);
+  if (!range) return null;
+  return lines.slice(range.open, range.close + 1).map((l) => l.trim()).join("\n");
+}
+
+/**
+ * Our block swapped for `block`, every line outside the markers byte for byte.
+ * `replaced: false` when there is no complete block to swap. PURE.
+ */
+export function replaceBlock(text, block) {
+  const lines = String(text).split("\n");
+  const range = blockRange(lines);
+  if (!range) return { text, replaced: false };
+  lines.splice(range.open, range.close - range.open + 1, ...block.split("\n"));
+  return { text: lines.join("\n"), replaced: true };
 }
 
 /** Remove the block and the shebang line it brought, leaving everything else
  *  byte for byte. PURE. */
 export function withoutBlock(text) {
   const lines = String(text).split("\n");
-  const open = lines.findIndex((l) => l.trim() === BLOCK_OPEN);
-  if (open < 0) return { text, removed: false };
-  let close = open;
-  while (close < lines.length && lines[close].trim() !== BLOCK_CLOSE) close++;
-  if (close >= lines.length) return { text, removed: false };
-  lines.splice(open, close - open + 1);
+  const range = blockRange(lines);
+  if (!range) return { text, removed: false };
+  lines.splice(range.open, range.close - range.open + 1);
   return { text: lines.join("\n"), removed: true };
 }
 
@@ -212,22 +256,45 @@ function runInstall(root, plan) {
     return 1;
   }
 
+  // A STALE BLOCK OF OUR OWN IS REPLACED, between its markers only (TL-588).
+  // Skipping every file that carried the marker meant a change to the gate
+  // never reached an installed hook. What lies outside the markers may be
+  // somebody else's gate in the same file, so it is kept byte for byte.
+  const stale = found.filter((entry) => entry.found.state === "ours" && !entry.found.current);
+  const replaced = stale.map((entry) => ({ entry, ...replaceBlock(entry.found.text, hookBlock(entry.target.name)) }));
+  const unclosed = replaced.find((r) => !r.replaced);
+  if (unclosed) {
+    // Refused before anything is written: a block with no closing marker has
+    // no edge, and guessing one could take somebody else's lines with it.
+    console.error(failure(N + " hooks install",
+      "the " + unclosed.entry.target.name + " hook opens our block and never closes it", [
+        unclosed.entry.target.path,
+        "It was not touched. Put this in place of the lines from `" + BLOCK_OPEN + "` onwards:",
+        ...hookBlock(unclosed.entry.target.name).split("\n"),
+      ], [N + " hooks print"]));
+    return 1;
+  }
+  for (const r of replaced) writeFileSync(r.entry.target.path, r.text, "utf8");
+
   for (const entry of found) {
     if (entry.found.state === "ours") continue;
     if (!existsSync(entry.target.dir)) mkdirSync(entry.target.dir, { recursive: true });
     writeFileSync(entry.target.path, hookFile(entry.target.name), "utf8");
     chmodSync(entry.target.path, 0o755);
   }
+  const outcome = (entry) => entry.found.state !== "ours" ? "installed" : entry.found.current ? "current" : "updated";
   if (plan.json) {
     console.log(JSON.stringify({ installed: true, hooks: found.map((entry) => ({
       hook: entry.target.name, path: entry.target.path, installed: entry.found.state !== "ours",
+      updated: outcome(entry) === "updated",
     })), custom: targets[0].custom }, null, 2));
     return 0;
   }
   for (const entry of found) {
-    const line = entry.found.state === "ours"
+    const done = outcome(entry);
+    const line = done === "current"
       ? color.dim(MARK.bullet + " already installed — " + entry.target.path)
-      : color.ok(MARK.ok) + " " + entry.target.name + " installed — " + entry.target.path;
+      : color.ok(MARK.ok) + " " + entry.target.name + " " + done + " — " + entry.target.path;
     console.log(line);
   }
   for (const line of renderTarget(targets[0])) console.log(line);

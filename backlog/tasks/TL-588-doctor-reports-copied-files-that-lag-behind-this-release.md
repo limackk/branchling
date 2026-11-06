@@ -8,8 +8,8 @@ epic: ""                           # free text — the group this task counts to
 release: ""                        # the release it is PLANNED for (a value from `releases:` in config.yaml). Empty = none
 target: []                         # the deploy targets in ANOTHER repository it ships from (`deploy_targets` with `repository:`). Empty = none
 priority: P1                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:impl-tl-588
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 conflict_group: []                 # the AREA it touches (e.g. a module): `next` and `run` hold it back while a task of the same group is in progress. Empty = `conflict_group_from`, or none
@@ -41,4 +41,4 @@ Several files are copied once and then frozen, each by its own rule. Measured on
 
 ## Acceptance criteria
 
-- [ ] doctor reports a template missing a shipped field and a hook block whose text differs from hookBlock(), and reports neither when both are current; hooks install replaces a stale block of its own. [proof: doctor-reports-lagging-copies]
+- [x] doctor reports a template missing a shipped field and a hook block whose text differs from hookBlock(), and reports neither when both are current; hooks install replaces a stale block of its own. [proof: doctor-reports-lagging-copies]

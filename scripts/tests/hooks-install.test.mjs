@@ -23,17 +23,20 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { HOOK_NAME, hookBlock, hooksTarget, withoutBlock } from "../hooks-command.mjs";
+import { COMMIT_MESSAGE_HOOK_NAME, HOOK_NAME, hookBlock, hooksTarget, inspect, installedBlock, replaceBlock, withoutBlock } from "../hooks-command.mjs";
 import { BLOCK_OPEN } from "../git-rules.mjs";
-import { isolateHome, posixPath } from "./_repo.mjs";
+import { isolateHome, plainOutput, posixPath } from "./_repo.mjs";
 import { canonicalPath } from "../canonical-path.mjs";
 
 isolateHome("hooks-install");
+// The assertions read the rendered lines, so the colour decision is taken out
+// of the environment the suite happened to start in.
+plainOutput();
 
 const CLI = join(dirname(fileURLToPath(import.meta.url)), "..", "cli.mjs");
 
@@ -95,6 +98,7 @@ test("an existing pre-commit is REFUSED and left byte for byte", () => {
   assert.equal(readFileSync(path, "utf8"), theirs, "somebody else's gate was modified");
   assert.match(r.stderr, /already a pre-commit hook/);
   assert.ok(r.stderr.includes(BLOCK_OPEN), "refusing without printing the block leaves the user stuck");
+  assert.match(r.stderr, /→ branchling hooks print$/m);
 });
 
 test("uninstall refuses to touch a hook that is not ours", () => {
@@ -123,6 +127,14 @@ test("core.hooksPath is honoured — nothing is written where git does not look"
   assert.match(r.stdout, /core\.hooksPath/, "the user has to be told whose directory this is");
 });
 
+test("a core.hooksPath that does not exist yet is created, nested directories included", () => {
+  const dir = repo();
+  assert.equal(git(dir, "config", "core.hooksPath", "nested/hooks").status, 0);
+  const r = run(dir, ["hooks", "install"]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(existsSync(join(dir, "nested", "hooks", HOOK_NAME)));
+});
+
 test("inside a worktree the hook goes to the COMMON directory git actually reads", () => {
   const dir = repo();
   writeFileSync(join(dir, "a.txt"), "x\n", "utf8");
@@ -142,6 +154,24 @@ test("inside a worktree the hook goes to the COMMON directory git actually reads
 
 // ── uninstall restores the previous state ─────────────────────────────────
 
+test("a first install writes executable hooks and says what it installed", () => {
+  const dir = repo();
+  const r = run(dir, ["hooks", "install"]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /^\S+ pre-commit installed — /m);
+  assert.match(r.stdout, /^\S+ commit-msg installed — /m);
+  assert.ok(r.stdout.includes("\n  `branchling hooks uninstall` removes exactly these lines."));
+  if (process.platform !== "win32") {
+    assert.notEqual(statSync(hookPath(dir)).mode & 0o111, 0, "a hook git cannot execute is no gate");
+  }
+  const again = mkdtempSync(join(tmpdir(), "branchling-hooks-json-"));
+  assert.equal(git(again, "init", "-q", ".").status, 0);
+  const json = JSON.parse(run(again, ["hooks", "install", "--json"]).stdout);
+  assert.equal(json.installed, true);
+  assert.deepEqual(json.hooks.map((h) => [h.hook, h.installed, h.updated]),
+    [["pre-commit", true, false], ["commit-msg", true, false]]);
+});
+
 test("install then uninstall leaves no file behind", () => {
   const dir = repo();
   assert.equal(run(dir, ["hooks", "install"]).status, 0);
@@ -158,6 +188,7 @@ test("uninstall leaves the REST of a shared file byte for byte", () => {
   const stripped = withoutBlock(merged);
   assert.equal(stripped.removed, true);
   assert.equal(stripped.text, before + "# theirs, below\n");
+  assert.deepEqual(withoutBlock(before), { text: before, removed: false });
 });
 
 test("installing twice is idempotent and says so", () => {
@@ -175,6 +206,85 @@ test("uninstalling what was never installed is an answer, not an error", () => {
   const r = run(dir, ["hooks", "uninstall"]);
   assert.equal(r.status, 0);
   assert.match(r.stdout, /nothing installed here/);
+});
+
+// ── a stale block of our own is replaced (TL-588) ─────────────────────────
+
+test("inspect says whether our block is the one this release writes", () => {
+  const dir = repo();
+  const target = hooksTarget(dir);
+  assert.deepEqual(inspect(target), { state: "absent", text: null });
+  assert.equal(run(dir, ["hooks", "install"]).status, 0);
+  assert.deepEqual([inspect(target).state, inspect(target).current], ["ours", true]);
+  writeFileSync(target.path, readFileSync(target.path, "utf8").replace("check || exit 1", "check --old || exit 1"), "utf8");
+  assert.deepEqual([inspect(target).state, inspect(target).current], ["ours", false]);
+  // Each hook is compared with ITS OWN block: the pre-commit text in commit-msg is stale.
+  const msg = hooksTarget(dir, COMMIT_MESSAGE_HOOK_NAME);
+  assert.equal(inspect(msg).current, true);
+  writeFileSync(msg.path, "#!/bin/sh\n" + hookBlock(HOOK_NAME) + "\n", "utf8");
+  assert.equal(inspect(msg).current, false);
+});
+
+test("installedBlock reads an indented or CRLF block as the text it carries", () => {
+  const block = hookBlock();
+  assert.equal(installedBlock("#!/bin/sh\n" + block + "\n"), block);
+  assert.equal(installedBlock(block), block, "a block on the first line is still a block");
+  assert.equal(installedBlock("x\r\n" + block.split("\n").map((l) => "  " + l).join("\r\n") + "\r\ny\r\n"), block);
+  assert.equal(installedBlock("#!/bin/sh\n" + block.split("\n").slice(0, -1).join("\n") + "\n"), null,
+    "an opening marker with no closing one is no block");
+  assert.equal(installedBlock("#!/bin/sh\nnpm test\n"), null);
+});
+
+test("replaceBlock swaps only the lines between the markers", () => {
+  const old = hookBlock().replace("check || exit 1", "check --old || exit 1");
+  const above = "#!/bin/sh\n# theirs, above\nnpm test\n";
+  const below = "\n# theirs, below\n";
+  const r = replaceBlock(above + old + below, hookBlock());
+  assert.equal(r.replaced, true);
+  assert.equal(r.text, above + hookBlock() + below);
+  const unclosed = above + old.split("\n").slice(0, -1).join("\n") + below;
+  assert.deepEqual(replaceBlock(unclosed, hookBlock()), { text: unclosed, replaced: false });
+  assert.deepEqual(replaceBlock(above, hookBlock()), { text: above, replaced: false });
+});
+
+test("install replaces a stale block of its own and leaves the rest of the file byte for byte", () => {
+  const dir = repo();
+  assert.equal(run(dir, ["hooks", "install"]).status, 0);
+  const path = hookPath(dir);
+  const above = "#!/bin/sh\n# theirs, above\nnpm test\n";
+  const below = "\n# theirs, below\n";
+  writeFileSync(path, above + hookBlock().replace("check || exit 1", "check --old || exit 1") + below, "utf8");
+  const msgPath = hooksTarget(dir, COMMIT_MESSAGE_HOOK_NAME).path;
+  const msgBytes = readFileSync(msgPath, "utf8");
+
+  const r = run(dir, ["hooks", "install"]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(readFileSync(path, "utf8"), above + hookBlock() + below);
+  assert.equal(readFileSync(msgPath, "utf8"), msgBytes, "a current block is not rewritten");
+  assert.match(r.stdout, /^\S+ pre-commit updated — /m);
+  assert.match(r.stdout, /already installed — .*commit-msg/);
+
+  writeFileSync(path, above + hookBlock().replace("check || exit 1", "check --old || exit 1") + below, "utf8");
+  const json = JSON.parse(run(dir, ["hooks", "install", "--json"]).stdout);
+  assert.deepEqual(json.hooks.map((h) => [h.hook, h.installed, h.updated]),
+    [["pre-commit", false, true], ["commit-msg", false, false]]);
+});
+
+test("install refuses a block that never closes, and touches nothing", () => {
+  const dir = repo();
+  assert.equal(run(dir, ["hooks", "install"]).status, 0);
+  const path = hookPath(dir);
+  const broken = "#!/bin/sh\n" + hookBlock().split("\n").slice(0, -1).join("\n") + "\nnpm test\n";
+  writeFileSync(path, broken, "utf8");
+  const r = run(dir, ["hooks", "install"]);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /branchling hooks install: the pre-commit hook opens our block and never closes it/);
+  assert.ok(r.stderr.includes("It was not touched. Put this in place of the lines from `" + BLOCK_OPEN + "` onwards:"));
+  assert.match(r.stderr, /→ branchling hooks print$/m);
+  for (const line of hookBlock().split("\n")) {
+    assert.ok(r.stderr.includes(line), "refusing without the block leaves the user stuck: " + line);
+  }
+  assert.equal(readFileSync(path, "utf8"), broken);
 });
 
 // ── usage ─────────────────────────────────────────────────────────────────
