@@ -1,1 +1,2 @@
 {"id":"01M6RES6NEXZK11GKTTGA8KR01","ts":"2026-11-06T12:54:18.542Z","task":"TL-596","field":"__created__","from":"","to":"The guides name check --release and deploy record where they apply","actor":"agent:impl-tl-584","source":"new","reason":"unknown"}
+{"id":"01M6S992RH349A7MFAX79HPJRA","ts":"2026-11-06T20:37:21.809Z","task":"TL-596","field":"blocked_by","from":[],"to":["TL-598"],"actor":"local:limack","source":"set","reason":"unknown"}

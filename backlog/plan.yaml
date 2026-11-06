@@ -118,3 +118,15 @@ waves:
   # Each follows one task of the previous wave on the same files: the released-backlog fixtures must see requires_version from TL-586, doctor's lagging-copy rows sit beside TL-585's skill row, and the guide coverage guard counts the lines TL-584 adds. Within the wave the three touch disjoint files.
   - name: "Upgrades are proven by the suite"
     tasks: [TL-587, TL-588, TL-589]
+
+  # The review findings of the upgrade waves, grouped by the files they change: the guides in instructions.mjs, the floor in config.mjs, the hook block in hooks-command.mjs, the skill and template rows of doctor.mjs, and three that stand alone. This wave takes the first task of each area, so no two of its tasks edit the same function.
+  - name: "Upgrade follow-ups, first of each area"
+    tasks: [TL-597, TL-592, TL-600, TL-594, TL-599, TL-602, TL-590]
+
+  # Each follows the task of the previous wave that edits the same function: the task-creation guide after the overview guide, the floor below its key after the empty floor, the line endings of a replaced block after the unclosed block, and the template refresh after the skill directory row.
+  - name: "Upgrade follow-ups, second of each area"
+    tasks: [TL-598, TL-593, TL-601, TL-595]
+
+  # The largest guide change comes last, because it renders beside the paragraphs TL-597 and TL-598 rewrite and extends the same promotion test.
+  - name: "Upgrade follow-ups, the rest of the promotion surface"
+    tasks: [TL-596]

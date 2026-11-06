@@ -1,1 +1,2 @@
 {"id":"01M6RENGSEQQX0YV8J8HRDN5WZ","ts":"2026-11-06T12:52:17.838Z","task":"TL-595","field":"__created__","from":"","to":"A lagging task template is refreshed by one command","actor":"agent:impl-tl-588","source":"new","reason":"unknown"}
+{"id":"01M6S993DBJEXKDKK58FQYQDR9","ts":"2026-11-06T20:37:22.475Z","task":"TL-595","field":"blocked_by","from":[],"to":["TL-594"],"actor":"local:limack","source":"set","reason":"unknown"}
