@@ -26,12 +26,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { PACKAGED_SKILLS, USER_SKILLS, installSkills, skillsTarget } from "../install-skills.mjs";
+import { PACKAGED_SKILLS, SHIPPED_VERSIONS, USER_SKILLS, compareInstalled, contentHash, installSkills, renderInstall, skillsTarget } from "../install-skills.mjs";
 import { isolateHome, REPO_ROOT, SHIM } from "./_repo.mjs";
 
 // THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
@@ -64,6 +64,10 @@ function fixture() {
 }
 
 const SKILL = join("backlog-workflow", "SKILL.md");
+
+// The command name a user types, written out: a test that took it from the
+// constant the code prints would assert that the constant equals itself.
+const CLI_NAME = "branchling";
 
 // ── it ships ──────────────────────────────────────────────────────────────
 
@@ -147,7 +151,20 @@ test("a missing packaged directory is a refusal, not a silent success", () => {
   const fx = fixture();
   const result = installSkills(fx.dir, { source: join(fx.dir, "nowhere") });
   assert.equal(result.ok, false);
+  assert.equal(result.kind, "no-source");
   assert.match(result.message, /not in this installation/);
+  assert.match(result.details.join("\n"), /tarball/);
+  for (const key of ["created", "skipped", "replaced", "kept"]) assert.deepEqual(result[key], [], key);
+  assert.deepEqual(compareInstalled(fx.dir, { source: join(fx.dir, "nowhere") }).files, []);
+});
+
+test("a skill the package does not carry is a refusal that names it", () => {
+  const fx = fixture();
+  const result = installSkills(fx.dir, { skills: ["no-such-skill"] });
+  assert.equal(result.ok, false);
+  assert.equal(result.kind, "no-skill");
+  assert.match(result.message, /no packaged skill called `no-such-skill`/);
+  assert.equal(existsSync(join(fx.dir, ".claude")), false);
 });
 
 // ── through the commands ──────────────────────────────────────────────────
@@ -198,6 +215,297 @@ test("an unknown flag and an unknown subcommand both fail", () => {
   assert.equal(run(["skills", "install", "--frobnicate"], fx.dir, fx.env).status, 2);
   assert.equal(run(["skills", "uninstall"], fx.dir, fx.env).status, 2);
   assert.equal(run(["init", "--dir", fx.backlog, "--skill"], fx.dir, fx.env).status, 2);
+});
+
+// ── refreshing a stale copy (TL-585) ──────────────────────────────────────
+//
+// `install` never overwrites, which freezes the skill's DESCRIPTION — the text
+// that decides whether an editor loads it — on the day of the install. The
+// refresh may replace a file only when it can prove the file holds no edit (it
+// is a version the package shipped) or the user names it. Each case below has
+// its counterpart where the same file is NOT replaced, so a refresh that
+// replaced everything, or nothing, fails here.
+
+/** A packaged source of one skill with two files, and a shipped-version list
+ *  that knows an older SKILL.md. The real package has one file and its old
+ *  versions live only in git history, which a shallow clone does not have. */
+function source(fx) {
+  const root = join(fx.dir, "pkg");
+  mkdirSync(join(root, "demo", "refs"), { recursive: true });
+  writeFileSync(join(root, "demo", "SKILL.md"), "---\ndescription: new\n---\n", "utf8");
+  writeFileSync(join(root, "demo", "refs", "notes.md"), "packaged notes v2\n", "utf8");
+  const old = join(fx.dir, "old.md");
+  writeFileSync(old, "---\ndescription: old\n---\n", "utf8");
+  const oldNotes = join(fx.dir, "old-notes.md");
+  writeFileSync(oldNotes, "packaged notes v1\n", "utf8");
+  return {
+    source: root, skills: ["demo"],
+    shipped: { "demo/SKILL.md": [contentHash(old)], "demo/refs/notes.md": [contentHash(oldNotes)] },
+  };
+}
+
+const DEMO = join("demo", "SKILL.md");
+const NOTES = join("demo", "refs", "notes.md");
+
+function installed(fx, file) {
+  return join(fx.dir, ".claude", "skills", file);
+}
+
+test("the current packaged content is recorded as shipped, so the next release knows it", () => {
+  // Without this the NEXT release would read today's copy as somebody's edit
+  // and refuse to refresh it — the exact staleness this list exists to end.
+  for (const name of USER_SKILLS) {
+    const file = name + "/SKILL.md";
+    const hash = contentHash(join(PACKAGED_SKILLS, name, "SKILL.md"));
+    assert.ok((SHIPPED_VERSIONS[file] || []).includes(hash),
+      "the packaged " + file + " is not in SHIPPED_VERSIONS — add this line to its list in scripts/install-skills.mjs:\n" +
+      '    "' + hash + '",');
+  }
+});
+
+test("every packaged file has a shipped-version list, and the list holds no duplicate", () => {
+  const listed = Object.keys(SHIPPED_VERSIONS).sort();
+  assert.deepEqual(listed, USER_SKILLS.map((n) => n + "/SKILL.md").sort());
+  for (const [file, hashes] of Object.entries(SHIPPED_VERSIONS)) {
+    assert.ok(hashes.length > 0, file + " has an empty list");
+    assert.equal(new Set(hashes).size, hashes.length, file + " lists a version twice");
+    for (const h of hashes) assert.match(h, /^[0-9a-f]{64}$/, file + ": not a SHA-256: " + h);
+  }
+});
+
+test("compareInstalled tells missing, current, shipped and edited apart", () => {
+  const fx = fixture();
+  const opts = source(fx);
+  assert.deepEqual(compareInstalled(fx.dir, opts).files.map((f) => f.state), ["missing", "missing"]);
+
+  installSkills(fx.dir, opts);
+  assert.deepEqual(compareInstalled(fx.dir, opts).files, [
+    { file: DEMO, state: "current" }, { file: NOTES, state: "current" },
+  ]);
+
+  writeFileSync(installed(fx, DEMO), "---\ndescription: old\n---\n", "utf8");
+  writeFileSync(installed(fx, NOTES), "my notes\n", "utf8");
+  assert.deepEqual(compareInstalled(fx.dir, opts).files, [
+    { file: DEMO, state: "shipped" }, { file: NOTES, state: "edited" },
+  ]);
+});
+
+test("a skill directory reached through a symlink is read through it", () => {
+  // The repository's own `.claude/skills/*` are symlinks; a packaged skill
+  // laid out the same way must not lose the files behind one.
+  const fx = fixture();
+  const opts = source(fx);
+  mkdirSync(join(fx.dir, "shared"), { recursive: true });
+  writeFileSync(join(fx.dir, "shared", "ref.md"), "shared\n", "utf8");
+  symlinkSync(join(fx.dir, "shared"), join(opts.source, "demo", "linked"));
+  // …and a link to a FILE is a file, not a directory to descend into.
+  symlinkSync(join(fx.dir, "shared", "ref.md"), join(opts.source, "demo", "ref-link.md"));
+  assert.deepEqual(compareInstalled(fx.dir, opts).files.map((f) => f.file).sort(),
+    [DEMO, join("demo", "linked", "ref.md"), join("demo", "ref-link.md"), NOTES].sort());
+});
+
+test("a copy differing only in CRLF line endings is current, not an edit", () => {
+  // A checkout with `core.autocrlf` rewrites line endings; reading that as the
+  // user's edit would refuse every refresh on Windows.
+  const fx = fixture();
+  const opts = source(fx);
+  installSkills(fx.dir, opts);
+  writeFileSync(installed(fx, DEMO), "---\r\ndescription: new\r\n---\r\n", "utf8");
+  assert.equal(compareInstalled(fx.dir, opts).files[0].state, "current");
+  writeFileSync(installed(fx, DEMO), "---\r\ndescription: old\r\n---\r\n", "utf8");
+  assert.equal(compareInstalled(fx.dir, opts).files[0].state, "shipped");
+});
+
+test("without --refresh an older shipped version is skipped, as before", () => {
+  const fx = fixture();
+  const opts = source(fx);
+  installSkills(fx.dir, opts);
+  writeFileSync(installed(fx, DEMO), "---\ndescription: old\n---\n", "utf8");
+  const again = installSkills(fx.dir, opts);
+  assert.deepEqual(again.skipped, [DEMO, NOTES]);
+  assert.deepEqual(again.replaced, []);
+  assert.equal(readFileSync(installed(fx, DEMO), "utf8"), "---\ndescription: old\n---\n");
+});
+
+test("--refresh replaces a shipped version, keeps an edit, and touches no file of the user's", () => {
+  const fx = fixture();
+  const opts = source(fx);
+  installSkills(fx.dir, opts);
+  writeFileSync(installed(fx, DEMO), "---\ndescription: old\n---\n", "utf8");
+  writeFileSync(installed(fx, NOTES), "my notes\n", "utf8");
+  // Files the package never shipped: one beside the skill, one in another skill.
+  const beside = installed(fx, join("demo", "mine.md"));
+  writeFileSync(beside, "mine\n", "utf8");
+  const other = installed(fx, join("theirs", "SKILL.md"));
+  mkdirSync(dirname(other), { recursive: true });
+  writeFileSync(other, "---\ndescription: old\n---\n", "utf8");
+
+  const result = installSkills(fx.dir, { ...opts, refresh: true });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.replaced, [DEMO]);
+  assert.deepEqual(result.kept, [NOTES]);
+  assert.deepEqual(result.created, []);
+  assert.deepEqual(result.skipped, []);
+  assert.equal(readFileSync(installed(fx, DEMO), "utf8"), "---\ndescription: new\n---\n");
+  assert.equal(readFileSync(installed(fx, NOTES), "utf8"), "my notes\n", "an edit was replaced unnamed");
+  assert.equal(readFileSync(beside, "utf8"), "mine\n");
+  assert.equal(readFileSync(other, "utf8"), "---\ndescription: old\n---\n",
+    "a file in a skill the package does not ship was replaced");
+});
+
+test("--refresh replaces an edited file only when it is named", () => {
+  const fx = fixture();
+  const opts = source(fx);
+  installSkills(fx.dir, opts);
+  writeFileSync(installed(fx, DEMO), "my skill\n", "utf8");
+  writeFileSync(installed(fx, NOTES), "my notes\n", "utf8");
+
+  const result = installSkills(fx.dir, { ...opts, refresh: true, named: ["demo/refs/notes.md"] });
+  assert.deepEqual(result.replaced, [NOTES]);
+  assert.deepEqual(result.kept, [DEMO]);
+  assert.equal(readFileSync(installed(fx, NOTES), "utf8"), "packaged notes v2\n");
+  assert.equal(readFileSync(installed(fx, DEMO), "utf8"), "my skill\n");
+});
+
+test("--refresh leaves a current file alone and creates a missing one", () => {
+  const fx = fixture();
+  const opts = source(fx);
+  installSkills(fx.dir, opts);
+  rmSync(installed(fx, NOTES));
+  const result = installSkills(fx.dir, { ...opts, refresh: true, named: ["demo/SKILL.md"] });
+  assert.deepEqual(result.created, [NOTES]);
+  assert.deepEqual(result.skipped, [DEMO]);
+  assert.deepEqual(result.replaced, [], "a file identical to the packaged one counts as nothing done");
+});
+
+test("--refresh --dry-run reports the replacement and writes nothing", () => {
+  const fx = fixture();
+  const opts = source(fx);
+  installSkills(fx.dir, opts);
+  writeFileSync(installed(fx, DEMO), "---\ndescription: old\n---\n", "utf8");
+  const result = installSkills(fx.dir, { ...opts, refresh: true, dryRun: true });
+  assert.deepEqual(result.replaced, [DEMO]);
+  assert.equal(readFileSync(installed(fx, DEMO), "utf8"), "---\ndescription: old\n---\n");
+});
+
+test("naming a file the package does not ship is a refusal", () => {
+  const fx = fixture();
+  const opts = source(fx);
+  installSkills(fx.dir, opts);
+  const result = installSkills(fx.dir, { ...opts, refresh: true, named: ["demo/mine.md"] });
+  assert.equal(result.ok, false);
+  assert.equal(result.kind, "unknown-file");
+  assert.equal(result.message, "`demo/mine.md` is not a packaged skill file");
+  assert.deepEqual(result.details, [
+    "Name a path under " + skillsTarget(fx.dir) + " as the package ships it: demo/SKILL.md, demo/refs/notes.md",
+  ]);
+  for (const key of ["created", "skipped", "replaced", "kept"]) assert.deepEqual(result[key], [], key);
+});
+
+test("what the install prints names each outcome, and only the ones that happened", () => {
+  const plain = { color: { ok: (s) => s, dim: (s) => s, warn: (s) => s } };
+  const base = { target: "/t", created: [], skipped: [], replaced: [], kept: [] };
+  const say = (over) => renderInstall({ ...base, ...over }, plain);
+
+  assert.match(say({}), /skills: nothing to install/);
+  for (const over of [{ created: ["a"] }, { skipped: ["a"] }, { replaced: ["a"] }, { kept: ["a"] }]) {
+    assert.doesNotMatch(say(over), /nothing to install/, JSON.stringify(over));
+  }
+
+  // Whole strings, because every line of this is something a user reads.
+  assert.equal(say({ replaced: ["demo/SKILL.md", "demo/b.md"] }),
+    "✓ refreshed: 2 file(s) → /t\n    demo/SKILL.md\n    demo/b.md");
+  assert.equal(say({ kept: ["demo/SKILL.md", "demo/b.md"] }), [
+    "! kept (matches no shipped version — your edit?): demo/SKILL.md, demo/b.md",
+    "  To replace it anyway, discarding what it holds, name it:",
+    "  `" + CLI_NAME + " skills install --refresh demo/SKILL.md demo/b.md`",
+  ].join("\n"));
+  assert.equal(say({ skipped: ["demo/SKILL.md", "demo/b.md"] }),
+    "· skipped (already there, left alone): demo/SKILL.md, demo/b.md");
+  assert.equal(say({ created: ["demo/SKILL.md"] }), [
+    "✓ skills: 1 file(s) → /t",
+    "    demo/SKILL.md",
+    "  The skill holds no procedure and no vocabulary — it tells an agent to run",
+    "  `" + CLI_NAME + " instructions overview`, which is rendered with YOUR config.yaml.",
+  ].join("\n"));
+});
+
+test("`skills install --refresh` through the CLI: keeps an edit, then replaces it when named", () => {
+  const fx = fixture();
+  assert.equal(run(["init", "--dir", fx.backlog, "--no-example", "--skills"], fx.dir, fx.env).status, 0);
+  const path = join(fx.dir, ".claude", "skills", SKILL);
+  writeFileSync(path, "# my own version\n", "utf8");
+
+  const kept = run(["skills", "install", "--refresh", "--dir", fx.backlog], fx.dir, fx.env);
+  assert.equal(kept.status, 0, kept.stderr);
+  assert.match(kept.stdout, /kept/);
+  assert.ok(kept.stdout.includes("skills install --refresh backlog-workflow/SKILL.md"),
+    "the remedy does not name the file:\n" + kept.stdout);
+  assert.equal(readFileSync(path, "utf8"), "# my own version\n");
+
+  const named = run(["skills", "install", "--refresh", "backlog-workflow/SKILL.md", "--dir", fx.backlog, "--json"], fx.dir, fx.env);
+  assert.equal(named.status, 0, named.stderr);
+  assert.deepEqual(JSON.parse(named.stdout).replaced, [SKILL]);
+  assert.equal(readFileSync(path, "utf8"), readFileSync(join(PACKAGED_SKILLS, SKILL), "utf8"));
+
+  const plain = run(["skills", "install", "--refresh", "--dir", fx.backlog], fx.dir, fx.env);
+  assert.match(plain.stdout, /skipped/);
+  assert.doesNotMatch(plain.stdout, /refreshed|kept/);
+
+  writeFileSync(path, "# edited again\n", "utf8");
+  const text = run(["skills", "install", "--refresh", "backlog-workflow/SKILL.md", "--dir", fx.backlog], fx.dir, fx.env);
+  assert.equal(text.status, 0, text.stderr);
+  assert.match(text.stdout, /refreshed: 1 file\(s\)/);
+  assert.ok(text.stdout.includes(SKILL), text.stdout);
+});
+
+test("`skills install --dry-run` through the CLI writes nothing", () => {
+  const fx = fixture();
+  assert.equal(run(["init", "--dir", fx.backlog, "--no-example"], fx.dir, fx.env).status, 0);
+  // From ANOTHER directory, so only --dir can find the backlog.
+  const r = run(["skills", "install", "--dry-run", "--dir", fx.backlog], tmp("elsewhere"), fx.env);
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(r.stdout.includes(SKILL), r.stdout);
+  assert.equal(existsSync(join(fx.dir, ".claude")), false, "a dry run wrote into .claude/");
+});
+
+test("a file argument without --refresh, or naming no packaged file, is a usage error", () => {
+  const fx = fixture();
+  assert.equal(run(["init", "--dir", fx.backlog, "--no-example", "--skills"], fx.dir, fx.env).status, 0);
+  const without = run(["skills", "install", "backlog-workflow/SKILL.md", "--dir", fx.backlog], fx.dir, fx.env);
+  assert.equal(without.status, 2);
+  assert.match(without.stderr, /unexpected argument/);
+  const unknown = run(["skills", "install", "--refresh", "nope.md", "--dir", fx.backlog], fx.dir, fx.env);
+  assert.equal(unknown.status, 2);
+  assert.match(unknown.stderr, /nope\.md/);
+  assert.match(unknown.stderr, /skills install: `nope\.md` is not a packaged skill file/);
+  assert.match(unknown.stderr, /as the package ships it/, "the refusal does not list what may be named");
+  // A flag is never read as a file name, with or without --refresh.
+  for (const args of [["--frobnicate"], ["--refresh", "--frobnicate"]]) {
+    const flag = run(["skills", "install", ...args, "--dir", fx.backlog], fx.dir, fx.env);
+    assert.equal(flag.status, 2, args.join(" "));
+    assert.match(flag.stderr, /unknown flag: --frobnicate/, args.join(" "));
+    assert.match(flag.stderr, /skills install: unknown flag: --frobnicate$/m, args.join(" "));
+    assert.match(flag.stderr, /available: --dry-run --json --dir --refresh \[<file>\.\.\.\]$/m, "the usage line does not offer a file");
+  }
+  const two = run(["skills", "install", "a.md", "b.md", "--dir", fx.backlog], fx.dir, fx.env);
+  assert.match(two.stderr, /skills install: unexpected argument: a\.md b\.md$/m);
+});
+
+test("the subcommand refusals say what was wrong", () => {
+  const fx = fixture();
+  assert.match(run(["skills", "uninstall"], fx.dir, fx.env).stderr, /skills: unknown subcommand: uninstall\n\s*available: install$/m);
+  assert.match(run(["skills"], fx.dir, fx.env).stderr, /skills: no subcommand\n/);
+});
+
+test("with no backlog to anchor on, `skills install` refuses and says how to make one", () => {
+  const fx = fixture();
+  assert.equal(spawnSync("git", ["init", "-q"], { cwd: fx.dir }).status, 0);
+  const r = run(["skills", "install"], fx.dir, fx.env);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /skills install: no backlog here/);
+  assert.match(r.stderr, /init --dir <path>/, "the refusal lost its details");
+  assert.equal(existsSync(join(fx.dir, ".claude")), false);
 });
 
 // ── the content is portable ───────────────────────────────────────────────

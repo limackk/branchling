@@ -714,6 +714,21 @@ by description knows a backlog is here and knows to run `branchling instructions
 overview`, which is rendered with *your* `config.yaml`. A skill that listed
 statuses would be a second truth about them, wrong the moment you renamed one.
 
+Never overwriting has one cost: the skill's *description*, which decides whether
+an editor loads it at all, stays as it was on the day of the install. `branchling
+doctor` reports an installed copy that differs from the one your installed
+package ships, and a refresh brings it up to date:
+
+```bash
+branchling skills install --refresh                            # replaces only copies the package shipped
+branchling skills install --refresh backlog-workflow/SKILL.md  # replaces this file whatever it holds
+```
+
+The first form replaces a file only when it is byte-for-byte a version the
+package once shipped, so it cannot hold an edit of yours; a file that matches no
+shipped version is kept and named. Naming the file is how you say that discarding
+its content is what you want. Files you added beside the skill are never touched.
+
 ## Platform notes
 
 A stored command line — a `bash:` verification entry, `--agent`, `--agent-for`

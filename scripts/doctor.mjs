@@ -41,7 +41,7 @@ import { ATTRIBUTE_RULES, IGNORE_RULES, hasUnionMerge, insideGitRepo, trackedVie
 import { SNAPSHOT_FILE, loadSnapshot, readMigrations, reconcile } from "./history.mjs";
 import { HOOK_NAMES, hooksTarget, inspect } from "./hooks-command.mjs";
 import { CLAUDE_AGENT_FILE, CLAUDE_IMPORT_LINE, NEUTRAL_AGENT_FILE, NUDGE_VERSION, nudgeState } from "./instructions.mjs";
-import { USER_SKILLS, skillsTarget } from "./install-skills.mjs";
+import { USER_SKILLS, compareInstalled, skillsTarget } from "./install-skills.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { MARK as UI_MARK, color, errColor, heading, refusal } from "./ui.mjs";
@@ -350,15 +350,35 @@ function checkAgentPointer(root) {
     carrying.map((f) => f.name).join(", ") + plural(carrying.length, " points", " point") + " at `" + N + " instructions overview`");
 }
 
-function checkSkill(root) {
+/**
+ * Installed AND current (TL-585). `skills install` never overwrites, so an
+ * installed copy keeps the description of the day it was installed — and the
+ * description is what decides whether an editor loads the skill at all. A
+ * difference is INFO, like an absent skill: the copy may be the user's own edit,
+ * and doctor cannot tell a deliberate edit from a forgotten one. What it can
+ * tell is whether the copy is a version this package shipped, and that decides
+ * which command to print. `opts` is `compareInstalled`'s, for the tests.
+ */
+export function checkSkill(root, opts = {}) {
   const target = skillsTarget(repositoryRoot(root));
-  const missing = USER_SKILLS.filter((name) => !existsSync(join(target, name, "SKILL.md")));
+  const missing = (opts.skills || USER_SKILLS).filter((name) => !existsSync(join(target, name, "SKILL.md")));
   if (missing.length) {
     return check("agent-skill", "packaged skill", INFO,
       "not installed: " + missing.join(", ") + " — an editor that loads skills will not know a backlog is here",
       N + " skills install");
   }
-  return check("agent-skill", "packaged skill", OK, USER_SKILLS.join(", ") + " in " + target);
+  const state = compareInstalled(repositoryRoot(root), opts);
+  // An installation without its packaged skills cannot be compared with them;
+  // that is a broken tarball, and `skills install` is where it is reported.
+  const differ = state.ok ? state.files.filter((f) => f.state === "shipped" || f.state === "edited") : [];
+  if (differ.length) {
+    const edited = differ.filter((f) => f.state === "edited").map((f) => f.file);
+    return check("agent-skill", "packaged skill", INFO,
+      differ.map((f) => f.file + (f.state === "shipped" ? " is an older packaged version" : " differs from every packaged version")).join(", ") +
+        " — its description is not the one this release ships",
+      N + " skills install --refresh" + (edited.length ? " " + edited.join(" ") + "   # replaces your edit of it" : ""));
+  }
+  return check("agent-skill", "packaged skill", OK, (opts.skills || USER_SKILLS).join(", ") + " in " + target);
 }
 
 function checkHooks(root) {
