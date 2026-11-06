@@ -8,8 +8,8 @@ epic: ""                           # free text — the group this task counts to
 release: ""                        # the release it is PLANNED for (a value from `releases:` in config.yaml). Empty = none
 target: []                         # the deploy targets in ANOTHER repository it ships from (`deploy_targets` with `repository:`). Empty = none
 priority: P3
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:impl-tl-594
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 conflict_group: []                 # the AREA it touches (e.g. a module): `next` and `run` hold it back while a task of the same group is in progress. Empty = `conflict_group_from`, or none
@@ -42,5 +42,5 @@ Found in the TL-585 review. compareInstalled() in scripts/install-skills.mjs cal
 
 ## Acceptance criteria
 
-- [ ] compareInstalled does not throw when a packaged path is a directory [proof: directory-in-place-no-throw]
-- [ ] the skill install and doctor tests pass, including the new directory case [proof: suite-files]
+- [x] compareInstalled does not throw when a packaged path is a directory [proof: directory-in-place-no-throw]
+- [x] the skill install and doctor tests pass, including the new directory case [proof: suite-files]

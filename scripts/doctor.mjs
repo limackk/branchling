@@ -427,6 +427,16 @@ export function checkSkill(root, opts = {}) {
       N + " skills install");
   }
   const state = compareInstalled(repositoryRoot(root), opts);
+  // A WARNING, unlike an absent or edited skill (TL-594): nobody chooses a
+  // directory where the skill file belongs, the editor reads nothing from it,
+  // and no refresh can repair it — `skills install` leaves it alone too.
+  const blocked = state.ok ? state.files.filter((f) => f.state === "blocked").map((f) => f.file) : [];
+  if (blocked.length) {
+    return check("agent-skill", "packaged skill", WARN,
+      blocked.join(", ") + plural(blocked.length, " is not a regular file", " are not regular files") + " — an editor cannot read the skill from " +
+        plural(blocked.length, "it", "them"),
+      N + " skills install   # after moving " + blocked.map((f) => join(state.target, f)).join(" ") + " aside");
+  }
   // An installation without its packaged skills cannot be compared with them;
   // that is a broken tarball, and `skills install` is where it is reported.
   const differ = state.ok ? state.files.filter((f) => f.state === "shipped" || f.state === "edited") : [];
