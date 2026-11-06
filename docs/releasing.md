@@ -17,6 +17,15 @@ memory (TL-455).
    `## Install or upgrade` block that names the exact version, `## Changes` with
    the task id beside each change, `## Upgrade notes` for anything a caller must
    do or will see differently, and `## Provenance`.
+   **A release that introduces a `config.yaml` key says so in `## Upgrade
+   notes`**: a backlog whose configuration uses that key must be read by
+   this release or later, and a team that shares the backlog upgrades
+   together. The keys a release introduces are the entries of `KEY_SINCE`
+   in `scripts/config.mjs` that name it; a key added between releases names
+   the next minor version, because adding a key is a minor release.
+   From the release that introduces `requires_version` on,
+   `release-notes.test.mjs` fails a bump whose notes do not name it and do
+   not say that teams upgrade together (TL-586).
 3. **Set `version` in `package.json`.** `scripts/tests/release-notes.test.mjs`
    fails until the notes file for that version exists and its install command
    names it, so the bump and the notes travel in one commit.

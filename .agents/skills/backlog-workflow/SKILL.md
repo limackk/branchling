@@ -1,6 +1,6 @@
 ---
 name: backlog-workflow
-description: Drive a branchling backlog — markdown task files with YAML frontmatter under a `backlog/` directory — from a coding session. The procedure itself is printed by the tool (`branchling instructions`); this skill is what tells you to go and read it. Use this skill whenever the repository has a `backlog/` (or co-located `tasks/` + `config.yaml`) directory, whenever a task ID like `TL-1234` or `BL-42` appears, and whenever the user says things like "what should I work on", "start TL-1234", "mark this done", "add a task for that", "what's blocked" — even if they never say the word branchling.
+description: Drives a branchling backlog — markdown task files with YAML frontmatter under a `backlog/` directory — from a coding session. The procedure itself is printed by the tool (`branchling instructions`); this skill only sends the agent to read it. Use this skill whenever the repository has a `backlog/` (or co-located `tasks/` + `config.yaml`) directory, whenever a task ID like `TL-1234` or `BL-42` appears, and whenever the user says things like "what should I work on", "start TL-1234", "mark this done", "add a task for that", "what's blocked" — even if they never say the word branchling.
 ---
 
 # Working a branchling backlog

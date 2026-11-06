@@ -48,6 +48,14 @@
  * command the whole configuration is then loaded strictly from the written
  * file, and the original bytes are restored if that fails. Refusal is total.
  *
+ * THE FLOOR TRAVELS WITH THE KEY (TL-586). Appending to a key a newer release
+ * introduced makes the file unreadable to an older one, so the same diff raises
+ * `requires_version` to that key's release when the file states a lower floor,
+ * and writes one when the key is newer than `requires_version` itself. A higher
+ * floor is left alone, and the rules are `raisedRequirement` in
+ * `scripts/config-version.mjs`. A build older than the file's floor refuses
+ * before writing anything: it cannot read the file, so it cannot edit it.
+ *
  * WHERE THE REASON GOES. `--reason` is required and is written as a comment
  * directly above the new entry. `backlog/history/` is keyed by a task, and a
  * release is not a task — TL-213 settled the same question for `plan.yaml`: the
@@ -61,11 +69,12 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { ConfigError, loadConfig, parseConfigYaml } from "./config.mjs";
+import { ConfigError, KEY_SINCE, loadConfig, parseConfigYaml } from "./config.mjs";
+import { REQUIRES_VERSION_KEY, raisedRequirement, readableVersion, setRequirementText } from "./config-version.mjs";
 import { NAME_SHAPE, REPOSITORY_SHAPE, isGlob } from "./deploy-targets.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { backlogPaths, BACKLOG_DIR_REFUSAL_EXIT, BACKLOG_DIR_REFUSAL_KIND, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
-import { PRODUCT_NAME as N } from "./product.mjs";
+import { PRODUCT_NAME as N, PRODUCT_VERSION } from "./product.mjs";
 import { RELEASE_SHAPE, normalizeReason, reasonRefusal, stripComment } from "./task-fields.mjs";
 import { MARK, color, failure, refusal } from "./ui.mjs";
 
@@ -203,15 +212,24 @@ function readBack(key, values) {
 
 /**
  * PURE — config.yaml with one entry appended to `key`, or the refusal. Nothing
- * else in the text changes.
+ * else in the text changes but the floor that key implies (see the header).
  *
- * @returns {{ok: true, text: string} | {ok: false, kind: string, message: string, details: string[]}}
+ * @param {Record<string, string>} [since] key → the release that introduced
+ *        it; a test passes its own to reach a key newer than any shipped
+ * @returns {{ok: true, text: string, requiresVersion: {from: string|null, to: string}|null}
+ *          | {ok: false, kind: string, message: string, details: string[]}}
  */
-export function appendEntryText(text, key, entry, reason) {
+export function appendEntryText(text, key, entry, reason, since = KEY_SINCE) {
   const no = (kind, message, details = []) => ({ ok: false, kind, message, details });
-  const before = parseConfigYaml(text);
+  // The build that knows `since` reads up to its newest release: the same rule
+  // `loadConfig` applies, here with the table the caller writes from.
+  const reader = { readable: readableVersion(PRODUCT_VERSION, since) };
+  const before = parseConfigYaml(text, reader);
   if (before.problems.length) {
-    return no("unreadable", "config.yaml cannot be read, so it cannot be edited safely", before.problems);
+    // A file above this build's floor carries its way out with it: the
+    // refusal is the parser's, and so is the upgrade it names.
+    const way = before.requirement ? before.requirement.remedy.map((l) => l.trim()) : [];
+    return no("unreadable", "config.yaml cannot be read, so it cannot be edited safely", before.problems.concat(way));
   }
   if (names(key, before.values).indexOf(entry.name) >= 0) {
     return no("duplicate", "`" + entry.name + "` is already declared in `" + key + "`", [
@@ -273,12 +291,18 @@ export function appendEntryText(text, key, entry, reason) {
     }
   }
 
-  const next = out.join(eol);
-  const after = parseConfigYaml(next);
+  const floorBefore = before.values[REQUIRES_VERSION_KEY] || null;
+  const floor = raisedRequirement(floorBefore, key, since);
+  const joined = out.join(eol);
+  const next = floor ? setRequirementText(joined, floor, N, stripComment) : joined;
+  const after = parseConfigYaml(next, reader);
   if (after.problems.length) return no("invalid", "the entry would make config.yaml unreadable", after.problems);
+  if (floor && after.values[REQUIRES_VERSION_KEY] !== floor) {
+    return no("disturbed", "the edit would not raise `" + REQUIRES_VERSION_KEY + "` to " + floor + ", so nothing was written");
+  }
   const keys = new Set(Object.keys(before.values).concat(Object.keys(after.values)));
   for (const k of keys) {
-    if (k === key) continue;
+    if (k === key || (floor && k === REQUIRES_VERSION_KEY)) continue;
     if (readBack(k, before.values) !== readBack(k, after.values)) {
       return no("disturbed", "the edit would change `" + k + "` as well, so nothing was written");
     }
@@ -295,7 +319,7 @@ export function appendEntryText(text, key, entry, reason) {
   if (readBack(key, expected) !== readBack(key, after.values)) {
     return no("disturbed", "the edit would not read back as the one entry it adds, so nothing was written");
   }
-  return { ok: true, text: next };
+  return { ok: true, text: next, requiresVersion: floor ? { from: floorBefore, to: floor } : null };
 }
 
 /** Flags into a spec, or a usage error. */
@@ -391,11 +415,15 @@ export function run(argv) {
   }
 
   if (wantsJson) {
-    printJson("vocabulary-declare", { ok: true, key, name, entry: built.entry, reason, file });
+    printJson("vocabulary-declare", { ok: true, key, name, entry: built.entry, reason, file, requiresVersion: edit.requiresVersion });
     return 0;
   }
   console.log(color.ok(MARK.ok) + " " + key + ": `" + name + "` declared");
   console.log("  reason: " + reason);
+  if (edit.requiresVersion) {
+    console.log("  " + REQUIRES_VERSION_KEY + ": " + (edit.requiresVersion.from || "none") + " → " + edit.requiresVersion.to +
+      " — `" + key + "` arrived in " + edit.requiresVersion.to + ", so an older release cannot read this file");
+  }
   console.log("  " + file + " — the change is the diff of this one file; the comments are kept");
   return 0;
 }

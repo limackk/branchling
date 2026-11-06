@@ -10,10 +10,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { checkSkill } from "../doctor.mjs";
+import { contentHash } from "../install-skills.mjs";
 import { CLAUDE_IMPORT_LINE, NUDGE_CLOSE, NUDGE_OPEN_PREFIX, NUDGE_VERSION } from "../instructions.mjs";
 import { isolateHome, SCRIPTS_DIR } from "./_repo.mjs";
 
@@ -80,6 +82,99 @@ test("the packaged skill: absent names `skills install`, installed is green", ()
   assert.equal(absent.status, "info");
   assert.match(absent.fix, /skills install/);
   assert.equal(rows(repo({}, "--skills"))["agent-skill"].status, "ok");
+});
+
+// ── a stale installed skill (TL-585) ──
+//
+// `skills install` never overwrites, so an installed copy keeps the description
+// of its install day. Doctor reports a difference as INFO — it may be the
+// user's own edit — and prints the command that matches what the copy is.
+
+test("an edited installed skill is reported, with the refresh that names it", () => {
+  const dir = repo({}, "--skills");
+  writeFileSync(join(dir, ".claude", "skills", "backlog-workflow", "SKILL.md"), "# my own version\n", "utf8");
+  const row = rows(dir)["agent-skill"];
+  assert.equal(row.status, "info");
+  assert.match(row.detail, /backlog-workflow\/SKILL\.md differs from every packaged version/);
+  assert.match(row.fix, /skills install --refresh backlog-workflow\/SKILL\.md/);
+});
+
+test("positive control: the refresh it prints makes the row green again", () => {
+  const dir = repo({}, "--skills");
+  writeFileSync(join(dir, ".claude", "skills", "backlog-workflow", "SKILL.md"), "# my own version\n", "utf8");
+  const r = run(dir, ["skills", "install", "--refresh", "backlog-workflow/SKILL.md", "--dir", "backlog"]);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const row = rows(dir)["agent-skill"];
+  assert.equal(row.status, "ok", JSON.stringify(row));
+  assert.equal(row.fix, null);
+});
+
+test("an older packaged version is reported with a plain refresh, which names no file", () => {
+  // The real package's old versions live in git history, absent from a shallow
+  // clone, so the comparison is given a fixture package with a known old one.
+  const dir = repo();
+  const pkg = join(dir, "pkg", "demo");
+  mkdirSync(pkg, { recursive: true });
+  writeFileSync(join(pkg, "SKILL.md"), "new\n", "utf8");
+  const target = join(dir, ".claude", "skills", "demo");
+  mkdirSync(target, { recursive: true });
+  writeFileSync(join(target, "SKILL.md"), "old\n", "utf8");
+  const opts = { source: join(dir, "pkg"), skills: ["demo"], shipped: { "demo/SKILL.md": [contentHash(join(target, "SKILL.md"))] } };
+
+  const row = checkSkill(join(dir, "backlog"), opts);
+  assert.equal(row.status, "info");
+  assert.equal(row.title, "packaged skill");
+  assert.equal(row.detail, join("demo", "SKILL.md") + " is an older packaged version — its description is not the one this release ships");
+  assert.match(row.fix, / skills install --refresh$/, "a plain refresh must name no file: " + row.fix);
+
+  writeFileSync(join(target, "SKILL.md"), "mine\n", "utf8");
+  const edited = checkSkill(join(dir, "backlog"), opts);
+  assert.equal(edited.title, "packaged skill");
+  assert.match(edited.fix, / skills install --refresh demo\/SKILL\.md {3}# replaces your edit of it$/);
+
+  writeFileSync(join(target, "SKILL.md"), "new\n", "utf8");
+  const current = checkSkill(join(dir, "backlog"), opts);
+  assert.equal(current.status, "ok");
+  assert.equal(current.title, "packaged skill");
+  // The repository root is canonical (macOS: /var is /private/var).
+  assert.equal(current.detail, "demo in " + join(realpathSync(dir), ".claude", "skills"));
+
+  // A package that cannot be read is not a difference: `skills install` is
+  // where a broken tarball is reported.
+  const broken = checkSkill(join(dir, "backlog"), { ...opts, source: join(dir, "nowhere") });
+  assert.equal(broken.status, "ok", JSON.stringify(broken));
+});
+
+test("several skills and files are each named, joined so they stay readable", () => {
+  const dir = repo();
+  const opts = { source: join(dir, "pkg"), skills: ["demo", "other"], shipped: {} };
+  for (const name of opts.skills) {
+    mkdirSync(join(dir, "pkg", name), { recursive: true });
+    writeFileSync(join(dir, "pkg", name, "SKILL.md"), "new\n", "utf8");
+  }
+  const backlog = join(dir, "backlog");
+  assert.match(checkSkill(backlog, opts).detail, /^not installed: demo, other — /);
+
+  for (const name of opts.skills) {
+    mkdirSync(join(dir, ".claude", "skills", name), { recursive: true });
+    writeFileSync(join(dir, ".claude", "skills", name, "SKILL.md"), "mine\n", "utf8");
+  }
+  const edited = checkSkill(backlog, opts);
+  assert.equal(edited.detail, join("demo", "SKILL.md") + " differs from every packaged version, " +
+    join("other", "SKILL.md") + " differs from every packaged version — its description is not the one this release ships");
+  assert.match(edited.fix, / skills install --refresh demo\/SKILL\.md other\/SKILL\.md {3}# replaces your edit of it$/);
+
+  for (const name of opts.skills) writeFileSync(join(dir, ".claude", "skills", name, "SKILL.md"), "new\n", "utf8");
+  assert.match(checkSkill(backlog, opts).detail, /^demo, other in /);
+});
+
+test("a skill directory without its SKILL.md counts as not installed", () => {
+  const dir = repo();
+  mkdirSync(join(dir, ".claude", "skills", "demo"), { recursive: true });
+  const row = checkSkill(join(dir, "backlog"), { skills: ["demo"] });
+  assert.equal(row.status, "info");
+  assert.equal(row.title, "packaged skill");
+  assert.match(row.detail, /^not installed: demo — an editor that loads skills will not know a backlog is here$/);
 });
 
 test("the git gates: absent names `hooks print`, installed is green", () => {

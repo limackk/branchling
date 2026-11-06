@@ -8,8 +8,8 @@ epic: ""                           # free text — the group this task counts to
 release: ""                        # the release it is PLANNED for (a value from `releases:` in config.yaml). Empty = none
 target: []                         # the deploy targets in ANOTHER repository it ships from (`deploy_targets` with `repository:`). Empty = none
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:impl-tl-586
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 conflict_group: []                 # the AREA it touches (e.g. a module): `next` and `run` hold it back while a task of the same group is in progress. Empty = `conflict_group_from`, or none
@@ -45,5 +45,5 @@ Measured on 2026-11-06: a backlog created by v0.1.0, then given `releases:` by v
 
 ## Acceptance criteria
 
-- [ ] A config whose requires_version is above the running version fails with both versions and the upgrade command, and no unknown-key list. [proof: requires-version-refuses-with-upgrade]
-- [ ] Declaring a key introduced in a release raises requires_version to that release when it was lower, and leaves a higher one alone. [proof: declare-raises-requirement]
+- [x] A config whose requires_version is above the running version fails with both versions and the upgrade command, and no unknown-key list. [proof: requires-version-refuses-with-upgrade]
+- [x] Declaring a key introduced in a release raises requires_version to that release when it was lower, and leaves a higher one alone. [proof: declare-raises-requirement]

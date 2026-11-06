@@ -13,6 +13,8 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
+import { KEY_SINCE } from "../config.mjs";
+import { REQUIRES_VERSION_KEY, compareVersions } from "../config-version.mjs";
 import { REPO_ROOT, isolateHome } from "./_repo.mjs";
 
 isolateHome("release-notes");
@@ -67,4 +69,38 @@ test("the release document names the token that publishes and how to recover", (
   assert.match(releasing, /bypasses two-factor authentication/, "the document omits the two-factor bypass");
   assert.match(releasing, /403 Forbidden/, "the document does not show what a refused token looks like");
   assert.match(releasing, /gh run rerun <run-id> --failed/, "the document does not say a failed publish is rerun, not retagged");
+});
+
+/**
+ * What the notes for `version` still owe about the config keys it introduces
+ * (TL-586): each key named, and the sentence that a team sharing the backlog
+ * upgrades together. Held only from the release that introduces
+ * `requires_version` on — the published notes before it are records, and
+ * correcting them would make them say what they never said.
+ */
+function owedKeyNotes(version, notes, since) {
+  if (compareVersions(version, since[REQUIRES_VERSION_KEY]) < 0) return [];
+  const upgrade = notes.slice(notes.indexOf("## Upgrade notes"));
+  const owed = Object.keys(since).filter((k) => since[k] === version && !upgrade.includes("`" + k + "`"))
+    .map((k) => "`" + k + "` is not named in ## Upgrade notes");
+  if (!/upgrade together/i.test(upgrade)) owed.push("## Upgrade notes do not say that teams upgrade together");
+  return owed;
+}
+
+test("the notes of a release that adds config keys name them and say teams upgrade together", () => {
+  // The rule itself, on cases that do not depend on which version is current:
+  // without these the assertion below is vacuous until the next bump.
+  const since = { old_key: "1.0.0", [REQUIRES_VERSION_KEY]: "2.0.0", new_key: "2.0.0" };
+  assert.deepEqual(owedKeyNotes("1.0.0", "## Upgrade notes\n", since), [], "notes before the floor key are records");
+  assert.deepEqual(owedKeyNotes("2.0.0", "## Changes\n`new_key`\n## Upgrade notes\nnothing.\n", since), [
+    "`" + REQUIRES_VERSION_KEY + "` is not named in ## Upgrade notes",
+    "`new_key` is not named in ## Upgrade notes",
+    "## Upgrade notes do not say that teams upgrade together",
+  ]);
+  assert.deepEqual(owedKeyNotes("2.0.0",
+    "## Upgrade notes\n`" + REQUIRES_VERSION_KEY + "` and `new_key` need 2.0.0; teams upgrade together.\n", since), []);
+
+  const { version } = JSON.parse(readFileSync(join(REPO_ROOT, "package.json"), "utf8"));
+  const notes = readFileSync(join(RELEASES, "v" + version + ".md"), "utf8");
+  assert.deepEqual(owedKeyNotes(version, notes, KEY_SINCE), [], "docs/releases/v" + version + ".md");
 });

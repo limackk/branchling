@@ -168,7 +168,9 @@ branchling skills install      # a skill pointer for editors that load skills
 branchling mcp                 # the same commands over the Model Context Protocol
 ```
 
-`skills install` never overwrites an existing file. Local profiles connect any
+`skills install` never overwrites an existing file; `skills install --refresh`
+replaces one only when it is a version the package shipped, so an edit of yours
+is never lost. Local profiles connect any
 provider through an adapter you own; see [the guide](docs/guide.md#a-queue-not-just-a-readable-list).
 
 ## Documentation
