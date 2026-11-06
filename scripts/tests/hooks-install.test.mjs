@@ -225,6 +225,19 @@ test("inspect says whether our block is the one this release writes", () => {
   assert.equal(inspect(msg).current, false);
 });
 
+test("inspect says whether our block closes, which is whether install can replace it (TL-600)", () => {
+  const dir = repo();
+  const target = hooksTarget(dir);
+  assert.equal(inspect(target).closed, undefined, "an absent hook has no block to close");
+  assert.equal(run(dir, ["hooks", "install"]).status, 0);
+  assert.deepEqual([inspect(target).current, inspect(target).closed], [true, true]);
+  writeFileSync(target.path, readFileSync(target.path, "utf8").replace("check || exit 1", "check --old || exit 1"), "utf8");
+  assert.deepEqual([inspect(target).current, inspect(target).closed], [false, true], "stale but closed: install replaces it");
+  writeFileSync(target.path, "#!/bin/sh\n" + hookBlock().split("\n").slice(0, -1).join("\n") + "\nnpm test\n", "utf8");
+  assert.deepEqual([inspect(target).state, inspect(target).current, inspect(target).closed], ["ours", false, false]);
+  assert.equal(run(dir, ["hooks", "install"]).status, 1, "the premise: what is not closed, install refuses");
+});
+
 test("installedBlock reads an indented or CRLF block as the text it carries", () => {
   const block = hookBlock();
   assert.equal(installedBlock("#!/bin/sh\n" + block + "\n"), block);

@@ -37,7 +37,7 @@ import { archivedElsewhereBySource, crossBranchState, divergences } from "./bran
 import { ConfigError, formatConfigError, loadConfig } from "./config.mjs";
 import { deployFetchState } from "./deploy-fetch.mjs";
 import { commandRunner, contextBudget } from "./context-budget.mjs";
-import { ATTRIBUTE_RULES, IGNORE_RULES, hasUnionMerge, insideGitRepo, trackedViews, unignoredViews } from "./git-rules.mjs";
+import { ATTRIBUTE_RULES, BLOCK_OPEN, IGNORE_RULES, hasUnionMerge, insideGitRepo, trackedViews, unignoredViews } from "./git-rules.mjs";
 import { SNAPSHOT_FILE, loadSnapshot, readMigrations, reconcile } from "./history.mjs";
 import { HOOK_NAMES, hooksTarget, inspect } from "./hooks-command.mjs";
 import { CLAUDE_AGENT_FILE, CLAUDE_IMPORT_LINE, NEUTRAL_AGENT_FILE, NUDGE_VERSION, nudgeState } from "./instructions.mjs";
@@ -445,7 +445,7 @@ function checkHooks(root) {
   const states = HOOK_NAMES.map((name) => {
     const target = hooksTarget(root, name);
     const found = target.ok ? inspect(target) : { state: "unknown" };
-    return { name, state: found.state, current: found.current === true };
+    return { name, path: target.path, state: found.state, current: found.current === true, closed: found.closed === true };
   });
   const missing = states.filter((s) => s.state !== "ours");
   const rows = [missing.length
@@ -463,19 +463,33 @@ function checkHooks(root) {
  * an absent gate: the person chose to install it, and what runs on their commit
  * is no longer what they chose. No row while every installed block is current —
  * the presence row above already says so. `hooks install` refuses outright
- * while any hook is somebody else's, so then the repair it names is the paste
- * that `hooks print` shows, not a command that would fail.
+ * while any hook is somebody else's, and while any block of ours opens without
+ * closing (TL-600), so then the repair it names is the paste that `hooks print`
+ * shows, not a command that would fail. An unclosed block is named by its path
+ * and its opening marker: with no closing one, "between the markers" points
+ * nowhere, and the lines to replace run from the marker to the end of the file.
  */
 function staleHooksRow(states) {
-  const stale = states.filter((s) => s.state === "ours" && !s.current).map((s) => s.name);
-  if (!stale.length) return [];
+  const staleStates = states.filter((s) => s.state === "ours" && !s.current);
+  if (!staleStates.length) return [];
+  const stale = staleStates.map((s) => s.name);
   const foreign = states.filter((s) => s.state === "foreign").map((s) => s.name);
+  const unclosed = staleStates.filter((s) => !s.closed);
+  const closed = staleStates.filter((s) => s.closed).map((s) => s.name);
+  const refusals = [];
+  if (foreign.length) refusals.push(foreign.join(", ") + " is your own hook");
+  if (unclosed.length) {
+    refusals.push(unclosed.map((s) => s.name).join(", ") + plural(unclosed.length, " opens our block and never closes it", " open our block and never close it"));
+  }
+  const repairs = [];
+  if (closed.length) repairs.push("our block in " + closed.join(", "));
+  if (unclosed.length) repairs.push("the lines from `" + BLOCK_OPEN + "` onwards in " + unclosed.map((s) => s.path).join(", "));
   return [check("git-hooks-current", "git gates are current", WARN,
     stale.join(", ") + " carr" + plural(stale.length, "ies a block", "y blocks") +
       " that differ" + plural(stale.length, "s", "") + " from the one this release writes — a change to the gate never reached " +
       plural(stale.length, "it", "them"),
-    foreign.length
-      ? N + " hooks print   # " + foreign.join(", ") + " is your own hook, so `hooks install` refuses; replace our block in " + stale.join(", ") + " by hand"
+    refusals.length
+      ? N + " hooks print   # " + refusals.join(" and ") + ", so `hooks install` refuses; replace " + repairs.join(" and ") + " by hand"
       : N + " hooks install   # replaces only the lines between its markers")];
 }
 

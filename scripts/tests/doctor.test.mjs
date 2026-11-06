@@ -21,6 +21,8 @@ import { fileURLToPath } from "node:url";
 import { isolateHome } from "./_repo.mjs";
 import { checkTemplate, templateFields } from "../doctor.mjs";
 import { HOOK_NAME, COMMIT_MESSAGE_HOOK_NAME, hookBlock, hooksTarget } from "../hooks-command.mjs";
+import { BLOCK_OPEN } from "../git-rules.mjs";
+import { canonicalPath } from "../canonical-path.mjs";
 
 // THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
 // file in its own process, so one call covers every case in it. Without this a
@@ -297,6 +299,67 @@ test("a stale block beside a hook of the user's own names the paste, since insta
     "pre-commit (a hook of your own, without ours) — the guards run only when somebody remembers");
   assert.match(row.fix, /^branchling hooks print   # pre-commit is your own hook, so `hooks install` refuses; replace our block in commit-msg by hand$/);
   assert.equal(run(dir, ["hooks", "install"]).status, 1, "the premise: install refuses beside a foreign hook");
+});
+
+/** Our block with its closing marker cut off — `hooks install` refuses this
+ *  file. Returns the path as doctor spells it: on macOS the temporary directory
+ *  is `/var/…` to Node and `/private/var/…` to git. */
+function unclose(dir, name) {
+  const p = hooksTarget(dir, name).path;
+  writeFileSync(p, "#!/bin/sh\n" + hookBlock(name).split("\n").slice(0, -1).join("\n") + "\n", "utf8");
+  return canonicalPath(p);
+}
+
+test("an unclosed block names the `hooks print` paste and its file, and that repair is callable (TL-600)", () => {
+  const dir = repo();
+  installHooks(dir);
+  const p = unclose(dir, HOOK_NAME);
+  const row = rows(dir).byId["git-hooks-current"];
+  assert.equal(row.status, "warn");
+  assert.match(row.detail, /^pre-commit carries a block that differs/);
+  assert.equal(row.fix, "branchling hooks print   # pre-commit opens our block and never closes it, so `hooks install` refuses; " +
+    "replace the lines from `" + BLOCK_OPEN + "` onwards in " + p + " by hand");
+  assert.equal(run(dir, ["hooks", "install"]).status, 1, "the premise: install refuses an unclosed block");
+
+  // The command it names succeeds and prints the paste; doing what the
+  // comment says is the repair, after which the row is gone.
+  const printed = run(dir, ["hooks", "print"]);
+  assert.equal(printed.status, 0, printed.stderr);
+  for (const line of hookBlock(HOOK_NAME).split("\n")) assert.ok(printed.stdout.includes(line), "the paste is printed: " + line);
+  const text = readFileSync(p, "utf8");
+  writeFileSync(p, text.slice(0, text.indexOf(BLOCK_OPEN)) + hookBlock(HOOK_NAME) + "\n", "utf8");
+  assert.equal(rows(dir).byId["git-hooks-current"], undefined);
+  assert.equal(run(dir, ["hooks", "install"]).status, 0, "once repaired, install no longer refuses");
+});
+
+test("two unclosed blocks are named in the plural, each by its file", () => {
+  const dir = repo();
+  installHooks(dir);
+  const pre = unclose(dir, HOOK_NAME);
+  const msg = unclose(dir, COMMIT_MESSAGE_HOOK_NAME);
+  assert.equal(rows(dir).byId["git-hooks-current"].fix,
+    "branchling hooks print   # pre-commit, commit-msg open our block and never close it, so `hooks install` refuses; " +
+    "replace the lines from `" + BLOCK_OPEN + "` onwards in " + pre + ", " + msg + " by hand");
+});
+
+test("an unclosed block beside a closed stale one names both repairs", () => {
+  const dir = repo();
+  installHooks(dir);
+  const pre = unclose(dir, HOOK_NAME);
+  editGate(dir, COMMIT_MESSAGE_HOOK_NAME, "commit-message", "commit-msg-old");
+  assert.equal(rows(dir).byId["git-hooks-current"].fix,
+    "branchling hooks print   # pre-commit opens our block and never closes it, so `hooks install` refuses; " +
+    "replace our block in commit-msg and the lines from `" + BLOCK_OPEN + "` onwards in " + pre + " by hand");
+});
+
+test("an unclosed block beside a hook of the user's own names both refusals", () => {
+  const dir = repo();
+  installHooks(dir);
+  writeFileSync(hooksTarget(dir, HOOK_NAME).path, "#!/bin/sh\nnpm test\n", "utf8");
+  const msg = unclose(dir, COMMIT_MESSAGE_HOOK_NAME);
+  assert.equal(rows(dir).byId["git-hooks-current"].fix,
+    "branchling hooks print   # pre-commit is your own hook and commit-msg opens our block and never closes it, so `hooks install` refuses; " +
+    "replace the lines from `" + BLOCK_OPEN + "` onwards in " + msg + " by hand");
 });
 
 test("positive control: freshly installed hooks carry no stale row", () => {
