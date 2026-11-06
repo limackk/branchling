@@ -134,6 +134,13 @@ not a task, so `backlog/history/` has no place for it, and — as with
 one file. `--json` answers in the `vocabulary-declare` kind, whose
 `refusalKind` names which refusal it was.
 
+The same diff raises `requires_version:` — the oldest release that can read
+the file — to the release that introduced the key written, when the file
+states a lower one, and reports the raise in `requiresVersion` (TL-586). A
+higher floor stays, and a file with no floor gets one only for a key newer than
+`requires_version` itself. A build older than the file's floor refuses before
+writing: it cannot read the file, so it does not edit it.
+
 **Why these two keys and nothing else.** The code knows the shape of a field
 and config.yaml knows the values (the third law); that does not require a text
 editor for every value, but it does separate two kinds of value. Planning a
