@@ -43,7 +43,7 @@ import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { loadConfigOrExit } from "./config.mjs";
+import { DEFAULTS, loadConfigOrExit } from "./config.mjs";
 import { CONTEXT_RULE, commandRunner, contextBudget } from "./context-budget.mjs";
 import { HOME_ENV } from "./home.mjs";
 import { STATE_DIR_ENV } from "./lock.mjs";
@@ -149,6 +149,75 @@ export function promotionState(config) {
   out.push("");
   if (targets.length) out.push("  deploy targets  " + list(targets));
   if (releases.length) out.push("  releases        " + list(releases));
+  return out.join("\n") + "\n\n";
+}
+
+/**
+ * The paragraph `overview` prints about the release gate and recorded stages
+ * (TL-596), or "" for a backlog with no deploy target in THIS repository.
+ *
+ * WHY overview AND NOT task-finalization. "Is this promotion safe" and "the
+ * store review passed" arrive with a deploy, not with the closing of a task,
+ * and `check --release` is never part of the `check` that finalization runs
+ * before a commit. Named there, it would read as a step of every closing.
+ *
+ * WHY CONDITIONAL ON AN OBSERVED TARGET, NOT ON `deploy_targets`. The gate
+ * reads commits and stage refs, and only a target of this repository has
+ * them: where every target declares `repository:`, or none is declared, it
+ * judges nothing and says so, and a guide offering it would teach a no-op.
+ * `deploy record` is narrower still — it is refused on any stage not declared
+ * `recorded: true` — so its half renders only where such a stage exists and
+ * names exactly those stages. A target in another repository has no stages,
+ * so a recorded stage never stands without an observed target.
+ *
+ * The gate's mode is named because it decides what the exit code means: under
+ * `report` a 0 is printed over any number of gaps, and an agent reading only
+ * the exit would call an unsafe promotion safe.
+ */
+export function promotionGate(config) {
+  const observed = observedTargets(config.deployTargets);
+  if (!observed.length) return "";
+  const recorded = [];
+  let parallel = false;
+  for (const t of observed) {
+    for (const s of t.stages || []) {
+      if (!s.recorded) continue;
+      recorded.push(t.name + "/" + s.name);
+      if (s.parallel) parallel = true;
+    }
+  }
+  const out = [
+    "WHETHER A PROMOTION IS SAFE is a question for `check --release`, never for a",
+    "bare `check`: CI runs it as the step before a deploy, and it names each gap by",
+    "its commit or task — a deployed commit naming no task, a task only partly in a",
+    "stage, a commit a stage holds that the trunk or an earlier stage lacks" + (recorded.length ? "." : ":"),
+  ];
+  if (recorded.length) {
+    out.push(
+      "A stage git cannot observe — store review, an update channel, a sign-off — is",
+      "declared `recorded: true`, and only `deploy record` moves its ref, on a stated",
+      "reason. It refuses every other stage" + (parallel ? ", and a stage of parallel refs also" : ":"),
+    );
+    if (parallel) out.push("takes `--ref <name>`, the one ref that moves:");
+  }
+  out.push(
+    "",
+    "  " + N + " check --release [--env <stage>]   a promotion's gaps, read from git",
+  );
+  if (recorded.length) {
+    out.push("  " + N + " deploy record --target <name> --stage <name> <commit-or-tag> --reason \"…\"");
+  }
+  // A partial configuration (a caller holding only some keys) carries no mode;
+  // the gate then runs under the loader's default, so that is what is named.
+  const mode = config.releaseGate || DEFAULTS.release_gate;
+  const label = recorded.length ? "release gate     " : "release gate  ";
+  out.push(
+    "",
+    "  " + label + "`" + mode + "` — " + (mode === "require"
+      ? "a gap `release_gate_accept` does not name exits 1"
+      : "the gaps are printed and the exit is 0"),
+  );
+  if (recorded.length) out.push("  recorded stages  " + list(recorded));
   return out.join("\n") + "\n\n";
 }
 
@@ -267,6 +336,7 @@ export function vocabulary(config) {
     // nothing to answer, so a backlog without promotion tracking is not shown
     // commands that would refuse it (TL-584).
     promotion_state: promotionState(config),
+    promotion_gate: promotionGate(config),
     release_planning: releasePlanning(config),
     target_planning: targetPlanning(config),
   };
@@ -346,7 +416,7 @@ it alone: open the guide that matches what you are about to do.
                                            one hand or one per role
   {{tool}} instructions context-budget     what an answer costs a session
 
-{{promotion_state}}THIS BACKLOG'S OWN WORDS, read from its configuration. Do not carry values over
+{{promotion_state}}{{promotion_gate}}THIS BACKLOG'S OWN WORDS, read from its configuration. Do not carry values over
 from another backlog and do not assume these:
 
   statuses    {{statuses}}
