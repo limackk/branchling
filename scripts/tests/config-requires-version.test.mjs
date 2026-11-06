@@ -18,6 +18,7 @@
  *   4. Without a floor, an unknown key with no near match says a newer
  *      release may have written it and which build is reading; a near match
  *      still says "did you mean", and a satisfied floor removes the excuse.
+ *      An empty `requires_version` line states no floor (TL-592).
  *
  * An OLDER RELEASE is played by the parser's `readable`/`running` options: the
  * release under test is this one, and the scenario is a file one release
@@ -226,6 +227,25 @@ test("without a floor, an unknown key with no near match may come from a newer r
   assert.deepEqual(r.newerKeys, ["sprint_calendar"]);
   assert.ok(r.problems[0].endsWith("(allowed: " + Object.keys(DEFAULTS).join(", ") + ")"), r.problems[0]);
   assert.match(parseConfigYaml("x_y_z: 1\n", { running: null }).problems[0], /not a key of \S+ of an unknown version/);
+});
+
+test("an empty floor line states no floor, so the newer-release hint stays (TL-592)", () => {
+  // Every spelling of an empty value: the default written out states nothing.
+  for (const empty of ['""', "''", ""]) {
+    const r = parseConfigYaml(REQUIRES_VERSION_KEY + ": " + empty + "\nsprint_calendar: weekly\n", { running: "0.3.0" });
+    assert.equal(r.requirement, null);
+    assert.equal(r.problems.length, 1, empty + ": " + r.problems.join("\n"));
+    assert.match(r.problems[0], new RegExp("^line 2: unknown key `sprint_calendar` — not a key of " + N +
+      " 0\\.3\\.0, so a newer release may have written it \\(allowed: "), empty);
+    assert.deepEqual(r.newerKeys, ["sprint_calendar"], empty);
+  }
+  // Control: the same file with a value on that line states a floor this
+  // build satisfies, and the excuse is gone — so the case above is not a
+  // parser that never suppresses the hint.
+  const stated = parseConfigYaml(REQUIRES_VERSION_KEY + ': "0.1.0"\nsprint_calendar: weekly\n', { running: "0.3.0" });
+  assert.equal(stated.requirement, null);
+  assert.doesNotMatch(stated.problems[0], /newer release/);
+  assert.deepEqual(stated.newerKeys, []);
 });
 
 test("LOAD: that error offers the upgrade beside the typo, and keeps the line", () => {
