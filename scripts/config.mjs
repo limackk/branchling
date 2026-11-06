@@ -456,6 +456,9 @@ export function parseConfigYaml(text, opts = {}) {
   // correct. A malformed floor is not a refusal of this kind; the loop below
   // reports it as a problem of its own line.
   const floor = findRequirement(lines.map(stripComment));
+  // A floor is STATED by its value, not by its line (TL-592): `requires_version: ""`
+  // is the default written out, and DEFAULTS says an empty value states none.
+  const statesFloor = Boolean(floor && floor.value);
   if (floor && VERSION_SHAPE.test(floor.value) && compareVersions(floor.value, readable) > 0) {
     const refusal = requirementRefusal(floor.value, running, PRODUCT_NAME);
     return {
@@ -490,11 +493,11 @@ export function parseConfigYaml(text, opts = {}) {
       // build is old — so the message says which build is reading it. A file
       // that states a floor this build satisfies has no such excuse.
       const near = nearestKey(key);
-      if (!near && !floor) newerKeys.push(key);
+      if (!near && !statesFloor) newerKeys.push(key);
       problems.push(
         near
           ? `line ${i + 1}: unknown key \`${key}\` — did you mean \`${near}\`?`
-          : !floor
+          : !statesFloor
             ? `line ${i + 1}: unknown key \`${key}\` — not a key of ${PRODUCT_NAME} ${shownVersion(running)}, ` +
               `so a newer release may have written it (allowed: ${KNOWN_KEYS.join(", ")})`
             : `line ${i + 1}: unknown key \`${key}\` (allowed: ${KNOWN_KEYS.join(", ")})`
