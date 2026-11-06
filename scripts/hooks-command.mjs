@@ -177,12 +177,25 @@ export function installedBlock(text) {
 /**
  * Our block swapped for `block`, every line outside the markers byte for byte.
  * `replaced: false` when there is no complete block to swap. PURE.
+ *
+ * THE REPLACEMENT IS WRITTEN IN THE SHAPE THE OLD BLOCK HAD (TL-601).
+ * `installedBlock` matches by trimmed line, so a block pasted indented or
+ * checked out with CRLF is recognised; writing its successor as flush-left LF
+ * lines would leave a CRLF file with mixed endings and an indented block
+ * flush left. The indentation and the ending are read from the opening
+ * marker, the line the match is anchored on. The closing marker keeps its
+ * OWN ending: as the last line of a file with no final newline it has none,
+ * and giving it the opening marker's CR would add a byte after the block.
  */
 export function replaceBlock(text, block) {
   const lines = String(text).split("\n");
   const range = blockRange(lines);
   if (!range) return { text, replaced: false };
-  lines.splice(range.open, range.close - range.open + 1, ...block.split("\n"));
+  const indent = /^[ \t]*/.exec(lines[range.open])[0];
+  const cr = (line) => (line.endsWith("\r") ? "\r" : "");
+  const fresh = block.split("\n").map((l) => indent + l + cr(lines[range.open]));
+  fresh[fresh.length - 1] = indent + block.split("\n").at(-1) + cr(lines[range.close]);
+  lines.splice(range.open, range.close - range.open + 1, ...fresh);
   return { text: lines.join("\n"), replaced: true };
 }
 
