@@ -17,7 +17,7 @@ estimate: 2h                       # 30m | 1h | 2h | 3h | 4h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-11-06
 updated: 2026-11-06
-blocked_by: []                     # ids of tasks that MUST be closed before this one starts
+blocked_by: [TL-584]  # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
 verification:

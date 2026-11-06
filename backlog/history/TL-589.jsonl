@@ -1,1 +1,2 @@
 {"id":"01M6QWWPKTRD4V4E17PA9MW8W7","ts":"2026-11-06T07:41:38.810Z","task":"TL-589","field":"__created__","from":"","to":"A command no agent guide names is marked as not for agents","actor":"agent:claude","source":"new","reason":"unknown"}
+{"id":"01M6QX3399XX5W67S2Y54JEMPV","ts":"2026-11-06T07:45:08.393Z","task":"TL-589","field":"blocked_by","from":[],"to":["TL-584"],"actor":"agent:claude","source":"set","reason":"the same files; the second wave builds on it"}

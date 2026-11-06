@@ -1,1 +1,2 @@
 {"id":"01M6QWWKJSWSRRJ43ZAS2KR3PV","ts":"2026-11-06T07:41:35.705Z","task":"TL-587","field":"__created__","from":"","to":"Each published release leaves a fixture the suite reads","actor":"agent:claude","source":"new","reason":"unknown"}
+{"id":"01M6QX2QFR7SQ1N7TTG70JYEKG","ts":"2026-11-06T07:44:56.312Z","task":"TL-587","field":"blocked_by","from":[],"to":["TL-586"],"actor":"agent:claude","source":"set","reason":"the same files; the second wave builds on it"}

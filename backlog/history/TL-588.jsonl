@@ -1,1 +1,2 @@
 {"id":"01M6QWWN4Y3C2VE5T3DFXWS5H8","ts":"2026-11-06T07:41:37.310Z","task":"TL-588","field":"__created__","from":"","to":"Doctor reports copied files that lag behind this release","actor":"agent:claude","source":"new","reason":"unknown"}
+{"id":"01M6QX303FSTGA3XM26ZTZ3GA9","ts":"2026-11-06T07:45:05.135Z","task":"TL-588","field":"blocked_by","from":[],"to":["TL-585"],"actor":"agent:claude","source":"set","reason":"the same files; the second wave builds on it"}
