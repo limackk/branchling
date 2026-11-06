@@ -25,7 +25,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -118,6 +118,49 @@ test("a mutant killed only through a spawned process is Killed, and an unasserte
     for (const s of out.survivors) {
       assert.ok(SHOUT_LINES.includes(s.line), "a survivor outside shout(): " + JSON.stringify(s));
     }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// TL-583. This repository links `.claude/skills/*` to `../../.agents/skills/*`,
+// and `instructions.test.mjs` reads a skill through such a link. Stryker cannot
+// copy a link to a directory into its sandbox; ignoring the directory holding
+// the links removed the file, and the initial run went red before any mutant.
+// The fixture reproduces the shape: a test reads through a directory link, a
+// sibling regular file sits beside the link and must arrive too, and the link
+// is relative, as git stores it.
+test("a test that reads through a directory symlink passes in the sandbox", { timeout: 300_000 }, () => {
+  const root = mkdtempSync(join(tmpdir(), "branchling-test-mutation-link-"));
+  try {
+    write(root, "shared/skill/SKILL.md", "linked\n");
+    write(root, "tools/settings.json", "{}\n");
+    mkdirSync(join(root, "tools", "skills"), { recursive: true });
+    symlinkSync("../../shared/skill", join(root, "tools", "skills", "skill"));
+    write(root, "scripts/greet.mjs", GREET);
+    write(root, "scripts/tests/greet.test.mjs", TEST + `
+import { existsSync, readFileSync } from "node:fs";
+test("the linked file and its sibling are both there", () => {
+  const at = (p) => fileURLToPath(new URL("../../" + p, import.meta.url));
+  assert.equal(readFileSync(at("tools/skills/skill/SKILL.md"), "utf8"), "linked\\n");
+  assert.ok(existsSync(at("tools/settings.json")));
+});
+`);
+    write(root, "scripts/lib.mjs", "export function greet() {}\nexport function shout() {}\n");
+    sh(root, "git", ["init", "-q"]);
+    sh(root, "git", ["add", "-A"]);
+    sh(root, "git", ["commit", "-q", "-m", "base"]);
+    sh(root, "git", ["switch", "-q", "-c", "feature"]);
+    write(root, "scripts/lib.mjs", LIB);
+
+    const r = spawnSync(process.execPath, [ENTRY, "--base", "main", "--json", "--concurrency", "2"], {
+      cwd: root,
+      encoding: "utf8",
+    });
+    assert.equal(r.status, 0, "the run did not complete — a red dry run looks like this: " + r.stdout + r.stderr.slice(-3000));
+    const out = JSON.parse(r.stdout);
+    assert.ok(out.files["scripts/lib.mjs"].Killed > 0, "nothing killed: " + r.stdout);
+    assert.equal(out.noCoverage, 0);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
