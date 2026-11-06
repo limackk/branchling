@@ -17,7 +17,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { appendFileSync, cpSync, existsSync, mkdtempSync, readdirSync } from "node:fs";
+import { appendFileSync, cpSync, existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -26,8 +26,23 @@ import { compareVersions } from "../config-version.mjs";
 import { REPO_ROOT, SCRIPTS_DIR, isolateHome, isolateState, plainOutput } from "./_repo.mjs";
 import { RELEASED_DIR, releasedKeys, releasedVersions, restoreReleasedBacklog } from "./_released.mjs";
 
-isolateHome("released-backlogs");
-isolateState("released-backlogs");
+// Every directory this file creates is removed when the file ends (TL-599),
+// whether its tests passed or not: one run made seven repositories, a home
+// and a state directory, and kept all nine. `released-backlogs-cleanup.test.mjs`
+// runs this file against a private temporary directory and holds it to
+// leaving that directory empty.
+const TEMP = [];
+test.after(() => { for (const d of TEMP) rmSync(d, { recursive: true, force: true }); });
+
+/** A fresh temporary directory, removed in the `after` hook above. */
+function tempDir(label) {
+  const dir = mkdtempSync(join(tmpdir(), "branchling-released-" + label + "-"));
+  TEMP.push(dir);
+  return dir;
+}
+
+TEMP.push(isolateHome("released-backlogs"));
+TEMP.push(isolateState("released-backlogs"));
 plainOutput();
 
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
@@ -39,7 +54,7 @@ function cli(cwd, args) {
 
 /** A git repository holding `version`'s backlog; returns its root. */
 function upgradedRepo(version) {
-  const root = mkdtempSync(join(tmpdir(), "branchling-released-" + version + "-"));
+  const root = tempDir(version);
   const r = spawnSync("git", ["init", "-q"], { cwd: root, encoding: "utf8" });
   assert.equal(r.status, 0, r.stderr);
   restoreReleasedBacklog(version, root);
@@ -84,7 +99,7 @@ test("positive control: the run fails on a backlog the current code cannot read"
 // the names, the same tree fails doctor — so the green doctor above read the
 // release's own ignore rules, not an absence nobody looked at.
 test("positive control: doctor fails the released tree when its dotfiles are not restored", () => {
-  const root = mkdtempSync(join(tmpdir(), "branchling-released-raw-"));
+  const root = tempDir("raw");
   assert.equal(spawnSync("git", ["init", "-q"], { cwd: root }).status, 0);
   cpSync(join(RELEASED_DIR, VERSIONS[0], "backlog"), join(root, "backlog"), { recursive: true });
   assert.notEqual(cli(root, ["doctor"]).status, 0, "doctor passed a backlog with no .gitignore");

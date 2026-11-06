@@ -8,8 +8,8 @@ epic: ""                           # free text — the group this task counts to
 release: ""                        # the release it is PLANNED for (a value from `releases:` in config.yaml). Empty = none
 target: []                         # the deploy targets in ANOTHER repository it ships from (`deploy_targets` with `repository:`). Empty = none
 priority: P3
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:impl-tl-599
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 conflict_group: []                 # the AREA it touches (e.g. a module): `next` and `run` hold it back while a task of the same group is in progress. Empty = `conflict_group_from`, or none
@@ -23,6 +23,8 @@ related_docs: []                   # paths relative to the repository root
 verification:
   - id: released-tests-clean-up
     bash: "node --test scripts/tests/released-backlogs.test.mjs"
+  - id: released-tests-leave-tmpdir-empty
+    bash: "node --test scripts/tests/released-backlogs-cleanup.test.mjs"
 ---
 
 ## Goal
@@ -40,4 +42,5 @@ Found in the TL-587 review. `upgradedRepo` (and the raw-copy control) in scripts
 
 ## Acceptance criteria
 
-- [ ] The released-backlog tests still pass, and every temporary repository they create is removed in an after hook. [proof: released-tests-clean-up]
+- [x] The released-backlog tests still pass, and every temporary repository they create is removed in an after hook. [proof: released-tests-clean-up]
+- [x] A run of the released-backlog tests with a private TMPDIR leaves that directory empty. [proof: released-tests-leave-tmpdir-empty]
