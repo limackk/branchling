@@ -139,7 +139,10 @@ the file — to the release that introduced the key written, when the file
 states a lower one, and reports the raise in `requiresVersion` (TL-586). A
 higher floor stays, and a file with no floor gets one only for a key newer than
 `requires_version` itself. A build older than the file's floor refuses before
-writing: it cannot read the file, so it does not edit it.
+writing: it cannot read the file, so it does not edit it. A floor below the
+release that introduced `requires_version` is refused the same way (TL-593):
+no release that old reads the key, so the parser reports it rather than
+`declare` raising it to another release that cannot read the file either.
 
 **Why these two keys and nothing else.** The code knows the shape of a field
 and config.yaml knows the values (the third law); that does not require a text

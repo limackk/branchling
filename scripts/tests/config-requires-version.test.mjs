@@ -242,7 +242,10 @@ test("an empty floor line states no floor, so the newer-release hint stays (TL-5
   // Control: the same file with a value on that line states a floor this
   // build satisfies, and the excuse is gone — so the case above is not a
   // parser that never suppresses the hint.
-  const stated = parseConfigYaml(REQUIRES_VERSION_KEY + ': "0.1.0"\nsprint_calendar: weekly\n', { running: "0.3.0" });
+  // The lowest floor the parser accepts is the floor key's own release (TL-593).
+  const stated = parseConfigYaml(REQUIRES_VERSION_KEY + ': "' + KEY_SINCE[REQUIRES_VERSION_KEY] +
+    '"\nsprint_calendar: weekly\n', { running: "0.3.0" });
+  assert.equal(stated.problems.length, 1, stated.problems.join("\n"));
   assert.equal(stated.requirement, null);
   assert.doesNotMatch(stated.problems[0], /newer release/);
   assert.deepEqual(stated.newerKeys, []);
@@ -266,7 +269,8 @@ test("a near match is still a typo, and a satisfied floor removes the newer-rele
   assert.equal(near.problems[0], "line 1: unknown key `statusess` — did you mean `statuses`?");
   assert.deepEqual(near.newerKeys, []);
 
-  const floored = parseConfigYaml(REQUIRES_VERSION_KEY + ": 0.1.0\nsprint_calendar: weekly\n");
+  const floored = parseConfigYaml(REQUIRES_VERSION_KEY + ": " + KEY_SINCE[REQUIRES_VERSION_KEY] + "\nsprint_calendar: weekly\n");
+  assert.equal(floored.problems.length, 1, floored.problems.join("\n"));
   assert.equal(floored.requirement, null);
   assert.equal(floored.problems[0], "line 2: unknown key `sprint_calendar` (allowed: " + Object.keys(DEFAULTS).join(", ") + ")");
   assert.doesNotMatch(floored.problems[0], /newer release/);

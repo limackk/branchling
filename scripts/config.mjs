@@ -308,7 +308,9 @@ export const DEFAULTS = Object.freeze({
   // Read BEFORE any other key: a release older than it refuses once and names
   // the upgrade, instead of calling a newer release's keys typos. Empty — the
   // default — states no floor. `declare` raises it when it writes a key newer
-  // than this one (`scripts/config-version.mjs`); nothing ever lowers it.
+  // than this one (`scripts/config-version.mjs`); nothing ever lowers it. A
+  // floor below the release that introduced this key is a problem (TL-593):
+  // no release that old reads the key, so it could never take effect.
   requires_version: "",
 });
 
@@ -509,6 +511,12 @@ export function parseConfigYaml(text, opts = {}) {
       const v = unquote(inline);
       if (v && !VERSION_SHAPE.test(v)) {
         problems.push(`line ${i + 1}: ${key}: expecting a release as major.minor.patch, got \`${inline}\``);
+      } else if (v && compareVersions(v, KEY_SINCE[key]) < 0) {
+        // A release older than this key refuses it as unknown, so a floor
+        // below it claims a reader that does not exist (TL-593). Reported,
+        // not raised: raising in `declare` would leave a hand-written one.
+        problems.push(`line ${i + 1}: ${key}: ${v} is below ${KEY_SINCE[key]}, the release that introduced ` +
+          `\`${key}\`, so no release can enforce it — state ${KEY_SINCE[key]} or later`);
       } else {
         values[key] = v;
       }

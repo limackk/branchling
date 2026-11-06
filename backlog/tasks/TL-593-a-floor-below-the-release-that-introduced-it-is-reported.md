@@ -8,8 +8,8 @@ epic: ""                           # free text — the group this task counts to
 release: ""                        # the release it is PLANNED for (a value from `releases:` in config.yaml). Empty = none
 target: []                         # the deploy targets in ANOTHER repository it ships from (`deploy_targets` with `repository:`). Empty = none
 priority: P3
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:impl-tl-593
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 conflict_group: []                 # the AREA it touches (e.g. a module): `next` and `run` hold it back while a task of the same group is in progress. Empty = `conflict_group_from`, or none
@@ -41,4 +41,4 @@ Found in the TL-586 review. scripts/config.mjs accepts any major.minor.patch for
 
 ## Acceptance criteria
 
-- [ ] a floor below the release that introduced requires_version is reported or raised, and a floor at that release is left alone [proof: floor-below-key-test]
+- [x] a floor below the release that introduced requires_version is reported or raised, and a floor at that release is left alone [proof: floor-below-key-test]

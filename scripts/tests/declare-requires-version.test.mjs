@@ -3,8 +3,9 @@
  *
  * WHAT HAS TO BE PROVED:
  *   1. Declaring into a key introduced in a release raises `requires_version`
- *      to that release when the file states a lower floor, keeps the floor's
- *      line and comment, and says so in text and in `--json`.
+ *      to that release when the file states a lower floor, and keeps the
+ *      floor's line and comment. Proved through the pure writer: since TL-593
+ *      no floor the parser accepts is below a key `declare` writes today.
  *   2. A floor at or above the key's release is left byte for byte alone.
  *   3. With no floor, one is written only when the key is newer than
  *      `requires_version` itself — otherwise writing it would make the file
@@ -24,7 +25,7 @@ import { join } from "node:path";
 
 import { KEY_SINCE, READABLE_VERSION, parseConfigYaml } from "../config.mjs";
 import { REQUIRES_VERSION_KEY, compareVersions, parseVersion, raisedRequirement, setRequirementText } from "../config-version.mjs";
-import { appendEntryText } from "../declare-vocabulary.mjs";
+import { WRITABLE_KEYS, appendEntryText } from "../declare-vocabulary.mjs";
 import { stripComment } from "../task-fields.mjs";
 import { SCRIPTS_DIR, isolateHome } from "./_repo.mjs";
 
@@ -49,31 +50,21 @@ const floorOf = (text) => parseConfigYaml(text).values[REQUIRES_VERSION_KEY];
 const RELEASES_SINCE = KEY_SINCE.releases;
 
 // ── 1. a lower floor is raised ────────────────────────────────────────────
+//
+// Through the CLI this case cannot be built today (TL-593): a floor below
+// `KEY_SINCE.requires_version` is a parse problem, and every key `declare`
+// writes predates `requires_version`, so no floor the parser accepts is lower
+// than a writable key's release. The raise is proved through the pure writer
+// with its own release table below; this test is what fails, and asks for the
+// CLI case back, the day a writable key is newer than the floor key.
 
-test("declaring a release raises a lower floor to the release `releases` arrived in", () => {
-  // Positive control: the floor below is really lower than the key's release.
-  assert.ok(compareVersions("0.2.0", RELEASES_SINCE) < 0);
-  const dir = fixture("\n" + REQUIRES_VERSION_KEY + ": 0.2.0   # stated by hand\n");
-  const r = cli(dir, "declare", "releases", "1.0", "--reason", "the first public cut", "--json");
-  assert.equal(r.status, 0, r.stderr);
-  const out = JSON.parse(r.stdout);
-  assert.deepEqual(out.requiresVersion, { from: "0.2.0", to: RELEASES_SINCE });
-  const after = read(dir);
-  assert.equal(floorOf(after), RELEASES_SINCE);
-  assert.match(after, new RegExp("^" + REQUIRES_VERSION_KEY + ": " + RELEASES_SINCE.replace(/\./g, "\\.") + "   # stated by hand$", "m"),
-    "the floor line lost its place or its comment");
-  assert.equal(after.split(REQUIRES_VERSION_KEY + ":").length - 1, 1, "a second floor line was written");
-  assert.deepEqual(parseConfigYaml(after).values.releases, [{ name: "1.0", ref: null }], "the entry itself was not written");
-});
-
-test("the text output names the raise and why", () => {
-  const dir = fixture("\n" + REQUIRES_VERSION_KEY + ": 0.1.0\n");
-  const r = cli(dir, "declare", "deploy_targets", "api", "--repository", "api-service", "--reason", "its own repository");
-  assert.equal(r.status, 0, r.stderr);
-  const to = KEY_SINCE.deploy_targets;
-  assert.ok(r.stdout.split("\n").includes("  " + REQUIRES_VERSION_KEY + ": 0.1.0 → " + to +
-    " — `deploy_targets` arrived in " + to + ", so an older release cannot read this file"), r.stdout);
-  assert.equal(floorOf(read(dir)), KEY_SINCE.deploy_targets);
+test("every key `declare` writes predates `requires_version`, so the CLI has no floor to raise", () => {
+  // Positive control: the loop runs over the real list.
+  assert.ok(WRITABLE_KEYS.length >= 2, "no writable keys");
+  for (const key of WRITABLE_KEYS) {
+    assert.ok(compareVersions(KEY_SINCE[key], KEY_SINCE[REQUIRES_VERSION_KEY]) <= 0,
+      "`" + key + "` is newer than `" + REQUIRES_VERSION_KEY + "`: restore a CLI test of the raise and its text line");
+  }
 });
 
 // ── 2. a floor at or above the key's release stays ────────────────────────
@@ -82,7 +73,8 @@ test("a floor higher than the key's release is left alone, and so is an equal on
   // The floor this build reads is the highest it can leave in place; a test
   // above THAT would be the refusal case below, not this one.
   assert.ok(compareVersions(READABLE_VERSION, RELEASES_SINCE) > 0, "no floor above `releases` is readable here");
-  for (const floor of [READABLE_VERSION, RELEASES_SINCE]) {
+  // The lowest floor the parser accepts is the floor key's own release (TL-593).
+  for (const floor of [READABLE_VERSION, KEY_SINCE[REQUIRES_VERSION_KEY]]) {
     const dir = fixture("\n" + REQUIRES_VERSION_KEY + ": " + floor + "\n");
     const r = cli(dir, "declare", "releases", "2.0", "--reason", "a later cut", "--json");
     assert.equal(r.status, 0, r.stderr);
