@@ -160,6 +160,10 @@ test("config validation reports a wrong NAME in `actors` as a name, and a namesp
 
 function run(cwd, args) {
   const env = { ...process.env, NO_COLOR: "1", BACKLOG_STATE_DIR: join(cwd, ".state") };
+  // One colour decision, as plainOutput() in _repo.mjs writes it: an inherited
+  // FORCE_COLOR beside NO_COLOR makes Node 18 and 20 print a warning on stderr,
+  // and the line count below would read Node's sentence as the refusal's (TL-623).
+  delete env.FORCE_COLOR;
   delete env.BACKLOG_ACTOR;
   env[HOME_ENV] = join(cwd, ".home");
   return spawnSync(process.execPath, [CLI].concat(args), { cwd, encoding: "utf8", timeout: 60_000, env, input: "" });
