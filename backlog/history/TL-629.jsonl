@@ -1,0 +1,2 @@
+{"id":"01M6TZ3C3G3MK1K5ZQ8HHD0MZJ","ts":"2026-11-07T12:17:57.872Z","task":"TL-629","field":"__created__","from":"","to":"A mutation run of mutation-run.mjs survives its nested Stryker test","actor":"agent:loop-2","source":"new","reason":"unknown"}
+{"id":"01M6TZ3Y5S8NRAGBYGD80CWHB9","ts":"2026-11-07T12:18:16.377Z","task":"TL-629","field":"title","from":"A mutation run of mutation-run.mjs survives its nested Stryker test","to":"The nested Stryker test works inside a mutation run","actor":"agent:loop-2","source":"set","reason":"unknown"}
