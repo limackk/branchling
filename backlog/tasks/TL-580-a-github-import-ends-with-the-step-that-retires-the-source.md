@@ -8,8 +8,8 @@ epic: ""                           # free text — the group this task counts to
 release: ""                        # the release it is PLANNED for (a value from `releases:` in config.yaml). Empty = none
 target: []                         # the deploy targets in ANOTHER repository it ships from (`deploy_targets` with `repository:`). Empty = none
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:loop-4
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 conflict_group: [import]  # the AREA it touches (e.g. a module): `next` and `run` hold it back while a task of the same group is in progress. Empty = `conflict_group_from`, or none
@@ -58,6 +58,6 @@ TL-577 edits the neighbouring omission line in the same USAGE array. Whichever o
 
 ## Acceptance criteria
 
-- [ ] `import --help` gives the procedure that closes the source issues after the import is committed. [proof: help-names-retirement]
-- [ ] The guide's section on bringing a team over tells the reader to retire the source issues. [proof: guide-names-retirement]
-- [ ] `created[]` carries each source issue's state, and the report points at retirement exactly when an open issue was imported, without changing the import's other behaviour. [proof: import-tests]
+- [x] `import --help` gives the procedure that closes the source issues after the import is committed. [proof: help-names-retirement]
+- [x] The guide's section on bringing a team over tells the reader to retire the source issues. [proof: guide-names-retirement]
+- [x] `created[]` carries each source issue's state, and the report points at retirement exactly when an open issue was imported, without changing the import's other behaviour. [proof: import-tests]

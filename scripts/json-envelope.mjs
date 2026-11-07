@@ -223,7 +223,10 @@ export const KINDS = {
   seed: { ok: null, root: null, dryRun: null, created: [], errors: [], actorSource: null },
   // `import --json`. A dry run reports `wouldCreate`; a real import reports
   // `created` and `withoutVerification`. Both paths share one kind, so the
-  // other path's keys stay present with their declared empty values.
+  // other path's keys stay present with their declared empty values. Each
+  // `created` entry carries `id`, `file`, `title`, `source` and `sourceState`
+  // (TL-580), the issue's own `open` or `closed`, which says what is still to
+  // retire in GitHub; entry shapes are documented, not declared here.
   import: {
     ok: null, root: null, dryRun: null, created: [], wouldCreate: [],
     skipped: [], droppedLabels: [], withoutVerification: null, errors: [], actorSource: null,

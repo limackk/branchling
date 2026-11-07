@@ -106,6 +106,22 @@ export const USAGE = [
   "  issue keeps them one click away.",
   "  NOR MILESTONES, which are not conversation but a planning assignment: the",
   "  iteration or release an issue was committed to stays in GitHub.",
+  "",
+  "  RETIRING THE SOURCE ISSUES. The import closes nothing in GitHub, and an issue",
+  "  left open there goes on collecting comments and a status of its own — a second",
+  "  copy of the task outside the branch. Keep the `--json` report of the real run:",
+  "  each `created` entry names the task `id`, the issue's `source` URL and its",
+  "  `sourceState`, open or closed. COMMIT the imported tasks first, so the comment",
+  "  names a task the team can see, then close every issue that was still open:",
+  "",
+  `    gh issue list … | ${N} import --from github --json > imported.json`,
+  "    jq -r '.created[] | select(.sourceState == \"open\") | \"\\(.source) \\(.id)\"' \\",
+  "      imported.json | while read -r url id; do",
+  "        gh issue close \"$url\" --comment \"Moved to $id in the repository backlog\"",
+  "      done",
+  "",
+  "  That pipeline runs in YOUR shell, deliberately, after the commit: jq is your",
+  "  choice rather than a dependency, and this command still makes no network request.",
 ].join("\n");
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -554,7 +570,12 @@ export function main(argv) {
   if (opts.json) {
     printJson("import", {
       ok: true, root, dryRun: false,
-      created: written.map((w) => ({ id: w.id, file: w.file, title: w.title, source: w.item.issue.url })),
+      // `sourceState` is what a caller retiring the source needs and cannot
+      // derive: the task's status is this project's vocabulary, the issue's
+      // state is GitHub's, and only an issue that was open is still to close.
+      created: written.map((w) => ({
+        id: w.id, file: w.file, title: w.title, source: w.item.issue.url, sourceState: w.item.issue.state,
+      })),
       skipped: plan.skipped.map((i) => i.url),
       droppedLabels: droppedSummary(plan.dropped),
       withoutVerification: written.length,
@@ -574,6 +595,15 @@ export function main(argv) {
     // how much work the import did not do.
     console.error(warn(written.length + " of them have no `verification:` — they cannot be closed until you write it"));
     console.error("  " + MARK.arrow + " " + `${N} query --status ` + config.statuses[0] + " --json");
+  }
+  // Only an issue that was OPEN is still a second copy in GitHub; one that was
+  // already closed needs nothing, and a pointer printed for it would send the
+  // reader to close what is closed.
+  const stillOpen = written.filter((w) => w.item.issue.state === "open").length;
+  if (stillOpen) {
+    console.error("  " + stillOpen + " came from issues still OPEN in GitHub. After committing, close each with");
+    console.error("  a comment naming its task — RETIRING THE SOURCE ISSUES in:");
+    console.error("  " + MARK.arrow + " " + `${N} import --help`);
   }
   if (built.status !== 0) console.log("  WARNING: could not rebuild the views — run `" + N + " build`");
   return 0;
