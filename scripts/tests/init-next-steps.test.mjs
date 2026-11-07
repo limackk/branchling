@@ -11,7 +11,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -29,7 +29,7 @@ function run(cwd, args) {
 }
 
 function repo() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-init-next-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-init-next-"));
   assert.equal(spawnSync("git", ["init", "-q", "."], { cwd: dir }).status, 0);
   return dir;
 }
@@ -59,7 +59,7 @@ test("installed git gates are no longer suggested", () => {
 });
 
 test("outside a git repository the gates are not suggested", () => {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-init-next-nogit-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-init-next-nogit-"));
   const out = run(dir, ["init", "--dir", "backlog", "--no-example"]);
   assert.ok(!out.includes(HOOKS), "a hook was suggested where git cannot run one:\n" + out);
 });

@@ -11,7 +11,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, realpathSync, rmSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { request } from "node:http";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
@@ -27,7 +28,7 @@ const SERVER = join(SCRIPTS_DIR, "serve-backlog.mjs");
 const LISTENING = /serve: http:\/\/127\.0\.0\.1:(\d+)\//;
 
 function fixture() {
-  const dir = realpathSync(mkdtempSync(join(tmpdir(), "branchling-set-field-")));
+  const dir = realpathSync(fixtureDir(join(tmpdir(), "branchling-set-field-")));
   const root = join(dir, "backlog");
   assert.equal(spawnSync(process.execPath, [CLI, "init", "--dir", root, "--no-example"], { encoding: "utf8" }).status, 0);
   const made = spawnSync(process.execPath, [CLI, "new", "--dir", root, "--title", "Editable work"], { encoding: "utf8" });

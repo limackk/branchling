@@ -25,7 +25,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "../_fixture-dir.mjs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -82,7 +83,7 @@ test("Stryker is installed, so this control cannot pass by not running", () => {
 });
 
 test("a mutant killed only through a spawned process is Killed, and an unasserted one Survives", { timeout: 300_000 }, () => {
-  const root = mkdtempSync(join(tmpdir(), "branchling-test-mutation-kill-"));
+  const root = fixtureDir(join(tmpdir(), "branchling-test-mutation-kill-"));
   try {
     write(root, "scripts/greet.mjs", GREET);
     write(root, "scripts/tests/greet.test.mjs", TEST);
@@ -131,7 +132,7 @@ test("a mutant killed only through a spawned process is Killed, and an unasserte
 // sibling regular file sits beside the link and must arrive too, and the link
 // is relative, as git stores it.
 test("a test that reads through a directory symlink passes in the sandbox", { timeout: 300_000 }, () => {
-  const root = mkdtempSync(join(tmpdir(), "branchling-test-mutation-link-"));
+  const root = fixtureDir(join(tmpdir(), "branchling-test-mutation-link-"));
   try {
     write(root, "shared/skill/SKILL.md", "linked\n");
     write(root, "tools/settings.json", "{}\n");

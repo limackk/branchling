@@ -45,7 +45,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -170,7 +171,7 @@ test("plainOutput() leaves ONE colour decision in the environment", () => {
 });
 
 test("POSITIVE CONTROL: a test that DOES depend on colour is caught by that runner", () => {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-colour-control-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-colour-control-"));
   try {
     const tests = join(dir, "tests");
     const file = join(tests, "depends-on-colour.test.mjs");
@@ -215,7 +216,7 @@ test("only a run started the way a terminal starts it defers to itself", () => {
 });
 
 test("POSITIVE CONTROL: a rerun killed by its limit is read as a timeout, not a verdict", () => {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-colour-timeout-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-colour-timeout-"));
   try {
     writeFileSync(join(dir, "slow.test.mjs"),
       'import { test } from "node:test";\n' +

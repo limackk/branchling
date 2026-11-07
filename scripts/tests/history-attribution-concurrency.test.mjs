@@ -37,7 +37,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -68,7 +69,7 @@ function run(args, env) {
  * the claimants cannot accidentally claim different events and both be right.
  */
 function fixture() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-claim-race-" + (counter++) + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-claim-race-" + (counter++) + "-"));
   const backlog = join(dir, "bl");
   const env = {
     ...process.env,

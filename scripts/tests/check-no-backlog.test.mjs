@@ -5,7 +5,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, realpathSync } from "node:fs";
+import { realpathSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -34,13 +35,13 @@ function assertNoBacklogEnvelope(r) {
 }
 
 test("check --json in an empty directory prints a check envelope with root null and failed backlog", () => {
-  const empty = mkdtempSync(join(tmpdir(), "branchling-check-none-"));
+  const empty = fixtureDir(join(tmpdir(), "branchling-check-none-"));
   const answer = assertNoBacklogEnvelope(run(empty, ["check", "--json"]));
   assert.match(answer.guards[0].output, /no backlog here/);
 });
 
 test("a --dir that is not a backlog answers the same envelope, not a stack trace", () => {
-  const empty = mkdtempSync(join(tmpdir(), "branchling-check-notone-"));
+  const empty = fixtureDir(join(tmpdir(), "branchling-check-notone-"));
   const r = run(tmpdir(), ["check", "--json", "--dir", empty]);
   const answer = assertNoBacklogEnvelope(r);
   assert.match(answer.guards[0].output, /does not look like a backlog/);
@@ -48,7 +49,7 @@ test("a --dir that is not a backlog answers the same envelope, not a stack trace
 });
 
 test("the human form still prints the 'no backlog here' message, and stdout stays empty", () => {
-  const empty = mkdtempSync(join(tmpdir(), "branchling-check-human-"));
+  const empty = fixtureDir(join(tmpdir(), "branchling-check-human-"));
   const r = run(empty, ["check"]);
   assert.equal(r.status, 1);
   assert.equal(r.stdout, "");
@@ -56,7 +57,7 @@ test("the human form still prints the 'no backlog here' message, and stdout stay
 });
 
 test("POSITIVE CONTROL: over a real backlog the envelope names its root", () => {
-  const repo = mkdtempSync(join(tmpdir(), "branchling-check-real-"));
+  const repo = fixtureDir(join(tmpdir(), "branchling-check-real-"));
   assert.equal(run(repo, ["init", "--dir", "backlog", "--no-example"]).status, 0);
   const r = run(repo, ["check", "--json", "--refs", "--dir", "backlog"]);
   const answer = JSON.parse(r.stdout);

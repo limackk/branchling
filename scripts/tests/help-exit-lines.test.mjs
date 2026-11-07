@@ -24,7 +24,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -45,7 +46,7 @@ const CLI = join(SCRIPTS_DIR, "cli.mjs");
 const DOC = join(REPO_ROOT, "docs", "external-consumers.md");
 
 /** A directory with git and no backlog: where every probe below runs. */
-const NOWHERE = mkdtempSync(join(tmpdir(), "help-exit-lines-"));
+const NOWHERE = fixtureDir(join(tmpdir(), "help-exit-lines-"));
 spawnSync("git", ["init", "-q", "."], { cwd: NOWHERE });
 writeFileSync(join(NOWHERE, "message.txt"), "TL-1 A message that is accepted\n");
 

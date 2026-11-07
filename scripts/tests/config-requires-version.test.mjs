@@ -27,7 +27,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { appendFileSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -48,14 +49,14 @@ const UPGRADE = "npm install -g " + N + "@latest";
 
 /** A backlog directory holding only `config.yaml` with `text`. */
 function backlogWith(text) {
-  const dir = mkdtempSync(join(tmpdir(), "requires-version-"));
+  const dir = fixtureDir(join(tmpdir(), "requires-version-"));
   writeFileSync(join(dir, "config.yaml"), text, "utf8");
   return dir;
 }
 
 /** A backlog made by `init`, its config.yaml extended with `extra`. */
 function initWith(extra) {
-  const dir = join(mkdtempSync(join(tmpdir(), "requires-version-cli-")), "backlog");
+  const dir = join(fixtureDir(join(tmpdir(), "requires-version-cli-")), "backlog");
   const init = spawnSync(process.execPath, [CLI, "init", "--dir", dir, "--no-example"], { encoding: "utf8" });
   assert.equal(init.status, 0, init.stderr);
   appendFileSync(join(dir, "config.yaml"), extra, "utf8");

@@ -19,7 +19,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -229,7 +230,7 @@ function task(dir, id, { blocked_by = [], status = "pending" } = {}) {
 }
 
 function withSandbox(build, fn) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-plan-cmd-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-plan-cmd-"));
   mkdirSync(join(dir, "tasks"));
   writeFileSync(join(dir, "_template.md"), "---\nid: TL-NNN\n---\n", "utf8");
   writeFileSync(join(dir, "config.yaml"), "task_id_prefix: TL\n", "utf8");

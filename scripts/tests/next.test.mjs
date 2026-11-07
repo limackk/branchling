@@ -22,7 +22,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -48,7 +49,7 @@ const CLI = join(SCRIPTS, "cli.mjs");
 
 let counter = 0;
 function tmp(prefix) {
-  return mkdtempSync(join(tmpdir(), "branchling-" + prefix + "-" + (counter++) + "-"));
+  return fixtureDir(join(tmpdir(), "branchling-" + prefix + "-" + (counter++) + "-"));
 }
 
 /** A backlog with `n` tasks, all pending, priorities in the order given. */

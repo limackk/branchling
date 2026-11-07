@@ -21,7 +21,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -41,7 +41,7 @@ function run(args) {
 
 /** A fresh backlog inside a real repository, and the priorities it declares. */
 function fixture() {
-  const repo = mkdtempSync(join(tmpdir(), "branchling-open-questions-"));
+  const repo = fixtureDir(join(tmpdir(), "branchling-open-questions-"));
   execFileSync("git", ["init", "-q", "-b", "main", "."], { cwd: repo, stdio: "ignore" });
   const dir = join(repo, "backlog");
   assert.equal(run(["init", "--dir", dir, "--no-example"]).status, 0, "init failed");

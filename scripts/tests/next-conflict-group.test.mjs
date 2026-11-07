@@ -27,7 +27,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -90,7 +91,7 @@ function statusOf(backlog, id) {
  * @param {{config?: string[], repo?: boolean}} opts
  */
 function backlogWith(tasks, opts = {}) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-conflict-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-conflict-"));
   const repoRoot = join(dir, "repo");
   mkdirSync(repoRoot, { recursive: true });
   const backlog = join(repoRoot, "backlog");

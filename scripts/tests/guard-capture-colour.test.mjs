@@ -10,7 +10,8 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { rmSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -39,7 +40,7 @@ test("this Node warns when NO_COLOR and FORCE_COLOR are both set", (t) => {
 });
 
 test("check --release --json under FORCE_COLOR carries the release report, not null", () => {
-  const root = mkdtempSync(join(tmpdir(), "branchling-guard-colour-"));
+  const root = fixtureDir(join(tmpdir(), "branchling-guard-colour-"));
   try {
     const env = forcedEnv(root);
     const git = (args) => spawnSync("git", args, { cwd: root, encoding: "utf8", env });

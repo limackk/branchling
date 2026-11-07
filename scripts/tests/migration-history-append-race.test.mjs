@@ -17,7 +17,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -48,7 +49,7 @@ const MIGRATIONS = [
 let fixtureNumber = 0;
 
 function fixture() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-history-append-race-" + fixtureNumber++ + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-history-append-race-" + fixtureNumber++ + "-"));
   const backlog = join(dir, "backlog");
   const tasks = join(backlog, "tasks");
   const history = join(backlog, "history");

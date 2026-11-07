@@ -20,7 +20,8 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 
@@ -100,7 +101,7 @@ test("a command cannot combine an asynchronous write with process.exit", () => {
 });
 
 test("POSITIVE CONTROL: a pipe-sized write followed by exit fails the guard", () => {
-  const root = mkdtempSync(join(tmpdir(), "branchling-exit-safe-output-"));
+  const root = fixtureDir(join(tmpdir(), "branchling-exit-safe-output-"));
   try {
     mkdirSync(join(root, "scripts"));
     mkdirSync(join(root, "bin"));

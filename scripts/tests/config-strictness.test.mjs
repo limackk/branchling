@@ -18,7 +18,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, readdirSync, writeFileSync, appendFileSync } from "node:fs";
+import { readFileSync, readdirSync, writeFileSync, appendFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -42,7 +43,7 @@ function run(cwd, args) {
 }
 
 function backlog() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-strict-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-strict-"));
   // `--no-example` (TL-64): the "it wrote nothing" assertion counts files in tasks/.
   assert.equal(run(dir, ["init", "--dir", ".", "--no-example"]).status, 0);
   return dir;

@@ -23,7 +23,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -214,7 +215,7 @@ test("the markdown stays narrow — no HTML block, one table shape, escaped pipe
 // ── A real branch ─────────────────────────────────────────────────────────
 
 function repo() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-prsummary-" + counter++ + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-prsummary-" + counter++ + "-"));
   execFileSync("git", ["init", "-q", "-b", "main", "."], { cwd: dir, stdio: "ignore" });
   execFileSync("git", ["config", "user.email", "t@example.test"], { cwd: dir });
   execFileSync("git", ["config", "user.name", "Test"], { cwd: dir });
@@ -289,7 +290,7 @@ test("--json carries the same summary, and says whether the range was read", () 
 });
 
 test("outside git it answers with a complete envelope, not a crash", () => {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-prsummary-nogit-" + counter++ + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-prsummary-nogit-" + counter++ + "-"));
   assert.equal(run(dir, ["init", "--dir", "backlog", "--no-example"]).status, 0);
   const r = run(dir, ["pr-summary", "--dir", "backlog", "--json"]);
   assert.equal(r.status, 0);

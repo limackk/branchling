@@ -25,7 +25,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -88,7 +89,7 @@ function prefixOf(dir) {
  * assembled here, so the fixture cannot disagree with the tree it built.
  */
 function backlog({ tasks = 0, rule = false } = {}) {
-  const repo = mkdtempSync(join(tmpdir(), "branchling-envelope-" + counter++ + "-"));
+  const repo = fixtureDir(join(tmpdir(), "branchling-envelope-" + counter++ + "-"));
   execFileSync("git", ["init", "-q", "-b", "main", "."], { cwd: repo, stdio: "ignore" });
   const dir = join(repo, "backlog");
   assert.equal(run(["init", "--dir", dir, "--no-example"]).status, 0, "init failed");

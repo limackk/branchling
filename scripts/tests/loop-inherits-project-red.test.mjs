@@ -21,7 +21,8 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -51,7 +52,7 @@ function task(verification) {
 const OWN = ["  - id: own", '    bash: "node -e 0"'];
 
 function withBacklog(projectId, verification, fn) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-loop-project-red-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-loop-project-red-"));
   mkdirSync(join(dir, "tasks"));
   writeFileSync(join(dir, "_template.md"), "---\nid: TASK-NNN\n---\n", "utf8");
   writeFileSync(join(dir, "boards.yaml"), 'default: main\nboards:\n  - slug: main\n    name: "Main"\n', "utf8");

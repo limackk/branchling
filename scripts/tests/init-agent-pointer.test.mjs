@@ -11,7 +11,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -24,7 +25,7 @@ isolateHome("init-agent-pointer");
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
 
 function repo(files = {}) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-agent-pointer-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-agent-pointer-"));
   assert.equal(spawnSync("git", ["init", "-q", "."], { cwd: dir }).status, 0);
   for (const [name, body] of Object.entries(files)) writeFileSync(join(dir, name), body, "utf8");
   return dir;

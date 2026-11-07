@@ -17,7 +17,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { get } from "node:http";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
@@ -54,7 +55,7 @@ function freePort() {
 
 /** A real backlog on disk, created by the tool itself, named as we ask. */
 function makeBacklog(projectName) {
-  const dir = canonicalPath(mkdtempSync(join(tmpdir(), "branchling-identity-")));
+  const dir = canonicalPath(fixtureDir(join(tmpdir(), "branchling-identity-")));
   const init = spawnSync(process.execPath, [CLI, "init", "--dir", dir], {
     encoding: "utf8",
     timeout: 30_000,
@@ -249,7 +250,7 @@ test("the same backlog reached through a symlink is the SAME backlog", async () 
   // A worktree behind a symlink compared as a raw string reads as a stranger,
   // and the tool would start a second writer over one directory.
   const dir = makeBacklog("Linked Project");
-  const link = join(mkdtempSync(join(tmpdir(), "branchling-link-")), "backlog");
+  const link = join(fixtureDir(join(tmpdir(), "branchling-link-")), "backlog");
   symlinkSync(dir, link);
   const port = await freePort();
   let server = null;

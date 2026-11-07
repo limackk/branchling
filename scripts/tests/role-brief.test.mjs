@@ -7,7 +7,8 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -26,7 +27,7 @@ function run(args, cwd) {
 }
 
 function fixture() {
-  const repo = mkdtempSync(join(tmpdir(), "branchling-role-brief-" + counter++ + "-"));
+  const repo = fixtureDir(join(tmpdir(), "branchling-role-brief-" + counter++ + "-"));
   execFileSync("git", ["init", "-q", "-b", "main", "."], { cwd: repo, stdio: "ignore" });
   const dir = join(repo, "backlog");
   const init = run(["init", "--dir", dir, "--no-example", "--no-nudge"], repo);

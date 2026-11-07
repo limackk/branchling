@@ -19,7 +19,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { appendFileSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -55,7 +56,7 @@ const OWN = {
 };
 
 function backlog() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-input-" + counter++ + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-input-" + counter++ + "-"));
   assert.equal(run(["init", "--dir", dir, "--no-example"]).status, 0);
   const p = join(dir, "config.yaml");
   writeFileSync(p, readFileSync(p, "utf8")
@@ -80,7 +81,7 @@ const helpJson = (dir, command) => {
   // backlog and "no configuration" is never actually tested.
   const r = dir
     ? run([command, "--help", "--json", "--dir", dir])
-    : run([command, "--help", "--json"], { cwd: mkdtempSync(join(tmpdir(), "branchling-nobacklog-" + counter++ + "-")) });
+    : run([command, "--help", "--json"], { cwd: fixtureDir(join(tmpdir(), "branchling-nobacklog-" + counter++ + "-")) });
   assert.equal(r.status, 0, r.stderr);
   return JSON.parse(r.stdout);
 };

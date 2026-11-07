@@ -27,7 +27,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -50,7 +50,7 @@ function run(dir, args) {
 }
 
 function backlogRepo() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-deploy-command-" + counter++ + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-deploy-command-" + counter++ + "-"));
   execFileSync("git", ["init", "-q", "-b", "main", "."], { cwd: dir });
   assert.equal(run(dir, ["init", "--dir", "backlog", "--no-example"]).status, 0);
   execFileSync("git", ["add", "-A"], { cwd: dir });

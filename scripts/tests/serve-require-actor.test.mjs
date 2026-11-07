@@ -14,7 +14,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, realpathSync, rmSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { request } from "node:http";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
@@ -42,7 +43,7 @@ function freePort() {
 }
 
 function fixture() {
-  const dir = realpathSync(mkdtempSync(join(tmpdir(), "branchling-require-actor-")));
+  const dir = realpathSync(fixtureDir(join(tmpdir(), "branchling-require-actor-")));
   const root = join(dir, "backlog");
   assert.equal(spawnSync(process.execPath, [CLI, "init", "--dir", root, "--no-example"], { encoding: "utf8" }).status, 0);
   const made = spawnSync(process.execPath, [CLI, "new", "--dir", root, "--title", "Editable work"], { encoding: "utf8" });

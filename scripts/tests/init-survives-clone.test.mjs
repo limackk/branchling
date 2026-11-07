@@ -9,7 +9,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, rmSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -33,7 +34,7 @@ function cli(cwd, args, env = {}) {
 
 /** init, commit everything, clone; returns the clone. */
 function initCommitClone(...initFlags) {
-  const base = mkdtempSync(join(tmpdir(), "branchling-clone-"));
+  const base = fixtureDir(join(tmpdir(), "branchling-clone-"));
   const origin = join(base, "origin");
   git(base, ["init", "-q", origin]);
   const r = cli(origin, ["init", "--dir", "backlog", ...initFlags]);
@@ -57,7 +58,7 @@ test("a fresh backlog with no task survives the clone, and takes its first task 
 });
 
 test("positive control: without the placeholder the clone really loses tasks/", () => {
-  const base = mkdtempSync(join(tmpdir(), "branchling-clone-control-"));
+  const base = fixtureDir(join(tmpdir(), "branchling-clone-control-"));
   const origin = join(base, "origin");
   git(base, ["init", "-q", origin]);
   assert.equal(cli(origin, ["init", "--dir", "backlog", "--no-example"]).status, 0);

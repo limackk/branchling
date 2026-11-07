@@ -19,7 +19,8 @@
  * repository) and `<repo>` itself (a co-located consumer). The tool supports
  * both, so its own tests must not hard-code either.
  */
-import { existsSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -156,9 +157,14 @@ export function shimArgs(args) {
 }
 
 export function isolateHome(label = "home") {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-test-" + label + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-test-" + label + "-"));
   process.env[HOME_ENV] = dir;
   isolateGit(dir);
+  // npm switches on Node's module compile cache, which defaults to
+  // `<tmpdir>/node-compile-cache` — a directory no test made and none removes,
+  // so a suite that starts npm would not leave the temporary directory as it
+  // found it (TL-575). Node versions without the cache ignore the variable.
+  process.env.NODE_DISABLE_COMPILE_CACHE = "1";
   return dir;
 }
 
@@ -176,7 +182,7 @@ export function isolateHome(label = "home") {
  * helper put it.
  */
 export function isolateState(label = "state") {
-  const dir = realpathSync(mkdtempSync(join(tmpdir(), "branchling-test-" + label + "-")));
+  const dir = realpathSync(fixtureDir(join(tmpdir(), "branchling-test-" + label + "-")));
   process.env[STATE_DIR_ENV] = dir;
   return dir;
 }

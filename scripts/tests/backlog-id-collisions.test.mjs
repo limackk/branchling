@@ -17,7 +17,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { writeFileSync, rmSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -47,7 +48,7 @@ function task(dir, filename, { id, title = "T" } = {}) {
 }
 
 function withTasks(build) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-backlog-guard-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-backlog-guard-"));
   try {
     build(dir);
     try {

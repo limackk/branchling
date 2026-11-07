@@ -31,7 +31,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -45,7 +46,7 @@ const TESTS_DIR = join(SCRIPTS_DIR, "tests");
  *  commit with a key that cannot possibly work. Deterministic — it does not
  *  depend on an ssh agent being present or refusing. */
 function hostileConfig() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-hostile-git-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-hostile-git-"));
   const file = join(dir, "gitconfig");
   writeFileSync(file, [
     "[user]", "\tname = Somebody", "\temail = somebody@example.invalid",
@@ -58,7 +59,7 @@ function hostileConfig() {
 
 /** A one-commit repository, built with the environment the caller gives. */
 function commitUnder(env) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-git-env-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-git-env-"));
   const git = (...args) => spawnSync("git", args, { cwd: dir, env, encoding: "utf8" });
   git("init", "-q", ".");
   writeFileSync(join(dir, "a.txt"), "x\n", "utf8");

@@ -16,7 +16,8 @@
 
 import { strict as assert } from "node:assert";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, rmSync, readFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -80,7 +81,7 @@ test("co-location does NOT fire from a package directory with no tasks/", () => 
   // `_template.md` is a MARKER, so if the rule required only a marker, this
   // layout would be taken for a backlog and the write would go into
   // node_modules. The rule also requires `tasks/` — this test enforces that.
-  const root = mkdtempSync(join(tmpdir(), "branchling-pkg-"));
+  const root = fixtureDir(join(tmpdir(), "branchling-pkg-"));
   try {
     const pkg = join(root, "node_modules", "branchling");
     mkdirSync(join(pkg, "scripts"), { recursive: true });
@@ -105,7 +106,7 @@ test("ON THE PACKED ARTEFACT: the tarball carries no data, and the install does 
   // The assertion on `package.json` speaks only about INTENT. What npm actually
   // pack is settled by `npm pack` — and only the installed copy answers the
   // question "will this behave correctly from somebody else's directory".
-  const work = mkdtempSync(join(tmpdir(), "branchling-install-"));
+  const work = fixtureDir(join(tmpdir(), "branchling-install-"));
   try {
     const packed = execFileSync("npm", shimArgs(["pack", "--pack-destination", work, "--silent"]), {
       ...SHIM,

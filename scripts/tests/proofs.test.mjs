@@ -15,7 +15,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -42,7 +43,7 @@ let counter = 0;
  * test is what the guard makes of a history that already exists.
  */
 function backlog({ command = "true", reason = REASON_PROVEN, manual = null } = {}) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-proofs-" + counter++ + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-proofs-" + counter++ + "-"));
   const init = spawnSync(process.execPath, [CLI, "init", "--dir", dir, "--no-example"], { encoding: "utf8" });
   assert.equal(init.status, 0, init.stderr);
 
@@ -209,7 +210,7 @@ test("touchedByRange keeps a task by its own files OR by a path its contract nam
  * report the guard writes about itself.
  */
 function withRangeBacklog(touched, fn) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-proofs-since-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-proofs-since-"));
   const git = (...args) => {
     const r = spawnSync("git", ["-C", dir, "-c", "user.name=t", "-c", "user.email=t@example.invalid",
       "-c", "commit.gpgsign=false", ...args], { encoding: "utf8" });

@@ -34,7 +34,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -102,7 +103,7 @@ estimates: [${OWN.estimates.join(", ")}]
  *  `agent` names an agent file to create first, so the nudge has something to
  *  append to. */
 function fixture({ agent = null, agentBody = "" } = {}) {
-  const repo = mkdtempSync(join(tmpdir(), "branchling-instructions-" + counter++ + "-"));
+  const repo = fixtureDir(join(tmpdir(), "branchling-instructions-" + counter++ + "-"));
   execFileSync("git", ["init", "-q", "-b", "main", "."], { cwd: repo, stdio: "ignore" });
   if (agent) writeFileSync(join(repo, agent), agentBody, "utf8");
   const dir = join(repo, "backlog");

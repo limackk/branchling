@@ -24,7 +24,8 @@
 
 import { strict as assert } from "node:assert";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync, rmSync, readdirSync } from "node:fs";
+import { readFileSync, writeFileSync, rmSync, readdirSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -93,7 +94,7 @@ test("an empty file parses to no rows", () => {
 
 /** Walks scenes 0-2: a fresh backlog, a task carrying its own contract, broken code. */
 function stageDemo() {
-  const root = mkdtempSync(join(tmpdir(), "branchling-demo-"));
+  const root = fixtureDir(join(tmpdir(), "branchling-demo-"));
   // Scene 0 runs `git init` on purpose: verification entries run from the
   // REPOSITORY root, so without it the relative `parse.test.mjs` in the
   // contract resolves against the backlog directory and fails for a reason

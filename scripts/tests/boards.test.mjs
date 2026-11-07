@@ -16,7 +16,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -55,7 +56,7 @@ boards:
 
 /** Minimal backlog tree: tasks/ + boards.yaml, ready for `build-backlog --root`. */
 function withBacklog(build) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-boards-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-boards-"));
   try {
     mkdirSync(join(dir, "tasks"));
     writeFileSync(join(dir, "boards.yaml"), REGISTRY);
@@ -151,7 +152,7 @@ test("an unknown board slug fails the build instead of creating a phantom board"
 });
 
 test("suggest-board routes by the paths a task touches, not by the word 'backlog'", () => {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-suggest-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-suggest-"));
   try {
     writeFileSync(join(dir, "boards.yaml"), REGISTRY);
     const t = (name, body) => {
@@ -282,7 +283,7 @@ function runGuard(args, cwd) {
 
 /** A tree with a registry plus tasks; returns the directory for the caller to clean up. */
 function boardTree(files, registry = REGISTRY) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-board-guard-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-board-guard-"));
   mkdirSync(join(dir, "tasks"));
   writeFileSync(join(dir, "boards.yaml"), registry);
   for (const [name, fm] of Object.entries(files)) {
@@ -584,7 +585,7 @@ function runQuery(args, dir) {
 }
 
 function queryTree(build) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-query-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-query-"));
   mkdirSync(join(dir, "tasks"));
   writeFileSync(join(dir, "boards.yaml"), REGISTRY);
   build(dir);

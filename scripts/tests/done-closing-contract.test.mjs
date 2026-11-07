@@ -21,7 +21,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -47,7 +48,7 @@ function task(verification, criteria = ["- [ ] The task's own check passes. [pro
 const OWN = ["  - id: own", '    bash: "touch own-ran"'];
 
 function withBacklog(config, verification, fn) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-closing-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-closing-"));
   mkdirSync(join(dir, "tasks"));
   writeFileSync(join(dir, "_template.md"), "---\nid: TASK-NNN\n---\n", "utf8");
   writeFileSync(join(dir, "boards.yaml"), 'default: main\nboards:\n  - slug: main\n    name: "Main"\n', "utf8");
@@ -95,7 +96,7 @@ test("a malformed closing_contract entry fails the configuration, as an unknown 
   const inline = parseConfigYaml("closing_contract: true\n").problems;
   assert.ok(inline.some((p) => /closing_contract: expecting a block list/.test(p)), inline.join("\n"));
 
-  const dir = mkdtempSync(join(tmpdir(), "branchling-closing-cfg-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-closing-cfg-"));
   try {
     writeFileSync(join(dir, "config.yaml"), 'closing_contract:\n  - id: x\n    shell: "true"\n', "utf8");
     assert.throws(() => loadConfig(dir), ConfigError);

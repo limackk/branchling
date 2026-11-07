@@ -16,7 +16,8 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, writeFileSync, rmSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { execFileSync, spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -155,7 +156,7 @@ test("backlogPaths keeps every path in one place", () => {
 });
 
 test("on a REAL tree: discovery from a subdirectory lands on the backlog directory", () => {
-  const tmp = mkdtempSync(join(tmpdir(), "backlog-paths-"));
+  const tmp = fixtureDir(join(tmpdir(), "backlog-paths-"));
   mkdirSync(join(tmp, "backlog", "tasks"), { recursive: true });
   writeFileSync(join(tmp, "backlog", "boards.yaml"), "default: main\n", "utf8");
   mkdirSync(join(tmp, "src", "nested"), { recursive: true });
@@ -178,7 +179,7 @@ function worktreeFixture() {
   // THE SPELLING GIT PRINTS, which `repositoryRoot()` also returns: on Windows
   // the temporary directory is an 8.3 short name (`RUNNER~1`) that git expands
   // and plain `realpathSync` does not, so the two would differ on the same path.
-  const base = canonicalPath(mkdtempSync(join(tmpdir(), "backlog-gitdir-")));
+  const base = canonicalPath(fixtureDir(join(tmpdir(), "backlog-gitdir-")));
   const main = join(base, "main");
   const wt = join(base, "wt");
   const env = { ...process.env, NO_COLOR: "1", BACKLOG_STATE_DIR: join(base, "state") };

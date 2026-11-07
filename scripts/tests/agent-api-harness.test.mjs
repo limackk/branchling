@@ -2,7 +2,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { chmodSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -103,7 +104,7 @@ function rewriteVerification(path, id) {
 }
 
 test("two incompatible API harnesses close work without exposing credentials", async () => {
-  const root = mkdtempSync(join(tmpdir(), "branchling-api-harness-"));
+  const root = fixtureDir(join(tmpdir(), "branchling-api-harness-"));
   const remote = await startRemote(SECRET);
   try {
     for (const shape of ["compatible", "different"]) {

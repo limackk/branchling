@@ -12,13 +12,13 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import {
-  mkdtempSync,
   mkdirSync,
   readFileSync,
   rmSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -27,7 +27,7 @@ import { REPO_ROOT, isolateHome } from "./_repo.mjs";
 isolateHome("gitignore-shape");
 
 function fixture(ignore) {
-  const outer = mkdtempSync(join(tmpdir(), "branchling-node-modules-ignore-"));
+  const outer = fixtureDir(join(tmpdir(), "branchling-node-modules-ignore-"));
   const root = join(outer, "repo");
   mkdirSync(root);
   writeFileSync(join(root, ".gitignore"), ignore, "utf8");

@@ -22,7 +22,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { appendFileSync, mkdtempSync } from "node:fs";
+import { appendFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import vm from "node:vm";
@@ -59,7 +60,7 @@ function newTask(dir, title, release) {
 
 /** A backlog whose config declares `releases` (or none, when it is empty). */
 function fixture(releases) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-viewer-release-filter-" + counter++ + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-viewer-release-filter-" + counter++ + "-"));
   execFileSync("git", ["init", "-q", "-b", "main", "."], { cwd: dir });
   assert.equal(run(dir, ["init", "--dir", "backlog", "--no-example"]).status, 0);
   if (releases.length) appendFileSync(join(dir, "backlog", "config.yaml"), "\nreleases: [" + releases.join(", ") + "]\n");

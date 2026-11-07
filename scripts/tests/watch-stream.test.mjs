@@ -17,7 +17,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -38,7 +39,7 @@ function run(dir, args) {
 }
 
 function fixture() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-watch-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-watch-"));
   const init = run(dir, ["init", "--dir", "backlog", "--no-example"]);
   assert.equal(init.status, 0, init.stderr);
   const created = run(dir, ["new", "--dir", "backlog", "--title", "A watched task"]);

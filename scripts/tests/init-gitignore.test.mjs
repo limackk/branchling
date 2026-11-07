@@ -20,7 +20,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -38,7 +39,7 @@ isolateHome("init-gitignore");
 const CLI = join(dirname(fileURLToPath(import.meta.url)), "..", "cli.mjs");
 
 function repo() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-gitignore-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-gitignore-"));
   const r = spawnSync("git", ["init", "-q", "."], { cwd: dir, encoding: "utf8" });
   assert.equal(r.status, 0, "git init: " + r.stderr);
   return dir;
@@ -143,7 +144,7 @@ test("a view already tracked: init mentions `git rm --cached`", () => {
 });
 
 test("outside a git repository: it says so once and does not pretend to be a crash", () => {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-nogit-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-nogit-"));
   const r = init(dir, ["--dir", "."]);
   assert.equal(r.status, 0, "the absence of a repository is not an error");
   assert.ok(/not a repository/.test(r.stdout), "it did not say why it is not checking:\n" + r.stdout);

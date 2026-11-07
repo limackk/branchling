@@ -26,7 +26,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -46,7 +47,7 @@ function git(dir, ...args) {
 }
 
 function repo() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-gaps-" + counter++ + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-gaps-" + counter++ + "-"));
   git(dir, "init", "-q", "-b", "main", ".");
   return dir;
 }
@@ -301,7 +302,7 @@ test("defaultTrunk is the remote's default branch, else HEAD", () => {
   assert.deepEqual(defaultTrunk(upstream), { spec: "HEAD", source: "head" });
   assert.deepEqual(defaultTrunk(null), { spec: "HEAD", source: "head" });
 
-  const clone = mkdtempSync(join(tmpdir(), "branchling-gaps-clone-"));
+  const clone = fixtureDir(join(tmpdir(), "branchling-gaps-clone-"));
   execFileSync("git", ["clone", "-q", upstream, clone]);
   assert.deepEqual(defaultTrunk(clone), { spec: "refs/remotes/origin/main", source: "remote-default" });
 });

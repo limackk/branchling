@@ -23,7 +23,8 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -67,7 +68,7 @@ function history(backlog, id) {
  * the already-closed refusal would leave two lines.
  */
 function fixture() {
-  const root = mkdtempSync(join(tmpdir(), "branchling-profile-closes-"));
+  const root = fixtureDir(join(tmpdir(), "branchling-profile-closes-"));
   const repo = join(root, "repo");
   const backlog = join(repo, "backlog");
   mkdirSync(repo, { recursive: true });

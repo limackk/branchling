@@ -36,7 +36,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -58,7 +58,7 @@ function cli(args, env) {
 
 /** Two open tasks, the handed-back one ranking FIRST so its absence is visible. */
 function tree() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-dry-run-handed-back-" + counter++ + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-dry-run-handed-back-" + counter++ + "-"));
   const backlog = join(dir, "bl");
   const env = { ...process.env, BACKLOG_STATE_DIR: join(dir, "state"), NO_COLOR: "1" };
   assert.equal(cli(["init", "--dir", backlog, "--no-example"], env).code, 0);

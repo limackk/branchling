@@ -22,7 +22,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -45,7 +46,7 @@ const CLI = join(HERE, "..", "cli.mjs");
 
 let counter = 0;
 function fixture() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-mcp-" + counter++ + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-mcp-" + counter++ + "-"));
   const backlog = join(dir, "bl");
   const state = join(dir, "state");
   const env = { ...process.env, BACKLOG_STATE_DIR: state, NO_COLOR: "1" };

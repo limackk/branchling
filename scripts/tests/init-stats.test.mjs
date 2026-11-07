@@ -14,7 +14,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readdirSync, writeFileSync, readFileSync, existsSync, rmSync } from "node:fs";
+import { mkdirSync, readdirSync, writeFileSync, readFileSync, existsSync, rmSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -38,7 +39,7 @@ function run(args) {
 }
 
 function emptyDir() {
-  return mkdtempSync(join(tmpdir(), "branchling-init-"));
+  return fixtureDir(join(tmpdir(), "branchling-init-"));
 }
 
 function task(over) {

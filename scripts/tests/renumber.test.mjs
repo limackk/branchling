@@ -29,7 +29,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -56,7 +57,7 @@ function cli(args) {
  * exists for. `bodies` maps an id to the prose put in its body.
  */
 function backlog({ prefix = "TL", numbers = [9301, 9305, 9310], bodies = {}, seed = true } = {}) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-renumber-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-renumber-"));
   mkdirSync(join(dir, "tasks"));
   writeFileSync(join(dir, "_template.md"), "---\nid: X-NNN\n---\n", "utf8");
   writeFileSync(join(dir, "boards.yaml"), 'default: main\nboards:\n  - slug: main\n    name: "Main"\n', "utf8");

@@ -20,7 +20,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -53,7 +54,7 @@ function provenHistory(id) {
 
 /** A backlog with one proven closing per entry of `owns`, and `projectCommand` as the project contract. */
 function withBacklog(projectCommand, owns, fn) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-proofs-once-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-proofs-once-"));
   mkdirSync(join(dir, "tasks"));
   mkdirSync(join(dir, "history"));
   writeFileSync(join(dir, "_template.md"), "---\nid: TASK-NNN\n---\n", "utf8");

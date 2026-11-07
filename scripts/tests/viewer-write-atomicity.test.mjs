@@ -5,7 +5,8 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -16,7 +17,7 @@ isolateHome("viewer-write-atomicity");
 isolateState("viewer-write-atomicity");
 
 test("an append failure restores the snapshot and writes no false transition", () => {
-  const dir = mkdtempSync(join(tmpdir(), "viewer-write-atomicity-"));
+  const dir = fixtureDir(join(tmpdir(), "viewer-write-atomicity-"));
   const backlog = join(dir, "backlog");
   const id = "TASK-1";
   mkdirSync(join(backlog, "tasks"), { recursive: true });

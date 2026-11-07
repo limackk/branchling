@@ -29,7 +29,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -62,7 +63,7 @@ function taskText(over = {}) {
 
 /** A backlog directory with `tasks/` and enough beside it to be recognised. */
 function sandbox() {
-  const dir = mkdtempSync(join(tmpdir(), "backlog-adoption-"));
+  const dir = fixtureDir(join(tmpdir(), "backlog-adoption-"));
   TRASH.push(dir);
   mkdirSync(join(dir, "tasks"));
   writeFileSync(join(dir, "config.yaml"), "", "utf8");

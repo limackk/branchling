@@ -14,7 +14,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
+import { mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -37,7 +38,7 @@ function run(args, opts) {
 }
 
 function sandbox() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-cli-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-cli-"));
   mkdirSync(join(dir, "tasks"));
   writeFileSync(join(dir, "_template.md"), "---\nid: BL-NNN\n---\n", "utf8");
   // The board guard requires a registry — without it `board:` has no vocabulary.
@@ -415,7 +416,7 @@ test("`regen-hook` takes the backlog directory FROM THE FILE, not from cwd", () 
   // The heart of portability: a hook installed in node_modules has no neighbours,
   // and cwd can be anything. The task's path IS the pointer to the data directory.
   const dir = sandbox();
-  const elsewhere = mkdtempSync(join(tmpdir(), "branchling-cwd-"));
+  const elsewhere = fixtureDir(join(tmpdir(), "branchling-cwd-"));
   try {
     const file = join(dir, "tasks", "BL-900-zrob-rzecz.md");
     const r = run(["regen-hook"], {

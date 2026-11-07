@@ -34,7 +34,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -73,7 +74,7 @@ function taskText(status) {
  * has nothing to do with the tree it chose.
  */
 function sandbox(label) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-" + label + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-" + label + "-"));
   TRASH.push(dir);
   mkdirSync(join(dir, "tasks"));
   // `looksLikeBacklogDir` wants one of boards/config/template beside `tasks/`;

@@ -20,7 +20,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { appendFileSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -63,7 +64,7 @@ function newTask(dir, title) {
  * `main` — the clone's record of the line everybody merges into.
  */
 function fixture() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-query-trunk-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-query-trunk-"));
   git(dir, "init", "-q", "-b", "main", ".");
   assert.equal(run(dir, ["init", "--dir", "backlog", "--no-example"]).status, 0);
   const merged = newTask(dir, "Merged into main");
