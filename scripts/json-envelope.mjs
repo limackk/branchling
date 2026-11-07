@@ -226,10 +226,13 @@ export const KINDS = {
   // other path's keys stay present with their declared empty values. Each
   // `created` entry carries `id`, `file`, `title`, `source` and `sourceState`
   // (TL-580), the issue's own `open` or `closed`, which says what is still to
-  // retire in GitHub; entry shapes are documented, not declared here.
+  // retire in GitHub — for Jira, the workflow status name (TL-581); entry
+  // shapes are documented, not declared here. `unknownNodes` counts the Jira
+  // description content the converter kept as text without its formatting,
+  // and is always empty for GitHub, whose bodies are markdown already.
   import: {
     ok: null, root: null, dryRun: null, created: [], wouldCreate: [],
-    skipped: [], droppedLabels: [], withoutVerification: null, errors: [], actorSource: null,
+    skipped: [], droppedLabels: [], unknownNodes: [], withoutVerification: null, errors: [], actorSource: null,
   },
   // `new --json` (TL-550). `idSource` is where the number came from — `repo`,
   // a scan of every branch and worktree, or `local`, this directory alone, the

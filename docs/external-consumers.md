@@ -121,7 +121,7 @@ table and the code disagree in either direction.
 | `release-record` | `deploy record --json` | write — a git ref, never the tree |
 | `task-new` | `new --title "…" --json` | write |
 | `seed` | `seed --json` | write |
-| `import` | `import --from github --json` | write |
+| `import` | `import --from github --json`, `import --from jira --json` | write |
 | `run` | `run --json` | write — dispatches agents |
 | `run-stop` | `run --stop --json` | write — the state directory, never the tree |
 | `serve-stop` | `serve --stop <port> --json` | write — stops a local process |
@@ -401,6 +401,7 @@ Common to all of them:
 | `plan add <ID>... --wave` | `--why` to create the wave; no `--json` | none (text) |
 | `seed` | a plan as JSON on stdin | `seed` |
 | `import --from github` | issues as JSON on stdin | `import` |
+| `import --from jira` | a Jira Cloud REST API v3 search response on stdin — one page or an array of pages; `--status <from>=<to>` maps a workflow status by name | `import` |
 
 `<command> --help --json` describes each command's flags, which are required,
 and which draw on a vocabulary — with that project's values — so an interface

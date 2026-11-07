@@ -8,8 +8,8 @@ epic: ""                           # free text — the group this task counts to
 release: ""                        # the release it is PLANNED for (a value from `releases:` in config.yaml). Empty = none
 target: []                         # the deploy targets in ANOTHER repository it ships from (`deploy_targets` with `repository:`). Empty = none
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:loop-2
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 conflict_group: [import]  # the AREA it touches (e.g. a module): `next` and `run` hold it back while a task of the same group is in progress. Empty = `conflict_group_from`, or none
@@ -61,6 +61,6 @@ Not part of this task: writing anything back to Jira, closing or transitioning t
 
 ## Acceptance criteria
 
-- [ ] Jira issues import from stdin with ADF converted, status mapped by category or override, the browse-URL marker written, and a re-run skipping what is already imported. [proof: jira-import-tests]
-- [ ] `import --help` shows how to bring Jira issues in. [proof: help-names-jira]
-- [ ] The GitHub source behaves as before after the shared parts are extracted. [proof: github-import-unchanged]
+- [x] Jira issues import from stdin with ADF converted, status mapped by category or override, the browse-URL marker written, and a re-run skipping what is already imported. [proof: jira-import-tests]
+- [x] `import --help` shows how to bring Jira issues in. [proof: help-names-jira]
+- [x] The GitHub source behaves as before after the shared parts are extracted. [proof: github-import-unchanged]

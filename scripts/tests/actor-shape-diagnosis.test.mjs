@@ -34,7 +34,7 @@ import {
 } from "../task-fields.mjs";
 import { actorRefusal as actorRefusalFromHistory } from "../history.mjs";
 import { loadConfig, validateConfig } from "../config.mjs";
-import { parseImportArgs } from "../import-github.mjs";
+import { parseImportArgs } from "../import.mjs";
 import { parseSeedArgs } from "../seed-backlog.mjs";
 import { isolateHome, REPO_ROOT, SCRIPTS_DIR } from "./_repo.mjs";
 

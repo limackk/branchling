@@ -1,0 +1,2 @@
+{"id":"01M6V9316ESPAHH5PXZ7MM7S7H","ts":"2026-11-07T15:12:32.462Z","task":"TL-640","field":"__created__","from":"","to":"Imported description headings cannot pose as task sections","actor":"agent:loop-2","source":"new","reason":"unknown"}
+{"id":"01M6V93JYR0Q43NMST20QX45RH","ts":"2026-11-07T15:12:50.648Z","task":"TL-640","field":"conflict_group","from":[],"to":["import"],"actor":"agent:loop-2","source":"set","reason":"touches the import command, the same area as TL-581"}

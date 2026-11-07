@@ -686,6 +686,50 @@ placeholder: those tasks are readable and searchable straight away, and
 `branchling done` will refuse them until somebody writes down how to check the
 outcome.
 
+### From Jira
+
+If your tickets live in Jira Cloud, the same command reads the search endpoint
+of the REST API v3. There is no `gh` for Jira that every team has, so the call
+is your own `curl`; the endpoint pages its results with `nextPageToken`, and
+`jq -s .` hands the collected pages over as one array:
+
+```bash
+JIRA=https://<site>.atlassian.net
+JQL='project = APP AND created >= -30d'
+token=""; while :; do
+  page=$(curl -sS -G -u "$JIRA_EMAIL:$JIRA_API_TOKEN" "$JIRA/rest/api/3/search/jql" \
+    -d maxResults=100 -d fields=summary,description,status,labels,priority \
+    ${token:+--data-urlencode "nextPageToken=$token"} --data-urlencode "jql=$JQL")
+  printf '%s\n' "$page"
+  token=$(printf '%s' "$page" | jq -r '.nextPageToken // empty')
+  [ -n "$token" ] || break
+done | jq -s . | branchling import --from jira --dry-run
+```
+
+**Run it again whenever you like.** Every imported task carries the line
+`Imported from Jira: <site>/browse/<KEY>`, and a ticket whose link is already
+in the backlog is skipped, so the same JQL pulls only what is new. A key that
+appears twice in one input is refused: overlapping pages may have missed
+tickets as well.
+
+**The description is converted from Atlassian Document Format to markdown** —
+paragraphs, headings, lists, code blocks, quotes, rules, hard breaks, and bold,
+italic, code and link marks. Anything else (a panel, a table, a mention) keeps
+its text, loses its formatting, and is counted in the report, so you know which
+tasks to read over. The v2 API's wiki-markup description is refused rather than
+copied in as if it were markdown.
+
+**Statuses map by category.** A Jira workflow is per project, but every status
+belongs to one of three categories: *To Do* lands on your first status, *In
+Progress* on your in-progress status, *Done* on your first archived one. Name a
+status more precisely with `--status "In Review=<one of yours>"`, repeatable;
+labels map with `--label` exactly as for GitHub. The ticket's priority is noted
+in the task body rather than mapped.
+
+**The ticket stays open in Jira.** Unlike a GitHub issue, there is nothing to
+retire: people outside the repository still work from the ticket, and the link
+in each task leads back to it.
+
 ## What does not belong in a backlog
 
 - **Fixes shorter than half an hour** — just do them and commit.
