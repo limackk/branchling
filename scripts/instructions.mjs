@@ -610,6 +610,29 @@ WHILE YOU WORK.
                        runs those as well, and where the project contract is
                        the whole suite, so is the run. The report says what it
                        left out; \`{{tool}} done\` still runs it.
+  Proving it fails     A new test is evidence only once you have watched it
+                       fail against the code WITHOUT your change. Run it in a
+                       scratch copy of the commit you started from, never in
+                       this tree:
+
+                         git worktree add --detach <scratch> <base>
+                         cp <your test> <scratch>/<its path>
+                         cd <scratch> && <your test command>
+                         git worktree remove --force <scratch>
+
+                       The same copy with no worktree entry at all:
+
+                         mkdir <scratch> &&
+                           git archive <base> | tar -x -C <scratch>
+
+                       To put back one module rather than the whole change,
+                       write its old copy into the SCRATCH tree with
+                       \`git show <base>:<path>\`, never over your own file.
+                       NOT \`git stash\`: the stash is one stack for the whole
+                       clone, shared by every worktree, so a \`git stash pop\`
+                       takes whichever entry is on top — another session's
+                       edits land in your tree, yours land in theirs, and
+                       nothing records that it happened.
   Changing a field     \`{{tool}} set <ID> <field> <value> --reason "…"\` checks
                        one field against this backlog's configuration and
                        records it; \`{{tool}} body <ID> --reason "…"\` replaces
