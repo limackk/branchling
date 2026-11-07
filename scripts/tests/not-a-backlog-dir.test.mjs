@@ -172,6 +172,7 @@ const DIRECT_CASES = [
   ["audit"],
   ["docs-drift"],
   ["pr-summary"],
+  ["jira-proof", "--base", "HEAD"],
   ["skills", "install", "--dry-run"],
   ["run", "--dry-run"],
 ];

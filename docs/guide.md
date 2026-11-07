@@ -730,6 +730,49 @@ in the task body rather than mapped.
 retire: people outside the repository still work from the ticket, and the link
 in each task leads back to it.
 
+### The proof, back on the Jira ticket
+
+The import is one pipe; this is the other, and nothing synchronises between
+them. Jira keeps the request and the conversation, the repository keeps
+execution, status and proof. When a task that came from Jira closes on `main`,
+its ticket gets one comment: which task closed it, which checks its
+verification ran and what each one proves, and the record of the run that
+closed it.
+
+```bash
+branchling jira-proof --base <commit before the push>   # the comments, as text
+branchling jira-proof --base <sha> --site https://<site>.atlassian.net --json
+```
+
+A task is reported when the last status record the range added puts it in the
+closed status; one closed and reopened within the same push has no standing
+proof and is left out. The ticket is the `Imported from Jira:` line the import
+wrote. A closed task without one is not dropped: it is listed under `skipped`
+with its reason and counted, as is one whose marker names a site other than
+`--site`.
+
+Copy [`examples/jira-proof.yml`](../examples/jira-proof.yml) into
+`.github/workflows/`. It runs on every push to `main` over the pushed range,
+reads `JIRA_SITE`, `JIRA_EMAIL` and `JIRA_API_TOKEN` from CI secrets — never
+from branchling, which makes no network request — and posts each comment
+through the REST API v3. Before posting it reads the ticket's comments for the
+marker that ends each one, so a re-run over the same range posts nothing
+twice. The job passes its own site as `--site`, so a task file cannot send the
+token to a host you did not choose.
+
+**The command writes the comment body as Atlassian Document Format**, beside
+the same comment as plain text. The v3 endpoint takes ADF, and wrapping plain
+text in the job would either post the list of checks as one run-on paragraph
+or put a converter into YAML — a decision living in every copy of the job
+instead of in the command.
+
+**What Jira already shows is not repeated.** With Atlassian's GitHub
+integration, a Jira key in a branch name, commit message or pull-request title
+already puts the branch, commits and pull request on the ticket. The job adds
+only what Jira cannot see, and it never transitions a ticket, syncs a field
+back, or reads Jira comments into the backlog. Tasks closed before the job was
+installed are not posted for.
+
 ## What does not belong in a backlog
 
 - **Fixes shorter than half an hour** — just do them and commit.

@@ -91,6 +91,7 @@ table and the code disagree in either direction.
 | `command-help` | `<command> --help --json` | read — the input surface of a command |
 | `plan` | `plan --json`, `plan init --json` | read; `plan init` writes `plan.yaml` |
 | `pr-summary` | `pr-summary --json` | read |
+| `jira-proof` | `jira-proof --base <ref> --json` | read — one Jira comment per task closed in a range |
 | `audit` | `audit --json` | read |
 | `docs-drift` | `docs-drift --json` | read |
 | `red-owners` | `red --json` | read |

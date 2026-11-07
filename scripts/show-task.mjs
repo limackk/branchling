@@ -188,7 +188,13 @@ export function computeShow({ root, config, id }) {
  * it would run.
  */
 export function verificationContract(root, file) {
-  const { frontmatter, body } = splitFrontmatter(readFileSync(join(root, file), "utf8"));
+  return verificationContractOf(readFileSync(join(root, file), "utf8"));
+}
+
+/** The same contract out of a task file's text — for a reader that already
+ *  holds it (`jira-proof`, TL-582), so the two answers cannot drift apart. PURE. */
+export function verificationContractOf(text) {
+  const { frontmatter, body } = splitFrontmatter(text);
   const { entries, problems } = parseVerification(frontmatter);
   const { items } = parseCriteria(body);
   return {

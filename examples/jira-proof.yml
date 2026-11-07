@@ -1,0 +1,120 @@
+# The proof of each closed task, as a comment on its Jira ticket.
+#
+# Copy this file to `.github/workflows/jira-proof.yml` in your repository.
+#
+# WHAT IT DOES. On every push to `main` it runs `branchling jira-proof` over the
+# pushed range and posts ONE comment on the Jira ticket of each task that
+# entered the closed status: which task closed it, which checks its
+# verification ran and what each one proves, and the record of the run that
+# closed it. People who never open the repository see the evidence where they
+# already work. The ticket is the `Imported from Jira: <site>/browse/<KEY>`
+# line that `branchling import --from jira` wrote into the task.
+#
+# WHAT IT DOES NOT DO. It never transitions a ticket, never syncs a field back,
+# and never reads Jira comments into the backlog. Atlassian's GitHub
+# integration already puts branches, commits and pull requests on the ticket;
+# this adds only what Jira cannot see. Tasks closed before the job was
+# installed are not posted for.
+#
+# WHY THE JOB IS THIS SHORT. Every decision is in the command — which tasks
+# closed in the range, which of them came from Jira, what the comment says, and
+# its body as Atlassian Document Format. This file is checkout, run, post. If
+# you need a different comment, change the command, not this file.
+#
+# THE CREDENTIALS are CI secrets and never pass through branchling:
+#   JIRA_SITE       https://<your-site>.atlassian.net
+#   JIRA_EMAIL      the account the comments are posted as
+#   JIRA_API_TOKEN  an API token of that account
+# The comments go to JIRA_SITE and nowhere else: `--site` makes the command
+# skip a task whose marker names another site, so a task file cannot send the
+# token to a host you did not choose.
+#
+# A RE-RUN POSTS NOTHING TWICE. Each comment ends in a marker naming its task;
+# the job reads the ticket's comments first and skips a ticket that already
+# carries it.
+#
+# `fetch-depth: 0` MUST STAY. The range starts at the commit before the push,
+# and a shallow checkout does not have it; the command says so and the job
+# fails rather than reporting an empty range as "nothing closed".
+
+name: jira proof
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  proof:
+    # A push that CREATED the branch has no commit before it, so no range.
+    if: github.event.before != '0000000000000000000000000000000000000000'
+    runs-on: ubuntu-latest
+    env:
+      JIRA_SITE: ${{ secrets.JIRA_SITE }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The whole history: the range starts at the commit before the push.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Read the closings in the pushed range
+        run: |
+          npx --yes branchling jira-proof \
+            --base "${{ github.event.before }}" \
+            --site "$JIRA_SITE" \
+            --json > jira-proof.json
+
+      - name: Post the proof on each ticket
+        uses: actions/github-script@v7
+        env:
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+        with:
+          script: |
+            const fs = require("node:fs");
+            const doc = JSON.parse(fs.readFileSync("jira-proof.json", "utf8"));
+            if (!doc.scanned) {
+              core.setFailed(doc.reason);
+              return;
+            }
+            for (const s of doc.skipped) core.info("skipped " + s.task + ": " + s.reason);
+
+            const site = process.env.JIRA_SITE.replace(/\/+$/, "");
+            const auth = Buffer.from(process.env.JIRA_EMAIL + ":" + process.env.JIRA_API_TOKEN).toString("base64");
+            const headers = {
+              Authorization: "Basic " + auth,
+              Accept: "application/json",
+              "Content-Type": "application/json",
+            };
+            const commentsOf = (key) => site + "/rest/api/3/issue/" + encodeURIComponent(key) + "/comment";
+
+            for (const c of doc.comments) {
+              // Every page of the ticket's comments: the marker may be on any.
+              let present = false;
+              for (let startAt = 0; ; ) {
+                const res = await fetch(commentsOf(c.key) + "?startAt=" + startAt + "&maxResults=100", { headers });
+                if (!res.ok) throw new Error("reading the comments of " + c.key + ": HTTP " + res.status);
+                const page = await res.json();
+                if (page.comments.some((x) => JSON.stringify(x.body).includes(c.marker))) {
+                  present = true;
+                  break;
+                }
+                startAt += page.comments.length;
+                if (!page.comments.length || startAt >= page.total) break;
+              }
+              if (present) {
+                core.info(c.task + ": " + c.key + " already carries " + c.marker);
+                continue;
+              }
+              const res = await fetch(commentsOf(c.key), {
+                method: "POST", headers, body: JSON.stringify({ body: c.adf }),
+              });
+              if (!res.ok) throw new Error("posting on " + c.key + ": HTTP " + res.status + " " + (await res.text()));
+              core.info(c.task + ": posted on " + c.key);
+            }

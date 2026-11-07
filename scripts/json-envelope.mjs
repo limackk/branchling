@@ -78,6 +78,12 @@ export const KINDS = {
   // at all: outside git, or with a base this clone does not have, `tasks: []` is
   // "nobody looked" rather than "nothing changed", and `reason` says which.
   "pr-summary": { base: null, scanned: null, reason: null, tasks: [], engaged: null, cost: null },
+  // `jira-proof --json` (TL-582). `scanned` means what it means for
+  // `pr-summary`: `comments: []` under `scanned: false` is "nobody looked".
+  // `closedStatuses` are the statuses whose role is `closed` — what "entered
+  // the closed status" was judged against. Every closed task NOT commented on
+  // is in `skipped` with its `reason`, never dropped.
+  "jira-proof": { base: null, site: null, scanned: null, reason: null, closedStatuses: [], comments: [], skipped: [] },
   // `audit --json` (TL-90). `since` and `dayZero` are what makes an empty
   // `closedWithoutTrace` readable: the log has a first day, and everything
   // before it left no trace for a reason that is nobody's fault.
@@ -688,6 +694,9 @@ export const KIND_EXERCISE = {
   // command with no range to read gives (TL-89) — which has to stay a complete
   // envelope saying `scanned: false`, not an error and not an empty list.
   "pr-summary": { args: ["pr-summary", "--json"] },
+  // The same: no git, so no range, and the envelope still carries every key.
+  // `--base` is required by the command, so the row names one.
+  "jira-proof": { args: ["jira-proof", "--base", "HEAD", "--json"] },
   // A backlog with no history at all (TL-90): every detector has nothing to
   // find, and the envelope still has to carry every key rather than dropping
   // the sections that came back empty.

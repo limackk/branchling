@@ -177,7 +177,8 @@ provider through an adapter you own; see [the guide](docs/guide.md#a-queue-not-j
 
 - **[The guide](docs/guide.md)** — the task file, the queue and agent profiles,
   where the data lives, composition with `--json`, importing from GitHub Issues
-  or Jira, pull-request summaries and audits.
+  or Jira, proof comments back on Jira tickets, pull-request summaries and
+  audits.
 - **[The manual](docs/manual.md)** — statuses, configuration, `plan.yaml`,
   seeding, the dispatcher, guards, the viewer and the `--json` contract.
 - **[`docs/branchling-global-tool.md`](docs/branchling-global-tool.md)** — the
