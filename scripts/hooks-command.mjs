@@ -140,26 +140,78 @@ export function hooksTarget(root, name = HOOK_NAME) {
  * `closed` SAYS WHETHER `install` CAN REPAIR IT (TL-600). A block whose opening
  * marker has no closing one is never current, but `install` refuses it rather
  * than guess its edge, so a caller naming a repair has to tell the two apart.
+ * `unclosed` is then the span a person may replace by hand (TL-609).
+ *
+ * OWNERSHIP IS READ FROM A MARKER LINE, THE TEST THE BLOCK PARSER USES. A
+ * substring test called a hook ours when it only quoted the marker inside a
+ * line of its own (`echo "<marker>"`); no block could then be found in it, so
+ * `install` and `doctor` reached an unclosed-block repair with no span to name,
+ * and `uninstall` reported removing a block that was never there.
  */
 export function inspect(target) {
   if (!existsSync(target.path)) return { state: "absent", text: null };
   const text = readFileSync(target.path, "utf8");
-  if (text.includes(BLOCK_OPEN)) {
+  if (openLine(text.split("\n")) >= 0) {
     const installed = installedBlock(text);
-    return { state: "ours", text, current: installed === hookBlock(target.name), closed: installed !== null };
+    return { state: "ours", text, current: installed === hookBlock(target.name), closed: installed !== null,
+      unclosed: unclosedBlockLines(text) };
   }
   return { state: "foreign", text };
+}
+
+/** The index of the line that IS our opening marker, trimmed, or -1. */
+function openLine(lines) {
+  return lines.findIndex((l) => l.trim() === BLOCK_OPEN);
 }
 
 /** The line range of our block, markers included, or null when the opening
  *  marker has no closing one. Matched by trimmed line, as `withoutBlock` does. */
 function blockRange(lines) {
-  const open = lines.findIndex((l) => l.trim() === BLOCK_OPEN);
+  const open = openLine(lines);
   if (open < 0) return null;
   let close = open;
   while (close < lines.length && lines[close].trim() !== BLOCK_CLOSE) close++;
   if (close >= lines.length) return null;
   return { open, close };
+}
+
+/**
+ * The lines an UNCLOSED block of ours occupies, 1-based and inclusive, or null
+ * when the text holds no unclosed block. PURE.
+ *
+ * WHERE THE BLOCK ENDS IS READ FROM ITS SHAPE, NOT FROM THE END OF THE FILE
+ * (TL-609). With no closing marker the edge is unknown, and "from the opening
+ * marker onwards" told the user to delete their own hook lines after it. What
+ * every release has written is the marker, comment lines, then one gate line
+ * ending in `|| exit 1`; the span stops at that gate. When the first line after
+ * the comments is not a gate, the span stops at the last comment, so a line the
+ * tool does not recognise as its own is never inside it.
+ */
+export function unclosedBlockLines(text) {
+  const lines = String(text).split("\n");
+  const open = openLine(lines);
+  if (open < 0 || blockRange(lines)) return null;
+  let last = open;
+  while (last + 1 < lines.length && lines[last + 1].trim().startsWith("#")) last++;
+  const next = lines[last + 1];
+  const gate = next !== undefined && /\|\| exit 1$/.test(next.trim());
+  if (gate) last++;
+  return { first: open + 1, last: last + 1, gate };
+}
+
+/**
+ * The span `hooks install` and `doctor` both name as the repair for an
+ * unclosed block — ONE string, so the two cannot drift apart (TL-609).
+ */
+export function unclosedSpan(range) {
+  const where = range.first === range.last ? "line " + range.first : "lines " + range.first + "–" + range.last;
+  return where + " (`" + BLOCK_OPEN + "`" +
+    (range.gate ? " through its gate line" : range.last > range.first ? " and the comments under it" : "") + ")";
+}
+
+/** What following the repair leaves alone, said after the span(s) it names. */
+export function unclosedKeeps(spans = 1) {
+  return "the lines after " + (spans === 1 ? "it" : "each") + " are yours and stay";
 }
 
 /**
@@ -287,7 +339,7 @@ function runInstall(root, plan) {
     console.error(failure(N + " hooks install",
       "the " + unclosed.entry.target.name + " hook opens our block and never closes it", [
         unclosed.entry.target.path,
-        "It was not touched. Put this in place of the lines from `" + BLOCK_OPEN + "` onwards:",
+        "It was not touched. Put this in place of " + unclosedSpan(unclosed.entry.found.unclosed) + "; " + unclosedKeeps() + ":",
         ...hookBlock(unclosed.entry.target.name).split("\n"),
       ], [N + " hooks print"]));
     return 1;
@@ -333,7 +385,7 @@ function runUninstall(root, plan) {
     console.error(failure(N + " hooks uninstall",
       "the " + foreign.target.name + " hook here is not ours", [
         foreign.target.path,
-        "It carries no `" + BLOCK_OPEN + "` marker, so removing it would be deleting",
+        "It has no `" + BLOCK_OPEN + "` line, so removing it would be deleting",
         "somebody else's gate. Nothing was changed.",
       ]));
     return 1;
