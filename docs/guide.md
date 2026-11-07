@@ -116,9 +116,9 @@ this is a read.
 
 During a later review, the same reader can ask for decisions by area rather
 than guessing which task carried them. `--modified-file` computes the tasks
-from commit messages and returns their decisions; a trailing `/` selects a
-directory. It does not run a review or judge whether an earlier rejection was
-right.
+from the ids that commit titles start with and returns their decisions; a
+trailing `/` selects a directory. It does not run a review or judge whether an
+earlier rejection was right.
 
 ### Editing a task by hand
 
@@ -607,15 +607,20 @@ branchling query --modified-file scripts/cli.mjs --status done
 branchling query --modified-file scripts/            # a whole directory
 ```
 
-**There is one data source and it is the commit messages.** A task's files are
-COMPUTED from every commit whose message names its id — the convention this
+**There is one data source and it is the commit titles.** A task's files are
+COMPUTED from every commit whose title STARTS with its id — the convention this
 tool already asks for, so there is no field to fill in and nothing that can go
-stale. Paths are relative to the repository root, not to the backlog directory;
+stale. Every id at the head of the title counts (`TASK-9 TASK-10: …`), and a
+range there, such as `TASK-7..TASK-11`, counts as every id it spans. An id that
+appears only later in the title, or only in the body, is a mention rather than
+a claim: a commit that says "filed as TASK-42" gives TASK-42 none of its files.
+Paths are relative to the repository root, not to the backlog directory;
 those differ whenever the backlog is not co-located with the code.
 
-A repository whose commits do not name task ids gets told so, rather than being
-handed an empty list that reads like an answer. This is the one thing an
-external tracker cannot do at all: it needs the tasks and the code in one tree.
+A repository whose commit titles do not start with task ids gets told so,
+rather than being handed an empty list that reads like an answer. This is the
+one thing an external tracker cannot do at all: it needs the tasks and the code
+in one tree.
 
 The envelope's promises — which keys are guaranteed, what may be reworded, and
 what requires a new `schemaVersion` — are in
