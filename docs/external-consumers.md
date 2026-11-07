@@ -129,9 +129,13 @@ table and the code disagree in either direction.
 **Moved into the envelope by TL-550.** `new --json` answers `task-new`, which
 carries the id it created and the file it wrote, so an interface that creates a
 task no longer needs a `query --json` after `new` returns to learn the new id.
-A refusal is not in the envelope yet, with one exception: a missing backlog
-answers `task-new` with `ok: false` (TL-548), and every other refusal of `new`
-is still a sentence on stderr with a non-zero exit.
+Every refusal answers `task-new` too (TL-568), with `ok: false`, a
+`refusalKind` to branch on — `usage`, `invalid-document`, `invalid-config`,
+`prefix-mismatch`, `template-drift`, `plan-refused`, `id-taken`, or the shared
+`no-backlog` (TL-548) — the sentence in `refusal` and the findings in
+`details`, on stdout; stderr stays empty and the exit code is unchanged. A
+`plan-refused` after the write is the one refusal that carries `id` and
+`file`: the task exists, and the plan did not take it.
 
 **Moved into the envelope by TL-528.** `decide --json` and `where --json` used
 to print a bare object. Their payload keys are unchanged, and the root now
@@ -377,7 +381,7 @@ Common to all of them:
 
 | Command | Required input | Kind |
 |---|---|---|
-| `new --title "…"` | the title; the body as one JSON document on stdin (`goal`, non-empty `verification`) or the template is written; `--actor` names who records the creation | `task-new` with `--json`; a missing backlog answers in it with `ok: false` (TL-548), any other refusal stays text on stderr |
+| `new --title "…"` | the title; the body as one JSON document on stdin (`goal`, non-empty `verification`) or the template is written; `--actor` names who records the creation | `task-new` with `--json`, a refusal included (`ok: false`, TL-568) |
 | `take <ID>` | the id; `--reason` when the target status requires one, and with `--take-over` | `task-take` |
 | `next` | nothing; the same filters `query` takes narrow the choice | `task-take` |
 | `set <ID> <field> <value>` | a field `set` writes (not `status` or `owner`) and a value from the vocabulary; `--reason` where required | `task-set` |

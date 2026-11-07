@@ -225,10 +225,16 @@ export const KINDS = {
   // `new --json` (TL-550). `idSource` is where the number came from — `repo`,
   // a scan of every branch and worktree, or `local`, this directory alone, the
   // known risk the text output says out loud. `wave` is null unless `--wave`
-  // scheduled the task. A missing backlog answers in this kind with `ok: false`
-  // and `refusalKind: "no-backlog"` (TL-548); every other refusal is still a
-  // sentence on stderr and a non-zero exit, as before the flag existed.
-  "task-new": { ok: null, id: null, file: null, board: null, wave: null, idSource: null, actorSource: null },
+  // scheduled the task. EVERY refusal answers in this kind with `ok: false`
+  // (TL-568): `refusalKind` is `usage`, `invalid-document`, `invalid-config`,
+  // `prefix-mismatch`, `template-drift`, `plan-refused`, `id-taken` or the
+  // shared `no-backlog` (TL-548), `refusal` the sentence and `details` the
+  // findings and remedies. Only `plan-refused` after the write carries `id`
+  // and `file`: the task exists, and the plan did not take it.
+  "task-new": {
+    ok: null, id: null, file: null, board: null, wave: null, idSource: null, actorSource: null,
+    refusalKind: null, refusal: null, details: [],
+  },
   // `plan --json`. `exists` is false for a backlog with no `plan.yaml`, and then
   // every other key carries its empty value — the execution order is optional,
   // so its absence is an answer and not an error to be told apart from one.
@@ -771,9 +777,14 @@ export const KIND_EXERCISE = {
     args: ["decide", ABSENT_TASK, "--reason", "a fixture", "--actor", "agent:test", "--json"],
     refuses: true, writes: true,
   },
-  // A task created for real: `new` has no refusal envelope to exercise, and
-  // the fixture is a throwaway tree.
-  "task-new": { args: ["new", "--title", "A fixture task", "--actor", "agent:test", "--json"], writes: true },
+  // A wave the fixture does not have: the refusal path (TL-568), reached only
+  // after the title, the actor and the backlog pass, and settled before a
+  // number is reserved, so nothing is written. The success envelope is held by
+  // `scripts/tests/new-json-refusals.test.mjs` beside every refusal.
+  "task-new": {
+    args: ["new", "--title", "A fixture task", "--wave", "no-such-wave", "--actor", "agent:test", "--json"],
+    refuses: true, writes: true,
+  },
   seed: {
     args: ["seed", "--json"],
     writes: true,
