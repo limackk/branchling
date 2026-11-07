@@ -126,8 +126,9 @@ table and the code disagree in either direction.
 | `run-stop` | `run --stop --json` | write — the state directory, never the tree |
 | `serve-stop` | `serve --stop <port> --json` | write — stops a local process |
 
-**Outside the envelope today.** `new` has no `--json` at all; an interface that
-creates a task reads the new id with `query --json` after `new` returns.
+**Moved into the envelope by TL-550.** `new --json` answers `task-new`, which
+carries the id it created and the file it wrote, so an interface that creates a
+task no longer needs a `query --json` after `new` returns to learn the new id.
 
 **Moved into the envelope by TL-528.** `decide --json` and `where --json` used
 to print a bare object. Their payload keys are unchanged, and the root now

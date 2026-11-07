@@ -8,8 +8,8 @@ epic: ""                           # free text — the group this task counts to
 release: ""                        # the release it is PLANNED for (a value from `releases:` in config.yaml). Empty = none
 target: []                         # the deploy targets in ANOTHER repository it ships from (`deploy_targets` with `repository:`). Empty = none
 priority: P1                       # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:loop-2
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 conflict_group: [consumer-doc]  # the AREA it touches (e.g. a module): `next` and `run` hold it back while a task of the same group is in progress. Empty = `conflict_group_from`, or none
@@ -31,4 +31,4 @@ docs/external-consumers.md no longer claims that `new` has no `--json`. Under th
 
 ## Acceptance criteria
 
-- [ ] The consumer guide no longer says new has no --json. [proof: no-stale-claim]
+- [x] The consumer guide no longer says new has no --json. [proof: no-stale-claim]
