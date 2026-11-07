@@ -31,7 +31,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { resolveActorReport } from "./actor.mjs";
-import { loadConfigOrExit } from "./config.mjs";
+import { ConfigError, formatConfigError, loadConfig } from "./config.mjs";
 import { actorRefusal, recordCreation } from "./history.mjs";
 import { withBacklogMutex } from "./lock.mjs";
 import { editPlanText, newPlanErrors, waveTargetProblem } from "./plan-write.mjs";
@@ -199,10 +199,66 @@ function parseArgs(argv) {
   return { values };
 }
 
-function fail(msg, hint) {
-  console.error(`${N} new: ` + msg);
-  if (hint) console.error("  " + hint);
-  return 2;
+/**
+ * A REFUSAL IS DESCRIBED ONCE AND PRINTED IN ONE OF TWO SHAPES (TL-568).
+ *
+ * `new --json` answered in its envelope only on success and for a missing
+ * backlog; every other refusal was a sentence on stderr and an empty stdout, so
+ * a program calling it had to branch on the exit code and parse prose to learn
+ * why. Every refusal path now builds this descriptor and hands it to
+ * `answerRefusal()`, which prints the `task-new` envelope under `--json` and the
+ * unchanged text otherwise — one function, so a new refusal cannot be added
+ * with only one of the two shapes.
+ *
+ * `refusalKind` is the word a consumer branches on:
+ *
+ *   usage             the invocation: an unknown flag, a missing value or
+ *                     title, an actor with no namespace, a value outside a
+ *                     vocabulary
+ *   invalid-document  the task document from stdin or `--body-file`
+ *   invalid-config    config.yaml cannot be loaded
+ *   prefix-mismatch   the configured prefix is not the one the tree uses
+ *   template-drift    `_template.md` carries a value config.yaml does not know
+ *   plan-refused      `--wave` names no wave, or the plan refused the task
+ *                     after it was written (then `id` and `file` are set)
+ *   id-taken          the file for the reserved number already exists
+ *   no-backlog        shared with every command (`answerBacklogDirRefusal()`)
+ *
+ * `text` is the stderr form exactly as it was before the envelope existed.
+ */
+function said(message, hint, refusalKind = "usage", code = 2) {
+  return {
+    code, refusalKind, message, details: hint ? [hint] : [],
+    text: `${N} new: ` + message + (hint ? "\n  " + hint : ""),
+  };
+}
+
+/**
+ * Print a refusal descriptor and return its exit code. Under `--json` stdout
+ * carries the envelope and stderr stays empty, as `answerBacklogDirRefusal()`
+ * does for the missing backlog.
+ */
+function answerRefusal(r, { json, actorSource = null }) {
+  if (json) {
+    printJson("task-new", {
+      ...(r.payload || {}), ok: false, actorSource,
+      refusalKind: r.refusalKind, refusal: r.message, details: r.details,
+    });
+  } else {
+    console.error(r.text);
+  }
+  return r.code;
+}
+
+/**
+ * Was `--json` asked for? Read from the raw arguments, BEFORE parsing, because
+ * a refusal of the parse itself has to answer in the shape that was asked for.
+ * Only the words before `--` count: past the separator `--json` is a value — a
+ * title about the flag — and not the flag.
+ */
+function jsonRequested(argv) {
+  const sep = argv.indexOf("--");
+  return (sep < 0 ? argv : argv.slice(0, sep)).includes("--json");
 }
 
 /**
@@ -264,30 +320,44 @@ export function templateDrift(text, config) {
  * a message blaming a file somebody never edited is worse than no message.
  */
 export function driftMessage(divergences, { templatePath, fields, command }) {
+  const r = driftRefusal(divergences, { templatePath, fields });
+  return failure(command, r.problem, r.findings.concat([""], r.explanation), r.next);
+}
+
+/**
+ * The same refusal as PARTS, so `new --json` (TL-568) carries the findings and
+ * the remedies as `details` without the paragraph written for a terminal.
+ */
+export function driftRefusal(divergences, { templatePath, fields }) {
   const opts = fields || {};
-  const details = [];
+  const findings = [];
   for (const d of divergences) {
     for (const f of d.found) {
       const fromCaller = String(opts[d.field] || "") === f.value;
-      details.push(
+      findings.push(
         "`" + d.field + ": " + f.value + "` is not a value this project uses" +
           (d.allowed.length ? " (" + d.allowed.join(" | ") + ")" : " — the vocabulary is empty")
       );
-      details.push(
+      findings.push(
         fromCaller
           ? "  it came from the arguments of this call"
           : "  it came from the template, not from your command — " + templatePath
       );
     }
   }
-  details.push("");
-  details.push("The template is a copy of the DEFAULT vocabularies taken at `init`. Once");
-  details.push("config.yaml changes, the two drift, and every task made from the template");
-  details.push("would carry a value the configuration does not know.");
-  return failure(command, "the template does not fit this project's vocabulary", details, [
-    "edit " + templatePath + " to use a value from config.yaml",
-    "or add the value to config.yaml, if it belongs to this project",
-  ]);
+  return {
+    problem: "the template does not fit this project's vocabulary",
+    findings,
+    explanation: [
+      "The template is a copy of the DEFAULT vocabularies taken at `init`. Once",
+      "config.yaml changes, the two drift, and every task made from the template",
+      "would carry a value the configuration does not know.",
+    ],
+    next: [
+      "edit " + templatePath + " to use a value from config.yaml",
+      "or add the value to config.yaml, if it belongs to this project",
+    ],
+  };
 }
 
 /**
@@ -525,8 +595,9 @@ export function createTask(args) {
  * with it: reading a pipe only to refuse it would reintroduce the block the
  * flag exists to avoid.
  *
- * @returns {Promise<{document: object|null, code: number}>} `code` is non-zero
- *          when the document was refused; nothing has been written by then.
+ * @returns {Promise<{document: object|null, refused: object|null}>} `refused`
+ *          is a refusal descriptor when the document was refused; nothing has
+ *          been written by then.
  */
 async function readTaskInput(opts) {
   let text = null;
@@ -534,32 +605,39 @@ async function readTaskInput(opts) {
     try {
       text = readFileSync(opts.bodyFile, "utf8");
     } catch (e) {
-      return { document: null, code: fail("`--body-file " + opts.bodyFile + "` could not be read: " + e.message) };
+      return { document: null, refused: said("`--body-file " + opts.bodyFile + "` could not be read: " + e.message, null, "invalid-document") };
     }
     if (!text.trim()) {
-      return { document: null, code: fail("`--body-file " + opts.bodyFile + "` is empty", "a file named and empty is a document somebody meant to write") };
+      return { document: null, refused: said("`--body-file " + opts.bodyFile + "` is empty", "a file named and empty is a document somebody meant to write", "invalid-document") };
     }
   } else {
     text = await readStdinText();
     // A terminal (`null`) and a writer that closed without sending anything are
     // the same answer here: no document.
-    if (text === null || !text.trim()) return { document: null, code: 0 };
+    if (text === null || !text.trim()) return { document: null, refused: null };
   }
 
   const { task, errors } = parseTaskDocument(text);
   if (errors.length) {
-    console.error(failure(
-      `${N} new`, "the task document was refused, and nothing was written",
-      errors,
-      [`the shape: { "goal": "…", "context": "…", "steps": ["…"], "verification": [ { "id": "…", "bash": "…", "proves": "…" } ] }`]
-    ));
-    return { document: null, code: 2 };
+    const message = "the task document was refused, and nothing was written";
+    const shape = `the shape: { "goal": "…", "context": "…", "steps": ["…"], "verification": [ { "id": "…", "bash": "…", "proves": "…" } ] }`;
+    return {
+      document: null,
+      refused: {
+        code: 2, refusalKind: "invalid-document", message, details: errors.concat([shape]),
+        text: failure(`${N} new`, message, errors, [shape]),
+      },
+    };
   }
-  return { document: task, code: 0 };
+  return { document: task, refused: null };
 }
 
 export async function main(argv) {
   const cli = takeDirFlag(argv);
+  // Null until the actor is resolved, so a refusal before it never names a
+  // rung nobody consulted (TL-550).
+  const answer = { json: jsonRequested(cli.argv), actorSource: null };
+  const refuse = (r) => answerRefusal(r, answer);
   const parsed = parseArgs(cli.argv);
   if (parsed.error) {
     // An argument error names the ACCEPTED SET, in the one wording every command
@@ -567,29 +645,33 @@ export async function main(argv) {
     // `new` takes. `--dir` is taken off by takeDirFlag before this point, so it
     // is named here rather than read out of FLAGS.
     if (parsed.available) {
-      console.error(refusal(N + " new", parsed.error, Object.keys(FLAGS).concat(Object.keys(SWITCHES)).join(" ") + " --dir <path>"));
-      return 2;
+      const available = Object.keys(FLAGS).concat(Object.keys(SWITCHES)).join(" ") + " --dir <path>";
+      return refuse({
+        code: 2, refusalKind: "usage", message: parsed.error, details: ["available: " + available],
+        text: refusal(N + " new", parsed.error, available),
+      });
     }
-    return fail(parsed.error, `usage: ${N} new --title "…" [--board b] [--priority P1] [--epic e] [--estimate 2h] [--body-file f]`);
+    return refuse(said(parsed.error, `usage: ${N} new --title "…" [--board b] [--priority P1] [--epic e] [--estimate 2h] [--body-file f]`));
   }
 
   const opts = parsed.values;
-  if (!opts.title) return fail(`give it a title: ${N} new --title "Do the thing"`, "a task with no title is useless to the next person");
+  if (!opts.title) return refuse(said(`give it a title: ${N} new --title "Do the thing"`, "a task with no title is useless to the next person"));
 
   const slug = slugify(opts.title);
-  if (!slug) return fail("no filename can be made from this title: " + JSON.stringify(opts.title), "at least one letter or digit is needed");
+  if (!slug) return refuse(said("no filename can be made from this title: " + JSON.stringify(opts.title), "at least one letter or digit is needed"));
 
   // The actor is judged BEFORE anything is written (TL-550), as every other
   // writing command judges it: a creation recorded under an actor with no
   // namespace would be a history row nobody can weigh.
   const { actor, actorSource } = resolveActorReport(opts.actor);
+  answer.actorSource = actorSource;
   const badActor = actorRefusal(actor);
-  if (badActor) return fail(badActor.refusal, badActor.hint);
+  if (badActor) return refuse(said(badActor.refusal, badActor.hint));
 
   // BEFORE the directory is even resolved: a refused document must leave a tree
   // that looks exactly like the one before the command ran.
   const input = await readTaskInput(opts);
-  if (input.code) return input.code;
+  if (input.refused) return refuse(input.refused);
   const content = input.document ? taskContent(input.document) : null;
 
   // A missing backlog answers under `--json` in this command's own kind
@@ -602,7 +684,18 @@ export async function main(argv) {
     if (!isBacklogDirRefusal(e)) throw e;
     return answerBacklogDirRefusal(e, { command: N + " new", jsonKind: opts.json ? "task-new" : null, payload: { actorSource } });
   }
-  const config = loadConfigOrExit(root);
+  // Not `loadConfigOrExit()`: that one prints on stderr and exits, which under
+  // `--json` would leave stdout empty — the gap this command closes (TL-568).
+  let config;
+  try {
+    config = loadConfig(root);
+  } catch (e) {
+    if (!(e instanceof ConfigError)) throw e;
+    return refuse({
+      code: 1, refusalKind: "invalid-config", message: e.headline + " — " + e.configPath,
+      details: e.problems.slice(), text: formatConfigError(e),
+    });
+  }
   const paths = backlogPaths(root);
 
   // Values from the configuration's VOCABULARIES — not from a list written here
@@ -613,8 +706,8 @@ export async function main(argv) {
   ];
   for (const [key, allowed] of checks) {
     if (opts[key] && allowed && allowed.length && allowed.indexOf(opts[key]) < 0) {
-      return fail("`" + opts[key] + "` is not an allowed value for the field `" + key + "`",
-        "allowed: " + allowed.join(" | "));
+      return refuse(said("`" + opts[key] + "` is not an allowed value for the field `" + key + "`",
+        "allowed: " + allowed.join(" | ")));
     }
   }
   // `releases:` is CLOSED even when it is empty (TL-505): an empty list says this
@@ -622,8 +715,8 @@ export async function main(argv) {
   if (opts.release) {
     const releases = config.releases || [];
     if (releases.indexOf(opts.release) < 0) {
-      return fail("`" + opts.release + "` is not a release this project plans",
-        releases.length ? "allowed: " + releases.join(" | ") : "`releases:` is not declared in config.yaml, so this backlog plans no releases");
+      return refuse(said("`" + opts.release + "` is not a release this project plans",
+        releases.length ? "allowed: " + releases.join(" | ") : "`releases:` is not declared in config.yaml, so this backlog plans no releases"));
     }
   }
   // `target:` is CLOSED even when it is empty (TL-514), like `releases:`. A
@@ -631,12 +724,12 @@ export async function main(argv) {
   // reader would otherwise go looking for a typo that is not there.
   if (opts.target !== undefined) {
     const named = String(opts.target).split(",").map((v) => v.trim()).filter(Boolean);
-    if (!named.length) return fail("--target requires a value", "one or more target names, comma-separated");
+    if (!named.length) return refuse(said("--target requires a value", "one or more target names, comma-separated"));
     const external = config.externalTargets || [];
     for (const name of named) {
       if (external.indexOf(name) >= 0) continue;
       const local = (config.deployTargets || []).some((t) => t.name === name);
-      return fail(local
+      return refuse(said(local
         ? "`" + name + "` is a target of this repository, and a task cannot name it in `target:`"
         : "`" + name + "` is not a declared target in another repository",
       local
@@ -644,15 +737,15 @@ export async function main(argv) {
           (external.length ? " (" + external.join(" | ") + ")" : "")
         : external.length
           ? "allowed: " + external.join(" | ")
-          : "no target in `deploy_targets` declares `repository:`, so this backlog has none a task could name");
+          : "no target in `deploy_targets` declares `repository:`, so this backlog has none a task could name"));
     }
     opts.target = [...new Set(named)];
   }
   const boardSlugs = (config.boards || []).map((b) => b.slug);
   const board = opts.board || config.defaultBoard || boardSlugs[0];
   if (boardSlugs.length && boardSlugs.indexOf(board) < 0) {
-    return fail("the board `" + board + "` does not exist in the registry",
-      "the board vocabulary is CLOSED; available: " + boardSlugs.join(" | "));
+    return refuse(said("the board `" + board + "` does not exist in the registry",
+      "the board vocabulary is CLOSED; available: " + boardSlugs.join(" | ")));
   }
 
   // `--wave` IS CHECKED BEFORE A NUMBER IS RESERVED (TL-213). Creating the task
@@ -664,7 +757,7 @@ export async function main(argv) {
   let scheduling = null;
   if (opts.wave) {
     const target = waveTargetProblem(paths.planPath, [opts.wave]);
-    if (target.problem) return fail(target.problem, target.hint);
+    if (target.problem) return refuse(said(target.problem, target.hint, "plan-refused"));
     scheduling = { text: target.text };
   }
 
@@ -682,20 +775,32 @@ export async function main(argv) {
   // is no reason to pay for a scan whose result will not be used anyway.
   const mismatch = detectPrefixMismatch(readdirSync(paths.tasksDir), config.taskIdPrefix);
   if (!mismatch.ok) {
-    console.error(prefixMismatchMessage(mismatch, paths.tasksDir, {
-      consequence: [
-        "  Stopping BEFORE anything is written. A task written now would get the",
-        "  prefix `" + mismatch.expected + "` and stand next to `" + mismatch.found.join("`, `") + "` — the tree would",
-        "  have two number spaces, and the numbering would start over.",
+    return refuse({
+      code: 1, refusalKind: "prefix-mismatch",
+      message: "the configuration says `task_id_prefix: " + mismatch.expected + "`, but " + paths.tasksDir +
+        " holds not one task with that prefix, so nothing was written",
+      details: [
+        "what is there instead: " + mismatch.found.join(", "),
+        "correct `task_id_prefix` in config.yaml to what the tree uses — if nobody owns these tasks yet, set it back to `" +
+          mismatch.found.join("` or `") + "`",
+        "or renumber the tree: `" + N + " migrate-prefix --to " + mismatch.expected + "` (with `--dry-run` first)",
       ],
-    }));
-    // One line more than `build` says: for a NEW backlog the most common case is
-    // a prefix changed just after `init`, and renumbering there is a sledgehammer
-    // for a nut.
-    console.error("");
-    console.error("  If nobody owns these tasks yet, the cheapest fix is to set `task_id_prefix`");
-    console.error("  back to `" + mismatch.found.join("` or `") + "`.");
-    return 1;
+      text: [
+        prefixMismatchMessage(mismatch, paths.tasksDir, {
+          consequence: [
+            "  Stopping BEFORE anything is written. A task written now would get the",
+            "  prefix `" + mismatch.expected + "` and stand next to `" + mismatch.found.join("`, `") + "` — the tree would",
+            "  have two number spaces, and the numbering would start over.",
+          ],
+        }),
+        // One line more than `build` says: for a NEW backlog the most common case is
+        // a prefix changed just after `init`, and renumbering there is a sledgehammer
+        // for a nut.
+        "",
+        "  If nobody owns these tasks yet, the cheapest fix is to set `task_id_prefix`",
+        "  back to `" + mismatch.found.join("` or `") + "`.",
+      ].join("\n"),
+    });
   }
 
   let created;
@@ -709,14 +814,17 @@ export async function main(argv) {
     });
   } catch (e) {
     if (e && e.code === "EEXIST") {
-      return fail("the file already exists: " + e.file,
-        "the number " + e.taskId + " is taken — check `" + N + " next-id --explain`");
+      return refuse(said("the file already exists: " + e.file,
+        "the number " + e.taskId + " is taken — check `" + N + " next-id --explain`", "id-taken"));
     }
     if (e && e.code === "EVOCABULARY") {
-      console.error(driftMessage(e.divergences, {
-        templatePath: e.templatePath, fields: opts, command: N + " new",
-      }));
-      return 1;
+      const drift = { templatePath: e.templatePath, fields: opts };
+      const parts = driftRefusal(e.divergences, drift);
+      return refuse({
+        code: 1, refusalKind: "template-drift", message: parts.problem,
+        details: parts.findings.map((line) => line.trim()).concat(parts.next),
+        text: driftMessage(e.divergences, { ...drift, command: N + " new" }),
+      });
     }
     throw e;
   }
@@ -748,11 +856,18 @@ export async function main(argv) {
       ? []
       : newPlanErrors(scheduling.text, edit.text, readTaskMetas(paths.tasksDir, config), config);
     if (edit.problems.length || introduced.length) {
-      console.error(`${N} new: the task was written and the plan was NOT`);
-      console.error("  " + full);
-      for (const p of edit.problems.concat(introduced)) console.error("  - " + p);
-      console.error(`  schedule it with \`${N} plan add ${taskId} --wave "${opts.wave}"\` once the plan allows it`);
-      return 1;
+      // The ONE refusal after a write: the task exists, so the envelope names it
+      // — a consumer must not be told `ok: false` and be left to guess that a
+      // file was created anyway.
+      const problems = edit.problems.concat(introduced);
+      const schedule = `schedule it with \`${N} plan add ${taskId} --wave "${opts.wave}"\` once the plan allows it`;
+      return refuse({
+        code: 1, refusalKind: "plan-refused", message: "the task was written and the plan was NOT",
+        details: problems.concat([schedule]),
+        payload: { id: taskId, file: full, board, idSource: source },
+        text: [`${N} new: the task was written and the plan was NOT`, "  " + full]
+          .concat(problems.map((p) => "  - " + p), ["  " + schedule]).join("\n"),
+      });
     }
     writeFileSync(paths.planPath, edit.text, "utf8");
   }
