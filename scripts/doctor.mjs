@@ -80,8 +80,54 @@ const MARK = {
  *  the column alignment out. */
 const MARK_WIDTH = 1;
 
+/**
+ * A repair that is one of this tool's own backlog commands (TL-615).
+ *
+ * WHY A MARKER AND NOT A STRING MATCH. Run as `doctor --dir <path>`, doctor
+ * reports on <path>, and a fix printed without that flag, run from the same
+ * cwd, resolves a different backlog or none — so every command of ours that
+ * acts on the backlog has to carry it. Which fixes those are is declared where
+ * each one is written, by building it with `ownCommand()`: a git command, a
+ * line to add to a file or an instruction stays a plain string and is printed
+ * as it is. Recognising our commands afterwards by their leading word would
+ * also catch a note that merely mentions one.
+ *
+ * The marker is a Symbol, so `--json` serialises the row exactly as before:
+ * `fix` is always the text a person can paste.
+ */
+const OWN_COMMAND = Symbol("own backlog command");
+
+/** `args`: the command after the product name; `note`: the comment printed after `#`. */
+function ownCommand(args, note) {
+  return { [OWN_COMMAND]: { args, note: note || "" } };
+}
+
+/** A path as one shell word, so a printed fix can be pasted as it stands. */
+function shellWord(s) {
+  return /^[A-Za-z0-9_\/.:=@%+,-]+$/.test(s) ? s : "'" + s.replace(/'/g, "'\\''") + "'";
+}
+
+function ownText({ args, note }, dir) {
+  const words = [N, args, dir ? "--dir " + shellWord(dir) : ""].filter(Boolean).join(" ");
+  return words + (note ? "   # " + note : "");
+}
+
 function check(id, title, status, detail, fix) {
-  return { id, title, status, detail: detail || "", fix: fix || null };
+  const row = { id, title, status, detail: detail || "", fix: null };
+  if (fix && fix[OWN_COMMAND]) {
+    row.fix = ownText(fix[OWN_COMMAND], null);
+    row[OWN_COMMAND] = fix[OWN_COMMAND];
+  } else {
+    row.fix = fix || null;
+  }
+  return row;
+}
+
+/** The rows with every fix of ours re-printed to carry `dir` — the `--dir`
+ *  doctor was run with, or nothing when it found the backlog without one. */
+function carryDir(rows, dir) {
+  if (!dir) return rows;
+  return rows.map((r) => (r[OWN_COMMAND] ? { ...r, fix: ownText(r[OWN_COMMAND], dir) } : r));
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -170,7 +216,7 @@ function checkLogStatus(root, config) {
     return check("log-status", "log vs status field", ERR,
       ahead.length + " task(s) log a closed status while the field is still open — " +
         ahead.slice(0, 3).map((r) => r.file.replace(/-.*$/, "")).join(", "),
-      N + " check --log-status");
+      ownCommand("check --log-status"));
   }
   if (behind.length) {
     // A WARNING and not an error, for the reason the guard gives: since TL-105
@@ -192,7 +238,7 @@ function checkPrefix(root, config) {
   }
   return check("prefix", "id prefix", ERR,
     "config.yaml says `" + mismatch.expected + "`, the tree uses `" + mismatch.found.join("`, `") + "`",
-    N + " migrate-prefix --to " + mismatch.expected + " --dry-run");
+    ownCommand("migrate-prefix --to " + mismatch.expected + " --dry-run"));
 }
 
 /**
@@ -271,7 +317,7 @@ function checkUnrecorded(root) {
   if (result.seeded) {
     return check("unrecorded", "changes not in the log", INFO,
       "no reference point yet — the first `history` run writes one and records nothing",
-      N + " history --actor <ns:name> --source manual");
+      ownCommand("history --actor <ns:name> --source manual"));
   }
   if (!result.entries.length) {
     return check("unrecorded", "changes not in the log", OK,
@@ -282,7 +328,7 @@ function checkUnrecorded(root) {
     result.entries.length + " change(s) across " + tasks.length + " task(s) the history has not seen (" +
       tasks.slice(0, 3).join(", ") + (tasks.length > 3 ? ", …" : "") + ")" +
       " — normal between an edit and the command that records it",
-    N + " history --actor <ns:name> --source manual");
+    ownCommand("history --actor <ns:name> --source manual"));
 }
 
 function checkGitIgnore(root) {
@@ -356,7 +402,7 @@ export function checkTemplate(root, { shipped = SHIPPED_TEMPLATE } = {}) {
     // themselves carry parentheses and commas.
     "missing " + missing.map((f) => "`" + f.key + "`" + (f.comment ? ": " + f.comment : "")).join("; ") +
       ". The writing commands add " + plural(missing.length, "it", "them") + " on demand, so only a task edited by hand goes without",
-    N + " template refresh   # inserts " + plural(missing.length, "that line", "those lines") + " and changes none of yours");
+    ownCommand("template refresh", "inserts " + plural(missing.length, "that line", "those lines") + " and changes none of yours"));
 }
 
 /**
@@ -374,13 +420,13 @@ function checkAgentPointer(root) {
       files.length
         ? "no pointer in " + files.map((f) => f.name).join(" or ") + " — an agent here works the backlog by guesswork"
         : "no CLAUDE.md or AGENTS.md — an agent here works the backlog by guesswork",
-      N + " instructions --update-nudge");
+      ownCommand("instructions --update-nudge"));
   }
   const stale = carrying.filter((f) => f.version !== NUDGE_VERSION);
   if (stale.length) {
     return check("agent-pointer", "agent instructions pointer", WARN,
       stale.map((f) => f.name + " carries v" + f.version).join(", ") + ", this release writes v" + NUDGE_VERSION,
-      N + " instructions --update-nudge");
+      ownCommand("instructions --update-nudge"));
   }
   // Claude Code reads CLAUDE.md and what it imports, never AGENTS.md on its own.
   const claude = files.find((f) => f.name === CLAUDE_AGENT_FILE);
@@ -410,7 +456,7 @@ export function checkSkill(root, opts = {}) {
   if (missing.length) {
     return check("agent-skill", "packaged skill", INFO,
       "not installed: " + missing.join(", ") + " — an editor that loads skills will not know a backlog is here",
-      N + " skills install");
+      ownCommand("skills install"));
   }
   const state = compareInstalled(repositoryRoot(root), opts);
   // A WARNING, unlike an absent or edited skill (TL-594): nobody chooses a
@@ -421,7 +467,7 @@ export function checkSkill(root, opts = {}) {
     return check("agent-skill", "packaged skill", WARN,
       blocked.join(", ") + plural(blocked.length, " is not a regular file", " are not regular files") + " — an editor cannot read the skill from " +
         plural(blocked.length, "it", "them"),
-      N + " skills install   # after moving " + blocked.map((f) => join(state.target, f)).join(" ") + " aside");
+      ownCommand("skills install", "after moving " + blocked.map((f) => join(state.target, f)).join(" ") + " aside"));
   }
   // An installation without its packaged skills cannot be compared with them;
   // that is a broken tarball, and `skills install` is where it is reported.
@@ -431,7 +477,7 @@ export function checkSkill(root, opts = {}) {
     return check("agent-skill", "packaged skill", INFO,
       differ.map((f) => f.file + (f.state === "shipped" ? " is an older packaged version" : " differs from every packaged version")).join(", ") +
         " — its description is not the one this release ships",
-      N + " skills install --refresh" + (edited.length ? " " + edited.join(" ") + "   # replaces your edit of it" : ""));
+      ownCommand("skills install --refresh" + (edited.length ? " " + edited.join(" ") : ""), edited.length ? "replaces your edit of it" : ""));
   }
   return check("agent-skill", "packaged skill", OK, (opts.skills || USER_SKILLS).join(", ") + " in " + target);
 }
@@ -448,7 +494,7 @@ function checkHooks(root) {
     ? check("git-hooks", "git gates on commit", INFO,
         missing.map((s) => s.name + (s.state === "foreign" ? " (a hook of your own, without ours)" : " (none)")).join(", ") +
           " — the guards run only when somebody remembers",
-        N + " hooks print")
+        ownCommand("hooks print"))
     : check("git-hooks", "git gates on commit", OK, HOOK_NAMES.join(", ") + " run the guards")];
   rows.push(...staleHooksRow(states));
   return rows;
@@ -485,8 +531,8 @@ function staleHooksRow(states) {
       " that differ" + plural(stale.length, "s", "") + " from the one this release writes — a change to the gate never reached " +
       plural(stale.length, "it", "them"),
     refusals.length
-      ? N + " hooks print   # " + refusals.join(" and ") + ", so `hooks install` refuses; replace " + repairs.join(" and ") + " by hand"
-      : N + " hooks install   # replaces only the lines between its markers")];
+      ? ownCommand("hooks print", refusals.join(" and ") + ", so `hooks install` refuses; replace " + repairs.join(" and ") + " by hand")
+      : ownCommand("hooks install", "replaces only the lines between its markers"))];
 }
 
 /**
@@ -582,11 +628,11 @@ function checkGuards(root) {
       : r.error ? "it could not be started: " + (r.error.code || r.error.message)
       : "it was ended by " + r.signal;
     return check("guards", "backlog guards", INFO,
-      "not checked — the guard run gave no verdict: " + why, N + " check");
+      "not checked — the guard run gave no verdict: " + why, ownCommand("check"));
   }
 
   const firstProblem = String(r.stderr || r.stdout || "").split("\n").filter(Boolean)[0] || "a guard failed";
-  return check("guards", "backlog guards", ERR, firstProblem, N + " check");
+  return check("guards", "backlog guards", ERR, firstProblem, ownCommand("check"));
 }
 
 /**
@@ -611,7 +657,7 @@ function checkContextBudget(root, config) {
   return budget.listOverBudget
     ? check("context", "cost of asking", WARN,
         detail + " — looking for work now costs more than doing it",
-        N + " next   # one task, constant cost; or query with a filter")
+        ownCommand("next", "one task, constant cost; or query with a filter"))
     : check("context", "cost of asking", OK, detail);
 }
 
@@ -637,7 +683,8 @@ function checkClosedElsewhere(root, config, metas) {
 // The run
 // ──────────────────────────────────────────────────────────────────────────
 
-export function diagnose(root) {
+/** `dir`: the `--dir` doctor was run with, which every fix of ours carries (TL-615). */
+export function diagnose(root, { dir } = {}) {
   const rows = [];
   const { config, row: configRow } = checkConfig(root);
   rows.push(configRow);
@@ -650,7 +697,7 @@ export function diagnose(root) {
       rows.push(check(id, title, INFO, "not checked — the configuration comes first"));
     }
     rows.push(...checkGitIgnore(root));
-    return rows;
+    return carryDir(rows, dir);
   }
 
   const { metas, row: vocabRow, rows: vocabExtra } = checkVocabulary(root, config);
@@ -667,15 +714,17 @@ export function diagnose(root) {
   rows.push(checkContextBudget(root, config));
   rows.push(checkTemplate(root));
   rows.push(checkAgentPointer(root), checkSkill(root), ...checkHooks(root));
-  return rows;
+  return carryDir(rows, dir);
 }
 
-/** What to do next — depending on what doctor saw. */
-export function nextStep(rows) {
-  if (rows.some((r) => r.status === ERR)) return N + " doctor   # once it is fixed";
+/** What to do next — depending on what doctor saw. Each answer is a command of
+ *  ours, so it carries `dir` as the fixes do (TL-615). */
+export function nextStep(rows, dir) {
+  const step = (args, note) => ownText({ args, note }, dir);
+  if (rows.some((r) => r.status === ERR)) return step("doctor", "once it is fixed");
   const volume = rows.find((r) => r.id === "volume");
-  if (volume && /^0 /.test(volume.detail)) return N + ' new --title "…"   # the backlog is empty';
-  return N + "   # the viewer, in your browser";
+  if (volume && /^0 /.test(volume.detail)) return step('new --title "…"', "the backlog is empty");
+  return step("", "the viewer, in your browser");
 }
 
 /** Singular or plural, spelled out. Written as a function rather than an inline
@@ -685,7 +734,7 @@ function plural(n, one, many) {
   return n === 1 ? one : many;
 }
 
-function render(root, rows) {
+function render(root, rows, dir) {
   const width = Math.max(...rows.map((r) => r.title.length));
   const out = [heading(N + " doctor — " + root), ""];
   for (const r of rows) {
@@ -697,7 +746,7 @@ function render(root, rows) {
   out.push("");
   out.push("  " + (errors ? errors + " " + plural(errors, "error", "errors") : "no errors") +
     (warns ? ", " + warns + " " + plural(warns, "warning", "warnings") : ""));
-  out.push("  next: " + nextStep(rows));
+  out.push("  next: " + nextStep(rows, dir));
   return out.join("\n");
 }
 
@@ -731,16 +780,19 @@ export function main(argv) {
     // --dir" answers somebody who has just done exactly that.
     const named = e instanceof NotABacklogError;
     const detail = named ? e.message : "no backlog directory found";
-    const rows = [check("backlog", "backlog", ERR, detail, N + " init --dir ./backlog")];
+    // `init` takes --dir as its argument, so the one it names is the one doctor
+    // was given, when it was given one (TL-615).
+    const target = cli.dir ? shellWord(cli.dir) : null;
+    const rows = [check("backlog", "backlog", ERR, detail, N + " init --dir " + (target || "./backlog"))];
     if (asJson) {
       printJson("doctor", {
-        ok: false, root: null, next: nextStep(rows), checks: rows,
+        ok: false, root: null, next: nextStep(rows, cli.dir), checks: rows,
         refusalKind: BACKLOG_DIR_REFUSAL_KIND, refusal: e.message, details: e.details || [],
       });
     }
     else if (named) {
       console.error(errColor.err(UI_MARK.err) + " " + errColor.bold(N + " doctor") + ": " + e.message);
-      console.error("  → create one there:       " + N + " init --dir <path>");
+      console.error("  → create one there:       " + N + " init --dir " + (target || "<path>"));
     } else {
       console.error(errColor.err(UI_MARK.err) + " " + errColor.bold(N + " doctor") + ": no backlog here");
       console.error("  → create one:            " + N + " init --dir ./backlog");
@@ -749,14 +801,14 @@ export function main(argv) {
     return 1;
   }
 
-  const rows = diagnose(root);
+  const rows = diagnose(root, { dir: cli.dir });
   const ok = !rows.some((r) => r.status === ERR);
 
   if (asJson) {
     // No ornament and no colour — this is the entry point for CI, not for the eye.
-    printJson("doctor", { ok, root, next: nextStep(rows), checks: rows });
+    printJson("doctor", { ok, root, next: nextStep(rows, cli.dir), checks: rows });
   } else {
-    console.log(render(root, rows));
+    console.log(render(root, rows, cli.dir));
   }
   return ok ? 0 : 1;
 }
