@@ -1,0 +1,2 @@
+{"id":"01M6V1MT36RQHEWHXD0M0WS8FK","ts":"2026-11-07T13:02:26.406Z","task":"TL-633","field":"__created__","from":"","to":"A file in place of the skills target directory is reported","actor":"agent:loop-4","source":"new","reason":"unknown"}
+{"id":"01M6V1PSRGX4T7HCZT6AMP6S3Z","ts":"2026-11-07T13:03:31.600Z","task":"TL-633","field":"conflict_group","from":[],"to":["skills"],"actor":"agent:loop-4","source":"set","reason":"changes compareInstalled and installSkills in scripts/install-skills.mjs"}

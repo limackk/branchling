@@ -1,0 +1,2 @@
+{"id":"01M6V1QA16HCPY9VK5Y8PBG9TQ","ts":"2026-11-07T13:03:48.262Z","task":"TL-634","field":"__created__","from":"","to":"A dangling link in place of a skill directory is reported","actor":"agent:loop-4","source":"new","reason":"unknown"}
+{"id":"01M6V1QE1NKBTTME1RMVX2FB2N","ts":"2026-11-07T13:03:52.373Z","task":"TL-634","field":"conflict_group","from":[],"to":["skills"],"actor":"agent:loop-4","source":"set","reason":"changes compareInstalled in scripts/install-skills.mjs"}

@@ -125,6 +125,26 @@ function filesUnder(dir, base = dir, out = []) {
 }
 
 /**
+ * The first directory between the skills target and a packaged file that
+ * exists and is NOT a directory, as a path under the target — or undefined.
+ *
+ * ONE LEVEL UP FROM TL-594 (TL-603). A regular file where the skill's
+ * directory belongs makes the packaged file read as merely absent, and the
+ * install's `mkdirSync` then threw EEXIST, uncaught. The remedy has to name
+ * the ancestor: the file the package ships is not there to move aside.
+ */
+function notADirectory(target, key) {
+  const parts = posix(dirname(key)).split("/");
+  let path = target;
+  for (let i = 0; i < parts.length; i++) {
+    path = join(path, parts[i]);
+    if (!existsSync(path)) return undefined;
+    if (!statSync(path).isDirectory()) return parts.slice(0, i + 1).join("/");
+  }
+  return undefined;
+}
+
+/**
  * How each installed packaged file compares with the one this installation
  * ships. Only PACKAGED paths are examined — a file the user added beside the
  * skill is not ours to judge, let alone to replace.
@@ -134,7 +154,9 @@ function filesUnder(dir, base = dir, out = []) {
  *   shipped  identical to an OLDER shipped version: safe to refresh
  *   edited   matches no shipped version: presumed to be the user's edit
  *   blocked  something that is not a regular file (a directory, a socket)
- *            stands at the path: it cannot be read, compared or replaced
+ *            stands at the path: it cannot be read, compared or replaced —
+ *            or something that is not a directory stands where one of its
+ *            directories belongs, and then `at` names that path (TL-603)
  *
  * BLOCKED IS A STATE, NOT AN EXCEPTION (TL-594). Hashing a directory throws
  * EISDIR, and an uncaught throw here took `doctor` and `skills install` down
@@ -165,8 +187,11 @@ export function compareInstalled(repoRoot, opts = {}) {
       const key = join(name, file);
       const installed = join(target, key);
       let state;
-      if (!existsSync(installed)) state = "missing";
-      else if (!statSync(installed).isFile()) state = "blocked";
+      let at;
+      if (!existsSync(installed)) {
+        at = notADirectory(target, key);
+        state = at === undefined ? "missing" : "blocked";
+      } else if (!statSync(installed).isFile()) state = "blocked";
       else {
         const hash = contentHash(installed);
         if (hash === contentHash(join(from, file))) state = "current";
@@ -175,7 +200,7 @@ export function compareInstalled(repoRoot, opts = {}) {
       }
       // The name the package, SHIPPED_VERSIONS and `--refresh <file>` all use,
       // on every platform: a `\` here reached doctor's rows on Windows (TL-624).
-      files.push({ file: posix(key), state });
+      files.push(at === undefined ? { file: posix(key), state } : { file: posix(key), state, at });
     }
   }
   return { ok: true, files, target };
@@ -190,20 +215,23 @@ export function compareInstalled(repoRoot, opts = {}) {
  *   `refresh` replaces files that are an older shipped version; `named` (with
  *   `refresh`) also replaces those files whatever they hold.
  * @returns {{ok: boolean, created: string[], skipped: string[], replaced: string[],
- *            kept: string[], blocked: string[], target: string}}
+ *            kept: string[], blocked: string[], notDirectories: string[], target: string}}
+ *   `blocked` lists every packaged file left uninstalled; `notDirectories` the
+ *   paths under the target where something other than a directory stands in
+ *   the way of some of them, each once.
  */
 export function installSkills(repoRoot, opts = {}) {
   const source = opts.source || PACKAGED_SKILLS;
   const named = (opts.named || []).map(posix);
   const state = compareInstalled(repoRoot, opts);
   const target = state.target;
-  if (!state.ok) return { ...state, created: [], skipped: [], replaced: [], kept: [], blocked: [] };
+  if (!state.ok) return { ...state, created: [], skipped: [], replaced: [], kept: [], blocked: [], notDirectories: [] };
 
   const known = state.files.map((f) => posix(f.file));
   const unknownName = named.find((f) => !known.includes(f));
   if (unknownName !== undefined) {
     return {
-      ok: false, kind: "unknown-file", target, created: [], skipped: [], replaced: [], kept: [], blocked: [],
+      ok: false, kind: "unknown-file", target, created: [], skipped: [], replaced: [], kept: [], blocked: [], notDirectories: [],
       message: "`" + unknownName + "` is not a packaged skill file",
       details: ["Name a path under " + target + " as the package ships it: " + known.join(", ")],
     };
@@ -214,7 +242,8 @@ export function installSkills(repoRoot, opts = {}) {
   const replaced = [];
   const kept = [];
   const blocked = [];
-  for (const { file, state: now } of state.files) {
+  const notDirectories = [];
+  for (const { file, state: now, at } of state.files) {
     const write = () => {
       if (opts.dryRun) return;
       const destination = join(target, file);
@@ -224,7 +253,11 @@ export function installSkills(repoRoot, opts = {}) {
     if (now === "missing") { write(); created.push(file); continue; }
     // Not even when named: naming a file says "discard what it holds", and a
     // directory holds files nobody named.
-    if (now === "blocked") { blocked.push(file); continue; }
+    if (now === "blocked") {
+      blocked.push(file);
+      if (at !== undefined && !notDirectories.includes(at)) notDirectories.push(at);
+      continue;
+    }
     // SKIPPED, NEVER OVERWRITTEN, unless the refresh can prove the file holds
     // no edit or the user named it. The file may be the user's own edit of this
     // very skill, and replacing it silently would take back a decision they
@@ -233,7 +266,7 @@ export function installSkills(repoRoot, opts = {}) {
     if (now === "shipped" || named.includes(posix(file))) { write(); replaced.push(file); continue; }
     kept.push(file);
   }
-  return { ok: true, created, skipped, replaced, kept, blocked, target, dryRun: Boolean(opts.dryRun) };
+  return { ok: true, created, skipped, replaced, kept, blocked, notDirectories, target, dryRun: Boolean(opts.dryRun) };
 }
 
 /** The lines `init` prints when it installs them, so the two commands say the
@@ -257,13 +290,22 @@ export function renderInstall(result, opts = {}) {
     out.push("  " + paint.dim("To replace it anyway, discarding what it holds, name it:"));
     out.push("  " + paint.dim("`" + N + " skills install --refresh " + result.kept.join(" ") + "`"));
   }
-  const blocked = result.blocked || [];
+  const notDirectories = result.notDirectories || [];
+  // A file under an obstructed directory is not there to move aside; the
+  // obstruction is, so that is the path the remedy names (TL-603).
+  const blocked = (result.blocked || []).filter((f) => !notDirectories.some((d) => f.startsWith(d + "/")));
   if (blocked.length) {
     out.push(paint.warn(MARK.warn) + " not a file, left alone: " + blocked.join(", "));
     out.push("  " + paint.dim("Something other than a file stands at that path, so the editor cannot read it."));
     out.push("  " + paint.dim("Move it aside, then run `" + N + " skills install` again."));
   }
-  if (!result.created.length && !result.skipped.length && !result.replaced.length && !result.kept.length && !blocked.length) {
+  if (notDirectories.length) {
+    out.push(paint.warn(MARK.warn) + " not a directory, left alone: " + notDirectories.join(", "));
+    out.push("  " + paint.dim("Something other than a directory stands where the skill's directory belongs,"));
+    out.push("  " + paint.dim("so nothing can be installed under it."));
+    out.push("  " + paint.dim("Move it aside, then run `" + N + " skills install` again."));
+  }
+  if (!result.created.length && !result.skipped.length && !result.replaced.length && !result.kept.length && !blocked.length && !notDirectories.length) {
     out.push(paint.dim(MARK.bullet + " skills: nothing to install"));
   }
   if (result.created.length) {

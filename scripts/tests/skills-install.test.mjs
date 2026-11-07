@@ -155,7 +155,7 @@ test("a missing packaged directory is a refusal, not a silent success", () => {
   assert.equal(result.kind, "no-source");
   assert.match(result.message, /not in this installation/);
   assert.match(result.details.join("\n"), /tarball/);
-  for (const key of ["created", "skipped", "replaced", "kept", "blocked"]) assert.deepEqual(result[key], [], key);
+  for (const key of ["created", "skipped", "replaced", "kept", "blocked", "notDirectories"]) assert.deepEqual(result[key], [], key);
   assert.deepEqual(compareInstalled(fx.dir, { source: join(fx.dir, "nowhere") }).files, []);
 });
 
@@ -338,6 +338,68 @@ test("a blocked path is left alone by install, by --refresh, and even when named
   assert.equal(readFileSync(join(path, "inside", "theirs.md"), "utf8"), "theirs\n", "what the directory held was touched");
 });
 
+// ── something other than a directory where a skill's directory belongs (TL-603) ──
+//
+// The packaged file then reads as merely absent, and the install's mkdirSync
+// threw EEXIST. Each case keeps a control: the same layout with the directory
+// real, or a sibling path the obstruction does not cover.
+
+function blockWithFile(fx, dir) {
+  const path = installed(fx, dir);
+  rmSync(path, { recursive: true, force: true });
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, "theirs\n", "utf8");
+  return path;
+}
+
+test("compareInstalled reports a file in place of a skill directory as blocked, naming that file", () => {
+  const fx = fixture();
+  const opts = source(fx);
+  blockWithFile(fx, "demo");
+  assert.deepEqual(compareInstalled(fx.dir, opts).files, [
+    { file: DEMO, state: "blocked", at: "demo" }, { file: NOTES, state: "blocked", at: "demo" },
+  ]);
+
+  // Control: with the directory real and empty, both are simply missing.
+  rmSync(installed(fx, "demo"));
+  mkdirSync(installed(fx, "demo"));
+  assert.deepEqual(compareInstalled(fx.dir, opts).files, [
+    { file: DEMO, state: "missing" }, { file: NOTES, state: "missing" },
+  ]);
+});
+
+test("a file in place of a nested directory blocks only the files under it", () => {
+  const fx = fixture();
+  const opts = source(fx);
+  installSkills(fx.dir, opts);
+  blockWithFile(fx, "demo/refs");
+  assert.deepEqual(compareInstalled(fx.dir, opts).files, [
+    { file: DEMO, state: "current" }, { file: NOTES, state: "blocked", at: "demo/refs" },
+  ]);
+});
+
+test("install does not throw on a file in place of the skill directory, and leaves it alone", () => {
+  const fx = fixture();
+  const opts = source(fx);
+  const path = blockWithFile(fx, "demo");
+
+  for (const extra of [{}, { refresh: true }, { refresh: true, named: [DEMO] }]) {
+    const result = installSkills(fx.dir, { ...opts, ...extra });
+    assert.equal(result.ok, true, JSON.stringify(extra));
+    assert.deepEqual(result.blocked, [DEMO, NOTES], JSON.stringify(extra));
+    assert.deepEqual(result.notDirectories, ["demo"], JSON.stringify(extra));
+    assert.deepEqual(result.created, [], JSON.stringify(extra));
+  }
+  assert.equal(readFileSync(path, "utf8"), "theirs\n", "the file in the way was touched");
+
+  // Positive control: once it is moved aside, the same call installs both.
+  rmSync(path);
+  const after = installSkills(fx.dir, opts);
+  assert.deepEqual(after.created, [DEMO, NOTES]);
+  assert.deepEqual(after.blocked, []);
+  assert.deepEqual(after.notDirectories, []);
+});
+
 test("a skill directory reached through a symlink is read through it", () => {
   // The repository's own `.claude/skills/*` are symlinks; a packaged skill
   // laid out the same way must not lose the files behind one.
@@ -462,7 +524,7 @@ test("naming a file the package does not ship is a refusal", () => {
   assert.deepEqual(result.details, [
     "Name a path under " + skillsTarget(fx.dir) + " as the package ships it: demo/SKILL.md, demo/refs/notes.md",
   ]);
-  for (const key of ["created", "skipped", "replaced", "kept", "blocked"]) assert.deepEqual(result[key], [], key);
+  for (const key of ["created", "skipped", "replaced", "kept", "blocked", "notDirectories"]) assert.deepEqual(result[key], [], key);
 });
 
 test("what the install prints names each outcome, and only the ones that happened", () => {
@@ -488,6 +550,17 @@ test("what the install prints names each outcome, and only the ones that happene
     "  Something other than a file stands at that path, so the editor cannot read it.",
     "  Move it aside, then run `" + CLI_NAME + " skills install` again.",
   ].join("\n"));
+  // The remedy names the path in the way, not the files that could not land.
+  assert.equal(say({ blocked: ["demo/SKILL.md", "demo/refs/b.md", "other/SKILL.md"], notDirectories: ["demo"] }), [
+    "! not a file, left alone: other/SKILL.md",
+    "  Something other than a file stands at that path, so the editor cannot read it.",
+    "  Move it aside, then run `" + CLI_NAME + " skills install` again.",
+    "! not a directory, left alone: demo",
+    "  Something other than a directory stands where the skill's directory belongs,",
+    "  so nothing can be installed under it.",
+    "  Move it aside, then run `" + CLI_NAME + " skills install` again.",
+  ].join("\n"));
+  assert.doesNotMatch(say({ notDirectories: ["demo"] }), /nothing to install/);
   assert.equal(say({ skipped: ["demo/SKILL.md", "demo/b.md"] }),
     "· skipped (already there, left alone): demo/SKILL.md, demo/b.md");
   assert.equal(say({ created: ["demo/SKILL.md"] }), [
@@ -636,4 +709,28 @@ test("`skills install` through the CLI names a directory at the skill path inste
   const after = run(["skills", "install", "--json", "--dir", fx.backlog], fx.dir, fx.env);
   assert.deepEqual(JSON.parse(after.stdout).created, [SKILL]);
   assert.deepEqual(JSON.parse(after.stdout).blocked, []);
+});
+
+test("`skills install` through the CLI names a file in place of the skill directory instead of crashing", () => {
+  const fx = fixture();
+  assert.equal(run(["init", "--dir", fx.backlog, "--no-example"], fx.dir, fx.env).status, 0);
+  const path = join(fx.dir, ".claude", "skills", "backlog-workflow");
+  rmSync(path, { recursive: true, force: true });
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, "theirs\n", "utf8");
+
+  const text = run(["skills", "install", "--dir", fx.backlog], fx.dir, fx.env);
+  assert.equal(text.status, 0, text.stderr);
+  assert.ok(text.stdout.includes("not a directory, left alone: backlog-workflow\n"), text.stdout);
+  assert.ok(!text.stdout.includes("not a file"), text.stdout);
+  const json = run(["skills", "install", "--json", "--dir", fx.backlog], fx.dir, fx.env);
+  assert.equal(json.status, 0, json.stderr);
+  assert.deepEqual(JSON.parse(json.stdout).notDirectories, ["backlog-workflow"]);
+  assert.deepEqual(JSON.parse(json.stdout).blocked, [SKILL]);
+  assert.equal(readFileSync(path, "utf8"), "theirs\n");
+
+  // Positive control: the remedy it prints works.
+  rmSync(path);
+  const after = run(["skills", "install", "--json", "--dir", fx.backlog], fx.dir, fx.env);
+  assert.deepEqual(JSON.parse(after.stdout).created, [SKILL]);
 });
