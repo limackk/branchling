@@ -71,7 +71,7 @@ waves:
   # envelope for hooks and skills, which waits for both modules' fixes above.
   # TL-473 moves here from the trust wave: it needs no other viewer work.
   - name: "Jira joins the imports and the release surface reads one record"
-    tasks: [TL-581, TL-582, TL-573, TL-612, TL-621, TL-566, TL-605, TL-567, TL-606, TL-608, TL-579]
+    tasks: [TL-581, TL-582, TL-573, TL-612, TL-621, TL-473, TL-566, TL-605, TL-567, TL-606, TL-608, TL-579]
 
   # The rest of the overview guide's release-gate sentences, which all edit
   # instructions.mjs and so run one after another, beside the exit line every
@@ -100,7 +100,7 @@ waves:
   # is the most urgent of them — every day without it raises the price of a
   # rename it might still require.
   - name: "Human publication gates"
-    tasks: [TL-179, TL-456, TL-457, TL-498, TL-555, TL-472, TL-102, TL-473]
+    tasks: [TL-179, TL-456, TL-457, TL-498, TL-555, TL-472, TL-102]
 
   # The release happened; what stays open is the evidence that the next one
   # repeats it rather than remembering it. The announcement follows, because
