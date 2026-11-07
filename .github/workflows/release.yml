@@ -46,7 +46,12 @@ jobs:
       # The suite already ran on this commit in the test workflow; it runs
       # again here because this job, not that one, is what publishes, and a
       # tag can be pushed on a commit whose test run was never looked at.
+      # Under the colour test.yml uses, for the reason given there (TL-466):
+      # without it the colour guard reruns every rendering test under a 600 s
+      # limit, and in the v0.4.0 run that rerun alone was killed by it (TL-625).
       - name: tests
+        env:
+          FORCE_COLOR: "1"
         run: node --test scripts/tests/*.test.mjs
 
       - name: guards
