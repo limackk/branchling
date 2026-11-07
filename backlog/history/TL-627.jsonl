@@ -1,1 +1,2 @@
 {"id":"01M6TXFGS13TY7V9JXWVSR2R6G","ts":"2026-11-07T11:49:38.721Z","task":"TL-627","field":"__created__","from":"","to":"A mistyped head range does not attribute a commit to thousands of tasks","actor":"agent:loop-3","source":"new","reason":"unknown"}
+{"id":"01M6VGAFCSHY249BP502X422HZ","ts":"2026-11-07T17:18:56.409Z","task":"TL-627","field":"conflict_group","from":[],"to":["attribution"],"actor":"agent:claude","source":"set","reason":"scheduled into the wave for the loop follow-ups; tasks sharing a module are held apart"}

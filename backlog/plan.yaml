@@ -79,6 +79,26 @@ waves:
   - name: "The overview and every --help say what ships"
     tasks: [TL-617, TL-618, TL-619, TL-620, TL-572]
 
+  # WHAT ONE SUPERVISED-LOOP SESSION TRIPPED OVER (2026-11-07), filed from
+  # what it observed and checked in the code: a `next` that claims when asked
+  # to look, a plan that reads as having work while no run can take any, a
+  # mutation run that leaks hung processes and is too large to run before a
+  # commit, task records read in filesystem order, a duplicate `new` did not
+  # notice, and a reserved reason described two ways. The two mutation tasks
+  # share a group, as do the two that touch the dispatch predicate. TL-647
+  # waits with the human gates: its first step is the owner's decision.
+  - name: "The loop surfaces stop misleading the loops"
+    tasks: [TL-645, TL-644, TL-646, TL-648, TL-643, TL-649, TL-650]
+
+  # THE FOLLOW-UPS THE LOOPS FILED while closing waves 4 to 6, seventeen of
+  # them, none needing a person. Highest priority first: a dangling link that
+  # still crashes `skills install` (TL-634), then the two P2 defects, then the
+  # rest. Modules shared by several are grouped (skills, import, hooks,
+  # attribution, doctor, mutation, json-envelope); TL-637 shares a group with
+  # TL-572 because both reword messages across every command.
+  - name: "The follow-ups the loops filed close"
+    tasks: [TL-634, TL-626, TL-640, TL-627, TL-628, TL-629, TL-630, TL-631, TL-632, TL-633, TL-635, TL-636, TL-637, TL-638, TL-639, TL-641, TL-642]
+
   # The viewer touches build-viewer.mjs and serve-backlog.mjs only, so it can
   # run beside the two waves above rather than after them. Both halves exist
   # on their own branches; they land before the surface is judged as a whole.
@@ -100,7 +120,7 @@ waves:
   # is the most urgent of them — every day without it raises the price of a
   # rename it might still require.
   - name: "Human publication gates"
-    tasks: [TL-179, TL-456, TL-457, TL-498, TL-555, TL-472, TL-102]
+    tasks: [TL-179, TL-456, TL-457, TL-498, TL-555, TL-647, TL-472, TL-102]
 
   # The release happened; what stays open is the evidence that the next one
   # repeats it rather than remembering it. The announcement follows, because

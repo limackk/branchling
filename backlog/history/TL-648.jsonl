@@ -1,1 +1,2 @@
 {"id":"01M6VG2D7GFYGE4S811PEBGAYG","ts":"2026-11-07T17:14:32.048Z","task":"TL-648","field":"__created__","from":"","to":"A mutation run can mutate only the lines a change touched","actor":"agent:claude","source":"new","reason":"unknown"}
+{"id":"01M6VG9GS05X15CVDVQD9Q317G","ts":"2026-11-07T17:18:25.056Z","task":"TL-648","field":"conflict_group","from":[],"to":["mutation"],"actor":"agent:claude","source":"set","reason":"scheduled into the wave for the loop-surface weaknesses; tasks sharing a module are held apart"}

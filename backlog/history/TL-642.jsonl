@@ -1,1 +1,2 @@
 {"id":"01M6VD7W42PENTASX9K4KD6RPG","ts":"2026-11-07T16:25:05.410Z","task":"TL-642","field":"__created__","from":"","to":"jira-proof reads the repository --dir names from any directory","actor":"agent:loop-2","source":"new","reason":"unknown"}
+{"id":"01M6VGAF2DNE3GEWN3E4PFFXJY","ts":"2026-11-07T17:18:56.077Z","task":"TL-642","field":"conflict_group","from":[],"to":["import"],"actor":"agent:claude","source":"set","reason":"scheduled into the wave for the loop follow-ups; tasks sharing a module are held apart"}

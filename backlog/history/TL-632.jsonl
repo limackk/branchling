@@ -1,2 +1,3 @@
 {"id":"01M6V1MSXMEZ0MAB7PBDPBRQZQ","ts":"2026-11-07T13:02:26.228Z","task":"TL-632","field":"__created__","from":"","to":"doctor names a file in place of a packaged skill directory","actor":"agent:loop-4","source":"new","reason":"unknown"}
 {"id":"01M6V1PSGXJA6MYYSSSVTMY1AF","ts":"2026-11-07T13:03:31.357Z","task":"TL-632","field":"conflict_group","from":[],"to":["skills"],"actor":"agent:loop-4","source":"set","reason":"touches the skill install state that TL-603 changed"}
+{"id":"01M6VGAFWAJQ13CSYW7SKFPE8Z","ts":"2026-11-07T17:18:56.906Z","task":"TL-632","field":"conflict_group","from":["skills"],"to":["skills","doctor"],"actor":"agent:claude","source":"set","reason":"scheduled into the wave for the loop follow-ups; tasks sharing a module are held apart"}

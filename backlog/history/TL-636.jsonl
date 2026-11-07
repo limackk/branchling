@@ -1,1 +1,2 @@
 {"id":"01M6V2SW7Z9VX87M7ZH2V7TV36","ts":"2026-11-07T13:22:41.023Z","task":"TL-636","field":"__created__","from":"","to":"The import help has one source instead of a dead USAGE copy","actor":"agent:loop-4","source":"new","reason":"unknown"}
+{"id":"01M6VGAEQX1PN60NAQ8959M8J9","ts":"2026-11-07T17:18:55.741Z","task":"TL-636","field":"conflict_group","from":[],"to":["import"],"actor":"agent:claude","source":"set","reason":"scheduled into the wave for the loop follow-ups; tasks sharing a module are held apart"}

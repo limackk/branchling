@@ -1,1 +1,2 @@
 {"id":"01M6P60ZR5J4ZKW71A7A2TKJC8","ts":"2026-11-05T15:42:47.557Z","task":"TL-572","field":"__created__","from":"","to":"Every command's --help ends with an exit line","actor":"agent:loop-4","source":"new","reason":"unknown"}
+{"id":"01M6VGAG6T03C1FACZMX4W8A5M","ts":"2026-11-07T17:18:57.242Z","task":"TL-572","field":"conflict_group","from":[],"to":["cli-surface"],"actor":"agent:claude","source":"set","reason":"scheduled into the wave for the loop follow-ups; tasks sharing a module are held apart"}

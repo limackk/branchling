@@ -1,1 +1,2 @@
 {"id":"01M6TWZMJJ5284J83HVHC149JC","ts":"2026-11-07T11:40:58.322Z","task":"TL-626","field":"__created__","from":"","to":"A task id mentioned in a trunk commit body does not deploy that task","actor":"agent:loop-3","source":"new","reason":"unknown"}
+{"id":"01M6VGAF7MGJ47P9CH9FR7FWCG","ts":"2026-11-07T17:18:56.244Z","task":"TL-626","field":"conflict_group","from":[],"to":["attribution"],"actor":"agent:claude","source":"set","reason":"scheduled into the wave for the loop follow-ups; tasks sharing a module are held apart"}

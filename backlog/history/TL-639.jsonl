@@ -1,1 +1,2 @@
 {"id":"01M6V62DCT5069KJV20EH11SXF","ts":"2026-11-07T14:19:46.458Z","task":"TL-639","field":"__created__","from":"","to":"Uninstall never reports removing an unclosed hook block it kept","actor":"agent:loop-1","source":"new","reason":"unknown"}
+{"id":"01M6VGAEJR6JQQAN7BTAS5YT57","ts":"2026-11-07T17:18:55.576Z","task":"TL-639","field":"conflict_group","from":[],"to":["hooks"],"actor":"agent:claude","source":"set","reason":"scheduled into the wave for the loop follow-ups; tasks sharing a module are held apart"}
