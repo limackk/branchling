@@ -126,6 +126,16 @@ than what it named when it was pushed. A rerun signs one more provenance
 statement into the transparency log; that is harmless, because only the
 statement of the publish that succeeds is attached to the version.
 
+**The one case a rerun cannot fix is a defect in `release.yml` itself**, because
+a tag push runs the workflow file of the tagged commit. v0.4.0 met it on
+2026-11-07: its tests step lacked the `FORCE_COLOR` that `test.yml` sets, and
+the colour guard's rerun was killed by its time limit before `npm publish` ran
+(TL-625). Nothing had been published under the version — no npm version and no
+GitHub release — so the tag was deleted and signed again on the commit that
+fixed the workflow, after the `test` workflow was green on it. That is the only
+condition under which a pushed tag may be recreated; once anything is published
+under a version, the next patch version is the fix.
+
 A published version cannot be reused. A broken release is fixed by the next
 patch version, never by deleting and republishing the same number; `npm
 deprecate branchling@<version> "<reason>"` marks the broken one for anybody

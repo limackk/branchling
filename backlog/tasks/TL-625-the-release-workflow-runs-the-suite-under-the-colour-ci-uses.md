@@ -8,7 +8,7 @@ epic: ""                           # free text — the group this task counts to
 release: ""                        # the release it is PLANNED for (a value from `releases:` in config.yaml). Empty = none
 target: []                         # the deploy targets in ANOTHER repository it ships from (`deploy_targets` with `repository:`). Empty = none
 priority: P0
-status: in_progress  # pending | in_progress | blocked | done | cancelled
+status: done  # pending | in_progress | blocked | done | cancelled
 owner: agent:claude
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
@@ -40,4 +40,4 @@ The release workflow runs the suite with FORCE_COLOR=1, as the test workflow doe
 
 ## Acceptance criteria
 
-- [ ] the release workflow's tests step starts the suite in colour, so the guard defers to it [proof: release-tests-step-forces-colour]
+- [x] the release workflow's tests step starts the suite in colour, so the guard defers to it [proof: release-tests-step-forces-colour]
