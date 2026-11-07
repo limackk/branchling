@@ -1,1 +1,2 @@
 {"id":"01M6SJFNQ8QJP398DXXHM39Q83","ts":"2026-11-06T23:18:15.016Z","task":"TL-619","field":"__created__","from":"","to":"Under require the overview names the accepted gaps","actor":"agent:coord-wave-21","source":"new","reason":"unknown"}
+{"id":"01M6TWMWK7TYSFWJPX5CFBN894","ts":"2026-11-07T11:35:06.087Z","task":"TL-619","field":"conflict_group","from":[],"to":["instructions"],"actor":"agent:claude","source":"set","reason":"scheduled into the 2026-11-07 waves; tasks sharing a module are held apart so parallel loops do not conflict"}

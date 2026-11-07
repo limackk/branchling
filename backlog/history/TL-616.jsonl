@@ -1,1 +1,2 @@
 {"id":"01M6SFN270JX5P278WAYYBP266","ts":"2026-11-06T22:28:45.920Z","task":"TL-616","field":"__created__","from":"","to":"Template refresh counts fields the way doctor counts them","actor":"agent:coordinator-wave-20","source":"new","reason":"unknown"}
+{"id":"01M6TWMYN6NXWN8QA4WNMYFAC5","ts":"2026-11-07T11:35:08.198Z","task":"TL-616","field":"conflict_group","from":[],"to":["doctor"],"actor":"agent:claude","source":"set","reason":"scheduled into the 2026-11-07 waves; tasks sharing a module are held apart so parallel loops do not conflict"}

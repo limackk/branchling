@@ -1,1 +1,2 @@
 {"id":"01M6SKSWD7P15HHA76CDK6G7Y2","ts":"2026-11-06T23:41:18.119Z","task":"TL-622","field":"__created__","from":"","to":"A hook block keeps any marker indentation and bare empty lines","actor":"agent:coordinator","source":"new","reason":"unknown"}
+{"id":"01M6TWMVFKCP0X89S1PXPCJJYF","ts":"2026-11-07T11:35:04.947Z","task":"TL-622","field":"conflict_group","from":[],"to":["hooks"],"actor":"agent:claude","source":"set","reason":"scheduled into the 2026-11-07 waves; tasks sharing a module are held apart so parallel loops do not conflict"}

@@ -1,1 +1,2 @@
 {"id":"01M51VJ5N06R3Y84958V9M27KQ","ts":"2026-10-16T07:59:25.856Z","task":"TL-473","field":"__created__","from":"","to":"Fit the viewer title row on a phone-width screen","actor":"agent:claude","source":"new","reason":"unknown"}
+{"id":"01M6TWMXPM6TAAVP3CTMGJD7D8","ts":"2026-11-07T11:35:07.220Z","task":"TL-473","field":"conflict_group","from":[],"to":["viewer"],"actor":"agent:claude","source":"set","reason":"scheduled into the 2026-11-07 waves; tasks sharing a module are held apart so parallel loops do not conflict"}

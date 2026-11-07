@@ -1,1 +1,2 @@
 {"id":"01M6SCD4VYV6Q92KN3N6XQTT6G","ts":"2026-11-06T21:32:00.766Z","task":"TL-607","field":"__created__","from":"","to":"The implementer guide names a stash-free way to run the old code","actor":"agent:wave-19-coordinator","source":"new","reason":"unknown"}
+{"id":"01M6TWMWXCWBAEFBX0DRQY8S27","ts":"2026-11-07T11:35:06.412Z","task":"TL-607","field":"conflict_group","from":[],"to":["instructions"],"actor":"agent:claude","source":"set","reason":"scheduled into the 2026-11-07 waves; tasks sharing a module are held apart so parallel loops do not conflict"}

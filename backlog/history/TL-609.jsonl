@@ -1,1 +1,2 @@
 {"id":"01M6SCD58V609AH48DQW0SYH9F","ts":"2026-11-06T21:32:01.179Z","task":"TL-609","field":"__created__","from":"","to":"The unclosed hook block repair keeps the user's lines after it","actor":"agent:wave-19-coordinator","source":"new","reason":"unknown"}
+{"id":"01M6TWMV5MV8259ZM5DSAV3W7Y","ts":"2026-11-07T11:35:04.628Z","task":"TL-609","field":"conflict_group","from":[],"to":["hooks"],"actor":"agent:claude","source":"set","reason":"scheduled into the 2026-11-07 waves; tasks sharing a module are held apart so parallel loops do not conflict"}

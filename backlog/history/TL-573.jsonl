@@ -1,1 +1,2 @@
 {"id":"01M6P63HQ9H776R0C03SSPX4TF","ts":"2026-11-05T15:44:11.497Z","task":"TL-573","field":"__created__","from":"","to":"The release pipeline reads task files through the gate's record reader","actor":"agent:loop-3","source":"new","reason":"unknown"}
+{"id":"01M6TWMYT7YPDDQDXNJAB41A50","ts":"2026-11-07T11:35:08.359Z","task":"TL-573","field":"conflict_group","from":[],"to":["release"],"actor":"agent:claude","source":"set","reason":"scheduled into the 2026-11-07 waves; tasks sharing a module are held apart so parallel loops do not conflict"}

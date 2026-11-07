@@ -13,7 +13,7 @@
 # means something first, outward claims last — and adds one: a human gate is
 # closed by a vouch, so the vouch has to be recorded under the right name
 # before any gate is closed with one.
-updated: 2026-11-06
+updated: 2026-11-07
 rationale: "The package is already public, so what remains is making each later claim true before it is made. Branchling first makes its suite answer the same way twice, then records a person's vouch as that person's and reads a CRLF checkout like an LF one; the viewer runs alongside, on files neither of those touches. Only then the human gates, and last the release evidence and the announcement that point at all of it."
 waves:
   # A SUITE THAT IS RED BY CHANCE CLOSES NOTHING. `done` runs the suite, so a
@@ -41,7 +41,43 @@ waves:
   # `next` never hands two of them out at once; the rest touch disjoint
   # files. TL-473 stays in the wave that judges responsiveness.
   - name: "The supervised-loop follow-ups close"
-    tasks: [TL-565, TL-563, TL-564, TL-498, TL-548, TL-550, TL-551, TL-556, TL-559, TL-561, TL-562, TL-547, TL-549, TL-552, TL-553, TL-554, TL-557, TL-558, TL-560]
+    tasks: [TL-565, TL-563, TL-564, TL-548, TL-550, TL-551, TL-556, TL-559, TL-561, TL-562, TL-547, TL-549, TL-552, TL-553, TL-554, TL-557, TL-558, TL-560]
+
+  # THE OPEN BACKLOG OF 2026-11-07, scheduled for four parallel loops. Every
+  # pending task an agent can take without a person, thirty-seven of them,
+  # thirty-six of which no earlier plan placed. They come before the viewer
+  # wave for the reason wave 3 did: that wave's open task is claimed, and
+  # every wave after it waits on people. Each wave mixes several
+  # `conflict_group`s (hooks, json-envelope, skills, instructions, import,
+  # viewer, config, doctor, release, consumer-doc), so `next` keeps two edits
+  # of one module apart while the other loops still have work.
+  #
+  # First what every later wave stands on: a suite that leaves the temporary
+  # directory as it found it, the two guides that send a consumer and an
+  # implementer the wrong way, and the attribution `done` records. TL-571 and
+  # TL-613 state one defect twice; they share a group, so the second runs
+  # against the first's fix and closes on its own stronger contract.
+  - name: "The suite leaves no trace and the guides stop misdirecting"
+    tasks: [TL-575, TL-571, TL-613, TL-607, TL-614, TL-591, TL-569, TL-570]
+
+  # Defects inside single modules, one group each: hook blocks, the new
+  # --json refusals, the config reader, doctor's printed repairs, skills
+  # install, and the GitHub import's own help.
+  - name: "Hook blocks, refusals and repairs say what is true"
+    tasks: [TL-609, TL-610, TL-622, TL-568, TL-574, TL-604, TL-611, TL-615, TL-616, TL-603, TL-577, TL-580]
+
+  # The two features (Jira import, then its proof reaching the ticket), the
+  # release surface reading one record, the viewer's small debts, and the
+  # envelope for hooks and skills, which waits for both modules' fixes above.
+  # TL-473 moves here from the trust wave: it needs no other viewer work.
+  - name: "Jira joins the imports and the release surface reads one record"
+    tasks: [TL-581, TL-582, TL-573, TL-612, TL-621, TL-473, TL-566, TL-605, TL-567, TL-606, TL-608, TL-579]
+
+  # The rest of the overview guide's release-gate sentences, which all edit
+  # instructions.mjs and so run one after another, beside the exit line every
+  # --help gains — last, because it touches the help of every command.
+  - name: "The overview and every --help say what ships"
+    tasks: [TL-617, TL-618, TL-619, TL-620, TL-572]
 
   # The viewer touches build-viewer.mjs and serve-backlog.mjs only, so it can
   # run beside the two waves above rather than after them. Both halves exist
@@ -50,18 +86,21 @@ waves:
     tasks: [TL-451, TL-450]
 
   # Accessibility and cross-mode QA judge the complete editing and dashboard
-  # surface rather than either half. The phone-width title row comes first,
-  # because TL-452 is the task that judges responsiveness.
+  # surface rather than either half. The phone-width title row (TL-473)
+  # lands earlier, so TL-452 judges a row that already fits.
   - name: "The expanded viewer earns trust"
-    tasks: [TL-473, TL-452]
+    tasks: [TL-452]
 
   # Acts only a person can perform: a dated name clearance, a recorded demo,
   # an uploaded social preview, and vouches over the public Windows run and
-  # the published community policies. The name is already public, so TL-179
+  # the published community policies, the vouch on the superseded-run
+  # cancellation (TL-498, moved from wave 3, where it held every later wave
+  # shut) and the decision on task-graph.mjs (TL-555). The name is already
+  # public, so TL-179
   # is the most urgent of them — every day without it raises the price of a
   # rename it might still require.
   - name: "Human publication gates"
-    tasks: [TL-179, TL-456, TL-457, TL-472, TL-102]
+    tasks: [TL-179, TL-456, TL-457, TL-498, TL-555, TL-472, TL-102]
 
   # The release happened; what stays open is the evidence that the next one
   # repeats it rather than remembering it. The announcement follows, because

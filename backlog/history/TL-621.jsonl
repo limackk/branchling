@@ -1,1 +1,2 @@
 {"id":"01M6SKSW1WMAMYWX7VDAHCP9C6","ts":"2026-11-06T23:41:17.756Z","task":"TL-621","field":"__created__","from":"","to":"The requires_version floor controls test distinct floors","actor":"agent:coordinator","source":"new","reason":"unknown"}
+{"id":"01M6TWMZ4AS4DJKEWQDG8NJKC3","ts":"2026-11-07T11:35:08.682Z","task":"TL-621","field":"conflict_group","from":[],"to":["release"],"actor":"agent:claude","source":"set","reason":"scheduled into the 2026-11-07 waves; tasks sharing a module are held apart so parallel loops do not conflict"}

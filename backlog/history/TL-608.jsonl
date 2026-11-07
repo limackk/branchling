@@ -1,1 +1,2 @@
 {"id":"01M6SCD52C9KBMYKCT0JDS6WEF","ts":"2026-11-06T21:32:00.972Z","task":"TL-608","field":"__created__","from":"","to":"The overview names a foreign target beside a local one as unobservable","actor":"agent:wave-19-coordinator","source":"new","reason":"unknown"}
+{"id":"01M6TWMW42X85J07W2MT8DJF8F","ts":"2026-11-07T11:35:05.602Z","task":"TL-608","field":"conflict_group","from":[],"to":["instructions"],"actor":"agent:claude","source":"set","reason":"scheduled into the 2026-11-07 waves; tasks sharing a module are held apart so parallel loops do not conflict"}

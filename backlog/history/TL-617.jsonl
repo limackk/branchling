@@ -1,1 +1,2 @@
 {"id":"01M6SJFN0B5EFFRKYCW1MZRVZD","ts":"2026-11-06T23:18:14.283Z","task":"TL-617","field":"__created__","from":"","to":"The release-gate sentence ending is asserted","actor":"agent:coord-wave-21","source":"new","reason":"unknown"}
+{"id":"01M6TWMW95MRJGYKPMPNVM5DT4","ts":"2026-11-07T11:35:05.765Z","task":"TL-617","field":"conflict_group","from":[],"to":["instructions"],"actor":"agent:claude","source":"set","reason":"scheduled into the 2026-11-07 waves; tasks sharing a module are held apart so parallel loops do not conflict"}

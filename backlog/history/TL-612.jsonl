@@ -1,1 +1,2 @@
 {"id":"01M6SCPKSGVKTZ20HFK8T9QJFP","ts":"2026-11-06T21:37:10.960Z","task":"TL-612","field":"__created__","from":"","to":"The raised floor line of declare has a CLI test again","actor":"agent:impl-tl-593","source":"new","reason":"unknown"}
+{"id":"01M6TWMYZ852RXGMMFK41DMFQ3","ts":"2026-11-07T11:35:08.520Z","task":"TL-612","field":"conflict_group","from":[],"to":["release"],"actor":"agent:claude","source":"set","reason":"scheduled into the 2026-11-07 waves; tasks sharing a module are held apart so parallel loops do not conflict"}

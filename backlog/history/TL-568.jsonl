@@ -1,1 +1,2 @@
 {"id":"01M6P3CM3F77R3VWXDSAZ30PZT","ts":"2026-11-05T14:56:43.119Z","task":"TL-568","field":"__created__","from":"","to":"Every refusal of new --json answers in its envelope","actor":"agent:loop-4","source":"new","reason":"unknown"}
+{"id":"01M6TWMV0HSJTGR3K2BGEKZK6X","ts":"2026-11-07T11:35:04.465Z","task":"TL-568","field":"conflict_group","from":[],"to":["json-envelope"],"actor":"agent:claude","source":"set","reason":"scheduled into the 2026-11-07 waves; tasks sharing a module are held apart so parallel loops do not conflict"}

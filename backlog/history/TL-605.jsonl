@@ -1,1 +1,2 @@
 {"id":"01M6S9YX8WZAXS49F7S20RCMJ7","ts":"2026-11-06T20:49:17.084Z","task":"TL-605","field":"__created__","from":"","to":"The viewer and agent profiles name the wrong half of an actor","actor":"agent:impl-tl-590","source":"new","reason":"unknown"}
+{"id":"01M6TWMY0S7PK5KAXDSDWV5WM9","ts":"2026-11-07T11:35:07.545Z","task":"TL-605","field":"conflict_group","from":[],"to":["viewer"],"actor":"agent:claude","source":"set","reason":"scheduled into the 2026-11-07 waves; tasks sharing a module are held apart so parallel loops do not conflict"}

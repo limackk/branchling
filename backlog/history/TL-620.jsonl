@@ -1,1 +1,2 @@
 {"id":"01M6SJFP1Y4Y53E1Z4W4Y6TX60","ts":"2026-11-06T23:18:15.358Z","task":"TL-620","field":"__created__","from":"","to":"The overview names which recorded stages take --ref","actor":"agent:coord-wave-21","source":"new","reason":"unknown"}
+{"id":"01M6TWMWR8ADBKPHAKYS70NJ4E","ts":"2026-11-07T11:35:06.248Z","task":"TL-620","field":"conflict_group","from":[],"to":["instructions"],"actor":"agent:claude","source":"set","reason":"scheduled into the 2026-11-07 waves; tasks sharing a module are held apart so parallel loops do not conflict"}

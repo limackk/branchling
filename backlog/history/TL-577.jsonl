@@ -1,1 +1,2 @@
 {"id":"01M6PR3JNAR0KMV8KVWMDGYSCD","ts":"2026-11-05T20:58:46.826Z","task":"TL-577","field":"__created__","from":"","to":"GitHub import names milestones among what it leaves behind","actor":"agent:claude","source":"new","reason":"unknown"}
+{"id":"01M6TWMX2DZT18E29NEBNREG9C","ts":"2026-11-07T11:35:06.573Z","task":"TL-577","field":"conflict_group","from":[],"to":["import"],"actor":"agent:claude","source":"set","reason":"scheduled into the 2026-11-07 waves; tasks sharing a module are held apart so parallel loops do not conflict"}

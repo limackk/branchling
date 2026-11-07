@@ -1,2 +1,3 @@
 {"id":"01M6PS946EM7JTRVBV7JY8VZXZ","ts":"2026-11-05T21:19:17.198Z","task":"TL-582","field":"__created__","from":"","to":"A merged task's proof reaches its Jira ticket","actor":"agent:claude","source":"new","reason":"unknown"}
 {"id":"01M6PS94DBFHYT8NGKVERZRQKE","ts":"2026-11-05T21:19:17.419Z","task":"TL-582","field":"blocked_by","from":[],"to":["TL-581"],"actor":"agent:claude","source":"set","reason":"unknown"}
+{"id":"01M6TWMXHDG9K6JBP7DP7HPSP0","ts":"2026-11-07T11:35:07.053Z","task":"TL-582","field":"conflict_group","from":[],"to":["import"],"actor":"agent:claude","source":"set","reason":"scheduled into the 2026-11-07 waves; tasks sharing a module are held apart so parallel loops do not conflict"}
