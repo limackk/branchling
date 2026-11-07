@@ -31,7 +31,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { appendFileSync, mkdtempSync } from "node:fs";
+import { appendFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -54,7 +55,7 @@ releases: [spring-tide]
 `;
 
 function fixture(extra) {
-  const repo = mkdtempSync(join(tmpdir(), "branchling-instructions-coverage-" + counter++ + "-"));
+  const repo = fixtureDir(join(tmpdir(), "branchling-instructions-coverage-" + counter++ + "-"));
   execFileSync("git", ["init", "-q", "-b", "main", "."], { cwd: repo, stdio: "ignore" });
   const dir = join(repo, "backlog");
   const r = spawnSync(process.execPath, [CLI, "init", "--dir", dir, "--no-example", "--no-nudge"], {

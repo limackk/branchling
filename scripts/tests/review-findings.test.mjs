@@ -6,7 +6,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -44,7 +45,7 @@ function makeDecidedTask(repo, backlog, title, reason, actor) {
 }
 
 function fixture() {
-  const repo = mkdtempSync(join(tmpdir(), "branchling-review-findings-"));
+  const repo = fixtureDir(join(tmpdir(), "branchling-review-findings-"));
   execFileSync("git", ["init", "-q", "-b", "main", "."], { cwd: repo });
   execFileSync("git", ["config", "user.email", "review@example.test"], { cwd: repo });
   execFileSync("git", ["config", "user.name", "Reviewer"], { cwd: repo });

@@ -24,7 +24,8 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { rmSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -70,7 +71,7 @@ function rowFor(rows, id) {
 }
 
 async function briefingFor(closingContract) {
-  const cwd = mkdtempSync(join(tmpdir(), "resume-project-"));
+  const cwd = fixtureDir(join(tmpdir(), "resume-project-"));
   try {
     const contract = await runVerification(FRONTMATTER, cwd, { closingContract });
     return renderBriefing(modelOf(contract));

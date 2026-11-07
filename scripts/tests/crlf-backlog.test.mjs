@@ -24,7 +24,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -88,7 +89,7 @@ function endings(backlog) {
 
 /** One origin committed with LF, and a clone of it per line-ending policy. */
 function clones() {
-  const base = mkdtempSync(join(tmpdir(), "branchling-crlf-"));
+  const base = fixtureDir(join(tmpdir(), "branchling-crlf-"));
   const origin = join(base, "origin");
   git(base, ["init", "-q", origin]);
   // The origin is written with LF whatever the platform's default, so the

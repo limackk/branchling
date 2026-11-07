@@ -26,7 +26,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -51,7 +52,7 @@ let counter = 0;
  * would leak reservations between runs and could refuse a task in a live session.
  */
 function fixture(specs) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-plan-order-" + counter++ + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-plan-order-" + counter++ + "-"));
   const backlog = join(dir, "bl");
   const env = {
     ...process.env, BACKLOG_STATE_DIR: join(dir, "state"), NO_COLOR: "1",

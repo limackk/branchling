@@ -21,7 +21,8 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -141,7 +142,7 @@ test("each character outside the set is named once, and an unrepairable name get
 });
 
 test("config validation reports a wrong NAME in `actors` as a name, and a namespace as before", () => {
-  const sandbox = mkdtempSync(join(tmpdir(), "branchling-actor-shape-config-"));
+  const sandbox = fixtureDir(join(tmpdir(), "branchling-actor-shape-config-"));
   TEMP.push(sandbox);
   writeFileSync(join(sandbox, "config.yaml"), "project_name: \"Test\"\n");
   const base = loadConfig(sandbox, { strict: false });
@@ -170,7 +171,7 @@ function run(cwd, args) {
 }
 
 function fixture() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-actor-shape-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-actor-shape-"));
   TEMP.push(dir);
   assert.equal(spawnSync("git", ["init", "-q", "-b", "main", "."], { cwd: dir }).status, 0);
   const init = run(dir, ["init", "--dir", "backlog", "--no-example"]);

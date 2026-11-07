@@ -18,7 +18,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -30,7 +31,7 @@ isolateHome("where-exit-codes");
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
 const REFUSAL = /does not look like a backlog/;
 
-const base = mkdtempSync(join(tmpdir(), "branchling-where-exit-"));
+const base = fixtureDir(join(tmpdir(), "branchling-where-exit-"));
 const cwd = join(base, "cwd");
 mkdirSync(cwd);
 

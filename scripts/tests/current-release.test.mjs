@@ -30,7 +30,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { appendFileSync, cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, cpSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -95,7 +96,7 @@ deploy_targets:
  * commit). So `r1` is current, and only `blocker` blocks.
  */
 function fixture() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-current-release-" + counter++ + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-current-release-" + counter++ + "-"));
   git(dir, ["init", "-q", "-b", "main", "."]);
   assert.equal(run(dir, ["init", "--dir", "backlog", "--no-example"]).status, 0);
   appendFileSync(join(dir, "backlog", "config.yaml"), CONFIG);
@@ -218,7 +219,7 @@ test("deploy status --release and check --release name the current release in te
 });
 
 test("a project that declares no releases is not told about a current release", () => {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-current-release-" + counter++ + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-current-release-" + counter++ + "-"));
   git(dir, ["init", "-q", "-b", "main", "."]);
   assert.equal(run(dir, ["init", "--dir", "backlog", "--no-example"]).status, 0);
   appendFileSync(join(dir, "backlog", "config.yaml"), CONFIG.replace(/^releases:.*$/m, ""));
@@ -236,7 +237,7 @@ test("a project that declares no releases is not told about a current release", 
  * commit, so nothing anywhere is waiting for a promotion.
  */
 function docsOnlyFixture() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-current-release-" + counter++ + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-current-release-" + counter++ + "-"));
   git(dir, ["init", "-q", "-b", "main", "."]);
   assert.equal(run(dir, ["init", "--dir", "backlog", "--no-example"]).status, 0);
   appendFileSync(join(dir, "backlog", "config.yaml"), CONFIG.replace(/^releases:.*$/m, "releases: [r1, r2]"));
@@ -302,7 +303,7 @@ test("when deployment was not read, no release is named current — neither by t
   assert.equal(gate(dir).current, "r1");
 
   // Outside git.
-  const bare = mkdtempSync(join(tmpdir(), "branchling-current-release-" + counter++ + "-"));
+  const bare = fixtureDir(join(tmpdir(), "branchling-current-release-" + counter++ + "-"));
   cpSync(join(dir, "backlog"), join(bare, "backlog"), { recursive: true });
   const unread = scope(bare, "r2");
   assert.equal(unread.current, null);

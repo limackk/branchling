@@ -17,7 +17,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -58,7 +59,7 @@ function json(r) {
 }
 
 function repo() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-actor-source-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-actor-source-"));
   assert.equal(spawnSync("git", ["init", "-q", "."], { cwd: dir }).status, 0);
   assert.equal(run(dir, ["init", "--dir", ".", "--no-example"]).status, 0);
   const p = join(dir, "config.yaml");
@@ -81,7 +82,7 @@ function historyLines(dir, id) {
 
 /** A home whose user configuration states an actor — the `config` rung. */
 function homeWithActor(actor) {
-  const home = mkdtempSync(join(tmpdir(), "branchling-actor-source-home-"));
+  const home = fixtureDir(join(tmpdir(), "branchling-actor-source-home-"));
   const path = userConfigPath({ [HOME_ENV]: home });
   mkdirSync(join(path, ".."), { recursive: true });
   writeFileSync(path, "actor: " + actor + "\n", "utf8");

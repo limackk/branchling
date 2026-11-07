@@ -1,7 +1,8 @@
 /** Offline conformance is an adapter contract, not a provider test (TL-296). */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -68,7 +69,7 @@ function cleanup(root) {
 }
 
 test("a compatible adapter passes every offline outcome in human and JSON modes without leaking its sentinel", () => {
-  const root = mkdtempSync(join(tmpdir(), "branchling-conformance-test-"));
+  const root = fixtureDir(join(tmpdir(), "branchling-conformance-test-"));
   try {
     const witness = join(root, "received.jsonl");
     const executable = compatibleAdapter(root, witness);
@@ -118,7 +119,7 @@ test("a compatible adapter passes every offline outcome in human and JSON modes 
 });
 
 test("an adapter cannot call an instruction an enforced delegation guarantee", () => {
-  const root = mkdtempSync(join(tmpdir(), "branchling-conformance-delegation-"));
+  const root = fixtureDir(join(tmpdir(), "branchling-conformance-delegation-"));
   try {
     const executable = adapter(root, "false-enforced.sh", [
       "cat >/dev/null",
@@ -132,7 +133,7 @@ test("an adapter cannot call an instruction an enforced delegation guarantee", (
 });
 
 test("malformed and unavailable adapters fail deterministically without exposing their output", () => {
-  const root = mkdtempSync(join(tmpdir(), "branchling-conformance-negative-"));
+  const root = fixtureDir(join(tmpdir(), "branchling-conformance-negative-"));
   try {
     const malformed = adapter(root, "malformed-adapter.mjs", 'process.stdin.resume(); process.stdin.on("end", () => process.stdout.write("not json"));');
     const bad = cli(["conformance", "--adapter", malformed, "--json"]);

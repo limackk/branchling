@@ -41,7 +41,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { appendFileSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -114,7 +115,7 @@ function run(cwd, args) {
 /** A backlog in a real repository with one commit, its config extended by
  *  `extra`. The commit is there so `deploy status` has a trunk to read. */
 function fixture(extra) {
-  const repo = mkdtempSync(join(tmpdir(), "branchling-instructions-promotion-" + counter++ + "-"));
+  const repo = fixtureDir(join(tmpdir(), "branchling-instructions-promotion-" + counter++ + "-"));
   execFileSync("git", ["init", "-q", "-b", "main", "."], { cwd: repo, stdio: "ignore" });
   const dir = join(repo, "backlog");
   const r = run(repo, ["init", "--dir", dir, "--no-example", "--no-nudge"]);

@@ -18,7 +18,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -44,7 +45,7 @@ let counter = 0;
  * under test is what the guard makes of a contract that is already on disk.
  */
 function backlog(entry, { status = "pending" } = {}) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-falsifiable-" + counter++ + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-falsifiable-" + counter++ + "-"));
   const init = spawnSync(process.execPath, [CLI, "init", "--dir", dir, "--no-example"], { encoding: "utf8" });
   assert.equal(init.status, 0, init.stderr);
 

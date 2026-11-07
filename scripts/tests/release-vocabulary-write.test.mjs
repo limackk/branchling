@@ -17,7 +17,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { appendFileSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -36,7 +37,7 @@ function cli(dir, ...args) {
 
 /** A fresh backlog made by `init`, with `extra` appended to its config.yaml. */
 function fixture(extra) {
-  const dir = join(mkdtempSync(join(tmpdir(), "declare-")), "backlog");
+  const dir = join(fixtureDir(join(tmpdir(), "declare-")), "backlog");
   const init = spawnSync(process.execPath, [CLI, "init", "--dir", dir], { encoding: "utf8" });
   assert.equal(init.status, 0, init.stderr);
   if (extra) appendFileSync(join(dir, "config.yaml"), extra);

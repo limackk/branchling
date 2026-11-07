@@ -1,7 +1,8 @@
 /** `release` returns a claimant's task to the queue (TL-304). */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -10,7 +11,7 @@ import { isolateHome, SCRIPTS_DIR } from "./_repo.mjs";
 isolateHome("release");
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
 function run(cwd, args) { return spawnSync(process.execPath, [CLI].concat(args), { cwd, encoding: "utf8", env: { ...process.env, NO_COLOR: "1", BACKLOG_STATE_DIR: join(cwd, ".state") } }); }
-function fixture() { const dir = mkdtempSync(join(tmpdir(), "branchling-release-")); assert.equal(run(dir, ["init", "--dir", ".", "--no-example"]).status, 0); const r = run(dir, ["new", "--title", "Release fixture"]); return { dir, id: r.stdout.match(/[A-Z]+-\d+/)[0] }; }
+function fixture() { const dir = fixtureDir(join(tmpdir(), "branchling-release-")); assert.equal(run(dir, ["init", "--dir", ".", "--no-example"]).status, 0); const r = run(dir, ["new", "--title", "Release fixture"]); return { dir, id: r.stdout.match(/[A-Z]+-\d+/)[0] }; }
 function text(dir, id) { return readFileSync(join(dir, "tasks", readdirSync(join(dir, "tasks")).find((f) => f.startsWith(id + "-"))), "utf8"); }
 
 test("a claimant releases the task, records why, and another actor can take it", () => {

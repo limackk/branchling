@@ -22,7 +22,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -42,7 +43,7 @@ function run(cwd, args, input) {
 }
 
 function repo() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-body-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-body-"));
   assert.equal(spawnSync("git", ["init", "-q", "."], { cwd: dir }).status, 0);
   assert.equal(run(dir, ["init", "--dir", ".", "--no-example"]).status, 0);
   const r = run(dir, ["new", "--dir", ".", "--title", "A task whose body is rewritten"]);

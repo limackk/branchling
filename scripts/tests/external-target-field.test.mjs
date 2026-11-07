@@ -24,7 +24,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { appendFileSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -94,7 +95,7 @@ deploy_targets:
 
 /** A backlog in a git repository, with `extra` appended to its config.yaml. */
 function backlog(extra) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-target-field-" + counter++ + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-target-field-" + counter++ + "-"));
   git(dir, ["init", "-q", "-b", "main", "."]);
   assert.equal(run(dir, ["init", "--dir", "backlog", "--no-example"]).status, 0);
   appendFileSync(join(dir, "backlog", "config.yaml"), extra);

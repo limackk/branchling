@@ -21,7 +21,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -39,7 +40,7 @@ const CLI = join(dirname(fileURLToPath(import.meta.url)), "..", "cli.mjs");
 const SERVERS = new Set(["serve", "mcp"]);
 
 function inEmptyDir(args) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-nobacklog-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-nobacklog-"));
   return spawnSync(process.execPath, [CLI, ...args], {
     cwd: dir, encoding: "utf8", timeout: 60_000, input: "",
   });
@@ -76,7 +77,7 @@ test("POSITIVE CONTROL: a genuine programmer error STILL shows its stack", () =>
   // Silencing everything would be a worse cure than the disease. Only the named
   // types become a message; a TypeError stays a TypeError, with the trace that
   // makes it findable.
-  const dir = mkdtempSync(join(tmpdir(), "branchling-boom-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-boom-"));
   const script = join(dir, "boom.mjs");
   writeFileSync(script,
     'import { resolveBacklogDirOrExit } from ' + JSON.stringify(pathToFileURL(join(dirname(CLI), "paths.mjs")).href) + ';\n' +
@@ -92,7 +93,7 @@ test("a named directory that is not a backlog is its own message, not `there is 
   // with a stack. It is a foreseen state like the missing backlog, so it exits
   // the same way — but the sentence names the directory, because "no backlog
   // here, point at one with --dir" answers somebody who has just done that.
-  const dir = mkdtempSync(join(tmpdir(), "branchling-named-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-named-"));
   const script = join(dir, "named.mjs");
   writeFileSync(script,
     'import { resolveBacklogDirOrExit } from ' + JSON.stringify(pathToFileURL(join(dirname(CLI), "paths.mjs")).href) + ';\n' +

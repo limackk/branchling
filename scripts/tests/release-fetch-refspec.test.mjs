@@ -25,7 +25,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { appendFileSync, mkdtempSync } from "node:fs";
+import { appendFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -180,7 +181,7 @@ test("the fix is a forced, same-name refspec quoted against the shell", () => {
 
 /** A bare remote and a clone of it whose backlog declares `yaml`. */
 function cloneWithBacklog(yaml) {
-  const base = mkdtempSync(join(tmpdir(), "branchling-fetch-" + counter++ + "-"));
+  const base = fixtureDir(join(tmpdir(), "branchling-fetch-" + counter++ + "-"));
   const remote = join(base, "remote.git");
   const seed = join(base, "seed");
   git(base, "init", "-q", "--bare", "-b", "main", remote);

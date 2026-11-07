@@ -25,7 +25,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { appendFileSync, mkdtempSync, writeFileSync } from "node:fs";
+import { appendFileSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -78,7 +79,7 @@ deploy_targets:
  *  tagged `app-v1`, `c2` after it and not yet tagged. */
 function recordRepo(dir = null) {
   if (!dir) {
-    dir = mkdtempSync(join(tmpdir(), "branchling-release-record-" + counter++ + "-"));
+    dir = fixtureDir(join(tmpdir(), "branchling-release-record-" + counter++ + "-"));
     git(dir, ["init", "-q", "-b", "main", "."]);
   }
   const init = run(dir, ["init", "--dir", "backlog", "--no-example"]);
@@ -300,7 +301,7 @@ test("`deploy status` names who recorded a stage, when and why", () => {
 // ── 7. Sharing ──────────────────────────────────────────────────────────
 
 test("a record prints the push command and never pushes; doctor names the refspec other clones need", () => {
-  const base = mkdtempSync(join(tmpdir(), "branchling-release-record-remote-" + counter++ + "-"));
+  const base = fixtureDir(join(tmpdir(), "branchling-release-record-remote-" + counter++ + "-"));
   const remote = join(base, "remote.git");
   git(base, ["init", "-q", "--bare", "-b", "main", remote]);
   const clone = join(base, "clone");

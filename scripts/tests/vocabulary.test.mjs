@@ -11,7 +11,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -30,7 +31,7 @@ function run(args) {
 
 /** A backlog whose `config.yaml` lines named in `lines` replace the template's. */
 function backlog(lines) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-vocabulary-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-vocabulary-"));
   assert.equal(run(["init", "--dir", dir, "--no-example"]).status, 0);
   const path = join(dir, "config.yaml");
   const keys = Object.keys(lines);

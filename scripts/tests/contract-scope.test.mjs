@@ -21,12 +21,12 @@ import {
   chmodSync,
   existsSync,
   mkdirSync,
-  mkdtempSync,
   readFileSync,
   readdirSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -75,7 +75,7 @@ function invocationCount(path) {
 }
 
 function fixture() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-contract-scope-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-contract-scope-"));
   const repo = join(dir, "repo");
   const backlog = join(repo, "backlog");
   const tests = join(repo, "contract-tests");

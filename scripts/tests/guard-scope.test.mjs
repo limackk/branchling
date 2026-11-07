@@ -24,7 +24,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -47,7 +48,7 @@ function run(args) {
 }
 
 function fixture() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-guard-scope-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-guard-scope-"));
   assert.equal(run(["init", "--dir", dir, "--no-example"]).status, 0);
   return dir;
 }
@@ -59,7 +60,7 @@ test("a backlog inside this checkout belongs to it; one in a temp directory does
   // The co-located layout: the root IS the backlog. A rule that only knew the
   // nested one would switch both guards off for every co-located consumer.
   assert.equal(insideInstallation(REPO_ROOT), true);
-  assert.equal(insideInstallation(mkdtempSync(join(tmpdir(), "elsewhere-"))), false);
+  assert.equal(insideInstallation(fixtureDir(join(tmpdir(), "elsewhere-"))), false);
   // A sibling whose path merely STARTS with the root's is not inside it.
   assert.equal(insideInstallation(REPO_ROOT + "-other"), false);
 });
@@ -106,7 +107,7 @@ test("a fixture's doctor is unaffected by this repository's own source", () => {
 });
 
 test("a non-git co-located backlog reads no markdown from its parent", () => {
-  const parent = mkdtempSync(join(tmpdir(), "branchling-docs-boundary-"));
+  const parent = fixtureDir(join(tmpdir(), "branchling-docs-boundary-"));
   const backlog = join(parent, "project");
   mkdirSync(backlog);
   assert.equal(run(["init", "--dir", backlog, "--no-example"]).status, 0);
@@ -127,7 +128,7 @@ test("a non-git co-located backlog reads no markdown from its parent", () => {
 });
 
 test("a non-colocated backlog still reads documents from its git repository root", () => {
-  const repository = mkdtempSync(join(tmpdir(), "branchling-docs-repository-"));
+  const repository = fixtureDir(join(tmpdir(), "branchling-docs-repository-"));
   const backlog = join(repository, "backlog");
   assert.equal(spawnSync("git", ["init", "-q"], { cwd: repository }).status, 0);
   assert.equal(run(["init", "--dir", backlog, "--no-example"]).status, 0);

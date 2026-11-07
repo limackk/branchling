@@ -1,7 +1,8 @@
 /** Local profile preflight and its explicit live probe (TL-294). */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -15,7 +16,7 @@ const CLI = join(SCRIPTS_DIR, "cli.mjs");
 const run = (args, env, cwd) => spawnSync(process.execPath, [CLI].concat(args), { cwd, encoding: "utf8", timeout: 120_000, env });
 
 function fixture() {
-  const root = mkdtempSync(join(tmpdir(), "branchling-agent-check-"));
+  const root = fixtureDir(join(tmpdir(), "branchling-agent-check-"));
   const home = join(root, "home");
   const env = { ...process.env, NO_COLOR: "1", [HOME_ENV]: home, BACKLOG_STATE_DIR: join(root, "state") };
   return { root, home, env };

@@ -30,7 +30,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -181,7 +182,7 @@ function task(dir, id, { blocked_by = [], status = "pending", executor = "" } = 
 }
 
 test("--json carries both fields, because that is what a dispatcher reads", () => {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-plan-executor-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-plan-executor-"));
   try {
     mkdirSync(join(dir, "tasks"));
     writeFileSync(join(dir, "_template.md"), "---\nid: TL-NNN\n---\n", "utf8");

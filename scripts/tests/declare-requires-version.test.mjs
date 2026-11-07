@@ -19,7 +19,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { appendFileSync, mkdtempSync, readFileSync } from "node:fs";
+import { appendFileSync, readFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -38,7 +39,7 @@ function cli(dir, ...args) {
 }
 
 function fixture(extra) {
-  const dir = join(mkdtempSync(join(tmpdir(), "declare-floor-")), "backlog");
+  const dir = join(fixtureDir(join(tmpdir(), "declare-floor-")), "backlog");
   const init = spawnSync(process.execPath, [CLI, "init", "--dir", dir, "--no-example"], { encoding: "utf8" });
   assert.equal(init.status, 0, init.stderr);
   if (extra) appendFileSync(join(dir, "config.yaml"), extra);

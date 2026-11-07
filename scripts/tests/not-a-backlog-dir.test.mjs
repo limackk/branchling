@@ -27,7 +27,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -46,7 +47,7 @@ const STACK = /^\s+at .+:\d+:\d+\)?$/m;
 const SOURCE = /^file:\/\//m;
 const REFUSAL = /does not look like a backlog/;
 
-const base = mkdtempSync(join(tmpdir(), "branchling-not-a-backlog-"));
+const base = fixtureDir(join(tmpdir(), "branchling-not-a-backlog-"));
 const cwd = join(base, "cwd");
 mkdirSync(cwd);
 spawnSync("git", ["init", "-q", "."], { cwd });

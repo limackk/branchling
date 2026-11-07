@@ -14,7 +14,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { readdirSync, rmSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -29,7 +30,7 @@ test.after(() => { for (const d of TEMP) rmSync(d, { recursive: true, force: tru
 TEMP.push(isolateHome("released-backlogs-cleanup"));
 
 function privateTmp() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-released-cleanup-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-released-cleanup-"));
   TEMP.push(dir);
   return dir;
 }
@@ -52,8 +53,8 @@ function envWithTmp(dir) {
 test("positive control: a directory the child leaves in its TMPDIR is counted", () => {
   const dir = privateTmp();
   const r = spawnSync(process.execPath, ["-e",
-    "const { mkdtempSync } = require('node:fs'); const { tmpdir } = require('node:os');" +
-    "mkdtempSync(require('node:path').join(tmpdir(), 'branchling-released-leak-'));"],
+    "const { mkdtempSync } = require('node:fs'); const { tmpdir } = require('node:os');" + // fixture-dir: allow — the child leaks on purpose
+    "mkdtempSync(require('node:path').join(tmpdir(), 'branchling-released-leak-'));"], // fixture-dir: allow
   { encoding: "utf8", env: envWithTmp(dir) });
   assert.equal(r.status, 0, r.stderr);
   // Without this, an empty directory below would also be what a child that

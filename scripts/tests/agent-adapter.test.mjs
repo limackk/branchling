@@ -1,7 +1,8 @@
 /** One executable profile adapter contract (TL-289). */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -18,7 +19,7 @@ function run(args, env, cwd) {
 }
 
 test("a provider-neutral executable receives the stable profile contract and closes through run", () => {
-  const root = mkdtempSync(join(tmpdir(), "branchling-adapter-"));
+  const root = fixtureDir(join(tmpdir(), "branchling-adapter-"));
   const repo = join(root, "repo");
   const backlog = join(repo, "backlog");
   const home = join(root, "home");

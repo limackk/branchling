@@ -17,7 +17,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { appendFileSync, cpSync, existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { appendFileSync, cpSync, existsSync, readdirSync, rmSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -36,7 +37,7 @@ test.after(() => { for (const d of TEMP) rmSync(d, { recursive: true, force: tru
 
 /** A fresh temporary directory, removed in the `after` hook above. */
 function tempDir(label) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-released-" + label + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-released-" + label + "-"));
   TEMP.push(dir);
   return dir;
 }

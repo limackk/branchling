@@ -9,7 +9,8 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, existsSync } from "node:fs";
+import { mkdirSync, writeFileSync, rmSync, readFileSync, existsSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -46,7 +47,7 @@ function taskFile(over = {}) {
 }
 
 function sandbox(tasks = { "BL-900-zrob-rzecz.md": taskFile() }) {
-  const dir = mkdtempSync(join(tmpdir(), "backlog-history-"));
+  const dir = fixtureDir(join(tmpdir(), "backlog-history-"));
   mkdirSync(join(dir, "tasks"));
   for (const [name, text] of Object.entries(tasks)) writeFileSync(join(dir, "tasks", name), text, "utf8");
   return dir;

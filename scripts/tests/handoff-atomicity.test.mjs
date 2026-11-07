@@ -29,7 +29,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -60,7 +61,7 @@ const ROLES = "roles: [archivist, stonemason]";
 /** A fresh co-located backlog with a role vocabulary of its own — `roles:` is a
  *  project's word list, never this repository's. */
 function repo() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-handoff-atomic-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-handoff-atomic-"));
   assert.equal(spawnSync("git", ["init", "-q", "."], { cwd: dir }).status, 0);
   assert.equal(run(dir, ["init", "--dir", ".", "--no-example"]).status, 0);
   const p = join(dir, "config.yaml");

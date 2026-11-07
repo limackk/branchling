@@ -17,7 +17,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -44,7 +45,7 @@ function run(cwd, args) {
 }
 
 function repo(configLines) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-unknown-value-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-unknown-value-"));
   assert.equal(spawnSync("git", ["init", "-q", "."], { cwd: dir }).status, 0);
   assert.equal(run(dir, ["init", "--dir", ".", "--no-example"]).status, 0);
   if (configLines) {

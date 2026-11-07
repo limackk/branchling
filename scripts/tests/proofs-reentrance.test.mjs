@@ -24,7 +24,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { realpathSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -113,7 +114,7 @@ function proofs(dir) {
 }
 
 test("a closed contract holding `check --proofs` does not make a proofs run recurse", async () => {
-  const dir = realpathSync(mkdtempSync(join(tmpdir(), "branchling-reentrance-")));
+  const dir = realpathSync(fixtureDir(join(tmpdir(), "branchling-reentrance-")));
   try {
     const init = spawnSync(process.execPath, [CLI, "init", "--dir", dir, "--no-example"], { encoding: "utf8", env: env() });
     assert.equal(init.status, 0, init.stderr);

@@ -21,7 +21,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -80,7 +81,7 @@ test("one instant is one day, whatever timezone the writer stands in", () => {
 /** A real backlog, created by the tool, so nothing here asserts a vocabulary
  *  this test invented. */
 function sandbox() {
-  const dir = mkdtempSync(join(tmpdir(), "today-stamp-"));
+  const dir = fixtureDir(join(tmpdir(), "today-stamp-"));
   const r = spawnSync(process.execPath, [CLI, "init", "--dir", dir], { encoding: "utf8" });
   assert.equal(r.status, 0, r.stderr);
   return dir;

@@ -39,7 +39,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { realpathSync, rmSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { request } from "node:http";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
@@ -75,7 +76,7 @@ const git = (cwd, ...args) => spawnSync("git", args, { cwd, encoding: "utf8", ti
  * the tree at all — the single variable this file is about.
  */
 function backlog({ repository }) {
-  const dir = realpathSync(mkdtempSync(join(tmpdir(), "branchling-serve-norepo-")));
+  const dir = realpathSync(fixtureDir(join(tmpdir(), "branchling-serve-norepo-")));
   if (repository) assert.equal(git(dir, "init").status, 0, "the control fixture could not be made a repository");
   const root = join(dir, "backlog");
   const init = spawnSync(process.execPath, [CLI, "init", "--dir", root, "--no-example"],

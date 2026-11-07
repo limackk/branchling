@@ -20,7 +20,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -44,7 +45,7 @@ let counter = 0;
 
 /** A backlog holding `n` closed tasks, each proven, each with a trivial contract. */
 function backlog(n = 2, command = "true") {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-proofs-progress-" + counter++ + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-proofs-progress-" + counter++ + "-"));
   const init = spawnSync(process.execPath, [CLI, "init", "--dir", dir, "--no-example"], { encoding: "utf8" });
   assert.equal(init.status, 0, init.stderr);
 
