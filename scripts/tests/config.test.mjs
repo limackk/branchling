@@ -100,6 +100,63 @@ test("a # inside quotes stays, a comment after the value goes", () => {
   assert.deepEqual(values.epic_aliases, { "Sprint #1": "Sprint 1" });
 });
 
+// ── The top-level line shape (TL-604) ─────────────────────────────────────
+//
+// A line at column zero is `key: value` or it is a problem of its own line.
+// Without these, a change to the line reader was invisible to the suite: no
+// test asserted the unreadable-line message, so a reader that skipped such a
+// line, or read a key out of the middle of one, stayed green.
+
+test("a top-level line that is not `key: value` is a problem naming its line and its text", () => {
+  const { values, problems } = parseConfigYaml([
+    "project_name: Test",
+    "",
+    "Statuses: [pending]   ",
+    "labels: [a]",
+  ].join("\n"));
+  assert.deepEqual(problems, ["line 3: cannot read `Statuses: [pending]` (expecting `key: value`)"]);
+  // The lines around it are still read: one bad line is not a reason to lose the file.
+  assert.equal(values.project_name, "Test");
+  assert.deepEqual(values.labels, ["a"]);
+});
+
+test("a key is read from the start of the line, never from text before it", () => {
+  const { values, problems } = parseConfigYaml("- statuses: [pending]\n");
+  assert.deepEqual(problems, ["line 1: cannot read `- statuses: [pending]` (expecting `key: value`)"]);
+  assert.equal(values.statuses, undefined);
+});
+
+test("a value is read to the end of the line, or the line is unreadable", () => {
+  // A lone carriage return is not a line break for the split and not a
+  // character `.` matches: the line is refused instead of cut at the `\r`.
+  const { values, problems } = parseConfigYaml("project_name: Before\rAfter\n");
+  assert.equal(problems.length, 1);
+  assert.match(problems[0], /^line 1: cannot read `project_name: Before\rAfter` \(expecting `key: value`\)$/);
+  assert.equal(values.project_name, undefined);
+});
+
+test("the value may follow the colon with or without a space", () => {
+  const { values, problems } = parseConfigYaml("project_name:Test\ntitle_max_length:   42\n");
+  assert.deepEqual(problems, []);
+  assert.equal(values.project_name, "Test");
+  assert.equal(values.title_max_length, 42);
+});
+
+test("trailing whitespace after a value is not part of it", () => {
+  const { values, problems } = parseConfigYaml("statuses: [pending, done]   \n");
+  assert.deepEqual(problems, []);
+  assert.deepEqual(values.statuses, ["pending", "done"]);
+});
+
+test("an indented line no block consumed is skipped, not reported", () => {
+  // A scalar key does not consume the indented lines under it; the reader
+  // passes over them rather than reporting each as an unreadable line.
+  const { values, problems } = parseConfigYaml("project_name: Test\n  stray continuation\nlabels: [a]\n");
+  assert.deepEqual(problems, []);
+  assert.equal(values.project_name, "Test");
+  assert.deepEqual(values.labels, ["a"]);
+});
+
 // ── boards.yaml ───────────────────────────────────────────────────────────
 
 test("the boards parser reads slug, name, paths and ignore_paths", () => {
