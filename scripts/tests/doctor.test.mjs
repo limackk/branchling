@@ -270,6 +270,81 @@ test("running the printed fix adds exactly the missing lines, in shipped order, 
   assert.equal(after.fix, null);
 });
 
+// ── A fix printed by `doctor --dir` acts on the backlog doctor examined (TL-615)
+
+/** The diagnosis of `dir`, asked from `cwd` with `--dir` — the case where a fix
+ *  without the flag resolves some other backlog, or none. */
+function rowsFrom(cwd, dir) {
+  const r = run(cwd, ["doctor", "--dir", dir, "--json"]);
+  const parsed = JSON.parse(r.stdout);
+  return { next: parsed.next, byId: Object.fromEntries(parsed.checks.map((c) => [c.id, c])) };
+}
+
+/** A printed fix as an argument vector: the comment dropped, the product name checked and removed. */
+function fixArgs(fix) {
+  const [command, ...args] = fix.split("#")[0].trim().split(/\s+/);
+  assert.equal(command, PRODUCT_NAME, "a fix of ours that does not start with the product name: " + fix);
+  return args;
+}
+
+test("a fix printed by doctor --dir, run from the same unrelated cwd, repairs the backlog doctor examined", () => {
+  const dir = repo();
+  dropTemplateKeys(dir, ["release"]);
+  // Not a backlog, not inside one and not a repository: from here only --dir finds `dir`.
+  const elsewhere = fixtureDir(join(tmpdir(), "branchling-doctor-elsewhere-"));
+
+  const before = rowsFrom(elsewhere, dir).byId.template;
+  assert.equal(before.status, "info");
+  assert.equal(before.fix, PRODUCT_NAME + " template refresh --dir " + dir + "   # inserts that line and changes none of yours");
+  const args = fixArgs(before.fix);
+
+  // CONTROL: the same command without the --dir doctor was given repairs nothing.
+  const at = args.indexOf("--dir");
+  const bare = args.slice(0, at).concat(args.slice(at + 2));
+  assert.deepEqual(bare, ["template", "refresh"]);
+  assert.notEqual(run(elsewhere, bare).status, 0, "without --dir the fix found a backlog from an unrelated cwd");
+  assert.equal(rowsFrom(elsewhere, dir).byId.template.status, "info", "the fix without --dir changed the backlog doctor examined");
+
+  const r = run(elsewhere, args);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const after = rowsFrom(elsewhere, dir).byId.template;
+  assert.equal(after.status, "ok", after.detail);
+});
+
+test("doctor --dir puts --dir on its own commands only; a git command or a line to add is printed as it is", () => {
+  const dir = repo();
+  writeFileSync(join(dir, "INDEX.yaml"), "tasks: []\n", "utf8");
+  spawnSync("git", ["add", "-f", "INDEX.yaml"], { cwd: dir });
+  spawnSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "x"], { cwd: dir });
+  writeFileSync(join(dir, ".gitattributes"), "", "utf8");
+  const elsewhere = fixtureDir(join(tmpdir(), "branchling-doctor-elsewhere-"));
+  const d = rowsFrom(elsewhere, dir);
+
+  assert.equal(d.byId["git-tracked"].fix, "git rm --cached INDEX.yaml");
+  assert.match(d.byId["git-merge"].fix, /^add to \.gitattributes: /);
+  assert.doesNotMatch(d.byId["git-merge"].fix, /--dir/);
+  assert.equal(d.byId["git-hooks"].fix, PRODUCT_NAME + " hooks print --dir " + dir);
+  assert.equal(d.next, PRODUCT_NAME + " doctor --dir " + dir + "   # once it is fixed");
+
+  // Without --dir nothing is added: the fix is run where doctor found the backlog.
+  const plain = rows(dir);
+  assert.equal(plain.byId["git-hooks"].fix, PRODUCT_NAME + " hooks print");
+  assert.equal(plain.next, PRODUCT_NAME + " doctor   # once it is fixed");
+});
+
+test("a --dir that needs quoting is printed as one shell word", () => {
+  const parent = fixtureDir(join(tmpdir(), "branchling-doctor-"));
+  const dir = join(parent, "it's a backlog");
+  assert.equal(spawnSync("git", ["init", "-q", dir]).status, 0);
+  assert.equal(run(dir, ["init", "--dir", "."]).status, 0);
+  dropTemplateKeys(dir, ["release"]);
+  const fix = rowsFrom(parent, dir).byId.template.fix;
+  assert.equal(fix, PRODUCT_NAME + " template refresh --dir '" + dir.replace(/'/g, "'\\''") + "'   # inserts that line and changes none of yours");
+  // The shell reads it back as the one path doctor was given.
+  const r = spawnSync("sh", ["-c", "printf '%s' " + fix.split(" --dir ")[1].split("   #")[0]], { encoding: "utf8" });
+  assert.equal(r.stdout, dir);
+});
+
 test("a template without a closed frontmatter is reported as not checked, not as missing every field", () => {
   const dir = repo();
   writeFileSync(join(dir, "_template.md"), "## Goal\n", "utf8");
@@ -476,6 +551,19 @@ test("with no backlog: it points at `init`, exits non-zero, with no stack trace"
   assert.notEqual(r.status, 0);
   assert.match(r.stderr, /init --dir/);
   assert.doesNotMatch(r.stderr + r.stdout, /^\s+at .+:\d+:\d+\)?$/m);
+});
+
+test("with --dir naming no backlog: the `init` it points at is that directory (TL-615)", () => {
+  const parent = fixtureDir(join(tmpdir(), "branchling-doctor-empty-"));
+  writeFileSync(join(parent, "notes.txt"), "x\n", "utf8");
+  const r = run(tmpdir(), ["doctor", "--dir", parent, "--json"]);
+  assert.equal(r.status, 1);
+  const parsed = JSON.parse(r.stdout);
+  assert.equal(parsed.checks[0].fix, PRODUCT_NAME + " init --dir " + parent);
+  assert.equal(parsed.next, PRODUCT_NAME + " doctor --dir " + parent + "   # once it is fixed");
+  // Control: found by nothing at all, it names the conventional place.
+  const bare = JSON.parse(run(parent, ["doctor", "--json"]).stdout);
+  assert.equal(bare.checks[0].fix, PRODUCT_NAME + " init --dir ./backlog");
 });
 
 test("an unknown flag fails with code 2", () => {

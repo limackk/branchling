@@ -189,7 +189,8 @@ test("a directory in place of the installed SKILL.md is a warning that names it,
   const row = rows(dir)["agent-skill"];
   assert.equal(row.status, "warn", JSON.stringify(row));
   assert.equal(row.detail, "backlog-workflow/SKILL.md" + " is not a regular file — an editor cannot read the skill from it");
-  assert.match(row.fix, / skills install {3}# after moving .*backlog-workflow[\\/]SKILL\.md aside$/);
+  // `rows()` runs doctor with `--dir backlog`, so the fix carries it (TL-615).
+  assert.match(row.fix, / skills install --dir backlog {3}# after moving .*backlog-workflow[\\/]SKILL\.md aside$/);
 
   // Positive control: once the directory is gone, the command it names makes the row green.
   rmSync(path, { recursive: true });
