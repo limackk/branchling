@@ -37,7 +37,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { appendFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -127,7 +128,7 @@ const FRONTEND = `  - name: frontend
  *   stranded   done, no target, commits on a branch only    → still done-not-on-trunk
  */
 function twoRepos() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-multi-repo-" + counter++ + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-multi-repo-" + counter++ + "-"));
   git(dir, ["init", "-q", "-b", "main", "."]);
   assert.equal(run(dir, ["init", "--dir", "backlog", "--no-example"]).status, 0);
   appendFileSync(join(dir, "backlog", "config.yaml"), "\nreleases: [r1]\n");
@@ -154,7 +155,7 @@ function twoRepos() {
   commit(dir, ids.stranded + " never merged", { "src/s.js": "s\n" });
   git(dir, ["checkout", "-q", "main"]);
 
-  const fe = mkdtempSync(join(tmpdir(), "branchling-multi-repo-frontend-" + counter++ + "-"));
+  const fe = fixtureDir(join(tmpdir(), "branchling-multi-repo-frontend-" + counter++ + "-"));
   git(fe, ["init", "-q", "-b", "main", "."]);
   commit(fe, ids.feDone + " the frontend half", { "app/view.ts": "v\n" });
   commit(fe, ids.feOpen + " started in the frontend", { "app/form.ts": "f\n" });

@@ -28,7 +28,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -55,7 +56,7 @@ function run(cwd, args) {
 
 /** A fresh co-located backlog with the given extra configuration lines. */
 function repo(configLines) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-handoff-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-handoff-"));
   assert.equal(spawnSync("git", ["init", "-q", "."], { cwd: dir }).status, 0);
   assert.equal(run(dir, ["init", "--dir", ".", "--no-example"]).status, 0);
   if (configLines) {

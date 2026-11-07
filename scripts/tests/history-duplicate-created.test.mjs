@@ -23,7 +23,8 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -46,7 +47,7 @@ function taskFile(over = {}) {
 }
 
 function sandbox(tasks = {}) {
-  const dir = mkdtempSync(join(tmpdir(), "backlog-dupcreated-"));
+  const dir = fixtureDir(join(tmpdir(), "backlog-dupcreated-"));
   mkdirSync(join(dir, "tasks"));
   for (const [name, text] of Object.entries(tasks)) writeFileSync(join(dir, "tasks", name), text, "utf8");
   return dir;

@@ -6,7 +6,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -16,7 +17,7 @@ import { SCRIPTS_DIR, isolateHome } from "./_repo.mjs";
 isolateHome("contract-real-file");
 
 function fixture(label) {
-  const root = mkdtempSync(join(tmpdir(), "branchling-" + label + "-"));
+  const root = fixtureDir(join(tmpdir(), "branchling-" + label + "-"));
   const backlog = join(root, "backlog");
   const made = spawnSync(process.execPath, [join(SCRIPTS_DIR, "cli.mjs"), "init", "--dir", backlog, "--no-example"], {
     cwd: root,

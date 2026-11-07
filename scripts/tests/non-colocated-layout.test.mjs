@@ -20,7 +20,8 @@
 
 import { strict as assert } from "node:assert";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, cpSync } from "node:fs";
+import { mkdirSync, writeFileSync, rmSync, existsSync, cpSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -42,7 +43,7 @@ function makeSplitRepo() {
   // The space is deliberate: Windows installations commonly live below
   // `C:\Users\First Last`, and a split-layout test that only exercises paths
   // without spaces misses the quoting boundary users are most likely to hit.
-  const root = mkdtempSync(join(tmpdir(), "branchling split "));
+  const root = fixtureDir(join(tmpdir(), "branchling split "));
   cpSync(SCRIPTS, join(root, "scripts"), { recursive: true });
 
   const bl = join(root, "backlog");

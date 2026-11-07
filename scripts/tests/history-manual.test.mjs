@@ -34,7 +34,8 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
+import { mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -80,7 +81,7 @@ function taskFile(over = {}) {
  * be pointed at the same fixture the in-process tests use.
  */
 function freshWorktree() {
-  const dir = mkdtempSync(join(tmpdir(), "backlog-history-manual-"));
+  const dir = fixtureDir(join(tmpdir(), "backlog-history-manual-"));
   mkdirSync(join(dir, "tasks"));
   writeFileSync(join(dir, "tasks", "BL-900-mine.md"), taskFile(), "utf8");
   writeFileSync(

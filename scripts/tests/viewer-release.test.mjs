@@ -23,7 +23,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { appendFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import vm from "node:vm";
@@ -66,7 +67,7 @@ function commit(dir, message, files) {
 }
 
 function backlogRepo() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-viewer-release-" + counter++ + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-viewer-release-" + counter++ + "-"));
   git(dir, ["init", "-q", "-b", "main", "."]);
   assert.equal(run(dir, ["init", "--dir", "backlog", "--no-example"]).status, 0);
   commit(dir, "the backlog", {});
@@ -469,7 +470,7 @@ function escaped(text) {
 test("an empty view with targets declared explains its reason and does not ask to declare them", () => {
   // Targets declared before the first commit: the tab is visible (only
   // `no-targets` hides it), so the page must not ask for what is declared.
-  const dir = mkdtempSync(join(tmpdir(), "branchling-viewer-release-" + counter++ + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-viewer-release-" + counter++ + "-"));
   git(dir, ["init", "-q", "-b", "main", "."]);
   assert.equal(run(dir, ["init", "--dir", "backlog", "--no-example"]).status, 0);
   appendFileSync(join(dir, "backlog", "config.yaml"), TARGETS_YAML);

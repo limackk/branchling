@@ -46,7 +46,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync, rmSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
@@ -130,8 +131,8 @@ function commit(root, message) {
  * cannot satisfy one test by contradicting another.
  */
 function fixture() {
-  const root = mkdtempSync(join(tmpdir(), "branchling-resume-"));
-  const state = mkdtempSync(join(tmpdir(), "branchling-resume-state-"));
+  const root = fixtureDir(join(tmpdir(), "branchling-resume-"));
+  const state = fixtureDir(join(tmpdir(), "branchling-resume-state-"));
 
   assert.equal(git(root, ["init", "-q", "-b", "main", "."]).code, 0);
   assert.equal(cli(root, state, ["init", "--dir", ".", "--no-example"]).code, 0);

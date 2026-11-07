@@ -7,7 +7,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -36,7 +37,7 @@ function git(dir, args) {
 }
 
 function fixture({ importsChangedFile = false, policy = "report" } = {}) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-contract-capability-" + counter++ + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-contract-capability-" + counter++ + "-"));
   const initialized = run(["init", "--dir", dir, "--no-example"], dir);
   assert.equal(initialized.status, 0, initialized.stdout + initialized.stderr);
   const config = join(dir, "config.yaml");

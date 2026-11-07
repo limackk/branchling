@@ -27,7 +27,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { appendFileSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -73,7 +74,7 @@ test("a floor below the release that introduced requires_version is a problem of
 
 test("LOAD: such a floor fails loadConfig, and the error names it", () => {
   const [floor] = below(SINCE);
-  const dir = mkdtempSync(join(tmpdir(), "floor-below-key-"));
+  const dir = fixtureDir(join(tmpdir(), "floor-below-key-"));
   writeFileSync(join(dir, "config.yaml"), REQUIRES_VERSION_KEY + ": " + floor + "\n", "utf8");
   let err;
   try { loadConfig(dir); } catch (e) { err = e; }
@@ -98,7 +99,7 @@ test("a floor at that release, or above it and readable here, is left alone", ()
 
 test("declare refuses a file whose floor is below the key's release, and writes nothing", () => {
   const [floor] = below(SINCE);
-  const dir = join(mkdtempSync(join(tmpdir(), "floor-below-key-cli-")), "backlog");
+  const dir = join(fixtureDir(join(tmpdir(), "floor-below-key-cli-")), "backlog");
   const init = spawnSync(process.execPath, [CLI, "init", "--dir", dir, "--no-example"], { encoding: "utf8" });
   assert.equal(init.status, 0, init.stderr);
   appendFileSync(join(dir, "config.yaml"), "\n" + REQUIRES_VERSION_KEY + ": " + floor + "\n");

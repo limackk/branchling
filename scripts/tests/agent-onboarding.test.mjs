@@ -1,7 +1,8 @@
 /** README profile onboarding stays runnable without a provider account (TL-293). */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -21,7 +22,7 @@ function task(backlog, id) {
 }
 
 test("README generalist and mixed-profile commands work in an isolated home", () => {
-  const root = mkdtempSync(join(tmpdir(), "branchling-onboarding-"));
+  const root = fixtureDir(join(tmpdir(), "branchling-onboarding-"));
   const repo = join(root, "repo");
   const backlog = join(repo, "backlog");
   const env = { ...process.env, NO_COLOR: "1", [HOME_ENV]: join(root, "home"), BACKLOG_STATE_DIR: join(root, "state"), OPENAI_API_KEY: "test-only" };

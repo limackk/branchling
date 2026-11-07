@@ -24,7 +24,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -50,7 +51,7 @@ const QUICK = "split it into four tasks — each design then gets its own verifi
 
 let counter = 0;
 function fixture() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-ask-options-" + counter++ + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-ask-options-" + counter++ + "-"));
   const backlog = join(dir, "bl");
   const env = { ...process.env, BACKLOG_STATE_DIR: join(dir, "state"), NO_COLOR: "1" };
   assert.equal(run(["init", "--dir", backlog, "--no-example"], env).status, 0);

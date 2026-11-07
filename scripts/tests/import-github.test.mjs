@@ -25,7 +25,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -50,7 +51,7 @@ const FIXTURE = join(HERE, "fixtures", "gh-issues.json");
 
 let counter = 0;
 function tmp(prefix) {
-  return mkdtempSync(join(tmpdir(), "branchling-import-" + prefix + "-" + counter++ + "-"));
+  return fixtureDir(join(tmpdir(), "branchling-import-" + prefix + "-" + counter++ + "-"));
 }
 
 function run(args, input) {

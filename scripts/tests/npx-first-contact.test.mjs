@@ -10,7 +10,8 @@
  */
 import { strict as assert } from "node:assert";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { rmSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -39,7 +40,7 @@ function run(args, cwd) {
 }
 
 test("the npx forwarding separator reaches top-level help", () => {
-  const outside = mkdtempSync(join(tmpdir(), "branchling-npx-first-contact-"));
+  const outside = fixtureDir(join(tmpdir(), "branchling-npx-first-contact-"));
   try {
     // This is the exact argv shape npx passes after
     // `npx --yes <path-to-package> -- --help`. Running the package entry
@@ -64,7 +65,7 @@ test("the npx forwarding separator reaches top-level help", () => {
 });
 
 test("only the package entry normalizes npx's leading separator", () => {
-  const outside = mkdtempSync(join(tmpdir(), "branchling-npx-separator-"));
+  const outside = fixtureDir(join(tmpdir(), "branchling-npx-separator-"));
   try {
     const cli = join(REPO_ROOT, "scripts", "cli.mjs");
     const result = execFileSync(process.execPath, [cli, "--", "--help"], {

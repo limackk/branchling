@@ -25,7 +25,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -255,7 +256,7 @@ test("an answer that is not JSON is retried, with the parse error told to the mo
 // ── The real gate ─────────────────────────────────────────────────────────
 
 function backlog() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-adapter-" + counter++ + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-adapter-" + counter++ + "-"));
   assert.equal(run(["init", "--dir", dir, "--no-example"]).status, 0);
   return dir;
 }

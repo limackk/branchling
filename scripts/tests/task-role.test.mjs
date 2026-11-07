@@ -25,7 +25,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -51,7 +52,7 @@ function run(cwd, args) {
 /** A fresh co-located backlog. `--dir .` everywhere, so nothing depends on cwd
  *  discovery finding the right tree. */
 function repo(configLines) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-role-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-role-"));
   assert.equal(spawnSync("git", ["init", "-q", "."], { cwd: dir }).status, 0);
   assert.equal(run(dir, ["init", "--dir", ".", "--no-example"]).status, 0);
   if (configLines) {

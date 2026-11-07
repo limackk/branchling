@@ -50,7 +50,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { createServer } from "node:net";
 import { get, request } from "node:http";
 import { tmpdir } from "node:os";
@@ -174,7 +175,7 @@ function configure(backlogDir, lines) {
  * test, not by the fixture, so the moment it appears is known.
  */
 function twoTrees(configLines = []) {
-  const base = realpathSync(mkdtempSync(join(tmpdir(), "branchling-xpush-")));
+  const base = realpathSync(fixtureDir(join(tmpdir(), "branchling-xpush-")));
   const repoRoot = join(base, "repo");
   const backlogDir = join(repoRoot, "backlog");
   const init = cli(["init", "--dir", backlogDir, "--no-example"]);
@@ -427,7 +428,7 @@ test("outside a git repository the loop has nothing to watch and says so at most
   // `not-a-repository` and never will answer anything else while this server
   // runs. A warning per tick would fill the terminal of every person serving a
   // backlog that is not yet committed.
-  const dir = realpathSync(mkdtempSync(join(tmpdir(), "branchling-xpush-nogit-")));
+  const dir = realpathSync(fixtureDir(join(tmpdir(), "branchling-xpush-nogit-")));
   const backlogDir = join(dir, "backlog");
   assert.equal(cli(["init", "--dir", backlogDir, "--no-example"]).status, 0);
   configure(backlogDir, [POLL_KEY + ": " + TICK_SECONDS]);

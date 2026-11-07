@@ -36,7 +36,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { createServer as createHttpServer, request } from "node:http";
 import { createServer } from "node:net";
 import { hostname, tmpdir } from "node:os";
@@ -67,7 +68,7 @@ function freePort() {
 }
 
 function backlog() {
-  const dir = realpathSync(mkdtempSync(join(tmpdir(), "branchling-serve-life-")));
+  const dir = realpathSync(fixtureDir(join(tmpdir(), "branchling-serve-life-")));
   const root = join(dir, "backlog");
   const init = spawnSync(process.execPath, [CLI, "init", "--dir", root, "--no-example"],
     { encoding: "utf8", timeout: 30_000 });

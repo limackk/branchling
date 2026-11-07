@@ -26,7 +26,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readdirSync } from "node:fs";
+import { mkdirSync, readdirSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -69,7 +70,7 @@ const STATE_EXEMPT = {
   seed: ["dir"],
 };
 
-const base = mkdtempSync(join(tmpdir(), "branchling-json-no-backlog-"));
+const base = fixtureDir(join(tmpdir(), "branchling-json-no-backlog-"));
 spawnSync("git", ["init", "-q", "."], { cwd: base });
 
 function rows() {

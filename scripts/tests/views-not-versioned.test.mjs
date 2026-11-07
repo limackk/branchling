@@ -16,7 +16,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -97,7 +98,7 @@ function mergeConflicts(root) {
 }
 
 test("positive control: a VERSIONED aggregate conflicts despite disjoint tasks", () => {
-  const root = mkdtempSync(join(tmpdir(), "branchling-views-ctl-"));
+  const root = fixtureDir(join(tmpdir(), "branchling-views-ctl-"));
   try {
     twoBranchesAddingDifferentTasks(root, true);
     assert.equal(mergeConflicts(root), true, "without this conflict the whole of step 3 would have nothing to fix");
@@ -107,7 +108,7 @@ test("positive control: a VERSIONED aggregate conflicts despite disjoint tasks",
 });
 
 test("an aggregate outside git: the same two branches merge cleanly", () => {
-  const root = mkdtempSync(join(tmpdir(), "branchling-views-"));
+  const root = fixtureDir(join(tmpdir(), "branchling-views-"));
   try {
     twoBranchesAddingDifferentTasks(root, false);
     assert.equal(mergeConflicts(root), false);

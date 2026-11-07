@@ -16,7 +16,8 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { appendFileSync, chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -34,7 +35,7 @@ const KINDS_COVERED = ["seed", "import", "task-new", "release-record", "run"];
 
 const TEMP = [];
 function temp(prefix) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-actor-rest-" + prefix + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-actor-rest-" + prefix + "-"));
   TEMP.push(dir);
   return dir;
 }

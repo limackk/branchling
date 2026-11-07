@@ -64,7 +64,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -152,7 +153,7 @@ function snapshotKeys(backlog) {
  * would be vacuous.
  */
 function fixture() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-migration-race-" + (counter++) + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-migration-race-" + (counter++) + "-"));
   const backlog = join(dir, "bl");
   const state = join(dir, "state");
   const env = { ...process.env, BACKLOG_STATE_DIR: state, NO_COLOR: "1" };

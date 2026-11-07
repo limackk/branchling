@@ -16,7 +16,8 @@ import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { get } from "node:http";
 import { createServer } from "node:net";
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -206,7 +207,7 @@ test("agent_estimate is the bucket shaped as a field, null below the threshold",
 // ── The commands, on a fixture backlog ────────────────────────────────────
 
 function fixtureBacklog(minN, samples) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-agent-time-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-agent-time-"));
   spawnSync("git", ["init", "-q"], { cwd: dir });
   const init = spawnSync(process.execPath, [CLI, "init", "--dir", ".", "--no-example"], { cwd: dir, encoding: "utf8" });
   assert.equal(init.status, 0, init.stderr);

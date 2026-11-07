@@ -29,7 +29,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -182,7 +183,7 @@ test("without --mine nothing is called ELSEWHERE — that word is a claim about 
  * keep answering from somewhere else.
  */
 function repoWithHistory({ titled = true } = {}) {
-  const root = mkdtempSync(join(tmpdir(), "known-red-"));
+  const root = fixtureDir(join(tmpdir(), "known-red-"));
   const backlog = join(root, "backlog");
   const init = spawnSync(process.execPath, [join(SCRIPTS, "init-backlog.mjs"), "--dir", backlog],
     { encoding: "utf8", timeout: 60_000 });

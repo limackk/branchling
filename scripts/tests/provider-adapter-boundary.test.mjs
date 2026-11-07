@@ -1,7 +1,8 @@
 /** TL-382: execution owns one provider-neutral, user-owned adapter boundary. */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -48,7 +49,7 @@ function adapter(root, name, kind, witness) {
 }
 
 function fixture(title = "Provider-neutral task") {
-  const root = mkdtempSync(join(tmpdir(), "branchling-provider-boundary-"));
+  const root = fixtureDir(join(tmpdir(), "branchling-provider-boundary-"));
   const repo = join(root, "repository");
   const backlog = join(repo, "backlog");
   const home = join(root, "home");

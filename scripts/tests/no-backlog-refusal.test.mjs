@@ -20,7 +20,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -64,7 +64,7 @@ const CASES = [
   ["run", "--dry-run"],
 ];
 
-const dir = mkdtempSync(join(tmpdir(), "branchling-no-backlog-"));
+const dir = fixtureDir(join(tmpdir(), "branchling-no-backlog-"));
 spawnSync("git", ["init", "-q", "."], { cwd: dir });
 
 /** Commands that validate stdin before resolving the backlog, so an empty

@@ -28,7 +28,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -54,7 +55,7 @@ function run(args) {
  * records no fold exposes.
  */
 function closedTask() {
-  const repo = mkdtempSync(join(tmpdir(), "branchling-ledger-"));
+  const repo = fixtureDir(join(tmpdir(), "branchling-ledger-"));
   execFileSync("git", ["init", "-q", "-b", "main", "."], { cwd: repo, stdio: "ignore" });
   const dir = join(repo, "backlog");
   assert.equal(run(["init", "--dir", dir, "--no-example"]).status, 0, "init failed");
@@ -169,7 +170,7 @@ test("the text form names every record once", () => {
 });
 
 test("a task with no ledger is an answer, and no task at all is a refusal", () => {
-  const repo = mkdtempSync(join(tmpdir(), "branchling-ledger-empty-"));
+  const repo = fixtureDir(join(tmpdir(), "branchling-ledger-empty-"));
   const dir = join(repo, "backlog");
   assert.equal(run(["init", "--dir", dir, "--no-example"]).status, 0);
   const made = run(["new", "--dir", dir, "--title", "Never touched"]);

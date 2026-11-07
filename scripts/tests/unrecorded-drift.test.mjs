@@ -22,7 +22,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -48,7 +49,7 @@ function run(cwd, args) {
 
 /** A backlog with one task, and a history that has already seen it. */
 function settled() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-unrecorded-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-unrecorded-"));
   assert.equal(spawnSync("git", ["init", "-q", "."], { cwd: dir }).status, 0);
   assert.equal(run(dir, ["init", "--dir", ".", "--no-example"]).status, 0);
   assert.equal(run(dir, ["new", "--dir", ".", "--title", "A task to edit"]).status, 0);
@@ -112,7 +113,7 @@ test("the row names the command that resolves it, with the actor placeholder", (
 });
 
 test("a tree with no reference point yet says so, rather than counting to zero", () => {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-unrecorded-fresh-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-unrecorded-fresh-"));
   assert.equal(run(dir, ["init", "--dir", ".", "--no-example"]).status, 0);
   assert.equal(existsSync(join(dir, "history", SNAPSHOT_FILE)), false,
     "the fixture already has a snapshot — the case is not the one being tested");

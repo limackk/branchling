@@ -12,7 +12,8 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -36,7 +37,7 @@ isolateHome("config");
 import { queueStatuses } from "../next-task.mjs";
 
 function sandbox(files = {}) {
-  const dir = mkdtempSync(join(tmpdir(), "backlog-config-"));
+  const dir = fixtureDir(join(tmpdir(), "backlog-config-"));
   mkdirSync(join(dir, "tasks"));
   for (const [name, text] of Object.entries(files)) writeFileSync(join(dir, name), text, "utf8");
   return dir;
@@ -284,7 +285,7 @@ test("config: an unknown actor namespace FAILS", () => {
 // ── What a FRESH backlog protects (TL-140) ────────────────────────────────
 
 test("`init` DECLARES reason_required_statuses, so a fresh backlog matches the documentation", () => {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-fresh-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-fresh-"));
   try {
     const r = spawnSync(process.execPath, [join(SCRIPTS_DIR, "cli.mjs"), "init", "--dir", dir, "--no-example"], {
       encoding: "utf8", env: { ...process.env, NO_COLOR: "1" },

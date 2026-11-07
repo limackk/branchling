@@ -10,7 +10,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { appendFileSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -107,7 +108,7 @@ test("a CLOSED task's contract is left alone, and this is deliberate", () => {
 
 /** A backlog of this tool's own making, holding one task to judge. */
 function fixture(label) {
-  const root = mkdtempSync(join(tmpdir(), "branchling-" + label + "-"));
+  const root = fixtureDir(join(tmpdir(), "branchling-" + label + "-"));
   const backlog = join(root, "backlog");
   const made = spawnSync(process.execPath, [join(SCRIPTS_DIR, "cli.mjs"), "init", "--dir", backlog, "--no-example"],
     { cwd: root, encoding: "utf8", env: { ...process.env, NO_COLOR: "1" } });

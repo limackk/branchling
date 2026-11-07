@@ -9,7 +9,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, readFileSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -42,7 +43,7 @@ function git(cwd, ...args) {
 }
 
 function message(text) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-commit-message-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-commit-message-"));
   const path = join(dir, "message");
   writeFileSync(path, text, "utf8");
   return { dir, path };
@@ -67,7 +68,7 @@ test("real paragraph breaks pass unchanged", () => {
 });
 
 test("POSITIVE CONTROL: the installed commit-msg hook blocks a literal separator", () => {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-commit-message-hook-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-commit-message-hook-"));
   assert.equal(git(dir, "init", "-q", ".").status, 0);
   assert.equal(run(["init", "--dir", "backlog", "--no-example"], dir).status, 0);
   assert.equal(run(["hooks", "install"], dir).status, 0);

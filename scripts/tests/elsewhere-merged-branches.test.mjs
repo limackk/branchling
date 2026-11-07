@@ -17,7 +17,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -47,7 +48,7 @@ function writeTask(repo, status) {
  * moved it to `in_progress`: one merged back, one left alone.
  */
 function repository() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-merged-refs-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-merged-refs-"));
   const repo = join(dir, "repo");
   mkdirSync(repo, { recursive: true });
   git(repo, "init", "-q", "-b", "main");

@@ -14,7 +14,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { rmSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -35,7 +36,7 @@ test("a checkout writes LF into code, prose and task files alike", () => {
 });
 
 test("POSITIVE CONTROL: without the rule the same question answers otherwise", () => {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-eol-control-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-eol-control-"));
   try {
     execFileSync("git", ["init", "-q"], { cwd: dir });
     assert.notEqual(eolOf(dir, "README.md"), "lf");

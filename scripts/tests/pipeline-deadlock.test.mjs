@@ -25,7 +25,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { appendFileSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -161,7 +162,7 @@ test("the hand-back counts as a finding of the report as a whole", () => {
 // ── End to end, through the commands that write the record ────────────────
 
 function backlog() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-deadlock-" + counter++ + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-deadlock-" + counter++ + "-"));
   assert.equal(run(["init", "--dir", dir, "--no-example"]).status, 0);
   appendFileSync(join(dir, "config.yaml"), "\nroles: [" + ROLES.join(", ") + "]\n", "utf8");
   return dir;

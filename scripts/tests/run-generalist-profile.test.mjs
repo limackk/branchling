@@ -1,7 +1,8 @@
 /** A named generalist profile serves the same queue as the legacy scalar hand (TL-292). */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -25,7 +26,7 @@ function field(backlog, id, name) {
 }
 
 test("one named profile serves roleless and roleful agent work, but not human work", () => {
-  const root = mkdtempSync(join(tmpdir(), "branchling-generalist-"));
+  const root = fixtureDir(join(tmpdir(), "branchling-generalist-"));
   const repo = join(root, "repo");
   const backlog = join(repo, "backlog");
   const home = join(root, "home");

@@ -16,7 +16,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from "node:fs";
+import { writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -61,7 +62,7 @@ function run(args, cwd, env) {
  *  frontmatter: the example task would take number 1 and the assertions would be
  *  about it rather than about the write. */
 function freshBacklog() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-new-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-new-"));
   const r = run(["init", "--dir", dir, "--no-example"]);
   assert.equal(r.status, 0, r.stderr);
   return dir;

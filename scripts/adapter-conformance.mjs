@@ -106,8 +106,14 @@ function disposableContext() {
   const root = mkdtempSync(join(tmpdir(), N + "-conformance-"));
   const repository = join(root, "repository");
   const backlog = join(repository, "backlog");
-  mkdirSync(join(backlog, "tasks"), { recursive: true });
-  writeFileSync(join(backlog, "tasks", TASK_ID + ".md"), TASK_TEXT, "utf8");
+  // The caller's `finally` only covers a context that was returned (TL-575).
+  try {
+    mkdirSync(join(backlog, "tasks"), { recursive: true });
+    writeFileSync(join(backlog, "tasks", TASK_ID + ".md"), TASK_TEXT, "utf8");
+  } catch (error) {
+    rmSync(root, { recursive: true, force: true });
+    throw error;
+  }
   return { root, repository, backlog };
 }
 

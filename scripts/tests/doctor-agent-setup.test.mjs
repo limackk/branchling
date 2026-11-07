@@ -10,7 +10,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -29,7 +30,7 @@ function run(cwd, args) {
 }
 
 function repo(files = {}, ...initFlags) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-doctor-agent-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-doctor-agent-"));
   assert.equal(spawnSync("git", ["init", "-q", "."], { cwd: dir }).status, 0);
   for (const [name, body] of Object.entries(files)) writeFileSync(join(dir, name), body, "utf8");
   const r = run(dir, ["init", "--dir", "backlog", "--no-example", ...initFlags]);

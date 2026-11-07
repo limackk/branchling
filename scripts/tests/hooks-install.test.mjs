@@ -23,7 +23,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -49,7 +50,7 @@ function git(cwd, ...args) {
 
 /** A git repository with a backlog in it. */
 function repo() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-hooks-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-hooks-"));
   assert.equal(git(dir, "init", "-q", ".").status, 0);
   assert.equal(run(dir, ["init", "--dir", "backlog", "--no-example"]).status, 0);
   return dir;
@@ -70,14 +71,14 @@ test("print shows the block and writes nothing", () => {
 });
 
 test("print works outside a repository and says why, instead of a stack trace", () => {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-hooks-bare-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-hooks-bare-"));
   const r = run(dir, ["hooks", "print"]);
   assert.equal(r.status, 0, "print has something to say even with no repository");
   assert.match(r.stdout, /not a git repository/);
 });
 
 test("install outside a repository is a readable refusal, not a crash", () => {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-hooks-bare2-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-hooks-bare2-"));
   const r = run(dir, ["hooks", "install"]);
   assert.equal(r.status, 1);
   assert.match(r.stderr, /not a git repository/);
@@ -140,7 +141,9 @@ test("inside a worktree the hook goes to the COMMON directory git actually reads
   writeFileSync(join(dir, "a.txt"), "x\n", "utf8");
   git(dir, "add", "-A");
   assert.equal(git(dir, "commit", "-qm", "base").status, 0);
-  const tree = join(dir, "..", "branchling-hooks-wt-" + Date.now());
+  // Inside a fixture of its own: a sibling of `dir` named by hand is a
+  // directory nothing removes (TL-575).
+  const tree = join(fixtureDir(join(tmpdir(), "branchling-hooks-wt-")), "tree");
   assert.equal(git(dir, "worktree", "add", "-q", "-b", "side", tree).status, 0);
 
   const target = hooksTarget(tree);
@@ -164,7 +167,7 @@ test("a first install writes executable hooks and says what it installed", () =>
   if (process.platform !== "win32") {
     assert.notEqual(statSync(hookPath(dir)).mode & 0o111, 0, "a hook git cannot execute is no gate");
   }
-  const again = mkdtempSync(join(tmpdir(), "branchling-hooks-json-"));
+  const again = fixtureDir(join(tmpdir(), "branchling-hooks-json-"));
   assert.equal(git(again, "init", "-q", ".").status, 0);
   const json = JSON.parse(run(again, ["hooks", "install", "--json"]).stdout);
   assert.equal(json.installed, true);

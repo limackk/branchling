@@ -17,7 +17,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { appendFileSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -223,7 +224,7 @@ test("a clean backlog reports nothing — and one edit makes it report something
 // ── The command ───────────────────────────────────────────────────────────
 
 function backlog() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-audit-" + counter++ + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-audit-" + counter++ + "-"));
   assert.equal(run(["init", "--dir", dir, "--no-example"]).status, 0);
   const p = join(dir, "config.yaml");
   writeFileSync(p, readFileSync(p, "utf8")

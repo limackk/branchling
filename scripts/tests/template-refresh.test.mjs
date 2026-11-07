@@ -13,7 +13,8 @@
 import { after, test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -26,7 +27,7 @@ isolateHome("template-refresh");
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
 // Real path: the tool reports resolved paths, and the temporary directory is a
 // symlink on macOS.
-const BASE = realpathSync(mkdtempSync(join(tmpdir(), "branchling-template-refresh-")));
+const BASE = realpathSync(fixtureDir(join(tmpdir(), "branchling-template-refresh-")));
 after(() => rmSync(BASE, { recursive: true, force: true }));
 
 let counter = 0;
@@ -166,7 +167,7 @@ test("templateFields reads each key's comment, not a `#` inside a quoted value",
 // ── The file ─────────────────────────────────────────────────────────────
 
 function fixtureFiles(own) {
-  const dir = mkdtempSync(join(BASE, "f-"));
+  const dir = fixtureDir(join(BASE, "f-"));
   writeFileSync(join(dir, "_template.md"), own, "utf8");
   writeFileSync(join(dir, "shipped.md"), SHIPPED, "utf8");
   return { dir, own: join(dir, "_template.md"), shipped: join(dir, "shipped.md") };
@@ -289,14 +290,14 @@ test("--dir names the backlog from anywhere", () => {
   const dir = backlog();
   const p = join(dir, "_template.md");
   writeFileSync(p, readFileSync(p, "utf8").replace(/^epic:.*\n/m, ""), "utf8");
-  const elsewhere = mkdtempSync(join(BASE, "cwd-"));
+  const elsewhere = fixtureDir(join(BASE, "cwd-"));
   const r = run(elsewhere, ["template", "refresh", "--dir", dir]);
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /added 1 field\(s\) → .*[\\/]_template\.md\n {4}epic {2}after `board`/);
 });
 
 test("outside a backlog it refuses with exit 1, in an envelope under --json", () => {
-  const dir = mkdtempSync(join(BASE, "nowhere-"));
+  const dir = fixtureDir(join(BASE, "nowhere-"));
   spawnSync("git", ["init", "-q", "."], { cwd: dir });
   const human = run(dir, ["template", "refresh"]);
   assert.equal(human.status, 1);

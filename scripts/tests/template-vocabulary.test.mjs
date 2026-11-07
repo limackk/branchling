@@ -31,7 +31,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -61,7 +62,7 @@ function run(args, input) {
 /** A backlog whose statuses are the project's own — and whose template still
  *  carries the defaults, which is the state `init` plus one edit leaves behind. */
 function drifted({ align = false } = {}) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-template-" + counter++ + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-template-" + counter++ + "-"));
   assert.equal(run(["init", "--dir", dir, "--no-example"]).status, 0);
   const p = join(dir, "config.yaml");
   writeFileSync(p, readFileSync(p, "utf8")
@@ -124,7 +125,7 @@ test("the SAME backlog writes once the template is corrected", () => {
 });
 
 test("on an untouched configuration `new` is unaffected", () => {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-template-plain-" + counter++ + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-template-plain-" + counter++ + "-"));
   assert.equal(run(["init", "--dir", dir, "--no-example"]).status, 0);
   const r = run(["new", "--dir", dir, "--title", "Ordinary"]);
   assert.equal(r.status, 0, r.stderr);
@@ -157,7 +158,7 @@ test("`import` reaches it too — on a field it does not set itself", () => {
   // `import` maps the STATUS from the configuration, so a drifted `statuses:`
   // never reaches it. Every other template value does, and `priorities:` is the
   // one a project is as likely to rename.
-  const dir = mkdtempSync(join(tmpdir(), "branchling-template-import-" + counter++ + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-template-import-" + counter++ + "-"));
   assert.equal(run(["init", "--dir", dir, "--no-example"]).status, 0);
   const p = join(dir, "config.yaml");
   writeFileSync(p, readFileSync(p, "utf8").replace(/^priorities:.*$/m, "priorities: [urgent, ordinary, someday]"), "utf8");
@@ -189,7 +190,7 @@ test("`init` re-run over an adjusted config.yaml says why there is no example, a
 test("`init`'s example takes its priority from the vocabulary, not from a literal", () => {
   // The example used to pass `priority: P2` whatever the project's priorities
   // were — the same defect as the template's, one layer up.
-  const dir = mkdtempSync(join(tmpdir(), "branchling-template-prio-" + counter++ + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-template-prio-" + counter++ + "-"));
   assert.equal(run(["init", "--dir", dir, "--no-example"]).status, 0);
   const p = join(dir, "config.yaml");
   writeFileSync(p, readFileSync(p, "utf8").replace(/^priorities:.*$/m, "priorities: [urgent, ordinary, someday]"), "utf8");

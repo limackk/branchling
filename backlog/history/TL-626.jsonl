@@ -1,0 +1,1 @@
+{"id":"01M6TWZMJJ5284J83HVHC149JC","ts":"2026-11-07T11:40:58.322Z","task":"TL-626","field":"__created__","from":"","to":"A task id mentioned in a trunk commit body does not deploy that task","actor":"agent:loop-3","source":"new","reason":"unknown"}

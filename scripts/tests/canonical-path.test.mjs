@@ -9,7 +9,8 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import { mkdirSync, rmSync, symlinkSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -19,7 +20,7 @@ import { isolateHome } from "./_repo.mjs";
 isolateHome("canonical-path");
 
 test("a directory and a link to it have one spelling", (t) => {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-canonical-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-canonical-"));
   try {
     const real = join(dir, "real");
     mkdirSync(real);

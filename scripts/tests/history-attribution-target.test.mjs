@@ -9,8 +9,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
-  mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync,
+  readFileSync, readdirSync, rmSync, writeFileSync,
 } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -30,7 +31,7 @@ function run(args, env) {
 }
 
 function fixture({ unknownCreation }) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-history-target-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-history-target-"));
   const backlog = join(dir, "backlog");
   const env = {
     ...process.env,

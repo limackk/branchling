@@ -36,7 +36,8 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -84,7 +85,7 @@ function parkReason(backlog, id) {
  * is measurable rather than asserted.
  */
 function fixture(title) {
-  const root = mkdtempSync(join(tmpdir(), "branchling-repeat-"));
+  const root = fixtureDir(join(tmpdir(), "branchling-repeat-"));
   const repo = join(root, "repo");
   const backlog = join(repo, "backlog");
   mkdirSync(repo, { recursive: true });

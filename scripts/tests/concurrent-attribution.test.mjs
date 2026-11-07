@@ -75,7 +75,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync, spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -124,7 +125,7 @@ function run(args, env) {
  * not this one).
  */
 function fixture() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-race-" + (counter++) + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-race-" + (counter++) + "-"));
   const backlog = join(dir, "bl");
   const env = { ...process.env, BACKLOG_STATE_DIR: join(dir, "state"), NO_COLOR: "1" };
   delete env.BACKLOG_SESSION;

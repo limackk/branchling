@@ -25,7 +25,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { request } from "node:http";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
@@ -79,7 +80,7 @@ function freePort() {
 }
 
 function backlog() {
-  const dir = realpathSync(mkdtempSync(join(tmpdir(), "branchling-read-only-")));
+  const dir = realpathSync(fixtureDir(join(tmpdir(), "branchling-read-only-")));
   const root = join(dir, "backlog");
   const init = spawnSync(process.execPath, [CLI, "init", "--dir", root, "--no-example"], { encoding: "utf8", timeout: 30_000 });
   assert.equal(init.status, 0, init.stderr);

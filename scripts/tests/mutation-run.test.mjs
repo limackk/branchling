@@ -13,7 +13,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -34,7 +35,7 @@ function write(root, rel, text) {
 }
 
 function fixture() {
-  const root = mkdtempSync(join(tmpdir(), "branchling-test-mutation-scope-"));
+  const root = fixtureDir(join(tmpdir(), "branchling-test-mutation-scope-"));
   write(root, "scripts/lib.mjs", "export const lib = () => 1;\n");
   write(root, "scripts/greet.mjs", 'import { lib } from "./lib.mjs";\nconsole.log(lib());\n');
   write(root, "scripts/other.mjs", "export const other = () => 2;\n");

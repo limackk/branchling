@@ -7,7 +7,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -21,7 +22,7 @@ const CLI = join(REPO_ROOT, "scripts", "cli.mjs");
 let serial = 0;
 
 function fixture(lines) {
-  const repo = mkdtempSync(join(tmpdir(), "branchling-green-cost-" + serial++ + "-"));
+  const repo = fixtureDir(join(tmpdir(), "branchling-green-cost-" + serial++ + "-"));
   execFileSync("git", ["init", "-q", "-b", "main", "."], { cwd: repo, stdio: "ignore" });
   const dir = join(repo, "backlog");
   const init = spawnSync(process.execPath, [CLI, "init", "--dir", dir, "--no-example"], {

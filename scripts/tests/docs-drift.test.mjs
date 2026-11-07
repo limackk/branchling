@@ -25,7 +25,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -314,7 +315,7 @@ function git(dir, args, env = {}) {
 
 /** A repository with its OWN vocabulary, a git history and a `docs/` tree. */
 function repo() {
-  const dir = realpathSync(mkdtempSync(join(tmpdir(), "branchling-drift-" + counter++ + "-")));
+  const dir = realpathSync(fixtureDir(join(tmpdir(), "branchling-drift-" + counter++ + "-")));
   git(dir, ["init", "-q"]);
   git(dir, ["config", "user.email", "fixture@example.invalid"]);
   git(dir, ["config", "user.name", "Fixture"]);

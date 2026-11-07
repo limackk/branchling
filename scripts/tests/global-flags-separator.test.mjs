@@ -30,7 +30,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, rmSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -118,7 +119,7 @@ for (const [command, parse] of commandParsers) {
 // ── the two layers composing, against a real write ────────────────────────
 
 function sandbox() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-sep-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-sep-"));
   mkdirSync(join(dir, "tasks"));
   writeFileSync(join(dir, "_template.md"), readFileSync(join(SCRIPTS_DIR, "..", "_template.md"), "utf8"), "utf8");
   writeFileSync(join(dir, "config.yaml"), "task_id_prefix: TL\n", "utf8");
@@ -174,7 +175,7 @@ test("a SECOND `--dir` past the separator is a value, not a redirection", () => 
 });
 
 test("init shares the --dir spelling and writes nothing for one past `--`", () => {
-  const parent = mkdtempSync(join(tmpdir(), "branchling-init-sep-"));
+  const parent = fixtureDir(join(tmpdir(), "branchling-init-sep-"));
   const home = join(parent, "home");
   const elsewhere = join(parent, "elsewhere");
   try {

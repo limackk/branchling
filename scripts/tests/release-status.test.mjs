@@ -23,7 +23,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { appendFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -62,7 +63,7 @@ function commit(dir, message, files, env = {}) {
 }
 
 function backlogRepo() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-release-status-" + counter++ + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-release-status-" + counter++ + "-"));
   git(dir, ["init", "-q", "-b", "main", "."]);
   assert.equal(run(dir, ["init", "--dir", "backlog", "--no-example"]).status, 0);
   commit(dir, "the backlog", {});

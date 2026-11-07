@@ -23,7 +23,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { appendFileSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -46,7 +47,7 @@ function git(dir, ...args) {
 }
 
 function repo() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-env-" + counter++ + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-env-" + counter++ + "-"));
   git(dir, "init", "-q", "-b", "main", ".");
   return dir;
 }
@@ -343,7 +344,7 @@ test("a short deploy ref is valid config and resolves the way git's search order
 
   // And what doctor assumes about that search order holds: where the deploy
   // ref exists, the short name reads it, not a branch of the same name.
-  const repo = mkdtempSync(join(tmpdir(), "branchling-short-ref-"));
+  const repo = fixtureDir(join(tmpdir(), "branchling-short-ref-"));
   execFileSync("git", ["init", "-q", "-b", "main", repo]);
   execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "--allow-empty", "-m", "a"], { cwd: repo });
   const first = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repo, encoding: "utf8" }).trim();

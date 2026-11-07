@@ -11,7 +11,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,7 +34,7 @@ function run(cwd, args) {
 }
 
 function fresh() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-cfgdoc-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-cfgdoc-"));
   assert.equal(run(dir, ["init", "--dir", ".", "--no-example"]).status, 0);
   return dir;
 }

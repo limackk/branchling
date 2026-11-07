@@ -13,7 +13,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { appendFileSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -38,7 +39,7 @@ function run(cwd, args) {
 }
 
 function repo(initArgs) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-doctor-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-doctor-"));
   assert.equal(spawnSync("git", ["init", "-q", "."], { cwd: dir }).status, 0);
   assert.equal(run(dir, ["init", "--dir", "."].concat(initArgs || [])).status, 0);
   return dir;
@@ -118,7 +119,7 @@ test("a prefix mismatch: the `prefix` row is red and names migrate-prefix", () =
 });
 
 test("views that are not ignored: the `git-ignore` row is red", () => {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-doctor-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-doctor-"));
   spawnSync("git", ["init", "-q", "."], { cwd: dir });
   writeFileSync(join(dir, ".gitignore"), "node_modules/\n", "utf8");
   run(dir, ["init", "--dir", ".", "--no-gitignore"]);
@@ -155,7 +156,7 @@ test("a failing guard: the `guards` row is red", () => {
 });
 
 test("the absence of a git repository is information, not an error", () => {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-doctor-nogit-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-doctor-nogit-"));
   run(dir, ["init", "--dir", "."]);
   const d = rows(dir);
   assert.equal(d.byId["git-repo"].status, "info");
@@ -441,7 +442,7 @@ test("positive control: freshly installed hooks carry no stale row", () => {
 // ── A diagnosis stays a diagnosis ─────────────────────────────────────────
 
 test("doctor changes NOTHING", () => {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-doctor-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-doctor-"));
   spawnSync("git", ["init", "-q", "."], { cwd: dir });
   writeFileSync(join(dir, ".gitignore"), "node_modules/\n", "utf8");
   run(dir, ["init", "--dir", ".", "--no-gitignore"]);
@@ -470,7 +471,7 @@ test("--json is pure JSON and nothing besides", () => {
 });
 
 test("with no backlog: it points at `init`, exits non-zero, with no stack trace", () => {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-doctor-empty-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-doctor-empty-"));
   const r = run(dir, ["doctor"]);
   assert.notEqual(r.status, 0);
   assert.match(r.stderr, /init --dir/);

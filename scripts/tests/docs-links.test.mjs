@@ -21,7 +21,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -49,7 +50,7 @@ const REPO = join(HERE, "..", "..");
 
 let counter = 0;
 function tmp(prefix) {
-  return mkdtempSync(join(tmpdir(), "branchling-" + prefix + "-" + (counter++) + "-"));
+  return fixtureDir(join(tmpdir(), "branchling-" + prefix + "-" + (counter++) + "-"));
 }
 
 function run(args, cwd, env) {

@@ -17,8 +17,9 @@ import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
-  chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync,
+  chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync,
 } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 
@@ -100,7 +101,7 @@ function createdTask(backlog, title, pattern) {
 }
 
 test("two concurrent new calls in separate worktrees reserve different ids", async () => {
-  const fixture = mkdtempSync(join(tmpdir(), "branchling-new-id-reservation-"));
+  const fixture = fixtureDir(join(tmpdir(), "branchling-new-id-reservation-"));
   const main = join(fixture, "main");
   const sibling = join(fixture, "sibling");
   const bin = join(fixture, "bin");
@@ -153,7 +154,7 @@ test("two concurrent new calls in separate worktrees reserve different ids", asy
 });
 
 test("an abandoned reservation does not permanently burn its number", () => {
-  const fixture = mkdtempSync(join(tmpdir(), "branchling-new-id-recovery-"));
+  const fixture = fixtureDir(join(tmpdir(), "branchling-new-id-recovery-"));
   const repo = join(fixture, "repo");
   const backlog = join(repo, "backlog");
   const state = join(fixture, "state");

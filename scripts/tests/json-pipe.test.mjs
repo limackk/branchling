@@ -24,7 +24,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -56,7 +57,7 @@ function run(args, cwd) {
 let BIG = null;
 function bigBacklog() {
   if (BIG) return BIG;
-  const dir = mkdtempSync(join(tmpdir(), "branchling-json-pipe-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-json-pipe-"));
   assert.equal(run(["init", "--dir", dir, "--no-example"]).status, 0);
   for (let i = 0; i < 120; i++) {
     const made = run(["new", "--dir", dir, "--title", "Task number " + i + " with a title long enough to matter to the size of the answer"]);
@@ -124,7 +125,7 @@ test("POSITIVE CONTROL: the old pattern truncates over the same number of bytes"
   // that the platform CAN lose bytes is POSIX-only.
   skip: process.platform === "win32" ? "POSIX non-blocking pipe" : false,
 }, async () => {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-json-pipe-control-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-json-pipe-control-"));
   const script = join(dir, "old-pattern.mjs");
   writeFileSync(script,
     'console.log(JSON.stringify({ blob: "x".repeat(' + PAYLOAD_BYTES + ') }));\n' +

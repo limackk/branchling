@@ -495,93 +495,98 @@ async function main(argv) {
   let commandsLeft = commandsTotal;
   const before = progress ? (e) => progress(`      ${MARK.arrow} ${e.bash}`) : undefined;
   const after = progress ? (e, r) => progress(`      ${MARK.ok} ${(r.ms / 1000).toFixed(1)}s`) : undefined;
-  for (const c of selected) {
-    // Keep a boundary between tasks as well as the abortable boundary inside
-    // each command. A signal arriving after one contract closes must not start
-    // the next contract before its handler runs.
-    await new Promise((resolve) => setImmediate(resolve));
-    if (stopped) break;
-    walked++;
-    if (progress) {
-      progress(
-        `  [${walked}/${selected.length}] ${c.id}: ${c.own.length} entr(ies), ` +
-          `${commandsLeft} command(s) left`
-      );
-    }
-    // Named BEFORE it runs, not after: the line an operator needs while the
-    // command hangs is the one that says which command is hanging.
-    const own = await runContract(c.own, repoRoot,
-      { capture: true, signal: cancellation.signal, before, after, env: markFor(c.id) });
-    if (own.interrupted) break;
-    commandsLeft -= c.own.length;
-    for (const r of own.results) {
-      if (r.kind === "manual") vouched.push({ id: c.id, entry: r.id || r.command });
-      else ran++;
-    }
-    // `runContract` stops at the first red line, and so does `done`: a closing
-    // whose own entry fails never reaches the project's, and must not be named
-    // as one the project entry would have failed.
-    if (own.failed) { broken.push({ ...c, failed: own.failed }); continue; }
-    if (!c.project.length) continue;
-    reachedProject++;
-    let interrupted = false;
-    let reused = 0;
-    for (const e of c.project) {
-      const key = projectKey(e);
-      let hit = projectCache.get(key);
-      if (hit) {
-        reused++;
-      } else {
-        const r = await runContract([e], repoRoot,
-          { capture: true, signal: cancellation.signal, before, after, env: markFor("project `closing_contract`") });
-        if (r.interrupted) { interrupted = true; break; }
-        hit = { row: r.results[0], failed: r.failed };
-        projectCache.set(key, hit);
-        commandsLeft--;
-        if (hit.row.kind === "manual") vouched.push({ id: "project `closing_contract`", entry: e.id || e.manual });
-        else ran++;
-      }
-      if (hit.failed) {
-        if (!failing.has(key)) failing.set(key, { entry: e, failed: hit.failed, closings: [] });
-        failing.get(key).closings.push(c);
-        break;
-      }
-    }
-    if (interrupted) break;
-    if (progress && reused) progress(`      ${MARK.ok} ${reused} project entr(ies) already run in this audit — result reused`);
-  }
-  // THE SECOND HALF (TL-260), after the first and never instead of it: a broken
-  // proof is a defect in the tree and outranks a defect in a sentence nobody has
-  // acted on yet. An interrupt that stopped the first walk stops here too — the
-  // operator asked for the run to end, not for a different run to begin.
   const unfalsifiable = [];
   let openWalked = 0;
-  for (const c of openSelected) {
-    await new Promise((resolve) => setImmediate(resolve));
-    if (stopped) break;
-    openWalked++;
-    if (progress) {
-      progress(`  [${openWalked}/${openSelected.length}] ${c.id} (${c.status}): ${c.entries.length} entr(ies)`);
-    }
-    const { results, interrupted } = await runContract(c.entries, repoRoot, {
-      capture: true,
-      signal: cancellation.signal,
-      env: markFor(c.id + " (" + c.status + ")"),
-      before: progress ? (e) => progress(`      ${MARK.arrow} ${e.bash}`) : undefined,
-    });
-    if (interrupted) break;
-    if (greenFromBirth(results)) unfalsifiable.push({ ...c, results });
-  }
-
-  // Each entry once, in the order it was reached: a contract run twice (a
-  // project entry reused, say) is one entry that hit the guard, not two.
   let nested = [];
+  // Removed on every exit path (TL-575): a contract that throws must not leave
+  // the mark's directory behind for every audit that ever ran.
   try {
-    nested = [...new Set(readFileSync(report, "utf8").split("\n").filter(Boolean))];
-  } catch {
-    // No nested run wrote anything, so the file was never created.
+    for (const c of selected) {
+      // Keep a boundary between tasks as well as the abortable boundary inside
+      // each command. A signal arriving after one contract closes must not start
+      // the next contract before its handler runs.
+      await new Promise((resolve) => setImmediate(resolve));
+      if (stopped) break;
+      walked++;
+      if (progress) {
+        progress(
+          `  [${walked}/${selected.length}] ${c.id}: ${c.own.length} entr(ies), ` +
+            `${commandsLeft} command(s) left`
+        );
+      }
+      // Named BEFORE it runs, not after: the line an operator needs while the
+      // command hangs is the one that says which command is hanging.
+      const own = await runContract(c.own, repoRoot,
+        { capture: true, signal: cancellation.signal, before, after, env: markFor(c.id) });
+      if (own.interrupted) break;
+      commandsLeft -= c.own.length;
+      for (const r of own.results) {
+        if (r.kind === "manual") vouched.push({ id: c.id, entry: r.id || r.command });
+        else ran++;
+      }
+      // `runContract` stops at the first red line, and so does `done`: a closing
+      // whose own entry fails never reaches the project's, and must not be named
+      // as one the project entry would have failed.
+      if (own.failed) { broken.push({ ...c, failed: own.failed }); continue; }
+      if (!c.project.length) continue;
+      reachedProject++;
+      let interrupted = false;
+      let reused = 0;
+      for (const e of c.project) {
+        const key = projectKey(e);
+        let hit = projectCache.get(key);
+        if (hit) {
+          reused++;
+        } else {
+          const r = await runContract([e], repoRoot,
+            { capture: true, signal: cancellation.signal, before, after, env: markFor("project `closing_contract`") });
+          if (r.interrupted) { interrupted = true; break; }
+          hit = { row: r.results[0], failed: r.failed };
+          projectCache.set(key, hit);
+          commandsLeft--;
+          if (hit.row.kind === "manual") vouched.push({ id: "project `closing_contract`", entry: e.id || e.manual });
+          else ran++;
+        }
+        if (hit.failed) {
+          if (!failing.has(key)) failing.set(key, { entry: e, failed: hit.failed, closings: [] });
+          failing.get(key).closings.push(c);
+          break;
+        }
+      }
+      if (interrupted) break;
+      if (progress && reused) progress(`      ${MARK.ok} ${reused} project entr(ies) already run in this audit — result reused`);
+    }
+    // THE SECOND HALF (TL-260), after the first and never instead of it: a broken
+    // proof is a defect in the tree and outranks a defect in a sentence nobody has
+    // acted on yet. An interrupt that stopped the first walk stops here too — the
+    // operator asked for the run to end, not for a different run to begin.
+    for (const c of openSelected) {
+      await new Promise((resolve) => setImmediate(resolve));
+      if (stopped) break;
+      openWalked++;
+      if (progress) {
+        progress(`  [${openWalked}/${openSelected.length}] ${c.id} (${c.status}): ${c.entries.length} entr(ies)`);
+      }
+      const { results, interrupted } = await runContract(c.entries, repoRoot, {
+        capture: true,
+        signal: cancellation.signal,
+        env: markFor(c.id + " (" + c.status + ")"),
+        before: progress ? (e) => progress(`      ${MARK.arrow} ${e.bash}`) : undefined,
+      });
+      if (interrupted) break;
+      if (greenFromBirth(results)) unfalsifiable.push({ ...c, results });
+    }
+
+    // Each entry once, in the order it was reached: a contract run twice (a
+    // project entry reused, say) is one entry that hit the guard, not two.
+    try {
+      nested = [...new Set(readFileSync(report, "utf8").split("\n").filter(Boolean))];
+    } catch {
+      // No nested run wrote anything, so the file was never created.
+    }
+  } finally {
+    rmSync(reportDir, { recursive: true, force: true });
   }
-  rmSync(reportDir, { recursive: true, force: true });
 
   const seconds = ((Date.now() - started) / 1000).toFixed(1);
   process.removeListener("SIGINT", onSignal);

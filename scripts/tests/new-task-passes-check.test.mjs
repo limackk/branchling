@@ -21,7 +21,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -47,7 +48,7 @@ function run(args) {
 
 /** A backlog with nothing in it but the task this test creates. */
 function freshBacklog(label) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-" + label + "-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-" + label + "-"));
   const r = run(["init", "--dir", dir, "--no-example"]);
   assert.equal(r.status, 0, r.stderr);
   return dir;

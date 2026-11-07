@@ -18,7 +18,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -101,7 +102,7 @@ function taskFile(over = {}) {
 }
 
 function sandbox(extraConfig = "", tasks = { "FX-1-do-the-thing.md": taskFile() }) {
-  const dir = mkdtempSync(join(tmpdir(), "change-reason-"));
+  const dir = fixtureDir(join(tmpdir(), "change-reason-"));
   mkdirSync(join(dir, "tasks"));
   writeFileSync(join(dir, "config.yaml"), configYaml(extraConfig), "utf8");
   writeFileSync(
@@ -371,7 +372,7 @@ const LOG_HEADING = /^##[ \t]+Log[ \t]*$/m;
  *  shipped template, so the overwrite is what makes the run judge the OTHER one
  *  as well — reading a file is not the same as proving what `new` writes. */
 function backlogFrom(templatePath) {
-  const dir = mkdtempSync(join(tmpdir(), "log-section-"));
+  const dir = fixtureDir(join(tmpdir(), "log-section-"));
   const r = spawnSync(process.execPath, [CLI, "init", "--dir", dir, "--no-example"], { encoding: "utf8" });
   assert.equal(r.status, 0, r.stderr);
   writeFileSync(join(dir, TEMPLATE_FILENAME), readFileSync(templatePath, "utf8"), "utf8");

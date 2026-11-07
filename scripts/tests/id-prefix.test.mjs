@@ -15,7 +15,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -46,7 +47,7 @@ function cli(args, opts) {
 }
 
 function backlog({ prefix, ids = [], extra = "" } = {}) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-prefix-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-prefix-"));
   mkdirSync(join(dir, "tasks"));
   writeFileSync(join(dir, "_template.md"), "---\nid: X-NNN\n---\n", "utf8");
   writeFileSync(join(dir, "boards.yaml"), 'default: main\nboards:\n  - slug: main\n    name: "Main"\n', "utf8");
@@ -132,7 +133,7 @@ test("a backlog with the TASK prefix passes new → build → check → next-id 
 });
 
 test("`init` creates a backlog that works straight away on the default prefix", () => {
-  const dir = join(mkdtempSync(join(tmpdir(), "branchling-init-")), "bl");
+  const dir = join(fixtureDir(join(tmpdir(), "branchling-init-")), "bl");
   try {
     const init = cli(["init", "--dir", dir]);
     assert.equal(init.code, 0, init.out);

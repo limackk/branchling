@@ -1,7 +1,8 @@
 /** The execution command composes one foreground task without owning Git topology. */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { execFileSync, spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -26,7 +27,7 @@ function git(args, cwd) {
 }
 
 test("only foreground execution ships, and it leaves the caller's Git topology unchanged", () => {
-  const root = mkdtempSync(join(tmpdir(), "branchling-execution-boundary-"));
+  const root = fixtureDir(join(tmpdir(), "branchling-execution-boundary-"));
   try {
     const repo = join(root, "repository");
     const backlog = join(repo, "backlog");

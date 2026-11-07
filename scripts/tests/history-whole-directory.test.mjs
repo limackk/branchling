@@ -34,7 +34,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -64,7 +65,7 @@ function taskText(over = {}) {
 
 /** A backlog with `tasks/` and enough beside it to be recognised as one. */
 function sandbox(tasks = {}) {
-  const dir = mkdtempSync(join(tmpdir(), "backlog-wholedir-"));
+  const dir = fixtureDir(join(tmpdir(), "backlog-wholedir-"));
   TRASH.push(dir);
   mkdirSync(join(dir, "tasks"));
   // `looksLikeBacklogDir` wants one of boards/config/template; nothing here

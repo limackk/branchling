@@ -1,7 +1,8 @@
 /** Local provider-neutral agent profiles (TL-288). */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -19,7 +20,7 @@ const CLI = join(SCRIPTS_DIR, "cli.mjs");
 let counter = 0;
 
 function fixture() {
-  const root = mkdtempSync(join(tmpdir(), "branchling-agent-profiles-" + counter++ + "-"));
+  const root = fixtureDir(join(tmpdir(), "branchling-agent-profiles-" + counter++ + "-"));
   const home = join(root, "home");
   return { root, home, env: { ...process.env, NO_COLOR: "1", [HOME_ENV]: home } };
 }

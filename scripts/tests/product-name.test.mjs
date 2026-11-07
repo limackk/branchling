@@ -13,7 +13,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -117,7 +118,7 @@ test("`--product-name` selects it ALONE", () => {
 // ── The end-to-end claim: the name comes from the manifest ────────────────
 
 test("a literal planted in a real file makes the guard fail", () => {
-  const dir = mkdtempSync(join(tmpdir(), "product-name-guard-"));
+  const dir = fixtureDir(join(tmpdir(), "product-name-guard-"));
   try {
     for (const p of [...CHECKED_PATHS, "package.json"]) {
       cpSync(join(ROOT, p), join(dir, p), { recursive: true });
@@ -143,7 +144,7 @@ test("renaming the product is ONE edit to package.json", () => {
   // The claim this whole task exists to make true. Nothing in `scripts/` is
   // touched: only `name` in the manifest changes, and the CLI must introduce
   // itself by the new name in help, in usage and in an error message.
-  const dir = mkdtempSync(join(tmpdir(), "product-rename-"));
+  const dir = fixtureDir(join(tmpdir(), "product-rename-"));
   try {
     for (const p of ["scripts", "bin", "package.json"]) {
       cpSync(join(ROOT, p), join(dir, p), { recursive: true });

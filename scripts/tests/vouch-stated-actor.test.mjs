@@ -19,7 +19,8 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -62,7 +63,7 @@ const TASK = [
 ].join("\n");
 
 function fixture() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-vouch-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-vouch-"));
   const backlog = join(dir, "backlog");
   mkdirSync(join(backlog, "tasks"), { recursive: true });
   writeFileSync(join(backlog, "_template.md"), "---\nid: TASK-NNN\n---\n", "utf8");
@@ -117,7 +118,7 @@ function withFixture(fn) {
 // ──────────────────────────────────────────────────────────────────────────
 
 test("the actor's source names the rung that answered, in the documented order", () => {
-  const home = mkdtempSync(join(tmpdir(), "branchling-vouch-src-"));
+  const home = fixtureDir(join(tmpdir(), "branchling-vouch-src-"));
   try {
     const env = { [HOME_ENV]: home };
     assert.deepEqual(resolveActorSource("", { env }), { actor: DEFAULT_ACTOR, source: "default" });

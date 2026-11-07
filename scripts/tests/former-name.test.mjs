@@ -26,7 +26,8 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { readFileSync, readdirSync, rmSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -116,7 +117,7 @@ test("no open task tells anybody to run a command that no longer exists", () => 
 });
 
 test("POSITIVE CONTROL: an empty task path cannot pass as the real backlog", (t) => {
-  const emptyDir = mkdtempSync(join(tmpdir(), "branchling-former-name-"));
+  const emptyDir = fixtureDir(join(tmpdir(), "branchling-former-name-"));
   t.after(() => rmSync(emptyDir, { recursive: true, force: true }));
   assert.throws(
     () => assertRealTaskScan(taskFiles(emptyDir)),

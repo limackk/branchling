@@ -25,7 +25,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 
@@ -152,7 +153,7 @@ test("the refs guard SEES a blocked_by that has a comment beside it", () => {
 // ── End to end: a fresh backlog, as a stranger meets it ───────────────────
 
 function freshBacklog(fn) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-comments-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-comments-"));
   try {
     const init = spawnSync(process.execPath, [CLI, "init", "--dir", dir], { encoding: "utf8" });
     assert.equal(init.status, 0, "init failed: " + init.stdout + init.stderr);
@@ -378,7 +379,7 @@ function gateTask({ verification, criteria }) {
 
 /** A backlog holding exactly one task, closed with `done`. */
 function withGateBacklog(fileText, fn) {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-comments-gate-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-comments-gate-"));
   try {
     mkdirSync(join(dir, "tasks"));
     writeFileSync(join(dir, "_template.md"), "---\nid: TASK-NNN\n---\n", "utf8");

@@ -403,18 +403,25 @@ function runBash(command, cwd, capture, observeCoverage = false) {
   delete env.NODE_TEST_CONTEXT;
   const coverageDir = observeCoverage ? mkdtempSync(join(tmpdir(), "contract-coverage-")) : null;
   if (coverageDir) env.NODE_V8_COVERAGE = coverageDir;
-  const r = spawnSync(command, {
-    shell: posixShell(),
-    cwd,
-    encoding: "utf8",
-    env,
-    stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit",
-    // A whole test suite's transcript is captured here by default (TL-221);
-    // Node's 1 MB default would turn a long green run into a spurious failure.
-    maxBuffer: 64 * 1024 * 1024,
-  });
-  const executedFiles = coverageDir ? [...readCoverageFiles(coverageDir, cwd)].sort() : [];
-  if (coverageDir) rmSync(coverageDir, { recursive: true, force: true });
+  let r;
+  let executedFiles = [];
+  // Removed on every exit path (TL-575): `done` runs on every close, and a
+  // coverage directory left by a throw is one more per close, forever.
+  try {
+    r = spawnSync(command, {
+      shell: posixShell(),
+      cwd,
+      encoding: "utf8",
+      env,
+      stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit",
+      // A whole test suite's transcript is captured here by default (TL-221);
+      // Node's 1 MB default would turn a long green run into a spurious failure.
+      maxBuffer: 64 * 1024 * 1024,
+    });
+    if (coverageDir) executedFiles = [...readCoverageFiles(coverageDir, cwd)].sort();
+  } finally {
+    if (coverageDir) rmSync(coverageDir, { recursive: true, force: true });
+  }
   return {
     ok: r.status === 0,
     exitCode: r.status == null ? 1 : r.status,
@@ -440,6 +447,11 @@ function runBashAsync(command, cwd, capture, observeCoverage = false, signal = n
     delete env.NODE_TEST_CONTEXT;
     const coverageDir = observeCoverage ? mkdtempSync(join(tmpdir(), "contract-coverage-")) : null;
     if (coverageDir) env.NODE_V8_COVERAGE = coverageDir;
+    // Removed on every exit path (TL-575), including a spawn that throws
+    // before any listener exists to remove it.
+    const removeCoverage = () => {
+      if (coverageDir) rmSync(coverageDir, { recursive: true, force: true });
+    };
 
     let stdout = "";
     let stderr = "";
@@ -458,8 +470,12 @@ function runBashAsync(command, cwd, capture, observeCoverage = false, signal = n
       // The shell can exit before a stubborn descendant. A final group kill
       // closes that race before the caller is told the process tree is gone.
       if (interrupted && child) stopProcessTree(child, "SIGKILL");
-      const executedFiles = coverageDir ? [...readCoverageFiles(coverageDir, cwd)].sort() : [];
-      if (coverageDir) rmSync(coverageDir, { recursive: true, force: true });
+      let executedFiles = [];
+      try {
+        if (coverageDir) executedFiles = [...readCoverageFiles(coverageDir, cwd)].sort();
+      } finally {
+        removeCoverage();
+      }
       resolve({
         ok: !interrupted && !overflow && !error && status === 0,
         exitCode: status == null ? 1 : status,
@@ -480,13 +496,18 @@ function runBashAsync(command, cwd, capture, observeCoverage = false, signal = n
     };
 
     if (interrupted) return finish(null);
-    child = spawn(command, {
-      shell: posixShell(),
-      cwd,
-      env,
-      detached: processTreeDetached(),
-      stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit",
-    });
+    try {
+      child = spawn(command, {
+        shell: posixShell(),
+        cwd,
+        env,
+        detached: processTreeDetached(),
+        stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit",
+      });
+    } catch (error) {
+      removeCoverage();
+      throw error;
+    }
     if (capture) {
       const collect = (key, chunk) => {
         const text = String(chunk);

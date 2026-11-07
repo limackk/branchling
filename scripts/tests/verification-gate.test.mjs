@@ -15,7 +15,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, rmSync, readdirSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync, existsSync, rmSync, readdirSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -66,7 +67,7 @@ function task({ id = "TASK-1", status = "pending", verification = [], criteria =
 }
 
 function backlog(files, config = "") {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-gate-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-gate-"));
   mkdirSync(join(dir, "tasks"));
   writeFileSync(join(dir, "_template.md"), "---\nid: TASK-NNN\n---\n", "utf8");
   writeFileSync(join(dir, "boards.yaml"), 'default: main\nboards:\n  - slug: main\n    name: "Main"\n', "utf8");
@@ -445,7 +446,7 @@ test("the working directory is the REPOSITORY root, in both layouts", () => {
   // backlog) put the root at different depths, which is exactly why it may not be
   // computed as `join(backlogRoot, "..")`. Git is asked; both layouts must give
   // the repository, not a level above or below it.
-  const repo = mkdtempSync(join(tmpdir(), "branchling-root-"));
+  const repo = fixtureDir(join(tmpdir(), "branchling-root-"));
   try {
     assert.equal(spawnSync("git", ["-C", repo, "init", "-q"]).status, 0, "git init failed");
     const real = canonicalPath(spawnSync("git", ["-C", repo, "rev-parse", "--show-toplevel"], { encoding: "utf8" }).stdout.trim());
@@ -460,7 +461,7 @@ test("the working directory is the REPOSITORY root, in both layouts", () => {
 });
 
 test("with no git at all it falls back to the backlog directory, and does not guess upwards", () => {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-nogit-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-nogit-"));
   try {
     // No repository anywhere above a temp dir is not guaranteed on every machine,
     // so this only asserts the property that matters: whatever comes back, it is

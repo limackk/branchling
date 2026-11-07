@@ -23,7 +23,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -47,7 +48,7 @@ function run(script, args, opts) {
 }
 
 function freshBacklog() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-flags-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-flags-"));
   const r = run("init-backlog.mjs", ["--dir", dir]);
   assert.equal(r.status, 0, r.stderr);
   return dir;
@@ -68,7 +69,7 @@ function freshBacklog() {
  * `next-id-root-backlog.test.mjs` now carries its regression coverage.
  */
 function gitBacklog() {
-  const repoRoot = mkdtempSync(join(tmpdir(), "branchling-flags-repo-"));
+  const repoRoot = fixtureDir(join(tmpdir(), "branchling-flags-repo-"));
   const dir = join(repoRoot, "backlog");
   const r = run("init-backlog.mjs", ["--dir", dir]);
   assert.equal(r.status, 0, r.stderr);

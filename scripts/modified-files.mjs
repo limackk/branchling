@@ -18,11 +18,29 @@
  * record; the index over them is a view, and a view may be deleted and rebuilt.
  * The cost is honest and bounded: one `git log` per query.
  *
- * The link between a commit and a task is the TASK ID IN THE COMMIT MESSAGE,
- * which this repository's own convention already requires ("the title starts
- * with the task id"). Nothing new is asked of anybody, and a project that does
- * not follow that convention gets an empty answer rather than a wrong one —
- * `explain()` says which of the two it is.
+ * The link between a commit and a task is the TASK ID AT THE HEAD OF THE
+ * COMMIT TITLE, which this repository's own convention already requires ("the
+ * title starts with the task id"). Nothing new is asked of anybody, and a
+ * project that does not follow that convention gets an empty answer rather than
+ * a wrong one — `explain()` says which of the two it is.
+ *
+ * WHICH IDS COUNT (TL-614). Only the run of ids the title STARTS with: ids
+ * separated by whitespace, commas or a colon (`TL-9 TL-10 …`, `TL-9: …`), and
+ * a range `TL-607..TL-611`, which counts as every id it spans — the title
+ * declares the commit is about each task in the set, and reading only the two
+ * endpoints would treat TL-608 differently from TL-607 for no reason the author
+ * wrote. The run ends at the first word that is not an id. A reversed range
+ * counts as its two endpoints, because nothing says what was meant between
+ * them. Merge commits are excluded separately, in `gitLogArgs()`.
+ *
+ * Rejected: every id anywhere in the message, which is what this module did
+ * until TL-614. A body that says "filed as TL-595" or a title that says "the
+ * TL-593 review findings are tasks" MENTIONS a task; it does not do its work.
+ * Read as a claim, the mention handed a commit's files to the task it named,
+ * and `done` then recorded in TL-595's capability record a file TL-595 never
+ * touched. Also rejected: any id anywhere in the TITLE. It fixes the body case
+ * and keeps the title one, and the title is where filing commits name the tasks
+ * they are about without being them.
  *
  * PATHS ARE RELATIVE TO THE REPOSITORY ROOT, not to the backlog directory. In a
  * co-located layout the two are the same and the distinction is invisible; in
@@ -61,8 +79,8 @@ export function repoRoot(cwd) {
  * PURE — parses one `git log` run, so a test needs no repository.
  *
  * @param {string} text the output of the command `gitLogArgs()` describes
- * @param {RegExp} scanner from `taskIdScanner(prefix)` — GLOBAL, so it is
- *   re-armed per record rather than carried between them
+ * @param {RegExp} scanner from `taskIdScanner(prefix)`; only its source is
+ *   read, by `titleIds()`, so no `lastIndex` is carried between records
  * @returns {Map<string, Set<string>>} task id to the paths its commits touched
  */
 export function parseLog(text, scanner) {
@@ -75,18 +93,65 @@ export function parseLog(text, scanner) {
     const files = record.slice(cut + 1).split("\n").map((l) => l.trim()).filter(Boolean);
     if (!files.length) continue;
 
-    // A commit may name more than one task. Both get the files: the alternative
-    // is to pick one, and picking is a guess this module has no basis for.
-    const ids = new Set();
-    scanner.lastIndex = 0;
-    for (const m of message.matchAll(scanner)) ids.add(m[1]);
-    for (const id of ids) {
+    // A commit may name more than one task at its head. All of them get the
+    // files: the alternative is to pick one, and picking is a guess this module
+    // has no basis for.
+    for (const id of titleIds(message, scanner)) {
       if (!byTask.has(id)) byTask.set(id, new Set());
       const set = byTask.get(id);
       for (const f of files) set.add(f);
     }
   }
   return byTask;
+}
+
+/**
+ * The ids a commit's title starts with — the rule the module header states.
+ *
+ * The scanner is re-read as a STICKY copy, so an id is matched only where the
+ * previous token ended; `parseLog` keeps taking the scanner `taskIdScanner()`
+ * builds, and the prefix stays escaped exactly as it is everywhere else. Each
+ * token is matched against the REST of the title rather than in place: the
+ * scanner's look-behind refuses an id preceded by `.`, which is right in prose
+ * and would refuse the second half of `TL-607..TL-611`.
+ *
+ * @param {string} message the whole commit message (`%B`)
+ * @param {RegExp} scanner from `taskIdScanner(prefix)`
+ * @returns {Set<string>}
+ */
+export function titleIds(message, scanner) {
+  const title = String(message || "").split("\n")[0];
+  const id = new RegExp(scanner.source, "y");
+  const separator = /[\s,:]+/y;
+  const ids = new Set();
+  const at = (pos) => {
+    id.lastIndex = 0;
+    const m = id.exec(title.slice(pos));
+    return m ? { m, end: pos + id.lastIndex } : null;
+  };
+  let pos = 0;
+  for (;;) {
+    const head = at(pos);
+    if (!head) break;
+    const first = head.m;
+    ids.add(first[1]);
+    pos = head.end;
+    if (title.startsWith("..", pos)) {
+      const tail = at(pos + 2);
+      if (!tail) break;
+      const last = tail.m;
+      ids.add(last[1]);
+      pos = tail.end;
+      const lo = Number(first[2]);
+      const hi = Number(last[2]);
+      const stem = first[1].slice(0, first[1].length - first[2].length);
+      for (let n = lo + 1; n < hi; n++) ids.add(stem + n);
+    }
+    separator.lastIndex = pos;
+    if (!separator.exec(title)) break;
+    pos = separator.lastIndex;
+  }
+  return ids;
 }
 
 /** The one `git log` invocation. Separate so a test can assert the arguments
@@ -199,6 +264,6 @@ export function touches(paths, query) {
 export function explain(reason) {
   if (reason === "no-git") return "not a git repository — the file index is computed from commit messages, so there is nothing to read";
   if (reason === "git-failed") return "`git log` failed — the file index could not be computed";
-  if (reason === "no-task-ids-in-commits") return "no commit message in this repository names a task id, so no file can be attributed to a task";
+  if (reason === "no-task-ids-in-commits") return "no commit title in this repository starts with a task id, so no file can be attributed to a task";
   return null;
 }

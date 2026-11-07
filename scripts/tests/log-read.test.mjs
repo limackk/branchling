@@ -21,7 +21,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -41,7 +42,7 @@ function run(args, input) {
 
 /** A backlog with one task, inside a real repository. */
 function fixture() {
-  const repo = mkdtempSync(join(tmpdir(), "branchling-log-"));
+  const repo = fixtureDir(join(tmpdir(), "branchling-log-"));
   execFileSync("git", ["init", "-q", "-b", "main", "."], { cwd: repo, stdio: "ignore" });
   const dir = join(repo, "backlog");
   assert.equal(run(["init", "--dir", dir, "--no-example"]).status, 0, "init failed");

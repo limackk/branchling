@@ -17,7 +17,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -108,7 +109,7 @@ function setConfig(backlogDir, lines) {
  *        narrow `active_branch_days`.
  */
 function twoBranchesDisagreeing(opts = {}) {
-  const repoRoot = mkdtempSync(join(tmpdir(), "branchling-xbranch-"));
+  const repoRoot = fixtureDir(join(tmpdir(), "branchling-xbranch-"));
   const backlogDir = join(repoRoot, "backlog");
   const init = cli(["init", "--dir", backlogDir, "--no-example"]);
   assert.equal(init.status, 0, init.stderr);
@@ -266,7 +267,7 @@ const ONLY_FILE = ONLY_ID + "-created-on-a-branch.md";
  * well by reporting a phantom on every listing.
  */
 function taskOnlyOnAnotherBranch(opts = {}) {
-  const repoRoot = mkdtempSync(join(tmpdir(), "branchling-xbranch-only-"));
+  const repoRoot = fixtureDir(join(tmpdir(), "branchling-xbranch-only-"));
   const backlogDir = join(repoRoot, "backlog");
   const init = cli(["init", "--dir", backlogDir, "--no-example"]);
   assert.equal(init.status, 0, init.stderr);
@@ -501,7 +502,7 @@ test("the caller's own uncommitted change is not reported as somebody else's", (
 // ──────────────────────────────────────────────────────────────────────────
 
 test("outside a git repository the query works and SAYS the state is local only", () => {
-  const backlogDir = mkdtempSync(join(tmpdir(), "branchling-xbranch-nogit-"));
+  const backlogDir = fixtureDir(join(tmpdir(), "branchling-xbranch-nogit-"));
   try {
     const init = cli(["init", "--dir", backlogDir, "--no-example"]);
     assert.equal(init.status, 0, init.stderr);
@@ -541,7 +542,7 @@ test("NO PATH RUNS `git fetch` — the tool works with no network", {
   // a `fetch` reached through a helper or an alias would be invisible to a grep
   // and would show up here as a recorded argument list.
   const { repoRoot, backlogDir } = twoBranchesDisagreeing();
-  const shimDir = mkdtempSync(join(tmpdir(), "branchling-xbranch-shim-"));
+  const shimDir = fixtureDir(join(tmpdir(), "branchling-xbranch-shim-"));
   const log = join(shimDir, "calls.log");
   try {
     const realGit = execFileSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).trim();

@@ -17,7 +17,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, existsSync, rmSync } from "node:fs";
+import { writeFileSync, existsSync, rmSync } from "node:fs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -50,7 +51,7 @@ function vcs(cwd, ...args) {
 
 /** The backlog is the ROOT of the git repo — exactly `branchling init --dir .`. */
 function backlogAtRepoRoot() {
-  const dir = mkdtempSync(join(tmpdir(), "branchling-root-"));
+  const dir = fixtureDir(join(tmpdir(), "branchling-root-"));
   const r = run("init-backlog.mjs", ["--dir", dir]);
   assert.equal(r.status, 0, r.stderr);
   vcs(dir, "init", "-q", "-b", "main");
@@ -62,7 +63,7 @@ function backlogAtRepoRoot() {
 
 /** The backlog in a SUBDIRECTORY of the repo — the other layout. A positive control. */
 function backlogInSubdir() {
-  const repoRoot = mkdtempSync(join(tmpdir(), "branchling-sub-"));
+  const repoRoot = fixtureDir(join(tmpdir(), "branchling-sub-"));
   const dir = join(repoRoot, "backlog");
   const r = run("init-backlog.mjs", ["--dir", dir]);
   assert.equal(r.status, 0, r.stderr);
