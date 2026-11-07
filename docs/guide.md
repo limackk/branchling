@@ -651,6 +651,11 @@ issue, so none of it is lost. Issue numbers are not carried either — `#412`
 becomes whatever number is free here, because a number that is free in your
 repository is not free on somebody else's branch.
 
+**Milestones stay behind as well**, and they are not conversation: for a team
+that plans in GitHub, a milestone is the iteration or release an issue was
+committed to. The import does not request it and no field here receives it, so
+read that assignment off GitHub before the run if you still need it.
+
 **And `verification:` arrives empty**, because no tracker has that field. The
 import says how many tasks it left in that state rather than filling it with a
 placeholder: those tasks are readable and searchable straight away, and

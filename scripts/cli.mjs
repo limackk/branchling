@@ -1001,6 +1001,8 @@ export const COMMANDS = {
       "  WHAT IT BRINGS: the title, the body, and open/closed mapped onto YOUR statuses.",
       "  WHAT IT DOES NOT: comments, attachments, status history, assignees — the",
       "  conversation around a task, one click away at the source link it writes.",
+      "  Nor milestones, which are not conversation but a planning assignment: the",
+      "  iteration or release an issue was committed to stays in GitHub.",
       "  `verification:` stays EMPTY, and how many tasks that leaves unfinishable is",
       "  part of the report rather than a footnote to it.",
       "",

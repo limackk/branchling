@@ -104,6 +104,8 @@ export const USAGE = [
   "  WHAT IT DOES NOT BRING OVER: comments, attachments, status history, assignees.",
   "  Those are the conversation around a task, not the task — the link to the source",
   "  issue keeps them one click away.",
+  "  NOR MILESTONES, which are not conversation but a planning assignment: the",
+  "  iteration or release an issue was committed to stays in GitHub.",
 ].join("\n");
 
 // ──────────────────────────────────────────────────────────────────────────
