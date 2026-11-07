@@ -293,6 +293,34 @@ test("replaceBlock keeps the indentation of the opening marker, the rest byte fo
   assert.equal(replaceBlock("x\n" + STALE + "\ny\n", hookBlock()).text, "x\n" + hookBlock() + "\ny\n");
 });
 
+test("replaceBlock keeps an indentation blockRange recognises beyond spaces and tabs (TL-622)", () => {
+  // `trim()` recognises the marker under any Unicode whitespace, so the
+  // replacement has to carry that same run back, not only its ASCII part.
+  const above = "#!/bin/sh\nif true; then\n";
+  const below = "\nfi\n";
+  for (const indent of [" ", "\f", "  \t", "　"]) {
+    const stale = above + shaped(STALE, indent, "\n") + below;
+    assert.equal(installedBlock(stale) !== null, true, "the premise: " + JSON.stringify(indent) + " is recognised");
+    const r = replaceBlock(stale, hookBlock());
+    assert.equal(r.replaced, true);
+    assert.equal(r.text, above + shaped(hookBlock(), indent, "\n") + below, JSON.stringify(indent));
+  }
+});
+
+test("replaceBlock writes an empty line of the new block without trailing whitespace (TL-622)", () => {
+  const lines = hookBlock().split("\n");
+  const withGap = [lines[0], "", ...lines.slice(1)].join("\n");
+  assert.equal(withGap.split("\n").includes(""), true, "the premise: the new block holds an empty line");
+  for (const [indent, eol] of [["  ", "\n"], ["\t", "\r\n"], [" ", "\n"]]) {
+    const r = replaceBlock("x" + eol + shaped(STALE, indent, eol) + eol + "y" + eol, withGap);
+    assert.equal(r.replaced, true);
+    const written = r.text.split("\n").map((l) => l.replace(/\r$/, ""));
+    assert.equal(written.some((l) => l !== "" && l.trim() === ""), false,
+      JSON.stringify(indent) + ": a line of whitespace alone is trailing whitespace");
+    assert.equal(r.text, "x" + eol + withGap.split("\n").map((l) => (l === "" ? "" : indent + l)).join(eol) + eol + "y" + eol);
+  }
+});
+
 test("replaceBlock gives the closing marker its own ending, so a file with no final newline gains no byte", () => {
   // The last line of a file has no CR to keep; giving it the opening marker's
   // would add a byte after the block.

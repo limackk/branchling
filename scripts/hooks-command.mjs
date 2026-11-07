@@ -238,15 +238,24 @@ export function installedBlock(text) {
  * marker, the line the match is anchored on. The closing marker keeps its
  * OWN ending: as the last line of a file with no final newline it has none,
  * and giving it the opening marker's CR would add a byte after the block.
+ *
+ * THE INDENTATION IS WHAT `blockRange` TRIMMED TO RECOGNISE THE MARKER (TL-622).
+ * `trim()` strips every Unicode whitespace character, so a marker indented
+ * with a non-breaking space or a form feed is ours; reading the indentation
+ * as spaces and tabs only wrote its successor flush left. An empty line of
+ * the new block stays empty: the indentation on it would be trailing
+ * whitespace and nothing else.
  */
 export function replaceBlock(text, block) {
   const lines = String(text).split("\n");
   const range = blockRange(lines);
   if (!range) return { text, replaced: false };
-  const indent = /^[ \t]*/.exec(lines[range.open])[0];
+  const marker = lines[range.open];
+  const indent = marker.slice(0, marker.length - marker.trimStart().length);
+  const indented = (l) => (l === "" ? "" : indent + l);
   const cr = (line) => (line.endsWith("\r") ? "\r" : "");
-  const fresh = block.split("\n").map((l) => indent + l + cr(lines[range.open]));
-  fresh[fresh.length - 1] = indent + block.split("\n").at(-1) + cr(lines[range.close]);
+  const fresh = block.split("\n").map((l) => indented(l) + cr(marker));
+  fresh[fresh.length - 1] = indented(block.split("\n").at(-1)) + cr(lines[range.close]);
   lines.splice(range.open, range.close - range.open + 1, ...fresh);
   return { text: lines.join("\n"), replaced: true };
 }
