@@ -644,6 +644,30 @@ pipe in a file instead if you prefer to look at it first.
 task state back outside the branch, which is the thing files were chosen over a
 tracker to avoid.
 
+**Retire the source issues once the import is committed.** The import closes
+nothing in GitHub, and an issue left open there goes on collecting comments,
+labels and a status of its own — the second copy the paragraph above rules out.
+Keep the `--json` report of the real run: every `created` entry carries the task
+`id`, the issue's `source` URL and its `sourceState`, `open` or `closed`. Commit
+the imported tasks first, so that the closing comment names a task the rest of
+the team can see, and then close every issue that was still open:
+
+```bash
+gh issue list --state all --limit 500 --json number,title,body,state,labels,url \
+  | branchling import --from github --json > imported.json
+git add backlog && git commit -m "Import the GitHub backlog"
+
+jq -r '.created[] | select(.sourceState == "open") | "\(.source) \(.id)"' \
+  imported.json | while read -r url id; do
+    gh issue close "$url" --comment "Moved to $id in the repository backlog"
+  done
+```
+
+That last step runs in your shell, deliberately: `branchling import` still makes
+no network request, and `jq` is your choice rather than its dependency. An issue
+that was already closed is left alone. `branchling import --help` prints the same
+procedure.
+
 **What it does not bring over**, so that nobody discovers it later: comments,
 attachments, status history and assignees. Those are the conversation *around* a
 task rather than the task, and every imported file carries a link back to the

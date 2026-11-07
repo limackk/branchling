@@ -252,6 +252,50 @@ test("the report states how many tasks it left unfinishable", () => {
   assert.match(r.stderr, /3 of them have no `verification:`/);
 });
 
+// ── Retiring the source issues (TL-580) ───────────────────────────────────
+
+test("created[] carries each source issue's state, open and closed alike", () => {
+  const dir = backlog("state");
+  const r = importInto(dir, ["--json"]);
+  assert.equal(r.status, 0, r.stderr);
+  const created = JSON.parse(r.stdout).created;
+  const bySource = new Map(created.map((c) => [c.source, c]));
+  assert.equal(bySource.size, 3);
+  assert.equal(bySource.get("https://github.com/acme/app/issues/12").sourceState, "open");
+  assert.equal(bySource.get("https://github.com/acme/app/issues/31").sourceState, "closed");
+  assert.equal(bySource.get("https://github.com/acme/app/issues/44").sourceState, "open");
+  const prefix = loadConfig(dir).taskIdPrefix;
+  for (const c of created) {
+    assert.match(c.id, new RegExp("^" + prefix + "-\\d+$"), "an entry without its task id cannot name the task in a comment");
+  }
+});
+
+test("the report points at retirement when an open issue was imported, and not otherwise", () => {
+  const pointer = /still OPEN in GitHub[\s\S]*RETIRING THE SOURCE ISSUES/;
+
+  // The positive control: the fixture holds two open issues.
+  const withOpen = importInto(backlog("retire-open"));
+  assert.equal(withOpen.status, 0, withOpen.stderr);
+  assert.match(withOpen.stderr, /2 came from issues still OPEN in GitHub/);
+  assert.match(withOpen.stderr, pointer);
+  assert.match(withOpen.stderr, /import --help/);
+
+  // The negative control: the same issues, every one already closed.
+  const allClosed = JSON.stringify(JSON.parse(issues()).map((i) => ({ ...i, state: "CLOSED" })));
+  const closed = importInto(backlog("retire-closed"), [], allClosed);
+  assert.equal(closed.status, 0, closed.stderr);
+  assert.match(closed.stderr, /3 of them have no `verification:`/, "the run reported nothing — the control proves nothing");
+  assert.doesNotMatch(closed.stdout + closed.stderr, pointer);
+});
+
+test("the help gives the retirement procedure, selecting only issues that were open", () => {
+  const r = run(["import", "--help"]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /RETIRING THE SOURCE ISSUES/);
+  assert.match(r.stdout, /select\(\.sourceState == "open"\)/);
+  assert.match(r.stdout, /gh issue close "\$url" --comment/);
+});
+
 test("a second import of the same input creates nothing — and a new issue still lands", () => {
   const dir = backlog("again");
   assert.equal(importInto(dir).status, 0);
