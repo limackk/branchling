@@ -29,12 +29,23 @@
  * untracked), and a run with nothing to mutate FAILS: a score over an empty
  * set reads exactly like a score over real work.
  *
- * HOW TESTS ARE SELECTED. A test file is run for a changed module M when it
+ * HOW TESTS ARE SELECTED. The candidates are every `*.test.mjs` under
+ * `scripts/tests/`, subdirectories included (TL-591): a file kept out of the
+ * default glob, such as `mutation/subprocess-kill.test.mjs`, is still a test
+ * that kills mutants, and leaving it out reported them Survived. Selecting
+ * from a subdirectory changes nothing about what `node --test
+ * scripts/tests/*.test.mjs` runs. A test file is run for a changed module M
+ * when it
  *   1. names M's filename,
  *   2. names another script whose static import closure contains M, or
- *   3. names `cli.mjs` and a command word whose script's closure contains M
- *      (read from the `COMMANDS` table `scripts/cli.mjs` exports), or
- *      M is in the closure of `cli.mjs` itself.
+ *   3. reaches the repository's `scripts/cli.mjs` and names a command word
+ *      whose script's closure contains M (read from the `COMMANDS` table
+ *      `scripts/cli.mjs` exports), or M is in the closure of `cli.mjs` itself.
+ * Rule 3 recognises the CLI by the path the test builds — `cli.mjs` as the
+ * last segment of a `join(…)` or `resolve(…)`, appended as `"/cli.mjs"`, or a
+ * relative specifier that resolves from the test's own directory to
+ * `scripts/cli.mjs` — not by the bare name: a fixture that writes a file
+ * called `cli.mjs` selected a test for every module the CLI imports.
  * Over-selection costs time; under-selection reports a killable mutant as
  * Survived. A script that reaches M only by SPAWNING another script is not
  * followed, so `--tests` exists to widen the set by hand.
@@ -153,6 +164,37 @@ function scriptsIn(root) {
   return readdirSync(dir).filter((f) => f.endsWith(".mjs")).map((f) => "scripts/" + f);
 }
 
+/** Every `*.test.mjs` under `dir`, as paths relative to it, subdirectories included. */
+function testFilesUnder(dir, rel = "") {
+  const found = [];
+  for (const entry of readdirSync(join(dir, rel), { withFileTypes: true })) {
+    const path = rel ? rel + "/" + entry.name : entry.name;
+    if (entry.isDirectory()) found.push(...testFilesUnder(dir, path));
+    else if (entry.isFile() && entry.name.endsWith(".test.mjs")) found.push(path);
+  }
+  return found;
+}
+
+const CLI_PATH_RES = [
+  /,\s*["'`]cli\.mjs["'`]\s*\)/,   // join(SCRIPTS_DIR, "cli.mjs"), resolve(HERE, "..", "cli.mjs")
+  /\+\s*["'`]\/cli\.mjs["'`]/,      // SCRIPTS_DIR + "/cli.mjs"
+];
+// Only `../` can lead from a test under scripts/tests/ to scripts/cli.mjs.
+const RELATIVE_CLI_RE = /["'`]((?:\.\.\/)+cli\.mjs)["'`]/g;
+
+/**
+ * Whether the test at `testPath` (repository-relative) builds the path of the
+ * repository's `scripts/cli.mjs`, rather than merely naming a file `cli.mjs`.
+ */
+export function reachesCli(text, testPath) {
+  if (CLI_PATH_RES.some((re) => re.test(text))) return true;
+  const from = dirname(testPath);
+  for (const m of text.matchAll(RELATIVE_CLI_RE)) {
+    if (join(from, m[1]).split(sep).join("/") === "scripts/cli.mjs") return true;
+  }
+  return false;
+}
+
 /**
  * The test files that can kill a mutant in any of `modules`, by the three rules
  * in the header. Returned with the reason each one was chosen, so a reader can
@@ -161,7 +203,7 @@ function scriptsIn(root) {
 export async function selectTests(root, modules, { namedOnly = false } = {}) {
   const testsDir = join(root, "scripts", "tests");
   if (!existsSync(testsDir)) return [];
-  const testFiles = readdirSync(testsDir).filter((f) => f.endsWith(".test.mjs")).sort();
+  const testFiles = testFilesUnder(testsDir).sort();
   const cache = new Map();
   const scripts = scriptsIn(root);
   const commands = await commandScripts(root);
@@ -169,10 +211,11 @@ export async function selectTests(root, modules, { namedOnly = false } = {}) {
   const selected = [];
 
   for (const f of testFiles) {
+    const file = "scripts/tests/" + f;
     const text = readFileSync(join(testsDir, f), "utf8");
     const named = scripts.filter((s) => text.includes(basename(s)));
     const words = new Set([...text.matchAll(/["'`]([a-z][a-z0-9-]*)["'`]/g)].map((m) => m[1]));
-    const spawnsCli = named.includes("scripts/cli.mjs");
+    const spawnsCli = reachesCli(text, file);
     const why = [];
     for (const m of modules) {
       if (text.includes(basename(m))) { why.push(basename(m) + " named"); continue; }
@@ -184,7 +227,7 @@ export async function selectTests(root, modules, { namedOnly = false } = {}) {
       const cmd = [...commands].find(([name, script]) => words.has(name) && importClosure(root, script, cache).has(m));
       if (cmd) why.push(basename(m) + " via `" + cmd[0] + "`");
     }
-    if (why.length) selected.push({ file: "scripts/tests/" + f, why });
+    if (why.length) selected.push({ file, why });
   }
   return selected;
 }
