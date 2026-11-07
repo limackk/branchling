@@ -90,6 +90,15 @@
  * tag. The report names who recorded it, when and why (`records`), because a
  * stage moved on somebody's word is only as good as the word.
  *
+ * THE TASK FILES are read through `releaseTaskRecords()` in release-gaps.mjs,
+ * the reader `check --release` judges by (TL-573). The viewer's Release view
+ * draws its lanes from this computation and its gap panel from the gate, so a
+ * parse of its own here would be a second answer to "what does this task say"
+ * inside one page — the drift TL-519 and TL-552 removed from the panel. The
+ * import closes a cycle with release-gaps.mjs, which takes `currentRelease()`
+ * from here; it is safe because each side calls the other only from inside a
+ * function, never while its module is being evaluated.
+ *
  * Tests: `node --test scripts/tests/release-status.test.mjs`,
  *        `node --test scripts/tests/release-scope.test.mjs`,
  *        `node --test scripts/tests/release-shipped-scope.test.mjs`
@@ -108,13 +117,13 @@ import {
 import { gitDiscoveryEnv } from "./git-env.mjs";
 import { readHistory } from "./history.mjs";
 import { releaseEntriesOf } from "./release-entries.mjs";
+import { releaseTaskRecords } from "./release-gaps.mjs";
 import { readRecord } from "./release-record.mjs";
 import { readShipments } from "./release-shipped.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { repoRoot } from "./modified-files.mjs";
-import { answerBacklogDirRefusal, backlogPaths, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { answerBacklogDirRefusal, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
-import { readTaskMetas } from "./task-io.mjs";
 import { taskIdScanner } from "./task-id.mjs";
 import { MARK, color, failure, refusal } from "./ui.mjs";
 
@@ -922,8 +931,16 @@ export function renderScope(scope, archived, paint = color) {
   return lines;
 }
 
-/** The whole computation, for a resolved backlog. */
-export function computeStatus({ root, config, filter, count, release = null, now = Date.now(), run = spawnSync }) {
+/**
+ * The whole computation, for a resolved backlog.
+ *
+ * @param {object[]|null} [opts.tasks] the task records, as `releaseTaskRecords()`
+ *        returns them. A caller that also hands them to `releaseGaps()` passes
+ *        them here so both answers are computed from ONE read of the tree;
+ *        omitted, they are read here through the same reader.
+ */
+export function computeStatus({ root, config, filter, count, release = null, now = Date.now(), run = spawnSync, tasks: given = null }) {
+  const taskRecords = given || releaseTaskRecords(root, config);
   const targets = config.deployTargets;
   const observed = observedTargets(targets);
   const repo = repoRoot(root);
@@ -950,13 +967,13 @@ export function computeStatus({ root, config, filter, count, release = null, now
   // is still an answer. Every other planned task is marked `unscanned` rather
   // than placed — "not shipped" there would be a verdict nobody measured.
   if (!state.scanned) {
-    const metas = readTaskMetas(backlogPaths(root).tasksDir, config).filter((m) => m.id);
+    const identified = taskRecords.filter((m) => m.id);
     // A target in another repository is answered without git: which tasks are
     // its, by their `target:` field. A project whose every target lives
     // elsewhere has nothing else to show.
     if (filter.stage === null) {
-      const away = unobservableTasks(targets, metas, config.archivedStatuses);
-      const describe = new Map(metas.map((m) => [m.id, { id: m.id, title: m.title, status: m.status, closed: null }]));
+      const away = unobservableTasks(targets, identified, config.archivedStatuses);
+      const describe = new Map(identified.map((m) => [m.id, { id: m.id, title: m.title, status: m.status, closed: null }]));
       for (const t of targets) {
         if (!isExternalTarget(t) || (filter.target !== null && t.name !== filter.target)) continue;
         report.targets.push(unobservableLane(t, away.get(t.name).map((id) => describe.get(id)), count));
@@ -964,18 +981,17 @@ export function computeStatus({ root, config, filter, count, release = null, now
     }
     if (release !== null) {
       report.release = withCurrent(releaseScope({
-        state, targets, tasks: metas.map(scopeRecord), release, archived: config.archivedStatuses,
+        state, targets, tasks: identified.map(scopeRecord), release, archived: config.archivedStatuses,
         target: filter.target, count, shipment: shipments.get(release) || null,
-      }), { state, targets, tasks: metas.map(scopeRecord), releases: config.releases, archived: config.archivedStatuses, shipments });
+      }), { state, targets, tasks: identified.map(scopeRecord), releases: config.releases, archived: config.archivedStatuses, shipments });
     }
     return { report, state };
   }
 
-  const metas = readTaskMetas(backlogPaths(root).tasksDir, config);
   const archived = config.archivedStatuses;
   const tasks = new Map();
   const archivedIds = [];
-  for (const m of metas) {
+  for (const m of taskRecords) {
     if (!m.id) continue;
     const isArchived = archived.indexOf(m.status) >= 0;
     if (isArchived) archivedIds.push(m.id);
@@ -988,7 +1004,7 @@ export function computeStatus({ root, config, filter, count, release = null, now
     return closedDate(readHistory(root, id), t.meta, archived);
   };
 
-  const away = unobservableTasks(targets, metas, archived);
+  const away = unobservableTasks(targets, taskRecords, archived);
   const awayIds = new Set([...away.values()].flat());
   const off = readOffTrunk({ run, root: repo, state, targets: observed, prefix: config.taskIdPrefix, archivedIds });
   // A closed task of a target in another repository is named in that target's
@@ -1019,7 +1035,7 @@ export function computeStatus({ root, config, filter, count, release = null, now
   report.targets = pipeline;
   report.unplaced = { count: off.unplaced.length, ids: count ? [] : off.unplaced };
   if (release !== null) {
-    const records = metas.filter((m) => m.id).map(scopeRecord);
+    const records = taskRecords.filter((m) => m.id).map(scopeRecord);
     report.release = withCurrent(releaseScope({
       state, targets, tasks: records, release, archived, target: filter.target, count,
       shipment: shipments.get(release) || null,
