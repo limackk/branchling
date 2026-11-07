@@ -25,6 +25,8 @@ import { listTaskFiles, recordEdit, requiresReason } from "./history.mjs";
 import { backlogPaths } from "./paths.mjs";
 import { ANY_TASK_ID } from "./task-id.mjs";
 import {
+  ACTOR_NAMESPACES,
+  ACTOR_UNKNOWN,
   actorRefusal,
   buildFieldSpecs,
   DEDICATED_FIELDS,
@@ -102,6 +104,18 @@ export function writeTaskField(opts) {
 
   const badActor = actorRefusal(actor);
   if (badActor) return refused("usage", 400, badActor.refusal, { details: [badActor.hint] });
+  // `isValidActor()` accepts `unknown` because history READERS and
+  // `reconcile()` need it: it is what the tool records for a change it
+  // OBSERVED. A field write is a change the tool MAKES, so the same value here
+  // would file a deliberate edit under "nobody knows who" with source `set` or
+  // `viewer` — a record contradicting itself (TL-569). The forms are in the
+  // message itself, because the served route answers with the message alone.
+  if (actor === ACTOR_UNKNOWN) {
+    const forms = ACTOR_NAMESPACES.map((namespace) => namespace + ":<name>");
+    return refused("usage", 400, "the actor `" + ACTOR_UNKNOWN + "` is reserved for a change the tool observed, " +
+      "not one it makes; state who makes this edit as " + forms.slice(0, -1).join(", ") + " or " + forms[forms.length - 1],
+    { details: ["Use one of: " + forms.join(" | ")] });
+  }
   if (refusedFields.indexOf(field) >= 0 && DEDICATED_FIELDS[field]) {
     return refused("dedicated", 400, "`" + field + "` has dedicated commands and is not set here",
       { details: ["use: " + DEDICATED_FIELDS[field].join(", ")] });
