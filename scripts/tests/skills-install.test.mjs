@@ -63,7 +63,7 @@ function fixture() {
   return { dir, backlog, env };
 }
 
-const SKILL = join("backlog-workflow", "SKILL.md");
+const SKILL = "backlog-workflow/SKILL.md";
 
 // The command name a user types, written out: a test that took it from the
 // constant the code prints would assert that the constant equals itself.
@@ -244,8 +244,8 @@ function source(fx) {
   };
 }
 
-const DEMO = join("demo", "SKILL.md");
-const NOTES = join("demo", "refs", "notes.md");
+const DEMO = "demo/SKILL.md";
+const NOTES = "demo/refs/notes.md";
 
 function installed(fx, file) {
   return join(fx.dir, ".claude", "skills", file);

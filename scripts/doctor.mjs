@@ -40,6 +40,7 @@ import { commandRunner, contextBudget } from "./context-budget.mjs";
 import { ATTRIBUTE_RULES, BLOCK_OPEN, IGNORE_RULES, hasUnionMerge, insideGitRepo, trackedViews, unignoredViews } from "./git-rules.mjs";
 import { SNAPSHOT_FILE, loadSnapshot, readMigrations, reconcile } from "./history.mjs";
 import { HOOK_NAMES, hooksTarget, inspect } from "./hooks-command.mjs";
+import { canonicalPath } from "./canonical-path.mjs";
 import { CLAUDE_AGENT_FILE, CLAUDE_IMPORT_LINE, NEUTRAL_AGENT_FILE, NUDGE_VERSION, nudgeState } from "./instructions.mjs";
 import { USER_SKILLS, compareInstalled, skillsTarget } from "./install-skills.mjs";
 import { SHIPPED_TEMPLATE, planRefresh, templateFields } from "./template-command.mjs";
@@ -478,7 +479,7 @@ function staleHooksRow(states) {
   }
   const repairs = [];
   if (closed.length) repairs.push("our block in " + closed.join(", "));
-  if (unclosed.length) repairs.push("the lines from `" + BLOCK_OPEN + "` onwards in " + unclosed.map((s) => s.path).join(", "));
+  if (unclosed.length) repairs.push("the lines from `" + BLOCK_OPEN + "` onwards in " + unclosed.map((s) => canonicalPath(s.path)).join(", "));
   return [check("git-hooks-current", "git gates are current", WARN,
     stale.join(", ") + " carr" + plural(stale.length, "ies a block", "y blocks") +
       " that differ" + plural(stale.length, "s", "") + " from the one this release writes — a change to the gate never reached " +

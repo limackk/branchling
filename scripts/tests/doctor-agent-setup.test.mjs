@@ -10,10 +10,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { canonicalPath } from "../canonical-path.mjs";
 import { checkSkill } from "../doctor.mjs";
 import { contentHash } from "../install-skills.mjs";
 import { CLAUDE_IMPORT_LINE, NUDGE_CLOSE, NUDGE_OPEN_PREFIX, NUDGE_VERSION } from "../instructions.mjs";
@@ -124,7 +125,7 @@ test("an older packaged version is reported with a plain refresh, which names no
   const row = checkSkill(join(dir, "backlog"), opts);
   assert.equal(row.status, "info");
   assert.equal(row.title, "packaged skill");
-  assert.equal(row.detail, join("demo", "SKILL.md") + " is an older packaged version — its description is not the one this release ships");
+  assert.equal(row.detail, "demo/SKILL.md" + " is an older packaged version — its description is not the one this release ships");
   assert.match(row.fix, / skills install --refresh$/, "a plain refresh must name no file: " + row.fix);
 
   writeFileSync(join(target, "SKILL.md"), "mine\n", "utf8");
@@ -137,7 +138,7 @@ test("an older packaged version is reported with a plain refresh, which names no
   assert.equal(current.status, "ok");
   assert.equal(current.title, "packaged skill");
   // The repository root is canonical (macOS: /var is /private/var).
-  assert.equal(current.detail, "demo in " + join(realpathSync(dir), ".claude", "skills"));
+  assert.equal(current.detail, "demo in " + join(canonicalPath(dir), ".claude", "skills"));
 
   // A package that cannot be read is not a difference: `skills install` is
   // where a broken tarball is reported.
@@ -160,8 +161,8 @@ test("several skills and files are each named, joined so they stay readable", ()
     writeFileSync(join(dir, ".claude", "skills", name, "SKILL.md"), "mine\n", "utf8");
   }
   const edited = checkSkill(backlog, opts);
-  assert.equal(edited.detail, join("demo", "SKILL.md") + " differs from every packaged version, " +
-    join("other", "SKILL.md") + " differs from every packaged version — its description is not the one this release ships");
+  assert.equal(edited.detail, "demo/SKILL.md" + " differs from every packaged version, " +
+    "other/SKILL.md" + " differs from every packaged version — its description is not the one this release ships");
   assert.match(edited.fix, / skills install --refresh demo\/SKILL\.md other\/SKILL\.md {3}# replaces your edit of it$/);
 
   for (const name of opts.skills) writeFileSync(join(dir, ".claude", "skills", name, "SKILL.md"), "new\n", "utf8");
@@ -186,8 +187,8 @@ test("a directory in place of the installed SKILL.md is a warning that names it,
   mkdirSync(path);
   const row = rows(dir)["agent-skill"];
   assert.equal(row.status, "warn", JSON.stringify(row));
-  assert.equal(row.detail, join("backlog-workflow", "SKILL.md") + " is not a regular file — an editor cannot read the skill from it");
-  assert.match(row.fix, / skills install {3}# after moving .*backlog-workflow\/SKILL\.md aside$/);
+  assert.equal(row.detail, "backlog-workflow/SKILL.md" + " is not a regular file — an editor cannot read the skill from it");
+  assert.match(row.fix, / skills install {3}# after moving .*backlog-workflow[\\/]SKILL\.md aside$/);
 
   // Positive control: once the directory is gone, the command it names makes the row green.
   rmSync(path, { recursive: true });
@@ -210,9 +211,9 @@ test("only the paths that are not files are named, and a regular file beside the
   const row = checkSkill(join(dir, "backlog"), opts);
   assert.equal(row.status, "warn");
   assert.equal(row.title, "packaged skill");
-  assert.equal(row.detail, join("demo", "SKILL.md") + ", " + join("other", "SKILL.md") +
+  assert.equal(row.detail, "demo/SKILL.md" + ", " + "other/SKILL.md" +
     " are not regular files — an editor cannot read the skill from them");
-  const target = join(realpathSync(dir), ".claude", "skills");
+  const target = join(canonicalPath(dir), ".claude", "skills");
   assert.ok(row.fix.endsWith("skills install   # after moving " + join(target, "demo", "SKILL.md") + " " +
     join(target, "other", "SKILL.md") + " aside"), row.fix);
 });

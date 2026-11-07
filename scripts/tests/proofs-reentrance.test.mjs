@@ -30,7 +30,7 @@ import { join } from "node:path";
 
 import { PROOFS_RUN_ENV, nestedRun } from "../check-backlog-proofs.mjs";
 
-import { isolateHome, SCRIPTS_DIR } from "./_repo.mjs";
+import { isolateHome, posixPath, SCRIPTS_DIR } from "./_repo.mjs";
 
 isolateHome("proofs-reentrance");
 
@@ -120,7 +120,7 @@ test("a closed contract holding `check --proofs` does not make a proofs run recu
     const marker = join(dir, "broken");
     // TASK-1 is the positive control's subject: green while the marker is absent.
     writeFileSync(join(dir, "tasks", "TASK-1-a-plain-contract.md"),
-      task("TASK-1", "A plain contract", "still-holds", "test ! -e " + marker), "utf8");
+      task("TASK-1", "A plain contract", "still-holds", "test ! -e " + posixPath(marker)), "utf8");
     // TASK-2 says "every earlier contract still passes" in the shape a consumer writes.
     writeFileSync(join(dir, "tasks", "TASK-2-earlier-proofs-hold.md"),
       task("TASK-2", "Earlier proofs hold", "earlier-proofs-hold",

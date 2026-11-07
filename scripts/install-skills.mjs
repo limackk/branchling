@@ -166,7 +166,9 @@ export function compareInstalled(repoRoot, opts = {}) {
         else if ((shipped[posix(key)] || []).includes(hash)) state = "shipped";
         else state = "edited";
       }
-      files.push({ file: key, state });
+      // The name the package, SHIPPED_VERSIONS and `--refresh <file>` all use,
+      // on every platform: a `\` here reached doctor's rows on Windows (TL-624).
+      files.push({ file: posix(key), state });
     }
   }
   return { ok: true, files, target };
