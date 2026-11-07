@@ -1112,12 +1112,20 @@ export function validateConfig(config) {
   for (const a of config.actors || []) {
     const bad = actorRefusal(a);
     if (!bad) continue;
-    // A right namespace with a wrong name is a different repair (TL-590):
-    // suggesting the three namespaces again would point at the half that is fine.
-    problems.push(bad.namespace
-      ? `\`actors\` contains \`${a}\` with no valid namespace — use ` +
-          ACTOR_NAMESPACES.map((n) => n + ":" + a.replace(/^[a-z]+:/, "")).join(" / ")
-      : "`actors` contains " + bad.refusal + " — " + bad.hint);
+    // The refusal is a whole clause with its own subject ("the actor `x` has
+    // ..."), so it is labelled with the key, not made the object of a verb
+    // (TL-611). Both causes take their sentence from actorRefusal(), so the
+    // diagnosis has one wording; only the remedy differs. A right namespace
+    // with a wrong name is a different repair (TL-590): suggesting the three
+    // namespaces again would point at the half that is fine, so the namespace
+    // remedy alone keeps the name and offers it under each namespace. The
+    // remedy reads the entry exactly as actorRefusal() shows it, so the two
+    // halves of one message cannot name different values; with no name left
+    // to keep (`~`, `robot:`), the remedy is the generic one.
+    const kept = (a == null ? "" : String(a)).replace(/^[a-z]+:/, "");
+    problems.push("`actors`: " + bad.refusal + ". " + (bad.namespace && kept
+      ? "Use " + ACTOR_NAMESPACES.map((n) => n + ":" + kept).join(" / ")
+      : bad.hint));
   }
 
   // A role is an identifier a dispatcher MATCHES ON and that a caller types as a

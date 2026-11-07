@@ -141,6 +141,10 @@ test("each character outside the set is named once, and an unrepairable name get
   assert.doesNotMatch(actorRefusal("agent:-X").hint, /for example/, "lowercased `-x` still starts badly");
 });
 
+// One diagnosis sentence, then one remedy sentence, and no third. A full stop
+// followed by a space ends a sentence; one inside a code span ("`.`,") does not.
+const TWO_SENTENCES = /^`actors`: the actor `[^`]*` has [^.]*(\.[^ ][^.]*)*\. [A-Z](?:[^.]|\.(?! ))*$/;
+
 test("config validation reports a wrong NAME in `actors` as a name, and a namespace as before", () => {
   const sandbox = fixtureDir(join(tmpdir(), "branchling-actor-shape-config-"));
   TEMP.push(sandbox);
@@ -151,10 +155,53 @@ test("config validation reports a wrong NAME in `actors` as a name, and a namesp
   const ns = problems.find((p) => p.includes("`" + NO_NAMESPACE + "`"));
   const unknown = problems.find((p) => p.includes(UNKNOWN_NAMESPACE));
   assert.ok(name && ns && unknown, problems.join("\n"));
-  assert.equal(name, "`actors` contains " + actorRefusal(UPPERCASE).refusal + " — " + actorRefusal(UPPERCASE).hint);
-  assert.equal(ns, "`actors` contains `nobody` with no valid namespace — use local:nobody / agent:nobody / user:nobody");
+  // The refusal is a clause with its own subject and verb, so it is labelled
+  // with the key and ended, not made the object of "contains" (TL-611).
+  assert.equal(name, "`actors`: " + actorRefusal(UPPERCASE).refusal + ". " + actorRefusal(UPPERCASE).hint);
+  assert.equal(ns, "`actors`: the actor `nobody` has no valid namespace — no `<namespace>:` comes before the name. " +
+    "Use local:nobody / agent:nobody / user:nobody");
   // The suggestion keeps the name and drops only the wrong namespace.
-  assert.equal(unknown, "`actors` contains `robot:r2d2` with no valid namespace — use local:r2d2 / agent:r2d2 / user:r2d2");
+  assert.equal(unknown, "`actors`: the actor `robot:r2d2` has no valid namespace — `robot` is not one of local, agent, user. " +
+    "Use local:r2d2 / agent:r2d2 / user:r2d2");
+  for (const p of [name, ns, unknown]) {
+    // The defect itself: a verb taking the refusal clause as its object.
+    assert.doesNotMatch(p, /contains (the actor|`)/, p);
+    assert.match(p, TWO_SENTENCES, p);
+  }
+  // Positive control: the shape is not one any message passes. A third
+  // sentence after the remedy fails it, and so does the old wording.
+  assert.doesNotMatch("`actors`: the actor `x` has foo. Use a. Third sentence. Fourth.", TWO_SENTENCES);
+  assert.doesNotMatch("`actors` contains the actor `x` has foo — Use a", TWO_SENTENCES);
+});
+
+test("an `actors` entry that YAML reads as a number is refused, not thrown on", () => {
+  const sandbox = fixtureDir(join(tmpdir(), "branchling-actor-shape-number-"));
+  TEMP.push(sandbox);
+  writeFileSync(join(sandbox, "config.yaml"), "project_name: \"Test\"\n");
+  const base = loadConfig(sandbox, { strict: false });
+  const problems = validateConfig(Object.assign({}, base, { actors: [42] }));
+  assert.ok(problems.includes("`actors`: the actor `42` has no valid namespace — no `<namespace>:` comes before " +
+    "the name. Use local:42 / agent:42 / user:42"), problems.join("\n"));
+});
+
+test("an `actors` entry with no name to keep gets the generic remedy, naming the value the refusal names", () => {
+  const sandbox = fixtureDir(join(tmpdir(), "branchling-actor-shape-null-"));
+  TEMP.push(sandbox);
+  writeFileSync(join(sandbox, "config.yaml"), "project_name: \"Test\"\n");
+  const base = loadConfig(sandbox, { strict: false });
+  // `actors: [~]` reads as null. actorRefusal() shows it as the empty string,
+  // so a remedy built from String(null) would offer `local:null` for an entry
+  // the diagnosis calls ``.
+  const problems = validateConfig(Object.assign({}, base, { actors: [null, "robot:"] }));
+  const generic = actorRefusal(null).hint;
+  assert.ok(problems.includes("`actors`: the actor `` has no valid namespace — no `<namespace>:` comes before " +
+    "the name. " + generic), problems.join("\n"));
+  assert.ok(problems.includes("`actors`: the actor `robot:` has no valid namespace — `robot` is not one of " +
+    "local, agent, user. " + generic), problems.join("\n"));
+  for (const p of problems.filter((p) => p.startsWith("`actors`"))) {
+    assert.doesNotMatch(p, /null/, p);
+    assert.match(p, TWO_SENTENCES, p);
+  }
 });
 
 // ── 2. Every writing command ──────────────────────────────────────────────
