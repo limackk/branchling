@@ -262,6 +262,67 @@ test("POSITIVE CONTROL: remove the sentence and the guard says which one went", 
 });
 
 /**
+ * TL-607: the step every implementer takes — watching a new test fail without
+ * the change — has a stated method that touches no ref the clone shares.
+ *
+ * `refs/stash` belongs to the clone, not to a worktree, so two sessions that
+ * each `stash push` / `stash pop` trade each other's edits. The guide has to
+ * name the scratch-copy route AND say why the stash is not one; the second half
+ * is what stops the next session from reaching for it anyway.
+ *
+ * The row is located by its label before anything is asked of it: a needle
+ * searched across the whole guide would also be satisfied by a stash mention in
+ * some other paragraph, and a check over a row it never found is a check over
+ * an empty string.
+ *
+ * PURE over the text, so the control below can hand it the guide without the row.
+ *
+ * @returns {{ found: boolean, problems: string[] }}
+ */
+function stashFreeBaseline(guide) {
+  const lines = String(guide || "").split("\n");
+  const start = lines.findIndex((l) => /^  Proving it fails\b/.test(l));
+  if (start < 0) return { found: false, problems: ["task-execution: no row on proving a new test fails"] };
+  // The row runs until the next row label (two-space indent) or unindented prose.
+  let end = start + 1;
+  while (end < lines.length && !/^ {0,2}\S/.test(lines[end])) end++;
+  const row = lines.slice(start, end).join(" ").replace(/\s+/g, " ");
+  const problems = [];
+  if (!/git worktree add --detach|git archive/.test(row)) {
+    problems.push("task-execution: names no scratch copy to run the old code in");
+  }
+  if (!/git stash/.test(row) || !/shared by every worktree/.test(row)) {
+    problems.push("task-execution: does not say `git stash` is shared by every worktree");
+  }
+  return { found: true, problems };
+}
+
+test("the guide names a stash-free way to run a new test against the old code", () => {
+  const fx = fixture();
+  const guide = topicText("task-execution", loadConfig(fx.dir));
+  const result = stashFreeBaseline(guide);
+  assert.ok(result.found, "the row on proving a test fails was not found at all");
+  assert.deepEqual(result.problems, []);
+});
+
+test("POSITIVE CONTROL: without the row, or with its halves gone, the guard says so", () => {
+  const fx = fixture();
+  const guide = topicText("task-execution", loadConfig(fx.dir));
+  // The row removed: from its label up to the next label.
+  const withoutRow = guide.replace(/^  Proving it fails[\s\S]*?(?=^  \S)/m, "");
+  assert.notEqual(withoutRow, guide, "the control removed nothing — the row's shape changed");
+  const gone = stashFreeBaseline(withoutRow);
+  assert.equal(gone.found, false);
+  assert.match(gone.problems[0], /no row on proving/);
+
+  // The row kept but each half stripped: each needle fails on its own.
+  const noMethod = stashFreeBaseline(guide.replace(/git worktree add --detach|git archive/g, "copy it"));
+  assert.deepEqual(noMethod.problems, ["task-execution: names no scratch copy to run the old code in"]);
+  const noWarning = stashFreeBaseline(guide.replace(/shared by every\s+worktree/g, "convenient"));
+  assert.deepEqual(noWarning.problems, ["task-execution: does not say `git stash` is shared by every worktree"]);
+});
+
+/**
  * TL-132: the handoff the guide teaches has to be callable in the backlog the
  * guide was rendered for. `roles:` is optional — the fixture declares none, as
  * this project does — and `handoff --to-role` refuses outright where there are

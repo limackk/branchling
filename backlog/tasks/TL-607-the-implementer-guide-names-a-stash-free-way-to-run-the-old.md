@@ -8,8 +8,8 @@ epic: ""                           # free text — the group this task counts to
 release: ""                        # the release it is PLANNED for (a value from `releases:` in config.yaml). Empty = none
 target: []                         # the deploy targets in ANOTHER repository it ships from (`deploy_targets` with `repository:`). Empty = none
 priority: P1
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:loop-4
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 conflict_group: [instructions]  # the AREA it touches (e.g. a module): `next` and `run` hold it back while a task of the same group is in progress. Empty = `conflict_group_from`, or none
@@ -41,4 +41,4 @@ In wave 19 two implementers (TL-594 and TL-597) each ran `git stash push` / `git
 
 ## Acceptance criteria
 
-- [ ] The implementer guide names a stash-free way to run a test against the old code, and the test fails if that paragraph is removed [proof: guide-names-stash-free-revert]
+- [x] The implementer guide names a stash-free way to run a test against the old code, and the test fails if that paragraph is removed [proof: guide-names-stash-free-revert]
