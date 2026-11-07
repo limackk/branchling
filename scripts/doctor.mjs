@@ -37,9 +37,9 @@ import { archivedElsewhereBySource, crossBranchState, divergences } from "./bran
 import { ConfigError, formatConfigError, loadConfig } from "./config.mjs";
 import { deployFetchState } from "./deploy-fetch.mjs";
 import { commandRunner, contextBudget } from "./context-budget.mjs";
-import { ATTRIBUTE_RULES, BLOCK_OPEN, IGNORE_RULES, hasUnionMerge, insideGitRepo, trackedViews, unignoredViews } from "./git-rules.mjs";
+import { ATTRIBUTE_RULES, IGNORE_RULES, hasUnionMerge, insideGitRepo, trackedViews, unignoredViews } from "./git-rules.mjs";
 import { SNAPSHOT_FILE, loadSnapshot, readMigrations, reconcile } from "./history.mjs";
-import { HOOK_NAMES, hooksTarget, inspect } from "./hooks-command.mjs";
+import { HOOK_NAMES, hooksTarget, inspect, unclosedKeeps, unclosedSpan } from "./hooks-command.mjs";
 import { canonicalPath } from "./canonical-path.mjs";
 import { CLAUDE_AGENT_FILE, CLAUDE_IMPORT_LINE, NEUTRAL_AGENT_FILE, NUDGE_VERSION, nudgeState } from "./instructions.mjs";
 import { USER_SKILLS, compareInstalled, skillsTarget } from "./install-skills.mjs";
@@ -487,7 +487,8 @@ function checkHooks(root) {
   const states = HOOK_NAMES.map((name) => {
     const target = hooksTarget(root, name);
     const found = target.ok ? inspect(target) : { state: "unknown" };
-    return { name, path: target.path, state: found.state, current: found.current === true, closed: found.closed === true };
+    return { name, path: target.path, state: found.state, current: found.current === true, closed: found.closed === true,
+      unclosed: found.unclosed || null };
   });
   const missing = states.filter((s) => s.state !== "ours");
   const rows = [missing.length
@@ -508,8 +509,10 @@ function checkHooks(root) {
  * while any hook is somebody else's, and while any block of ours opens without
  * closing (TL-600), so then the repair it names is the paste that `hooks print`
  * shows, not a command that would fail. An unclosed block is named by its path
- * and its opening marker: with no closing one, "between the markers" points
- * nowhere, and the lines to replace run from the marker to the end of the file.
+ * and the span `unclosedSpan` reads from its shape: with no closing marker,
+ * "between the markers" points nowhere, and "from the marker onwards" would
+ * take the user's own lines after the gate with it (TL-609). The wording is the
+ * one `hooks install` prints, from the same function.
  */
 function staleHooksRow(states) {
   const staleStates = states.filter((s) => s.state === "ours" && !s.current);
@@ -525,13 +528,14 @@ function staleHooksRow(states) {
   }
   const repairs = [];
   if (closed.length) repairs.push("our block in " + closed.join(", "));
-  if (unclosed.length) repairs.push("the lines from `" + BLOCK_OPEN + "` onwards in " + unclosed.map((s) => canonicalPath(s.path)).join(", "));
+  if (unclosed.length) repairs.push(unclosed.map((s) => unclosedSpan(s.unclosed) + " in " + canonicalPath(s.path)).join(" and "));
   return [check("git-hooks-current", "git gates are current", WARN,
     stale.join(", ") + " carr" + plural(stale.length, "ies a block", "y blocks") +
       " that differ" + plural(stale.length, "s", "") + " from the one this release writes — a change to the gate never reached " +
       plural(stale.length, "it", "them"),
     refusals.length
-      ? ownCommand("hooks print", refusals.join(" and ") + ", so `hooks install` refuses; replace " + repairs.join(" and ") + " by hand")
+      ? ownCommand("hooks print", refusals.join(" and ") + ", so `hooks install` refuses; replace " + repairs.join(" and ") + " by hand" +
+        (unclosed.length ? "; " + unclosedKeeps(unclosed.length) : ""))
       : ownCommand("hooks install", "replaces only the lines between its markers"))];
 }
 

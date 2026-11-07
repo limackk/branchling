@@ -29,9 +29,10 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { COMMIT_MESSAGE_HOOK_NAME, HOOK_NAME, hookBlock, hooksTarget, inspect, installedBlock, replaceBlock, withoutBlock } from "../hooks-command.mjs";
+import { COMMIT_MESSAGE_HOOK_NAME, HOOK_NAME, hookBlock, hooksTarget, inspect, installedBlock, replaceBlock, unclosedBlockLines, unclosedSpan, withoutBlock } from "../hooks-command.mjs";
 import { BLOCK_OPEN } from "../git-rules.mjs";
 import { isolateHome, plainOutput, posixPath } from "./_repo.mjs";
+import { followRepair } from "./_follow-repair.mjs";
 import { canonicalPath } from "../canonical-path.mjs";
 
 isolateHome("hooks-install");
@@ -350,12 +351,77 @@ test("install refuses a block that never closes, and touches nothing", () => {
   const r = run(dir, ["hooks", "install"]);
   assert.equal(r.status, 1);
   assert.match(r.stderr, /branchling hooks install: the pre-commit hook opens our block and never closes it/);
-  assert.ok(r.stderr.includes("It was not touched. Put this in place of the lines from `" + BLOCK_OPEN + "` onwards:"));
+  assert.ok(r.stderr.includes("It was not touched. Put this in place of lines 2–5 (`" + BLOCK_OPEN +
+    "` through its gate line); the lines after it are yours and stay:"), r.stderr);
   assert.match(r.stderr, /→ branchling hooks print$/m);
   for (const line of hookBlock().split("\n")) {
     assert.ok(r.stderr.includes(line), "refusing without the block leaves the user stuck: " + line);
   }
   assert.equal(readFileSync(path, "utf8"), broken);
+});
+
+/** The opening marker quoted inside a line of the user's, not standing on one. */
+const QUOTED_MARKER = "#!/bin/sh\necho \"" + BLOCK_OPEN + "\"\nnpm test\n";
+
+test("a marker quoted inside a line is not our block: install refuses it as foreign and touches nothing", () => {
+  const dir = repo();
+  const path = hookPath(dir);
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, QUOTED_MARKER, "utf8");
+  const r = run(dir, ["hooks", "install"]);
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  assert.doesNotMatch(r.stderr, /TypeError|\n\s+at /, "a refusal, not a stack trace");
+  assert.match(r.stderr, /branchling hooks install: there is already a pre-commit hook here/);
+  assert.equal(readFileSync(path, "utf8"), QUOTED_MARKER);
+  assert.equal(inspect(hooksTarget(dir)).state, "foreign", "ownership is read from a marker LINE, as the block is");
+
+  const u = run(dir, ["hooks", "uninstall"]);
+  assert.equal(u.status, 1, "uninstall must not report removing a block that was never there");
+  assert.match(u.stderr, /the pre-commit hook here is not ours/);
+  assert.equal(readFileSync(path, "utf8"), QUOTED_MARKER);
+
+  // Positive control: the marker standing on a line of its own, even the
+  // first line of the file, is ours.
+  writeFileSync(path, hookBlock().split("\n").slice(0, -1).join("\n") + "\nnpm test\n", "utf8");
+  assert.equal(inspect(hooksTarget(dir)).state, "ours");
+});
+
+test("following the repair for an unclosed block keeps the user's lines after it (TL-609)", () => {
+  const dir = repo();
+  assert.equal(run(dir, ["hooks", "install"]).status, 0);
+  const path = hookPath(dir);
+  const theirs = "\n# theirs, after the block\nnpm test || exit 1\n./scripts/lint.sh\n";
+  const broken = "#!/bin/sh\nnpm run pre\n" + STALE.split("\n").slice(0, -1).join("\n") + theirs;
+  writeFileSync(path, broken, "utf8");
+  const r = run(dir, ["hooks", "install"]);
+  assert.equal(r.status, 1, "the premise: install refuses an unclosed block");
+  assert.equal(readFileSync(path, "utf8"), broken);
+
+  writeFileSync(path, followRepair(broken, r.stderr, hookBlock()), "utf8");
+  const repaired = readFileSync(path, "utf8");
+  assert.equal(repaired, "#!/bin/sh\nnpm run pre\n" + hookBlock() + theirs,
+    "every line of the user's, before and after the block, survives the repair");
+  assert.equal(inspect(hooksTarget(dir)).current, true, "the repaired block is the current one");
+  assert.equal(run(dir, ["hooks", "install"]).status, 0, "once repaired, install no longer refuses");
+});
+
+test("the unclosed span stops at the gate, and short of a line it does not recognise", () => {
+  const open = hookBlock().split("\n").slice(0, -1);
+  assert.deepEqual(unclosedBlockLines("#!/bin/sh\n" + open.join("\n") + "\nnpm test\n"), { first: 2, last: 5, gate: true });
+  assert.deepEqual(unclosedBlockLines(["  " + open[0], ...open.slice(1, 3), "npm test"].join("\r\n")),
+    { first: 1, last: 3, gate: false }, "no gate: the span ends at the last comment, never on the user's line");
+  assert.deepEqual(unclosedBlockLines(open[0] + "\nnpm test"), { first: 1, last: 1, gate: false });
+  assert.deepEqual(unclosedBlockLines(open.map((l) => "  " + l).join("\r\n") + "\r\nnpm test\r\n"),
+    { first: 1, last: 4, gate: true }, "an indented CRLF paste is read by trimmed line, its gate included");
+  assert.deepEqual(unclosedBlockLines(open.slice(0, 3).join("\n")), { first: 1, last: 3, gate: false },
+    "comments running to the end of the file end the span there");
+  assert.deepEqual(unclosedBlockLines(open.slice(0, 3).join("\n") + "\nnpm test || exit 1 # theirs\n"),
+    { first: 1, last: 3, gate: false }, "a line that only CONTAINS `|| exit 1` is not the gate");
+  assert.equal(unclosedBlockLines(hookBlock()), null, "a closed block is not unclosed");
+  assert.equal(unclosedBlockLines("#!/bin/sh\nnpm test\n"), null);
+  assert.equal(unclosedSpan({ first: 2, last: 5, gate: true }), "lines 2–5 (`" + BLOCK_OPEN + "` through its gate line)");
+  assert.equal(unclosedSpan({ first: 1, last: 3, gate: false }), "lines 1–3 (`" + BLOCK_OPEN + "` and the comments under it)");
+  assert.equal(unclosedSpan({ first: 4, last: 4, gate: false }), "line 4 (`" + BLOCK_OPEN + "`)");
 });
 
 // ── usage ─────────────────────────────────────────────────────────────────
