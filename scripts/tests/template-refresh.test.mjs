@@ -292,7 +292,7 @@ test("--dir names the backlog from anywhere", () => {
   const elsewhere = mkdtempSync(join(BASE, "cwd-"));
   const r = run(elsewhere, ["template", "refresh", "--dir", dir]);
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.match(r.stdout, /added 1 field\(s\) → .*\/_template\.md\n {4}epic {2}after `board`/);
+  assert.match(r.stdout, /added 1 field\(s\) → .*[\\/]_template\.md\n {4}epic {2}after `board`/);
 });
 
 test("outside a backlog it refuses with exit 1, in an envelope under --json", () => {

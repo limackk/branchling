@@ -348,7 +348,22 @@ test("a skill directory reached through a symlink is read through it", () => {
   // …and a link to a FILE is a file, not a directory to descend into.
   symlinkSync(join(fx.dir, "shared", "ref.md"), join(opts.source, "demo", "ref-link.md"));
   assert.deepEqual(compareInstalled(fx.dir, opts).files.map((f) => f.file).sort(),
-    [DEMO, join("demo", "linked", "ref.md"), join("demo", "ref-link.md"), NOTES].sort());
+    [DEMO, "demo/linked/ref.md", "demo/ref-link.md", NOTES].sort());
+});
+
+test("the files are listed in one order on every filesystem", () => {
+  // readdirSync returns the filesystem's own order: NTFS sorts names
+  // case-insensitively, so on Windows `refs/` came before `SKILL.md` and the
+  // first row of doctor and of a refusal named a different file (TL-624).
+  // APFS already returns this order, so on macOS the test passes without the
+  // sort; the Windows CI job is the one that tells the two apart.
+  const fx = fixture();
+  const opts = source(fx);
+  for (const name of ["zeta.md", "Beta.md", "alpha.md"]) {
+    writeFileSync(join(opts.source, "demo", name), name + "\n", "utf8");
+  }
+  assert.deepEqual(compareInstalled(fx.dir, opts).files.map((f) => f.file),
+    ["demo/Beta.md", DEMO, "demo/alpha.md", NOTES, "demo/zeta.md"]);
 });
 
 test("a copy differing only in CRLF line endings is current, not an edit", () => {

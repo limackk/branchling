@@ -105,8 +105,15 @@ function posix(path) {
   return path.split(sep).join("/");
 }
 
+/** One order on every platform: `readdirSync` returns the filesystem's own,
+ *  which NTFS sorts case-insensitively and APFS does not, so the same skill
+ *  listed its files differently in doctor's rows and in a refusal (TL-624). */
+function byName(a, b) {
+  return a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
+}
+
 function filesUnder(dir, base = dir, out = []) {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+  for (const entry of readdirSync(dir, { withFileTypes: true }).sort(byName)) {
     const path = join(dir, entry.name);
     if (entry.isDirectory() || (entry.isSymbolicLink() && statSync(path).isDirectory())) {
       filesUnder(path, base, out);

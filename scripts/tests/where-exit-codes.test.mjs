@@ -83,7 +83,9 @@ for (const [shape, flags] of SHAPES) {
     for (const r of [run([...flags, "--dir", backlog]), run(flags, { BACKLOG_DIR: backlog })]) {
       const all = r.stdout + r.stderr;
       assert.equal(r.status, 0, all);
-      assert.ok(all.includes(backlog), "the named backlog is not in the report:\n" + all);
+      // Under --json the path is a JSON string, which writes each Windows `\` as `\\`.
+      const spelled = [backlog, JSON.stringify(backlog).slice(1, -1)];
+      assert.ok(spelled.some((p) => all.includes(p)), "the named backlog is not in the report:\n" + all);
     }
   });
 }
