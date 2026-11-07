@@ -24,6 +24,7 @@ import { join } from "node:path";
 
 import { KINDS } from "../json-envelope.mjs";
 import { COMMANDS } from "../cli.mjs";
+import { PRODUCT_NAME as N } from "../product.mjs";
 import { REPO_ROOT, isolateHome } from "./_repo.mjs";
 
 // Importing the dispatch table loads modules that read the user layer.
@@ -79,6 +80,90 @@ export function unknownCommands(rows, commands = COMMANDS) {
   return bad;
 }
 
+/**
+ * Every place the document says an invocation has no `--json` (TL-613):
+ * `[{ invocation, line }]`. PURE. Two shapes are read — a sentence
+ * "`<invocation>` has no `--json`", and a table row whose first cell is the
+ * invocation and whose other cells say "no `--json`". TL-571 found the first
+ * shape stating, about `new`, the opposite of the kinds table above it.
+ */
+export function noJsonClaims(doc) {
+  const claims = [];
+  doc.split("\n").forEach((text, i) => {
+    const line = i + 1;
+    for (const m of text.matchAll(/`([^`]+)`\s+has no `--json`/g)) {
+      claims.push({ invocation: m[1], line });
+    }
+    if (text.startsWith("|")) {
+      const cells = text.split("|").slice(1, -1).map((c) => c.trim());
+      const first = cells[0] && cells[0].match(/^`([^`]+)`$/);
+      if (first && cells.slice(1).some((c) => /\bno `--json`/.test(c))) {
+        claims.push({ invocation: first[1], line });
+      }
+    }
+  });
+  return claims;
+}
+
+/** The leading literal words of an invocation — `plan add <ID>... --wave` is
+ *  `["plan", "add"]`; a flag, a placeholder or a quoted value ends them. PURE. */
+function commandWords(invocation) {
+  const words = [];
+  for (const token of invocation.trim().split(/\s+/)) {
+    if (!/^[a-z][a-z0-9-]*$/.test(token)) break;
+    words.push(token);
+  }
+  return words;
+}
+
+/**
+ * The usage forms of one command: each line naming `<product> <command> …`
+ * together with the continuation lines that follow it (indented lines opening
+ * with `[` or `<`), as `{ words, text }`. PURE.
+ */
+function usageForms(name, spec) {
+  const forms = [];
+  let current = null;
+  const lines = Array.isArray(spec.usage) ? spec.usage : String(spec.usage || "").split("\n");
+  for (const raw of lines) {
+    const line = String(raw);
+    const head = line.trimStart();
+    if (head.startsWith(N + " " + name)) {
+      current = { words: commandWords(head.slice(N.length + 1)), text: line };
+      forms.push(current);
+    } else if (current && /^\s+[[<]/.test(line)) {
+      current.text += "\n" + line;
+    } else {
+      current = null;
+    }
+  }
+  return forms;
+}
+
+/**
+ * Claims the dispatch table contradicts, or cannot judge. PURE.
+ * A claim about `plan add` is checked against every usage form that begins
+ * with `plan add`; a claim nothing resolves is reported too, because a claim
+ * the guard cannot read is one it would otherwise pass.
+ */
+export function contradictedNoJsonClaims(claims, commands = COMMANDS) {
+  const bad = [];
+  for (const { invocation, line } of claims) {
+    const words = commandWords(invocation);
+    const spec = words.length && Object.prototype.hasOwnProperty.call(commands, words[0])
+      ? commands[words[0]] : null;
+    const forms = spec
+      ? usageForms(words[0], spec).filter((f) => words.every((w, i) => f.words[i] === w))
+      : [];
+    if (!forms.length) {
+      bad.push("line " + line + ": `" + invocation + "` matches no usage form in COMMANDS");
+    } else if (forms.some((f) => /--json\b/.test(f.text))) {
+      bad.push("line " + line + ": `" + invocation + "` is said to have no `--json`, and its usage declares it");
+    }
+  }
+  return bad;
+}
+
 const fixture = (rows) => [
   "# Doc", "", HEADING, "",
   "| `kind` | Emitted by | Role |", "|---|---|---|",
@@ -120,4 +205,41 @@ test("docs/external-consumers.md lists exactly the declared kinds", () => {
 test("every command the declared-kinds table names exists", () => {
   const rows = documentedRows(readFileSync(DOC, "utf8"));
   assert.deepEqual(unknownCommands(rows), []);
+});
+
+const claimDoc = (...lines) => ["# Doc", "", ...lines, ""].join("\n");
+
+test("positive control: both shapes of a no-`--json` claim are read", () => {
+  const claims = noJsonClaims(claimDoc(
+    "**Outside the envelope today.** `new` has no `--json` at all.",
+    "| `plan add <ID>... --wave` | `--why` to create the wave; no `--json` | none (text) |",
+    "| `take <ID>` | the id | `task-take` |",
+  ));
+  assert.deepEqual(claims, [
+    { invocation: "new", line: 3 },
+    { invocation: "plan add <ID>... --wave", line: 4 },
+  ]);
+});
+
+test("positive control: a claim against a usage that declares --json is caught (TL-613)", () => {
+  const sentence = noJsonClaims(claimDoc("`new` has no `--json` at all."));
+  assert.equal(contradictedNoJsonClaims(sentence).length, 1);
+  const row = noJsonClaims(claimDoc("| `new --title \"…\"` | the title; no `--json` | none (text) |"));
+  assert.match(contradictedNoJsonClaims(row)[0], /`new --title "…"` is said to have no `--json`/);
+  // A subcommand is judged by its own form: `plan` declares --json, `plan add` does not.
+  const sub = noJsonClaims(claimDoc("`plan add` has no `--json`."));
+  assert.deepEqual(contradictedNoJsonClaims(sub), []);
+});
+
+test("positive control: a claim the dispatch table cannot resolve is reported, not passed", () => {
+  const claims = noJsonClaims(claimDoc("`sessions` has no `--json`.", "`plan shuffle` has no `--json`."));
+  assert.equal(contradictedNoJsonClaims(claims).length, 2);
+});
+
+test("no sentence in docs/external-consumers.md denies a --json the usage declares", () => {
+  const claims = noJsonClaims(readFileSync(DOC, "utf8"));
+  // The document carries a true claim today (`plan add`); an empty sample would
+  // mean the reader stopped matching, not that the document is clean.
+  assert.ok(claims.length >= 1, "no no-`--json` claim was read from the document");
+  assert.deepEqual(contradictedNoJsonClaims(claims), []);
 });

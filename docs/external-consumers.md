@@ -129,6 +129,9 @@ table and the code disagree in either direction.
 **Moved into the envelope by TL-550.** `new --json` answers `task-new`, which
 carries the id it created and the file it wrote, so an interface that creates a
 task no longer needs a `query --json` after `new` returns to learn the new id.
+A refusal is not in the envelope yet, with one exception: a missing backlog
+answers `task-new` with `ok: false` (TL-548), and every other refusal of `new`
+is still a sentence on stderr with a non-zero exit.
 
 **Moved into the envelope by TL-528.** `decide --json` and `where --json` used
 to print a bare object. Their payload keys are unchanged, and the root now
