@@ -200,6 +200,14 @@ export function table(rows) {
 // Messages
 // ──────────────────────────────────────────────────────────────────────────
 
+/** Singular or plural, spelled out. Written as a function rather than an inline
+ *  `n === 1 ? …` because "1 error(s)" is not text — it is a programmer's note
+ *  seen by a user. One helper for every report, so two commands describing the
+ *  same thing cannot count it in two styles (TL-616). */
+export function plural(n, one, many) {
+  return n === 1 ? one : many;
+}
+
 export function ok(message) {
   return color.ok(MARK.ok) + " " + message;
 }

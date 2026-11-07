@@ -46,7 +46,7 @@ import { USER_SKILLS, compareInstalled, skillsTarget } from "./install-skills.mj
 import { SHIPPED_TEMPLATE, planRefresh, templateFields } from "./template-command.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
-import { MARK as UI_MARK, color, errColor, heading, refusal } from "./ui.mjs";
+import { MARK as UI_MARK, color, errColor, heading, plural, refusal } from "./ui.mjs";
 import { backlogPaths, TEMPLATE_FILENAME, BACKLOG_DIR_REFUSAL_KIND, isBacklogDirRefusal, NotABacklogError, repositoryRoot, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { summarize } from "./stats.mjs";
 import { vocabularyUsage } from "./task-fields.mjs";
@@ -725,13 +725,6 @@ export function nextStep(rows, dir) {
   const volume = rows.find((r) => r.id === "volume");
   if (volume && /^0 /.test(volume.detail)) return step('new --title "…"', "the backlog is empty");
   return step("", "the viewer, in your browser");
-}
-
-/** Singular or plural, spelled out. Written as a function rather than an inline
- *  `n === 1 ? …` because "1 error(s)" is not text — it is a programmer's note
- *  seen by a user. */
-function plural(n, one, many) {
-  return n === 1 ? one : many;
 }
 
 function render(root, rows, dir) {

@@ -205,12 +205,21 @@ test("refreshTemplate refuses what it cannot refresh and writes nothing", () => 
 test("renderRefresh names each added key and where it went", () => {
   const added = [{ key: "id", after: null }, { key: "release", after: "epic" }];
   assert.equal(renderRefresh({ path: "/p/_template.md", dryRun: false, added }, { color: plain }), [
-    "✓ template: added 2 field(s) → /p/_template.md",
+    "✓ template: added 2 fields → /p/_template.md",
     "    id       at the end of the frontmatter",
     "    release  after `epic`",
     "  Every line that was already there is unchanged. A field you removed on purpose is back: delete its line again.",
   ].join("\n"));
-  assert.match(renderRefresh({ path: "/p", dryRun: true, added }, { color: plain }), /^✓ template: would add 2 field\(s\)/);
+  assert.match(renderRefresh({ path: "/p", dryRun: true, added }, { color: plain }), /^✓ template: would add 2 fields → \/p\n/);
+  // One field is counted in the singular, both when written and when only planned.
+  const one = [{ key: "release", after: "epic" }];
+  assert.match(renderRefresh({ path: "/p", dryRun: false, added: one }, { color: plain }), /^✓ template: added 1 field → \/p\n {4}release {2}after `epic`\n/);
+  assert.match(renderRefresh({ path: "/p", dryRun: true, added: one }, { color: plain }), /^✓ template: would add 1 field → \/p\n/);
+  for (const added of [one, [{ key: "id", after: null }, { key: "release", after: "epic" }]]) {
+    for (const dryRun of [false, true]) {
+      assert.doesNotMatch(renderRefresh({ path: "/p", dryRun, added }, { color: plain }), /\(s\)/);
+    }
+  }
   assert.equal(renderRefresh({ path: "/p", dryRun: false, added: [] }, { color: plain }),
     "· template: every field this release ships is already in /p — nothing changed");
 });
@@ -227,12 +236,12 @@ test("the command refreshes a lagging template and says what it added", () => {
 
   const dry = run(dir, ["template", "refresh", "--dry-run"]);
   assert.equal(dry.status, 0, dry.stderr);
-  assert.match(dry.stdout, /would add 2 field\(s\)/);
+  assert.match(dry.stdout, /would add 2 fields → /);
   assert.equal(readFileSync(p, "utf8"), lagging, "--dry-run wrote");
 
   const r = run(dir, ["template", "refresh"]);
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /added 2 field\(s\) → .*_template\.md\n {4}release {2}after `epic`\n {4}target {3}after `release`/);
+  assert.match(r.stdout, /added 2 fields → .*_template\.md\n {4}release {2}after `epic`\n {4}target {3}after `release`/);
   assert.equal(readFileSync(p, "utf8"), fresh, "the refreshed template is the one init wrote");
 
   const twice = run(dir, ["template", "refresh"]);
@@ -293,7 +302,7 @@ test("--dir names the backlog from anywhere", () => {
   const elsewhere = fixtureDir(join(BASE, "cwd-"));
   const r = run(elsewhere, ["template", "refresh", "--dir", dir]);
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.match(r.stdout, /added 1 field\(s\) → .*[\\/]_template\.md\n {4}epic {2}after `board`/);
+  assert.match(r.stdout, /added 1 field → .*[\\/]_template\.md\n {4}epic {2}after `board`/);
 });
 
 test("outside a backlog it refuses with exit 1, in an envelope under --json", () => {

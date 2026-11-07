@@ -61,7 +61,7 @@ import { fileURLToPath } from "node:url";
 import { printJson } from "./json-envelope.mjs";
 import { answerBacklogDirRefusal, backlogPaths, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag, TEMPLATE_FILENAME } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
-import { MARK, color, failure, refusal } from "./ui.mjs";
+import { MARK, color, failure, plural, refusal } from "./ui.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -231,7 +231,7 @@ export function renderRefresh(result, opts = {}) {
     return paint.dim(MARK.bullet + " template: every field this release ships is already in " + result.path + " — nothing changed");
   }
   const verb = result.dryRun ? "would add" : "added";
-  const out = [paint.ok(MARK.ok) + " template: " + verb + " " + result.added.length + " field(s) → " + result.path];
+  const out = [paint.ok(MARK.ok) + " template: " + verb + " " + result.added.length + " " + plural(result.added.length, "field", "fields") + " → " + result.path];
   const width = Math.max(...result.added.map((a) => a.key.length));
   for (const a of result.added) {
     out.push("    " + a.key.padEnd(width) + "  " + paint.dim(a.after ? "after `" + a.after + "`" : "at the end of the frontmatter"));
