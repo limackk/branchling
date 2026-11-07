@@ -18,7 +18,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { request } from "node:http";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
@@ -26,6 +26,7 @@ import { join } from "node:path";
 
 import { ACTOR_ENV } from "../actor.mjs";
 import { ACTOR_UNKNOWN, isValidActor } from "../task-fields.mjs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 import { isolateHome, isolateState, SCRIPTS_DIR } from "./_repo.mjs";
 
 isolateHome("field-write-reserved-actor");
@@ -37,7 +38,7 @@ const LISTENING = /serve: http:\/\/127\.0\.0\.1:(\d+)\//;
 const NAMESPACED_FORMS = /local:<name>.*agent:<name>.*user:<name>/;
 
 function fixture() {
-  const dir = realpathSync(mkdtempSync(join(tmpdir(), "branchling-reserved-actor-")));
+  const dir = realpathSync(fixtureDir(join(tmpdir(), "branchling-reserved-actor-")));
   const root = join(dir, "backlog");
   assert.equal(spawnSync(process.execPath, [CLI, "init", "--dir", root, "--no-example"], { encoding: "utf8" }).status, 0);
   const made = spawnSync(process.execPath, [CLI, "new", "--dir", root, "--title", "Editable work", "--actor", "agent:fixture"], { encoding: "utf8" });
@@ -144,35 +145,31 @@ test("the shared predicate still accepts unknown, so history readers keep it", (
 
 test("set --actor unknown is refused, names the namespaced forms, and writes nothing", () => {
   const fx = fixture();
-  try {
-    const before = snapshot(fx.root, fx.id);
-    const human = set(fx.root, [fx.id, "title", "Edited by nobody", "--actor", ACTOR_UNKNOWN]);
-    assert.equal(human.status, 2, human.stdout + human.stderr);
-    assert.match(human.stderr, /reserved/);
-    assert.match(human.stderr, NAMESPACED_FORMS);
-    assert.equal(human.stdout, "");
-    assert.deepEqual(snapshot(fx.root, fx.id), before, "a refused set must not touch the task or its history");
+  const before = snapshot(fx.root, fx.id);
+  const human = set(fx.root, [fx.id, "title", "Edited by nobody", "--actor", ACTOR_UNKNOWN]);
+  assert.equal(human.status, 2, human.stdout + human.stderr);
+  assert.match(human.stderr, /reserved/);
+  assert.match(human.stderr, NAMESPACED_FORMS);
+  assert.equal(human.stdout, "");
+  assert.deepEqual(snapshot(fx.root, fx.id), before, "a refused set must not touch the task or its history");
 
-    const json = set(fx.root, [fx.id, "title", "Edited by nobody", "--actor", ACTOR_UNKNOWN, "--json"]);
-    assert.equal(json.status, 2, json.stdout + json.stderr);
-    const body = JSON.parse(json.stdout);
-    assert.equal(body.ok, false);
-    assert.match(body.refusal, /reserved/);
-    assert.match(body.refusal, NAMESPACED_FORMS);
-    assert.deepEqual(snapshot(fx.root, fx.id), before, "a refused set --json must not touch the task or its history");
-  } finally { rmSync(fx.dir, { recursive: true, force: true }); }
+  const json = set(fx.root, [fx.id, "title", "Edited by nobody", "--actor", ACTOR_UNKNOWN, "--json"]);
+  assert.equal(json.status, 2, json.stdout + json.stderr);
+  const body = JSON.parse(json.stdout);
+  assert.equal(body.ok, false);
+  assert.match(body.refusal, /reserved/);
+  assert.match(body.refusal, NAMESPACED_FORMS);
+  assert.deepEqual(snapshot(fx.root, fx.id), before, "a refused set --json must not touch the task or its history");
 });
 
 test("set with a namespaced actor still writes and records that actor", () => {
   const fx = fixture();
-  try {
-    const accepted = set(fx.root, [fx.id, "title", "Edited by Ada", "--actor", "local:ada"]);
-    assert.equal(accepted.status, 0, accepted.stdout + accepted.stderr);
-    assert.match(taskText(fx.root, fx.id), /title: "?Edited by Ada"?/);
-    const rows = historyRows(fx.root, fx.id).filter((row) => row.field === "title" && row.source === "set");
-    assert.ok(rows.length > 0, "the accepted set recorded no title row");
-    assert.ok(rows.every((row) => row.actor === "local:ada"), JSON.stringify(rows));
-  } finally { rmSync(fx.dir, { recursive: true, force: true }); }
+  const accepted = set(fx.root, [fx.id, "title", "Edited by Ada", "--actor", "local:ada"]);
+  assert.equal(accepted.status, 0, accepted.stdout + accepted.stderr);
+  assert.match(taskText(fx.root, fx.id), /title: "?Edited by Ada"?/);
+  const rows = historyRows(fx.root, fx.id).filter((row) => row.field === "title" && row.source === "set");
+  assert.ok(rows.length > 0, "the accepted set recorded no title row");
+  assert.ok(rows.every((row) => row.actor === "local:ada"), JSON.stringify(rows));
 });
 
 test("POST /api/task with actor unknown is refused and writes nothing; a namespaced actor still writes", async () => {
@@ -195,5 +192,5 @@ test("POST /api/task with actor unknown is refused and writes nothing; a namespa
     const rows = historyRows(fx.root, fx.id).filter((row) => row.field === "title" && row.source === "viewer");
     assert.ok(rows.length > 0, "the accepted edit recorded no title row");
     assert.ok(rows.every((row) => row.actor === "user:ada"), JSON.stringify(rows));
-  } finally { await stop(handle); rmSync(fx.dir, { recursive: true, force: true }); }
+  } finally { await stop(handle); }
 });
