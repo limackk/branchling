@@ -157,7 +157,9 @@ test("`next` refuses a typo instead of reporting an empty queue", () => {
   const dir = repo();
   newTask(dir, ["--title", "Work to be found"]);
   const r = run(dir, ["next", "--dir", ".", "--actor", "agent:test", "--priority", "P9"]);
-  assert.equal(r.status, 2, "a typo answered `nothing to take` — the loop would have ended");
+  // A refusal (1) since TL-574, as `query` answers it — never 3, the code a
+  // loop stops on.
+  assert.equal(r.status, 1, "a typo answered `nothing to take` — the loop would have ended");
   assert.match(r.stderr, /`P9` is not an allowed value/);
 
   // The control: the same call with a real value still hands out the task.
@@ -169,7 +171,7 @@ test("`run --dry-run` refuses the same typo, before it claims anything", () => {
   const dir = repo();
   newTask(dir, ["--title", "Work for a loop"]);
   const r = run(dir, ["run", "--dir", ".", "--agent", "true", "--board", "nowhere", "--dry-run"]);
-  assert.equal(r.status, 2);
+  assert.equal(r.status, 1, "a refusal (1) since TL-574: " + r.stderr);
   assert.match(r.stderr, /`nowhere` is not an allowed value/);
 });
 

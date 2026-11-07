@@ -1,0 +1,2 @@
+{"id":"01M6V2S248WPXBT7K75Q2A21JH","ts":"2026-11-07T13:22:14.280Z","task":"TL-635","field":"__created__","from":"","to":"handoff refuses an archived --status as a refusal, not a usage error","actor":"agent:loop-2","source":"new","reason":"unknown"}
+{"id":"01M6V2S5NHBR55GN1VHFHT1XQ2","ts":"2026-11-07T13:22:17.905Z","task":"TL-635","field":"conflict_group","from":[],"to":["json-envelope"],"actor":"agent:loop-2","source":"set","reason":"It changes the task-handoff refusal envelope, the area TL-574 touched."}

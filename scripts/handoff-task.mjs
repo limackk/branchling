@@ -615,33 +615,41 @@ export function run(argv) {
   // chose, inside a correctly built call, so `--json` answers an
   // `unknown-value` envelope naming the declared roles — `[]` when there are
   // none — as `set` does for a field's vocabulary (TL-543).
-  if (plan.toRole !== null && (config.roles || []).indexOf(plan.toRole) < 0) {
-    const declared = (config.roles || []).slice();
-    const message = "unknown role `" + plan.toRole + "`";
-    const details = declared.length
-      ? ["`roles` in config.yaml holds: " + declared.join(", ")]
-      : [
-          "This backlog declares no `roles:` in config.yaml, so there is no role to hand to.",
-          "Declare the vocabulary there first — a handoff to a role nobody serves is a",
-          "task that leaves every queue without a word.",
-        ];
+  //
+  // `--to-owner` and `--status` are values of the same kind and get the same
+  // refusal (TL-574); an unknown flag or a missing `--reason` stays exit 2.
+  const refuseUnknownValue = (field, value, message, details, declared) => {
     if (plan.json) {
       printJson("task-handoff", {
         ok: false, id: plan.id, actorSource, refusalKind: "unknown-value", refusal: message, details,
-        rejected: { field: "role", value: plan.toRole }, declared,
+        rejected: { field, value }, declared,
       });
     } else {
       console.error(failure(N + " handoff", message, details, [N + " handoff --help"]));
     }
     return 1;
+  };
+  if (plan.toRole !== null && (config.roles || []).indexOf(plan.toRole) < 0) {
+    const declared = (config.roles || []).slice();
+    return refuseUnknownValue("role", plan.toRole, "unknown role `" + plan.toRole + "`", declared.length
+      ? ["`roles` in config.yaml holds: " + declared.join(", ")]
+      : [
+          "This backlog declares no `roles:` in config.yaml, so there is no role to hand to.",
+          "Declare the vocabulary there first — a handoff to a role nobody serves is a",
+          "task that leaves every queue without a word.",
+        ], declared);
   }
+  // An empty `owners:` declares no vocabulary, so there is nothing for a
+  // value to be outside of.
   if (plan.toOwner !== null && (config.owners || []).length && config.owners.indexOf(plan.toOwner) < 0) {
-    return fail2("`" + plan.toOwner + "` is not an allowed value for the field `owner`",
-      ["allowed: " + config.owners.join(" | ")]);
+    return refuseUnknownValue("owner", plan.toOwner,
+      "`" + plan.toOwner + "` is not an allowed value for the field `owner`",
+      ["allowed: " + config.owners.join(" | ")], config.owners.slice());
   }
   if (plan.status !== null) {
     if (config.statuses.indexOf(plan.status) < 0) {
-      return fail2("unknown status `" + plan.status + "`", ["`statuses` in config.yaml holds: " + config.statuses.join(", ")]);
+      return refuseUnknownValue("status", plan.status, "unknown status `" + plan.status + "`",
+        ["`statuses` in config.yaml holds: " + config.statuses.join(", ")], config.statuses.slice());
     }
     if (config.archivedStatuses.indexOf(plan.status) >= 0) {
       return fail2("`" + plan.status + "` is an archived status", [
