@@ -8,8 +8,8 @@ epic: ""                           # free text — the group this task counts to
 release: ""                        # the release it is PLANNED for (a value from `releases:` in config.yaml). Empty = none
 target: []                         # the deploy targets in ANOTHER repository it ships from (`deploy_targets` with `repository:`). Empty = none
 priority: P3
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:loop-4
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 conflict_group: [skills]  # the AREA it touches (e.g. a module): `next` and `run` hold it back while a task of the same group is in progress. Empty = `conflict_group_from`, or none
@@ -42,5 +42,5 @@ Found while doing TL-594. compareInstalled() in scripts/install-skills.mjs tests
 
 ## Acceptance criteria
 
-- [ ] installSkills does not throw and reports the path as blocked when a file stands where the skill directory belongs [proof: file-in-place-of-directory-no-throw]
-- [ ] the skill install tests pass, including the new case [proof: suite-file]
+- [x] installSkills does not throw and reports the path as blocked when a file stands where the skill directory belongs [proof: file-in-place-of-directory-no-throw]
+- [x] the skill install tests pass, including the new case [proof: suite-file]
