@@ -308,9 +308,9 @@ test("the filters narrow the choice, and they are query's filters", () => {
 
   // A value outside a CLOSED vocabulary is a typo, and since TL-161 it fails
   // instead. Exit 3 is what a loop stops on, so a typo that answered it would
-  // report a queue as finished.
+  // report a queue as finished. A refusal (1) since TL-574, not a usage error.
   const board = run(["next", "--dir", backlog, "--actor", "agent:a2", "--board", "nonexistent"], env);
-  assert.equal(board.status, 2, "a board outside the registry answered `nothing to take`");
+  assert.equal(board.status, 1, "a board outside the registry answered `nothing to take`");
   assert.match(board.stderr, /`nonexistent` is not an allowed value/);
 });
 
@@ -602,7 +602,7 @@ test("several roles at once, and a role outside the vocabulary fails", () => {
   assert.ok([ids[0], ids[1]].includes(JSON.parse(r.stdout).id));
 
   const bad = run(["next", "--dir", backlog, "--actor", "agent:b", "--role", "carpenter"], env);
-  assert.equal(bad.status, 2);
+  assert.equal(bad.status, 1, "a role outside `roles:` is a refusal (1) since TL-574");
   assert.match(bad.stderr, /unknown role/);
 });
 

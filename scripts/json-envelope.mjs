@@ -123,6 +123,12 @@ export const KINDS = {
     // `actorSource` always says `flag`; this is the only place the real rung
     // is visible.
     actorSource: null,
+    // A `--priority` or `--board` value outside the backlog's vocabulary, or a
+    // `--label` outside a closed `labels:` (TL-574), is `ok: false` with
+    // `refusalKind: "unknown-value"`, `rejected` `{ field, value }` (the first
+    // one refused) and `declared`, what that field accepts — the refusal
+    // `query` gives since TL-559, given before anything is claimed.
+    rejected: null, declared: [],
   },
   // `run --stop --json` (TL-485): the request as written, and where. `origin`
   // is the clone it reaches — every run of it, from any of its worktrees.
@@ -290,6 +296,11 @@ export const KINDS = {
     // as `refusalKind: "actor-required"`.
     actorSource: null,
     refusalKind: null, refusal: null, details: [],
+    // `next` only (TL-574): a filter value outside the backlog's vocabulary is
+    // `refusalKind: "unknown-value"` with `rejected` `{ field, value }` (the
+    // first one refused) and `declared`, what that field accepts — the shape
+    // `query` refuses with since TL-559.
+    rejected: null, declared: [],
     // `next` only, and the reason each is here rather than in prose on stderr:
     // a loop must be able to tell an empty queue from a queue it was not allowed
     // to draw from, and it cannot parse a sentence to do it.
@@ -327,7 +338,9 @@ export const KINDS = {
   // hands, and a consumer wants both ends of every field that moved.
   // A `--to-role` outside `roles:` (TL-559) is `refusalKind: "unknown-value"`
   // with `rejected` `{ field: "role", value }` and `declared`, the roles this
-  // backlog declares — `[]` when it declares none.
+  // backlog declares — `[]` when it declares none. A `--to-owner` outside a
+  // declared `owners:` and a `--status` outside `statuses:` (TL-574) answer
+  // the same refusal, with `field` `owner` and `status`.
   "task-handoff": {
     ok: null, id: null, file: null, task: null,
     role: null, owner: null, status: null, comment: null, released: null,

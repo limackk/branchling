@@ -852,20 +852,27 @@ export function run(argv) {
   // A role outside the project's vocabulary is a typo, and a typo that silently
   // matches nothing looks exactly like an empty queue (TL-97's rule, applied to
   // the dispatcher's side).
+  //
+  // A REFUSAL (1), NOT A USAGE ERROR (TL-574): the role is a value somebody
+  // chose inside a correctly built call, so it is answered as `query` answers
+  // one (TL-559) — under `--json`, an `unknown-value` envelope.
   const wantedRoles = splitList(plan.role);
   if (wantedRoles) {
     const unknown = wantedRoles.filter((r) => (config.roles || []).indexOf(r) < 0);
     if (unknown.length) {
-      console.error(failure(N + " next", "unknown role(s): " + unknown.join(", "),
-        (config.roles || []).length
-          ? ["`roles` in config.yaml holds: " + config.roles.join(", ")]
+      const declared = (config.roles || []).slice();
+      return refuseUnknownValue(plan, actorSource, {
+        refusal: "unknown role(s): " + unknown.join(", "),
+        details: declared.length
+          ? ["`roles` in config.yaml holds: " + declared.join(", ")]
           : [
               "This backlog declares no `roles:` in config.yaml, so no task can carry one.",
               "Declare the vocabulary there first — filtering by a role nobody serves",
               "would answer `nothing to take` about a queue that is not empty.",
             ],
-        [N + " next --help"]));
-      return 2;
+        rejected: { field: "role", value: unknown[0] },
+        declared,
+      });
     }
   }
 
@@ -913,13 +920,19 @@ export function run(argv) {
   // than in `query`: it does not answer zero, it answers "nothing to take" —
   // exit 3, which the loop protocol treats as an empty queue and stops on
   // (TL-161). The vocabularies are the project's, read from its configuration.
+  // Exit 1 and an `unknown-value` envelope (TL-574), as `query` answers the
+  // same value since TL-559; exit 2 stays for a call built wrong.
   const unknownValues = unknownFilterValues(filters, config);
   if (unknownValues.length) {
-    console.error(failure(N + " next",
-      "`" + unknownValues[0].value + "` is not an allowed value for the field `" + unknownValues[0].axis + "`",
-      unknownValues.map((p) => "allowed for `" + p.axis + "`: " + p.allowed.join(" | ") + "   (" + p.where + ")"),
-      [N + " next --help"]));
-    return 2;
+    const sentence = (p) => "`" + p.value + "` is not an allowed value for the field `" + p.axis + "`";
+    const [first] = unknownValues;
+    return refuseUnknownValue(plan, actorSource, {
+      refusal: sentence(first),
+      details: unknownValues.map((p) => "allowed for `" + p.axis + "`: " + p.allowed.join(" | ") + "   (" + p.where + ")"),
+      jsonDetails: unknownValues.map((p) => sentence(p) + "; allowed: " + p.allowed.join(" | ")),
+      rejected: { field: first.axis, value: first.value },
+      declared: first.allowed.slice(),
+    });
   }
 
   const now = Date.now();
@@ -1186,6 +1199,25 @@ export function run(argv) {
     for (const d of details) console.log("  " + color.dim(d));
   }
   return EXIT_NOTHING_TO_TAKE;
+}
+
+/**
+ * A filter value outside the backlog's vocabulary, refused (TL-574): the
+ * sentence on stderr always, and under `--json` the `task-take` envelope with
+ * `refusalKind: "unknown-value"`. Exit 1, because the call was built right and
+ * the value is what is wrong — the split `query` draws since TL-559.
+ * `jsonDetails` is one sentence per refused value where the stderr lines are
+ * phrased for a person reading them under the headline.
+ */
+function refuseUnknownValue(plan, actorSource, { refusal, details, jsonDetails, rejected, declared }) {
+  console.error(failure(N + " next", refusal, details, [N + " next --help"]));
+  if (plan.json) {
+    printJson("task-take", {
+      ok: false, taken: false, actorSource, refusalKind: "unknown-value", refusal,
+      details: jsonDetails || details, rejected, declared,
+    });
+  }
+  return 1;
 }
 
 if (process.argv[1] && process.argv[1].endsWith("next-task.mjs")) {

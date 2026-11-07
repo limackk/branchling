@@ -1797,13 +1797,26 @@ export async function run(argv) {
   // than in `query`: it does not answer zero, it answers "nothing to take" —
   // exit 3, which the loop protocol treats as an empty queue and stops on
   // (TL-161). The vocabularies are the project's, read from its configuration.
+  //
+  // A REFUSAL (1), NOT A USAGE ERROR (TL-574): the value sits inside a
+  // correctly built call, so it is answered as `query` answers it since TL-559
+  // — under `--json`, a `run` envelope with `refusalKind: "unknown-value"`.
+  // Nothing has been claimed yet; exit 2 stays for a call built wrong.
   const unknownValues = unknownFilterValues(filters, config);
   if (unknownValues.length) {
-    console.error(failure(N + " run",
-      "`" + unknownValues[0].value + "` is not an allowed value for the field `" + unknownValues[0].axis + "`",
+    const sentence = (p) => "`" + p.value + "` is not an allowed value for the field `" + p.axis + "`";
+    const [first] = unknownValues;
+    console.error(failure(N + " run", sentence(first),
       unknownValues.map((p) => "allowed for `" + p.axis + "`: " + p.allowed.join(" | ") + "   (" + p.where + ")"),
       [N + " run --help"]));
-    return 2;
+    if (plan.json) {
+      printJson("run", {
+        ok: false, dryRun: plan.dryRun, actorSource, refusalKind: "unknown-value", refusal: sentence(first),
+        details: unknownValues.map((p) => sentence(p) + "; allowed: " + p.allowed.join(" | ")),
+        rejected: { field: first.axis, value: first.value }, declared: first.allowed.slice(),
+      });
+    }
+    return 1;
   }
 
   const passthrough = [];
