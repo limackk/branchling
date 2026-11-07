@@ -68,9 +68,41 @@ test("a commit naming NO task attributes nothing — silence, not a bucket", () 
   assert.equal(byTask.size, 0);
 });
 
-test("a commit naming two tasks gives the files to both — picking one would be a guess", () => {
-  const byTask = parseLog(record("TL-9 done, and TL-10 opened", ["a.mjs"]), taskIdScanner("TL"));
+test("a commit whose title starts with two tasks gives the files to both — picking one would be a guess", () => {
+  const byTask = parseLog(record("TL-9 TL-10 both are true now", ["a.mjs"]), taskIdScanner("TL"));
   assert.deepEqual([...byTask.keys()].sort(), ["TL-10", "TL-9"]);
+  const commas = parseLog(record("TL-9, TL-10: both are true now", ["a.mjs"]), taskIdScanner("TL"));
+  assert.deepEqual([...commas.keys()].sort(), ["TL-10", "TL-9"]);
+});
+
+// TL-614: commit 52986cb (TL-588) said "filed as TL-595" in its body, and
+// TL-595's capability record then listed a file TL-595 never touched.
+test("a task id mentioned only in the body is given none of the commit's files", () => {
+  const log = record("TL-9 the thing is true now\n\nThe follow-up is filed as TL-10.", ["scripts/a.mjs"]);
+  const byTask = parseLog(log, taskIdScanner("TL"));
+  assert.equal(byTask.has("TL-10"), false, "a mention in the body claimed the commit's files");
+  // The positive control: the same parse still attributes the title's id, so the
+  // assertion above is not passing on a parser that attributes nothing.
+  assert.deepEqual([...byTask.get("TL-9")], ["scripts/a.mjs"]);
+});
+
+test("an id named later in the title is a mention, not a claim", () => {
+  const log = record("TL-9 the TL-10 review findings are tasks", ["a.mjs"]);
+  assert.deepEqual([...parseLog(log, taskIdScanner("TL")).keys()], ["TL-9"]);
+  assert.equal(parseLog(record("0.4.0 carries TL-9 to TL-10", ["a.mjs"]), taskIdScanner("TL")).size, 0);
+});
+
+test("a range at the head of the title counts as every id it spans", () => {
+  const byTask = parseLog(record("TL-7..TL-10 the findings are tasks", ["a.mjs"]), taskIdScanner("TL"));
+  assert.deepEqual([...byTask.keys()].sort(), ["TL-10", "TL-7", "TL-8", "TL-9"]);
+  const reversed = parseLog(record("TL-10..TL-7 written backwards", ["a.mjs"]), taskIdScanner("TL"));
+  assert.deepEqual([...reversed.keys()].sort(), ["TL-10", "TL-7"]);
+});
+
+test("the scanner's own state does not leak into the next parse", () => {
+  const scanner = taskIdScanner("TL");
+  scanner.lastIndex = 5;
+  assert.deepEqual([...parseLog(record("TL-9 first", ["a.mjs"]), scanner).keys()], ["TL-9"]);
 });
 
 test("several commits for one task union their files", () => {
@@ -196,7 +228,7 @@ test("a repository whose commits name no task says so instead of answering zero"
 
   const r = run(dir, ["query", "--dir", "backlog", "--modified-file", "scripts/thing.mjs", "--status", "pending"]);
   assert.equal(r.status, 0);
-  assert.match(r.stdout, /no commit message in this repository names a task id/);
+  assert.match(r.stdout, /no commit title in this repository starts with a task id/);
 
   const json = JSON.parse(run(dir, ["query", "--dir", "backlog", "--modified-file", "x", "--status", "pending", "--json"]).stdout);
   assert.equal(json.modifiedFile.scanned, true);
@@ -235,7 +267,7 @@ test("the log is asked for in one pass, with no rename following and no merge fi
 test("`explain` distinguishes the three empties, and stays silent on a real answer", () => {
   assert.match(explain("no-git"), /not a git repository/);
   assert.match(explain("git-failed"), /could not be computed/);
-  assert.match(explain("no-task-ids-in-commits"), /names a task id/);
+  assert.match(explain("no-task-ids-in-commits"), /starts with a task id/);
   assert.equal(explain("ok"), null);
 });
 
