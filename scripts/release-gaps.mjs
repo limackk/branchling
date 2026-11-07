@@ -124,13 +124,23 @@ export const RELEASE_GATE_MODES = Object.freeze(["report", "require"]);
  * task objects, which a different parser produced, through a shim that
  * restated this reader's defaults field by field; a field that shim forgot was
  * a gap the gate reported and the panel could not show (TL-519), with no
- * failure anywhere to say so.
+ * failure anywhere to say so. `computeStatus()` in release-status.mjs reads
+ * here too (TL-573), so `deploy status` and the Release view's lanes judge the
+ * same records the panel beside them does.
+ *
+ * IN FILENAME ORDER, SORTED HERE. The lanes, the scope's lists and the gate's
+ * findings follow the order of these records, and `readTaskRecords()` keeps
+ * the order `readdirSync` gives: sorted on POSIX only because libuv sorts it,
+ * the filesystem's own on Windows. `readTaskMetas()`, which `computeStatus()`
+ * read before, sorted explicitly; dropping that would make `deploy status`
+ * list in one order on one platform and another elsewhere (the TL-624 class).
  *
  * @param {string} backlogRoot the backlog directory, not the repository root
  * @param {object} config the loaded configuration
  */
 export function releaseTaskRecords(backlogRoot, config) {
-  return readTaskRecords(backlogPaths(backlogRoot).tasksDir, config.taskId.file);
+  return readTaskRecords(backlogPaths(backlogRoot).tasksDir, config.taskId.file)
+    .sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0));
 }
 
 const RS = String.fromCharCode(30);

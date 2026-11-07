@@ -17,7 +17,8 @@
  * the target that no other bucket placed — rather than by restating the rule
  * that put them there. The gap panel is `releaseGaps()` from release-gaps.mjs,
  * handed the same `deploymentState()` so one build reads the refs once, and the
- * same task records `check --release` reads (`releaseTaskRecords()`, TL-552).
+ * same task records `check --release` reads (`releaseTaskRecords()`, TL-552),
+ * read once and handed to `computeStatus()` as well (TL-573).
  *
  * A TARGET IN ANOTHER REPOSITORY (`repository:`, TL-507) gets a lane of one
  * column, `unobservable`: the command's bucket of the same name, holding the
@@ -152,8 +153,12 @@ export function releaseViewData({ root, config, now = Date.now(), run = spawnSyn
   };
   if (!targets.length) return data;
   try {
+    // ONE read of the task files for the whole view (TL-573): the lanes and the
+    // gap panel are computed from the same records, so they cannot disagree
+    // about what a task says.
+    const tasks = releaseTaskRecords(root, config);
     const { report, state } = computeStatus({
-      root, config, filter: { target: null, stage: null }, count: false, now, run,
+      root, config, filter: { target: null, stage: null }, count: false, now, run, tasks,
     });
     data.reason = state.reason;
     data.explanation = state.reason === "ok" ? null : explain(state.reason);
@@ -169,7 +174,7 @@ export function releaseViewData({ root, config, now = Date.now(), run = spawnSyn
 
     const gaps = releaseGaps({
       root: repoRoot(root), config,
-      tasks: releaseTaskRecords(root, config),
+      tasks,
       trunk: { spec: report.trunk.spec, source: report.trunk.source },
       state, run,
     });
