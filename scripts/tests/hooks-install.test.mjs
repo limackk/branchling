@@ -381,9 +381,12 @@ test("a marker quoted inside a line is not our block: install refuses it as fore
   assert.equal(readFileSync(path, "utf8"), QUOTED_MARKER);
 
   // Positive control: the marker standing on a line of its own, even the
-  // first line of the file, is ours.
+  // first line of the file, is ours — and, with no closing line, unclosed (TL-610).
   writeFileSync(path, hookBlock().split("\n").slice(0, -1).join("\n") + "\nnpm test\n", "utf8");
-  assert.equal(inspect(hooksTarget(dir)).state, "ours");
+  const found = inspect(hooksTarget(dir));
+  assert.equal(found.state, "ours");
+  assert.equal(found.closed, false, "a marker line with no closing line is our block that never closes");
+  assert.deepEqual(found.unclosed, { first: 1, last: 4, gate: true });
 });
 
 test("following the repair for an unclosed block keeps the user's lines after it (TL-609)", () => {
