@@ -134,6 +134,9 @@ table and the code disagree in either direction.
 **Moved into the envelope by TL-550.** `new --json` answers `task-new`, which
 carries the id it created and the file it wrote, so an interface that creates a
 task no longer needs a `query --json` after `new` returns to learn the new id.
+It also carries `nearDuplicates` (TL-649): the open tasks whose title the new
+one nearly repeats, each with `id`, `title` and `similarity`, most similar
+first. It is a note, not a refusal — the task is created either way.
 Every refusal answers `task-new` too (TL-568), with `ok: false`, a
 `refusalKind` to branch on — `usage`, `invalid-document`, `invalid-config`,
 `prefix-mismatch`, `template-drift`, `plan-refused`, `id-taken`, or the shared

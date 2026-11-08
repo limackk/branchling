@@ -41,7 +41,7 @@ import { auditVocabulary, extractMeta, lineEnding, splitFrontmatter, withLineEnd
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { readStdinText } from "./stdin.mjs";
 import { parseTaskDocument, taskContent } from "./task-input.mjs";
-import { failure, refusal } from "./ui.mjs";
+import { failure, plural, refusal, warn } from "./ui.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { readTaskMetas } from "./task-io.mjs";
 import { agentEstimate, agentEstimateText } from "./agent-time.mjs";
@@ -75,6 +75,94 @@ export function slugify(title) {
   const cut = out.slice(0, SLUG_MAX);
   const lastDash = cut.lastIndexOf("-");
   return (lastDash > 20 ? cut.slice(0, lastDash) : cut).replace(/-+$/, "");
+}
+
+/**
+ * A TITLE AS A SET OF WORDS (TL-649): lowercased, diacritics folded by the same
+ * table `slugify()` uses, split on every run of characters that is neither a
+ * letter nor a digit. A set and not a sequence, so word order and a repeated
+ * word do not count; `--json` and `json` are the same word.
+ */
+export function titleWords(title) {
+  const lowered = String(title || "").toLowerCase();
+  let folded = "";
+  for (const ch of lowered) folded += Object.prototype.hasOwnProperty.call(DIACRITICS, ch) ? DIACRITICS[ch] : ch;
+  return new Set(folded.split(/[^a-z0-9]+/).filter(Boolean));
+}
+
+/**
+ * How nearly two titles say the same thing: the Jaccard index of their word
+ * sets — the words they share over the words either of them uses, from 0 (none
+ * in common) to 1 (the same set).
+ *
+ * WHY THIS MEASURE. It reads the titles and nothing else, so comparing one
+ * title against every open task costs one pass over words already in memory,
+ * and it carries no vocabulary of its own: no stop-word list, which would be
+ * one language's grammar written into the code. Its known blind spots are
+ * stated rather than discovered: two titles with the same words in another
+ * order score 1, and a rephrasing that shares few words scores low.
+ */
+export function titleSimilarity(a, b) {
+  const left = a instanceof Set ? a : titleWords(a);
+  const right = b instanceof Set ? b : titleWords(b);
+  let shared = 0;
+  for (const w of left) if (right.has(w)) shared++;
+  const union = left.size + right.size - shared;
+  // Two empty titles share nothing; without this they would score NaN.
+  return union ? shared / union : 0;
+}
+
+/**
+ * The score at or above which `new` names an open task (TL-649).
+ *
+ * WHY 0.7. Replacing one word of an n-word title scores (n-1)/(n+1): 0.71 at
+ * six words, 0.8 at nine. Measured across all 659 titles of this tool's own
+ * backlog on 2026-11-08, five pairs scored at or above 0.7: the duplicate that
+ * motivated the check (TL-571 and TL-613 at 0.80), two pairs that differ by one
+ * word, one rephrasing of the same refusal, and one pair that swaps "file" and
+ * "directory" (1.00 — the word-order blind spot above). At 0.6 the note started
+ * naming families of related but distinct tasks ("A file in place of …"), and
+ * a note that fires on every second title stops being read. Below
+ * six words a one-word change stays under the threshold — the price of not
+ * naming every short title that shares a verb.
+ */
+export const NEAR_DUPLICATE_THRESHOLD = 0.7;
+
+/**
+ * The OPEN tasks whose title nearly repeats `title`, most similar first. Open
+ * means a status outside `archived_statuses`: a closed task with the same title
+ * is history, and a second task for work already done is a separate question
+ * this note does not answer. It only reports — two similar titles can be two
+ * real tasks, so nothing here refuses.
+ *
+ * @returns {Array<{id: string, title: string, similarity: number}>} the
+ *          similarity rounded to two decimals
+ */
+export function nearDuplicateTitles(title, metas, config) {
+  const archived = new Set(config.archivedStatuses);
+  const words = titleWords(title);
+  const found = [];
+  for (const m of metas) {
+    if (!m || !m.id || archived.has(m.status)) continue;
+    const similarity = titleSimilarity(words, titleWords(m.title));
+    if (similarity >= NEAR_DUPLICATE_THRESHOLD) {
+      found.push({ id: m.id, title: String(m.title), similarity: Math.round(similarity * 100) / 100 });
+    }
+  }
+  return found.sort((x, y) => y.similarity - x.similarity || String(x.id).localeCompare(String(y.id)));
+}
+
+/**
+ * The note `new` prints when the title nearly repeats open tasks (TL-649), as
+ * lines for stderr; empty when nothing is close. One builder for both answers
+ * that follow a write — success and a plan refused after it — so a person
+ * without `--json` is told about the duplicate on either.
+ */
+export function nearDuplicateNote(nearDuplicates) {
+  if (!nearDuplicates.length) return [];
+  return [warn("the title nearly repeats " + plural(nearDuplicates.length, "an open task", "open tasks") +
+    " — the task was created; check it is not the same work:")]
+    .concat(nearDuplicates.map((d) => "    " + d.id + "  " + d.title + "  (similarity " + d.similarity.toFixed(2) + ")"));
 }
 
 /** A YAML scalar for a value that may contain spaces and colons. */
@@ -803,6 +891,10 @@ export async function main(argv) {
     });
   }
 
+  // The open tasks this title nearly repeats (TL-649), read BEFORE the write so
+  // the task being created is not among them. A note, never a refusal.
+  const nearDuplicates = nearDuplicateTitles(opts.title, readTaskMetas(paths.tasksDir, config), config);
+
   let created;
   try {
     created = createTask({
@@ -864,9 +956,9 @@ export async function main(argv) {
       return refuse({
         code: 1, refusalKind: "plan-refused", message: "the task was written and the plan was NOT",
         details: problems.concat([schedule]),
-        payload: { id: taskId, file: full, board, idSource: source },
+        payload: { id: taskId, file: full, board, idSource: source, nearDuplicates },
         text: [`${N} new: the task was written and the plan was NOT`, "  " + full]
-          .concat(problems.map((p) => "  - " + p), ["  " + schedule]).join("\n"),
+          .concat(problems.map((p) => "  - " + p), ["  " + schedule], nearDuplicateNote(nearDuplicates)).join("\n"),
       });
     }
     writeFileSync(paths.planPath, edit.text, "utf8");
@@ -875,6 +967,7 @@ export async function main(argv) {
   if (opts.json) {
     printJson("task-new", {
       ok: true, id: taskId, file: full, board, wave: scheduling ? opts.wave : null, idSource: source, actorSource,
+      nearDuplicates,
     });
     return 0;
   }
@@ -887,6 +980,8 @@ export async function main(argv) {
   }
   console.log("  board: " + board + (opts.board ? "" : " (the registry default)"));
   if (scheduling) console.log("  wave: " + opts.wave + " — scheduled in " + paths.planPath);
+  // On stderr: the task WAS created, and this is something to know about it.
+  for (const line of nearDuplicateNote(nearDuplicates)) console.error(line);
   // The one moment an estimate can still change a decision is while it is being
   // written (TL-480), shown as the computed field it is everywhere else
   // (TL-482). Silent below the threshold: a value from three samples would be
