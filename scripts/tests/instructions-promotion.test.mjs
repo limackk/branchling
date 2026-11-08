@@ -596,6 +596,32 @@ test("POSITIVE CONTROL, then the guard: overview names `check --release` where a
     "a configuration without `release_gate` does not name the default mode");
 });
 
+// The gap sentence is the one line whose punctuation depends on what follows
+// it: a full stop where the `deploy record` sentence comes next, a colon where
+// the command table does. Asserted at the line boundary in BOTH fixtures,
+// because each fixture alone survives one of the two constant endings — the
+// TL-596 review replaced the expression with ":" and nothing failed (TL-617).
+test("the gap sentence ends with a full stop before the record half, and with a colon before the command table", () => {
+  // The last two lines of the sentence, with the line break between them:
+  // "among them" (TL-618) pushed "lacks" onto a line of its own, and the
+  // ending is still asserted at the boundary where the sentence breaks.
+  const GAP = "partly in a stage, a commit a stage holds that the trunk or an earlier stage\nlacks";
+  for (const [label, yaml] of [["recorded", RECORDED_YAML], ["parallel", PARALLEL_YAML]]) {
+    const text = promotionGate(fixture(yaml).config);
+    assert.ok(text.includes("\n" + GAP + ".\nA stage git cannot observe"),
+      label + ": the gap sentence does not end with a full stop before the `deploy record` sentence");
+    assert.ok(!text.includes(GAP + ":"), label + ": the gap sentence ends with a colon where a sentence follows it");
+  }
+  const local = promotionGate(BOTH.config);
+  // The list of gaps is the sentence's whole content, so it is held word for
+  // word: a line dropped from it leaves the ending intact and says less.
+  assert.ok(local.replace(/\s+/g, " ").includes("it names each gap by its commit or task — among them a deployed commit " +
+    "naming no task, a task only " + GAP.replace(/\s+/g, " ") + ":"), "local: the gap sentence does not list every kind of gap");
+  assert.ok(local.includes("\n" + GAP + ":\n\n  " + PRODUCT_NAME + " check --release"),
+    "local: the gap sentence does not end with a colon before the command table");
+  assert.ok(!local.includes(GAP + "."), "local: the gap sentence ends with a full stop where the command table follows it");
+});
+
 test("the gate and `deploy record` are callable where the guide offers them, and are not where it is silent", () => {
   // The gate judges in every backlog that offers it ...
   const recorded = fixture(RECORDED_YAML);
