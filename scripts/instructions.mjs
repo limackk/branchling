@@ -193,7 +193,10 @@ export function promotionState(config) {
  * `deploy record` is narrower still — it is refused on any stage not declared
  * `recorded: true` — so its half renders only where such a stage exists and
  * names exactly those stages. A target in another repository has no stages,
- * so a recorded stage never stands without an observed target.
+ * so a recorded stage never stands without an observed target. The recorded
+ * stages of parallel refs are named again on a line of their own (TL-620):
+ * `deploy record` refuses them without `--ref`, and a sentence saying only
+ * that some stage needs it leaves the reader to find which by a refusal.
  *
  * The gate's mode is named because it decides what the exit code means: under
  * `report` a 0 is printed over any number of gaps, and an agent reading only
@@ -214,12 +217,12 @@ export function promotionGate(config) {
   const observed = observedTargets(config.deployTargets);
   if (!observed.length) return "";
   const recorded = [];
-  let parallel = false;
+  const parallel = [];
   for (const t of observed) {
     for (const s of t.stages || []) {
       if (!s.recorded) continue;
       recorded.push(t.name + "/" + s.name);
-      if (s.parallel) parallel = true;
+      if (s.parallel) parallel.push(t.name + "/" + s.name);
     }
   }
   const out = [
@@ -233,9 +236,9 @@ export function promotionGate(config) {
     out.push(
       "A stage git cannot observe — store review, an update channel, a sign-off — is",
       "declared `recorded: true`, and only `deploy record` moves its ref, on a stated",
-      "reason. It refuses every other stage" + (parallel ? ", and a stage of parallel refs also" : ":"),
+      "reason. It refuses every other stage" + (parallel.length ? ", and a stage of parallel refs also" : ":"),
     );
-    if (parallel) out.push("takes `--ref <name>`, the one ref that moves:");
+    if (parallel.length) out.push("takes `--ref <name>`, the one ref that moves:");
   }
   out.push(
     "",
@@ -260,6 +263,7 @@ export function promotionGate(config) {
       : "none — `release_gate_accept` is empty, so every gap exits 1"]);
   }
   if (recorded.length) rows.push(["recorded stages", list(recorded)]);
+  if (parallel.length) rows.push(["parallel refs", list(parallel)]);
   const width = Math.max(...rows.map(([label]) => label.length)) + 2;
   out.push("", ...rows.map(([label, value]) => "  " + label.padEnd(width) + value));
   return out.join("\n") + "\n\n";

@@ -52,6 +52,10 @@
  *      `report` it names neither (TL-619). The accepted gaps are the fixture's
  *      own, and the ones it does not accept are shown absent, so a fixed list
  *      cannot pass.
+ *  12. With several recorded stages, overview names exactly the ones of
+ *      parallel refs as taking `--ref <name>` (TL-620), and a live
+ *      `deploy record` refuses exactly those without it — so the line is
+ *      shown to separate the stages the command itself separates.
  *
  * Release and target names are deliberately unlike this repository's
  * vocabulary, so a literal in the source is the only way they could match.
@@ -755,4 +759,47 @@ test("under `require` overview names the accepted gaps or says none are accepted
   // loader's default, which accepts nothing.
   assert.ok(promotionGate({ releaseGate: "require", deployTargets: [{ name: TARGETS[0], stages: [] }] })
     .includes("accepted gaps  none — "), "a configuration without `release_gate_accept` does not say none are accepted");
+});
+
+// Two recorded stages, only the second of parallel refs: a renderer that
+// named every recorded stage, or none, as taking `--ref` fails on one of
+// them, and `deploy record` is run on both to show the line follows the
+// command's own refusal (TL-620).
+test("with several recorded stages, overview names exactly the parallel ones as taking `--ref`", () => {
+  const SINGLE = TARGETS[0] + "/" + STAGES[0];
+  const PARALLEL = TARGETS[0] + "/" + STAGES[1];
+  const two = fixture(`deploy_targets:
+  - name: ${TARGETS[0]}
+    stages:
+      - { name: quay, ref: main }
+      - { name: ${STAGES[0]}, ref: refs/deploys/${STAGES[0]}, recorded: true }
+      - name: ${STAGES[1]}
+        recorded: true
+        refs: [refs/deploys/${STAGES[2]}, refs/deploys/${STAGES[3]}]
+`);
+  const overview = topicText("overview", two.config);
+  assert.ok(overview.includes("\n  release gate     `report` — the gaps are printed and the exit is 0\n" +
+    "  recorded stages  `" + SINGLE + "`, `" + PARALLEL + "`\n" +
+    "  parallel refs    `" + PARALLEL + "`\n\nTHIS BACKLOG'S OWN WORDS"),
+    "two recorded: the parallel stage is not named, alone and aligned, after the recorded ones");
+  assert.ok(!overview.includes("  parallel refs    `" + SINGLE), "two recorded: a stage of one ref is named as taking `--ref`");
+  assert.match(overview.replace(/\s+/g, " "), /a stage of parallel refs also takes `--ref <name>`, the one ref that moves:/,
+    "two recorded: the sentence the line answers is not rendered");
+
+  // Where no recorded stage has parallel refs the line is absent: the
+  // recorded-only fixture is the control that the condition is not constant.
+  assert.ok(!topicText("overview", fixture(RECORDED_YAML).config).includes("parallel refs  "),
+    "recorded only: a parallel-refs line is printed where no stage has them");
+
+  // The command draws the same line: the stage of one ref moves without
+  // `--ref`, the stage of parallel refs is refused without it.
+  const record = (stage, extra) => run(two.repo, ["deploy", "record", "--target", TARGETS[0], "--stage", stage, "main"]
+    .concat(extra, ["--reason", "fixture", "--actor", "agent:test", "--dir", two.dir]));
+  const single = record(STAGES[0], []);
+  assert.equal(single.status, 0, "`deploy record` refuses without `--ref` a stage the guide does not name: " + single.stderr);
+  const bare = record(STAGES[1], []);
+  assert.notEqual(bare.status, 0, "`deploy record` moves the named parallel stage without `--ref`");
+  assert.match(bare.stderr, /has parallel refs/, "`deploy record` refused the parallel stage for another reason");
+  const withRef = record(STAGES[1], ["--ref", STAGES[2]]);
+  assert.equal(withRef.status, 0, "`deploy record --ref` refuses the stage the guide names: " + withRef.stderr);
 });
