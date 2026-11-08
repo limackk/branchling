@@ -198,6 +198,15 @@ export function promotionState(config) {
  * The gate's mode is named because it decides what the exit code means: under
  * `report` a 0 is printed over any number of gaps, and an agent reading only
  * the exit would call an unsafe promotion safe.
+ *
+ * The gap kinds are EXAMPLES, and the sentence says so (TL-618). `GAP_NAMES`
+ * in release-gaps.mjs declares more of them than a paragraph can describe;
+ * listed without a marker, three read as everything the gate reports, and an
+ * agent would wave through the gaps the list left out. Deriving the list from
+ * `GAP_NAMES` was rejected: it would print kebab-case identifiers where the
+ * reader needs what each gap means, and the kinds only some configurations
+ * produce (a planned blocker, an untargeted commit) would be offered to a
+ * backlog that can never see them.
  */
 export function promotionGate(config) {
   const observed = observedTargets(config.deployTargets);
@@ -214,8 +223,9 @@ export function promotionGate(config) {
   const out = [
     "WHETHER A PROMOTION IS SAFE is a question for `check --release`, never for a",
     "bare `check`: CI runs it as the step before a deploy, and it names each gap by",
-    "its commit or task — a deployed commit naming no task, a task only partly in a",
-    "stage, a commit a stage holds that the trunk or an earlier stage lacks" + (recorded.length ? "." : ":"),
+    "its commit or task — among them a deployed commit naming no task, a task only",
+    "partly in a stage, a commit a stage holds that the trunk or an earlier stage",
+    "lacks" + (recorded.length ? "." : ":"),
   ];
   if (recorded.length) {
     out.push(

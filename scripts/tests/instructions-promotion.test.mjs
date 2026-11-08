@@ -44,6 +44,9 @@
  *      (TL-606). A local target, alone or beside a foreign one, is the
  *      positive control, and the command is run in each fixture to show that
  *      the two descriptions follow what it reports.
+ *  10. The gate's paragraph does not present the gap kinds it names as all the
+ *      gate reports (TL-618): a list shorter than `GAP_NAMES` is marked as
+ *      examples. The predicate is first shown to flag the wording it replaced.
  *
  * Release and target names are deliberately unlike this repository's
  * vocabulary, so a literal in the source is the only way they could match.
@@ -59,6 +62,7 @@ import { join } from "node:path";
 import { loadConfig } from "../config.mjs";
 import { PRODUCT_NAME } from "../product.mjs";
 import { TOPIC_NAMES, promotionGate, promotionState, releasePlanning, targetPlanning, topicText } from "../instructions.mjs";
+import { GAP_NAMES } from "../release-gaps.mjs";
 import { SCRIPTS_DIR, isolateHome } from "./_repo.mjs";
 
 isolateHome("instructions-promotion");
@@ -565,7 +569,7 @@ test("POSITIVE CONTROL, then the guard: overview names `check --release` where a
   const both = topicText("overview", BOTH.config);
   assert.deepEqual(gateTeaching(both), ["gate", "mode"], "local: the gate is not offered, or `deploy record` is");
   assert.ok(both.includes("\n  release gate  `report` — the gaps are printed and the exit is 0\n\n"), "local: the mode is not named on a line of its own");
-  assert.match(both, /an earlier stage lacks:\n\n {2}\S/, "local: the command table is not set apart");
+  assert.match(both, /an earlier stage\s+lacks:\n\n {2}\S/, "local: the command table is not set apart");
   assert.ok(!both.includes("recorded: true"), "local: recorded stages are explained where none is declared");
 
   // Parallel refs under `require`: `--ref` is named, and so is what the exit means.
@@ -629,4 +633,39 @@ test("the gate and `deploy record` are callable where the guide offers them, and
     "--reason", "fixture", "--actor", "agent:test", "--dir", BOTH.dir]);
   assert.notEqual(refused.status, 0, "`deploy record` accepts an observed stage — the condition may be obsolete");
   assert.match(refused.stderr, /not a recorded stage/, "`deploy record` refused an observed stage for another reason");
+});
+
+/**
+ * Whether the gate's sentence presents its gap kinds as the complete set, or
+ * null where the sentence is absent. PURE, so it is shown to flag the wording
+ * TL-618 replaced before its silence over the rendered one is trusted.
+ *
+ * A list is read as complete unless it opens with a marker of examples; an
+ * unmarked list is complete only if it names as many kinds as `GAP_NAMES`
+ * declares, which no prose list here does. Counting is all a test can do:
+ * whether each description matches a kind is a sentence, not a value.
+ */
+function gapKindsReadAsComplete(text) {
+  const m = text.replace(/\s+/g, " ").match(/names each gap by its commit or task — (.*?)[.:](?: |$)/);
+  if (!m) return null;
+  if (/^(?:among them|for example|including|such as)\b/.test(m[1])) return false;
+  const kinds = m[1].split(/, (?:and )?/);
+  return kinds.length < GAP_NAMES.length ? "unmarked" : false;
+}
+
+test("POSITIVE CONTROL, then the guard: the gate does not present the gap kinds it names as all it reports", () => {
+  // The wording before TL-618, verbatim: three kinds, no marker.
+  const before = "it names each gap by its commit or task — a deployed commit naming no task, a task only partly in a " +
+    "stage, a commit a stage holds that the trunk or an earlier stage lacks:";
+  assert.equal(gapKindsReadAsComplete(before), "unmarked", "the predicate does not flag the wording TL-618 replaced");
+  assert.ok(GAP_NAMES.length > 3, "the gate declares no more kinds than the paragraph names — the marker may be obsolete");
+
+  // Both endings of the sentence: before the command table, and before the
+  // recorded-stage half.
+  for (const [label, config] of [["local", BOTH.config], ["recorded", fixture(RECORDED_YAML).config]]) {
+    const gate = promotionGate(config);
+    assert.equal(gapKindsReadAsComplete(gate), false, label + ": the gap kinds read as everything the gate reports");
+    assert.equal(gapKindsReadAsComplete(topicText("overview", config)), false,
+      label + ": the overview presents the gap kinds as complete");
+  }
 });
