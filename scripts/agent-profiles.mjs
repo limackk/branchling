@@ -20,7 +20,7 @@ import { agentProfilesPath, ensureHome, homePaths } from "./home.mjs";
 import { lockScope } from "./lock.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
-import { isValidActor, stripComment, unquote } from "./task-fields.mjs";
+import { actorRefusal, isValidActor, stripComment, unquote } from "./task-fields.mjs";
 import { failure, heading, refusal, table } from "./ui.mjs";
 import { isBacklogDirRefusal, resolveBacklogDir } from "./paths.mjs";
 import { executableInvocation } from "./posix-shell.mjs";
@@ -93,7 +93,17 @@ function profileProblems(profile, path) {
     problems.push("profile `" + profile.name + "` delegation_control must be one of: " + DELEGATION_ENFORCEMENT.join(", "));
   }
   if (profile.actor && (!isValidActor(profile.actor) || !String(profile.actor).startsWith("agent:"))) {
-    problems.push("profile `" + profile.name + "` actor must be an `agent:<name>` identity");
+    // The shape is diagnosed by actorRefusal(), as in every writing command,
+    // so `agent:Impl` is refused for its name, not for a namespace it already
+    // has (TL-605). The agent: requirement stays this check's own sentence,
+    // and the shared hint is printed only when agent: is the half that is
+    // right — under another namespace it would vouch for the wrong half.
+    const required = "profile `" + profile.name + "` actor must be an `agent:<name>` identity";
+    const bad = actorRefusal(profile.actor);
+    if (!bad) problems.push(required);
+    else if (!bad.namespace && String(profile.actor).startsWith("agent:")) {
+      problems.push("profile `" + profile.name + "` actor: " + bad.refusal + ". " + bad.hint);
+    } else problems.push(required + " — " + bad.refusal);
   }
   return problems;
 }
