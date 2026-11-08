@@ -128,12 +128,27 @@ test("the command writes a floor where there was none, and prints it as raised f
 
 // ── 2. a floor at or above the key's release stays ────────────────────────
 
-test("a floor higher than the key's release is left alone, and so is an equal one", () => {
+// A floor EQUAL to `releases` cannot reach the CLI: since TL-593 it is below
+// the floor key's own release, so it is a parse problem. That case is proved
+// through the pure writer — "PURE: a lower floor is raised in place, an equal
+// one stays" below.
+
+test("through the CLI, the floor key's own release and the newest floor this build reads are left alone", () => {
   // The floor this build reads is the highest it can leave in place; a test
   // above THAT would be the refusal case below, not this one.
   assert.ok(compareVersions(READABLE_VERSION, RELEASES_SINCE) > 0, "no floor above `releases` is readable here");
-  // The lowest floor the parser accepts is the floor key's own release (TL-593).
-  for (const floor of [READABLE_VERSION, KEY_SINCE[REQUIRES_VERSION_KEY]]) {
+  // The lowest floor the parser accepts is the floor key's own release (TL-593),
+  // and the highest is READABLE_VERSION. While the two are equal they are one
+  // floor, so the list is deduplicated rather than run twice (TL-621).
+  const floorKeySince = KEY_SINCE[REQUIRES_VERSION_KEY];
+  const floors = [...new Set([floorKeySince, READABLE_VERSION])];
+  const apart = compareVersions(READABLE_VERSION, floorKeySince) > 0;
+  assert.equal(floors.length, apart ? 2 : 1,
+    "distinct floors through the CLI: " + floors.join(", ") + (apart ? "" : " — READABLE_VERSION " +
+      READABLE_VERSION + " equals the floor key's release, so one floor is exercised; " +
+      "a second returns when READABLE_VERSION moves past it"));
+  for (const floor of floors) {
+    assert.ok(compareVersions(floor, RELEASES_SINCE) > 0, floor + " is not above `releases`");
     const dir = fixture("\n" + REQUIRES_VERSION_KEY + ": " + floor + "\n");
     const r = cli(dir, "declare", "releases", "2.0", "--reason", "a later cut", "--json");
     assert.equal(r.status, 0, r.stderr);

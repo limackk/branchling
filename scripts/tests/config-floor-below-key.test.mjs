@@ -18,9 +18,11 @@
  * WHAT HAS TO BE PROVED:
  *   1. A floor below the key's release is one problem of its line, naming
  *      both versions, through the parser and through `loadConfig`.
- *   2. A floor AT the key's release, and one above it that this build reads,
- *      read with no problem — the control that this is not a parser that
- *      rejects every floor.
+ *   2. A floor AT the key's release, and one above it, read with no problem —
+ *      the control that this is not a parser that rejects every floor. While
+ *      this build reads no floor above the key's release, the one above is
+ *      read through the parser's `readable` seam, standing in for a newer
+ *      reader (TL-621).
  *   3. `declare` refuses such a file before writing, instead of raising the
  *      floor to another release that cannot read it.
  */
@@ -84,13 +86,30 @@ test("LOAD: such a floor fails loadConfig, and the error names it", () => {
 
 // ── 2. the control: a floor at or above it ────────────────────────────────
 
-test("a floor at that release, or above it and readable here, is left alone", () => {
+test("a floor at that release, or above it for a reader that reads it, is left alone", () => {
   assert.ok(compareVersions(READABLE_VERSION, SINCE) >= 0, "this build cannot read its own floor key");
-  for (const floor of [SINCE, READABLE_VERSION]) {
+  // The floors THIS build reads at or above the key's release. They are one
+  // floor while READABLE_VERSION equals it, and a loop over both literals would
+  // run the same case twice while reading as if it proved two (TL-621).
+  const floors = [...new Set([SINCE, READABLE_VERSION])];
+  const above = compareVersions(READABLE_VERSION, SINCE) > 0;
+  assert.equal(floors.length, above ? 2 : 1,
+    "distinct floors this build reads: " + floors.join(", ") + (above ? "" : " — READABLE_VERSION " +
+      READABLE_VERSION + " equals " + SINCE + ", so no floor above the key's release is readable here; " +
+      "this loop covers one again when READABLE_VERSION moves past it"));
+  for (const floor of floors) {
     const r = parseConfigYaml("labels: []\n" + REQUIRES_VERSION_KEY + ": " + floor + "\n");
     assert.deepEqual(r.problems, [], floor);
     assert.equal(r.values[REQUIRES_VERSION_KEY], floor, floor);
   }
+  // A floor strictly above the key's release, read by a reader as new as it:
+  // the case the loop above cannot reach while it collapses.
+  const [major, minor] = parseVersion(SINCE);
+  const higher = major + "." + (minor + 1) + ".0";
+  assert.ok(compareVersions(higher, SINCE) > 0, higher + " is not above " + SINCE);
+  const r = parseConfigYaml("labels: []\n" + REQUIRES_VERSION_KEY + ": " + higher + "\n", { readable: higher });
+  assert.deepEqual(r.problems, [], higher);
+  assert.equal(r.values[REQUIRES_VERSION_KEY], higher, higher);
   // An empty floor states none (TL-592), so it is not below anything.
   assert.deepEqual(parseConfigYaml(REQUIRES_VERSION_KEY + ': ""\n').problems, []);
 });
