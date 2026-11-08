@@ -349,7 +349,17 @@ export function parseDeclareArgs(argv) {
   return opts;
 }
 
-export function run(argv) {
+/**
+ * @param {string[]} argv
+ * @param {{since?: Record<string, string>}} [opts] `since` — key → the release
+ *        that introduced it, `KEY_SINCE` by default. Every key this command
+ *        writes predates `requires_version`, so with the shipped table no file
+ *        the parser accepts has a floor to raise (TL-593); a test passes a table
+ *        of its own to reach the raise through the command (TL-612). The same
+ *        table decides the newest floor the written file is read back with.
+ */
+export function run(argv, opts = {}) {
+  const since = opts.since || KEY_SINCE;
   const cmd = N + " declare";
   const dirFlag = takeDirFlag(argv);
   const wantsJson = dirFlag.argv.includes("--json");
@@ -358,15 +368,15 @@ export function run(argv) {
     else console.error(failure(cmd, message, details, [cmd + " --help"]));
     return code;
   };
-  let opts;
-  try { opts = parseDeclareArgs(dirFlag.argv); }
+  let flags;
+  try { flags = parseDeclareArgs(dirFlag.argv); }
   catch (e) {
     const [head, avail] = e.message.split("\n");
     if (wantsJson) return refuse(head, ["available: " + avail], 2, "usage");
     console.error(refusal(cmd, head, avail));
     return 2;
   }
-  const [key, name, ...extra] = opts.positionals;
+  const [key, name, ...extra] = flags.positionals;
   if (!key) return refuse("no key — which vocabulary gets the entry?", ["writable: " + WRITABLE_KEYS.join(", ")], 2, "usage");
   if (WRITABLE_KEYS.indexOf(key) < 0) {
     return refuse("`" + key + "` is not written by a command", [
@@ -378,14 +388,14 @@ export function run(argv) {
   if (!name) return refuse("no name for the new entry of `" + key + "`", [], 2, "usage", { key });
   if (extra.length) return refuse("unexpected argument: " + extra[0] + " — one entry per call", [], 2, "usage", { key, name });
 
-  const why = reasonRefusal(opts.reason === null ? "" : opts.reason, "--reason");
+  const why = reasonRefusal(flags.reason === null ? "" : flags.reason, "--reason");
   if (why) {
     const [head, ...rest] = why.split("\n");
     return refuse(head, rest, 2, "usage", { key, name });
   }
-  const reason = normalizeReason(opts.reason);
+  const reason = normalizeReason(flags.reason);
 
-  const built = buildEntry({ key, name, ref: opts.ref, repository: opts.repository, paths: opts.paths, stages: opts.stages });
+  const built = buildEntry({ key, name, ref: flags.ref, repository: flags.repository, paths: flags.paths, stages: flags.stages });
   if (!built.ok) return refuse(built.message, built.details, 2, "malformed", { key, name, reason });
 
   let root;
@@ -397,7 +407,7 @@ export function run(argv) {
   const file = backlogPaths(root).configPath;
   const original = existsSync(file) ? readFileSync(file, "utf8") : "";
 
-  const edit = appendEntryText(original, key, built.entry, reason);
+  const edit = appendEntryText(original, key, built.entry, reason, since);
   if (!edit.ok) return refuse(edit.message, edit.details, 1, edit.kind, { key, name, reason, file });
 
   writeFileSync(file, edit.text, "utf8");
@@ -405,7 +415,7 @@ export function run(argv) {
   // vocabularies the line reader does not make must not be discovered by the
   // next command instead.
   try {
-    loadConfig(root);
+    loadConfig(root, { readable: readableVersion(PRODUCT_VERSION, since) });
   } catch (e) {
     if (original === "" && !existsSync(file)) throw e;
     writeFileSync(file, original, "utf8");

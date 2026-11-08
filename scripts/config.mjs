@@ -739,10 +739,12 @@ function toEntries(list) {
 
 /**
  * @param {string} root the backlog directory (from paths.mjs)
- * @param {{strict?: boolean, boardsPath?: string}} opts
+ * @param {{strict?: boolean, boardsPath?: string, readable?: string}} opts
  *        `strict` (true by default) — an error in config.yaml throws instead of
  *        being ignored. A typo in the status vocabulary quietly papered over is
- *        validation that lets everything through.
+ *        validation that lets everything through. `readable` — the newest floor
+ *        accepted, `READABLE_VERSION` by default; a command written against a
+ *        release table of its own (TL-612) reads back with that table's floor.
  * @returns {object} a frozen configuration, plus the boards
  */
 export function loadConfig(root, opts = {}) {
@@ -752,7 +754,7 @@ export function loadConfig(root, opts = {}) {
 
   let parsedValues = {};
   if (existsSync(paths.configPath)) {
-    const parsed = parseConfigYaml(readFileSync(paths.configPath, "utf8"));
+    const parsed = parseConfigYaml(readFileSync(paths.configPath, "utf8"), { readable: opts.readable });
     if (parsed.problems.length && strict) {
       const req = parsed.requirement;
       throw new ConfigError(

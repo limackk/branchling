@@ -4,8 +4,10 @@
  * WHAT HAS TO BE PROVED:
  *   1. Declaring into a key introduced in a release raises `requires_version`
  *      to that release when the file states a lower floor, and keeps the
- *      floor's line and comment. Proved through the pure writer: since TL-593
- *      no floor the parser accepts is below a key `declare` writes today.
+ *      floor's line and comment, and the command says so on a line of its own
+ *      and in `--json` as `requiresVersion`. Since TL-593 no floor the parser
+ *      accepts is below a key `declare` writes today, so the command is run
+ *      with a release table of its own (TL-612).
  *   2. A floor at or above the key's release is left byte for byte alone.
  *   3. With no floor, one is written only when the key is newer than
  *      `requires_version` itself — otherwise writing it would make the file
@@ -14,7 +16,8 @@
  *
  * The keys `declare` writes today all predate `requires_version`, so case 3's
  * "written" half is proved through the pure writer with a release table of
- * its own, the seam `appendEntryText` takes for exactly this.
+ * its own, the seam `appendEntryText` takes for exactly this — and both
+ * halves through the command's own `run`, which takes the same table.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -23,6 +26,7 @@ import { appendFileSync, readFileSync } from "node:fs";
 import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 import { KEY_SINCE, READABLE_VERSION, parseConfigYaml } from "../config.mjs";
 import { REQUIRES_VERSION_KEY, compareVersions, parseVersion, raisedRequirement, setRequirementText } from "../config-version.mjs";
@@ -52,12 +56,13 @@ const RELEASES_SINCE = KEY_SINCE.releases;
 
 // ── 1. a lower floor is raised ────────────────────────────────────────────
 //
-// Through the CLI this case cannot be built today (TL-593): a floor below
-// `KEY_SINCE.requires_version` is a parse problem, and every key `declare`
-// writes predates `requires_version`, so no floor the parser accepts is lower
-// than a writable key's release. The raise is proved through the pure writer
-// with its own release table below; this test is what fails, and asks for the
-// CLI case back, the day a writable key is newer than the floor key.
+// With the shipped release table this case cannot be built (TL-593): a floor
+// below `KEY_SINCE.requires_version` is a parse problem, and every key
+// `declare` writes predates `requires_version`, so no floor the parser accepts
+// is lower than a writable key's release. The command is therefore run in a
+// child process through its own `run`, with a release table of its own — the
+// same seam `appendEntryText` takes (TL-612). The guard below fails the day a
+// writable key is newer than the floor key, when the plain CLI reaches it too.
 
 test("every key `declare` writes predates `requires_version`, so the CLI has no floor to raise", () => {
   // Positive control: the loop runs over the real list.
@@ -66,6 +71,59 @@ test("every key `declare` writes predates `requires_version`, so the CLI has no 
     assert.ok(compareVersions(KEY_SINCE[key], KEY_SINCE[REQUIRES_VERSION_KEY]) <= 0,
       "`" + key + "` is newer than `" + REQUIRES_VERSION_KEY + "`: restore a CLI test of the raise and its text line");
   }
+});
+
+const DECLARE = pathToFileURL(join(SCRIPTS_DIR, "declare-vocabulary.mjs")).href;
+
+/** `declare` as the CLI runs it — its own process, stdout, stderr and exit
+ *  code — with only the release table replaced. */
+function declareWith(since, dir, ...args) {
+  const src = "import { run } from " + JSON.stringify(DECLARE) + ";\n" +
+    "process.exitCode = run(JSON.parse(process.argv[1]), { since: JSON.parse(process.argv[2]) });";
+  return spawnSync(process.execPath, ["--input-type=module", "-e", src, JSON.stringify([...args, "--dir", dir]), JSON.stringify(since)],
+    { encoding: "utf8", env: { ...process.env, NO_COLOR: "1" } });
+}
+
+const RAISING = { ...KEY_SINCE, releases: "7.1.0", [REQUIRES_VERSION_KEY]: "7.0.0" };
+// The written floor is above this build, so it is read back as the table's build would.
+const raisedFloorOf = (dir) => parseConfigYaml(read(dir), { readable: "7.1.0" }).values[REQUIRES_VERSION_KEY];
+
+test("the command raises a lower floor, prints the raise and answers it in --json", () => {
+  // Positive control: the same runner with the shipped table raises nothing,
+  // so what follows is the table's doing, not the runner's.
+  const plain = fixture("\n" + REQUIRES_VERSION_KEY + ": " + KEY_SINCE[REQUIRES_VERSION_KEY] + "\n");
+  const control = declareWith(KEY_SINCE, plain, "releases", "1.0", "--reason", "a cut", "--json");
+  assert.equal(control.status, 0, control.stderr);
+  assert.equal(JSON.parse(control.stdout).requiresVersion, null);
+
+  const json = fixture("\n" + REQUIRES_VERSION_KEY + ": 7.0.0  # why\n");
+  const j = declareWith(RAISING, json, "releases", "1.0", "--reason", "a cut", "--json");
+  assert.equal(j.status, 0, j.stdout + j.stderr);
+  const out = JSON.parse(j.stdout);
+  assert.equal(out.ok, true);
+  assert.deepEqual(out.requiresVersion, { from: "7.0.0", to: "7.1.0" });
+  assert.match(read(json), /^requires_version: 7\.1\.0  # why$/m);
+
+  const text = fixture("\n" + REQUIRES_VERSION_KEY + ": 7.0.0\n");
+  const t = declareWith(RAISING, text, "releases", "1.0", "--reason", "a cut");
+  assert.equal(t.status, 0, t.stdout + t.stderr);
+  assert.ok(t.stdout.split("\n").includes("  " + REQUIRES_VERSION_KEY +
+    ": 7.0.0 → 7.1.0 — `releases` arrived in 7.1.0, so an older release cannot read this file"), t.stdout);
+  assert.equal(raisedFloorOf(text), "7.1.0");
+});
+
+test("the command writes a floor where there was none, and prints it as raised from none", () => {
+  const json = fixture("");
+  const j = declareWith(RAISING, json, "releases", "1.0", "--reason", "the first cut", "--json");
+  assert.equal(j.status, 0, j.stdout + j.stderr);
+  assert.deepEqual(JSON.parse(j.stdout).requiresVersion, { from: null, to: "7.1.0" });
+
+  const text = fixture("");
+  const t = declareWith(RAISING, text, "releases", "1.0", "--reason", "the first cut");
+  assert.equal(t.status, 0, t.stdout + t.stderr);
+  assert.ok(t.stdout.split("\n").includes("  " + REQUIRES_VERSION_KEY +
+    ": none → 7.1.0 — `releases` arrived in 7.1.0, so an older release cannot read this file"), t.stdout);
+  assert.equal(raisedFloorOf(text), "7.1.0");
 });
 
 // ── 2. a floor at or above the key's release stays ────────────────────────
