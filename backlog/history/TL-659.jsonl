@@ -1,0 +1,2 @@
+{"id":"01M6X5FK8RE6APRY9N9BZG931H","ts":"2026-11-08T08:47:58.744Z","task":"TL-659","field":"__created__","from":"","to":"doctor.mjs's own help states its exit codes the way the dispatcher help does","actor":"agent:loop-2","source":"new","reason":"unknown"}
+{"id":"01M6X5G3401TT6N2XDE8J0MF24","ts":"2026-11-08T08:48:14.976Z","task":"TL-659","field":"__adopted__","from":"","to":["title","status","priority","type","owner","estimate","confidence","board","created"],"actor":"agent:loop-2","source":"manual","reason":"unknown"}

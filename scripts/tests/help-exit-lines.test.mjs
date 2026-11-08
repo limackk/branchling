@@ -15,6 +15,14 @@
  * with the sentence in docs/external-consumers.md that states the contract,
  * and with a live process, so none of the three can name a different code.
  *
+ * EVERY COMMAND HAS ONE (TL-572). The clause above was guarded only where an
+ * `exit:` line already existed, and fourteen entries of the command table
+ * printed none through the dispatcher, so the guard could ask nothing of them
+ * and docs/external-consumers.md promised a line they did not have. Now an
+ * entry whose help does not END with an exit line listing 2 fails here —
+ * 2 because every command refuses an unknown flag with it — which puts every
+ * entry in the scope of the clause test below.
+ *
  * THE EXEMPTIONS ARE NAMED AND PROVED. A command that never resolves a backlog
  * never meets the state, and a help line claiming it would be false. Each one
  * is run outside a backlog below; the day one of them starts resolving one, it
@@ -74,18 +82,38 @@ const EXEMPT = {
     argv: ["conformance", "--adapter", "./no-such-adapter"],
     why: "it judges an adapter executable and never resolves a backlog",
   },
+  init: {
+    argv: ["init", "--dir", "fresh-backlog", "--no-gitignore", "--no-nudge", "--no-example"],
+    why: "it creates a backlog in the directory it is given and never resolves one",
+  },
+  mcp: {
+    argv: ["mcp"],
+    why: "the server resolves nothing itself; each call that meets no backlog answers inside the stream",
+  },
+  "regen-hook": {
+    argv: ["regen-hook"],
+    why: "the backlog comes from the edited file's own path, never from resolution",
+  },
 };
 
 /** The `exit:` block — the last line naming exit codes and its continuations —
  *  with whitespace collapsed, so wrapping a help line cannot change the verdict. */
 function exitBlock(text) {
+  const located = locateExitBlock(text);
+  return located ? located.block : null;
+}
+
+/** The exit block and the non-blank help lines that follow it — none, when the
+ *  help ENDS with its exit line. */
+function locateExitBlock(text) {
   const lines = String(text).split("\n");
   let start = -1;
   for (let i = 0; i < lines.length; i++) if (/\bexit( code)?:/.test(lines[i])) start = i;
   if (start < 0) return null;
   const block = [];
-  for (let i = start; i < lines.length && lines[i].trim(); i++) block.push(lines[i].trim());
-  return block.join(" ").replace(/\s+/g, " ");
+  let i = start;
+  for (; i < lines.length && lines[i].trim(); i++) block.push(lines[i].trim());
+  return { block: block.join(" ").replace(/\s+/g, " "), after: lines.slice(i).filter((l) => l.trim()) };
 }
 
 const listsTwo = (block) => /(?<![\w-])2(?![\w-])/.test(block.replace(/^.*?\bexit( code)?:/, ""));
@@ -99,6 +127,15 @@ const doc = readFileSync(DOC, "utf8").replace(/\s+/g, " ");
 const inScope = Object.entries(COMMANDS)
   .map(([name, spec]) => ({ name, block: exitBlock(commandHelpText(name, spec)) }))
   .filter(({ block }) => block && listsTwo(block));
+
+for (const [name, spec] of Object.entries(COMMANDS)) {
+  test("`" + name + " --help` ends with an exit line that lists 2", () => {
+    const located = locateExitBlock(commandHelpText(name, spec));
+    assert.ok(located, "`" + name + " --help` prints no `exit:` line — a reader cannot learn its exit codes");
+    assert.deepEqual(located.after, [], "`" + name + " --help` goes on after its exit line instead of ending with it");
+    assert.ok(listsTwo(located.block), "`" + name + "` exit line does not list 2, the code of a usage error:\n  " + located.block);
+  });
+}
 
 test("the guard has something to judge — a zero sample would pass on nothing", () => {
   const carrying = inScope.filter(({ name }) => !(name in EXEMPT));

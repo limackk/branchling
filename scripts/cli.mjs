@@ -169,6 +169,10 @@ const CHECK_USAGE = [
   "                       the whole suite, `--task <ID> --own-only` re-runs one task's",
   "                       proofs without starting it. The report says what it left out:",
   "                       `done` still runs the project's entries before it closes a task",
+  "",
+  "  exit: 0 every guard run passed · 1 a guard failed, or the configuration cannot be",
+  "        read · 2 usage error",
+  NO_BACKLOG_EXIT_LINE,
 ].join("\n");
 
 /**
@@ -215,6 +219,11 @@ export const COMMANDS = {
       "",
       "  A backgrounded serve does NOT stop when the shell that started it goes away,",
       "  and it keeps reconciling the tree into backlog/history/ while it lives.",
+      "",
+      "  exit: 0 stopped by a signal, already running (a tab is opened), or a list or",
+      "        stop answered · 1 the port could not be bound, or `--stop` met a viewer",
+      "        that is not this tool's or that would not stop · 2 usage error",
+      NO_BACKLOG_EXIT_LINE,
     ].join("\n"),
   },
   query: {
@@ -297,19 +306,34 @@ export const COMMANDS = {
       "                 born with. Kept because calls and hooks written before --dir",
       "                 existed still pass it; --dir is the shared spelling for a",
       "                 backlog override on commands that take one",
+      "",
+      "  exit: 0 rebuilt · 1 refused before writing (an inconsistent configuration, no",
+      "        board registry, a prefix mismatch) or an id collision, board or role",
+      "        error in the tree · 2 usage error",
+      NO_BACKLOG_EXIT_LINE,
     ].join("\n"),
   },
   viewer: {
     audience: "person",
     script: "build-viewer.mjs",
     summary: "rebuild viewer.html without starting the server",
-    usage: `${N} viewer [--dir <path>]`,
+    usage: [
+      `${N} viewer [--dir <path>]`,
+      "",
+      "  exit: 0 written · 1 the configuration cannot be read · 2 usage error",
+      NO_BACKLOG_EXIT_LINE,
+    ].join("\n"),
   },
   "next-id": {
     audience: "person",
     script: "next-backlog-id.mjs",
     summary: "the next free task number (computed across ALL branches and worktrees)",
-    usage: `${N} next-id [--explain] [--json]`,
+    usage: [
+      `${N} next-id [--explain] [--json]`,
+      "",
+      "  exit: 0 answered · 1 the configuration cannot be read · 2 usage error",
+      NO_BACKLOG_EXIT_LINE,
+    ].join("\n"),
   },
   board: {
     audience: "agent",
@@ -326,6 +350,10 @@ export const COMMANDS = {
       "                          after it that is not a flag is one of them",
       "  --registry <boards.yaml>  read the board rules from this file rather than from",
       "                          the backlog's own boards.yaml",
+      "",
+      "  exit: 0 answered, including the default board · 2 usage error, or a registry",
+      "        whose `default:` names no board in its list",
+      NO_BACKLOG_EXIT_LINE,
     ].join("\n"),
   },
   history: {
@@ -912,6 +940,12 @@ export const COMMANDS = {
       "                  a typo here. Without the flag the plan is not opened at all.",
       "",
       `  \`${N} new --help --json\` prints those lists, so nothing has to be guessed.`,
+      "",
+      "  exit: 0 created · 2 usage error, a value outside the vocabulary, a refused",
+      "        document, a number already taken · 1 refused by the tree (unreadable",
+      "        configuration, prefix mismatch, template drift), or the task was",
+      "        written and the plan was not",
+      NO_BACKLOG_EXIT_LINE,
     ].join("\n"),
   },
   seed: {
@@ -1204,6 +1238,11 @@ export const COMMANDS = {
       "  It talks to nothing. The CI job is checkout, run, comment — examples/pr-summary.yml",
       "  is a working GitHub Actions workflow, and the same command needs no change in",
       "  GitLab CI or a hook.",
+      "",
+      "  exit: 0 summarised, including a branch that touched no task and a base the",
+      "        clone cannot resolve (the summary says so) · 1 the configuration cannot",
+      "        be read · 2 usage error",
+      NO_BACKLOG_EXIT_LINE,
     ].join("\n"),
   },
   "jira-proof": {
@@ -1235,6 +1274,10 @@ export const COMMANDS = {
       "",
       "  It talks to nothing. The CI job is checkout, run, post — examples/jira-proof.yml",
       "  reads the Jira credentials from CI secrets; they never pass through here.",
+      "",
+      "  exit: 0 reported, including a range that closed nothing · 1 the configuration",
+      "        cannot be read · 2 usage error",
+      NO_BACKLOG_EXIT_LINE,
     ].join("\n"),
   },
   where: {
@@ -1403,6 +1446,9 @@ export const COMMANDS = {
       "  --no-example    do not write the example task",
       "  --no-nudge      do not create the agent nudge file",
       `  --skills        also install the packaged skills, as \`${N} skills install\` does`,
+      "",
+      "  exit: 0 created, or every file already existed and was left alone · 1 a",
+      "        packaged file is missing (a broken install) · 2 usage error",
     ].join("\n"),
   },
   instructions: {
@@ -1475,7 +1521,12 @@ export const COMMANDS = {
     audience: "person",
     script: "doctor.mjs",
     summary: "is the backlog set up correctly — configuration, tree, git, guards",
-    usage: `${N} doctor [--dir <path>] [--json]`,
+    usage: [
+      `${N} doctor [--dir <path>] [--json]`,
+      "",
+      "  exit: 0 no errors, warnings allowed · 1 there is an error · 2 usage error",
+      NO_BACKLOG_EXIT_LINE,
+    ].join("\n"),
   },
   stats: {
     audience: "agent",
@@ -1733,6 +1784,10 @@ export const COMMANDS = {
       "",
       "  There is no `--force`. Editing the file by hand is the bypass, and it leaves a",
       "  diff somebody can see; a flag would leave one word in a CI job nobody reads.",
+      "",
+      "  exit: 0 closed, or a --dry-run that passed · 1 the verification failed, or the",
+      "        closure was refused · 2 usage error",
+      NO_BACKLOG_EXIT_LINE,
     ].join("\n"),
   },
   check: {
@@ -1786,7 +1841,13 @@ export const COMMANDS = {
     audience: "person",
     script: "migrate-prefix.mjs",
     summary: "renumber the backlog onto a different id prefix (names, ids, dependencies, history)",
-    usage: `${N} migrate-prefix --to <NEW> [--actor <ns:name>] [--dry-run]`,
+    usage: [
+      `${N} migrate-prefix --to <NEW> [--actor <ns:name>] [--dry-run]`,
+      "",
+      "  exit: 0 migrated, a --dry-run, or already on that prefix · 1 stopped before",
+      "        anything was written, or the configuration cannot be read · 2 usage error",
+      NO_BACKLOG_EXIT_LINE,
+    ].join("\n"),
   },
   renumber: {
     audience: "person",
@@ -1831,6 +1892,9 @@ export const COMMANDS = {
       "",
       "  Started by an MCP client, not by hand: JSON-RPC goes in on stdin and out on",
       "  stdout, so anything else written there would corrupt the stream.",
+      "",
+      "  exit: 0 stdin closed · 2 usage error. A call that meets no backlog answers",
+      "        with that command's refusal inside the stream; the server goes on",
     ].join("\n"),
   },
   ask: {
@@ -1875,7 +1939,12 @@ export const COMMANDS = {
     audience: "program",
     script: "regen-hook.mjs",
     summary: "entry point for an editor hook: rebuild the views after a task edit (stdin: JSON)",
-    usage: `${N} regen-hook   # the hook's JSON on stdin`,
+    usage: [
+      `${N} regen-hook   # the hook's JSON on stdin`,
+      "",
+      "  exit: 0 rebuilt, or nothing to do (no payload, a malformed one, a file that is",
+      "        not a task) · 1 the history could not be recorded · 2 usage error",
+    ].join("\n"),
   },
 };
 
