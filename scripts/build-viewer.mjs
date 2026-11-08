@@ -1132,16 +1132,13 @@ ${paletteBadgeCss}
   .chips-editor { display: flex; flex-wrap: wrap; gap: 5px; }
   .chip-opt { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; cursor: pointer; }
   .editor-actions { display: flex; gap: 6px; margin-top: 7px; flex-basis: 100%; }
-  .editor-actions button, .reason-actions button {
+  .editor-actions button {
     font: inherit; font-size: 12px; padding: 4px 10px; border-radius: 6px;
     border: 1px solid var(--border); background: var(--bg-card); color: var(--fg); cursor: pointer;
   }
-  .editor-actions button:first-child, .reason-actions button:first-child { border-color: var(--accent); }
+  .editor-actions button:first-child { border-color: var(--accent); }
   .read-only-note, .edit-result { margin-top: 10px; font-size: 12px; color: var(--fg-muted); }
-  .edit-result[role="alert"], .reason-ask [role="alert"] { color: var(--refusal); font-weight: 600; }
-  .reason-ask { margin-top: 12px; padding: 12px; border: 1px solid var(--accent); border-radius: 8px; background: var(--bg-card); }
-  .reason-ask textarea { width: 100%; margin-top: 8px; }
-  .reason-actions { display: flex; gap: 6px; margin-top: 8px; }
+  .edit-result[role="alert"] { color: var(--refusal); font-weight: 600; }
   .history-summary { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 12px; color: var(--fg-muted); }
 
   /* ─── Toast ─────────────────────────────────────────────────────── */
@@ -2107,7 +2104,6 @@ const state = {
   // history. It never travels in a shared URL or local storage, so it is named
   // again for every server session before the first write.
   actor: "user:",
-  reasonAsk: null,
   editMessage: "",
   editError: false,
   // The scope, not a filter: BOARD_ALL or a board slug. Kept apart from
@@ -2233,11 +2229,11 @@ function renderBoardScope() {
 // validates against. A local list would drift at the first new status.
 const STATUSES = CONFIG.statuses;
 
-// The reason for a change (TL-105). The RULE is one line and reads the same
-// \`reason_required_statuses\` the server reads — the browser has to know it in
-// order to ask BEFORE the write, and the server refuses independently, so an
-// answer typed here is a convenience and never the enforcement.
-const REASON_REQUIRED_STATUSES = CONFIG.reasonRequiredStatuses || [];
+// No reason prompt (TL-566). \`reason_required_statuses\` names statuses only,
+// and the route refuses \`status\` for its dedicated commands (TL-563), so no
+// write this page can send is one that requires a reason. A prompt for it
+// would be code no input reaches; the commands that move a status ask there.
+
 const FS_SUPPORTED = typeof window.showDirectoryPicker === "function";
 
 // Served by scripts/serve-backlog.mjs? Then the backlog path is known
@@ -3168,10 +3164,6 @@ const IN_FLIGHT_TICK_MS = 30000;
 // ─── Field editors ──────────────────────────────────────────────
 const CAN_EDIT = SERVER_MODE && !!window.VIEWER_WRITE;
 
-function reasonRequiredFor(field, value) {
-  return field === "status" && REASON_REQUIRED_STATUSES.indexOf(String(value)) !== -1;
-}
-
 function fieldLabel(key) {
   const spec = fieldSpec(key, FIELDS);
   return spec ? spec.label : key;
@@ -3234,7 +3226,7 @@ function saveText(id, field, button) { saveField(id, field, button.closest(".fie
 function saveLines(id, field, button) { saveField(id, field, button.closest(".field-editor").querySelector("textarea").value.split("\\n").map(function (line) { return line.trim(); }).filter(Boolean)); }
 function saveChips(id, field, button) { saveField(id, field, [...button.closest(".chips-editor").querySelectorAll("input:checked")].map(function (input) { return input.value; })); }
 
-async function saveField(taskId, field, value, reason) {
+async function saveField(taskId, field, value) {
   const task = ALL_TASKS.find(function (candidate) { return candidate.id === taskId; });
   const normalized = normalizeValue(field, value, { fields: FIELDS, options: dynamicOptions() });
   if (!task || !normalized.ok) {
@@ -3244,14 +3236,6 @@ async function saveField(taskId, field, value, reason) {
     return;
   }
   if (sameValue(task[field], normalized.value)) { cancelEdit(); return; }
-  if (reasonRequiredFor(field, normalized.value) && !isValidReason(reason)) {
-    state.editing = null;
-    state.reasonAsk = { id: taskId, field: field, value: normalized.value, draft: reason || "", error: reason === undefined ? "" : "Enter a specific reason; reserved words are not accepted." };
-    renderDetail();
-    focusReasonAsk();
-    return;
-  }
-  state.reasonAsk = null;
   state.editing = null;
   state.editMessage = "Saving…";
   state.editError = false;
@@ -3263,15 +3247,12 @@ async function saveField(taskId, field, value, reason) {
       headers: { "Content-Type": "application/json", "X-Viewer-Capability": window.VIEWER_WRITE.token },
       body: JSON.stringify({
         id: taskId, field: field, value: normalized.value, actor: state.actor,
-        reason: reason || "", revision: task.revision,
+        revision: task.revision,
       }),
     });
     const data = await res.json().catch(function () { return {}; });
     if (!res.ok) {
       if (res.status === 409) await refreshFromServer(true);
-      if (data.needsReason) {
-        state.reasonAsk = { id: taskId, field: field, value: normalized.value, draft: reason || "", error: data.error || "A reason is required." };
-      }
       // The server refused to record the edit under a default nobody named
       // (TL-551): the fix is the identity field, so that is where focus goes.
       if (data.refusalKind === "actor-required") actorRefused = true;
@@ -3286,34 +3267,8 @@ async function saveField(taskId, field, value, reason) {
     state.editMessage = "Not saved: " + error.message;
     state.editError = true;
     renderDetail();
-    if (state.reasonAsk) focusReasonAsk();
     if (actorRefused) document.getElementById("editingActor").focus();
   }
-}
-
-// The prompt is rendered directly under the title, which renderDetail scrolls
-// to, so it is in view; focus is what tells a keyboard or screen-reader user
-// that pressing Save opened a question rather than closing the editor.
-function focusReasonAsk() {
-  const input = document.getElementById("reasonAskInput");
-  if (!input) return;
-  input.focus();
-  input.setSelectionRange(input.value.length, input.value.length);
-}
-
-function submitReason() {
-  const ask = state.reasonAsk;
-  const input = document.getElementById("reasonAskInput");
-  if (ask) saveField(ask.id, ask.field, ask.value, input ? input.value : "");
-}
-function cancelReason() { state.reasonAsk = null; renderDetail(); }
-
-function reasonAskHtml(t) {
-  const ask = state.reasonAsk;
-  if (!ask || ask.id !== t.id) return "";
-  return '<section class="reason-ask"><strong>Why ' + escape(fieldLabel(ask.field)) + ' → ' + escape(formatValue(ask.value)) + '?</strong><p>This protected transition must carry a reason in history.</p>' +
-    (ask.error ? '<p role="alert">' + escape(ask.error) + '</p>' : '') +
-    '<textarea class="field-input" id="reasonAskInput" rows="2" maxlength="' + REASON_MAX_LENGTH + '" placeholder="One sentence about this change">' + escape(ask.draft || "") + '</textarea><div class="reason-actions"><button type="button" onclick="submitReason()">Save with reason</button><button type="button" onclick="cancelReason()">Cancel</button></div></section>';
 }
 
 function valueHtml(t, key) {
@@ -3400,9 +3355,9 @@ function renderDetail() {
       "</div>" +
       titleHtml +
       // Directly under the title, not after the field grid: renderDetail
-      // scrolls to the top, so a result or a question rendered below a long
-      // grid was out of sight and a save looked like nothing happened.
-      editResult + reasonAskHtml(t) +
+      // scrolls to the top, so a result rendered below a long grid was out of
+      // sight and a save looked like nothing happened.
+      editResult +
       '<div class="detail-meta-grid">' + rows + readOnlyRows + "</div>" +
       readOnlyNote + historySummary +
     "</div>" +

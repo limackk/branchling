@@ -13,6 +13,9 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { loadConfig } from "../config.mjs";
+import { DEDICATED_FIELDS, writableFields } from "../field-write.mjs";
+import { requiresReason } from "../history.mjs";
 import { isolateHome, isolateState, SCRIPTS_DIR } from "./_repo.mjs";
 
 isolateHome("viewer-write-api");
@@ -136,8 +139,39 @@ test("only a same-origin served page can make an attributed edit", async () => {
     assert.equal(accepted.status, 200, accepted.text);
     assert.match(readFileSync(taskPath(fx.root, fx.id), "utf8"), /title: Edited in the live viewer/);
     const rows = readFileSync(join(fx.root, "history", fx.id + ".jsonl"), "utf8").trim().split("\n").map(JSON.parse);
-    assert.ok(rows.some((row) => row.field === "title" && row.actor === "local:owner" && row.source === "viewer"));
+    const edit = rows.find((row) => row.field === "title" && row.actor === "local:owner" && row.source === "viewer");
+    assert.ok(edit, "the edit was not recorded in history");
+    // The optional reason on a plain field is not the dead prompt (TL-566):
+    // stated, it travels with the write into the record.
+    assert.equal(edit.reason, "Clarify the task");
   } finally { await stop(handle); rmSync(fx.dir, { recursive: true, force: true }); }
+});
+
+/**
+ * No field the route accepts can require a reason (TL-566), so the route has
+ * no `needsReason` answer and the page no prompt for one. The fields are the
+ * route's own (`writableFields` minus `DEDICATED_FIELDS`, as serve-backlog.mjs
+ * passes them) and the protected values the fixture's own configuration, so a
+ * field added to the route that a reason rule covers fails here.
+ */
+test("no field the route accepts requires a reason", () => {
+  const fx = fixture();
+  try {
+    const config = loadConfig(fx.root);
+    const protectedStatuses = config.reasonRequiredStatuses || [];
+    assert.ok(protectedStatuses.length > 0, "the fixture protects no status; the check would pass on nothing");
+    // Positive control: the rule does fire, for the field the route refuses.
+    assert.equal(requiresReason(config, { field: "status", to: protectedStatuses[0] }), true);
+    const fields = writableFields(config, Object.keys(DEDICATED_FIELDS));
+    assert.ok(fields.length > 0 && !fields.some((spec) => DEDICATED_FIELDS[spec.key]));
+    const reached = [];
+    for (const spec of fields) {
+      for (const value of protectedStatuses) {
+        if (requiresReason(config, { field: spec.key, to: value })) reached.push(spec.key + " → " + value);
+      }
+    }
+    assert.deepEqual(reached, []);
+  } finally { rmSync(fx.dir, { recursive: true, force: true }); }
 });
 
 test("repeated page requests evict old capabilities while the current page can write", async () => {
@@ -189,7 +223,7 @@ test("stale tokens, traversal, invalid actors and oversized input are refused", 
     });
     assert.equal(dedicated.status, 400);
     assert.match(dedicated.json().error, /`status` has dedicated commands/);
-    assert.notEqual(dedicated.json().needsReason, true);
+    assert.equal("needsReason" in dedicated.json(), false, "the route answers with a reason flag no write can raise");
     const latest = await capability(port);
     const huge = "x".repeat(17 * 1024);
     const oversized = await call(port, "/api/task", {
