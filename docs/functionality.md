@@ -1,17 +1,24 @@
-# Functionality — state and direction
+# Functionality — scope record
 
-What `branchling` does today and what it is meant to do. State as of **2026-09-01**.
+What `branchling` did on **2026-09-01**, what was open on that day and what
+became of it, and what it deliberately does not do.
 
-This document describes SCOPE. The reasoning behind decisions lives elsewhere:
-[`docs/branchling-global-tool.md`](branchling-global-tool.md) (the four laws),
-[`LINEAGE.md`](../LINEAGE.md) (the order of decisions), and in the `## Context`
-section of each task. The "What's coming" section is a snapshot of the backlog,
-not a promise — the source of truth is `backlog/tasks/*.md`, not this list.
+**This is a dated record, not a description of the current tool.** §1 and §4
+are maintained and true today. §2 is the state of 2026-09-01, kept as written:
+the tool has grown since, and a command or guard missing from §2 is not missing
+from the tool. §3 is the backlog of 2026-09-01, each entry with its outcome as
+of 2026-11-08. What ships now is described by [`README.md`](../README.md) and
+[`docs/manual.md`](manual.md), and listed by `branchling --help`.
 
-> The root `README.md` is still a document of the project this tool was
-> extracted from: it says `backlog` instead of `branchling`, `BL-NNN`
-> instead of `TL-NNN`, and carries that project's vocabulary. TL-49 lists it;
-> until then this file is the more accurate one.
+The reasoning behind decisions lives elsewhere:
+[`docs/branchling-global-tool.md`](branchling-global-tool.md) (the product
+boundary), [`LINEAGE.md`](../LINEAGE.md) (the order of decisions), and the
+`## Context` section of each task. The source of truth for what is open is
+`backlog/tasks/*.md`, not this file.
+
+> On 2026-09-01 the root `README.md` was still a document of the project this
+> tool was extracted from, and this file was the more accurate of the two.
+> TL-49 replaced it; the README now describes this tool.
 
 ---
 
@@ -36,7 +43,10 @@ Four rules everything else follows from:
 
 ---
 
-## 2. What works today
+## 2. What worked on 2026-09-01
+
+A snapshot, not maintained. Read it as the state of that day: the frontmatter,
+the commands and the guards listed below are a subset of what ships now.
 
 ### 2.1 Data model
 
@@ -176,148 +186,166 @@ DATA, not the tool's contract.
 
 ---
 
-## 3. What's coming
+## 3. What was open on 2026-09-01, and what became of it
 
-What is still open — `branchling stats` counts it, this list does not. Grouped
-below by topic; the ID leads to the file with the full reasoning.
+The backlog of that day, grouped by topic. Each entry keeps the sentence that
+described it then and adds its outcome as of 2026-11-08: **done**, **cancelled**
+with the date, or **open**. What is open now is `branchling query --status
+pending` and `branchling plan`, not this list; the id leads to the file with the
+full reasoning.
 
 ### 3.1 Closing a task must be proven — the highest priority
 
-Today `verification:` is written and validated, but **no script runs it**.
-Execution is carried out by the instructions given to the agent — the same
-agent it was meant to police. This is the tool's single distinguishing
-feature and today it exists only as a convention, not a mechanism.
+On 2026-09-01 `verification:` was written and validated, but **no script ran
+it**. Execution was carried out by the instructions given to the agent — the
+same agent it was meant to police.
 
-- **TL-86** — acceptance criteria ticked from `verification:`, not declared.
-  The measurement that prompted this, taken on this repository and
-  reproducible on any other with `branchling check --criteria`: a quarter of
-  the closed tasks had criteria left unticked while their `verification:` was
-  green and real. Two lists about the same "done", only one of them run.
-- **TL-82** — `branchling done <ID>` runs `verification:`, shows its output
-  and REFUSES to close on failure. An empty list and a template literal also
-  fail the check; `manual:` requires confirmation recorded in the history.
+- **TL-86** (done) — acceptance criteria ticked from `verification:`, not
+  declared. The measurement that prompted this, reproducible on any backlog
+  with `branchling check --criteria`: a quarter of the closed tasks had
+  criteria left unticked while their `verification:` was green and real.
+- **TL-82** (done) — `branchling done <ID>` runs `verification:`, shows its
+  output and REFUSES to close on failure. It is now the only command that runs
+  it.
 
 ### 3.2 Before publication
 
-- **TL-48** — LICENSE and package metadata (today `private`, `UNLICENSED`).
-- **TL-49** — the README is a document of a different project.
-- **TL-81** — distribution channels and the name collision on `npx`.
-- **TL-53** — CI, CONTRIBUTING, issue templates.
-- **TL-56**, **TL-69** — the `types` vocabulary has drifted from the tree; the
-  template smuggles in a value outside the vocabularies.
-- **TL-68** — the log says `done`, the frontmatter says `pending`, nobody
-  catches it.
-- **TL-57** — `--json` on `check`, `next-id`, `board`.
-- **TL-84** — settle and record whether manually editing a task file is a
-  supported path or merely a tolerated one.
+- **TL-48** (done) — LICENSE and package metadata (then `private`,
+  `UNLICENSED`).
+- **TL-49** (done) — the README was a document of a different project.
+- **TL-81** (done) — distribution channels and the name collision on `npx`.
+- **TL-53** (done) — CI, CONTRIBUTING, issue templates.
+- **TL-56**, **TL-69** (done) — the `types` vocabulary had drifted from the
+  tree; the template smuggled in a value outside the vocabularies.
+- **TL-68** (done) — the log said `done`, the frontmatter said `pending`, and
+  nothing caught it.
+- **TL-57** (done) — `--json` on `check`, `next-id`, `board`.
+- **TL-84** (done) — settle and record whether manually editing a task file is
+  a supported path or merely a tolerated one.
 
 ### 3.3 Machine contract
 
-- **TL-72** — a JSON envelope with `schemaVersion` and `kind` instead of a
-  bare array. `--json` IS our extension API, and a bare array cannot grow a
-  field without breaking consumers.
-- **TL-83** — enums from the vocabularies in `--help --json` and
-  `--append-<field>` on writing commands (agent sandboxes reject
-  `$'…\n…'` syntax).
-- **TL-76** — a transitive dependency graph computed on read, with explicit
-  handling of cycles, repeats, and unknown or ambiguous IDs.
-- **TL-75** — `modified_files` and searching for tasks by touched file.
-- **TL-77** — shell completions with values from the vocabularies.
-- **TL-79** — `board export` as markdown to paste elsewhere.
+- **TL-72** (done) — a JSON envelope with `schemaVersion` and `kind` instead of
+  a bare array.
+- **TL-83** (done) — enums from the vocabularies in `--help --json` and
+  `--append-<field>` on writing commands.
+- **TL-75** (done) — `modified_files` and searching for tasks by touched file
+  (`query --modified-file`).
+- **TL-76** (cancelled 2026-09-08) — a transitive dependency graph computed on
+  read: tracker convenience outside the evidence-gated delivery core.
+- **TL-77** (cancelled 2026-09-08) — shell completions with values from the
+  vocabularies: convenience surface outside the reduced product boundary.
+- **TL-79** (cancelled 2026-09-08) — `board export` as markdown to paste
+  elsewhere: tracker reporting, not a delivery capability.
 
 ### 3.4 State across branches
 
-- **TL-73** — a task's state computed from active branches, not from the
-  current checkout. The branch and worktree scan already exists (`next-id`);
-  this task generalises it from "which numbers are taken" to "what is this
-  task's state". A discrepancy is shown with the branch name, never resolved
-  silently.
+- **TL-73** (done) — a task's state computed from active branches, not from the
+  current checkout. `branchling show <ID>` reports a discrepancy with the
+  branch name and never resolves it silently.
 
 ### 3.5 Surface for agents
 
-- **TL-74** — `branchling instructions`: workflow instructions issued by the
-  CLI, not a file rotting in someone else's repo. Text templated with the
-  vocabulary of the backlog being read, split into a dispatcher and phase
-  guides.
-- **TL-104** — an autonomous loop: `next --claim`, recovery of abandoned
-  tasks, a fresh-session-per-task pattern (context compaction at vendors is
-  lossy; the loop's memory is the task file).
-- **TL-85** — settle the scope policy: does an agent found a task itself or ask.
-- **TL-54** — the `backlog-workflow` skill ships in the package to the user.
-- **TL-46** — `init --hooks`: a gate that installs itself.
-- **TL-78** — `on_status_change`: a configurable command on status change.
-- **TL-80** — separating comments, execution notes and the final summary.
+- **TL-74** (done) — `branchling instructions`: workflow instructions issued by
+  the CLI, templated with the vocabulary of the backlog being read.
+- **TL-104** (done) — an autonomous loop: claiming on `next`, recovery of
+  abandoned tasks, a fresh-session-per-task pattern.
+- **TL-85** (done) — the scope policy: an agent opens a task for a topic outside
+  its own, without asking.
+- **TL-54** (done) — the `backlog-workflow` skill ships in the package
+  (`branchling skills`).
+- **TL-46** (done) — a gate that installs itself; it ships as `branchling
+  hooks`, not as the `init --hooks` flag this entry named.
+- **TL-78** (cancelled 2026-09-08) — `on_status_change`, a configurable command
+  on status change: it widened integration scope without strengthening
+  evidence-gated delivery.
+- **TL-80** (cancelled 2026-09-04) — separating comments, execution notes and
+  the final summary: TL-105 had already ended `## Log`, which removed the
+  premise.
 
-### 3.6 Time tracking
+### 3.6 Time tracking — shipped, then removed
 
-A separate axis, described in [`docs/backlog-time-tracking.md`](backlog-time-tracking.md).
+TL-27 (the foundation), TL-28 (activity heartbeats), TL-29 (estimate
+calibration), TL-30 (a token and cost adapter), TL-31 (retention and the right
+to deletion) and TL-35 (the raw activity log in the home directory) all
+closed as done. On 2026-09-08 TL-378 removed activity telemetry from the
+product: the shipped tool records no heartbeats, sessions, working time or
+token cost, and keeps no activity log. The single question that came back,
+how long an agent takes on a task of a given estimate, is answered from the
+task ledger by `stats --agent-time` (TL-480), under the reporting rules TL-29
+settled. See [`docs/backlog-time-tracking.md`](backlog-time-tracking.md) and
+§4.
 
-- **TL-27** — the foundation and an honest point zero.
-- **TL-28** — activity heartbeats and the attribution chain.
-- **TL-31** — retention, attribution correction, the right to deletion.
-- **TL-35** — the raw activity log moved to the home directory.
-- **TL-29**, **TL-30** — estimate calibration from data; a token and cost
-  adapter.
+### 3.7 Multiple projects — shipped, then removed
 
-### 3.7 Multiple projects
-
-- **TL-34** — home directory: preferences and project registry (pointers
-  globally, data in the repository).
-- **TL-36** — a cross-project view over multiple projects.
+TL-34 (a home directory with preferences and a registry of projects) and
+TL-36 (a view over several projects at once) closed as done. On 2026-09-08
+TL-380 made one repository the complete product boundary: the project
+registry, the cross-project query and the project switcher no longer ship.
+Machine-local preferences remain. See
+[`docs/branchling-global-tool.md`](branchling-global-tool.md) and §4.
 
 ### 3.8 Input and output
 
-- **TL-67** — import from GitHub Issues: one-off, from stdin, with
-  `--dry-run`. Raised to P2: a path to trying the tool without migration cost.
-- **TL-55** — exporting the viewer to a single file to send.
-- **TL-37** — splitting the documents apart: the mechanism ships, the
+- **TL-67** (done) — import from GitHub Issues: one-off, from stdin, with
+  `--dry-run`. It now also reads Jira (`branchling import`).
+- **TL-37** (done) — splitting the documents apart: the mechanism ships, the
   measurements stay.
-- **TL-32** — an English public surface (P1): the condition for entering the
-  market.
+- **TL-32** (done) — an English public surface.
+- **TL-55** (cancelled 2026-09-08) — exporting the viewer to a single file to
+  send: outside the read-only current-work boundary of the viewer.
 
 ### 3.9 Launch
 
 From a competitive analysis (2026-09-01): a mechanism without a demo is
-invisible, and a project in this category grows from one good launch.
+invisible.
 
-- **TL-102** — the first-contact demo: `branchling done` refusing to close in
-  60 seconds, in the README's header.
-- **TL-103** — launch material: the 27% measurement as the thesis, Show HN,
-  every number paired with a command to reproduce it.
+- **TL-102** (open) — the first-contact demo: `branchling done` refusing to
+  close in 60 seconds, in the README's header.
+- **TL-103** (cancelled 2026-09-08) — launch material built on the 27%
+  measurement: launch material has to follow product validation rather than a
+  superseded narrative.
 
 ### 3.10 Hygiene
 
-- **TL-43** — the history log sometimes goes untracked in git, and the gate
-  loses its premise.
-- **TL-45** — a gate against dead links and `related_docs`.
-- **TL-47** — a missing backlog surfaces as an unhandled exception with a
-  stack trace.
-- **TL-58** — a value starting with a hyphen fails in `new`.
+- **TL-43** (done) — the history log sometimes went untracked in git, and the
+  gate lost its premise.
+- **TL-45** (done) — a gate against dead links and `related_docs`
+  (`branchling check --docs`).
+- **TL-47** (done) — a missing backlog surfaced as an unhandled exception with
+  a stack trace.
+- **TL-58** (done) — a value starting with a hyphen failed in `new`.
 
 ---
 
 ## 4. What deliberately will not happen
 
 Rejected during the Backlog.md analysis (2026-08-31) and earlier, unless a row
-names a later date. Recorded so they don't come back as "maybe after all".
+names a later date. Recorded so they don't come back as "maybe after all". A
+rejection that was later reversed stays in the table, marked with the date and
+the task that reversed it, so the reasoning on both sides remains readable.
 
 | Thing | Why not |
 |---|---|
-| **An MCP server** | A second surface with its own lifecycle. `branchling instructions` (TL-74) gives the same reach at a fraction of the maintenance cost. |
+| **An MCP server** — reversed on 2026-09-02 (TL-146) | Rejected on 2026-08-31 as a second surface with its own lifecycle, `branchling instructions` (TL-74) being the cheaper reach. Reversed because instructions reach only an agent that runs shell commands; for every other agent host the CLI was a barrier at the door. `branchling mcp` ships as a thin adapter over the `--json` envelopes and the writing commands, with no logic, validation or vocabulary of its own: a rule that existed only there would be a rule the CLI does not enforce. |
 | **Prioritised configuration layers** | Contradicts law III. More convenient and quieter — and rejected for exactly that reason. |
 | **Drafts as a separate entity** | This is `status: pending`. An extra state buys nothing. |
-| **Milestones as files with their own IDs** | `epic:` as free text within a board is enough and removes the cost of operating on someone else's IDs. |
+| **Milestones as files with their own IDs** | `epic:` as free text within a board is enough and removes the cost of operating on someone else's IDs. The later `release:` field answers the same need the same way: a value from `releases:` in `config.yaml`, not a file with an id. |
 | **A plugin API** | Law IV: extensibility through composition. `--json` and callable inputs instead of a hook registry. |
 | **An external tracker as source of truth** | Law I: state divorced from the branch is the defect this project exists to fix. |
+| **Activity telemetry** (2026-09-08, TL-378) | Heartbeats, sessions, working time, token cost and per-actor scorecards shipped (TL-27 to TL-31, TL-35) and were removed: collecting and retaining that data is a privacy and retention product that strengthens neither authorization, scope nor proof. Agent time per estimate is computed from `backlog/history/` (TL-480), and nothing is collected for it. See [`backlog-time-tracking.md`](backlog-time-tracking.md). |
+| **A project registry and cross-project views** (2026-09-08, TL-380) | Shipped (TL-34, TL-36) and removed: one invocation answers about one resolved repository. A portfolio view is not reviewable with the branch that produced the work, and trackers that aggregate repositories already own that problem. See [`branchling-global-tool.md`](branchling-global-tool.md). |
 | **Sprints as an entity** (2026-11-05, TL-578) | Of the five things a sprint bundles, four are already here or deliberately absent. Committed scope is `release:`, a wave in `plan.yaml`, `epic:` or a label; the goal is a wave's name and the plan's `rationale`; progress is `plan` and the viewer's burndown. Velocity is the productivity analytics TL-377 put outside the product and TL-378 removed. What remains, a time window, serves a team of people; work handed out by `next` is bounded by a person's vouch, not by a session's time. This repository's own plan on 2026-11-05 had 25 tasks closed in waves after the active one and 12 of 22 open tasks outside every wave, so an order without dates did not hold for three weeks. A team that plans in sprints keeps them in its tracker, which this tool composes with, or labels them and asks `query --label <sprint>`. Not as a release either: `check --release` gates shipping on the current release's scope (TL-515), and a sprint read as a release would change what that gate means. Reopen only as a filter computed from `backlog/history/` (what closed between two dates), never as stored state. |
 
 ---
 
 ## 5. How to check whether this document is current
 
-It is not the source of truth — the backlog is. Reproduce the snapshot with:
+It is not the source of truth — the backlog is. §2 and §3 are dated and are not
+kept current; §4 is. What ships today, and what is open today:
 
 ```bash
+node scripts/cli.mjs --help
 node scripts/cli.mjs stats
 node scripts/cli.mjs query --status pending --priority P0,P1
 node scripts/cli.mjs check
