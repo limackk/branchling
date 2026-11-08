@@ -586,6 +586,8 @@ test("`skills install --refresh` through the CLI: keeps an edit, then replaces i
 
   const named = run(["skills", "install", "--refresh", "backlog-workflow/SKILL.md", "--dir", fx.backlog, "--json"], fx.dir, fx.env);
   assert.equal(named.status, 0, named.stderr);
+  assert.equal(JSON.parse(named.stdout).kind, "skills-install");
+  assert.equal(JSON.parse(named.stdout).ok, true);
   assert.deepEqual(JSON.parse(named.stdout).replaced, [SKILL]);
   assert.equal(readFileSync(path, "utf8"), readFileSync(join(PACKAGED_SKILLS, SKILL), "utf8"));
 
@@ -621,6 +623,15 @@ test("a file argument without --refresh, or naming no packaged file, is a usage 
   assert.match(unknown.stderr, /nope\.md/);
   assert.match(unknown.stderr, /skills install: `nope\.md` is not a packaged skill file/);
   assert.match(unknown.stderr, /as the package ships it/, "the refusal does not list what may be named");
+  // Under --json the same refusal is a `skills-install` envelope on stdout,
+  // with the exit code unchanged (TL-567).
+  const json = run(["skills", "install", "--refresh", "nope.md", "--dir", fx.backlog, "--json"], fx.dir, fx.env);
+  assert.equal(json.status, 2);
+  assert.equal(json.stderr, "", json.stderr);
+  const refused = JSON.parse(json.stdout);
+  assert.deepEqual([refused.kind, refused.ok, refused.refusalKind], ["skills-install", false, "unknown-file"]);
+  assert.match(refused.refusal, /`nope\.md` is not a packaged skill file/);
+  assert.match(refused.details.join("\n"), /as the package ships it/);
   // A flag is never read as a file name, with or without --refresh.
   for (const args of [["--frobnicate"], ["--refresh", "--frobnicate"]]) {
     const flag = run(["skills", "install", ...args, "--dir", fx.backlog], fx.dir, fx.env);

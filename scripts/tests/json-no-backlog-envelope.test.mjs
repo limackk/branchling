@@ -46,6 +46,11 @@ const CLI = join(SCRIPTS_DIR, "cli.mjs");
 const ANSWERS_THE_STATE = {
   where: "reports which directories it resolved, and no backlog is one of its answers",
   "command-help": "describes a command's flags; without a backlog it says `configured: false`",
+  // `hooks` answers about the git repository `--dir` lies in and never resolves
+  // a backlog (TL-567); the test below holds each of its kinds to an answer.
+  "hooks-print": "answers about a git repository, not a backlog",
+  "hooks-install": "answers about a git repository, not a backlog",
+  "hooks-uninstall": "answers about a git repository, not a backlog",
 };
 
 /** Commands sharing a kind another row registers — each must refuse in it too. */
@@ -58,10 +63,7 @@ const EXTRA_ROWS = [
  * Commands in the table whose usage names `--json` but that no row exercises.
  * Each entry says why; a command missing from both fails the coverage test.
  */
-const EXEMPT_COMMANDS = {
-  hooks: "prints bare JSON outside the envelope and reads no backlog — TL-567",
-  skills: "`skills install --json` prints bare JSON outside the envelope, so it has no kind to refuse in — TL-567",
-};
+const EXEMPT_COMMANDS = {};
 
 /** States per row in which the refusal is not the designed answer. */
 const STATE_EXEMPT = {
@@ -152,4 +154,31 @@ test("a kind that answers the state is still an answer, not a refusal", () => {
   assert.equal(answer.kind, "where");
   assert.equal(answer.ok, true);
   assert.equal(answer.refusalKind, null);
+});
+
+test("`hooks` answers each of its kinds in every no-backlog state, and leaves no hook behind", () => {
+  // Print, install, uninstall in that order per state: the base directory is a
+  // git repository, so `install` really writes its hooks and `uninstall` really
+  // removes them — the answer is about the repository, whatever the backlog.
+  const order = ["hooks-print", "hooks-install", "hooks-uninstall"];
+  let answered = 0;
+  for (const state of Object.keys(STATES)) {
+    for (const kind of order) {
+      const r = run(KIND_EXERCISE[kind].args, state);
+      const all = r.stdout + r.stderr;
+      assert.equal(r.status, 0, kind + " with " + STATES[state] + ": exit " + r.status + ":\n" + all);
+      assert.equal(r.stderr, "", all);
+      const answer = JSON.parse(r.stdout);
+      assert.equal(answer.kind, kind, all);
+      assert.equal(answer.ok, true, all);
+      assert.equal(answer.refusalKind, null, all);
+      for (const key of Object.keys(KINDS[kind])) assert.ok(key in answer, "`" + key + "` is missing:\n" + all);
+      answered++;
+      if (kind === "hooks-install") assert.equal(answer.installed, true, all);
+      if (kind === "hooks-uninstall") assert.equal(answer.removed, true, "install wrote nothing to remove:\n" + all);
+    }
+  }
+  assert.equal(answered, order.length * Object.keys(STATES).length);
+  assert.deepEqual(readdirSync(join(base, ".git", "hooks")).filter((f) => !f.endsWith(".sample")), [],
+    "a hook outlived the uninstall");
 });
