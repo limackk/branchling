@@ -193,6 +193,15 @@ export function parseTaskRecord(raw, file) {
 /**
  * Every task in the tree, in filename order.
  *
+ * SORTED HERE, BY CODE UNIT (TL-643). `readdirSync` is sorted on Linux and
+ * macOS only because libuv sorts the names it scans; on Windows it is the
+ * filesystem's own order, which NTFS collates case-insensitively. Every
+ * caller — `query`, `next`, `take`, the release pipeline and the rest —
+ * inherits this order, so leaving it to the platform would make the same tree
+ * answer in one order on one machine and another elsewhere (the TL-624
+ * class). The comparison is the default `sort()`, the one
+ * `listTaskFileNames()` in task-io.mjs uses, so both readers agree.
+ *
  * @param {string} tasksDir
  * @param {RegExp} taskFile which filenames count as tasks — from the
  *        CONFIGURATION (`config.taskId.file`), never a constant here.
@@ -200,6 +209,7 @@ export function parseTaskRecord(raw, file) {
 export function readTaskRecords(tasksDir, taskFile) {
   return readdirSync(tasksDir)
     .filter((f) => taskFile.test(f))
+    .sort()
     .map((f) => parseTaskRecord(readFileSync(join(tasksDir, f), "utf8"), f))
     .filter(Boolean);
 }

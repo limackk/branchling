@@ -128,19 +128,17 @@ export const RELEASE_GATE_MODES = Object.freeze(["report", "require"]);
  * here too (TL-573), so `deploy status` and the Release view's lanes judge the
  * same records the panel beside them does.
  *
- * IN FILENAME ORDER, SORTED HERE. The lanes, the scope's lists and the gate's
- * findings follow the order of these records, and `readTaskRecords()` keeps
- * the order `readdirSync` gives: sorted on POSIX only because libuv sorts it,
- * the filesystem's own on Windows. `readTaskMetas()`, which `computeStatus()`
- * read before, sorted explicitly; dropping that would make `deploy status`
- * list in one order on one platform and another elsewhere (the TL-624 class).
+ * IN FILENAME ORDER. The lanes, the scope's lists and the gate's findings
+ * follow the order of these records. `readTaskRecords()` sorts them itself
+ * (TL-643), so this reader adds no sort of its own; the ordering test in
+ * scripts/tests/release-view-one-reader.test.mjs still holds the pipeline to
+ * it.
  *
  * @param {string} backlogRoot the backlog directory, not the repository root
  * @param {object} config the loaded configuration
  */
 export function releaseTaskRecords(backlogRoot, config) {
-  return readTaskRecords(backlogPaths(backlogRoot).tasksDir, config.taskId.file)
-    .sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0));
+  return readTaskRecords(backlogPaths(backlogRoot).tasksDir, config.taskId.file);
 }
 
 const RS = String.fromCharCode(30);
