@@ -34,6 +34,12 @@
  *      (TL-596). Both offered calls succeed in their fixtures; where every
  *      target is foreign, or none is declared, the gate is shown to judge
  *      nothing, and `deploy record` on a stage git observes is shown to refuse.
+ *   9. With no target of THIS repository — releases alone, or every target
+ *      foreign — overview does not describe `deploy status --release` as a
+ *      comparison with what shipped, which that command cannot make there
+ *      (TL-606). A local target, alone or beside a foreign one, is the
+ *      positive control, and the command is run in each fixture to show that
+ *      the two descriptions follow what it reports.
  *
  * Release and target names are deliberately unlike this repository's
  * vocabulary, so a literal in the source is the only way they could match.
@@ -328,6 +334,49 @@ test("POSITIVE CONTROL, then the guard: with every target in another repository,
   // half of the paragraph that stays true without git.
   assert.match(releasesOnly, /is a question\nfor the tool, not for the task files\. The answer is computed on every call, so\nit is current/,
     "releases alone: the paragraph lost the reason to ask rather than read");
+});
+
+/** What overview says the `--release` line answers. PURE, so it is shown to
+ *  find the shipping claim where a local target makes it true before its
+ *  absence elsewhere is trusted. */
+function releaseLine(text) {
+  const line = text.split("\n").find((l) => l.startsWith("  " + PRODUCT_NAME + " deploy status --release <name>"));
+  if (line === undefined) return "absent";
+  if (line.endsWith("   a release's plan against what shipped")) return "against what shipped";
+  if (line.endsWith("   a release's plan; what shipped is not read here")) return "shipping not read";
+  return "other: " + line;
+}
+
+test("POSITIVE CONTROL, then the guard: with no local target, overview does not offer `--release` as a comparison with what shipped", () => {
+  // The command is run in every fixture: the line's two descriptions are only
+  // as true as the difference in what `deploy status --release` reports.
+  const notRead = /which release is current was not judged — deployment was not read/;
+  for (const [label, extra] of [["local with releases", DEPLOY_YAML + RELEASES_YAML], ["mixed with releases", MIXED_YAML + RELEASES_YAML]]) {
+    const fx = fixture(extra);
+    assert.ok(fx.config.deployTargets.some((t) => !t.repository), label + ": the fixture lost its local target");
+    assert.equal(releaseLine(topicText("overview", fx.config)), "against what shipped",
+      label + ": the predicate does not find the shipping claim where a local target makes it true");
+    const r = run(fx.repo, ["deploy", "status", "--release", RELEASES[0], "--dir", fx.dir]);
+    assert.equal(r.status, 0, label + ": `deploy status --release` refuses where the guide offers it: " + r.stderr);
+    assert.doesNotMatch(r.stdout, notRead, label + ": deployment is not read although a target is local");
+  }
+
+  for (const [label, extra] of [["releases alone", RELEASES_YAML], ["foreign with releases", FOREIGN_YAML + RELEASES_YAML]]) {
+    const fx = fixture(extra);
+    assert.ok(fx.config.releases.length, label + ": the fixture lost its releases");
+    assert.ok((fx.config.deployTargets || []).every((t) => t.repository), label + ": a fixture target became local");
+    const overview = topicText("overview", fx.config);
+    assert.equal(releaseLine(overview), "shipping not read",
+      label + ": overview promises a comparison with what shipped that this backlog cannot make");
+    // Still a line of the command table, set apart from the name list below it.
+    assert.match(overview, /what shipped is not read here\n\n {2}(deploy targets|releases) /,
+      label + ": the `--release` line is not the last line of the command table");
+    // What the guide says is what the command does: it answers, without
+    // reading deployment.
+    const r = run(fx.repo, ["deploy", "status", "--release", RELEASES[0], "--dir", fx.dir]);
+    assert.equal(r.status, 0, label + ": `deploy status --release` refuses where the guide offers it: " + r.stderr);
+    assert.match(r.stdout, notRead, label + ": `deploy status --release` now reads deployment — the guide undersells it");
+  }
 });
 
 /** Where task-creation teaches `target:`. PURE, so it is shown to find the

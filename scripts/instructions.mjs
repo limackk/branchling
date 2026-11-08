@@ -107,6 +107,11 @@ function targetNames(config) {
  * target at all there is nothing in git to read either, so the claim follows
  * the same predicate rather than the presence of `releases:`.
  *
+ * The `--release` line follows it too (TL-606). Without a local target the
+ * command still prints the plan and which planned tasks are open, but judges
+ * no release current and counts nothing as shipped, so "against what shipped"
+ * would promise a comparison that backlog never gets.
+ *
  * The text ends with a blank line so the placeholder can stand at the start of
  * the paragraph that follows it and vanish without leaving a gap.
  */
@@ -144,7 +149,9 @@ export function promotionState(config) {
     out.push("  " + N + " deploy status                    each target's tasks, unobservable here");
   }
   if (releases.length) {
-    out.push("  " + N + " deploy status --release <name>   a release's plan against what shipped");
+    out.push("  " + N + " deploy status --release <name>   " + (observed
+      ? "a release's plan against what shipped"
+      : "a release's plan; what shipped is not read here"));
   }
   out.push("");
   if (targets.length) out.push("  deploy targets  " + list(targets));
