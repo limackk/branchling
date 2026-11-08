@@ -1,1 +1,2 @@
 {"id":"01M6X5D19MYZY5C9YD30R30QV9","ts":"2026-11-08T08:46:34.804Z","task":"TL-658","field":"__created__","from":"","to":"A line range in mutation-run --files keeps its test selection","actor":"agent:loop-4","source":"new","reason":"unknown"}
+{"id":"01M6XVBGH4QQXW0D232YPS1M2C","ts":"2026-11-08T15:10:13.540Z","task":"TL-658","field":"conflict_group","from":[],"to":["mutation"],"actor":"agent:claude","source":"set","reason":"shares scripts/mutation-run.mjs with the other mutation tasks; parallel loops must not edit it at once"}

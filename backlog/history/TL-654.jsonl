@@ -1,1 +1,2 @@
 {"id":"01M6X2DTN7R8033TAC9SD3ZX6Z","ts":"2026-11-08T07:54:35.047Z","task":"TL-654","field":"__created__","from":"","to":"A mutation run over the JSON envelope survives its source-reading test","actor":"agent:loop-3","source":"new","reason":"unknown"}
+{"id":"01M6XVBG5V6HBTHRP89NW8MZXN","ts":"2026-11-08T15:10:13.179Z","task":"TL-654","field":"conflict_group","from":[],"to":["mutation"],"actor":"agent:claude","source":"set","reason":"shares scripts/mutation-run.mjs with the other mutation tasks; parallel loops must not edit it at once"}
