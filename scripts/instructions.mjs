@@ -105,7 +105,11 @@ function targetNames(config) {
  * `target:` field, and reports them as unobservable; a guide promising stages
  * computed from git would describe an answer that backlog never gets. With no
  * target at all there is nothing in git to read either, so the claim follows
- * the same predicate rather than the presence of `releases:`.
+ * the same predicate rather than the presence of `releases:`. Where a local
+ * target stands beside foreign ones the claim holds for the local one only, so
+ * the paragraph keeps it and names the foreign targets as the exception
+ * (TL-608): `deploy status` reports their tasks as unobservable, and a guide
+ * describing every stage as read from git would contradict it there.
  *
  * The `--release` line follows it too (TL-606). Without a local target the
  * command still prints the plan and which planned tasks are open, but judges
@@ -120,10 +124,19 @@ export function promotionState(config) {
   const releases = config.releases || [];
   if (!targets.length && !releases.length) return "";
   const observed = observedTargets(config.deployTargets).length > 0;
+  const foreign = observed ? externalTargetNames(config.deployTargets) : [];
   const out = [
     "WHAT IS WAITING FOR AN ENVIRONMENT, OR WHAT SHIPS IN A RELEASE, is a question",
   ];
-  if (observed) {
+  if (observed && foreign.length) {
+    out.push(
+      "for the tool, not for the task files. The answer is computed from git on every",
+      "call, so it is current where a board is not. A foreign target is the exception:",
+      "it declares `repository:`, so this repository holds no commit or ref of it, and",
+      "a task joins it by its own `target:` field and is reported as unobservable here,",
+      "never as deployed:",
+    );
+  } else if (observed) {
     out.push(
       "for the tool, not for the task files. The answer is computed from git on every",
       "call, so it is current where a board is not:",
@@ -154,8 +167,13 @@ export function promotionState(config) {
       : "a release's plan; what shipped is not read here"));
   }
   out.push("");
-  if (targets.length) out.push("  deploy targets  " + list(targets));
-  if (releases.length) out.push("  releases        " + list(releases));
+  // The foreign names stand on a line of their own, as every list here does,
+  // and the column widens only where that longer label is printed, so a
+  // backlog without a foreign target beside a local one renders unchanged.
+  const pad = (label) => "  " + label.padEnd(foreign.length ? 17 : 16);
+  if (targets.length) out.push(pad("deploy targets") + list(targets));
+  if (foreign.length) out.push(pad("foreign targets") + list(foreign));
+  if (releases.length) out.push(pad("releases") + list(releases));
   return out.join("\n") + "\n\n";
 }
 
