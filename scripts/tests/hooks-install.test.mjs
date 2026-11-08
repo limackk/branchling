@@ -86,6 +86,48 @@ test("install outside a repository is a readable refusal, not a crash", () => {
   assert.equal(/at .*\.mjs:\d+/.test(r.stderr), false, "a stack trace is not an error message");
 });
 
+/** One `--json` refusal: its own kind, `ok: false`, the name to branch on, stderr empty (TL-567). */
+function jsonRefusal(r, kind, refusalKind, sentence) {
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  assert.equal(r.stderr, "", "a --json refusal went to stderr:\n" + r.stderr);
+  const answer = JSON.parse(r.stdout);
+  assert.equal(answer.schemaVersion, 1);
+  assert.equal(answer.kind, kind);
+  assert.equal(answer.ok, false);
+  assert.equal(answer.refusalKind, refusalKind);
+  assert.match(answer.refusal, sentence);
+  assert.ok(Array.isArray(answer.details) && answer.details.length, "the refusal carries no details");
+  return answer;
+}
+
+test("under --json every hooks refusal is an envelope of the subcommand's kind (TL-567)", () => {
+  const bare = fixtureDir(join(tmpdir(), "branchling-hooks-bare-json-"));
+  assert.equal(jsonRefusal(run(bare, ["hooks", "install", "--json"]), "hooks-install", "not-a-repository", /not a git repository/).installed, false);
+  assert.equal(jsonRefusal(run(bare, ["hooks", "uninstall", "--json"]), "hooks-uninstall", "not-a-repository", /not a git repository/).removed, false);
+
+  const dir = repo();
+  const path = hookPath(dir);
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, "#!/bin/sh\nnpm test\n", "utf8");
+  const install = jsonRefusal(run(dir, ["hooks", "install", "--json"]), "hooks-install", "foreign-hook", /already a pre-commit hook/);
+  assert.ok(install.details.includes(BLOCK_OPEN), "the block to paste is missing from details");
+  jsonRefusal(run(dir, ["hooks", "uninstall", "--json"]), "hooks-uninstall", "foreign-hook", /is not ours/);
+  assert.equal(readFileSync(path, "utf8"), "#!/bin/sh\nnpm test\n");
+
+  writeFileSync(path, "#!/bin/sh\n" + hookBlock().split("\n").slice(0, -1).join("\n") + "\n", "utf8");
+  jsonRefusal(run(dir, ["hooks", "install", "--json"]), "hooks-install", "unclosed-block", /never closes it/);
+});
+
+test("print --json answers in the envelope, inside a repository and outside one", () => {
+  const inside = JSON.parse(run(repo(), ["hooks", "print", "--json"]).stdout);
+  assert.equal(inside.kind, "hooks-print");
+  assert.equal(inside.ok, true);
+  assert.deepEqual(inside.hooks.map((h) => [h.hook, h.error]), [["pre-commit", null], ["commit-msg", null]]);
+  const outside = JSON.parse(run(fixtureDir(join(tmpdir(), "branchling-hooks-bare-print-")), ["hooks", "print", "--json"]).stdout);
+  assert.equal(outside.ok, true);
+  assert.ok(outside.hooks.every((h) => h.target === null && /not a git repository/.test(h.error)), JSON.stringify(outside));
+});
+
 // ── an existing hook is never overwritten ─────────────────────────────────
 
 test("an existing pre-commit is REFUSED and left byte for byte", () => {
@@ -171,6 +213,8 @@ test("a first install writes executable hooks and says what it installed", () =>
   const again = fixtureDir(join(tmpdir(), "branchling-hooks-json-"));
   assert.equal(git(again, "init", "-q", ".").status, 0);
   const json = JSON.parse(run(again, ["hooks", "install", "--json"]).stdout);
+  assert.equal(json.kind, "hooks-install");
+  assert.equal(json.ok, true);
   assert.equal(json.installed, true);
   assert.deepEqual(json.hooks.map((h) => [h.hook, h.installed, h.updated]),
     [["pre-commit", true, false], ["commit-msg", true, false]]);
@@ -210,6 +254,11 @@ test("uninstalling what was never installed is an answer, not an error", () => {
   const r = run(dir, ["hooks", "uninstall"]);
   assert.equal(r.status, 0);
   assert.match(r.stdout, /nothing installed here/);
+  // Under --json the same answer is an envelope, not the human sentence.
+  const json = run(dir, ["hooks", "uninstall", "--json"]);
+  assert.equal(json.status, 0, json.stderr);
+  const answer = JSON.parse(json.stdout);
+  assert.deepEqual([answer.kind, answer.ok, answer.removed, answer.hooks], ["hooks-uninstall", true, false, []]);
 });
 
 // ── a stale block of our own is replaced (TL-588) ─────────────────────────

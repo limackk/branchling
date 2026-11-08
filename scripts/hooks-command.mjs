@@ -50,6 +50,7 @@ import { PRODUCT_NAME as N } from "./product.mjs";
 import { takeDirFlag } from "./paths.mjs";
 import { MARK, color, failure, heading, refusal } from "./ui.mjs";
 import { gitDiscoveryEnv } from "./git-env.mjs";
+import { printJson } from "./json-envelope.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -285,13 +286,32 @@ function renderTarget(target) {
   return out;
 }
 
+/**
+ * Say a refusal in the shape the caller asked for, and return exit 1.
+ *
+ * Under `--json` it is the subcommand's own kind with `ok: false` on stdout and
+ * nothing on stderr (TL-567): an empty stdout beside exit 1 is what a consumer
+ * cannot tell from a crash. `refusalKind` is the name a program branches on;
+ * the sentence and the lines under it are for a person.
+ */
+function refuse(plan, sub, refusalKind, message, details = [], hints = [], payload = {}) {
+  if (plan.json) {
+    printJson("hooks-" + sub, { ...payload, refusalKind, refusal: message, details });
+  } else {
+    console.error(failure(N + " hooks " + sub, message, details, hints));
+  }
+  return 1;
+}
+
 function runPrint(root, plan) {
   const targets = HOOK_NAMES.map((name) => hooksTarget(root, name));
   if (plan.json) {
-    console.log(JSON.stringify({ hooks: targets.map((target) => ({
+    // A directory that is not a repository is not a refusal here: `print`
+    // still answers with the block, and each hook says why it has no target.
+    printJson("hooks-print", { hooks: targets.map((target) => ({
       hook: target.name, block: hookBlock(target.name), target: target.ok ? target : null,
       error: target.ok ? null : target.message,
-    })) }, null, 2));
+    })) });
     return 0;
   }
   console.log(heading("the Git gates"));
@@ -314,8 +334,7 @@ function runInstall(root, plan) {
   const targets = HOOK_NAMES.map((name) => hooksTarget(root, name));
   const unusable = targets.find((target) => !target.ok);
   if (unusable) {
-    console.error(failure(N + " hooks install", unusable.message, unusable.details || []));
-    return 1;
+    return refuse(plan, "install", unusable.kind, unusable.message, unusable.details || [], [], { installed: false });
   }
   const found = targets.map((target) => ({ target, found: inspect(target) }));
   const foreign = found.find((entry) => entry.found.state === "foreign");
@@ -325,14 +344,13 @@ function runInstall(root, plan) {
     // where in their gate ours belongs and what their `exit` does to it. The
     // block is printed instead, so the choice stays with the person who wrote
     // the file.
-    console.error(failure(N + " hooks install",
+    return refuse(plan, "install", "foreign-hook",
       "there is already a " + foreign.target.name + " hook here", [
         foreign.target.path,
         "",
         "It was not touched. Add this yourself where it belongs in your gate:",
         ...hookBlock(foreign.target.name).split("\n"),
-      ], [N + " hooks print"]));
-    return 1;
+      ], [N + " hooks print"], { installed: false, custom: targets[0].custom });
   }
 
   // A STALE BLOCK OF OUR OWN IS REPLACED, between its markers only (TL-588).
@@ -345,13 +363,12 @@ function runInstall(root, plan) {
   if (unclosed) {
     // Refused before anything is written: a block with no closing marker has
     // no edge, and guessing one could take somebody else's lines with it.
-    console.error(failure(N + " hooks install",
+    return refuse(plan, "install", "unclosed-block",
       "the " + unclosed.entry.target.name + " hook opens our block and never closes it", [
         unclosed.entry.target.path,
         "It was not touched. Put this in place of " + unclosedSpan(unclosed.entry.found.unclosed) + "; " + unclosedKeeps() + ":",
         ...hookBlock(unclosed.entry.target.name).split("\n"),
-      ], [N + " hooks print"]));
-    return 1;
+      ], [N + " hooks print"], { installed: false, custom: targets[0].custom });
   }
   for (const r of replaced) writeFileSync(r.entry.target.path, r.text, "utf8");
 
@@ -363,10 +380,10 @@ function runInstall(root, plan) {
   }
   const outcome = (entry) => entry.found.state !== "ours" ? "installed" : entry.found.current ? "current" : "updated";
   if (plan.json) {
-    console.log(JSON.stringify({ installed: true, hooks: found.map((entry) => ({
+    printJson("hooks-install", { installed: true, hooks: found.map((entry) => ({
       hook: entry.target.name, path: entry.target.path, installed: entry.found.state !== "ours",
       updated: outcome(entry) === "updated",
-    })), custom: targets[0].custom }, null, 2));
+    })), custom: targets[0].custom });
     return 0;
   }
   for (const entry of found) {
@@ -385,22 +402,26 @@ function runUninstall(root, plan) {
   const targets = HOOK_NAMES.map((name) => hooksTarget(root, name));
   const unusable = targets.find((target) => !target.ok);
   if (unusable) {
-    console.error(failure(N + " hooks uninstall", unusable.message, unusable.details || []));
-    return 1;
+    return refuse(plan, "uninstall", unusable.kind, unusable.message, unusable.details || [], [], { removed: false });
   }
   const found = targets.map((target) => ({ target, found: inspect(target) }));
   const foreign = found.find((entry) => entry.found.state === "foreign");
   if (foreign) {
-    console.error(failure(N + " hooks uninstall",
+    return refuse(plan, "uninstall", "foreign-hook",
       "the " + foreign.target.name + " hook here is not ours", [
         foreign.target.path,
         "It has no `" + BLOCK_OPEN + "` line, so removing it would be deleting",
         "somebody else's gate. Nothing was changed.",
-      ]));
-    return 1;
+      ], [], { removed: false });
   }
   const ours = found.filter((entry) => entry.found.state === "ours");
   if (!ours.length) {
+    // An answer, not a refusal: the state the command exists to reach already
+    // holds. Under `--json` it used to print the human sentence instead.
+    if (plan.json) {
+      printJson("hooks-uninstall", { removed: false, hooks: [] });
+      return 0;
+    }
     console.log(color.dim(MARK.bullet + " nothing installed here — " + targets.map((target) => target.path).join(", ")));
     return 0;
   }
@@ -414,9 +435,9 @@ function runUninstall(root, plan) {
   }
 
   if (plan.json) {
-    console.log(JSON.stringify({ removed: true, hooks: removed.map((entry) => ({
+    printJson("hooks-uninstall", { removed: true, hooks: removed.map((entry) => ({
       hook: entry.target.name, path: entry.target.path, fileDeleted: !entry.remains,
-    })) }, null, 2));
+    })) });
     return 0;
   }
   for (const entry of removed) {

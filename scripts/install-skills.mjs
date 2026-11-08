@@ -50,7 +50,8 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSyn
 import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { repositoryRoot, BACKLOG_DIR_REFUSAL_EXIT, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { printJson } from "./json-envelope.mjs";
+import { answerBacklogDirRefusal, repositoryRoot, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { MARK, color, failure, refusal } from "./ui.mjs";
 
@@ -334,14 +335,14 @@ export function main(argv) {
   // A file argument means "replace this one whatever it holds", which only
   // makes sense as part of a refresh — without one it is refused above.
   const named = cli.argv.filter((a) => !a.startsWith("-"));
+  const json = cli.argv.includes("--json");
 
   let backlog;
   try {
     backlog = resolveBacklogDir({ dir: cli.dir || undefined, moduleDir: HERE }).root;
   } catch (e) {
     if (!isBacklogDirRefusal(e)) throw e;
-    console.error(failure(N + " skills install", e.message, e.details || []));
-    return BACKLOG_DIR_REFUSAL_EXIT;
+    return answerBacklogDirRefusal(e, { command: N + " skills install", jsonKind: json ? "skills-install" : null });
   }
 
   const result = installSkills(repositoryRoot(backlog), {
@@ -350,11 +351,25 @@ export function main(argv) {
     named,
   });
   if (!result.ok) {
-    console.error(failure(N + " skills install", result.message, result.details || []));
+    if (json) {
+      // The same kind with `ok: false` (TL-567). The result's own `kind` is the
+      // refusal's name, and `kind` belongs to the envelope, so it travels as
+      // `refusalKind`; `files` is the comparison's working state, not an answer.
+      printJson("skills-install", {
+        created: result.created, skipped: result.skipped, replaced: result.replaced, kept: result.kept,
+        blocked: result.blocked, notDirectories: result.notDirectories, target: result.target || null,
+        dryRun: Boolean(cli.argv.includes("--dry-run")),
+        refusalKind: result.kind, refusal: result.message, details: result.details || [],
+      });
+    } else {
+      console.error(failure(N + " skills install", result.message, result.details || []));
+    }
     return result.kind === "unknown-file" ? 2 : 1;
   }
-  if (cli.argv.includes("--json")) {
-    console.log(JSON.stringify(result, null, 2));
+  if (json) {
+    // The result's `ok: true` stays out: the envelope derives it.
+    const { ok: _ok, ...payload } = result;
+    printJson("skills-install", payload);
     return 0;
   }
   console.log(renderInstall(result));

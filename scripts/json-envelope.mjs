@@ -196,6 +196,19 @@ export const KINDS = {
   // never there" and with "I refused to kill a stranger's process", which are
   // three different things to do next.
   "serve-stop": { stopped: [], requested: null },
+  // `hooks print|install|uninstall --json` and `skills install --json`
+  // (TL-567). Their payload keys are the ones the bare objects carried before
+  // the envelope; a refusal is the same kind with `ok: false`. One kind per
+  // subcommand, because `installed: null` on a `print` would be a key that
+  // means nothing for that answer. `hooks` reads no backlog, so none of the
+  // three meets the no-backlog state; `skills install` does, and refuses in
+  // its own kind.
+  "hooks-print": { hooks: [] },
+  "hooks-install": { installed: null, hooks: [], custom: null },
+  "hooks-uninstall": { removed: null, hooks: [] },
+  "skills-install": {
+    created: [], skipped: [], replaced: [], kept: [], blocked: [], notDirectories: [], target: null, dryRun: null,
+  },
   // `board --json`. `rule` and `matched` are null exactly when `isDefault` is
   // true — nothing matched, so there is no rule to name.
   board: { board: null, rule: null, matched: null, isDefault: null, reason: null },
@@ -743,6 +756,16 @@ export const KIND_EXERCISE = {
   // A stop request is written to the state directory, never to the tree, and
   // reaches only a run started before it — none is running here.
   "run-stop": { args: ["run", "--stop", "--json"], writes: true },
+  // The hooks answer about the git repository `--dir` lies in, which for the
+  // fixture is the repository around its backlog (TL-567). `print` writes
+  // nothing; `install` writes the two hooks, and `uninstall` on a fresh
+  // fixture finds nothing installed — still `removed: false` in a complete
+  // envelope, and a `writes` row because it removes whatever it finds.
+  "hooks-print": { args: ["hooks", "print", "--json"] },
+  "hooks-install": { args: ["hooks", "install", "--json"], writes: true },
+  "hooks-uninstall": { args: ["hooks", "uninstall", "--json"], writes: true },
+  // Writes the packaged skill into the fixture repository's `.claude/skills/`.
+  "skills-install": { args: ["skills", "install", "--json"], writes: true },
   // A fresh `init` writes a current template, so the fixture exercises the
   // "nothing to add" answer; it is a `writes` row because the command writes
   // whenever something is missing.

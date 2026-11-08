@@ -126,6 +126,10 @@ table and the code disagree in either direction.
 | `run` | `run --json` | write — dispatches agents |
 | `run-stop` | `run --stop --json` | write — the state directory, never the tree |
 | `serve-stop` | `serve --stop <port> --json` | write — stops a local process |
+| `hooks-print` | `hooks print --json` | read — the git repository, not the backlog |
+| `hooks-install` | `hooks install --json` | write — the hooks directory git reads |
+| `hooks-uninstall` | `hooks uninstall --json` | write — the hooks directory git reads |
+| `skills-install` | `skills install --json` | write — `.claude/skills/` in the repository |
 
 **Moved into the envelope by TL-550.** `new --json` answers `task-new`, which
 carries the id it created and the file it wrote, so an interface that creates a
@@ -137,6 +141,17 @@ Every refusal answers `task-new` too (TL-568), with `ok: false`, a
 `details`, on stdout; stderr stays empty and the exit code is unchanged. A
 `plan-refused` after the write is the one refusal that carries `id` and
 `file`: the task exists, and the plan did not take it.
+
+**Moved into the envelope by TL-567.** `hooks print|install|uninstall --json`
+and `skills install --json` used to print a bare object with no
+`schemaVersion`, `kind` or `ok`. Their payload keys are unchanged, and each
+subcommand answers in a kind of its own. Their refusals, which went to stderr
+with stdout empty, are now the same kind with `ok: false`, a `refusalKind`,
+the sentence in `refusal` and the lines under it in `details`; the exit codes
+are unchanged. `hooks uninstall --json` with nothing installed used to print
+a human sentence; it answers `removed: false`. `hooks` never resolves a
+backlog, so it never meets the no-backlog state; `skills install --json`
+refuses it as a `skills-install` with `refusalKind: "no-backlog"`.
 
 **Moved into the envelope by TL-528.** `decide --json` and `where --json` used
 to print a bare object. Their payload keys are unchanged, and the root now
