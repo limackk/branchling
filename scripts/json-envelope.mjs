@@ -262,8 +262,13 @@ export const KINDS = {
   // shared `no-backlog` (TL-548), `refusal` the sentence and `details` the
   // findings and remedies. Only `plan-refused` after the write carries `id`
   // and `file`: the task exists, and the plan did not take it.
+  // `nearDuplicates` (TL-649) names the open tasks whose title the new one
+  // nearly repeats, each `{ id, title, similarity }`, most similar first. It
+  // is a note and never a refusal: the task is created either way, and the
+  // list is empty when nothing is close or a refusal came before the write.
   "task-new": {
     ok: null, id: null, file: null, board: null, wave: null, idSource: null, actorSource: null,
+    nearDuplicates: [],
     refusalKind: null, refusal: null, details: [],
   },
   // `plan --json`. `exists` is false for a backlog with no `plan.yaml`, and then
