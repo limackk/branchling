@@ -23,6 +23,10 @@
  *      says what `deploy status` reports instead (TL-597). A backlog with a
  *      local target — alone or beside a foreign one — is the positive control
  *      that the same predicate still finds the claim where it is true.
+ *      Where a local target stands beside a foreign one, the claim stays and
+ *      the foreign targets are named as unobservable here, joined by
+ *      `target:` (TL-608); a local-only backlog's paragraph is held byte for
+ *      byte, so the exception cannot leak into it.
  *   7. task-creation names `target:` and `new --target` exactly where a target
  *      declares `repository:`, listing only those targets, and the offered
  *      call succeeds there (TL-598). With only local targets, or none, the
@@ -328,6 +332,72 @@ test("POSITIVE CONTROL, then the guard: with every target in another repository,
   // half of the paragraph that stays true without git.
   assert.match(releasesOnly, /is a question\nfor the tool, not for the task files\. The answer is computed on every call, so\nit is current/,
     "releases alone: the paragraph lost the reason to ask rather than read");
+});
+
+/** What the paragraph says about foreign targets beside a local one. PURE, so
+ *  it is shown to find the exception in the mixed fixture before its silence
+ *  over a local-only backlog is trusted. */
+function foreignException(text) {
+  const flat = text.replace(/\s+/g, " ");
+  const hits = [];
+  if (flat.includes("A foreign target is the exception: it declares `repository:`")) hits.push("exception");
+  if (flat.includes("joins it by its own `target:` field and is reported as unobservable here")) hits.push("field");
+  if (text.includes("\n  foreign targets  ")) hits.push("names");
+  return hits;
+}
+
+test("POSITIVE CONTROL, then the guard: beside a local target, overview names the foreign ones as unobservable", () => {
+  for (const [label, extra] of [["mixed", MIXED_YAML], ["mixed with releases", MIXED_YAML + RELEASES_YAML]]) {
+    const fx = fixture(extra);
+    assert.deepEqual(fx.config.deployTargets.map((t) => Boolean(t.repository)), [false, true],
+      label + ": the fixture stopped holding one local and one foreign target");
+    const overview = topicText("overview", fx.config);
+    assert.deepEqual(foreignException(overview), ["exception", "field", "names"],
+      label + ": overview does not name the foreign target as unobservable here");
+    // The local target still makes the git claim true, so it is kept.
+    assert.deepEqual(gitClaims(overview), ["computed from git", "per-stage line"], label + ": the git claim was dropped");
+    // Only the foreign name is listed as foreign; every target is still listed.
+    assert.ok(overview.includes("\n  foreign targets  `" + TARGETS[1] + "`\n"),
+      label + ": the foreign targets line does not list exactly the foreign target");
+    assert.ok(overview.includes("\n  deploy targets   `" + TARGETS[0] + "`, `" + TARGETS[1] + "`\n"),
+      label + ": the declared targets are not listed in the widened column");
+    if (extra.includes("releases:")) {
+      assert.ok(overview.includes("\n  releases         `" + RELEASES[0] + "`, `" + RELEASES[1] + "`\n"),
+        label + ": the releases line is not aligned with the foreign targets line");
+    }
+    assert.match(overview, /never as deployed:\n\n {2}\S/, label + ": the command table is not set apart");
+    assert.ok(!/\n\n\n/.test(overview), label + ": the paragraph left an empty one behind");
+    // What the guide says is what the command does: a task naming the foreign
+    // target is reported as unobservable, beside the local target's stages.
+    const made = run(fx.repo, ["new", "--title", "Ship from the jetty", "--target", TARGETS[1],
+      "--dir", fx.dir, "--actor", "agent:test", "--json"]);
+    assert.equal(made.status, 0, label + ": `new --target` refuses the foreign target: " + made.stderr);
+    const id = JSON.parse(made.stdout).id;
+    const r = run(fx.repo, ["deploy", "status", "--dir", fx.dir]);
+    assert.equal(r.status, 0, label + ": `deploy status` refuses where the guide offers it: " + r.stderr);
+    const section = r.stdout.slice(r.stdout.indexOf("\n" + TARGETS[1] + " "));
+    assert.match(section, new RegExp("unobservable here[^\\n]*\\n\\s+" + id + "\\s"),
+      label + ": `deploy status` does not report the foreign target's task as unobservable");
+  }
+
+  // A local-only backlog is held byte for byte: the exception must not leak
+  // into it, and the column must not widen there.
+  assert.deepEqual(foreignException(topicText("overview", BOTH.config)), [], "local only: the foreign exception is printed");
+  assert.equal(promotionState(BOTH.config), [
+    "WHAT IS WAITING FOR AN ENVIRONMENT, OR WHAT SHIPS IN A RELEASE, is a question",
+    "for the tool, not for the task files. The answer is computed from git on every",
+    "call, so it is current where a board is not:",
+    "",
+    "  " + PRODUCT_NAME + " deploy status                    what each stage does not hold yet",
+    "  " + PRODUCT_NAME + " deploy status --release <name>   a release's plan against what shipped",
+    "",
+    "  deploy targets  `" + TARGETS[0] + "`, `" + TARGETS[1] + "`",
+    "  releases        `" + RELEASES[0] + "`, `" + RELEASES[1] + "`",
+  ].join("\n") + "\n\n", "local only: the paragraph changed");
+  // Every target foreign has its own paragraph (TL-597); the mixed exception
+  // is not appended to it.
+  assert.deepEqual(foreignException(topicText("overview", fixture(FOREIGN_YAML).config)), [],
+    "foreign only: the mixed exception is printed where no target is local");
 });
 
 /** Where task-creation teaches `target:`. PURE, so it is shown to find the
