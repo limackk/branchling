@@ -3181,7 +3181,15 @@ function dynamicOptions() {
 function startEdit(id, field) {
   if (!CAN_EDIT || DEDICATED_FIELDS[field]) return;
   if (!isValidActor(state.actor) || !state.actor.startsWith("user:")) {
-    state.editMessage = "Enter a user:name identity before editing.";
+    // The shape is diagnosed by actorRefusal(), the sentence every writing
+    // command prints, so "user:Kamil" is refused for its name, not as if it
+    // lacked an identity (TL-605). Only the user: requirement is the page's
+    // own: the shared hint is printed when user: is the half already right,
+    // since under any other namespace it would vouch for the wrong half.
+    const bad = actorRefusal(state.actor);
+    const required = "Enter a user:name identity before editing.";
+    state.editMessage = !bad ? required
+      : bad.refusal.charAt(0).toUpperCase() + bad.refusal.slice(1) + ". " + (!bad.namespace && state.actor.startsWith("user:") ? bad.hint + "." : required);
     state.editError = true;
     renderDetail();
     document.getElementById("editingActor").focus();
