@@ -47,6 +47,11 @@
  *  10. The gate's paragraph does not present the gap kinds it names as all the
  *      gate reports (TL-618): a list shorter than `GAP_NAMES` is marked as
  *      examples. The predicate is first shown to flag the wording it replaced.
+ *  11. Under `release_gate: require` overview names the gaps THIS backlog's
+ *      `release_gate_accept` accepts, or says it accepts none, and under
+ *      `report` it names neither (TL-619). The accepted gaps are the fixture's
+ *      own, and the ones it does not accept are shown absent, so a fixed list
+ *      cannot pass.
  *
  * Release and target names are deliberately unlike this repository's
  * vocabulary, so a literal in the source is the only way they could match.
@@ -694,4 +699,60 @@ test("POSITIVE CONTROL, then the guard: the gate does not present the gap kinds 
     assert.equal(gapKindsReadAsComplete(topicText("overview", config)), false,
       label + ": the overview presents the gap kinds as complete");
   }
+});
+
+// Which gap exits 1 under `require` is this backlog's value, so the overview
+// names it (TL-619). Two accepted gaps, of the eight, in a non-sorted order:
+// a renderer printing GAP_NAMES, or a constant, fails on the order or on the
+// six it must not name.
+test("under `require` overview names the accepted gaps or says none are accepted, and under `report` it names neither", () => {
+  const ACCEPTED = ["stage-only-commit", "partial-task"];
+  const LOCAL = `deploy_targets:
+  - name: ${TARGETS[0]}
+    stages:
+      - { name: quay, ref: main }
+`;
+  const accepting = fixture("release_gate: require\nrelease_gate_accept: [" + ACCEPTED.join(", ") + "]\n" + LOCAL);
+  assert.deepEqual(accepting.config.releaseGateAccept, ACCEPTED, "the fixture did not declare the accepted gaps");
+  const strict = fixture("release_gate: require\n" + LOCAL);
+  const lenient = fixture("release_gate: report\nrelease_gate_accept: [" + ACCEPTED.join(", ") + "]\n" + LOCAL);
+
+  const named = topicText("overview", accepting.config);
+  assert.ok(named.includes("\n  release gate   `require` — a gap `release_gate_accept` does not name exits 1\n" +
+    "  accepted gaps  `" + ACCEPTED[0] + "`, `" + ACCEPTED[1] + "`\n\nTHIS BACKLOG'S OWN WORDS"),
+    "accepting: the accepted gaps are not listed, aligned, after the mode");
+  for (const gap of GAP_NAMES.filter((g) => !ACCEPTED.includes(g))) {
+    assert.ok(!named.includes("`" + gap + "`"), "accepting: `" + gap + "` is named although the backlog does not accept it");
+  }
+
+  const none = topicText("overview", strict.config);
+  assert.ok(none.includes("\n  release gate   `require` — a gap `release_gate_accept` does not name exits 1\n" +
+    "  accepted gaps  none — `release_gate_accept` is empty, so every gap exits 1\n\n"),
+    "strict: an empty acceptance list is not stated as such");
+  for (const gap of GAP_NAMES) assert.ok(!none.includes("`" + gap + "`"), "strict: `" + gap + "` is named although nothing is accepted");
+
+  // Under `report` nothing blocks: the backlog's acceptance list is DECLARED
+  // here, so its absence from the text is the renderer's choice, not the data's.
+  const report = topicText("overview", lenient.config);
+  assert.deepEqual(lenient.config.releaseGateAccept, ACCEPTED, "the report fixture did not declare the accepted gaps");
+  assert.ok(report.includes("\n  release gate  `report` — the gaps are printed and the exit is 0\n\n"), "report: the mode line changed");
+  assert.ok(!report.includes("accepted gaps"), "report: an acceptance line is printed where nothing blocks");
+  for (const gap of ACCEPTED) assert.ok(!report.includes("`" + gap + "`"), "report: the accepted `" + gap + "` is named");
+
+  // With a recorded stage the three labels share one column.
+  const par = topicText("overview", fixture(PARALLEL_YAML).config);
+  assert.ok(par.includes("\n  release gate     `require` — a gap `release_gate_accept` does not name exits 1\n" +
+    "  accepted gaps    none — `release_gate_accept` is empty, so every gap exits 1\n" +
+    "  recorded stages  `" + TARGETS[0] + "/" + STAGES[1] + "`\n"),
+    "parallel: the accepted gaps do not share the column of the other labels");
+
+  // The configuration the paragraph was rendered for is one the gate accepts
+  // and judges: the fixture has no gap, so 0 is what the gate owes it.
+  const r = run(accepting.repo, ["check", "--release", "--dir", accepting.dir]);
+  assert.equal(r.status, 0, "accepting: `check --release` refuses the configuration the guide was rendered for: " + r.stderr);
+
+  // A partial configuration under `require` carries no list: it is the
+  // loader's default, which accepts nothing.
+  assert.ok(promotionGate({ releaseGate: "require", deployTargets: [{ name: TARGETS[0], stages: [] }] })
+    .includes("accepted gaps  none — "), "a configuration without `release_gate_accept` does not say none are accepted");
 });
