@@ -605,7 +605,6 @@ async function handleFieldEdit(payload) {
     if (!result.ok) {
       throw Object.assign(new Error(result.message), {
         status: result.status,
-        ...(result.needsReason ? { needsReason: true } : {}),
         ...(result.revision ? { revision: result.revision } : {}),
       });
     }
@@ -695,7 +694,6 @@ async function handle(req, res) {
     } catch (error) {
       sendJson(res, error.status || 400, {
         error: error.message,
-        needsReason: error.needsReason === true,
         ...(error.revision ? { revision: error.revision } : {}),
         ...(error.refusalKind ? { refusalKind: error.refusalKind, details: error.details || [], actorSource: error.actorSource } : {}),
       });

@@ -8,15 +8,15 @@ epic: "Backlog viewer"
 release: ""                        # the release it is PLANNED for (a value from `releases:` in config.yaml). Empty = none
 target: []                         # the deploy targets in ANOTHER repository it ships from (`deploy_targets` with `repository:`). Empty = none
 priority: P3
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:loop-4
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 conflict_group: [viewer]  # the AREA it touches (e.g. a module): `next` and `run` hold it back while a task of the same group is in progress. Empty = `conflict_group_from`, or none
 estimate: 2h                       # 30m | 1h | 2h | 3h | 4h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-11-05
-updated: 2026-11-07
+updated: 2026-11-08
 blocked_by: [TL-563]  # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
@@ -41,4 +41,4 @@ TL-563 made POST /api/task refuse `status` and `owner`, the fields dedicated com
 
 ## Acceptance criteria
 
-- [ ] The viewer's reason handling covers only writes the route can accept, and a stated reason on a plain field is still recorded. [proof: no-dead-reason-prompt]
+- [x] The viewer's reason handling covers only writes the route can accept, and a stated reason on a plain field is still recorded. [proof: no-dead-reason-prompt]

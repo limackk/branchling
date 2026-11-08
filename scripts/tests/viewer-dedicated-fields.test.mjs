@@ -177,7 +177,7 @@ test("the route refuses every field a dedicated command owns, and writes nothing
         const label = field + " → " + value;
         assert.equal(answer.status, 400, label + ": " + answer.text);
         assert.match(answer.json().error, new RegExp("`" + field + "` has dedicated commands"), label);
-        assert.notEqual(answer.json().needsReason, true, label + ": refused for the reason, not the field");
+        assert.equal("needsReason" in answer.json(), false, label + ": the route answers with a reason flag (TL-566)");
         assert.deepEqual(snapshot(fx.root, fx.id), before, label + " touched the tree");
       }
     }
