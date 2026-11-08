@@ -197,7 +197,9 @@ export function promotionState(config) {
  *
  * The gate's mode is named because it decides what the exit code means: under
  * `report` a 0 is printed over any number of gaps, and an agent reading only
- * the exit would call an unsafe promotion safe.
+ * the exit would call an unsafe promotion safe. Under `require` the gaps
+ * `release_gate_accept` names are listed too, or the absence of any, because
+ * which gap exits 1 is a value of this backlog, not of the key.
  */
 export function promotionGate(config) {
   const observed = observedTargets(config.deployTargets);
@@ -235,14 +237,21 @@ export function promotionGate(config) {
   // A partial configuration (a caller holding only some keys) carries no mode;
   // the gate then runs under the loader's default, so that is what is named.
   const mode = config.releaseGate || DEFAULTS.release_gate;
-  const label = recorded.length ? "release gate     " : "release gate  ";
-  out.push(
-    "",
-    "  " + label + "`" + mode + "` — " + (mode === "require"
-      ? "a gap `release_gate_accept` does not name exits 1"
-      : "the gaps are printed and the exit is 0"),
-  );
-  if (recorded.length) out.push("  recorded stages  " + list(recorded));
+  // Under `require` the exit depends on which gaps this backlog accepts, so
+  // they are named here rather than left to config.yaml (TL-619). Under
+  // `report` nothing blocks, and an acceptance list would suggest it did.
+  const rows = [["release gate", "`" + mode + "` — " + (mode === "require"
+    ? "a gap `release_gate_accept` does not name exits 1"
+    : "the gaps are printed and the exit is 0")]];
+  if (mode === "require") {
+    const accepted = config.releaseGateAccept || [];
+    rows.push(["accepted gaps", accepted.length
+      ? list(accepted)
+      : "none — `release_gate_accept` is empty, so every gap exits 1"]);
+  }
+  if (recorded.length) rows.push(["recorded stages", list(recorded)]);
+  const width = Math.max(...rows.map(([label]) => label.length)) + 2;
+  out.push("", ...rows.map(([label, value]) => "  " + label.padEnd(width) + value));
   return out.join("\n") + "\n\n";
 }
 
