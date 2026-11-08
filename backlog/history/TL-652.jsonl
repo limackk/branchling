@@ -1,0 +1,2 @@
+{"id":"01M6X228NWZYEABF70BBQR98P9","ts":"2026-11-08T07:48:16.188Z","task":"TL-652","field":"__created__","from":"","to":"Fit the viewer connection bar on a phone-width screen","actor":"agent:loop-4","source":"new","reason":"unknown"}
+{"id":"01M6X22CFTRKSRJSP77HNBJ0XW","ts":"2026-11-08T07:48:20.090Z","task":"TL-652","field":"conflict_group","from":[],"to":["viewer"],"actor":"agent:loop-4","source":"set","reason":"It edits the viewer template, like every task in the viewer group"}

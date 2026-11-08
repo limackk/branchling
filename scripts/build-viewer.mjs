@@ -520,10 +520,14 @@ ${paletteVarCss}
     z-index: 10;
     box-shadow: var(--shadow);
   }
+  /* The row wraps rather than overflowing: a forwarded link is often opened on
+     a phone, and a non-wrapping row pushed the tabs, Copy link and the mark
+     past the right edge (TL-473). The phone layout is below, beside the tabs. */
   .app-title {
     display: flex;
+    flex-wrap: wrap;
     align-items: baseline;
-    gap: 16px;
+    gap: 8px 16px;
     margin-bottom: 12px;
   }
   .app-title h1 { font-size: 18px; margin: 0; font-weight: 600; }
@@ -1306,10 +1310,11 @@ ${paletteBadgeCss}
     font-size: 13px;
   }
   /* ─── View tabs ─────────────────────────────────────────────────── */
-  .view-tabs { display: flex; gap: 4px; margin-left: auto; }
+  .view-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-left: auto; }
   .view-tab {
     font: inherit;
     font-size: 12px;
+    white-space: nowrap;
     padding: 5px 14px;
     border: 1px solid var(--border);
     background: var(--bg);
@@ -1336,8 +1341,21 @@ ${paletteBadgeCss}
     border-radius: 999px;
     cursor: pointer;
     margin-left: 10px;
+    white-space: nowrap;
   }
   .copy-link-btn:hover { border-color: var(--accent); color: var(--fg); }
+  /* Phone width: the project name and the mark share the first row, the
+     snapshot time takes the second and the tabs the third, wrapping among
+     themselves. Fixed rows instead of free wrapping, so the order does not
+     depend on how long the project's name happens to be. Declared after the
+     .view-tabs rule above, which it has to override. */
+  @media (max-width: 640px) {
+    header.app-header { padding: 12px 16px; }
+    .app-title .brand-mark { order: 1; margin-left: auto; }
+    .app-title .build-meta { order: 2; flex-basis: 100%; }
+    .app-title .view-tabs { order: 3; flex-basis: 100%; margin-left: 0; }
+    .copy-link-btn { margin-left: 0; }
+  }
 
   /* ─── Dashboard ─────────────────────────────────────────────────── */
   .dashboard-view { display: none; }
