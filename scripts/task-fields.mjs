@@ -203,7 +203,22 @@ export function actorRefusal(actor) {
 // be asked why. "" would read as "no reason needed", which is a different claim
 // and one nothing here can support. `unknown` says which of the two it is —
 // exactly the choice already made for the actor.
+//
+// WHAT IT CLAIMS, AND WHAT IT DOES NOT (TL-650). `normalizeReason()` writes it
+// for EVERY entry without a usable reason, so a claim by `next` or `take` made
+// without `--reason` carries it as well, and the append-only log already holds
+// many such entries. The value therefore says only that no reason was
+// stated; whether the tool observed the change or made it is the entry's
+// `source` (`external`, `manual` and `boot` are observations). Narrowing the
+// value to observations alone would have left every earlier command entry, in
+// an append-only log, contradicting its own description.
 export const REASON_UNKNOWN = "unknown";
+
+/** What `unknown` means, in the one sentence AGENTS.md and the config.yaml
+ *  template written by `init` carry verbatim — a test fails if they drift. */
+export const REASON_UNKNOWN_MEANING =
+  "no reason was stated: a change the tool observed rather than made, or a " +
+  "write made without one where none is required; the record's `source` says which";
 
 // WHY THERE IS A SECOND SENTINEL. Closing a task with `done` runs its
 // `verification:` and refuses on the first failure, so the "why" of that
