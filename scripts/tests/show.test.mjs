@@ -217,7 +217,7 @@ test("a task with no commits says so, rather than reading as deployed nowhere", 
   assert.equal(json.deploy.commits, 0);
   assert.deepEqual(json.deploy.targets, []);
   assert.deepEqual(json.deploy.unobservable, []);
-  assert.match(show(dir, never).stdout, /no commit on the trunk names this task/);
+  assert.match(show(dir, never).stdout, /no commit title on the trunk starts with this task's id/);
 });
 
 test("a task of a target in another repository is unobservable, named with that repository", () => {
