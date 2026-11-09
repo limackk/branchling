@@ -1,0 +1,2 @@
+{"id":"01M70BFATMGAGDB576GEVNFAS9","ts":"2026-11-09T14:30:24.852Z","task":"TL-668","field":"__created__","from":"","to":"A dangling link at a skill file or at the skills directory is reported","actor":"agent:loop-3","source":"new","reason":"unknown"}
+{"id":"01M70BFH3597B0WHYAJDHMSP8F","ts":"2026-11-09T14:30:31.269Z","task":"TL-668","field":"conflict_group","from":[],"to":["skills"],"actor":"agent:loop-3","source":"set","reason":"unknown"}

@@ -46,7 +46,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -133,16 +133,34 @@ function filesUnder(dir, base = dir, out = []) {
  * directory belongs makes the packaged file read as merely absent, and the
  * install's `mkdirSync` then threw EEXIST, uncaught. The remedy has to name
  * the ancestor: the file the package ships is not there to move aside.
+ *
+ * A LINK IS JUDGED BY lstat, NOT BY existsSync (TL-634). existsSync follows
+ * the link, so one whose target is gone read as absent, and `mkdirSync` then
+ * threw ENOENT on it. This repository's own `.claude/skills/*` are links, so a
+ * target that moved is a layout people have. A link that resolves to a
+ * directory is a directory; one that resolves to nothing is in the way.
  */
 function notADirectory(target, key) {
   const parts = posix(dirname(key)).split("/");
   let path = target;
   for (let i = 0; i < parts.length; i++) {
     path = join(path, parts[i]);
-    if (!existsSync(path)) return undefined;
-    if (!statSync(path).isDirectory()) return parts.slice(0, i + 1).join("/");
+    if (lstatSync(path, { throwIfNoEntry: false }) === undefined) return undefined;
+    if (!resolvesToDirectory(path)) return parts.slice(0, i + 1).join("/");
   }
   return undefined;
+}
+
+/** Whether a path that exists resolves to a directory. Only the errors a
+ *  link with no usable target raises mean "no"; any other is not ours to
+ *  hide. */
+function resolvesToDirectory(path) {
+  try {
+    return statSync(path).isDirectory();
+  } catch (err) {
+    if (err.code === "ENOENT" || err.code === "ENOTDIR" || err.code === "ELOOP") return false;
+    throw err;
+  }
 }
 
 /**
