@@ -1888,9 +1888,12 @@ export async function run(argv) {
       // wave `next` hands out of right now, which answers "what is next" and not
       // "what order would this run follow" — and the order is the whole reason
       // somebody passes `--plan` to a dry run.
+      // The WHOLE configuration and the clock (TL-645): the holds the wall
+      // names are `plan`'s, and `plan` asks them of exactly this.
       const state = planState(planned, records, {
-        archivedStatuses: config.archivedStatuses,
+        ...config,
         inProgressStatus: inProgressStatus(config),
+        now: Date.now(),
       });
       const from = state.activeWave === null ? state.waves.length : state.activeWave;
       for (const w of state.waves.slice(from)) {
@@ -1960,6 +1963,8 @@ export async function run(argv) {
           "the projection stops at wave " + wall.wave + " — " + (wall.name || "unnamed") + ": " +
           wall.left + " of " + wall.open + " open task(s) in it are not this run's to take"
         ));
+        // The same sentence per task that `plan` prints under a held wave.
+        for (const h of wall.holds) console.log("    " + color.dim(h.id + "  " + h.reason));
       }
       if (planned) {
         console.log("  " + color.dim(

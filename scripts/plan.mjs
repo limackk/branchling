@@ -333,6 +333,178 @@ export function validatePlan(plan, tasks, config = {}) {
   return { errors, blockedBy, warnings, planned, waves: plan.waves.length };
 }
 
+const HOLD_DAY_MS = 86400000;
+const holdDayOf = (s) => String(s || "").slice(0, 10);
+
+/**
+ * Why NO UNATTENDED RUN will take this open task, or null when one may (TL-645).
+ * PURE.
+ *
+ * WHAT WAS MEASURED. On 2026-11-07 the active wave's only open task sat in
+ * `awaiting_vouch`. `plan` printed it as "next up", `run --dry-run --plan`
+ * answered "0 task(s) would run" and stopped at that wave, and thirty-six
+ * pending tasks behind it were unreachable. Another wave's only task was a
+ * claim `audit` already called parked, printed as plain "in progress". A
+ * stalled plan read exactly like a plan with work in it.
+ *
+ * ONE PREDICATE, BOTH READERS. `planState` decorates every open task with this
+ * answer, `plan` prints it, and the run's projection names the same holds where
+ * it stops (`projectionWall`). The rules are the dispatcher's own, stated in
+ * `next-task.mjs` (`queueStatuses`, `isUnblocked`, `parkedByRun`,
+ * `isAbandoned`, `servesExecutor`, `isOverSized`) and `audit.mjs` (`parked`),
+ * and restated here rather than imported because this module is pasted into
+ * the viewer page, which can reach nothing but `task-fields.mjs`.
+ * `scripts/tests/plan-held-wave.test.mjs` holds the two sides together.
+ *
+ * THE KINDS, and whether a PERSON asking `next` may still be handed the task
+ * (`startable`) — which decides whether it stays in `next up`:
+ *
+ *   awaiting-vouch    the project's `awaiting_vouch_status`. The work is
+ *                     finished and a person has to vouch for it.   no
+ *   protected-status  a status `reason_required_statuses` protects, not
+ *                     discharged: nothing named in `blocked_by`, a blocker
+ *                     still open, an open question, or a run parked it there.
+ *                                                                  no
+ *   parked-claim      in progress with no recorded change for more than
+ *                     `audit_stale_days` — what `audit` reports as parked.
+ *                                                                  no
+ *   claimed           in progress, and not yet parked or abandoned. no
+ *   person-only       `executor: human`.                           yes
+ *   over-size         an estimate above `max_unattended_estimate`. yes
+ *
+ * A CLAIM PAST `abandoned_after_days` IS NOT A STATUS HOLD: `next` reclaims
+ * it. Neither is a protected status its named blockers discharged. Both still
+ * meet the person-only and over-size gates, which the dispatcher applies to
+ * every record before it reads a status. A task waiting on a blocker is not a
+ * hold either — the run closes the blocker first, which is the rule
+ * `projectionWall` states.
+ *
+ * WITHOUT `config.now` NOTHING IS AGED: a claim is then `claimed`, never
+ * parked and never abandoned, because no date is not an old date.
+ *
+ * @param {object} task a task record (`history` attached, when it is known)
+ * @param {Map<string, object>} byId every record, keyed by the UPPERCASED id
+ * @param {object} config the loaded configuration, plus `now` in milliseconds
+ * @returns {object|null} `{kind, startable, ...}` or null
+ */
+export function unattendedHold(task, byId, config = {}) {
+  if (!task) return null;
+  const archived = new Set(config.archivedStatuses || []);
+  if (archived.has(task.status)) return null;
+  // The dispatcher drops a person-only or over-size record BEFORE it looks at
+  // any status (`selectCandidates`), so a status that releases the task — a
+  // claim old enough to reclaim, a block its blockers discharged — releases
+  // it to those two gates, not past them.
+  return statusHold(task, byId, config, archived) || recordHold(task, config);
+}
+
+/** The holds a task's STATUS imposes, or null. PURE; see `unattendedHold`. */
+function statusHold(task, byId, config, archived) {
+  const status = task.status;
+  const now = Number.isFinite(config.now) ? config.now : null;
+  const history = task.history || [];
+
+  if (config.awaitingVouchStatus && status === config.awaitingVouchStatus) {
+    return { kind: "awaiting-vouch", startable: false, status };
+  }
+
+  if (config.inProgressStatus && status === config.inProgressStatus) {
+    const updated = holdDayOf(task.updated);
+    const owner = String(task.owner || "").trim();
+    const abandonDays = Number(config.abandonedAfterDays || 0);
+    if (now !== null && abandonDays > 0 && /^\d{4}-\d{2}-\d{2}$/.test(updated)) {
+      const at = Date.parse(updated + "T00:00:00Z");
+      // Reclaimable: `next` hands it out again, so the status holds nothing.
+      if (Number.isFinite(at) && now - at >= abandonDays * HOLD_DAY_MS) return null;
+    }
+    // The last recorded change, as `audit` reads it: the later of `updated:`
+    // and every history entry's day.
+    const last = history.reduce((acc, e) => {
+      const d = holdDayOf(e && e.ts);
+      return d > acc ? d : acc;
+    }, updated);
+    const staleDays = config.auditStaleDays == null ? NaN : Number(config.auditStaleDays);
+    if (now !== null && last && Number.isFinite(staleDays)) {
+      const today = holdDayOf(new Date(now).toISOString());
+      const cutoff = holdDayOf(new Date(Date.parse(today) - staleDays * HOLD_DAY_MS).toISOString());
+      if (last < cutoff) {
+        const days = Math.round((Date.parse(today) - Date.parse(last)) / HOLD_DAY_MS);
+        return { kind: "parked-claim", startable: false, status, owner, lastChange: last, days, staleDays };
+      }
+    }
+    return { kind: "claimed", startable: false, status, owner, lastChange: last || null };
+  }
+
+  if ((config.reasonRequiredStatuses || []).indexOf(status) >= 0) {
+    const named = (task.blocked_by || []).map((b) => String(b).toUpperCase());
+    // An unknown blocker is unresolved, as `isExecutable` reads it.
+    const open = named.filter((b) => {
+      const blocker = byId.get(b);
+      return !blocker || !archived.has(blocker.status);
+    });
+    const asked = openQuestions(history).length > 0;
+    const into = history.filter((e) => e && e.field === "status" && e.to === status).pop();
+    const parkedByRun = !!(into && into.park === true);
+    if (named.length && !open.length && !asked && !parkedByRun) return null;
+    return { kind: "protected-status", startable: false, status, blockedBy: open, named: named.length, asked, parkedByRun };
+  }
+  return null;
+}
+
+/** The holds the RECORD imposes whatever its status, or null. PURE. */
+function recordHold(task, config) {
+  if (String(task.executor || "").trim() === "human") {
+    return { kind: "person-only", startable: true, executor: "human" };
+  }
+
+  const bar = String(config.maxUnattendedEstimate || "").trim();
+  if (bar) {
+    const order = config.estimates || [];
+    const limit = order.indexOf(bar);
+    const estimate = String(task.estimate || "").trim();
+    const at = order.indexOf(estimate);
+    if (limit >= 0 && at >= 0 && at > limit) {
+      return { kind: "over-size", startable: true, estimate, limit: bar };
+    }
+  }
+  return null;
+}
+
+/**
+ * One sentence for a hold, the same in `plan` and in the run's projection.
+ * PURE. The words name the configuration key behind each rule, so a reader who
+ * disagrees with a hold knows where it was decided.
+ */
+export function describeHold(hold) {
+  if (!hold) return "";
+  switch (hold.kind) {
+    case "awaiting-vouch":
+      return "awaiting a person's vouch (status `" + hold.status + "`)";
+    case "protected-status": {
+      const why = hold.asked
+        ? "an open question is waiting for a decision"
+        : hold.parkedByRun
+          ? "a run parked it there"
+          : hold.blockedBy.length
+            ? "waiting on " + hold.blockedBy.join(", ")
+            : "nothing is named in `blocked_by`";
+      return "in `" + hold.status + "`, a status `reason_required_statuses` protects — " + why;
+    }
+    case "parked-claim":
+      return "claim parked for " + hold.days + " day(s) by " + (hold.owner || "nobody") +
+        " — no recorded change since " + hold.lastChange + " (`audit_stale_days` is " + hold.staleDays + ")";
+    case "claimed":
+      return "claimed by " + (hold.owner || "nobody") + " — work in flight" +
+        (hold.lastChange ? ", last change " + hold.lastChange : "");
+    case "person-only":
+      return "asks for an executor an unattended run is not (human)";
+    case "over-size":
+      return "estimate " + hold.estimate + " is above `max_unattended_estimate` (" + hold.limit + ")";
+    default:
+      return hold.kind;
+  }
+}
+
 /**
  * What the plan looks like AGAINST THE TREE right now (TL-108).
  *
@@ -350,7 +522,10 @@ export function validatePlan(plan, tasks, config = {}) {
  *
  *   active wave  the FIRST wave holding an open task. Earlier waves are
  *                finished; the plan is read from the front.
- *   next up      the open tasks of that wave whose every `blocked_by` is closed.
+ *   next up      the open tasks of that wave whose every `blocked_by` is closed,
+ *                less those `next` hands out to nobody (`unattendedHold`, a
+ *                hold that is not `startable`: a vouch, a protected status, a
+ *                claim). Since TL-645 it never names what `next --plan` will not.
  *                A `together` group is one entry and is ready only when ALL of
  *                its open members are — the group exists to say "these are done
  *                as one act", and half a group is not that act.
@@ -395,6 +570,10 @@ export function planState(plan, tasks, config = {}) {
   // `decision-panel.mjs` compares against. Empty means anybody, which is the
   // overwhelming majority of tasks and the reason the field is optional.
   const executorOf = (t) => String((t && t.executor) || "").trim();
+  // The hold is asked against the dispatcher's own reading of the tree, whose
+  // ids are uppercased (TL-645).
+  const byUpper = new Map(tasks.map((t) => [String(t.id).toUpperCase(), t]));
+  const holdOf = (t) => (isOpen(t) ? unattendedHold(t, byUpper, config) : null);
 
   const waveOf = new Map();
   const waves = ((plan && plan.waves) || []).map((w, i) => {
@@ -406,9 +585,10 @@ export function planState(plan, tasks, config = {}) {
       // wave keeps its titles.
       return {
         id, title: t ? t.title : null, status: t ? t.status : null, blocked_by: t ? (t.blocked_by || []).slice() : [],
-        known: !!t, open: isOpen(t), executor: executorOf(t),
+        known: !!t, open: isOpen(t), executor: executorOf(t), hold: holdOf(t),
       };
     });
+    const openEntries = entries.filter((e) => e.open);
     return {
       index: i,
       name: w.name,
@@ -419,6 +599,9 @@ export function planState(plan, tasks, config = {}) {
       // A CLOSED task that asked for a person no longer stops anybody, so only
       // the open ones count: a wave finished by a person yesterday is finished.
       endsOnHuman: entries.some((e) => e.open && e.executor === "human"),
+      // Every open task of the wave carries a hold, so no unattended run can
+      // finish it and the run's projection stops here (TL-645).
+      held: openEntries.length > 0 && openEntries.every((e) => e.hold),
       active: false,
     };
   });
@@ -435,7 +618,10 @@ export function planState(plan, tasks, config = {}) {
   const nextUp = [];
   if (activeWave >= 0) {
     const w = waves[activeWave];
-    const openIds = w.tasks.filter((e) => e.open).map((e) => e.id);
+    // A task `next` hands out to NOBODY is not next up, whoever reads the plan
+    // (TL-645): a vouch, a protected status, a claim. A person-only or
+    // over-size task stays — a person asking is handed it — and is marked.
+    const openIds = w.tasks.filter((e) => e.open && !(e.hold && !e.hold.startable)).map((e) => e.id);
     const openSet = new Set(openIds);
     const groupOf = new Map();
     w.together.forEach((g, gi) => g.forEach((id) => groupOf.set(id, gi)));
@@ -571,15 +757,24 @@ export function scheduledIds(plan) {
  * caller counts those as reachable; a wall is work this run may never be handed
  * at all, which is what a person's task and a claim in another tree are.
  *
+ * THE WALL NAMES ITS HOLDS (TL-645): every open task of the wave that
+ * `unattendedHold` says no unattended run will take, with the sentence `plan`
+ * prints for it, so the projection and `plan` give one reason in one wording.
+ * `held` says the wave is held shut by those alone; when it is false, the rest
+ * of `left` is this run's own filter (a role, a conflict group, a handback).
+ *
  * @param {object} wave one entry of `planState().waves`
  * @param {number} reachable how many of that wave's open tasks this run would take
- * @returns {{wave: number, name: string, open: number, reachable: number, left: number}|null}
+ * @returns {{wave: number, name: string, open: number, reachable: number, left: number,
+ *            held: boolean, holds: Array<{id: string, kind: string, reason: string}>}|null}
  *          the wall, in the terms a report needs, or null when the wave is finishable
  */
 export function projectionWall(wave, reachable) {
   const left = wave.open - reachable;
   if (left <= 0) return null;
-  return { wave: wave.index + 1, name: wave.name || "", open: wave.open, reachable, left };
+  const holds = (wave.tasks || []).filter((e) => e.open && e.hold)
+    .map((e) => ({ id: e.id, kind: e.hold.kind, reason: describeHold(e.hold) }));
+  return { wave: wave.index + 1, name: wave.name || "", open: wave.open, reachable, left, held: !!wave.held, holds };
 }
 
 /**

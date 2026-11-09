@@ -38,7 +38,7 @@ import { fileURLToPath } from "node:url";
 import { loadConfigOrExit } from "./config.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { backlogPaths, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
-import { loadPlan, planState, validatePlan } from "./plan.mjs";
+import { describeHold, loadPlan, planState, validatePlan } from "./plan.mjs";
 import { readHistory } from "./history.mjs";
 import { EDIT_SUBCOMMANDS, runPlanEdit, runPlanInit } from "./plan-write.mjs";
 import { reportPlanErrors } from "./check-backlog-plan.mjs";
@@ -107,15 +107,33 @@ export function renderPlan(state, config, opts = {}) {
   } else {
     const w = state.waves[state.activeWave];
     out.push("next up (wave " + (w.index + 1) + " — " + (w.name || "unnamed") + "):");
+    // The open tasks `next` hands out to NOBODY now (TL-645): left out of next
+    // up, so each is named below with its hold. Without that line a claim, or a
+    // task awaiting a vouch, would simply vanish from the answer, and the empty
+    // line would blame a blocker for what is in fact a hold.
+    const withheld = w.tasks.filter((e) => e.open && e.hold && !e.hold.startable);
     if (!state.nextUp.length) {
-      out.push("  " + paint.dim("none — every open task of this wave is waiting on a blocker"));
+      out.push("  " + paint.dim(w.held
+        ? "none — no open task of this wave is one `next` hands out"
+        : withheld.length
+          ? "none — `next` hands out the tasks named below to nobody now, and the rest wait on a blocker"
+          : "none — every open task of this wave is waiting on a blocker"));
     }
     for (const entry of state.nextUp) {
       const ids = entry.ids.map((id) => paint.id(id)).join(", ");
       // The mark is APPENDED to the row the plan was going to print anyway
       // (TL-199): the order is somebody's decision and `executor:` is a filter
       // the dispatcher applies, so nothing here may reorder or drop a row.
-      const mark = entry.waitsOnHuman ? "  " + paint.dim("— asks for an executor an unattended run is not (human)") : "";
+      let mark = entry.waitsOnHuman ? "  " + paint.dim("— asks for an executor an unattended run is not (human)") : "";
+      // A group member `next` hands out to nobody is not next up (TL-645), but
+      // the group is still one act, so the rest of it is named beside it.
+      if (entry.together) {
+        const group = w.together.find((g) => g.indexOf(entry.ids[0]) >= 0) || [];
+        const members = withheld.filter((e) => group.indexOf(e.id) >= 0);
+        if (members.length) {
+          mark += "  " + paint.dim("— with " + members.map((e) => e.id).join(", ") + ", which `next` hands out to nobody now");
+        }
+      }
       // The group is named as a group. Splitting it into three bullets would
       // lose the one thing `together:` says.
       out.push("  " + (entry.together ? "together: " + ids : ids) + mark);
@@ -125,6 +143,20 @@ export function renderPlan(state, config, opts = {}) {
     // here and yet cannot be finished by a fleet either.
     if (w.endsOnHuman) {
       out.push("  " + paint.dim("this wave ends on a person — an unattended run cannot close it on its own"));
+    }
+    // HELD, AND WHY, ONE TASK PER LINE (TL-645). Without it a wave nobody can
+    // move printed the same rows as a wave with work in it, while `run
+    // --dry-run --plan` stopped here; the sentences are the ones it prints.
+    // A wave that is NOT held still names what it withholds, for the same
+    // reason: a stalled task must not read as work somebody is about to start.
+    if (w.held) {
+      out.push("  " + paint.bold("held") + " — no unattended run will take any open task of this wave, so `run --plan` stops here:");
+      for (const e of w.tasks) {
+        if (e.open && e.hold) out.push("    " + paint.id(e.id) + "  " + describeHold(e.hold));
+      }
+    } else if (withheld.length) {
+      out.push("  " + paint.bold("withheld") + " — `next` hands these out to nobody now:");
+      for (const e of withheld) out.push("    " + paint.id(e.id) + "  " + describeHold(e.hold));
     }
   }
   out.push("");
@@ -242,7 +274,9 @@ function main(argv) {
       : refuse("plan-contradicts-tree", audit.errors, "the plan names tasks the tree does not hold as it says");
   }
 
-  const state = planState(loaded.plan, tasks, config);
+  // The clock is passed IN, so `planState` stays pure: it is what ages a
+  // claim into a parked one (TL-645).
+  const state = planState(loaded.plan, tasks, { ...config, now: Date.now() });
 
   if (asJson) {
     printJson("plan", { ok: true, root, exists: true, ...state });

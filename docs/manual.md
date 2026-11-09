@@ -743,11 +743,12 @@ next up (wave 2 — Consumers):
 Five definitions, and `--json` returns all of them for an agent that would
 otherwise assemble the graph out of every task file: the **active wave** is the
 first one holding an open task; **next up** are its open tasks whose every
-`blocked_by` is closed, with a `together` group counted as one entry and ready
-only when all of it is; **in progress** is every plan task in flight, in any
-wave; **unplanned** are the open tasks the plan does not schedule — listed by id,
-because that is how a plan rots; **stale** are plan tasks already closed in a
-later wave, the sign that the order wants reshuffling.
+`blocked_by` is closed and which `next` would hand out to somebody, with a
+`together` group counted as one entry and ready only when all of it is; **in
+progress** is every plan task in flight, in any wave; **unplanned** are the open
+tasks the plan does not schedule — listed by id, because that is how a plan
+rots; **stale** are plan tasks already closed in a later wave, the sign that the
+order wants reshuffling.
 
 **A wave that ends on a person says so.** A task carrying `executor: human` is
 one no unattended run can take, so `next up` marks its row and the wave carries
@@ -764,6 +765,26 @@ next up (wave 2 — Consumers):
   TASK-18
   TASK-20  — asks for an executor an unattended run is not (human)
   this wave ends on a person — an unattended run cannot close it on its own
+```
+
+**A wave held shut says so, and names why for each task.** A task awaiting a
+vouch (`awaiting_vouch_status`), one in a status `reason_required_statuses`
+protects that its named blockers have not discharged, and a claim not yet old
+enough for `abandoned_after_days` to reclaim — fresh, or parked past
+`audit_stale_days` the way `audit` reports it — are handed out by `next` to
+nobody, so they are never next up; the active wave names them as withheld
+instead. When every open task of the wave is one no unattended run will
+take, the wave is printed as **held**, one reason per task, and `run --plan
+--dry-run` stops there with the same sentences. In `--json` every open task of a
+wave carries `hold` (`kind`, and whether a person asking `next` is still handed
+it as `startable`), and the wave carries `held`.
+
+```
+next up (wave 3 — Release):
+  none — no open task of this wave is one `next` hands out
+  held — no unattended run will take any open task of this wave, so `run --plan` stops here:
+    TASK-31  awaiting a person's vouch (status `awaiting_vouch`)
+    TASK-32  claim parked for 42 day(s) by agent:gone — no recorded change since 2026-09-26 (`audit_stale_days` is 7)
 ```
 
 **Asking the dispatcher to follow it** is `--plan`, on `next` and on `run`. The
