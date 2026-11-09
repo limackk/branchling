@@ -29,7 +29,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { explain, gitLogArgs, modifiedFiles, parseLog, repoRoot, touches } from "../modified-files.mjs";
+import { MAX_RANGE_SPAN, explain, gitLogArgs, modifiedFiles, parseLog, repoRoot, titleIds, touches } from "../modified-files.mjs";
 import { taskIdScanner } from "../task-id.mjs";
 
 import { isolateHome } from "./_repo.mjs";
@@ -98,6 +98,31 @@ test("a range at the head of the title counts as every id it spans", () => {
   assert.deepEqual([...byTask.keys()].sort(), ["TL-10", "TL-7", "TL-8", "TL-9"]);
   const reversed = parseLog(record("TL-10..TL-7 written backwards", ["a.mjs"]), taskIdScanner("TL"));
   assert.deepEqual([...reversed.keys()].sort(), ["TL-10", "TL-7"]);
+});
+
+// TL-627: one typo at the head of a title must not attribute the commit's files
+// to tens of thousands of tasks.
+test("a head range wider than the bound counts only its endpoints", () => {
+  const scanner = taskIdScanner("TL");
+  const typo = parseLog(record("TL-6..TL-60000 a mistyped range", ["a.mjs"]), scanner);
+  assert.deepEqual([...typo.keys()].sort(), ["TL-6", "TL-60000"]);
+  assert.deepEqual([...typo.get("TL-60000")], ["a.mjs"]);
+  // Just over the bound: the edge, so a `>=` in place of `>` is caught.
+  const over = titleIds(`TL-1..TL-${2 + MAX_RANGE_SPAN} just over the bound`, scanner);
+  assert.deepEqual([...over].sort(), ["TL-1", `TL-${2 + MAX_RANGE_SPAN}`]);
+});
+
+test("a head range exactly as wide as the bound still expands to every id", () => {
+  // The positive control for the test above: without it, a parser that never
+  // expanded any range would pass it.
+  const ids = titleIds(`TL-1..TL-${1 + MAX_RANGE_SPAN} at the bound`, taskIdScanner("TL"));
+  assert.equal(ids.size, MAX_RANGE_SPAN + 1);
+  for (let n = 1; n <= 1 + MAX_RANGE_SPAN; n++) assert.ok(ids.has(`TL-${n}`), `TL-${n} was dropped`);
+});
+
+test("the bound leaves headroom above the widest range this repository wrote", () => {
+  // The value is measured, not invented: TL-626..TL-650 spanned 24.  (renumber: allow)
+  assert.ok(MAX_RANGE_SPAN >= 24 * 2, `MAX_RANGE_SPAN ${MAX_RANGE_SPAN} is within reach of a real range`);
 });
 
 test("the scanner's own state does not leak into the next parse", () => {
