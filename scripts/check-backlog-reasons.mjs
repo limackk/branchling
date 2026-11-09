@@ -21,8 +21,10 @@
  * on speculation, because a setting nobody has asked for is a second thing to
  * explain.
  *
- * THREE KINDS OF MISSING, COUNTED APART. `unknown` is an entry from
- * reconciliation: a change the tool SAW rather than made, where the value is the
+ * THREE KINDS OF MISSING, COUNTED APART. `unknown` says only that no reason was
+ * stated; among the transitions audited here it is an entry from
+ * reconciliation, a change the tool SAW rather than made, because the writing
+ * commands refuse these transitions without a reason. There the value is the
  * true record of what it knows. A MISSING `reason` field is an entry written
  * before this mechanism existed — the log is append-only and is not rewritten, so
  * those rows stay as they were. Only an entry that could have carried a reason

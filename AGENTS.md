@@ -78,9 +78,11 @@ drift apart; a test fails if this copy falls behind it.
   `reason_required_statuses` in `config.yaml` says which statuses may not be
   entered without one (here: `blocked`, `cancelled`) — writing commands REFUSE
   rather than ask. Two values are reserved and must never be typed by hand:
-  `unknown` (a change that was observed, not made by the tool) and `proven` (the
-  reason is a verification run). `## Log` sections in old tasks stay — they are
-  sentences nobody will reconstruct, not debt to tidy away.
+  `unknown` (no reason was stated: a change the tool observed rather than made,
+  or a write made without one where none is required; the record's `source`
+  says which) and `proven` (the reason is a verification run). `## Log`
+  sections in old tasks stay — they are sentences nobody will reconstruct, not
+  debt to tidy away.
 - **The product name comes from `scripts/product.mjs`** (read from
   `package.json`), not from literals — in messages, in `--help`, in comments and
   in templates written into other people's repositories. `branchling check

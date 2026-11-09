@@ -31,6 +31,7 @@ import {
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
 import { DEFAULT_TASK_ID_PREFIX } from "./task-id.mjs";
+import { REASON_PROVEN, REASON_UNKNOWN, REASON_UNKNOWN_MEANING } from "./task-fields.mjs";
 import { loadConfig } from "./config.mjs";
 import { TEMPLATE_FILENAME, backlogPaths, repositoryRoot, takeDirFlag } from "./paths.mjs";
 import { USER_SKILLS, installSkills, renderInstall, skillsTarget } from "./install-skills.mjs";
@@ -45,6 +46,29 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+
+/** Lays `text` out as `# ` comment lines no wider than `width` columns. */
+function commentLines(text, width = 80) {
+  const lines = [];
+  let line = "#";
+  for (const word of text.split(/\s+/).filter(Boolean)) {
+    if (line !== "#" && line.length + 1 + word.length > width) {
+      lines.push(line);
+      line = "#";
+    }
+    line += " " + word;
+  }
+  lines.push(line);
+  return lines.join("\n");
+}
+
+// The meaning of `unknown` is taken from the module that writes it, not restated
+// here: the copy written into other people's repositories is the one a stranger
+// reads, and a second hand-written copy is the one that drifts (TL-650).
+const RESERVED_REASONS_COMMENT = commentLines(
+  "Two values are reserved and are never typed by hand: `" + REASON_UNKNOWN + "` (" +
+    REASON_UNKNOWN_MEANING + ") and `" + REASON_PROVEN + "` (a verification run).",
+);
 
 const CONFIG_YAML = `# The backlog configuration — this project's vocabularies.
 # The code knows the SHAPE of a field, this file knows the VALUES. An unknown key
@@ -79,9 +103,8 @@ dashboard_open_statuses: [pending, in_progress, blocked]
 # resolves to \`archived_statuses\` and \`blocked\` would then be dispatched to
 # agents by default, which is not what the documentation says and not what
 # \`${N} run\` can work with — it parks a task it could not finish in this
-# very status. Two values are reserved and are never typed by hand:
-# \`unknown\` (a change the tool observed rather than made) and \`proven\`
-# (a verification run).
+# very status.
+${RESERVED_REASONS_COMMENT}
 reason_required_statuses: [blocked, cancelled]
 
 priorities: [P0, P1, P2, P3]       # [tree]

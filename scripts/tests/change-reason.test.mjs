@@ -123,8 +123,8 @@ function cli(args, dir) {
 // ── The value itself ──────────────────────────────────────────────────────
 
 test("a reason nobody gave is `unknown`, never an empty string", () => {
-  // "" and `unknown` are two different claims: "no reason was needed" and "nobody
-  // was there to ask". Collapsing them loses the only interesting one.
+  // "" and `unknown` are two different claims: "no reason was needed" and "no
+  // reason was stated". Collapsing them loses the only interesting one.
   assert.equal(normalizeReason(""), REASON_UNKNOWN);
   assert.equal(normalizeReason(undefined), REASON_UNKNOWN);
   assert.equal(normalizeReason("   "), REASON_UNKNOWN);
