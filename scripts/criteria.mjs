@@ -54,8 +54,14 @@ import { stripComment, unquote } from "./task-fields.mjs";
 
 /** The heading that opens the criteria list. Part of the FORMAT (`_template.md`
  *  writes it), so it belongs in the code — unlike statuses or labels, which are
- *  project vocabulary and live in config.yaml. */
-const CRITERIA_HEADING = /^#{2,}\s+Acceptance criteria\s*$/;
+ *  project vocabulary and live in config.yaml.
+ *
+ *  SECOND LEVEL ONLY (TL-640), the level every task section is written at and
+ *  every other section reader looks for. A deeper heading of the same name is
+ *  text inside some section — an imported ticket's own criteria, demoted under
+ *  `## Goal` by `import` — and reading it as the contract would make somebody
+ *  else's prose the list `done` proves. */
+const CRITERIA_HEADING = /^##[ \t]+Acceptance criteria\s*$/;
 
 /** A proof id: lower case, digits and dashes. Narrow on purpose — the id ends up
  *  inside `[proof: …]`, where a comma or a bracket would be unparseable. */
