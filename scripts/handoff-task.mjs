@@ -618,10 +618,10 @@ export function run(argv) {
   //
   // `--to-owner` and `--status` are values of the same kind and get the same
   // refusal (TL-574); an unknown flag or a missing `--reason` stays exit 2.
-  const refuseUnknownValue = (field, value, message, details, declared) => {
+  const refuseValue = (refusalKind, field, value, message, details, declared) => {
     if (plan.json) {
       printJson("task-handoff", {
-        ok: false, id: plan.id, actorSource, refusalKind: "unknown-value", refusal: message, details,
+        ok: false, id: plan.id, actorSource, refusalKind, refusal: message, details,
         rejected: { field, value }, declared,
       });
     } else {
@@ -629,6 +629,7 @@ export function run(argv) {
     }
     return 1;
   };
+  const refuseUnknownValue = (...args) => refuseValue("unknown-value", ...args);
   if (plan.toRole !== null && (config.roles || []).indexOf(plan.toRole) < 0) {
     const declared = (config.roles || []).slice();
     return refuseUnknownValue("role", plan.toRole, "unknown role `" + plan.toRole + "`", declared.length
@@ -651,11 +652,16 @@ export function run(argv) {
       return refuseUnknownValue("status", plan.status, "unknown status `" + plan.status + "`",
         ["`statuses` in config.yaml holds: " + config.statuses.join(", ")], config.statuses.slice());
     }
+    // DECLARED, so `unknown-value` would be the wrong word for it (TL-635); it
+    // is still a value inside a correctly built call, so a refusal (1) with a
+    // kind of its own, naming the statuses a handoff may set.
     if (config.archivedStatuses.indexOf(plan.status) >= 0) {
-      return fail2("`" + plan.status + "` is an archived status", [
+      const open = config.statuses.filter((s) => config.archivedStatuses.indexOf(s) < 0);
+      return refuseValue("archived-status", "status", plan.status, "`" + plan.status + "` is an archived status", [
         "A handoff puts a task back in the queue; closing one is `" + N + " done`, which",
         "runs its verification first.",
-      ]);
+        "a handoff may set: " + (open.length ? open.join(", ") : "nothing — every declared status is archived"),
+      ], open);
     }
   }
 

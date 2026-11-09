@@ -607,8 +607,11 @@ test("`--status` cannot be used to close a task behind `done`'s back", () => {
   const id = newTask(dir, "Sort the deeds");
   const r = run(dir, ["handoff", id, "--dir", ".", "--to-role", "archivist",
     "--reason", "Shortcut.", "--status", "done"]);
-  assert.equal(r.status, 2);
-  assert.match(r.stderr, /done/);
+  // A refusal (1), not a usage error: the value is declared, the call is built
+  // right (TL-635). The envelope is proved in handoff-archived-status.test.mjs.
+  assert.equal(r.status, 1, r.stderr);
+  assert.equal(r.stdout, "");
+  assert.match(r.stderr, /`done` is an archived status/);
 });
 
 // ── The comment as an event: written, read back, deduplicated ─────────────
