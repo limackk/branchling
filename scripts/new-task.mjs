@@ -32,7 +32,7 @@ import { fileURLToPath } from "node:url";
 
 import { resolveActorReport } from "./actor.mjs";
 import { ConfigError, formatConfigError, loadConfig } from "./config.mjs";
-import { actorRefusal, recordCreation } from "./history.mjs";
+import { statedActorRefusal, recordCreation } from "./history.mjs";
 import { withBacklogMutex } from "./lock.mjs";
 import { editPlanText, newPlanErrors, waveTargetProblem } from "./plan-write.mjs";
 import { detectPrefixMismatch, prefixMismatchMessage, taskIdPatterns } from "./task-id.mjs";
@@ -753,7 +753,7 @@ export async function main(argv) {
   // namespace would be a history row nobody can weigh.
   const { actor, actorSource } = resolveActorReport(opts.actor);
   answer.actorSource = actorSource;
-  const badActor = actorRefusal(actor);
+  const badActor = statedActorRefusal(actor);
   if (badActor) return refuse(said(badActor.refusal, badActor.hint));
 
   // BEFORE the directory is even resolved: a refused document must leave a tree

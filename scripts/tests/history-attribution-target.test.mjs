@@ -36,15 +36,29 @@ function fixture({ unknownCreation }) {
   const env = {
     ...process.env,
     BACKLOG_STATE_DIR: join(dir, "state"),
-    BACKLOG_ACTOR: unknownCreation ? "unknown" : "local:creator",
+    BACKLOG_ACTOR: "local:creator",
     NO_COLOR: "1",
   };
   assert.equal(run(["init", "--dir", backlog, "--no-example"], env).status, 0);
-  const created = run(["new", "--dir", backlog, "--title", "Attribution target"], env);
-  assert.equal(created.status, 0, created.stderr);
-  const id = (created.stdout.match(/([A-Z]+-\d+)/) || [])[1];
-  const file = join(backlog, "tasks",
-    readdirSync(join(backlog, "tasks")).find((name) => name.startsWith(id + "-")));
+  let id;
+  let file;
+  if (unknownCreation) {
+    // A creation nobody can name is one the tool OBSERVED: a file written by
+    // hand and reconciled. `new` records its own act and refuses `unknown`
+    // as its author (TL-628), so it cannot stand in for this case.
+    assert.equal(run(["history", "--dir", backlog, "--actor", "unknown", "--quiet"], env).status, 0);
+    const prefix = readFileSync(join(backlog, "config.yaml"), "utf8").match(/^task_id_prefix:\s*"?([A-Za-z][\w.-]*)/m)[1];
+    id = prefix + "-1";
+    file = join(backlog, "tasks", id + "-attribution-target.md");
+    writeFileSync(file, "---\nid: " + id + "\ntitle: \"Attribution target\"\nstatus: pending\n---\n", "utf8");
+    assert.equal(run(["history", "--dir", backlog, "--file", file, "--actor", "unknown", "--quiet"], env).status, 0);
+  } else {
+    const created = run(["new", "--dir", backlog, "--title", "Attribution target"], env);
+    assert.equal(created.status, 0, created.stderr);
+    id = (created.stdout.match(/([A-Z]+-\d+)/) || [])[1];
+    file = join(backlog, "tasks",
+      readdirSync(join(backlog, "tasks")).find((name) => name.startsWith(id + "-")));
+  }
 
   // Establish the reference point, then let the external reconciler observe a
   // later field change without an author.

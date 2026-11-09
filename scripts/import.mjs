@@ -74,7 +74,7 @@ import { fileURLToPath } from "node:url";
 
 import { resolveActorReport } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { actorRefusal, reasonRefusal, recordCreation, reconcile } from "./history.mjs";
+import { statedActorRefusal, reasonRefusal, recordCreation, reconcile } from "./history.mjs";
 import * as github from "./import-github.mjs";
 import * as jira from "./import-jira.mjs";
 import { printJson } from "./json-envelope.mjs";
@@ -207,7 +207,7 @@ export function parseImportArgs(args) {
     // nothing is refused rather than ignored.
     throw new Error("`--status` maps a Jira workflow status\na GitHub issue is only open or closed, and that is mapped already");
   }
-  const badActor = actor ? actorRefusal(actor) : null;
+  const badActor = actor ? statedActorRefusal(actor) : null;
   if (badActor) throw new Error(badActor.refusal + "\n" + badActor.hint);
   return { from, dryRun, json, actor, reason, labelMap, statusMap };
 }

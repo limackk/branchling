@@ -59,7 +59,7 @@ import { fileURLToPath } from "node:url";
 
 import { actorRequiredRefusal, resolveActorReport } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { actorRefusal, appendEntries, currentSession, eventId, FIELD_COMMENT, normalizeReason, openQuestions, questionIdFromReason, readHistory, reasonRefusal, recordEdit } from "./history.mjs";
+import { statedActorRefusal, appendEntries, currentSession, eventId, FIELD_COMMENT, normalizeReason, openQuestions, questionIdFromReason, readHistory, reasonRefusal, recordEdit } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { isExpired, lockDir, readLock, releaseLock } from "./lock.mjs";
 import { queueStatuses } from "./next-task.mjs";
@@ -590,7 +590,7 @@ export function run(argv) {
     else console.error(failure(N + " handoff", required.refusal, required.details));
     return 1;
   }
-  const badActor = actorRefusal(actor);
+  const badActor = statedActorRefusal(actor);
   if (badActor) {
     return fail2(badActor.refusal, [badActor.hint].concat(badActor.namespace ? [
       "The namespace says how much the attribution is worth — local: declared,",

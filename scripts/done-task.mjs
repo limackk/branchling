@@ -44,7 +44,7 @@ import { backlogPaths, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs"
 import { loadConfig, loadConfigOrExit } from "./config.mjs";
 import { applyProofs, auditTask, parseCriteria, parseVerification } from "./criteria.mjs";
 import { buildFieldSpecs, extractMeta, fieldSpec, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
-import { actorRefusal, appendEntries, currentSession, eventId, FIELD_UNVERIFIED, FIELD_VERIFIED, REASON_PROVEN, reasonRefusal, recordEdit, requiresReason } from "./history.mjs";
+import { statedActorRefusal, appendEntries, currentSession, eventId, FIELD_UNVERIFIED, FIELD_VERIFIED, REASON_PROVEN, reasonRefusal, recordEdit, requiresReason } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { releaseLock } from "./lock.mjs";
 import { MARK, color, errColor, failure } from "./ui.mjs";
@@ -823,7 +823,7 @@ async function run(argv, io = {}) {
   // refuses the default for it; a closure proved by commands is evidence, and
   // the default actor is honest for it.
   plan.actorSource = reportedActorSource(actorSource);
-  const badActor = actorRefusal(actor);
+  const badActor = statedActorRefusal(actor);
   if (badActor) {
     console.error(
       failure(N + " done", badActor.refusal, [badActor.hint].concat(badActor.namespace ? [

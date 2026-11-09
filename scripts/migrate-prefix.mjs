@@ -43,7 +43,7 @@ import { fileURLToPath } from "node:url";
 
 import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { actorRefusal, MIGRATIONS_FILE, SNAPSHOT_FILE, appendMigration, applyIdMigrations, loadSnapshot, saveSnapshot } from "./history.mjs";
+import { statedActorRefusal, MIGRATIONS_FILE, SNAPSHOT_FILE, appendMigration, applyIdMigrations, loadSnapshot, saveSnapshot } from "./history.mjs";
 import { withHistoryLogMutex } from "./history-log-mutex.mjs";
 import { backlogPaths, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { withSnapshotMutex } from "./snapshot-mutex.mjs";
@@ -277,7 +277,7 @@ export function main(argv) {
     console.error(`${N} migrate-prefix: \`--actor\` with no name\n` + USAGE);
     return 2;
   }
-  const badActor = actor ? actorRefusal(actor) : null;
+  const badActor = actor ? statedActorRefusal(actor) : null;
   if (badActor) {
     console.error(`${N} migrate-prefix: ${badActor.refusal}\n  ${badActor.hint}`);
     return 2;

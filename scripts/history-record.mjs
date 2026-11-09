@@ -26,7 +26,7 @@ import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { resolveActor } from "./actor.mjs";
-import { actorRefusal, BulkAdoptionError, FIELD_ADOPTED, FIELD_ATTRIBUTED, attributeChanges, historyEntryIdentity, readHistory, reasonRefusal, reconcile, taskIdFromFile, unattributedChanges } from "./history.mjs";
+import { actorRefusal, statedActorRefusal, BulkAdoptionError, FIELD_ADOPTED, FIELD_ATTRIBUTED, attributeChanges, historyEntryIdentity, readHistory, reasonRefusal, reconcile, taskIdFromFile, unattributedChanges } from "./history.mjs";
 import { resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { printLine } from "./stdout.mjs";
@@ -136,6 +136,16 @@ if (all && file) {
 }
 if (all && eventFlag) {
   console.error(`${N} history: \`--all\` claims every unowned change, so it cannot be combined with \`--event\`.`);
+  process.exit(2);
+}
+// Reconciliation records changes it OBSERVED, so `unknown` stays a legitimate
+// author on that route. A claim is the opposite: an act this command performs
+// for somebody, and a claim by `unknown` would mark a change as owned while
+// still naming nobody (TL-628).
+const badClaimant = attribute ? statedActorRefusal(actor) : null;
+if (badClaimant) {
+  console.error(`${N} history: \`--attribute\` claims a change for somebody, and ` + badClaimant.refusal + ".\n" +
+    "  " + badClaimant.hint);
   process.exit(2);
 }
 if (attribute && !reasonFlag) {

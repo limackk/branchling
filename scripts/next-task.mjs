@@ -67,7 +67,7 @@ import { resolveActorReport } from "./actor.mjs";
 import { handedBackAcross } from "./audit.mjs";
 import { archivedElsewhereBySource, crossBranchState, describeDivergence, divergences, scanNote } from "./branch-scan.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { actorRefusal, FIELD_COMMENT, openQuestions, readAllHistory, readHistory, reasonRefusal } from "./history.mjs";
+import { statedActorRefusal, FIELD_COMMENT, openQuestions, readAllHistory, readHistory, reasonRefusal } from "./history.mjs";
 import { answerBacklogDirRefusal, backlogPaths, isBacklogDirRefusal, resolveBacklogDir } from "./paths.mjs";
 import { dispatchWave, loadPlanForDispatch, scheduledIds } from "./plan.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
@@ -841,7 +841,7 @@ export function run(argv) {
   // `--require-actor` here: `next` is the automated draw from the queue, and a
   // person choosing a task names it with `take`, which accepts the flag.
   const { actor, actorSource } = resolveActorReport(plan.actor);
-  const badActor = actorRefusal(actor);
+  const badActor = statedActorRefusal(actor);
   if (badActor) {
     console.error(failure(N + " next", badActor.refusal, [badActor.hint].concat(badActor.namespace ? [
       "The namespace says how much the attribution is worth — local: declared,",
