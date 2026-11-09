@@ -15,9 +15,13 @@
  * `takeTask()`. A second reservation path would be a second set of rules about
  * who holds what, and the one that drifted would be the automated one.
  *
- * WHY THERE IS NO `--dry-run`. "Which task would I get, without taking it" is a
- * question `query` already answers, over the SAME selection code (task-select.mjs).
- * A second preview would be a second answer to one question.
+ * WHY `take` HAS NO `--dry-run` AND `next` HAS ONE (TL-644). `take` names its
+ * task, so "which task would I get" is not a question it can be asked. `next`
+ * chooses, and its choice applies gates `query` does not — the branch scan, the
+ * plan's wave, handoffs, conflict groups, reservations — so `query` is not the
+ * preview it was once said to be. `next --dry-run` runs the same selection and
+ * calls this function with `dryRun`, which stops after the last refusal that
+ * only reads: one set of rules, two depths.
  *
  * THE `focus:` FIELD IS NOT COMING BACK. It was abolished in BL-1386 after
  * measurement: at the time it named 3 tasks while 11 P0/P1 tasks sat outside it,
@@ -50,7 +54,7 @@ import { withProbe } from "./probe.mjs";
 import { actorRefusal, changesRequiringReason, currentSession, eventId, FIELD_ROLE_OVERRIDE, FIELD_TAKEOVER, isValidReason, normalizeReason, readHistory, reasonRefusal, recordEdit } from "./history.mjs";
 import { decisionsOf, withDecisions } from "./decisions.mjs";
 import { printJson } from "./json-envelope.mjs";
-import { acquireLock, isExpired, lockDir, readLock, releaseLock } from "./lock.mjs";
+import { acquireLock, isExpired, lockDir, peekLock, readLock, releaseLock } from "./lock.mjs";
 import { answerBacklogDirRefusal, backlogPaths, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { buildFieldSpecs, extractMeta, fieldSpec, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
@@ -146,6 +150,22 @@ export function inProgressStatus(config) {
   return config.inProgressStatus || null;
 }
 
+/** The refusal for a task another session holds the reservation of — one
+ *  sentence for the real take and for the dry run that projects it. */
+function lockedRefusal(id, holder, config) {
+  const h = holder || {};
+  return {
+    ok: false, kind: "locked", id, holder,
+    message: id + " is held by " + (h.actor || "another session"),
+    details: [
+      "since " + (h.ts || "?") + ", pid " + (h.pid || "?") + " on " + (h.host || "?"),
+      "tree: " + (h.tree || "?"),
+      "The lock expires after " + config.lockTtlMinutes + " minutes (`lock_ttl_minutes`).",
+      "Take it over deliberately with `--take-over --reason \"…\"` — or wait it out.",
+    ],
+  };
+}
+
 /**
  * Claim one task: validate, reserve, write, record.
  *
@@ -154,10 +174,13 @@ export function inProgressStatus(config) {
  * function that exited would make that impossible.
  *
  * @param {{root: string, config: object, id: string, actor: string, role?: string,
- *          reason?: string, source?: string, now?: number, env?: object}} opts
+ *          reason?: string, source?: string, now?: number, env?: object,
+ *          dryRun?: boolean}} opts
  *        `role` is the role the CALLER declares they are acting as. It never
  *        blocks the take — see FIELD_ROLE_OVERRIDE — it only decides whether the
  *        history gets an entry saying the take was outside the task's role.
+ *        `dryRun` answers whether the take would succeed and writes nothing:
+ *        the result carries `dryRun: true` and the task as it stands now.
  * @returns {{ok: boolean, kind?: string, message?: string, details?: string[],
  *            id?: string, file?: string, text?: string, before?: object,
  *            after?: object, lock?: object, warnings?: string[]}}
@@ -274,6 +297,24 @@ export function takeTask(opts) {
     };
   }
 
+  // THE DRY RUN STOPS HERE (TL-644), after every refusal that reads and before
+  // the first act that writes. Everything above is the same code a real take
+  // runs, so `next --dry-run` cannot name a task this function would refuse
+  // for a reason it could have known. The reservation is READ, by the
+  // predicates `acquireLock` itself applies, and nothing below is reached: no
+  // lock file, no frontmatter, no history record.
+  if (opts.dryRun) {
+    const peek = peekLock({
+      root, taskId: id, actor, ttlMinutes: config.lockTtlMinutes, now, env: opts.env,
+    });
+    if (!peek.ok) return lockedRefusal(id, peek.holder, config);
+    const reclaimedFrom = record.owner && record.owner !== actor && opts.reclaim ? record.owner : null;
+    return {
+      ok: true, dryRun: true, id, file, text: raw, before, after: before,
+      actor, wouldBecome: inProgress, reclaimed: reclaimedFrom, warnings,
+    };
+  }
+
   const reserve = () => acquireLock({
     root, taskId: id, actor, ttlMinutes: config.lockTtlMinutes, now, env: opts.env,
   });
@@ -295,19 +336,7 @@ export function takeTask(opts) {
     if (retaken.ok) seized = lock.holder;
     lock = retaken;
   }
-  if (!lock.ok) {
-    const h = lock.holder || {};
-    return {
-      ok: false, kind: "locked", id, holder: lock.holder,
-      message: id + " is held by " + (h.actor || "another session"),
-      details: [
-        "since " + (h.ts || "?") + ", pid " + (h.pid || "?") + " on " + (h.host || "?"),
-        "tree: " + (h.tree || "?"),
-        "The lock expires after " + config.lockTtlMinutes + " minutes (`lock_ttl_minutes`).",
-        "Take it over deliberately with `--take-over --reason \"…\"` — or wait it out.",
-      ],
-    };
-  }
+  if (!lock.ok) return lockedRefusal(id, lock.holder, config);
   if (seized) {
     warnings.push(
       "took over the reservation held by " + seized.actor + " since " + (seized.ts || "?") +
@@ -517,6 +546,17 @@ export function renderTake(result, root, opts = {}) {
   for (const w of result.warnings || []) out.push(paint.warn(MARK.warn) + " " + w);
   if (result.alreadyOwned) {
     out.push(paint.ok(MARK.ok) + " " + result.message);
+  } else if (result.dryRun) {
+    // Not the success mark: nothing succeeded, and a projection that looked
+    // like a claim is the confusion the dry run exists to remove (TL-644).
+    const [from, to] = result.reclaimed
+      ? [result.reclaimed, result.actor]
+      : [result.before.status, result.wouldBecome];
+    out.push(
+      paint.dim(MARK.bullet) + " " + paint.id(result.id) + " would be taken by " + result.actor +
+        " — " + from + " " + MARK.arrow + " " + to
+    );
+    out.push("  dry run: nothing was claimed, written or reserved");
   } else {
     // The transition worth printing is the one that HAPPENED. An ordinary take
     // moves the status; a takeover of an abandoned claim moves the owner and

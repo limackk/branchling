@@ -232,7 +232,7 @@ export function acquireLock(opts) {
     // The same session asking again is not a collision: `take` on a task you are
     // already holding has to be idempotent, otherwise a retried command refuses
     // on the strength of its own first run.
-    if (held && held.actor === opts.actor && held.pid === process.pid && held.tree === record.tree) {
+    if (sameSession(held, opts.actor, record.tree)) {
       return { ok: true, lock: held, path, alreadyMine: true };
     }
     if (!isExpired(held, ttl, now)) return { ok: false, holder: held, path };
@@ -247,6 +247,42 @@ export function acquireLock(opts) {
   }
 
   return { ok: false, holder: readLock(dir, opts.taskId), path };
+}
+
+/** Is this reservation the calling process's own? `acquireLock` treats it as
+ *  already held rather than as a collision; `peekLock` has to answer the same. */
+function sameSession(held, actor, tree) {
+  return Boolean(held) && held.actor === actor && held.pid === process.pid && held.tree === tree;
+}
+
+/**
+ * Would `acquireLock` with these options succeed? Reads, never writes (TL-644).
+ *
+ * WHY IT EXISTS. `next --dry-run` names the task `next` would hand out, and a
+ * candidate held by another session is one `next` steps over. Answering that
+ * by acquiring and releasing would be a write with a window in which a real
+ * `next` is refused, so the judgement is read instead — with `acquireLock`'s
+ * own predicates (`sameSession`, `isExpired`), so the projection cannot drift
+ * from the act it projects. A race is not closed by this: a session may take
+ * the task a moment later, and the projection says only what is true now.
+ *
+ * It creates nothing, not even the state directory: an absent directory holds
+ * no reservation.
+ *
+ * @param {{root: string, taskId: string, actor: string, ttlMinutes?: number,
+ *          now?: number, env?: object, scope?: object}} opts
+ * @returns {{ok: boolean, holder?: object, expired?: object}} `expired` is the
+ *          stale reservation a real acquisition would take over
+ */
+export function peekLock(opts) {
+  const ttl = opts.ttlMinutes === undefined ? DEFAULT_LOCK_TTL_MINUTES : opts.ttlMinutes;
+  const now = opts.now || Date.now();
+  const { dir } = lockDir(opts.root, opts);
+  const held = readLock(dir, opts.taskId);
+  if (!held) return { ok: true };
+  if (sameSession(held, opts.actor, resolve(opts.root))) return { ok: true };
+  if (!isExpired(held, ttl, now)) return { ok: false, holder: held };
+  return { ok: true, expired: held };
 }
 
 /**

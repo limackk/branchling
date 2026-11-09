@@ -573,6 +573,7 @@ question. The values \`<s>\` and \`<p>\` take are this backlog's own:
 TAKING IT. Do not edit the status by hand to claim it.
 
   {{tool}} next [--actor <ns:name>]        the closest executable task, claimed
+  {{tool}} next --dry-run                  which task that would be, claimed by nobody
   {{tool}} take <ID> [--actor <ns:name>]   one named task, claimed
 
 Both RESERVE the task before handing it over, so two sessions asking at the same
