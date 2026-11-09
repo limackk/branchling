@@ -43,11 +43,21 @@
  * The distinction from `run --max-attempts`, which parks a task after a
  * contract has failed repeatedly, is that nothing was attempted here.
  *
- * EXIT CODES. 0 took a task · 3 nothing to take · 1 a refusal about a task that
- * exists · 2 a usage error. "Nothing to take" must be distinguishable from "the
- * call was wrong", or a loop cannot tell an empty queue from its own typo.
+ * A DRY RUN (TL-644). `--dry-run` answers which task this call would hand out
+ * and writes nothing: no reservation, no task file, no history record, no view
+ * rebuild. It is not a second selection — the candidates come from the same
+ * `selectCandidates`, and each is put to the same `takeTask`, which in that
+ * mode stops after the last refusal that only reads. "What should I work on"
+ * used to have a claim as its side effect, and undoing one costs a `release`
+ * with a reason plus two restored files.
+ *
+ * EXIT CODES. 0 took a task (under `--dry-run`: would take one) · 3 nothing to
+ * take · 1 a refusal about a task that exists · 2 a usage error. "Nothing to
+ * take" must be distinguishable from "the call was wrong", or a loop cannot
+ * tell an empty queue from its own typo.
  *
  * Tests: `node --test scripts/tests/next.test.mjs`
+ *        `node --test scripts/tests/next-dry-run.test.mjs`
  */
 
 import { dirname } from "node:path";
@@ -73,7 +83,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export const NEXT_FLAGS = [
   "--dir", "--actor", "--reason", "--json", "--plan",
-  "--board", "--label", "--priority", "--epic", "--status", "--role", "--probe",
+  "--board", "--label", "--priority", "--epic", "--status", "--role", "--probe", "--dry-run",
 ];
 
 /** No candidate is not an error — see the header. */
@@ -83,13 +93,14 @@ export const EXIT_NOTHING_TO_TAKE = 3;
 export function parseNextArgs(args) {
   const plan = { dir: null, actor: null, reason: null, json: false, usePlan: false,
     board: null, label: null, priority: null, epic: null, status: null,
-    role: null, roleStrict: false, probe: false };
+    role: null, roleStrict: false, probe: false, dryRun: false };
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === "--json") { plan.json = true; continue; }
     if (a === "--plan") { plan.usePlan = true; continue; }
     if (a === "--role-strict") { plan.roleStrict = true; continue; }
     if (a === "--probe") { plan.probe = true; continue; }
+    if (a === "--dry-run") { plan.dryRun = true; continue; }
     if (NEXT_FLAGS.indexOf(a) >= 0) {
       const value = args[++i] || null;
       if (!value) throw new Error("`" + a + "` with no value");
@@ -112,6 +123,18 @@ export function parseNextArgs(args) {
       "`--role-strict` with no `--role`\n" +
         "It narrows `--role r` from `r or no role` to `exactly r`; on its own there is\n" +
         "nothing for it to narrow."
+    );
+  }
+  // `--probe` RUNS the task's contract, and a contract is arbitrary commands —
+  // a test suite writes caches, fixtures, reports. A dry run that promised to
+  // write nothing and then ran one would be the promise broken by the flag
+  // beside it (TL-644), so the pair is refused rather than half-honoured.
+  if (plan.dryRun && plan.probe) {
+    throw new Error(
+      "`--dry-run` with `--probe`\n" +
+        "`--probe` runs the task's verification commands, which may write anything;\n" +
+        "a dry run writes nothing. Ask `" + N + " next --dry-run`, then probe the task\n" +
+        "you are actually handed."
     );
   }
   if (plan.reason !== null) {
@@ -1005,6 +1028,22 @@ export function run(argv) {
   // stepping over — every other refusal would repeat itself on the next
   // candidate, so it ends the run and is reported.
   const passedOver = [];
+  // What was stepped over on the way to the task, said before it — the same
+  // lines for a real hand-out and for the dry run that projects one.
+  const skippedLinesForHuman = () => {
+    const out = [];
+    if (wave) {
+      out.push(color.dim(MARK.bullet + " plan wave " + (wave.index + 1) + ": " + (wave.name || "unnamed")));
+    }
+    for (const line of deadlockLines) out.push(color.dim(MARK.warn + " " + line));
+    for (const line of handedBackLines) out.push(color.dim(MARK.bullet + " " + line));
+    for (const line of recordLines) out.push(color.dim(MARK.bullet + " " + line));
+    for (const line of elsewhereLines) out.push(color.dim(MARK.bullet + " " + line));
+    for (const line of conflictLines) out.push(color.dim(MARK.bullet + " " + line));
+    for (const line of closedElsewhereLines) out.push(color.dim(MARK.bullet + " " + line));
+    for (const p of passedOver) out.push(color.dim(MARK.bullet + " " + p.id + " passed over: " + p.why));
+    return out;
+  };
   for (const candidate of candidates) {
     const reclaim = reclaimable.has(String(candidate.id).toUpperCase())
       ? { afterDays: config.abandonedAfterDays }
@@ -1026,10 +1065,35 @@ export function run(argv) {
     const actingAs = wantedRoles && candidateRole && wantedRoles.indexOf(candidateRole) >= 0
       ? candidateRole
       : null;
+    // THE DRY RUN GOES THROUGH THE SAME CALL (TL-644), so every refusal a real
+    // take would meet on the way to its first write — a held reservation, an
+    // owner in the file, a missing reason — is met here too, and a candidate it
+    // steps over is the one this steps over.
     const result = takeTask({
       root, config, id: candidate.id, actor, reason: plan.reason, role: actingAs,
       source: reclaim ? "reclaim" : "next", reclaim, unblocked: cleared, now,
+      dryRun: plan.dryRun,
     });
+    if (result.ok && plan.dryRun) {
+      const agentField = agentEstimate(readAgentTime(root, config), result.after && result.after.estimate);
+      if (plan.json) {
+        const handover = takeJson(result, root);
+        printJson("task-take", {
+          ...handover, task: handover.task ? { ...handover.task, agent_estimate: agentField } : handover.task,
+          taken: false, dryRun: true, lock: null,
+          actorSource, passedOver, considered: candidates.length,
+          skippedElsewhere, skippedExecutor, skippedHandedBack, skippedDeadlocked, skippedSize, skippedByRecord,
+          skippedConflict, closedElsewhere,
+          plan: planJson,
+          scan: { scanned: scan.scanned, reason: scan.reason },
+        });
+      } else {
+        for (const line of skippedLinesForHuman()) console.log(line);
+        if (agentField) console.log(color.dim(MARK.bullet + " agent_estimate: " + agentEstimateText(agentField) + " (computed, not stored)"));
+        console.log(renderTake(result, root));
+      }
+      return 0;
+    }
     if (result.ok) {
       // The contract's live state, when asked for (TL-268) — see `take`.
       if (plan.probe) result.probe = probeTask(root, result.file, config);
@@ -1044,7 +1108,7 @@ export function run(argv) {
         const handover = takeJson(result, root);
         printJson("task-take", {
           ...handover, task: handover.task ? { ...handover.task, agent_estimate: agentField } : handover.task,
-          actorSource,
+          actorSource, dryRun: false,
           passedOver, considered: candidates.length,
           skippedElsewhere, skippedExecutor, skippedHandedBack, skippedDeadlocked, skippedSize, skippedByRecord,
           skippedConflict, closedElsewhere,
@@ -1052,20 +1116,7 @@ export function run(argv) {
           scan: { scanned: scan.scanned, reason: scan.reason },
         });
       } else {
-        if (wave) {
-          console.log(color.dim(
-            MARK.bullet + " plan wave " + (wave.index + 1) + ": " + (wave.name || "unnamed")
-          ));
-        }
-        for (const line of deadlockLines) console.log(color.dim(MARK.warn + " " + line));
-        for (const line of handedBackLines) console.log(color.dim(MARK.bullet + " " + line));
-        for (const line of recordLines) console.log(color.dim(MARK.bullet + " " + line));
-        for (const line of elsewhereLines) console.log(color.dim(MARK.bullet + " " + line));
-        for (const line of conflictLines) console.log(color.dim(MARK.bullet + " " + line));
-        for (const line of closedElsewhereLines) console.log(color.dim(MARK.bullet + " " + line));
-        for (const p of passedOver) {
-          console.log(color.dim(MARK.bullet + " " + p.id + " passed over: " + p.why));
-        }
+        for (const line of skippedLinesForHuman()) console.log(line);
         if (agentField) console.log(color.dim(MARK.bullet + " agent_estimate: " + agentEstimateText(agentField) + " (computed, not stored)"));
         console.log(renderTake(result, root));
       }
@@ -1076,7 +1127,7 @@ export function run(argv) {
       continue;
     }
     if (plan.json) {
-      printJson("task-take", { ...refusalPayload(result), considered: candidates.length, passedOver, actorSource });
+      printJson("task-take", { ...refusalPayload(result), considered: candidates.length, passedOver, actorSource, dryRun: plan.dryRun });
     } else {
       console.error(failure(N + " next", result.message, result.details || []));
     }
@@ -1186,7 +1237,7 @@ export function run(argv) {
     // `skipped*` lists are the only place that distinction lives.
     printJson("task-take", {
       ok: false, taken: false, refusalKind: "nothing-to-take", refusal: "nothing to take",
-      details, actorSource,
+      details, actorSource, dryRun: plan.dryRun,
       searchedStatuses: searched, skippedBlocked, passedOver, skippedElsewhere, skippedExecutor,
       closedElsewhere,
       skippedHandedBack, skippedDeadlocked, skippedSize, skippedByRecord, skippedConflict, plan: planJson,

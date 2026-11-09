@@ -298,6 +298,24 @@ test("next --json hands the field over ON the task, not beside it", () => {
   assert.equal("agentTime" in d, false, "the TL-480 top-level key is gone");
 });
 
+test("next --dry-run carries the same field as the hand-out it projects (TL-644)", () => {
+  const dir = withOpenTask(3, [5, 7, 9]);
+  const r = cli(dir, ["next", "--actor", "agent:test", "--json", "--dry-run"]);
+  assert.equal(r.status, 0, r.stderr);
+  const d = JSON.parse(r.stdout);
+  assert.equal(d.dryRun, true);
+  assert.equal(d.id, "TASK-100");
+  assert.equal(d.task.agent_estimate.median, 7);
+  const human = cli(dir, ["next", "--actor", "agent:test", "--dry-run"]);
+  assert.equal(human.status, 0, human.stderr);
+  assert.match(human.stdout, /agent_estimate: 6m–8m, median 7m \(n=3\) — insufficient \(computed, not stored\)/);
+
+  const thin = withOpenTask(5, [5, 7, 9]);
+  const none = cli(thin, ["next", "--actor", "agent:test", "--dry-run"]);
+  assert.equal(none.status, 0, none.stderr);
+  assert.doesNotMatch(none.stdout, /agent_estimate/, "a thin bucket printed a figure");
+});
+
 test("the built viewer embeds the field for a task whose bucket qualifies", () => {
   const dir = withOpenTask(3, [5, 7, 9]);
   const r = cli(dir, ["viewer"]);

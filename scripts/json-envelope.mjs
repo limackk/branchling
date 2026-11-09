@@ -357,6 +357,12 @@ export const KINDS = {
     // were left alone because the plan does not schedule them. `null` when the
     // flag was not given — a wave number of 0 would say a plan was consulted.
     plan: null,
+    // `next --dry-run` (TL-644): true when the answer is a projection and
+    // nothing was claimed — `taken` is false, `lock` null, and `task` is the
+    // task as it stands. False on a real `next`, so a consumer reading
+    // `taken: false` can tell "would hand out this one" from a refusal without
+    // the exit code; null on `take`, which has no dry run to ask about.
+    dryRun: null,
   },
   // Every writing kind below carries `actorSource` (TL-544): which rung of the
   // actor chain named the actor — `flag`, `env`, `config` or `default` — and
