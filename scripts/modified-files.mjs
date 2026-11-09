@@ -33,6 +33,23 @@
  * counts as its two endpoints, because nothing says what was meant between
  * them. Merge commits are excluded separately, in `gitLogArgs()`.
  *
+ * A RANGE WIDER THAN `MAX_RANGE_SPAN` COUNTS AS ITS TWO ENDPOINTS (TL-627),
+ * for the reason a reversed one does: nothing credible says what was meant
+ * between them. One typo — `PROJ-6..PROJ-60000` — would otherwise create sixty
+ * thousand entries, each holding the commit's files, and `query
+ * --modified-file` and the capability record `done` writes would hand those
+ * files to tasks that never existed or never touched them. The bound is the
+ * width `hi - lo`. The widest head range this repository's own history held
+ * when it was set was 24, in the title `TL-626..TL-650 Every open agent task …`  (renumber: allow)
+ * (one wave of the plan filed in a single commit); 100 leaves four times that
+ * as headroom, and a commit that genuinely concerns more than a hundred
+ * consecutive tasks is a bulk edit whose files say little about any one of
+ * them. It is a constant here and not a key in `config.yaml` because it is
+ * part of the parsing rule, not the project's vocabulary. Rejected: skipping
+ * the commit, which would also drop the two ids the author certainly typed;
+ * and failing the command, which would let one historical typo — immutable
+ * once pushed — break `query` and `done` for good.
+ *
  * Rejected: every id anywhere in the message, which is what this module did
  * until TL-614. A body that says "filed as TL-595" or a title that says "the
  * TL-593 review findings are tasks" MENTIONS a task; it does not do its work.
@@ -64,6 +81,9 @@ import { gitDiscoveryEnv } from "./git-env.mjs";
  * themselves are invisible in an editor, which is how a delimiter goes missing
  * during an edit nobody can see.
  */
+/** The widest range `titleIds()` expands; the module header says why 100. */
+export const MAX_RANGE_SPAN = 100;
+
 const RS = String.fromCharCode(30);
 const US = String.fromCharCode(31);
 
@@ -145,7 +165,7 @@ export function titleIds(message, scanner) {
       const lo = Number(first[2]);
       const hi = Number(last[2]);
       const stem = first[1].slice(0, first[1].length - first[2].length);
-      for (let n = lo + 1; n < hi; n++) ids.add(stem + n);
+      if (hi - lo <= MAX_RANGE_SPAN) for (let n = lo + 1; n < hi; n++) ids.add(stem + n);
     }
     separator.lastIndex = pos;
     if (!separator.exec(title)) break;
