@@ -95,7 +95,7 @@ import { loadPlanForDispatch, planState, projectionWall } from "./plan.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { inProgressStatus, rebuildViews } from "./take-task.mjs";
 import { todayStamp } from "./today.mjs";
-import { actorRefusal, buildFieldSpecs, extractMeta, fieldSpec, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
+import { statedActorRefusal, buildFieldSpecs, extractMeta, fieldSpec, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
 import { readTaskRecords, splitList, unknownFilterValues } from "./task-select.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { MARK, color, failure, ok, plainChildEnv, warn } from "./ui.mjs";
@@ -1741,7 +1741,7 @@ export async function run(argv) {
     : fromProfile
       ? { actor: profileActors.length === 1 ? profileActors[0] : "agent:fleet", actorSource: "profile" }
       : resolveActorReport(plan.actor);
-  const badActor = actorRefusal(actor);
+  const badActor = statedActorRefusal(actor);
   if (badActor) {
     console.error(failure(N + " run", badActor.refusal, [
       badActor.hint,

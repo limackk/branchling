@@ -69,7 +69,7 @@ import { fileURLToPath } from "node:url";
 import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { PROJECT_ENTRY_TAG, closingContractOf, collisionHeadline, contractProblem, findTaskFile, repoRootFor, runContract, transcriptBlock } from "./done-task.mjs";
-import { actorRefusal, isValidActor, readHistory } from "./history.mjs";
+import { statedActorRefusal, isValidActor, readHistory } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { backlogPaths, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
@@ -583,7 +583,7 @@ export async function run(argv) {
   }
 
   const actor = resolveActor(plan.actor);
-  const badActor = actorRefusal(actor);
+  const badActor = statedActorRefusal(actor);
   if (badActor) {
     console.error(failure(N + " resume", badActor.refusal, [badActor.hint]));
     return 2;

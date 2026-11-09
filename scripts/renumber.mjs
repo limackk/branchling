@@ -52,7 +52,7 @@ import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadConfigOrExit } from "./config.mjs";
-import { actorRefusal, MIGRATIONS_FILE, appendRenumberMigration, applyIdMigrations, loadSnapshot, saveSnapshot } from "./history.mjs";
+import { statedActorRefusal, MIGRATIONS_FILE, appendRenumberMigration, applyIdMigrations, loadSnapshot, saveSnapshot } from "./history.mjs";
 import { withHistoryLogMutex } from "./history-log-mutex.mjs";
 import { BACKLOG_DIR_REFUSAL_HELP, backlogPaths, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { withSnapshotMutex } from "./snapshot-mutex.mjs";
@@ -452,7 +452,7 @@ export function main(argv) {
     console.error(`${ERRM} ${N} renumber: --start takes a whole number ≥ 0`);
     return 2;
   }
-  const badActor = actor ? actorRefusal(actor) : null;
+  const badActor = actor ? statedActorRefusal(actor) : null;
   if (badActor) {
     console.error(`${ERRM} ${N} renumber: ${badActor.refusal}\n  ${badActor.hint}`);
     return 2;

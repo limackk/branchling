@@ -1,0 +1,2 @@
+{"id":"01M70DR0GBKF3N4P1WTZ5NKAD3","ts":"2026-11-09T15:10:06.347Z","task":"TL-671","field":"__created__","from":"","to":"resume never offers the reserved actor unknown as a remedy","actor":"agent:loop-3","source":"new","reason":"unknown"}
+{"id":"01M70DR5EN9E38GBFD5VAEF7V2","ts":"2026-11-09T15:10:11.413Z","task":"TL-671","field":"blocked_by","from":[],"to":["TL-628"],"actor":"agent:loop-3","source":"set","reason":"the remedy becomes unusable only once TL-628 refuses a stated unknown"}

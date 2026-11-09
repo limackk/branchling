@@ -58,7 +58,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 
 import { resolveActorReport } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { actorRefusal, appendEntries, currentSession, eventId, FIELD_COMMENT, questionBlockReason, reasonRefusal, recordEdit } from "./history.mjs";
+import { statedActorRefusal, appendEntries, currentSession, eventId, FIELD_COMMENT, questionBlockReason, reasonRefusal, recordEdit } from "./history.mjs";
 import { releaseLock } from "./lock.mjs";
 import { answerBacklogDirRefusal, backlogPaths, isBacklogDirRefusal, resolveBacklogDir } from "./paths.mjs";
 import { printJson } from "./json-envelope.mjs";
@@ -396,7 +396,7 @@ export function run(argv) {
   // an agent far more often than a person, and the default actor is honest for
   // it. The answer is the person's act, and `decide` accepts the flag.
   const { actor, actorSource } = resolveActorReport(plan.actor);
-  const badActor = actorRefusal(actor);
+  const badActor = statedActorRefusal(actor);
   if (badActor) {
     console.error(failure(N + " ask", badActor.refusal, [
       badActor.hint,

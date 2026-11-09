@@ -51,7 +51,7 @@ import { actorRequiredRefusal, resolveActorReport } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { probeTask } from "./done-task.mjs";
 import { withProbe } from "./probe.mjs";
-import { actorRefusal, changesRequiringReason, currentSession, eventId, FIELD_ROLE_OVERRIDE, FIELD_TAKEOVER, isValidReason, normalizeReason, readHistory, reasonRefusal, recordEdit } from "./history.mjs";
+import { statedActorRefusal, changesRequiringReason, currentSession, eventId, FIELD_ROLE_OVERRIDE, FIELD_TAKEOVER, isValidReason, normalizeReason, readHistory, reasonRefusal, recordEdit } from "./history.mjs";
 import { decisionsOf, withDecisions } from "./decisions.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { acquireLock, isExpired, lockDir, peekLock, readLock, releaseLock } from "./lock.mjs";
@@ -681,7 +681,7 @@ export function run(argv) {
     else console.error(failure(N + " take", required.refusal, required.details));
     return 1;
   }
-  const badActor = actorRefusal(actor);
+  const badActor = statedActorRefusal(actor);
   if (badActor) {
     return fail2(badActor.refusal, [badActor.hint].concat(badActor.namespace ? [
       "The namespace says how much the attribution is worth — local: declared,",

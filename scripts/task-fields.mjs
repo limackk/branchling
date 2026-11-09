@@ -188,6 +188,37 @@ export function actorRefusal(actor) {
     hint };
 }
 
+// ── The reserved actor, stated for the tool's own act (TL-569, TL-628) ────
+//
+// WHY A SECOND FUNCTION AND NOT A NARROWER `isValidActor()`. `unknown` is the
+// value the tool records for a change it OBSERVED — `reconcile()` writes it,
+// history readers read it, and `isUnattributed()` queues a row carrying it for
+// somebody to claim. Narrowing the shared predicate would break all three. A
+// command that records its OWN act is a different case: the tool knows the act
+// happened because it is performing it, so `unknown` there files a deliberate
+// claim, close or handover as a change nobody witnessed. That is a property of
+// the caller, so the caller chooses this function instead of `actorRefusal()`.
+export const ACTOR_CAUSE_RESERVED = "reserved";
+
+/**
+ * Why `actor` may not be the author of an act this command performs, or null
+ * when it may: everything `actorRefusal()` refuses, and the reserved `unknown`.
+ *
+ * The forms are in the refusal itself, not only in the hint, because the served
+ * routes answer with the refusal sentence alone.
+ *
+ * @returns {null | {cause: string, namespace: boolean, refusal: string, hint: string}}
+ */
+export function statedActorRefusal(actor) {
+  if (actor !== ACTOR_UNKNOWN) return actorRefusal(actor);
+  const forms = ACTOR_NAMESPACES.map(function (n) { return n + ":<name>"; });
+  return { cause: ACTOR_CAUSE_RESERVED, namespace: true,
+    refusal: "the actor `" + ACTOR_UNKNOWN + "` is reserved for a change the tool observed, " +
+      "not one it makes; state who makes this change as " +
+      forms.slice(0, -1).join(", ") + " or " + forms[forms.length - 1],
+    hint: "Use one of: " + forms.join(" | ") };
+}
+
 // ── The reason for a change (TL-105) ─────────────────────────────────────
 //
 // WHY A FIELD AND NOT PROSE IN THE TASK FILE. The record says WHAT changed —

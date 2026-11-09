@@ -49,7 +49,7 @@ import { fileURLToPath } from "node:url";
 
 import { resolveActorReport } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
-import { actorRefusal, reasonRefusal, recordCreation, reconcile } from "./history.mjs";
+import { statedActorRefusal, reasonRefusal, recordCreation, reconcile } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { createTask, driftMessage, slugify } from "./new-task.mjs";
 import {
@@ -155,7 +155,7 @@ export function parseSeedArgs(args) {
       "unexpected argument: " + a + "\nthe plan comes in on stdin: `" + N + " seed --dir <path> < plan.json`"
     );
   }
-  const badActor = actor ? actorRefusal(actor) : null;
+  const badActor = actor ? statedActorRefusal(actor) : null;
   if (badActor) {
     throw new Error(
       badActor.refusal + "\n" + badActor.hint +
