@@ -138,12 +138,15 @@ It also carries `nearDuplicates` (TL-649): the open tasks whose title the new
 one nearly repeats, each with `id`, `title` and `similarity`, most similar
 first. It is a note, not a refusal — the task is created either way.
 Every refusal answers `task-new` too (TL-568), with `ok: false`, a
-`refusalKind` to branch on — `usage`, `invalid-document`, `invalid-config`,
-`prefix-mismatch`, `template-drift`, `plan-refused`, `id-taken`, or the shared
-`no-backlog` (TL-548) — the sentence in `refusal` and the findings in
-`details`, on stdout; stderr stays empty and the exit code is unchanged. A
-`plan-refused` after the write is the one refusal that carries `id` and
-`file`: the task exists, and the plan did not take it.
+`refusalKind` to branch on — `usage`, `unknown-value`, `invalid-document`,
+`invalid-config`, `prefix-mismatch`, `template-drift`, `plan-refused`,
+`id-taken`, or the shared `no-backlog` (TL-548) — the sentence in `refusal`
+and the findings in `details`, on stdout; stderr stays empty and the exit code
+is the one the text form has. A `plan-refused` after the write is the one
+refusal that carries `id` and `file`: the task exists, and the plan did not
+take it. A value outside a vocabulary was `usage` with exit 2 until TL-630; it
+is now `unknown-value` with exit 1, as `set`, `query`, `next` and `handoff`
+refuse it — see the table under "When a reading command refuses".
 
 **Moved into the envelope by TL-567.** `hooks print|install|uninstall --json`
 and `skills install --json` used to print a bare object with no
@@ -304,6 +307,7 @@ contradict each other), and then stdout is empty.
 | `handoff` (a write) | `unknown-value` — `--to-owner` names an owner outside a declared `owners:`, or `--status` a status outside `statuses:`; an archived `--status` stays exit `2` | `rejected` (`{ field, value }`, the field `owner` or `status`), `declared` (what that field accepts) | 1 |
 | `next` (a write) | `unknown-value` — a `--status`, `--priority`, `--board`, `--role` (or any other filter with a declared vocabulary) value outside it; nothing is claimed, and an unknown flag or a missing value stays exit `2` | `rejected` (`{ field, value }`, the first one refused), `declared` (what that field accepts; `[]` for `--role` when no roles are declared), `details` | 1 |
 | `run` (a write) | `unknown-value` — a `--priority` or `--board` value outside the backlog's vocabulary (or a `--label` outside a closed `labels:`), refused before anything is claimed; an unknown flag or a missing value stays exit `2` | `rejected` (`{ field, value }`, the first one refused), `declared` (what that field accepts), `details` (one sentence per refused value) | 1 |
+| `new` (a write) | `unknown-value` — a `--priority`, `--status`, `--type`, `--owner`, `--board`, `--release` or `--target` value outside its vocabulary; nothing is written. A `--target` naming a target of this repository, an unknown flag or a missing value stays `usage`, exit `2` | `rejected` (`{ field, value }`), `declared` (what that field accepts; `[]` when nothing is — `releases:` or the targets in another repository left undeclared), `details` | 1 |
 | `deploy status` | `unknown-name` — `--release`, `--target` or `--env` names nothing declared | `rejected` (`{ flag, value }`), `declared` (what that flag accepts; `[]` when nothing is) | 1 |
 
 A successful `deploy status --json`, `plan --json` or `query --json` carries `ok: true`.

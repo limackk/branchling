@@ -257,19 +257,25 @@ export const KINDS = {
   // a scan of every branch and worktree, or `local`, this directory alone, the
   // known risk the text output says out loud. `wave` is null unless `--wave`
   // scheduled the task. EVERY refusal answers in this kind with `ok: false`
-  // (TL-568): `refusalKind` is `usage`, `invalid-document`, `invalid-config`,
-  // `prefix-mismatch`, `template-drift`, `plan-refused`, `id-taken` or the
-  // shared `no-backlog` (TL-548), `refusal` the sentence and `details` the
-  // findings and remedies. Only `plan-refused` after the write carries `id`
-  // and `file`: the task exists, and the plan did not take it.
+  // (TL-568): `refusalKind` is `usage`, `unknown-value`, `invalid-document`,
+  // `invalid-config`, `prefix-mismatch`, `template-drift`, `plan-refused`,
+  // `id-taken` or the shared `no-backlog` (TL-548), `refusal` the sentence and
+  // `details` the findings and remedies. Only `plan-refused` after the write
+  // carries `id` and `file`: the task exists, and the plan did not take it.
   // `nearDuplicates` (TL-649) names the open tasks whose title the new one
   // nearly repeats, each `{ id, title, similarity }`, most similar first. It
   // is a note and never a refusal: the task is created either way, and the
   // list is empty when nothing is close or a refusal came before the write.
+  // A `--priority`, `--status`, `--type`, `--owner`, `--board`, `--release` or
+  // `--target` value outside its vocabulary (TL-630) is `refusalKind:
+  // "unknown-value"` with `rejected` `{ field, value }` and `declared`, what
+  // that field accepts — `[]` when nothing is — the shape `set`, `query`,
+  // `next` and `handoff` refuse with, and exit 1 as theirs. A target of THIS
+  // repository stays `usage`: its name is declared, so nothing is unknown.
   "task-new": {
     ok: null, id: null, file: null, board: null, wave: null, idSource: null, actorSource: null,
     nearDuplicates: [],
-    refusalKind: null, refusal: null, details: [],
+    refusalKind: null, refusal: null, details: [], rejected: null, declared: [],
   },
   // `plan --json`. `exists` is false for a backlog with no `plan.yaml`, and then
   // every other key carries its empty value — the execution order is optional,

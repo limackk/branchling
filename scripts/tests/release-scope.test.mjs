@@ -242,7 +242,7 @@ test("new writes a declared release and refuses any other, even into a template 
   assert.match(readFileSync(taskFile(dir, id), "utf8"), /^release: r2$/m);
 
   const bad = run(dir, ["new", "--dir", "backlog", "--title", "Typo", "--release", "r9"]);
-  assert.equal(bad.status, 2);
+  assert.equal(bad.status, 1, "an unknown value is a refusal, exit 1 (TL-630)");
   assert.match(bad.stderr, /`r9` is not a release this project plans/);
   assert.match(bad.stderr, /allowed: r1 \| r2/);
 
@@ -255,7 +255,7 @@ test("new writes a declared release and refuses any other, even into a template 
 
   const none = backlogRepo();
   const refused = run(none, ["new", "--dir", "backlog", "--title", "Nowhere", "--release", "r1"]);
-  assert.equal(refused.status, 2);
+  assert.equal(refused.status, 1);
   assert.match(refused.stderr, /plans no releases/);
 });
 

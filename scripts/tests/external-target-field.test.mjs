@@ -183,14 +183,15 @@ test("new --target writes the list; a local, an undeclared and an absent target 
   assert.match(local.stderr, /`api` is a target of this repository, and a task cannot name it in `target:`/);
   assert.match(local.stderr, /computed from the paths their commits touch/);
   const typo = run(dir, ["new", "--dir", "backlog", "--title", "Typo", "--target", "frotnend"]);
-  assert.equal(typo.status, 2);
+  // A local target stays a usage error (2); an undeclared one is a refusal (1, TL-630).
+  assert.equal(typo.status, 1);
   assert.match(typo.stderr, /`frotnend` is not a declared target in another repository/);
   assert.match(typo.stderr, /allowed: frontend \| desktop/);
   assert.equal(readdirSync(join(dir, "backlog", "tasks")).length, before, "a refused --target writes nothing");
 
   const bare = backlog(LOCAL_ONLY);
   const none = run(bare, ["new", "--dir", "backlog", "--title", "Nothing to name", "--target", "frontend"]);
-  assert.equal(none.status, 2);
+  assert.equal(none.status, 1);
   assert.match(none.stderr, /no target in `deploy_targets` declares `repository:`/);
 });
 

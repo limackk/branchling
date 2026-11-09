@@ -16,6 +16,12 @@
  * no longer succeed, and one that only reads `--json` would pass on a command
  * whose text form had moved into stdout.
  *
+ * A value outside a vocabulary (TL-630) is `unknown-value` with exit 1 and
+ * names `rejected` `{ field, value }` and `declared`, the shape `set`, `query`,
+ * `next` and `handoff` refuse with. `declared` is held to what `new --help
+ * --json` advertises for the same flag in the same fixture, so the refusal and
+ * the help cannot name two different vocabularies.
+ *
  * Every fixture is a throwaway backlog; no value of this repository's own
  * configuration is asserted. Values a refusal needs are ones no project
  * declares (`no-such-priority`, `no-such-wave`).
@@ -105,7 +111,7 @@ test("control: a created task answers ok:true with every declared key, and no re
 test("control: without --json a refusal is still text on stderr and stdout stays empty", () => {
   const dir = repo();
   const r = run(dir, ["new", "--dir", "backlog", "--title", "Refused", "--priority", "no-such-priority"]);
-  assert.equal(r.status, 2);
+  assert.equal(r.status, 1, "an unknown value exits 1 in both shapes (TL-630)");
   assert.equal(r.stdout, "");
   assert.match(r.stderr, /`no-such-priority` is not an allowed value for the field `priority`/);
   assert.throws(() => JSON.parse(r.stderr), "the text form became JSON");
@@ -132,20 +138,121 @@ test("a refusal of the invocation is a usage envelope, before and after the acto
 test("`--json` past the separator is a title, not a request for an envelope", () => {
   const dir = repo();
   const r = run(dir, ["new", "--dir", "backlog", "--priority", "no-such-priority", "--actor", "agent:test", "--title", "--", "--json"]);
-  assert.equal(r.status, 2);
+  assert.equal(r.status, 1);
   assert.equal(r.stdout, "", "a literal title was read as the flag");
   assert.match(r.stderr, /no-such-priority/);
 });
 
-test("a value outside a vocabulary is a usage envelope naming what is allowed", () => {
+/** Releases and targets declared, so each vocabulary has values to name. */
+const DECLARED_VOCABULARY = `
+releases: [r1, r2]
+deploy_targets:
+  - name: api
+    paths: [src/]
+    stages:
+      - { name: production, ref: prod }
+  - name: frontend
+    repository: acme-frontend
+  - name: desktop
+    repository: acme-desktop
+`;
+
+/** A second board, so a list of boards has a separator to name. */
+const SECOND_BOARD = `
+  - slug: side
+    name: "Side"
+    description: >-
+      A second board for the fixture.
+`;
+
+/** The fixture with both appended: every vocabulary declares two values or more. */
+function declaredRepo() {
   const dir = repo();
-  const priority = refusedAs(dir, ["--title", "x", "--priority", "no-such-priority", "--actor", "agent:test"],
-    { refusalKind: "usage", exit: 2 });
-  assert.match(priority.refusal, /no-such-priority/);
-  assert.ok(priority.details.some((d) => d.startsWith("allowed: ")), JSON.stringify(priority.details));
-  refusedAs(dir, ["--title", "x", "--board", "no-such-board", "--actor", "agent:test"], { refusalKind: "usage", exit: 2 });
-  refusedAs(dir, ["--title", "x", "--release", "no-such-release", "--actor", "agent:test"], { refusalKind: "usage", exit: 2 });
-  refusedAs(dir, ["--title", "x", "--target", "no-such-target", "--actor", "agent:test"], { refusalKind: "usage", exit: 2 });
+  appendFileSync(join(dir, "backlog", "config.yaml"), DECLARED_VOCABULARY, "utf8");
+  appendFileSync(join(dir, "backlog", "boards.yaml"), SECOND_BOARD, "utf8");
+  return dir;
+}
+
+/** What `new --help --json` advertises for `flag` in this fixture. */
+function advertised(dir, flag) {
+  const r = run(dir, ["new", "--dir", "backlog", "--help", "--json"]);
+  assert.equal(r.status, 0, r.stderr);
+  const entry = JSON.parse(r.stdout).flags.find((f) => f.flag === flag);
+  assert.ok(entry, flag + " is not in new --help --json");
+  return entry.values || [];
+}
+
+test("a value outside a vocabulary is unknown-value, exit 1, naming the field, the value and what it accepts", () => {
+  const dir = declaredRepo();
+  const rows = [
+    ["--priority", "priority"], ["--status", "status"], ["--type", "type"], ["--owner", "owner"],
+    ["--board", "board"], ["--release", "release"], ["--target", "target"],
+  ];
+  for (const [flag, field] of rows) {
+    const value = "no-such-" + field;
+    const declared = advertised(dir, flag);
+    // A positive control per row: an empty vocabulary would make `declared: []`
+    // pass for a refusal that never read the vocabulary at all.
+    assert.ok(declared.length > 0, flag + ": the fixture declares nothing to compare against");
+    const doc = refusedAs(dir, ["--title", "x", flag, value, "--actor", "agent:test"],
+      { refusalKind: "unknown-value", exit: 1 });
+    assert.deepEqual(doc.rejected, { field, value }, flag);
+    assert.deepEqual(doc.declared, declared, flag + ": `declared` is not what the help advertises");
+    assert.match(doc.refusal, new RegExp(value), flag);
+    // The person reading `details` gets the same list, in the text form's words.
+    assert.ok(doc.details.some((d) => d.endsWith(": " + declared.join(" | "))),
+      flag + ": the accepted values are not in details: " + JSON.stringify(doc.details));
+  }
+
+  // The board's sentence names the slug the way the text form always has.
+  const board = refusedAs(dir, ["--title", "x", "--board", "no-such-board", "--actor", "agent:test"],
+    { refusalKind: "unknown-value", exit: 1 });
+  assert.equal(board.refusal, "the board `no-such-board` does not exist in the registry");
+
+  // A list names the first value outside it, not the whole list.
+  const listed = refusedAs(dir, ["--title", "x", "--target", "frontend,no-such-target", "--actor", "agent:test"],
+    { refusalKind: "unknown-value", exit: 1 });
+  assert.deepEqual(listed.rejected, { field: "target", value: "no-such-target" });
+
+  // A declared value is accepted: the refusal is about the value, not the flag.
+  const r = run(dir, ["new", "--dir", "backlog", "--title", "Accepted", "--release", "r1", "--target", "frontend",
+    "--actor", "agent:test", "--json"]);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const created = JSON.parse(r.stdout);
+  assert.equal(created.ok, true);
+  assert.equal(created.rejected, null);
+  assert.deepEqual(created.declared, []);
+});
+
+test("an undeclared vocabulary still refuses as unknown-value, with nothing declared", () => {
+  const dir = repo();
+  const release = refusedAs(dir, ["--title", "x", "--release", "r1", "--actor", "agent:test"],
+    { refusalKind: "unknown-value", exit: 1 });
+  assert.deepEqual(release.rejected, { field: "release", value: "r1" });
+  assert.deepEqual(release.declared, []);
+  assert.ok(release.details.some((d) => /plans no releases/.test(d)), JSON.stringify(release.details));
+  const target = refusedAs(dir, ["--title", "x", "--target", "frontend", "--actor", "agent:test"],
+    { refusalKind: "unknown-value", exit: 1 });
+  assert.deepEqual(target.declared, []);
+});
+
+test("a target of this repository is a usage refusal: its name is declared, so nothing is unknown", () => {
+  const dir = declaredRepo();
+  const doc = refusedAs(dir, ["--title", "x", "--target", "api", "--actor", "agent:test"], { refusalKind: "usage", exit: 2 });
+  assert.match(doc.refusal, /target of this repository/);
+  // It names the targets a task CAN carry, since the one given cannot be.
+  assert.ok(doc.details.some((d) => d.includes("computed from the paths their commits touch") && d.endsWith(" (frontend | desktop)")),
+    JSON.stringify(doc.details));
+
+  // With no target in another repository there is nothing to offer, and no list.
+  const bare = repo();
+  appendFileSync(join(bare, "backlog", "config.yaml"),
+    "\ndeploy_targets:\n  - name: api\n    paths: [src/]\n    stages:\n      - { name: production, ref: prod }\n", "utf8");
+  const alone = refusedAs(bare, ["--title", "x", "--target", "api", "--actor", "agent:test"], { refusalKind: "usage", exit: 2 });
+  assert.ok(alone.details.some((d) => d.endsWith("takes only a target that declares `repository:`")),
+    JSON.stringify(alone.details));
+  assert.equal(doc.rejected, null);
+  assert.deepEqual(doc.declared, []);
 });
 
 test("a refused task document, from stdin or --body-file, is invalid-document", () => {
