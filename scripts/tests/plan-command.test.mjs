@@ -172,7 +172,7 @@ test("stale = a plan task already closed in a wave AFTER the active one", () => 
 test("a plan naming a task that is not in the tree marks it, rather than dropping it", () => {
   const s = state(THREE_WAVES, [t("TL-1", "done"), t("TL-2"), t("TL-3")]);
   const missing = s.waves[2].tasks[0];
-  assert.deepEqual(missing, { id: "TL-4", title: null, status: null, blocked_by: [], known: false, open: false, executor: "" });
+  assert.deepEqual(missing, { id: "TL-4", title: null, status: null, blocked_by: [], known: false, open: false, executor: "", hold: null });
 });
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -285,7 +285,9 @@ test("POSITIVE CONTROL: a real plan reports a wave, a next-up group and the unpl
       const r = run(["--dir", dir]);
       assert.equal(r.code, 0, r.out + r.err);
       assert.match(r.out, /next up \(wave 2 — Consumers\)/);
-      assert.match(r.out, /together: TL-2, TL-3/);
+      // TL-2 is claimed, so `next` hands it out to nobody and it is not next up
+      // (TL-645); the group is still one act, so it is named beside TL-3.
+      assert.match(r.out, /together: TL-3 {2}— with TL-2, which `next` hands out to nobody now/);
       assert.match(r.out, /TL-2\s+in_progress\s+wave 2/);
       assert.match(r.out, /unplanned open tasks: 1 of 3 \(33%\)/);
       assert.match(r.out, /TL-9/);
@@ -294,7 +296,8 @@ test("POSITIVE CONTROL: a real plan reports a wave, a next-up group and the unpl
       assert.equal(answer.exists, true);
       assert.equal(answer.activeWave, 1);
       assert.deepEqual(answer.nextUp,
-        [{ together: true, ids: ["TL-2", "TL-3"], executors: [], waitsOnHuman: false }]);
+        [{ together: true, ids: ["TL-3"], executors: [], waitsOnHuman: false }]);
+      assert.equal(answer.waves[1].tasks.find((e) => e.id === "TL-2").hold.startable, false);
       assert.deepEqual(answer.unplanned, [{ id: "TL-9", status: "pending" }]);
       assert.deepEqual(answer.coverage, { open: 3, planned: 2, unplanned: 1, share: 33 });
       assert.deepEqual(answer.inProgress, [{ id: "TL-2", wave: 1, status: "in_progress" }]);
