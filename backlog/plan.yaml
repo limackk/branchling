@@ -99,11 +99,12 @@ waves:
   - name: "The follow-ups the loops filed close"
     tasks: [TL-634, TL-626, TL-640, TL-627, TL-628, TL-629, TL-630, TL-631, TL-632, TL-633, TL-635, TL-636, TL-637, TL-638, TL-639, TL-641, TL-642]
 
-  # THE FOLLOW-UPS FILED while closing waves 7 and 8, nine of them, none
-  # needing a person. The four that run or change mutation-run.mjs share the
-  # mutation group with TL-646; TL-652 keeps the viewer group.
+  # THE FOLLOW-UPS FILED while closing waves 7 and 8, eleven of them, none
+  # needing a person. The five that run or change mutation-run.mjs (TL-661
+  # among them) share the mutation group with TL-646; TL-652 keeps the
+  # viewer group. TL-662 asserts the output TL-649 added to `new`.
   - name: "The follow-ups filed in waves 7 and 8 close"
-    tasks: [TL-651, TL-655, TL-656, TL-659, TL-652, TL-653, TL-654, TL-657, TL-658]
+    tasks: [TL-651, TL-655, TL-656, TL-659, TL-661, TL-652, TL-653, TL-654, TL-657, TL-658, TL-662]
 
   # The viewer touches build-viewer.mjs and serve-backlog.mjs only, so it can
   # run beside the two waves above rather than after them. Both halves exist
