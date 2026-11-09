@@ -498,7 +498,7 @@ test("an empty view with targets declared explains its reason and does not ask t
   // The stubbed reason the empty state can be handed: a hint of its own.
   const noIds = renderRelease(releaseViewModel({ available: false, reason: "no-task-ids-in-commits", explanation: "no commit names a task id" }));
   assert.match(noIds, /no commit names a task id/);
-  assert.match(noIds, /Name the task id in the message of each commit/);
+  assert.match(noIds, /Start the title of each commit that does its work with the task id/);
   assert.doesNotMatch(noIds, /Declare the deploy targets/);
 
   // The positive control: for `no-targets` the hint IS shown.

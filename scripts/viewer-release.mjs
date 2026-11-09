@@ -352,7 +352,7 @@ export function releaseEmptyHint(reason) {
     return "Declare the deploy targets and their stages under <code>deploy_targets:</code> in config.yaml; each stage is a git ref, so this view fills itself in on the next build.";
   }
   if (reason === "no-task-ids-in-commits") {
-    return "A task is placed in a stage by the commits that name its id. Name the task id in the message of each commit that does its work, then rebuild.";
+    return "A task is placed in a stage by the commits whose title starts with its id. Start the title of each commit that does its work with the task id, then rebuild.";
   }
   if (reason === "no-trunk") return "Commit to the trunk, then rebuild.";
   return null;

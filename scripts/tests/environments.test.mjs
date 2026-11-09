@@ -304,6 +304,25 @@ test("another project's ids are not read — the prefix comes from the caller", 
   assert.equal(st.byTask.size, 1);
 });
 
+test("only the ids a commit title starts with place it under a task; a mention in the body or later in the title does not (TL-626)", () => {
+  const dir = repo();
+  const work = commit(dir, "PROJ-8 the real change\n\nThe follow-up is filed as PROJ-9.", { "a.txt": "a\n" });
+  const aside = commit(dir, "PROJ-10 a second change, unlike PROJ-11", { "b.txt": "b\n" });
+  git(dir, "branch", "production");
+
+  const st = state(dir, BRANCHES);
+  // Positive controls: the ids at the head of each title still deploy their task,
+  // so the empty answers below are the rule, not a parser that reads nothing.
+  assert.deepEqual(taskDeployment(st, "PROJ-8").commits, [work]);
+  assert.deepEqual(stages(st, "PROJ-8"), { "app/test": "full", "app/production": "full" });
+  assert.deepEqual(taskDeployment(st, "PROJ-10").commits, [aside]);
+  // A mention is not a claim: neither task gets a commit or a stage.
+  for (const mentioned of ["PROJ-9", "PROJ-11"]) {
+    assert.deepEqual(taskDeployment(st, mentioned).commits, [], mentioned + " was only mentioned");
+    assert.deepEqual(stages(st, mentioned), {}, mentioned + " was only mentioned");
+  }
+});
+
 test("`git cherry` output: `+` is missing, `-` is held by patch identity", () => {
   const missing = parseCherry("+ " + "a".repeat(40) + "\n- " + "b".repeat(40) + "\n");
   assert.deepEqual([...missing], ["a".repeat(40)]);

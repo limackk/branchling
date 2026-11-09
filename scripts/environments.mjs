@@ -13,9 +13,14 @@
  * fact. A ref moved back removes tasks from a stage here without anybody
  * editing anything.
  *
- * HOW A COMMIT BELONGS TO A TASK. The task id in its message — anywhere in it —
- * read with the scanner from `scripts/task-id.mjs`, the same link
- * `scripts/modified-files.mjs` (TL-75) reads.
+ * HOW A COMMIT BELONGS TO A TASK. Only through the ids its TITLE STARTS WITH,
+ * read by `titleIds()` from `scripts/modified-files.mjs` (TL-75, TL-614) — the
+ * same function, not a second copy of its rule, so "which files did this task
+ * change" and "where is this task deployed" cannot disagree about which commits
+ * are the task's (TL-626). A body that says "filed as TL-595", or an id later
+ * in the title, MENTIONS a task; read as a claim, that mention placed the task
+ * in every stage the commit reached. That module's header records the rule —
+ * ranges, separators — and the options rejected.
  *
  * ONLY COMMITS REACHABLE FROM THE TRUNK COUNT. The trunk is `HEAD` unless the
  * caller names another ref: in the main checkout that is the trunk itself,
@@ -60,6 +65,7 @@ import { spawnSync } from "node:child_process";
 
 import { isGlob, observedTargets, pathInTarget } from "./deploy-targets.mjs";
 import { gitDiscoveryEnv } from "./git-env.mjs";
+import { titleIds } from "./modified-files.mjs";
 import { taskIdScanner } from "./task-id.mjs";
 
 const RS = String.fromCharCode(30);
@@ -95,10 +101,7 @@ export function parseTrunkLog(text, scanner) {
     const sha = record.slice(0, a).trim();
     const message = record.slice(a + 1, b);
     const files = record.slice(b + 1).split("\n").map((l) => l.trim()).filter(Boolean);
-    const ids = new Set();
-    scanner.lastIndex = 0;
-    for (const m of message.matchAll(scanner)) ids.add(m[1]);
-    commits.push({ sha, ids: [...ids], files });
+    commits.push({ sha, ids: [...titleIds(message, scanner)], files });
   }
   return commits;
 }
@@ -407,7 +410,7 @@ export function deploymentScanJson(state) {
 
 /** One line per task and target, for the text output. */
 export function describeTaskDeployment(task) {
-  if (!task.commits.length) return ["no commit on the trunk names this task"];
+  if (!task.commits.length) return ["no commit title on the trunk starts with this task's id"];
   if (!task.targets.length) return ["its commits touch no deploy target's paths"];
   return task.targets.map((t) =>
     t.target + ": " + t.stages.map((s) => {
@@ -427,7 +430,7 @@ export function explain(reason) {
   if (reason === "no-git") return "not a git repository — deployment state is computed from git, so there is nothing to read";
   if (reason === "no-trunk") return "the trunk has no commits yet, so nothing can have been deployed";
   if (reason === "git-failed") return "a git command failed — deployment state could not be computed";
-  if (reason === "no-task-ids-in-commits") return "no commit on the trunk names a task id, so no task can be placed in a stage";
+  if (reason === "no-task-ids-in-commits") return "no commit title on the trunk starts with a task id, so no task can be placed in a stage";
   return null;
 }
 
