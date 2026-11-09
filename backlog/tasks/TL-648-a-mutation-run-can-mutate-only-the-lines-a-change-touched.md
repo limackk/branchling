@@ -8,21 +8,23 @@ epic: ""                           # free text — the group this task counts to
 release: ""                        # the release it is PLANNED for (a value from `releases:` in config.yaml). Empty = none
 target: []                         # the deploy targets in ANOTHER repository it ships from (`deploy_targets` with `repository:`). Empty = none
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:loop-1
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 conflict_group: [mutation]  # the AREA it touches (e.g. a module): `next` and `run` hold it back while a task of the same group is in progress. Empty = `conflict_group_from`, or none
 estimate: 4h
 confidence: medium                 # how much you trust the estimate
 created: 2026-11-07
-updated: 2026-11-07
+updated: 2026-11-09
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
 verification:
   - id: changed-lines
     bash: "node --test scripts/tests/mutation-changed-lines.test.mjs"
+  - id: changed-lines-run
+    bash: "node --test scripts/tests/mutation/changed-lines.test.mjs"
 ---
 
 ## Goal
@@ -41,4 +43,4 @@ Observed on 2026-11-07, on TL-573. The supervisor ran `npm run mutation -- --nam
 
 ## Acceptance criteria
 
-- [ ] a mutation run limited to changed lines mutates nothing outside them [proof: changed-lines]
+- [x] a mutation run limited to changed lines mutates nothing outside them [proof: changed-lines, changed-lines-run]

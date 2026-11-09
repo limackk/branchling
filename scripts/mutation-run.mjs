@@ -55,12 +55,25 @@
  * an expensive one. `--named-only` keeps rule 1 alone: a fast LOWER bound,
  * whose survivors may still be killed by a file it left out.
  *
+ * `--changed-lines` NARROWS WHAT IS MUTATED, not what is tested (TL-648). The
+ * whole-module scope cost 2373 mutants and about two hours for a change of
+ * about 60 lines (TL-573), which is a check nobody runs. With the flag, each
+ * module is mutated only on the lines `git diff --unified=0` against the
+ * merge base reports as added or changed — the working tree included, an
+ * untracked module whole — handed to Stryker as `path:start-end` entries.
+ * Stryker places a mutant only where its whole location lies inside a range,
+ * so a mutant that spans a changed line and an unchanged one (a function body
+ * removed whole, a multi-line expression) is NOT created; a line that was only
+ * deleted leaves nothing behind to mutate. Both are why the report names the
+ * ranges and says that every line outside them was not mutated.
+ *
  * Stryker is a pinned devDependency, not a runtime one: the published package
  * keeps zero dependencies, and this file does not ship (`files` in
  * package.json). It is a tool for working on this repository.
  *
  *   node scripts/mutation-run.mjs [--base <ref>] [--files <a,b>] [--tests <a,b>]
- *                                 [--concurrency <n>] [--named-only] [--plan] [--json]
+ *                                 [--concurrency <n>] [--named-only] [--changed-lines]
+ *                                 [--plan] [--json]
  *
  * NO PROCESS OUTLIVES THE RUN (TL-646). A test that spawns git with a timeout
  * kills git, not git's hook children; they are reparented to PID 1, out of
@@ -86,7 +99,8 @@ import { fail, warn } from "./ui.mjs";
 
 const COMMAND = "node scripts/mutation-run.mjs";
 const FLAGS_WITH_VALUE = new Set(["--base", "--files", "--tests", "--concurrency"]);
-const FLAGS_BARE = new Set(["--plan", "--json", "--named-only"]);
+const FLAGS_BARE = new Set(["--plan", "--json", "--named-only", "--changed-lines"]);
+const BARE_KEYS = { "--named-only": "namedOnly", "--changed-lines": "changedLines" };
 const STRYKER_PIN = "@stryker-mutator/core";
 // The file in THIS tree, never the sandbox copy, which Stryker may mutate.
 const CONTAIN_ENTRY = join(dirname(fileURLToPath(import.meta.url)), "mutation-contain.mjs");
@@ -107,11 +121,14 @@ function lines(text) {
 }
 
 export function parseArgs(argv) {
-  const opts = { base: "main", files: null, tests: null, concurrency: null, plan: false, json: false, namedOnly: false };
+  const opts = {
+    base: "main", files: null, tests: null, concurrency: null,
+    plan: false, json: false, namedOnly: false, changedLines: false,
+  };
   for (let i = 0; i < argv.length; i++) {
     const flag = argv[i];
     if (FLAGS_BARE.has(flag)) {
-      opts[flag === "--named-only" ? "namedOnly" : flag.slice(2)] = true;
+      opts[BARE_KEYS[flag] || flag.slice(2)] = true;
     } else if (FLAGS_WITH_VALUE.has(flag)) {
       const value = argv[++i];
       if (value === undefined || value.startsWith("--")) return { error: flag + " needs a value" };
@@ -140,6 +157,59 @@ export function changedModules(root, base) {
     .filter(isMutable)
     .filter((p) => existsSync(join(root, p)))
     .sort();
+}
+
+/**
+ * The new-side line ranges of a `git diff --unified=0` for ONE file, merged
+ * where they touch. Only `@@` headers are read: a hunk line starts with `+`,
+ * `-`, a space or a backslash, so `@@` in column 0 is always a header, while
+ * an added line that reads `++ x` appears as `+++ x` and is not a file name.
+ * A hunk adding no line (`+c,0`) is a deletion and contributes nothing.
+ */
+export function hunkRanges(diffText) {
+  const found = [];
+  for (const line of diffText.split("\n")) {
+    const m = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/.exec(line);
+    if (!m) continue;
+    const count = m[2] === undefined ? 1 : Number(m[2]);
+    if (count > 0) found.push({ start: Number(m[1]), end: Number(m[1]) + count - 1 });
+  }
+  return mergeRanges(found);
+}
+
+function mergeRanges(ranges) {
+  const sorted = [...ranges].sort((a, b) => a.start - b.start);
+  const merged = [];
+  for (const r of sorted) {
+    const last = merged[merged.length - 1];
+    if (last && r.start <= last.end + 1) last.end = Math.max(last.end, r.end);
+    else merged.push({ ...r });
+  }
+  return merged;
+}
+
+/**
+ * For each of `modules`, the lines added or changed against the merge base
+ * with `base`, the working tree included. An untracked module is new in
+ * every line. A module with no such line is absent from the result: there is
+ * nothing in it this change wrote.
+ */
+export function changedLineRanges(root, base, modules) {
+  const mergeBase = git(root, ["merge-base", base, "HEAD"]).trim();
+  const untracked = new Set(lines(git(root, ["ls-files", "--others", "--exclude-standard"])));
+  const result = {};
+  for (const m of modules) {
+    let ranges;
+    if (untracked.has(m)) {
+      const text = existsSync(join(root, m)) ? readFileSync(join(root, m), "utf8") : "";
+      const count = text === "" ? 0 : text.split("\n").length - (text.endsWith("\n") ? 1 : 0);
+      ranges = count > 0 ? [{ start: 1, end: count }] : [];
+    } else {
+      ranges = hunkRanges(git(root, ["diff", "--unified=0", "--no-color", "--no-ext-diff", mergeBase, "--", m]));
+    }
+    if (ranges.length) result[m] = ranges;
+  }
+  return result;
 }
 
 const IMPORT_RE = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)["'](\.{1,2}\/[^"']+\.mjs)["']/g;
@@ -243,12 +313,36 @@ export async function selectTests(root, modules, { namedOnly = false } = {}) {
   return selected;
 }
 
+/**
+ * What the run mutates and which tests judge it. `mutate` is exactly the list
+ * handed to Stryker; with `--changed-lines` it holds `path:start-end` entries,
+ * `lines` holds the same ranges per module, and `noAddedLines` the selected
+ * modules left out because the change added no line to them.
+ */
 export async function plan(root, opts) {
-  const modules = opts.files || changedModules(root, opts.base);
+  let modules = opts.files || changedModules(root, opts.base);
+  let changed = null;
+  let noAddedLines = [];
+  if (opts.changedLines) {
+    changed = changedLineRanges(root, opts.base, modules);
+    noAddedLines = modules.filter((m) => !changed[m]);
+    modules = modules.filter((m) => changed[m]);
+  }
+  const mutate = changed
+    ? modules.flatMap((m) => changed[m].map((r) => m + ":" + r.start + "-" + r.end))
+    : modules;
   const tests = opts.tests
     ? opts.tests.map((file) => ({ file, why: ["--tests"] }))
     : await selectTests(root, modules, { namedOnly: opts.namedOnly });
-  return { base: opts.base, modules, tests };
+  return { base: opts.base, modules, mutate, ...(changed ? { lines: changed, noAddedLines } : {}), tests };
+}
+
+/** The ranges a `--changed-lines` run mutates, and what it did not, for a reader. */
+function rangeReport(p) {
+  const out = ["mutated lines only: " + p.modules.map((m) => m + ":" + p.lines[m].map((r) => r.start + "-" + r.end).join(",")).join("  ")];
+  out.push("not mutated: every line outside these ranges, and every mutant spanning one");
+  if (p.noAddedLines.length) out.push("not mutated (no added line): " + p.noAddedLines.join(", "));
+  return out;
 }
 
 function strykerBin() {
@@ -402,36 +496,41 @@ export function sweepLeftovers(marker, { ps = null, kill = process.kill, self = 
   return leftovers;
 }
 
+/** The Stryker configuration for plan `p`, its work files under `work`. */
+export function strykerConfig(p, opts, links, work) {
+  return {
+    testRunner: "command",
+    commandRunner: { command: sandboxCommand(links, p.tests.map((t) => t.file)) },
+    coverageAnalysis: "off",
+    mutate: p.mutate,
+    // Exactly the links, anchored, never their parent: see directorySymlinks.
+    ignorePatterns: links.map((l) => "/" + l.path),
+    plugins: [],
+    reporters: ["json", "clear-text", "progress"],
+    jsonReporter: { fileName: join(work, "mutation.json") },
+    clearTextReporter: { reportMutants: false },
+    tempDirName: join(work, "sandbox"),
+    cleanTempDir: true,
+    // Every test file here spawns processes of its own, so one Stryker worker
+    // occupies more than one core. Stryker's default (cores - 1) turned 101
+    // of 116 mutants into Timeouts on a 15-core machine on 2026-11-05, which
+    // it counts as DETECTED: a 100% score with almost nothing killed. At
+    // half the cores and a wider timeout the same run gave 62 Killed, 54
+    // Survived, 0 Timeout.
+    concurrency: opts.concurrency || defaultConcurrency(),
+    timeoutFactor: 3,
+    timeoutMS: 30000,
+  };
+}
+
 function runStryker(root, p, opts) {
   const bin = strykerBin();
   if (!bin) return { code: 2, problem: STRYKER_PIN + " is not installed", next: ["npm install"] };
   const links = directorySymlinks(root);
   const work = mkdtempSync(join(tmpdir(), "mutation-run-"));
   try {
-    const reportPath = join(work, "mutation.json");
-    const config = {
-      testRunner: "command",
-      commandRunner: { command: sandboxCommand(links, p.tests.map((t) => t.file)) },
-      coverageAnalysis: "off",
-      mutate: p.modules,
-      // Exactly the links, anchored, never their parent: see directorySymlinks.
-      ignorePatterns: links.map((l) => "/" + l.path),
-      plugins: [],
-      reporters: ["json", "clear-text", "progress"],
-      jsonReporter: { fileName: reportPath },
-      clearTextReporter: { reportMutants: false },
-      tempDirName: join(work, "sandbox"),
-      cleanTempDir: true,
-      // Every test file here spawns processes of its own, so one Stryker worker
-      // occupies more than one core. Stryker's default (cores - 1) turned 101
-      // of 116 mutants into Timeouts on a 15-core machine on 2026-11-05, which
-      // it counts as DETECTED: a 100% score with almost nothing killed. At
-      // half the cores and a wider timeout the same run gave 62 Killed, 54
-      // Survived, 0 Timeout.
-      concurrency: opts.concurrency || defaultConcurrency(),
-      timeoutFactor: 3,
-      timeoutMS: 30000,
-    };
+    const config = strykerConfig(p, opts, links, work);
+    const reportPath = config.jsonReporter.fileName;
     const configPath = join(work, "stryker.config.json");
     writeFileSync(configPath, JSON.stringify(config, null, 2));
     // A nested `node --test` that inherits NODE_TEST_CONTEXT reports to a
@@ -488,6 +587,11 @@ export async function main(argv, cwd = process.cwd()) {
     return fail(COMMAND, "cannot work out what changed against " + JSON.stringify(opts.base), [String(e.message)], [COMMAND + " --base <ref>"]);
   }
 
+  if (p.modules.length === 0 && opts.changedLines && p.noAddedLines.length) {
+    return fail(COMMAND, "nothing to mutate: the change added no line to " + p.noAddedLines.join(", "),
+      ["A line that was only deleted leaves nothing to mutate, and a score over an empty set would read like a score over real work."],
+      [COMMAND + " --files " + p.noAddedLines.join(",")], 1);
+  }
   if (p.modules.length === 0) {
     return fail(COMMAND, "nothing to mutate: no module under scripts/ or bin/ changed against " + opts.base,
       ["A score over an empty set would read like a score over real work, so none is reported."],
@@ -503,6 +607,7 @@ export async function main(argv, cwd = process.cwd()) {
     if (opts.json) console.log(JSON.stringify({ kind: "mutation-plan", ...p }, null, 2));
     else {
       console.log("mutate (" + p.modules.length + "): " + p.modules.join(", "));
+      if (p.lines) for (const l of rangeReport(p)) console.log(l);
       console.log("tests (" + p.tests.length + "):");
       for (const t of p.tests) console.log("  " + t.file + "  — " + t.why.join("; "));
     }
@@ -518,6 +623,7 @@ export async function main(argv, cwd = process.cwd()) {
     console.log(JSON.stringify({ kind: "mutation-run", ...p, ...summary }, null, 2));
   } else {
     for (const s of summary.survivors) console.log("survived  " + s.file + ":" + s.line + "  " + s.mutator + " → " + s.replacement);
+    if (p.lines) for (const l of rangeReport(p)) console.log(l);
   }
   if (summary.noCoverage > 0) {
     return fail(COMMAND, summary.noCoverage + " mutant(s) reported NoCoverage under coverageAnalysis: off",
