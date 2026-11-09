@@ -561,10 +561,17 @@ function staleHooksRow(states) {
  * without `deploy_targets`, or one whose stages are branches and tags, has
  * nothing to ask here, and a tick about it would be green with no evidentiary
  * force.
+ *
+ * `dir`: the `--dir` doctor was run with (TL-631). The repair here is a git
+ * command or a declaration in config.yaml, never a command of ours, so the
+ * row is not built with `ownCommand()`; only the trailing note that sends the
+ * reader back to doctor is ours, and it carries `dir` the way every fix of
+ * ours does (TL-615).
  */
-function checkDeployFetch(root, config) {
+function checkDeployFetch(root, config, dir) {
   if (!insideGitRepo(root)) return [];
   const title = "deploy refs reach every clone";
+  const thenDoctor = "   # then " + ownText({ args: "doctor" }, dir);
   const st = deployFetchState({ root, targets: config.deployTargets });
   if (!st.declared.length && !st.unresolved.length) return [];
   // A glob whose first component under refs/ starts with a glob character has
@@ -579,7 +586,7 @@ function checkDeployFetch(root, config) {
     : null;
   const unresolvedFix = st.unresolved.length
     ? "declare " + st.unresolved.map((u) => "`refs/" + u.spec + "`").join(", ") +
-      " by its full refs/ name in deploy_targets (or the branch or tag it is meant to be)   # then " + N + " doctor"
+      " by its full refs/ name in deploy_targets (or the branch or tag it is meant to be)" + thenDoctor
     : null;
   if (st.why === "no-remote") {
     return [check("deploy-fetch", title, INFO,
@@ -589,7 +596,7 @@ function checkDeployFetch(root, config) {
   if (st.why === "ambiguous") {
     return [check("deploy-fetch", title, WARN,
       "remotes " + st.remotes.join(", ") + " and no upstream on this branch — cannot tell which one the deploy refs come from",
-      "git branch --set-upstream-to <remote>/<branch>   # then " + N + " doctor")];
+      "git branch --set-upstream-to <remote>/<branch>" + thenDoctor)];
   }
   if (st.missing.length) {
     const commands = st.missing.filter((m) => m.fix).map((m) => m.fix);
@@ -711,7 +718,7 @@ export function diagnose(root, { dir } = {}) {
   rows.push(checkUnrecorded(root));
   rows.push(checkLogStatus(root, config));
   rows.push(...checkGitIgnore(root));
-  rows.push(...checkDeployFetch(root, config));
+  rows.push(...checkDeployFetch(root, config, dir));
   rows.push(checkGuards(root));
   rows.push(...checkClosedElsewhere(root, config, metas));
   rows.push(checkVolume(metas, config));

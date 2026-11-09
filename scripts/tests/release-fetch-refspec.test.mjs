@@ -17,6 +17,8 @@
  *      `deploys/web/production` warns in a fresh clone, where it resolves to
  *      nothing, and is checked as `refs/deploys/web/production` in a clone
  *      that has that ref; `origin/main` beside it is never reported.
+ *   6. The note that sends the reader back to doctor after a git repair
+ *      carries the `--dir` doctor was run with, and only then (TL-631).
  *
  * The deploy namespace in the fixtures is `refs/deploys/`, the shape
  * `docs/release-tracking.md` §2 uses; it is a fixture value, not something the
@@ -37,6 +39,7 @@ import {
 } from "../deploy-fetch.mjs";
 
 import { SCRIPTS_DIR, isolateHome } from "./_repo.mjs";
+import { PRODUCT_NAME } from "../product.mjs";
 
 isolateHome("release-fetch-refspec");
 
@@ -354,4 +357,58 @@ test("positive control: origin/main as the only short name gives no row", () => 
       - { name: test, ref: origin/main }
       - { name: trunk, ref: main }
 `)).row, undefined);
+});
+
+// ── 6. The note back to doctor carries --dir (TL-631) ────────────────────
+
+/** The deploy-fetch row of `dir`, asked from `cwd` with `--dir`. */
+function doctorRowFrom(cwd, dir) {
+  const r = run(cwd, ["doctor", "--dir", dir, "--json"]);
+  return JSON.parse(r.stdout).checks.find((c) => c.id === "deploy-fetch");
+}
+
+/** The note after the git repair as an argument vector, product name checked and removed. */
+function noteArgs(fix) {
+  const [command, ...args] = fix.split("# then ")[1].trim().split(/\s+/);
+  assert.equal(command, PRODUCT_NAME, "the note does not name a command of ours: " + fix);
+  return args;
+}
+
+test("doctor --dir from an unrelated cwd: the note after the git repair names doctor with that --dir", () => {
+  const dir = cloneWithBacklog(DEPLOYS);
+  const url = git(dir, "config", "--get", "remote.origin.url");
+  git(dir, "remote", "remove", "origin");
+  git(dir, "remote", "add", "alpha", url);
+  git(dir, "remote", "add", "beta", url);
+  // Not a backlog, not inside one and not a repository: from here only --dir finds `dir`.
+  const elsewhere = fixtureDir(join(tmpdir(), "branchling-fetch-elsewhere-"));
+
+  const row = doctorRowFrom(elsewhere, dir);
+  assert.equal(row.status, "warn");
+  // The repair itself is git's and stays as it is; only the note is ours.
+  assert.equal(row.fix, "git branch --set-upstream-to <remote>/<branch>   # then " + PRODUCT_NAME + " doctor --dir " + dir);
+
+  // The note, followed from the same cwd, examines the backlog doctor examined.
+  const followed = run(elsewhere, noteArgs(row.fix).concat("--json"));
+  assert.equal(JSON.parse(followed.stdout).root, dir);
+  // CONTROL: the same note without --dir finds no backlog from here.
+  const bare = run(elsewhere, ["doctor", "--json"]);
+  assert.notEqual(bare.status, 0, "without --dir the note found a backlog from an unrelated cwd");
+  assert.equal(JSON.parse(bare.stdout).root, null);
+
+  // Run without --dir, the note carries none: it is followed where doctor found the backlog.
+  assert.equal(doctorRow(dir).row.fix, "git branch --set-upstream-to <remote>/<branch>   # then " + PRODUCT_NAME + " doctor");
+});
+
+test("doctor --dir: the note after declaring a short deploy ref by its full name carries that --dir", () => {
+  const dir = cloneWithBacklog(SHORT);
+  const elsewhere = fixtureDir(join(tmpdir(), "branchling-fetch-elsewhere-"));
+
+  const row = doctorRowFrom(elsewhere, dir);
+  assert.equal(row.status, "warn");
+  assert.match(row.fix, /^declare `refs\/deploys\/web\/production` by its full refs\/ name in deploy_targets/);
+  assert.ok(row.fix.endsWith("   # then " + PRODUCT_NAME + " doctor --dir " + dir), row.fix);
+
+  // CONTROL: run without --dir, the note names plain doctor.
+  assert.ok(doctorRow(dir).row.fix.endsWith("   # then " + PRODUCT_NAME + " doctor"), doctorRow(dir).row.fix);
 });
