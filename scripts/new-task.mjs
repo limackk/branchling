@@ -301,8 +301,10 @@ function parseArgs(argv) {
  * `refusalKind` is the word a consumer branches on:
  *
  *   usage             the invocation: an unknown flag, a missing value or
- *                     title, an actor with no namespace, a value outside a
- *                     vocabulary
+ *                     title, an actor with no namespace, a target of this
+ *                     repository named in `--target`
+ *   unknown-value     a value outside its field's vocabulary (TL-630), with
+ *                     `rejected` `{ field, value }` and `declared`
  *   invalid-document  the task document from stdin or `--body-file`
  *   invalid-config    config.yaml cannot be loaded
  *   prefix-mismatch   the configured prefix is not the one the tree uses
@@ -318,6 +320,22 @@ function said(message, hint, refusalKind = "usage", code = 2) {
   return {
     code, refusalKind, message, details: hint ? [hint] : [],
     text: `${N} new: ` + message + (hint ? "\n  " + hint : ""),
+  };
+}
+
+/**
+ * A VALUE OUTSIDE A VOCABULARY IS A REFUSAL, NOT A USAGE ERROR (TL-630). The
+ * call was built right and the value a person typed is what is wrong, so it
+ * exits 1 and names the field, the value and what the field accepts — the
+ * shape `set` (TL-543), `query`, `handoff` (TL-559) and `next` (TL-574) refuse
+ * with. Until then `new` said `usage` with exit 2, and a consumer branching on
+ * `refusalKind` across the writers saw two words for one refusal. The stderr
+ * form is the sentence it always was.
+ */
+function unknownValue(field, value, declared, message, hint) {
+  return {
+    ...said(message, hint, "unknown-value", 1),
+    payload: { rejected: { field, value }, declared },
   };
 }
 
@@ -794,7 +812,8 @@ export async function main(argv) {
   ];
   for (const [key, allowed] of checks) {
     if (opts[key] && allowed && allowed.length && allowed.indexOf(opts[key]) < 0) {
-      return refuse(said("`" + opts[key] + "` is not an allowed value for the field `" + key + "`",
+      return refuse(unknownValue(key, opts[key], allowed,
+        "`" + opts[key] + "` is not an allowed value for the field `" + key + "`",
         "allowed: " + allowed.join(" | ")));
     }
   }
@@ -803,7 +822,8 @@ export async function main(argv) {
   if (opts.release) {
     const releases = config.releases || [];
     if (releases.indexOf(opts.release) < 0) {
-      return refuse(said("`" + opts.release + "` is not a release this project plans",
+      return refuse(unknownValue("release", opts.release, releases,
+        "`" + opts.release + "` is not a release this project plans",
         releases.length ? "allowed: " + releases.join(" | ") : "`releases:` is not declared in config.yaml, so this backlog plans no releases"));
     }
   }
@@ -817,13 +837,14 @@ export async function main(argv) {
     for (const name of named) {
       if (external.indexOf(name) >= 0) continue;
       const local = (config.deployTargets || []).some((t) => t.name === name);
-      return refuse(said(local
-        ? "`" + name + "` is a target of this repository, and a task cannot name it in `target:`"
-        : "`" + name + "` is not a declared target in another repository",
-      local
-        ? "its tasks are computed from the paths their commits touch; `target:` takes only a target that declares `repository:`" +
-          (external.length ? " (" + external.join(" | ") + ")" : "")
-        : external.length
+      if (local) {
+        return refuse(said("`" + name + "` is a target of this repository, and a task cannot name it in `target:`",
+          "its tasks are computed from the paths their commits touch; `target:` takes only a target that declares `repository:`" +
+            (external.length ? " (" + external.join(" | ") + ")" : "")));
+      }
+      return refuse(unknownValue("target", name, external,
+        "`" + name + "` is not a declared target in another repository",
+        external.length
           ? "allowed: " + external.join(" | ")
           : "no target in `deploy_targets` declares `repository:`, so this backlog has none a task could name"));
     }
@@ -832,7 +853,8 @@ export async function main(argv) {
   const boardSlugs = (config.boards || []).map((b) => b.slug);
   const board = opts.board || config.defaultBoard || boardSlugs[0];
   if (boardSlugs.length && boardSlugs.indexOf(board) < 0) {
-    return refuse(said("the board `" + board + "` does not exist in the registry",
+    return refuse(unknownValue("board", board, boardSlugs,
+      "the board `" + board + "` does not exist in the registry",
       "the board vocabulary is CLOSED; available: " + boardSlugs.join(" | ")));
   }
 

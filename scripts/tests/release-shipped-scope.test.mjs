@@ -274,7 +274,7 @@ test("every reader of the release names accepts both shapes of entry", () => {
   const id = newTask(dir, "Planned for a shipped release", "--release", "r1");
   assert.match(readFileSync(taskFile(dir, id), "utf8"), /^release: r1$/m);
   const refused = run(dir, ["new", "--dir", "backlog", "--title", "Typo", "--release", "v1"]);
-  assert.equal(refused.status, 2, "the ref is not a release name");
+  assert.equal(refused.status, 1, "the ref is not a release name (an unknown value exits 1 since TL-630)");
   assert.match(refused.stderr, /allowed: r1 \| r2 \| r3/);
 
   const q = run(dir, ["query", "--dir", "backlog", "--status", configList(dir, "statuses").join(","), "--json", "--release", "r2"]);
