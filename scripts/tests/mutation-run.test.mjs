@@ -20,7 +20,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { SCRIPTS_DIR, isolateHome } from "./_repo.mjs";
-import { reachesCli } from "../mutation-run.mjs";
+import { MIN_SWEEP_MARKER, leftoverProcesses, reachesCli, sandboxCommand, sweepLeftovers } from "../mutation-run.mjs";
 
 const HOME = isolateHome("mutation-run");
 const ENTRY = join(SCRIPTS_DIR, "mutation-run.mjs");
@@ -222,4 +222,84 @@ test("an unknown flag fails", () => {
   const r = run(HOME, ["--everything"]);
   assert.equal(r.code, 2);
   assert.match(r.err, /unknown argument "--everything"/);
+});
+
+// TL-646. The parsing half of the end-of-run sweep, without `ps` or a process
+// to kill; `mutation/no-orphan-processes.test.mjs` holds the half that kills.
+test("a leftover is a process naming the marker, never the one asking", () => {
+  const ps = [
+    "  101   100 /usr/bin/node /tmp/mutation-run-AbCdEf/sandbox/sandbox-1/scripts/cli.mjs",
+    "  102   102 /bin/sh .git/hooks/commit-msg .git/COMMIT_EDITMSG",
+    "  103   100 node /tmp/mutation-run-AbCdEf/sandbox/sandbox-1/scripts/serve-backlog.mjs --port 0",
+    "  104   104 node /tmp/mutation-run-AbCdEg/sandbox/sandbox-1/scripts/cli.mjs",
+    "  105   100 node /tmp/mutation-run-AbCdEf/sandbox/x.mjs",
+    "not a ps line /tmp/mutation-run-AbCdEf/",
+    "",
+  ].join("\n");
+  assert.deepEqual(leftoverProcesses("/tmp/mutation-run-AbCdEf/", ps, 105), [
+    { pid: 101, pgid: 100, args: "/usr/bin/node /tmp/mutation-run-AbCdEf/sandbox/sandbox-1/scripts/cli.mjs" },
+    { pid: 103, pgid: 100, args: "node /tmp/mutation-run-AbCdEf/sandbox/sandbox-1/scripts/serve-backlog.mjs --port 0" },
+  ]);
+});
+
+test("the test command runs inside the containing process group", () => {
+  const cmd = sandboxCommand([], ["scripts/tests/a.test.mjs"], "/x/contain.mjs");
+  assert.equal(cmd, [process.execPath, "/x/contain.mjs", "node", "--test", "scripts/tests/a.test.mjs"]
+    .map((s) => "'" + s + "'").join(" "));
+});
+
+// The guards of the sweep, judged on a `ps` listing and a recording `kill`, so
+// a defect here signals nothing real. The sweep's own header says why each of
+// these is a guard and not a style choice.
+function recordedSweep(marker, ps, self = 900) {
+  const calls = [];
+  const swept = sweepLeftovers(marker, { ps, self, kill: (pid, signal) => calls.push([pid, signal]) });
+  return { swept, calls };
+}
+
+test("the sweep kills a leftover's group and the leftover, never its own group", () => {
+  const marker = "/tmp/mutation-run-AbCdEf/";
+  const ps = [
+    "  900   800 node scripts/mutation-run.mjs",
+    "  101   100 node /tmp/mutation-run-AbCdEf/sandbox/scripts/cli.mjs",
+    "  102   800 node /tmp/mutation-run-AbCdEf/sandbox/scripts/serve-backlog.mjs",
+    "  103     1 node /tmp/mutation-run-AbCdEf/sandbox/scripts/cli.mjs",
+    "  104     0 node /tmp/mutation-run-AbCdEf/sandbox/scripts/cli.mjs",
+    "  105   105 node /tmp/elsewhere/cli.mjs",
+  ].join("\n");
+  const { swept, calls } = recordedSweep(marker, ps);
+  assert.deepEqual(swept.map((p) => p.pid), [101, 102, 103, 104]);
+  assert.deepEqual(calls, [
+    [-100, "SIGKILL"], [101, "SIGKILL"],
+    // 800 is the sweeper's own group: by pid only.
+    [102, "SIGKILL"],
+    // A pgid of 1 or 0 is never signalled as a group: kill(-1) reaches every
+    // process the user owns, kill(-0) the sweeper's own group.
+    [103, "SIGKILL"],
+    [104, "SIGKILL"],
+  ]);
+});
+
+test("a kill that fails on the group still kills the leftover", () => {
+  const calls = [];
+  const kill = (pid, signal) => {
+    calls.push([pid, signal]);
+    if (pid < 0) throw Object.assign(new Error("ESRCH"), { code: "ESRCH" });
+  };
+  sweepLeftovers("/tmp/mutation-run-AbCdEf/", { self: 1, kill, ps: "  101   100 node /tmp/mutation-run-AbCdEf/x.mjs\n" });
+  assert.deepEqual(calls, [[-100, "SIGKILL"], [101, "SIGKILL"]]);
+});
+
+test("a marker too short to be a run's own directory is refused before anything is killed", () => {
+  const ps = "  101   100 node /tmp/x.mjs\n  102   102 sh -c true\n";
+  for (const marker of ["", "/", "/tmp/", "x".repeat(MIN_SWEEP_MARKER - 1), NaN, undefined]) {
+    const calls = [];
+    assert.throws(() => sweepLeftovers(marker, { ps, self: 1, kill: (...a) => calls.push(a) }), /refusing to sweep/,
+      "marker " + JSON.stringify(marker) + " was accepted");
+    assert.deepEqual(calls, []);
+  }
+  // POSITIVE CONTROL: one character more is a marker, so the refusal above is
+  // the length, not something else about the call.
+  const { calls } = recordedSweep("x".repeat(MIN_SWEEP_MARKER), "  101   100 node /" + "x".repeat(MIN_SWEEP_MARKER) + "\n", 1);
+  assert.deepEqual(calls, [[-100, "SIGKILL"], [101, "SIGKILL"]]);
 });
