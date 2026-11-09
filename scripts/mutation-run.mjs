@@ -62,8 +62,17 @@
  *   node scripts/mutation-run.mjs [--base <ref>] [--files <a,b>] [--tests <a,b>]
  *                                 [--concurrency <n>] [--named-only] [--plan] [--json]
  *
+ * NO PROCESS OUTLIVES THE RUN (TL-646). A test that spawns git with a timeout
+ * kills git, not git's hook children; they are reparented to PID 1, out of
+ * reach of Stryker's kill, which walks the tree by parent. Each test command
+ * therefore runs under `mutation-contain.mjs`, which leads a process group of
+ * its own and kills what is left in it; and when Stryker returns, whatever
+ * still names the run's directory is killed with its group and reported,
+ * because a process nobody reports is found only by somebody running `pgrep`.
+ *
  * Tests: scripts/tests/mutation-run.test.mjs (scope and selection, no Stryker),
- *        scripts/tests/mutation/subprocess-kill.test.mjs (a real run).
+ *        scripts/tests/mutation/subprocess-kill.test.mjs (a real run),
+ *        scripts/tests/mutation/no-orphan-processes.test.mjs (nothing left behind).
  */
 
 import { spawnSync } from "node:child_process";
@@ -71,7 +80,7 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSyn
 import { createRequire } from "node:module";
 import os, { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { fail, warn } from "./ui.mjs";
 
@@ -79,6 +88,8 @@ const COMMAND = "node scripts/mutation-run.mjs";
 const FLAGS_WITH_VALUE = new Set(["--base", "--files", "--tests", "--concurrency"]);
 const FLAGS_BARE = new Set(["--plan", "--json", "--named-only"]);
 const STRYKER_PIN = "@stryker-mutator/core";
+// The file in THIS tree, never the sandbox copy, which Stryker may mutate.
+const CONTAIN_ENTRY = join(dirname(fileURLToPath(import.meta.url)), "mutation-contain.mjs");
 
 /** The mutable surface: shipped code, never the tests that judge it. */
 function isMutable(path) {
@@ -310,18 +321,85 @@ export function directorySymlinks(root, rel = "") {
 
 /**
  * The command the runner executes in the sandbox: recreate each ignored link
- * with its own relative target, then run the tests. Every worker shares one
- * sandbox, so a link another worker made first is not an error; the check
- * after `ln` is what decides.
+ * with its own relative target, then run the tests in a process group of their
+ * own (`mutation-contain.mjs`). Every worker shares one sandbox, so a link
+ * another worker made first is not an error; the check after `ln` is what
+ * decides.
  */
-export function sandboxCommand(links, testFiles) {
+export function sandboxCommand(links, testFiles, contain = CONTAIN_ENTRY) {
   const steps = links.map((l) => {
     const p = shellQuote(l.path);
     const parent = shellQuote(dirname(l.path));
     return "{ mkdir -p " + parent + " && { ln -s " + shellQuote(l.target) + " " + p + " 2>/dev/null; [ -L " + p + " ]; }; }";
   });
-  steps.push("node --test " + testFiles.map(shellQuote).join(" "));
+  steps.push([process.execPath, contain, "node", "--test", ...testFiles].map(shellQuote).join(" "));
   return steps.join(" && ");
+}
+
+/** `ps` for every process: `pid pgid args`, one per line, nothing truncated. */
+function processListing() {
+  const r = spawnSync("ps", ["-A", "-ww", "-o", "pid=,pgid=,args="], { encoding: "utf8" });
+  if (r.status !== 0) throw new Error("ps: " + (r.stderr || r.error || "").toString().trim());
+  return r.stdout;
+}
+
+/**
+ * Every process whose command line names `marker`, with its process group,
+ * from `ps` output (`pid= pgid= args=`). The caller itself is never one.
+ */
+export function leftoverProcesses(marker, psOutput = null, self = process.pid) {
+  if (psOutput === null) psOutput = processListing();
+  const found = [];
+  for (const line of psOutput.split("\n")) {
+    const m = /^\s*(\d+)\s+(\d+)\s+(.*)$/.exec(line);
+    if (!m || Number(m[1]) === self || !m[3].includes(marker)) continue;
+    found.push({ pid: Number(m[1]), pgid: Number(m[2]), args: m[3] });
+  }
+  return found;
+}
+
+/** Shorter than this, a marker could name processes that are not the run's. */
+export const MIN_SWEEP_MARKER = 8;
+
+/**
+ * Kill every process that still names `marker`, and the group it leads.
+ *
+ * The group matters as much as the process: a git hook runs as `/bin/sh
+ * .git/hooks/commit-msg`, which names no sandbox path, while the CLI it runs
+ * does. A group shared with this process is never killed whole, because this
+ * process and whatever started it are in it.
+ *
+ * TWO checks stand between a process and this kill: the filter in
+ * `leftoverProcesses()` and the one below it. Either alone looks redundant;
+ * together they mean no SINGLE defect makes this function match every process
+ * on the machine. That is not hypothetical: a mutation run mutates this file,
+ * one mutant at a time, while its own tests call this function for real, and
+ * a mutant that dropped the only filter would SIGKILL every process group the
+ * user owns, desktop session included. A marker too short to be a run's own
+ * directory is refused for the same reason.
+ *
+ * `ps`, `kill` and `self` are injectable so the guards can be judged without
+ * killing anything.
+ */
+export function sweepLeftovers(marker, { ps = null, kill = process.kill, self = process.pid } = {}) {
+  if (typeof marker !== "string" || marker.length < MIN_SWEEP_MARKER) {
+    throw new Error("refusing to sweep for " + JSON.stringify(marker) + ": a marker this short could name any process");
+  }
+  if (ps === null) {
+    if (process.platform === "win32") return [];
+    ps = processListing();
+  }
+  const ownGroup = leftoverProcesses("", ps, -1).find((p) => p.pid === self);
+  const leftovers = leftoverProcesses(marker, ps, self).filter((p) => p.args.includes(marker));
+  for (const p of leftovers) {
+    // A pgid of 0 or 1 is the kernel's or init's: `kill(-1)` would signal
+    // every process this user owns, so such a leftover is killed by pid only.
+    if (p.pgid > 1 && (!ownGroup || p.pgid !== ownGroup.pgid)) {
+      try { kill(-p.pgid, "SIGKILL"); } catch { /* the group is already gone */ }
+    }
+    try { kill(p.pid, "SIGKILL"); } catch { /* it exited meanwhile */ }
+  }
+  return leftovers;
 }
 
 function runStryker(root, p, opts) {
@@ -368,13 +446,26 @@ function runStryker(root, p, opts) {
       stdio: ["ignore", opts.json ? "pipe" : "inherit", opts.json ? "pipe" : "inherit"],
       encoding: "utf8",
     });
-    if (!existsSync(reportPath)) {
-      return { code: r.status || 1, problem: "Stryker produced no report", details: lines((r.stderr || "") + (r.stdout || "")).slice(-10) };
+    let leftovers = [];
+    try {
+      leftovers = sweepLeftovers(work + sep);
+    } catch (e) {
+      console.error(warn("cannot look for processes the run left behind: " + e.message));
     }
-    return { code: r.status, report: JSON.parse(readFileSync(reportPath, "utf8")) };
+    if (!existsSync(reportPath)) {
+      return { code: r.status || 1, problem: "Stryker produced no report", leftovers,
+        details: lines((r.stderr || "") + (r.stdout || "")).slice(-10) };
+    }
+    return { code: r.status, leftovers, report: JSON.parse(readFileSync(reportPath, "utf8")) };
   } finally {
     rmSync(work, { recursive: true, force: true });
   }
+}
+
+function reportLeftovers(leftovers) {
+  if (!leftovers || leftovers.length === 0) return;
+  console.error(warn(leftovers.length + " process(es) outlived the run and were killed: a test left them behind"));
+  for (const p of leftovers.slice(0, 10)) console.error("  " + p.pid + "  " + p.args);
 }
 
 export async function main(argv, cwd = process.cwd()) {
@@ -419,6 +510,7 @@ export async function main(argv, cwd = process.cwd()) {
   }
 
   const run = runStryker(root, p, opts);
+  reportLeftovers(run.leftovers);
   if (!run.report) return fail(COMMAND, run.problem, run.details || [], run.next || [], run.code || 1);
   const summary = summarise(run.report);
 
