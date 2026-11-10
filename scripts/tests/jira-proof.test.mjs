@@ -443,6 +443,24 @@ test("over a range: exactly the Jira-linked closings, the rest counted as skippe
   assert.deepEqual(all.skipped, [{ task: plain, reason: "no-jira-marker" }]);
 });
 
+// Every other fixture test starts the CLI inside the repository, so a git
+// runner that dropped its `cwd` would still read the right one (TL-642).
+test("the range is read in the repository --dir names, not where the command was started", () => {
+  const dir = repo();
+  const SITE = "https://acme.atlassian.net";
+  const linked = newTask(dir, "Linked and closed", jira(SITE, "APP-1"));
+  const base = commit(dir, "a linked task exists");
+  take(dir, linked); done(dir, linked);
+  commit(dir, "the work is done");
+
+  const elsewhere = fixtureDir(join(tmpdir(), "branchling-jiraproof-elsewhere-" + counter++ + "-"));
+  const r = run(elsewhere, ["jira-proof", "--dir", join(dir, "backlog"), "--base", base, "--json"]);
+  assert.equal(r.status, 0, r.stderr);
+  const doc = JSON.parse(r.stdout);
+  assert.equal(doc.scanned, true, doc.reason);
+  assert.deepEqual(doc.comments.map((c) => [c.task, c.key]), [[linked, "APP-1"]]);
+});
+
 test("in process: the diff is read over the history directory, in id order, a vouch kept", () => {
   const dir = repo();
   const linked = newTask(dir, "Linked", jira("https://acme.atlassian.net", "APP-1"));
