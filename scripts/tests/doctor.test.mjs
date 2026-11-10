@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url";
 
 import { isolateHome } from "./_repo.mjs";
 import { followRepair } from "./_follow-repair.mjs";
-import { checkTemplate, templateFields } from "../doctor.mjs";
+import { checkSkill, checkTemplate, templateFields } from "../doctor.mjs";
 import { HOOK_NAME, COMMIT_MESSAGE_HOOK_NAME, hookBlock, hooksTarget } from "../hooks-command.mjs";
 import { BLOCK_OPEN } from "../git-rules.mjs";
 import { canonicalPath } from "../canonical-path.mjs";
@@ -601,6 +601,75 @@ test("with --dir naming no backlog: the `init` it points at is that directory (T
   // Control: found by nothing at all, it names the conventional place.
   const bare = JSON.parse(run(parent, ["doctor", "--json"]).stdout);
   assert.equal(bare.checks[0].fix, PRODUCT_NAME + " init --dir ./backlog");
+});
+
+// ── a non-directory where a packaged skill's directory belongs (TL-632) ──
+
+/** A fixture package: `demo` ships SKILL.md and two files under `refs/`. */
+function skillPackage(dir) {
+  const pkg = join(dir, "pkg", "demo");
+  mkdirSync(join(pkg, "refs"), { recursive: true });
+  for (const file of ["SKILL.md", "refs/notes.md", "refs/more.md"]) writeFileSync(join(pkg, file), file + "\n", "utf8");
+  return { source: join(dir, "pkg"), skills: ["demo"], shipped: {} };
+}
+
+test("a file in place of the skill directory is a warning naming it, and its remedy repairs the row", () => {
+  const dir = repo(["--skills"]);
+  const skill = join(dir, ".claude", "skills", "backlog-workflow");
+  rmSync(skill, { recursive: true });
+  writeFileSync(skill, "not a directory\n", "utf8");
+
+  const row = rows(dir).byId["agent-skill"];
+  assert.equal(row.status, "warn", JSON.stringify(row));
+  assert.equal(row.detail, "backlog-workflow is not a directory — nothing the skill ships can be installed under it");
+  assert.equal(row.fix, PRODUCT_NAME + " skills install   # after moving " +
+    join(canonicalPath(dir), ".claude", "skills", "backlog-workflow") + " aside");
+  assert.equal(readFileSync(skill, "utf8"), "not a directory\n", "doctor touched the obstruction");
+
+  // Positive control: once the file is moved aside, the command the row names turns it green.
+  rmSync(skill);
+  const r = run(dir, ["skills", "install"]);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.equal(rows(dir).byId["agent-skill"].status, "ok");
+});
+
+test("a file in place of a nested directory is named once, not each packaged file under it", () => {
+  const dir = repo();
+  const opts = skillPackage(dir);
+  const installed = join(dir, ".claude", "skills", "demo");
+  mkdirSync(installed, { recursive: true });
+  writeFileSync(join(installed, "SKILL.md"), "SKILL.md\n", "utf8");
+  writeFileSync(join(installed, "refs"), "not a directory\n", "utf8");
+
+  const row = checkSkill(dir, opts);
+  assert.equal(row.status, "warn", JSON.stringify(row));
+  assert.equal(row.detail, "demo/refs is not a directory — nothing the skill ships can be installed under it");
+  assert.ok(row.fix.endsWith("skills install   # after moving " +
+    join(canonicalPath(dir), ".claude", "skills", "demo", "refs") + " aside"), row.fix);
+
+  // A directory where SKILL.md belongs beside it: both are named, each in its own words.
+  rmSync(join(installed, "SKILL.md"));
+  mkdirSync(join(installed, "SKILL.md"));
+  const both = checkSkill(dir, opts);
+  assert.equal(both.status, "warn");
+  assert.equal(both.detail, "demo/SKILL.md is not a regular file — an editor cannot read the skill from it; " +
+    "demo/refs is not a directory — nothing the skill ships can be installed under it");
+  const target = join(canonicalPath(dir), ".claude", "skills");
+  assert.ok(both.fix.endsWith("# after moving " + join(target, "demo", "SKILL.md") + " " + join(target, "demo", "refs") + " aside"), both.fix);
+});
+
+test("positive control: with the directories real, an absent skill is not installed and a present one is green", () => {
+  const dir = repo();
+  const opts = skillPackage(dir);
+  const installed = join(dir, ".claude", "skills", "demo");
+  mkdirSync(join(installed, "refs"), { recursive: true });
+  const absent = checkSkill(dir, opts);
+  assert.equal(absent.status, "info", JSON.stringify(absent));
+  assert.match(absent.detail, /^not installed: demo — /);
+  assert.match(absent.fix, / skills install$/);
+
+  for (const file of ["SKILL.md", "refs/notes.md", "refs/more.md"]) writeFileSync(join(installed, file), file + "\n", "utf8");
+  assert.equal(checkSkill(dir, opts).status, "ok");
 });
 
 test("an unknown flag fails with code 2", () => {

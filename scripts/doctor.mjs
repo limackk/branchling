@@ -452,22 +452,36 @@ function checkAgentPointer(root) {
  */
 export function checkSkill(root, opts = {}) {
   const target = skillsTarget(repositoryRoot(root));
+  const state = compareInstalled(repositoryRoot(root), opts);
+  // A WARNING, unlike an absent or edited skill (TL-594): nobody chooses a
+  // directory where the skill file belongs, the editor reads nothing from it,
+  // and no refresh can repair it — `skills install` leaves it alone too.
+  // Consulted BEFORE the absence check (TL-632): a file standing where the
+  // skill's directory belongs also leaves SKILL.md absent, and "not installed"
+  // would print a remedy that installs nothing there.
+  const blocked = state.ok ? state.files.filter((f) => f.state === "blocked") : [];
+  if (blocked.length) {
+    // An obstructed ancestor is what has to move, not each packaged file under
+    // it, so it is named once — the path `skills install` names too (TL-603).
+    const files = blocked.filter((f) => f.at === undefined).map((f) => f.file);
+    const dirs = [...new Set(blocked.filter((f) => f.at !== undefined).map((f) => f.at))];
+    const clauses = [];
+    if (files.length) {
+      clauses.push(files.join(", ") + plural(files.length, " is not a regular file", " are not regular files") +
+        " — an editor cannot read the skill from " + plural(files.length, "it", "them"));
+    }
+    if (dirs.length) {
+      clauses.push(dirs.join(", ") + plural(dirs.length, " is not a directory", " are not directories") +
+        " — nothing the skill ships can be installed under " + plural(dirs.length, "it", "them"));
+    }
+    return check("agent-skill", "packaged skill", WARN, clauses.join("; "),
+      ownCommand("skills install", "after moving " + files.concat(dirs).map((f) => join(state.target, f)).join(" ") + " aside"));
+  }
   const missing = (opts.skills || USER_SKILLS).filter((name) => !existsSync(join(target, name, "SKILL.md")));
   if (missing.length) {
     return check("agent-skill", "packaged skill", INFO,
       "not installed: " + missing.join(", ") + " — an editor that loads skills will not know a backlog is here",
       ownCommand("skills install"));
-  }
-  const state = compareInstalled(repositoryRoot(root), opts);
-  // A WARNING, unlike an absent or edited skill (TL-594): nobody chooses a
-  // directory where the skill file belongs, the editor reads nothing from it,
-  // and no refresh can repair it — `skills install` leaves it alone too.
-  const blocked = state.ok ? state.files.filter((f) => f.state === "blocked").map((f) => f.file) : [];
-  if (blocked.length) {
-    return check("agent-skill", "packaged skill", WARN,
-      blocked.join(", ") + plural(blocked.length, " is not a regular file", " are not regular files") + " — an editor cannot read the skill from " +
-        plural(blocked.length, "it", "them"),
-      ownCommand("skills install", "after moving " + blocked.map((f) => join(state.target, f)).join(" ") + " aside"));
   }
   // An installation without its packaged skills cannot be compared with them;
   // that is a broken tarball, and `skills install` is where it is reported.
