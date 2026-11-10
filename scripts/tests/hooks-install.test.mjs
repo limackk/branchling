@@ -485,6 +485,41 @@ test("following the repair for an unclosed block keeps the user's lines after it
   assert.equal(run(dir, ["hooks", "install"]).status, 0, "once repaired, install no longer refuses");
 });
 
+test("uninstall refuses an unclosed block of ours and leaves every hook byte for byte (TL-639)", () => {
+  const dir = repo();
+  assert.equal(run(dir, ["hooks", "install"]).status, 0);
+  const path = hookPath(dir);
+  const other = hooksTarget(dir, COMMIT_MESSAGE_HOOK_NAME).path;
+  const otherBytes = readFileSync(other, "utf8");
+  const theirs = "\n# theirs, after the block\nnpm test || exit 1\n";
+  const broken = "#!/bin/sh\nnpm run pre\n" + hookBlock().split("\n").slice(0, -1).join("\n") + theirs;
+  writeFileSync(path, broken, "utf8");
+
+  const r = run(dir, ["hooks", "uninstall"]);
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  assert.doesNotMatch(r.stdout + r.stderr, /removed —/, "a removal it did not make was reported");
+  assert.match(r.stderr, /branchling hooks uninstall: the pre-commit hook opens our block and never closes it/);
+  assert.ok(r.stderr.includes(unclosedSpan(inspect(hooksTarget(dir)).unclosed)),
+    "the span is the one install names:\n" + r.stderr);
+  assert.match(r.stderr, /Nothing was changed/);
+  assert.equal(readFileSync(path, "utf8"), broken, "the unclosed hook was written");
+  assert.equal(readFileSync(other, "utf8"), otherBytes, "the other hook was changed before the refusal");
+
+  const json = jsonRefusal(run(dir, ["hooks", "uninstall", "--json"]), "hooks-uninstall", "unclosed-block", /never closes it/);
+  assert.equal(json.removed, false);
+  assert.equal(readFileSync(path, "utf8"), broken);
+
+  // Positive control: the same file with its closing marker is removed, and
+  // only the block goes.
+  writeFileSync(path, "#!/bin/sh\nnpm run pre\n" + hookBlock() + theirs, "utf8");
+  const ok = run(dir, ["hooks", "uninstall"]);
+  assert.equal(ok.status, 0, ok.stderr);
+  assert.match(ok.stdout, /^\S+ pre-commit removed — the rest of /m);
+  assert.equal(readFileSync(path, "utf8"), "#!/bin/sh\nnpm run pre\n" + theirs.slice(1),
+    "the block goes with the line break that ended it; every other line stays");
+  assert.equal(existsSync(other), false, "the untouched commit-msg hook held only our block");
+});
+
 test("the unclosed span stops at the gate, and short of a line it does not recognise", () => {
   const open = hookBlock().split("\n").slice(0, -1);
   assert.deepEqual(unclosedBlockLines("#!/bin/sh\n" + open.join("\n") + "\nnpm test\n"), { first: 2, last: 5, gate: true });

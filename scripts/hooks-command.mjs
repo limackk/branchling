@@ -201,8 +201,9 @@ export function unclosedBlockLines(text) {
 }
 
 /**
- * The span `hooks install` and `doctor` both name as the repair for an
- * unclosed block — ONE string, so the two cannot drift apart (TL-609).
+ * The span `hooks install`, `hooks uninstall` and `doctor` all name as the
+ * repair for an unclosed block — ONE string, so they cannot drift apart
+ * (TL-609, TL-639).
  */
 export function unclosedSpan(range) {
   const where = range.first === range.last ? "line " + range.first : "lines " + range.first + "–" + range.last;
@@ -425,12 +426,25 @@ function runUninstall(root, plan) {
     console.log(color.dim(MARK.bullet + " nothing installed here — " + targets.map((target) => target.path).join(", ")));
     return 0;
   }
+  // REFUSED BEFORE ANYTHING IS WRITTEN, as `install` refuses it (TL-639). An
+  // unclosed block has no edge, so `withoutBlock` removes nothing; writing that
+  // text back and reporting a removal left the opening marker and the gate in
+  // place under a success line. The span is the one `install` names, so a
+  // person deletes the same lines whichever command they ran.
+  const stripped = ours.map((entry) => ({ entry, ...withoutBlock(entry.found.text) }));
+  const unclosed = stripped.find((s) => !s.removed);
+  if (unclosed) {
+    return refuse(plan, "uninstall", "unclosed-block",
+      "the " + unclosed.entry.target.name + " hook opens our block and never closes it", [
+        unclosed.entry.target.path,
+        "Nothing was changed. Delete " + unclosedSpan(unclosed.entry.found.unclosed) + " by hand; " + unclosedKeeps() + ".",
+      ], [], { removed: false });
+  }
   const removed = [];
-  for (const entry of ours) {
-    const stripped = withoutBlock(entry.found.text);
-    const remains = stripped.text.replace(/^#!.*\n?/, "").trim();
+  for (const { entry, text } of stripped) {
+    const remains = text.replace(/^#!.*\n?/, "").trim();
     if (!remains) rmSync(entry.target.path, { force: true });
-    else writeFileSync(entry.target.path, stripped.text, "utf8");
+    else writeFileSync(entry.target.path, text, "utf8");
     removed.push({ target: entry.target, remains });
   }
 
