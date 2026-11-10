@@ -327,7 +327,7 @@ test("the rebuild warning appears when the views cannot be built, and only then"
 
   const clean = importInto(backlog("build-ok"));
   assert.equal(clean.status, 0, clean.stderr);
-  assert.match(clean.stdout, /3 task\(s\) from github/, "the run reported nothing — the control proves nothing");
+  assert.match(clean.stdout, /3 tasks from github/, "the run reported nothing — the control proves nothing");
   assert.doesNotMatch(clean.stdout, warning);
 
   // A task already in the tree on a board outside the registry makes the build
