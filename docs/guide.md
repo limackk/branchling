@@ -723,8 +723,13 @@ copied in as if it were markdown.
 belongs to one of three categories: *To Do* lands on your first status, *In
 Progress* on your in-progress status, *Done* on your first archived one. Name a
 status more precisely with `--status "In Review=<one of yours>"`, repeatable;
-labels map with `--label` exactly as for GitHub. The ticket's priority is noted
-in the task body rather than mapped.
+labels map with `--label` exactly as for GitHub.
+
+**Priorities map only when you name them.** Jira priority names are configured
+per site, so there is no safe default: without `--priority` every task keeps
+your template's priority and the body notes the ticket's. `--priority
+"High=<one of yours>"`, repeatable, sets the field; a target outside
+`priorities:` in `config.yaml` is refused before anything is written.
 
 **The ticket stays open in Jira.** Unlike a GitHub issue, there is nothing to
 retire: people outside the repository still work from the ticket, and the link

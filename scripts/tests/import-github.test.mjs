@@ -278,9 +278,9 @@ test("--dry-run --json answers in its envelope, writes nothing, and lists what t
   assert.equal(env.root, dir);
   assert.deepEqual(env.created, []);
   assert.deepEqual(env.wouldCreate, [
-    { title: "Crash on startup when the config file is missing", status: config.statuses[0], labels: [], source: SOURCES[0], sourceState: "open" },
-    { title: "Document the retry policy", status: config.archivedStatuses[0], labels: [], source: SOURCES[1], sourceState: "closed" },
-    { title: "Batch the outbound writes", status: config.statuses[0], labels: [], source: SOURCES[2], sourceState: "open" },
+    { title: "Crash on startup when the config file is missing", status: config.statuses[0], priority: null, labels: [], source: SOURCES[0], sourceState: "open" },
+    { title: "Document the retry policy", status: config.archivedStatuses[0], priority: null, labels: [], source: SOURCES[1], sourceState: "closed" },
+    { title: "Batch the outbound writes", status: config.statuses[0], priority: null, labels: [], source: SOURCES[2], sourceState: "open" },
   ]);
   assert.deepEqual(env.skipped, []);
   assert.deepEqual(env.droppedLabels, ["bug ×1", "performance ×1", "needs-triage ×1"]);

@@ -428,7 +428,7 @@ Common to all of them:
 | `plan add <ID>... --wave` | `--why` to create the wave; no `--json` | none (text) |
 | `seed` | a plan as JSON on stdin | `seed` |
 | `import --from github` | issues as JSON on stdin | `import` |
-| `import --from jira` | a Jira Cloud REST API v3 search response on stdin — one page or an array of pages; `--status <from>=<to>` maps a workflow status by name | `import` |
+| `import --from jira` | a Jira Cloud REST API v3 search response on stdin — one page or an array of pages; `--status <from>=<to>` maps a workflow status by name, `--priority <from>=<to>` a priority onto one of `priorities:` | `import` |
 
 `<command> --help --json` describes each command's flags, which are required,
 and which draw on a vocabulary — with that project's values — so an interface
