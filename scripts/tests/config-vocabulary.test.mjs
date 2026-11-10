@@ -78,7 +78,7 @@ test("a tree written by the tool passes, and says how much it read", () => {
   assert.equal(r.status, 0, r.stderr);
   // Not just "green": the count is what separates a tree in order from a guard
   // that read nothing. Without it this test would pass on an empty directory.
-  assert.match(r.stdout, /2 task\(s\) checked/);
+  assert.match(r.stdout, /2 tasks checked/);
 });
 
 // ── The positive control: it MUST go red ──────────────────────────────────
@@ -109,7 +109,7 @@ test("the message names the field, the value, the count and the file", () => {
 
   const r = vocabulary(dir);
   assert.equal(r.status, 1);
-  assert.match(r.stderr, /sasquatch ×2 in 2 file\(s\)/);
+  assert.match(r.stderr, /sasquatch ×2 in 2 files/);
   // Naming the count without naming a file leaves the reader grepping the tree.
   for (const f of files) assert.ok(r.stderr.includes(f), "the message does not name " + f);
 });
@@ -210,7 +210,7 @@ test("filesCarrying counts a list field once per file, not once per hit", () => 
 test("report prints the count on a clean audit, so green carries evidence", () => {
   const { lines, code } = report([], ["a.md"], [{ type: "task" }]);
   assert.equal(code, 0);
-  assert.match(lines.join("\n"), /1 task\(s\) checked/);
+  assert.match(lines.join("\n"), /1 task checked/);
 });
 
 test("report refuses to pick a side between the config and the tree", () => {
@@ -316,7 +316,7 @@ test("`doctor` prints the row, with the denominator and both repairs", () => {
   const r = run(dir, ["doctor", "--dir", "."]);
   const out = r.stdout + r.stderr;
   assert.match(out, /declared but unused/);
-  assert.match(out, /carried by 0 of 1 task\(s\)/, "the count arrived without its denominator");
+  assert.match(out, /carried by 0 of 1 task\b/, "the count arrived without its denominator");
   assert.match(out, /use the value, or drop it from/);
   // A MEASUREMENT, not a failure: the exit code does not move.
   assert.equal(r.status, 0, out);

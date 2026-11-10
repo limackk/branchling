@@ -37,7 +37,7 @@ import { fileURLToPath } from "node:url";
 import { PRODUCT_NAME as N, PRODUCT_VERSION } from "./product.mjs";
 import { ConfigError, formatConfigError, loadConfig } from "./config.mjs";
 import { printJson } from "./json-envelope.mjs";
-import { MARK, color, failure, plainChildEnv } from "./ui.mjs";
+import { MARK, color, failure, plainChildEnv, plural } from "./ui.mjs";
 import { CHECK_GUARDS, effectiveSeverity, guardsForRun } from "./check-guards.mjs";
 import { BACKLOG_DIR_REFUSAL_HELP, BACKLOG_DIR_REFUSAL_KIND, isBacklogDirRefusal, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { FIELD_SHAPES, REASON_MAX_LENGTH } from "./task-fields.mjs";
@@ -1743,7 +1743,7 @@ export const COMMANDS = {
       "",
       "  WORK HELD IN ANOTHER TREE IS NOT AN EMPTY QUEUE. When every eligible task is",
       "  claimed in another worktree of this clone, the run ends with `stopped: every",
-      "  eligible task is held in another tree of this clone — N task(s): <ids>`, and",
+      "  eligible task is held in another tree of this clone — N tasks: <ids>`, and",
       "  `--json` carries `heldInOtherTrees`. --wait <s> keeps the run in the",
       "  foreground instead: while a task is held elsewhere, or a `--plan` wave is",
       "  still in flight, it asks `next` again every <s> seconds and resumes on the",
@@ -2616,9 +2616,9 @@ function skippedGuardLine(name) {
  */
 export function checkVerdict(failed, ran) {
   if (!failed.length) {
-    return color.ok(MARK.ok) + " check: " + ran + " release gate(s) passed";
+    return color.ok(MARK.ok) + " check: " + ran + " release " + plural(ran, "gate", "gates") + " passed";
   }
-  return color.err(MARK.err) + " check: " + failed.length + " gate(s) failed — " + failed.join(", ") + "\n" +
+  return color.err(MARK.err) + " check: " + failed.length + " " + plural(failed.length, "gate", "gates") + " failed — " + failed.join(", ") + "\n" +
     "  " + MARK.arrow + " " + N + " check --" + failed[0] + "   # that gate on its own, with what it found";
 }
 

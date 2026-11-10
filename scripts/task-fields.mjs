@@ -645,13 +645,14 @@ export function historyEntryKind(entry) {
  * The hashes are kept short for READING only; the record holds them whole,
  * because a base-version comparison against eight characters is a comparison
  * against a prefix. The arrow is a parameter because this file is pasted into
- * the viewer and cannot import the terminal's symbols from `ui.mjs`.
+ * the viewer and cannot import the terminal's symbols from `ui.mjs` —
+ * which is also why the count below spells its own singular or plural.
  */
 export function describeBodyChange(entry, arrow = "->") {
   const lines = (entry && entry.lines) || {};
   const short = (h) => String(h || "").replace(/^sha256:/, "").slice(0, 8) || "(none)";
   const counts = Number.isInteger(lines.added) && Number.isInteger(lines.removed)
-    ? "+" + lines.added + " -" + lines.removed + " line(s)"
+    ? "+" + lines.added + " -" + lines.removed + (lines.added + lines.removed === 1 ? " line" : " lines")
     : "rewritten";
   return "body " + counts + " (" + short(entry && entry.from) + " " + arrow + " " + short(entry && entry.to) + ")";
 }

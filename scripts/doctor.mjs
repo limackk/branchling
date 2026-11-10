@@ -189,7 +189,7 @@ function unusedRow(unused, taskCount) {
       taskCount ? "every declared value is carried by at least one task" : "no tasks yet — nothing to measure against");
   }
   const detail = unused
-    .map((u) => "`" + u.field + "`: " + u.values.join(", ") + " carried by 0 of " + taskCount + " task(s)")
+    .map((u) => "`" + u.field + "`: " + u.values.join(", ") + " carried by 0 of " + taskCount + " " + plural(taskCount, "task", "tasks"))
     .join("; ");
   const where = unused.length === 1 ? "`" + unused[0].dictionary + ":` in config.yaml" : "config.yaml";
   return check("unused-vocabulary", title, INFO, detail,
@@ -214,7 +214,7 @@ function checkLogStatus(root, config) {
   const { ahead, behind, logged } = auditLogStatus(readTaskTexts(backlogPaths(root).tasksDir), config);
   if (ahead.length) {
     return check("log-status", "log vs status field", ERR,
-      ahead.length + " task(s) log a closed status while the field is still open — " +
+      ahead.length + " " + plural(ahead.length, "task logs", "tasks log") + " a closed status while the field is still open — " +
         ahead.slice(0, 3).map((r) => r.file.replace(/-.*$/, "")).join(", "),
       ownCommand("check --log-status"));
   }
@@ -223,11 +223,12 @@ function checkLogStatus(root, config) {
     // nothing writes `## Log`, so a legacy section falling behind is the normal
     // end state of a task, not a mistake anybody made.
     return check("log-status", "log vs status field", WARN,
-      behind.length + " of " + logged + " legacy `## Log` section(s) are behind their field — prose, not state",
+      behind.length + " of " + logged + " legacy `## Log` " + plural(logged, "section", "sections") + " " +
+        plural(behind.length, "is", "are") + " behind " + plural(behind.length, "its", "their") + " field — prose, not state",
       null);
   }
   return check("log-status", "log vs status field", OK,
-    logged + " task(s) with a status-bearing `## Log`, each agreeing with its field");
+    logged + " " + plural(logged, "task", "tasks") + " with a status-bearing `## Log`, each agreeing with its field");
 }
 
 function checkPrefix(root, config) {
@@ -275,10 +276,10 @@ function checkSnapshot(root, config) {
   const uncovered = foreign.filter((id) => !records.some((m) => taskIdPatterns(m.from).id.test(id)));
   if (!uncovered.length) {
     return check("snapshot", "history reference point", INFO,
-      foreign.length + " key(s) still on a previous prefix — the recorded migration repoints them on the next run");
+      foreign.length + " " + plural(foreign.length, "key", "keys") + " still on a previous prefix — the recorded migration repoints them on the next run");
   }
   return check("snapshot", "history reference point", WARN,
-    uncovered.length + " key(s) under a prefix the tree does not use (" + uncovered.slice(0, 3).join(", ") +
+    uncovered.length + " " + plural(uncovered.length, "key", "keys") + " under a prefix the tree does not use (" + uncovered.slice(0, 3).join(", ") +
       ") and no migration record explains it — the next reconcile will log them as deleted",
     "rm " + join("history", SNAPSHOT_FILE) + "   # drop the stale reference point instead of recording tombstones");
 }
@@ -325,7 +326,8 @@ function checkUnrecorded(root) {
   }
   const tasks = [...new Set(result.entries.map((e) => e.task))];
   return check("unrecorded", "changes not in the log", WARN,
-    result.entries.length + " change(s) across " + tasks.length + " task(s) the history has not seen (" +
+    result.entries.length + " " + plural(result.entries.length, "change", "changes") + " across " +
+      tasks.length + " " + plural(tasks.length, "task", "tasks") + " the history has not seen (" +
       tasks.slice(0, 3).join(", ") + (tasks.length > 3 ? ", …" : "") + ")" +
       " — normal between an edit and the command that records it",
     ownCommand("history --actor <ns:name> --source manual"));
@@ -700,7 +702,8 @@ function checkClosedElsewhere(root, config, metas) {
     .map((task) => ({ ...task, elsewhere: divergences(task.status, scan.byId.get(task.id)) }));
   return archivedElsewhereBySource(tasks, config.archivedStatuses).map((group) =>
     check("closed-elsewhere-" + group.source, "closed elsewhere", WARN,
-      group.ids.length + " task(s) closed on " + group.source + " are still open here",
+      group.ids.length + " " + plural(group.ids.length, "task", "tasks") + " closed on " + group.source + " " +
+        plural(group.ids.length, "is", "are") + " still open here",
       "merge or rebase before taking work"));
 }
 

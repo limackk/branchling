@@ -98,7 +98,7 @@ import { todayStamp } from "./today.mjs";
 import { statedActorRefusal, buildFieldSpecs, extractMeta, fieldSpec, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
 import { readTaskRecords, splitList, unknownFilterValues } from "./task-select.mjs";
 import { printJson } from "./json-envelope.mjs";
-import { MARK, color, failure, ok, plainChildEnv, warn } from "./ui.mjs";
+import { MARK, color, failure, ok, plainChildEnv, warn, plural } from "./ui.mjs";
 import { processTreeDetached, stopProcessTree } from "./process-tree.mjs";
 import { executableInvocation, posixShell } from "./posix-shell.mjs";
 import { processEssentials } from "./process-env.mjs";
@@ -327,15 +327,18 @@ export function planStop(answer) {
   // turn to wait for.
   const unplanned = plan.skippedUnplanned;
   const unplannedClause = unplanned
-    ? ", and " + unplanned + " open task(s) the plan does not schedule were left alone"
+    ? ", and " + unplanned + " open " + plural(unplanned, "task", "tasks") + " the plan does not schedule " +
+      plural(unplanned, "was", "were") + " left alone"
     : "";
   if (!plan.wave) return "every wave of the plan is finished" + unplannedClause;
   const later = typeof plan.skippedOutsideWave === "number" && typeof unplanned === "number"
     ? plan.skippedOutsideWave - unplanned
     : 0;
   return "plan wave " + plan.wave + " (" + (plan.name || "unnamed") + ") is not finished — " +
-    plan.open + " of " + plan.scheduled + " task(s) in it are still open and none was free to take" +
-    (later ? ", " + later + " open task(s) in later waves are not reached yet" : "") +
+    plan.open + " of " + plan.scheduled + " " + plural(plan.scheduled, "task", "tasks") + " in it " +
+    plural(plan.open, "is", "are") + " still open and none was free to take" +
+    (later ? ", " + later + " open " +
+      plural(later, "task in later waves is", "tasks in later waves are") + " not reached yet" : "") +
     unplannedClause;
 }
 
@@ -366,7 +369,7 @@ export function heldInOtherTrees(answer, archivedStatuses) {
  *
  * A SKIP IS NEVER SILENT. A task quietly left out is indistinguishable from an
  * empty queue, and the reader has no second place to look — the same class of
- * defect as a silent no-op. So the run reports "3 task(s) waiting for `analyst`
+ * defect as a silent no-op. So the run reports "3 tasks waiting for `analyst`
  * — no command was given for that role" and names the ids.
  */
 /**
@@ -1509,7 +1512,7 @@ function renderReport(report, plan) {
   const lines = [];
   const tally = report.tally;
   lines.push("");
-  lines.push("  " + report.taken.length + " task(s) taken · " + tally.closed + " closed · " +
+  lines.push("  " + report.taken.length + " " + plural(report.taken.length, "task", "tasks") + " taken · " + tally.closed + " closed · " +
     tally.blocked + " blocked · " +
     (tally.awaitingVouch ? tally.awaitingVouch + " awaiting a vouch · " : "") +
     (tally.foreignBaseline ? tally.foreignBaseline + " foreign baseline red · " : "") +
@@ -1546,16 +1549,16 @@ function renderReport(report, plan) {
   if (!report.taken.length) lines.push("  " + color.dim(MARK.bullet + " nothing was taken"));
   if (report.skippedDeadlocked && report.skippedDeadlocked.length) {
     lines.push("");
-    lines.push("  " + MARK.warn + " " + report.skippedDeadlocked.length +
-      " task(s) skipped at a role-boundary deadlock");
+    lines.push("  " + MARK.warn + " " + report.skippedDeadlocked.length + " " +
+      plural(report.skippedDeadlocked.length, "task", "tasks") + " skipped at a role-boundary deadlock");
     for (const finding of report.skippedDeadlocked) {
       lines.push("    " + color.dim(describeDeadlock(finding)));
     }
   }
   if (report.skippedConflict && report.skippedConflict.length) {
     lines.push("");
-    lines.push("  " + MARK.bullet + " " + report.skippedConflict.length +
-      " task(s) held back while their conflict group is in progress");
+    lines.push("  " + MARK.bullet + " " + report.skippedConflict.length + " " +
+      plural(report.skippedConflict.length, "task held back while its", "tasks held back while their") + " conflict group is in progress");
     for (const skip of report.skippedConflict) lines.push("    " + color.dim(describeConflict(skip)));
   }
   // THE FACT ABOUT THE MACHINE, SAID HERE AND NOWHERE ELSE (TL-184). The task
@@ -1602,9 +1605,9 @@ function renderReport(report, plan) {
       // (TL-223). It is named for what it is — those tasks ask for nobody in
       // particular — rather than as a role called "", which no reader would
       // recognise and no `--agent-for` could ever answer.
-      lines.push("    " + MARK.warn + " " + ids.length + " task(s) " + (role
-        ? "ask for `" + role + "` — no `--agent-for " + role + "=…` or `--profile-for " + role + "=…` was given"
-        : "ask for no role in particular — no `--agent` or `--profile` was given"));
+      lines.push("    " + MARK.warn + " " + ids.length + " " + plural(ids.length, "task", "tasks") + " " + (role
+        ? plural(ids.length, "asks", "ask") + " for `" + role + "` — no `--agent-for " + role + "=…` or `--profile-for " + role + "=…` was given"
+        : plural(ids.length, "asks", "ask") + " for no role in particular — no `--agent` or `--profile` was given"));
       lines.push("      " + color.dim(ids.join(", ")));
     }
   }
@@ -1614,7 +1617,7 @@ function renderReport(report, plan) {
     lines.push("  waiting for an executor this run is not:");
     for (const kind of waitingExecutors) {
       const ids = report.waitingExecutor[kind];
-      lines.push("    " + MARK.warn + " " + ids.length + " task(s) ask for `executor: " + kind + "`");
+      lines.push("    " + MARK.warn + " " + ids.length + " " + plural(ids.length, "task asks", "tasks ask") + " for `executor: " + kind + "`");
       lines.push("      " + color.dim(ids.join(", ")));
     }
   }
@@ -1625,7 +1628,7 @@ function renderReport(report, plan) {
       + (report.maxUnattendedEstimate ? " (above `" + report.maxUnattendedEstimate + "`)" : "") + ":");
     for (const estimate of waitingSizes) {
       const ids = report.waitingSize[estimate];
-      lines.push("    " + MARK.warn + " " + ids.length + " task(s) are `" + estimate + "` — start a session for one deliberately");
+      lines.push("    " + MARK.warn + " " + ids.length + " " + plural(ids.length, "task is", "tasks are") + " `" + estimate + "` — start a session for one deliberately");
       lines.push("      " + color.dim(ids.join(", ")));
     }
   }
@@ -1682,7 +1685,8 @@ export async function run(argv) {
   // is the project's, and the consistency between them is checked at the seam).
   const unknownRoles = servedRoles(plan).filter((r) => (config.roles || []).indexOf(r) < 0);
   if (unknownRoles.length) {
-    console.error(failure(N + " run", "`--agent-for` or `--profile-for` names role(s) this backlog does not declare: " + unknownRoles.join(", "),
+    console.error(failure(N + " run", "`--agent-for` or `--profile-for` names " +
+      plural(unknownRoles.length, "a role", "roles") + " this backlog does not declare: " + unknownRoles.join(", "),
       (config.roles || []).length
         ? ["`roles` in config.yaml holds: " + config.roles.join(", ")]
         : ["This backlog declares no `roles:` in config.yaml, so no task can ask for one."],
@@ -1938,7 +1942,7 @@ export async function run(argv) {
       });
     } else {
       console.log("");
-      console.log("  " + shown.length + " task(s) would run, in this order:");
+      console.log("  " + shown.length + " " + plural(shown.length, "task", "tasks") + " would run, in this order:");
       let heading = null;
       for (const r of shown) {
         if (planned && r.wave !== heading) {
@@ -1961,7 +1965,8 @@ export async function run(argv) {
       if (wall) {
         console.log("  " + color.dim(
           "the projection stops at wave " + wall.wave + " — " + (wall.name || "unnamed") + ": " +
-          wall.left + " of " + wall.open + " open task(s) in it are not this run's to take"
+          wall.left + " of " + wall.open + " open " + plural(wall.open, "task", "tasks") + " in it " +
+          plural(wall.left, "is", "are") + " not this run's to take"
         ));
         // The same sentence per task that `plan` prints under a held wave.
         for (const h of wall.holds) console.log("    " + color.dim(h.id + "  " + h.reason));
@@ -2122,8 +2127,8 @@ export async function run(argv) {
       // wave and what was left alone; without the flag the sentence is untouched.
       const why = planned ? planStop(answer) : null;
       const deadlockStop = ((answer && answer.skippedDeadlocked) || []).length
-        ? ((answer && answer.skippedDeadlocked) || []).length +
-          " task(s) were skipped at a role-boundary deadlock"
+        ? ((answer && answer.skippedDeadlocked) || []).length + " " +
+          plural(((answer && answer.skippedDeadlocked) || []).length, "task was", "tasks were") + " skipped at a role-boundary deadlock"
         : null;
       // NOT AN EMPTY QUEUE EITHER (TL-491): work another loop of this clone is
       // holding comes back when that loop gives it up, and a run that called
@@ -2149,7 +2154,7 @@ export async function run(argv) {
         gaveUp = waited.gaveUp = true;
       }
       const heldStop = held.length
-        ? held.length + " task(s): " + held.join(", ")
+        ? held.length + " " + plural(held.length, "task", "tasks") + ": " + held.join(", ")
         : null;
       const parts = [why, deadlockStop].filter(Boolean);
       if (heldStop) {
@@ -2211,7 +2216,7 @@ export async function run(argv) {
       spin = { id: task.id, role, eligible: left };
       stopped = task.id + " was handed out twice" + (role ? " to role `" + role + "`" : "") +
         " — the loop stopped rather than spin, and gave the claim back" +
-        (left ? "; " + left + " other task(s) are still eligible, so the queue is not empty" : "");
+        (left ? "; " + left + " other " + plural(left, "task is", "tasks are") + " still eligible, so the queue is not empty" : "");
       if (!recordState(task.id, null)) stopped += "; " + stateStop();
       break;
     }

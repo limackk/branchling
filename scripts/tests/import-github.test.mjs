@@ -327,7 +327,7 @@ test("the rebuild warning appears when the views cannot be built, and only then"
 
   const clean = importInto(backlog("build-ok"));
   assert.equal(clean.status, 0, clean.stderr);
-  assert.match(clean.stdout, /3 task\(s\) from github/, "the run reported nothing — the control proves nothing");
+  assert.match(clean.stdout, /3 tasks from github/, "the run reported nothing — the control proves nothing");
   assert.doesNotMatch(clean.stdout, warning);
 
   // A task already in the tree on a board outside the registry makes the build
@@ -441,7 +441,7 @@ test("a second import of the same input creates nothing — and a new issue stil
   const second = importInto(dir);
   assert.equal(second.status, 0, second.stderr);
   assert.equal(taskFiles(dir).length, 3, "the second import duplicated tasks");
-  assert.match(second.stdout, /1 task\(s\) from github|0 task\(s\) from github/);
+  assert.match(second.stdout, /1 task from github|0 tasks from github/);
 
   // The control: the deduplication must be about the URL, not about refusing to
   // write at all.

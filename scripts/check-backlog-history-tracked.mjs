@@ -56,7 +56,7 @@ import { loadConfigOrExit } from "./config.mjs";
 import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { ANY_HISTORY_FILE } from "./task-id.mjs";
-import { MARK, color } from "./ui.mjs";
+import { MARK, color, plural } from "./ui.mjs";
 import { canonicalPath } from "./canonical-path.mjs";
 import { gitDiscoveryEnv } from "./git-env.mjs";
 
@@ -226,7 +226,7 @@ export function main(argv) {
 
   if (result.orphans.length && only !== "gates") {
     console.log(
-      `${WARNM} history: ${result.orphans.length} log(s) with no task in this tree — ` +
+      `${WARNM} history: ${result.orphans.length} ${plural(result.orphans.length, "log", "logs")} with no task in this tree — ` +
         "usually a task on another branch, which is the point of data travelling with branches"
     );
     for (const id of result.orphans.slice(0, 10)) {
@@ -248,15 +248,15 @@ export function main(argv) {
     // The counts are the positive control: "0 untracked" over 0 logs would be a
     // guard that read nothing, and it must not look like a guard that passed.
     console.log(
-      `${OKM} history: ${result.checked} log(s) checked against git, each one tracked ` +
-        `(${result.tasks} task(s) in the tree)`
+      `${OKM} history: ${result.checked} ${plural(result.checked, "log", "logs")} checked against git, each one tracked ` +
+        `(${result.tasks} ${plural(result.tasks, "task", "tasks")} in the tree)`
     );
     return 0;
   }
 
   console.log(
-    `${ERRM} history: ${result.untracked.length} of ${result.checked} log(s) are NOT tracked, ` +
-      "while their task files are"
+    `${ERRM} history: ${result.untracked.length} of ${result.checked} ${plural(result.checked, "log", "logs")} ` +
+      `${plural(result.untracked.length, "is", "are")} NOT tracked, while ${plural(result.untracked.length, "its task file is", "their task files are")}`
   );
   for (const id of result.untracked.slice(0, 20)) {
     console.log(`  - ${rel(join(paths.historyDir, id + ".jsonl"))}`);

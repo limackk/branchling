@@ -216,7 +216,7 @@ test("the gate's text names what it did not look at", () => {
   setConfig(fx.dir, API + FRONTEND);
   const r = run(fx.dir, ["check", "--release", "--dir", "backlog"]);
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /frontend: deployed from the repository `acme-frontend`, which this one cannot observe — 3 task\(s\)/);
+  assert.match(r.stdout, /frontend: deployed from the repository `acme-frontend`, which this one cannot observe — 3 tasks/);
 });
 
 test("deploy status names the frontend's tasks as unobservable, in their own lane", () => {

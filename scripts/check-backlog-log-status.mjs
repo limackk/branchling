@@ -64,7 +64,7 @@ import { fileURLToPath } from "node:url";
 import { loadConfigOrExit } from "./config.mjs";
 import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { extractMeta, splitFrontmatter } from "./task-fields.mjs";
-import { MARK, color, errColor } from "./ui.mjs";
+import { MARK, color, errColor, plural } from "./ui.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 
 const OKM = color.ok(MARK.ok);
@@ -156,19 +156,19 @@ export function main(argv) {
   if (!ahead.length && !behind.length) {
     // The two counts ARE the positive control: "no drift" over zero logged tasks
     // means the guard found nothing to read, which is a different answer.
-    console.log(`${OKM} log/status: ${logged} of ${checked} task(s) carry a status-bearing \`## Log\`, each agreeing with its field`);
+    console.log(`${OKM} log/status: ${logged} of ${checked} ${plural(checked, "task", "tasks")} ${plural(logged, "carries", "carry")} a status-bearing \`## Log\`, each agreeing with its field`);
     return 0;
   }
 
   if (ahead.length) {
-    console.error(`${ERRM} log/status: ${ahead.length} task(s) whose log records a CLOSED status while the field is still open`);
+    console.error(`${ERRM} log/status: ${ahead.length} ${plural(ahead.length, "task", "tasks")} whose log records a CLOSED status while the field is still open`);
     for (const row of ahead) console.error(describe(row));
     console.error("  The views take the field, so these count as open work while being finished —");
     console.error("  the state the index misreports without looking wrong. Settle it by hand: either");
     console.error(`  side may be the true one, so \`${N} done <ID>\` or a new log entry, not a guess.`);
   }
   if (behind.length) {
-    console.log(`${WARNM} log/status: ${behind.length} of ${logged} logged task(s) have a \`## Log\` behind their field`);
+    console.log(`${WARNM} log/status: ${behind.length} of ${logged} ${plural(logged, "logged task", "logged tasks")} ${plural(behind.length, "has", "have")} a \`## Log\` behind their field`);
     for (const row of behind.slice(0, 10)) console.log(describe(row));
     if (behind.length > 10) console.log(`  … and ${behind.length - 10} more`);
     console.log("  This reports, it does not fail. Since TL-105 the tool writes no `## Log` at all —");

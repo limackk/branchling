@@ -46,7 +46,7 @@ import { queueStatuses } from "./next-task.mjs";
 import { backlogPaths } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { extractMeta, splitFrontmatter } from "./task-fields.mjs";
-import { MARK, color, heading, plainChildEnv, table } from "./ui.mjs";
+import { MARK, color, heading, plainChildEnv, table, plural } from "./ui.mjs";
 
 /**
  * The window every share in the report is a share OF.
@@ -263,7 +263,7 @@ const pct = (share) => (share * 100).toFixed(share < 0.01 ? 2 : 1) + "%";
 export function renderBudget(budget) {
   const out = [heading(N + " stats --context — what an answer from this backlog costs")];
   out.push("  " + color.dim(
-    "measured by running each command over " + budget.tasks + " task file(s); tokens estimated at " +
+    "measured by running each command over " + budget.tasks + " " + plural(budget.tasks, "task file", "task files") + "; tokens estimated at " +
     "4 characters each, shares of a " + (budget.window / 1000) + "k window"
   ));
   out.push("");

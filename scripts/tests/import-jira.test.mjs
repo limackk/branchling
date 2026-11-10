@@ -416,7 +416,7 @@ test("the text report names the unknown nodes and points at no retirement", () =
   const dir = backlog("report");
   const r = importInto(dir);
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /3 task\(s\) from jira/);
+  assert.match(r.stdout, /3 tasks from jira/);
   assert.match(r.stdout, /formatting not converted: .*panel ×1/);
   assert.match(r.stderr, /3 of them have no `verification:`/);
   assert.doesNotMatch(r.stdout + r.stderr, /RETIRING THE SOURCE ISSUES|still OPEN/, "a Jira ticket stays open by design");
@@ -454,7 +454,7 @@ test("a re-run creates nothing — and a new ticket still lands", () => {
   const second = importInto(dir);
   assert.equal(second.status, 0, second.stderr);
   assert.equal(taskFiles(dir).length, 3, "the second import duplicated tasks");
-  assert.match(second.stdout, /3 issue\(s\) skipped/);
+  assert.match(second.stdout, /3 issues skipped/);
 
   // The control: deduplication is by the browse URL, not a refusal to write.
   const grown = JSON.parse(search());

@@ -270,13 +270,13 @@ test("one run reports what it recorded AND what it adopted", () => {
 
   assert.equal(run.status, 0, run.stderr);
   // The incident's complaint in one line: the run reported NEITHER.
-  assert.match(run.stdout, /recorded 1 change\(s\)/, "what it wrote");
+  assert.match(run.stdout, /recorded 1 change\b/, "what it wrote");
   assert.match(run.stdout, /BL-901 · status/);
   // BOTH tasks are adopted, including the one an entry was written for: the log
   // vouches for `status` alone, so every other field of BL-901 is still taken on
   // the file's word. Naming only the tasks nothing was recorded for would say
   // the rest were fully accounted for, which is the claim that cannot be made.
-  assert.match(run.stdout, /2 task\(s\) had no reference point/, "what it took on trust");
+  assert.match(run.stdout, /2 tasks had no reference point/, "what it took on trust");
   // Each adopted task names the fields it was adopted with (TL-387); the id
   // alone left a caller who had just edited one of them to guess.
   assert.match(run.stdout, /^ {2}BL-900 · .*estimate/m);

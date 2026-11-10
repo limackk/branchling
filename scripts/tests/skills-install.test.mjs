@@ -673,7 +673,7 @@ test("what the install prints names each outcome, and only the ones that happene
 
   // Whole strings, because every line of this is something a user reads.
   assert.equal(say({ replaced: ["demo/SKILL.md", "demo/b.md"] }),
-    "✓ refreshed: 2 file(s) → /t\n    demo/SKILL.md\n    demo/b.md");
+    "✓ refreshed: 2 files → /t\n    demo/SKILL.md\n    demo/b.md");
   assert.equal(say({ kept: ["demo/SKILL.md", "demo/b.md"] }), [
     "! kept (matches no shipped version — your edit?): demo/SKILL.md, demo/b.md",
     "  To replace it anyway, discarding what it holds, name it:",
@@ -698,7 +698,7 @@ test("what the install prints names each outcome, and only the ones that happene
   assert.equal(say({ skipped: ["demo/SKILL.md", "demo/b.md"] }),
     "· skipped (already there, left alone): demo/SKILL.md, demo/b.md");
   assert.equal(say({ created: ["demo/SKILL.md"] }), [
-    "✓ skills: 1 file(s) → /t",
+    "✓ skills: 1 file → /t",
     "    demo/SKILL.md",
     "  The skill holds no procedure and no vocabulary — it tells an agent to run",
     "  `" + CLI_NAME + " instructions overview`, which is rendered with YOUR config.yaml.",
@@ -732,7 +732,7 @@ test("`skills install --refresh` through the CLI: keeps an edit, then replaces i
   writeFileSync(path, "# edited again\n", "utf8");
   const text = run(["skills", "install", "--refresh", "backlog-workflow/SKILL.md", "--dir", fx.backlog], fx.dir, fx.env);
   assert.equal(text.status, 0, text.stderr);
-  assert.match(text.stdout, /refreshed: 1 file\(s\)/);
+  assert.match(text.stdout, /refreshed: 1 file\b/);
   assert.ok(text.stdout.includes(SKILL), text.stdout);
 });
 

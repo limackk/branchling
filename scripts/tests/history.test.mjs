@@ -665,7 +665,7 @@ test("CLI: it does NOT say `no changes to record` when a change has no author", 
   assert.equal(r.status, 0, r.stderr);
   assert.ok(!/no changes to record/.test(r.stdout),
     "that sentence reads as `all recorded` while the truth is `recorded as nobody's`");
-  assert.match(r.stdout, /carry no author/);
+  assert.match(r.stdout, /carr(y|ies) no author/);
   assert.match(r.stdout, /--attribute/, "and it has to say what to do about it");
   rmSync(dir, { recursive: true, force: true });
 });

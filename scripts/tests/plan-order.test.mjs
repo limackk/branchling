@@ -313,8 +313,8 @@ test("work scheduled in a later wave is not reported as work nobody scheduled", 
 
   // And the sentences say WHICH of the two each number is.
   const text = cli(["next", "--dir", f.backlog, "--plan"], f.env).out;
-  assert.match(text, /1 open task\(s\) scheduled in a LATER wave/);
-  assert.match(text, /1 open task\(s\) no wave schedules at all/);
+  assert.match(text, /1 open task scheduled in a LATER wave/);
+  assert.match(text, /1 open task no wave schedules at all/);
   assert.equal(statusOf(f.backlog, f.ids.later), "pending");
   assert.equal(statusOf(f.backlog, f.ids.unplanned), "pending");
 });
@@ -432,11 +432,11 @@ test("a run that stops on a wave somebody else holds names the wave", () => {
     cli(["run", "--dir", f.backlog, "--plan", "--agent", "true", "--actor", "agent:mine", "--json"], f.env)
   );
   assert.match(stopped, /plan wave 1 \(Foundations\)/);
-  assert.match(stopped, /1 of 1 task\(s\) in it are still open/);
+  assert.match(stopped, /1 of 1 task in it is still open/);
   assert.doesNotMatch(stopped, /the queue is empty/);
   // The wave 2 task is open and this run stepped over it. It is NOT unscheduled
   // — the plan schedules it later — so the sentence must not say it is (TL-219).
-  assert.match(stopped, /1 open task\(s\) in later waves are not reached yet/);
+  assert.match(stopped, /1 open task in later waves is not reached yet/);
   assert.doesNotMatch(stopped, /does not schedule/);
 
   // POSITIVE CONTROL: the backlog is not empty and the plan is what stopped the
@@ -459,7 +459,7 @@ test("a run that stops with a finished plan says so, and counts what it left", (
     cli(["run", "--dir", f.backlog, "--plan", "--agent", "true", "--actor", "agent:mine", "--json"], f.env)
   );
   assert.match(stopped, /every wave of the plan is finished/);
-  assert.match(stopped, /1 open task\(s\) the plan does not schedule were left alone/);
+  assert.match(stopped, /1 open task the plan does not schedule was left alone/);
   assert.doesNotMatch(stopped, /the queue is empty/);
   assert.equal(statusOf(f.backlog, f.ids.unplanned), "pending", "the run took unplanned work");
 });

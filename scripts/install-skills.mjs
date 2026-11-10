@@ -54,7 +54,7 @@ import { fileURLToPath } from "node:url";
 import { printJson } from "./json-envelope.mjs";
 import { answerBacklogDirRefusal, repositoryRoot, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
-import { MARK, color, failure, refusal } from "./ui.mjs";
+import { MARK, color, failure, refusal, plural } from "./ui.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -329,11 +329,11 @@ export function renderInstall(result, opts = {}) {
   const paint = opts.color || color;
   const out = [];
   if (result.created.length) {
-    out.push(paint.ok(MARK.ok) + " skills: " + result.created.length + " file(s) → " + result.target);
+    out.push(paint.ok(MARK.ok) + " skills: " + result.created.length + " " + plural(result.created.length, "file", "files") + " → " + result.target);
     for (const file of result.created) out.push("    " + file);
   }
   if (result.replaced.length) {
-    out.push(paint.ok(MARK.ok) + " refreshed: " + result.replaced.length + " file(s) → " + result.target);
+    out.push(paint.ok(MARK.ok) + " refreshed: " + result.replaced.length + " " + plural(result.replaced.length, "file", "files") + " → " + result.target);
     for (const file of result.replaced) out.push("    " + file);
   }
   if (result.skipped.length) {

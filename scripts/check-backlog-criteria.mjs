@@ -39,7 +39,7 @@ import { loadConfigOrExit } from "./config.mjs";
 import { auditTask } from "./criteria.mjs";
 import { listTaskFileNames } from "./task-io.mjs";
 import { extractMeta, splitFrontmatter } from "./task-fields.mjs";
-import { MARK, color, errColor } from "./ui.mjs";
+import { MARK, color, errColor, plural } from "./ui.mjs";
 // The product name comes from the manifest, never from a literal (CLAUDE.md) —
 // it is still provisional, so renaming it has to stay a single edit.
 import { PRODUCT_NAME } from "./product.mjs";
@@ -96,10 +96,10 @@ function main(argv) {
 
   if (!failures.length) {
     const tail = advisories.length
-      ? ` — ${advisories.length} task(s) not linked yet (criteria_links: ${config.criteriaLinks})`
+      ? ` — ${advisories.length} ${plural(advisories.length, "task", "tasks")} not linked yet (criteria_links: ${config.criteriaLinks})`
       : "";
     console.log(
-      `${OKM} backlog: ${links} criterion→verification link(s) across ${judged} open tasks all resolve${tail}`
+      `${OKM} backlog: ${links} ${plural(links, "criterion→verification link", "criterion→verification links")} across ${judged} ${plural(judged, "open task", "open tasks")} ${plural(links, "resolves", "all resolve")}${tail}`
     );
     return 0;
   }

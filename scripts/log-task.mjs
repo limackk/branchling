@@ -57,7 +57,7 @@ import {
 } from "./task-fields.mjs";
 import { readTaskRecords } from "./task-select.mjs";
 import { decisionsOf } from "./decisions.mjs";
-import { MARK, color, failure, heading, table } from "./ui.mjs";
+import { MARK, color, failure, heading, table, plural } from "./ui.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -279,7 +279,8 @@ export function renderLog(model) {
   }
   const matched = Number.isInteger(model.matched) ? model.matched : model.total;
   out.push("  " + color.dim(
-    model.records + " record(s) folded into " + model.total + " exchange(s)" +
+    model.records + " " + plural(model.records, "record", "records") + " folded into " +
+    model.total + " " + plural(model.total, "exchange", "exchanges") +
     (model.decisions
       ? ", " + matched + " carrying a decision or an open question"
       : "") +
@@ -343,7 +344,7 @@ export function renderLedger(model) {
     return out.join("\n");
   }
   out.push("  " + color.dim(
-    model.total + " record(s)" +
+    model.total + " " + plural(model.total, "record", "records") +
     (model.omitted ? ", the newest " + model.records.length + " shown" : "") +
     " — " + model.path
   ));
@@ -375,8 +376,8 @@ export function renderAreaLog(model) {
     return out.join("\n");
   }
   out.push("  " + color.dim(
-    model.tasks.length + " task(s) touched this area; " + model.matched +
-    " decision or open question exchange(s) found" +
+    model.tasks.length + " " + plural(model.tasks.length, "task", "tasks") + " touched this area; " + model.matched +
+    " decision or open question " + plural(model.matched, "exchange", "exchanges") + " found" +
     (model.limit && model.matched > model.exchanges.length
       ? ", the newest " + model.exchanges.length + " shown"
       : "")

@@ -64,7 +64,7 @@ import { modifiedFilesCached, repoRoot } from "./modified-files.mjs";
 import { resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { taskIdScanner } from "./task-id.mjs";
-import { MARK, color, failure, refusal, heading, table } from "./ui.mjs";
+import { MARK, color, failure, refusal, heading, table, plural } from "./ui.mjs";
 import { posixShell } from "./posix-shell.mjs";
 import { repoRelative } from "./canonical-path.mjs";
 
@@ -269,7 +269,7 @@ export function renderRed(report, opts = {}) {
     }
     return ["    " + f.path, owner, f.verdict];
   });
-  out.push("  " + report.tally.failed + " failing test file(s):");
+  out.push("  " + report.tally.failed + " failing test " + plural(report.tally.failed, "file", "files") + ":");
   out.push(table(rows));
   out.push("");
   out.push("  " + (report.tally.yours ? paint.err(MARK.err) : paint.ok(MARK.ok)) + " yours: " +

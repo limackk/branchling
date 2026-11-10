@@ -158,7 +158,7 @@ test("a seeded backlog passes `check` with nothing to say", () => {
   // with no criteria at all passes every rule below its own absence. So assert it
   // actually saw links — through `audit`, which is where it reports now.
   assert.match(run(["audit", "--dir", dir]).stdout,
-    /criterion→verification link\(s\) across 2 open tasks all resolve/);
+    /criterion→verification links? across 2 open tasks (all resolve|resolves)/);
 });
 
 test("`next` hands out the unblocked task and skips the one waiting on it", () => {

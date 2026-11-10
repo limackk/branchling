@@ -57,7 +57,7 @@ import { withHistoryLogMutex } from "./history-log-mutex.mjs";
 import { BACKLOG_DIR_REFUSAL_HELP, backlogPaths, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { withSnapshotMutex } from "./snapshot-mutex.mjs";
 import { taskIdPatterns, taskIdScanner } from "./task-id.mjs";
-import { MARK, color, errColor, refusal } from "./ui.mjs";
+import { MARK, color, errColor, refusal, plural } from "./ui.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 
 const OKM = color.ok(MARK.ok);
@@ -481,9 +481,10 @@ export function main(argv) {
   const last = [...plan.renames].reverse().find((r) => r.kind === "task");
 
   console.log(`${N} renumber — ${relative(process.cwd(), root) || root}`);
-  console.log(`  ${plan.taskCount} task(s): ${first.id} → ${first.newId} … ${last.id} → ${last.newId}`);
-  console.log(`  ${plan.renames.filter((r) => r.kind === "history").length} history log(s) follow their task`);
-  console.log(`  also rewriting ids in ${alsoFiles.length} file(s) outside the backlog`);
+  console.log(`  ${plan.taskCount} ${plural(plan.taskCount, "task", "tasks")}: ${first.id} → ${first.newId} … ${last.id} → ${last.newId}`);
+  const historyLogs = plan.renames.filter((r) => r.kind === "history").length;
+  console.log(`  ${historyLogs} ${plural(historyLogs, "history log follows its", "history logs follow their")} task`);
+  console.log(`  also rewriting ids in ${alsoFiles.length} ${plural(alsoFiles.length, "file", "files")} outside the backlog`);
   console.log(`  history/${MIGRATIONS_FILE}: recording the full map so other clones repoint theirs`);
   console.log("");
   console.log(`  ${WARNM} commit messages are NOT rewritten and cannot be — an id in a commit title`);
@@ -498,15 +499,15 @@ export function main(argv) {
   const report = applyRenumber(root, plan, { actor, also: alsoFiles });
 
   console.log("");
-  console.log(`${OKM} renumbered. ${report.replacements} reference(s) rewritten across ${report.files} file(s)`);
+  console.log(`${OKM} renumbered. ${report.replacements} ${plural(report.replacements, "reference", "references")} rewritten across ${report.files} ${plural(report.files, "file", "files")}`);
   if (report.historyProse) {
-    console.log(`  ${report.historyProse} mention(s) inside history records left as written — the log is append-only`);
+    console.log(`  ${report.historyProse} ${plural(report.historyProse, "mention", "mentions")} inside history records left as written — the log is append-only`);
   }
   if (report.exempt) {
-    console.log(`  ${report.exempt} id(s) across ${report.exemptFiles.size} file(s) left as EXAMPLES — the line says \`${EXAMPLE_MARKER}\``);
+    console.log(`  ${report.exempt} ${plural(report.exempt, "id", "ids")} across ${report.exemptFiles.size} ${plural(report.exemptFiles.size, "file", "files")} left as EXAMPLES — the line says \`${EXAMPLE_MARKER}\``);
   }
   if (report.unknown.size) {
-    console.log(`  ${report.unknown.size} id(s) left alone because this renumber does not know them:`);
+    console.log(`  ${report.unknown.size} ${plural(report.unknown.size, "id", "ids")} left alone because this renumber does not know ${plural(report.unknown.size, "it", "them")}:`);
     for (const [id, files] of [...report.unknown].sort()) {
       console.log(`    ${id} — ${[...files].sort().slice(0, 3).join(", ")}${files.size > 3 ? ` (+${files.size - 3} more)` : ""}`);
     }

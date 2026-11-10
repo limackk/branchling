@@ -34,7 +34,7 @@ import { repoRoot } from "./modified-files.mjs";
 import { resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { currentReleaseText, gateVerdict, releaseGaps, releaseTaskRecords } from "./release-gaps.mjs";
-import { MARK, color, errColor, plain, refusal } from "./ui.mjs";
+import { MARK, color, errColor, plain, refusal, plural } from "./ui.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const FLAGS = ["--dir", "--env", "--trunk", "--json"];
@@ -131,7 +131,8 @@ function main(argv) {
   }
   if (result.excludedBeforeAdoption) {
     console.log(MARK.bullet + " " + result.excludedBeforeAdoption +
-      " trunk commit(s) older than the first one naming a task id were not judged");
+      " " + plural(result.excludedBeforeAdoption, "trunk commit older than the first one naming a task id was",
+        "trunk commits older than the first one naming a task id were") + " not judged");
   }
   for (const line of unobservableLines(result)) console.log(line);
   const current = currentReleaseLine(result, config.releases);
@@ -155,7 +156,8 @@ function main(argv) {
 export function unobservableLines(result) {
   return (result.unobservable || []).map((u) =>
     MARK.bullet + " " + u.target + ": deployed from the repository `" + u.repository + "`, which this one cannot observe — " +
-    u.count + " task(s) name it in `target:` and none of them is judged on its account");
+    u.count + " " + plural(u.count, "task names", "tasks name") + " it in `target:` and " +
+    plural(u.count, "it is not", "none of them is") + " judged on its account");
 }
 
 /** Which release's plan was judged (TL-515), worded once in release-gaps.mjs
@@ -187,13 +189,14 @@ function summaryLine(result, mode, verdict, paint = color) {
   const n = result.gaps.length;
   const blocking = verdict.blocking.length;
   const accepted = n - blocking;
-  const counted = n + " gap(s)" + (accepted ? ", " + accepted + " accepted in `release_gate_accept`" : "");
+  const counted = n + " " + plural(n, "gap", "gaps") + (accepted ? ", " + accepted + " accepted in `release_gate_accept`" : "");
   if (verdict.exit === 0 && mode !== "require") {
     return (n ? paint.warn(MARK.warn) : paint.ok(MARK.ok)) + " release: " + counted +
       " — `release_gate: report` prints them and does not block";
   }
   if (verdict.exit === 0) return paint.ok(MARK.ok) + " release: " + counted + " — nothing blocks the promotion";
-  const unknown = result.unknownRefs.length ? ", " + result.unknownRefs.length + " ref(s) unknown" : "";
+  const unknown = result.unknownRefs.length ? ", " + result.unknownRefs.length + " " +
+    plural(result.unknownRefs.length, "ref", "refs") + " unknown" : "";
   return paint.err(MARK.err) + " release: " + counted + ", " + blocking + " blocking" + unknown +
     " — `release_gate: " + mode + "` refuses the promotion";
 }

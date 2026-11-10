@@ -27,7 +27,7 @@ import { detectPrefixMismatch, prefixMismatchMessage } from "./task-id.mjs";
 import { resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { printLine } from "./stdout.mjs";
 import { buildFieldSpecs, extractMeta as sharedExtractMeta, normalizeValue, stripComment, unquote } from "./task-fields.mjs";
-import { MARK, color, errColor, refusal } from "./ui.mjs";
+import { MARK, color, errColor, refusal, plural } from "./ui.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { todayStamp } from "./today.mjs";
 
@@ -583,13 +583,13 @@ if (collisions > 0) {
 }
 if (boardErrors.length > 0) {
   console.error(
-    `\n✗ ${boardErrors.length} task(s) with a board outside the registry — fix \`board:\` in the ` +
+    `\n✗ ${boardErrors.length} ${plural(boardErrors.length, "task", "tasks")} with a board outside the registry — fix \`board:\` in the ` +
       `frontmatter, or add the board to boards.yaml.`,
   );
 }
 if (roleErrors.length > 0) {
   console.error(
-    `\n✗ ${roleErrors.length} task(s) with a role outside \`roles:\` — fix \`role:\` in the ` +
+    `\n✗ ${roleErrors.length} ${plural(roleErrors.length, "task", "tasks")} with a role outside \`roles:\` — fix \`role:\` in the ` +
       `frontmatter, or declare the role in config.yaml. Which side is the truth is a ` +
       `decision about this project, so the build does not pick one.`,
   );

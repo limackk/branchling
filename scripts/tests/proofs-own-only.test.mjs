@@ -99,10 +99,10 @@ test("the own-only audit of one task runs that task's entries and no project ent
     for (const other of ["own-2", "own-3", "own-4"]) {
       assert.equal(runsOf(dir, other), 0, other + " ran, but only TASK-1 was named\n" + r.out);
     }
-    assert.match(r.out, /1 verification command\(s\) re-run across 1 proven closing/);
+    assert.match(r.out, /1 verification command re-run across 1 proven closing/);
     // The report says what it left out, so this green cannot pass for a full one.
     assert.match(r.out, /narrowed to TASK-1 by `--task`/);
-    assert.match(r.out, /own entries only \(`--own-only`\): 1 project `closing_contract` entr\(ies\) not run/);
+    assert.match(r.out, /own entries only \(`--own-only`\): 1 project `closing_contract` entry not run/);
   });
 });
 
@@ -131,7 +131,7 @@ test("a red own entry still fails the own-only audit", () => {
   withBacklog((dir) => {
     const r = check(dir, "--proofs", "--task", "TASK-1", "--own-only");
     assert.equal(r.code, 1, r.out);
-    assert.match(r.out, /1 closed task\(s\) whose proof no longer holds/);
+    assert.match(r.out, /1 closed task whose proof no longer holds/);
     assert.match(r.out, /- TASK-1 .*`false` exits 1/);
     assert.equal(runsOf(dir, "project-runs"), 0, r.out);
   }, { ownOne: "false" });
@@ -143,7 +143,7 @@ test("a named task nobody has started gets its own contract run, and no project 
     assert.equal(r.code, 0, r.out);
     assert.equal(runsOf(dir, "own-4"), 1, r.out);
     assert.equal(runsOf(dir, "own-1") + runsOf(dir, "project-runs"), 0, r.out);
-    assert.match(r.out, /1 open contract\(s\) can still fail against this tree/);
+    assert.match(r.out, /1 open contract can still fail against this tree/);
   });
 });
 

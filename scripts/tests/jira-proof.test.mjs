@@ -321,7 +321,7 @@ test("the person's report: each comment under its ticket, then the skipped ones 
       { task: "TASK-4", reason: "no-task-file" }, { task: "TASK-5", reason: "other-site" },
     ] }),
     "── TASK-1 → APP-1  https://acme.atlassian.net/browse/APP-1\n\n" + c.text + "\n" +
-    "skipped 4 closed task(s):\n" +
+    "skipped 4 closed tasks:\n" +
     "  TASK-2  no `Imported from Jira:` line\n" +
     "  TASK-3  its Jira line is not a browse URL\n" +
     "  TASK-4  its task file is not in this tree\n" +
@@ -434,7 +434,7 @@ test("over a range: exactly the Jira-linked closings, the rest counted as skippe
   const text = run(dir, ["jira-proof", "--dir", "backlog", "--base", base, "--site", SITE]);
   assert.equal(text.status, 0, text.stderr);
   assert.match(text.stdout, new RegExp(linked + " → APP-1"));
-  assert.match(text.stdout, /skipped 2 closed task\(s\):/);
+  assert.match(text.stdout, /skipped 2 closed tasks:/);
   assert.match(text.stdout, new RegExp(plain + "\\s+no `Imported from Jira:` line"));
 
   // Without `--site`, the other site's task is a comment like any other.

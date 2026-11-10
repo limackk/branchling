@@ -194,7 +194,7 @@ test("plan prints the wave as held with one reason per task, and agrees with run
   }
   assert.match(dry.stoppedAt.holds.find((h) => h.id === f.ids.vouch).reason, /awaiting a person's vouch/);
   assert.match(dry.stoppedAt.holds.find((h) => h.id === f.ids.claim).reason,
-    /claim parked for \d+ day\(s\) by agent:gone — no recorded change since 2026-01-05/);
+    /claim parked for \d+ days? by agent:gone — no recorded change since 2026-01-05/);
 
   const plain = dryRun(f, false);
   for (const h of dry.stoppedAt.holds) assert.ok(plain.includes(h.id + "  " + h.reason), plain);
@@ -316,9 +316,9 @@ test("every hold has its own sentence, naming the key that decided it", () => {
     [{ kind: "protected-status", status: "blocked", blockedBy: ["TL-2", "TL-3"], asked: false, parkedByRun: false },
       "in `blocked`, a status `reason_required_statuses` protects — waiting on TL-2, TL-3"],
     [{ kind: "parked-claim", days: 40, owner: "agent:a", lastChange: "2026-09-29", staleDays: 14 },
-      "claim parked for 40 day(s) by agent:a — no recorded change since 2026-09-29 (`audit_stale_days` is 14)"],
+      "claim parked for 40 days by agent:a — no recorded change since 2026-09-29 (`audit_stale_days` is 14)"],
     [{ kind: "parked-claim", days: 40, owner: "", lastChange: "2026-09-29", staleDays: 14 },
-      "claim parked for 40 day(s) by nobody — no recorded change since 2026-09-29 (`audit_stale_days` is 14)"],
+      "claim parked for 40 days by nobody — no recorded change since 2026-09-29 (`audit_stale_days` is 14)"],
     [{ kind: "claimed", owner: "agent:a", lastChange: "2026-11-07" }, "claimed by agent:a — work in flight, last change 2026-11-07"],
     [{ kind: "claimed", owner: "", lastChange: null }, "claimed by nobody — work in flight"],
     [{ kind: "person-only" }, "asks for an executor an unattended run is not (human)"],

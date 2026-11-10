@@ -39,7 +39,7 @@ import { backlogForTaskPath, backlogPaths, resolveBacklogDir } from "./paths.mjs
 import { loadConfigOrExit } from "./config.mjs";
 import { inferPrefix, taskIdPatterns } from "./task-id.mjs";
 import { printLine } from "./stdout.mjs";
-import { MARK, color, errColor } from "./ui.mjs";
+import { MARK, color, errColor, plural } from "./ui.mjs";
 import { stripComment, unquote } from "./task-fields.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 
@@ -205,6 +205,6 @@ if (problems.length) {
 }
 
 printLine(
-  `${OKM} backlog: ${files.length} task(s) checked, each with a board from the registry ` +
+  `${OKM} backlog: ${files.length} ${plural(files.length, "task", "tasks")} checked, each with a board from the registry ` +
     `(${[...seen].join(", ")})`,
 );

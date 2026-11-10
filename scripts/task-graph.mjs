@@ -54,6 +54,7 @@
  */
 
 import { FIELD_COMMENT, FIELD_CREATED, FIELD_DECISION, FIELD_DELETED, actorParts, isQuestion } from "./task-fields.mjs";
+import { plural } from "./ui.mjs";
 
 /**
  * The fields whose change is a node of its own.
@@ -300,8 +301,8 @@ export function renderTaskGraph(graph, opts = {}) {
   const since = '<p class="tgraph-since">history since ' + graphEsc(day(graph.firstKnown)) +
     " — anything earlier is in git, not here</p>";
   const trailing = graph.trailing && graph.trailing.length
-    ? '<p class="tgraph-trailing">' + graph.trailing.length +
-      " later change(s) not shown as nodes: " + graphEsc(graph.trailing.map((c) => c.field).join(", ")) + "</p>"
+    ? '<p class="tgraph-trailing">' + graph.trailing.length + " later " +
+      plural(graph.trailing.length, "change", "changes") + " not shown as nodes: " + graphEsc(graph.trailing.map((c) => c.field).join(", ")) + "</p>"
     : "";
   const legend =
     '<p class="tgraph-legend">' +
@@ -314,8 +315,8 @@ export function renderTaskGraph(graph, opts = {}) {
   return (
     '<section class="tgraph">' + since +
     '<div class="tgraph-scroll"><svg class="tgraph-svg" width="' + width + '" height="140" ' +
-    'viewBox="0 0 ' + width + ' 140" role="img" aria-label="Change graph: ' + graph.nodes.length +
-    " event(s) between " + graphEsc(day(graph.firstKnown)) + " and " + graphEsc(day(graph.lastKnown)) + '">' +
+    'viewBox="0 0 ' + width + ' 140" role="img" aria-label="Change graph: ' + graph.nodes.length + " " +
+    plural(graph.nodes.length, "event", "events") + " between " + graphEsc(day(graph.firstKnown)) + " and " + graphEsc(day(graph.lastKnown)) + '">' +
     '<line class="tgraph-axis" x1="' + PAD + '" y1="' + AXIS_Y + '" x2="' + (width - PAD) + '" y2="' + AXIS_Y + '"/>' +
     arcs + marks +
     "</svg></div>" + trailing + legend +

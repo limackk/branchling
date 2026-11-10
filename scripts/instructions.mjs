@@ -53,7 +53,7 @@ import { resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths
 import { BLOCK_MARKER_NAME as MARKER, PRODUCT_NAME as N } from "./product.mjs";
 import { inProgressStatus } from "./take-task.mjs";
 import { externalTargetNames, observedTargets } from "./deploy-targets.mjs";
-import { failure } from "./ui.mjs";
+import { failure, plural } from "./ui.mjs";
 import { writeOut } from "./stdout.mjs";
 import { canonicalPath } from "./canonical-path.mjs";
 import { gitDiscoveryEnv } from "./git-env.mjs";
@@ -974,7 +974,7 @@ claim, not halfway through the run.
 A GENERALIST IS OPTIONAL ONCE A ROLE IS SERVED, and so is a hand for every role.
 A role you gave no hand for is not handed out and not failed over: it waits —
 possibly for a person — and the report counts those tasks BY NAME, on the
-terminal and under \`--json\`, as \`N task(s) ask for <role> — no --agent-for\`.
+terminal and under \`--json\`, as \`N tasks ask for <role> — no --agent-for\`.
 Read that block: without it a queue whose every task asks for a hand you never
 named is indistinguishable from an empty one. The only invocation refused
 outright is the one with no command of any kind — no \`--agent\`, no
@@ -1101,7 +1101,7 @@ export const TOPICS = {
       });
       return {
         context_rule: CONTEXT_RULE.join("\n"),
-        context_tasks: budget.tasks + " task file(s)",
+        context_tasks: budget.tasks + " " + plural(budget.tasks, "task file", "task files"),
         context_table: budget.rows
           .map((r) => "  " + r.label.padEnd(34) + String(r.tokens).padStart(7) + " tok   " +
             (r.share * 100).toFixed(r.share < 0.01 ? 2 : 1) + "%")

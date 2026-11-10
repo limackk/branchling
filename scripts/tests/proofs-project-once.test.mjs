@@ -87,10 +87,10 @@ test("two proven closings, one run of the project entry", () => {
     const r = checkProofs(dir);
     assert.equal(r.code, 0, r.out);
     assert.equal(runsOf(dir), 1, "the project entry ran " + runsOf(dir) + " times for two closings\n" + r.out);
-    assert.match(r.out, /3 verification command\(s\) re-run across 2 proven closing/);
-    assert.match(r.out, /1 project `closing_contract` entr\(ies\) run once and applied to 2 proven closing/);
+    assert.match(r.out, /3 verification commands re-run across 2 proven closing/);
+    assert.match(r.out, /1 project `closing_contract` entry run once and applied to 2 proven closing/);
     // The cost line counts what will run, not the project entry once per closing.
-    assert.match(r.out, /re-running 3 verification command\(s\) from 2 proven closing/);
+    assert.match(r.out, /re-running 3 verification commands from 2 proven closing/);
   });
 });
 
@@ -107,10 +107,10 @@ test("POSITIVE CONTROL: a red project entry is one project finding naming every 
     const r = checkProofs(dir);
     assert.equal(r.code, 1, r.out);
     assert.equal(runsOf(dir), 1, r.out);
-    assert.match(r.out, /1 project `closing_contract` entr\(ies\) no longer pass — 2 proven closing\(s\) would fail on them/);
+    assert.match(r.out, /1 project `closing_contract` entry no longer passes — 2 proven closings would fail on it/);
     assert.match(r.out, /- repo-guard: `echo run >> project-runs; exit 3` exits 3\n\s+would fail: TASK-1, TASK-2/);
     // Not repeated as a broken proof of each task: the repair is not in them.
-    assert.doesNotMatch(r.out, /closed task\(s\) whose proof no longer holds/);
+    assert.doesNotMatch(r.out, /closed tasks? whose proof no longer holds/);
   });
 });
 
@@ -119,7 +119,7 @@ test("a closing whose own entry fails is its own broken proof and is not named u
     const r = checkProofs(dir);
     assert.equal(r.code, 1, r.out);
     assert.equal(runsOf(dir), 1, r.out);
-    assert.match(r.out, /1 closed task\(s\) whose proof no longer holds/);
+    assert.match(r.out, /1 closed task whose proof no longer holds/);
     assert.match(r.out, /- TASK-1 .*`false` exits 1/);
     assert.match(r.out, /would fail: TASK-2\n/);
   });

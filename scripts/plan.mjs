@@ -31,6 +31,7 @@
 import { existsSync, readFileSync } from "node:fs";
 
 import { openQuestions, stripComment, unquote } from "./task-fields.mjs";
+import { plural } from "./ui.mjs";
 
 /** The only keys the file may carry. An unknown key FAILS — same rule as
  *  config.yaml: this is a fixed shape, so a new word is a typo, not a feature. */
@@ -342,7 +343,7 @@ const holdDayOf = (s) => String(s || "").slice(0, 10);
  *
  * WHAT WAS MEASURED. On 2026-11-07 the active wave's only open task sat in
  * `awaiting_vouch`. `plan` printed it as "next up", `run --dry-run --plan`
- * answered "0 task(s) would run" and stopped at that wave, and thirty-six
+ * answered "0 tasks would run" and stopped at that wave, and thirty-six
  * pending tasks behind it were unreachable. Another wave's only task was a
  * claim `audit` already called parked, printed as plain "in progress". A
  * stalled plan read exactly like a plan with work in it.
@@ -491,7 +492,7 @@ export function describeHold(hold) {
       return "in `" + hold.status + "`, a status `reason_required_statuses` protects — " + why;
     }
     case "parked-claim":
-      return "claim parked for " + hold.days + " day(s) by " + (hold.owner || "nobody") +
+      return "claim parked for " + hold.days + " " + plural(hold.days, "day", "days") + " by " + (hold.owner || "nobody") +
         " — no recorded change since " + hold.lastChange + " (`audit_stale_days` is " + hold.staleDays + ")";
     case "claimed":
       return "claimed by " + (hold.owner || "nobody") + " — work in flight" +

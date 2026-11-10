@@ -120,7 +120,7 @@ test("…and the same repository is quiet once the closing is committed", () => 
   commitAll(fx, "the task, as it was taken");
   const file = taskFile(fx);
   writeFileSync(file, readFileSync(file, "utf8").replace(/^status: .*$/m, "status: done"), "utf8");
-  assert.match(check(fx).stdout, /differ from HEAD/, "the control: it reported first");
+  assert.match(check(fx).stdout, /differs? from HEAD/, "the control: it reported first");
 
   commitAll(fx, "the closing, with the work");
   const r = check(fx);
@@ -128,7 +128,7 @@ test("…and the same repository is quiet once the closing is committed", () => 
   assert.match(r.stdout, /each one agrees/);
   // The counts are what tell a reader this looked at something. "0 diverged"
   // over 0 files compared is a report that read nothing.
-  assert.match(r.stdout, /1 task file\(s\) compared with HEAD/);
+  assert.match(r.stdout, /1 task file compared with HEAD/);
 });
 
 test("`owner:` counts too — a task handed over on disk only looks free elsewhere", () => {
@@ -155,10 +155,10 @@ test("a task file git has never seen produces no report", () => {
 
   const r = check(fx);
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.doesNotMatch(r.stdout, /differ from HEAD/);
+  assert.doesNotMatch(r.stdout, /differs? from HEAD/);
   // …and it says so with a zero it earned: nothing was compared, and the line
   // must not read like a comparison that passed.
-  assert.match(r.stdout, /0 task file\(s\) compared with HEAD/);
+  assert.match(r.stdout, /0 task files compared with HEAD/);
 });
 
 test("a backlog outside any repository says so, rather than printing a tick", () => {

@@ -375,7 +375,7 @@ test("a run leaves the over-sized task alone and says so, in words and in JSON",
     const text = cli(["run", "--dir", backlog, "--actor", "agent:worker", "--agent", agent],
       env, { cwd: repo });
     assert.equal(text.status, 0, text.stderr);
-    assert.match(text.stdout, /1 task\(s\)/, text.stdout);
+    assert.match(text.stdout, /1 task\b/, text.stdout);
     assert.match(text.stdout, /huge/, text.stdout);
     assert.match(text.stdout, new RegExp(ids[0]), text.stdout);
   } finally {

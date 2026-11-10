@@ -20,7 +20,7 @@ import { rebuildViews } from "./handoff-task.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { answerBacklogDirRefusal, BACKLOG_DIR_REFUSAL_EXIT, BACKLOG_DIR_REFUSAL_KIND, isBacklogDirRefusal, resolveBacklogDir } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
-import { failure } from "./ui.mjs";
+import { failure, plural } from "./ui.mjs";
 
 export const SET_FLAGS = ["--dir", "--actor", "--reason", "--json", "--fields", "--require-actor"];
 
@@ -54,7 +54,7 @@ export function parseSetArgs(args) {
   // The value may legitimately be empty (`epic ""` clears it), so the count is
   // what is checked, not truthiness.
   if (positional.length !== 3) {
-    throw new Error("expected <ID> <field> <value>, got " + positional.length + " argument(s)\n" +
+    throw new Error("expected <ID> <field> <value>, got " + positional.length + " " + plural(positional.length, "argument", "arguments") + "\n" +
       "usage: " + N + " set <ID> <field> <value>");
   }
   [plan.id, plan.field, plan.value] = positional;

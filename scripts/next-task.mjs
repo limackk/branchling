@@ -75,7 +75,7 @@ import { printJson } from "./json-envelope.mjs";
 import { probeTask } from "./done-task.mjs";
 import { inProgressStatus, rebuildViews, refusalCode, refusalPayload, renderTake, takeJson, takeTask } from "./take-task.mjs";
 import { filterTasks, readTaskRecords, sortTasks, splitList, unknownFilterValues } from "./task-select.mjs";
-import { MARK, color, failure, warn } from "./ui.mjs";
+import { MARK, color, failure, warn, plural } from "./ui.mjs";
 import { agentEstimate, agentEstimateText } from "./agent-time.mjs";
 import { readAgentTime } from "./agent-time-read.mjs";
 
@@ -885,7 +885,7 @@ export function run(argv) {
     if (unknown.length) {
       const declared = (config.roles || []).slice();
       return refuseUnknownValue(plan, actorSource, {
-        refusal: "unknown role(s): " + unknown.join(", "),
+        refusal: plural(unknown.length, "unknown role: ", "unknown roles: ") + unknown.join(", "),
         details: declared.length
           ? ["`roles` in config.yaml holds: " + declared.join(", ")]
           : [
@@ -1014,7 +1014,8 @@ export function run(argv) {
   );
   const closedElsewhere = archivedElsewhereBySource(skippedElsewhere, config.archivedStatuses);
   const closedElsewhereLines = closedElsewhere.map((group) =>
-    group.ids.length + " task(s) closed on " + group.source + " are still open here — merge or rebase before taking work");
+    group.ids.length + " " + plural(group.ids.length, "task", "tasks") + " closed on " + group.source + " " +
+      plural(group.ids.length, "is", "are") + " still open here — merge or rebase before taking work");
   const handedBackLines = skippedHandedBack.map(
     (s) => s.id + " skipped — you handed it back yourself" + (s.reason ? ": " + s.reason : "")
   );
@@ -1144,10 +1145,10 @@ export function run(argv) {
   if (planned) {
     details.push(wave
       ? "plan wave " + (wave.index + 1) + " (" + (wave.name || "unnamed") + ") — " +
-          wave.ids.length + " task(s) scheduled, " + wave.open + " still open"
+          wave.ids.length + " " + plural(wave.ids.length, "task", "tasks") + " scheduled, " + wave.open + " still open"
       : "the plan schedules nothing that is still open — every wave of it is finished");
     // TWO SENTENCES FOR TWO QUANTITIES (TL-219). One line saying "N open
-    // task(s) the plan does not schedule" was printing the count of everything
+    // tasks the plan does not schedule" was printing the count of everything
     // outside the active wave, so work scheduled in wave 7 was reported as work
     // nobody had scheduled — 34 here against `plan`'s 16 on 2026-09-03. Waiting
     // for its turn and never having been given one are different states of a
@@ -1155,12 +1156,13 @@ export function run(argv) {
     const laterWaves = skippedUnplanned === null ? 0 : skippedOutsideWave - skippedUnplanned;
     if (laterWaves) {
       details.push(
-        laterWaves + " open task(s) scheduled in a LATER wave — this wave is handed out first"
+        laterWaves + " open " + plural(laterWaves, "task", "tasks") + " scheduled in a LATER wave — this wave is handed out first"
       );
     }
     if (skippedUnplanned) {
       details.push(
-        skippedUnplanned + " open task(s) no wave schedules at all — `--plan` never hands those out"
+        skippedUnplanned + " open " + plural(skippedUnplanned, "task", "tasks") + " no wave schedules at all — `--plan` never hands " +
+          plural(skippedUnplanned, "it", "those") + " out"
       );
     }
   }
@@ -1170,16 +1172,21 @@ export function run(argv) {
         (plan.roleStrict ? " (exactly — `--role-strict`)" : " (or no role at all)")
     );
   }
-  if (skippedBlocked) details.push(skippedBlocked + " matching task(s) still have open blockers");
+  if (skippedBlocked) details.push(skippedBlocked + " matching " +
+    plural(skippedBlocked, "task still has", "tasks still have") + " open blockers");
   // Never silent: a task left out without a word is indistinguishable from an
   // empty queue, and for `executor: human` the whole point is that somebody is
   // meant to notice and pick it up.
   if (skippedExecutor.length) {
     const waiting = skippedExecutor.filter((s) => s.executor === "human");
     details.push(
-      skippedExecutor.length + " open task(s) ask for an executor you are not (" +
+      skippedExecutor.length + " open " +
+        plural(skippedExecutor.length, "task asks", "tasks ask") + " for an executor you are not (" +
         filters.callerSpecies + ")" +
-        (waiting.length ? " — " + waiting.length + " of them wait for a person" : "")
+        (waiting.length
+          ? " — " + plural(skippedExecutor.length, "it waits",
+            waiting.length + " of them " + plural(waiting.length, "waits", "wait")) + " for a person"
+          : "")
     );
     for (const s of skippedExecutor) details.push("  " + MARK.bullet + " " + s.id + " → " + s.executor);
   }
@@ -1189,18 +1196,20 @@ export function run(argv) {
   // without the sentence the queue simply reads as empty.
   if (skippedSize.length) {
     details.push(
-      skippedSize.length + " open task(s) are larger than an unattended run may be handed" +
+      skippedSize.length + " open " +
+        plural(skippedSize.length, "task is", "tasks are") + " larger than an unattended run may be handed" +
         " (above `" + config.maxUnattendedEstimate + "`)"
     );
     for (const s of skippedSize) details.push("  " + MARK.bullet + " " + s.id + " → " + s.estimate);
   }
   if (deadlockLines.length) {
-    details.push(deadlockLines.length + " candidate(s) stopped at a role-boundary deadlock");
+    details.push(deadlockLines.length + " " + plural(deadlockLines.length, "candidate", "candidates") + " stopped at a role-boundary deadlock");
     for (const line of deadlockLines) details.push("  " + MARK.warn + " " + line);
   }
   if (handedBackLines.length) {
     details.push(
-      handedBackLines.length + " candidate(s) YOU handed back — another actor is still offered them"
+      handedBackLines.length + " " + plural(handedBackLines.length, "candidate", "candidates") +
+        " YOU handed back — another actor is still offered " + plural(handedBackLines.length, "it", "them")
     );
     for (const line of handedBackLines) details.push("  " + MARK.bullet + " " + line);
   }
@@ -1208,16 +1217,18 @@ export function run(argv) {
   // by a person, by `take`, by another actor. Without the sentence, a queue this
   // caller may not draw from reads exactly like an empty one.
   if (recordLines.length) {
-    details.push(recordLines.length + " candidate(s) withheld by this project's actor policy");
+    details.push(recordLines.length + " " + plural(recordLines.length, "candidate", "candidates") + " withheld by this project's actor policy");
     for (const line of recordLines) details.push("  " + MARK.bullet + " " + line);
   }
   if (elsewhereLines.length) {
-    details.push(elsewhereLines.length + " candidate(s) are in another state on another branch or worktree");
+    details.push(elsewhereLines.length + " " +
+      plural(elsewhereLines.length, "candidate is", "candidates are") + " in another state on another branch or worktree");
     for (const line of elsewhereLines) details.push("  " + MARK.bullet + " " + line);
     for (const line of closedElsewhereLines) details.push("  " + MARK.bullet + " " + line);
   }
   if (conflictLines.length) {
-    details.push(conflictLines.length + " candidate(s) touch a conflict group that is in progress");
+    details.push(conflictLines.length + " " +
+      plural(conflictLines.length, "candidate touches", "candidates touch") + " a conflict group that is in progress");
     for (const line of conflictLines) details.push("  " + MARK.bullet + " " + line);
   }
   const note = scanNote(scan.reason);
@@ -1227,7 +1238,8 @@ export function run(argv) {
       "claims already held are never handed out again — `abandoned_after_days` is 0 (off)"
     );
   }
-  if (passedOver.length) details.push(passedOver.length + " candidate(s) are held by another session");
+  if (passedOver.length) details.push(passedOver.length + " " +
+    plural(passedOver.length, "candidate is", "candidates are") + " held by another session");
   for (const p of passedOver) details.push("  " + MARK.bullet + " " + p.why);
 
   if (plan.json) {
