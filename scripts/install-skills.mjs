@@ -39,7 +39,8 @@
  * that matches no shipped version is the user's until they say otherwise, and
  * the refresh says that it left it alone and how to replace it.
  *
- * Exit: 0 installed or nothing to do · 1 the source is missing · 2 a usage
+ * Exit: 0 installed or nothing to do · 1 the source is missing, or something
+ * other than a directory stands at `.claude` or `.claude/skills` · 2 a usage
  * error, including a named file the package does not ship.
  *
  * Tests: `node --test scripts/tests/skills-install.test.mjs`
@@ -164,6 +165,28 @@ function resolvesToDirectory(path) {
 }
 
 /**
+ * The first of `.claude` and `.claude/skills` that exists and is NOT a
+ * directory, as a path under the repository root — or undefined.
+ *
+ * AT OR ABOVE THE TARGET, NOT BELOW IT (TL-633). `notADirectory` starts its
+ * walk under the skills target, so a regular file AT `.claude` or
+ * `.claude/skills` made every packaged file look merely absent — and the walk's
+ * own lstat, and then install's `mkdirSync`, threw ENOTDIR or EEXIST, uncaught.
+ * This is not a per-file state: nothing the package ships can go anywhere, and
+ * the path to move aside is outside the tree `at` is relative to.
+ */
+function targetObstruction(repoRoot) {
+  let path = repoRoot;
+  const parts = [".claude", "skills"];
+  for (let i = 0; i < parts.length; i++) {
+    path = join(path, parts[i]);
+    if (lstatSync(path, { throwIfNoEntry: false }) === undefined) return undefined;
+    if (!resolvesToDirectory(path)) return parts.slice(0, i + 1).join("/");
+  }
+  return undefined;
+}
+
+/**
  * How each installed packaged file compares with the one this installation
  * ships. Only PACKAGED paths are examined — a file the user added beside the
  * skill is not ours to judge, let alone to replace.
@@ -182,6 +205,9 @@ function resolvesToDirectory(path) {
  * together, naming no path. Whatever stands there is the user's, and removing
  * it is not ours to do — so both commands name it and leave it alone.
  *
+ * A file (or a link that resolves to none) AT `.claude` or `.claude/skills`
+ * is a refusal of kind `target-not-directory`, naming that path (TL-633).
+ *
  * @returns {{ok: boolean, files: {file: string, state: string}[], target: string}}
  */
 export function compareInstalled(repoRoot, opts = {}) {
@@ -194,6 +220,15 @@ export function compareInstalled(repoRoot, opts = {}) {
       ok: false, kind: "no-source", target, files: [],
       message: "the packaged skills are not in this installation: " + source,
       details: ["A tarball built without `skills/` in `files` produces exactly this."],
+    };
+  }
+  const obstruction = targetObstruction(repoRoot);
+  if (obstruction !== undefined) {
+    const path = join(repoRoot, obstruction);
+    return {
+      ok: false, kind: "target-not-directory", target, files: [],
+      message: path + " is not a directory, so no skill can be installed under it",
+      details: ["Move it aside, then run `" + N + " skills install` again."],
     };
   }
   const files = [];
