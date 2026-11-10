@@ -481,6 +481,59 @@ test("install does not throw on a dangling link in place of the skill directory,
   assert.equal(readFileSync(join(away, "SKILL.md"), "utf8"), "---\ndescription: new\n---\n");
 });
 
+// ── a file in place of `.claude` or `.claude/skills` itself (TL-633) ──
+//
+// The walk above starts BELOW the skills target, so a file AT it made every
+// packaged file look absent, and lstat and then mkdirSync threw ENOTDIR or
+// EEXIST, uncaught. Nothing can be installed anywhere, so it is a refusal that
+// names the path. The control in each case is the same directory made real.
+
+for (const at of [".claude", ".claude/skills"]) {
+  test("compareInstalled and install refuse a file in place of `" + at + "`, naming it, and leave it alone", () => {
+    const fx = fixture();
+    const opts = source(fx);
+    const path = join(fx.dir, at);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, "theirs\n", "utf8");
+
+    const compared = compareInstalled(fx.dir, opts);
+    assert.equal(compared.ok, false);
+    assert.equal(compared.kind, "target-not-directory");
+    assert.ok(compared.message.startsWith(path + " is not a directory"), compared.message);
+    for (const extra of [{}, { dryRun: true }, { refresh: true }]) {
+      const result = installSkills(fx.dir, { ...opts, ...extra });
+      assert.equal(result.ok, false, JSON.stringify(extra));
+      assert.equal(result.kind, "target-not-directory", JSON.stringify(extra));
+      assert.deepEqual(result.created, [], JSON.stringify(extra));
+    }
+    assert.equal(readFileSync(path, "utf8"), "theirs\n", "the file in the way was touched");
+
+    // Positive control: with the directory real, the same call installs both.
+    rmSync(path);
+    mkdirSync(path, { recursive: true });
+    assert.equal(compareInstalled(fx.dir, opts).ok, true);
+    const after = installSkills(fx.dir, opts);
+    assert.equal(after.ok, true);
+    assert.deepEqual(after.created, [DEMO, NOTES]);
+  });
+}
+
+test("a dangling link in place of `.claude/skills` is refused too, and a resolving one is a directory", () => {
+  const fx = fixture();
+  const opts = source(fx);
+  const path = join(fx.dir, ".claude", "skills");
+  const away = join(fx.dir, "moved-away");
+  mkdirSync(dirname(path), { recursive: true });
+  symlinkSync(away, path);
+  assert.equal(installSkills(fx.dir, opts).kind, "target-not-directory");
+  assert.equal(lstatSync(path).isSymbolicLink(), true, "the link in the way was replaced");
+  assert.equal(existsSync(away), false, "the install created the link's target");
+
+  // Control: the same link with its target present installs through it.
+  mkdirSync(away);
+  assert.deepEqual(installSkills(fx.dir, opts).created, [DEMO, NOTES]);
+});
+
 test("a skill directory reached through a symlink is read through it", () => {
   // The repository's own `.claude/skills/*` are symlinks; a packaged skill
   // laid out the same way must not lose the files behind one.
@@ -850,3 +903,34 @@ test("`skills install` through the CLI names a dangling link in place of the ski
   const after = run(["skills", "install", "--json", "--dir", fx.backlog], fx.dir, fx.env);
   assert.deepEqual(JSON.parse(after.stdout).created, [SKILL]);
 });
+
+for (const at of [".claude", ".claude/skills"]) {
+  test("`skills install` and `init --skills` through the CLI name a file in place of `" + at + "` instead of crashing", () => {
+    const fx = fixture();
+    const path = join(fx.dir, at);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, "theirs\n", "utf8");
+    const init = run(["init", "--dir", fx.backlog, "--no-example", "--skills"], fx.dir, fx.env);
+    assert.equal(init.status, 0, init.stderr);
+    assert.ok(init.stdout.includes("WARNING: " + path + " is not a directory"), init.stdout);
+
+    const text = run(["skills", "install", "--dir", fx.backlog], fx.dir, fx.env);
+    assert.equal(text.status, 1, text.stderr);
+    assert.doesNotMatch(text.stderr, /ENOTDIR|EEXIST|at .*\.mjs/);
+    assert.ok(text.stderr.includes(path + " is not a directory"), text.stderr);
+    assert.ok(text.stderr.includes("Move it aside, then run `" + CLI_NAME + " skills install` again."), text.stderr);
+    const json = run(["skills", "install", "--json", "--dir", fx.backlog], fx.dir, fx.env);
+    assert.equal(json.status, 1, json.stderr);
+    const parsed = JSON.parse(json.stdout);
+    assert.equal(parsed.ok, false);
+    assert.equal(parsed.refusalKind, "target-not-directory");
+    assert.deepEqual(parsed.created, []);
+    assert.equal(readFileSync(path, "utf8"), "theirs\n");
+
+    // Positive control: the remedy it prints works.
+    rmSync(path);
+    const after = run(["skills", "install", "--json", "--dir", fx.backlog], fx.dir, fx.env);
+    assert.equal(after.status, 0, after.stderr);
+    assert.deepEqual(JSON.parse(after.stdout).created, [SKILL]);
+  });
+}

@@ -251,6 +251,144 @@ test("the report states how many tasks it left unfinishable", () => {
   assert.match(r.stderr, /3 of them have no `verification:`/);
 });
 
+// ── What main() reports (TL-638) ──────────────────────────────────────────
+//
+// A mutation run over `main()` showed these paths surviving: the envelope of a
+// dry run under `--json` was never parsed, the `ok`, `dryRun` and `skipped`
+// values of a real run were never read, and neither the rebuild warning nor
+// the refusal of a directory that is not a backlog was ever reached. Each test
+// below pins one of them by its VALUE, not by the presence of a key — the
+// registry exercise in json-envelope.mjs already checks the key set.
+
+const SOURCES = [
+  "https://github.com/acme/app/issues/12",
+  "https://github.com/acme/app/issues/31",
+  "https://github.com/acme/app/issues/44",
+];
+
+test("--dry-run --json answers in its envelope, writes nothing, and lists what the real run creates", () => {
+  const dir = backlog("dry-json");
+  const config = loadConfig(dir);
+  const dry = importInto(dir, ["--dry-run", "--json", "--actor", "agent:fixture"]);
+  assert.equal(dry.status, 0, dry.stderr);
+  const env = JSON.parse(dry.stdout);
+  assert.equal(env.kind, "import");
+  assert.equal(env.ok, true);
+  assert.equal(env.dryRun, true);
+  assert.equal(env.root, dir);
+  assert.deepEqual(env.created, []);
+  assert.deepEqual(env.wouldCreate, [
+    { title: "Crash on startup when the config file is missing", status: config.statuses[0], labels: [], source: SOURCES[0], sourceState: "open" },
+    { title: "Document the retry policy", status: config.archivedStatuses[0], labels: [], source: SOURCES[1], sourceState: "closed" },
+    { title: "Batch the outbound writes", status: config.statuses[0], labels: [], source: SOURCES[2], sourceState: "open" },
+  ]);
+  assert.deepEqual(env.skipped, []);
+  assert.deepEqual(env.droppedLabels, ["bug ×1", "performance ×1", "needs-triage ×1"]);
+  assert.deepEqual(env.unknownNodes, []);
+  assert.equal(env.actorSource, "flag");
+  assert.equal(taskFiles(dir).length, 0, "a dry run wrote a task");
+
+  // The positive control: the same input, written, creates exactly what the
+  // dry run listed — and a second dry run then lists every source as skipped.
+  const real = importInto(dir, ["--json"]);
+  assert.equal(real.status, 0, real.stderr);
+  assert.deepEqual(JSON.parse(real.stdout).created.map((c) => c.title), env.wouldCreate.map((w) => w.title));
+  const again = JSON.parse(importInto(dir, ["--dry-run", "--json"]).stdout);
+  assert.deepEqual(again.wouldCreate, []);
+  assert.deepEqual(again.skipped, SOURCES);
+});
+
+test("a real --json run reports ok and no dry run, and a re-import names the sources it skipped", () => {
+  const dir = backlog("real-json");
+  const first = importInto(dir, ["--json"]);
+  assert.equal(first.status, 0, first.stderr);
+  const env = JSON.parse(first.stdout);
+  assert.equal(env.ok, true);
+  assert.equal(env.dryRun, false);
+  assert.equal(env.root, dir);
+  assert.deepEqual(env.skipped, []);
+  assert.deepEqual(env.droppedLabels, ["bug ×1", "performance ×1", "needs-triage ×1"]);
+  assert.deepEqual(env.unknownNodes, []);
+  assert.equal(env.withoutVerification, 3);
+  assert.equal(typeof env.actorSource, "string");
+
+  const second = importInto(dir, ["--json"]);
+  assert.equal(second.status, 0, second.stderr);
+  const re = JSON.parse(second.stdout);
+  assert.equal(re.ok, true);
+  assert.equal(re.dryRun, false);
+  assert.deepEqual(re.created, []);
+  assert.deepEqual(re.skipped, SOURCES);
+  assert.equal(re.withoutVerification, 0);
+});
+
+test("the rebuild warning appears when the views cannot be built, and only then", () => {
+  const warning = /WARNING: could not rebuild the views/;
+
+  const clean = importInto(backlog("build-ok"));
+  assert.equal(clean.status, 0, clean.stderr);
+  assert.match(clean.stdout, /3 task\(s\) from github/, "the run reported nothing — the control proves nothing");
+  assert.doesNotMatch(clean.stdout, warning);
+
+  // A task already in the tree on a board outside the registry makes the build
+  // exit 1 while leaving the import itself nothing to object to.
+  const dir = backlog("build-fails");
+  const made = run(["new", "--dir", dir, "--title", "A task on a board nobody declared"]);
+  assert.equal(made.status, 0, made.stderr);
+  const [file] = taskFiles(dir);
+  const path = join(dir, "tasks", file);
+  writeFileSync(path, readFileSync(path, "utf8").replace(/^board: .*$/m, "board: undeclared"));
+  assert.notEqual(run(["build", "--dir", dir]).status, 0, "the fixture did not break the build — the test proves nothing");
+
+  const broken = importInto(dir);
+  assert.equal(broken.status, 0, broken.stderr);
+  assert.equal(taskFiles(dir).length, 4);
+  assert.match(broken.stdout, warning);
+});
+
+test("the imported tasks land on the default board, or on the first board when none is default", () => {
+  const boards = (withDefault) => [
+    ...(withDefault ? ["default: beta", ""] : []),
+    "boards:",
+    "  - slug: alpha",
+    '    name: "Alpha"',
+    "  - slug: beta",
+    '    name: "Beta"',
+    "",
+  ].join("\n");
+
+  const withDefault = backlog("board-default");
+  writeFileSync(join(withDefault, "boards.yaml"), boards(true));
+  assert.equal(importInto(withDefault).status, 0);
+  const onDefault = taskFiles(withDefault).map((f) => field(taskText(withDefault, f), "board"));
+  assert.deepEqual(onDefault, ["beta", "beta", "beta"]);
+
+  const noDefault = backlog("board-first");
+  writeFileSync(join(noDefault, "boards.yaml"), boards(false));
+  assert.equal(importInto(noDefault).status, 0);
+  const onFirst = taskFiles(noDefault).map((f) => field(taskText(noDefault, f), "board"));
+  assert.deepEqual(onFirst, ["alpha", "alpha", "alpha"]);
+});
+
+test("a directory that is not a backlog is refused, in prose and in the --json envelope", () => {
+  const notBacklog = tmp("not-backlog");
+
+  const prose = importInto(notBacklog);
+  assert.equal(prose.status, 1);
+  assert.match(prose.stderr, /does not look like a backlog/);
+  assert.match(prose.stderr, /import --from github --dir <path> < issues\.json/);
+  assert.equal(prose.stdout, "");
+
+  const json = importInto(notBacklog, ["--json"]);
+  assert.equal(json.status, 1);
+  const env = JSON.parse(json.stdout);
+  assert.equal(env.kind, "import");
+  assert.equal(env.ok, false);
+  assert.equal(env.refusalKind, "no-backlog");
+  assert.match(env.refusal, /does not look like a backlog/);
+  assert.equal(taskFiles(notBacklog).length, 0);
+});
+
 // ── Retiring the source issues (TL-580) ───────────────────────────────────
 
 test("created[] carries each source issue's state, open and closed alike", () => {
