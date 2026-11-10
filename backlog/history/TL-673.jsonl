@@ -1,0 +1,2 @@
+{"id":"01M70F94JFB37R3QZY1CW4BZ0R","ts":"2026-11-09T15:36:56.143Z","task":"TL-673","field":"__created__","from":"","to":"A mutation run judges mutation-contain.mjs with its own mutant active","actor":"agent:loop-1","source":"new","reason":"unknown"}
+{"id":"01M70MMAEG20EAD8N99YWXXCY3","ts":"2026-11-09T17:10:25.488Z","task":"TL-673","field":"conflict_group","from":[],"to":["mutation"],"actor":"agent:loop-1","source":"set","reason":"it runs a mutation run, so it must not run beside another task of the mutation group"}

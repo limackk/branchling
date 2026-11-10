@@ -523,6 +523,33 @@ export function strykerConfig(p, opts, links, work) {
   };
 }
 
+/**
+ * The environment handed to Stryker: this process's, minus what belongs to a
+ * run ABOVE this one.
+ *
+ * A nested `node --test` that inherits NODE_TEST_CONTEXT reports to a parent
+ * runner instead of through its exit code, and exits 0 on a failing test.
+ * Inherited here, every mutant would be reported Survived. Measured on
+ * 2026-11-05 when this file was itself started from a test.
+ *
+ * The active mutant of an OUTER mutation run must not reach this one either
+ * (TL-629). Both runs speak through the same `__STRYKER_ACTIVE_MUTANT__` and
+ * number their mutants from 0, and Stryker's command runner starts the initial
+ * test run with the environment as it finds it, so an inherited id switched on
+ * THIS run's mutant of that number during the run that must pass unmutated.
+ * The initial run failed, the test that started this run failed, and the outer
+ * mutant was reported Killed by something other than an assertion. Measured
+ * with `subprocess-kill.test.mjs` under ids 0 and 1. The outer mutant stays
+ * active in the process that calls this, which read the id when it loaded;
+ * only the copy handed to Stryker loses it.
+ */
+export function strykerEnv(env = process.env) {
+  const copy = { ...env };
+  delete copy.NODE_TEST_CONTEXT;
+  delete copy.__STRYKER_ACTIVE_MUTANT__;
+  return copy;
+}
+
 function runStryker(root, p, opts) {
   const bin = strykerBin();
   if (!bin) return { code: 2, problem: STRYKER_PIN + " is not installed", next: ["npm install"] };
@@ -533,15 +560,9 @@ function runStryker(root, p, opts) {
     const reportPath = config.jsonReporter.fileName;
     const configPath = join(work, "stryker.config.json");
     writeFileSync(configPath, JSON.stringify(config, null, 2));
-    // A nested `node --test` that inherits NODE_TEST_CONTEXT reports to a
-    // parent runner instead of through its exit code, and exits 0 on a failing
-    // test. Inherited here, every mutant would be reported Survived. Measured
-    // on 2026-11-05 when this file was itself started from a test.
-    const env = { ...process.env };
-    delete env.NODE_TEST_CONTEXT;
     const r = spawnSync(process.execPath, [bin, "run", configPath], {
       cwd: root,
-      env,
+      env: strykerEnv(),
       stdio: ["ignore", opts.json ? "pipe" : "inherit", opts.json ? "pipe" : "inherit"],
       encoding: "utf8",
     });

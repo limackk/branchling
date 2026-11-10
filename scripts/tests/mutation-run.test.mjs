@@ -20,7 +20,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { SCRIPTS_DIR, isolateHome } from "./_repo.mjs";
-import { MIN_SWEEP_MARKER, leftoverProcesses, reachesCli, sandboxCommand, sweepLeftovers } from "../mutation-run.mjs";
+import { MIN_SWEEP_MARKER, leftoverProcesses, reachesCli, sandboxCommand, strykerEnv, sweepLeftovers } from "../mutation-run.mjs";
 
 const HOME = isolateHome("mutation-run");
 const ENTRY = join(SCRIPTS_DIR, "mutation-run.mjs");
@@ -240,6 +240,19 @@ test("a leftover is a process naming the marker, never the one asking", () => {
     { pid: 101, pgid: 100, args: "/usr/bin/node /tmp/mutation-run-AbCdEf/sandbox/sandbox-1/scripts/cli.mjs" },
     { pid: 103, pgid: 100, args: "node /tmp/mutation-run-AbCdEf/sandbox/sandbox-1/scripts/serve-backlog.mjs --port 0" },
   ]);
+});
+
+// TL-629. The end-to-end form of this — a nested run started with an outer
+// id — cannot live in `mutation/subprocess-kill.test.mjs`: that file runs
+// inside an outer mutation run whenever this module changes, and an id the
+// test sets for its child switches on the OUTER run's mutant of that number
+// in the child, during the outer initial run as well, so the outer run judged
+// mutant 0 instead of the one under test. Measured on 2026-11-09.
+test("Stryker is started without the active mutant or the test context of a run above it", () => {
+  const above = { PATH: "/bin", HOME: "/h", NODE_TEST_CONTEXT: "child-v8", __STRYKER_ACTIVE_MUTANT__: "0" };
+  assert.deepEqual(strykerEnv(above), { PATH: "/bin", HOME: "/h" });
+  assert.equal(above.__STRYKER_ACTIVE_MUTANT__, "0", "the caller's environment was changed, not copied");
+  assert.equal(strykerEnv().PATH, process.env.PATH, "without an argument it is this process's environment");
 });
 
 test("the test command runs inside the containing process group", () => {

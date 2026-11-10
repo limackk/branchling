@@ -1,0 +1,2 @@
+{"id":"01M70M76CPBEM52R5YD1AQ7VTJ","ts":"2026-11-09T17:03:15.350Z","task":"TL-676","field":"__created__","from":"","to":"Survivors of a whole-file mutation run of mutation-run.mjs are killed or named","actor":"agent:loop-1","source":"new","reason":"unknown"}
+{"id":"01M70MMAQ6A63RN846NYMWE39S","ts":"2026-11-09T17:10:25.766Z","task":"TL-676","field":"conflict_group","from":[],"to":["mutation"],"actor":"agent:loop-1","source":"set","reason":"it runs a mutation run, so it must not run beside another task of the mutation group"}
