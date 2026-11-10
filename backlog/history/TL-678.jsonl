@@ -1,0 +1,1 @@
+{"id":"01M72XZ6MMDZ5B9TJ0C626FNSM","ts":"2026-11-10T14:32:08.084Z","task":"TL-678","field":"__created__","from":"","to":"mutation-run --help prints usage instead of an unknown argument","actor":"agent:claude","source":"new","reason":"unknown"}
