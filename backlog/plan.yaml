@@ -13,7 +13,7 @@
 # means something first, outward claims last — and adds one: a human gate is
 # closed by a vouch, so the vouch has to be recorded under the right name
 # before any gate is closed with one.
-updated: 2026-11-07
+updated: 2026-11-10
 rationale: "The package is already public, so what remains is making each later claim true before it is made. Branchling first makes its suite answer the same way twice, then records a person's vouch as that person's and reads a CRLF checkout like an LF one; the viewer runs alongside, on files neither of those touches. Only then the human gates, and last the release evidence and the announcement that point at all of it."
 waves:
   # A SUITE THAT IS RED BY CHANCE CLOSES NOTHING. `done` runs the suite, so a
@@ -106,8 +106,17 @@ waves:
   - name: "The follow-ups filed in waves 7 and 8 close"
     tasks: [TL-651, TL-655, TL-656, TL-659, TL-661, TL-652, TL-653, TL-654, TL-657, TL-658, TL-662]
 
+  # THE FOLLOW-UPS FILED while closing waves 9 and 10, fifteen of them,
+  # none needing a person. Highest priority first: `plan` withholding a
+  # task another tree has claimed (TL-664, P1), then the two P2 defects,
+  # then the rest. The six that run or change the mutation tooling
+  # (TL-665, TL-667, TL-672, TL-674, and TL-673 and TL-676 in the mutation
+  # group) come last, so they serialise on one machine.
+  - name: "The follow-ups filed in waves 9 and 10 close"
+    tasks: [TL-664, TL-660, TL-668, TL-663, TL-666, TL-669, TL-671, TL-675, TL-670, TL-665, TL-667, TL-672, TL-674, TL-673, TL-676]
+
   # The viewer touches build-viewer.mjs and serve-backlog.mjs only, so it can
-  # run beside the two waves above rather than after them. Both halves exist
+  # run beside the follow-up waves above rather than after them. Both halves exist
   # on their own branches; they land before the surface is judged as a whole.
   - name: "The viewer becomes an operating surface"
     tasks: [TL-451, TL-450]
