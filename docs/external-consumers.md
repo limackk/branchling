@@ -7,7 +7,7 @@ against, what it must not, and where the built-in viewer stops so the two do
 not duplicate each other.
 
 The short version: **build against the command line, never against
-`scripts/`.** The fourth law (`docs/branchling-global-tool.md` §3) makes
+`scripts/`.** The fourth law (`docs/functionality.md` §1) makes
 `--json` on every reading command and a callable input on every writing command
 the only extension surface. There is no plugin API, and the modules under
 `scripts/` are internals that move without notice.

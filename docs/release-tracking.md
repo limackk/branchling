@@ -19,7 +19,7 @@ release from CI with a commit SHA. GitLab marks merge requests deployed to an
 environment; Sentry associates commits with a release and records deploys per
 environment.
 
-Here that division falls on the laws (`docs/branchling-global-tool.md` §3):
+Here that division falls on the laws (`docs/functionality.md` §1):
 
 - **What a person decides is task data** and travels with the branch (Law 1):
   the status, and the release a task is planned for (TL-505).

@@ -9,7 +9,7 @@
  * more than one project.
  *
  * THE BOUNDARY IS DISJOINT, NOT PRIORITISED, and this is the whole risk of the
- * feature — Law 3, §3 of docs/branchling-global-tool.md (product-name: allow)
+ * feature — Law 3, §1 of docs/functionality.md
  * Two layers that may both speak about the same thing
  * WILL drift. So the user layer may not override the project's vocabulary — not
  * "does not by default", may not: `statuses` in a user file FAILS, and the

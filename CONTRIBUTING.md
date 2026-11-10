@@ -98,7 +98,7 @@ discovered at review.
 Two other places worth reading first, because they are where the project's
 opinions live rather than its code:
 
-- [`docs/branchling-global-tool.md`](docs/branchling-global-tool.md) §3 — the four
+- [`docs/functionality.md`](docs/functionality.md) §1 — the four
   rules everything else follows from. Data in the repository and pointers
   globally; what is computed may be deleted; configuration layers are disjoint
   rather than ranked; extension by composition and not a plugin API.

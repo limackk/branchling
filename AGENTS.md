@@ -11,8 +11,9 @@ views, indexes and aggregates are COMPUTED and are not versioned.
 
 ## Four laws
 
-Extensibility comes from these rules, not from a plugin API. Full reasoning:
-[`docs/branchling-global-tool.md`](docs/branchling-global-tool.md) §3.
+Extensibility comes from these rules, not from a plugin API. They are kept, as
+part of the maintained scope record, in
+[`docs/functionality.md`](docs/functionality.md) §1.
 
 1. **Data in the repository, pointers globally.** A task travels with its branch
    and goes through review. State divorced from the branch is the defect that
