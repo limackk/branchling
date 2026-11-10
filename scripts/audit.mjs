@@ -47,7 +47,7 @@ import { printJson } from "./json-envelope.mjs";
 import { answerBacklogDirRefusal, backlogPaths, BACKLOG_DIR_REFUSAL_HELP, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { readTaskRecords } from "./task-select.mjs";
-import { MARK, color, failure, heading, table } from "./ui.mjs";
+import { MARK, color, failure, heading, table, plural } from "./ui.mjs";
 import { todayStamp } from "./today.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -453,7 +453,7 @@ function section(out, title, rows, note) {
 }
 
 export function render(report, config) {
-  const out = [heading(N + " audit — " + report.tasks + " task(s), judged from " + report.since)];
+  const out = [heading(N + " audit — " + report.tasks + " " + plural(report.tasks, "task", "tasks") + ", judged from " + report.since)];
   if (report.dayZero && report.since === report.dayZero) {
     out.push("  " + color.dim("that is the day the log first recorded a status transition; nothing before it could leave the trace this looks for"));
   }
@@ -472,7 +472,7 @@ export function render(report, config) {
   section(out,
     "parked",
     report.parked.found.map((f) => [f.task, f.owner || "(nobody)", f.days + "d since " + f.lastChange, f.title]),
-    report.parked.reason || "no recorded change for " + config.auditStaleDays + " day(s); `updated:` has a day's resolution");
+    report.parked.reason || "no recorded change for " + config.auditStaleDays + " " + plural(config.auditStaleDays, "day", "days") + "; `updated:` has a day's resolution");
 
   section(out,
     "no premise",
@@ -502,7 +502,8 @@ export function render(report, config) {
   section(out,
     "closing contract capability undetermined",
     report.contractCapability.undetermined.map((f) => [f.task, f.actor, f.title]),
-    report.contractCapability.legacy + " legacy closing(s) predate this reading; manual and foreign-program proofs are not guessed");
+    report.contractCapability.legacy + " legacy " +
+      plural(report.contractCapability.legacy, "closing predates", "closings predate") + " this reading; manual and foreign-program proofs are not guessed");
 
   out.push("");
   out.push(heading("  vouched `manual:` entries  (" + report.vouches.found.length + ")"));
@@ -532,7 +533,7 @@ export function render(report, config) {
 
   out.push("");
   out.push(report.findings
-    ? "  " + color.warn(MARK.warn) + " " + report.findings + " finding(s). This is a REPORT: nothing was changed, and nothing failed."
+    ? "  " + color.warn(MARK.warn) + " " + report.findings + " " + plural(report.findings, "finding", "findings") + ". This is a REPORT: nothing was changed, and nothing failed."
     : "  " + color.ok(MARK.ok) + " nothing to report — every declaration has the trace it should have.");
   out.push("  " + color.dim("Backlog hygiene, not a judgement of anybody's work."));
   return out.join("\n");

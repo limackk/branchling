@@ -71,7 +71,7 @@ import { DEFAULT_LOCK_TTL_MINUTES, isExpired, listLocks } from "./lock.mjs";
 import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { extractMeta, splitFrontmatter } from "./task-fields.mjs";
-import { MARK, color } from "./ui.mjs";
+import { MARK, color, plural } from "./ui.mjs";
 import { canonicalPath } from "./canonical-path.mjs";
 import { gitDiscoveryEnv } from "./git-env.mjs";
 
@@ -250,7 +250,7 @@ export function main(argv) {
     // would be a report that read nothing, and it must not look like one that
     // looked and found nothing.
     console.log(
-      `${OKM} task-state: ${compared} task file(s) compared with HEAD, each one agrees ` +
+      `${OKM} task-state: ${compared} ${plural(compared, "task file", "task files")} compared with HEAD, each one agrees ` +
         `(${pairs.length} in the tree)`
     );
     return 0;
@@ -272,7 +272,8 @@ export function main(argv) {
   // their way out of a session.
   if (unheld.length) {
     console.log(
-      `${WARNM} task-state: ${unheld.length} of ${compared} task file(s) differ from HEAD ` +
+      `${WARNM} task-state: ${unheld.length} of ${compared} ${plural(compared, "task file", "task files")} ` +
+        `${plural(unheld.length, "differs", "differ")} from HEAD ` +
         "with no session holding them — a state change left behind"
     );
     listOut(unheld, (d) => `  - ${d.id} — ${sides(d)}`);
@@ -290,7 +291,8 @@ export function main(argv) {
   if (held.length) {
     if (unheld.length) console.log("");
     console.log(
-      `${BULLET} task-state: ${held.length} of ${compared} task file(s) differ from HEAD and are ` +
+      `${BULLET} task-state: ${held.length} of ${compared} ${plural(compared, "task file", "task files")} ` +
+        `${plural(held.length, "differs from HEAD and is", "differ from HEAD and are")} ` +
         `held by ${color.id(actor)} right now — the normal condition of a session mid-task`
     );
     listOut(held, (d) => {

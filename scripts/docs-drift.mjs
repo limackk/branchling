@@ -64,7 +64,7 @@ import { answerBacklogDirRefusal, backlogPaths, BACKLOG_DIR_REFUSAL_HELP, isBack
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { splitFrontmatter } from "./task-fields.mjs";
 import { readTaskRecords } from "./task-select.mjs";
-import { MARK, color, failure, heading, table } from "./ui.mjs";
+import { MARK, color, failure, heading, table, plural } from "./ui.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -263,7 +263,7 @@ export function judgeDocument({ doc, text, changed, tasks, config, exists, root,
     else if (r.fired) {
       out.push({
         detector: "tasks-newer",
-        detail: r.tasks.length + " task(s) naming this document closed after it last changed (" + changed + ")",
+        detail: r.tasks.length + " " + plural(r.tasks.length, "task", "tasks") + " naming this document closed after it last changed (" + changed + ")",
         items: r.tasks.map((t) => t.task + " — closed " + t.closed + " — " + t.title),
       });
     }
@@ -440,7 +440,7 @@ export function documentsInScope(root, tasksDir) {
 // ──────────────────────────────────────────────────────────────────────────
 
 export function render(report, config, { seeded } = {}) {
-  const out = [heading(N + " docs-drift — " + report.documents + " document(s)")];
+  const out = [heading(N + " docs-drift — " + report.documents + " " + plural(report.documents, "document", "documents"))];
   out.push("  " + color.dim("a report, not a gate: nothing here was changed, and nothing failed"));
 
   out.push("");
@@ -456,9 +456,9 @@ export function render(report, config, { seeded } = {}) {
 
   out.push("");
   out.push(heading("  too little signal  (" + report.tooLittle.length + ")"));
-  out.push("  " + color.dim("below " + report.minSignals + " signal(s) a document is not called stale — one dead link is a typo"));
+  out.push("  " + color.dim("below " + report.minSignals + " " + plural(report.minSignals, "signal", "signals") + " a document is not called stale — one dead link is a typo"));
   if (report.tooLittle.length) {
-    out.push(table(report.tooLittle.map((d) => ["   ", d.doc, d.signals.length + " signal(s)", d.signals.map((s) => s.detector).join(", ")])));
+    out.push(table(report.tooLittle.map((d) => ["   ", d.doc, d.signals.length + " " + plural(d.signals.length, "signal", "signals"), d.signals.map((s) => s.detector).join(", ")])));
   }
 
   const notes = new Map();
@@ -480,7 +480,8 @@ export function render(report, config, { seeded } = {}) {
 
   out.push("");
   out.push(report.flagged.length
-    ? "  " + color.warn(MARK.warn) + " " + report.flagged.length + " document(s) flagged."
+    ? "  " + color.warn(MARK.warn) + " " + report.flagged.length + " " +
+      plural(report.flagged.length, "document", "documents") + " flagged."
     : "  " + color.ok(MARK.ok) + " nothing to report — no document carries enough signal to call it stale.");
   return out.join("\n");
 }

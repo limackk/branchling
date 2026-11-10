@@ -64,7 +64,7 @@ import { loadConfigOrExit } from "./config.mjs";
 import { backlogPaths, repositoryRoot, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { splitFrontmatter, stripComment } from "./task-fields.mjs";
-import { MARK, color } from "./ui.mjs";
+import { MARK, color, plural } from "./ui.mjs";
 
 const OKM = color.ok(MARK.ok);
 const ERRM = color.err(MARK.err);
@@ -336,7 +336,8 @@ export function main(argv) {
 
   if (result.artefacts.length) {
     console.log(
-      `${ERRM} docs: ${result.artefacts.length} of ${result.checked} target(s) point inside ` +
+      `${ERRM} docs: ${result.artefacts.length} of ${result.checked} ${plural(result.checked, "target", "targets")} ` +
+        `${plural(result.artefacts.length, "points", "point")} inside ` +
         `\`${INSTALL_DIR}/\`, which an install creates and no clone contains`
     );
     for (const a of result.artefacts.slice(0, 25)) {
@@ -353,12 +354,13 @@ export function main(argv) {
     // The counts are the positive control: "0 dead" over 0 links read is a guard
     // that found nothing to judge, and it must not look like one that passed.
     console.log(
-      `${OKM} docs: ${result.checked} link(s) and related_docs entr(ies), including ` +
-        `${result.anchorsChecked} anchor(s), across ${result.documents} document(s), each one resolving locally`
+      `${OKM} docs: ${result.checked} ${plural(result.checked, "link and related_docs entry", "links and related_docs entries")}, including ` +
+        `${result.anchorsChecked} ${plural(result.anchorsChecked, "anchor", "anchors")}, across ${result.documents} ${plural(result.documents, "document", "documents")}, each one resolving locally`
     );
-    if (result.skipped["other-repository"]) {
+    const skippedOther = result.skipped["other-repository"];
+    if (skippedOther) {
       console.log(
-        `  ${result.skipped["other-repository"]} reference(s) to another repository were skipped ` +
+        `  ${skippedOther} ${plural(skippedOther, "reference to another repository was", "references to another repository were")} skipped ` +
           "on purpose — `<repo>#<path>` is not a local path"
       );
     }
@@ -367,7 +369,7 @@ export function main(argv) {
 
   if (!result.dead.length) return 1;
 
-  console.log(`${ERRM} docs: ${result.dead.length} of ${result.checked} target(s) lead nowhere or to a missing section`);
+  console.log(`${ERRM} docs: ${result.dead.length} of ${result.checked} ${plural(result.checked, "target", "targets")} ${plural(result.dead.length, "leads", "lead")} nowhere or to a missing section`);
   for (const d of result.dead.slice(0, 25)) {
     console.log(`  - ${rel(d.file)}:${d.line} → ${d.target}` + label(d.kind));
   }

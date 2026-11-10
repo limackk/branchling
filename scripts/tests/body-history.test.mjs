@@ -102,14 +102,14 @@ test("a body written through the tool keeps the frontmatter byte-identical, reco
 
   const log = run(dir, ["log", id, "--dir", "."]);
   assert.equal(log.status, 0, log.stderr);
-  assert.match(log.stdout, /body \+1 -1 line\(s\)/);
+  assert.match(log.stdout, /body \+1 -1 lines/);
   assert.match(log.stdout, /the goal was vague/);
   assert.match(log.stdout, /agent:writer/);
   assert.ok(!log.stdout.includes(NEW_GOAL) && !log.stdout.includes(GOAL), "log printed a body");
 
   const json = JSON.parse(run(dir, ["log", id, "--dir", ".", "--json"]).stdout);
   const shown = JSON.stringify(json);
-  assert.ok(shown.includes("body +1 -1 line(s)"), "log --json does not carry the body change");
+  assert.ok(shown.includes("body +1 -1 lines"), "log --json does not carry the body change");
 });
 
 test("the body arrives on stdin, and --json hands back the hash a next write uses as --base", () => {

@@ -227,13 +227,13 @@ test("doctor and next diagnose work closed on another branch without refusing", 
     const rows = JSON.parse(doctor.stdout).checks;
     const warning = rows.find((row) => row.id === "closed-elsewhere-feature");
     assert.equal(warning.status, "warn");
-    assert.match(warning.detail, /1 task\(s\) closed on feature are still open here/);
+    assert.match(warning.detail, /1 task closed on feature is still open here/);
 
     const next = cli(["next", "--dir", backlogDir, "--actor", "agent:test", "--json"], { cwd: repoRoot });
     assert.equal(next.status, 3, next.stderr);
     const out = JSON.parse(next.stdout);
     assert.deepEqual(out.closedElsewhere, [{ source: "feature", kind: "branch", ids: [ID] }]);
-    assert.ok(out.details.some((line) => /closed on feature are still open here/.test(line)));
+    assert.ok(out.details.some((line) => /1 task closed on feature is still open here/.test(line)));
   } finally {
     cleanup(repoRoot);
   }

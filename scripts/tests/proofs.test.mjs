@@ -99,7 +99,7 @@ test("POSITIVE CONTROL: the same fixture with the contract intact reports nothin
   withBacklog({ command: "true" }, (dir) => {
     const r = check(dir);
     assert.equal(r.code, 0, r.out);
-    assert.match(r.out, /1 verification command\(s\) re-run across 1 proven closing\(s\)/,
+    assert.match(r.out, /1 verification command re-run across 1 proven closing,/,
       "the guard ran nothing and said so as if it had: " + r.out);
   });
 });
@@ -110,7 +110,7 @@ test("a task closed with `unknown` is not a broken proof — it was never proved
   withBacklog({ command: "exit 3", reason: REASON_UNKNOWN }, (dir) => {
     const r = check(dir);
     assert.equal(r.code, 0, "a hand-closed task was reported as a broken proof: " + r.out);
-    assert.match(r.out, /across 0 proven closing\(s\)/);
+    assert.match(r.out, /across 0 proven closings/);
   });
 });
 
@@ -135,7 +135,7 @@ test("a bare `check` does NOT re-run proofs", () => {
     assert.doesNotMatch(out, /proofs:/, "a bare check re-ran the proofs: " + out);
     // POSITIVE CONTROL for this very assertion: asked by name, it runs — and on
     // this fixture it finds the broken proof the bare run said nothing about.
-    assert.match(check(dir).out, /proofs: 1 closed task\(s\) whose proof no longer holds/);
+    assert.match(check(dir).out, /proofs: 1 closed task whose proof no longer holds/);
   });
 });
 
@@ -267,7 +267,7 @@ test("--since keeps only the closings whose OWN entries the range touched, thoug
   withRangeBacklog(["shared.txt", "own-2.txt"], (dir, base) => {
     const r = check(dir, ["--since", base]);
     assert.equal(r.code, 0, r.out);
-    assert.match(r.out, /narrowed to 1 of 2 closing\(s\)/,
+    assert.match(r.out, /narrowed to 1 of 2 closings/,
       "a project entry naming a touched path kept every closing: " + r.out);
     assert.match(r.out, /\[1\/1\] TASK-2:/);
     assert.doesNotMatch(r.out, /TASK-1:/, "TASK-1 was re-run though the range touched nothing of its own");
@@ -280,7 +280,7 @@ test("POSITIVE CONTROL: --since with nothing of any task's own in the range keep
   withRangeBacklog(["shared.txt"], (dir, base) => {
     const r = check(dir, ["--since", base]);
     assert.equal(r.code, 0, r.out);
-    assert.match(r.out, /narrowed to 0 of 2 closing\(s\)/, r.out);
+    assert.match(r.out, /narrowed to 0 of 2 closings/, r.out);
     assert.equal(projectRuns(dir), 0, r.out);
   });
 });
@@ -289,7 +289,7 @@ test("POSITIVE CONTROL: unnarrowed, the same fixture re-runs both closings and t
   withRangeBacklog(["shared.txt"], (dir) => {
     const r = check(dir);
     assert.equal(r.code, 0, r.out);
-    assert.match(r.out, /across 2 proven closing\(s\)/, r.out);
+    assert.match(r.out, /across 2 proven closings/, r.out);
     assert.equal(projectRuns(dir), 1, r.out);
   });
 });

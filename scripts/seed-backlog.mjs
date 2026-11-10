@@ -62,7 +62,7 @@ import { editPlanTextMany, newPlanErrors, waveTargetProblem } from "./plan-write
 import { buildFieldSpecs, fieldSpec, normalizeValue, setFrontmatterField } from "./task-fields.mjs";
 import { readTaskMetas } from "./task-io.mjs";
 import { DEFAULT_TASK_ID_PREFIX, detectPrefixMismatch, prefixMismatchMessage } from "./task-id.mjs";
-import { MARK, color, failure } from "./ui.mjs";
+import { MARK, color, failure, plural } from "./ui.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -588,7 +588,8 @@ function seedFromText(input, cli, opts) {
     }
     console.error(failure(
       N + " seed", "the seed failed part-way through and was rolled back",
-      [e.message, (e.rolledBack || 0) + " task file(s) created by this run were removed"], []
+      [e.message, (e.rolledBack || 0) + " " +
+        plural(e.rolledBack || 0, "task file created by this run was", "task files created by this run were") + " removed"], []
     ));
     return 1;
   }
@@ -606,7 +607,7 @@ function seedFromText(input, cli, opts) {
     return 0;
   }
 
-  console.log(color.ok(MARK.ok) + " " + N + " seed: " + written.length + " task(s) in " + root);
+  console.log(color.ok(MARK.ok) + " " + N + " seed: " + written.length + " " + plural(written.length, "task", "tasks") + " in " + root);
   if (initialised) console.log("  the backlog was created here first (`" + N + " init`)");
   for (const w of written) {
     const blockers = (w.item.blocked_by || []).map((ref) => idFor(written, ref)).filter(Boolean);
@@ -777,7 +778,7 @@ function reportDryRun(plan, { root, prefix, firstId, json, fresh, actorSource })
     printJson("seed", { ok: true, root, dryRun: true, created, actorSource });
     return 0;
   }
-  console.log(N + " seed --dry-run: " + plan.tasks.length + " task(s) would be created in " + root);
+  console.log(N + " seed --dry-run: " + plan.tasks.length + " " + plural(plan.tasks.length, "task", "tasks") + " would be created in " + root);
   if (fresh) console.log("  this directory is not a backlog yet — `" + N + " init` would create it first");
   for (const item of plan.tasks) {
     const after = (item.blocked_by || []).map((ref) => ids.get(ref)).filter(Boolean);

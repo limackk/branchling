@@ -190,7 +190,7 @@ test("the instructions topic prints the rule and a table measured on the tree", 
   const r = run(["instructions", "context-budget", "--dir", dir]);
   assert.equal(r.status, 0, r.stderr);
   assert.ok(r.stdout.includes(CONTEXT_RULE[0]), "the topic must print the rule, not a paraphrase of it");
-  assert.match(r.stdout, /4 task file\(s\)/, "the table has to be measured on the tree it is printed for");
+  assert.match(r.stdout, /4 task files/, "the table has to be measured on the tree it is printed for");
   for (const word of ["pending", "in_progress", "done"]) {
     assert.ok(!r.stdout.includes(word), "a default status leaked into the topic: " + word);
   }

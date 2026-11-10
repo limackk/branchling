@@ -135,7 +135,7 @@ test("the count in the green line says how much was actually looked at", () => {
   assert.equal(git(fx.dir, ["add", "backlog"]).status, 0);
   const r = check(fx);
   assert.equal(r.status, 0);
-  assert.match(r.stdout, /1 log\(s\) checked against git/);
+  assert.match(r.stdout, /1 log checked against git/);
 });
 
 // ── outside git ───────────────────────────────────────────────────────────

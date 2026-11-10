@@ -638,7 +638,7 @@ test("the gate and `deploy record` are callable where the guide offers them, and
     assert.ok(topicText("overview", fx.config).includes(" check --release"), label + ": not offered");
     const r = run(fx.repo, ["check", "--release", "--dir", fx.dir]);
     assert.equal(r.status, 0, label + ": `check --release` refuses where the guide offers it: " + r.stderr);
-    assert.match(r.stdout, /release: 0 gap\(s\)/, label + ": `check --release` did not judge the promotion");
+    assert.match(r.stdout, /release: 0 gaps/, label + ": `check --release` did not judge the promotion");
   }
   // ... and judges nothing where the guide is silent: offering it would teach a no-op.
   for (const [label, fx] of [["foreign", fixture(FOREIGN_YAML)], ["neither", NEITHER]]) {

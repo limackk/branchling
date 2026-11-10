@@ -83,7 +83,7 @@ import { parseVerification } from "./criteria.mjs";
 import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME } from "./product.mjs";
 import { readTaskRecords } from "./task-select.mjs";
-import { MARK, color, errColor } from "./ui.mjs";
+import { MARK, color, errColor, plural } from "./ui.mjs";
 
 const OKM = color.ok(MARK.ok);
 const ERRM = errColor.err(MARK.err);
@@ -199,21 +199,21 @@ export function main(argv) {
       // finding — there is nothing to repair. What it must not be either is a
       // plain tick, which would read as ninety entries examined and clean.
       console.log(
-        `${MARK.bullet} contracts: ${tasksChecked} open task(s) and no verification entry among them ` +
+        `${MARK.bullet} contracts: ${tasksChecked} ${plural(tasksChecked, "open task", "open tasks")} and no verification entry among them ` +
           "— nothing was examined"
       );
       return 0;
     }
     console.log(
-      `${OKM} contracts: ${entriesChecked} verification entr(ies) across ${tasksChecked} open task(s) ` +
+      `${OKM} contracts: ${entriesChecked} ${plural(entriesChecked, "verification entry", "verification entries")} across ${tasksChecked} ${plural(tasksChecked, "open task", "open tasks")} ` +
         `name \`${PRODUCT_NAME}\` or a program allowed by \`contract_programs\``
     );
     return 0;
   }
 
   console.error(
-    `${ERRM} contracts: ${findings.length} open contract(s) name a command that is not \`${PRODUCT_NAME}\`` +
-      ` (out of ${entriesChecked} entr(ies) in ${tasksChecked} open task(s))`
+    `${ERRM} contracts: ${findings.length} ${plural(findings.length, "open contract names", "open contracts name")} a command that is not \`${PRODUCT_NAME}\`` +
+      ` (out of ${entriesChecked} ${plural(entriesChecked, "entry", "entries")} in ${tasksChecked} ${plural(tasksChecked, "open task", "open tasks")})`
   );
   for (const f of findings) {
     console.error(`  - ${f.task} (${f.kind}): \`${f.name} ${f.sub}\``);

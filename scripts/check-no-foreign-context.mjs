@@ -73,7 +73,7 @@ import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadUserConfig, USER_KEYS } from "./home.mjs";
-import { MARK, color, errColor } from "./ui.mjs";
+import { MARK, color, errColor, plural } from "./ui.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OKM = color.ok(MARK.ok);
@@ -253,9 +253,9 @@ function main(argv = process.argv.slice(2)) {
     // The counts are the positive control: a ✓ over zero files would mean the
     // walk read the wrong tree, not that the documents are clean.
     console.log(
-      `${OKM} foreign context: ${linesChecked} lines across ${filesChecked} public document(s), ` +
+      `${OKM} foreign context: ${linesChecked} lines across ${filesChecked} ${plural(filesChecked, "public document", "public documents")}, ` +
         "no personal paths, addresses or unreproducible measurements" +
-        (words.length ? ", and none of the " + words.length + " forbidden word(s)" : "")
+        (words.length ? ", and none of the " + words.length + " forbidden " + plural(words.length, "word", "words") : "")
     );
     return 0;
   }

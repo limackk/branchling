@@ -6,6 +6,7 @@
  */
 
 import { todayStamp } from "./today.mjs";
+import { plural } from "./ui.mjs";
 
 const DAY_MS = 86400000;
 
@@ -178,8 +179,9 @@ export function renderDashboard(model) {
   const epics = model.epics.map((epic) => dashboardTaskLink(epic.ids,
     epic.name + ": " + epic.open + " open, " + epic.blocked + " blocked", "dash-epic")).join("");
   const quality = model.flow.incompleteCreated || model.flow.leadSamples === 0
-    ? '<p class="dash-quality">Lead time is ' + (model.flow.leadSamples ? "based on " + model.flow.leadSamples + " closure(s)" : "unknown: no complete creation-to-closure samples") +
-      ". " + model.flow.incompleteCreated + " task(s) have no readable creation date.</p>" : "";
+    ? '<p class="dash-quality">Lead time is ' + (model.flow.leadSamples ? "based on " + model.flow.leadSamples + " " + plural(model.flow.leadSamples, "closure", "closures") : "unknown: no complete creation-to-closure samples") +
+      ". " + model.flow.incompleteCreated + " " +
+        plural(model.flow.incompleteCreated, "task has", "tasks have") + " no readable creation date.</p>" : "";
   return '<div class="dash-head"><div><h2>Backlog health</h2><p>Current state and historical flow are separate. Metrics describe tasks, never people.</p></div></div>' +
     '<section aria-labelledby="dashCurrent"><h3 id="dashCurrent">Current state</h3><div class="dash-kpis">' + cards + "</div></section>" +
     '<section aria-labelledby="dashFlow"><h3 id="dashFlow">Flow in the selected range</h3><div class="dash-flow">' + flowCards + "</div>" + quality +

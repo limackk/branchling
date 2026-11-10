@@ -68,7 +68,7 @@ import { fileURLToPath } from "node:url";
 import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { taskIdPatterns } from "./task-id.mjs";
-import { MARK, color, errColor } from "./ui.mjs";
+import { MARK, color, errColor, plural } from "./ui.mjs";
 import { stripComment, unquote } from "./task-fields.mjs";
 import { openQuestions, questionIdFromReason, readHistory } from "./history.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
@@ -298,7 +298,8 @@ function main(argv) {
   const staleLines = [];
   if (stale.length) {
     staleLines.push(
-      color.warn(MARK.warn) + " backlog: " + stale.length + " task(s) stand in a blocking status " +
+      color.warn(MARK.warn) + " backlog: " + stale.length + " " +
+        plural(stale.length, "task stands", "tasks stand") + " in a blocking status " +
         "whose every stated blocker is closed"
     );
     for (const t of stale) {
@@ -317,7 +318,7 @@ function main(argv) {
       `${OKM} backlog: ${checked} blocked_by/blocks references across ${taskCount} tasks all point at tasks that exist`
     );
     console.log(
-      `${OKM} backlog: ${pathsChecked} path(s) to a task file written in prose, each one leading to a file that exists`
+      `${OKM} backlog: ${pathsChecked} ${plural(pathsChecked, "path", "paths")} to a task file written in prose, each one leading to a file that exists`
     );
     for (const line of staleLines) console.log(line);
     return 0;

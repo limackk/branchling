@@ -133,7 +133,7 @@ test("`check --json` names every guard it ran, and the ones that failed", () => 
   // the very second truth the guard table was extracted to prevent, so the
   // question is put to the command: its own verdict line counts what it ran.
   const text = run(["check", "--dir", fx.backlog], fx.dir, fx.env);
-  const counted = Number(text.stdout.match(/check: (\d+) release gate\(s\) passed/)[1]);
+  const counted = Number(text.stdout.match(/check: (\d+) release gates? passed/)[1]);
   assert.equal(answer.guards.filter((g) => !g.skipped).length, counted,
     "a bare `check --json` did not run the same set the text mode runs");
   for (const guard of answer.guards) {

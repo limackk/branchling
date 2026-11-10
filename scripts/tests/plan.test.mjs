@@ -326,7 +326,7 @@ test("an executable plan passes, and the ✓ names how much it judged", () => {
     (dir) => {
       const r = run(["--dir", dir]);
       assert.equal(r.code, 0, r.out);
-      assert.match(r.out, /2 task\(s\) across 2 wave\(s\)/);
+      assert.match(r.out, /2 tasks across 2 waves/);
     },
   );
 });
@@ -386,7 +386,7 @@ test("this repository's own plan.yaml is executable, and it schedules something"
   }
   const r = run(["--dir", BACKLOG_DIR]);
   assert.equal(r.code, 0, r.out);
-  const m = r.out.match(/schedules (\d+) task\(s\)/);
+  const m = r.out.match(/schedules (\d+) tasks?\b/);
   assert.ok(m, "the ✓ does not say how much it judged: " + r.out);
   assert.ok(Number(m[1]) > 0, "the plan schedules nothing — a guard over an empty plan proves nothing");
 });

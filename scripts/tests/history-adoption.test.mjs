@@ -285,7 +285,7 @@ test("an explicit whole-tree adoption still records what entered without a refer
   const accepted = run(dir, ["--actor", "agent:codex", "--source", "manual", "--adopt"]);
 
   assert.equal(accepted.code, 0, accepted.out);
-  assert.match(accepted.out, /1 task\(s\) had no reference point/);
+  assert.match(accepted.out, /1 task had no reference point/);
   const adoption = readHistory(dir, "BL-900").find((e) => e.field === FIELD_ADOPTED);
   assert.ok(adoption, "the positive control proves the refusal did not make adoption unreachable");
   assert.ok(adoption.to.includes("related_docs"), "the accepted entry still names the absorbed field");

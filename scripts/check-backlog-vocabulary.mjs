@@ -43,7 +43,7 @@ import { loadConfigOrExit } from "./config.mjs";
 import { resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { listTaskFileNames, readTaskMetas } from "./task-io.mjs";
 import { auditVocabulary } from "./task-fields.mjs";
-import { MARK, color } from "./ui.mjs";
+import { MARK, color, plural } from "./ui.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 
 const OKM = color.ok(MARK.ok);
@@ -94,7 +94,7 @@ export function report(divergent, names, metas) {
     // and it would stay green through any regression.
     return {
       lines: [
-        `${OKM} vocabulary: ${metas.length} task(s) checked, every value inside the ` +
+        `${OKM} vocabulary: ${metas.length} ${plural(metas.length, "task", "tasks")} checked, every value inside the ` +
           "vocabularies config.yaml declares",
       ],
       code: 0,
@@ -103,7 +103,7 @@ export function report(divergent, names, metas) {
 
   const lines = [];
   const fields = divergent.map((d) => "`" + d.field + "`").join(", ");
-  lines.push(`${ERRM} vocabulary: ${divergent.length} field(s) carry a value outside their vocabulary: ${fields}`);
+  lines.push(`${ERRM} vocabulary: ${divergent.length} ${plural(divergent.length, "field carries", "fields carry")} a value outside their vocabulary: ${fields}`);
   for (const d of divergent) {
     // A field whose values are the TOOL's shape has no key in config.yaml, and
     // saying it "diverges from config.yaml" would send the reader to edit
@@ -116,7 +116,7 @@ export function report(divergent, names, metas) {
     if (d.note) lines.push(`    ${d.note}`);
     for (const f of d.found) {
       const carriers = filesCarrying(names, metas, d.field, f.value);
-      lines.push(`    ${f.value} ×${f.count} in ${carriers.length} file(s):`);
+      lines.push(`    ${f.value} ×${f.count} in ${carriers.length} ${plural(carriers.length, "file", "files")}:`);
       for (const name of carriers.slice(0, SHOWN_FILES)) lines.push(`      - ${name}`);
       if (carriers.length > SHOWN_FILES) {
         lines.push(`      … and ${carriers.length - SHOWN_FILES} more`);

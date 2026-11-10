@@ -194,7 +194,7 @@ test("the guard says how many entries it read, and says when it read none", () =
   withContract(fx.backlog, 'bash: "' + PRODUCT_NAME + ' check --refs"');
   const one = guard(fx.backlog);
   assert.equal(one.status, 0, one.stdout + one.stderr);
-  const counted = one.stdout.match(/(\d+) verification entr\(ies\) across 1 open task\(s\)/);
+  const counted = one.stdout.match(/(\d+) verification entr(?:y|ies) across 1 open task\b/);
   assert.ok(counted, one.stdout);
   // The NUMBER is the template's business, not this test's; what has to hold is
   // that the count is the guard's own sample and is no longer zero.

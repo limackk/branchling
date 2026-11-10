@@ -51,7 +51,7 @@ import { fileURLToPath } from "node:url";
 import { loadConfigOrExit } from "./config.mjs";
 import { BACKLOG_DIR_REFUSAL_EXIT, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
-import { failure } from "./ui.mjs";
+import { failure, plural } from "./ui.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -402,7 +402,7 @@ export async function main(argv) {
 
   if (!result.ok) {
     console.error(failure(
-      N + " plan-from", "no plan survived " + result.attempts.length + " attempt(s)",
+      N + " plan-from", "no plan survived " + result.attempts.length + " " + plural(result.attempts.length, "attempt", "attempts"),
       result.errors.concat([
         "",
         "The last answer is on stdout. It is NOT repaired: a plan this command",

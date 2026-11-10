@@ -74,7 +74,7 @@ import { BLOCK_MARKER_NAME, PRODUCT_NAME as N } from "./product.mjs";
 import { verificationContractOf } from "./show-task.mjs";
 import { extractMeta, splitFrontmatter } from "./task-fields.mjs";
 import { listTaskFileNames } from "./task-io.mjs";
-import { refusal } from "./ui.mjs";
+import { refusal, plural } from "./ui.mjs";
 import { statusEntries } from "./vocabulary.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -380,7 +380,7 @@ export function renderReport(model) {
     out.push("── " + c.task + " → " + c.key + "  " + c.url + "\n\n" + c.text);
   }
   if (model.skipped.length) {
-    out.push("skipped " + model.skipped.length + " closed task(s):\n" +
+    out.push("skipped " + model.skipped.length + " closed " + plural(model.skipped.length, "task", "tasks") + ":\n" +
       model.skipped.map((s) => "  " + s.task + "  " + SKIP_WORDS[s.reason] + "\n").join(""));
   }
   return out.join("\n").replace(/\n*$/, "\n");

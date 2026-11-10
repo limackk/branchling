@@ -229,7 +229,7 @@ test("`check --docs` answers the same with and without the hook's GIT_DIR (TL-48
   try {
     const plain = f.cli(f.wt, ["check", "--docs"]);
     assert.equal(plain.status, 0, plain.stdout + plain.stderr);
-    assert.match(plain.stdout, /1 link\(s\) and related_docs/, "the gate judged nothing, so its green is no evidence");
+    assert.match(plain.stdout, /1 link and related_docs/, "the gate judged nothing, so its green is no evidence");
     const hooked = f.cli(f.wt, ["check", "--docs"], { GIT_DIR: f.gitDir });
     assert.equal(hooked.status, 0, hooked.stdout + hooked.stderr);
   } finally {

@@ -661,7 +661,7 @@ test("the skip is counted and named, never silent", () => {
 
   const r = run(["next", "--dir", backlog, "--actor", "agent:claude"], env);
   assert.equal(r.status, 3);
-  assert.match(r.stdout, /1 of them wait for a person/);
+  assert.match(r.stdout, /1 open task asks for an executor you are not \(agent\) — it waits for a person/);
   assert.match(r.stdout, new RegExp(ids[0]));
 
   const j = run(["next", "--dir", backlog, "--actor", "agent:claude", "--json"], env);

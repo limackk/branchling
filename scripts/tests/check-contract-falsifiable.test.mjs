@@ -117,7 +117,7 @@ test("an open task whose contract fails against the tree is not named", () => {
     const r = check(dir);
     assert.doesNotMatch(r.out, /already passes/,
       "a contract that can fail is sound, and a guard naming it would be noise: " + r.out);
-    assert.match(r.out, /1 open contract\(s\) can still fail/,
+    assert.match(r.out, /1 open contract can still fail/,
       "and the run has to say it looked — a finding of none needs its sample size: " + r.out);
     assert.equal(r.code, 0, r.out);
   });

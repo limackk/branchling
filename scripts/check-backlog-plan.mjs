@@ -38,7 +38,7 @@ import { loadConfigOrExit } from "./config.mjs";
 import { loadPlan, validatePlan } from "./plan.mjs";
 import { listTaskFileNames } from "./task-io.mjs";
 import { extractMeta, splitFrontmatter } from "./task-fields.mjs";
-import { MARK, color, errColor } from "./ui.mjs";
+import { MARK, color, errColor, plural } from "./ui.mjs";
 // The product name comes from the manifest, never from a literal (CLAUDE.md).
 import { PRODUCT_NAME as N } from "./product.mjs";
 
@@ -105,7 +105,7 @@ function main(argv) {
 
   if (!result.errors.length) {
     console.log(
-      `${OKM} backlog: plan.yaml schedules ${result.planned} task(s) across ${result.waves} wave(s), ` +
+      `${OKM} backlog: plan.yaml schedules ${result.planned} ${plural(result.planned, "task", "tasks")} across ${result.waves} ${plural(result.waves, "wave", "waves")}, ` +
         `and no wave stands before something it is blocked by`
     );
     return 0;

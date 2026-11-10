@@ -239,7 +239,7 @@ test("check --proofs re-runs the project's entries with a proven closing, and ho
     rmSync(join(dir, "guard-ran"));
     const r = checkProofs(dir);
     assert.equal(r.code, 0, r.out);
-    assert.match(r.out, /2 verification command\(s\) re-run across 1 proven closing/);
+    assert.match(r.out, /2 verification commands re-run across 1 proven closing/);
     assert.ok(existsSync(join(dir, "guard-ran")), "the project entry was not re-run after the task's own");
   });
 });
@@ -271,6 +271,6 @@ test("check --proofs judges an open task's falsifiability by its own entries, no
   withBacklog('closing_contract:\n  - id: repo-guard\n    bash: "exit 3"\n', OWN, (dir) => {
     const r = checkProofs(dir);
     assert.equal(r.code, 0, r.out);
-    assert.match(r.out, /1 open task\(s\) whose whole contract already passes/);
+    assert.match(r.out, /1 open task whose whole contract already passes/);
   });
 });

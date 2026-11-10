@@ -105,7 +105,7 @@ test("the audit states what it is about to cost before it runs anything", () => 
   withBacklog(2, (dir) => {
     const r = check(dir);
     assert.equal(r.code, 0, r.out + r.err);
-    assert.match(r.err, /re-running 2 verification command\(s\) from 2 proven closing\(s\)/,
+    assert.match(r.err, /re-running 2 verification commands from 2 proven closings/,
       "the run began without saying how big it was: " + r.err);
     // The way out is named where the cost is named; an operator told only that
     // it is expensive has been told half of it.
@@ -123,8 +123,8 @@ test("the audit names each task as it reaches it, and how much is left", () => {
     assert.match(r.err, /\[2\/2\] TASK-2/, "the second task was not announced: " + r.err);
     // The commands remaining, not only the tasks: one task can carry a whole
     // suite, and "1 task left" says nothing about how long that is.
-    assert.match(r.err, /2 command\(s\) left/);
-    assert.match(r.err, /1 command\(s\) left/);
+    assert.match(r.err, /2 commands left/);
+    assert.match(r.err, /1 command left/);
     // The command in flight is named BEFORE it runs — that is the line somebody
     // reads while it hangs.
     assert.match(r.err, /→ true/, "the entry in flight was not named: " + r.err);
@@ -136,7 +136,7 @@ test("the audit names each task as it reaches it, and how much is left", () => {
 test("the narration is on stderr and the report on stdout, unchanged", () => {
   withBacklog(2, (dir) => {
     const r = check(dir);
-    assert.match(r.out, /2 verification command\(s\) re-run across 2 proven closing\(s\)/, r.out);
+    assert.match(r.out, /2 verification commands re-run across 2 proven closings/, r.out);
     assert.doesNotMatch(r.out, /\[1\/2\]/, "the progress leaked into the report: " + r.out);
     assert.doesNotMatch(r.out, /re-running/, "the cost line leaked into the report: " + r.out);
   });
@@ -169,7 +169,7 @@ test("a single signal stops the walk, and it says where it stopped", {
     const code = await finished;
 
     assert.equal(code, 130, "an interrupted run did not say so in its exit code: " + err);
-    assert.match(err, /stopped by SIGTERM after 1 of 2 proven closing\(s\)/, err);
+    assert.match(err, /stopped by SIGTERM after 1 of 2 proven closings/, err);
     assert.match(err, /process tree were stopped/, err);
     assert.doesNotMatch(err, /\[2\/2\]/, "the walk carried on past the signal: " + err);
   } finally {
@@ -243,7 +243,7 @@ test("`--quiet` silences the narration and leaves the report alone", () => {
     assert.deepEqual(doc.guards.map((g) => g.name), ["proofs"]);
     assert.doesNotMatch(doc.guards[0].output, /\[1\/2\]/,
       "the narration was captured into the JSON document: " + doc.guards[0].output);
-    assert.match(doc.guards[0].output, /2 verification command\(s\) re-run/, doc.guards[0].output);
+    assert.match(doc.guards[0].output, /2 verification commands re-run/, doc.guards[0].output);
 
     // The control for the control: the same guard, asked directly with
     // `--quiet`, is silent on stderr — so the assertion above is testing the

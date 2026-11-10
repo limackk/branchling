@@ -154,7 +154,7 @@ test("an agent that satisfies the contract empties the queue", () => {
     const r = cli(["run", "--dir", backlog, "--actor", "agent:worker", "--agent", agent], env, { cwd: repo });
     assert.equal(r.status, 0, r.stdout + r.stderr);
     for (const id of ids) assert.equal(statusOf(backlog, id), "done", id + " was not closed by the run");
-    assert.match(r.stdout, /2 task\(s\) taken · 2 closed · 0 blocked/);
+    assert.match(r.stdout, /2 tasks taken · 2 closed · 0 blocked/);
   } finally {
     cleanup(dir);
   }
@@ -539,7 +539,7 @@ test("a skip is never silent: the report names the role and counts the tasks", (
       "--agent", agent, "--agent-for", "archivist=" + agent,
     ], env, { cwd: repo });
     assert.equal(r.status, 0, r.stderr);
-    assert.match(r.stdout, /2 task\(s\) ask for `stonemason`/);
+    assert.match(r.stdout, /2 tasks ask for `stonemason`/);
     assert.match(r.stdout, new RegExp(ids[0]));
   } finally {
     cleanup(dir);
@@ -641,7 +641,7 @@ test("the report says so in words, not only in the JSON", () => {
     const agent = agentScript(dir, "a.sh", "cat > /dev/null");
     const r = cli(["run", "--dir", backlog, "--actor", "agent:worker", "--agent", agent], env, { cwd: repo });
     assert.equal(r.status, 0, r.stderr);
-    assert.match(r.stdout, /1 task\(s\) ask for `executor: human`/);
+    assert.match(r.stdout, /1 task asks for `executor: human`/);
   } finally {
     cleanup(dir);
   }
@@ -767,7 +767,7 @@ test("POSITIVE CONTROL: a task handed out again with nothing changed still stops
     assert.equal(readFileSync(join(dir, a + ".turns"), "utf8").trim().split("\n").length, 1,
       "the unchanged task was worked a second time");
     assert.match(out.stopped, new RegExp(a + " was handed out twice"), out.stopped);
-    assert.match(out.stopped, /1 other task\(s\) are still eligible/, out.stopped);
+    assert.match(out.stopped, /1 other task is still eligible/, out.stopped);
     assert.deepEqual(out.spinGuard, { id: a, role: "", eligible: 1 });
     assert.equal(statusOf(backlog, a), "blocked", "the claim was not given back");
     assert.equal(statusOf(backlog, c), "pending", "the run went on after its guard fired");

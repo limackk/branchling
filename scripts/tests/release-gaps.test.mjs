@@ -374,7 +374,7 @@ test("check --release: report prints the gaps and exits 0, require exits 1, acce
   assert.equal(guard.report.mode, "require");
   assert.deepEqual(guard.report.gaps.map((g) => [g.gap, g.subject, g.accepted]), [["untracked-commit", untracked, true]]);
   assert.equal(guard.report.trunk.spec, "main");
-  assert.match(guard.output, /1 gap\(s\), 1 accepted/);
+  assert.match(guard.output, /1 gap, 1 accepted/);
 });
 
 test("check --release with a --trunk naming nothing fails under require and names the trunk", () => {
@@ -385,7 +385,7 @@ test("check --release with a --trunk naming nothing fails under require and name
   // Positive control: the same fixture with a trunk that resolves is judged and passes.
   const good = run(dir, ["check", "--dir", "backlog", "--release", "--trunk", "main"]);
   assert.equal(good.status, 0, good.stdout + good.stderr);
-  assert.match(good.stdout, /0 gap\(s\)/);
+  assert.match(good.stdout, /0 gaps/);
 
   const bad = run(dir, ["check", "--dir", "backlog", "--release", "--trunk", "origin/mian"]);
   assert.equal(bad.status, 1, bad.stdout + bad.stderr);
@@ -408,7 +408,7 @@ test("check --release on a clean fixture passes under require, and the default t
   const r = run(dir, ["check", "--dir", "backlog", "--release"]);
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /trunk: HEAD [0-9a-f]{12} \(HEAD — this clone has no `origin\/HEAD`, so pass --trunk in CI\)/);
-  assert.match(r.stdout, /0 gap\(s\)/);
+  assert.match(r.stdout, /0 gaps/);
 });
 
 test("check --release with no deploy_targets names the trunk's real SHA, never `unresolved`", () => {

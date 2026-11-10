@@ -98,6 +98,7 @@ import { releaseEntriesOf } from "./release-entries.mjs";
 import { readShipments } from "./release-shipped.mjs";
 import { currentRelease } from "./release-status.mjs";
 import { taskIdScanner } from "./task-id.mjs";
+import { plural } from "./ui.mjs";
 import { readTaskRecords } from "./task-select.mjs";
 
 /** The gap names, in the order a report lists them. `release_gate_accept`
@@ -330,7 +331,7 @@ export function releaseGaps({ root, config, tasks, selector = null, trunk, state
               const gone = state.missing.get(r.sha);
               note("partial-task", entry.id, [place(te.target, st.stage, r.spec, parallel)],
                 te.commits.filter((sha) => gone.has(sha)),
-                r.held + " of " + r.of + " commit(s) held; the listed ones are not");
+                r.held + " of " + r.of + " " + plural(r.of, "commit", "commits") + " held; the listed ones are not");
             }
           }
           const states = st.refs.map((r) => r.state);

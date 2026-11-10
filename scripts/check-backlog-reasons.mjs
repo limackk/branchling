@@ -45,7 +45,7 @@ import { fileURLToPath } from "node:url";
 
 import { loadConfigOrExit } from "./config.mjs";
 import { resolveBacklogDir, takeDirFlag } from "./paths.mjs";
-import { MARK, color } from "./ui.mjs";
+import { MARK, color, plural } from "./ui.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import {
   REASON_UNKNOWN,
@@ -101,14 +101,15 @@ function main(argv) {
     // guard read a history that has nothing to say, not that everything is
     // answered.
     console.log(
-      `${OKM} reasons: ${required} recorded transition(s) into [${named}], each with a stated reason`
+      `${OKM} reasons: ${required} ${plural(required, "recorded transition", "recorded transitions")} into [${named}], each with a stated reason`
     );
     return 0;
   }
 
+  const missing = gaps.length + unwitnessed.length + legacy.length;
   console.log(
-    `${WARNM} reasons: ${gaps.length + unwitnessed.length + legacy.length} of ${required} ` +
-      `transition(s) into [${named}] carry no stated reason`
+    `${WARNM} reasons: ${missing} of ${required} ` +
+      `${plural(required, "transition", "transitions")} into [${named}] ${plural(missing, "carries", "carry")} no stated reason`
   );
   for (const g of gaps.slice(0, 10)) {
     console.log(`  - ${g.task} → ${g.to} (${g.ts.slice(0, 10)}, ${g.actor}, ${g.source})`);

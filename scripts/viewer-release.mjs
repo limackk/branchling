@@ -32,6 +32,7 @@
  */
 
 import { encodeTasksHash, TASKS_HASH_ROUTE } from "./viewer-url.mjs";
+import { plural } from "./ui.mjs";
 
 /** The column keys that are not a stage name; a stage column is keyed by its
  *  name. Shared with `release-view.mjs`, which builds the columns. */
@@ -389,7 +390,9 @@ export function renderRelease(vm) {
       : "") +
     '<div class="rel-columns">' + lane.columns.map(renderColumn).join("") + "</div></section>").join("");
   const unplaced = vm.unplaced.count
-    ? '<p class="rel-hint">' + vm.unplaced.count + " closed task(s) are named by no commit on any ref, so no target can be given to them.</p>"
+    ? '<p class="rel-hint">' + vm.unplaced.count + " closed " +
+      plural(vm.unplaced.count, "task is", "tasks are") + " named by no commit on any ref, so no target can be given to " +
+      plural(vm.unplaced.count, "it", "them") + ".</p>"
     : "";
   return head.join("") + lanes + unplaced + renderGaps(vm.gaps);
 }

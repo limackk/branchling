@@ -31,7 +31,7 @@ import { loadPlan } from "./plan.mjs";
 import { PRODUCT_NAME as N, STORAGE_KEY_PREFIX } from "./product.mjs";
 import { printLine } from "./stdout.mjs";
 import { faviconDataUri, headerMarkSvg } from "./brand-mark.mjs";
-import { refusal } from "./ui.mjs";
+import { refusal, plural } from "./ui.mjs";
 import { releaseViewData } from "./release-view.mjs";
 import { RELEASE_CSS } from "./viewer-release.mjs";
 
@@ -1969,6 +1969,13 @@ ${RELEASE_CSS}
 // rename of the display name.
 const STORAGE_PREFIX = ${storagePrefix};
 
+// ─── plural() from scripts/ui.mjs (TL-637) ───────────────────────────
+// Embedded from the terminal's own helper, so a count reads the same on the
+// page as in a report: "1 task", "2 tasks", never a parenthesised plural.
+// The pasted modules below import it from ui.mjs; their import lines are
+// dropped here, so this definition is the one they reach.
+${plural.toString()}
+
 // ─── Pasted source of scripts/viewer-url.mjs (BL-1390) ────────────────
 // The link format for the tasks view. Edit THAT file — this is the build's copy,
 // which \`node --test scripts/tests/viewer-url.test.mjs\` tests.
@@ -3613,7 +3620,7 @@ function execApplySelection() {
   const note = document.createElement("p");
   note.className = "exec-selection-hint";
   note.id = "execSelectionHint";
-  note.textContent = EXEC_SELECTED + " unblocks " + lit.size + " task(s) — click again or press Escape to clear";
+  note.textContent = EXEC_SELECTED + " unblocks " + lit.size + " " + plural(lit.size, "task", "tasks") + " — click again or press Escape to clear";
   flow.parentElement.insertBefore(note, flow);
 }
 

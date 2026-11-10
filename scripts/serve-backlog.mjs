@@ -46,7 +46,7 @@ import { loadPlan } from "./plan.mjs";
 import { crossBranchState } from "./branch-scan.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { printLine } from "./stdout.mjs";
-import { refusal } from "./ui.mjs";
+import { refusal, plural } from "./ui.mjs";
 import {
   PING_ID,
   listServers,
@@ -151,7 +151,7 @@ if (argv.includes("--list")) {
     printLine("  A server started before this version knows about the register is NOT here —");
     printLine("  it was never recorded. `lsof -nP -iTCP -sTCP:LISTEN` still finds those.");
   } else {
-    printLine(`${N} serve: ${servers.length} registered viewer(s)`);
+    printLine(`${N} serve: ${servers.length} ${plural(servers.length, "registered viewer", "registered viewers")}`);
     for (const entry of servers) printLine(describe(entry));
     if (servers.some((e) => e.state === "stale")) {
       printLine("  `stale` means the entry outlived its process — SIGKILL, a crash or a reboot");
@@ -384,7 +384,7 @@ function scheduleReconcile() {
       if (seeded) {
         printLine(`${N} serve: history: reference point created (no entries)`);
       } else if (entries.length) {
-        printLine(`${N} serve: history: ` + entries.length + " change(s) from outside the viewer (author: unknown)");
+        printLine(`${N} serve: history: ` + entries.length + " " + plural(entries.length, "change", "changes") + " from outside the viewer (author: unknown)");
         for (const res of sseClients) {
           try { res.write("event: history-changed\ndata: {}\n\n"); } catch { sseClients.delete(res); }
         }
@@ -844,7 +844,7 @@ function listen(port, attemptsLeft) {
       boot = seeded
         ? "  History: reference point (snapshot) created — entries start with the next change\n"
         : entries.length
-          ? `  History: ${entries.length} change(s) from before the server started (author: unknown)\n`
+          ? `  History: ${entries.length} ${plural(entries.length, "change", "changes")} from before the server started (author: unknown)\n`
           : "";
     } catch (e) {
       boot = `  History: reconciliation did not pass (${e.message})\n`;

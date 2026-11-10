@@ -36,7 +36,7 @@ import { printJsonLine } from "./json-envelope.mjs";
 import { backlogPaths, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { printLine } from "./stdout.mjs";
-import { color, failure, refusal } from "./ui.mjs";
+import { color, failure, refusal, plural } from "./ui.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -154,7 +154,7 @@ export function run(argv) {
   if (plan.json) {
     if (!emit({ event: "ready" })) return 0;
   } else {
-    console.error(COMMAND + ": watching " + snapshot.size + " task(s) in " + tasksDir + " — Ctrl-C stops");
+    console.error(COMMAND + ": watching " + snapshot.size + " " + plural(snapshot.size, "task", "tasks") + " in " + tasksDir + " — Ctrl-C stops");
   }
   if (plan.maxEvents === 0) { stop(0); return 0; }
 

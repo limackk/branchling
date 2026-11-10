@@ -33,7 +33,7 @@ import { PRODUCT_NAME as N } from "./product.mjs";
 import { printLine } from "./stdout.mjs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { refusal } from "./ui.mjs";
+import { refusal, plural } from "./ui.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -175,6 +175,6 @@ answer({
   matched: null,
   reason:
     "the default from boards.yaml — no paths rule matched (" +
-    paths.length +
-    " path(s) in the task). If this is the wrong board, set it yourself and say why.",
+    paths.length + " " + plural(paths.length, "path", "paths") +
+    " in the task). If this is the wrong board, set it yourself and say why.",
 });

@@ -95,7 +95,7 @@ import os, { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { fail, warn } from "./ui.mjs";
+import { fail, warn, plural } from "./ui.mjs";
 
 const COMMAND = "node scripts/mutation-run.mjs";
 const FLAGS_WITH_VALUE = new Set(["--base", "--files", "--tests", "--concurrency"]);
@@ -584,7 +584,8 @@ function runStryker(root, p, opts) {
 
 function reportLeftovers(leftovers) {
   if (!leftovers || leftovers.length === 0) return;
-  console.error(warn(leftovers.length + " process(es) outlived the run and were killed: a test left them behind"));
+  console.error(warn(leftovers.length + " " +
+    plural(leftovers.length, "process outlived the run and was", "processes outlived the run and were") + " killed: a test left them behind"));
   for (const p of leftovers.slice(0, 10)) console.error("  " + p.pid + "  " + p.args);
 }
 
@@ -647,7 +648,7 @@ export async function main(argv, cwd = process.cwd()) {
     if (p.lines) for (const l of rangeReport(p)) console.log(l);
   }
   if (summary.noCoverage > 0) {
-    return fail(COMMAND, summary.noCoverage + " mutant(s) reported NoCoverage under coverageAnalysis: off",
+    return fail(COMMAND, summary.noCoverage + " " + plural(summary.noCoverage, "mutant", "mutants") + " reported NoCoverage under coverageAnalysis: off",
       ["This configuration cannot lose coverage, so the result is not a score; the runner setup has changed."],
       [], 1);
   }
@@ -655,7 +656,8 @@ export async function main(argv, cwd = process.cwd()) {
     // Stryker counts a Timeout as detected. On this suite a timeout is far
     // more often an overloaded machine than a mutant that loops, so it is
     // reported where a reader of the score cannot miss it.
-    console.error(warn(summary.timeouts + " mutant(s) timed out and are counted as detected; "
+    console.error(warn(summary.timeouts + " " +
+      plural(summary.timeouts, "mutant timed out and is", "mutants timed out and are") + " counted as detected; "
       + "rerun with a lower --concurrency before trusting the score"));
   }
   return run.code === 0 ? 0 : run.code || 1;

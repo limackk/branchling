@@ -137,13 +137,13 @@ test("a run stopped by a queue held elsewhere counts what is held, and where it 
     assert.equal(r.status, 0, r.stdout + r.stderr);
     const report = JSON.parse(r.stdout);
     assert.notEqual(report.stopped, "the queue is empty", "the held task was reported as an empty queue");
-    assert.match(report.stopped, /every eligible task is held in another tree of this clone — 1 task\(s\)/, report.stopped);
+    assert.match(report.stopped, /every eligible task is held in another tree of this clone — 1 task\b/, report.stopped);
     assert.deepEqual(report.heldInOtherTrees, { count: 1, ids: [id] });
     assert.equal(report.waited, null, "a run without --wait reported a wait");
     assert.equal(statusOf(backlog, id), "pending");
 
     const text = cli(["run", "--dir", backlog, "--actor", RUN_ACTOR, "--agent", worker(dir)], env, { cwd: repo });
-    assert.match(text.stdout, new RegExp("stopped: every eligible task is held in another tree of this clone — 1 task\\(s\\): " + id));
+    assert.match(text.stdout, new RegExp("stopped: every eligible task is held in another tree of this clone — 1 task: " + id));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -177,7 +177,7 @@ test("`--wait-max` ends a wait nothing answers, with the reason", () => {
     assert.equal(r.status, 0, r.stdout + r.stderr);
     const report = JSON.parse(r.stdout);
     assert.equal(report.tally.taken, 0);
-    assert.match(report.stopped, /held in another tree of this clone — 1 task\(s\)/, report.stopped);
+    assert.match(report.stopped, /held in another tree of this clone — 1 task\b/, report.stopped);
     assert.match(report.stopped, /waited 2s \(--wait-max\) and nothing was freed/, report.stopped);
     assert.equal(report.waited.gaveUp, true);
     assert.ok(report.waited.polls >= 1);

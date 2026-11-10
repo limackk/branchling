@@ -210,7 +210,7 @@ export function unclosedSpan(range) {
     (range.gate ? " through its gate line" : range.last > range.first ? " and the comments under it" : "") + ")";
 }
 
-/** What following the repair leaves alone, said after the span(s) it names. */
+/** What following the repair leaves alone, said after the spans it names. */
 export function unclosedKeeps(spans = 1) {
   return "the lines after " + (spans === 1 ? "it" : "each") + " are yours and stay";
 }

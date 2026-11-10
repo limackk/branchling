@@ -161,7 +161,7 @@ import { backlogPaths, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { readTaskRecords } from "./task-select.mjs";
 import { splitFrontmatter } from "./task-fields.mjs";
-import { MARK, color, errColor } from "./ui.mjs";
+import { MARK, color, errColor, plural } from "./ui.mjs";
 import { closingContractOf, collisionHeadline, repoRootFor, runContract } from "./done-task.mjs";
 
 const OKM = color.ok(MARK.ok);
@@ -420,8 +420,8 @@ async function main(argv) {
     // one half only would make the narrowing mean two things at once.
     openSelected = open.filter(keep);
     narrowedNote =
-      `narrowed to ${selected.length} of ${candidates.length} closing(s) and ` +
-      `${openSelected.length} of ${open.length} open contract(s) by ${since}..HEAD ` +
+      `narrowed to ${selected.length} of ${candidates.length} ${plural(candidates.length, "closing", "closings")} and ` +
+      `${openSelected.length} of ${open.length} ${plural(open.length, "open contract", "open contracts")} by ${since}..HEAD ` +
       "— a task is kept when the range touched a file it changed, or a path its own contract names";
   }
 
@@ -459,9 +459,9 @@ async function main(argv) {
     // and some of them are whole test suites; an operator who learns the size
     // of the run at minute 68 learns it too late to decide anything.
     progress(
-      `${MARK.bullet} proofs: re-running ${commandsTotal} verification command(s) from ` +
-        `${selected.length} proven closing(s), then the contract of ${openSelected.length} ` +
-        "task(s) nobody has started"
+      `${MARK.bullet} proofs: re-running ${commandsTotal} ${plural(commandsTotal, "verification command", "verification commands")} from ` +
+        `${selected.length} ${plural(selected.length, "proven closing", "proven closings")}, then the contract of ` +
+        `${openSelected.length} ${plural(openSelected.length, "task", "tasks")} nobody has started`
     );
     progress(
       `  in ${repoRoot} — narrow the run with \`--since <sha>\` or \`--task <ID> --own-only\`, ` +
@@ -510,8 +510,8 @@ async function main(argv) {
       walked++;
       if (progress) {
         progress(
-          `  [${walked}/${selected.length}] ${c.id}: ${c.own.length} entr(ies), ` +
-            `${commandsLeft} command(s) left`
+          `  [${walked}/${selected.length}] ${c.id}: ${c.own.length} ${plural(c.own.length, "entry", "entries")}, ` +
+            `${commandsLeft} ${plural(commandsLeft, "command", "commands")} left`
         );
       }
       // Named BEFORE it runs, not after: the line an operator needs while the
@@ -554,7 +554,7 @@ async function main(argv) {
         }
       }
       if (interrupted) break;
-      if (progress && reused) progress(`      ${MARK.ok} ${reused} project entr(ies) already run in this audit — result reused`);
+      if (progress && reused) progress(`      ${MARK.ok} ${reused} ${plural(reused, "project entry", "project entries")} already run in this audit — result reused`);
     }
     // THE SECOND HALF (TL-260), after the first and never instead of it: a broken
     // proof is a defect in the tree and outranks a defect in a sentence nobody has
@@ -565,7 +565,7 @@ async function main(argv) {
       if (stopped) break;
       openWalked++;
       if (progress) {
-        progress(`  [${openWalked}/${openSelected.length}] ${c.id} (${c.status}): ${c.entries.length} entr(ies)`);
+        progress(`  [${openWalked}/${openSelected.length}] ${c.id} (${c.status}): ${c.entries.length} ${plural(c.entries.length, "entry", "entries")}`);
       }
       const { results, interrupted } = await runContract(c.entries, repoRoot, {
         capture: true,
@@ -594,8 +594,8 @@ async function main(argv) {
 
   if (stopped) {
     console.error(
-      `${WARNM} proofs: stopped by ${stopped} after ${walked} of ${selected.length} proven closing(s) ` +
-        `and ${openWalked} of ${openSelected.length} open contract(s) ` +
+      `${WARNM} proofs: stopped by ${stopped} after ${walked} of ${selected.length} ${plural(selected.length, "proven closing", "proven closings")} ` +
+        `and ${openWalked} of ${openSelected.length} ${plural(openSelected.length, "open contract", "open contracts")} ` +
         "— the command in flight and its process tree were stopped"
     );
   }
@@ -610,29 +610,29 @@ async function main(argv) {
     // half is what a closing still has to pass, and nothing here ran it.
     lines.push(
       `  ${WARNM} own entries only (\`--own-only\`): ${projectSkipped.size} project \`closing_contract\` ` +
-        `entr(ies) not run — \`${N} done\` still runs them before it closes anything`
+        `${plural(projectSkipped.size, "entry", "entries")} not run — \`${N} done\` still runs them before it closes anything`
     );
   }
   if (projectCache.size && reachedProject > 1) {
     // Said, not left implicit: a reader comparing this count with the archive
     // must be able to tell a reused result from a command nobody ran.
     lines.push(
-      `  ${MARK.bullet} ${projectCache.size} project \`closing_contract\` entr(ies) run once ` +
-        `and applied to ${reachedProject} proven closing(s)`
+      `  ${MARK.bullet} ${projectCache.size} project \`closing_contract\` ` +
+        `${plural(projectCache.size, "entry", "entries")} run once and applied to ${reachedProject} ${plural(reachedProject, "proven closing", "proven closings")}`
     );
   }
   if (nested.length) {
     // NAMED, because a pass here proved nothing by itself: the nested run
     // re-ran nothing, and this run's own verdict is what covers those contracts.
     lines.push(
-      `  ${WARNM} ${nested.length} entr(ies) started a nested \`check --proofs\`, which re-ran nothing ` +
+      `  ${WARNM} ${nested.length} ${plural(nested.length, "entry", "entries")} started a nested \`check --proofs\`, which re-ran nothing ` +
         "— this run re-runs every closed contract itself"
     );
     for (const n of nested) lines.push(`    ${MARK.bullet} ${n}`);
   }
   if (vouched.length) {
     lines.push(
-      `  ${WARNM} ${vouched.length} manual entr(ies) were vouched for by a person and cannot be re-run`
+      `  ${WARNM} ${vouched.length} ${plural(vouched.length, "manual entry was", "manual entries were")} vouched for by a person and cannot be re-run`
     );
     for (const v of vouched) lines.push(`    ${MARK.bullet} ${v.id}: ${v.entry}`);
   }
@@ -641,7 +641,7 @@ async function main(argv) {
     // examined forty contracts or none, and a green with no sample size behind
     // it is exactly the shape of claim this guard exists to refuse.
     lines.push(
-      `  ${MARK.ok} ${openWalked} open contract(s) can still fail against this tree`
+      `  ${MARK.ok} ${openWalked} ${plural(openWalked, "open contract", "open contracts")} can still fail against this tree`
     );
   }
   if (unfalsifiable.length) {
@@ -650,7 +650,7 @@ async function main(argv) {
     // which one and which command. The status is printed beside it because it
     // is half the argument — this contract passes while nobody has started.
     lines.push(
-      `  ${WARNM} ${unfalsifiable.length} open task(s) whose whole contract already passes ` +
+      `  ${WARNM} ${unfalsifiable.length} ${plural(unfalsifiable.length, "open task", "open tasks")} whose whole contract already passes ` +
         "against this tree — green before the work, so the work cannot make it red"
     );
     for (const u of unfalsifiable) {
@@ -666,7 +666,7 @@ async function main(argv) {
   const projectFailures = [...failing.values()];
   if (!broken.length && !collided.length && !projectFailures.length) {
     console.log(
-      `${OKM} proofs: ${ran} verification command(s) re-run across ${selected.length} proven closing(s), ` +
+      `${OKM} proofs: ${ran} ${plural(ran, "verification command", "verification commands")} re-run across ${selected.length} ${plural(selected.length, "proven closing", "proven closings")}, ` +
         `each still passing (${seconds}s)`
     );
     for (const l of lines) console.log(l);
@@ -675,7 +675,7 @@ async function main(argv) {
     return stopped ? 130 : 0;
   }
 
-  if (broken.length) console.error(`${ERRM} proofs: ${broken.length} closed task(s) whose proof no longer holds`);
+  if (broken.length) console.error(`${ERRM} proofs: ${broken.length} ${plural(broken.length, "closed task", "closed tasks")} whose proof no longer holds`);
   for (const b of broken) {
     const range = b.closing.ts ? " closed " + b.closing.ts : "";
     console.error(
@@ -690,8 +690,9 @@ async function main(argv) {
     // a broken proof would send readers to task files that hold no part of it.
     const affected = projectFailures.reduce((n, f) => n + f.closings.length, 0);
     console.error(
-      `${ERRM} proofs: ${projectFailures.length} project \`closing_contract\` entr(ies) no longer pass ` +
-        `— ${affected} proven closing(s) would fail on them`
+      `${ERRM} proofs: ${projectFailures.length} project \`closing_contract\` ` +
+        `${plural(projectFailures.length, "entry no longer passes", "entries no longer pass")} ` +
+        `— ${affected} ${plural(affected, "proven closing", "proven closings")} would fail on ${plural(projectFailures.length, "it", "them")}`
     );
     for (const f of projectFailures) {
       console.error(
@@ -701,7 +702,7 @@ async function main(argv) {
     }
   }
   if (collided.length) {
-    console.error(`${ERRM} proofs: ${collided.length} closed task(s) whose proof cannot be re-run as written`);
+    console.error(`${ERRM} proofs: ${collided.length} ${plural(collided.length, "closed task", "closed tasks")} whose proof cannot be re-run as written`);
     for (const c of collided) {
       console.error(`  - ${collisionHeadline(c.id)}: ${c.collisions.map((id) => "`id: " + id + "`").join(", ")}`);
       console.error(`    ${c.file}`);

@@ -58,7 +58,7 @@ import { PRODUCT_NAME as N } from "./product.mjs";
 import { printLine } from "./stdout.mjs";
 import { splitFrontmatter } from "./task-fields.mjs";
 import { readTaskRecords } from "./task-select.mjs";
-import { MARK, color, failure, priorityPaint, refusal, statusPaint, table } from "./ui.mjs";
+import { MARK, color, failure, priorityPaint, refusal, statusPaint, table, plural } from "./ui.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -293,8 +293,9 @@ export function renderShow(model, config, paint = color) {
   if (model.elsewhere.length) {
     for (const o of model.elsewhere) lines.push("  " + describeDivergence(o));
   } else if (model.scan.scanned) {
-    lines.push("  " + paint.dim("no other branch or worktree disagrees (" + model.scan.branches.length +
-      " branch(es) and " + model.scan.trees + " worktree(s) read)"));
+    lines.push("  " + paint.dim("no other branch or worktree disagrees (" + model.scan.branches.length + " " +
+      plural(model.scan.branches.length, "branch", "branches") + " and " + model.scan.trees + " " +
+      plural(model.scan.trees, "worktree", "worktrees") + " read)"));
   } else {
     const note = scanNote(model.scan.reason);
     lines.push("  " + paint.dim(note || "not read — `cross_branch_state` is off in config.yaml"));

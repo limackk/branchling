@@ -30,7 +30,7 @@ import { actorRefusal, statedActorRefusal, BulkAdoptionError, FIELD_ADOPTED, FIE
 import { resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { printLine } from "./stdout.mjs";
-import { failure, refusal } from "./ui.mjs";
+import { failure, refusal, plural } from "./ui.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -198,7 +198,7 @@ function selectClaim(changes) {
 const preflight = attribute ? unattributedChanges(BACKLOG_DIR, { only }) : [];
 if (attribute) selectClaim(preflight);
 if (attribute && all && !quiet) {
-  printLine(`${N} history: --all will claim ${preflight.length} recorded change(s) with no author.`);
+  printLine(`${N} history: --all will claim ${preflight.length} ${plural(preflight.length, "recorded change", "recorded changes")} with no author.`);
 }
 
 let reconciliation;
@@ -263,7 +263,8 @@ if (refused.length) {
     ": a recorded change carries ONE first claim, and this log is append-only,");
   console.error("  so a second claim cannot be written beside the first and taken back later.");
   if (claimed.length) {
-    console.error("  " + claimed.length + " other change(s) in this run WERE claimed for " + actor + ".");
+    console.error("  " + claimed.length + " other " +
+      plural(claimed.length, "change in this run WAS", "changes in this run WERE") + " claimed for " + actor + ".");
   }
   process.exit(1);
 }
@@ -271,7 +272,7 @@ if (refused.length) {
 // AN ADOPTION IS REPORTED AS AN ADOPTION, NOT AS A CHANGE (TL-387). The
 // `__adopted__` entries travel in `entries` because that is what gets appended
 // under the run's lock and withheld by `--dry-run`; printing them here as
-// "recorded N change(s) · — → title, board, related_docs" would say the fields
+// "recorded N changes · — → title, board, related_docs" would say the fields
 // changed, which is the one thing an adoption does not know. They are reported
 // below, beside the tasks they belong to.
 const adoptedFields = new Map();
@@ -286,7 +287,7 @@ if (seeded) {
 } else if (!recorded.length) {
   if (!unclaimed.length && !adopted.length && !seeds.length) printLine(`${N} history: no changes to record`);
 } else {
-  printLine(`${N} history: recorded ` + recorded.length + " change(s) (" + actor + "):");
+  printLine(`${N} history: recorded ` + recorded.length + " " + plural(recorded.length, "change", "changes") + " (" + actor + "):");
   for (const e of recorded.slice(0, 20)) {
     const fmt = (v) => (Array.isArray(v) ? v.join(", ") : String(v == null ? "" : v)) || "—";
     printLine("  " + e.task + " · " + e.field + ": " + fmt(e.from) + " → " + fmt(e.to));
@@ -304,7 +305,7 @@ if (seeded) {
 // while a false one cannot be taken back.
 if (seeds.length) {
   printLine(
-    `${N} history: ` + seeds.length + " task(s) taken as a reference point (seed) — no " +
+    `${N} history: ` + seeds.length + " " + plural(seeds.length, "task", "tasks") + " taken as a reference point (seed) — no " +
       "creation claimed:"
   );
   for (const id of seeds.slice(0, 20)) printLine("  " + id);
@@ -321,7 +322,7 @@ if (seeds.length) {
 // either. Normal after a pull or a merge; anything else deserves a look.
 if (adopted.length) {
   printLine(
-    `${N} history: ` + adopted.length + " task(s) had no reference point and were adopted " +
+    `${N} history: ` + adopted.length + " " + plural(adopted.length, "task", "tasks") + " had no reference point and were adopted " +
       "from the log:"
   );
   for (const id of adopted.slice(0, 20)) {
@@ -343,7 +344,7 @@ if (adopted.length) {
 }
 
 if (claimed.length) {
-  printLine(`${N} history: claimed ` + claimed.length + " recorded change(s) for " + actor + ":");
+  printLine(`${N} history: claimed ` + claimed.length + " recorded " + plural(claimed.length, "change", "changes") + " for " + actor + ":");
   for (const c of claimed.slice(0, 20)) printLine("  " + c.task + " · " + c.to);
   if (claimed.length > 20) printLine("  … and " + (claimed.length - 20) + " more");
   printLine("  the original entries still say `unknown` — this log is append-only, so a");
@@ -353,7 +354,8 @@ if (claimed.length) {
   // the defect invisible: it reads as "everything is recorded", and what was
   // actually true was "everything is recorded as nobody's".
   printLine(
-    `${N} history: ` + unclaimed.length + " recorded change(s) carry no author — somebody else's " +
+    `${N} history: ` + unclaimed.length + " recorded " +
+      plural(unclaimed.length, "change carries", "changes carry") + " no author — somebody else's " +
       "reconcile\n  (a running `" + N + " serve`, a `git pull`) got to them first:"
   );
   for (const u of unclaimed.slice(0, 20)) {

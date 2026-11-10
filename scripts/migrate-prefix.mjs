@@ -48,7 +48,7 @@ import { withHistoryLogMutex } from "./history-log-mutex.mjs";
 import { backlogPaths, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { withSnapshotMutex } from "./snapshot-mutex.mjs";
 import { PREFIX_SHAPE, taskIdPatterns } from "./task-id.mjs";
-import { MARK, color, errColor, refusal } from "./ui.mjs";
+import { MARK, color, errColor, refusal, plural } from "./ui.mjs";
 import { stripComment, unquote } from "./task-fields.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 
@@ -312,7 +312,7 @@ export function main(argv) {
   if (plan.renames.length > 10) console.log(`  … and ${plan.renames.length - 10} more`);
   console.log(
     plan.hasSnapshot
-      ? `  history/${SNAPSHOT_FILE}: ${plan.snapshotKeys} key(s) repointed to \`${to}\``
+      ? `  history/${SNAPSHOT_FILE}: ${plan.snapshotKeys} ${plural(plan.snapshotKeys, "key", "keys")} repointed to \`${to}\``
       : `  history/${SNAPSHOT_FILE}: none yet — nothing to repoint`
   );
   console.log(`  history/${MIGRATIONS_FILE}: recording ${from} → ${to} so other clones repoint theirs`);

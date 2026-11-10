@@ -197,7 +197,7 @@ test("the text answer carries the same buckets, prints zero, and names the trunk
   assert.match(r.stdout, /in production +1 +\(counted, not listed\)/);
   assert.match(r.stdout, new RegExp(ids.halfway + " +Task halfway .*partial \\(held by refs/deploys/web/production-eu\\)"));
   assert.match(r.stdout, new RegExp(ids.branched + " +Task branched +\\S+ \\d{4}-\\d{2}-\\d{2} · waiting 0d"));
-  assert.match(r.stdout, /1 closed task\(s\) are named by no commit/);
+  assert.match(r.stdout, /1 closed task is named by no commit/);
 });
 
 test("an unresolvable ref makes its bucket and every later one unknown, never zero", () => {

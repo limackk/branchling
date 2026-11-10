@@ -176,7 +176,7 @@ test("a dead link FAILS, naming the file, the line and the target", () => {
   writeFileSync(join(fx.dir, "docs", "broken.md"), "See [the plan](missing.md).\n", "utf8");
   const r = check(fx);
   assert.equal(r.status, 1);
-  assert.match(r.stdout, /lead nowhere/);
+  assert.match(r.stdout, /leads? nowhere/);
   assert.match(r.stdout, /docs\/broken\.md:1/);
   assert.match(r.stdout, /missing\.md/);
 });
@@ -214,7 +214,7 @@ test("a cross-repository reference does not fail the run", () => {
     "See [the plan](other-repo#qa/plan.yaml) and [a site](https://example.com).\n", "utf8");
   const r = check(fx);
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.match(r.stdout, /another repository were skipped on purpose/);
+  assert.match(r.stdout, /another repository (was|were) skipped on purpose/);
 });
 
 test("the green line says how much was looked at", () => {
@@ -224,7 +224,7 @@ test("the green line says how much was looked at", () => {
   writeFileSync(join(fx.dir, "docs", "ok.md"), "[a](real.md)\n", "utf8");
   const r = check(fx);
   assert.equal(r.status, 0);
-  assert.match(r.stdout, /\d+ link\(s\) and related_docs entr\(ies\), including \d+ anchor\(s\), across \d+ document\(s\)/);
+  assert.match(r.stdout, /\d+ links? and related_docs entr(y|ies), including \d+ anchors?, across \d+ documents?\b/);
 });
 
 test("a missing local anchor FAILS, then the same document passes once the heading exists", () => {
@@ -280,10 +280,10 @@ test("…and a related_docs entry into it FAILS with ITS OWN message, file prese
   cite("node_modules/pkg/README.md");
   const red = check(fx);
   assert.equal(red.status, 1, red.stdout + red.stderr);
-  assert.match(red.stdout, /point inside/);
+  assert.match(red.stdout, /points? inside/);
   assert.match(red.stdout, /node_modules\/pkg\/README\.md/);
   assert.match(red.stdout, /related_docs/);
-  assert.equal(/lead nowhere/.test(red.stdout), false,
+  assert.equal(/leads? nowhere/.test(red.stdout), false,
     "filed as a dead link: finding the file fixes one of those and not this one\n" + red.stdout);
 
   // The other half of the control: the same tree, the same guard, green once the
@@ -334,7 +334,7 @@ test("a bare `check` runs it", () => {
   writeFileSync(join(fx.dir, "docs", "broken.md"), "[x](missing.md)\n", "utf8");
   const bare = run(["check", "--dir", fx.backlog], fx.dir, fx.env);
   assert.notEqual(bare.status, 0, "the bare `check` did not run the docs guard");
-  assert.match(bare.stdout, /lead nowhere/);
+  assert.match(bare.stdout, /leads? nowhere/);
 });
 
 test("`--docs` selects it ALONE", () => {

@@ -82,7 +82,7 @@ import { createTask, driftMessage, slugify } from "./new-task.mjs";
 import { answerBacklogDirRefusal, backlogPaths, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { detectPrefixMismatch, prefixMismatchMessage } from "./task-id.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
-import { MARK, color, failure, warn } from "./ui.mjs";
+import { MARK, color, failure, warn, plural } from "./ui.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -504,11 +504,11 @@ export function main(argv) {
       });
       return 0;
     }
-    console.log(`${N} import --dry-run: ` + plan.items.length + " task(s) would be created in " + root);
+    console.log(`${N} import --dry-run: ` + plan.items.length + " " + plural(plan.items.length, "task", "tasks") + " would be created in " + root);
     for (const item of plan.items) {
       console.log("  " + color.dim(item.issue.ref) + "  " + item.status + "  " + item.title);
     }
-    if (plan.skipped.length) console.log("  " + plan.skipped.length + " issue(s) already here — a re-import creates nothing for them");
+    if (plan.skipped.length) console.log("  " + plan.skipped.length + " " + plural(plan.skipped.length, "issue", "issues") + " already here — a re-import creates nothing for them");
     if (plan.dropped.length) console.log("  labels dropped (not in this project's vocabulary): " + droppedSummary(plan.dropped).join(", "));
     if (unknownNodes.length) console.log(unknownLine);
     if (plan.items.length) {
@@ -532,7 +532,8 @@ export function main(argv) {
     }
     console.error(failure(
       N + " import", "the import failed part-way through and was rolled back",
-      [e.message, (e.rolledBack || 0) + " task file(s) created by this run were removed"], []
+      [e.message, (e.rolledBack || 0) + " " +
+        plural(e.rolledBack || 0, "task file created by this run was", "task files created by this run were") + " removed"], []
     ));
     return 1;
   }
@@ -559,11 +560,11 @@ export function main(argv) {
     return 0;
   }
 
-  console.log(color.ok(MARK.ok) + " " + N + " import: " + written.length + " task(s) from " + opts.from + " in " + root);
+  console.log(color.ok(MARK.ok) + " " + N + " import: " + written.length + " " + plural(written.length, "task", "tasks") + " from " + opts.from + " in " + root);
   for (const w of written) {
     console.log("  " + color.id(w.id) + "  " + color.dim(w.item.issue.ref) + "  " + w.title);
   }
-  if (plan.skipped.length) console.log("  " + plan.skipped.length + " issue(s) skipped — already imported into this checkout");
+  if (plan.skipped.length) console.log("  " + plan.skipped.length + " " + plural(plan.skipped.length, "issue", "issues") + " skipped — already imported into this checkout");
   if (plan.dropped.length) console.log("  labels dropped (not in this project's vocabulary): " + droppedSummary(plan.dropped).join(", "));
   if (unknownNodes.length) console.log(unknownLine);
   if (written.length) {

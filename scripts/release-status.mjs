@@ -125,7 +125,7 @@ import { repoRoot } from "./modified-files.mjs";
 import { answerBacklogDirRefusal, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { taskIdScanner } from "./task-id.mjs";
-import { MARK, color, failure, refusal } from "./ui.mjs";
+import { MARK, color, failure, refusal, plural } from "./ui.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DAY = 86_400_000;
@@ -826,7 +826,9 @@ export function renderStatus(report, paint = color) {
   lines.push(...renderLanes(report.targets, report.archived, paint));
   if (report.unplaced.count) {
     lines.push("");
-    lines.push(paint.dim(MARK.bullet + " " + report.unplaced.count + " closed task(s) are named by no commit on any ref, so no target can be given to them"));
+    lines.push(paint.dim(MARK.bullet + " " + report.unplaced.count + " closed " +
+      plural(report.unplaced.count, "task is", "tasks are") + " named by no commit on any ref, so no target can be given to " +
+      plural(report.unplaced.count, "it", "them")));
   }
   return lines.join("\n");
 }
@@ -871,7 +873,7 @@ function describeStanding(task) {
     if (s.ref !== undefined) {
       if (s.state === "full") return "in " + s.ref;
       if (s.state === "absent") return "not in " + s.ref;
-      return "partly in " + s.ref + (s.of ? " (" + s.held + " of " + s.of + " trunk commit(s))" : "");
+      return "partly in " + s.ref + (s.of ? " (" + s.held + " of " + s.of + " trunk " + plural(s.of, "commit", "commits") + ")" : "");
     }
     if (s.state === "unobservable") return s.target + ": unobservable — deployed from `" + s.repository + "`";
     if (s.state === "unknown") return s.target + ": unknown — a ref of " + s.waitingFor + " does not resolve";

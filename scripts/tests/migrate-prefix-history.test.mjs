@@ -262,7 +262,7 @@ test("`--dry-run` names the snapshot and the record among what will change", () 
     const r = cli(["migrate-prefix", "--dir", dir, "--to", "TL", "--dry-run"]);
     assert.equal(r.code, 0, r.out);
     assert.match(r.out, new RegExp(SNAPSHOT_FILE.replace(".", "\\.")), "the dry run says nothing about the snapshot: " + r.out);
-    assert.match(r.out, /2 key\(s\) repointed/, r.out);
+    assert.match(r.out, /2 keys repointed/, r.out);
     assert.match(r.out, new RegExp(MIGRATIONS_FILE.replace(".", "\\.")), "the dry run says nothing about the record: " + r.out);
 
     // And it is a DRY run: neither file was touched.
