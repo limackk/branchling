@@ -133,6 +133,9 @@ export function writeTaskField(opts) {
     const [head, ...rest] = reasonRefusal(reason, "reason").split("\n");
     return refused("usage", 400, head, { details: rest });
   }
+  // Both shipped callers refuse `status` above, so neither reaches this; it
+  // stays as the core's own guard for an importer that refuses no field
+  // (TL-656), proved directly in viewer-write-api.test.mjs.
   if (requiresReason(config, { field, to: normalized.value }) && !reason) {
     return refused("reason-required", 422, "This status requires a non-reserved reason", { needsReason: true });
   }

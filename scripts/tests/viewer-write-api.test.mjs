@@ -6,7 +6,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { fixtureDir } from "./_fixture-dir.mjs";
 import { request } from "node:http";
 import { createServer } from "node:net";
@@ -14,7 +14,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { loadConfig } from "../config.mjs";
-import { DEDICATED_FIELDS, writableFields } from "../field-write.mjs";
+import { DEDICATED_FIELDS, writableFields, writeTaskField } from "../field-write.mjs";
 import { requiresReason } from "../history.mjs";
 import { isolateHome, isolateState, SCRIPTS_DIR } from "./_repo.mjs";
 
@@ -171,6 +171,49 @@ test("no field the route accepts requires a reason", () => {
       }
     }
     assert.deepEqual(reached, []);
+  } finally { rmSync(fx.dir, { recursive: true, force: true }); }
+});
+
+/**
+ * The core keeps its own reason rule for a caller that does NOT refuse
+ * `status` (TL-656). Both shipped callers refuse it first, so the test above
+ * cannot reach the branch; `writeTaskField()` is exported, and a future caller
+ * passing no `refusedFields` must still be stopped before the file is touched.
+ * The positive controls separate the rule from an unwritable field: the same
+ * call with a stated reason, and with an unprotected status, both write.
+ */
+test("the core refuses a protected status without a reason when the caller does not refuse status", () => {
+  const fx = fixture();
+  try {
+    const config = loadConfig(fx.root);
+    const protectedStatus = (config.reasonRequiredStatuses || [])[0];
+    assert.ok(protectedStatus, "the fixture protects no status; the refusal would pass on nothing");
+    const write = (value, reason) => writeTaskField({
+      root: fx.root, config, source: "set", id: fx.id, field: "status", value,
+      actor: "agent:fixture", reason, refusedFields: [],
+    });
+    const historyFile = join(fx.root, "history", fx.id + ".jsonl");
+    const snapshot = () => ({
+      task: readFileSync(taskPath(fx.root, fx.id), "utf8"),
+      history: existsSync(historyFile) ? readFileSync(historyFile, "utf8") : "",
+    });
+
+    const before = snapshot();
+    const refusal = write(protectedStatus, "");
+    assert.equal(refusal.ok, false);
+    assert.equal(refusal.kind, "reason-required");
+    assert.equal(refusal.status, 422);
+    assert.equal(refusal.needsReason, true);
+    assert.deepEqual(snapshot(), before, "a refused write must not touch the task or its history");
+
+    const stated = write(protectedStatus, "Waiting on the upstream release");
+    assert.equal(stated.ok, true, stated.message);
+    assert.match(readFileSync(taskPath(fx.root, fx.id), "utf8"), new RegExp("^status: " + protectedStatus + "\\b", "m"));
+
+    const unprotected = config.statuses.find((status) => !(config.reasonRequiredStatuses || []).includes(status));
+    assert.ok(unprotected, "the fixture has no unprotected status");
+    const plain = write(unprotected, "");
+    assert.equal(plain.ok, true, plain.message);
   } finally { rmSync(fx.dir, { recursive: true, force: true }); }
 });
 
