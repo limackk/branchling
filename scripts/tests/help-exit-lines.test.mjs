@@ -175,7 +175,7 @@ test("the help texts a script prints when it is run directly carry the clause to
     "audit.mjs USAGE": AUDIT_USAGE,
     "docs-drift.mjs USAGE": DOCS_DRIFT_USAGE,
   };
-  for (const script of ["renumber.mjs", "query.mjs"]) {
+  for (const script of ["renumber.mjs", "query.mjs", "doctor.mjs"]) {
     const r = spawnSync(process.execPath, [join(SCRIPTS_DIR, script), "--help"], { encoding: "utf8", timeout: 30_000 });
     assert.equal(r.status, 0, script + " --help: " + r.stderr);
     direct[script + " --help"] = r.stdout;

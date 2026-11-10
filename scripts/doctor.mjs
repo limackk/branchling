@@ -20,7 +20,9 @@
  * from the first, and then `doctor` would say something different from `check` —
  * which would be worse than not having it at all.
  *
- * EXIT CODES: 0 = no errors (warnings allowed), 1 = there is an error. A warning
+ * EXIT CODES: 0 = no errors (warnings allowed), 1 = there is an error or no
+ * backlog, 2 = usage error. USAGE states them in the words of the dispatcher's
+ * `doctor` entry, so the two help texts of one command agree (TL-659). A warning
  * does NOT fail, because a `doctor` in CI that fails over a detail gets switched
  * off, and then nobody sees anything.
  *
@@ -47,7 +49,7 @@ import { SHIPPED_TEMPLATE, planRefresh, templateFields } from "./template-comman
 import { printJson } from "./json-envelope.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { MARK as UI_MARK, color, errColor, heading, plural, refusal } from "./ui.mjs";
-import { backlogPaths, TEMPLATE_FILENAME, BACKLOG_DIR_REFUSAL_KIND, isBacklogDirRefusal, NotABacklogError, repositoryRoot, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { backlogPaths, TEMPLATE_FILENAME, BACKLOG_DIR_REFUSAL_HELP, BACKLOG_DIR_REFUSAL_KIND, isBacklogDirRefusal, NotABacklogError, repositoryRoot, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { summarize } from "./stats.mjs";
 import { vocabularyUsage } from "./task-fields.mjs";
 import { detectPrefixMismatch, taskIdPatterns } from "./task-id.mjs";
@@ -60,7 +62,8 @@ export const USAGE = [
   "",
   "  collects the configuration, tree and git checks into one answer",
   "  it fixes NOTHING — it prints the repair command next to each problem",
-  "  exit code: 0 = no errors (warnings allowed), 1 = there is an error",
+  "  exit: 0 no errors, warnings allowed · 1 there is an error · 2 usage error",
+  "        · " + BACKLOG_DIR_REFUSAL_HELP,
 ].join("\n");
 
 const OK = "ok";
