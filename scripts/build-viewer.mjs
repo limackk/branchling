@@ -1085,6 +1085,14 @@ ${paletteBadgeCss}
   .connection-bar.live .connection-dot { background: var(--status-done); }
   .connection-status { font-weight: 600; }
   .connection-hint { color: var(--fg-muted); flex: 1; }
+  /* On a phone one row cannot hold the label, the hint and the buttons: the
+     hint was squeezed into a column of two words per line and the banner grew
+     to about 290 px (TL-652). Below the breakpoint the row wraps, the hint
+     takes a full-width line after the status label, the buttons follow it. */
+  @media (max-width: 640px) {
+    .connection-bar { flex-wrap: wrap; row-gap: 6px; }
+    .connection-hint, .edit-context { flex: 1 1 100%; }
+  }
   .btn-action {
     background: var(--bg-card);
     border: 1px solid var(--border);
