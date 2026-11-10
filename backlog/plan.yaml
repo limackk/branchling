@@ -112,19 +112,24 @@ waves:
   # cost was discovered only after it started (TL-682); and `next --plan`
   # answered "nothing to take" while a wave waited on claims or a merge,
   # so loops sat idle (TL-683). Placed before the wave-9/10 follow-ups so
-  # that run has them.
+  # that run has them. Joined after the 2026-11-10 run by a stop request
+  # that `next` honours (TL-697), so a loop can finish its task and stop
+  # without the orchestration being killed mid-merge, and by `done`
+  # parking an unvouched manual entry as awaiting_vouch (TL-699), so such
+  # a task stops holding an agent wave shut.
   - name: "The loops run within the machine's memory and never idle blindly"
-    tasks: [TL-681, TL-682, TL-683]
+    tasks: [TL-681, TL-682, TL-683, TL-697, TL-699]
 
   # THE FOLLOW-UPS FILED while closing waves 9 and 10, fifteen of them,
   # joined on 2026-11-10 by twelve from a review of the loop sessions
-  # (TL-677 to TL-680, TL-684 to TL-691), none needing a person. Highest priority first: `plan` withholding a
+  # (TL-677 to TL-680, TL-684 to TL-691) and after the next run by more
+  # (TL-693 to TL-701), none needing a person. Highest priority first: `plan` withholding a
   # task another tree has claimed (TL-664, P1), then the two P2 defects,
   # then the rest. The six that run or change the mutation tooling
   # (TL-665, TL-667, TL-672, TL-674, and TL-673 and TL-676 in the mutation
   # group) come last, so they serialise on one machine.
   - name: "The follow-ups filed in waves 9 and 10 close"
-    tasks: [TL-664, TL-660, TL-668, TL-663, TL-666, TL-669, TL-671, TL-675, TL-670, TL-665, TL-667, TL-672, TL-674, TL-673, TL-676, TL-677, TL-678, TL-679, TL-680, TL-684, TL-685, TL-686, TL-687, TL-688, TL-689, TL-690, TL-691, TL-692, TL-693, TL-694, TL-695, TL-696]
+    tasks: [TL-664, TL-660, TL-668, TL-663, TL-666, TL-669, TL-671, TL-675, TL-670, TL-665, TL-667, TL-672, TL-674, TL-673, TL-676, TL-677, TL-678, TL-679, TL-680, TL-684, TL-685, TL-686, TL-687, TL-688, TL-689, TL-690, TL-691, TL-692, TL-693, TL-694, TL-695, TL-696, TL-698, TL-700, TL-701]
 
   # The viewer touches build-viewer.mjs and serve-backlog.mjs only, so it can
   # run beside the follow-up waves above rather than after them. Both halves exist
