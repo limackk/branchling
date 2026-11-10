@@ -118,6 +118,27 @@ test("--status is refused for GitHub rather than ignored", () => {
   assert.equal(r.status, 2, r.stdout + r.stderr);
 });
 
+test("--priority takes from=to, and is refused for GitHub rather than ignored", () => {
+  const opts = parseImportArgs(["--from", "jira", "--priority", "High=P1", "--priority", "Lowest=P3"]);
+  assert.equal(opts.priorityMap.get("High"), "P1");
+  assert.equal(opts.priorityMap.get("Lowest"), "P3");
+  assert.equal(parseImportArgs(["--from", "jira"]).priorityMap.size, 0);
+  assert.throws(
+    () => parseImportArgs(["--from", "jira", "--priority", "High"]),
+    /`--priority High` is not a mapping\nit takes `<from>=<to>`: a Jira priority name, and one of this project's priorities/
+  );
+  // The refusal of an unknown flag names every accepted one, `--priority` among them.
+  assert.throws(
+    () => parseImportArgs(["--from", "jira", "--priorty", "High=P1"]),
+    (e) => e.message === "unknown flag: --priorty\navailable: --from --dry-run --json --actor --reason --label --label-map --status --priority"
+  );
+  assert.throws(() => parseImportArgs(["--from", "jira", "--priority", "High="]), /is not a mapping/);
+  assert.throws(() => parseImportArgs(["--from", "jira", "--priority"]), /`--priority` with no mapping/);
+  assert.throws(() => parseImportArgs(["--from", "github", "--priority", "High=P1"]), /`--priority` maps a Jira priority/);
+  const r = run(["import", "--from", "github", "--priority", "High=P1"], "[]");
+  assert.equal(r.status, 2, r.stdout + r.stderr);
+});
+
 test("the help shows the Jira pipeline against the paged search endpoint", () => {
   const r = run(["import", "--help"]);
   assert.equal(r.status, 0, r.stderr);
@@ -125,6 +146,7 @@ test("the help shows the Jira pipeline against the paged search endpoint", () =>
   assert.match(r.stdout, /\/rest\/api\/3\/search\/jql/);
   assert.match(r.stdout, /nextPageToken/);
   assert.match(r.stdout, /--status <from>=<to>/);
+  assert.match(r.stdout, /--priority <from>=<to>/);
 });
 
 // ── Atlassian Document Format ─────────────────────────────────────────────
@@ -370,6 +392,46 @@ test("--status names a status more precisely than its category, and must name on
   assert.match(wrong.errors.join("\n"), /`qa` is not one of this project's statuses/);
 });
 
+test("--priority maps a named Jira priority onto ONE of ours, and only that one", () => {
+  const { issues } = parseJiraIssues(search());
+  const config = CONFIG({ priorities: ["urgent", "normal", "someday"] });
+  const plan = planImport({
+    issues, config, labelMap: new Map(), priorityMap: new Map([["High", "urgent"]]), alreadyImported: new Set(),
+  });
+  assert.deepEqual(plan.errors, []);
+  assert.deepEqual(plan.items.map((i) => i.priority), ["urgent", null, null], "Medium was not named, so it is not mapped");
+
+  const none = planImport({ issues, config, labelMap: new Map(), alreadyImported: new Set() });
+  assert.deepEqual(none.items.map((i) => i.priority), [null, null, null]);
+
+  const wrong = planImport({
+    issues, config, labelMap: new Map(),
+    statusMap: new Map([["In Review", "qa"]]),
+    priorityMap: new Map([["High", "P1"], ["Medium", "normal"], ["Low", "later"]]),
+    alreadyImported: new Set(),
+  });
+  assert.equal(wrong.items.length, 0, "a refused plan hands back nothing to write");
+  const all = wrong.errors.join("\n");
+  assert.match(all, /`--priority High=P1`: `P1` is not one of this project's priorities \(urgent \| normal \| someday\)/);
+  assert.match(all, /`--priority Low=later`: `later` is not one of this project's priorities/);
+  assert.doesNotMatch(all, /Medium=normal/, "a valid target is not a complaint");
+  assert.match(all, /`qa` is not one of this project's statuses/, "every complaint at once");
+  assert.match(all, /a priority onto one of `priorities:`/);
+
+  const undeclared = planImport({
+    issues, config: CONFIG(), labelMap: new Map(), priorityMap: new Map([["High", "P1"]]), alreadyImported: new Set(),
+  });
+  assert.match(undeclared.errors.join("\n"), /\(none declared\)/);
+});
+
+test("a mapped priority's note names both sides; an unmapped one keeps the old note", () => {
+  const { issues } = parseJiraIssues(search());
+  const mapped = renderBody(issues[0], { priority: "P1" });
+  assert.ok(mapped.includes("Jira priority: High — mapped onto `P1`."));
+  assert.doesNotMatch(mapped, /not mapped onto this project's priorities/);
+  assert.ok(renderBody(issues[0], { priority: null }).includes("Jira priority: High — not mapped onto this project's priorities."));
+});
+
 test("the body carries the converted description, the browse link, and what was not mapped", () => {
   const { issues } = parseJiraIssues(search());
   const body = renderBody(issues[0]);
@@ -431,6 +493,47 @@ test("--status reaches the written task", () => {
   const refused = importInto(backlog("override-bad"), ["--status", "In Review=qa"]);
   assert.equal(refused.status, 1);
   assert.match(refused.stderr, /`qa` is not one of this project's statuses/);
+});
+
+test("--priority reaches the written task; without it the template's default stays", () => {
+  const dir = backlog("priority");
+  const config = loadConfig(dir);
+  // A target that is not the template's default, so a write that ignored the
+  // flag cannot pass by coincidence.
+  const templateDefault = field(readFileSync(join(dir, "_template.md"), "utf8"), "priority");
+  const target = config.priorities.find((p) => p !== templateDefault);
+  assert.ok(target && templateDefault, "the fixture needs a priority other than the template's");
+
+  const r = importInto(dir, ["--priority", "High=" + target, "--json"]);
+  assert.equal(r.status, 0, r.stderr);
+  const tasks = tasksByMarker(dir);
+  assert.equal(field(tasks.get(BROWSE("APP-101")), "priority"), target);
+  assert.ok(tasks.get(BROWSE("APP-101")).includes("Jira priority: High — mapped onto `" + target + "`."));
+  assert.equal(field(tasks.get(BROWSE("APP-102")), "priority"), templateDefault, "Medium was not named");
+  assert.ok(tasks.get(BROWSE("APP-102")).includes("Jira priority: Medium — not mapped onto this project's priorities."));
+  assert.equal(run(["check", "--dir", dir]).status, 0, "the mapped tree is a valid tree");
+
+  const plain = backlog("priority-none");
+  assert.equal(importInto(plain).status, 0);
+  for (const text of tasksByMarker(plain).values()) assert.equal(field(text, "priority"), templateDefault);
+
+  const dry = importInto(backlog("priority-dry"), ["--priority", "High=" + target, "--dry-run", "--json"]);
+  assert.equal(dry.status, 0, dry.stderr);
+  assert.deepEqual(JSON.parse(dry.stdout).wouldCreate.map((w) => w.priority), [target, null, null]);
+  const dryText = importInto(backlog("priority-dry-text"), ["--priority", "High=" + target, "--dry-run"]);
+  assert.equal(dryText.status, 0, dryText.stderr);
+  assert.ok(dryText.stdout.includes("  APP-101  " + config.statuses[0] + "  " + target + "  "), "the mapped priority is in the plan:\n" + dryText.stdout);
+  const unmapped = parseJiraIssues(search()).issues[1];
+  assert.ok(
+    dryText.stdout.split("\n").includes("  APP-102  " + config.archivedStatuses[0] + "  " + unmapped.title),
+    "an unmapped ticket's line carries no priority column:\n" + dryText.stdout
+  );
+
+  const refusedDir = backlog("priority-bad");
+  const refused = importInto(refusedDir, ["--priority", "High=nonesuch"]);
+  assert.equal(refused.status, 1);
+  assert.match(refused.stderr, /`nonesuch` is not one of this project's priorities/);
+  assert.equal(taskFiles(refusedDir).length, 0, "an unknown target is refused before anything is written");
 });
 
 test("--dry-run writes nothing — and the same input then does write", () => {

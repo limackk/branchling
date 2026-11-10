@@ -267,10 +267,16 @@ export function parseJiraIssues(text) {
   return { issues, errors };
 }
 
-/** Lines the body carries beyond the shared ones: what was read but not mapped. */
-export function extraNotes(issue) {
+/**
+ * Lines the body carries beyond the shared ones: what was read but not mapped.
+ * `mapped.priority` is the project priority `--priority` chose, or null. A
+ * mapped priority still names its Jira source, which the field alone loses.
+ */
+export function extraNotes(issue, mapped = {}) {
   const notes = [];
-  if (issue.priority) {
+  if (issue.priority && mapped.priority) {
+    notes.push("Jira priority: " + issue.priority + " — mapped onto `" + mapped.priority + "`.");
+  } else if (issue.priority) {
     notes.push("Jira priority: " + issue.priority + " — not mapped onto this project's priorities.");
   }
   if (issue.unknownNodes && issue.unknownNodes.size) {
@@ -282,6 +288,6 @@ export function extraNotes(issue) {
 
 /** The body of an imported Jira issue: the shared shape, this source's marker,
  *  and what was read but not mapped. */
-export function renderBody(issue) {
-  return renderImportedBody({ marker: SOURCE_MARKER, text: issue.body, url: issue.url, notes: extraNotes(issue) });
+export function renderBody(issue, mapped = {}) {
+  return renderImportedBody({ marker: SOURCE_MARKER, text: issue.body, url: issue.url, notes: extraNotes(issue, mapped) });
 }

@@ -112,13 +112,13 @@ export const SOURCES = {
 };
 const SOURCE_NAMES = Object.keys(SOURCES);
 
-const FLAGS = ["--from", "--dry-run", "--json", "--actor", "--reason", "--label", "--label-map", "--status"];
+const FLAGS = ["--from", "--dry-run", "--json", "--actor", "--reason", "--label", "--label-map", "--status", "--priority"];
 
 // ──────────────────────────────────────────────────────────────────────────
 // Arguments — PURE
 // ──────────────────────────────────────────────────────────────────────────
 
-/** `<from>=<to>`, the shape `--label` and `--status` share. */
+/** `<from>=<to>`, the shape `--label`, `--status` and `--priority` share. */
 function mappingPair(flag, pair, shape, { emptyTarget }) {
   if (pair === undefined) throw new Error("`" + flag + "` with no mapping\n" + shape);
   const eq = pair.indexOf("=");
@@ -134,6 +134,7 @@ export function parseImportArgs(args) {
   let reason = null;
   const labelMap = new Map();
   const statusMap = new Map();
+  const priorityMap = new Map();
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -166,6 +167,13 @@ export function parseImportArgs(args) {
         "--status", args[++i], "it takes `<from>=<to>`: a Jira status name, and one of this project's statuses", { emptyTarget: false }
       );
       statusMap.set(k, v);
+      continue;
+    }
+    if (a === "--priority") {
+      const [k, v] = mappingPair(
+        "--priority", args[++i], "it takes `<from>=<to>`: a Jira priority name, and one of this project's priorities", { emptyTarget: false }
+      );
+      priorityMap.set(k, v);
       continue;
     }
     if (a === "--label-map") {
@@ -207,9 +215,14 @@ export function parseImportArgs(args) {
     // nothing is refused rather than ignored.
     throw new Error("`--status` maps a Jira workflow status\na GitHub issue is only open or closed, and that is mapped already");
   }
+  if (priorityMap.size && from !== "jira") {
+    // The GitHub source reads no priority at all, so the mapping could apply
+    // to nothing — refused for the reason `--status` is.
+    throw new Error("`--priority` maps a Jira priority\na GitHub issue carries no priority this command reads");
+  }
   const badActor = actor ? statedActorRefusal(actor) : null;
   if (badActor) throw new Error(badActor.refusal + "\n" + badActor.hint);
-  return { from, dryRun, json, actor, reason, labelMap, statusMap };
+  return { from, dryRun, json, actor, reason, labelMap, statusMap, priorityMap };
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -271,7 +284,7 @@ function categoryStatuses(config) {
  *
  * @returns {{items: object[], skipped: object[], errors: string[], dropped: {label: string, issue: string}[]}}
  */
-export function planImport({ issues, config, labelMap, statusMap = new Map(), alreadyImported }) {
+export function planImport({ issues, config, labelMap, statusMap = new Map(), priorityMap = new Map(), alreadyImported }) {
   const items = [];
   const skipped = [];
   const errors = [];
@@ -283,6 +296,15 @@ export function planImport({ issues, config, labelMap, statusMap = new Map(), al
   for (const [from, to] of statusMap) {
     if (config.statuses.indexOf(to) < 0) {
       errors.push("`--status " + from + "=" + to + "`: `" + to + "` is not one of this project's statuses (" + config.statuses.join(" | ") + ")");
+    }
+  }
+  const priorities = config.priorities || [];
+  for (const [from, to] of priorityMap) {
+    if (priorities.indexOf(to) < 0) {
+      errors.push(
+        "`--priority " + from + "=" + to + "`: `" + to + "` is not one of this project's priorities (" +
+          (priorities.length ? priorities.join(" | ") : "none declared") + ")"
+      );
     }
   }
 
@@ -309,14 +331,17 @@ export function planImport({ issues, config, labelMap, statusMap = new Map(), al
       dropped.push({ label: mapped, issue: issue.ref });
     }
     const status = issue.statusName && statusMap.has(issue.statusName) ? statusMap.get(issue.statusName) : byCategory[issue.category];
-    items.push({ issue, title: issue.title, status, labels });
+    // No default mapping: Jira priority names are per site, so a ticket whose
+    // priority was not named keeps the template's value, and the body says so.
+    const priority = issue.priority && priorityMap.has(issue.priority) ? priorityMap.get(issue.priority) : null;
+    items.push({ issue, title: issue.title, status, labels, priority });
   }
 
   if (errors.length) {
     errors.push(
       "Nothing was written. Map labels with `--label <from>=<to>` or add them to " +
         "`labels:` in config.yaml if they belong to this project's vocabulary; a status " +
-        "is mapped onto one of `statuses:`."
+        "is mapped onto one of `statuses:`, a priority onto one of `priorities:`."
     );
     // The PLAN is emptied, not merely reported alongside the errors. A caller
     // holding both a list of complaints and a list of items to write has been
@@ -359,13 +384,16 @@ export function writeImport({ root, config, board, items, renderBody, createOne 
           title: item.title,
           status: item.status,
           labels: item.labels,
+          // `null` leaves the template's priority in place: `createTask()`
+          // sets only a value it is given.
+          priority: item.priority,
           // EMPTY, not the template's placeholder (TL-67 decision 3). A field
           // filled in by the template was filled in by nobody, and hundreds of
           // tasks carrying one would make `done` refuse for a reason that reads
           // like a bug rather than like the point.
           verification: [],
         },
-        body: renderBody(item.issue),
+        body: renderBody(item.issue, { priority: item.priority }),
       });
       written.push({ id: created.taskId, file: created.path, title: item.title, item });
     }
@@ -483,7 +511,7 @@ export function main(argv) {
   }
 
   const alreadyImported = importedSources(paths.tasksDir);
-  const plan = planImport({ issues, config, labelMap: opts.labelMap, statusMap: opts.statusMap, alreadyImported });
+  const plan = planImport({ issues, config, labelMap: opts.labelMap, statusMap: opts.statusMap, priorityMap: opts.priorityMap, alreadyImported });
   if (plan.errors.length) return refused(plan.errors, opts);
 
   const board = config.defaultBoard || (config.boards || []).map((b) => b.slug)[0] || "main";
@@ -495,7 +523,7 @@ export function main(argv) {
       printJson("import", {
         ok: true, root, dryRun: true,
         wouldCreate: plan.items.map((i) => ({
-          title: i.title, status: i.status, labels: i.labels, source: i.issue.url, sourceState: i.issue.sourceState,
+          title: i.title, status: i.status, priority: i.priority, labels: i.labels, source: i.issue.url, sourceState: i.issue.sourceState,
         })),
         skipped: plan.skipped.map((i) => i.url),
         droppedLabels: droppedSummary(plan.dropped),
@@ -506,7 +534,7 @@ export function main(argv) {
     }
     console.log(`${N} import --dry-run: ` + plan.items.length + " " + plural(plan.items.length, "task", "tasks") + " would be created in " + root);
     for (const item of plan.items) {
-      console.log("  " + color.dim(item.issue.ref) + "  " + item.status + "  " + item.title);
+      console.log("  " + color.dim(item.issue.ref) + "  " + item.status + (item.priority ? "  " + item.priority : "") + "  " + item.title);
     }
     if (plan.skipped.length) console.log("  " + plan.skipped.length + " " + plural(plan.skipped.length, "issue", "issues") + " already here — a re-import creates nothing for them");
     if (plan.dropped.length) console.log("  labels dropped (not in this project's vocabulary): " + droppedSummary(plan.dropped).join(", "));
