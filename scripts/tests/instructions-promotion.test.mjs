@@ -56,6 +56,11 @@
  *      parallel refs as taking `--ref <name>` (TL-620), and a live
  *      `deploy record` refuses exactly those without it — so the line is
  *      shown to separate the stages the command itself separates.
+ *  13. With no target of THIS repository, task-creation does not describe
+ *      `deploy status --release` as what the release still lacks, which that
+ *      command cannot know there (TL-651). A local target, alone or beside a
+ *      foreign one, is the positive control, and the command is run in each
+ *      fixture to show that the two descriptions follow what it reports.
  *
  * Release and target names are deliberately unlike this repository's
  * vocabulary, so a literal in the source is the only way they could match.
@@ -390,6 +395,56 @@ test("POSITIVE CONTROL, then the guard: with no local target, overview does not 
       label + ": the `--release` line is not the last line of the command table");
     // What the guide says is what the command does: it answers, without
     // reading deployment.
+    const r = run(fx.repo, ["deploy", "status", "--release", RELEASES[0], "--dir", fx.dir]);
+    assert.equal(r.status, 0, label + ": `deploy status --release` refuses where the guide offers it: " + r.stderr);
+    assert.match(r.stdout, notRead, label + ": `deploy status --release` now reads deployment — the guide undersells it");
+  }
+});
+
+/** What task-creation says the `--release` line answers. PURE, so it is shown
+ *  to find the "still lacks" claim where a local target makes it true before
+ *  its absence elsewhere is trusted. */
+function creationReleaseLine(text) {
+  const line = text.split("\n").find((l) => l.startsWith("  " + PRODUCT_NAME + " deploy status --release <name>"));
+  if (line === undefined) return "absent";
+  if (line.endsWith("         what that release still lacks")) return "still lacks";
+  if (line.endsWith("         that release's plan; what shipped is not read here")) return "shipping not read";
+  return "other: " + line;
+}
+
+test("POSITIVE CONTROL, then the guard: with no local target, task-creation does not call `--release` what the release still lacks", () => {
+  const notRead = /which release is current was not judged — deployment was not read/;
+  // The description column of the `declare releases` line above it: the two
+  // commands stay one table whichever description is printed.
+  const column = (text, command) => {
+    const line = text.split("\n").find((l) => l.startsWith("  " + PRODUCT_NAME + " " + command));
+    return line.length - line.replace(/^ {2}\S.*?\s{3,}/, "").length;
+  };
+  for (const [label, extra] of [["local with releases", DEPLOY_YAML + RELEASES_YAML], ["mixed with releases", MIXED_YAML + RELEASES_YAML]]) {
+    const fx = fixture(extra);
+    assert.ok(fx.config.deployTargets.some((t) => !t.repository), label + ": the fixture lost its local target");
+    const creation = topicText("task-creation", fx.config);
+    assert.equal(creationReleaseLine(creation), "still lacks",
+      label + ": the predicate does not find the claim where a local target makes it true");
+    assert.equal(column(creation, "deploy status --release"), column(creation, "declare releases"),
+      label + ": the `--release` line left the column of the line above it");
+    const r = run(fx.repo, ["deploy", "status", "--release", RELEASES[0], "--dir", fx.dir]);
+    assert.equal(r.status, 0, label + ": `deploy status --release` refuses where the guide offers it: " + r.stderr);
+    assert.doesNotMatch(r.stdout, notRead, label + ": deployment is not read although a target is local");
+  }
+
+  for (const [label, extra] of [["releases alone", RELEASES_YAML], ["foreign with releases", FOREIGN_YAML + RELEASES_YAML]]) {
+    const fx = fixture(extra);
+    assert.ok(fx.config.releases.length, label + ": the fixture lost its releases");
+    assert.ok((fx.config.deployTargets || []).every((t) => t.repository), label + ": a fixture target became local");
+    const creation = topicText("task-creation", fx.config);
+    assert.equal(creationReleaseLine(creation), "shipping not read",
+      label + ": task-creation calls the answer what the release lacks, which this backlog cannot know");
+    assert.equal(column(creation, "deploy status --release"), column(creation, "declare releases"),
+      label + ": the `--release` line left the column of the line above it");
+    // Still the last line of the command table, set apart from the name list.
+    assert.match(creation, /what shipped is not read here\n\n {2}releases {2}`/,
+      label + ": the `--release` line is not the last line of the command table");
     const r = run(fx.repo, ["deploy", "status", "--release", RELEASES[0], "--dir", fx.dir]);
     assert.equal(r.status, 0, label + ": `deploy status --release` refuses where the guide offers it: " + r.stderr);
     assert.match(r.stdout, notRead, label + ": `deploy status --release` now reads deployment — the guide undersells it");
