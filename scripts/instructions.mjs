@@ -278,17 +278,26 @@ export function promotionGate(config) {
  * sentence, a list of any length other than the one the prose was wrapped for
  * breaks the paragraph mid-line. `declare` is named beside the refusal because
  * a refusal without the way out sends the agent to edit config.yaml by hand.
+ *
+ * The `--release` line follows a target of THIS repository (TL-651), as the
+ * same line in `overview` does (TL-606). Without one the command judges no
+ * release current, counts nothing as shipped and reports every planned task
+ * as not shipped or unobservable, so "what that release still lacks" would
+ * assert a gap the command cannot know is there.
  */
 export function releasePlanning(config) {
   const releases = config.releases || [];
   if (!releases.length) return "";
+  const observed = observedTargets(config.deployTargets).length > 0;
   return [
     "PLANNING IT FOR A RELEASE. `release:` names the release a task is planned for.",
     "An undeclared name FAILS rather than creating a release nobody plans, so a new",
     "one is declared first. The plan is then a question, not a reading:",
     "",
     "  " + N + " declare releases <name> --reason \"…\"   add a release to plan for",
-    "  " + N + " deploy status --release <name>         what that release still lacks",
+    "  " + N + " deploy status --release <name>         " + (observed
+      ? "what that release still lacks"
+      : "that release's plan; what shipped is not read here"),
     "",
     "  releases  " + list(releases),
   ].join("\n") + "\n\n";
