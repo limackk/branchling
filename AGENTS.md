@@ -150,7 +150,9 @@ pinned devDependency); the default suite and CI do not.
   That is the case where test and code share every assumption. Start with
   `--named-only`: a fast lower bound from the test files that name the
   module. Without it, a module that `cli.mjs` imports selects most of the
-  suite, which is the honest set and can take an hour.
+  suite, which is the honest set and can take an hour. A module that more
+  than half of the test files name — `cli.mjs` itself — is not narrowed by
+  `--named-only`, so the run refuses it and asks for `--tests` (TL-661).
 - **A surviving mutant is a missing assertion, not a number to raise.** Write
   the test that fails on that mutant, and check that it does. Never make a
   survivor disappear (a narrower `--files`, a weaker selection) without saying

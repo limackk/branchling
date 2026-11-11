@@ -55,6 +55,19 @@
  * an expensive one. `--named-only` keeps rule 1 alone: a fast LOWER bound,
  * whose survivors may still be killed by a file it left out.
  *
+ * A MODULE MOST OF THE SUITE NAMES IS NOT NARROWED BY `--named-only` (TL-661).
+ * Nearly every end-to-end test spawns `cli.mjs` by its path, so 230 of 294
+ * test files name it, and on 2026-11-08 that selection's initial test run
+ * outlasted Stryker's dry-run timeout: 4307 mutants instrumented, none judged,
+ * a stack trace instead of a result. When more than `NAMED_ONLY_MAX_SHARE` of
+ * the candidate test files name a module, the run therefore refuses before
+ * starting Stryker, names the module and the count, and says what to pass
+ * instead. Rejected: raising the dry-run timeout to fit (every mutant then
+ * costs a run of most of the suite, which is the honest set's price under a
+ * name that promises speed); selecting by the command word a test exercises
+ * (a `--help` line or a dispatch change in `cli.mjs` belongs to no single
+ * command, so the bound would silently stop being one).
+ *
  * `--changed-lines` NARROWS WHAT IS MUTATED, not what is tested (TL-648). The
  * whole-module scope cost 2373 mutants and about two hours for a change of
  * about 60 lines (TL-573), which is a check nobody runs. With the flag, each
@@ -102,6 +115,8 @@ const FLAGS_WITH_VALUE = new Set(["--base", "--files", "--tests", "--concurrency
 const FLAGS_BARE = new Set(["--plan", "--json", "--named-only", "--changed-lines"]);
 const BARE_KEYS = { "--named-only": "namedOnly", "--changed-lines": "changedLines" };
 const STRYKER_PIN = "@stryker-mutator/core";
+/** Beyond this share of the candidate test files, naming a module selects nothing narrower than the suite. */
+export const NAMED_ONLY_MAX_SHARE = 0.5;
 // The file in THIS tree, never the sandbox copy, which Stryker may mutate.
 const CONTAIN_ENTRY = join(dirname(fileURLToPath(import.meta.url)), "mutation-contain.mjs");
 
@@ -276,6 +291,23 @@ export function reachesCli(text, testPath) {
   return false;
 }
 
+/** How many test files the selection chooses from: every `*.test.mjs` under `scripts/tests/`. */
+export function candidateTestCount(root) {
+  const testsDir = join(root, "scripts", "tests");
+  return existsSync(testsDir) ? testFilesUnder(testsDir).length : 0;
+}
+
+/**
+ * The modules a `--named-only` selection does not narrow: each one named by
+ * more than `NAMED_ONLY_MAX_SHARE` of the `candidates` test files, with that
+ * count, read from the reasons `selectTests` recorded.
+ */
+export function unselectiveModules(tests, modules, candidates) {
+  return modules
+    .map((m) => ({ module: m, named: tests.filter((t) => t.why.includes(basename(m) + " named")).length, of: candidates }))
+    .filter((u) => u.named > candidates * NAMED_ONLY_MAX_SHARE);
+}
+
 /**
  * The test files that can kill a mutant in any of `modules`, by the three rules
  * in the header. Returned with the reason each one was chosen, so a reader can
@@ -334,7 +366,9 @@ export async function plan(root, opts) {
   const tests = opts.tests
     ? opts.tests.map((file) => ({ file, why: ["--tests"] }))
     : await selectTests(root, modules, { namedOnly: opts.namedOnly });
-  return { base: opts.base, modules, mutate, ...(changed ? { lines: changed, noAddedLines } : {}), tests };
+  const unselective = opts.namedOnly && !opts.tests ? unselectiveModules(tests, modules, candidateTestCount(root)) : null;
+  return { base: opts.base, modules, mutate, ...(changed ? { lines: changed, noAddedLines } : {}), tests,
+    ...(unselective ? { unselective } : {}) };
 }
 
 /** The ranges a `--changed-lines` run mutates, and what it did not, for a reader. */
@@ -623,6 +657,21 @@ export async function main(argv, cwd = process.cwd()) {
     return fail(COMMAND, "no test file reaches " + p.modules.join(", "),
       ["Every mutant would survive, and that would measure the selection, not the suite."],
       [COMMAND + " --tests scripts/tests/<file>.test.mjs"], 1);
+  }
+
+  if (p.unselective && p.unselective.length) {
+    const names = p.unselective.map((u) => u.module);
+    const others = p.modules.filter((m) => !names.includes(m));
+    const flags = (opts.base !== "main" ? " --base " + opts.base : "") + (opts.changedLines ? " --changed-lines" : "");
+    const next = [COMMAND + flags + " --tests scripts/tests/<file>.test.mjs"];
+    if (others.length) next.push(COMMAND + flags + " --named-only --files " + others.join(","));
+    return fail(COMMAND, "--named-only does not narrow the tests for " + names.join(", "),
+      [...p.unselective.map((u) => u.module + " is named by " + u.named + " of " + u.of + " test files, more than "
+        + Math.round(NAMED_ONLY_MAX_SHARE * 100) + "% of the suite"),
+      "That selection is close to the whole suite: neither fast nor a lower bound, and its initial test run",
+      "outlasts Stryker's dry-run timeout, so no mutant would be judged. Stryker was not started.",
+      "Name the tests that exercise the changed lines with --tests, or leave the module out with --files."],
+      next, 1);
   }
 
   if (opts.plan) {
