@@ -22,6 +22,7 @@
  *   query --epic "Legal compliance" --priority P0,P1
  *   query --text sync --limit 10
  *   query --blocked-by TASK-003 --files | xargs code
+ *   query --ids TASK-003,TASK-007 --json   (several known tasks, by exact id)
  *   query --modified-file scripts/cli.mjs        (as part of what was it touched)
  *   query --modified-file scripts/               (the whole directory)
  *   query --status done --text audit --count
@@ -31,6 +32,8 @@
  *   --status --priority --board --label --epic --owner --type --role --executor
  *   --release
  *   --blocked-by
+ *   --ids            exact task ids (TL-680). An id outside the configured prefix
+ *                    is refused; one that matches no task is named on stderr
  *   --modified-file  which task touched this file — COMPUTED from commit
  *                    messages naming the task id, so there is nothing to keep
  *                    up to date. Paths are relative to the REPOSITORY root; a
@@ -72,6 +75,7 @@ import {
 import { BACKLOG_DIR_REFUSAL_EXIT, BACKLOG_DIR_REFUSAL_PHRASE, backlogPaths, resolveBacklogDir, resolveBacklogDirOrExit } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { SORT_KEYS, filterTasks, readTaskRecords, sortTasks, splitList, unknownFilterValues } from "./task-select.mjs";
+import { ANY_TASK_ID } from "./task-id.mjs";
 import { refusal } from "./ui.mjs";
 import { agentEstimate } from "./agent-time.mjs";
 import { readAgentTime } from "./agent-time-read.mjs";
@@ -92,7 +96,7 @@ function collectBacklog(root, opts = {}) {
 
 const VALUE_FLAGS = new Set([
   "--status", "--priority", "--board", "--label", "--epic", "--owner", "--type",
-  "--role", "--executor", "--release", "--blocked-by", "--text", "--limit", "--sort", "--tasks", "--dir",
+  "--role", "--executor", "--release", "--blocked-by", "--ids", "--text", "--limit", "--sort", "--tasks", "--dir",
   "--modified-file", "--env", "--not-env", "--scope",
 ]);
 const BOOL_FLAGS = new Set(["--json", "--files", "--count", "--help", "-h"]);
@@ -235,6 +239,7 @@ const f = {
   executor: opts.executor === undefined ? null : (splitList(opts.executor) || [""]),
   release: opts.release === undefined ? null : (splitList(opts.release) || [""]),
   blockedBy: splitList(opts["blocked-by"]),
+  ids: splitList(opts.ids),
   text: opts.text,
 };
 
@@ -246,6 +251,18 @@ const f = {
 // already draw.
 const withConfig = COLLECTED.filter((c) => c.config);
 const unknownValues = unknownFilterValues(f, withConfig.length ? withConfig[0].config : null);
+// AN ID OUTSIDE THE CONFIGURED PREFIX (TL-680) is refused the same way: it can
+// match nothing in this backlog, so answering it with zero rows would be the
+// typo that reads like an answer. Without a configuration (`--tasks <dir>`)
+// only the generic `<prefix>-<number>` shape can be judged.
+if (f.ids) {
+  const cfg = withConfig.length ? withConfig[0].config : null;
+  const shape = cfg ? cfg.taskId.id : ANY_TASK_ID;
+  const declared = [(cfg ? cfg.taskIdPrefix : "<prefix>") + "-<number>"];
+  for (const value of f.ids) {
+    if (!shape.test(value)) unknownValues.push({ axis: "ids", value, allowed: declared, where: cfg ? "the task id prefix in config.yaml" : "the task id shape" });
+  }
+}
 if (unknownValues.length) {
   const sentence = (p) => "`" + p.value + "` is not an allowed value for the field `" + p.axis + "`";
   for (const p of unknownValues) {
@@ -376,6 +393,34 @@ const CFG = PRIMARY.config;
 const SCAN = PRIMARY.scan;
 const INDEX = PRIMARY.index;
 const ELSEWHERE_ONLY = COLLECTED.flatMap((c) => c.elsewhereOnly);
+
+// EVERY LISTED ID THAT MATCHED NOTHING IS NAMED (TL-680), on stderr so stdout
+// stays rows, JSON or paths. A list that comes back one short is otherwise a
+// silently smaller answer, and the reader cannot tell a missing task from one
+// the other criteria or the scope held out. Computed before `--limit`: a row
+// cut off by the limit matched, and the limit says so itself.
+const unmatchedIdLines = [];
+if (f.ids) {
+  const matched = new Set(hits.map((t) => t.id));
+  for (const id of f.ids) {
+    if (matched.has(id)) continue;
+    const one = COLLECTED.find((c) => c.tasks.some((t) => t.id === id));
+    const task = one && one.tasks.find((t) => t.id === id);
+    let why;
+    if (!task) {
+      why = "no task with this id in this tree";
+    } else {
+      const archived = new Set(one.config ? one.config.archivedStatuses : ["done", "cancelled"]);
+      const outOfScope = (SCOPE === "active" && archived.has(task.status)) ||
+        (SCOPE === "archived" && !archived.has(task.status));
+      why = outOfScope
+        ? "its status `" + task.status + "` is outside --scope " + SCOPE + " (--scope all searches every status)"
+        : "it does not meet the other criteria";
+    }
+    unmatchedIdLines.push(id + " matched nothing: " + why);
+  }
+}
+for (const line of unmatchedIdLines) console.error("# " + line);
 const elsewhereOnlyLines = ELSEWHERE_ONLY.map(
   (t) => (t.project ? t.project + "/" : "") + t.id +
     " is not in this tree — elsewhere: [" + t.elsewhere.map(describeDivergence).join(", ") + "]"
