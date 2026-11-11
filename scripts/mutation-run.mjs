@@ -769,18 +769,37 @@ export function directorySymlinks(root, rel = "") {
 }
 
 /**
- * The command the runner executes in the sandbox: recreate each ignored link
- * with its own relative target, then run the tests in a process group of their
- * own (`mutation-contain.mjs`). Every worker shares one sandbox, so a link
- * another worker made first is not an error; the check after `ln` is what
- * decides.
+ * Make the sandbox a git repository of its own when it is not one (TL-674).
+ *
+ * Stryker copies the tree without `.git`, so a test that asks git about ITS
+ * OWN tree — `git check-attr` in line-endings.test.mjs, the document root
+ * `check --docs` takes from `git rev-parse --show-toplevel` in
+ * docs-links.test.mjs — failed in the initial run on 2026-11-09, and Stryker
+ * judged no mutant. The same suite was green outside the sandbox. An empty
+ * repository answers both questions from the sandbox's own files, so those
+ * tests keep judging the code under test instead of being left out of the
+ * selection. It answers nothing about history or the index: a test that needs
+ * the repository's commits still fails the initial run, and Stryker names it.
+ * The initial run is one process, so the first `git init` happens before any
+ * worker shares the directory. The repository's own variables are unset so
+ * an inherited `GIT_DIR` cannot point the init at a real repository.
+ */
+export const SANDBOX_GIT_INIT = "{ [ -e .git ] || env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE git init -q . >/dev/null 2>&1 || true; }";
+
+/**
+ * The command the runner executes in the sandbox: give it a git repository
+ * (`SANDBOX_GIT_INIT`), recreate each ignored link with its own relative
+ * target, then run the tests in a process group of their own
+ * (`mutation-contain.mjs`). Every worker shares one sandbox, so a link another
+ * worker made first is not an error; the check after `ln` is what decides.
  */
 export function sandboxCommand(links, testFiles, contain = CONTAIN_ENTRY) {
-  const steps = links.map((l) => {
+  const steps = [SANDBOX_GIT_INIT];
+  steps.push(...links.map((l) => {
     const p = shellQuote(l.path);
     const parent = shellQuote(dirname(l.path));
     return "{ mkdir -p " + parent + " && { ln -s " + shellQuote(l.target) + " " + p + " 2>/dev/null; [ -L " + p + " ]; }; }";
-  });
+  }));
   steps.push([process.execPath, contain, "node", "--test", ...testFiles].map(shellQuote).join(" "));
   return steps.join(" && ");
 }
