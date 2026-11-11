@@ -25,7 +25,8 @@
  * WHAT MAY BE IMPORTED. The page is not a module — the inlined files share one
  * scope and `readModuleSource` strips their imports — so this file may only call
  * into a module PASTED BEFORE it, and the paste order in build-viewer.mjs is the
- * module graph written out by hand. `elsewhere.mjs` qualifies and is imported;
+ * module graph written out by hand. `elsewhere.mjs` and `plan.mjs` qualify and
+ * are imported;
  * anything further away arrives as a function in `opts` (parsing an `estimate:`)
  * or is written out here.
  *
@@ -33,6 +34,7 @@
  */
 
 import { ELSEWHERE_HINT, elsewhereSourceLabel, runningElsewhere } from "./elsewhere.mjs";
+import { describeHold, planState } from "./plan.mjs";
 
 /** HTML escaping, local on purpose: see WHAT MAY BE IMPORTED above. */
 function planEsc(s) {
@@ -249,6 +251,34 @@ export function statusChanges(previous, vm) {
 }
 
 /**
+ * The plan's state as the PAGE computes it, with the holds `plan` applies
+ * (TL-660).
+ *
+ * WHY A FUNCTION AND NOT TWO CALLS IN THE TEMPLATE. `unattendedHold` reads the
+ * whole configuration, the clock and each task's history: without them an
+ * `awaiting_vouch` task is next up, an undischarged protected status is next
+ * up, no claim ages into a parked one and no wave is held — the page and the
+ * terminal then disagree about one plan, which is what `planState` exists to
+ * prevent. The Execution view and the dashboard both call this, so neither can
+ * drop a key the other passes.
+ *
+ * The page embeds the history beside the tasks, keyed by id; `plan` attaches
+ * it to each record, so it is attached here the same way. The clock is passed
+ * IN, as `plan-report.mjs` passes it, so the function stays pure.
+ *
+ * @param {object} plan     the parsed plan file
+ * @param {Array<object>} tasks the tasks the plan is read against
+ * @param {object} history  { id: [entry] } as the page embeds it
+ * @param {object} config   the loaded configuration the page embeds
+ * @param {number} now      epoch ms
+ */
+export function pagePlanState(plan, tasks, history, config, now) {
+  const byHistory = history || {};
+  const records = (tasks || []).map((t) => ({ ...t, history: byHistory[t.id] || t.history || [] }));
+  return planState(plan, records, { ...(config || {}), now });
+}
+
+/**
  * The plan, the tree and the history folded into what the view draws.
  *
  * @param {object|null} state   the result of `planState()` (null = no plan file)
@@ -352,6 +382,14 @@ export function planViewModel(state, tasks, opts = {}) {
       future: state.activeWave !== null && w.index > state.activeWave,
       closed: w.closed,
       total: w.tasks.length,
+      // HELD, AND WHY, ONE TASK PER LINE — the rows `plan` prints (TL-645,
+      // TL-660). A held wave names every open task's hold; a wave that is not
+      // held still names what `next` hands out to nobody, because a stalled
+      // task must not read as work somebody is about to start.
+      held: !!w.held,
+      holds: w.tasks
+        .filter((e) => e.open && e.hold && (w.held || !e.hold.startable))
+        .map((e) => ({ id: e.id, kind: e.hold.kind, text: describeHold(e.hold) })),
       groups: w.together.map((g) => g.slice()),
       cards,
     };
@@ -531,6 +569,29 @@ export function criticalLabel(critical) {
   return parts.join(" · ");
 }
 
+/**
+ * Why no unattended run moves this wave, one task per line (TL-660). The
+ * sentences are `describeHold`'s, so the page and `plan` cannot word one hold
+ * two ways; the lead-in is the reader's, not the command's.
+ */
+function renderHolds(wave) {
+  const holds = wave.holds || [];
+  if (!holds.length) return "";
+  const lead = wave.held
+    ? "Held — no unattended run will take any open task of this wave, so a run following the plan stops here:"
+    : "Withheld — no unattended run is handed these now:";
+  return (
+    '<div class="exec-holds" data-plan-holds="' + holds.length + '">' +
+    "<p>" + planEsc(lead) + "</p><ul>" +
+    holds
+      .map((h) =>
+        '<li data-plan-hold="' + planEsc(h.id) + '" data-plan-hold-kind="' + planEsc(h.kind) + '">' +
+        '<a class="exec-id" href="#' + planEsc(h.id) + '">' + planEsc(h.id) + "</a> " + planEsc(h.text) + "</li>")
+      .join("") +
+    "</ul></div>"
+  );
+}
+
 /** The whole Execution view. */
 export function renderExecution(vm, opts = {}) {
   if (!vm || !vm.exists) return renderPlanMissing(opts);
@@ -564,7 +625,9 @@ export function renderExecution(vm, opts = {}) {
         '<span class="exec-wave-name">' + planEsc(w.name || "unnamed") + "</span>" +
         '<span class="exec-wave-count">' + w.closed + " / " + w.total + " done</span>" +
         (w.active ? '<span class="exec-wave-tag">active wave</span>' : "") +
+        (w.held ? '<span class="exec-wave-tag exec-wave-held" data-plan-held="1">held</span>' : "") +
         "</header>" +
+        renderHolds(w) +
         '<div class="exec-cards">' + renderWaveCards(w) + "</div>" +
         "</section>"
       );

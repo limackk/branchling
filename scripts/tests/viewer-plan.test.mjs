@@ -19,7 +19,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { planState } from "../plan.mjs";
+import { readFileSync } from "node:fs";
+
+import { describeHold, planState } from "../plan.mjs";
 import { estimateHours } from "../estimate.mjs";
 import {
   criticalLabel,
@@ -27,6 +29,7 @@ import {
   descendants,
   durationLabel,
   enteredInProgressAt,
+  pagePlanState,
   planViewModel,
   renderExecution,
   renderPlanMissing,
@@ -398,4 +401,151 @@ test("a wave that has just closed in full is reported once, and only once", () =
   assert.deepEqual(first.waves, [0]);
   // The same state again is not a second closing.
   assert.deepEqual(statusChanges(first, vmA).waves, []);
+});
+
+// ── A wave held shut, as `plan` prints it (TL-660) ────────────────────────
+//
+// The page computes the plan through `pagePlanState`, with the whole
+// configuration, the history and the clock — the inputs `plan` hands
+// `planState`. The vocabulary is this fixture's own: `vouching` is the status
+// awaiting a person, `parked` a protected one.
+
+const HOLD_CONFIG = {
+  archivedStatuses: ["shipped"],
+  inProgressStatus: "running",
+  awaitingVouchStatus: "vouching",
+  reasonRequiredStatuses: ["parked"],
+  auditStaleDays: 7,
+  abandonedAfterDays: 30,
+  estimates: ["1h", "2h", "4h", "1d"],
+  maxUnattendedEstimate: "4h",
+};
+const HOLD_PLAN = {
+  updated: "2026-01-01",
+  waves: [
+    { name: "review", tasks: ["HX-1"], together: [] },
+    { name: "after", tasks: ["HX-2"], together: [] },
+  ],
+};
+const holdTasks = (status) => [
+  { id: "HX-1", title: "the finished one", status, blocked_by: [], owner: "", estimate: "2h" },
+  { id: "HX-2", title: "the next one", status: "queued", blocked_by: [], owner: "", estimate: "1h" },
+];
+function holdView(tasks, history = {}) {
+  const state = pagePlanState(HOLD_PLAN, tasks, history, HOLD_CONFIG, NOW);
+  const vm = planViewModel(state, tasks, {
+    history, now: NOW, estimateHours, archivedStatuses: HOLD_CONFIG.archivedStatuses,
+  });
+  return { state, vm, html: renderExecution(vm) };
+}
+
+test("an active wave holding only a task awaiting a vouch renders as held, with that reason, and nothing is next up", () => {
+  const { state, vm, html } = holdView(holdTasks("vouching"));
+  assert.equal(state.activeWave, 0);
+  assert.deepEqual(state.nextUp, [], "a task `next --plan` hands out to nobody is not next up");
+  assert.equal(vm.waves[0].held, true);
+  assert.deepEqual(vm.waves[0].holds.map((h) => [h.id, h.kind]), [["HX-1", "awaiting-vouch"]]);
+  // The sentence is `plan`'s own, not a second wording of it.
+  const reason = describeHold({ kind: "awaiting-vouch", status: "vouching" });
+  assert.equal(vm.waves[0].holds[0].text, reason);
+  assert.match(html, /data-plan-wave="0"[^]*?data-plan-held="1"/);
+  assert.ok(html.includes('data-plan-hold="HX-1" data-plan-hold-kind="awaiting-vouch"'));
+  assert.ok(html.includes(reason), "the reason reaches the page");
+  // The wave after it is not held: its task is pending and nothing holds it.
+  assert.equal(vm.waves[1].held, false);
+  assert.ok(!/data-plan-wave="1"[^]*data-plan-held/.test(html));
+});
+
+test("positive control: the same task pending is next up and the wave is not held", () => {
+  const { state, vm, html } = holdView(holdTasks("queued"));
+  assert.deepEqual(state.nextUp.map((e) => e.ids), [["HX-1"]]);
+  assert.equal(vm.waves[0].held, false);
+  assert.deepEqual(vm.waves[0].holds, []);
+  assert.ok(!html.includes("data-plan-held"));
+  assert.ok(!html.includes("data-plan-holds"));
+});
+
+test("the page reads the history it embeds: a claim with no change past audit_stale_days is parked", () => {
+  const tasks = holdTasks("running").map((t) =>
+    t.id === "HX-1" ? { ...t, owner: "agent:x", updated: "2025-12-15" } : t);
+  const history = { "HX-1": [{ ts: "2025-12-20T09:00:00Z", field: "status", to: "running" }] };
+  const { vm } = holdView(tasks, history);
+  const hold = vm.waves[0].holds[0];
+  assert.equal(hold.kind, "parked-claim");
+  // 2025-12-20 is the last change, which only the history says.
+  assert.ok(hold.text.includes("since 2025-12-20"), hold.text);
+});
+
+test("a wave that is not held still names what it withholds, as `plan` does", () => {
+  const plan = { updated: "2026-01-01", waves: [{ name: "mixed", tasks: ["HX-1", "HX-2"], together: [] }] };
+  const tasks = holdTasks("vouching");
+  const state = pagePlanState(plan, tasks, {}, HOLD_CONFIG, NOW);
+  const vm = planViewModel(state, tasks, { now: NOW, estimateHours, archivedStatuses: ["shipped"] });
+  assert.equal(vm.waves[0].held, false);
+  assert.deepEqual(vm.waves[0].holds.map((h) => h.id), ["HX-1"]);
+  assert.deepEqual(state.nextUp.map((e) => e.ids), [["HX-2"]]);
+});
+
+test("both of the page's plan computations go through pagePlanState", () => {
+  const src = readFileSync(new URL("../build-viewer.mjs", import.meta.url), "utf8");
+  assert.equal((src.match(/pagePlanState\(PLAN\.plan, /g) || []).length, 2);
+  assert.ok(!/[^.\w]planState\(PLAN\.plan/.test(src), "a call with a partial configuration bypasses the holds");
+});
+
+test("a startable hold in a wave that is not held is not withheld: `next` still hands it to a person", () => {
+  // `executor: human` is a hold an unattended run applies, but a person asking
+  // `next` is still handed the task — `plan` lists it as next up, not withheld.
+  const plan = { updated: "2026-01-01", waves: [{ name: "mixed", tasks: ["HX-1", "HX-2"], together: [] }] };
+  const tasks = holdTasks("queued").map((t) => (t.id === "HX-1" ? { ...t, executor: "human" } : t));
+  const state = pagePlanState(plan, tasks, {}, HOLD_CONFIG, NOW);
+  const vm = planViewModel(state, tasks, { now: NOW, estimateHours, archivedStatuses: ["shipped"] });
+  assert.equal(state.waves[0].tasks[0].hold.kind, "person-only", "the fixture must carry the hold it is about");
+  assert.equal(vm.waves[0].held, false);
+  assert.deepEqual(vm.waves[0].holds, []);
+});
+
+test("the held block is structure a reader can follow: a word on the wave, a link and a sentence per task", () => {
+  const { vm, html } = holdView(holdTasks("vouching"));
+  const reason = vm.waves[0].holds[0].text;
+  // The claim is carried by a WORD, not by colour alone (TL-52).
+  assert.ok(html.includes('<span class="exec-wave-tag exec-wave-held" data-plan-held="1">held</span>'));
+  const block = html.match(/<div class="exec-holds" data-plan-holds="(\d+)"><p>([^<]+)<\/p><ul>(.*?)<\/ul><\/div>/);
+  assert.ok(block, "the holds render as one block with a lead-in and a list");
+  assert.equal(block[1], "1");
+  assert.equal(
+    block[3],
+    '<li data-plan-hold="HX-1" data-plan-hold-kind="awaiting-vouch">' +
+      '<a class="exec-id" href="#HX-1">HX-1</a> ' + reason + "</li>"
+  );
+  // A held wave and a wave that only withholds open with different lead-ins:
+  // the first stops a run, the second does not.
+  const plan = { updated: "2026-01-01", waves: [{ name: "mixed", tasks: ["HX-1", "HX-2"], together: [] }] };
+  const tasks = holdTasks("vouching");
+  const withheld = renderExecution(planViewModel(pagePlanState(plan, tasks, {}, HOLD_CONFIG, NOW), tasks, {
+    now: NOW, estimateHours, archivedStatuses: ["shipped"],
+  }));
+  const lead = withheld.match(/<div class="exec-holds" data-plan-holds="1"><p>([^<]+)<\/p>/);
+  assert.ok(lead, "a withholding wave renders the block too");
+  assert.ok(block[2].length > 0 && lead[1].length > 0);
+  assert.notEqual(block[2], lead[1]);
+  assert.ok(!withheld.includes("data-plan-held"));
+});
+
+test("a wave with no hold renders no block between its header and its cards", () => {
+  const { html } = holdView(holdTasks("queued"));
+  assert.match(html, /data-plan-wave="0"><header class="exec-wave-head">.*?<\/header><div class="exec-cards">/);
+  // Nothing follows the last tag of an unheld wave's header — no stray mark.
+  assert.match(html, /data-plan-wave="0"><header class="exec-wave-head">.*?active wave<\/span><\/header>/);
+  assert.match(html, /data-plan-wave="1"><header class="exec-wave-head">.*? done<\/span><\/header>/);
+});
+
+test("a held wave names each of its open tasks, one line apiece", () => {
+  const plan = { updated: "2026-01-01", waves: [{ name: "review", tasks: ["HX-1", "HX-2"], together: [] }] };
+  const tasks = holdTasks("vouching").map((t) => (t.id === "HX-2" ? { ...t, status: "parked" } : t));
+  const state = pagePlanState(plan, tasks, {}, HOLD_CONFIG, NOW);
+  const html = renderExecution(planViewModel(state, tasks, { now: NOW, estimateHours, archivedStatuses: ["shipped"] }));
+  assert.equal(state.waves[0].held, true);
+  const list = html.match(/<div class="exec-holds" data-plan-holds="2"><p>[^<]+<\/p><ul>(.*?)<\/ul><\/div>/);
+  assert.ok(list);
+  assert.match(list[1], /^<li data-plan-hold="HX-1" [^]*?<\/li><li data-plan-hold="HX-2" data-plan-hold-kind="protected-status">[^]*<\/li>$/);
 });
