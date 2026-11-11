@@ -31,6 +31,7 @@ import { fileURLToPath } from "node:url";
 
 import { COMMIT_MESSAGE_HOOK_NAME, HOOK_NAME, hookBlock, hooksTarget, inspect, installedBlock, replaceBlock, unclosedBlockLines, unclosedSpan, withoutBlock } from "../hooks-command.mjs";
 import { BLOCK_OPEN } from "../git-rules.mjs";
+import { git as containedGit } from "./_git.mjs";
 import { isolateHome, plainOutput, posixPath } from "./_repo.mjs";
 import { followRepair } from "./_follow-repair.mjs";
 import { canonicalPath } from "../canonical-path.mjs";
@@ -46,7 +47,7 @@ function run(cwd, args) {
   return spawnSync(process.execPath, [CLI, ...args], { cwd, encoding: "utf8", timeout: 60_000 });
 }
 function git(cwd, ...args) {
-  return spawnSync("git", args, { cwd, encoding: "utf8", timeout: 30_000 });
+  return containedGit(cwd, args);
 }
 
 /** A git repository with a backlog in it. */
