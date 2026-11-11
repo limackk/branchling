@@ -152,16 +152,21 @@ function notADirectory(target, key) {
   return undefined;
 }
 
-/** Whether a path that exists resolves to a directory. Only the errors a
- *  link with no usable target raises mean "no"; any other is not ours to
- *  hide. */
-function resolvesToDirectory(path) {
+/** What a path that exists resolves to, or undefined when it is a link with
+ *  no usable target. Only the errors such a link raises mean "nothing"; any
+ *  other is not ours to hide. */
+function resolved(path) {
   try {
-    return statSync(path).isDirectory();
+    return statSync(path);
   } catch (err) {
-    if (err.code === "ENOENT" || err.code === "ENOTDIR" || err.code === "ELOOP") return false;
+    if (err.code === "ENOENT" || err.code === "ENOTDIR" || err.code === "ELOOP") return undefined;
     throw err;
   }
+}
+
+function resolvesToDirectory(path) {
+  const stat = resolved(path);
+  return stat !== undefined && stat.isDirectory();
 }
 
 /**
@@ -195,8 +200,9 @@ function targetObstruction(repoRoot) {
  *   current  identical to the packaged file
  *   shipped  identical to an OLDER shipped version: safe to refresh
  *   edited   matches no shipped version: presumed to be the user's edit
- *   blocked  something that is not a regular file (a directory, a socket)
- *            stands at the path: it cannot be read, compared or replaced —
+ *   blocked  something that is not a regular file (a directory, a socket,
+ *            a link that resolves to no file) stands at the path: it cannot be
+ *            read, compared or replaced —
  *            or something that is not a directory stands where one of its
  *            directories belongs, and then `at` names that path (TL-603)
  *
@@ -242,10 +248,14 @@ export function compareInstalled(repoRoot, opts = {}) {
       const installed = join(target, key);
       let state;
       let at;
-      if (!existsSync(installed)) {
-        at = notADirectory(target, key);
-        state = at === undefined ? "missing" : "blocked";
-      } else if (!statSync(installed).isFile()) state = "blocked";
+      // lstat, not existsSync (TL-668): a dangling link AT the file read as
+      // absent, and the install's copyFileSync then followed it — throwing
+      // ENOENT, or, when the link's directory existed, writing the file
+      // wherever the link pointed, outside the repository.
+      at = notADirectory(target, key);
+      if (at !== undefined) state = "blocked";
+      else if (lstatSync(installed, { throwIfNoEntry: false }) === undefined) state = "missing";
+      else if (!resolved(installed)?.isFile()) state = "blocked";
       else {
         const hash = contentHash(installed);
         if (hash === contentHash(join(from, file))) state = "current";
