@@ -233,23 +233,84 @@ function addIdText(src, waveName, id) {
 }
 
 /**
- * A new wave, at the END of the order and with the caller's sentence above it.
- *
- * APPENDED, never inserted: where a wave stands is the argument the file makes,
- * and a command that guessed a position would be composing the reasoning this
- * module refuses to compose. Moving it earlier is a hand edit of one line,
- * which is a person deciding.
+ * The width a hand-written comment in plan.yaml is wrapped at. Measured on
+ * 2026-11-11 in this repository's plan: 116 of its 131 comment lines end at or
+ * before column 78, and the fifteen past it were written by this command before
+ * it wrapped (TL-677). A `--why` left on one line is the one paragraph in the
+ * file a reviewer has to scroll sideways to read.
  */
-function createWaveText(src, name, why, id) {
+export const PLAN_COMMENT_WIDTH = 78;
+
+/**
+ * The caller's sentence as comment lines no wider than `PLAN_COMMENT_WIDTH`.
+ *
+ * Only the line breaks are the tool's: every word is the caller's, in order. A
+ * single word longer than the width keeps a line of its own rather than being
+ * cut, because a path or a URL broken in half is no longer the caller's text.
+ */
+export function wrapComment(indent, text, width = PLAN_COMMENT_WIDTH) {
+  const prefix = " ".repeat(indent) + "# ";
+  const out = [];
+  let line = "";
+  for (const word of String(text).split(/\s+/).filter(Boolean)) {
+    if (line && (prefix + line + " " + word).length > width) {
+      out.push(prefix + line);
+      line = word;
+    } else {
+      line = line ? line + " " + word : word;
+    }
+  }
+  out.push(prefix + line);
+  return out;
+}
+
+/**
+ * The first line of wave `k`'s block: its `- name:` line, or the comment
+ * paragraph directly above it. That paragraph is the wave's argument, so a wave
+ * inserted BEFORE this one goes above the paragraph and never between it and
+ * the wave it argues for. A comment indented deeper than the wave belongs to
+ * the wave above (the fixture's "below the list" paragraph), so it stops the
+ * walk.
+ */
+function waveStart(s, k) {
+  const w = s.waves[k];
+  let at = w.head;
+  // The `waves:` line above every wave is not a comment, so it ends the walk.
+  while (s.lines[at - 1].trim().startsWith("#") && indentOf(s.lines[at - 1]) <= w.indent) at--;
+  return at;
+}
+
+/**
+ * A new wave with the caller's sentence above it: at the END of the order by
+ * default, or directly before or after a wave the caller NAMES (TL-677).
+ *
+ * The tool never chooses a position — where a wave stands is the argument the
+ * file makes, and a guessed position would be composing the reasoning this
+ * module refuses to compose. A position the caller states is not a guess: it
+ * is the same decision a hand edit of the file was, made in the one act that
+ * also writes the sentence arguing for it. Without one, the end of the order is
+ * the only placement that asserts nothing about the waves already there.
+ *
+ * @param {number} slot the index the new wave takes in the order; the number
+ *        of waves, or more, means the end
+ */
+function createWaveText(src, name, why, id, slot) {
   const s = scan(src);
   if (s.wavesLine < 0) return null;
+  // The items of one YAML list share one indentation, so the last wave's is
+  // every wave's.
   const indent = s.waves.length ? s.waves[s.waves.length - 1].indent : 2;
-  const at = s.wavesEnd;
+  // Inserted in front of an existing wave, or at the end of the block.
+  const inFront = slot < s.waves.length;
+  const at = inFront ? waveStart(s, slot) : s.wavesEnd;
   const block = [];
-  if (at > 0 && s.lines[at - 1].trim()) block.push("");
-  block.push(" ".repeat(indent) + "# " + why);
+  // A blank line separates waves; directly under `waves:` a wave inserted in
+  // front of the first one needs none.
+  if (s.lines[at - 1].trim() && !(inFront && at - 1 === s.wavesLine)) block.push("");
+  block.push(...wrapComment(indent, why));
   block.push(" ".repeat(indent) + "- name: " + JSON.stringify(name));
   block.push(" ".repeat(indent + 2) + "tasks: [" + id + "]");
+  if (inFront) block.push("");
   s.lines.splice(at, 0, ...block);
   return s.lines.join("\n");
 }
@@ -278,7 +339,9 @@ const shapeOf = (waves) =>
  *
  * @param {string} text the file as it stands
  * @param {{op: "add"|"move"|"remove", id: string, wave?: string, why?: string,
- *          today?: string}} spec
+ *          before?: string, after?: string, today?: string}} spec
+ *        `before` / `after` name an EXISTING wave the new one is placed next
+ *        to; they are `add`-only and only for a wave this edit creates
  * @returns {{text: string, problems: string[], kind: "usage"|"state"|null}}
  */
 export function editPlanText(text, spec = {}) {
@@ -294,6 +357,18 @@ export function editPlanText(text, spec = {}) {
   const wave = String(spec.wave == null ? "" : spec.wave).trim();
   const whyGiven = spec.why !== undefined && spec.why !== null;
   const why = whyGiven ? String(spec.why).trim() : "";
+  const placeFlag = spec.before != null ? "--before" : spec.after != null ? "--after" : "";
+  // Read only where `placeFlag` is set; both flags at once are refused below.
+  const anchor = String(spec.before ?? spec.after ?? "").trim();
+  if (spec.before != null && spec.after != null) {
+    return refuse("usage", ["`--before` and `--after` both place the new wave — name one neighbour, not two"]);
+  }
+  if (placeFlag && op !== "add") {
+    return refuse("usage", ["`" + placeFlag + "` places a wave `add` creates, so it says nothing about a " + (op === "move" ? "move" : "removal")]);
+  }
+  if (placeFlag && !anchor) {
+    return refuse("usage", ["`" + placeFlag + "` is empty — it names the existing wave the new one stands next to"]);
+  }
 
   if (op === "remove") {
     if (wave) return refuse("usage", ["`remove` takes an id and no wave — it takes the id out of whichever wave holds it"]);
@@ -366,6 +441,18 @@ export function editPlanText(text, spec = {}) {
       return refuse("state", [id + " is already in wave " + waveLabel(plan, target)]);
     }
     creating = target < 0;
+    if (placeFlag && !creating) {
+      return refuse("usage", [
+        "the wave `" + wave + "` already exists, and `" + placeFlag + "` places a wave this call creates",
+        "an existing wave is moved by a hand edit somebody reviews, not as a side effect of scheduling one id",
+      ]);
+    }
+    if (placeFlag && names.indexOf(anchor) < 0) {
+      return refuse("usage", [
+        "there is no wave `" + anchor + "` to place the new wave " + placeFlag.slice(2),
+        waveList,
+      ]);
+    }
   }
 
   // The membership this edit is MEANT to produce, taken from the parse. The
@@ -380,9 +467,14 @@ export function editPlanText(text, spec = {}) {
   }
   if (op !== "remove") {
     if (creating) {
-      next = createWaveText(next, wave, why, id);
+      // The parse and the scan list the same waves in the same order — the
+      // shape check below would refuse the edit if they did not — so the
+      // parse's index addresses the scan's wave.
+      const ref = names.indexOf(anchor);
+      const slot = placeFlag === "--before" ? ref : placeFlag === "--after" ? ref + 1 : expected.length;
+      next = createWaveText(next, wave, why, id, slot);
       if (next === null) return refuse("state", ["this plan has no `waves:` section, so a wave cannot be added to it"]);
-      expected.push({ name: wave, tasks: [id], together: [] });
+      expected.splice(slot, 0, { name: wave, tasks: [id], together: [] });
     } else {
       next = addIdText(next, wave, id);
       if (next === null) return refuse("state", ["wave " + waveLabel(plan, target) + " has no `tasks:` line this writer could extend"]);
@@ -490,7 +582,7 @@ export function newPlanErrors(before, after, tasks, config) {
   return validatePlan(parsePlanYaml(after).plan, tasks, config).errors.filter((e) => !was.has(e));
 }
 
-const FLAGS = { "--wave": "wave", "--why": "why" };
+const FLAGS = { "--wave": "wave", "--why": "why", "--before": "before", "--after": "after" };
 
 /**
  * `--` ENDS FLAG READING (TL-248), the shape TL-58 settled for `new`.
@@ -560,6 +652,7 @@ export function runPlanEdit(op, argv) {
   const parsed = parseEditArgs(cli.argv);
   const usage = [
     "usage: " + N + " plan add <ID>... --wave \"<name>\" [--why \"<sentence>\"]",
+    "         [--before \"<wave>\" | --after \"<wave>\"]",
     "       " + N + " plan move <ID> --wave \"<name>\" [--why \"<sentence>\"]",
     "       " + N + " plan remove <ID>",
   ];
@@ -605,10 +698,14 @@ export function runPlanEdit(op, argv) {
     ], [N + " new --title \"…\""], 1);
   }
 
-  // `--why` creates the wave, so it travels with the FIRST id only; the ids
-  // after it join the wave that edit made.
+  // `--why` creates the wave, so it travels with the FIRST id only, and so do
+  // `--before` / `--after`, which place it; the ids after it join the wave
+  // that edit made.
   const edit = editPlanTextMany(before, ids.map((id, i) => ({
-    op, id, wave: parsed.values.wave, why: i === 0 ? parsed.values.why : undefined,
+    op, id, wave: parsed.values.wave,
+    why: i === 0 ? parsed.values.why : undefined,
+    before: i === 0 ? parsed.values.before : undefined,
+    after: i === 0 ? parsed.values.after : undefined,
   })));
   if (edit.problems.length) {
     const [head, ...rest] = edit.problems;
