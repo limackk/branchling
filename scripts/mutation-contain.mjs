@@ -13,6 +13,10 @@
  * tree by parent, which an orphan has left; the process GROUP is kept across
  * reparenting, so a kill aimed at the group still reaches it.
  *
+ * The default suite uses it too (TL-665): `scripts/tests/_git.mjs` runs every
+ * hook test's git under it, so a timed-out git does not leave its hooks behind
+ * outside a mutation run either.
+ *
  * WHAT IT DOES NOT COVER. When Stryker kills this process itself with SIGKILL
  * on a timeout, nothing here runs. `sweepLeftovers()` in `mutation-run.mjs`
  * catches that case when the run ends.

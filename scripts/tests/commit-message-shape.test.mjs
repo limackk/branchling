@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url";
 
 import { literalParagraphBreaks } from "../commit-message.mjs";
 import { HOOK_NAMES, hookBlock, hooksTarget } from "../hooks-command.mjs";
+import { git as containedGit } from "./_git.mjs";
 import { isolateHome } from "./_repo.mjs";
 
 isolateHome("commit-message-shape");
@@ -32,8 +33,7 @@ function run(args, cwd) {
 }
 
 function git(cwd, ...args) {
-  return spawnSync("git", args, {
-    cwd, encoding: "utf8", timeout: 30_000,
+  return containedGit(cwd, args, {
     env: {
       ...process.env,
       GIT_AUTHOR_NAME: "T", GIT_AUTHOR_EMAIL: "t@example.com",
