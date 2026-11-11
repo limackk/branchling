@@ -49,6 +49,7 @@ const DECLARED = Object.keys(KINDS["task-new"]);
 
 function run(cwd, args, input = "") {
   const env = { ...process.env, NO_COLOR: "1", BACKLOG_STATE_DIR: join(cwd, ".state") };
+  delete env.FORCE_COLOR;
   delete env.BACKLOG_ACTOR;
   delete env.BACKLOG_DIR;
   return spawnSync(process.execPath, [CLI].concat(args), { cwd, encoding: "utf8", timeout: 60_000, env, input });
@@ -297,13 +298,13 @@ test("a template outside the vocabulary is template-drift", () => {
   assert.ok(doc.details.some((d) => d.includes("no-such-status")), JSON.stringify(doc.details));
 });
 
-test("a wave the plan refuses is plan-refused — before the write, and after it with the task named", () => {
+/**
+ * The fixture of the one refusal after the write: the next number is already
+ * scheduled in the wave "second", so `new --wave first` writes the task and the
+ * plan then refuses to schedule one id twice.
+ */
+function planRefusedRepo() {
   const dir = repo();
-  // No plan.yaml at all, then a plan without that wave.
-  refusedAs(dir, ["--title", "x", "--wave", "no-such-wave", "--actor", "agent:test"], { refusalKind: "plan-refused", exit: 2 });
-
-  // The next number is already scheduled in another wave: the task is written,
-  // and the plan refuses to schedule one id twice.
   const files = taskFiles(dir);
   const first = files[0].match(/^([A-Za-z][A-Za-z0-9]*)-(\d+)-/);
   assert.ok(first, "the fixture's first task has no id: " + files[0]);
@@ -318,6 +319,15 @@ test("a wave the plan refuses is plan-refused — before the write, and after it
     "    tasks: [" + nextId + "]",
     "",
   ].join("\n"), "utf8");
+  return { dir, nextId };
+}
+
+test("a wave the plan refuses is plan-refused — before the write, and after it with the task named", () => {
+  // No plan.yaml at all.
+  refusedAs(repo(), ["--title", "x", "--wave", "no-such-wave", "--actor", "agent:test"], { refusalKind: "plan-refused", exit: 2 });
+
+  // A plan without that wave.
+  const { dir, nextId } = planRefusedRepo();
   refusedAs(dir, ["--title", "x", "--wave", "no-such-wave", "--actor", "agent:test"], { refusalKind: "plan-refused", exit: 2 });
 
   const after = refusedAs(dir, ["--title", "Written", "--wave", "first", "--actor", "agent:test"],
@@ -326,6 +336,37 @@ test("a wave the plan refuses is plan-refused — before the write, and after it
   assert.ok(taskFiles(dir).some((f) => f.startsWith(nextId + "-")), "the named task is not on disk");
   assert.ok(after.file && after.file.includes(nextId), "the file that was written is not named");
   assert.equal(after.wave, null, "a wave is reported although the plan did not take the task");
+});
+
+// TL-662: the text form of the refusal after the write is read line by line.
+// The problems are taken from the envelope of a twin fixture, so the test holds
+// the text to the same list the --json consumer is given rather than to this
+// fixture's wording; the count below is the positive control that there is
+// more than one problem line, so the separator between them is exercised.
+test("without --json, the plan refused after the write names the file, each problem and the command that schedules it", () => {
+  const twin = planRefusedRepo();
+  const doc = refusedAs(twin.dir, ["--title", "Written", "--wave", "first", "--actor", "agent:test"],
+    { refusalKind: "plan-refused", exit: 1, writes: true });
+  const problems = doc.details.slice(0, -1);
+  const schedule = doc.details[doc.details.length - 1];
+  assert.ok(problems.length >= 2, "the fixture no longer yields two plan problems: " + JSON.stringify(doc.details));
+  assert.equal(schedule, "schedule it with `branchling plan add " + twin.nextId + ' --wave "first"` once the plan allows it');
+
+  const { dir, nextId } = planRefusedRepo();
+  assert.equal(nextId, twin.nextId, "the twin fixtures do not hand out the same id");
+  const r = run(dir, ["new", "--dir", "backlog", "--title", "Written", "--wave", "first", "--actor", "agent:test"]);
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  assert.equal(r.stdout, "");
+  const written = taskFiles(dir).find((f) => f.startsWith(nextId + "-"));
+  assert.ok(written, "the task was not written, so this is not the refusal after the write");
+
+  assert.deepEqual(r.stderr.split("\n"), [
+    "branchling new: the task was written and the plan was NOT",
+    "  " + join(dir, "backlog", "tasks", written),
+    ...problems.map((p) => "  - " + p),
+    "  " + schedule,
+    "",
+  ]);
 });
 
 test("a missing backlog is the shared no-backlog envelope", () => {
