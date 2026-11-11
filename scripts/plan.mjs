@@ -711,6 +711,26 @@ export function dispatchWave(plan, tasks, config = {}) {
 }
 
 /**
+ * The wave `next --plan --spill` may draw from when the active one is waiting
+ * on other trees (TL-683). PURE.
+ *
+ * The first wave AFTER the active one that still holds an open task, in the
+ * shape `dispatchWave` returns, or null when there is none. It reads the same
+ * `planState`, so "active" means here what it means to `plan` and to the
+ * dispatcher. Whether the active wave is waiting is the caller's judgement; this
+ * only names where the spill would go.
+ *
+ * @returns {{index: number, name: string, ids: string[], open: number}|null}
+ */
+export function spillWave(plan, tasks, config = {}) {
+  const state = planState(plan, tasks, config);
+  // No active wave means every wave is closed, so the search finds nothing.
+  const w = state.waves.find((x) => x.index > state.activeWave && x.open > 0);
+  if (!w) return null;
+  return { index: w.index, name: w.name, ids: w.tasks.map((e) => e.id), open: w.open };
+}
+
+/**
  * EVERY ID THE PLAN SCHEDULES, IN ANY WAVE. PURE (TL-219).
  *
  * `dispatchWave` above answers "which wave may be handed out of now", and a

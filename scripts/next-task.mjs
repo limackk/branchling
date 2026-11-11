@@ -56,6 +56,13 @@
  * take" must be distinguishable from "the call was wrong", or a loop cannot
  * tell an empty queue from its own typo.
  *
+ * Exit 3 under `--plan` carries one of three refusal kinds (TL-683):
+ * `nothing-to-take`, `wave-claimed-elsewhere` (the active wave's open work is
+ * held by another tree or session) and `wave-awaits-merge` (it is closed on a
+ * branch not merged here). The exit code stays 3 for all three — nothing was
+ * taken, and `run` stops or waits on that code — while the kind tells a
+ * supervisor "retry later" from "stop". See `waveWaiting`.
+ *
  * Tests: `node --test scripts/tests/next.test.mjs`
  *        `node --test scripts/tests/next-dry-run.test.mjs`
  */
@@ -69,7 +76,7 @@ import { archivedElsewhereBySource, crossBranchState, describeDivergence, diverg
 import { loadConfigOrExit } from "./config.mjs";
 import { statedActorRefusal, FIELD_COMMENT, openQuestions, readAllHistory, readHistory, reasonRefusal } from "./history.mjs";
 import { answerBacklogDirRefusal, backlogPaths, isBacklogDirRefusal, resolveBacklogDir } from "./paths.mjs";
-import { dispatchWave, loadPlanForDispatch, scheduledIds } from "./plan.mjs";
+import { dispatchWave, loadPlanForDispatch, scheduledIds, spillWave } from "./plan.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { probeTask } from "./done-task.mjs";
@@ -83,7 +90,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export const NEXT_FLAGS = [
   "--dir", "--actor", "--reason", "--json", "--plan",
-  "--board", "--label", "--priority", "--epic", "--status", "--role", "--probe", "--dry-run",
+  "--board", "--label", "--priority", "--epic", "--status", "--role", "--probe", "--dry-run", "--spill",
 ];
 
 /** No candidate is not an error — see the header. */
@@ -93,7 +100,7 @@ export const EXIT_NOTHING_TO_TAKE = 3;
 export function parseNextArgs(args) {
   const plan = { dir: null, actor: null, reason: null, json: false, usePlan: false,
     board: null, label: null, priority: null, epic: null, status: null,
-    role: null, roleStrict: false, probe: false, dryRun: false };
+    role: null, roleStrict: false, probe: false, dryRun: false, spill: false };
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === "--json") { plan.json = true; continue; }
@@ -101,6 +108,7 @@ export function parseNextArgs(args) {
     if (a === "--role-strict") { plan.roleStrict = true; continue; }
     if (a === "--probe") { plan.probe = true; continue; }
     if (a === "--dry-run") { plan.dryRun = true; continue; }
+    if (a === "--spill") { plan.spill = true; continue; }
     if (NEXT_FLAGS.indexOf(a) >= 0) {
       const value = args[++i] || null;
       if (!value) throw new Error("`" + a + "` with no value");
@@ -123,6 +131,16 @@ export function parseNextArgs(args) {
       "`--role-strict` with no `--role`\n" +
         "It narrows `--role r` from `r or no role` to `exactly r`; on its own there is\n" +
         "nothing for it to narrow."
+    );
+  }
+  // `--spill` changes which wave `--plan` draws from; without a plan there is
+  // no wave to spill out of, and ignoring the flag would hand out the priority
+  // queue to a caller who asked for an order (TL-683).
+  if (plan.spill && !plan.usePlan) {
+    throw new Error(
+      "`--spill` with no `--plan`\n" +
+        "It lets `--plan` draw from the next wave while the active one waits on other\n" +
+        "trees; on its own there is no wave to spill out of."
     );
   }
   // `--probe` RUNS the task's contract, and a contract is arbitrary commands —
@@ -827,6 +845,101 @@ export function selectCandidates(records, config, filters, now) {
   };
 }
 
+/** `next --plan` found the active wave waiting on a claim in another tree or
+ *  session (TL-683). Exit 3 like an empty queue: nothing was taken. */
+export const WAVE_CLAIMED_ELSEWHERE = "wave-claimed-elsewhere";
+/** `next --plan` found the active wave's open work closed on a branch that is
+ *  not merged here (TL-683). */
+export const WAVE_AWAITS_MERGE = "wave-awaits-merge";
+
+/**
+ * Is the active wave WAITING rather than exhausted? PURE (TL-683).
+ *
+ * `next --plan` used to answer `nothing-to-take` both for a backlog with no
+ * work left and for a wave whose last open task another loop was holding, or
+ * had closed on a branch nobody had merged yet. Measured in the supervised-loop
+ * runs of 2026-11-05 to 2026-11-09: more than forty such answers, each of which
+ * a supervisor read as "stop" when the right reading was "retry after the
+ * coordinator merges". The text said the difference; the refusal kind did not.
+ *
+ * EVERY OPEN TASK OF THE WAVE HAS TO BE ACCOUNTED FOR. One task left out for any
+ * other reason — a role, an executor, a size, a protected status, a handback —
+ * means waiting would not help this caller, and the answer stays
+ * `nothing-to-take`. Per task, in this order:
+ *
+ *   awaitingMerge  another branch or tree reports it in an archived status: the
+ *                  work is finished and only a merge brings it here
+ *   claimed        in the in-progress status in THIS tree, reported open in
+ *                  another tree, or held by a reservation another session made
+ *                  (`heldIds`, the candidates `next` passed over)
+ *   behind         every unresolved blocker is itself one of the above, so it
+ *                  starts the moment they arrive
+ *
+ * The kind is `wave-claimed-elsewhere` while any task is claimed, because a
+ * merge alone does not free a claim; `wave-awaits-merge` when the merge is all
+ * that is missing.
+ *
+ * @param {string[]} waveIds the active wave's ids, as `dispatchWave` returns them
+ * @param {object[]} records task records with `elsewhere` attached
+ * @param {object} config the loaded configuration
+ * @param {Iterable<string>} heldIds ids a reservation held during this call
+ * @returns {{kind: string|null, claimed: string[], awaitingMerge: string[], behind: string[]}}
+ */
+export function waveWaiting(waveIds, records, config, heldIds) {
+  const archived = new Set(config.archivedStatuses);
+  const inProgress = inProgressStatus(config);
+  const byId = new Map(records.map((t) => [String(t.id).toUpperCase(), t]));
+  const held = new Set([...heldIds].map((id) => String(id).toUpperCase()));
+  const open = waveIds
+    .map((id) => byId.get(String(id).toUpperCase()))
+    .filter((t) => t && !archived.has(t.status));
+
+  const claimed = [];
+  const awaitingMerge = [];
+  const waiting = new Set();
+  let rest = [];
+  for (const t of open) {
+    const key = String(t.id).toUpperCase();
+    const elsewhere = t.elsewhere || [];
+    if (elsewhere.some((o) => archived.has(o.status))) {
+      awaitingMerge.push(t.id);
+    } else if (
+      (inProgress && t.status === inProgress) ||
+      held.has(key) ||
+      elsewhere.some((o) => !archived.has(o.status))
+    ) {
+      claimed.push(t.id);
+    } else {
+      rest.push(t);
+      continue;
+    }
+    waiting.add(key);
+  }
+  // A task blocked only by waiting work waits with it. Repeated until nothing
+  // moves, because a chain inside one wave is the case a plan is written for.
+  const behind = [];
+  for (let moved = true; moved && rest.length;) {
+    moved = false;
+    const still = [];
+    for (const t of rest) {
+      const unresolved = (t.blocked_by || [])
+        .map((b) => String(b).toUpperCase())
+        .filter((b) => !blockerResolved(byId.get(b), archived));
+      if (unresolved.length && unresolved.every((b) => waiting.has(b))) {
+        behind.push(t.id);
+        waiting.add(String(t.id).toUpperCase());
+        moved = true;
+      } else {
+        still.push(t);
+      }
+    }
+    rest = still;
+  }
+  if (rest.length) return { kind: null, claimed: [], awaitingMerge: [], behind: [] };
+  const kind = claimed.length ? WAVE_CLAIMED_ELSEWHERE : awaitingMerge.length ? WAVE_AWAITS_MERGE : null;
+  return { kind, claimed, awaitingMerge, behind };
+}
+
 export function run(argv) {
   let plan;
   try {
@@ -978,8 +1091,40 @@ export function run(argv) {
   // Which of the protected tasks a run parked, rather than a person declaring
   // the status (TL-282). Read here and handed in, so the selection stays pure.
   filters.parkedByRun = parkedByRun(root, records, config);
+  let selection = selectCandidates(records, config, filters, now);
+  // THE WAVE THE PLAN SAYS IS ACTIVE, kept apart from the one this call draws
+  // from (TL-683): a spill draws from a later wave, and the refusal below still
+  // has to judge whether the ACTIVE one is waiting.
+  const activeWave = wave;
+  // `--spill`: the active wave is waiting on other trees and this call found
+  // nothing in it, so it draws from the next wave instead. Judged before any
+  // take, from the records alone — a reservation met DURING the takes is still
+  // reported, but it does not send the call into another wave half-way through
+  // its candidates. The next wave's own gates still hold: its blockers in this
+  // wave keep it waiting, and `selectCandidates` holds back a conflict group
+  // somebody is working in.
+  let spill = null;
+  if (plan.spill && activeWave && !selection.candidates.length) {
+    const waiting = waveWaiting(activeWave.ids, records, config, []);
+    if (waiting.kind) {
+      const later = spillWave(planned, records, {
+        archivedStatuses: config.archivedStatuses,
+        inProgressStatus: inProgressStatus(config),
+      });
+      spill = {
+        from: activeWave.index + 1, fromName: activeWave.name,
+        refusalKind: waiting.kind, claimedElsewhere: waiting.claimed, awaitingMerge: waiting.awaitingMerge,
+        wave: later ? later.index + 1 : null, name: later ? later.name : "",
+      };
+      if (later) {
+        wave = later;
+        filters.planIds = new Set(later.ids.map((id) => String(id).toUpperCase()));
+        selection = selectCandidates(records, config, filters, now);
+      }
+    }
+  }
   const { candidates: selected, reclaimable, unblocked, skippedBlocked, skippedElsewhere, skippedExecutor, skippedHandedBack, skippedDeadlocked, skippedSize, skippedOutsideWave, skippedUnplanned, skippedConflict } =
-    selectCandidates(records, config, filters, now);
+    selection;
   // THE ACTOR'S RECORD, LAST OF ALL THE FILTERS (TL-150). It only removes, and
   // it removes from a queue the dispatcher has already ordered — eligibility and
   // ordering are different decisions, and the second one is settled above.
@@ -1004,6 +1149,11 @@ export function run(argv) {
         // quantity its name always promised; the other one did not vanish, it
         // acquired an honest name.
         skippedOutsideWave, skippedUnplanned,
+        // `--spill` (TL-683): null unless the active wave was found waiting and
+        // this call looked past it — then `from` is that wave, `refusalKind`
+        // what it waits on, and `wave` the one drawn from (null: none left).
+        // The keys above then describe the wave drawn from.
+        spill,
       }
     : null;
   // Named, never silent: a candidate that disappears without a word is
@@ -1033,6 +1183,10 @@ export function run(argv) {
   // lines for a real hand-out and for the dry run that projects one.
   const skippedLinesForHuman = () => {
     const out = [];
+    if (spill && spill.wave) {
+      out.push(color.dim(MARK.bullet + " plan wave " + spill.from + " (" + spill.fromName + ") " +
+        waitingPhrase(spill.refusalKind) + " — spilled into wave " + spill.wave));
+    }
     if (wave) {
       out.push(color.dim(MARK.bullet + " plan wave " + (wave.index + 1) + ": " + (wave.name || "unnamed")));
     }
@@ -1242,26 +1396,56 @@ export function run(argv) {
     plural(passedOver.length, "candidate is", "candidates are") + " held by another session");
   for (const p of passedOver) details.push("  " + MARK.bullet + " " + p.why);
 
+  // A WAVE THAT IS WAITING IS NOT AN EMPTY BACKLOG (TL-683). Judged against
+  // the ACTIVE wave, also after a spill found nothing: that wave is still the
+  // one whose arrival the caller is waiting for.
+  const waiting = activeWave ? waveWaiting(activeWave.ids, records, config, passedOver.map((p) => p.id)) : null;
+  const refusalKind = waiting && waiting.kind ? waiting.kind : "nothing-to-take";
+  const refusal = waiting && waiting.kind
+    ? "nothing to take now — plan wave " + (activeWave.index + 1) + " " + waitingPhrase(waiting.kind)
+    : "nothing to take";
+  if (waiting && waiting.kind) {
+    const lines = [];
+    if (waiting.claimed.length) lines.push("claimed in another tree or session: " + waiting.claimed.join(", "));
+    if (waiting.awaitingMerge.length) lines.push("closed on a branch not merged here: " + waiting.awaitingMerge.join(", "));
+    if (waiting.behind.length) lines.push("blocked only by those: " + waiting.behind.join(", "));
+    lines.push(waiting.kind === WAVE_AWAITS_MERGE
+      ? "ask again after the merge"
+      : "ask again when those claims are closed and merged" +
+        (plan.spill ? "" : " — `--spill` draws from the next wave meanwhile"));
+    details.unshift(...lines);
+  }
+  const planOut = planJson && waiting
+    ? { ...planJson, claimedElsewhere: waiting.claimed, awaitingMerge: waiting.awaitingMerge, waitingBehind: waiting.behind }
+    : planJson;
+
   if (plan.json) {
     // AN EMPTY QUEUE IS AN ANSWER, not an error — and it is still an envelope,
     // with every key of the kind present. A loop reading this has to tell "there
     // is nothing" from "there is something I was not allowed to take", and the
     // `skipped*` lists are the only place that distinction lives.
     printJson("task-take", {
-      ok: false, taken: false, refusalKind: "nothing-to-take", refusal: "nothing to take",
+      ok: false, taken: false, refusalKind, refusal,
       details, actorSource, dryRun: plan.dryRun,
       searchedStatuses: searched, skippedBlocked, passedOver, skippedElsewhere, skippedExecutor,
       closedElsewhere,
-      skippedHandedBack, skippedDeadlocked, skippedSize, skippedByRecord, skippedConflict, plan: planJson,
+      skippedHandedBack, skippedDeadlocked, skippedSize, skippedByRecord, skippedConflict, plan: planOut,
       scan: { scanned: scan.scanned, reason: scan.reason },
     });
   } else {
     // NOT an error, and it says so: silence here would read as a crash, and an
     // error would make an empty queue indistinguishable from a broken call.
-    console.log(color.dim(MARK.bullet) + " nothing to take");
+    console.log(color.dim(MARK.bullet) + " " + refusal);
     for (const d of details) console.log("  " + color.dim(d));
   }
   return EXIT_NOTHING_TO_TAKE;
+}
+
+/** The clause a waiting wave is described by, in the refusal and the spill line. */
+function waitingPhrase(kind) {
+  return kind === WAVE_AWAITS_MERGE
+    ? "is waiting on a merge"
+    : "is waiting on claims held in another tree or session";
 }
 
 /**
