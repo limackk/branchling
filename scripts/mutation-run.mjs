@@ -110,7 +110,7 @@
  *
  *   node scripts/mutation-run.mjs [--base <ref>] [--files <a,b>] [--tests <a,b>]
  *                                 [--concurrency <n>] [--named-only] [--changed-lines]
- *                                 [--no-wait] [--budget <minutes>] [--plan] [--json]
+ *                                 [--no-wait] [--budget <minutes>] [--plan] [--json] [--help]
  *
  * ONE RUN PER MACHINE, AND A CONCURRENCY THAT FITS ITS MEMORY (TL-681). A run
  * takes the machine's mutation slot before starting Stryker and waits, naming
@@ -157,6 +157,39 @@ export const SOURCE_ROOT_ENV = "MUTATION_SOURCE_ROOT";
 // The file in THIS tree, never the sandbox copy, which Stryker may mutate.
 const CONTAIN_ENTRY = join(dirname(fileURLToPath(import.meta.url)), "mutation-contain.mjs");
 
+const HELP_FLAGS = new Set(["--help", "-h"]);
+// One line per accepted flag (TL-678). `usage()` walks the parser's own sets,
+// so a flag added there without a line here prints a bare name, which
+// `mutation-run.test.mjs` refuses.
+const FLAG_HELP = {
+  "--base": ["<ref>", "the branch the change is measured against (default: main)"],
+  "--files": ["<a,b>", "mutate these modules instead of the changed ones; path:start-end narrows one to lines"],
+  "--tests": ["<a,b>", "add these test files to the selection, for a module reached only by spawning"],
+  "--concurrency": ["<n>", "Stryker workers (default: chosen from free memory, at most half the cores)"],
+  "--budget": ["<minutes>", "refuse a run whose estimate exceeds this (default: " + DEFAULT_BUDGET_MINUTES + ")"],
+  "--plan": ["", "print the modules, the selected tests, the mutant count and the estimate; run nothing"],
+  "--json": ["", "print the plan or the result as JSON on stdout"],
+  "--named-only": ["", "select only the test files that name the module: a fast lower bound"],
+  "--changed-lines": ["", "mutate only the lines this branch added or changed, not whole modules"],
+  "--no-wait": ["", "refuse instead of waiting while another run holds the machine's mutation slot"],
+};
+
+/** The text `--help` prints: every flag the parser accepts, one line each. */
+export function usage() {
+  const flags = [...FLAGS_WITH_VALUE, ...FLAGS_BARE];
+  const left = flags.map((f) => (FLAG_HELP[f] && FLAG_HELP[f][0] ? f + " " + FLAG_HELP[f][0] : f));
+  const width = Math.max(...left.map((l) => l.length));
+  return [
+    "usage: " + COMMAND + " [flags]",
+    "",
+    "Mutation run over the modules changed against --base. See the header of",
+    "scripts/mutation-run.mjs for what is measured and why.",
+    "",
+    ...flags.map((f, i) => "  " + (FLAG_HELP[f] ? left[i].padEnd(width) + "  " + FLAG_HELP[f][1] : left[i])),
+    "  " + "-h, --help".padEnd(width) + "  print this text",
+  ].join("\n");
+}
+
 /** The mutable surface: shipped code, never the tests that judge it. */
 function isMutable(path) {
   return /^(scripts|bin)\/.+\.mjs$/.test(path) && !path.startsWith("scripts/tests/");
@@ -179,6 +212,7 @@ export function parseArgs(argv) {
   };
   for (let i = 0; i < argv.length; i++) {
     const flag = argv[i];
+    if (HELP_FLAGS.has(flag)) return { help: true };
     if (FLAGS_BARE.has(flag)) {
       opts[BARE_KEYS[flag] || flag.slice(2)] = true;
     } else if (FLAGS_WITH_VALUE.has(flag)) {
@@ -994,8 +1028,12 @@ function withoutBudget(argv) {
  */
 export async function main(argv, cwd = process.cwd(), deps = {}) {
   const parsed = parseArgs(argv);
+  if (parsed.help) {
+    console.log(usage());
+    return 0;
+  }
   if (parsed.error) {
-    return fail(COMMAND, parsed.error, ["known flags: " + [...FLAGS_WITH_VALUE, ...FLAGS_BARE].join(" ")], [COMMAND + " --plan"]);
+    return fail(COMMAND, parsed.error, ["known flags: " + [...FLAGS_WITH_VALUE, ...FLAGS_BARE].join(" ")], [COMMAND + " --help"]);
   }
   const { opts } = parsed;
   let root;
