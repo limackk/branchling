@@ -866,7 +866,7 @@ export function renderLanes(targets, archived, paint = color) {
 /** Where one row stands, in words. */
 function describeStanding(task) {
   if (task.note === "unscanned") return ["deployment not read"];
-  if (task.note === "no-commits") return ["no commit on the trunk names it"];
+  if (task.note === "no-commits") return ["no commit title on the trunk starts with its id"];
   if (task.note === "no-target") return ["its commits touch no deploy target's paths"];
   if (task.note === "release-ref-unknown") return ["unknown — the release's ref does not resolve"];
   return task.standing.map((s) => {

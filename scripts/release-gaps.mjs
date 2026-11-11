@@ -362,7 +362,7 @@ export function releaseGaps({ root, config, tasks, selector = null, trunk, state
         for (const t of done) {
           if (!elsewhere.has(t.id)) continue;
           note("done-not-on-trunk", t.id, ["trunk " + trunk.spec], elsewhere.get(t.id),
-            "closed as `" + doneStatus + "`, and no commit on the trunk names it; the listed commits are on a branch or remote only");
+            "closed as `" + doneStatus + "`, and no commit title on the trunk starts with its id; the listed commits are on a branch or remote only");
         }
       }
     }
