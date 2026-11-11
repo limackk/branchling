@@ -782,3 +782,182 @@ test("init without a rationale, or with a line break in it, is a usage error and
       assert.equal(existsSync(join(dir, "plan.yaml")), false);
     }
   }));
+
+// ──────────────────────────────────────────────────────────────────────────
+// A new wave at a stated position (TL-677)
+// ──────────────────────────────────────────────────────────────────────────
+//
+// Observed on 2026-11-10: a wave of agent follow-ups created by `plan add
+// --why` landed at the end of the order, behind a wave that waits on a person,
+// where `plan` held it shut. It was moved by a hand edit, which also left the
+// sentence on one unwrapped line. `--before` / `--after` let the caller state
+// the position in the same act; the end of the order stays the default.
+
+const NEW_WHY = "the writer comes between the parser and the consumers that read it";
+
+test("--before places a new wave above a named wave AND above that wave's paragraph", () => {
+  const r = edit(PLAN, { op: "add", id: "TL-5", wave: "Writers", why: NEW_WHY, before: "Foundation", today: "2026-09-04" });
+  assert.deepEqual(r.problems, []);
+  const plan = parsed(r.text);
+  assert.deepEqual(names(plan), ["Writers", "Foundation", "Consumers"]);
+  assert.deepEqual(ids(plan), [["TL-5"], ["TL-1", "TL-2"], ["TL-3", "TL-4"]]);
+  // Foundation's own argument still sits directly above Foundation, and the
+  // new sentence comes before it rather than between it and its wave.
+  const lines = r.text.split("\n");
+  const head = lines.indexOf('  - name: "Foundation"');
+  assert.equal(lines[head - 1], "  # Above a wave: why this one stands first.");
+  assert.equal(lines[head - 2], "", "a blank line separates the new wave from the paragraph below it");
+  const all = comments(r.text);
+  assert.ok(all.indexOf("# " + NEW_WHY) < all.indexOf("# Above a wave: why this one stands first."));
+  assert.equal(all.length, comments(PLAN).length + 1);
+});
+
+test("--after places a new wave directly below a named wave, before the next one", () => {
+  const r = edit(PLAN, { op: "add", id: "TL-5", wave: "Writers", why: NEW_WHY, after: "Foundation", today: "2026-09-04" });
+  assert.deepEqual(r.problems, []);
+  const plan = parsed(r.text);
+  assert.deepEqual(names(plan), ["Foundation", "Writers", "Consumers"]);
+  assert.deepEqual(ids(plan), [["TL-1", "TL-2"], ["TL-5"], ["TL-3", "TL-4"]]);
+  // The comments indented under Foundation stay Foundation's: the new wave
+  // starts after them, not inside its list.
+  const all = comments(r.text);
+  assert.ok(all.indexOf("# a program could not have.") < all.indexOf("# " + NEW_WHY));
+  assert.deepEqual(all.filter((c) => c !== "# " + NEW_WHY), comments(PLAN));
+});
+
+test("--after the LAST wave and no position at all both append at the end", () => {
+  const last = edit(PLAN, { op: "add", id: "TL-5", wave: "Writers", why: NEW_WHY, after: "Consumers", today: "2026-09-04" });
+  const plain = edit(PLAN, { op: "add", id: "TL-5", wave: "Writers", why: NEW_WHY, today: "2026-09-04" });
+  assert.deepEqual(last.problems, []);
+  assert.deepEqual(plain.problems, []);
+  assert.deepEqual(names(parsed(plain.text)), ["Foundation", "Consumers", "Writers"], "the default is unchanged");
+  assert.equal(last.text, plain.text);
+});
+
+test("a second id joins the wave the first one created at its position", () => {
+  const r = writer.editPlanTextMany(PLAN, [
+    { op: "add", id: "TL-5", wave: "Writers", why: NEW_WHY, before: "Consumers", today: "2026-09-04" },
+    { op: "add", id: "TL-6", wave: "Writers", today: "2026-09-04" },
+  ]);
+  assert.deepEqual(r.problems, []);
+  assert.deepEqual(ids(parsed(r.text)), [["TL-1", "TL-2"], ["TL-5", "TL-6"], ["TL-3", "TL-4"]]);
+});
+
+test("a position naming an unknown wave, two positions, or a wave that exists is refused", () => {
+  const cases = [
+    [{ wave: "Writers", why: NEW_WHY, before: "Nowhere" }, /no wave `Nowhere` to place the new wave before\n[^\n]*Foundation \| Consumers/],
+    [{ wave: "Writers", why: NEW_WHY, after: "Nowhere" }, /no wave `Nowhere` to place the new wave after\n/],
+    [{ wave: "Writers", why: NEW_WHY, before: "Foundation", after: "Consumers" }, /one neighbour/],
+    [{ wave: "Writers", why: NEW_WHY, before: "  " }, /^`--before` is empty/],
+    [{ wave: "Consumers", before: "Foundation" }, /^the wave `Consumers` already exists, and `--before` places a wave this call creates\nan existing wave is moved by a hand edit/],
+  ];
+  for (const [spec, message] of cases) {
+    const r = edit(PLAN, { op: "add", id: "TL-5", today: "2026-09-04", ...spec });
+    assert.equal(r.kind, "usage", JSON.stringify(spec));
+    assert.match(r.problems.join("\n"), message);
+    assert.equal(r.text, PLAN, "a refusal returns the input byte for byte");
+  }
+  const move = edit(PLAN, { op: "move", id: "TL-1", wave: "Writers", why: NEW_WHY, after: "Consumers" });
+  assert.equal(move.kind, "usage");
+  assert.match(move.problems.join("\n"), /^`--after` places a wave `add` creates, so it says nothing about a move$/);
+  assert.equal(move.text, PLAN);
+  const remove = edit(PLAN, { op: "remove", id: "TL-1", before: "Consumers" });
+  assert.equal(remove.kind, "usage");
+  assert.match(remove.problems.join("\n"), /^`--before` places a wave `add` creates, so it says nothing about a removal$/);
+});
+
+test("a position given as null is no position at all", () => {
+  const r = edit(PLAN, { op: "add", id: "TL-5", wave: "Writers", why: NEW_WHY, before: null, after: null, today: "2026-09-04" });
+  assert.deepEqual(r.problems, []);
+  assert.deepEqual(names(parsed(r.text)), ["Foundation", "Consumers", "Writers"]);
+});
+
+// Waves with no blank line between them and a paragraph indented under the
+// first, so where the blank lines go and where the walk over a wave's
+// paragraph stops are both visible in the exact text.
+const TIGHT = [
+  "waves:",
+  "  # A's argument.",
+  '  - name: "A"',
+  "    tasks: [TL-1]",
+  "    # Inside A, below its list.",
+  "  # B's argument.",
+  '  - name: "B"',
+  "    tasks: [TL-2]",
+  "",
+].join("\n");
+
+test("the exact text: --before the first wave, --after a wave, and the end", () => {
+  const add = (place) => edit(TIGHT, { op: "add", id: "TL-5", wave: "W", why: "why W", today: "2026-09-04", ...place });
+  const W = ["  # why W", '  - name: "W"', "    tasks: [TL-5]"];
+  assert.equal(add({ before: "A" }).text, ["waves:", ...W, "", ...TIGHT.split("\n").slice(1)].join("\n"));
+  assert.equal(add({ after: "A" }).text, [
+    ...TIGHT.split("\n").slice(0, 5), "", ...W, "", ...TIGHT.split("\n").slice(5),
+  ].join("\n"));
+  assert.equal(add({ before: "B" }).text, add({ after: "A" }).text);
+  assert.equal(add({}).text, [...TIGHT.split("\n").slice(0, 8), "", ...W, ""].join("\n"));
+  assert.equal(add({ after: "B" }).text, add({}).text);
+  // A line of spaces is a blank line, so no second one is added after it.
+  const spaced = TIGHT.replace(/\n$/, "\n  \n");
+  assert.equal(
+    edit(spaced, { op: "add", id: "TL-5", wave: "W", why: "why W", today: "2026-09-04" }).text,
+    [...spaced.split("\n").slice(0, 9), ...W, ""].join("\n"),
+  );
+});
+
+test("wrapComment breaks only where the next word would pass the width", () => {
+  // "  # aaaa bbbb cccc d" is exactly 20 columns: it stays one line.
+  assert.deepEqual(writer.wrapComment(2, "aaaa bbbb cccc d e", 20), ["  # aaaa bbbb cccc d", "  # e"]);
+  assert.deepEqual(writer.wrapComment(0, "  one   two\n three ", 80), ["# one two three"]);
+  assert.equal(writer.PLAN_COMMENT_WIDTH, 78);
+});
+
+test("the `--why` sentence is wrapped at the plan's comment width, every word kept", () => {
+  const why = "A wave of follow-ups the implementation loops filed, none needing a person, " +
+    "placed ahead of the human publication gates so that `plan` does not hold it shut behind a " +
+    "wave that waits on somebody: https://example.invalid/a-single-word-longer-than-the-width-" +
+    "is-kept-whole-rather-than-cut-in-half-by-the-wrapper";
+  const r = edit(PLAN, { op: "add", id: "TL-5", wave: "Writers", why, before: "Consumers", today: "2026-09-04" });
+  assert.deepEqual(r.problems, []);
+  const added = r.text.split("\n").filter((l) => l.trim().startsWith("#") && !PLAN.includes(l));
+  assert.ok(added.length > 2, "a long sentence spans several lines: " + added.join("\n"));
+  for (const line of added) {
+    assert.ok(line.startsWith("  # "), "indented as the waves are: " + line);
+    const oneWord = !line.slice(4).includes(" ");
+    assert.ok(line.length <= writer.PLAN_COMMENT_WIDTH || oneWord, "too wide: " + line);
+  }
+  assert.equal(added.map((l) => l.slice(4)).join(" "), why, "the words are the caller's, in order");
+});
+
+test("`plan add --before` writes the wave in place; an unknown neighbour writes nothing", () =>
+  withSandbox((dir) => {
+    task(dir, "TL-5");
+    const before = planOf(dir);
+    const bad = run(["plan", "add", "TL-5", "--wave", "Writers", "--why", NEW_WHY, "--after", "Nowhere", "--dir", dir]);
+    assert.equal(bad.code, 2, bad.out + bad.err);
+    assert.equal(bad.out, "");
+    assert.match(bad.err, /no wave `Nowhere`/);
+    assert.equal(planOf(dir), before);
+
+    task(dir, "TL-6");
+    const r = run(["plan", "add", "TL-5", "TL-6", "--wave", "Writers", "--why", NEW_WHY, "--before", "Consumers", "--dir", dir]);
+    assert.equal(r.code, 0, r.out + r.err);
+    assert.deepEqual(names(parsed(planOf(dir))), ["Foundation", "Writers", "Consumers"]);
+    assert.deepEqual(parsed(planOf(dir)).waves[1].tasks, ["TL-5", "TL-6"], "the second id joins the wave the first placed");
+    task(dir, "TL-7");
+    task(dir, "TL-8");
+    const late = run(["plan", "add", "TL-7", "TL-8", "--wave", "Late", "--why", NEW_WHY, "--after", "Foundation", "--dir", dir]);
+    assert.equal(late.code, 0, late.out + late.err);
+    assert.deepEqual(ids(parsed(planOf(dir))).slice(0, 3), [["TL-1", "TL-2"], ["TL-7", "TL-8"], ["TL-5", "TL-6"]]);
+    assert.equal(run(["check", "--plan", "--dir", dir]).code, 0);
+  }));
+
+test("`plan --help` and the usage of a wrong call document --before and --after", () => {
+  const r = run(["plan", "--help"]);
+  assert.equal(r.code, 0);
+  assert.match(r.out, /--before <wave>/);
+  assert.match(r.out, /--after <wave>/);
+  const wrong = run(["plan", "add", "TL-5", "--beside", "A"]);
+  assert.equal(wrong.code, 2);
+  assert.match(wrong.err, /\[--before "<wave>" \| --after "<wave>"\]/);
+});
