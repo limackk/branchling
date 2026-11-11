@@ -14,7 +14,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { fixtureDir } from "./_fixture-dir.mjs";
 import os, { hostname, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -23,7 +23,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { SCRIPTS_DIR, isolateHome, isolateState, scriptSource } from "./_repo.mjs";
 import {
   DEFAULT_BUDGET_MINUTES, MIN_SWEEP_MARKER, SOURCE_ROOT_ENV, countMutants, estimateSeconds, formatDuration, leftoverProcesses,
-  loadInstrumenter, main, mutateDescriptions, reachesCli, sandboxCommand, strykerEnv, sweepLeftovers, timeTests,
+  SANDBOX_GIT_INIT, loadInstrumenter, main, mutateDescriptions, reachesCli, sandboxCommand, strykerEnv, sweepLeftovers, timeTests,
 } from "../mutation-run.mjs";
 import { SLOT_TOKEN_ENV, chooseConcurrency, describeHolder, releaseSlot, slotPath, tryAcquireSlot } from "../mutation-slot.mjs";
 import { STATE_DIR_ENV } from "../lock.mjs";
@@ -322,8 +322,70 @@ test("scriptSource reads the tree a mutation run names, and this one otherwise",
 
 test("the test command runs inside the containing process group", () => {
   const cmd = sandboxCommand([], ["scripts/tests/a.test.mjs"], "/x/contain.mjs");
-  assert.equal(cmd, [process.execPath, "/x/contain.mjs", "node", "--test", "scripts/tests/a.test.mjs"]
+  assert.equal(cmd, SANDBOX_GIT_INIT + " && " + [process.execPath, "/x/contain.mjs", "node", "--test", "scripts/tests/a.test.mjs"]
     .map((s) => "'" + s + "'").join(" "));
+});
+
+// TL-674: Stryker's sandbox is a copy of the tree without `.git`, and a test
+// asking git about its own tree failed the initial run, so no mutant was
+// judged. The sandbox is played here by a directory outside any repository.
+const ASKS_GIT_ABOUT_ITS_TREE = `
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { realpathSync } from "node:fs";
+test("git answers about this tree", () => {
+  const top = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
+  assert.equal(realpathSync(top), realpathSync(process.cwd()));
+  const eol = execFileSync("git", ["check-attr", "eol", "--", "README.md"], { encoding: "utf8" }).trim();
+  assert.equal(eol.split(": ").pop(), "lf");
+});
+`;
+
+function gitlessSandbox() {
+  const dir = fixtureDir(join(tmpdir(), "branchling-test-mutation-sandbox-"));
+  write(dir, ".gitattributes", "* text eol=lf\n");
+  write(dir, "README.md", "x\n");
+  write(dir, "scripts/tests/git.test.mjs", ASKS_GIT_ABOUT_ITS_TREE);
+  return dir;
+}
+
+function runIn(dir, cmd, env = process.env) {
+  const clean = { ...env };
+  delete clean.NODE_TEST_CONTEXT;
+  return spawnSync("sh", ["-c", cmd], { cwd: dir, encoding: "utf8", env: clean, timeout: 60_000 });
+}
+
+test("a test asking git about its own tree passes in a sandbox copied without .git", () => {
+  const dir = gitlessSandbox();
+  const r = runIn(dir, sandboxCommand([], ["scripts/tests/git.test.mjs"]));
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+});
+
+test("POSITIVE CONTROL: without the init step the same test fails in that sandbox", () => {
+  const dir = gitlessSandbox();
+  const withoutInit = sandboxCommand([], ["scripts/tests/git.test.mjs"]).slice((SANDBOX_GIT_INIT + " && ").length);
+  const r = runIn(dir, withoutInit);
+  assert.notEqual(r.status, 0, "the fixture is inside a repository, so it cannot tell the step's absence apart");
+});
+
+test("a sandbox that already is a repository is not initialised again", () => {
+  const dir = gitlessSandbox();
+  sh(dir, "git", ["init", "-q"]);
+  sh(dir, "git", ["-c", "user.name=t", "-c", "user.email=t@t", "add", "-A"]);
+  sh(dir, "git", ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "kept"]);
+  const r = runIn(dir, sandboxCommand([], ["scripts/tests/git.test.mjs"]));
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.equal(sh(dir, "git", ["log", "--format=%s"]).trim(), "kept");
+});
+
+test("an inherited GIT_DIR does not point the sandbox's init at another repository", () => {
+  const other = fixtureDir(join(tmpdir(), "branchling-test-mutation-other-"));
+  sh(other, "git", ["init", "-q"]);
+  const dir = gitlessSandbox();
+  const r = runIn(dir, SANDBOX_GIT_INIT, { ...process.env, GIT_DIR: join(other, ".git") });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.ok(existsSync(join(dir, ".git", "HEAD")), "the sandbox received no repository of its own");
 });
 
 // The guards of the sweep, judged on a `ps` listing and a recording `kill`, so

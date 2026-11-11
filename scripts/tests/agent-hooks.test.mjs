@@ -30,7 +30,7 @@ import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 
 import { loadConfig } from "../config.mjs";
-import { BACKLOG_DIR, isolateHome, REPO_ROOT, SCRIPTS_DIR } from "./_repo.mjs";
+import { BACKLOG_DIR, isolateHome, REPO_ROOT, SCRIPTS_DIR, scriptSource } from "./_repo.mjs";
 
 // The CLI subprocess below reads the developer's own configuration otherwise,
 // and `--help` renders differently once it finds one.
@@ -178,7 +178,7 @@ export function scriptsNamedIn(source) {
 }
 
 test("every command entry names a script that is in the tree", () => {
-  const source = readFileSync(join(SCRIPTS_DIR, "cli.mjs"), "utf8");
+  const source = scriptSource("cli.mjs");
   const named = scriptsNamedIn(source);
   assert.ok(named.length > 20, "only " + named.length + " command scripts found — the reader is looking at the wrong text");
   const missing = named.filter((s) => !existsSync(join(SCRIPTS_DIR, s)));
