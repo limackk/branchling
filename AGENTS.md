@@ -147,12 +147,32 @@ each one the suite did NOT notice. It needs `npm install` (Stryker is a
 pinned devDependency); the default suite and CI do not.
 
 - **Run it before committing code whose tests you wrote in the same pass.**
-  That is the case where test and code share every assumption. Start with
-  `--named-only`: a fast lower bound from the test files that name the
-  module. Without it, a module that `cli.mjs` imports selects most of the
-  suite, which is the honest set and can take an hour. A module that more
-  than half of the test files name — `cli.mjs` itself — is not narrowed by
-  `--named-only`, so the run refuses it and asks for `--tests` (TL-661).
+  That is the case where test and code share every assumption. The first
+  run is `npm run mutation -- --named-only --changed-lines`: the two flags
+  narrow different things, and each is explained below.
+- **`--named-only` narrows the TESTS** to the files that name the module: a
+  fast lower bound. Without it, a module that `cli.mjs` imports selects most
+  of the suite, which is the honest set and can take an hour. A module that
+  more than half of the test files name — `cli.mjs` itself — is not narrowed
+  by `--named-only`, so the run refuses it and asks for `--tests` (TL-661).
+- **`--changed-lines` narrows the MUTANTS** to the lines `git diff
+  --unified=0` against the merge base reports as added or changed (TL-648).
+  A whole-module run costs every mutant in the module — over a thousand for
+  `doctor.mjs`, hours of wall time — so for a change to part of an existing
+  module it does not finish in the time a session or a supervised loop has,
+  and a run cut off by a timeout settles nothing. A new, untracked module is
+  mutated whole either way. `--plan` prints the mutant count and the
+  estimate without running anything, and a run whose estimate exceeds
+  `--budget` is refused before Stryker starts (TL-682).
+- **What a changed-lines run leaves unmeasured.** A mutant whose location
+  spans a changed line and an unchanged one — a function body replaced
+  whole, a multi-line expression edited on one of its lines — is never
+  created, and a line that was only deleted leaves nothing to mutate. Every
+  line outside the reported ranges was not mutated, so a clean result is a
+  statement about those ranges, not about the module. When the change is
+  mostly a deletion or a restructuring of multi-line code, run the module
+  whole as well, if its `--plan` estimate fits the time available; if it
+  does not, say in the commit that the run was changed-lines only.
 - **A surviving mutant is a missing assertion, not a number to raise.** Write
   the test that fails on that mutant, and check that it does. Never make a
   survivor disappear (a narrower `--files`, a weaker selection) without saying
