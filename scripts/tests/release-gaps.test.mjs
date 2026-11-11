@@ -180,6 +180,13 @@ test("every gap is detected, each with the commit or task that proves it", () =>
   // revert risk, seen from the task's side.
   assert.deepEqual(gaps["done-not-on-trunk"].map((g) => [g.subject, g.commits]),
     [["PROJ-6", [c.hotfix]], ["PROJ-7", [c.unmerged]]]);
+  // A trunk commit counts by the head of its title (TL-626), so the detail
+  // states that rule: a commit whose body mentions the id is not one that
+  // "names" it in any sense the report can rely on (TL-670).
+  for (const g of gaps["done-not-on-trunk"]) {
+    assert.match(g.detail, /no commit title on the trunk starts with its id/);
+    assert.doesNotMatch(g.detail, /names it/);
+  }
 
   // No commit yet, so it holds back the last stage of every target.
   assert.deepEqual(gaps["planned-blocker-open"].map((g) => [g.subject, g.where]), [["PROJ-8", ["app/production"]]]);

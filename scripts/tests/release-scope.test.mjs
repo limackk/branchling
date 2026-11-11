@@ -190,7 +190,7 @@ test("the text answer names every list, where each task stands, and counts what 
   assert.match(r.stdout, /release r1 {2}4 planned · 1 shipped \(counted, not listed\) · 1 dropped/);
   assert.match(r.stdout, /planned, not shipped +2$/m);
   assert.match(r.stdout, new RegExp(t.staged + " +Task staged .*web: in test, waiting for production"));
-  assert.match(r.stdout, new RegExp(t.unstarted + " +Task unstarted .*no commit on the trunk names it"));
+  assert.match(r.stdout, new RegExp(t.unstarted + " +Task unstarted .*no commit title on the trunk starts with its id"));
   assert.match(r.stdout, /unplanned, carried by the next promotion +2$/m);
   assert.match(r.stdout, new RegExp(t.other + " +Task other .*planned for r2 · web: on the trunk, waiting for test"));
   assert.match(r.stdout, /planned, then dropped +1$/m);

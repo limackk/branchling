@@ -341,7 +341,7 @@ release 2026.11  4 planned · 1 shipped (counted, not listed) · 1 dropped
   the current release — the first in `releases:` not fully shipped
   planned, not shipped                      2
     TASK-21  Checkout redesign  done · P1 · web: in test, waiting for production
-    TASK-24  Fraud check        pending · P0 · no commit on the trunk names it
+    TASK-24  Fraud check        pending · P0 · no commit title on the trunk starts with its id
   planned, still open                       1
     TASK-24  Fraud check        pending · P0
   unplanned, carried by the next promotion  1
