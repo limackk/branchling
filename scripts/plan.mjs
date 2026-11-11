@@ -370,6 +370,14 @@ const holdDayOf = (s) => String(s || "").slice(0, 10);
  *                     `audit_stale_days` — what `audit` reports as parked.
  *                                                                  no
  *   claimed           in progress, and not yet parked or abandoned. no
+ *   claimed-elsewhere another branch or worktree of this clone reports the
+ *                     task in a status `next` would not hand out (TL-664):
+ *                     claimed, closed or blocked there. The observations are
+ *                     `elsewhere`, attached by the caller from the scan in
+ *                     `branch-scan.mjs`; the rule is `heldElsewhere` in
+ *                     `next-task.mjs`, and a claim old enough to reclaim is
+ *                     held by ANY disagreement, as the reclaim path holds it.
+ *                                                                  no
  *   person-only       `executor: human`.                           yes
  *   over-size         an estimate above `max_unattended_estimate`. yes
  *
@@ -396,7 +404,38 @@ export function unattendedHold(task, byId, config = {}) {
   // any status (`selectCandidates`), so a status that releases the task — a
   // claim old enough to reclaim, a block its blockers discharged — releases
   // it to those two gates, not past them.
-  return statusHold(task, byId, config, archived) || recordHold(task, config);
+  return statusHold(task, byId, config, archived) || elsewhereHold(task, config) || recordHold(task, config);
+}
+
+/**
+ * The hold another tree's record imposes, or null. PURE; see `unattendedHold`.
+ *
+ * WHICH STATUSES `next` HANDS OUT is `queueStatuses` in `next-task.mjs`,
+ * restated here for the reason the header gives: the active statuses less the
+ * in-progress one, the awaiting-vouch one and every protected one. A caller
+ * that does not pass `activeStatuses` (the viewer, `eligibleBesides` in `run-loop.mjs`)
+ * cannot say which statuses those are, and is answered with no hold rather
+ * than with every observation counted against the task.
+ */
+function elsewhereHold(task, config) {
+  const observations = task.elsewhere || [];
+  if (!observations.length || !Array.isArray(config.activeStatuses)) return null;
+  const protectedOnes = new Set(config.reasonRequiredStatuses || []);
+  const handedOut = new Set(config.activeStatuses
+    .filter((s) => s !== config.inProgressStatus && s !== config.awaitingVouchStatus && !protectedOnes.has(s))
+    .map((s) => String(s).toLowerCase()));
+  // A local claim reaches this line only when it is old enough to reclaim, and
+  // the reclaim path refuses on ANY disagreement: another tree saying anything
+  // else about a claim is the evidence that taking it over is the wrong guess.
+  const reclaim = !!config.inProgressStatus && task.status === config.inProgressStatus;
+  const held = observations.filter((o) => reclaim || !handedOut.has(String(o.status).toLowerCase()));
+  if (!held.length) return null;
+  // The observations as the scan wrote them (`branch-scan.mjs` always names a
+  // source, a kind and a status), so `--json` carries what `next` reports.
+  return {
+    kind: "claimed-elsewhere", startable: false, status: task.status,
+    elsewhere: held.map((o) => ({ source: o.source, kind: o.kind, status: o.status })),
+  };
 }
 
 /** The holds a task's STATUS imposes, or null. PURE; see `unattendedHold`. */
@@ -497,6 +536,11 @@ export function describeHold(hold) {
     case "claimed":
       return "claimed by " + (hold.owner || "nobody") + " — work in flight" +
         (hold.lastChange ? ", last change " + hold.lastChange : "");
+    case "claimed-elsewhere":
+      // `<source>: <status>` is the wording `next` gives the same observation
+      // (`describeElsewhere`), so the skip and the hold read alike.
+      return "already moved on in another tree — " +
+        hold.elsewhere.map((o) => o.source + ": " + o.status).join(", ");
     case "person-only":
       return "asks for an executor an unattended run is not (human)";
     case "over-size":

@@ -40,6 +40,7 @@ import { printJson } from "./json-envelope.mjs";
 import { backlogPaths, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { describeHold, loadPlan, planState, validatePlan } from "./plan.mjs";
 import { readHistory } from "./history.mjs";
+import { crossBranchState, divergences } from "./branch-scan.mjs";
 import { EDIT_SUBCOMMANDS, runPlanEdit, runPlanInit } from "./plan-write.mjs";
 import { reportPlanErrors } from "./check-backlog-plan.mjs";
 import { readTaskMetas } from "./task-io.mjs";
@@ -267,6 +268,12 @@ function main(argv) {
 
   const tasks = readTaskMetas(backlogPaths(root).tasksDir, config);
   for (const task of tasks) task.history = readHistory(root, task.id);
+  // What the REST of this clone says about each task (TL-664), attached from
+  // the scan `readDispatchRecords` attaches it from: a task claimed in a
+  // sibling worktree is one `next` and `run` skip, and a plan that could not see
+  // the claim listed it as next up while the run's projection stopped short.
+  const scan = crossBranchState(root, config);
+  for (const task of tasks) task.elsewhere = divergences(task.status, scan.byId.get(task.id));
   const audit = validatePlan(loaded.plan, tasks, config);
   if (audit.errors.length) {
     return audit.blockedBy.length
