@@ -80,6 +80,13 @@
  * deleted leaves nothing behind to mutate. Both are why the report names the
  * ranges and says that every line outside them was not mutated.
  *
+ * TEMPLATE-LITERAL TEXT IS NAMED, NOT MUTATED (TL-657). Stryker sees a
+ * template literal as one string, so code written inside one — the viewer's
+ * page script in build-viewer.mjs — yields no mutant. A range made only of
+ * such lines is not handed to Stryker, a run left with nothing else refuses,
+ * and every report says which lines were text (`templateTextLines`), so a
+ * range that selected nothing no longer reads like one fully killed.
+ *
  * Stryker is a pinned devDependency, not a runtime one: the published package
  * keeps zero dependencies, and this file does not ship (`files` in
  * package.json). It is a tool for working on this repository.
@@ -229,6 +236,120 @@ export function changedLineRanges(root, base, modules) {
   return result;
 }
 
+// After one of these, a `/` opens a regular expression; after anything else it divides.
+const REGEX_AFTER_PUNCT = new Set([..."(,=:[!&|?{};+-*%<>~^"]);
+const REGEX_AFTER_WORD = new Set(["return", "typeof", "instanceof", "in", "of", "new", "delete", "void",
+  "throw", "case", "do", "else", "yield", "await"]);
+
+/**
+ * The lines of `source` that hold template-literal text and nothing else, as
+ * merged `{start, end}` ranges (TL-657).
+ *
+ * WHY A RUN NEEDS TO KNOW. Stryker mutates the code it parses. To it a
+ * template literal is one string, however much JavaScript the string holds:
+ * the viewer's whole page script, `startEdit()` included, is text inside the
+ * template `buildHtml()` returns. A range of such lines produces no mutant,
+ * and a run that produced none in a range used to read exactly like a run
+ * whose mutants there were all killed.
+ *
+ * WHY A LEXER AND NOT STRYKER'S PARSER. Babel arrives with Stryker, and the
+ * default suite and CI run without `npm install`; a classification that only
+ * exists where Stryker is installed could not be tested where the suite runs.
+ * The lexer knows strings, comments, regular expressions (by the token before
+ * the `/`) and nested `${ … }`, which is all a template boundary depends on.
+ * It errs one way only: a line that carries any delimiter or expression is
+ * code, so a line it calls text cannot hold a mutant. Source it cannot follow
+ * to the end (an unterminated template or string) yields no text lines at all.
+ */
+export function templateTextLines(source) {
+  const src = String(source);
+  const code = new Set();
+  const text = new Set();
+  const stack = [];          // "tmpl", or { depth } for an open `${`
+  let line = 1;
+  let regexMayStart = true;  // whether a `/` here opens a regular expression rather than dividing
+  let i = 0;
+  const take = (set) => { set.add(line); if (src[i] === "\n") line++; i++; };
+  const takeCode = () => take(code);
+
+  while (i < src.length) {
+    const c = src[i];
+    if (stack[stack.length - 1] === "tmpl") {
+      if (c === "`") { stack.pop(); regexMayStart = false; takeCode(); continue; }
+      if (c === "$" && src[i + 1] === "{") { stack.push({ depth: 0 }); regexMayStart = true; takeCode(); takeCode(); continue; }
+      if (c === "\\") take(text);
+      take(text);
+      continue;
+    }
+    if (/\s/.test(c)) { takeCode(); continue; }
+    if (src.startsWith("//", i)) { while (i < src.length && src[i] !== "\n") takeCode(); continue; }
+    if (src.startsWith("/*", i)) {
+      const close = src.indexOf("*/", i + 2);
+      if (close < 0) return [];
+      while (i < close + 2) takeCode();
+      continue;
+    }
+    if (c === "`") { stack.push("tmpl"); takeCode(); continue; }
+    if (c === "'" || c === '"') {
+      takeCode();
+      while (src[i] !== c) {
+        if (i >= src.length || src[i] === "\n") return [];
+        if (src[i] === "\\") takeCode();
+        takeCode();
+      }
+      takeCode();
+      regexMayStart = false;
+      continue;
+    }
+    if (c === "/" && regexMayStart) {
+      takeCode();
+      let inClass = false;
+      while (inClass || src[i] !== "/") {
+        if (i >= src.length || src[i] === "\n") return [];
+        if (src[i] === "\\") takeCode();
+        else if (src[i] === "[") inClass = true;
+        else if (src[i] === "]") inClass = false;
+        takeCode();
+      }
+      takeCode();
+      regexMayStart = false;
+      continue;
+    }
+    if (/[\w$]/.test(c)) {
+      const start = i;
+      while (/[\w$]/.test(src[i] || "")) takeCode();
+      regexMayStart = REGEX_AFTER_WORD.has(src.slice(start, i));
+      continue;
+    }
+    const top = stack[stack.length - 1];
+    if (top && c === "}" && top.depth === 0) { stack.pop(); takeCode(); continue; }
+    if (top && c === "{") top.depth++;
+    if (top && c === "}") top.depth--;
+    regexMayStart = REGEX_AFTER_PUNCT.has(c);
+    takeCode();
+  }
+  if (stack.length) return [];
+  const only = [...text].filter((l) => !code.has(l)).map((l) => ({ start: l, end: l }));
+  return mergeRanges(only);
+}
+
+/** The part of `ranges` that lies inside `{start, end}`. */
+function clip(ranges, within) {
+  return ranges
+    .map((r) => ({ start: Math.max(r.start, within.start), end: Math.min(r.end, within.end) }))
+    .filter((r) => r.start <= r.end);
+}
+
+function lineCount(ranges) {
+  return ranges.reduce((n, r) => n + r.end - r.start + 1, 0);
+}
+
+/** `path` or `path:start-end`, the two shapes Stryker's `mutate` accepts here. */
+function parseEntry(entry) {
+  const m = /^(.+):(\d+)-(\d+)$/.exec(entry);
+  return m ? { file: m[1], range: { start: Number(m[2]), end: Number(m[3]) } } : { file: entry, range: null };
+}
+
 const IMPORT_RE = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)["'](\.{1,2}\/[^"']+\.mjs)["']/g;
 
 /** Static import closure of one module, as repository-relative paths. */
@@ -362,15 +483,56 @@ export async function plan(root, opts) {
     noAddedLines = modules.filter((m) => !changed[m]);
     modules = modules.filter((m) => changed[m]);
   }
-  const mutate = changed
-    ? modules.flatMap((m) => changed[m].map((r) => m + ":" + r.start + "-" + r.end))
-    : modules;
+  const entries = changed
+    ? modules.flatMap((m) => changed[m].map((r) => ({ raw: m + ":" + r.start + "-" + r.end, module: m, file: m, range: r })))
+    : modules.map((m) => ({ raw: m, module: m, ...parseEntry(m) }));
+  // Template text is reported, and a range made of nothing else is not handed
+  // to Stryker: it can produce no mutant there (see templateTextLines).
+  const templateText = {};
+  const kept = entries.filter((e) => {
+    const abs = join(root, e.file);
+    const all = existsSync(abs) ? templateTextLines(readFileSync(abs, "utf8")) : [];
+    const text = e.range ? clip(all, e.range) : all;
+    if (text.length) {
+      const seen = templateText[e.file] || { whole: false, ranges: [] };
+      templateText[e.file] = { whole: seen.whole || !e.range, ranges: mergeRanges([...seen.ranges, ...text]) };
+    }
+    return !(e.range && lineCount(text) === e.range.end - e.range.start + 1);
+  });
+  const onlyText = [...new Set(entries.map((e) => e.module))].filter((m) => !kept.some((e) => e.module === m));
+  modules = modules.filter((m) => !onlyText.includes(m));
+  const mutate = kept.map((e) => e.raw);
+  if (changed) {
+    // `lines` names what IS mutated; the text ranges are reported apart.
+    for (const m of Object.keys(changed)) {
+      const ranges = kept.filter((e) => e.module === m).map((e) => e.range);
+      if (ranges.length) changed[m] = ranges;
+      else delete changed[m];
+    }
+  }
   const tests = opts.tests
     ? opts.tests.map((file) => ({ file, why: ["--tests"] }))
     : await selectTests(root, modules, { namedOnly: opts.namedOnly });
   const unselective = opts.namedOnly && !opts.tests ? unselectiveModules(tests, modules, candidateTestCount(root)) : null;
   return { base: opts.base, modules, mutate, ...(changed ? { lines: changed, noAddedLines } : {}), tests,
-    ...(unselective ? { unselective } : {}) };
+    templateText, onlyText, ...(unselective ? { unselective } : {}) };
+}
+
+/** What a reader is told about the lines no mutant can reach. */
+export const TEMPLATE_TEXT_GUARD = "a template literal is one string to Stryker, so code written inside one — "
+  + "the viewer's page script in build-viewer.mjs — is guarded only by tests that execute the text it builds "
+  + "(the page script run in node:vm), not by this run";
+
+/** The template-literal text inside what the run was asked to mutate, for a reader. */
+export function templateTextReport(p) {
+  const files = Object.keys(p.templateText || {});
+  if (!files.length) return [];
+  const out = ["not mutated (template-literal text): " + files.map((f) => {
+    const { whole, ranges } = p.templateText[f];
+    return f + (whole ? " (" + lineCount(ranges) + " " + plural(lineCount(ranges), "line", "lines") + ")" : ":" + ranges.map((r) => r.start + "-" + r.end).join(","));
+  }).join("  ")];
+  out.push("  " + TEMPLATE_TEXT_GUARD);
+  return out;
 }
 
 /** The ranges a `--changed-lines` run mutates, and what it did not, for a reader. */
@@ -658,6 +820,17 @@ export async function main(argv, cwd = process.cwd()) {
     return fail(COMMAND, "cannot work out what changed against " + JSON.stringify(opts.base), [String(e.message)], [COMMAND + " --base <ref>"]);
   }
 
+  if (p.modules.length === 0 && p.onlyText.length) {
+    const ranges = p.onlyText.map((m) => {
+      const t = p.templateText[parseEntry(m).file];
+      return parseEntry(m).range ? m : m + ":" + t.ranges.map((r) => r.start + "-" + r.end).join(",");
+    });
+    return fail(COMMAND, "nothing to mutate: every line asked for is template-literal text, " + ranges.join(", "),
+      ["Stryker would create no mutant there, and a run with none would read like one whose mutants were all killed.",
+        "Not mutated because " + TEMPLATE_TEXT_GUARD + ".",
+        ...(p.noAddedLines && p.noAddedLines.length ? ["Not mutated (no added line): " + p.noAddedLines.join(", ")] : [])],
+      [], 1);
+  }
   if (p.modules.length === 0 && opts.changedLines && p.noAddedLines.length) {
     return fail(COMMAND, "nothing to mutate: the change added no line to " + p.noAddedLines.join(", "),
       ["A line that was only deleted leaves nothing to mutate, and a score over an empty set would read like a score over real work."],
@@ -694,6 +867,7 @@ export async function main(argv, cwd = process.cwd()) {
     else {
       console.log("mutate (" + p.modules.length + "): " + p.modules.join(", "));
       if (p.lines) for (const l of rangeReport(p)) console.log(l);
+      for (const l of templateTextReport(p)) console.log(l);
       console.log("tests (" + p.tests.length + "):");
       for (const t of p.tests) console.log("  " + t.file + "  — " + t.why.join("; "));
     }
@@ -710,6 +884,7 @@ export async function main(argv, cwd = process.cwd()) {
   } else {
     for (const s of summary.survivors) console.log("survived  " + s.file + ":" + s.line + "  " + s.mutator + " → " + s.replacement);
     if (p.lines) for (const l of rangeReport(p)) console.log(l);
+    for (const l of templateTextReport(p)) console.log(l);
   }
   if (summary.noCoverage > 0) {
     return fail(COMMAND, summary.noCoverage + " " + plural(summary.noCoverage, "mutant", "mutants") + " reported NoCoverage under coverageAnalysis: off",
