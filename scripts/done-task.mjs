@@ -67,6 +67,36 @@ const WARNM = errColor.warn(MARK.warn);
 export const TEMPLATE_PLACEHOLDER = "command to run";
 
 /**
+ * Every `refusalKind` `done --json` publishes, and the only place one is spelled.
+ *
+ * Each refusal below names its kind through this table, never through a string
+ * literal, so the set a consumer can compare against is the set `done` writes.
+ * `run-loop.mjs` decides which refusals end a run by these names (TL-190), and
+ * `run-terminal-refusal.test.mjs` holds the two sides together through this
+ * export. That test used to recover the kinds by matching the SOURCE text of
+ * this file, which a mutation run instruments: the literals lost their shape,
+ * the test failed in Stryker's initial run and no mutant was ever tried
+ * (TL-672). A value read from the module is the same under instrumentation.
+ */
+export const REFUSAL_KINDS = Object.freeze({
+  reasonRequired: "reason-required",
+  noSuchTask: "no-such-task",
+  alreadyClosed: "already-closed",
+  unreadableContract: "unreadable-contract",
+  noContract: "no-contract",
+  closingContractCollision: "closing-contract-collision",
+  missingTestFile: "missing-test-file",
+  criteria: "criteria",
+  unstatedActor: "unstated-actor",
+  manualNeedsPerson: "manual-needs-person",
+  contractCapability: "contract-capability",
+  internal: "internal",
+  unwritable: "unwritable",
+  historyUnwritable: "history-unwritable",
+  awaitingVouch: "awaiting-vouch",
+});
+
+/**
  * What a `manual:` entry is NOT evidence of.
  *
  * The enumeration matters more than the request. "Verify this properly" is
@@ -867,12 +897,12 @@ async function run(argv, io = {}) {
         "is being closed this way, and that why is what nobody can reconstruct later.",
       ],
       [],
-      "reason-required"
+      REFUSAL_KINDS.reasonRequired
     );
   }
 
   const file = findTaskFile(tasksDir, config, plan.id);
-  if (!file) return refuse(plan, "there is no task " + plan.id + " in " + tasksDir, [], [], "no-such-task");
+  if (!file) return refuse(plan, "there is no task " + plan.id + " in " + tasksDir, [], [], REFUSAL_KINDS.noSuchTask);
 
   const raw = readFileSync(file, "utf8");
   const { frontmatter, body } = splitFrontmatter(raw);
@@ -882,7 +912,7 @@ async function run(argv, io = {}) {
     return refuse(plan, plan.id + " is already closed (`status: " + before.status + "`)", [
       "Nothing was run. Re-running a contract against a tree that has moved on",
       "would answer a different question than the one that closed this task.",
-    ], [], "already-closed");
+    ], [], REFUSAL_KINDS.alreadyClosed);
   }
 
   // A dry run is the one exception: it promises to run the whole contract and
@@ -908,9 +938,9 @@ async function run(argv, io = {}) {
           "",
           "The contract is there — this is one line of it, not the whole thing. Fix the",
           "line above; nothing was run and the file is untouched.",
-        ]), [], "unreadable-contract");
+        ]), [], REFUSAL_KINDS.unreadableContract);
     }
-    return refuse(plan, plan.id + " has no closing contract", contract.split("\n"), [], "no-contract");
+    return refuse(plan, plan.id + " has no closing contract", contract.split("\n"), [], REFUSAL_KINDS.noContract);
   }
 
   // AFTER the task's own contract is judged, never in place of it: a task with
@@ -922,7 +952,7 @@ async function run(argv, io = {}) {
         "",
         "A proof id names ONE entry, and a criterion pointing at it would be ambiguous.",
         "Rename the task's entry; nothing was run and the file is untouched.",
-      ]), [], "closing-contract-collision");
+      ]), [], REFUSAL_KINDS.closingContractCollision);
   }
   entries = closingContract.entries;
 
@@ -940,7 +970,7 @@ async function run(argv, io = {}) {
         "`node --test`; it does not guess at globs, variables or other shell expansions.",
       ],
       [],
-      "missing-test-file"
+      REFUSAL_KINDS.missingTestFile
     );
   }
 
@@ -959,7 +989,7 @@ async function run(argv, io = {}) {
         "would spend the time and answer nothing.",
       ]),
       [],
-      "criteria"
+      REFUSAL_KINDS.criteria
     );
   }
 
@@ -978,7 +1008,7 @@ async function run(argv, io = {}) {
         "means. Nothing was run and nothing was written. State who you are:",
       ].concat(statedActorOptions(env)),
       [],
-      "unstated-actor"
+      REFUSAL_KINDS.unstatedActor
     );
   }
 
@@ -1030,7 +1060,7 @@ async function run(argv, io = {}) {
         // program is incoherent, and the prompt would land in the middle of the
         // JSON besides. `--json` has to say so rather than produce broken output.
         stop = {
-          kind: "manual-needs-person",
+          kind: REFUSAL_KINDS.manualNeedsPerson,
           refusal: "json",
           manual: e.manual,
           headline: plan.id + ": `--json` cannot ask a person to vouch for a `manual:` entry",
@@ -1187,7 +1217,7 @@ async function run(argv, io = {}) {
         "The verification commands passed, but the task file was NOT touched.",
       ],
       results,
-      "contract-capability"
+      REFUSAL_KINDS.contractCapability
     );
   }
 
@@ -1214,7 +1244,7 @@ async function run(argv, io = {}) {
         "The task file was NOT touched.",
       ]),
       results,
-      "internal"
+      REFUSAL_KINDS.internal
     );
   }
   if (remaining.length) {
@@ -1256,7 +1286,7 @@ async function run(argv, io = {}) {
       plan.id + ": the whole contract passed, but the task file could not be written",
       [e.message, "", "The task file was NOT touched — its status is still `" + before.status + "`."],
       results,
-      "unwritable"
+      REFUSAL_KINDS.unwritable
     );
   }
   writeFileSync(file, text, "utf8");
@@ -1275,7 +1305,7 @@ async function run(argv, io = {}) {
     // history route can fail (for example a local state directory is unwritable)
     // after the task write, so restore the exact pre-contract text before returning.
     writeFileSync(file, raw, "utf8");
-    return refuse(plan, plan.id + ": history could not be recorded; the task was restored", [error.message], results, "history-unwritable");
+    return refuse(plan, plan.id + ": history could not be recorded; the task was restored", [error.message], results, REFUSAL_KINDS.historyUnwritable);
   }
 
   // The vouching is an EVENT, not a field change, so it does not come out of
@@ -1361,7 +1391,7 @@ function parkAwaitingVouch({ plan, root, file, raw, before, config, actor, resul
   } catch (e) {
     return refuse(plan, plan.id + ": every automatic entry passed, but the task file could not be written",
       [e.message, "", "The task file was NOT touched — its status is still `" + before.status + "`."],
-      results, "unwritable");
+      results, REFUSAL_KINDS.unwritable);
   }
   writeFileSync(file, text, "utf8");
   const ts = new Date().toISOString();
@@ -1372,7 +1402,7 @@ function parkAwaitingVouch({ plan, root, file, raw, before, config, actor, resul
     });
   } catch (error) {
     writeFileSync(file, raw, "utf8");
-    return refuse(plan, plan.id + ": history could not be recorded; the task was restored", [error.message], results, "history-unwritable");
+    return refuse(plan, plan.id + ": history could not be recorded; the task was restored", [error.message], results, REFUSAL_KINDS.historyUnwritable);
   }
   appendEntries(root, before.id, awaiting.map((manual) => ({
     id: eventId(ts), ts, task: before.id, field: FIELD_UNVERIFIED,
@@ -1390,7 +1420,7 @@ function parkAwaitingVouch({ plan, root, file, raw, before, config, actor, resul
   ])));
   const build = spawnSync(process.execPath, [join(__dirname, "build-backlog.mjs"), "--dir", root], { encoding: "utf8" });
   if (build.status !== 0) console.error(WARNM + " the views were not rebuilt — run `" + N + " build` yourself");
-  if (plan.json) answer(plan, results, { status, closed: false, awaitingVouch: true, refusalKind: "awaiting-vouch" });
+  if (plan.json) answer(plan, results, { status, closed: false, awaitingVouch: true, refusalKind: REFUSAL_KINDS.awaitingVouch });
   return EXIT_AWAITING_VOUCH;
 }
 
