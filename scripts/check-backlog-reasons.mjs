@@ -22,10 +22,12 @@
  * explain.
  *
  * THREE KINDS OF MISSING, COUNTED APART. `unknown` says only that no reason was
- * stated; among the transitions audited here it is an entry from
- * reconciliation, a change the tool SAW rather than made, because the writing
- * commands refuse these transitions without a reason. There the value is the
- * true record of what it knows. A MISSING `reason` field is an entry written
+ * stated; the entry's `source` says whether the tool SAW the change or made it.
+ * Under an observing source (`OBSERVED_SOURCES`) it is the true record of what
+ * the tool knows, and is reported as a change made outside the tool. Under any
+ * other source a command made the transition without a reason, which is a gap
+ * — read from the source, not inferred from the writing commands refusing such
+ * a transition today (TL-663). A MISSING `reason` field is an entry written
  * before this mechanism existed — the log is append-only and is not rewritten, so
  * those rows stay as they were. Only an entry that could have carried a reason
  * and does not is a gap in the sense the word suggests. Rolled into one number
@@ -53,6 +55,7 @@ import {
   readAllHistory,
   requiresReason,
 } from "./history.mjs";
+import { OBSERVED_SOURCES } from "./task-fields.mjs";
 
 const OKM = color.ok(MARK.ok);
 const WARNM = color.warn(MARK.warn);
@@ -76,7 +79,7 @@ export function auditReasons(config, history) {
       if (hasStatedReason(e)) continue;
       const row = { task: id, ts: e.ts || "", to: e.to, actor: e.actor, source: e.source };
       if (e.reason === undefined || e.reason === null) legacy.push(row);
-      else if (e.reason === REASON_UNKNOWN) unwitnessed.push(row);
+      else if (e.reason === REASON_UNKNOWN && OBSERVED_SOURCES.includes(e.source)) unwitnessed.push(row);
       else gaps.push(row);
     }
   }

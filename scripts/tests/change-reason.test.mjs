@@ -25,6 +25,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { auditReasons } from "../check-backlog-reasons.mjs";
+import { OBSERVED_SOURCES } from "../task-fields.mjs";
 import { loadConfig } from "../config.mjs";
 import { TEMPLATE_FILENAME } from "../paths.mjs";
 import { BACKLOG_DIR, REPO_ROOT, isolateHome } from "./_repo.mjs";
@@ -319,7 +320,7 @@ test("the report separates `unknown`, legacy rows and real gaps", () => {
   const config = loadConfig(dir);
   const history = {
     "FX-1": [
-      { field: "status", to: "parked", reason: REASON_UNKNOWN, ts: "2026-08-01T00:00:00Z" },
+      { field: "status", to: "parked", reason: REASON_UNKNOWN, source: "external", ts: "2026-08-01T00:00:00Z" },
       { field: "status", to: "parked", ts: "2026-08-02T00:00:00Z" },                       // pre-schema
       { field: "status", to: "parked", reason: "", ts: "2026-08-03T00:00:00Z" },           // asked, skipped
       { field: "status", to: "parked", reason: "vendor", ts: "2026-08-04T00:00:00Z" },     // answered
@@ -332,6 +333,40 @@ test("the report separates `unknown`, legacy rows and real gaps", () => {
   assert.equal(out.legacy.length, 1);
   assert.equal(out.gaps.length, 1);
   rmSync(dir, { recursive: true, force: true });
+});
+
+test("`unknown` is an outside change only under an observing source (TL-663)", () => {
+  // `unknown` says only that no reason was stated; the source says whether the
+  // tool saw the change or made it. A command that recorded a required
+  // transition as `unknown` skipped the question, and reporting it as a hand
+  // edit would hide exactly the gap this report exists to show.
+  const dir = sandbox("reason_required_statuses: [parked]");
+  const config = loadConfig(dir);
+  const history = {
+    "FX-1": [
+      { field: "status", to: "parked", reason: REASON_UNKNOWN, source: "next", ts: "2026-08-01T00:00:00Z" },
+      { field: "status", to: "parked", reason: REASON_UNKNOWN, source: "external", ts: "2026-08-02T00:00:00Z" },
+    ],
+  };
+  const out = auditReasons(config, history);
+  assert.equal(out.required, 2);
+  assert.deepEqual(out.gaps.map((r) => r.source), ["next"]);
+  assert.deepEqual(out.unwitnessed.map((r) => r.source), ["external"]);
+  assert.equal(out.legacy.length, 0);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("the observing sources have one definition, and every reader takes it from there", () => {
+  assert.deepEqual([...OBSERVED_SOURCES], ["external", "manual", "boot"]);
+  for (const name of ["pr-summary.mjs", "jira-proof.mjs", "check-backlog-reasons.mjs"]) {
+    const src = readFileSync(join(ROOT, "scripts", name), "utf8");
+    assert.match(src, /import \{[^}]*\bOBSERVED_SOURCES\b[^}]*\} from "\.\/task-fields\.mjs"/,
+      name + " does not import OBSERVED_SOURCES from task-fields.mjs");
+    assert.doesNotMatch(src, /\b(const|let|var)\s+OBSERVED_SOURCES\b/, name + " defines its own OBSERVED_SOURCES");
+  }
+  // Positive control: the pattern does see a local definition where one exists.
+  assert.match(readFileSync(join(ROOT, "scripts", "task-fields.mjs"), "utf8"),
+    /export const OBSERVED_SOURCES\b/);
 });
 
 test("a real command runs the report — a guard wired to nothing proves nothing", () => {

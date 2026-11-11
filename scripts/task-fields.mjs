@@ -245,6 +245,20 @@ export function statedActorRefusal(actor) {
 // an append-only log, contradicting its own description.
 export const REASON_UNKNOWN = "unknown";
 
+/**
+ * The sources that mean the tool SAW a change rather than made it: `external`
+ * is what reconciliation writes, `manual` is `history --source manual`, `boot`
+ * is the first snapshot. Everything else is a command, and there `unknown`
+ * means "nobody stated a reason" — a different sentence entirely.
+ *
+ * Listed rather than inverted, and the fallback is deliberately the milder
+ * reading: a source this list has not heard of is reported as an unstated
+ * reason, never as a change made behind the tool's back. One definition
+ * (TL-663), because every reader that tells the two sentences apart has to
+ * draw the line in the same place.
+ */
+export const OBSERVED_SOURCES = Object.freeze(["external", "manual", "boot"]);
+
 /** What `unknown` means, in the one sentence AGENTS.md and the config.yaml
  *  template written by `init` carry verbatim — a test fails if they drift. */
 export const REASON_UNKNOWN_MEANING =

@@ -72,7 +72,7 @@ import { answerBacklogDirRefusal, backlogPaths, isBacklogDirRefusal, resolveBack
 import { addedHistoryEntries } from "./pr-summary.mjs";
 import { BLOCK_MARKER_NAME, PRODUCT_NAME as N } from "./product.mjs";
 import { verificationContractOf } from "./show-task.mjs";
-import { extractMeta, splitFrontmatter } from "./task-fields.mjs";
+import { OBSERVED_SOURCES, extractMeta, splitFrontmatter } from "./task-fields.mjs";
 import { listTaskFileNames } from "./task-io.mjs";
 import { refusal, plural } from "./ui.mjs";
 import { statusEntries } from "./vocabulary.mjs";
@@ -181,8 +181,6 @@ export function commentMarker(id) {
 // The comment — PURE. One block model, rendered twice, so the ADF and the
 // plain text cannot say different things.
 // ──────────────────────────────────────────────────────────────────────────
-
-const OBSERVED_SOURCES = ["external", "manual", "boot"];
 
 /**
  * What the closing record says about whether the checks RAN. A `proven`
