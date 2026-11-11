@@ -138,7 +138,10 @@ export const KINDS = {
   },
   // `run --stop --json` (TL-485): the request as written, and where. `origin`
   // is the clone it reaches — every run of it, from any of its worktrees.
-  "run-stop": { ok: null, requestedAt: null, by: null, origin: null, path: null },
+  // `cleared` (TL-697) is false when a request was written, and under
+  // `--stop --clear` says whether one was withdrawn; `requestedAt` and `by` are
+  // then the withdrawn request's, null when there was none.
+  "run-stop": { ok: null, cleared: null, requestedAt: null, by: null, origin: null, path: null },
   // `advisories` are the findings `check` stopped reporting when it became a
   // release gate (TL-383): each `{ name, output }`, where `name` is the same
   // registry string `check --json` puts in `failed` and `output` is text written
@@ -337,6 +340,9 @@ export const KINDS = {
     // first one refused) and `declared`, what that field accepts — the shape
     // `query` refuses with since TL-559.
     rejected: null, declared: [],
+    // `next` only (TL-697): `{requestedAt, by, origin}` of the `run --stop`
+    // request that made it claim nothing, with `refusalKind: "stop-requested"`.
+    stopRequest: null,
     // `next` only, and the reason each is here rather than in prose on stderr:
     // a loop must be able to tell an empty queue from a queue it was not allowed
     // to draw from, and it cannot parse a sentence to do it.

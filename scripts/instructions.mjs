@@ -835,6 +835,13 @@ the same effect: a run killed between \`{{tool}} next\` and \`{{tool}} done\`
 leaves a claim that nobody is working, and one frozen while \`next\` runs holds
 a task \`next\` has already claimed.
 
+The same request stops a loop built on \`{{tool}} next\` alone — a supervisor
+that calls \`{{tool}} next --plan\` itself. While it holds, \`next\` claims
+nothing and exits 3 with \`refusalKind: "stop-requested"\`, naming who asked
+and when; a loop reading that takes nothing new and ends. For \`next\` the
+request holds until \`{{tool}} run --stop --clear\` withdraws it, so clear it
+before starting the loops again.
+
 SEVERAL LOOPS, ONE WORKTREE EACH. A wrapper that runs one \`{{tool}} run\` per
 worktree of a clone, merging the base branch in before a task and back out
 after it, meets two costs of the claim being written to the tree on purpose:

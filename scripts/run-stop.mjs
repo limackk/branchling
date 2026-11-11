@@ -24,11 +24,23 @@
  *
  * WHY A TIMESTAMP AND NOT A FILE THAT IS CONSUMED. Several runs may share one
  * clone, and the first to delete a request would hide it from the others. A run
- * honours a request made after IT started; an older one is left behind, harmless,
- * and is simply overwritten by the next request.
+ * honours a request made after IT started; an older one does not stop a run
+ * started later, and is simply overwritten by the next request.
+ *
+ * TWO LIFETIMES, ONE FILE (TL-697). A loop built on `next` alone — a workflow
+ * whose supervisors call `next --plan` directly — has no start time for the
+ * request to postdate: `next` is one-shot. For `next` the request therefore
+ * holds from the moment it is written until somebody withdraws it with
+ * `run --stop --clear`, which deletes the file. A run keeps its own rule: when
+ * it spawns `next` it passes its start time in `STOP_SINCE_ENV`, and that
+ * `next` honours only a request at least that recent — otherwise a request left
+ * behind would make every later run refuse at its first `next`, which is the
+ * behaviour the run's rule was written to avoid. An expiry was not added: a
+ * stop that lapses on a clock nobody is watching restarts loops nobody asked to
+ * restart, and an explicit withdrawal is the one act that cannot do that.
  */
 
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { lockScope, stateRoot } from "./lock.mjs";
@@ -54,18 +66,52 @@ export function requestStop(backlogRoot, opts = {}) {
 }
 
 /**
+ * The environment variable through which `run` tells the `next` it spawns when
+ * the run started, so that `next` applies the run's rule rather than its own
+ * (see the header). Set on that one child only, never on the run's own
+ * environment, so an agent the run starts does not inherit it.
+ */
+export const STOP_SINCE_ENV = "BACKLOG_STOP_SINCE";
+
+/**
  * The request a run started at `sinceMs` must honour, or null. An unreadable
  * file is no request: a loop that stopped on garbage would be stopped by
  * anything that can write a byte there, and nothing here wrote it.
  */
 export function stopRequestedSince(backlogRoot, sinceMs, opts = {}) {
-  const { path } = stopRequestPath(backlogRoot, opts);
+  const request = readRequest(stopRequestPath(backlogRoot, opts).path);
+  return request && Date.parse(request.requestedAt) >= sinceMs ? request : null;
+}
+
+/**
+ * The request in force for a one-shot `next`, or null (TL-697): any readable
+ * request that has not been withdrawn. With `opts.env[STOP_SINCE_ENV]` naming a
+ * valid time — the `next` a run spawned — the run's rule applies instead.
+ */
+export function stopRequestInForce(backlogRoot, opts = {}) {
+  const since = Date.parse((opts.env || process.env)[STOP_SINCE_ENV] || "");
+  if (Number.isFinite(since)) return stopRequestedSince(backlogRoot, since, opts);
+  return readRequest(stopRequestPath(backlogRoot, opts).path);
+}
+
+/**
+ * Withdraw the request (TL-697): the file is deleted, so neither `next` nor a
+ * run honours it any longer. Returns what was withdrawn — `request` is null
+ * when there was nothing to withdraw, which is an answer, not an error.
+ */
+export function clearStop(backlogRoot, opts = {}) {
+  const { path, origin } = stopRequestPath(backlogRoot, opts);
+  const request = readRequest(path);
+  rmSync(path, { force: true });
+  return { request, path, origin };
+}
+
+function readRequest(path) {
   let request;
   try {
     request = JSON.parse(readFileSync(path, "utf8"));
   } catch {
     return null;
   }
-  const at = Date.parse(request && request.requestedAt);
-  return Number.isFinite(at) && at >= sinceMs ? request : null;
+  return request && Number.isFinite(Date.parse(request.requestedAt)) ? request : null;
 }
