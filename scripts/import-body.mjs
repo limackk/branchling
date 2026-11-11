@@ -5,6 +5,8 @@
  * — is the same promise whichever tracker the task came from.
  */
 
+import { fencedLines } from "./markdown-fence.mjs";
+
 /** The level a task's own sections are written at. Every reader of a section
  *  (`parseCriteria`, `resume`, the `## Log` guard) looks at this level and no
  *  other, so imported text must never reach it. */
@@ -14,8 +16,6 @@ const SECTION_LEVEL = 2;
  *  then whitespace or the end of the line. Seven `#` is a paragraph. */
 const ATX_HEADING = /^( {0,3})(#{1,6})(?=[ \t]|$)/;
 
-/** A fenced code block's opening or closing line. */
-const FENCE = /^ {0,3}(`{3,}|~{3,})/;
 
 /**
  * Every heading of an imported description, moved below the task's own
@@ -30,19 +30,15 @@ const FENCE = /^ {0,3}(`{3,}|~{3,})/;
  * stays at six.
  *
  * A line inside a fenced code block is code, not a heading, and is left as it
- * was written.
+ * was written; which lines those are is `fencedLines()`, the rule
+ * `parseCriteria()` reads a body by as well (TL-669).
  */
 export function demoteHeadings(text) {
   const lines = String(text || "").split("\n");
   const headings = [];
-  let fence = null;
+  const code = fencedLines(lines);
   lines.forEach((line, i) => {
-    const f = line.match(FENCE);
-    if (fence) {
-      if (f && f[1][0] === fence[0] && f[1].length >= fence.length && !line.slice(f[0].length).trim()) fence = null;
-      return;
-    }
-    if (f) { fence = f[1]; return; }
+    if (code[i]) return;
     const h = line.match(ATX_HEADING);
     if (h) headings.push({ i, indent: h[1], level: h[2].length });
   });
