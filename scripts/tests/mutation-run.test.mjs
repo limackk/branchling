@@ -218,6 +218,45 @@ test("a changed module that no test reaches fails instead of scoring zero", () =
   }
 });
 
+test("a --files entry with a line range selects its module's tests and reaches Stryker unchanged (TL-658)", () => {
+  const root = fixture();
+  try {
+    write(root, "scripts/lib.mjs", "export const lib = () => 1;\nexport const two = () => 2;\nexport const three = () => 3;\n");
+    for (const extra of [[], ["--named-only"]]) {
+      const bare = planOf(root, ["--files", "scripts/lib.mjs", ...extra]);
+      const ranged = planOf(root, ["--files", "scripts/lib.mjs:1-2", ...extra]);
+      assert.ok(bare.tests.length > 0, "a selection compared against an empty one proves nothing");
+      assert.deepEqual(ranged.tests, bare.tests, "the range changed the selection " + extra.join(" "));
+      assert.deepEqual(ranged.modules, ["scripts/lib.mjs"]);
+      assert.deepEqual(ranged.mutate, ["scripts/lib.mjs:1-2"]);
+      assert.deepEqual(ranged.lines, { "scripts/lib.mjs": [{ start: 1, end: 2 }] });
+      assert.equal(bare.lines, undefined, "a whole module is reported as ranges");
+      assert.equal(ranged.noAddedLines, undefined, "a hand-written range claims a change was read");
+    }
+
+    const two = planOf(root, ["--files", "scripts/lib.mjs:1-1,scripts/lib.mjs:3-3,scripts/other.mjs"]);
+    assert.deepEqual(two.modules, ["scripts/lib.mjs", "scripts/other.mjs"]);
+    assert.deepEqual(two.mutate, ["scripts/lib.mjs:1-1", "scripts/lib.mjs:3-3", "scripts/other.mjs"]);
+    assert.deepEqual(two.lines, { "scripts/lib.mjs": [{ start: 1, end: 1 }, { start: 3, end: 3 }] });
+
+    const alsoWhole = planOf(root, ["--files", "scripts/lib.mjs:1-1,scripts/lib.mjs"]);
+    assert.deepEqual(alsoWhole.modules, ["scripts/lib.mjs"]);
+    assert.equal(alsoWhole.lines, undefined, "a module also given whole is mutated whole");
+
+    const text = run(root, ["--files", "scripts/lib.mjs:1-2,scripts/other.mjs", "--plan"]);
+    assert.equal(text.code, 0, text.err);
+    assert.match(text.out, /^mutate \(2\): scripts\/lib\.mjs, scripts\/other\.mjs$/m);
+    assert.match(text.out, /^mutated lines only: scripts\/lib\.mjs:1-2$/m);
+    assert.match(text.out, /^not mutated: every line outside these ranges/m);
+    assert.doesNotMatch(text.out, /no added line/);
+    const several = run(root, ["--files", "scripts/lib.mjs:1-1,scripts/lib.mjs:3-3,scripts/other.mjs:1-1", "--plan"]);
+    assert.equal(several.code, 0, several.err);
+    assert.match(several.out, /^mutated lines only: scripts\/lib\.mjs:1-1,3-3  scripts\/other\.mjs:1-1$/m);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("an unknown flag fails", () => {
   const r = run(HOME, ["--everything"]);
   assert.equal(r.code, 2);

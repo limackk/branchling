@@ -58,6 +58,7 @@ function fixture() {
   const root = fixtureDir(join(tmpdir(), "branchling-test-mutation-lines-"));
   write(root, "scripts/lib.mjs", BASE_LIB);
   write(root, "scripts/gone.mjs", "export const a = 1;\nexport const b = 2;\n");
+  write(root, "scripts/gone-too.mjs", "export const c = 3;\nexport const d = 4;\n");
   write(root, "scripts/tests/lib.test.mjs", 'import "../lib.mjs"; import "../gone.mjs"; import "../fresh.mjs";\n');
   sh(root, "git", ["init", "-q"]);
   sh(root, "git", ["add", "-A"]);
@@ -130,11 +131,12 @@ test("the report names the ranges and says that lines outside them were not muta
   try {
     write(root, "scripts/lib.mjs", CHANGED_LIB);
     write(root, "scripts/gone.mjs", "export const a = 1;\n");
+    write(root, "scripts/gone-too.mjs", "export const c = 3;\n");
     const r = run(root, ["--plan", "--changed-lines"]);
     assert.equal(r.code, 0, r.err);
     assert.match(r.out, /^mutated lines only: scripts\/lib\.mjs:6-7$/m);
     assert.match(r.out, /^not mutated: every line outside these ranges/m);
-    assert.match(r.out, /^not mutated \(no added line\): scripts\/gone\.mjs$/m);
+    assert.match(r.out, /^not mutated \(no added line\): scripts\/gone-too\.mjs, scripts\/gone\.mjs$/m);
 
     const plain = run(root, ["--plan"]);
     assert.doesNotMatch(plain.out, /mutated lines only/, "a whole-module run claimed a line range");

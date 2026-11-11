@@ -234,8 +234,7 @@ test("an explicit --files range inside the template is refused the same way, wha
     }
     const two = run(root, ["--files", "scripts/view.mjs:7-9,scripts/view.mjs:11-12"]);
     assert.match(two.err, /template-literal text, scripts\/view\.mjs:7-9, scripts\/view\.mjs:11-12\n/);
-    // --tests because a range entry selects no test by itself yet (TL-703).
-    const whole = run(root, ["--files", "scripts/view.mjs:6-7", "--tests", "scripts/tests/view.test.mjs", "--plan", "--json"]);
+    const whole = run(root, ["--files", "scripts/view.mjs:6-7", "--plan", "--json"]);
     assert.equal(whole.code, 0, "a range with one line of code in it is still mutated: " + whole.err);
     assert.deepEqual(JSON.parse(whole.out).mutate, ["scripts/view.mjs:6-7"]);
   } finally {

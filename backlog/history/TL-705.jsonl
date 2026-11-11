@@ -1,0 +1,1 @@
+{"id":"01M74ZR67SV6KTFH01K0MT0AMG","ts":"2026-11-11T09:41:44.313Z","task":"TL-705","field":"__created__","from":"","to":"A ranged --files entry under --changed-lines is read as a path, not a range","actor":"agent:loop-2","source":"new","reason":"unknown"}

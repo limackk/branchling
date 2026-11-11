@@ -470,9 +470,11 @@ export async function selectTests(root, modules, { namedOnly = false } = {}) {
 
 /**
  * What the run mutates and which tests judge it. `mutate` is exactly the list
- * handed to Stryker; with `--changed-lines` it holds `path:start-end` entries,
- * `lines` holds the same ranges per module, and `noAddedLines` the selected
- * modules left out because the change added no line to them.
+ * handed to Stryker; with `--changed-lines`, or a `--files` entry written as
+ * `path:start-end`, it holds such entries and `lines` holds the same ranges per
+ * module mutated on ranges only. `modules` holds bare paths either way, since
+ * they select the tests. `noAddedLines` (`--changed-lines` only) names the
+ * selected modules left out because the change added no line to them.
  */
 export async function plan(root, opts) {
   let modules = opts.files || changedModules(root, opts.base);
@@ -500,7 +502,9 @@ export async function plan(root, opts) {
     return !(e.range && lineCount(text) === e.range.end - e.range.start + 1);
   });
   const onlyText = [...new Set(entries.map((e) => e.module))].filter((m) => !kept.some((e) => e.module === m));
-  modules = modules.filter((m) => !onlyText.includes(m));
+  // Tests are selected by the file, never by the entry: a `path:start-end`
+  // names no test and is imported by no script (TL-658).
+  modules = [...new Set(kept.map((e) => e.file))];
   const mutate = kept.map((e) => e.raw);
   if (changed) {
     // `lines` names what IS mutated; the text ranges are reported apart.
@@ -509,12 +513,17 @@ export async function plan(root, opts) {
       if (ranges.length) changed[m] = ranges;
       else delete changed[m];
     }
+  } else {
+    // A file also given whole is mutated whole, so it has no ranges to report.
+    const ranged = {};
+    for (const e of kept) if (e.range && !kept.some((w) => w.file === e.file && !w.range)) (ranged[e.file] ||= []).push(e.range);
+    if (Object.keys(ranged).length) changed = ranged;
   }
   const tests = opts.tests
     ? opts.tests.map((file) => ({ file, why: ["--tests"] }))
     : await selectTests(root, modules, { namedOnly: opts.namedOnly });
   const unselective = opts.namedOnly && !opts.tests ? unselectiveModules(tests, modules, candidateTestCount(root)) : null;
-  return { base: opts.base, modules, mutate, ...(changed ? { lines: changed, noAddedLines } : {}), tests,
+  return { base: opts.base, modules, mutate, ...(changed ? { lines: changed, ...(opts.changedLines ? { noAddedLines } : {}) } : {}), tests,
     templateText, onlyText, ...(unselective ? { unselective } : {}) };
 }
 
@@ -535,11 +544,12 @@ export function templateTextReport(p) {
   return out;
 }
 
-/** The ranges a `--changed-lines` run mutates, and what it did not, for a reader. */
+/** The ranges a run mutates (from `--changed-lines` or a `--files` range), and what it did not, for a reader. */
 function rangeReport(p) {
-  const out = ["mutated lines only: " + p.modules.map((m) => m + ":" + p.lines[m].map((r) => r.start + "-" + r.end).join(",")).join("  ")];
+  const ranged = p.modules.filter((m) => p.lines[m]);
+  const out = ["mutated lines only: " + ranged.map((m) => m + ":" + p.lines[m].map((r) => r.start + "-" + r.end).join(",")).join("  ")];
   out.push("not mutated: every line outside these ranges, and every mutant spanning one");
-  if (p.noAddedLines.length) out.push("not mutated (no added line): " + p.noAddedLines.join(", "));
+  if (p.noAddedLines && p.noAddedLines.length) out.push("not mutated (no added line): " + p.noAddedLines.join(", "));
   return out;
 }
 
