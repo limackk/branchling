@@ -30,6 +30,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { REFUSAL_KINDS } from "../done-task.mjs";
 import { TERMINAL_REFUSALS } from "../run-loop.mjs";
 
 import { isolateHome, posixPath } from "./_repo.mjs";
@@ -190,18 +191,21 @@ test("a `manual:` contract ends as `needs-person`, also in one attempt", () => {
 
 test("every kind the loop calls terminal is a kind `done` publishes", () => {
   // The defect was a name, not a rule: the loop compared against a key nothing
-  // wrote. Reading the literals out of `done-task.mjs` is what makes a rename on
-  // either side fail here instead of silently switching the branch off again.
-  const source = readFileSync(join(HERE, "..", "done-task.mjs"), "utf8");
-  // Both shapes a kind is written in: the last argument of a `refuse(…)` call,
-  // and the `kind:` of a `stop` that a later `refuse` passes on.
-  const published = new Set(
-    (source.match(/"[a-z-]+"\s*\n?\s*\);/g) || []).map((m) => m.replace(/[^a-z-]/g, ""))
-      .concat((source.match(/kind: "[a-z-]+"/g) || []).map((m) => m.replace(/^kind: "|"$/g, "")))
-  );
-  // A positive control on the extraction itself: a set that matched nothing
-  // would make the loop below vacuous.
+  // wrote. `done-task.mjs` spells every kind it publishes in `REFUSAL_KINDS` and
+  // nowhere else, so a rename on either side fails here instead of silently
+  // switching the branch off again. The table is read as a VALUE, not out of
+  // the source text: a mutation run instruments the source, and matching its
+  // literals failed Stryker's initial test run (TL-672).
+  const values = Object.values(REFUSAL_KINDS);
+  const published = new Set(values);
+  // A positive control on the table itself: an empty or collapsed set would make
+  // the loop below vacuous, and two names spelling one kind would let a consumer
+  // tell apart refusals `done` does not.
   assert.ok(published.size >= 4, "the refusal kinds could not be read out of `done-task.mjs`");
+  assert.equal(published.size, values.length, "two names in `REFUSAL_KINDS` spell the same kind");
+  for (const kind of values) {
+    assert.match(kind, /^[a-z]+(-[a-z]+)*$/, "`" + kind + "` is not the shape of a refusal kind");
+  }
   for (const [kind, outcome] of Object.entries(TERMINAL_REFUSALS)) {
     assert.ok(published.has(kind),
       "`" + kind + "` is not a refusal kind `done` writes — the loop is reading a name nobody publishes");
