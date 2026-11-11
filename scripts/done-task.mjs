@@ -306,6 +306,43 @@ export function nodeTestFiles(entry) {
   return found;
 }
 
+/**
+ * Literal repository-relative scripts that a segment runs as `node <script>`
+ * (TL-679).
+ *
+ * Coverage observes every Node process the command starts, so a changed script
+ * executed directly is as observable as one imported by a test. Only the first
+ * argument that is not an option is read: `node --import tsx script.mjs`, an
+ * inline `-e` program or a variable names nothing certain, so that entry stays
+ * unobserved and its verdict `undetermined` rather than a false `incapable`.
+ * A `node --test` segment is `nodeTestFiles`' business, not this one's.
+ */
+export function nodeScriptFiles(entry) {
+  if (!entry || !entry.bash) return [];
+  const found = [];
+  for (const segment of String(entry.bash).split(/\n|;|&&|\|\|/)) {
+    const match = segment.trim().match(
+      /^(?:[A-Za-z_][A-Za-z0-9_]*=[^\s]+\s+)*(?:[^\s/]+\/)*node\s+([\s\S]*)$/
+    );
+    if (!match) continue;
+    for (let token of match[1].trim().split(/\s+/)) {
+      if (token === "--test") break;
+      if (token.startsWith("-")) continue;
+      if ((token.startsWith('"') && token.endsWith('"')) ||
+          (token.startsWith("'") && token.endsWith("'"))) token = token.slice(1, -1);
+      if (LITERAL_TEST_FILE.test(token)) found.push(token);
+      break;
+    }
+  }
+  return found;
+}
+
+/** Whether an entry's coverage can be read: it runs Node on a literal file,
+ *  as a test or as a script. Anything else stays unobserved (TL-443). */
+export function coverageObservable(entry) {
+  return nodeTestFiles(entry).length > 0 || nodeScriptFiles(entry).length > 0;
+}
+
 /** The first literal `node --test` file that cannot be run, or null. */
 export function missingNodeTestFile(entries, repoRoot) {
   for (const entry of entries || []) {
@@ -603,7 +640,7 @@ export async function runContract(entries, cwd, opts = {}) {
     }
     if (opts.before) opts.before(e, i);
     const r = await runBashAsync(e.bash, cwd, opts.capture,
-      Boolean(opts.observeCoverage && nodeTestFiles(e).length), opts.signal || null,
+      Boolean(opts.observeCoverage && coverageObservable(e)), opts.signal || null,
       opts.env ? opts.env(e) : null);
     const row = { id: e.id, kind: "bash", command: e.bash, ok: r.ok, exitCode: r.exitCode, ms: r.ms };
     // Coverage is private runner evidence. It feeds the compact capability
