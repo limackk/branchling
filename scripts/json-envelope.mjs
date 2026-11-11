@@ -362,6 +362,11 @@ export const KINDS = {
     // `--plan` only (TL-183): which wave was followed, and how many open tasks
     // were left alone because the plan does not schedule them. `null` when the
     // flag was not given — a wave number of 0 would say a plan was consulted.
+    // Exit 3 under `--plan` is `refusalKind` `nothing-to-take`,
+    // `wave-claimed-elsewhere` or `wave-awaits-merge` (TL-683); on that answer
+    // `plan` also carries `claimedElsewhere`, `awaitingMerge` and
+    // `waitingBehind`, the ids of the active wave each kind was judged from.
+    // `plan.spill` is null unless `--spill` looked past a waiting wave.
     plan: null,
     // `next --dry-run` (TL-644): true when the answer is a projection and
     // nothing was claimed — `taken` is false, `lock` null, and `task` is the
