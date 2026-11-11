@@ -1006,7 +1006,12 @@ async function run(argv, io = {}) {
   const tagOf = (e, i) => "  " + (i + 1) + "/" + entries.length + "  " +
     (e.project ? PROJECT_ENTRY_TAG + "  " : "") + (e.id ? e.id + "  " : "");
   let stop = null;
-  const { results, failed } = await runContract(entries, cwd, {
+  // Where a `manual:` entry nobody could be asked about parks the task, and the
+  // entries that were left there (TL-699). Empty unless the project declares
+  // `awaiting_vouch_status` and the run found no terminal.
+  const vouchStatus = plan.confirmManual ? null : config.awaitingVouchStatus || null;
+  const awaiting = [];
+  const { results, failed, interrupted } = await runContract(entries, cwd, {
     capture,
     observeCoverage: true,
     before: (e, i) => log(plan.json, tagOf(e, i) + "bash: " + e.bash),
@@ -1039,19 +1044,41 @@ async function run(argv, io = {}) {
         };
         return { ok: false };
       }
+      if (!confirmed && awaiting.length) {
+        // A second `manual:` entry in a run that already found no terminal: there
+        // is still nobody to ask, so it waits beside the first.
+        awaiting.push(e.manual);
+        return { ok: null };
+      }
       if (!confirmed) {
         const answer = ask("  type `" + CONFIRM_WORD + "` to vouch, anything else to stop: ");
         confirmed = answer === CONFIRM_WORD;
+        if (answer === null && vouchStatus) {
+          // A THIRD WAY ON, and the only one that does not vouch (TL-699). Both
+          // ways the refusal below offers make the caller sign for the entry,
+          // which an agent may not do for a person. With a project word for
+          // "worked, unverified" the entry is left unanswered and the rest of
+          // the contract still runs: the task is parked there only if every
+          // automatic entry passes, because that is what the status claims.
+          awaiting.push(e.manual);
+          log(plan.json, "  " + WARNM + " no terminal to ask at — left for a person to vouch");
+          log(plan.json, "");
+          return { ok: null };
+        }
         if (answer === null) {
           stop = {
             refusal: "no-terminal",
             manual: e.manual,
             headline: plan.id + ": a `manual:` entry needs a person, and there is no terminal here",
             details: [
-              "Nothing was changed. Two ways on:",
+              "Nothing was changed. Three ways on:",
               "  · run it in a terminal and type `" + CONFIRM_WORD + "` when asked;",
-              "  · or pass `--confirm-manual`, which vouches for EVERY manual entry at once",
-              "    and records " + actor + " as the one who did.",
+              "  · pass `--confirm-manual`, which vouches for EVERY manual entry at once",
+              "    and records " + actor + " as the one who did — only if you are vouching yourself;",
+              "  · or leave it for a person. The task stays `" + before.status + "`, and `" + N + " plan`",
+              "    holds it as a claim no unattended run will take — a parked claim after",
+              "    `audit_stale_days`. Declaring `awaiting_vouch_status` in config.yaml lets",
+              "    `" + N + " done` park it there instead, with the automated entries' results.",
             ],
           };
           return { ok: false };
@@ -1138,6 +1165,10 @@ async function run(argv, io = {}) {
       ])
     );
     return finishFailed(plan, results, 1);
+  }
+  if (awaiting.length) {
+    if (interrupted) return finishFailed(plan, results, 1);
+    return parkAwaitingVouch({ plan, root, file, raw, before, config, actor, results, awaiting, status: vouchStatus });
   }
 
   const modified = taskModifiedFiles({ root: cwd, prefix: config.taskIdPrefix, taskId: before.id });
@@ -1283,6 +1314,84 @@ async function run(argv, io = {}) {
 
   if (plan.json) answer(plan, results, { status, ticked: proofed.ticked, closed: true, capability });
   return 0;
+}
+
+/** The exit code of a task parked awaiting a vouch (TL-699): neither closed (0)
+ *  nor refused (1), because the work was verified as far as a command can go. */
+export const EXIT_AWAITING_VOUCH = 3;
+
+/** The sentence a parked task carries in its history. PURE. */
+export function awaitingVouchReason(results, awaiting) {
+  const ran = results.filter((r) => r.kind === "bash").length;
+  return "every automatic entry passed (" + ran + "); " +
+    (awaiting.length === 1 ? "a `manual:` entry is" : awaiting.length + " `manual:` entries are") +
+    " waiting for a person to vouch, and there was no terminal to ask at: " + awaiting[0];
+}
+
+/**
+ * Park a task whose automatic entries all passed and whose `manual:` entries
+ * nobody could be asked about, in the project's `awaiting_vouch_status`
+ * (TL-699).
+ *
+ * WHY NOT STAY IN PROGRESS. A task left `in_progress` reads as a claim
+ * somebody is still working, holds its plan wave shut for every unattended
+ * run, and says nothing about the one act left — a person's signature. `run`
+ * already parks such a task (TL-212); `done` reaching the same fact by another
+ * door must leave the same state behind, written the same way: the status
+ * write is marked as a park and carries its reason, and each unanswered entry
+ * keeps its `__unverified__` record (TL-170).
+ *
+ * The criteria are NOT ticked and the closing status is NOT written: nothing
+ * here is closed, and a later `done` in a terminal re-runs the contract and
+ * asks.
+ */
+function parkAwaitingVouch({ plan, root, file, raw, before, config, actor, results, awaiting, status }) {
+  const reason = awaitingVouchReason(results, awaiting);
+  if (plan.dryRun) {
+    log(plan.json, "  " + WARNM + " every automatic entry passed; " + awaiting.length + " `manual:` entr" +
+      (awaiting.length === 1 ? "y waits" : "ies wait") + " for a person. `--dry-run`: nothing was changed.");
+    log(plan.json, "    would set: status " + before.status + " → " + status);
+    if (plan.json) answer(plan, results, { status: before.status, wouldBe: status, closed: false, awaitingVouch: true });
+    return EXIT_AWAITING_VOUCH;
+  }
+  let text;
+  try {
+    text = setFrontmatterField(raw, "status", status, fieldSpec("status", buildFieldSpecs(config)));
+    text = setFrontmatterField(text, "updated", todayStamp());
+  } catch (e) {
+    return refuse(plan, plan.id + ": every automatic entry passed, but the task file could not be written",
+      [e.message, "", "The task file was NOT touched — its status is still `" + before.status + "`."],
+      results, "unwritable");
+  }
+  writeFileSync(file, text, "utf8");
+  const ts = new Date().toISOString();
+  try {
+    recordEdit(root, {
+      taskId: before.id, before, after: extractMeta(splitFrontmatter(text).frontmatter),
+      actor, ts, source: "done", role: plan.role, park: true, reason,
+    });
+  } catch (error) {
+    writeFileSync(file, raw, "utf8");
+    return refuse(plan, plan.id + ": history could not be recorded; the task was restored", [error.message], results, "history-unwritable");
+  }
+  appendEntries(root, before.id, awaiting.map((manual) => ({
+    id: eventId(ts), ts, task: before.id, field: FIELD_UNVERIFIED,
+    from: "", to: manual, actor, source: "done", refusal: "no-terminal", reason,
+    session: currentSession(root),
+  })));
+
+  console.error("");
+  console.error(failure(N + " done", plan.id + ": parked as `" + status + "` — a `manual:` entry needs a person, and there is no terminal here", [
+    "Every automatic entry passed. Nobody vouched, so the task is NOT closed:",
+  ].concat(awaiting.map((m) => "  " + m), [
+    "",
+    "`awaiting_vouch_status` in config.yaml names `" + status + "`. A person closes it with",
+    "`" + N + " done " + plan.id + "` in a terminal, typing `" + CONFIRM_WORD + "` when asked.",
+  ])));
+  const build = spawnSync(process.execPath, [join(__dirname, "build-backlog.mjs"), "--dir", root], { encoding: "utf8" });
+  if (build.status !== 0) console.error(WARNM + " the views were not rebuilt — run `" + N + " build` yourself");
+  if (plan.json) answer(plan, results, { status, closed: false, awaitingVouch: true, refusalKind: "awaiting-vouch" });
+  return EXIT_AWAITING_VOUCH;
 }
 
 // A prose line summarising the run USED to be appended to a `## Log` section
