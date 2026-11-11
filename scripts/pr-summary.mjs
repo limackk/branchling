@@ -47,7 +47,7 @@ import { printJson } from "./json-envelope.mjs";
 import { repoRoot } from "./modified-files.mjs";
 import { answerBacklogDirRefusal, backlogPaths, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
-import { actorParts } from "./task-fields.mjs";
+import { OBSERVED_SOURCES, actorParts } from "./task-fields.mjs";
 import { taskIdPatterns } from "./task-id.mjs";
 import { failure } from "./ui.mjs";
 import { repoRelative } from "./canonical-path.mjs";
@@ -225,18 +225,6 @@ export function engagedFor(root, ids, env = process.env) {
 
 /** GitHub renders a pipe inside a table cell as a column break. */
 const cell = (s) => String(s == null ? "" : s).replace(/\|/g, "\\|").replace(/\n/g, " ");
-
-/**
- * The sources that mean the tool SAW a change rather than made it: `external`
- * is what reconciliation writes, `manual` is `history --source manual`, `boot`
- * is the first snapshot. Everything else is a command, and there `unknown`
- * means "nobody stated a reason" — a different sentence entirely.
- *
- * Listed rather than inverted, and the fallback is deliberately the milder
- * reading: a source this list has not heard of is reported as an unstated
- * reason, never as a change made behind the tool's back.
- */
-const OBSERVED_SOURCES = ["external", "manual", "boot"];
 
 export function transitionLine(t) {
   const arrow = "`" + (t.from || "(new)") + "` → `" + (t.to || "(none)") + "`";
