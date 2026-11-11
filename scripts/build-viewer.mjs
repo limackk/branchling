@@ -1459,6 +1459,12 @@ ${paletteBadgeCss}
   .exec-wave.is-active { border-color: var(--accent); box-shadow: var(--shadow); }
   .exec-wave.is-past { opacity: .55; }
   .exec-wave-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+  /* A held wave (TL-660): the word carries the claim, the colour only repeats it. */
+  .exec-wave-held { color: var(--fg-muted); border-color: var(--fg-muted); }
+  .exec-holds { font-size: 12px; color: var(--fg-muted); margin: -4px 0 10px; }
+  .exec-holds p { margin: 0 0 4px; }
+  .exec-holds ul { margin: 0; padding-left: 18px; }
+  .exec-holds li { margin: 2px 0; overflow-wrap: anywhere; }
   .exec-wave-name { font-weight: 600; font-size: 13px; }
   .exec-wave-count { font-size: 11px; color: var(--fg-muted); font-variant-numeric: tabular-nums; }
   .exec-wave-tag {
@@ -3474,10 +3480,8 @@ function tasksApplyHash(query) {
 // ─── Dashboard (TL-451) ─────────────────────────────────────────────
 function dashboardPlanState() {
   if (!PLAN || !PLAN.exists || (PLAN.problems && PLAN.problems.length)) return null;
-  return planState(PLAN.plan, TASKS, {
-    archivedStatuses: CONFIG.archivedStatuses,
-    inProgressStatus: CONFIG.inProgressStatus,
-  });
+  // The holds \`plan\` applies (TL-660): the whole configuration and the clock.
+  return pagePlanState(PLAN.plan, TASKS, HISTORY, CONFIG, Date.now());
 }
 
 function renderDashboard_() {
@@ -3534,10 +3538,9 @@ function renderExecution_() {
       escapeHtmlStr(PLAN.problems[0]) + "</p></div>";
     return;
   }
-  const state_ = planState(PLAN.plan, ALL_TASKS, {
-    archivedStatuses: CONFIG.archivedStatuses,
-    inProgressStatus: CONFIG.inProgressStatus,
-  });
+  // The holds \`plan\` applies (TL-660): the whole configuration, the history
+  // and the clock — without them a wave held shut reads as one with work in it.
+  const state_ = pagePlanState(PLAN.plan, ALL_TASKS, HISTORY, CONFIG, Date.now());
   const vm = planViewModel(state_, ALL_TASKS, {
     history: HISTORY,
     now: Date.now(),
