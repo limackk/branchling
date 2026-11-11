@@ -14,6 +14,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { CAPABLE, INCAPABLE, UNDETERMINED, contractCapability } from "../contract-capability.mjs";
+import { coverageObservable, nodeScriptFiles } from "../done-task.mjs";
 import { isolateHome, plainOutput } from "./_repo.mjs";
 
 isolateHome("contract-can-fail");
@@ -36,7 +37,7 @@ function git(dir, args) {
   assert.equal(result.status, 0, result.stderr);
 }
 
-function fixture({ importsChangedFile = false, policy = "report" } = {}) {
+function fixture({ importsChangedFile = false, policy = "report", verification = "node --test proof.test.mjs" } = {}) {
   const dir = fixtureDir(join(tmpdir(), "branchling-contract-capability-" + counter++ + "-"));
   const initialized = run(["init", "--dir", dir, "--no-example"], dir);
   assert.equal(initialized.status, 0, initialized.stdout + initialized.stderr);
@@ -51,12 +52,13 @@ function fixture({ importsChangedFile = false, policy = "report" } = {}) {
     'test("the fixture is green", () => assert.equal(' + (importsChangedFile ? "answer" : "1") + ', 1));',
     "",
   ].filter(Boolean).join("\n"), "utf8");
+  writeFileSync(join(dir, "unrelated.mjs"), "process.exitCode = 0;\n", "utf8");
   writeFileSync(join(dir, "tasks", "TASK-1-capability.md"), [
     "---", "id: TASK-1", 'title: "Capability fixture"', "type: task", "labels: []", "board: main",
     'epic: ""', "priority: P1", "status: in_progress", "owner: agent:test", 'role: ""', 'executor: ""',
     "estimate: 2h", "confidence: medium", "created: 2026-09-25", "updated: 2026-09-25",
     "blocked_by: []", "blocks: []", "related_docs: []", "verification:",
-    '  - id: proof\n    bash: "node --test proof.test.mjs"', "---", "", "## Goal", "", "Change the feature.", "",
+    '  - id: proof\n    bash: "' + verification + '"', "---", "", "## Goal", "", "Change the feature.", "",
     "## Acceptance criteria", "", "- [ ] The feature changed [proof: proof]", "",
   ].join("\n"), "utf8");
   git(dir, ["init", "-q"]);
@@ -128,4 +130,71 @@ test("requiring the signal is an explicit policy and leaves the task open", () =
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// TL-679: TL-629's only entry ran its changed script as `node <script>` and
+// was reported `undetermined`, because only `node --test` was observed.
+test("a closing that runs its changed script directly is capable", () => {
+  const dir = fixture({ verification: "node feature.mjs" });
+  try {
+    const done = run(["done", "TASK-1", "--actor", "agent:test", "--dir", dir, "--json"], dir);
+    assert.equal(done.status, 0, done.stdout + done.stderr);
+    const capability = JSON.parse(done.stdout).capability;
+    assert.equal(capability.verdict, CAPABLE);
+    assert.deepEqual(capability.changedFilesExecuted, ["feature.mjs"]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// The negative control: the same direct execution is OBSERVED, so a script
+// that leaves the changed file alone is incapable, not merely undetermined.
+test("a closing that runs an unrelated script directly is incapable", () => {
+  const dir = fixture({ verification: "node unrelated.mjs" });
+  try {
+    const done = run(["done", "TASK-1", "--actor", "agent:test", "--dir", dir, "--json"], dir);
+    assert.equal(done.status, 0, done.stdout + done.stderr);
+    assert.equal(JSON.parse(done.stdout).capability.verdict, INCAPABLE);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// Observation is not widened past Node: a foreign entry yields no coverage, so
+// observing it would turn "not measured" into a false `incapable`.
+test("a closing whose only entry is not a Node run stays undetermined", () => {
+  const dir = fixture({ verification: "sh -c true" });
+  try {
+    const done = run(["done", "TASK-1", "--actor", "agent:test", "--dir", dir, "--json"], dir);
+    assert.equal(done.status, 0, done.stdout + done.stderr);
+    assert.equal(JSON.parse(done.stdout).capability.verdict, UNDETERMINED);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("only a literal script run by Node makes an entry observable", () => {
+  assert.deepEqual(nodeScriptFiles({ bash: "cd sub && node tool.mjs" }), ["tool.mjs"]);
+  assert.deepEqual(nodeScriptFiles({ bash: "echo node tool.mjs" }), []);
+  assert.deepEqual(nodeScriptFiles({ bash: "MODE=fast tools/bin/node tool.mjs" }), ["tool.mjs"]);
+  assert.deepEqual(nodeScriptFiles({ bash: 'node "tool.mjs"' }), ["tool.mjs"]);
+  assert.deepEqual(nodeScriptFiles({ bash: "node --no-warnings  tool.mjs" }), ["tool.mjs"]);
+  assert.deepEqual(nodeScriptFiles({ bash: "node tool.mjs'" }), []);
+  assert.deepEqual(nodeScriptFiles({ bash: 'node "tool.mjss' }), []);
+  assert.deepEqual(nodeScriptFiles({ bash: 'node tool.mjs"' }), []);
+  assert.deepEqual(nodeScriptFiles({ bash: "node 'tool.mjss" }), []);
+  assert.deepEqual(nodeScriptFiles({ bash: "FOO=1  node tool.mjs" }), ["tool.mjs"]);
+  assert.deepEqual(nodeScriptFiles(null), []);
+  assert.deepEqual(nodeScriptFiles({ bash: "node scripts/mutation-run.mjs --files scripts/mutation-run.mjs" }),
+    ["scripts/mutation-run.mjs"]);
+  assert.deepEqual(nodeScriptFiles({ bash: "FOO=1 node --no-warnings 'tool.mjs' && echo ok" }), ["tool.mjs"]);
+  assert.deepEqual(nodeScriptFiles({ bash: "node --test proof.test.mjs" }), []);
+  assert.deepEqual(nodeScriptFiles({ bash: "node --import tsx tool.mjs" }), []);
+  assert.deepEqual(nodeScriptFiles({ bash: "node /abs/tool.mjs" }), []);
+  assert.deepEqual(nodeScriptFiles({ bash: "node $SCRIPT" }), []);
+  assert.deepEqual(nodeScriptFiles({ bash: "nodemon tool.mjs" }), []);
+  assert.deepEqual(nodeScriptFiles({ manual: "look at it" }), []);
+  assert.equal(coverageObservable({ bash: "node tool.mjs" }), true);
+  assert.equal(coverageObservable({ bash: "node --test proof.test.mjs" }), true);
+  assert.equal(coverageObservable({ bash: "bash check.sh" }), false);
 });
