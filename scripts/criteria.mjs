@@ -51,6 +51,7 @@
 // it here would make `id: the-name  # optional` parse as an id with a comment in
 // it, which is exactly the class of bug that module was extracted to end.
 import { stripComment, unquote } from "./task-fields.mjs";
+import { fencedLines } from "./markdown-fence.mjs";
 
 /** The heading that opens the criteria list. Part of the FORMAT (`_template.md`
  *  writes it), so it belongs in the code — unlike statuses or labels, which are
@@ -222,9 +223,18 @@ export function parseCriteria(body) {
   const lines = String(body || "").split(/\r?\n/);
   const items = [];
 
+  // A HEADING INSIDE A FENCED BLOCK IS CODE (TL-669). A body that quotes the
+  // template, or an imported description carrying a fenced `## Acceptance
+  // criteria` (which `demoteHeadings` leaves alone precisely because it is
+  // code), would otherwise hand `done` the quoted list as the contract. The
+  // same holds for the heading that ENDS the section: a fenced `## Notes`
+  // between two criteria is not the next section. Lines are only skipped,
+  // never removed, so every index below is still the file's own.
+  const code = fencedLines(lines);
+
   let start = -1;
   for (let i = 0; i < lines.length; i++) {
-    if (CRITERIA_HEADING.test(lines[i])) { start = i + 1; break; }
+    if (!code[i] && CRITERIA_HEADING.test(lines[i])) { start = i + 1; break; }
   }
   if (start < 0) return { present: false, items };
 
@@ -260,7 +270,7 @@ export function parseCriteria(body) {
 
   for (let i = start; i < lines.length; i++) {
     const raw = lines[i];
-    if (/^#{2,}\s+\S/.test(raw)) { close(); break; }   // the next section
+    if (!code[i] && /^#{2,}\s+\S/.test(raw)) { close(); break; }   // the next section
     const m = raw.match(/^\s*-\s*\[([ xX])\]\s*(.*)$/);
     if (m) {
       close();

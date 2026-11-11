@@ -28,6 +28,7 @@ import { isolateHome, SCRIPTS_DIR } from "./_repo.mjs";
 isolateHome("criteria-mapping");
 
 import { applyProofs, auditTask, parseCriteria, parseVerification } from "../criteria.mjs";
+import { fencedLines } from "../markdown-fence.mjs";
 
 const GUARD = join(SCRIPTS_DIR, "check-backlog-criteria.mjs");
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
@@ -478,4 +479,80 @@ test("a criterion knows both its first line and its last", () => {
   const { items } = parseCriteria("## Acceptance criteria\n\n- [ ] One\n      two\n      three. [proof: a]\n");
   assert.equal(items[0].line, 2);
   assert.equal(items[0].endLine, 4);
+});
+
+// A FENCED HEADING IS CODE, NOT A SECTION (TL-669). The body below quotes the
+// template in a fenced block BEFORE its real criteria section; the parser that
+// knew nothing of fences took the quoted list as the contract, and `done`
+// ticked lines inside a code sample.
+const quotesTheTemplate = [
+  "## Goal",
+  "",
+  "The template looks like this:",
+  "",
+  "```md",
+  "## Acceptance criteria",
+  "",
+  "- [ ] Quoted, not a contract. [proof: quoted]",
+  "```",
+  "",
+  "## Acceptance criteria",
+  "",
+  "- [ ] The real one. [proof: real]",
+  "",
+  "~~~~",
+  "## Notes",
+  "~~~",
+  "~~~~",
+  "- [ ] Still the real section. [proof: real]",
+  "",
+  "## Notes",
+  "",
+  "- [ ] Past the section. [proof: real]",
+].join("\n");
+
+test("a fenced `## Acceptance criteria` before the real section is ignored", () => {
+  const { present, items } = parseCriteria(quotesTheTemplate);
+  assert.equal(present, true);
+  assert.deepEqual(items.map((i) => i.text), ["The real one.", "Still the real section."],
+    "the quoted list became the contract, or a fenced `## Notes` ended the real section");
+  assert.deepEqual(items.map((i) => i.line), [12, 18], "line numbers are the body's own, fences included");
+  assert.deepEqual(items.map((i) => i.endLine), [12, 18]);
+});
+
+test("the tick lands on the real criterion, not on the quoted one", () => {
+  const raw = "---\nid: MAP-2\n---\n" + quotesTheTemplate;
+  const { text, ticked } = applyProofs(raw, ["real", "quoted"]);
+  assert.deepEqual(ticked, ["The real one.", "Still the real section."]);
+  assert.match(text, /^- \[ \] Quoted, not a contract\./m, "a line inside the fence was rewritten");
+  assert.match(text, /^- \[x\] The real one\./m);
+  assert.match(text, /^- \[x\] Still the real section\./m);
+  assert.match(text, /^- \[ \] Past the section\./m);
+});
+
+test("POSITIVE CONTROL: the same heading outside a fence is still the section", () => {
+  // Without this, "skip every heading" would pass the two tests above.
+  const unfenced = quotesTheTemplate.replace("```md\n", "").replace("```\n", "");
+  const { items } = parseCriteria(unfenced);
+  assert.deepEqual(items.map((i) => i.text), ["Quoted, not a contract."]);
+});
+
+test("the fence rule flags both fence lines and everything between them", () => {
+  // Contract of the shared rule itself: the opening and closing lines are code
+  // too, though no heading could ever start with a fence character.
+  assert.deepEqual(fencedLines(["a", "```", "## x", "```", "b"]), [false, true, true, true, false]);
+  assert.deepEqual(fencedLines(["~~~~", "~~~", "~~~~ ", "c"]), [true, true, true, false]);
+});
+
+test("the heading that ends the section is a line START, whatever spacing follows `##`", () => {
+  const { items } = parseCriteria([
+    "## Acceptance criteria",
+    "",
+    "- [ ] Mentions ## Notes mid-line and stays a criterion. [proof: a]",
+    "",
+    "##   Notes",
+    "",
+    "- [ ] Past a heading written with three spaces. [proof: a]",
+  ].join("\n"));
+  assert.deepEqual(items.map((i) => i.text), ["Mentions ## Notes mid-line and stays a criterion."]);
 });
