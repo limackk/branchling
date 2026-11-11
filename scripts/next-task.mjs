@@ -447,8 +447,13 @@ export function heldElsewhere(task, handedOut) {
  * needs `filters.plannedIds`, every id of every wave; without it there is no
  * way to tell "later" from "never" and the field is `null` rather than a guess.
  *
+ * `skippedAsked` is the part of `skippedBlocked` an open QUESTION holds back
+ * (TL-666). `skippedBlocked` keeps counting it, as `next` always has; the run's
+ * projection subtracts it, because a blocker inside the wave is work the run
+ * closes first, while a question waits for a person whatever the run does.
+ *
  * @returns {{candidates: object[], reclaimable: Set<string>, skippedBlocked: number,
- *            skippedOutsideWave: number, skippedUnplanned: number|null,
+ *            skippedAsked: number, skippedOutsideWave: number, skippedUnplanned: number|null,
  *            skippedElsewhere: Array<{id: string, elsewhere: object[]}>,
  *            skippedConflict: Array<{id: string, group: string[], heldBy: object[]}>}}
  */
@@ -853,6 +858,7 @@ export function selectCandidates(records, config, filters, now) {
     // the unblocked ones were never in `matching`, so they must not be
     // subtracted from it.
     skippedBlocked: matching.length - (fresh.length - unblocked.size),
+    skippedAsked: matching.filter((t) => openQuestions(t.history || []).length).length,
   };
 }
 

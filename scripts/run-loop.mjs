@@ -1924,7 +1924,7 @@ export async function run(argv) {
       const from = state.activeWave === null ? state.waves.length : state.activeWave;
       for (const w of state.waves.slice(from)) {
         const planIds = new Set(w.tasks.map((e) => String(e.id).toUpperCase()));
-        const { candidates, skippedBlocked, skippedHandedBack, skippedDeadlocked, skippedConflict } =
+        const { candidates, skippedBlocked, skippedAsked, skippedHandedBack, skippedDeadlocked, skippedConflict } =
           selectCandidates(records, config, { ...base, planIds }, Date.now());
         for (const t of candidates) rows.push({ task: t, wave: w.index + 1, name: w.name });
         for (const s of skippedConflict) conflicted.set(s.id, s);
@@ -1935,8 +1935,9 @@ export async function run(argv) {
         // what the footnote below has always said — so it counts towards
         // finishing the wave. Anything else still open is work this run may never
         // be handed, and `next` will keep answering from THIS wave until somebody
-        // else finishes it.
-        wall = projectionWall(w, candidates.length + skippedBlocked);
+        // else finishes it. A task held by an open question is not reachable
+        // whatever its blockers say (TL-666): only a person's decision lifts it.
+        wall = projectionWall(w, candidates.length + skippedBlocked - skippedAsked);
         if (wall) break;
       }
     } else {

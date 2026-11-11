@@ -30,6 +30,11 @@
  *   withheld, named   — a task left out of next up is named with its hold in
  *                       every active wave, held or not, and the empty next-up
  *                       line does not blame a blocker for a hold.
+ *   an open question  — holds whatever the status (TL-666): a claim old enough
+ *                       to reclaim and a `pending` task, each asked through
+ *                       `ask` and set back by hand, hold their wave in `plan`
+ *                       where `run --dry-run --plan` stops, with one sentence;
+ *                       the same tree with the question decided is not held.
  *   the edges         — the day a claim turns parked or abandoned, a history
  *                       entry newer than `updated:`, a question or a park that
  *                       a later write superseded, a closed task inside a held
@@ -309,11 +314,15 @@ test("the size gate holds only an estimate later than the threshold, both in the
 test("every hold has its own sentence, naming the key that decided it", () => {
   const cases = [
     [{ kind: "awaiting-vouch", status: "awaiting_vouch" }, "awaiting a person's vouch (status `awaiting_vouch`)"],
-    [{ kind: "protected-status", status: "blocked", blockedBy: [], asked: true, parkedByRun: true },
-      "in `blocked`, a status `reason_required_statuses` protects — an open question is waiting for a decision"],
-    [{ kind: "protected-status", status: "blocked", blockedBy: ["TL-2"], asked: false, parkedByRun: true },
+    [{ kind: "open-question", status: "pending", question: "Which  one?\n Say so. ", askedBy: "agent:a", event: "Q1", more: 0 },
+      "an open question is waiting for a decision (agent:a, `Q1`): Which one? Say so."],
+    [{ kind: "open-question", status: "pending", question: "Which?", askedBy: "agent:a", event: "Q1", more: 2 },
+      "an open question is waiting for a decision (agent:a, `Q1`): Which? — and 2 more"],
+    [{ kind: "protected-status", status: "blocked", blockedBy: [], parkedByRun: true },
       "in `blocked`, a status `reason_required_statuses` protects — a run parked it there"],
-    [{ kind: "protected-status", status: "blocked", blockedBy: ["TL-2", "TL-3"], asked: false, parkedByRun: false },
+    [{ kind: "protected-status", status: "blocked", blockedBy: ["TL-2"], parkedByRun: true },
+      "in `blocked`, a status `reason_required_statuses` protects — a run parked it there"],
+    [{ kind: "protected-status", status: "blocked", blockedBy: ["TL-2", "TL-3"], parkedByRun: false },
       "in `blocked`, a status `reason_required_statuses` protects — waiting on TL-2, TL-3"],
     [{ kind: "parked-claim", days: 40, owner: "agent:a", lastChange: "2026-09-29", staleDays: 14 },
       "claim parked for 40 days by agent:a — no recorded change since 2026-09-29 (`audit_stale_days` is 14)"],
@@ -440,10 +449,10 @@ test("a protected status reads its question and its park from the latest record"
   const unnamed = unattendedHold({ id: "TL-2", status: "blocked", history: [] }, byId, CONFIG);
   assert.deepEqual([unnamed.kind, unnamed.named, unnamed.blockedBy], ["protected-status", 0, []]);
 
-  const question = { id: "Q1", field: FIELD_COMMENT, source: "ask", ts: "2026-11-01T00:00:00Z" };
+  const question = { id: "Q1", field: FIELD_COMMENT, source: "ask", to: "Which?", actor: "agent:q", ts: "2026-11-01T00:00:00Z" };
   const asked = unattendedHold(t("TL-3", { status: "blocked", blocked_by: ["TL-1"], history: [question] }), byId, CONFIG);
-  assert.equal(asked && asked.asked, true, "a discharged block with an open question was released");
-  assert.match(describeHold(asked), /an open question is waiting for a decision/);
+  assert.equal(asked && asked.kind, "open-question", "a discharged block with an open question was released");
+  assert.match(describeHold(asked), /an open question is waiting for a decision \(agent:q, `Q1`\): Which\?$/);
   const decided = { id: "D1", field: FIELD_DECISION, resolves: "Q1", ts: "2026-11-02T00:00:00Z" };
   assert.equal(unattendedHold(t("TL-4", { status: "blocked", blocked_by: ["TL-1"], history: [question, decided] }), byId, CONFIG), null);
 
@@ -516,4 +525,138 @@ test("a together group names only its own withheld members, and a whole group ca
   const rows = text.slice(text.indexOf("next up"), text.indexOf("in progress:")).split("\n");
   assert.ok(rows.includes("  together: TL-2  — with TL-3, which `next` hands out to nobody now"), rows.join("\n"));
   assert.ok(rows.includes("  together: TL-5, TL-6"), rows.join("\n"));
+});
+
+// ── An open question holds whatever the status (TL-666) ───────────────────
+
+test("an open question is a hold before any status, and a decision lifts it", () => {
+  const byId = index([]);
+  const q = (id, text, actor = "agent:q") => ({ id, field: FIELD_COMMENT, source: "ask", to: text, actor, ts: "2026-11-01T00:00:00Z" });
+  const reclaimable = { ...CONFIG, abandonedAfterDays: 30 };
+  const old = unattendedHold(claim("TL-1", { updated: "2026-09-01", history: [q("Q1", "Ship it?")] }), byId, reclaimable);
+  assert.deepEqual(old, {
+    kind: "open-question", startable: false, status: "in_progress",
+    question: "Ship it?", askedBy: "agent:q", event: "Q1", more: 0,
+  }, "a reclaimable claim with an open question was released");
+
+  const pending = unattendedHold(t("TL-2", { history: [q("Q1", "First?"), q("Q2", "Second?")] }), byId, CONFIG);
+  assert.deepEqual([pending.kind, pending.status, pending.event, pending.question, pending.more],
+    ["open-question", "pending", "Q1", "First?", 1]);
+  // It outranks every other hold, because `isExecutable` refuses it first.
+  assert.equal(unattendedHold(claim("TL-3", { updated: "2026-11-07", history: [q("Q1", "?")] }), byId, CONFIG).kind, "open-question");
+  assert.equal(unattendedHold(t("TL-4", { status: "awaiting_vouch", history: [q("Q1", "?")] }), byId, CONFIG).kind, "open-question");
+  assert.equal(unattendedHold(t("TL-5", { executor: "human", history: [q("Q1", "?")] }), byId, CONFIG).kind, "open-question");
+
+  // POSITIVE CONTROL: the same records with the question decided hold nothing.
+  const decided = { id: "D1", field: FIELD_DECISION, resolves: "Q1", ts: "2026-11-02T00:00:00Z" };
+  assert.equal(unattendedHold(claim("TL-6", { updated: "2026-09-01", history: [q("Q1", "?"), decided] }), byId, reclaimable), null);
+  assert.equal(unattendedHold(t("TL-7", { history: [q("Q1", "?"), decided] }), byId, CONFIG), null);
+  const one = unattendedHold(t("TL-8", { history: [q("Q1", "?"), q("Q2", "Left?"), decided] }), byId, CONFIG);
+  assert.deepEqual([one.event, one.question, one.more], ["Q2", "Left?", 0]);
+
+  // A question entry with none of its fields still holds, and names nothing.
+  const bare = unattendedHold(t("TL-9", { history: [{ field: FIELD_COMMENT, source: "ask" }] }), byId, CONFIG);
+  assert.deepEqual([bare.kind, bare.question, bare.askedBy, bare.event], ["open-question", "", "", ""]);
+
+  const state = planState({ waves: [{ name: "w", tasks: ["TL-2"], together: [] }] }, [t("TL-2", { history: [q("Q1", "?")] })], CONFIG);
+  assert.equal(state.waves[0].held, true);
+  assert.deepEqual(state.nextUp, [], "a task `next` refuses for its question was listed as next up");
+});
+
+/**
+ * Wave 1's only open task is the claim: the vouch is closed. The question is
+ * asked through `ask`, which moves the task into a protected status, and the
+ * status is then written back by hand — the record no `ask` produces itself.
+ */
+function asked(f, status) {
+  setField(f.backlog, f.ids.vouch, "status", "done");
+  const r = cli(["ask", f.ids.claim, "--question", "Which storage layout does this keep?",
+    "--dir", f.backlog, "--actor", "agent:asker"], f.env);
+  assert.equal(r.code, 0, r.out + r.err);
+  setField(f.backlog, f.ids.claim, "status", status);
+  if (status === "in_progress") {
+    setField(f.backlog, f.ids.claim, "owner", "agent:gone");
+    setField(f.backlog, f.ids.claim, "updated", "2026-01-05");
+    const configPath = join(f.backlog, "config.yaml");
+    writeFileSync(configPath, readFileSync(configPath, "utf8") + "abandoned_after_days: 30\n", "utf8");
+  }
+}
+
+for (const status of ["in_progress", "pending"]) {
+  test("a " + status + " task with an open question holds its wave in plan exactly where the run stops", () => {
+    const f = tree();
+    asked(f, status);
+    const state = planJson(f);
+    assert.equal(state.activeWave, 0);
+    assert.equal(state.waves[0].held, true, JSON.stringify(state.waves[0]));
+    assert.deepEqual(state.nextUp, []);
+    const hold = state.waves[0].tasks.find((e) => e.id === f.ids.claim).hold;
+    assert.deepEqual([hold.kind, hold.status, hold.askedBy, hold.question],
+      ["open-question", status, "agent:asker", "Which storage layout does this keep?"]);
+
+    const dry = dryRun(f, true);
+    assert.deepEqual(dry.order, [], "the projection listed work behind a held wave");
+    assert.equal(dry.stoppedAt.wave, 1);
+    assert.equal(dry.stoppedAt.held, true);
+    assert.deepEqual(dry.stoppedAt.holds.map((h) => [h.id, h.kind]), [[f.ids.claim, "open-question"]]);
+    const reason = dry.stoppedAt.holds[0].reason;
+    assert.match(reason, /^an open question is waiting for a decision \(agent:asker, `[^`]+`\): Which storage layout does this keep\?$/);
+
+    const text = cli(["plan", "--dir", f.backlog], f.env).out;
+    const section = text.slice(text.indexOf("next up"), text.indexOf("in progress:"));
+    assert.match(section, /held — no unattended run will take any open task of this wave/, section);
+    assert.ok(section.includes(f.ids.claim + "  " + reason), section);
+    assert.doesNotMatch(section, /waiting on a blocker/, "the empty next-up line blamed a blocker for a question");
+  });
+}
+
+test("POSITIVE CONTROL: the same trees with the question decided are not held, and the run walks past", () => {
+  for (const status of ["in_progress", "pending"]) {
+    const f = tree();
+    asked(f, status);
+    const history = readFileSync(join(f.backlog, "history", f.ids.claim + ".jsonl"), "utf8")
+      .split("\n").filter(Boolean).map((l) => JSON.parse(l));
+    const question = history.find((e) => e.field === FIELD_COMMENT && e.source === "ask");
+    assert.ok(question, "the fixture recorded no question");
+    const d = cli(["decide", f.ids.claim, "--resolves", question.id, "--reason", "keep the current layout",
+      "--dir", f.backlog, "--actor", "local:person"], f.env);
+    assert.equal(d.code, 0, d.out + d.err);
+    // `decide` puts the task back where `ask` found it; the hand-written
+    // status is what this case is about, so it is written again.
+    // `setField` refuses a write that changes nothing, so each field is
+    // written only where `decide` left a different value.
+    const now = readFileSync(taskPath(f.backlog, f.ids.claim), "utf8");
+    if (!new RegExp("^status: " + status + "\\b", "m").test(now)) setField(f.backlog, f.ids.claim, "status", status);
+    if (status === "in_progress" && !/^updated: 2026-01-05$/m.test(now)) setField(f.backlog, f.ids.claim, "updated", "2026-01-05");
+
+    const state = planJson(f);
+    assert.equal(state.waves[0].held, false, status + ": " + JSON.stringify(state.waves[0]));
+    assert.equal(state.waves[0].tasks.find((e) => e.id === f.ids.claim).hold, null);
+    const dry = dryRun(f, true);
+    assert.equal(dry.stoppedAt, null, status + ": " + JSON.stringify(dry.stoppedAt));
+    assert.deepEqual(dry.order.map((o) => o.id), [f.ids.claim, f.ids.behind]);
+  }
+});
+
+test("a blocker inside the wave is reachable work, and a question on the blocked task is not", () => {
+  // Both tasks pending, the claim waiting on the vouch: the run closes the
+  // blocker first, so the wave is finishable and the projection walks on.
+  const f = tree();
+  setField(f.backlog, f.ids.claim, "blocked_by", "[" + f.ids.vouch + "]");
+  const walked = dryRun(f, true);
+  assert.equal(walked.stoppedAt, null, JSON.stringify(walked.stoppedAt));
+  assert.deepEqual(walked.order.map((o) => o.id), [f.ids.vouch, f.ids.behind]);
+
+  // The same blocked task with an open question: closing its blocker lifts
+  // nothing, so the run stops at this wave and `plan` names the question.
+  const r = cli(["ask", f.ids.claim, "--question", "Is this still wanted?", "--dir", f.backlog, "--actor", "agent:asker"], f.env);
+  assert.equal(r.code, 0, r.out + r.err);
+  setField(f.backlog, f.ids.claim, "status", "pending");
+  const dry = dryRun(f, true);
+  assert.deepEqual(dry.order.map((o) => o.id), [f.ids.vouch], "the projection walked past a question");
+  assert.equal(dry.stoppedAt.wave, 1);
+  assert.deepEqual([dry.stoppedAt.reachable, dry.stoppedAt.left], [1, 1]);
+  assert.deepEqual(dry.stoppedAt.holds.map((h) => [h.id, h.kind]), [[f.ids.claim, "open-question"]]);
+  const hold = planJson(f).waves[0].tasks.find((e) => e.id === f.ids.claim).hold;
+  assert.equal(describeHold(hold), dry.stoppedAt.holds[0].reason);
 });

@@ -360,12 +360,17 @@ const holdDayOf = (s) => String(s || "").slice(0, 10);
  * THE KINDS, and whether a PERSON asking `next` may still be handed the task
  * (`startable`) — which decides whether it stays in `next up`:
  *
+ *   open-question     a question `ask` recorded and nobody has decided,
+ *                     WHATEVER THE STATUS (TL-666). `isExecutable` refuses
+ *                     it before it reads a status, so a claim old enough to
+ *                     reclaim, or a `pending` task whose status a person set
+ *                     back by hand, is held exactly as a protected one is.
+ *                                                                  no
  *   awaiting-vouch    the project's `awaiting_vouch_status`. The work is
  *                     finished and a person has to vouch for it.   no
  *   protected-status  a status `reason_required_statuses` protects, not
  *                     discharged: nothing named in `blocked_by`, a blocker
- *                     still open, an open question, or a run parked it there.
- *                                                                  no
+ *                     still open, or a run parked it there.        no
  *   parked-claim      in progress with no recorded change for more than
  *                     `audit_stale_days` — what `audit` reports as parked.
  *                                                                  no
@@ -374,11 +379,11 @@ const holdDayOf = (s) => String(s || "").slice(0, 10);
  *   over-size         an estimate above `max_unattended_estimate`. yes
  *
  * A CLAIM PAST `abandoned_after_days` IS NOT A STATUS HOLD: `next` reclaims
- * it. Neither is a protected status its named blockers discharged. Both still
- * meet the person-only and over-size gates, which the dispatcher applies to
- * every record before it reads a status. A task waiting on a blocker is not a
- * hold either — the run closes the blocker first, which is the rule
- * `projectionWall` states.
+ * it, unless a question is open on it. Neither is a protected status its
+ * named blockers discharged. Both still meet the person-only and over-size
+ * gates, which the dispatcher applies to every record before it reads a
+ * status. A task waiting on a blocker is not a hold either — the run closes
+ * the blocker first, which is the rule `projectionWall` states.
  *
  * WITHOUT `config.now` NOTHING IS AGED: a claim is then `claimed`, never
  * parked and never abandoned, because no date is not an old date.
@@ -404,6 +409,18 @@ function statusHold(task, byId, config, archived) {
   const status = task.status;
   const now = Number.isFinite(config.now) ? config.now : null;
   const history = task.history || [];
+
+  // Before any status: `isExecutable` refuses an open question first, so no
+  // status — not a reclaimable claim, not `pending` — releases the task.
+  const questions = openQuestions(history);
+  if (questions.length) {
+    const first = questions[0];
+    return {
+      kind: "open-question", startable: false, status,
+      question: String(first.to || ""), askedBy: String(first.actor || ""), event: String(first.id || ""),
+      more: questions.length - 1,
+    };
+  }
 
   if (config.awaitingVouchStatus && status === config.awaitingVouchStatus) {
     return { kind: "awaiting-vouch", startable: false, status };
@@ -443,11 +460,10 @@ function statusHold(task, byId, config, archived) {
       const blocker = byId.get(b);
       return !blocker || !archived.has(blocker.status);
     });
-    const asked = openQuestions(history).length > 0;
     const into = history.filter((e) => e && e.field === "status" && e.to === status).pop();
     const parkedByRun = !!(into && into.park === true);
-    if (named.length && !open.length && !asked && !parkedByRun) return null;
-    return { kind: "protected-status", startable: false, status, blockedBy: open, named: named.length, asked, parkedByRun };
+    if (named.length && !open.length && !parkedByRun) return null;
+    return { kind: "protected-status", startable: false, status, blockedBy: open, named: named.length, parkedByRun };
   }
   return null;
 }
@@ -481,14 +497,18 @@ export function describeHold(hold) {
   switch (hold.kind) {
     case "awaiting-vouch":
       return "awaiting a person's vouch (status `" + hold.status + "`)";
+    case "open-question":
+      // The asker and the event id are what `decide --resolves` needs; the
+      // words are the question, so a reader knows what is being waited on.
+      return "an open question is waiting for a decision (" + hold.askedBy + ", `" + hold.event + "`): " +
+        hold.question.replace(/\s+/g, " ").trim() +
+        (hold.more > 0 ? " — and " + hold.more + " more" : "");
     case "protected-status": {
-      const why = hold.asked
-        ? "an open question is waiting for a decision"
-        : hold.parkedByRun
-          ? "a run parked it there"
-          : hold.blockedBy.length
-            ? "waiting on " + hold.blockedBy.join(", ")
-            : "nothing is named in `blocked_by`";
+      const why = hold.parkedByRun
+        ? "a run parked it there"
+        : hold.blockedBy.length
+          ? "waiting on " + hold.blockedBy.join(", ")
+          : "nothing is named in `blocked_by`";
       return "in `" + hold.status + "`, a status `reason_required_statuses` protects — " + why;
     }
     case "parked-claim":
@@ -525,8 +545,9 @@ export function describeHold(hold) {
  *                finished; the plan is read from the front.
  *   next up      the open tasks of that wave whose every `blocked_by` is closed,
  *                less those `next` hands out to nobody (`unattendedHold`, a
- *                hold that is not `startable`: a vouch, a protected status, a
- *                claim). Since TL-645 it never names what `next --plan` will not.
+ *                hold that is not `startable`: an open question, a vouch, a
+ *                protected status, a claim). Since TL-645 it never names what
+ *                `next --plan` will not.
  *                A `together` group is one entry and is ready only when ALL of
  *                its open members are — the group exists to say "these are done
  *                as one act", and half a group is not that act.
@@ -612,16 +633,18 @@ export function planState(plan, tasks, config = {}) {
 
   // An unknown blocker does not block: `check --refs` owns that defect, and
   // treating it as blocking here would hide every ready task behind a typo.
+  // An open question needs no test here: it is an `open-question` hold, which
+  // keeps the task out of `openIds` below (TL-666).
   const cleared = (t) =>
-    !openQuestions((t && t.history) || []).length &&
     (t.blocked_by || []).every((b) => !byId.has(b) || archived.has(byId.get(b).status));
 
   const nextUp = [];
   if (activeWave >= 0) {
     const w = waves[activeWave];
     // A task `next` hands out to NOBODY is not next up, whoever reads the plan
-    // (TL-645): a vouch, a protected status, a claim. A person-only or
-    // over-size task stays — a person asking is handed it — and is marked.
+    // (TL-645): a question, a vouch, a protected status, a claim. A
+    // person-only or over-size task stays — a person asking is handed it —
+    // and is marked.
     const openIds = w.tasks.filter((e) => e.open && !(e.hold && !e.hold.startable)).map((e) => e.id);
     const openSet = new Set(openIds);
     const groupOf = new Map();
