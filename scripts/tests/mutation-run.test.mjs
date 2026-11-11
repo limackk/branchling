@@ -19,8 +19,8 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { SCRIPTS_DIR, isolateHome } from "./_repo.mjs";
-import { MIN_SWEEP_MARKER, leftoverProcesses, reachesCli, sandboxCommand, strykerEnv, sweepLeftovers } from "../mutation-run.mjs";
+import { SCRIPTS_DIR, isolateHome, scriptSource } from "./_repo.mjs";
+import { MIN_SWEEP_MARKER, SOURCE_ROOT_ENV, leftoverProcesses, reachesCli, sandboxCommand, strykerEnv, sweepLeftovers } from "../mutation-run.mjs";
 
 const HOME = isolateHome("mutation-run");
 const ENTRY = join(SCRIPTS_DIR, "mutation-run.mjs");
@@ -253,6 +253,23 @@ test("Stryker is started without the active mutant or the test context of a run 
   assert.deepEqual(strykerEnv(above), { PATH: "/bin", HOME: "/h" });
   assert.equal(above.__STRYKER_ACTIVE_MUTANT__, "0", "the caller's environment was changed, not copied");
   assert.equal(strykerEnv().PATH, process.env.PATH, "without an argument it is this process's environment");
+});
+
+// TL-653. A test that reads a module's source text must find it as written,
+// not the instrumented sandbox copy, or the initial run fails on a change it
+// has nothing to do with.
+test("Stryker is told the tree the run started in, never an outer run's", () => {
+  const above = { PATH: "/bin", [SOURCE_ROOT_ENV]: "/outer" };
+  assert.deepEqual(strykerEnv(above, "/inner"), { PATH: "/bin", [SOURCE_ROOT_ENV]: "/inner" });
+  assert.deepEqual(strykerEnv(above), { PATH: "/bin" }, "without a root an outer run's tree is dropped, not kept");
+});
+
+test("scriptSource reads the tree a mutation run names, and this one otherwise", () => {
+  const root = fixtureDir(join(tmpdir(), "branchling-test-mutation-source-root-"));
+  write(root, "scripts/build-viewer.mjs", "// the original, uninstrumented\n");
+  assert.equal(scriptSource("build-viewer.mjs", { [SOURCE_ROOT_ENV]: root }), "// the original, uninstrumented\n");
+  assert.equal(scriptSource("mutation-run.mjs", {}), readFileSync(ENTRY, "utf8"));
+  rmSync(root, { recursive: true, force: true });
 });
 
 test("the test command runs inside the containing process group", () => {

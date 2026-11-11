@@ -24,17 +24,16 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 
 import { auditText } from "../check-no-foreign-context.mjs";
 import { STORAGE_KEY_PREFIX } from "../product.mjs";
 import { buildHtml, readTasks } from "../build-viewer.mjs";
-import { BACKLOG_DIR, SCRIPTS_DIR, isolateHome } from "./_repo.mjs";
+import { BACKLOG_DIR, isolateHome, scriptSource } from "./_repo.mjs";
 
 isolateHome("viewer-storage-keys");
 
-const VIEWER_SOURCE = readFileSync(join(SCRIPTS_DIR, "build-viewer.mjs"), "utf8");
+// The text as written, not a mutation run's instrumented copy (TL-653).
+const VIEWER_SOURCE = scriptSource("build-viewer.mjs");
 
 /** Every place the page reaches for browser storage with a STRING instead of a
  *  constant. PURE, so the positive control can drive it. */
@@ -67,10 +66,17 @@ test("POSITIVE CONTROL: a literal key IS caught", () => {
   assert.deepEqual(literalStorageKeys('const k = PREFIX + "-board";'), []);
 });
 
+const DERIVED_PREFIX = /STORAGE_KEY_PREFIX \+ "-backlog"/;
+
 test("the prefix is the FROZEN constant, not the display name", () => {
   assert.equal(STORAGE_KEY_PREFIX, "branchling");
-  assert.match(VIEWER_SOURCE, /STORAGE_KEY_PREFIX \+ "-backlog"/,
+  assert.match(VIEWER_SOURCE, DERIVED_PREFIX,
     "the page's prefix must be derived from the frozen constant in product.mjs");
+});
+
+test("POSITIVE CONTROL: a prefix written out as a literal is NOT taken for the derived one", () => {
+  assert.doesNotMatch('const storagePrefix = JSON.stringify("branchling-backlog");', DERIVED_PREFIX);
+  assert.match('const storagePrefix = JSON.stringify(STORAGE_KEY_PREFIX + "-backlog");', DERIVED_PREFIX);
 });
 
 test("the built page declares one prefix, and every key hangs off it", () => {

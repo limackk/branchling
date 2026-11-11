@@ -28,6 +28,7 @@ import { fileURLToPath } from "node:url";
 import { HOME_ENV } from "../home.mjs";
 import { STATE_DIR_ENV } from "../lock.mjs";
 import { loadConfig } from "../config.mjs";
+import { SOURCE_ROOT_ENV } from "../mutation-run.mjs";
 import { templateDrift } from "../new-task.mjs";
 import { looksLikeBacklogDir } from "../paths.mjs";
 
@@ -63,6 +64,21 @@ export const BACKLOG_DIR = findOwnBacklog();
 
 /** `<backlog>/tasks` — the only source of truth about tasks. */
 export const TASKS_DIR = join(BACKLOG_DIR, "tasks");
+
+/**
+ * The source text of `scripts/<name>`, as the author wrote it (TL-653).
+ *
+ * Inside a mutation run the file under `SCRIPTS_DIR` is Stryker's instrumented
+ * copy, in which every string literal is wrapped in a mutant switch; a test
+ * that matches the source with a regex then fails in the initial run and no
+ * mutant is ever tried. `mutation-run.mjs` names the tree it started in
+ * through `SOURCE_ROOT_ENV`, and this reads from there. Outside a run the
+ * variable is absent and this is `SCRIPTS_DIR` itself. Use it for a guard
+ * about the code's TEXT; a test of its behaviour imports the module instead.
+ */
+export function scriptSource(name, env = process.env) {
+  return readFileSync(join(env[SOURCE_ROOT_ENV] || REPO_ROOT, "scripts", name), "utf8");
+}
 
 
 /**
