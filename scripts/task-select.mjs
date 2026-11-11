@@ -231,7 +231,7 @@ const allStatuses = (t) => [t.status].concat((t.elsewhere || []).map((e) => e.st
 /**
  * @param {object[]} tasks
  * @param {object} f the axes from `splitList` (null = the axis is not filtered),
- *        plus `text` — a substring of "id title".
+ *        plus `text` — a substring of "id title" — and `ids`, exact task ids.
  * @param {Set<string>} archived which statuses count as closed; they are dropped
  *        UNLESS `--status` was given explicitly. In a backlog of any age most
  *        tasks are closed and would flood every answer.
@@ -261,6 +261,9 @@ export function filterTasks(tasks, f, archived) {
     if (f.label && !f.label.some((l) => t.labels.includes(l))) return false;
     if (f.epic && !f.epic.some((e) => String(t.epic || "").toLowerCase().includes(e.toLowerCase()))) return false;
     if (f.blockedBy && !f.blockedBy.some((b) => t.blocked_by.includes(b))) return false;
+    // An EXACT id, never a substring: `--text TL-66` also matches TL-660 to
+    // TL-669, which is why a list of known tasks needs an axis of its own.
+    if (f.ids && !f.ids.includes(t.id)) return false;
     if (f.text && !(t.id + " " + t.title).toLowerCase().includes(String(f.text).toLowerCase())) return false;
     return true;
   });
