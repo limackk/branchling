@@ -104,7 +104,7 @@ waves:
   # among them) share the mutation group with TL-646; TL-652 keeps the
   # viewer group. TL-662 asserts the output TL-649 added to `new`.
   - name: "The follow-ups filed in waves 7 and 8 close"
-    tasks: [TL-651, TL-655, TL-656, TL-659, TL-661, TL-653, TL-654, TL-657, TL-658, TL-662]
+    tasks: [TL-651, TL-655, TL-656, TL-659, TL-661, TL-654, TL-657, TL-658, TL-662]
 
   # THE LOOPS' OWN PRECONDITIONS, before the next supervised run. Three
   # OOM kills on 2026-11-08 and 2026-11-09 came from parallel suites and
@@ -152,7 +152,7 @@ waves:
   # is the most urgent of them — every day without it raises the price of a
   # rename it might still require.
   - name: "Human publication gates"
-    tasks: [TL-179, TL-456, TL-457, TL-498, TL-555, TL-647, TL-472, TL-102, TL-473, TL-652]
+    tasks: [TL-179, TL-456, TL-457, TL-498, TL-555, TL-647, TL-472, TL-102, TL-473, TL-652, TL-653]
 
   # The release happened; what stays open is the evidence that the next one
   # repeats it rather than remembering it. The announcement follows, because
