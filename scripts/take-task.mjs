@@ -39,6 +39,7 @@
  * Tests: `node --test scripts/tests/next.test.mjs`
  *        `node --test scripts/tests/takeover.test.mjs`
  *        `node --test scripts/tests/take-atomicity.test.mjs`
+ *        `node --test scripts/tests/take-closed-resume.test.mjs`
  */
 
 import { spawnSync } from "node:child_process";
@@ -49,7 +50,10 @@ import { fileURLToPath } from "node:url";
 
 import { actorRequiredRefusal, resolveActorReport } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
+import { repoRootFor } from "./branch-scan.mjs";
+import { repoRelative } from "./canonical-path.mjs";
 import { probeTask } from "./done-task.mjs";
+import { gitDiscoveryEnv } from "./git-env.mjs";
 import { withProbe } from "./probe.mjs";
 import { statedActorRefusal, changesRequiringReason, currentSession, eventId, FIELD_ROLE_OVERRIDE, FIELD_TAKEOVER, isValidReason, normalizeReason, readHistory, reasonRefusal, recordEdit } from "./history.mjs";
 import { decisionsOf, withDecisions } from "./decisions.mjs";
@@ -58,6 +62,7 @@ import { acquireLock, isExpired, lockDir, peekLock, readLock, releaseLock } from
 import { answerBacklogDirRefusal, backlogPaths, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { buildFieldSpecs, extractMeta, fieldSpec, setFrontmatterField, splitFrontmatter } from "./task-fields.mjs";
+import { DEFAULT_BASE } from "./resume-task.mjs";
 import { readTaskRecords } from "./task-select.mjs";
 import { MARK, color, failure, warn } from "./ui.mjs";
 import { todayStamp } from "./today.mjs";
@@ -150,6 +155,39 @@ export function inProgressStatus(config) {
   return config.inProgressStatus || null;
 }
 
+/**
+ * The closing of `id` when it is THIS actor's and the default branch does not
+ * carry it — the state a session leaves behind when it dies between `done` and
+ * the commit or the merge (TL-684). Null in every other case, including every
+ * case this function cannot settle: no closing record, a closing by somebody
+ * else, no repository, or no `DEFAULT_BASE` ref. An unsettled case keeps the
+ * reopen refusal, because pointing a caller at a resume of somebody else's
+ * decision is the takeover `resume` itself refuses.
+ *
+ * "Carried by the base" is read from the task file on the base ref, not from
+ * commit ancestry: an uncommitted closing, a closing committed on an unmerged
+ * branch and a closing merged and then reverted all answer the one question
+ * the caller has — whether the rest of the repository sees the task as closed.
+ */
+function ownUnmergedClosing(root, config, id, file, actor) {
+  const closing = readHistory(root, id)
+    .filter((e) => e && e.field === "status" && config.archivedStatuses.indexOf(e.to) >= 0)
+    .pop();
+  if (!closing || closing.actor !== actor) return null;
+  const top = repoRootFor(root);
+  if (!top) return null;
+  const base = DEFAULT_BASE;
+  const gitIn = (args) => spawnSync("git", args, {
+    cwd: top, env: gitDiscoveryEnv(), encoding: "utf8", timeout: 30_000,
+    stdio: ["ignore", "pipe", "ignore"],
+  });
+  if (gitIn(["rev-parse", "--verify", "--quiet", base + "^{commit}"]).status !== 0) return null;
+  const shown = gitIn(["show", base + ":" + repoRelative(top, file)]);
+  const baseStatus = shown.status === 0 ? extractMeta(splitFrontmatter(shown.stdout).frontmatter).status || null : null;
+  if (config.archivedStatuses.indexOf(baseStatus) >= 0) return null;
+  return { base, ts: closing.ts || null, baseStatus };
+}
+
 /** The refusal for a task another session holds the reservation of — one
  *  sentence for the real take and for the dry run that projects it. */
 function lockedRefusal(id, holder, config) {
@@ -204,6 +242,20 @@ export function takeTask(opts) {
   const file = join(paths.tasksDir, record.file.replace(/^tasks\//, ""));
 
   if (config.archivedStatuses.indexOf(record.status) >= 0) {
+    const own = ownUnmergedClosing(root, config, id, file, actor);
+    if (own) {
+      return {
+        ok: false, kind: "closed-unmerged", id,
+        message: id + " is closed (status: " + record.status + "), by you, and `" + own.base + "` does not have that closing",
+        details: [
+          actor + " closed it at " + (own.ts || "an unrecorded time") + "; on `" + own.base + "` it is " +
+            (own.baseStatus ? "still `" + own.baseStatus + "`" : "absent") + ".",
+          "The session that closed it stopped before its commit or its merge.",
+          "Do not reopen it — the closing stands. Finish it from the briefing:",
+        ],
+        next: [N + " resume " + id + " --actor " + actor],
+      };
+    }
     return {
       ok: false, kind: "closed", id,
       message: id + " is closed (status: " + record.status + ")",
@@ -649,7 +701,9 @@ export function refusalPayload(result, fallbackId) {
     id: result.id || fallbackId || null,
     refusalKind: result.kind,
     refusal: result.message,
-    details: result.details || [],
+    // The command a refusal points at is part of its details in JSON — the
+    // envelope's keys are fixed, and the route is what a consumer acts on.
+    details: (result.details || []).concat(result.next || []),
   };
 }
 
@@ -723,7 +777,7 @@ export function run(argv) {
     if (plan.json) {
       printJson("task-take", { ...refusalPayload(result, plan.id), actorSource });
     } else {
-      console.error(failure(N + " take", result.message, result.details || []));
+      console.error(failure(N + " take", result.message, result.details || [], result.next || []));
     }
     return refusalCode(result.kind);
   }
