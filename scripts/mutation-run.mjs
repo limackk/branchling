@@ -117,6 +117,8 @@ const BARE_KEYS = { "--named-only": "namedOnly", "--changed-lines": "changedLine
 const STRYKER_PIN = "@stryker-mutator/core";
 /** Beyond this share of the candidate test files, naming a module selects nothing narrower than the suite. */
 export const NAMED_ONLY_MAX_SHARE = 0.5;
+/** The variable that names the tree a run started in; see strykerEnv. */
+export const SOURCE_ROOT_ENV = "MUTATION_SOURCE_ROOT";
 // The file in THIS tree, never the sandbox copy, which Stryker may mutate.
 const CONTAIN_ENTRY = join(dirname(fileURLToPath(import.meta.url)), "mutation-contain.mjs");
 
@@ -576,11 +578,24 @@ export function strykerConfig(p, opts, links, work) {
  * with `subprocess-kill.test.mjs` under ids 0 and 1. The outer mutant stays
  * active in the process that calls this, which read the id when it loaded;
  * only the copy handed to Stryker loses it.
+ *
+ * What it ADDS is `SOURCE_ROOT_ENV`, naming the tree this run was started in
+ * (TL-653). A test that reads a module's SOURCE TEXT finds the sandbox copy,
+ * which Stryker has instrumented: every string literal is wrapped in a mutant
+ * switch, so a regex for `X + "-backlog"` cannot match and the initial run
+ * fails before a single mutant is tried. The instrumented text is the same
+ * for every mutant, so such a test can never kill one; reading the original
+ * through `scriptSource()` in `tests/_repo.mjs` keeps it a true statement
+ * about the code instead of a failure the change under test did not cause.
+ * An outer run's value is replaced, never inherited: its tree is not this
+ * run's.
  */
-export function strykerEnv(env = process.env) {
+export function strykerEnv(env = process.env, root = null) {
   const copy = { ...env };
   delete copy.NODE_TEST_CONTEXT;
   delete copy.__STRYKER_ACTIVE_MUTANT__;
+  delete copy[SOURCE_ROOT_ENV];
+  if (root) copy[SOURCE_ROOT_ENV] = root;
   return copy;
 }
 
@@ -596,7 +611,7 @@ function runStryker(root, p, opts) {
     writeFileSync(configPath, JSON.stringify(config, null, 2));
     const r = spawnSync(process.execPath, [bin, "run", configPath], {
       cwd: root,
-      env: strykerEnv(),
+      env: strykerEnv(process.env, root),
       stdio: ["ignore", opts.json ? "pipe" : "inherit", opts.json ? "pipe" : "inherit"],
       encoding: "utf8",
     });
