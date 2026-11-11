@@ -51,13 +51,23 @@
  * used to have a claim as its side effect, and undoing one costs a `release`
  * with a reason plus two restored files.
  *
+ * A STOP REQUEST (TL-697). `run --stop` writes a request that every run of the
+ * clone reads before its next `next`; a loop built on `next` alone — a
+ * supervisor calling `next --plan` itself — had no way to be told the same.
+ * `next` now reads the request before anything else that could lead to a claim
+ * and, while it holds, claims nothing and answers `stop-requested` with exit 3:
+ * a loop that cannot tell it from an empty queue still does the right thing,
+ * which is to take nothing more. How long a request holds is `run-stop.mjs`'s.
+ *
  * EXIT CODES. 0 took a task (under `--dry-run`: would take one) · 3 nothing to
- * take · 1 a refusal about a task that exists · 2 a usage error. "Nothing to
+ * take, or a stop request holds · 1 a refusal about a task that exists · 2 a
+ * usage error. "Nothing to
  * take" must be distinguishable from "the call was wrong", or a loop cannot
  * tell an empty queue from its own typo.
  *
  * Tests: `node --test scripts/tests/next.test.mjs`
  *        `node --test scripts/tests/next-dry-run.test.mjs`
+ *        `node --test scripts/tests/next-stop-request.test.mjs`
  */
 
 import { dirname } from "node:path";
@@ -71,6 +81,7 @@ import { statedActorRefusal, FIELD_COMMENT, openQuestions, readAllHistory, readH
 import { answerBacklogDirRefusal, backlogPaths, isBacklogDirRefusal, resolveBacklogDir } from "./paths.mjs";
 import { dispatchWave, loadPlanForDispatch, scheduledIds } from "./plan.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
+import { stopRequestInForce, stopRequestPath } from "./run-stop.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { probeTask } from "./done-task.mjs";
 import { inProgressStatus, rebuildViews, refusalCode, refusalPayload, renderTake, takeJson, takeTask } from "./take-task.mjs";
@@ -857,6 +868,12 @@ export function run(argv) {
     if (!isBacklogDirRefusal(e)) throw e;
     return answerBacklogDirRefusal(e, { command: N + " next", jsonKind: plan.json ? "task-take" : null, payload: { taken: false, actorSource } });
   }
+  // BEFORE THE CONFIGURATION, as `run --stop` is (TL-697): the request needs the
+  // clone and nothing else, and a backlog whose configuration is broken must
+  // still be stoppable. `--dry-run` is refused alike — it answers what a real
+  // call would hand out, and a real call would hand out nothing.
+  const stop = stopRequestInForce(root);
+  if (stop) return refuseStopRequested(plan, actorSource, root, stop);
   const config = loadConfigOrExit(root);
 
   // `--plan` is settled BEFORE the scan and before any claim (TL-183): a caller
@@ -1259,6 +1276,32 @@ export function run(argv) {
     // NOT an error, and it says so: silence here would read as a crash, and an
     // error would make an empty queue indistinguishable from a broken call.
     console.log(color.dim(MARK.bullet) + " nothing to take");
+    for (const d of details) console.log("  " + color.dim(d));
+  }
+  return EXIT_NOTHING_TO_TAKE;
+}
+
+/**
+ * A stop request holds (TL-697). Exit 3 like an empty queue — nothing was
+ * claimed and the call was built right — with its own `refusalKind`, so a loop
+ * that wants to can tell "stop" from "nothing left". On stdout, as `nothing to
+ * take` is: it is the answer to the question asked, not a diagnostic.
+ */
+function refuseStopRequested(plan, actorSource, root, stop) {
+  const { origin } = stopRequestPath(root);
+  const refusal = "stop requested — nothing is claimed while it holds";
+  const details = [
+    "requested " + stop.requestedAt + (stop.by ? " by " + stop.by : "") + " with `" + N + " run --stop`, for " + origin,
+    "withdraw it with `" + N + " run --stop --clear` to claim again",
+  ];
+  if (plan.json) {
+    printJson("task-take", {
+      ok: false, taken: false, actorSource, refusalKind: "stop-requested", refusal, details,
+      stopRequest: { requestedAt: stop.requestedAt, by: stop.by || null, origin },
+      dryRun: plan.dryRun,
+    });
+  } else {
+    console.log(color.dim(MARK.bullet) + " " + refusal);
     for (const d of details) console.log("  " + color.dim(d));
   }
   return EXIT_NOTHING_TO_TAKE;

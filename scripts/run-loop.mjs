@@ -88,7 +88,7 @@ import { historyPath, readHistory, recordEdit } from "./history.mjs";
 import { roleBrief } from "./instructions.mjs";
 import { userConfigPath } from "./home.mjs";
 import { lockScope, releaseLock, stateRoot } from "./lock.mjs";
-import { requestStop, stopRequestedSince } from "./run-stop.mjs";
+import { clearStop, requestStop, STOP_SINCE_ENV, stopRequestedSince } from "./run-stop.mjs";
 import { callerSpecies, deadlockIdentity, describeConflict, describeDeadlock, isOverSized, parkedByRun, queueStatuses, readDispatchRecords, selectCandidates, servesExecutor } from "./next-task.mjs";
 import { answerBacklogDirRefusal, backlogPaths, isBacklogDirRefusal, repositoryRoot, resolveBacklogDir } from "./paths.mjs";
 import { loadPlanForDispatch, planState, projectionWall } from "./plan.mjs";
@@ -124,12 +124,12 @@ export const AGENT_ENV = "BACKLOG_AGENT_COMMAND";
 export const RUN_FLAGS = [
   "--dir", "--actor", "--agent", "--agent-for", "--profile", "--profile-for", "--max-attempts", "--max-tasks", "--timeout",
   "--log-dir", "--stuck-status", "--delegation", "--allow-uncontrolled-delegation", "--json", "--dry-run", "--plan", "--probe",
-  "--board", "--label", "--priority", "--epic", "--stop", "--before-next", "--commit-state", "--wait", "--wait-max",
+  "--board", "--label", "--priority", "--epic", "--stop", "--clear", "--before-next", "--commit-state", "--wait", "--wait-max",
 ];
 
 /** What `--stop` may be combined with: it names a clone and who asks, nothing a
  *  loop would use, so anything else on the line is a run somebody meant to start. */
-const STOP_FLAGS = ["--stop", "--dir", "--actor", "--json"];
+const STOP_FLAGS = ["--stop", "--clear", "--dir", "--actor", "--json"];
 
 const DEFAULT_MAX_ATTEMPTS = 2;
 const DEFAULT_TIMEOUT_SECONDS = 900;
@@ -143,7 +143,7 @@ export function parseRunArgs(args) {
   const plan = {
     dir: null, actor: null, agent: null, profile: null, agentFor: {}, profileFor: {}, json: false, dryRun: false, usePlan: false,
     maxAttempts: DEFAULT_MAX_ATTEMPTS, maxTasks: 0, timeout: DEFAULT_TIMEOUT_SECONDS, probe: false, delegation: "provider", allowUncontrolledDelegation: false,
-    logDir: null, stuckStatus: null, board: null, label: null, priority: null, epic: null, stop: false,
+    logDir: null, stuckStatus: null, board: null, label: null, priority: null, epic: null, stop: false, clear: false,
     beforeNext: null, commitState: false, wait: 0, waitMax: 0,
   };
   const given = [];
@@ -152,6 +152,7 @@ export function parseRunArgs(args) {
     const a = args[i];
     if (a.startsWith("-")) given.push(a);
     if (a === "--stop") { plan.stop = true; continue; }
+    if (a === "--clear") { plan.clear = true; continue; }
     if (a === "--json") { plan.json = true; continue; }
     if (a === "--dry-run") { plan.dryRun = true; continue; }
     if (a === "--probe") { plan.probe = true; continue; }
@@ -212,6 +213,9 @@ export function parseRunArgs(args) {
         "told which task to run is a queue with the choosing put back in."
     );
   }
+  // `--clear` withdraws a stop request (TL-697); on its own it would read as a
+  // run that ignored a flag, so it is refused without `--stop`.
+  if (plan.clear && !plan.stop) throw new Error("`--clear` withdraws a stop request and needs `--stop`: `run --stop --clear`");
   if (plan.stop) {
     const extra = given.filter((f) => STOP_FLAGS.indexOf(f) < 0);
     if (extra.length) {
@@ -1667,14 +1671,32 @@ export async function run(argv) {
   // A REQUEST, NOT A RUN (TL-485). It needs the clone and nothing else — no
   // configuration, no profile, no agent — so it is answered before any of them
   // is read, and a backlog whose configuration is broken can still be told to stop.
+  // A WITHDRAWAL (TL-697). `next` honours a request until it is withdrawn, so
+  // this is how the loops built on it are allowed to claim again. A run that
+  // already saw the request has already stopped; withdrawing it starts nothing.
+  if (plan.stop && plan.clear) {
+    const gone = clearStop(root);
+    const was = gone.request;
+    if (plan.json) {
+      printJson("run-stop", { ok: true, cleared: !!was, requestedAt: was ? was.requestedAt : null,
+        by: was ? was.by || null : null, origin: gone.origin, path: gone.path });
+    } else if (was) {
+      console.log(ok("stop request withdrawn — it was made " + was.requestedAt +
+        (was.by ? " by " + was.by : "") + "; `" + N + " next` claims again in " + gone.origin));
+    } else {
+      console.log(ok("no stop request was in force for " + gone.origin + " — nothing to withdraw"));
+    }
+    return 0;
+  }
   if (plan.stop) {
     const asked = requestStop(root, { actor: resolveActor(plan.actor, { fallback: "" }) || null });
     if (plan.json) {
-      printJson("run-stop", { ok: true, requestedAt: asked.requestedAt, by: asked.by, origin: asked.origin, path: asked.path });
+      printJson("run-stop", { ok: true, cleared: false, requestedAt: asked.requestedAt, by: asked.by, origin: asked.origin, path: asked.path });
     } else {
       console.log(ok("stop requested — every run of " + asked.origin +
         " finishes the task it is on, then claims nothing new"));
       console.log("  " + color.dim("a run started after this request is not affected · " + asked.path));
+      console.log("  " + color.dim("`" + N + " next` claims nothing until `" + N + " run --stop --clear` withdraws it"));
     }
     return 0;
   }
@@ -2115,8 +2137,22 @@ export async function run(argv) {
         break;
       }
     }
-    const handed = cli(["next", "--dir", root, "--actor", actor, "--json"].concat(passthrough));
+    // `next` honours a stop request on its own (TL-697), and for a one-shot call
+    // a request holds until withdrawn. This loop's rule is the older one — a
+    // request made after it started — so it hands `next` its start time, or a
+    // request left behind would end every later run at its first `next`.
+    const handed = cli(["next", "--dir", root, "--actor", actor, "--json"].concat(passthrough),
+      { env: { [STOP_SINCE_ENV]: new Date(started).toISOString() } });
     const answer = parseJson(handed.stdout);
+    // A request written between the check above and this `next`: the same stop,
+    // seen one step later, and nothing was claimed.
+    if (handed.status === 3 && answer && answer.refusalKind === "stop-requested") {
+      const after = taken.length ? taken[taken.length - 1].id : null;
+      const req = answer.stopRequest || {};
+      stopRequest = { requestedAt: req.requestedAt || null, by: req.by || null, after };
+      stopped = after ? "asked to stop after " + after : "asked to stop before any task was taken";
+      break;
+    }
     for (const finding of (answer && answer.skippedDeadlocked) || []) {
       skippedDeadlocked.set(deadlockIdentity(finding), finding);
     }
