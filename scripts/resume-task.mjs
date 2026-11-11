@@ -59,6 +59,7 @@
  * this one points at it rather than becoming a second route to the same effect.
  *
  * Tests: `node --test scripts/tests/resume-briefing.test.mjs`
+ *        `node --test scripts/tests/resume-unknown-owner.test.mjs`
  */
 
 import { spawnSync } from "node:child_process";
@@ -69,7 +70,7 @@ import { fileURLToPath } from "node:url";
 import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { PROJECT_ENTRY_TAG, closingContractOf, collisionHeadline, contractProblem, findTaskFile, repoRootFor, runContract, transcriptBlock } from "./done-task.mjs";
-import { statedActorRefusal, isValidActor, readHistory } from "./history.mjs";
+import { ACTOR_UNKNOWN, statedActorRefusal, isValidActor, readHistory } from "./history.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { backlogPaths, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
@@ -245,6 +246,17 @@ export function goalOf(body) {
  * handing back `--actor <them>`; a word that this predicate would let through
  * but `isValidActor` would not is a remedy the next invocation rejects as a
  * usage error, which leaves the successor with nothing to do at all.
+ *
+ * ONE WORD SITS ON BOTH SIDES OF THAT LINE (TL-671): the reserved `unknown`.
+ * `isValidActor` accepts it, because history readers and `reconcile()` record
+ * it, and a writing command refuses it when stated (TL-628). It stays a CLAIM
+ * here: an `owner: unknown` was written by a `take --actor unknown` before
+ * TL-628, or by a hand edit the log observed, and either way a session may
+ * still be working under it. Treating it as nobody would let any actor resume
+ * it quietly, the takeover in all but name that `claimant()` exists to stop.
+ * What changes is the REMEDY: there is nobody to ask and no actor to resume
+ * as, so the refusal names the deliberate route, `take --take-over`, which
+ * accepts a held `unknown` and records who crossed it.
  */
 function isClaim(owner) {
   return isValidActor(String(owner || ""));
@@ -563,6 +575,22 @@ function verdictWord(r) {
 // The command
 // ──────────────────────────────────────────────────────────────────────────
 
+/**
+ * The way out of a claim held by the reserved `unknown` (TL-671). The ordinary
+ * remedy, "resume as them", hands back `--actor unknown`, which every writing
+ * command and `resume` itself refuse as a usage error; and there is nobody to
+ * ask, because `unknown` names no session. So the route is the deliberate
+ * takeover, followed by the resume the successor asked for under its own name.
+ */
+function unattributedClaimRemedy(id, actor) {
+  return [
+    "`" + ACTOR_UNKNOWN + "` is reserved for a change the tool observed: it names nobody to",
+    "ask and no actor to resume as. Cross the claim deliberately, then resume:",
+    "  " + N + " take " + id + " --take-over --reason \"…\" --actor " + actor,
+    "  " + N + " resume " + id + " --actor " + actor,
+  ];
+}
+
 function refuse(plan, headline, details, kind) {
   if (plan.json) {
     printJson("resume", { ok: false, id: plan.id, refusalKind: kind, refusal: headline, details });
@@ -609,7 +637,7 @@ export async function run(argv) {
   if (held && held.actor !== actor) {
     return refuse(plan,
       id + (held.held ? " is held by " : " was taken by ") + held.actor + ", not by " + actor,
-      [
+      held.actor === ACTOR_UNKNOWN ? unattributedClaimRemedy(id, actor) : [
         "A briefing does not change hands. Taking an abandoned claim over is a",
         "decision with a stated window — `abandoned_after_days` in config.yaml, which",
         "`" + N + " next` judges and which names the previous owner when it fires.",
