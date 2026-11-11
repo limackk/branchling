@@ -15,6 +15,12 @@
  * THE POSITIVE CONTROL runs the same commit through a plain `spawnSync`. If
  * that one left nothing alive either, the contained case would pass without
  * proving anything — the hook might never have run, or might have exited.
+ *
+ * It is also the test a mutation run selects to judge mutation-contain.mjs
+ * (TL-673), by the name on this line: `_git.mjs` runs that file in this test's
+ * own process chain, where the active mutant is the one under test. The
+ * nested run in `mutation/no-orphan-processes.test.mjs` uses the source
+ * tree's copy and judges none of its mutants.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";

@@ -22,6 +22,12 @@
  * in, so it judges the containment alone. The sweep is judged by the tests
  * after it, on processes started for the purpose.
  *
+ * WHAT THIS FILE DOES NOT JUDGE: the mutants of `mutation-contain.mjs` itself
+ * (TL-673). The nested run uses the source tree's copy, never the sandbox copy
+ * an outer run mutates, because the nested Stryker would execute that copy
+ * under its own mutant ids. The test that judges the file directly is
+ * `hook-orphans.test.mjs`; the last two tests below hold both halves.
+ *
  * Outside the default glob for the reason `subprocess-kill.test.mjs` gives: it
  * runs StrykerJS, a devDependency. Run it by name:
  *
@@ -31,14 +37,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, join, sep } from "node:path";
+import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 
 import { fixtureDir } from "../_fixture-dir.mjs";
-import { SCRIPTS_DIR, isolateHome } from "../_repo.mjs";
-import { leftoverProcesses, sweepLeftovers } from "../../mutation-run.mjs";
+import { REPO_ROOT, SCRIPTS_DIR, isolateHome } from "../_repo.mjs";
+import { SOURCE_ROOT_ENV, containEntry, importClosure, leftoverProcesses, selectTests, sweepLeftovers } from "../../mutation-run.mjs";
 
 isolateHome("mutation-orphans");
 const ENTRY = join(SCRIPTS_DIR, "mutation-run.mjs");
@@ -274,4 +281,81 @@ test("the sweep never matches the process that runs it", () => {
   assert.ok(leftoverProcesses(marker, null, -1).some((p) => p.pid === process.pid),
     "the marker does not match this process, so the exclusion below would hold on an empty sample");
   assert.ok(!leftoverProcesses(marker).some((p) => p.pid === process.pid));
+});
+
+// TL-673. An outer run of mutation-contain.mjs instruments the sandbox copy;
+// a nested run that executed that copy did so under the INNER run's mutant
+// ids, so the outer mutant under test was never the active one. The fixture
+// stands in for that sandbox: a copy of mutation-run.mjs and what it imports,
+// beside a mutation-contain.mjs that records it ran and fails. The plan's
+// timed run of the fixture project's tests goes through the contain entry, so
+// the stub decides that run's result.
+const STUB_CONTAIN = `import { writeFileSync } from "node:fs";
+writeFileSync(process.env.STUB_CONTAIN_MARK, "ran");
+process.exitCode = 1;
+`;
+
+function nestedPlan(sandbox, project, mark, sourceRoot) {
+  const env = { ...process.env, STUB_CONTAIN_MARK: mark };
+  delete env.NODE_TEST_CONTEXT;
+  delete env[SOURCE_ROOT_ENV];
+  if (sourceRoot) env[SOURCE_ROOT_ENV] = sourceRoot;
+  const r = spawnSync(process.execPath, [join(sandbox, "scripts", "mutation-run.mjs"), "--plan", "--json",
+    "--files", "scripts/lib.mjs", "--tests", "scripts/tests/lib.test.mjs"], { cwd: project, env, encoding: "utf8" });
+  assert.equal(r.status, 0, "the plan failed: " + r.stdout + r.stderr);
+  return JSON.parse(r.stdout).cost;
+}
+
+test("a nested run never executes the sandbox's mutation-contain.mjs, which an outer run mutates", { timeout: 120_000 }, () => {
+  const sandbox = fixtureDir(join(tmpdir(), "branchling-test-contain-sandbox-"));
+  const project = fixtureDir(join(tmpdir(), "branchling-test-contain-project-"));
+  const mark = join(sandbox, "contain-ran");
+  try {
+    for (const rel of importClosure(REPO_ROOT, "scripts/mutation-run.mjs")) {
+      mkdirSync(dirname(join(sandbox, rel)), { recursive: true });
+      copyFileSync(join(REPO_ROOT, rel), join(sandbox, rel));
+    }
+    write(sandbox, "scripts/mutation-contain.mjs", STUB_CONTAIN);
+    // Stryker's sandbox links node_modules the same way; without it nothing is
+    // counted and the timed run, the one that starts the contain entry, is skipped.
+    const core = createRequire(import.meta.url).resolve("@stryker-mutator/core/package.json");
+    symlinkSync(core.slice(0, core.lastIndexOf(sep + "node_modules" + sep) + "/node_modules".length), join(sandbox, "node_modules"));
+
+    write(project, "scripts/lib.mjs", "export const one = () => 1;\n");
+    write(project, "scripts/tests/lib.test.mjs",
+      'import { test } from "node:test";\nimport assert from "node:assert/strict";\nimport { one } from "../lib.mjs";\n'
+      + 'test("one", () => assert.equal(one(), 1));\n');
+    sh(project, "git", ["init", "-q"]);
+
+    // POSITIVE CONTROL: outside an outer run the copy beside the file is the
+    // entry, so the stub runs and the timed run fails. Without this, a fixture
+    // that never reached the contain entry would pass the assertion below.
+    const outside = nestedPlan(sandbox, project, mark, null);
+    assert.equal(outside.counted, true, "nothing was counted, so the contain entry was never started");
+    assert.equal(existsSync(mark), true, "the stub was not run outside an outer run: the fixture proves nothing");
+    assert.equal(outside.initialRunPassed, false);
+    rmSync(mark);
+
+    const inside = nestedPlan(sandbox, project, mark, REPO_ROOT);
+    assert.equal(existsSync(mark), false, "a nested run executed the sandbox's mutation-contain.mjs");
+    assert.equal(inside.initialRunPassed, true, "the source tree's mutation-contain.mjs did not run the tests");
+  } finally {
+    rmSync(sandbox, { recursive: true, force: true });
+    rmSync(project, { recursive: true, force: true });
+  }
+});
+
+test("the contain entry is the source tree's inside an outer run, and the copy beside the file outside one", () => {
+  assert.equal(containEntry({ [SOURCE_ROOT_ENV]: "/src" }, "/sandbox/scripts"), join("/src", "scripts", "mutation-contain.mjs"));
+  assert.equal(containEntry({}, "/sandbox/scripts"), join("/sandbox", "scripts", "mutation-contain.mjs"));
+});
+
+test("a run of mutation-contain.mjs selects a test that executes it with the mutant under test active", async () => {
+  // Named-only is the lower bound; a test it selects is selected by every run.
+  const tests = await selectTests(REPO_ROOT, ["scripts/mutation-contain.mjs"], { namedOnly: true });
+  assert.ok(tests.some((t) => t.file === "scripts/tests/hook-orphans.test.mjs"),
+    "only the nested run judges mutation-contain.mjs, and it judges none of its mutants: " + JSON.stringify(tests));
+  // POSITIVE CONTROL for the test itself: it really runs the file, through `_git.mjs`.
+  assert.match(readFileSync(join(SCRIPTS_DIR, "tests", "hook-orphans.test.mjs"), "utf8"), /from "\.\/_git\.mjs"/);
+  assert.match(readFileSync(join(SCRIPTS_DIR, "tests", "_git.mjs"), "utf8"), /"mutation-contain\.mjs"/);
 });

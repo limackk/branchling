@@ -154,8 +154,29 @@ export const DEFAULT_BUDGET_MINUTES = 45;
 export const NAMED_ONLY_MAX_SHARE = 0.5;
 /** The variable that names the tree a run started in; see strykerEnv. */
 export const SOURCE_ROOT_ENV = "MUTATION_SOURCE_ROOT";
-// The file in THIS tree, never the sandbox copy, which Stryker may mutate.
-const CONTAIN_ENTRY = join(dirname(fileURLToPath(import.meta.url)), "mutation-contain.mjs");
+const CONTAIN_ENTRY = containEntry();
+
+/**
+ * The `mutation-contain.mjs` this run wraps every test command in: the one
+ * beside this file, or, inside an outer run's sandbox, the one in the tree
+ * that outer run was started in (TL-673).
+ *
+ * Inside a sandbox the copy beside this file is the one the OUTER run may
+ * mutate, and a nested run would hand it to its own Stryker, whose command
+ * runner executes it with `__STRYKER_ACTIVE_MUTANT__` set to the INNER run's
+ * ids. Both runs number their mutants from 0, so the outer mutant under test
+ * was never the active one there: whichever outer mutant shared the inner id
+ * was, and a Killed or Survived verdict on it was evidence about nothing.
+ * The source tree's copy is never instrumented, so a nested run is no judge of
+ * mutation-contain.mjs at all; the test that judges it is one that runs it in
+ * its own process chain, where the outer id is the one inherited
+ * (`hook-orphans.test.mjs`, through `tests/_git.mjs`). Rejected: a refusal to
+ * report the file's mutants, which would have left it unjudged by design.
+ */
+export function containEntry(env = process.env, here = dirname(fileURLToPath(import.meta.url))) {
+  const source = env[SOURCE_ROOT_ENV];
+  return join(source ? join(source, "scripts") : here, "mutation-contain.mjs");
+}
 
 /** The mutable surface: shipped code, never the tests that judge it. */
 function isMutable(path) {
