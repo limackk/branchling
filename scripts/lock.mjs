@@ -123,7 +123,7 @@ function lockPath(dir, taskId) {
  * appears only when the content behind it is complete, and `link` fails rather
  * than overwrite.
  */
-function createExclusively(path, content) {
+export function createExclusively(path, content) {
   const tmp = path + "." + process.pid + "." + randomBytes(4).toString("hex") + ".tmp";
   writeFileSync(tmp, content, "utf8");
   try {
@@ -391,7 +391,7 @@ function readRecord(path) {
  * one mutex measured it 3 to 8 times in 4800 entries, with no load beyond the
  * contention itself.
  */
-function readHolder(path) {
+export function readHolder(path) {
   let fd;
   try {
     fd = openSync(path, "r");
@@ -432,7 +432,7 @@ function readHolder(path) {
  * right after the stale one was unlinked commonly has the same `(dev, ino)`;
  * only its content, which carries the holder's token, tells the two apart.
  */
-function removeIfUnchanged(path, judged) {
+export function removeIfUnchanged(path, judged) {
   const aside = path + "." + process.pid + "." + randomBytes(4).toString("hex") + ".stale";
   try {
     renameSync(path, aside);

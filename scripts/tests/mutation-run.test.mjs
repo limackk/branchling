@@ -12,17 +12,22 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { fixtureDir } from "./_fixture-dir.mjs";
-import { tmpdir } from "node:os";
+import os, { hostname, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { SCRIPTS_DIR, isolateHome, scriptSource } from "./_repo.mjs";
+import { SCRIPTS_DIR, isolateHome, isolateState, scriptSource } from "./_repo.mjs";
 import { MIN_SWEEP_MARKER, SOURCE_ROOT_ENV, leftoverProcesses, reachesCli, sandboxCommand, strykerEnv, sweepLeftovers } from "../mutation-run.mjs";
+import { SLOT_TOKEN_ENV, chooseConcurrency, describeHolder, releaseSlot, slotPath, tryAcquireSlot } from "../mutation-slot.mjs";
+import { STATE_DIR_ENV } from "../lock.mjs";
 
 const HOME = isolateHome("mutation-run");
+// Every run spawned here, and the slot holders below, use a throwaway slot,
+// never the one a real mutation run on this machine holds.
+const STATE = isolateState("mutation-run-state");
 const ENTRY = join(SCRIPTS_DIR, "mutation-run.mjs");
 
 function sh(cwd, cmd, args) {
@@ -371,4 +376,289 @@ test("a marker too short to be a run's own directory is refused before anything 
   // the length, not something else about the call.
   const { calls } = recordedSweep("x".repeat(MIN_SWEEP_MARKER), "  101   100 node /" + "x".repeat(MIN_SWEEP_MARKER) + "\n", 1);
   assert.deepEqual(calls, [[-100, "SIGKILL"], [101, "SIGKILL"]]);
+});
+
+// ── The machine's mutation slot and the default concurrency (TL-681) ──────────
+
+const GiB = 1024 ** 3;
+const MiB = 1024 ** 2;
+
+test("the default concurrency follows free memory, capped at half the cores", () => {
+  // 3 test files at once: 64 MiB + 3 × 180 MiB = 604 MiB per worker.
+  const roomy = chooseConcurrency({ testFiles: 3, freeBytes: 16 * GiB, cores: 16 });
+  assert.equal(roomy.value, 8, "16 GiB fits 20 such workers; the cap is half of 16 cores");
+  assert.match(roomy.reason, /^half of 16 cores; 16\.0 GB free, 75% of it at 0\.6 GB per worker \(3 test files at once\) would allow 20$/);
+
+  const tight = chooseConcurrency({ testFiles: 3, freeBytes: 4 * GiB, cores: 16 });
+  assert.equal(tight.value, 5, "3 GiB usable over 604 MiB per worker");
+  assert.match(tight.reason, /^4\.0 GB free, 75% of it at 0\.6 GB per worker \(3 test files at once\), below the cap of 8 \(half of 16 cores\)$/);
+
+  // Files beyond cores - 1 do not run at once, so they cost nothing more.
+  assert.equal(chooseConcurrency({ testFiles: 40, freeBytes: 32 * GiB, cores: 16 }).value,
+    chooseConcurrency({ testFiles: 15, freeBytes: 32 * GiB, cores: 16 }).value);
+  assert.equal(chooseConcurrency({ testFiles: 15, freeBytes: 32 * GiB, cores: 16 }).value, 8,
+    "24 GiB over 64 + 15 × 180 MiB is 8 workers");
+  assert.equal(chooseConcurrency({ testFiles: 15, freeBytes: 16 * GiB, cores: 16 }).value, 4);
+
+  const starved = chooseConcurrency({ testFiles: 3, freeBytes: 512 * MiB, cores: 16 });
+  assert.equal(starved.value, 1);
+  assert.match(starved.reason, /allows none; one worker is the least a run can use$/);
+  assert.equal(chooseConcurrency({ testFiles: 1, freeBytes: 64 * GiB, cores: 1 }).value, 1, "one core still runs one worker");
+  assert.match(chooseConcurrency({ testFiles: 1, freeBytes: 64 * GiB, cores: 1 }).reason, /\(1 test file at once\)/);
+
+  assert.deepEqual(chooseConcurrency({ concurrency: 3, testFiles: 3, freeBytes: 512 * MiB, cores: 16 }),
+    { value: 3, reason: "given by --concurrency" });
+
+  // The boundaries: memory for exactly the cap is the cap, and for exactly one
+  // worker is one worker, not "none".
+  const exact = chooseConcurrency({ testFiles: 3, freeBytes: 6443 * MiB, cores: 16 });
+  assert.equal(exact.value, 8);
+  assert.match(exact.reason, /^half of 16 cores; .* would allow 8$/);
+  const one = chooseConcurrency({ testFiles: 3, freeBytes: 1 * GiB, cores: 16 });
+  assert.equal(one.value, 1);
+  assert.match(one.reason, /, below the cap of 8 \(half of 16 cores\)$/);
+
+  // Without a figure for the cores, the machine's own is used.
+  // availableParallelism is Node 18.14+, so it is looked up, never imported by name.
+  const cores = typeof os.availableParallelism === "function" ? os.availableParallelism() : os.cpus().length;
+  assert.match(chooseConcurrency({ testFiles: 1, freeBytes: 1024 * GiB }).reason, new RegExp("^half of " + cores + " cores; "));
+});
+
+test("the slot is one file per machine, in the state directory, under a name runs of other versions agree on", () => {
+  // Not keyed by repository: two clones share the memory as much as two worktrees do.
+  assert.equal(slotPath({ [STATE_DIR_ENV]: "/state" }), join("/state", "mutation", "slot.lock"));
+  assert.equal(SLOT_TOKEN_ENV, "MUTATION_SLOT_TOKEN", "a nested run of another version would no longer recognise its holder");
+  assert.equal(describeHolder({ pid: 7, host: "h", ts: "T", tree: "/r" }, "/s/slot.lock"),
+    "pid 7 on h since T, run from /r (/s/slot.lock)");
+  assert.equal(describeHolder(null, "/s/slot.lock"), "an unreadable record at /s/slot.lock");
+});
+
+function slotEnv(label) {
+  return { [STATE_DIR_ENV]: fixtureDir(join(tmpdir(), "branchling-test-" + label + "-")) };
+}
+
+function plantSlot(env, record) {
+  mkdirSync(dirname(slotPath(env)), { recursive: true });
+  writeFileSync(slotPath(env), typeof record === "string" ? record : JSON.stringify(record) + "\n");
+}
+
+test("a holder whose process is alive keeps the slot; a dead or unreadable one is reclaimed", () => {
+  const env = slotEnv("mutation-slot-stale");
+  const held = { pid: 4242, host: "here", tree: "/elsewhere", ts: "2026-11-11T00:00:00.000Z", token: "t1" };
+  try {
+    plantSlot(env, held);
+    const refused = tryAcquireSlot({ env, tree: "/me", host: "here", alive: () => true });
+    assert.equal(refused.ok, false);
+    assert.deepEqual(refused.holder, held);
+    // On another host the pid cannot be signalled, so it is not judged dead.
+    const foreign = tryAcquireSlot({ env, tree: "/me", host: "there", alive: () => false });
+    assert.equal(foreign.ok, false);
+
+    // POSITIVE CONTROL: the same record, its process gone.
+    const won = tryAcquireSlot({ env, tree: "/me", host: "here", alive: () => false });
+    assert.equal(won.ok, true);
+    assert.deepEqual(won.tookOver, held);
+    const now = JSON.parse(readFileSync(slotPath(env), "utf8"));
+    assert.equal(now.pid, process.pid);
+    assert.equal(now.tree, "/me");
+    assert.equal(now.token, won.token);
+
+    assert.ok(readFileSync(slotPath(env), "utf8").endsWith("}\n"), "the record is not one line");
+
+    plantSlot(env, "{not json");
+    const fromCorrupt = tryAcquireSlot({ env: { ...env, [SLOT_TOKEN_ENV]: "t1" }, tree: "/me", host: "here", alive: () => true });
+    assert.equal(fromCorrupt.ok, true, "a record naming nobody blocked the slot");
+    assert.equal(fromCorrupt.tookOver, null);
+
+    assert.equal(releaseSlot(fromCorrupt), true);
+    const fresh = tryAcquireSlot({ env, tree: "/me" });
+    assert.equal(fresh.ok, true);
+    assert.equal("tookOver" in fresh, false, "a free slot reported a holder it took over");
+  } finally {
+    rmSync(env[STATE_DIR_ENV], { recursive: true, force: true });
+  }
+});
+
+test("a run gives up after three passes when dead holders keep reappearing, and retries when one vanishes", () => {
+  const env = slotEnv("mutation-slot-passes");
+  const dead = { pid: 4242, host: "here", tree: "/x", ts: "T", token: "d" };
+  const opts = { env, tree: "/me", host: "here", alive: () => false };
+  try {
+    // Every removal is followed by another dead holder: three passes, then a refusal naming the last.
+    plantSlot(env, dead);
+    let removed = 0;
+    const exhausted = tryAcquireSlot({ ...opts, interleave: (step) => {
+      if (step === "removed") { removed++; plantSlot(env, { ...dead, pid: 5000 + removed }); }
+    } });
+    assert.equal(removed, 3);
+    assert.deepEqual(exhausted, { ok: false, path: slotPath(env), holder: { ...dead, pid: 5003 } });
+
+    // The last removal leaves nothing behind: still a refusal, naming nobody.
+    plantSlot(env, dead);
+    removed = 0;
+    const vanished = tryAcquireSlot({ ...opts, interleave: (step) => {
+      if (step === "removed" && ++removed < 3) plantSlot(env, dead);
+    } });
+    assert.deepEqual(vanished, { ok: false, path: slotPath(env), holder: null });
+
+    // The holder released between the failed create and the read: the next pass wins.
+    plantSlot(env, { ...dead, host: "elsewhere" });
+    const released = tryAcquireSlot({ ...opts, interleave: (step) => {
+      if (step === "contended") rmSync(slotPath(env), { force: true });
+    } });
+    assert.equal(released.ok, true);
+    assert.equal("tookOver" in released, false);
+  } finally {
+    rmSync(env[STATE_DIR_ENV], { recursive: true, force: true });
+  }
+});
+
+test("releasing nothing, or a slot whose file is gone, is a quiet no", () => {
+  assert.equal(releaseSlot(null), false);
+  assert.equal(releaseSlot(undefined), false);
+  assert.equal(releaseSlot({ ok: true, path: join(STATE, "no-such-dir", "slot.lock"), token: "t" }), false);
+});
+
+test("a real dead pid is reclaimed with the real liveness check", () => {
+  const env = slotEnv("mutation-slot-dead");
+  try {
+    // Written, not logged: under FORCE_COLOR console.log paints a number.
+    const gone = spawnSync(process.execPath, ["-e", "process.stdout.write(String(process.pid))"], { encoding: "utf8" });
+    const pid = Number(gone.stdout.trim());
+    plantSlot(env, { pid, host: hostname(), tree: "/x", ts: "2026-11-11T00:00:00.000Z", token: "t" });
+    const r = tryAcquireSlot({ env, tree: "/me" });
+    assert.equal(r.ok, true);
+    assert.equal(r.tookOver.pid, pid);
+    // POSITIVE CONTROL: this process is alive, and its record is respected.
+    releaseSlot(r);
+    plantSlot(env, { pid: process.pid, host: hostname(), tree: "/x", ts: "2026-11-11T00:00:00.000Z", token: "u" });
+    assert.equal(tryAcquireSlot({ env, tree: "/me" }).ok, false);
+  } finally {
+    rmSync(env[STATE_DIR_ENV], { recursive: true, force: true });
+  }
+});
+
+test("a run started inside the holder's run shares its slot and does not release it", () => {
+  const env = slotEnv("mutation-slot-nested");
+  try {
+    const outer = tryAcquireSlot({ env, tree: "/outer" });
+    assert.equal(outer.ok, true);
+    const inner = tryAcquireSlot({ env: { ...env, [SLOT_TOKEN_ENV]: outer.token }, tree: "/sandbox" });
+    assert.equal(inner.ok, true);
+    assert.equal(inner.nested, true);
+    assert.equal(releaseSlot(inner), false);
+    assert.equal(JSON.parse(readFileSync(slotPath(env), "utf8")).token, outer.token, "the inner run released the outer slot");
+
+    const stranger = tryAcquireSlot({ env: { ...env, [SLOT_TOKEN_ENV]: "another run's token" }, tree: "/b" });
+    assert.equal(stranger.ok, false, "a token that is not the holder's opened the slot");
+
+    // A run whose slot was taken over does not remove the new holder's file.
+    const taker = { ...outer, token: "stale" };
+    assert.equal(releaseSlot(taker), false);
+    assert.equal(releaseSlot(outer), true);
+    assert.equal(tryAcquireSlot({ env, tree: "/next" }).ok, true, "a released slot was not free");
+  } finally {
+    rmSync(env[STATE_DIR_ENV], { recursive: true, force: true });
+  }
+});
+
+// The slot module run in a process of its own: acquires, says so, and holds
+// the slot until its stdin closes.
+const SLOT_URL = pathToFileURL(join(SCRIPTS_DIR, "mutation-slot.mjs")).href;
+const HOLDER = `import { acquireSlot, releaseSlot } from ${JSON.stringify(SLOT_URL)};
+const slot = await acquireSlot({ pollMs: 50, tree: process.argv[1], onWait: (h) => console.log("waiting " + h.pid) });
+console.log("held " + process.pid);
+process.stdin.resume();
+process.stdin.on("end", () => { releaseSlot(slot); console.log("released"); process.exit(0); });`;
+
+function startHolder(env, tree) {
+  const child = spawn(process.execPath, ["--input-type=module", "-e", HOLDER, tree], {
+    env: { ...process.env, ...env }, stdio: ["pipe", "pipe", "pipe"],
+  });
+  let out = "";
+  let err = "";
+  child.stdout.on("data", (d) => { out += d; });
+  child.stderr.on("data", (d) => { err += d; });
+  const until = (re, ms = 20000) => new Promise((done, reject) => {
+    const started = Date.now();
+    const look = () => {
+      if (re.test(out)) return done(out);
+      if (Date.now() - started > ms) return reject(new Error("no " + re + " in " + JSON.stringify(out) + " / " + err));
+      setTimeout(look, 20);
+    };
+    look();
+  });
+  return { child, until, out: () => out };
+}
+
+test("two processes never hold the slot at once: the second waits, naming the first, until it releases", async () => {
+  const env = slotEnv("mutation-slot-two");
+  const first = startHolder(env, "/first");
+  let second;
+  try {
+    await first.until(/^held (\d+)$/m);
+    const firstPid = Number(/^held (\d+)$/m.exec(first.out())[1]);
+    second = startHolder(env, "/second");
+    await second.until(/^waiting \d+$/m);
+    assert.match(second.out(), new RegExp("^waiting " + firstPid + "$", "m"));
+    await new Promise((done) => setTimeout(done, 300));
+    assert.doesNotMatch(second.out(), /held/, "the second process took a slot the first still held");
+
+    first.child.stdin.end();
+    await first.until(/^released$/m);
+    await second.until(/^held \d+$/m);
+    assert.equal(JSON.parse(readFileSync(slotPath(env), "utf8")).pid, second.child.pid);
+  } finally {
+    first.child.kill("SIGKILL");
+    if (second) second.child.kill("SIGKILL");
+    rmSync(env[STATE_DIR_ENV], { recursive: true, force: true });
+  }
+});
+
+test("a mutation run refuses with --no-wait, and otherwise waits naming the holder, while another run holds the slot", async () => {
+  const root = fixture();
+  const holder = startHolder({}, "/holder");
+  try {
+    write(root, "scripts/lib.mjs", "export const lib = () => 3;\n");
+    await holder.until(/^held \d+$/m);
+    const pid = holder.child.pid;
+
+    const refused = run(root, ["--base", "main", "--no-wait"]);
+    assert.equal(refused.code, 1, refused.out + refused.err);
+    assert.match(refused.err, new RegExp("another mutation run holds the machine's slot: pid " + pid + " on "));
+    assert.match(refused.err, /run from \/holder/);
+    assert.ok(refused.err.includes(slotPath({ [STATE_DIR_ENV]: STATE })), "the refusal does not say where the slot is");
+
+    const waiting = spawn(process.execPath, [ENTRY, "--base", "main"], { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
+    let err = "";
+    waiting.stderr.on("data", (d) => { err += d; });
+    try {
+      const started = Date.now();
+      while (!/waiting for the machine's mutation slot/.test(err) && Date.now() - started < 20000) {
+        await new Promise((done) => setTimeout(done, 20));
+      }
+      assert.match(err, new RegExp("waiting for the machine's mutation slot, held by pid " + pid + " on "));
+      assert.doesNotMatch(err, /^concurrency /m, "the waiting run went on to choose its workers");
+    } finally {
+      waiting.kill("SIGKILL");
+    }
+    assert.equal(JSON.parse(readFileSync(slotPath({ [STATE_DIR_ENV]: STATE }), "utf8")).pid, pid);
+  } finally {
+    holder.child.kill("SIGKILL");
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("--plan takes no slot: it starts nothing", async () => {
+  const root = fixture();
+  const holder = startHolder({}, "/holder");
+  try {
+    write(root, "scripts/lib.mjs", "export const lib = () => 3;\n");
+    await holder.until(/^held \d+$/m);
+    const p = run(root, ["--base", "main", "--plan", "--no-wait"]);
+    assert.equal(p.code, 0, p.err);
+  } finally {
+    holder.child.kill("SIGKILL");
+    rmSync(root, { recursive: true, force: true });
+  }
 });

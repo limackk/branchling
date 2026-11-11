@@ -93,7 +93,14 @@
  *
  *   node scripts/mutation-run.mjs [--base <ref>] [--files <a,b>] [--tests <a,b>]
  *                                 [--concurrency <n>] [--named-only] [--changed-lines]
- *                                 [--plan] [--json]
+ *                                 [--no-wait] [--plan] [--json]
+ *
+ * ONE RUN PER MACHINE, AND A CONCURRENCY THAT FITS ITS MEMORY (TL-681). A run
+ * takes the machine's mutation slot before starting Stryker and waits, naming
+ * the holder, while another run has it; `--no-wait` refuses instead. Without
+ * `--concurrency` the number of workers follows free memory, never above half
+ * the cores, and the run prints the value and why. Both live in
+ * `mutation-slot.mjs`, which says what was measured.
  *
  * NO PROCESS OUTLIVES THE RUN (TL-646). A test that spawns git with a timeout
  * kills git, not git's hook children; they are reparented to PID 1, out of
@@ -111,16 +118,17 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import os, { tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import { SLOT_TOKEN_ENV, acquireSlot, chooseConcurrency, describeHolder, releaseSlot } from "./mutation-slot.mjs";
 import { fail, warn, plural } from "./ui.mjs";
 
 const COMMAND = "node scripts/mutation-run.mjs";
 const FLAGS_WITH_VALUE = new Set(["--base", "--files", "--tests", "--concurrency"]);
-const FLAGS_BARE = new Set(["--plan", "--json", "--named-only", "--changed-lines"]);
-const BARE_KEYS = { "--named-only": "namedOnly", "--changed-lines": "changedLines" };
+const FLAGS_BARE = new Set(["--plan", "--json", "--named-only", "--changed-lines", "--no-wait"]);
+const BARE_KEYS = { "--named-only": "namedOnly", "--changed-lines": "changedLines", "--no-wait": "noWait" };
 const STRYKER_PIN = "@stryker-mutator/core";
 /** Beyond this share of the candidate test files, naming a module selects nothing narrower than the suite. */
 export const NAMED_ONLY_MAX_SHARE = 0.5;
@@ -147,7 +155,7 @@ function lines(text) {
 export function parseArgs(argv) {
   const opts = {
     base: "main", files: null, tests: null, concurrency: null,
-    plan: false, json: false, namedOnly: false, changedLines: false,
+    plan: false, json: false, namedOnly: false, changedLines: false, noWait: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const flag = argv[i];
@@ -589,12 +597,6 @@ export function summarise(report) {
   return { files, survivors, noCoverage, timeouts };
 }
 
-function defaultConcurrency() {
-  // availableParallelism is Node 18.14+; the default suite also runs on 18.0.
-  const cores = typeof os.availableParallelism === "function" ? os.availableParallelism() : os.cpus().length;
-  return Math.max(1, Math.floor(cores / 2));
-}
-
 const WALK_SKIP = new Set(["node_modules", ".git"]);
 
 /**
@@ -724,8 +726,8 @@ export function strykerConfig(p, opts, links, work) {
     // of 116 mutants into Timeouts on a 15-core machine on 2026-11-05, which
     // it counts as DETECTED: a 100% score with almost nothing killed. At
     // half the cores and a wider timeout the same run gave 62 Killed, 54
-    // Survived, 0 Timeout.
-    concurrency: opts.concurrency || defaultConcurrency(),
+    // Survived, 0 Timeout. Below that cap, free memory decides (TL-681).
+    concurrency: chooseConcurrency({ concurrency: opts.concurrency, testFiles: p.tests.length }).value,
     timeoutFactor: 3,
     timeoutMS: 30000,
   };
@@ -771,7 +773,7 @@ export function strykerEnv(env = process.env, root = null) {
   return copy;
 }
 
-function runStryker(root, p, opts) {
+function runStryker(root, p, opts, slot) {
   const bin = strykerBin();
   if (!bin) return { code: 2, problem: STRYKER_PIN + " is not installed", next: ["npm install"] };
   const links = directorySymlinks(root);
@@ -783,7 +785,8 @@ function runStryker(root, p, opts) {
     writeFileSync(configPath, JSON.stringify(config, null, 2));
     const r = spawnSync(process.execPath, [bin, "run", configPath], {
       cwd: root,
-      env: strykerEnv(process.env, root),
+      // The token lets a run a test starts inside this one share its slot.
+      env: { ...strykerEnv(process.env, root), [SLOT_TOKEN_ENV]: slot.token },
       stdio: ["ignore", opts.json ? "pipe" : "inherit", opts.json ? "pipe" : "inherit"],
       encoding: "utf8",
     });
@@ -884,7 +887,25 @@ export async function main(argv, cwd = process.cwd()) {
     return 0;
   }
 
-  const run = runStryker(root, p, opts);
+  const slot = await acquireSlot({
+    wait: !opts.noWait,
+    tree: root,
+    onWait: (holder, path) => console.error(warn("waiting for the machine's mutation slot, held by " + describeHolder(holder, path))),
+  });
+  if (!slot.ok) {
+    return fail(COMMAND, "another mutation run holds the machine's slot: " + describeHolder(slot.holder, slot.path),
+      ["Two runs at once can exhaust the machine's memory, so --no-wait refuses rather than start a second."],
+      [COMMAND + " (without --no-wait, to wait for it)"], 1);
+  }
+  let run;
+  try {
+    // Chosen here, after the wait: memory the previous holder used is free now.
+    const concurrency = chooseConcurrency({ concurrency: opts.concurrency, testFiles: p.tests.length });
+    console.error("concurrency " + concurrency.value + ": " + concurrency.reason);
+    run = runStryker(root, p, { ...opts, concurrency: concurrency.value }, slot);
+  } finally {
+    releaseSlot(slot);
+  }
   reportLeftovers(run.leftovers);
   if (!run.report) return fail(COMMAND, run.problem, run.details || [], run.next || [], run.code || 1);
   const summary = summarise(run.report);
