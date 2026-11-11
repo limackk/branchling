@@ -23,7 +23,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { SCRIPTS_DIR, isolateHome, isolateState, scriptSource } from "./_repo.mjs";
 import {
   DEFAULT_BUDGET_MINUTES, MIN_SWEEP_MARKER, SOURCE_ROOT_ENV, countMutants, estimateSeconds, formatDuration, leftoverProcesses,
-  SANDBOX_GIT_INIT, loadInstrumenter, main, mutateDescriptions, reachesCli, sandboxCommand, strykerEnv, sweepLeftovers, timeTests,
+  SANDBOX_GIT_INIT, loadInstrumenter, main, mutateDescriptions, parseArgs, reachesCli, sandboxCommand, strykerEnv, sweepLeftovers, timeTests,
 } from "../mutation-run.mjs";
 import { SLOT_TOKEN_ENV, chooseConcurrency, describeHolder, releaseSlot, slotPath, tryAcquireSlot } from "../mutation-slot.mjs";
 import { STATE_DIR_ENV } from "../lock.mjs";
@@ -270,6 +270,46 @@ test("an unknown flag fails", () => {
   const r = run(HOME, ["--everything"]);
   assert.equal(r.code, 2);
   assert.match(r.err, /unknown argument "--everything"/);
+});
+
+// TL-678. The accepted set is read from the refusal, which the parser builds
+// from its own sets, so a flag added there without a help line fails here.
+// Colour is stripped, not disabled: under FORCE_COLOR the refusal ends in a
+// reset sequence, and the assertions are about the text, not the terminal.
+test("--help names every accepted flag with a description and exits 0", () => {
+  const plain = (text) => text.replace(/\x1b\[[0-9;]*m/g, "");
+  const refused = run(HOME, ["--everything"]);
+  const err = plain(refused.err);
+  const known = /known flags: (.+)/.exec(err);
+  assert.ok(known, err);
+  assert.match(err, /→ node scripts\/mutation-run\.mjs --help$/m, "the refusal points at --help");
+  const flags = known[1].trim().split(/\s+/);
+  assert.ok(flags.includes("--changed-lines") && flags.length >= 10, "positive control: " + flags.join(" "));
+  for (const asked of ["--help", "-h"]) {
+    const shown = run(HOME, [asked]);
+    assert.equal(shown.code, 0, shown.err);
+    assert.equal(shown.err, "");
+    const out = plain(shown.out);
+    assert.match(out, /^usage: node scripts\/mutation-run\.mjs \[flags\]$/m);
+    const columns = new Set();
+    for (const flag of ["-h, --help", ...flags]) {
+      const line = out.split("\n").find((l) => l.startsWith("  " + flag + " "));
+      assert.ok(line, flag + " has no help line");
+      const m = /^  (\S+(?:,? \S+)?) +(\S.*)$/.exec(line);
+      assert.ok(m, flag + ": " + JSON.stringify(line));
+      // A value placeholder exactly where the parser demands a value.
+      const takesValue = /needs a value/.test(parseArgs([flag]).error || "");
+      if (flag !== "-h, --help") assert.equal(/ <[^>]+>$/.test(m[1]), takesValue, flag + ": " + JSON.stringify(line));
+      assert.doesNotMatch(m[2], /undefined/, flag);
+      columns.add(line.length - m[2].length);
+    }
+    assert.equal(columns.size, 1, "descriptions start in one column");
+    assert.match(out, new RegExp("^  --budget <minutes> +.*\\(default: " + DEFAULT_BUDGET_MINUTES + "\\)$", "m"));
+  }
+  // --help wins over the flags around it, so it never starts a run.
+  const late = run(HOME, ["--plan", "--help"]);
+  assert.equal(late.code, 0, late.err);
+  assert.match(plain(late.out), /^usage:/);
 });
 
 // TL-646. The parsing half of the end-of-run sweep, without `ps` or a process
