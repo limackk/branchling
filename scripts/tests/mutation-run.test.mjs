@@ -13,6 +13,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
@@ -20,7 +21,10 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { SCRIPTS_DIR, isolateHome, scriptSource } from "./_repo.mjs";
-import { MIN_SWEEP_MARKER, SOURCE_ROOT_ENV, leftoverProcesses, reachesCli, sandboxCommand, strykerEnv, sweepLeftovers } from "../mutation-run.mjs";
+import {
+  DEFAULT_BUDGET_MINUTES, MIN_SWEEP_MARKER, SOURCE_ROOT_ENV, countMutants, estimateSeconds, formatDuration, leftoverProcesses,
+  loadInstrumenter, main, mutateDescriptions, reachesCli, sandboxCommand, strykerEnv, sweepLeftovers, timeTests,
+} from "../mutation-run.mjs";
 
 const HOME = isolateHome("mutation-run");
 const ENTRY = join(SCRIPTS_DIR, "mutation-run.mjs");
@@ -372,3 +376,244 @@ test("a marker too short to be a run's own directory is refused before anything 
   const { calls } = recordedSweep("x".repeat(MIN_SWEEP_MARKER), "  101   100 node /" + "x".repeat(MIN_SWEEP_MARKER) + "\n", 1);
   assert.deepEqual(calls, [[-100, "SIGKILL"], [101, "SIGKILL"]]);
 });
+
+// TL-682. The cost gate, judged without Stryker: the instrumenter, the timed
+// test run and Stryker itself are replaced, so the arithmetic and the refusal
+// are what is asserted, wherever the suite runs.
+test("the estimate is the initial run plus one test run per mutant, concurrency at a time", () => {
+  assert.equal(estimateSeconds({ mutants: 600, testSeconds: 10, concurrency: 2 }), 3010);
+  assert.equal(estimateSeconds({ mutants: 601, testSeconds: 10, concurrency: 2 }), 3020, "a remainder costs a whole round");
+  assert.equal(estimateSeconds({ mutants: 1, testSeconds: 4, concurrency: 8 }), 8);
+  assert.equal(estimateSeconds({ mutants: 0, testSeconds: 4, concurrency: 1 }), 0, "nothing to mutate costs nothing");
+  assert.equal(formatDuration(59.2), "60 s");
+  assert.equal(formatDuration(61), "2 min");
+  assert.equal(formatDuration(60), "1 min", "a whole minute is not 60 s");
+  assert.equal(formatDuration(120 * 60), "2 h 0 min", "two whole hours are not 120 min");
+  assert.equal(formatDuration(119 * 60), "119 min");
+  assert.equal(formatDuration(125 * 60), "2 h 5 min");
+});
+
+test("the mutate list is read as Stryker reads it: 1-based lines handed on 0-based, whole beats ranged", () => {
+  const d = mutateDescriptions(["a.mjs:3-4", "a.mjs:9-9", "b.mjs", "c.mjs:2-2", "c.mjs"]);
+  const end = Number.MAX_SAFE_INTEGER;
+  assert.deepEqual(d.get("a.mjs"), [
+    { start: { line: 2, column: 0 }, end: { line: 3, column: end } },
+    { start: { line: 8, column: 0 }, end: { line: 8, column: end } },
+  ]);
+  assert.equal(d.get("b.mjs"), true);
+  assert.equal(d.get("c.mjs"), true);
+  const wholeFirst = mutateDescriptions(["c.mjs", "c.mjs:2-2"]);
+  assert.equal(wholeFirst.get("c.mjs"), true, "a range listed after the whole file narrowed it");
+});
+
+async function inProcess(argv, cwd, deps) {
+  const out = [];
+  const err = [];
+  const { log, error } = console;
+  console.log = (...a) => out.push(a.join(" "));
+  console.error = (...a) => err.push(a.join(" "));
+  try {
+    const code = await main(argv, cwd, deps);
+    // The painter was chosen when ui.mjs loaded, from the terminal of that
+    // moment; the words are what is asserted, not the observer's colours.
+    const plain = (lines) => lines.join("\n").replace(/\x1b\[[0-9;]*m/g, "");
+    return { code, out: plain(out), err: plain(err) };
+  } finally {
+    console.log = log;
+    console.error = error;
+  }
+}
+
+function costDeps({ mutants, seconds }) {
+  const calls = { stryker: 0, timed: [] };
+  const deps = {
+    loadInstrumenter: async () => ({}),
+    countMutants: async (_root, mutate) => ({ total: mutants, files: Object.fromEntries(mutate.map((m) => [m, mutants])) }),
+    timeTests: (_root, files) => { calls.timed.push(files); return { seconds, passed: true }; },
+    runStryker: () => { calls.stryker++; return { code: 0, leftovers: [], report: { files: {} } }; },
+  };
+  return { deps, calls };
+}
+
+test("--plan states the mutant count and the estimate (TL-682)", async () => {
+  const root = fixture();
+  try {
+    const { deps, calls } = costDeps({ mutants: 40, seconds: 3 });
+    const text = await inProcess(["--files", "scripts/lib.mjs", "--concurrency", "2", "--plan"], root, deps);
+    assert.equal(text.code, 0, text.err);
+    assert.match(text.out, /^mutants \(40\): scripts\/lib\.mjs 40$/m);
+    assert.doesNotMatch(text.out, /failed without a mutant/, "a passing initial run was reported failed");
+    const two = await inProcess(["--files", "scripts/lib.mjs,scripts/other.mjs", "--plan"], root, deps);
+    assert.match(two.out, /^mutants \(40\): scripts\/lib\.mjs 40, scripts\/other\.mjs 40$/m);
+    assert.match(text.out, /^estimate: 2 min — one run of the selected tests took 3 s, run once more for each mutant, 2 at a time; budget 45 min$/m);
+    assert.ok(calls.timed[0].length > 0 && calls.timed[0].includes("scripts/tests/named.test.mjs"),
+      "the timed run was not the selection: " + JSON.stringify(calls.timed));
+
+    const json = await inProcess(["--files", "scripts/lib.mjs", "--concurrency", "2", "--plan", "--json"], root, deps);
+    const cost = JSON.parse(json.out).cost;
+    assert.equal(cost.mutants, 40);
+    assert.equal(cost.estimateSeconds, 63);
+    assert.equal(cost.budgetMinutes, DEFAULT_BUDGET_MINUTES);
+    assert.equal(cost.overBudget, false);
+    assert.equal(calls.stryker, 0, "a plan started Stryker");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a run over budget is refused before Stryker starts, naming --changed-lines and --budget (TL-682)", async () => {
+  const root = fixture();
+  try {
+    // 600 mutants × 10 s, 2 at a time: 3010 s, just over 45 minutes.
+    const { deps, calls } = costDeps({ mutants: 600, seconds: 10 });
+    const argv = ["--files", "scripts/lib.mjs", "--concurrency", "2"];
+    const refused = await inProcess(argv, root, deps);
+    assert.equal(refused.code, 1, refused.out + refused.err);
+    assert.equal(calls.stryker, 0, "Stryker was started over budget");
+    assert.equal(refused.out, "", "a refused run printed something that could be read as a result");
+    assert.match(refused.err, /^estimate: 51 min — /m, "the estimate was not stated before the refusal");
+    assert.match(refused.err, /: the run is estimated at 51 min, over the budget of 45 min: 600 mutants × 10 s of tests, 2 at a time$/m);
+    assert.match(refused.err, /^  A run cut off by a timeout settles nothing, so Stryker was not started\.$/m);
+    assert.match(refused.err, /^  --changed-lines mutates only the lines this change wrote; --budget <minutes> admits a longer run deliberately\.$/m);
+    assert.deepEqual(refused.err.split("\n").filter((l) => l.startsWith("  →")), [
+      "  → node scripts/mutation-run.mjs --files scripts/lib.mjs --concurrency 2 --changed-lines",
+      "  → node scripts/mutation-run.mjs --files scripts/lib.mjs --concurrency 2 --budget 51",
+    ]);
+
+    const plan = await inProcess([...argv, "--plan"], root, deps);
+    assert.equal(plan.code, 0, "--plan is refused instead of reporting the cost");
+    assert.match(plan.out, /budget 45 min, exceeded: a run is refused/);
+
+    // A run already narrowed is not told to narrow; the budget it is told to
+    // pass replaces the one it gave instead of adding a second.
+    write(root, "scripts/lib.mjs", "export const lib = () => 7;\n");
+    const narrowed = await inProcess([...argv, "--changed-lines", "--budget", "50"], root, deps);
+    assert.equal(narrowed.code, 1, narrowed.err);
+    assert.deepEqual(narrowed.err.split("\n").filter((l) => l.startsWith("  →")), [
+      "  → node scripts/mutation-run.mjs --files scripts/lib.mjs --concurrency 2 --changed-lines --budget 51",
+    ]);
+    assert.match(narrowed.err, /^  --budget <minutes> admits a longer run deliberately\.$/m);
+    assert.equal(calls.stryker, 0);
+
+    // POSITIVE CONTROL: the same run under a budget that admits it starts, and
+    // states its estimate first.
+    const admitted = await inProcess([...argv, "--budget", "51", "--json"], root, deps);
+    assert.equal(admitted.code, 0, admitted.err);
+    assert.equal(calls.stryker, 1, "a run within its budget did not start");
+    assert.match(admitted.err, /^estimate: 51 min — /m);
+    const result = JSON.parse(admitted.out);
+    assert.equal(result.kind, "mutation-run");
+    assert.equal(result.cost.estimateSeconds, 3010);
+
+    const one = costDeps({ mutants: 1, seconds: 1500 });
+    assert.match((await inProcess(argv, root, one.deps)).err, /: 1 mutant × 25 min of tests, 2 at a time$/m);
+
+    // An estimate exactly at the budget is within it: 538 mutants × 10 s, 2 at a time, is 2700 s.
+    const exact = costDeps({ mutants: 538, seconds: 10 });
+    assert.equal((await inProcess(argv, root, exact.deps)).code, 0);
+    assert.equal(exact.calls.stryker, 1, "a run estimated at exactly its budget was refused");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("without Stryker installed the plan says nothing was counted, and no test is timed (TL-682)", async () => {
+  const root = fixture();
+  try {
+    const { deps, calls } = costDeps({ mutants: 1, seconds: 1 });
+    deps.loadInstrumenter = async () => null;
+    delete deps.countMutants;
+    const r = await inProcess(["--files", "scripts/lib.mjs", "--plan"], root, deps);
+    assert.equal(r.code, 0, r.err);
+    assert.match(r.out, /^mutants: not counted — @stryker-mutator\/core is not installed/m);
+    assert.deepEqual(calls.timed, []);
+    const json = await inProcess(["--files", "scripts/lib.mjs", "--plan", "--json"], root, deps);
+    assert.deepEqual(JSON.parse(json.out).cost, { counted: false, budgetMinutes: DEFAULT_BUDGET_MINUTES });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("nothing to mutate times no test, a failing initial run is named, and a count that fails is refused (TL-682)", async () => {
+  const root = fixture();
+  try {
+    const none = costDeps({ mutants: 0, seconds: 30 });
+    const zero = JSON.parse((await inProcess(["--files", "scripts/lib.mjs", "--plan", "--json"], root, none.deps)).out).cost;
+    assert.deepEqual(none.calls.timed, [], "tests were timed for a selection with no mutant");
+    assert.equal(zero.initialRunSeconds, 0);
+    assert.equal(zero.initialRunPassed, true);
+    assert.equal(zero.estimateSeconds, 0);
+
+    const red = costDeps({ mutants: 4, seconds: 1 });
+    red.deps.timeTests = () => ({ seconds: 1, passed: false });
+    const failing = await inProcess(["--files", "scripts/lib.mjs", "--plan"], root, red.deps);
+    assert.match(failing.out, /^the selected tests failed without a mutant, so Stryker's initial run will fail too$/m);
+
+    const broken = costDeps({ mutants: 4, seconds: 1 });
+    broken.deps.countMutants = async () => { throw new Error("Unexpected token (3:1)"); };
+    const r = await inProcess(["--files", "scripts/lib.mjs,scripts/other.mjs"], root, broken.deps);
+    assert.equal(r.code, 1);
+    assert.equal(broken.calls.stryker, 0);
+    assert.match(r.err, /: cannot count the mutants of scripts\/lib\.mjs, scripts\/other\.mjs$/m);
+    assert.doesNotMatch(r.err, /→/, "a count that failed suggested a command");
+    assert.match(r.err, /^  Unexpected token \(3:1\)$/m);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("the timed run is the selected tests' own verdict and duration (TL-682)", () => {
+  const root = fixtureDir(join(tmpdir(), "branchling-test-mutation-time-"));
+  try {
+    write(root, "scripts/tests/slow.test.mjs",
+      'import { test } from "node:test";\ntest("waits", () => new Promise((r) => setTimeout(r, 400)));\n');
+    write(root, "scripts/tests/red.test.mjs", 'import { test } from "node:test";\ntest("fails", () => { throw new Error("red"); });\n');
+    const before = performance.now();
+    const green = timeTests(root, ["scripts/tests/slow.test.mjs"]);
+    const outside = (performance.now() - before) / 1000;
+    assert.equal(green.passed, true);
+    assert.ok(green.seconds >= 0.4 && green.seconds <= outside, "duration " + green.seconds + " s, measured around it " + outside + " s");
+    // Run from inside node --test, as this is: a run that inherited the test
+    // context would report through it and exit 0 on a failure.
+    assert.equal(timeTests(root, ["scripts/tests/red.test.mjs"]).passed, false, "a failing selection was reported passed");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("--budget takes a positive integer", () => {
+  for (const value of ["0", "-3", "1.5", "lots"]) {
+    const r = run(HOME, ["--budget", value]);
+    assert.equal(r.code, 2, value);
+    assert.match(r.err, /--budget takes a positive integer/);
+  }
+});
+
+// Stryker's own instrumenter counts, where it is installed; the default suite
+// runs without `npm install`, and then there is nothing to count with.
+const instrumenter = await loadInstrumenter();
+let coreInstalled = true;
+try { createRequire(import.meta.url).resolve("@stryker-mutator/core/package.json"); } catch { coreInstalled = false; }
+
+test("where Stryker is installed its instrumenter is found, so the count below is not skipped", () => {
+  assert.equal(Boolean(instrumenter), coreInstalled);
+});
+test("the mutant count is Stryker's instrumenter over exactly the lines asked for (TL-682)",
+  { skip: instrumenter ? false : "@stryker-mutator/core is not installed" }, async () => {
+    const root = fixtureDir(join(tmpdir(), "branchling-test-mutation-count-"));
+    try {
+      write(root, "scripts/m.mjs", "export const a = (x) => x + 1;\nexport const b = (x) => x > 2 && x < 9;\nexport const c = 'text';\n");
+      const whole = await countMutants(root, ["scripts/m.mjs"], instrumenter);
+      const first = await countMutants(root, ["scripts/m.mjs:1-1"], instrumenter);
+      const second = await countMutants(root, ["scripts/m.mjs:2-2"], instrumenter);
+      const both = await countMutants(root, ["scripts/m.mjs:1-1", "scripts/m.mjs:2-2"], instrumenter);
+      assert.ok(first.total > 0 && second.total > 0, "a line with an operator yielded no mutant");
+      assert.equal(both.total, first.total + second.total);
+      assert.ok(whole.total > both.total, "the third line's string was not counted in the whole file");
+      assert.deepEqual(whole.files, { "scripts/m.mjs": whole.total });
+      const missing = await countMutants(root, ["scripts/gone.mjs"], instrumenter);
+      assert.deepEqual(missing, { total: 0, files: { "scripts/gone.mjs": 0 } }, "Stryker mutates nothing at a missing path");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });

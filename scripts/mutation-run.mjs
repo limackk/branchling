@@ -87,13 +87,30 @@
  * and every report says which lines were text (`templateTextLines`), so a
  * range that selected nothing no longer reads like one fully killed.
  *
+ * A RUN STATES ITS COST BEFORE IT STARTS, AND ONE OVER BUDGET IS REFUSED
+ * (TL-682). Without coverage every mutant runs every selected test file, so the
+ * cost is known before Stryker starts: the mutant count, from Stryker's own
+ * instrumenter over exactly the `mutate` list, times the duration of one run
+ * of the selected tests, divided among the workers. That run is the same
+ * initial run Stryker makes, timed here once more; it costs one mutant's worth
+ * of time and is the only measurement of THIS selection on THIS machine. A
+ * whole-module run over doctor.mjs was found to need about seven hours only
+ * after it had started (2026-11-09), and another was cut by a timeout at 125
+ * of 1079 mutants, settling nothing (2026-11-10). `--plan` prints the count
+ * and the estimate; a run prints them first, and refuses when the estimate
+ * exceeds `--budget` minutes (`DEFAULT_BUDGET_MINUTES` unless given), naming
+ * `--changed-lines` and the `--budget` that would admit it. The estimate
+ * assumes the workers do not slow each other down, so it is a floor more
+ * often than a ceiling. Without Stryker installed nothing is counted and the
+ * plan says so.
+ *
  * Stryker is a pinned devDependency, not a runtime one: the published package
  * keeps zero dependencies, and this file does not ship (`files` in
  * package.json). It is a tool for working on this repository.
  *
  *   node scripts/mutation-run.mjs [--base <ref>] [--files <a,b>] [--tests <a,b>]
  *                                 [--concurrency <n>] [--named-only] [--changed-lines]
- *                                 [--plan] [--json]
+ *                                 [--budget <minutes>] [--plan] [--json]
  *
  * NO PROCESS OUTLIVES THE RUN (TL-646). A test that spawns git with a timeout
  * kills git, not git's hook children; they are reparented to PID 1, out of
@@ -118,10 +135,13 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { fail, warn, plural } from "./ui.mjs";
 
 const COMMAND = "node scripts/mutation-run.mjs";
-const FLAGS_WITH_VALUE = new Set(["--base", "--files", "--tests", "--concurrency"]);
+const FLAGS_WITH_VALUE = new Set(["--base", "--files", "--tests", "--concurrency", "--budget"]);
 const FLAGS_BARE = new Set(["--plan", "--json", "--named-only", "--changed-lines"]);
 const BARE_KEYS = { "--named-only": "namedOnly", "--changed-lines": "changedLines" };
 const STRYKER_PIN = "@stryker-mutator/core";
+const INSTRUMENTER = "@stryker-mutator/instrumenter";
+/** The longest estimated run started without `--budget`, in minutes. */
+export const DEFAULT_BUDGET_MINUTES = 45;
 /** Beyond this share of the candidate test files, naming a module selects nothing narrower than the suite. */
 export const NAMED_ONLY_MAX_SHARE = 0.5;
 /** The variable that names the tree a run started in; see strykerEnv. */
@@ -146,7 +166,7 @@ function lines(text) {
 
 export function parseArgs(argv) {
   const opts = {
-    base: "main", files: null, tests: null, concurrency: null,
+    base: "main", files: null, tests: null, concurrency: null, budget: null,
     plan: false, json: false, namedOnly: false, changedLines: false,
   };
   for (let i = 0; i < argv.length; i++) {
@@ -158,9 +178,9 @@ export function parseArgs(argv) {
       if (value === undefined || value.startsWith("--")) return { error: flag + " needs a value" };
       const key = flag.slice(2);
       if (key === "files" || key === "tests") opts[key] = value.split(",").map((s) => s.trim()).filter(Boolean);
-      else if (key === "concurrency") {
-        if (!/^[1-9]\d*$/.test(value)) return { error: "--concurrency takes a positive integer, not " + JSON.stringify(value) };
-        opts.concurrency = Number(value);
+      else if (key === "concurrency" || key === "budget") {
+        if (!/^[1-9]\d*$/.test(value)) return { error: flag + " takes a positive integer, not " + JSON.stringify(value) };
+        opts[key] = Number(value);
       } else opts[key] = value;
     } else {
       return { error: "unknown argument " + JSON.stringify(flag) };
@@ -595,6 +615,131 @@ function defaultConcurrency() {
   return Math.max(1, Math.floor(cores / 2));
 }
 
+/**
+ * What Stryker's instrumenter is told to mutate for each file of `mutate`, by
+ * the same reading Stryker applies to the list: a bare path is the whole file,
+ * `path:start-end` the lines from `start` to `end` (1-based, both included),
+ * which Stryker hands on 0-based and to the end of the last line. A file also
+ * listed whole is mutated whole.
+ */
+export function mutateDescriptions(mutate) {
+  const files = new Map();
+  for (const raw of mutate) {
+    const { file, range } = parseEntry(raw);
+    const seen = files.get(file);
+    if (!range || seen === true) { files.set(file, true); continue; }
+    const located = { start: { line: range.start - 1, column: 0 }, end: { line: range.end - 1, column: Number.MAX_SAFE_INTEGER } };
+    files.set(file, [...(seen || []), located]);
+  }
+  return files;
+}
+
+const SILENT_LOGGER = Object.fromEntries([
+  ...["trace", "debug", "info", "warn", "error", "fatal"].map((l) => [l, () => {}]),
+  ...["Trace", "Debug", "Info", "Warn", "Error", "Fatal"].map((l) => ["is" + l + "Enabled", () => false]),
+]);
+
+/**
+ * Stryker's instrumenter, the one its core runs, or null where Stryker is not
+ * installed. It is a dependency of the core rather than of this repository, so
+ * it is resolved from the core's own location.
+ */
+export async function loadInstrumenter() {
+  let entry;
+  try {
+    const core = createRequire(import.meta.url).resolve(STRYKER_PIN + "/package.json");
+    entry = createRequire(core).resolve(INSTRUMENTER);
+  } catch {
+    return null;
+  }
+  const mod = await import(pathToFileURL(entry).href);
+  return new mod.Instrumenter(SILENT_LOGGER);
+}
+
+/**
+ * How many mutants Stryker will create for `mutate`, in total and per file,
+ * counted by `instrumenter` with Stryker's default mutator options; null when
+ * no instrumenter is available. Nothing is run and nothing is written.
+ */
+export async function countMutants(root, mutate, instrumenter) {
+  if (!instrumenter) return null;
+  const files = {};
+  let total = 0;
+  for (const [file, description] of mutateDescriptions(mutate)) {
+    const name = join(root, file);
+    // Stryker matches a missing path to no file and mutates nothing there.
+    if (!existsSync(name)) { files[file] = 0; continue; }
+    const result = await instrumenter.instrument([{ name, mutate: description, content: readFileSync(name, "utf8") }],
+      { plugins: null, excludedMutations: [], ignorers: [] });
+    files[file] = result.mutants.length;
+    total += result.mutants.length;
+  }
+  return { total, files };
+}
+
+/**
+ * One run of `testFiles` as Stryker's command runner makes it — in its own
+ * process group, in the environment Stryker is handed — timed. A failing run
+ * is reported, not hidden: Stryker's initial run would fail on it too.
+ */
+export function timeTests(root, testFiles) {
+  const started = performance.now();
+  const r = spawnSync(process.execPath, [CONTAIN_ENTRY, "node", "--test", ...testFiles], {
+    cwd: root, env: strykerEnv(process.env, root), stdio: "ignore",
+  });
+  return { seconds: (performance.now() - started) / 1000, passed: r.status === 0 };
+}
+
+/**
+ * Wall time of a run: the initial test run, then every mutant running the
+ * same tests, `concurrency` at a time. Workers are assumed not to slow each
+ * other down, which on a loaded machine makes this a floor.
+ */
+export function estimateSeconds({ mutants, testSeconds, concurrency }) {
+  if (mutants === 0) return 0;
+  return testSeconds * (1 + Math.ceil(mutants / Math.max(1, concurrency)));
+}
+
+/** A duration for a reader: seconds, minutes, or hours and minutes. */
+export function formatDuration(seconds) {
+  if (seconds < 60) return Math.ceil(seconds) + " s";
+  const minutes = Math.ceil(seconds / 60);
+  if (minutes < 120) return minutes + " min";
+  return Math.floor(minutes / 60) + " h " + (minutes % 60) + " min";
+}
+
+/**
+ * The cost of plan `p`: mutants counted, the selected tests timed once, the
+ * estimate, and whether it fits the budget. `{ counted: false }` when Stryker
+ * is not installed, since nothing can then be counted.
+ */
+export async function measureCost(root, p, opts, deps = {}) {
+  const instrumenter = await (deps.loadInstrumenter || loadInstrumenter)();
+  const count = await (deps.countMutants || countMutants)(root, p.mutate, instrumenter);
+  const budgetMinutes = opts.budget || DEFAULT_BUDGET_MINUTES;
+  if (!count) return { counted: false, budgetMinutes };
+  const concurrency = opts.concurrency || defaultConcurrency();
+  const initial = count.total === 0 ? { seconds: 0, passed: true } : (deps.timeTests || timeTests)(root, p.tests.map((t) => t.file));
+  const estimate = estimateSeconds({ mutants: count.total, testSeconds: initial.seconds, concurrency });
+  return {
+    counted: true, mutants: count.total, mutantsPerFile: count.files,
+    initialRunSeconds: Math.round(initial.seconds * 100) / 100, initialRunPassed: initial.passed,
+    concurrency, estimateSeconds: Math.round(estimate * 100) / 100, budgetMinutes,
+    overBudget: estimate > budgetMinutes * 60,
+  };
+}
+
+/** What a reader is told about the cost before anything is mutated. */
+export function costReport(cost) {
+  if (!cost.counted) return ["mutants: not counted — " + STRYKER_PIN + " is not installed (npm install)"];
+  const out = ["mutants (" + cost.mutants + "): " + Object.entries(cost.mutantsPerFile).map(([f, n]) => f + " " + n).join(", ")];
+  out.push("estimate: " + formatDuration(cost.estimateSeconds) + " — one run of the selected tests took "
+    + formatDuration(cost.initialRunSeconds) + ", run once more for each mutant, " + cost.concurrency + " at a time; budget "
+    + cost.budgetMinutes + " min" + (cost.overBudget ? ", exceeded: a run is refused without a larger --budget" : ""));
+  if (!cost.initialRunPassed) out.push("the selected tests failed without a mutant, so Stryker's initial run will fail too");
+  return out;
+}
+
 const WALK_SKIP = new Set(["node_modules", ".git"]);
 
 /**
@@ -810,7 +955,22 @@ function reportLeftovers(leftovers) {
   for (const p of leftovers.slice(0, 10)) console.error("  " + p.pid + "  " + p.args);
 }
 
-export async function main(argv, cwd = process.cwd()) {
+/** `argv` without its `--budget <minutes>`, so a suggested command does not carry two. */
+function withoutBudget(argv) {
+  const out = [];
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "--budget") i++;
+    else out.push(argv[i]);
+  }
+  return out;
+}
+
+/**
+ * `deps` replaces the parts that need Stryker or real time — `loadInstrumenter`,
+ * `countMutants`, `timeTests`, `runStryker` — so the gate can be judged where
+ * Stryker is not installed.
+ */
+export async function main(argv, cwd = process.cwd(), deps = {}) {
   const parsed = parseArgs(argv);
   if (parsed.error) {
     return fail(COMMAND, parsed.error, ["known flags: " + [...FLAGS_WITH_VALUE, ...FLAGS_BARE].join(" ")], [COMMAND + " --plan"]);
@@ -872,25 +1032,48 @@ export async function main(argv, cwd = process.cwd()) {
       next, 1);
   }
 
+  let cost;
+  try {
+    cost = await measureCost(root, p, opts, deps);
+  } catch (e) {
+    return fail(COMMAND, "cannot count the mutants of " + p.mutate.join(", "), [String(e.message)], [], 1);
+  }
+
   if (opts.plan) {
-    if (opts.json) console.log(JSON.stringify({ kind: "mutation-plan", ...p }, null, 2));
+    if (opts.json) console.log(JSON.stringify({ kind: "mutation-plan", ...p, cost }, null, 2));
     else {
       console.log("mutate (" + p.modules.length + "): " + p.modules.join(", "));
       if (p.lines) for (const l of rangeReport(p)) console.log(l);
       for (const l of templateTextReport(p)) console.log(l);
       console.log("tests (" + p.tests.length + "):");
       for (const t of p.tests) console.log("  " + t.file + "  — " + t.why.join("; "));
+      for (const l of costReport(cost)) console.log(l);
     }
     return 0;
   }
 
-  const run = runStryker(root, p, opts);
+  for (const l of costReport(cost)) console.error(l);
+  if (cost.overBudget) {
+    const rest = withoutBudget(argv);
+    const next = [];
+    if (!opts.changedLines) next.push([COMMAND, ...rest, "--changed-lines"].join(" "));
+    next.push([COMMAND, ...rest, "--budget", String(Math.ceil(cost.estimateSeconds / 60))].join(" "));
+    return fail(COMMAND, "the run is estimated at " + formatDuration(cost.estimateSeconds) + ", over the budget of "
+      + cost.budgetMinutes + " min: " + cost.mutants + " " + plural(cost.mutants, "mutant", "mutants") + " × "
+      + formatDuration(cost.initialRunSeconds) + " of tests, " + cost.concurrency + " at a time",
+    ["A run cut off by a timeout settles nothing, so Stryker was not started.",
+      (opts.changedLines ? "" : "--changed-lines mutates only the lines this change wrote; ")
+        + "--budget <minutes> admits a longer run deliberately."],
+    next, 1);
+  }
+
+  const run = (deps.runStryker || runStryker)(root, p, opts);
   reportLeftovers(run.leftovers);
   if (!run.report) return fail(COMMAND, run.problem, run.details || [], run.next || [], run.code || 1);
   const summary = summarise(run.report);
 
   if (opts.json) {
-    console.log(JSON.stringify({ kind: "mutation-run", ...p, ...summary }, null, 2));
+    console.log(JSON.stringify({ kind: "mutation-run", ...p, cost, ...summary }, null, 2));
   } else {
     for (const s of summary.survivors) console.log("survived  " + s.file + ":" + s.line + "  " + s.mutator + " → " + s.replacement);
     if (p.lines) for (const l of rangeReport(p)) console.log(l);

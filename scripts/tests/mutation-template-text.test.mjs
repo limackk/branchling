@@ -276,7 +276,11 @@ test("a change touching code and template text mutates the code and names the te
     const code = run(root, ["--changed-lines", "--plan", "--json"]);
     assert.equal(code.code, 0, code.err);
     assert.deepEqual(JSON.parse(code.out).templateText, {});
-    assert.equal(run(root, ["--changed-lines", "--plan"]).out, [
+    // The cost lines (TL-682) depend on whether Stryker is installed and on a
+    // timed run; mutation-run.test.mjs asserts them.
+    const scope = run(root, ["--changed-lines", "--plan"]).out.split("\n")
+      .filter((l) => !/^(mutants\b|estimate: |the selected tests failed)/.test(l)).join("\n");
+    assert.equal(scope, [
       "mutate (1): scripts/view.mjs",
       "mutated lines only: scripts/view.mjs:2-2",
       "not mutated: every line outside these ranges, and every mutant spanning one",
