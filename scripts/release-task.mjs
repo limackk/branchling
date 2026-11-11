@@ -55,8 +55,10 @@ export function run(argv) {
   // Null until the actor is resolved: a refusal before that point (a usage
   // error, a deploy subcommand) has no actor to report a source for.
   let actorSource = null;
-  const refuse = (message, details = [], code = 1, refusalKind = "refused") => {
-    if (wantsJson) printJson("task-release", { ok: false, actorSource, refusalKind, refusal: message, details });
+  // `value` — `{ rejected, declared }` — travels only on a refusal of a value
+  // a person typed; every other refusal keeps the envelope it always had.
+  const refuse = (message, details = [], code = 1, refusalKind = "refused", value = null) => {
+    if (wantsJson) printJson("task-release", { ok: false, actorSource, refusalKind, refusal: message, details, ...(value || {}) });
     else console.error(failure(N + " release", message, details, [N + " release --help"]));
     return code;
   };
@@ -96,8 +98,24 @@ export function run(argv) {
     return refuse(e.message, e.details || [], BACKLOG_DIR_REFUSAL_EXIT, BACKLOG_DIR_REFUSAL_KIND);
   }
   const config = loadConfigOrExit(root);
-  if (plan.status && (config.statuses.indexOf(plan.status) < 0 || config.archivedStatuses.indexOf(plan.status) >= 0)) {
-    return refuse("`--status` must name an open status in this backlog", [], 2, "usage");
+  // A `--status` outside the vocabulary, or an archived one, is a value typed
+  // into a correctly built call: a refusal (1), not a usage error, with the
+  // same two kinds `handoff` answers (TL-574, TL-635), because both commands
+  // share one write path and a consumer must not need to know which it called.
+  if (plan.status) {
+    if (config.statuses.indexOf(plan.status) < 0) {
+      return refuse("unknown status `" + plan.status + "`",
+        ["`statuses` in config.yaml holds: " + config.statuses.join(", ")], 1, "unknown-value",
+        { rejected: { field: "status", value: plan.status }, declared: config.statuses.slice() });
+    }
+    if (config.archivedStatuses.indexOf(plan.status) >= 0) {
+      const open = config.statuses.filter((s) => config.archivedStatuses.indexOf(s) < 0);
+      return refuse("`" + plan.status + "` is an archived status", [
+        "A release puts a task back in the queue; closing one is `" + N + " done`, which",
+        "runs its verification first.",
+        "a release may set: " + (open.length ? open.join(", ") : "nothing — every declared status is archived"),
+      ], 1, "archived-status", { rejected: { field: "status", value: plan.status }, declared: open });
+    }
   }
   const result = handoffTask({ root, config, id: plan.id, actor, reason: plan.reason, status: plan.status });
   if (!result.ok) return refuse(result.message, result.details || [], result.kind === "not-found" ? 2 : 1, result.kind || "refused");

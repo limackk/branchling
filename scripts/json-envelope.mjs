@@ -406,9 +406,12 @@ export const KINDS = {
     ok: null, id: null, file: null, changed: null, body: null, lines: null, entry: null, actorSource: null,
     refusalKind: null, refusal: null, details: [],
   },
+  // An undeclared or archived `--status` is `unknown-value` or
+  // `archived-status` (TL-675), with `rejected` and `declared` as `handoff`
+  // answers them; every other refusal leaves them null and empty.
   "task-release": {
     ok: null, id: null, status: null, owner: null, released: null, comment: null, actorSource: null,
-    refusalKind: null, refusal: null, details: [],
+    refusalKind: null, refusal: null, details: [], rejected: null, declared: [],
   },
   // `set --json` (TL-521). `changes` are the history entries the write
   // appended, so a consumer reads the attribution without opening the log; an
