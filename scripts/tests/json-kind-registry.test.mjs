@@ -25,7 +25,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { KINDS, KIND_EXERCISE, registrationGaps } from "../json-envelope.mjs";
-import { SCRIPTS_DIR, isolateHome } from "./_repo.mjs";
+import { SCRIPTS_DIR, isolateHome, scriptSource } from "./_repo.mjs";
 
 // THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). Nothing here reads the
 // user's configuration, but the rule is uniform on purpose: an exception has to
@@ -63,8 +63,10 @@ test("POSITIVE CONTROL: a kind nothing exercises is REPORTED, in both directions
 
 test("the registry is declared where KINDS is, so registering needs no test edit", () => {
   // The whole thesis, read from the source rather than from a habit: both
-  // declarations are in one file, and that file is production code.
-  const src = readFileSync(join(SCRIPTS_DIR, ENVELOPE_FILE), "utf8");
+  // declarations are in one file, and that file is production code. The text
+  // is the one the author wrote, not a mutation run's instrumented copy, where
+  // `{` after `KINDS =` sits inside a mutant switch (TL-654, by TL-653's route).
+  const src = scriptSource(ENVELOPE_FILE);
   assert.match(src, /export const KINDS = \{/, "KINDS is not declared where it is expected");
   assert.match(src, /export const KIND_EXERCISE = \{/, "the invocation registry does not ship beside KINDS");
   // And the sentinels the rows name, so an id is never typed into one (TL-273).
@@ -86,7 +88,7 @@ test("no file under scripts/tests/ holds a table of kinds again", () => {
   // POSITIVE CONTROL: the detector really counts, and the file that DOES hold
   // the registry is over the threshold. Without it a broken reader would report
   // no offenders while measuring nothing.
-  const envelopeSrc = readFileSync(join(SCRIPTS_DIR, ENVELOPE_FILE), "utf8");
+  const envelopeSrc = scriptSource(ENVELOPE_FILE);
   assert.ok(mentions(envelopeSrc) > threshold,
     "the detector does not recognise the registry it is modelled on");
 
