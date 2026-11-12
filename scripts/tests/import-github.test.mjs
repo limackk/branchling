@@ -35,7 +35,7 @@ import { loadConfig } from "../config.mjs";
 import { SOURCE_MARKER, parseIssues, renderBody } from "../import-github.mjs";
 import { importedSources, parseImportArgs, planImport } from "../import.mjs";
 
-import { isolateHome } from "./_repo.mjs";
+import { isolateHome, sourceRoot } from "./_repo.mjs";
 
 // THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
 // file in its own process, so one call covers every case in it. Without this a
@@ -489,7 +489,8 @@ test("check passes on the tree the import produced", () => {
 test("the importer cannot reach the network — proved on its dependencies, not on a run", () => {
   const seen = new Set();
   const forbidden = ["node:http", "node:https", "node:net", "node:tls", "node:dgram", "http", "https", "net", "tls"];
-  const stack = [join(SCRIPTS, "import.mjs")];
+  const sources = join(sourceRoot(), "scripts");
+  const stack = [join(sources, "import.mjs")];
   while (stack.length) {
     const file = stack.pop();
     if (seen.has(file)) continue;

@@ -12,7 +12,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { isolateHome, REPO_ROOT } from "./_repo.mjs";
+import { isolateHome, REPO_ROOT, scriptSource } from "./_repo.mjs";
 
 isolateHome("viewer-mode-contract");
 
@@ -23,7 +23,7 @@ const SOURCES = {
   manual: read("docs/manual.md"),
   brief: read("docs/viewer-redesign-brief.md"),
   skill: read(".agents/skills/branchling-viewer/SKILL.md"),
-  server: read("scripts/serve-backlog.mjs"),
+  server: scriptSource("serve-backlog.mjs"),
 };
 
 export function contractProblems(sources) {

@@ -41,7 +41,7 @@ import {
 import { COMMANDS } from "../cli.mjs";
 import { DEFAULTS } from "../config.mjs";
 import { renderWhere, whereReport } from "../where-command.mjs";
-import { isolateHome, SCRIPTS_DIR } from "./_repo.mjs";
+import { isolateHome, scriptSource, sourceRoot } from "./_repo.mjs";
 
 // THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
 // file in its own process, so one call covers every case in it. Without this a
@@ -319,7 +319,7 @@ test("the preferences file the tool would read is named in `where`", () => {
   assert.equal(report.preferences.path, join(home, "config", "config.yaml"));
   assert.equal(report.agentProfiles.path, agentProfilesPath(env));
   assert.equal(report.agentProfiles.exists, false);
-  assert.equal(readFileSync(CLI, "utf8").includes("--project"), false,
+  assert.equal(scriptSource("cli.mjs").includes("--project"), false,
     "the dispatcher itself must not learn about a --project flag either");
 });
 
@@ -395,9 +395,10 @@ test("an actor without a namespace in the preferences is not an actor", () => {
 test("the chain is spelled out in ONE file — this is what stops the next copy", () => {
   // Before TL-157 ten files ended the chain themselves and three of them had
   // already drifted apart. Nothing compared them, which is why nobody noticed.
-  const scripts = readdirSync(SCRIPTS_DIR)
+  const sources = join(sourceRoot(), "scripts");
+  const scripts = readdirSync(sources)
     .filter((f) => f.endsWith(".mjs"))
-    .filter((f) => readFileSync(join(SCRIPTS_DIR, f), "utf8").includes(ACTOR_ENV));
+    .filter((f) => readFileSync(join(sources, f), "utf8").includes(ACTOR_ENV));
 
   // The positive control: a guard that passes because it found nothing at all
   // is green with no evidentiary force.

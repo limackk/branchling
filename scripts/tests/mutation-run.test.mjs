@@ -20,7 +20,7 @@ import os, { hostname, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { SCRIPTS_DIR, isolateHome, isolateState, scriptSource } from "./_repo.mjs";
+import { REPO_ROOT, SCRIPTS_DIR, isolateHome, isolateState, scriptSource, sourceRoot } from "./_repo.mjs";
 import {
   DEFAULT_BUDGET_MINUTES, MIN_SWEEP_MARKER, SOURCE_ROOT_ENV, countMutants, estimateSeconds, formatDuration, leftoverProcesses,
   SANDBOX_GIT_INIT, SILENT_LOGGER, keepReport, changedLineRanges, directorySymlinks, importClosure, loadInstrumenter, main, mutateDescriptions,
@@ -371,6 +371,9 @@ test("scriptSource reads the tree a mutation run names, and this one otherwise",
   write(root, "scripts/build-viewer.mjs", "// the original, uninstrumented\n");
   assert.equal(scriptSource("build-viewer.mjs", { [SOURCE_ROOT_ENV]: root }), "// the original, uninstrumented\n");
   assert.equal(scriptSource("mutation-run.mjs", {}), readFileSync(ENTRY, "utf8"));
+  // A guard that walks scripts/ or bin/ joins onto the same root (TL-702).
+  assert.equal(sourceRoot({ [SOURCE_ROOT_ENV]: root }), root);
+  assert.equal(sourceRoot({}), REPO_ROOT);
   rmSync(root, { recursive: true, force: true });
 });
 

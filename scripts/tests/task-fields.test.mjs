@@ -29,7 +29,7 @@ import {
   unquote,
 } from "../task-fields.mjs";
 import { loadConfig } from "../config.mjs";
-import { BACKLOG_DIR, isolateHome } from "./_repo.mjs";
+import { BACKLOG_DIR, isolateHome, scriptSource } from "./_repo.mjs";
 
 // THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
 // file in its own process, so one call covers every case in it. Without this a
@@ -376,9 +376,8 @@ test("the shape of a field does not depend on the configuration (list style surv
   assert.equal(FIELD_SHAPES.every((f) => f.key && f.label && f.kind), true);
 });
 
-test("the module has no imports — its source is pasted into the viewer", async () => {
-  const { readFileSync } = await import("node:fs");
-  const src = readFileSync(new URL("../task-fields.mjs", import.meta.url), "utf8");
+test("the module has no imports — its source is pasted into the viewer", () => {
+  const src = scriptSource("task-fields.mjs");
   assert.doesNotMatch(src, /^\s*import\s/m);
   assert.doesNotMatch(src, /<\/script/i);
 });

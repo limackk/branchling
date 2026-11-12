@@ -3,13 +3,13 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 
-import { isolateHome, REPO_ROOT } from "./_repo.mjs";
+import { isolateHome, REPO_ROOT, sourceRoot } from "./_repo.mjs";
 
 isolateHome("agent-activity-language");
 
 const PATHS = {
   agents: join(REPO_ROOT, "AGENTS.md"),
-  instructions: join(REPO_ROOT, "scripts", "instructions.mjs"),
+  instructions: join(sourceRoot(), "scripts", "instructions.mjs"),
   guide: join(REPO_ROOT, "docs", "guide.md"),
 };
 

@@ -10,7 +10,7 @@ import { join } from "node:path";
 
 import { HOME_ENV } from "../home.mjs";
 import { logPathFor } from "../run-loop.mjs";
-import { isolateHome, SCRIPTS_DIR } from "./_repo.mjs";
+import { isolateHome, SCRIPTS_DIR, scriptSource } from "./_repo.mjs";
 
 isolateHome("agent-api-harness");
 
@@ -161,7 +161,7 @@ test("two incompatible API harnesses close work without exposing credentials", a
       assert.match(request.input, /## Task/);
       assert.doesNotMatch(request.input, new RegExp(SECRET));
     }
-    const dispatcher = readFileSync(join(SCRIPTS_DIR, "run-loop.mjs"), "utf8");
+    const dispatcher = scriptSource("run-loop.mjs");
     assert.equal(dispatcher.includes("/v1/chat/completions"), false);
     assert.equal(dispatcher.includes("X-Harness-Token"), false);
   } finally {

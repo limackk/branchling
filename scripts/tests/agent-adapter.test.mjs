@@ -9,7 +9,7 @@ import { spawnSync } from "node:child_process";
 
 import { HOME_ENV } from "../home.mjs";
 import { handFor, parseRunArgs } from "../run-loop.mjs";
-import { isolateHome, SCRIPTS_DIR } from "./_repo.mjs";
+import { isolateHome, SCRIPTS_DIR, sourceRoot } from "./_repo.mjs";
 
 isolateHome("agent-adapter");
 
@@ -59,7 +59,8 @@ test("a provider-neutral executable receives the stable profile contract and clo
     assert.match(received, new RegExp(repo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
     assert.match(result.stdout, /1 closed/);
 
-    const production = readdirSync(SCRIPTS_DIR).filter((f) => f.endsWith(".mjs")).map((f) => readFileSync(join(SCRIPTS_DIR, f), "utf8")).join("\n");
+    const sources = join(sourceRoot(), "scripts");
+    const production = readdirSync(sources).filter((f) => f.endsWith(".mjs")).map((f) => readFileSync(join(sources, f), "utf8")).join("\n");
     assert.equal(production.includes("neutral-runner"), false, "the fixture provider leaked into production source");
   } finally {
     rmSync(root, { recursive: true, force: true });

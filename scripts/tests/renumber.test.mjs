@@ -34,7 +34,7 @@ import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { isolateHome, SCRIPTS_DIR } from "./_repo.mjs";
+import { isolateHome, SCRIPTS_DIR, scriptSource } from "./_repo.mjs";
 
 // THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
 // file in its own process, so one call covers every case in it. Without this a
@@ -217,7 +217,7 @@ test("the convention is printed by the command, not only agreed in a task", () =
   assert.match(help.out, new RegExp(EXAMPLE_MARKER), "`--help` does not name the marker");
   assert.match(help.out, /example/i);
 
-  const header = readFileSync(join(SCRIPTS_DIR, "renumber.mjs"), "utf8").split("*/")[0];
+  const header = scriptSource("renumber.mjs").split("*/")[0];
   assert.match(header, new RegExp(EXAMPLE_MARKER), "the module header still promises a rewrite with no exception");
 });
 

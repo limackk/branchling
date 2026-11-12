@@ -114,20 +114,15 @@ test("an empty search and empty filters do not clutter the link", () => {
 // The module alone can be green while the page never calls it once. This test
 // enforces one thing: that the module's SOURCE reaches the HTML (rather than a
 // second copy of the logic beside it) and that the page has something to call.
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { buildHtml, computeStats } from "../build-viewer.mjs";
 
-import { isolateHome } from "./_repo.mjs";
+import { isolateHome, scriptSource } from "./_repo.mjs";
 
 // THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
 // file in its own process, so one call covers every case in it. Without this a
 // test reads the DEVELOPER's `<config>/config.yaml` — their actor, their model
 // endpoint — and the suite answers differently on different machines.
 isolateHome("viewer-url");
-
-const SCRIPTS = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 test("viewer: the page carries the source of viewer-url.mjs, not its own copy", () => {
   const tasks = [{
@@ -138,7 +133,7 @@ test("viewer: the page carries the source of viewer-url.mjs, not its own copy", 
 
   // A fragment characteristic of the module — if the build stopped pasting it in,
   // the page would still be generated, only without URL routing.
-  const src = readFileSync(join(SCRIPTS, "viewer-url.mjs"), "utf8");
+  const src = scriptSource("viewer-url.mjs");
   const marker = "export function encodeTasksHash";
   assert.ok(src.includes(marker), "the module changed shape — fix the marker in this test");
   assert.ok(html.includes(marker.replace("export ", "")), "the source of viewer-url.mjs did not reach the page");

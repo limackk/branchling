@@ -27,7 +27,7 @@ import { BacklogNotFoundError, looksLikeBacklogDir, resolveBacklogDir } from "..
 import { PRODUCT_NAME, PRODUCT_VERSION, MANIFEST_PATH, readManifest } from "../product.mjs";
 import { versionText, helpText } from "../cli.mjs";
 
-import { isolateHome, REPO_ROOT as PKG_ROOT, SHIM, shimArgs, shimPath } from "./_repo.mjs";
+import { isolateHome, REPO_ROOT as PKG_ROOT, SHIM, shimArgs, shimPath, sourceRoot } from "./_repo.mjs";
 
 // THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
 // file in its own process, so one call covers every case in it. Without this a
@@ -208,7 +208,7 @@ test("bin and cli give the same result for --version and --help", () => {
 });
 
 test("bin carries no logic of its own", () => {
-  const src = readFileSync(BIN, "utf8");
+  const src = readFileSync(join(sourceRoot(), "bin", "branchling.mjs"), "utf8");
   const code = src
     .split("\n")
     .filter((l) => !l.trim().startsWith("*") && !l.trim().startsWith("/*") && !l.trim().startsWith("//"))

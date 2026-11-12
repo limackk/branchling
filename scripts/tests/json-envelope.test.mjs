@@ -34,7 +34,7 @@ import { fileURLToPath } from "node:url";
 import {
   ABSENT_TASK, FIRST_TASK, KINDS, KIND_EXERCISE, OK_BY_DEFAULT, SCHEMA_VERSION, envelope, registrationGaps,
 } from "../json-envelope.mjs";
-import { isolateHome, REPO_ROOT, SCRIPTS_DIR, plainOutput } from "./_repo.mjs";
+import { isolateHome, REPO_ROOT, SCRIPTS_DIR, plainOutput, scriptSource, sourceRoot } from "./_repo.mjs";
 
 // THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
 // file in its own process, so one call covers every case in it. Without this a
@@ -261,16 +261,17 @@ test("the version number lives in exactly one file", () => {
   // that one is called `planVersion` (TL-94).
   // A deliberate mention — prose explaining why something else is NOT called
   // this — is marked on its own line. A marker per line, never per file.
-  const files = readdirSync(SCRIPTS_DIR).filter((f) => f.endsWith(".mjs"));
+  const sources = join(sourceRoot(), "scripts");
+  const files = readdirSync(sources).filter((f) => f.endsWith(".mjs"));
   // POSITIVE CONTROL: the guard reads real files, and the word is really in the
   // one file that owns it. Without this, a broken listing would report "no
   // offenders" — green, with nothing measured.
   assert.ok(files.length > 20, "the scan found almost no source files");
-  assert.ok(readFileSync(join(SCRIPTS_DIR, "json-envelope.mjs"), "utf8").includes("schemaVersion"));
+  assert.ok(scriptSource("json-envelope.mjs").includes("schemaVersion"));
 
   const offenders = files
     .filter((f) => f !== "json-envelope.mjs")
-    .filter((f) => readFileSync(join(SCRIPTS_DIR, f), "utf8")
+    .filter((f) => readFileSync(join(sources, f), "utf8")
       .split("\n")
       .some((line) => line.includes("schemaVersion") && !line.includes("envelope-version: allow")));
   assert.deepEqual(offenders, [], "a second answer to `which contract is this`");
@@ -278,7 +279,7 @@ test("the version number lives in exactly one file", () => {
 
 test("no reading command builds an envelope of its own", () => {
   for (const file of ["query.mjs", "stats-report.mjs", "doctor.mjs", "suggest-board.mjs", "next-backlog-id.mjs", "instructions.mjs", "agent-profiles.mjs"]) {
-    const src = readFileSync(join(SCRIPTS_DIR, file), "utf8");
+    const src = scriptSource(file);
     assert.match(src, /json-envelope\.mjs/, file + ": emits --json without the shared envelope");
   }
 });

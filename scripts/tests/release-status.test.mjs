@@ -31,7 +31,7 @@ import { dirname, join } from "node:path";
 import { TRUNK_SOURCE_TEXT, defaultTrunk } from "../environments.mjs";
 import { parseStatusArgs, releasePipeline, resolveFilter } from "../release-status.mjs";
 
-import { SCRIPTS_DIR, isolateHome } from "./_repo.mjs";
+import { SCRIPTS_DIR, isolateHome, scriptSource, sourceRoot } from "./_repo.mjs";
 
 isolateHome("release-status");
 
@@ -315,10 +315,11 @@ test("deploy status words the trunk's source from the one shared map, for both s
  */
 test("no script but environments.mjs defines the wording of the trunk's source", () => {
   const signatures = [/this clone has no/, /["']the remote's default branch["']/];
-  const owners = readdirSync(SCRIPTS_DIR).filter((f) => f.endsWith(".mjs"))
-    .filter((f) => signatures.some((re) => re.test(readFileSync(join(SCRIPTS_DIR, f), "utf8"))));
+  const sources = join(sourceRoot(), "scripts");
+  const owners = readdirSync(sources).filter((f) => f.endsWith(".mjs"))
+    .filter((f) => signatures.some((re) => re.test(readFileSync(join(sources, f), "utf8"))));
   assert.deepEqual(owners, ["environments.mjs"]);
-  const source = readFileSync(join(SCRIPTS_DIR, "environments.mjs"), "utf8");
+  const source = scriptSource("environments.mjs");
   for (const re of signatures) assert.match(source, re);
   for (const text of Object.values(TRUNK_SOURCE_TEXT)) assert.ok(source.includes(text), text);
 });

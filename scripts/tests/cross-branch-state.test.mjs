@@ -27,7 +27,7 @@ import { DEFAULT_TASK_ID_PREFIX as P } from "../task-id.mjs";
 import { absentHere, crossBranchState, statusSetAt } from "../branch-scan.mjs";
 import { loadConfig } from "../config.mjs";
 
-import { isolateHome, plainOutput } from "./_repo.mjs";
+import { isolateHome, plainOutput, scriptSource } from "./_repo.mjs";
 
 // THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
 // file in its own process, so one call covers every case in it. Without this a
@@ -580,7 +580,7 @@ test("the branch and worktree scan lives in ONE module", () => {
   // A structural guard, because the cost of a second copy is not a failing test
   // — it is `next-id` and `query` disagreeing about which branches exist, which
   // surfaces as a task handed to two sessions.
-  const nextId = readFileSync(join(SCRIPTS, "next-backlog-id.mjs"), "utf8");
+  const nextId = scriptSource("next-backlog-id.mjs");
   assert.match(nextId, /from ['"]\.\/branch-scan\.mjs['"]/, "next-id no longer uses the shared scan");
   // Asked as "does it run git ITSELF", not as "does the word appear": the prose
   // at the top of that file names the same commands, and a guard that reads
@@ -588,7 +588,7 @@ test("the branch and worktree scan lives in ONE module", () => {
   assert.doesNotMatch(nextId, /child_process/, "next-id grew its own git calls again");
 
   for (const caller of ["query.mjs", "stats-report.mjs", "build-viewer.mjs"]) {
-    const src = readFileSync(join(SCRIPTS, caller), "utf8");
+    const src = scriptSource(caller);
     assert.match(src, /from ['"]\.\/branch-scan\.mjs['"]/, caller + " reads state from one checkout only");
   }
 });

@@ -36,7 +36,7 @@ import { importedSources, parseImportArgs, planImport } from "../import.mjs";
 import { SOURCE_MARKER, adfToMarkdown, browseUrl, parseJiraIssues, renderBody } from "../import-jira.mjs";
 import { SOURCE_MARKER as GITHUB_MARKER } from "../import-github.mjs";
 
-import { isolateHome } from "./_repo.mjs";
+import { isolateHome, sourceRoot } from "./_repo.mjs";
 
 isolateHome("import-jira");
 
@@ -601,7 +601,8 @@ test("check passes on the tree the import produced", () => {
 test("the Jira source is reached from the command and reaches no network module", () => {
   const seen = new Set();
   const forbidden = ["node:http", "node:https", "node:net", "node:tls", "node:dgram", "http", "https", "net", "tls"];
-  const stack = [join(SCRIPTS, "import.mjs")];
+  const sources = join(sourceRoot(), "scripts");
+  const stack = [join(sources, "import.mjs")];
   while (stack.length) {
     const file = stack.pop();
     if (seen.has(file)) continue;
@@ -613,5 +614,5 @@ test("the Jira source is reached from the command and reaches no network module"
       if (spec.startsWith(".")) stack.push(join(dirname(file), spec));
     }
   }
-  assert.ok(seen.has(join(SCRIPTS, "import-jira.mjs")), "the walk never reached the Jira source — it proved nothing about it");
+  assert.ok(seen.has(join(sources, "import-jira.mjs")), "the walk never reached the Jira source — it proved nothing about it");
 });

@@ -26,7 +26,7 @@ import { fileURLToPath } from "node:url";
 
 import { ConfigError, loadConfig } from "../config.mjs";
 
-import { isolateHome } from "./_repo.mjs";
+import { isolateHome, sourceRoot } from "./_repo.mjs";
 
 // THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
 // file in its own process, so one call covers every case in it. Without this a
@@ -36,7 +36,6 @@ isolateHome("config-strictness");
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CLI = join(HERE, "..", "cli.mjs");
-const SCRIPTS = join(HERE, "..");
 
 function run(cwd, args) {
   return spawnSync(process.execPath, [CLI].concat(args), { cwd, encoding: "utf8", timeout: 30_000 });
@@ -127,13 +126,14 @@ test("a defect in the program is NOT a ConfigError — otherwise we would silenc
 // ── A rule, not a one-off fix ─────────────────────────────────────────────
 
 test("no production file goes back to `strict: false`", () => {
-  const files = readdirSync(SCRIPTS).filter((f) => f.endsWith(".mjs") && f !== "config.mjs");
-  const offenders = files.filter((f) => readFileSync(join(SCRIPTS, f), "utf8").includes("strict: false"));
+  const SOURCES = join(sourceRoot(), "scripts");
+  const files = readdirSync(SOURCES).filter((f) => f.endsWith(".mjs") && f !== "config.mjs");
+  const offenders = files.filter((f) => readFileSync(join(SOURCES, f), "utf8").includes("strict: false"));
   assert.deepEqual(offenders, [],
     "these files load the configuration leniently again: " + offenders.join(", "));
 
   // A positive control for the scan itself: if it read empty files or the wrong
   // path, the assertion above would be green and would mean nothing.
-  const users = files.filter((f) => readFileSync(join(SCRIPTS, f), "utf8").includes("loadConfigOrExit"));
+  const users = files.filter((f) => readFileSync(join(SOURCES, f), "utf8").includes("loadConfigOrExit"));
   assert.ok(users.length >= 8, "the scan sees no calls — it is measuring the wrong tree (found " + users.length + ")");
 });
