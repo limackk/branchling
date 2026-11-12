@@ -1,1 +1,4 @@
 {"id":"01M74VWF53ZGYT3DHJ7BA13TH1","ts":"2026-11-11T08:34:10.211Z","task":"TL-703","field":"__created__","from":"","to":"A --files entry with a line range selects its module's tests","actor":"agent:loop-2","source":"new","reason":"unknown"}
+{"id":"01M787P5JM2WNGM0JC1D8GHCJT","ts":"2026-11-12T15:58:10.004Z","task":"TL-703","field":"status","from":"pending","to":"in_progress","actor":"agent:loop-2","source":"next","reason":"unknown"}
+{"id":"01M787P5JMTCJQ01QJTMCA95WH","ts":"2026-11-12T15:58:10.004Z","task":"TL-703","field":"owner","from":"unassigned","to":"agent:loop-2","actor":"agent:loop-2","source":"next","reason":"unknown"}
+{"id":"01M7888634TD7SHZNK6FXNT9QH","ts":"2026-11-12T16:08:00.356Z","task":"TL-703","field":"status","from":"in_progress","to":"done","actor":"agent:loop-2","source":"done","reason":"proven","contractCapability":{"verdict":"incapable","statement":"the run executed no file this task changed","changedFilesExecuted":[]}}
