@@ -23,7 +23,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { SCRIPTS_DIR, isolateHome, isolateState, scriptSource } from "./_repo.mjs";
 import {
   DEFAULT_BUDGET_MINUTES, MIN_SWEEP_MARKER, SOURCE_ROOT_ENV, countMutants, estimateSeconds, formatDuration, leftoverProcesses,
-  SANDBOX_GIT_INIT, loadInstrumenter, main, mutateDescriptions, parseArgs, reachesCli, sandboxCommand, strykerEnv, sweepLeftovers, timeTests,
+  SANDBOX_GIT_INIT, keepReport, loadInstrumenter, main, mutateDescriptions, summarise, parseArgs, reachesCli, sandboxCommand, strykerEnv, sweepLeftovers, timeTests,
 } from "../mutation-run.mjs";
 import { SLOT_TOKEN_ENV, chooseConcurrency, describeHolder, releaseSlot, slotPath, tryAcquireSlot } from "../mutation-slot.mjs";
 import { STATE_DIR_ENV } from "../lock.mjs";
@@ -968,6 +968,94 @@ test("the timed run is the selected tests' own verdict and duration (TL-682)", (
     // Run from inside node --test, as this is: a run that inherited the test
     // context would report through it and exit 0 on a failure.
     assert.equal(timeTests(root, ["scripts/tests/red.test.mjs"]).passed, false, "a failing selection was reported passed");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// TL-686. A report with one mutant of every status that matters to a reader.
+const REPORT = {
+  files: {
+    "scripts/lib.mjs": {
+      mutants: [
+        { status: "Killed", location: { start: { line: 1 } }, mutatorName: "ArithmeticOperator", replacement: "x - 1" },
+        { status: "Survived", location: { start: { line: 2 } }, mutatorName: "ConditionalExpression", replacement: "true" },
+        { status: "Timeout", location: { start: { line: 7 } }, mutatorName: "BlockStatement", replacement: "{}" },
+        { status: "Timeout", location: { start: { line: 9 } }, mutatorName: "UpdateOperator", replacement: "i--" },
+      ],
+    },
+  },
+};
+
+test("Timeout mutants are listed by file, line and mutator like survivors (TL-686)", async () => {
+  const s = summarise(REPORT);
+  assert.equal(s.timeouts, 2);
+  assert.deepEqual(s.timedOut, [
+    { file: "scripts/lib.mjs", line: 7, mutator: "BlockStatement", replacement: "{}" },
+    { file: "scripts/lib.mjs", line: 9, mutator: "UpdateOperator", replacement: "i--" },
+  ]);
+  assert.deepEqual(s.survivors.map((m) => m.line), [2], "a Timeout was listed as a survivor, or a survivor was lost");
+
+  const root = fixture();
+  try {
+    const { deps } = costDeps({ mutants: 4, seconds: 1 });
+    deps.runStryker = () => ({ code: 0, leftovers: [], report: REPORT });
+    const text = await inProcess(["--files", "scripts/lib.mjs", "--concurrency", "1"], root, deps);
+    assert.equal(text.code, 0, text.err);
+    assert.match(text.out, /^survived  scripts\/lib\.mjs:2  ConditionalExpression → true$/m);
+    assert.match(text.out, /^timed out  scripts\/lib\.mjs:7  BlockStatement → \{\}$/m);
+    assert.match(text.out, /^timed out  scripts\/lib\.mjs:9  UpdateOperator → i--$/m);
+    assert.match(text.err, /2 mutants timed out and are counted as detected/);
+    const json = JSON.parse((await inProcess(["--files", "scripts/lib.mjs", "--concurrency", "1", "--json"], root, deps)).out);
+    assert.deepEqual(json.timedOut.map((m) => m.file + ":" + m.line), ["scripts/lib.mjs:7", "scripts/lib.mjs:9"]);
+    assert.equal(json.keptReport, null, "a report nobody asked to keep was named");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("--keep-report copies the report, and a destination that cannot hold it is refused before the run (TL-686)", async () => {
+  const root = fixture();
+  try {
+    const from = join(root, "mutation.json");
+    writeFileSync(from, JSON.stringify(REPORT));
+    const to = join(root, "kept.json");
+    assert.equal(keepReport(from, to), to);
+    assert.deepEqual(JSON.parse(readFileSync(to, "utf8")), REPORT, "the kept report is not Stryker's");
+    const lost = keepReport(from, join(root, "no-such-dir", "kept.json"));
+    assert.match(lost.error, /ENOENT/, "a copy that failed was reported written");
+
+    // The path handed to the run is resolved against the directory the run starts in.
+    const { deps, calls } = costDeps({ mutants: 4, seconds: 1 });
+    let handed = null;
+    deps.runStryker = (_root, _p, opts) => {
+      calls.stryker++;
+      handed = opts.keepReport;
+      return { code: 0, leftovers: [], report: REPORT, kept: keepReport(from, opts.keepReport) };
+    };
+    const kept = await inProcess(["--files", "scripts/lib.mjs", "--concurrency", "1", "--keep-report", "out.json"], root, deps);
+    assert.equal(kept.code, 0, kept.err);
+    assert.equal(handed, join(root, "out.json"));
+    assert.ok(existsSync(join(root, "out.json")), "the report was not kept");
+    assert.match(kept.err, new RegExp("^report kept: " + join(root, "out.json").replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$", "m"));
+    const json = JSON.parse((await inProcess(["--files", "scripts/lib.mjs", "--concurrency", "1", "--json", "--keep-report", "j.json"], root, deps)).out);
+    assert.equal(json.keptReport, join(root, "j.json"));
+
+    // A copy that failed after the run is reported, and the run does not read as clean.
+    deps.runStryker = () => ({ code: 0, leftovers: [], report: REPORT, kept: { error: "EACCES: permission denied" } });
+    const failed = await inProcess(["--files", "scripts/lib.mjs", "--concurrency", "1", "--keep-report", "x.json"], root, deps);
+    assert.equal(failed.code, 1);
+    assert.match(failed.err, /the report could not be kept at .*x\.json: EACCES/);
+    assert.match(failed.out, /^survived  scripts\/lib\.mjs:2/m, "the result was withheld because the copy failed");
+
+    const before = calls.stryker;
+    const missing = await inProcess(["--files", "scripts/lib.mjs", "--keep-report", "no-such-dir/r.json"], root, deps);
+    assert.equal(missing.code, 1);
+    assert.match(missing.err, /--keep-report .*no-such-dir\/r\.json: .*no-such-dir is not a directory/);
+    const plan = await inProcess(["--files", "scripts/lib.mjs", "--plan", "--keep-report", "r.json"], root, deps);
+    assert.equal(plan.code, 2);
+    assert.match(plan.err, /--keep-report has nothing to keep under --plan/);
+    assert.equal(calls.stryker, before, "a refused --keep-report started Stryker");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
