@@ -25,7 +25,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { fixtureDir } from "../_fixture-dir.mjs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
@@ -94,12 +94,17 @@ test("a mutant killed only through a spawned process is Killed, and an unasserte
     sh(root, "git", ["switch", "-q", "-c", "feature"]);
     write(root, "scripts/lib.mjs", LIB);
 
-    const r = spawnSync(process.execPath, [ENTRY, "--base", "main", "--json", "--concurrency", "2"], {
+    const r = spawnSync(process.execPath, [ENTRY, "--base", "main", "--json", "--concurrency", "2", "--keep-report", "kept.json"], {
       cwd: root,
       encoding: "utf8",
     });
     assert.equal(r.status, 0, r.stdout + r.stderr);
     const out = JSON.parse(r.stdout);
+    // TL-686: Stryker's own report outlives the run's directory when asked to.
+    assert.equal(out.keptReport, join(root, "kept.json"));
+    const kept = JSON.parse(readFileSync(join(root, "kept.json"), "utf8"));
+    assert.equal(kept.files["scripts/lib.mjs"].mutants.filter((m) => m.status === "Killed").length,
+      out.files["scripts/lib.mjs"].Killed, "the kept report is not the one this run was scored from");
 
     assert.deepEqual(out.modules, ["scripts/lib.mjs"]);
     assert.deepEqual(out.tests.map((t) => t.file), ["scripts/tests/greet.test.mjs"],

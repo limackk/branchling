@@ -110,7 +110,16 @@
  *
  *   node scripts/mutation-run.mjs [--base <ref>] [--files <a,b>] [--tests <a,b>]
  *                                 [--concurrency <n>] [--named-only] [--changed-lines]
- *                                 [--no-wait] [--budget <minutes>] [--plan] [--json] [--help]
+ *                                 [--no-wait] [--budget <minutes>] [--keep-report <path>]
+ *                                 [--plan] [--json] [--help]
+ *
+ * WHAT THE RUN LEAVES TO READ (TL-686). Survivors and Timeout mutants are both
+ * printed by file, line and mutator: a Timeout is counted as detected, so the
+ * lines it sits on are the ones whose score is least trustworthy, and naming
+ * them is what lets a reader rerun exactly those. Stryker's mutation.json is
+ * written into the run's temporary directory, which is removed when the run
+ * ends; `--keep-report <path>` copies it there first. Reading the temporary
+ * directory afterwards found nothing four times before this flag existed.
  *
  * ONE RUN PER MACHINE, AND A CONCURRENCY THAT FITS ITS MEMORY (TL-681). A run
  * takes the machine's mutation slot before starting Stryker and waits, naming
@@ -133,7 +142,7 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
@@ -143,7 +152,7 @@ import { SLOT_TOKEN_ENV, acquireSlot, chooseConcurrency, describeHolder, release
 import { fail, warn, plural } from "./ui.mjs";
 
 const COMMAND = "node scripts/mutation-run.mjs";
-const FLAGS_WITH_VALUE = new Set(["--base", "--files", "--tests", "--concurrency", "--budget"]);
+const FLAGS_WITH_VALUE = new Set(["--base", "--files", "--tests", "--concurrency", "--budget", "--keep-report"]);
 const FLAGS_BARE = new Set(["--plan", "--json", "--named-only", "--changed-lines", "--no-wait"]);
 const BARE_KEYS = { "--named-only": "namedOnly", "--changed-lines": "changedLines", "--no-wait": "noWait" };
 const STRYKER_PIN = "@stryker-mutator/core";
@@ -188,6 +197,7 @@ const FLAG_HELP = {
   "--tests": ["<a,b>", "add these test files to the selection, for a module reached only by spawning"],
   "--concurrency": ["<n>", "Stryker workers (default: chosen from free memory, at most half the cores)"],
   "--budget": ["<minutes>", "refuse a run whose estimate exceeds this (default: " + DEFAULT_BUDGET_MINUTES + ")"],
+  "--keep-report": ["<path>", "copy Stryker's mutation.json to this path before the run's directory is removed"],
   "--plan": ["", "print the modules, the selected tests, the mutant count and the estimate; run nothing"],
   "--json": ["", "print the plan or the result as JSON on stdout"],
   "--named-only": ["", "select only the test files that name the module: a fast lower bound"],
@@ -228,7 +238,7 @@ function lines(text) {
 
 export function parseArgs(argv) {
   const opts = {
-    base: "main", files: null, tests: null, concurrency: null, budget: null,
+    base: "main", files: null, tests: null, concurrency: null, budget: null, keepReport: null,
     plan: false, json: false, namedOnly: false, changedLines: false, noWait: false,
   };
   for (let i = 0; i < argv.length; i++) {
@@ -239,7 +249,7 @@ export function parseArgs(argv) {
     } else if (FLAGS_WITH_VALUE.has(flag)) {
       const value = argv[++i];
       if (value === undefined || value.startsWith("--")) return { error: flag + " needs a value" };
-      const key = flag.slice(2);
+      const key = flag === "--keep-report" ? "keepReport" : flag.slice(2);
       if (key === "files" || key === "tests") opts[key] = value.split(",").map((s) => s.trim()).filter(Boolean);
       else if (key === "concurrency" || key === "budget") {
         if (!/^[1-9]\d*$/.test(value)) return { error: flag + " takes a positive integer, not " + JSON.stringify(value) };
@@ -649,19 +659,24 @@ function shellQuote(s) {
   return "'" + s.replace(/'/g, "'\\''") + "'";
 }
 
-/** The counts a reader needs, per file, from Stryker's JSON report. */
+/**
+ * The counts a reader needs, per file, from Stryker's JSON report, and the
+ * mutants a reader has to look at by line: those that survived and those that
+ * timed out, which Stryker counts as detected without any assertion failing.
+ */
 export function summarise(report) {
   const files = {};
   const survivors = [];
+  const timedOut = [];
   let noCoverage = 0;
   let timeouts = 0;
   for (const [file, data] of Object.entries(report.files || {})) {
     const c = { Killed: 0, Survived: 0, Timeout: 0, NoCoverage: 0, RuntimeError: 0, CompileError: 0, Ignored: 0 };
     for (const m of data.mutants) {
       c[m.status] = (c[m.status] || 0) + 1;
-      if (m.status === "Survived") {
-        survivors.push({ file, line: m.location.start.line, mutator: m.mutatorName, replacement: m.replacement });
-      }
+      const where = { file, line: m.location.start.line, mutator: m.mutatorName, replacement: m.replacement };
+      if (m.status === "Survived") survivors.push(where);
+      else if (m.status === "Timeout") timedOut.push(where);
     }
     noCoverage += c.NoCoverage;
     timeouts += c.Timeout;
@@ -669,7 +684,7 @@ export function summarise(report) {
     const valid = detected + c.Survived + c.NoCoverage;
     files[file] = { ...c, score: valid ? Math.round((detected / valid) * 10000) / 100 : null };
   }
-  return { files, survivors, noCoverage, timeouts };
+  return { files, survivors, timedOut, noCoverage, timeouts };
 }
 
 /**
@@ -992,6 +1007,21 @@ export function strykerEnv(env = process.env, root = null) {
   return copy;
 }
 
+/**
+ * Copy Stryker's report from `from` to `to`: `to` when it was written, or
+ * `{ error }` when it was not. A failure is returned, not thrown, because the
+ * run it belongs to has already finished and its result is still worth
+ * printing.
+ */
+export function keepReport(from, to) {
+  try {
+    copyFileSync(from, to);
+    return to;
+  } catch (e) {
+    return { error: e.message };
+  }
+}
+
 function runStryker(root, p, opts, slot) {
   const bin = strykerBin();
   if (!bin) return { code: 2, problem: STRYKER_PIN + " is not installed", next: ["npm install"] };
@@ -1019,7 +1049,9 @@ function runStryker(root, p, opts, slot) {
       return { code: r.status || 1, problem: "Stryker produced no report", leftovers,
         details: lines((r.stderr || "") + (r.stdout || "")).slice(-10) };
     }
-    return { code: r.status, leftovers, report: JSON.parse(readFileSync(reportPath, "utf8")) };
+    // Copied before the parse, so a report this file cannot read is kept too.
+    const kept = opts.keepReport ? keepReport(reportPath, opts.keepReport) : null;
+    return { code: r.status, leftovers, kept, report: JSON.parse(readFileSync(reportPath, "utf8")) };
   } finally {
     rmSync(work, { recursive: true, force: true });
   }
@@ -1057,6 +1089,19 @@ export async function main(argv, cwd = process.cwd(), deps = {}) {
     return fail(COMMAND, parsed.error, ["known flags: " + [...FLAGS_WITH_VALUE, ...FLAGS_BARE].join(" ")], [COMMAND + " --help"]);
   }
   const { opts } = parsed;
+  if (opts.keepReport && opts.plan) {
+    return fail(COMMAND, "--keep-report has nothing to keep under --plan",
+      ["A plan starts no Stryker run, so no mutation.json is written."], [COMMAND + " --plan (without --keep-report)"]);
+  }
+  if (opts.keepReport) {
+    // Checked before the run, which can take most of an hour, not after it.
+    opts.keepReport = resolve(cwd, opts.keepReport);
+    const parent = dirname(opts.keepReport);
+    if (!existsSync(parent) || !statSync(parent).isDirectory()) {
+      return fail(COMMAND, "--keep-report " + opts.keepReport + ": " + parent + " is not a directory",
+        ["The report would be lost when the run's directory is removed, so the run is not started."], [], 1);
+    }
+  }
   let root;
   try {
     root = git(cwd, ["rev-parse", "--show-toplevel"]).trim();
@@ -1170,14 +1215,21 @@ export async function main(argv, cwd = process.cwd(), deps = {}) {
   reportLeftovers(run.leftovers);
   if (!run.report) return fail(COMMAND, run.problem, run.details || [], run.next || [], run.code || 1);
   const summary = summarise(run.report);
+  const kept = typeof run.kept === "string" ? run.kept : null;
 
   if (opts.json) {
-    console.log(JSON.stringify({ kind: "mutation-run", ...p, cost, ...summary }, null, 2));
+    console.log(JSON.stringify({ kind: "mutation-run", ...p, cost, ...summary, keptReport: kept }, null, 2));
   } else {
     for (const s of summary.survivors) console.log("survived  " + s.file + ":" + s.line + "  " + s.mutator + " → " + s.replacement);
+    for (const s of summary.timedOut) console.log("timed out  " + s.file + ":" + s.line + "  " + s.mutator + " → " + s.replacement);
     if (p.lines) for (const l of rangeReport(p)) console.log(l);
     for (const l of templateTextReport(p)) console.log(l);
   }
+  // Reported before any verdict below, which may return: the report is most
+  // wanted exactly when the run did not end cleanly.
+  if (kept) console.error("report kept: " + kept);
+  const keepFailed = Boolean(run.kept && run.kept.error);
+  if (keepFailed) console.error(warn("the report could not be kept at " + opts.keepReport + ": " + run.kept.error));
   if (summary.noCoverage > 0) {
     return fail(COMMAND, summary.noCoverage + " " + plural(summary.noCoverage, "mutant", "mutants") + " reported NoCoverage under coverageAnalysis: off",
       ["This configuration cannot lose coverage, so the result is not a score; the runner setup has changed."],
@@ -1191,6 +1243,7 @@ export async function main(argv, cwd = process.cwd(), deps = {}) {
       plural(summary.timeouts, "mutant timed out and is", "mutants timed out and are") + " counted as detected; "
       + "rerun with a lower --concurrency before trusting the score"));
   }
+  if (keepFailed) return 1;
   return run.code === 0 ? 0 : run.code || 1;
 }
 
