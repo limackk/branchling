@@ -20,12 +20,12 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { runInNewContext } from "node:vm";
 
 import { buildHtml, readTasks } from "../build-viewer.mjs";
 import { parseAgentProfiles } from "../agent-profiles.mjs";
 import { actorRefusal, isValidActor } from "../task-fields.mjs";
-import { BACKLOG_DIR, isolateHome } from "./_repo.mjs";
+import { SOURCE_ROOT_ENV } from "../mutation-run.mjs";
+import { BACKLOG_DIR, isolateHome, scriptSource } from "./_repo.mjs";
 
 isolateHome("actor-shape-diagnosis-readers");
 
@@ -54,16 +54,36 @@ function functionSource(page, name) {
   return null;
 }
 
+// The field editors are scripts/viewer-field-editors.mjs, pasted into the
+// page by source (TL-704). The test runs the PASTE, taken from the built page,
+// so what it judges is what the browser runs and, inside a mutation run, the
+// instrumented copy Stryker switches mutants in.
+const PASTE_OPEN = "// ─── Pasted source of scripts/viewer-field-editors.mjs";
+const PASTE_CLOSE = "// ─── end of the pasted module";
+
+function pastedEditors(page) {
+  const start = page.indexOf(PASTE_OPEN);
+  if (start < 0) return null;
+  const end = page.indexOf(PASTE_CLOSE, start);
+  return end < 0 ? null : page.slice(start, end);
+}
+
 /**
  * Runs the page's own `startEdit()` with `actor` typed into "Editing as" and
- * returns what the page would show. The shared functions are the module's,
- * which the page inlines by source (asserted below), so this is the code the
- * browser runs, not a copy of its decision.
+ * returns what the page would show. The page names it resolves when called are
+ * supplied as parameters; the shared functions are the module's, which the
+ * page inlines by source (asserted below), so this is the code the browser
+ * runs, not a copy of its decision.
+ *
+ * Evaluated with `Function` in THIS realm rather than in node:vm: Stryker's
+ * mutant switch reads the active mutant from `globalThis.process.env`, which a
+ * fresh vm context does not have, so every mutant would run as the original.
  */
 function viewerAnswer(actor) {
-  const source = functionSource(PAGE, "startEdit");
-  assert.ok(source, "the page no longer declares startEdit()");
-  const context = {
+  const source = pastedEditors(PAGE);
+  assert.ok(source, "the page no longer pastes viewer-field-editors.mjs");
+  assert.ok(functionSource(source, "startEdit"), "the pasted module no longer declares startEdit()");
+  const page = {
     CAN_EDIT: true,
     DEDICATED_FIELDS: {},
     state: { actor, editing: null, editMessage: "", editError: false },
@@ -72,13 +92,29 @@ function viewerAnswer(actor) {
     isValidActor,
     actorRefusal,
   };
-  runInNewContext(source + "\nstartEdit('X-1', 'title');", context);
-  return context.state;
+  const names = Object.keys(page);
+  new Function(...names, source + "\nstartEdit('X-1', 'title');")(...names.map((name) => page[name]));
+  return page.state;
 }
 
 test("the page carries the shared diagnosis it calls", () => {
   assert.ok(PAGE.includes("function actorRefusal("), "task-fields.mjs is no longer inlined with actorRefusal()");
-  assert.ok(functionSource(PAGE, "startEdit").includes("actorRefusal(state.actor)"));
+  assert.ok(functionSource(pastedEditors(PAGE), "startEdit").includes("actorRefusal(state.actor)"));
+});
+
+test("the page pastes viewer-field-editors.mjs by source, without its import and exports", () => {
+  const module = scriptSource("viewer-field-editors.mjs");
+  const paste = pastedEditors(PAGE);
+  assert.ok(paste, "the page no longer pastes viewer-field-editors.mjs");
+  assert.match(module, /^export function startEdit\(/m, "startEdit() is no longer the module's own");
+  assert.doesNotMatch(paste, /^(import|export) /m, "the paste is a script, not a module");
+  assert.equal(PAGE.split("function startEdit(").length, 2, "startEdit() is declared once in the page");
+  if (!process.env[SOURCE_ROOT_ENV]) {
+    // Outside a mutation run the page carries the module's text exactly; inside
+    // one the paste is the instrumented sandbox copy, which no source equals.
+    assert.ok(paste.includes(module.replace(/^import [^;]*;\n/gm, "").replace(/^export /gm, "")),
+      "the page's copy differs from scripts/viewer-field-editors.mjs");
+  }
 });
 
 test("viewer: a user: identity with an uppercase name is refused for its name", () => {
