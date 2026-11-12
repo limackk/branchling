@@ -47,7 +47,7 @@ import { join } from "node:path";
 
 import { HISTORY_DIRNAME } from "./history.mjs";
 import { gitLogArgs, parseLog } from "./modified-files.mjs";
-import { parseTaskRecord } from "./task-select.mjs";
+import { parseTaskRecord, readTaskRecords } from "./task-select.mjs";
 import { taskIdScanner } from "./task-id.mjs";
 import { canonicalPath, repoRelative } from "./canonical-path.mjs";
 import { gitDiscoveryEnv } from "./git-env.mjs";
@@ -701,6 +701,60 @@ export function scanNote(reason) {
     return "state from this tree only — the backlog lies outside the repository";
   }
   return null;
+}
+
+/**
+ * The task files of every OTHER working tree of this repository, as rows of
+ * their own (TL-700) — what `query --worktrees` adds to this tree's answer.
+ *
+ * WHY WHOLE ROWS AND NOT `elsewhere`. The scan above reports a sibling's
+ * STATUS against this tree's copy, which is enough to tell "somebody moved
+ * it" but not WHO: a claim is a status and an owner, and the owner never left
+ * the other tree. A coordinator asking "what does every loop hold" therefore
+ * looped over the worktrees by hand. Reading the sibling's file as a record
+ * lets every criterion — the owner first — apply to it.
+ *
+ * WHY THE WHOLE DIRECTORY, opt-in. An uncommitted `take` is exactly the state
+ * a ref cannot show, and a committed claim on an unmerged branch is the other
+ * half; reading the files on disk covers both at once. It costs one directory
+ * read per worktree, which is why `query` pays it only when asked.
+ *
+ * A COPY IDENTICAL TO THIS TREE'S IS NOT A SECOND ROW. Every worktree holds
+ * the same backlog, so without this each answer would repeat once per tree
+ * and a real difference would drown in copies. A task this tree does not
+ * have at all is always a row.
+ *
+ * @param {string} root the backlog directory the caller resolved
+ * @param {object} config the loaded configuration (`taskId.file`)
+ * @param {object[]} localTasks this tree's own records, to compare against
+ * @returns {{reason: string|null, self: string|null, trees: string[],
+ *            tasks: object[]}} `reason` is null when the repository could be
+ *          read; each task carries `worktree` (the tree it was read in) and a
+ *          `file` that is absolute, since it is not under this backlog
+ */
+export function siblingTreeTasks(root, config, localTasks) {
+  const repoRoot = repoRootFor(root);
+  if (!repoRoot) return { reason: "not-a-repository", self: null, trees: [], tasks: [] };
+  const backlogRel = backlogRelFor(repoRoot, root);
+  if (backlogRel === null) return { reason: "outside-repository", self: repoRoot, trees: [], tasks: [] };
+  const selfKey = samePathKey(repoRoot);
+  const comparable = (t) => JSON.stringify({ ...t, file: null, elsewhere: null, worktree: null });
+  const local = new Map(localTasks.map((t) => [t.id, comparable(t)]));
+  const trees = [];
+  const tasks = [];
+  for (const w of worktrees(repoRoot)) {
+    if (samePathKey(w.path) === selfKey) continue;
+    const tasksDir = join(w.path, backlogRel, "tasks");
+    // A worktree on a branch from before the backlog existed, or one whose
+    // directory was deleted without `git worktree remove`, has nothing to say.
+    if (!existsSync(tasksDir)) continue;
+    trees.push(w.path);
+    for (const t of readTaskRecords(tasksDir, config.taskId.file)) {
+      if (local.get(t.id) === comparable(t)) continue;
+      tasks.push({ ...t, file: join(tasksDir, t.file.slice("tasks/".length)), elsewhere: [], worktree: w.path });
+    }
+  }
+  return { reason: null, self: repoRoot, trees, tasks };
 }
 
 /** `elsewhere` rendered for a human: `feature/x: in_progress`. The wording lives

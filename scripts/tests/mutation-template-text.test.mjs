@@ -21,7 +21,7 @@ import { dirname, join } from "node:path";
 
 import { fixtureDir } from "./_fixture-dir.mjs";
 import { SCRIPTS_DIR, isolateHome, scriptSource } from "./_repo.mjs";
-import { templateTextLines } from "../mutation-run.mjs";
+import { plan, templateTextLines } from "../mutation-run.mjs";
 
 isolateHome("mutation-template-text");
 const ENTRY = join(SCRIPTS_DIR, "mutation-run.mjs");
@@ -76,6 +76,9 @@ test("a slash after a value divides", () => {
     const src = "q = " + lead + " / 2; const t = `\nTEXT\n`;\n";
     assert.deepEqual(templateTextLines(src), [{ start: 2, end: 2 }], "after " + JSON.stringify(lead) + ": " + src);
   }
+  // The closing slash is consumed with the regex: left behind, it and the `*`
+  // that multiplies would read as a comment that never closes.
+  assert.deepEqual(templateTextLines("q = /re/*2; const t = `\nTEXT\n`;\n"), [{ start: 2, end: 2 }]);
 });
 
 test("comments, strings and escapes hide a backtick from the lexer", () => {
@@ -187,10 +190,13 @@ const GUARD = "a template literal is one string to Stryker, so code written insi
   + "in build-viewer.mjs — is guarded only by tests that execute the text it builds (the page script run in node:vm), "
   + "not by this run";
 
-test("a change only inside a template literal is refused, and the run says it is template text", () => {
+test("a change only inside a template literal is refused, and the run says it is template text", async () => {
   const root = fixture();
   try {
     write(root, "scripts/view.mjs", BASE.replace("  return x;\n", "  return x + 1;\n"));
+    const p = await plan(root, { base: "main", changedLines: true });
+    assert.deepEqual(p.lines, {}, "the plan names template text as lines it mutates");
+    assert.deepEqual(p.onlyText, ["scripts/view.mjs"]);
     const r = run(root, ["--changed-lines"]);
     assert.equal(r.code, 1, r.out + r.err);
     assert.equal(r.err.replace(/^\S+ /, ""), [

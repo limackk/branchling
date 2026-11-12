@@ -718,7 +718,7 @@ export function mutateDescriptions(mutate) {
   return files;
 }
 
-const SILENT_LOGGER = Object.fromEntries([
+export const SILENT_LOGGER = Object.fromEntries([
   ...["trace", "debug", "info", "warn", "error", "fatal"].map((l) => [l, () => {}]),
   ...["Trace", "Debug", "Info", "Warn", "Error", "Fatal"].map((l) => ["is" + l + "Enabled", () => false]),
 ]);
@@ -1046,8 +1046,8 @@ export function keepReport(from, to) {
   }
 }
 
-function runStryker(root, p, opts, slot) {
-  const bin = strykerBin();
+export function runStryker(root, p, opts, slot, stryker = strykerBin, sweep = sweepLeftovers) {
+  const bin = stryker();
   if (!bin) return { code: 2, problem: STRYKER_PIN + " is not installed", next: ["npm install"] };
   const links = directorySymlinks(root);
   const work = mkdtempSync(join(tmpdir(), "mutation-run-"));
@@ -1065,7 +1065,7 @@ function runStryker(root, p, opts, slot) {
     });
     let leftovers = [];
     try {
-      leftovers = sweepLeftovers(work + sep);
+      leftovers = sweep(work + sep);
     } catch (e) {
       console.error(warn("cannot look for processes the run left behind: " + e.message));
     }

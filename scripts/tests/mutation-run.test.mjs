@@ -14,7 +14,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { fixtureDir } from "./_fixture-dir.mjs";
 import os, { hostname, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -23,7 +23,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { SCRIPTS_DIR, isolateHome, isolateState, scriptSource } from "./_repo.mjs";
 import {
   DEFAULT_BUDGET_MINUTES, MIN_SWEEP_MARKER, SOURCE_ROOT_ENV, countMutants, estimateSeconds, formatDuration, leftoverProcesses,
-  SANDBOX_GIT_INIT, keepReport, loadInstrumenter, main, mutateDescriptions, summarise, parseArgs, reachesCli, sandboxCommand, strykerEnv, sweepLeftovers, timeTests,
+  SANDBOX_GIT_INIT, SILENT_LOGGER, keepReport, changedLineRanges, directorySymlinks, importClosure, loadInstrumenter, main, mutateDescriptions,
+  parseArgs, reachesCli, runStryker, sandboxCommand, selectTests, strykerConfig, strykerEnv, summarise, sweepLeftovers, timeTests, usage,
 } from "../mutation-run.mjs";
 import { SLOT_TOKEN_ENV, chooseConcurrency, describeHolder, releaseSlot, slotPath, tryAcquireSlot } from "../mutation-slot.mjs";
 import { STATE_DIR_ENV } from "../lock.mjs";
@@ -119,6 +120,10 @@ test("a run with nothing changed fails and reports no score", () => {
     assert.equal(r.code, 1, r.out + r.err);
     assert.match(r.err, /nothing to mutate/);
     assert.equal(r.out, "", "a refused run printed something that could be read as a result");
+    assert.deepEqual(r.err.replace(/\x1b\[[0-9;]*m/g, "").split("\n").slice(1, 3), [
+      "  A score over an empty set would read like a score over real work, so none is reported.",
+      "  → node scripts/mutation-run.mjs --files scripts/<module>.mjs",
+    ]);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -219,9 +224,14 @@ test("a changed module that no test reaches fails instead of scoring zero", () =
   const root = fixture();
   try {
     write(root, "scripts/orphan.mjs", "export const orphan = 1;\n");
+    write(root, "scripts/stray.mjs", "export const stray = 1;\n");
     const r = run(root, ["--base", "main"]);
     assert.equal(r.code, 1, r.out + r.err);
-    assert.match(r.err, /no test file reaches scripts\/orphan\.mjs/);
+    assert.deepEqual(r.err.replace(/\x1b\[[0-9;]*m/g, "").split("\n").slice(0, 3), [
+      "✗ node scripts/mutation-run.mjs: no test file reaches scripts/orphan.mjs, scripts/stray.mjs",
+      "  Every mutant would survive, and that would measure the selection, not the suite.",
+      "  → node scripts/mutation-run.mjs --tests scripts/tests/<file>.test.mjs",
+    ]);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -269,7 +279,11 @@ test("a --files entry with a line range selects its module's tests and reaches S
 test("an unknown flag fails", () => {
   const r = run(HOME, ["--everything"]);
   assert.equal(r.code, 2);
-  assert.match(r.err, /unknown argument "--everything"/);
+  assert.deepEqual(r.err.replace(/\x1b\[[0-9;]*m/g, "").split("\n").slice(0, 3), [
+    '✗ node scripts/mutation-run.mjs: unknown argument "--everything"',
+    "  known flags: --base --files --tests --concurrency --budget --keep-report --plan --json --named-only --changed-lines --no-wait",
+    "  → node scripts/mutation-run.mjs --help",
+  ]);
 });
 
 // TL-678. The accepted set is read from the refusal, which the parser builds
@@ -734,6 +748,8 @@ test("a mutation run refuses with --no-wait, and otherwise waits naming the hold
     assert.match(refused.err, new RegExp("another mutation run holds the machine's slot: pid " + pid + " on "));
     assert.match(refused.err, /run from \/holder/);
     assert.ok(refused.err.includes(slotPath({ [STATE_DIR_ENV]: STATE })), "the refusal does not say where the slot is");
+    assert.match(refused.err, /^  Two runs at once can exhaust the machine's memory, so --no-wait refuses rather than start a second\.$/m);
+    assert.match(refused.err.replace(/\x1b\[[0-9;]*m/g, ""), /^  \S+ node scripts\/mutation-run\.mjs \(without --no-wait, to wait for it\)$/m);
 
     const waiting = spawn(process.execPath, [ENTRY, "--base", "main"], { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
     let err = "";
@@ -1144,14 +1160,22 @@ test("--keep-report copies the report, and a destination that cannot hold it is 
     assert.equal(failed.code, 1);
     assert.match(failed.err, /the report could not be kept at .*x\.json: EACCES/);
     assert.match(failed.out, /^survived  scripts\/lib\.mjs:2/m, "the result was withheld because the copy failed");
+    assert.doesNotMatch(failed.err, /report kept/, "a report that was not kept was announced as kept");
 
     const before = calls.stryker;
     const missing = await inProcess(["--files", "scripts/lib.mjs", "--keep-report", "no-such-dir/r.json"], root, deps);
     assert.equal(missing.code, 1);
-    assert.match(missing.err, /--keep-report .*no-such-dir\/r\.json: .*no-such-dir is not a directory/);
+    assert.deepEqual(missing.err.replace(/^\S+ /, "").split("\n"), [
+      "node scripts/mutation-run.mjs: --keep-report " + join(root, "no-such-dir", "r.json") + ": " + join(root, "no-such-dir") + " is not a directory",
+      "  The report would be lost when the run's directory is removed, so the run is not started.",
+    ]);
     const plan = await inProcess(["--files", "scripts/lib.mjs", "--plan", "--keep-report", "r.json"], root, deps);
     assert.equal(plan.code, 2);
-    assert.match(plan.err, /--keep-report has nothing to keep under --plan/);
+    assert.deepEqual(plan.err.replace(/^\S+ /, "").split("\n"), [
+      "node scripts/mutation-run.mjs: --keep-report has nothing to keep under --plan",
+      "  A plan starts no Stryker run, so no mutation.json is written.",
+      "  → node scripts/mutation-run.mjs --plan (without --keep-report)",
+    ]);
     assert.equal(calls.stryker, before, "a refused --keep-report started Stryker");
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -1194,6 +1218,606 @@ test("the mutant count is Stryker's instrumenter over exactly the lines asked fo
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+// TL-676. The options are read only through the run they configure, and a
+// test that runs with the defaults cannot tell a dropped flag from an unused one.
+test("every flag lands in the option the run reads, and a malformed value is named", () => {
+  const defaults = {
+    base: "main", files: null, tests: null, concurrency: null, budget: null, keepReport: null,
+    plan: false, json: false, namedOnly: false, changedLines: false, noWait: false,
+  };
+  assert.deepEqual(parseArgs([]), { opts: defaults });
+  assert.deepEqual(parseArgs([
+    "--base", "dev", "--files", " a.mjs , ,b.mjs:3-4 ", "--tests", "t.test.mjs", "--concurrency", "10", "--budget", "7",
+    "--keep-report", "out/m.json", "--plan", "--json", "--named-only", "--changed-lines", "--no-wait",
+  ]), { opts: {
+    base: "dev", files: ["a.mjs", "b.mjs:3-4"], tests: ["t.test.mjs"], concurrency: 10, budget: 7, keepReport: "out/m.json",
+    plan: true, json: true, namedOnly: true, changedLines: true, noWait: true,
+  } });
+  assert.deepEqual(parseArgs(["--base"]), { error: "--base needs a value" });
+  assert.deepEqual(parseArgs(["--files", "--plan"]), { error: "--files needs a value" });
+  assert.deepEqual(parseArgs(["--tests", "-x"]), { opts: { ...defaults, tests: ["-x"] } }, "one dash is a value, two are a flag");
+  for (const value of ["02", "5x", "x5", ""]) {
+    assert.deepEqual(parseArgs(["--concurrency", value]), { error: "--concurrency takes a positive integer, not " + JSON.stringify(value) });
+  }
+  assert.deepEqual(parseArgs(["--plan", "--everything"]), { error: 'unknown argument "--everything"' });
+});
+
+test("the summary counts every status per file, scores only the valid ones, and lists each survivor", () => {
+  const at = (line) => ({ start: { line, column: 0 } });
+  const mutant = (status, line, mutatorName = "M", replacement = "r") => ({ status, location: at(line), mutatorName, replacement });
+  const s = summarise({ files: {
+    "a.mjs": { mutants: [
+      mutant("Killed", 1), mutant("Killed", 2), mutant("Timeout", 3), mutant("Survived", 4, "ConditionalExpression", "true"),
+      mutant("NoCoverage", 5), mutant("RuntimeError", 6), mutant("CompileError", 7), mutant("Ignored", 8),
+    ] },
+    "b.mjs": { mutants: [mutant("Ignored", 1)] },
+    "c.mjs": { mutants: [mutant("Killed", 1), mutant("Killed", 2), mutant("Survived", 3, "StringLiteral", '""')] },
+  } });
+  assert.deepEqual(s.files["a.mjs"], {
+    Killed: 2, Survived: 1, Timeout: 1, NoCoverage: 1, RuntimeError: 1, CompileError: 1, Ignored: 1, score: 60,
+  });
+  assert.equal(s.files["b.mjs"].score, null, "a file with no valid mutant has no score, not zero");
+  assert.equal(s.files["c.mjs"].score, 66.67, "the score is rounded to two decimals");
+  assert.deepEqual(s.survivors, [
+    { file: "a.mjs", line: 4, mutator: "ConditionalExpression", replacement: "true" },
+    { file: "c.mjs", line: 3, mutator: "StringLiteral", replacement: '""' },
+  ]);
+  assert.equal(s.noCoverage, 1);
+  assert.equal(s.timeouts, 1);
+  assert.equal(s.mutants, 10, "an Ignored mutant is not one the run produced (TL-698)");
+  assert.deepEqual(s.timedOut, [{ file: "a.mjs", line: 3, mutator: "M", replacement: "r" }]);
+  assert.deepEqual(summarise({}), { files: {}, survivors: [], timedOut: [], noCoverage: 0, timeouts: 0, mutants: 0 });
+});
+
+/** A stand-in for Stryker that returns `result` and records what it was handed. */
+function strykerReturning(result) {
+  const { deps } = costDeps({ mutants: 2, seconds: 1 });
+  const seen = [];
+  deps.runStryker = (root, p, opts, slot) => { seen.push({ root, p, opts, slot }); return result; };
+  return { deps, seen };
+}
+
+const reportOf = (...mutants) => ({ files: { "scripts/lib.mjs": { mutants: mutants.map(([status, line, mutatorName, replacement]) =>
+  ({ status, location: { start: { line, column: 0 } }, mutatorName, replacement })) } } });
+
+// TL-676. The text a person reads after a run: no other test reads it, so a
+// survivor line, a range or a warning could vanish with the suite still green.
+test("a text run names each survivor, the lines it mutated, what it killed afterwards and what timed out", async () => {
+  const root = fixture();
+  try {
+    const leftovers = Array.from({ length: 12 }, (_, i) => ({ pid: 100 + i, pgid: 100, args: "node /tmp/x-" + i }));
+    const { deps, seen } = strykerReturning({ code: 0, leftovers, report: reportOf(
+      ["Survived", 1, "ArrowFunction", "() => undefined"], ["Timeout", 1, "M", "r"], ["Timeout", 1, "M", "r"], ["Killed", 1, "M", "r"]) });
+    const r = await inProcess(["--files", "scripts/lib.mjs:1-1", "--concurrency", "3"], root, deps);
+    assert.equal(r.code, 0, r.err);
+    assert.equal(r.out, [
+      "survived  scripts/lib.mjs:1  ArrowFunction → () => undefined",
+      "timed out  scripts/lib.mjs:1  M → r",
+      "timed out  scripts/lib.mjs:1  M → r",
+      "mutated lines only: scripts/lib.mjs:1-1",
+      "not mutated: every line outside these ranges, and every mutant spanning one",
+    ].join("\n"));
+    const err = r.err.split("\n");
+    assert.ok(err.includes("concurrency 3: given by --concurrency"), r.err);
+    assert.match(r.err, /^\S+ 12 processes outlived the run and were killed: a test left them behind$/m);
+    assert.deepEqual(err.filter((l) => /^  1\d\d  /.test(l)), leftovers.slice(0, 10).map((p) => "  " + p.pid + "  " + p.args),
+      "the first ten leftovers are named, and only those");
+    assert.ok(err.some((l) => / 2 mutants timed out and are counted as detected; rerun with a lower --concurrency before trusting the score$/.test(l)), r.err);
+    assert.equal(seen.length, 1);
+    assert.equal(seen[0].opts.concurrency, 3, "Stryker was not handed the concurrency the run chose");
+    assert.equal(seen[0].root, root);
+    assert.deepEqual(seen[0].p.mutate, ["scripts/lib.mjs:1-1"]);
+    assert.equal(typeof seen[0].slot.token, "string", "Stryker was not handed the slot it runs under");
+
+    const one = strykerReturning({ code: 0, leftovers: [{ pid: 9, pgid: 9, args: "git hook" }], report: reportOf(["Timeout", 1, "M", "r"]) });
+    const single = await inProcess(["--files", "scripts/lib.mjs", "--concurrency", "1"], root, one.deps);
+    assert.equal(single.code, 0, single.err);
+    assert.equal(single.out, "timed out  scripts/lib.mjs:1  M → r", "a run with no survivor and no range printed more than its timeout");
+    assert.match(single.err, / 1 process outlived the run and was killed: a test left them behind$/m);
+    assert.match(single.err, /^  9  git hook$/m);
+    assert.match(single.err, / 1 mutant timed out and is counted as detected; /m);
+
+    const quiet = strykerReturning({ code: 0, leftovers: [], report: reportOf(["Killed", 1, "M", "r"]) });
+    const clean = await inProcess(["--files", "scripts/lib.mjs", "--concurrency", "1"], root, quiet.deps);
+    assert.doesNotMatch(clean.err, /outlived|timed out/, "a clean run warned");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a run's exit code is Stryker's, NoCoverage fails it, and a run without a report says why", async () => {
+  const root = fixture();
+  const argv = ["--files", "scripts/lib.mjs", "--concurrency", "1"];
+  try {
+    const red = strykerReturning({ code: 3, leftovers: [], report: reportOf(["Killed", 1, "M", "r"]) });
+    assert.equal((await inProcess(argv, root, red.deps)).code, 3, "Stryker's failure was not the run's");
+    const nullCode = strykerReturning({ code: null, leftovers: [], report: reportOf(["Killed", 1, "M", "r"]) });
+    assert.equal((await inProcess(argv, root, nullCode.deps)).code, 1, "a Stryker killed by a signal read as success");
+
+    const uncovered = strykerReturning({ code: 0, leftovers: [], report: reportOf(["NoCoverage", 1, "M", "r"], ["NoCoverage", 1, "M", "r"]) });
+    const nc = await inProcess([...argv, "--json"], root, uncovered.deps);
+    assert.equal(nc.code, 1);
+    assert.equal(JSON.parse(nc.out).noCoverage, 2, "the JSON report was not printed before the failure");
+    assert.match(nc.err, /: 2 mutants reported NoCoverage under coverageAnalysis: off$/m);
+    assert.match(nc.err, /^  This configuration cannot lose coverage, so the result is not a score; the runner setup has changed\.$/m);
+    assert.doesNotMatch(nc.err, /→/, "a NoCoverage failure suggested a command");
+    const ncOne = strykerReturning({ code: 0, leftovers: [], report: reportOf(["NoCoverage", 1, "M", "r"]) });
+    assert.match((await inProcess(argv, root, ncOne.deps)).err, /: 1 mutant reported NoCoverage/m);
+
+    const missing = strykerReturning({ code: 2, problem: "@stryker-mutator/core is not installed", next: ["npm install"] });
+    const m = await inProcess(argv, root, missing.deps);
+    assert.equal(m.code, 2);
+    assert.equal(m.out, "");
+    assert.match(m.err, /^\S+ node scripts\/mutation-run\.mjs: @stryker-mutator\/core is not installed$/m);
+    assert.match(m.err, /^  \S+ npm install$/m);
+    assert.match(m.err, /: @stryker-mutator\/core is not installed\n  \S+ npm install$/, "a problem without details printed some");
+
+    const noReport = strykerReturning({ code: null, problem: "Stryker produced no report", details: ["last line"],
+      leftovers: [{ pid: 5, pgid: 5, args: "node stray" }] });
+    const n = await inProcess(argv, root, noReport.deps);
+    assert.equal(n.code, 1, "a run with no report and no exit code read as success");
+    assert.match(n.err, /: Stryker produced no report$/m);
+    assert.match(n.err, /^  last line$/m);
+    assert.match(n.err, /^  5  node stray$/m, "leftovers of a run that produced no report were not named");
+    assert.doesNotMatch(n.err, /→/, "a problem without a next step suggested one");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// TL-676. What counts as a module to mutate, read from the change itself.
+test("only scripts/ and bin/ modules that exist are mutated, never a look-alike path", () => {
+  const root = fixture();
+  try {
+    write(root, "docs/scripts/example.mjs", "export const e = 1;\n");
+    write(root, "scripts/lib.mjs.orig", "export const lib = () => 0;\n");
+    write(root, "bin/tool.mjs", "export const t = 1;\n");
+    write(root, "scripts/tests/tool.test.mjs", 'const s = "tool.mjs example.mjs lib.mjs.orig dangling.mjs";\n');
+    sh(root, "ln", ["-s", "nowhere.mjs", join(root, "scripts", "dangling.mjs")]);
+    assert.deepEqual(planOf(root).modules, ["bin/tool.mjs"]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a failing git is named with its own words, outside a repository and for an unknown base", () => {
+  const outside = fixtureDir(join(tmpdir(), "branchling-test-mutation-nogit-"));
+  const root = fixture();
+  try {
+    const r = run(outside, ["--plan"]);
+    assert.equal(r.code, 2, r.out + r.err);
+    const err = r.err.replace(/\x1b\[[0-9;]*m/g, "").split("\n");
+    assert.match(err[0], /^\S+ node scripts\/mutation-run\.mjs: not inside a git repository$/);
+    assert.match(err[1], /^  git rev-parse --show-toplevel: fatal: not a git repository/);
+    assert.equal(err.length, 3, "git's own trailing newline reached the detail: " + JSON.stringify(err));
+
+    const b = run(root, ["--base", "no-such-ref", "--plan"]);
+    assert.equal(b.code, 2, b.out + b.err);
+    assert.match(b.err, /: cannot work out what changed against "no-such-ref"$/m);
+    assert.match(b.err, /^  git merge-base no-such-ref HEAD: fatal: /m);
+    assert.match(b.err.replace(/\x1b\[[0-9;]*m/g, ""), /^  \S+ node scripts\/mutation-run\.mjs --base <ref>$/m);
+  } finally {
+    rmSync(outside, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("an untracked module is new in every line it has, and an empty one in none", () => {
+  const root = fixture();
+  try {
+    write(root, "scripts/fresh.mjs", "export const x = 1;\nexport const y = 2;\nexport const z = 3;");
+    write(root, "scripts/empty.mjs", "");
+    write(root, "scripts/tests/fresh.test.mjs", 'import "../fresh.mjs"; import "../empty.mjs";\n');
+    const p = planOf(root, ["--changed-lines"]);
+    assert.deepEqual(p.lines, { "scripts/fresh.mjs": [{ start: 1, end: 3 }] }, "a last line without a newline is still a line");
+    assert.deepEqual(p.noAddedLines, ["scripts/empty.mjs"]);
+    write(root, "scripts/fresh.mjs", "export const x = 1;\nexport const y = 2;\n");
+    assert.deepEqual(planOf(root, ["--changed-lines"]).lines, { "scripts/fresh.mjs": [{ start: 1, end: 2 }] });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("template text from ranges given out of order is merged in line order", () => {
+  const root = fixture();
+  try {
+    write(root, "scripts/view.mjs", [
+      "export const a = `", "text", "text", "`;", "export const x = 1;", "export const y = 2;",
+      "export const b = `", "more", "more", "`;", "",
+    ].join("\n"));
+    write(root, "scripts/tests/view.test.mjs", 'import "../view.mjs";\n');
+    const p = planOf(root, ["--files", "scripts/view.mjs:7-10,scripts/view.mjs:1-4"]);
+    assert.deepEqual(p.templateText["scripts/view.mjs"], { whole: false, ranges: [{ start: 2, end: 3 }, { start: 8, end: 9 }] });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// TL-676. What surrounds Stryker — its configuration file, its environment,
+// its report and the directory it all lives in — judged with a stand-in that
+// records what it was handed, so it is judged where Stryker is not installed.
+const FAKE_STRYKER = `
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { spawn } from "node:child_process";
+import { dirname } from "node:path";
+const [, , verb, configPath] = process.argv;
+const config = JSON.parse(readFileSync(configPath, "utf8"));
+const mode = readFileSync("mode.txt", "utf8").trim();
+writeFileSync("seen.json", JSON.stringify({ verb, configPath, config, cwd: process.cwd(), env: {
+  source: process.env.MUTATION_SOURCE_ROOT ?? null, token: process.env.${SLOT_TOKEN_ENV} ?? null,
+  mutant: process.env.__STRYKER_ACTIVE_MUTANT__ ?? null, context: process.env.NODE_TEST_CONTEXT ?? null } }));
+if (mode === "stray") {
+  spawn(process.execPath, ["-e", "setTimeout(() => {}, 60000)", config.tempDirName], { detached: true, stdio: "ignore" }).unref();
+}
+if (mode === "noreport") {
+  process.stdout.write("out one\\n");
+  process.stderr.write(Array.from({ length: 12 }, (_, i) => "  line " + i + "  ").join("\\n\\n") + "\\n");
+  process.exit(3);
+}
+if (mode === "vanish") {
+  rmSync(dirname(configPath), { recursive: true, force: true });
+  process.exit(0);
+}
+process.stdout.write("progress text\\n");
+process.stderr.write("progress on stderr\\n");
+writeFileSync(config.jsonReporter.fileName, JSON.stringify({ files: { "scripts/lib.mjs": { mutants: [] } } }));
+`;
+
+test("Stryker is handed its configuration, an environment of its own and the slot, and its directory is removed", () => {
+  const root = fixture();
+  const bin = join(root, "fake-stryker.mjs");
+  write(root, "fake-stryker.mjs", FAKE_STRYKER);
+  const p = { mutate: ["scripts/lib.mjs"], tests: [{ file: "scripts/tests/named.test.mjs" }] };
+  const saved = { mutant: process.env.__STRYKER_ACTIVE_MUTANT__, context: process.env.NODE_TEST_CONTEXT };
+  try {
+    write(root, "mode.txt", "report");
+    process.env.__STRYKER_ACTIVE_MUTANT__ = "41";
+    const r = runStryker(root, p, { concurrency: 1, json: true }, { token: "tok-1" }, () => bin);
+    process.env.__STRYKER_ACTIVE_MUTANT__ = saved.mutant;
+    if (saved.mutant === undefined) delete process.env.__STRYKER_ACTIVE_MUTANT__;
+    assert.deepEqual(r, { code: 0, leftovers: [], kept: null, report: { files: { "scripts/lib.mjs": { mutants: [] } } } });
+    const seen = JSON.parse(readFileSync(join(root, "seen.json"), "utf8"));
+    assert.equal(seen.verb, "run");
+    assert.equal(seen.cwd, root);
+    assert.equal(seen.configPath, join(dirname(seen.configPath), "stryker.config.json"));
+    assert.match(dirname(seen.configPath), new RegExp("^" + tmpdir().replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "/mutation-run-"));
+    assert.equal(seen.config.jsonReporter.fileName, join(dirname(seen.configPath), "mutation.json"));
+    assert.equal(seen.config.tempDirName, join(dirname(seen.configPath), "sandbox"));
+    assert.deepEqual(seen.config.mutate, ["scripts/lib.mjs"]);
+    assert.deepEqual(seen.env, { source: root, token: "tok-1", mutant: null, context: null },
+      "Stryker inherited a run above it, or was not told its tree and slot");
+    assert.equal(existsSync(dirname(seen.configPath)), false, "the run's work directory outlived it");
+
+    write(root, "mode.txt", "stray");
+    const stray = runStryker(root, p, { concurrency: 1, json: true }, { token: "tok-2" }, () => bin);
+    const sandbox = JSON.parse(readFileSync(join(root, "seen.json"), "utf8")).config.tempDirName;
+    assert.equal(stray.leftovers.length, 1, "a process naming the work directory was not swept: " + JSON.stringify(stray.leftovers));
+    assert.ok(stray.leftovers[0].args.includes(sandbox), stray.leftovers[0].args);
+
+    write(root, "mode.txt", "noreport");
+    const none = runStryker(root, p, { concurrency: 1, json: true }, { token: "tok-3" }, () => bin);
+    assert.equal(none.code, 3);
+    assert.equal(none.problem, "Stryker produced no report");
+    assert.deepEqual(none.details, ["line 3", "line 4", "line 5", "line 6", "line 7", "line 8", "line 9", "line 10", "line 11", "out one"],
+      "the details are not the last ten lines Stryker printed, trimmed and without blanks");
+    assert.equal(existsSync(dirname(JSON.parse(readFileSync(join(root, "seen.json"), "utf8")).configPath)), false);
+    // A text run hands Stryker the terminal, so its progress reaches the reader and nothing is captured.
+    const shown = runStryker(root, p, { concurrency: 1, json: false }, { token: "tok-4" }, () => bin);
+    assert.equal(shown.code, 3);
+    assert.deepEqual(shown.details, [], "a text run captured what Stryker printed instead of showing it");
+
+    // A sweep that cannot list processes is a warning, never a failed run or an invented leftover.
+    write(root, "mode.txt", "report");
+    const errors = [];
+    const { error } = console;
+    console.error = (...a) => errors.push(a.join(" "));
+    let blind;
+    try {
+      blind = runStryker(root, p, { concurrency: 1, json: true }, { token: "tok-5" }, () => bin, () => { throw new Error("ps: denied"); });
+    } finally {
+      console.error = error;
+    }
+    assert.deepEqual(blind.leftovers, []);
+    assert.equal(blind.code, 0);
+    assert.deepEqual(errors.map((l) => l.replace(/\x1b\[[0-9;]*m/g, "").replace(/^\S+ /, "")),
+      ["cannot look for processes the run left behind: ps: denied"]);
+
+    // A work directory that is already gone when the run ends is not an error of the run.
+    write(root, "mode.txt", "vanish");
+    const vanished = runStryker(root, p, { concurrency: 1, json: true }, { token: "tok-6" }, () => bin, () => []);
+    assert.equal(vanished.problem, "Stryker produced no report");
+
+    assert.deepEqual(runStryker(root, p, { concurrency: 1 }, { token: "t" }, () => null),
+      { code: 2, problem: "@stryker-mutator/core is not installed", next: ["npm install"] });
+  } finally {
+    if (saved.mutant === undefined) delete process.env.__STRYKER_ACTIVE_MUTANT__;
+    else process.env.__STRYKER_ACTIVE_MUTANT__ = saved.mutant;
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("--plan in text names every reason a test was chosen, and a text run names the template text it skipped", async () => {
+  const root = fixture();
+  try {
+    write(root, "scripts/tests/both.test.mjs", 'import "../lib.mjs"; import "../other.mjs";\n');
+    write(root, "scripts/view.mjs", "export const page = `\nbody\n`;\n");
+    write(root, "scripts/tests/view.test.mjs", 'import "../view.mjs";\n');
+    const planned = await inProcess(["--files", "scripts/lib.mjs,scripts/other.mjs", "--plan"], root, costDeps({ mutants: 1, seconds: 1 }).deps);
+    assert.match(planned.out, /^  scripts\/tests\/both\.test\.mjs  — lib\.mjs named; other\.mjs named$/m);
+
+    const { deps } = strykerReturning({ code: 0, leftovers: [], report: reportOf(["Killed", 1, "M", "r"]) });
+    const r = await inProcess(["--files", "scripts/view.mjs", "--concurrency", "1"], root, deps);
+    assert.equal(r.code, 0, r.err);
+    assert.match(r.out, /^not mutated \(template-literal text\): scripts\/view\.mjs \(1 line\)$/m);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// TL-676. Assertions on behaviour of mutation-run.mjs that no test read. The
+// whole module was then mutated in seven line-range chunks on 2026-11-12,
+// with these tests in place; each assertion added after that run (here and
+// in mutation-template-text.test.mjs) was checked to fail on the mutant it
+// answers, and the survivors no test can tell apart from the original are
+// named in the task's commit, not chased.
+const ANSI = /\x1b\[[0-9;]*m/g;
+
+test("--help opens with the usage line and says where the run is explained", () => {
+  assert.deepEqual(usage().split("\n").slice(0, 5), [
+    "usage: node scripts/mutation-run.mjs [flags]",
+    "",
+    "Mutation run over the modules changed against --base. See the header of",
+    "scripts/mutation-run.mjs for what is measured and why.",
+    "",
+  ]);
+});
+
+test("a git that cannot be started fails with the command that failed, and no invented detail", () => {
+  const empty = fixtureDir(join(tmpdir(), "branchling-test-mutation-nopath-"));
+  try {
+    const r = spawnSync(process.execPath, [ENTRY, "--plan"], { cwd: empty, encoding: "utf8", env: { ...process.env, PATH: empty } });
+    assert.equal(r.status, 2, r.stdout + r.stderr);
+    const err = r.stderr.replace(ANSI, "").split("\n");
+    assert.match(err[0], /: not inside a git repository$/);
+    assert.equal(err[1].trimEnd(), "  git rev-parse --show-toplevel:");
+  } finally {
+    rmSync(empty, { recursive: true, force: true });
+  }
+});
+
+test("an untracked link to nothing has no changed line", () => {
+  const root = fixture();
+  try {
+    sh(root, "ln", ["-s", "nowhere.mjs", join(root, "scripts", "dangling.mjs")]);
+    assert.deepEqual(changedLineRanges(root, "main", ["scripts/dangling.mjs"]), {});
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("the import closure follows every spelling of a relative import, and a missing target ends it", () => {
+  const root = fixtureDir(join(tmpdir(), "branchling-test-mutation-closure-"));
+  try {
+    write(root, "scripts/entry.mjs", [
+      'import{a}from"./a.mjs";',
+      'const b = await import("./b.mjs");',
+      'const c = await import ( "./c.mjs" );',
+      'import  "./d.mjs";',
+      'export * from "../e.mjs";',
+      'import "./missing.mjs";',
+      "",
+    ].join("\n"));
+    for (const f of ["scripts/a.mjs", "scripts/b.mjs", "scripts/c.mjs", "scripts/d.mjs", "e.mjs"]) write(root, f, "export {};\n");
+    assert.deepEqual([...importClosure(root, "scripts/entry.mjs")].sort(), [
+      "e.mjs", "scripts/a.mjs", "scripts/b.mjs", "scripts/c.mjs", "scripts/d.mjs", "scripts/entry.mjs", "scripts/missing.mjs",
+    ]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("test selection called bare follows imports and commands, in path order, and reads only .mjs scripts", async () => {
+  const root = fixture();
+  const bare = fixtureDir(join(tmpdir(), "branchling-test-mutation-notests-"));
+  try {
+    // A command entry that is not an object is skipped, not dereferenced.
+    write(root, "scripts/cli.mjs", 'export const COMMANDS = { gone: null, greet: { script: "greet.mjs" } };\n');
+    // Not a module: an import written in it reaches nothing.
+    write(root, "scripts/notes.txt", 'import "./lib.mjs";\n');
+    write(root, "scripts/tests/notes.test.mjs", 'const s = "notes.txt";\n');
+    write(root, "scripts/tests/zz-named.test.mjs", 'import "../lib.mjs";\n');
+    write(root, "scripts/tests/aa/named.test.mjs", 'import "../../lib.mjs";\n');
+    // A directory is listed before a file its name prefixes ("nested" before
+    // "nested-a.test.mjs"), while the path order puts "-" before "/".
+    write(root, "scripts/tests/nested-a.test.mjs", 'import "../lib.mjs";\n');
+    const selected = await selectTests(root, ["scripts/lib.mjs"]);
+    assert.deepEqual(selected, [
+      { file: "scripts/tests/aa/named.test.mjs", why: ["lib.mjs named"] },
+      { file: "scripts/tests/named.test.mjs", why: ["lib.mjs named"] },
+      { file: "scripts/tests/nested-a.test.mjs", why: ["lib.mjs named"] },
+      { file: "scripts/tests/nested/deep.test.mjs", why: ["lib.mjs via `greet`"] },
+      { file: "scripts/tests/via-command.test.mjs", why: ["lib.mjs via `greet`"] },
+      { file: "scripts/tests/via-script.test.mjs", why: ["lib.mjs imported by greet.mjs"] },
+      { file: "scripts/tests/zz-named.test.mjs", why: ["lib.mjs named"] },
+    ]);
+    assert.deepEqual(await selectTests(bare, ["scripts/lib.mjs"]), [], "a tree with no scripts/tests selected something");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(bare, { recursive: true, force: true });
+  }
+});
+
+test("a test file given with --tests is selected for that reason alone", () => {
+  const root = fixture();
+  try {
+    const p = planOf(root, ["--files", "scripts/lib.mjs", "--tests", "scripts/tests/unrelated.test.mjs"]);
+    assert.deepEqual(p.tests, [{ file: "scripts/tests/unrelated.test.mjs", why: ["--tests"] }]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a path with a single quote reaches the sandbox command quoted, not cut", () => {
+  const cmd = sandboxCommand([{ path: "it's/dir", target: "../o'k" }], ["t.test.mjs"], "/c.mjs");
+  assert.ok(cmd.includes("ln -s '../o'\\''k' 'it'\\''s/dir'"), cmd);
+  assert.ok(cmd.includes("mkdir -p 'it'\\''s'"), cmd);
+});
+
+test("where Stryker is not installed the instrumenter is null, not an error", () => {
+  // loadInstrumenter resolves Stryker from the module's own location, so the
+  // module is loaded from a copy of scripts/ with no node_modules above it.
+  const bare = fixtureDir(join(tmpdir(), "branchling-test-mutation-nostryker-"));
+  try {
+    const tests = join(SCRIPTS_DIR, "tests");
+    cpSync(SCRIPTS_DIR, join(bare, "scripts"), { recursive: true, filter: (src) => join(src) !== tests && !join(src).startsWith(tests + "/") });
+    cpSync(join(SCRIPTS_DIR, "..", "package.json"), join(bare, "package.json"));
+    const probe = "const { loadInstrumenter } = await import(" + JSON.stringify(pathToFileURL(join(bare, "scripts", "mutation-run.mjs")).href)
+      + "); console.log(JSON.stringify(await loadInstrumenter()));";
+    const r = spawnSync(process.execPath, ["--input-type=module", "-e", probe],
+      { cwd: bare, encoding: "utf8", env: { ...process.env, NODE_PATH: "" } });
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(r.stdout, "null\n");
+  } finally {
+    rmSync(bare, { recursive: true, force: true });
+  }
+});
+
+test("the logger handed to Stryker's instrumenter answers every level and enables none", () => {
+  const out = [];
+  const { log, error, warn: w, info } = console;
+  console.log = console.error = console.warn = console.info = (...a) => out.push(a.join(" "));
+  try {
+    for (const level of ["trace", "debug", "info", "warn", "error", "fatal"]) {
+      assert.equal(typeof SILENT_LOGGER[level], "function", level);
+      assert.equal(SILENT_LOGGER[level]("message"), undefined, level);
+      const enabled = "is" + level[0].toUpperCase() + level.slice(1) + "Enabled";
+      assert.equal(SILENT_LOGGER[enabled](), false, enabled);
+    }
+  } finally {
+    Object.assign(console, { log, error, warn: w, info });
+  }
+  assert.deepEqual(out, []);
+});
+
+test("timing the tests discards what they print, however much", () => {
+  const root = fixtureDir(join(tmpdir(), "branchling-test-mutation-loud-"));
+  try {
+    write(root, "scripts/tests/loud.test.mjs",
+      'import { test } from "node:test";\ntest("loud", () => { process.stdout.write("x".repeat(3000000) + "\\n"); });\n');
+    assert.equal(timeTests(root, ["scripts/tests/loud.test.mjs"]).passed, true, "output past the pipe buffer failed the run");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("only links to directories are recreated, never inside node_modules or .git", () => {
+  const root = fixtureDir(join(tmpdir(), "branchling-test-mutation-links-"));
+  try {
+    write(root, "real/f.txt", "x\n");
+    write(root, "nested/keep.txt", "x\n");
+    write(root, "node_modules/keep.txt", "x\n");
+    write(root, ".git/keep.txt", "x\n");
+    sh(root, "ln", ["-s", "real", "link-dir"]);
+    sh(root, "ln", ["-s", "real/f.txt", "link-file"]);
+    sh(root, "ln", ["-s", "nowhere", "dangling"]);
+    sh(root, "ln", ["-s", "../real", "nested/inner"]);
+    sh(root, "ln", ["-s", "../real", "node_modules/pkg"]);
+    sh(root, "ln", ["-s", "../real", ".git/linked"]);
+    assert.deepEqual(directorySymlinks(root).sort((a, b) => a.path.localeCompare(b.path)), [
+      { path: "link-dir", target: "real" },
+      { path: "nested/inner", target: "../real" },
+    ]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("Stryker's configuration anchors the ignored links, loads no plugin, and removes its sandbox", () => {
+  const p = { mutate: ["scripts/lib.mjs"], tests: [{ file: "scripts/tests/named.test.mjs" }] };
+  const c = strykerConfig(p, { concurrency: 1 }, [{ path: "a/b", target: "x" }], "/work");
+  assert.deepEqual(c.ignorePatterns, ["/a/b"]);
+  assert.deepEqual(c.plugins, []);
+  assert.deepEqual(c.clearTextReporter, { reportMutants: false });
+  assert.equal(c.cleanTempDir, true);
+  assert.equal(c.tempDirName, join("/work", "sandbox"));
+});
+
+test("a ps line is read from its first column, and the command keeps its own spacing", () => {
+  const ps = ["x 12 34 node marker-abcdef", "  5   6   node  marker-abcdef tail"].join("\n");
+  assert.deepEqual(leftoverProcesses("marker-abcdef", ps, 0), [{ pid: 5, pgid: 6, args: "node  marker-abcdef tail" }]);
+});
+
+test("a marker too short to sweep for is refused in words that name it", () => {
+  assert.throws(() => sweepLeftovers("short"),
+    { message: 'refusing to sweep for "short": a marker this short could name any process' });
+});
+
+test("the sweeper's own group is found by its own pid, whatever that pid is", () => {
+  const ps = ["    1    50 node runner", "    7    50 node /tmp/marker-abcdef/x"].join("\n");
+  const { swept, calls } = recordedSweep("/tmp/marker-abcdef/", ps, 1);
+  assert.deepEqual(swept.map((p) => p.pid), [7]);
+  assert.deepEqual(calls, [[7, "SIGKILL"]], "the sweeper's own group was killed whole");
+});
+
+test("on Windows the sweep lists nothing and kills nothing", () => {
+  const marker = join(tmpdir(), "mutation-run-win32probe-" + process.pid) + "/";
+  const sleeper = spawn(process.execPath, ["-e", "setTimeout(() => {}, 60000)", marker], { stdio: "ignore" });
+  const saved = Object.getOwnPropertyDescriptor(process, "platform");
+  const calls = [];
+  try {
+    // The sleeper names the marker, so a sweep that listed processes would find it.
+    assert.equal(leftoverProcesses(marker).length, 1, "the positive control found no process naming the marker");
+    Object.defineProperty(process, "platform", { value: "win32" });
+    assert.deepEqual(sweepLeftovers(marker, { kill: (...a) => calls.push(a) }), []);
+  } finally {
+    Object.defineProperty(process, "platform", saved);
+    sleeper.kill("SIGKILL");
+  }
+  assert.deepEqual(calls, []);
+});
+
+test("a ps that fails is named with its own words, and one that cannot start with the reason", () => {
+  const dir = fixtureDir(join(tmpdir(), "branchling-test-mutation-ps-"));
+  try {
+    write(dir, "probe.mjs", "import { leftoverProcesses } from " + JSON.stringify(pathToFileURL(ENTRY).href) + ";\n"
+      + 'try { console.log(JSON.stringify(leftoverProcesses("marker-abcdef", null, 0))); } catch (e) { console.log(JSON.stringify(e.message)); }\n');
+    const listed = (script) => {
+      const bin = join(dir, "bin");
+      rmSync(bin, { recursive: true, force: true });
+      mkdirSync(bin);
+      if (script !== null) writeFileSync(join(bin, "ps"), "#!/bin/sh\n" + script + "\n", { mode: 0o755 });
+      const r = spawnSync(process.execPath, [join(dir, "probe.mjs")], { encoding: "utf8", env: { ...process.env, PATH: bin } });
+      assert.equal(r.status, 0, r.stderr);
+      return JSON.parse(r.stdout);
+    };
+    assert.deepEqual(listed("printf '  7     7 node marker-abcdef\\n'; exit 0"), [{ pid: 7, pgid: 7, args: "node marker-abcdef" }]);
+    assert.equal(listed("printf '  denied \\n' >&2; exit 1"), "ps: denied");
+    assert.equal(listed("exit 1"), "ps: ");
+    assert.equal(listed(null), "ps: Error: spawnSync ps ENOENT");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a text run hands Stryker the terminal, so what it prints reaches the reader", () => {
+  const root = fixture();
+  try {
+    write(root, "fake-stryker.mjs", FAKE_STRYKER);
+    write(root, "mode.txt", "report");
+    write(root, "probe.mjs", "import { runStryker } from " + JSON.stringify(pathToFileURL(ENTRY).href) + ";\n"
+      + "const r = runStryker(process.cwd(), { mutate: [\"scripts/lib.mjs\"], tests: [{ file: \"scripts/tests/named.test.mjs\" }] },\n"
+      + "  { concurrency: 1, json: false }, { token: \"t\" }, () => process.argv[2], () => []);\n"
+      + "process.exitCode = r.code;\n");
+    const r = spawnSync(process.execPath, [join(root, "probe.mjs"), join(root, "fake-stryker.mjs")], { cwd: root, encoding: "utf8" });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /^progress text$/m);
+    assert.match(r.stderr, /^progress on stderr$/m);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("Stryker's instrumenter places no mutant on a line that is only a comment, so the run is refused (TL-698)",
   { skip: instrumenter ? false : "@stryker-mutator/core is not installed" }, async () => {
     const root = fixture();
