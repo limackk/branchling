@@ -723,15 +723,26 @@ async function readTaskInput(opts) {
     if (text === null || !text.trim()) return { document: null, refused: null };
   }
 
-  const { task, errors } = parseTaskDocument(text);
+  const { task, errors, notJson } = parseTaskDocument(text);
   if (errors.length) {
-    const message = "the task document was refused, and nothing was written";
     const shape = `the shape: { "goal": "…", "context": "…", "steps": ["…"], "verification": [ { "id": "…", "bash": "…", "proves": "…" } ] }`;
+    // The flag's name reads as "a file holding the body", and `body --body-file`
+    // does take markdown, so a markdown file here is the expected mistake
+    // (TL-690). The parser's own words — an unexpected `#` — do not tell that
+    // caller what the file was meant to hold; this message does.
+    const wrongFile = notJson && opts.bodyFile;
+    const message = wrongFile
+      ? "`--body-file " + opts.bodyFile + "` is not the JSON task document, and nothing was written"
+      : "the task document was refused, and nothing was written";
+    const hints = wrongFile
+      ? [shape, "the file holds the same JSON document stdin takes, not a markdown body; " +
+        "a markdown body for an EXISTING task is `" + N + " body <ID> --body-file <f>`"]
+      : [shape];
     return {
       document: null,
       refused: {
-        code: 2, refusalKind: "invalid-document", message, details: errors.concat([shape]),
-        text: failure(`${N} new`, message, errors, [shape]),
+        code: 2, refusalKind: "invalid-document", message, details: errors.concat(hints),
+        text: failure(`${N} new`, message, errors, hints),
       },
     };
   }

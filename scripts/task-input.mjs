@@ -182,17 +182,21 @@ export function validateTaskDocument(doc) {
 /**
  * Text → a task document, judged.
  *
- * @returns {{task: object|null, errors: string[]}}
+ * `notJson` separates "this is not the document at all" from "this document is
+ * wrong": a caller that read the text from a file named by the user can then say
+ * what the file was supposed to be, rather than only what the parser met.
+ *
+ * @returns {{task: object|null, errors: string[], notJson: boolean}}
  */
 export function parseTaskDocument(text) {
   let doc;
   try {
     doc = JSON.parse(String(text == null ? "" : text));
   } catch (e) {
-    return { task: null, errors: ["the task is not valid JSON: " + e.message] };
+    return { task: null, errors: ["the task is not valid JSON: " + e.message], notJson: true };
   }
   const errors = validateTaskDocument(doc);
-  return { task: errors.length ? null : doc, errors };
+  return { task: errors.length ? null : doc, errors, notJson: false };
 }
 
 /**
