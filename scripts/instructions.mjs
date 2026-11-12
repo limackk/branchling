@@ -668,6 +668,11 @@ WHILE YOU WORK.
                        runs those as well, and where the project contract is
                        the whole suite, so is the run. The report says what it
                        left out; \`{{tool}} done\` still runs it.
+                       It audits proven closings and unstarted contracts, and
+                       refuses a task in progress. The self-check before closing
+                       your own task is \`{{tool}} done <ID> --dry-run\`: it
+                       runs the whole contract a closing runs, and changes
+                       nothing.
   Proving it fails     A new test is evidence only once you have watched it
                        fail against the code WITHOUT your change. Run it in a
                        scratch copy of the commit you started from, never in
@@ -881,7 +886,9 @@ which runs that one task's own \`verification:\` entries and no project
 closing AND the project's entries; where the project contract is the whole
 suite, that starts the suite in every loop that asks. \`{{tool}} done\` still
 runs the project's entries before it closes a task, so the narrowed green is a
-progress check, never a closing.
+progress check, never a closing. A task in progress is not its to audit: it
+refuses one, and the self-check before closing is \`{{tool}} done <ID>
+--dry-run\`, which runs the whole contract and changes nothing.
 
 THE TWO ENDS OF A SESSION.
 

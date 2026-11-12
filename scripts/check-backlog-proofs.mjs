@@ -346,12 +346,18 @@ async function main(argv) {
   const candidates = [];
   const collided = [];
   const open = [];
-  // Why the named task is in neither half, for the refusal below.
+  // Why the named task is in neither half, for the refusal below, and the
+  // command that answers what its asker wanted, where one exists.
   let notCovered = null;
+  let remedy = null;
   for (const t of walk) {
     if ((config.archivedStatuses || []).indexOf(t.status) < 0) {
       if (!queue.has(t.status)) {
         notCovered = `it is \`${t.status}\`: neither a proven closing, nor a task nobody has started`;
+        // Work under way is asked about as a self-check before closing (TL-685).
+        // That question is `done --dry-run`'s: it runs the whole contract `done`
+        // would run, the project's half included, and changes nothing.
+        remedy = `${N} done ${t.id} --dry-run`;
         continue;
       }
       // The task's OWN entries only. This half asks whether the work could turn
@@ -396,6 +402,7 @@ async function main(argv) {
   if (named && !candidates.length && !collided.length && !open.length) {
     console.error(`${ERRM} proofs: ${named.id} has no proof this audit can re-run — ${notCovered} — nothing was run`);
     console.error(`    ${named.file}`);
+    if (remedy) console.error(`  ${errColor.id(MARK.arrow + " " + remedy)}`);
     return 1;
   }
 
