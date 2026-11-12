@@ -26,15 +26,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
   buildProof, closingRecord, closingSentence, commentBlocks, commentMarker, compareTaskIds,
-  jiraTicketOf, normalizeSite, parseJiraProofArgs, proofComment, renderAdf, renderReport,
+  jiraTicketOf, main, normalizeSite, parseJiraProofArgs, proofComment, renderAdf, renderReport,
 } from "../jira-proof.mjs";
+import { isBacklogDirRefusal } from "../paths.mjs";
 import { loadConfig } from "../config.mjs";
 import { BLOCK_MARKER_NAME, PRODUCT_NAME } from "../product.mjs";
 import { fixtureDir } from "./_fixture-dir.mjs";
@@ -92,6 +93,27 @@ test("a directory that is not a backlog is refused in the command's own kind", (
   assert.match(text.stderr, new RegExp(PRODUCT_NAME + " jira-proof --dir <path>"));
 });
 
+test("an error that is not a backlog refusal propagates instead of being answered as one", () => {
+  // `resolveBacklogDir` reads the working directory before any source, and a
+  // removed working directory makes that read throw ENOENT: a failure of the
+  // process, not a verdict about a directory. Answering it as "no backlog"
+  // would exit 1 with a refusal that names the wrong cause.
+  const gone = fixtureDir(join(tmpdir(), "branchling-jiraproof-gonecwd-" + counter++ + "-"));
+  const before = process.cwd();
+  const stderr = process.stderr.write;
+  let printed = "";
+  process.chdir(gone);
+  rmSync(gone, { recursive: true, force: true });
+  process.stderr.write = (chunk) => { printed += chunk; return true; };
+  try {
+    assert.throws(() => main(["--base", "HEAD"]), (e) => e.code === "ENOENT" && !isBacklogDirRefusal(e));
+  } finally {
+    process.stderr.write = stderr;
+    process.chdir(before);
+  }
+  assert.equal(printed, "", "nothing is reported as a refusal");
+});
+
 // ── Reading one task ──────────────────────────────────────────────────────
 
 test("the ticket comes from the marker line import --from jira writes", () => {
@@ -110,6 +132,10 @@ test("the ticket comes from the marker line import --from jira writes", () => {
   assert.deepEqual(jiraTicketOf("Imported from Jira: https://acme.atlassian.net/browse/APP-0\n"), { ok: false, reason: "malformed-jira-marker" });
   assert.deepEqual(jiraTicketOf("Imported from Jira: https://acme.atlassian.net/browse/APP-1x\n"), { ok: false, reason: "malformed-jira-marker" });
   assert.deepEqual(jiraTicketOf("Imported from Jira: /browse/APP-1\n"), { ok: false, reason: "malformed-jira-marker" });
+  // Dropping the `^` of the browse pattern is an equivalent mutant (TL-694):
+  // the URL is the marker's `\S+` capture, so it holds no line break, and a
+  // match found from any later position also exists from position 0, where
+  // `[^/]+$` leaves the greedy `(.+)` exactly one split to choose.
 });
 
 test("the LAST status record of the range decides whether the task closed", () => {
@@ -326,6 +352,14 @@ test("the person's report: each comment under its ticket, then the skipped ones 
     "  TASK-3  its Jira line is not a browse URL\n" +
     "  TASK-4  its task file is not in this tree\n" +
     "  TASK-5  its ticket is on another Jira site\n",
+  );
+  // One skipped task is counted in the singular: the plural above leaves the
+  // singular word unasserted.
+  assert.equal(
+    renderReport({ scanned: true, base: "b", comments: [c], skipped: [{ task: "TASK-2", reason: "no-jira-marker" }] }),
+    "── TASK-1 → APP-1  https://acme.atlassian.net/browse/APP-1\n\n" + c.text + "\n" +
+    "skipped 1 closed task:\n" +
+    "  TASK-2  no `Imported from Jira:` line\n",
   );
 });
 
