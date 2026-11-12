@@ -40,6 +40,8 @@ import { join } from "node:path";
 import { COMMANDS, commandHelpText } from "../cli.mjs";
 import { USAGE as AUDIT_USAGE } from "../audit.mjs";
 import { USAGE as DOCS_DRIFT_USAGE } from "../docs-drift.mjs";
+import { USAGE as PR_SUMMARY_USAGE } from "../pr-summary.mjs";
+import { USAGE as SEED_ADAPTER_USAGE } from "../seed-adapter.mjs";
 import {
   BACKLOG_DIR_REFUSAL_EXIT,
   BACKLOG_DIR_REFUSAL_HELP,
@@ -170,20 +172,56 @@ for (const [name, spec] of Object.entries(EXEMPT)) {
   });
 }
 
-test("the help texts a script prints when it is run directly carry the clause too", () => {
+/**
+ * The help a script carries for when it is run outside the dispatcher, keyed
+ * by the command table entry that dispatches to it. A script whose USAGE is
+ * only exported is judged by that constant; one that prints it on `--help` is
+ * run, so the text judged is the text printed (TL-659, TL-695).
+ */
+function directHelpTexts() {
   const direct = {
-    "audit.mjs USAGE": AUDIT_USAGE,
-    "docs-drift.mjs USAGE": DOCS_DRIFT_USAGE,
+    audit: { where: "audit.mjs USAGE", text: AUDIT_USAGE },
+    "docs-drift": { where: "docs-drift.mjs USAGE", text: DOCS_DRIFT_USAGE },
+    "pr-summary": { where: "pr-summary.mjs USAGE", text: PR_SUMMARY_USAGE },
+    "plan-from": { where: "seed-adapter.mjs USAGE", text: SEED_ADAPTER_USAGE },
   };
-  for (const script of ["renumber.mjs", "query.mjs", "doctor.mjs"]) {
+  for (const [command, script] of [["renumber", "renumber.mjs"], ["query", "query.mjs"], ["doctor", "doctor.mjs"], ["migrate-prefix", "migrate-prefix.mjs"]]) {
     const r = spawnSync(process.execPath, [join(SCRIPTS_DIR, script), "--help"], { encoding: "utf8", timeout: 30_000 });
     assert.equal(r.status, 0, script + " --help: " + r.stderr);
-    direct[script + " --help"] = r.stdout;
+    direct[command] = { where: script + " --help", text: r.stdout };
   }
-  for (const [where, text] of Object.entries(direct)) {
+  return direct;
+}
+
+/** The exit codes an exit block names, sorted and NOT deduplicated: each one
+ *  opens a segment after `exit:`, `·` or `,` — `0 clean · 1 findings` and
+ *  `0 = …, 1 = …` alike. Kept as a multiset because the no-backlog clause names
+ *  1 as well, so a set would hide a command's own 1 going missing. */
+const codesNamed = (block) =>
+  [...block.replace(/^.*?\bexit( code)?:/, ":").matchAll(/[:·,] (\d+)(?= )/g)].map((m) => Number(m[1])).sort();
+
+test("the help texts a script prints when it is run directly carry the clause too", () => {
+  const direct = directHelpTexts();
+  assert.ok(Object.keys(direct).length >= 8, "the direct-script sample shrank to " + Object.keys(direct).length);
+  for (const { where, text } of Object.values(direct)) {
     const block = exitBlock(text);
     assert.ok(block && listsTwo(block), where + " has no exit line listing 2: " + block);
     assert.match(block, CLAUSE, where + " lists 2 but not the no-backlog case:\n  " + block);
+    // Every dispatcher entry sets its exit line apart as its own paragraph; one
+    // glued to the prose above it reads as the last sentence of that prose.
+    const lines = text.split("\n");
+    const at = lines.findLastIndex((l) => /\bexit( code)?:/.test(l));
+    assert.equal(lines[at - 1].trim(), "", where + " runs its exit line on from the line above it:\n  " + lines[at - 1]);
+  }
+});
+
+test("a script run directly names the exit codes its dispatcher entry names", () => {
+  for (const [command, { where, text }] of Object.entries(directHelpTexts())) {
+    assert.ok(COMMANDS[command], "`" + command + "` is not in the command table — " + where + " is keyed wrongly");
+    const dispatched = codesNamed(exitBlock(commandHelpText(command, COMMANDS[command])));
+    assert.ok(dispatched.length >= 4, "`" + command + " --help` names too few codes to compare: " + dispatched);
+    assert.deepEqual(codesNamed(exitBlock(text)), dispatched,
+      where + " and `" + command + " --help` name different exit codes");
   }
 });
 

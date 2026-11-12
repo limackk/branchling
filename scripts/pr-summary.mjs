@@ -45,7 +45,7 @@ import { fileURLToPath } from "node:url";
 import { loadConfigOrExit } from "./config.mjs";
 import { printJson } from "./json-envelope.mjs";
 import { repoRoot } from "./modified-files.mjs";
-import { answerBacklogDirRefusal, backlogPaths, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { answerBacklogDirRefusal, backlogPaths, BACKLOG_DIR_REFUSAL_HELP, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { OBSERVED_SOURCES, actorParts } from "./task-fields.mjs";
 import { taskIdPatterns } from "./task-id.mjs";
@@ -74,6 +74,11 @@ export const USAGE = [
   "  It talks to nothing. The CI job is checkout, run, comment — see",
   "  examples/pr-summary.yml. A branch that touched no task says so outright",
   "  rather than producing an empty comment.",
+  "",
+  "  exit: 0 summarised, including a branch that touched no task and a base the",
+  "        clone cannot resolve (the summary says so) · 1 the configuration cannot",
+  "        be read · 2 usage error",
+  "        · " + BACKLOG_DIR_REFUSAL_HELP,
 ].join("\n");
 
 // ──────────────────────────────────────────────────────────────────────────
