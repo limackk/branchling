@@ -513,10 +513,12 @@ export const KINDS = {
   // than lines appended to `diff`, because a consumer that could not tell a
   // committed hunk from an uncommitted one would be wrong in the expensive
   // direction — a `git checkout` destroys one and not the other.
+  // `uncommittedClosing` (TL-688) is `{ id, status, path, history }` when the
+  // task is closed on disk and that closing is in no commit, otherwise null.
   resume: {
     ok: null, id: null, file: null, actor: null, owner: null,
     base: null, mergeBase: null, verified: null,
-    decisions: [], goal: null, history: [], diff: null, uncommitted: null, verification: [],
+    decisions: [], goal: null, history: [], diff: null, uncommitted: null, uncommittedClosing: null, verification: [],
     refusalKind: null, refusal: null, details: [],
   },
   // `done --json`. `entries` carries one row per `verification:` entry with its

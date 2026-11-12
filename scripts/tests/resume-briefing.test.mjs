@@ -627,3 +627,44 @@ test("--json answers in the envelope, with the parts in the same order", () => {
     }
   });
 });
+
+// ── A closing nobody committed (TL-688) ──────────────────────────────────
+
+const UNCOMMITTED_CLOSING = /in no commit/;
+
+function closeOnDisk(f) {
+  const text = readFileSync(f.file, "utf8");
+  const closed = text.replace(/^status:\s*\S+/m, "status: done");
+  assert.notEqual(closed, text, "the fixture's task file has no status line to change");
+  writeFileSync(f.file, closed, "utf8");
+}
+
+test("POSITIVE CONTROL: a task in progress is briefed without an uncommitted closing", () => {
+  withFixture((f) => {
+    const r = resume(f, ["--no-verify"]);
+    assert.equal(r.code, 0, r.all);
+    assert.doesNotMatch(r.stdout, UNCOMMITTED_CLOSING, r.stdout);
+    const j = JSON.parse(resume(f, ["--no-verify", "--json"]).stdout);
+    assert.equal(j.uncommittedClosing, null);
+  });
+});
+
+test("a task closed on disk and in no commit is named before the briefing, with the commit", () => {
+  withFixture((f) => {
+    closeOnDisk(f);
+    const r = resume(f, ["--no-verify"]);
+    assert.equal(r.code, 0, r.all);
+    const head = r.stdout.slice(0, r.stdout.indexOf(f.id + " — resume briefing"));
+    assert.match(head, UNCOMMITTED_CLOSING, "the uncommitted closing is not stated before the briefing:\n" + r.stdout);
+    assert.match(head, new RegExp(f.id + " is done"));
+    assert.match(head, new RegExp("git add tasks/" + f.id + "[^ ]*\\.md history/" + f.id + "\\.jsonl && git commit"), head);
+
+    const j = JSON.parse(resume(f, ["--no-verify", "--json"]).stdout);
+    assert.equal(j.uncommittedClosing && j.uncommittedClosing.status, "done", JSON.stringify(j.uncommittedClosing));
+    assert.equal(j.uncommittedClosing.id, f.id);
+
+    // Once committed, the closing is no longer news.
+    commit(f.root, "the successor commits the closing");
+    assert.doesNotMatch(resume(f, ["--no-verify"]).stdout, UNCOMMITTED_CLOSING);
+  });
+});

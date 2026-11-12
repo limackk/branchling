@@ -684,3 +684,103 @@ test("--help exits zero and writes to stdout", () => {
   assert.match(r.stdout, /doctor/);
   assert.equal(r.stderr, "");
 });
+
+// ── What a killed session leaves behind (TL-688) ─────────────────────────
+
+function gitIn(dir, args) {
+  const r = spawnSync("git", ["-c", "user.email=t@t", "-c", "user.name=t"].concat(args), { cwd: dir, encoding: "utf8" });
+  return { status: r.status, out: (r.stdout || "") + (r.stderr || "") };
+}
+
+/** A repository whose backlog holds one task, everything committed. */
+function committedRepo() {
+  const dir = repo(["--no-example"]);
+  newTask(dir, "Close me");
+  const name = readdirSync(join(dir, "tasks")).find((f) => /\.md$/.test(f) && !f.startsWith("_"));
+  assert.ok(name, "the fixture made no task");
+  assert.equal(gitIn(dir, ["add", "-A"]).status, 0);
+  const c = gitIn(dir, ["commit", "-qm", "the backlog"]);
+  assert.equal(c.status, 0, c.out);
+  const id = name.match(/^[A-Z]+-\d+/)[0];
+  return { dir, id, file: join(dir, "tasks", name), path: "tasks/" + name };
+}
+
+function setStatus(file, status) {
+  const text = readFileSync(file, "utf8");
+  const next = text.replace(/^status:\s*\S+/m, "status: " + status);
+  assert.notEqual(next, text, "the fixture's task file has no status line to change");
+  writeFileSync(file, next, "utf8");
+}
+
+test("POSITIVE CONTROL: a committed tree has no closing to commit and no merge to finish", () => {
+  const { dir } = committedRepo();
+  const d = rows(dir);
+  assert.equal(d.byId["uncommitted-closing"], undefined, JSON.stringify(d.byId["uncommitted-closing"]));
+  assert.equal(d.byId["merge-in-progress"], undefined, JSON.stringify(d.byId["merge-in-progress"]));
+});
+
+test("a task closed on disk and in no commit is a warning that names it and the commit", () => {
+  const { dir, id, file, path } = committedRepo();
+  setStatus(file, "done");
+  const d = rows(dir);
+  const row = d.byId["uncommitted-closing"];
+  assert.ok(row, "a closing nobody committed passed unreported: " + JSON.stringify(Object.keys(d.byId)));
+  assert.equal(row.status, "warn");
+  assert.match(row.detail, new RegExp("\\b" + id + "\\b"));
+  assert.match(row.fix, /^git add /);
+  assert.ok(row.fix.includes(path), row.fix);
+  assert.ok(row.fix.includes("history/" + id + ".jsonl"), "the history entry is not committed with the closing: " + row.fix);
+  assert.match(row.fix, /&& git commit/);
+  assert.equal(d.status, 0, "a warning must not fail doctor");
+
+  // Committing it silences the row: the row answers the commit, not the status.
+  assert.equal(gitIn(dir, ["commit", "-qam", "closed"]).status, 0);
+  assert.equal(rows(dir).byId["uncommitted-closing"], undefined);
+});
+
+test("a task file never committed at all and already closed is reported too", () => {
+  const { dir } = committedRepo();
+  newTask(dir, "Born and closed in one session");
+  const name = readdirSync(join(dir, "tasks")).filter((f) => /\.md$/.test(f) && !f.startsWith("_")).sort().pop();
+  setStatus(join(dir, "tasks", name), "cancelled");
+  const row = rows(dir).byId["uncommitted-closing"];
+  assert.ok(row, "an untracked closed task passed unreported");
+  assert.match(row.detail, new RegExp(name.match(/^[A-Z]+-\d+/)[0]));
+});
+
+test("an edit to a task already closed in HEAD is not a closing", () => {
+  const { dir, file } = committedRepo();
+  setStatus(file, "done");
+  assert.equal(gitIn(dir, ["commit", "-qam", "closed"]).status, 0);
+  appendFileSync(file, "\nA sentence added after the closing.\n", "utf8");
+  assert.equal(rows(dir).byId["uncommitted-closing"], undefined);
+
+  // And an OPEN task edited without a commit is no closing either.
+  setStatus(file, "pending");
+  assert.equal(rows(dir).byId["uncommitted-closing"], undefined);
+});
+
+test("an interrupted merge is a warning naming --continue and --abort, silent once aborted", () => {
+  const { dir } = committedRepo();
+  writeFileSync(join(dir, "conflict.txt"), "base\n", "utf8");
+  assert.equal(gitIn(dir, ["add", "conflict.txt"]).status, 0);
+  assert.equal(gitIn(dir, ["commit", "-qm", "base"]).status, 0);
+  const home = gitIn(dir, ["rev-parse", "--abbrev-ref", "HEAD"]).out.trim();
+  assert.equal(gitIn(dir, ["checkout", "-qb", "side"]).status, 0);
+  writeFileSync(join(dir, "conflict.txt"), "side\n", "utf8");
+  assert.equal(gitIn(dir, ["commit", "-qam", "side"]).status, 0);
+  assert.equal(gitIn(dir, ["checkout", "-q", home]).status, 0);
+  writeFileSync(join(dir, "conflict.txt"), "home\n", "utf8");
+  assert.equal(gitIn(dir, ["commit", "-qam", "home"]).status, 0);
+  assert.notEqual(gitIn(dir, ["merge", "side"]).status, 0, "the fixture's merge did not stop on a conflict");
+
+  const row = rows(dir).byId["merge-in-progress"];
+  assert.ok(row, "an interrupted merge passed unreported");
+  assert.equal(row.status, "warn");
+  assert.match(row.detail, /MERGE_HEAD/);
+  assert.match(row.fix, /git merge --continue/);
+  assert.match(row.fix, /git merge --abort/);
+
+  assert.equal(gitIn(dir, ["merge", "--abort"]).status, 0);
+  assert.equal(rows(dir).byId["merge-in-progress"], undefined);
+});

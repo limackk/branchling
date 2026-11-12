@@ -36,6 +36,7 @@ import { fileURLToPath } from "node:url";
 
 import { auditLogStatus, readTaskTexts } from "./check-backlog-log-status.mjs";
 import { archivedElsewhereBySource, crossBranchState, divergences } from "./branch-scan.mjs";
+import { mergeInProgress, uncommittedClosings } from "./closing-state.mjs";
 import { ConfigError, formatConfigError, loadConfig } from "./config.mjs";
 import { deployFetchState } from "./deploy-fetch.mjs";
 import { commandRunner, contextBudget } from "./context-budget.mjs";
@@ -710,6 +711,45 @@ function checkClosedElsewhere(root, config, metas) {
       "merge or rebase before taking work"));
 }
 
+/**
+ * A closing no commit carries (TL-688). A session killed between `done` and
+ * its commit leaves a task file that says closed in this tree only: every
+ * reading command here believes it, and every other branch still has it open.
+ *
+ * A WARNING, not an error: between `done` and `git commit` it is the normal
+ * state for a minute, the same reasoning as the `unrecorded` row. NO ROW when
+ * there is none — a tick saying "nothing was left half done" on every run is a
+ * line a reader learns to skip, and this one has to be read the day it fires.
+ */
+function checkUncommittedClosing(root, config) {
+  const found = uncommittedClosings(root, config);
+  if (!found || !found.length) return [];
+  const ids = found.map((f) => f.id);
+  const paths = found.flatMap((f) => (f.history ? [f.path, f.history] : [f.path]));
+  return [check("uncommitted-closing", "closing not committed", WARN,
+    ids.length + " " + plural(ids.length, "task", "tasks") + " closed on disk and in no commit (" +
+      ids.slice(0, 5).join(", ") + (ids.length > 5 ? ", …" : "") +
+      ") — another branch, or a checkout, still sees " + plural(ids.length, "it", "them") + " open",
+    "git add " + paths.map(shellWord).join(" ") + " && git commit   # from the top of the work tree, once its verification has passed")];
+}
+
+/**
+ * A merge stopped half way (TL-688): MERGE_HEAD is set, so the next commit
+ * made here — by anybody, for any reason — becomes the merge commit. Asked of
+ * git rather than of `.git/`, because a linked worktree keeps its own.
+ *
+ * A WARNING and no row otherwise, for the reason the closing row gives. Both
+ * remedies are named: which one is right depends on whether the resolution in
+ * the tree is finished, and only the person looking at it can say.
+ */
+function checkMergeInProgress(root) {
+  const merge = mergeInProgress(root);
+  if (!merge || !merge.inProgress) return [];
+  return [check("merge-in-progress", "interrupted merge", WARN,
+    "a merge is in progress (MERGE_HEAD is set) — the next commit here becomes the merge commit",
+    "git merge --continue   # once every conflict is resolved and staged; or: git merge --abort")];
+}
+
 // ──────────────────────────────────────────────────────────────────────────
 // The run
 // ──────────────────────────────────────────────────────────────────────────
@@ -728,6 +768,9 @@ export function diagnose(root, { dir } = {}) {
       rows.push(check(id, title, INFO, "not checked — the configuration comes first"));
     }
     rows.push(...checkGitIgnore(root));
+    // A merge stopped half way is a likely reason the configuration could not
+    // be read at all, so this row does not wait for it.
+    rows.push(...checkMergeInProgress(root));
     return carryDir(rows, dir);
   }
 
@@ -738,6 +781,8 @@ export function diagnose(root, { dir } = {}) {
   rows.push(checkUnrecorded(root));
   rows.push(checkLogStatus(root, config));
   rows.push(...checkGitIgnore(root));
+  rows.push(...checkMergeInProgress(root));
+  rows.push(...checkUncommittedClosing(root, config));
   rows.push(...checkDeployFetch(root, config, dir));
   rows.push(checkGuards(root));
   rows.push(...checkClosedElsewhere(root, config, metas));

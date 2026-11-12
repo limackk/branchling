@@ -64,10 +64,11 @@
 
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { basename, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { resolveActor } from "./actor.mjs";
+import { uncommittedClosings } from "./closing-state.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { PROJECT_ENTRY_TAG, closingContractOf, collisionHeadline, contractProblem, findTaskFile, repoRootFor, runContract, transcriptBlock } from "./done-task.mjs";
 import { ACTOR_UNKNOWN, statedActorRefusal, isValidActor, readHistory } from "./history.mjs";
@@ -397,6 +398,19 @@ export function renderBriefing(model) {
     out.push("  successor would act on. Run `" + N + " done " + model.id + " --dry-run` to learn where it stands.");
     out.push("");
   }
+  // AN UNCOMMITTED CLOSING COMES BEFORE EVERYTHING (TL-688). The session
+  // being resumed got as far as `done` and died before the commit: the work is
+  // finished and only its landing is missing. A successor that read on would
+  // find a done task, a Goal already met and a working tree full of edits, and
+  // could start the task a second time.
+  if (model.uncommittedClosing) {
+    const c = model.uncommittedClosing;
+    out.push(MARK.warn + " " + model.id + " is " + c.status + " in this tree and in no commit — the previous");
+    out.push("  session closed it and stopped before committing. Commit the closing");
+    out.push("  with its history entry once the contract below is green:");
+    out.push("    git add " + [c.path].concat(c.history ? [c.history] : []).join(" ") + " && git commit");
+    out.push("");
+  }
   out.push(model.id + " — resume briefing for " + model.actor);
   const where = [];
   if (model.diff.branch) where.push("branch " + model.diff.branch);
@@ -658,6 +672,7 @@ export async function run(argv) {
     history: since.map((e) => ({ ts: e.ts, actor: e.actor, field: e.field, text: describeEntry(e) })),
     diff: branchDiff(cwd, plan.base),
     working: workingTree(cwd),
+    uncommittedClosing: (uncommittedClosings(root, config, { only: basename(file) }) || [])[0] || null,
     verification: [],
     contractProblem: null,
     failedOutput: null,
@@ -687,6 +702,9 @@ export async function run(argv) {
         untracked: model.working.untracked,
         reason: model.working.reason,
       },
+      // `{ status, path, history }` when this task is closed on disk and in no
+      // commit (TL-688), otherwise null.
+      uncommittedClosing: model.uncommittedClosing,
       verification: model.verification,
     });
     return 0;
