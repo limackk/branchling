@@ -583,7 +583,7 @@ export function describeHold(hold) {
  * view: a view is a snapshot of the last build, and a plan read out of a
  * snapshot describes a backlog that may have moved an hour ago.
  *
- * THE FIVE DEFINITIONS, stated once:
+ * THE SIX DEFINITIONS, stated once:
  *
  *   active wave  the FIRST wave holding an open task. Earlier waves are
  *                finished; the plan is read from the front.
@@ -602,6 +602,9 @@ export function describeHold(hold) {
  *                the rot is exactly the tasks nobody put in it.
  *   stale        plan tasks already closed in a wave AFTER the active one — the
  *                signal that the order has been overtaken and wants reshuffling.
+ *   waiting      OPEN tasks the plan does not schedule yet whose own file names
+ *                the wave they belong to (`wave_hint:`, TL-689): placed on a
+ *                branch, waiting for `plan place` on the main line.
  *
  * A task named by the plan that does not exist in the tree is reported here as
  * `known: false` rather than skipped, but it is `validatePlan` that calls it an
@@ -727,11 +730,19 @@ export function planState(plan, tasks, config = {}) {
     }
   }
 
+  // A task whose own file names the wave it asks for (`wave_hint:`, TL-689) is
+  // not unplanned: somebody placed it, on a branch that could not edit the plan
+  // without conflicting with every other branch doing the same. It is reported
+  // apart, with its wave, until `plan place` folds it into the file.
+  const hintOf = (t) => String((t && t.wave_hint) || "").trim();
+  const waiting = tasks
+    .filter((t) => isOpen(t) && !waveOf.has(t.id) && hintOf(t))
+    .map((t) => ({ id: t.id, status: t.status, wave: hintOf(t) }));
   const unplanned = tasks
-    .filter((t) => isOpen(t) && !waveOf.has(t.id))
+    .filter((t) => isOpen(t) && !waveOf.has(t.id) && !hintOf(t))
     .map((t) => ({ id: t.id, status: t.status }));
   const open = tasks.filter(isOpen).length;
-  const planned = open - unplanned.length;
+  const planned = open - unplanned.length - waiting.length;
   const coverage = {
     open,
     planned,
@@ -747,6 +758,7 @@ export function planState(plan, tasks, config = {}) {
     nextUp,
     inProgress,
     unplanned,
+    waiting,
     coverage,
     stale,
     inProgressStatus,

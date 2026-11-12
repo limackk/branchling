@@ -48,7 +48,7 @@
  */
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { reportPlanErrors } from "./check-backlog-plan.mjs";
@@ -59,8 +59,10 @@ import { printJson } from "./json-envelope.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { printLine } from "./stdout.mjs";
 import { todayStamp } from "./today.mjs";
-import { stripComment, unquote } from "./task-fields.mjs";
-import { readTaskMetas } from "./task-io.mjs";
+import {
+  WAVE_HINT_FIELD, extractMeta, removeFrontmatterField, splitFrontmatter, stripComment, unquote,
+} from "./task-fields.mjs";
+import { listTaskFileNames, readTaskMetas } from "./task-io.mjs";
 import { MARK, color, fail, failure } from "./ui.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -735,6 +737,102 @@ export function runPlanEdit(op, argv) {
   }
   if (parsed.values.why) printLine("  the wave was created, with your sentence above it");
   printLine("  " + paths.planPath + " — the change is the diff of this one file, and of nothing else");
+  return 0;
+}
+
+/**
+ * `plan place` — fold every `wave_hint:` into plan.yaml (TL-689).
+ *
+ * WHY A SEPARATE ACT. A follow-up filed in a worktree with `new --wave` edited
+ * the wave's one-line `tasks:` list there, so parallel branches filing into one
+ * wave edited the same line and their merges conflicted. `new --wave-hint`
+ * writes the wave into the NEW task's own file instead — a file no other branch
+ * touches — and this command, run where the plan has one writer, appends each
+ * such task to its wave and removes the hint, as one change of the plan plus
+ * one line out of each placed file.
+ *
+ * ALL OR NOTHING, like `plan add`: a hint naming a wave the plan does not have
+ * refuses the whole call and names the task, because a task placed by a typo
+ * is placed nowhere anybody is reading. A task the plan ALREADY schedules keeps
+ * its place — the plan is the record of membership — and only loses the hint.
+ *
+ * Exit: 0 placed, or nothing to place · 1 refused by the plan or the tree ·
+ * 2 usage error.
+ */
+export function runPlanPlace(argv) {
+  const command = N + " plan place";
+  const cli = takeDirFlag(argv);
+  const usage = ["usage: " + N + " plan place [--dir <path>]"];
+  if (cli.argv.length) {
+    const a = cli.argv[0];
+    return fail(command, (a.startsWith("-") ? "unknown flag: " : "unexpected argument: ") + a, usage, [N + " plan --help"]);
+  }
+
+  const root = resolveBacklogDirOrExit({ dir: cli.dir, moduleDir: HERE }, command).root;
+  const config = loadConfigOrExit(root);
+  const paths = backlogPaths(root);
+  if (!existsSync(paths.planPath)) {
+    return fail(command, "there is no plan to place tasks in", [
+      "expected: " + paths.planPath,
+      "A wave named in a task's file means nothing without the plan that has it.",
+    ], [N + " plan init --rationale \"…\""], 1);
+  }
+  const before = readFileSync(paths.planPath, "utf8");
+  const read = parsePlanYaml(before);
+  if (read.problems.length) {
+    return fail(command, "the plan cannot be read, so nothing can be placed in it",
+      [paths.planPath + ": " + read.problems[0]], [N + " check --plan"], 1);
+  }
+
+  const files = listTaskFileNames(paths.tasksDir, config).map((name) => {
+    const file = join(paths.tasksDir, name);
+    const text = readFileSync(file, "utf8");
+    return { file, text, meta: extractMeta(splitFrontmatter(text).frontmatter) };
+  });
+  const hinted = files.filter((f) => f.meta.wave_hint);
+  if (!hinted.length) {
+    printLine(color.ok(MARK.ok) + " plan: no task names a wave to be placed in — nothing was written");
+    return 0;
+  }
+
+  const waves = read.plan.waves.map((w) => w.name);
+  const unknown = hinted.filter((f) => waves.indexOf(f.meta.wave_hint) < 0);
+  if (unknown.length) {
+    const named = unknown.map((f) => f.meta.id + " names the wave `" + f.meta.wave_hint + "`, which " +
+      paths.planPath + " does not have");
+    return fail(command, named[0], named.slice(1).concat([
+      waves.length ? "the waves it has: " + waves.join(" | ") : "the plan has no waves yet",
+      "correct `" + WAVE_HINT_FIELD + ":` in that task's file, or create the wave it names",
+      "nothing was placed — one unknown wave refuses the whole call",
+    ]), [N + " plan add <ID> --wave \"…\" --why \"…\""], 1);
+  }
+
+  const scheduled = new Set(read.plan.waves.flatMap((w) => w.tasks));
+  const toAdd = hinted.filter((f) => !scheduled.has(f.meta.id));
+  const edit = editPlanTextMany(before, toAdd.map((f) => ({ op: "add", id: f.meta.id, wave: f.meta.wave_hint })));
+  if (edit.problems.length) {
+    const [head, ...rest] = edit.problems;
+    console.error(failure(command, head, rest.concat(["nothing was placed"]), [N + " plan --help"]));
+    return 1;
+  }
+  const introduced = newPlanErrors(before, edit.text, files.map((f) => f.meta), config);
+  if (introduced.length) {
+    reportPlanErrors(introduced);
+    return 1;
+  }
+
+  if (toAdd.length) writeFileSync(paths.planPath, edit.text, "utf8");
+  for (const f of hinted) writeFileSync(f.file, removeFrontmatterField(f.text, WAVE_HINT_FIELD), "utf8");
+
+  const plan = parsePlanYaml(edit.text).plan;
+  for (const f of hinted) {
+    const at = plan.waves.findIndex((w) => w.tasks.indexOf(f.meta.id) >= 0);
+    printLine(color.ok(MARK.ok) + " plan: " + f.meta.id + (scheduled.has(f.meta.id)
+      ? " was already scheduled in wave " + waveLabel(plan, at) + "; the plan keeps that place"
+      : " is scheduled in wave " + waveLabel(plan, at)));
+  }
+  printLine("  `" + WAVE_HINT_FIELD + ":` is removed from " + (hinted.length === 1 ? "its file" : "each of the " +
+    hinted.length + " files") + " — the plan is the record of membership now");
   return 0;
 }
 
