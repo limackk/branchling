@@ -13,7 +13,7 @@ import { spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import { canonicalPath } from "../canonical-path.mjs";
 import { checkSkill } from "../doctor.mjs";
@@ -219,6 +219,34 @@ test("only the paths that are not files are named, and a regular file beside the
   assert.ok(row.fix.endsWith("skills install   # after moving " + join(target, "demo", "SKILL.md") + " " +
     join(target, "other", "SKILL.md") + " aside"), row.fix);
 });
+
+// ── a file in place of the skills target itself (TL-692) ──
+
+for (const at of [".claude", ".claude/skills"]) {
+  test("a file in place of `" + at + "` is a warning that names it, not `not installed`", () => {
+    const dir = repo();
+    const path = join(canonicalPath(dir), at);
+    rmSync(path, { recursive: true, force: true });
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, "theirs\n", "utf8");
+    const row = rows(dir)["agent-skill"];
+    assert.equal(row.status, "warn", JSON.stringify(row));
+    assert.equal(row.detail, path + " is not a directory — nothing the skill ships can be installed under it");
+    assert.ok(row.fix.endsWith(" skills install --dir backlog   # after moving " + path + " aside"), row.fix);
+    assert.equal(readFileSync(path, "utf8"), "theirs\n", "doctor touched the file in the way");
+
+    // Positive control: with the directory real, the row is the absence it
+    // then is, and the command it names makes it green.
+    rmSync(path);
+    mkdirSync(path, { recursive: true });
+    const absent = rows(dir)["agent-skill"];
+    assert.equal(absent.status, "info", JSON.stringify(absent));
+    assert.match(absent.detail, /^not installed: /);
+    const r = run(dir, ["skills", "install", "--dir", "backlog"]);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.equal(rows(dir)["agent-skill"].status, "ok");
+  });
+}
 
 test("the git gates: absent names `hooks print`, installed is green", () => {
   const dir = repo();

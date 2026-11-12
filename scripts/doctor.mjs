@@ -459,6 +459,14 @@ function checkAgentPointer(root) {
 export function checkSkill(root, opts = {}) {
   const target = skillsTarget(repositoryRoot(root));
   const state = compareInstalled(repositoryRoot(root), opts);
+  // Before the absence check for the same reason as `blocked` below (TL-692):
+  // a file at `.claude` or `.claude/skills` leaves every SKILL.md absent, and
+  // the `skills install` that "not installed" names refuses until it moves.
+  if (state.kind === "target-not-directory") {
+    return check("agent-skill", "packaged skill", WARN,
+      state.path + " is not a directory — nothing the skill ships can be installed under it",
+      ownCommand("skills install", "after moving " + state.path + " aside"));
+  }
   // A WARNING, unlike an absent or edited skill (TL-594): nobody chooses a
   // directory where the skill file belongs, the editor reads nothing from it,
   // and no refresh can repair it — `skills install` leaves it alone too.

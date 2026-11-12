@@ -212,7 +212,8 @@ function targetObstruction(repoRoot) {
  * it is not ours to do — so both commands name it and leave it alone.
  *
  * A file (or a link that resolves to none) AT `.claude` or `.claude/skills`
- * is a refusal of kind `target-not-directory`, naming that path (TL-633).
+ * is a refusal of kind `target-not-directory`, naming that path (TL-633) in
+ * its message and, for doctor's remedy, in `path` (TL-692).
  *
  * @returns {{ok: boolean, files: {file: string, state: string}[], target: string}}
  */
@@ -232,7 +233,7 @@ export function compareInstalled(repoRoot, opts = {}) {
   if (obstruction !== undefined) {
     const path = join(repoRoot, obstruction);
     return {
-      ok: false, kind: "target-not-directory", target, files: [],
+      ok: false, kind: "target-not-directory", target, files: [], path,
       message: path + " is not a directory, so no skill can be installed under it",
       details: ["Move it aside, then run `" + N + " skills install` again."],
     };
