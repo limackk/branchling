@@ -824,10 +824,15 @@ function costDeps({ mutants, seconds }) {
     loadInstrumenter: async () => ({}),
     countMutants: async (_root, mutate) => ({ total: mutants, files: Object.fromEntries(mutate.map((m) => [m, mutants])) }),
     timeTests: (_root, files) => { calls.timed.push(files); return { seconds, passed: true }; },
-    runStryker: () => { calls.stryker++; return { code: 0, leftovers: [], report: { files: {} } }; },
+    runStryker: () => { calls.stryker++; return { code: 0, leftovers: [], report: ONE_KILLED }; },
   };
   return { deps, calls };
 }
+
+// A run that judged one mutant: the smallest report that is evidence (TL-698).
+const ONE_KILLED = {
+  files: { "scripts/lib.mjs": { mutants: [{ status: "Killed", location: { start: { line: 1 } }, mutatorName: "ArrowFunction", replacement: "() => undefined" }] } },
+};
 
 test("--plan states the mutant count and the estimate (TL-682)", async () => {
   const root = fixture();
@@ -906,6 +911,98 @@ test("a run over budget is refused before Stryker starts, naming --changed-lines
     const exact = costDeps({ mutants: 538, seconds: 10 });
     assert.equal((await inProcess(argv, root, exact.deps)).code, 0);
     assert.equal(exact.calls.stryker, 1, "a run estimated at exactly its budget was refused");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// TL-698. A change whose lines hold no mutable code — here a comment — has
+// no mutation evidence, and Stryker reports `All files | n/a` with exit 0 for it.
+// Two comments, so the change is two ranges and the refusal has to name both.
+function commentOnly(root) {
+  write(root, "scripts/lib.mjs", "// a comment above\nexport const lib = () => 1;\n// a comment below\n");
+}
+const NO_MUTANT_LINE = /: no mutant in scripts\/lib\.mjs:1-1, scripts\/lib\.mjs:3-3: a change with no mutable code has no mutation evidence$/m;
+const EMPTY_SET_LINE = /^  A score over an empty set would read like a score over real work, so none is reported\.$/m;
+
+test("a run with no mutant is refused before Stryker starts, naming the ranges, and --plan says so (TL-698)", async () => {
+  const root = fixture();
+  try {
+    commentOnly(root);
+    const argv = ["--base", "main", "--changed-lines", "--named-only", "--concurrency", "1"];
+    const { deps, calls } = costDeps({ mutants: 0, seconds: 1 });
+    const refused = await inProcess(argv, root, deps);
+    assert.equal(refused.code, 1, refused.out + refused.err);
+    assert.equal(calls.stryker, 0, "Stryker was started for a selection with no mutant");
+    assert.equal(refused.out, "", "a refused run printed something that could be read as a result");
+    assert.match(refused.err, NO_MUTANT_LINE);
+    assert.match(refused.err, /^  Stryker's instrumenter places none on those lines, so Stryker was not started\.$/m);
+    assert.match(refused.err, EMPTY_SET_LINE);
+    assert.doesNotMatch(refused.err, /→/, "a refusal with nothing to run suggested a command");
+
+    const plan = await inProcess([...argv, "--plan"], root, deps);
+    assert.equal(plan.code, 0, plan.err);
+    assert.match(plan.out, /^no mutant: a change with no mutable code has no mutation evidence; a run is refused$/m);
+    assert.equal(calls.stryker, 0);
+
+    // POSITIVE CONTROL: the same selection with a mutant to judge starts, and
+    // neither the plan nor the run says there is none.
+    const one = costDeps({ mutants: 1, seconds: 1 });
+    const admitted = await inProcess(argv, root, one.deps);
+    assert.equal(admitted.code, 0, admitted.err);
+    assert.equal(one.calls.stryker, 1);
+    assert.doesNotMatch(admitted.err, /no mutant/);
+    assert.doesNotMatch((await inProcess([...argv, "--plan"], root, one.deps)).out, /no mutant/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a Stryker report with no mutant fails, naming the ranges, though nothing was counted first (TL-698)", async () => {
+  const root = fixture();
+  try {
+    commentOnly(root);
+    const argv = ["--base", "main", "--changed-lines", "--named-only", "--concurrency", "1"];
+    const reports = {
+      empty: { files: {} },
+      "no mutant in the file": { files: { "scripts/lib.mjs": { mutants: [] } } },
+      "only ignored": { files: { "scripts/lib.mjs": { mutants: [{ ...ONE_KILLED.files["scripts/lib.mjs"].mutants[0], status: "Ignored" }] } } },
+    };
+    for (const [name, report] of Object.entries(reports)) {
+      const { deps, calls } = costDeps({ mutants: 0, seconds: 1 });
+      deps.loadInstrumenter = async () => null;
+      delete deps.countMutants;
+      deps.runStryker = () => { calls.stryker++; return { code: 0, leftovers: [], report }; };
+      for (const extra of [[], ["--json"]]) {
+        const r = await inProcess([...argv, ...extra], root, deps);
+        assert.equal(r.code, 1, name + ": a run with no mutant passed\n" + r.out + r.err);
+        assert.equal(r.out, "", name + ": a run with no mutant printed a result");
+        assert.match(r.err, NO_MUTANT_LINE, name);
+        assert.match(r.err, /^  Stryker ran and its report holds none\.$/m, name);
+        assert.match(r.err, EMPTY_SET_LINE, name);
+        assert.doesNotMatch(r.err, /→|report kept/, name + ": a command was suggested, or a report nobody kept was named");
+      }
+      assert.equal(calls.stryker, 2, name + ": the run was refused before Stryker, so the report was not what was judged");
+    }
+    // A report kept on request is named even though the run is refused: it is
+    // what a reader opens to see why Stryker found nothing.
+    const kept = costDeps({ mutants: 0, seconds: 1 });
+    kept.deps.loadInstrumenter = async () => null;
+    delete kept.deps.countMutants;
+    const keptAt = join(root, "kept.json");
+    kept.deps.runStryker = () => ({ code: 0, leftovers: [], report: reports.empty, kept: keptAt });
+    const withKept = await inProcess([...argv, "--keep-report", "kept.json"], root, kept.deps);
+    assert.equal(withKept.code, 1);
+    assert.ok(withKept.err.split("\n").includes("report kept: " + keptAt), withKept.err);
+    // POSITIVE CONTROL: one judged mutant beside an ignored one is evidence.
+    const { deps } = costDeps({ mutants: 0, seconds: 1 });
+    deps.loadInstrumenter = async () => null;
+    delete deps.countMutants;
+    const judged = { files: { "scripts/lib.mjs": { mutants: [...reports["only ignored"].files["scripts/lib.mjs"].mutants, ...ONE_KILLED.files["scripts/lib.mjs"].mutants] } } };
+    deps.runStryker = () => ({ code: 0, leftovers: [], report: judged });
+    const ok = await inProcess(argv, root, deps);
+    assert.equal(ok.code, 0, ok.err);
+    assert.equal(summarise(judged).mutants, 1, "an Ignored mutant was counted as judged");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -1168,8 +1265,9 @@ test("the summary counts every status per file, scores only the valid ones, and 
   ]);
   assert.equal(s.noCoverage, 1);
   assert.equal(s.timeouts, 1);
+  assert.equal(s.mutants, 10, "an Ignored mutant is not one the run produced (TL-698)");
   assert.deepEqual(s.timedOut, [{ file: "a.mjs", line: 3, mutator: "M", replacement: "r" }]);
-  assert.deepEqual(summarise({}), { files: {}, survivors: [], timedOut: [], noCoverage: 0, timeouts: 0 });
+  assert.deepEqual(summarise({}), { files: {}, survivors: [], timedOut: [], noCoverage: 0, timeouts: 0, mutants: 0 });
 });
 
 /** A stand-in for Stryker that returns `result` and records what it was handed. */
@@ -1719,3 +1817,25 @@ test("a text run hands Stryker the terminal, so what it prints reaches the reade
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("Stryker's instrumenter places no mutant on a line that is only a comment, so the run is refused (TL-698)",
+  { skip: instrumenter ? false : "@stryker-mutator/core is not installed" }, async () => {
+    const root = fixture();
+    try {
+      commentOnly(root);
+      const argv = ["--base", "main", "--changed-lines", "--named-only", "--concurrency", "1"];
+      const { deps, calls } = costDeps({ mutants: 0, seconds: 1 });
+      delete deps.countMutants;
+      deps.loadInstrumenter = async () => instrumenter;
+      const r = await inProcess(argv, root, deps);
+      assert.equal(r.code, 1, r.out + r.err);
+      assert.equal(calls.stryker, 0);
+      assert.match(r.err, NO_MUTANT_LINE);
+      // POSITIVE CONTROL: a changed line of code in the same file yields mutants.
+      write(root, "scripts/lib.mjs", "// a comment above\nexport const lib = () => 1 + 1;\n// a comment below\n");
+      const code = await inProcess([...argv, "--plan", "--json"], root, deps);
+      assert.ok(JSON.parse(code.out).cost.mutants > 0, "a changed line of code yielded no mutant: " + code.out);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
