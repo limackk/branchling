@@ -148,6 +148,40 @@ test("the report names the ranges and says that lines outside them were not muta
   }
 });
 
+test("a ranged --files entry under --changed-lines mutates the changed lines inside its range (TL-705)", () => {
+  const root = fixture();
+  try {
+    write(root, "scripts/lib.mjs", CHANGED_LIB);                    // lines 6-7 changed
+    const p = planOf(root, ["--changed-lines", "--files", "scripts/lib.mjs:7-8"]);
+    assert.deepEqual(p.mutate, ["scripts/lib.mjs:7-7"], "the range was not intersected with the change");
+    assert.deepEqual(p.lines, { "scripts/lib.mjs": [{ start: 7, end: 7 }] });
+    assert.deepEqual(p.modules, ["scripts/lib.mjs"]);
+    assert.deepEqual(p.noAddedLines, []);
+    assert.deepEqual(p.tests.map((t) => t.file), ["scripts/tests/lib.test.mjs"]);
+
+    // A range wider than the change keeps the change; one beside it holds no changed line.
+    assert.deepEqual(planOf(root, ["--changed-lines", "--files", "scripts/lib.mjs:1-8"]).mutate, ["scripts/lib.mjs:6-7"]);
+    const beside = planOf(root, ["--changed-lines", "--files", "scripts/lib.mjs:7-8,scripts/lib.mjs:1-3"]);
+    assert.deepEqual(beside.mutate, ["scripts/lib.mjs:7-7"]);
+    assert.deepEqual(beside.noAddedLines, ["scripts/lib.mjs:1-3"]);
+    // The same file also given whole is mutated on every changed line.
+    assert.deepEqual(planOf(root, ["--changed-lines", "--files", "scripts/lib.mjs:7-8,scripts/lib.mjs"]).mutate,
+      ["scripts/lib.mjs:6-7"]);
+
+    // Each file is narrowed by its own entries only.
+    write(root, "scripts/fresh.mjs", "export const x = 1;\nexport const y = 2;\nexport const z = 3;\n");
+    const two = planOf(root, ["--changed-lines", "--files", "scripts/lib.mjs:7-8,scripts/fresh.mjs:2-2"]);
+    assert.deepEqual(two.lines, { "scripts/lib.mjs": [{ start: 7, end: 7 }], "scripts/fresh.mjs": [{ start: 2, end: 2 }] });
+    assert.deepEqual(two.mutate, ["scripts/lib.mjs:7-7", "scripts/fresh.mjs:2-2"]);
+
+    const outside = run(root, ["--changed-lines", "--files", "scripts/lib.mjs:1-3"]);
+    assert.equal(outside.code, 1, outside.out + outside.err);
+    assert.match(outside.err, /nothing to mutate: the change added no line to scripts\/lib\.mjs:1-3\n/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("a change that only deleted lines leaves nothing to mutate, and the run says so", () => {
   const root = fixture();
   try {
