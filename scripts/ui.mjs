@@ -20,6 +20,8 @@
  * Tests: `node --test scripts/tests/ui.test.mjs`
  */
 
+import { suggestionFor } from "./did-you-mean.mjs";
+
 // ──────────────────────────────────────────────────────────────────────────
 // Whether colour is allowed
 // ──────────────────────────────────────────────────────────────────────────
@@ -239,6 +241,10 @@ export function failure(command, problem, details, next, opts) {
   const paint = (opts && opts.color) || errColor;
   const out = [paint.err(MARK.err) + " " + paint.bold(command) + ": " + problem];
   for (const d of details || []) out.push("  " + d);
+  // The nearest known name, when the refusal is for an unknown one (TL-701):
+  // before the `--help` line, because it is the shorter way out.
+  const guess = suggestionFor(problem, details, command);
+  if (guess) out.push("  " + paint.id(MARK.arrow + " " + guess));
   for (const n of next || []) out.push("  " + paint.id(MARK.arrow + " " + n));
   return out.join("\n");
 }
