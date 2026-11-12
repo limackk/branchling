@@ -113,6 +113,16 @@
  *                                 [--no-wait] [--budget <minutes>] [--keep-report <path>]
  *                                 [--plan] [--json] [--help]
  *
+ * A RUN WITH NO MUTANT FAILS, NAMING WHAT IT WAS ASKED TO MUTATE (TL-698).
+ * Lines can change without holding mutable code — a comment, CSS inside a
+ * template literal — and Stryker then reports `All files | n/a` and exits 0.
+ * Twice on 2026-11-10 such a run read as green evidence for a change it had
+ * not measured at all. The count Stryker's instrumenter gives before the run
+ * refuses it there, and `--plan` says so; the report after the run is checked
+ * again, because the count is skipped where the instrumenter cannot be
+ * loaded, and a count that disagrees with the run must not pass either. An
+ * `Ignored` mutant was never run, so it is not counted as one.
+ *
  * WHAT THE RUN LEAVES TO READ (TL-686). Survivors and Timeout mutants are both
  * printed by file, line and mutator: a Timeout is counted as detected, so the
  * lines it sits on are the ones whose score is least trustworthy, and naming
@@ -670,6 +680,7 @@ export function summarise(report) {
   const timedOut = [];
   let noCoverage = 0;
   let timeouts = 0;
+  let mutants = 0;
   for (const [file, data] of Object.entries(report.files || {})) {
     const c = { Killed: 0, Survived: 0, Timeout: 0, NoCoverage: 0, RuntimeError: 0, CompileError: 0, Ignored: 0 };
     for (const m of data.mutants) {
@@ -680,11 +691,12 @@ export function summarise(report) {
     }
     noCoverage += c.NoCoverage;
     timeouts += c.Timeout;
+    mutants += data.mutants.length - c.Ignored;
     const detected = c.Killed + c.Timeout;
     const valid = detected + c.Survived + c.NoCoverage;
     files[file] = { ...c, score: valid ? Math.round((detected / valid) * 10000) / 100 : null };
   }
-  return { files, survivors, timedOut, noCoverage, timeouts };
+  return { files, survivors, timedOut, noCoverage, timeouts, mutants };
 }
 
 /**
@@ -801,6 +813,17 @@ export async function measureCost(root, p, opts, deps = {}) {
   };
 }
 
+/** Why a run with no mutant is not evidence, in the plan and in the refusal alike (TL-698). */
+const NO_MUTANT_REASON = "a change with no mutable code has no mutation evidence";
+
+/** The refusal of a run whose `mutate` list holds no mutant, before or after Stryker ran. */
+function failNoMutant(p, when) {
+  return fail(COMMAND, "no mutant in " + p.mutate.join(", ") + ": " + NO_MUTANT_REASON,
+    [when, "A score over an empty set would read like a score over real work, so none is reported.",
+      ...templateTextReport(p)],
+    [], 1);
+}
+
 /** What a reader is told about the cost before anything is mutated. */
 export function costReport(cost) {
   if (!cost.counted) return ["mutants: not counted — " + STRYKER_PIN + " is not installed (npm install)"];
@@ -809,6 +832,7 @@ export function costReport(cost) {
     + formatDuration(cost.initialRunSeconds) + ", run once more for each mutant, " + cost.concurrency + " at a time; budget "
     + cost.budgetMinutes + " min" + (cost.overBudget ? ", exceeded: a run is refused without a larger --budget" : ""));
   if (!cost.initialRunPassed) out.push("the selected tests failed without a mutant, so Stryker's initial run will fail too");
+  if (cost.mutants === 0) out.push("no mutant: " + NO_MUTANT_REASON + "; a run is refused");
   return out;
 }
 
@@ -1192,6 +1216,9 @@ export async function main(argv, cwd = process.cwd(), deps = {}) {
         + "--budget <minutes> admits a longer run deliberately."],
     next, 1);
   }
+  if (cost.counted && cost.mutants === 0) {
+    return failNoMutant(p, "Stryker's instrumenter places none on those lines, so Stryker was not started.");
+  }
 
   const slot = await acquireSlot({
     wait: !opts.noWait,
@@ -1216,6 +1243,10 @@ export async function main(argv, cwd = process.cwd(), deps = {}) {
   if (!run.report) return fail(COMMAND, run.problem, run.details || [], run.next || [], run.code || 1);
   const summary = summarise(run.report);
   const kept = typeof run.kept === "string" ? run.kept : null;
+  if (summary.mutants === 0) {
+    if (kept) console.error("report kept: " + kept);
+    return failNoMutant(p, "Stryker ran and its report holds none.");
+  }
 
   if (opts.json) {
     console.log(JSON.stringify({ kind: "mutation-run", ...p, cost, ...summary, keptReport: kept }, null, 2));
