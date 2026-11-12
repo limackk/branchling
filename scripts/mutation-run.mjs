@@ -80,6 +80,15 @@
  * deleted leaves nothing behind to mutate. Both are why the report names the
  * ranges and says that every line outside them was not mutated.
  *
+ * A `--files` ENTRY WRITTEN AS `path:start-end` UNDER `--changed-lines` IS
+ * INTERSECTED, NOT REFUSED (TL-705). git is asked about the bare path, and
+ * only the changed lines inside the hand-written range are mutated; an entry
+ * whose range holds no changed line is named under "no added line", which is
+ * then literally true. The entry used to reach `git diff` whole, matched no
+ * file, and the run blamed the change for a parsing gap. Rejected: refusing
+ * the combination — both flags narrow the same thing, the lines mutated, and
+ * their intersection is the one reading that honours each of them.
+ *
  * TEMPLATE-LITERAL TEXT IS NAMED, NOT MUTATED (TL-657). Stryker sees a
  * template literal as one string, so code written inside one — the viewer's
  * page script in build-viewer.mjs — yields no mutant. A range made only of
@@ -577,16 +586,28 @@ export async function selectTests(root, modules, { namedOnly = false } = {}) {
  * `path:start-end`, it holds such entries and `lines` holds the same ranges per
  * module mutated on ranges only. `modules` holds bare paths either way, since
  * they select the tests. `noAddedLines` (`--changed-lines` only) names the
- * selected modules left out because the change added no line to them.
+ * selected entries, as written, left out because the change added no line to
+ * them — to the module, or inside a hand-written range of it.
  */
 export async function plan(root, opts) {
   let modules = opts.files || changedModules(root, opts.base);
   let changed = null;
   let noAddedLines = [];
   if (opts.changedLines) {
-    changed = changedLineRanges(root, opts.base, modules);
-    noAddedLines = modules.filter((m) => !changed[m]);
-    modules = modules.filter((m) => changed[m]);
+    // git is asked about the bare path; a hand-written range then narrows
+    // the changed lines instead of naming a file git does not have (TL-705).
+    const asked = modules.map((raw) => ({ raw, ...parseEntry(raw) }));
+    const files = [...new Set(asked.map((e) => e.file))];
+    const diff = changedLineRanges(root, opts.base, files);
+    const within = (e) => (diff[e.file] ? (e.range ? clip(diff[e.file], e.range) : diff[e.file]) : []);
+    changed = {};
+    for (const f of files) {
+      // A bare entry contributes every changed line, so a file also given whole keeps them all.
+      const ranges = mergeRanges(asked.filter((e) => e.file === f).flatMap(within));
+      if (ranges.length) changed[f] = ranges;
+    }
+    noAddedLines = asked.filter((e) => !within(e).length).map((e) => e.raw);
+    modules = files.filter((f) => changed[f]);
   }
   const entries = changed
     ? modules.flatMap((m) => changed[m].map((r) => ({ raw: m + ":" + r.start + "-" + r.end, module: m, file: m, range: r })))
