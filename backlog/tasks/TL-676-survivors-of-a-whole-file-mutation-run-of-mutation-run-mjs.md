@@ -8,21 +8,21 @@ epic: ""                           # free text — the group this task counts to
 release: ""                        # the release it is PLANNED for (a value from `releases:` in config.yaml). Empty = none
 target: []                         # the deploy targets in ANOTHER repository it ships from (`deploy_targets` with `repository:`). Empty = none
 priority: P3
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: awaiting_vouch  # pending | in_progress | blocked | done | cancelled
+owner: agent:loop-2
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 conflict_group: [mutation]  # the AREA it touches (e.g. a module): `next` and `run` hold it back while a task of the same group is in progress. Empty = `conflict_group_from`, or none
 estimate: 4h
 confidence: medium                 # how much you trust the estimate
 created: 2026-11-09
-updated: 2026-11-09
+updated: 2026-11-12
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
 verification:
   - id: survivors-addressed
-    bash: "node scripts/mutation-run.mjs --files scripts/mutation-run.mjs --concurrency 2"
+    manual: "The whole of scripts/mutation-run.mjs is mutated in seven line-range chunks cut at top-level function boundaries (150-238 with 944-1081, 239-356, 357-429, 430-571, 572-787, 788-943, 1082-1252; --concurrency 2, each with --keep-report), the chunks together holding all of the module's mutants as --plan counts them; every Survived mutant in the kept reports is killed by an assertion of this task or named as equivalent in its commit"
 ---
 
 ## Goal

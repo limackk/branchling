@@ -91,6 +91,9 @@ test("hunk headers become merged new-side ranges, and a deletion contributes non
   ].join("\n");
   assert.deepEqual(hunkRanges(diff), [{ start: 1, end: 4 }, { start: 12, end: 13 }]);
   assert.deepEqual(hunkRanges(""), []);
+  // TL-676: a header is read only at the start of a line, and counts of any width.
+  assert.deepEqual(hunkRanges("@@ -100,20 +100,30 @@\n+x @@ -1 +5,2 @@\n"), [{ start: 100, end: 129 }]);
+  assert.deepEqual(hunkRanges("@@ -1,12 +1 @@"), [{ start: 1, end: 1 }]);
 });
 
 test("with --changed-lines only the lines the change wrote are mutated, committed and uncommitted alike", () => {
@@ -149,9 +152,14 @@ test("a change that only deleted lines leaves nothing to mutate, and the run say
   const root = fixture();
   try {
     write(root, "scripts/gone.mjs", "export const a = 1;\n");
+    write(root, "scripts/gone-too.mjs", "export const c = 3;\n");
     const r = run(root, ["--changed-lines", "--json"]);
     assert.equal(r.code, 1, r.out + r.err);
-    assert.match(r.err, /nothing to mutate: the change added no line to scripts\/gone\.mjs/);
+    assert.deepEqual(r.err.replace(/\x1b\[[0-9;]*m/g, "").split("\n").slice(0, 3), [
+      "✗ node scripts/mutation-run.mjs: nothing to mutate: the change added no line to scripts/gone-too.mjs, scripts/gone.mjs",
+      "  A line that was only deleted leaves nothing to mutate, and a score over an empty set would read like a score over real work.",
+      "  → node scripts/mutation-run.mjs --files scripts/gone-too.mjs,scripts/gone.mjs",
+    ]);
     assert.equal(r.out, "", "a refused run printed something that could be read as a result");
   } finally {
     rmSync(root, { recursive: true, force: true });
