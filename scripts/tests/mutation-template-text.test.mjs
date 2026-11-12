@@ -4,8 +4,10 @@
  *
  * Stryker parses a module and mutates its code; a template literal is one
  * string to it, however much JavaScript the string holds. The viewer's page
- * script — `startEdit()` and every function beside it — is such text inside
- * scripts/build-viewer.mjs. A `--files` or `--changed-lines` range there used
+ * script — `metaRowHtml()` and most functions beside it — is such text inside
+ * scripts/build-viewer.mjs. The field editors, `startEdit()` among them, left
+ * it for scripts/viewer-field-editors.mjs, which the page pastes by source
+ * (TL-704), and are code there. A `--files` or `--changed-lines` range there used
  * to produce no mutant and read exactly like a range whose mutants were all
  * killed. No Stryker here: this file runs in the default suite, which CI runs
  * without `npm install`, and what it proves is the classification and what
@@ -121,7 +123,7 @@ test("source the lexer cannot follow to the end claims no text at all", () => {
   assert.deepEqual(templateTextLines("const a = `\nopen\n"), []);
 });
 
-test("in build-viewer.mjs, the body of the page's startEdit() is text and buildHtml is code", () => {
+test("in build-viewer.mjs, the body of the page's metaRowHtml() is text and buildHtml is code", () => {
   const source = scriptSource("build-viewer.mjs");
   const lines = source.split("\n");
   const at = (re) => {
@@ -130,11 +132,23 @@ test("in build-viewer.mjs, the body of the page's startEdit() is text and buildH
     return i + 1;
   };
   const text = new Set(lineSet(source));
-  const startEdit = at(/^function startEdit\(/);
-  assert.ok(text.has(startEdit) && text.has(startEdit + 1),
-    "startEdit() is page code inside a template literal and must be classified as such");
+  const metaRow = at(/^function metaRowHtml\(/);
+  assert.ok(text.has(metaRow) && text.has(metaRow + 1),
+    "metaRowHtml() is page code inside a template literal and must be classified as such");
   assert.equal(text.has(at(/^export function buildHtml\(/)), false, "buildHtml() is module code Stryker mutates");
   assert.ok(text.size > 1000, "the page script is far larger than " + text.size + " lines");
+  assert.equal(lines.some((l) => /^function startEdit\(/.test(l)), false,
+    "startEdit() is written in the page template again instead of in viewer-field-editors.mjs");
+});
+
+test("in viewer-field-editors.mjs, the body of startEdit() is code a mutation run mutates", () => {
+  const source = scriptSource("viewer-field-editors.mjs");
+  const lines = source.split("\n");
+  const startEdit = lines.findIndex((l) => /^export function startEdit\(/.test(l)) + 1;
+  assert.ok(startEdit > 0, "viewer-field-editors.mjs no longer declares startEdit()");
+  // Positive control: the module does hold template-free code to classify.
+  assert.ok(lines.length > startEdit + 10);
+  assert.deepEqual(templateTextLines(source), [], "no line of the field editors is template-literal text");
 });
 
 // Lines 7-16 are the page's text; line 17 interpolates, so it is code.

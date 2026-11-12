@@ -411,6 +411,9 @@ export function buildHtml(
   const dashboardModuleSrc = readModuleSource("viewer-dashboard.mjs");
   // The decision panel reads `openQuestions` from task-fields.mjs, pasted above.
   const decisionPanelModuleSrc = readModuleSource("decision-panel.mjs");
+  // The field editors read task-fields.mjs, pasted above, and the page's own
+  // state and renderers, which they resolve when called (TL-704).
+  const fieldEditorsModuleSrc = readModuleSource("viewer-field-editors.mjs");
   const historyJson = JSON.stringify(history).replace(/</g, "\\u003c");
   // THE RELEASE VIEW (TL-504): where each task stands in each deploy target's
   // promotion, read from git NOW and carried with the time it was read. Ids
@@ -3196,120 +3199,12 @@ const IN_FLIGHT_TICK_MS = 30000;
 // ─── Field editors ──────────────────────────────────────────────
 const CAN_EDIT = SERVER_MODE && !!window.VIEWER_WRITE;
 
-function fieldLabel(key) {
-  const spec = fieldSpec(key, FIELDS);
-  return spec ? spec.label : key;
-}
-
-function dynamicOptions() {
-  const unique = function (key) {
-    return [...new Set(ALL_TASKS.map(function (task) {
-      return String(task[key] == null ? "" : task[key]).trim();
-    }).filter(Boolean))].sort();
-  };
-  return { boards: knownBoards().map(function (board) { return board.slug; }), epics: unique("epic"), owners: unique("owner") };
-}
-
-function startEdit(id, field) {
-  if (!CAN_EDIT || DEDICATED_FIELDS[field]) return;
-  if (!isValidActor(state.actor) || !state.actor.startsWith("user:")) {
-    // The shape is diagnosed by actorRefusal(), the sentence every writing
-    // command prints, so "user:Kamil" is refused for its name, not as if it
-    // lacked an identity (TL-605). Only the user: requirement is the page's
-    // own: the shared hint is printed when user: is the half already right,
-    // since under any other namespace it would vouch for the wrong half.
-    const bad = actorRefusal(state.actor);
-    const required = "Enter a user:name identity before editing.";
-    state.editMessage = !bad ? required
-      : bad.refusal.charAt(0).toUpperCase() + bad.refusal.slice(1) + ". " + (!bad.namespace && state.actor.startsWith("user:") ? bad.hint + "." : required);
-    state.editError = true;
-    renderDetail();
-    document.getElementById("editingActor").focus();
-    return;
-  }
-  state.editing = { id: id, field: field };
-  state.editMessage = "";
-  renderDetail();
-  const input = document.querySelector("[data-editor-focus]");
-  if (input) input.focus();
-}
-
-function cancelEdit() { state.editing = null; renderDetail(); }
-
-function editorHtml(t, spec) {
-  const value = t[spec.key];
-  const options = dynamicOptions();
-  const id = escape(t.id);
-  const key = escape(spec.key);
-  if (spec.kind === "enum") {
-    const list = (spec.dynamic ? (options[spec.dynamic] || []) : (spec.options || [])).slice();
-    if (value && list.indexOf(String(value)) < 0) list.push(String(value));
-    return '<select class="field-editor" data-editor-focus>' +
-      (spec.allowEmpty ? '<option value="">— none —</option>' : "") +
-      list.map(function (item) { return '<option value="' + escape(item) + '"' + (String(value || "") === item ? " selected" : "") + '>' + escape(labelTitle(item)) + '</option>'; }).join("") +
-      '</select><div class="editor-actions"><button type="button" onclick="saveSelected(\\'' + id + '\\',\\'' + key + '\\',this)">Save</button><button type="button" onclick="cancelEdit()">Cancel</button></div>';
-  }
-  if (spec.kind === "list" && spec.closed) {
-    return '<div class="field-editor chips-editor" data-editor-focus tabindex="-1">' + (spec.options || []).map(function (item) {
-      const on = (value || []).indexOf(item) >= 0;
-      return '<label class="chip-opt"><input type="checkbox" value="' + escape(item) + '"' + (on ? " checked" : "") + '> ' + escape(item) + '</label>';
-    }).join("") + '<div class="editor-actions"><button type="button" onclick="saveChips(\\'' + id + '\\',\\'' + key + '\\',this)">Save</button><button type="button" onclick="cancelEdit()">Cancel</button></div></div>';
-  }
-  if (spec.kind === "list") {
-    return '<div class="field-editor"><textarea class="field-input" data-editor-focus rows="3" placeholder="' + escape(spec.itemHint || "one value per line") + '">' + escape((value || []).join("\\n")) + '</textarea><div class="editor-actions"><button type="button" onclick="saveLines(\\'' + id + '\\',\\'' + key + '\\',this)">Save</button><button type="button" onclick="cancelEdit()">Cancel</button></div></div>';
-  }
-  return '<div class="field-editor"><input class="field-input" data-editor-focus value="' + escape(value == null ? "" : value) + '"' + (spec.maxLength ? ' maxlength="' + spec.maxLength + '"' : '') + '><div class="editor-actions"><button type="button" onclick="saveText(\\'' + id + '\\',\\'' + key + '\\',this)">Save</button><button type="button" onclick="cancelEdit()">Cancel</button></div></div>';
-}
-
-function saveSelected(id, field, button) { saveField(id, field, button.parentElement.previousElementSibling.value); }
-function saveText(id, field, button) { saveField(id, field, button.closest(".field-editor").querySelector("input").value); }
-function saveLines(id, field, button) { saveField(id, field, button.closest(".field-editor").querySelector("textarea").value.split("\\n").map(function (line) { return line.trim(); }).filter(Boolean)); }
-function saveChips(id, field, button) { saveField(id, field, [...button.closest(".chips-editor").querySelectorAll("input:checked")].map(function (input) { return input.value; })); }
-
-async function saveField(taskId, field, value) {
-  const task = ALL_TASKS.find(function (candidate) { return candidate.id === taskId; });
-  const normalized = normalizeValue(field, value, { fields: FIELDS, options: dynamicOptions() });
-  if (!task || !normalized.ok) {
-    state.editMessage = normalized.error || "The task is no longer available.";
-    state.editError = true;
-    renderDetail();
-    return;
-  }
-  if (sameValue(task[field], normalized.value)) { cancelEdit(); return; }
-  state.editing = null;
-  state.editMessage = "Saving…";
-  state.editError = false;
-  renderDetail();
-  let actorRefused = false;
-  try {
-    const res = await fetch("api/task", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Viewer-Capability": window.VIEWER_WRITE.token },
-      body: JSON.stringify({
-        id: taskId, field: field, value: normalized.value, actor: state.actor,
-        revision: task.revision,
-      }),
-    });
-    const data = await res.json().catch(function () { return {}; });
-    if (!res.ok) {
-      if (res.status === 409) await refreshFromServer(true);
-      // The server refused to record the edit under a default nobody named
-      // (TL-551): the fix is the identity field, so that is where focus goes.
-      if (data.refusalKind === "actor-required") actorRefused = true;
-      throw new Error(data.error || "HTTP " + res.status);
-    }
-    if (data.entries) HISTORY[taskId] = (HISTORY[taskId] || []).concat(data.entries);
-    await refreshFromServer(true);
-    state.editMessage = fieldLabel(field) + " saved to Markdown and history as " + (data.actor || state.actor) + ".";
-    state.editError = false;
-    renderDetail();
-  } catch (error) {
-    state.editMessage = "Not saved: " + error.message;
-    state.editError = true;
-    renderDetail();
-    if (actorRefused) document.getElementById("editingActor").focus();
-  }
-}
+// ─── Pasted source of scripts/viewer-field-editors.mjs (TL-704) ───────
+// startEdit(), the editors and saveField(). Edit THAT file — this is the
+// build's copy, which scripts/tests/actor-shape-diagnosis-readers.test.mjs
+// runs and a mutation run mutates.
+${fieldEditorsModuleSrc}
+// ─── end of the pasted module ─────────────────────────────────────────
 
 function valueHtml(t, key) {
   const value = t[key];
