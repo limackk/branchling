@@ -190,7 +190,9 @@ test("the anatomy of an error: what happened, what was expected, what to do", ()
   const lines = text.split("\n");
   assert.match(lines[0], /branchling query: unknown flag: --statu/);
   assert.match(lines[1], /available: --status --board/);
-  assert.match(lines[2], /branchling query --help/, "the command to paste is missing");
+  // The last line, not the third: a near miss like this one gains a
+  // "did you mean" line between the two (TL-701).
+  assert.match(lines[lines.length - 1], /branchling query --help/, "the command to paste is missing");
 });
 
 test("numbers right-aligned, the table aligned to the widest value", () => {
