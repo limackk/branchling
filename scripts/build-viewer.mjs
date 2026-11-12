@@ -1083,8 +1083,19 @@ ${paletteBadgeCss}
     background: var(--status-pending);
   }
   .connection-bar.live .connection-dot { background: var(--status-done); }
-  .connection-status { font-weight: 600; }
+  .connection-status { font-weight: 600; white-space: nowrap; }
+  .connection-bar .btn-action { white-space: nowrap; }
   .connection-hint { color: var(--fg-muted); flex: 1; }
+  /* In live mode the edit context (the backlog path, the actor input and its
+     note) does not fit beside the hint: the path is one unbroken monospace
+     string, so at 1280 px it squeezed the hint into a 115 px column and wrapped
+     the status label and the buttons (TL-696). The live bar therefore wraps at
+     every width, the edit context takes a line of its own below the status
+     row, and the path may break anywhere. The hint keeps a minimum width so a
+     narrow row moves the buttons down instead of narrowing the hint. */
+  .connection-bar.live { flex-wrap: wrap; row-gap: 6px; }
+  .connection-bar.live .connection-hint { min-width: min(100%, 18em); }
+  .connection-bar.live .edit-context { flex: 1 1 100%; min-width: 0; }
   /* On a phone one row cannot hold the label, the hint and the buttons: the
      hint was squeezed into a column of two words per line and the banner grew
      to about 290 px (TL-652). Below the breakpoint the row wraps, the hint
@@ -1117,7 +1128,7 @@ ${paletteBadgeCss}
      being changed, the named actor, and whether the server accepted the write. */
   .edit-context { display: none; align-items: center; gap: 8px; flex-wrap: wrap; }
   .connection-bar.live .edit-context { display: flex; }
-  .edit-context-path { font-family: "SF Mono", Monaco, Menlo, monospace; font-size: 11px; color: var(--fg-muted); }
+  .edit-context-path { font-family: "SF Mono", Monaco, Menlo, monospace; font-size: 11px; color: var(--fg-muted); overflow-wrap: anywhere; min-width: 0; }
   .actor-input, .field-editor, .field-input {
     font: inherit; color: var(--fg); background: var(--bg-card);
     border: 1px solid var(--border); border-radius: 6px; padding: 5px 7px;
