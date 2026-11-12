@@ -112,6 +112,12 @@ const opts = {};
 const argv = process.argv.slice(2);
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
+  // `--text=<substring>` (TL-691): the joined spelling, so a search string that
+  // begins with a dash can also be written without relying on position.
+  if (a.startsWith("--text=")) {
+    opts.text = a.slice("--text=".length);
+    continue;
+  }
   if (!a.startsWith("--") && a !== "-h") {
     console.error(refusal(`${N} query`, `unexpected argument: ${a} (every criterion is given as a flag)`,
       [...VALUE_FLAGS, ...BOOL_FLAGS].sort().join(" ")));

@@ -230,6 +230,10 @@ export const COMMANDS = {
     audience: "agent",
     script: "query.mjs",
     summary: "ask about tasks — reads tasks/*.md, so it sees changes before a rebuild",
+    // A search string may legitimately begin with a dash (TL-691): the token
+    // after `--text` is its value, so `--text --help` searches rather than
+    // printing this command's help.
+    literalValueFlags: ["--text"],
     usage: [
       `${N} query [--status s] [--priority p] [--board b] [--label l] [--epic e]`,
       `            [--type t] [--owner o] [--role r] [--executor x] [--release r]`,
@@ -264,6 +268,8 @@ export const COMMANDS = {
       "  --text <substring>      a case-insensitive substring of \"<id> <title>\", NOT of",
       "                          the body. It answers `what was that task called`, never",
       "                          `where is this word used` — for the latter, ask git.",
+      "                          The next token is the value whatever it begins with, so",
+      "                          `--text --help` searches; `--text=<substring>` also works.",
       "",
       "  --sort <key>            priority (the default, the order the INDEX uses), id or",
       "                          id-desc. An unknown key fails instead of falling back to",
@@ -2288,10 +2294,20 @@ export function commandHelpJson(name, spec, config) {
  *
  * The scan stops at `--`, so that a value beginning with a dash is not mistaken
  * for a flag once the separator lands in TL-58.
+ *
+ * `literalValueFlags` are the command's flags whose NEXT token is a value
+ * whatever it begins with (TL-691): `query --text --help` searches for the
+ * string "--help". The scan skips that token, as the command's own parser
+ * does, so the dispatcher and the command read the line the same way. It is
+ * a per-command list rather than every value-taking flag, because a filter
+ * like `--status` has a closed vocabulary in which `--help` cannot be a value,
+ * and there the request for help is the likelier reading.
  */
-export function wantsHelp(args) {
-  for (const a of args) {
+export function wantsHelp(args, literalValueFlags = []) {
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
     if (a === "--") return false;
+    if (literalValueFlags.includes(a)) { i++; continue; }
     if (COMMAND_HELP_FLAGS.includes(a)) return true;
   }
   return false;
@@ -2830,7 +2846,7 @@ export function main(argv) {
     return 2;
   }
 
-  if (wantsHelp(resolved.args)) {
+  if (wantsHelp(resolved.args, resolved.spec.literalValueFlags)) {
     // Help goes to stdout and exits zero: this is not a usage error.
     if (resolved.args.includes("--json")) {
       // Law 4's other half (TL-83): the reading commands answer in JSON, and so
