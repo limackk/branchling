@@ -49,7 +49,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadConfigOrExit } from "./config.mjs";
-import { BACKLOG_DIR_REFUSAL_EXIT, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
+import { BACKLOG_DIR_REFUSAL_EXIT, BACKLOG_DIR_REFUSAL_HELP, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { failure, plural } from "./ui.mjs";
 
@@ -93,6 +93,9 @@ export const USAGE = [
   "  --dry-run`, and a rejected one goes back to the model with the errors",
   "  attached, up to `llm_retries` times; after that the plan and the complaints",
   "  are printed and the command fails.",
+  "",
+  "  exit: 0 a plan · 1 no plan survived the retries · 2 the invocation was wrong",
+  "        · " + BACKLOG_DIR_REFUSAL_HELP,
 ].join("\n");
 
 // ──────────────────────────────────────────────────────────────────────────

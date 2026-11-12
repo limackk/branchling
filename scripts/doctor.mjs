@@ -63,6 +63,7 @@ export const USAGE = [
   "",
   "  collects the configuration, tree and git checks into one answer",
   "  it fixes NOTHING — it prints the repair command next to each problem",
+  "",
   "  exit: 0 no errors, warnings allowed · 1 there is an error · 2 usage error",
   "        · " + BACKLOG_DIR_REFUSAL_HELP,
 ].join("\n");

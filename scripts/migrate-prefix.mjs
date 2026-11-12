@@ -45,7 +45,7 @@ import { resolveActor } from "./actor.mjs";
 import { loadConfigOrExit } from "./config.mjs";
 import { statedActorRefusal, MIGRATIONS_FILE, SNAPSHOT_FILE, appendMigration, applyIdMigrations, loadSnapshot, saveSnapshot } from "./history.mjs";
 import { withHistoryLogMutex } from "./history-log-mutex.mjs";
-import { backlogPaths, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
+import { BACKLOG_DIR_REFUSAL_HELP, backlogPaths, resolveBacklogDirOrExit, takeDirFlag } from "./paths.mjs";
 import { withSnapshotMutex } from "./snapshot-mutex.mjs";
 import { PREFIX_SHAPE, taskIdPatterns } from "./task-id.mjs";
 import { MARK, color, errColor, refusal, plural } from "./ui.mjs";
@@ -65,6 +65,10 @@ const USAGE = [
   "  `task_id_prefix` in config.yaml. The migration is recorded in",
   `  history/${MIGRATIONS_FILE}, so other clones repoint their own snapshot too.`,
   "  References in PROSE are left untouched — they may point at another repository.",
+  "",
+  "  exit: 0 migrated, a --dry-run, or already on that prefix · 1 stopped before",
+  "        anything was written, or the configuration cannot be read · 2 usage error",
+  "        · " + BACKLOG_DIR_REFUSAL_HELP,
 ].join("\n");
 
 /**
