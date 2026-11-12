@@ -66,18 +66,31 @@ export const BACKLOG_DIR = findOwnBacklog();
 export const TASKS_DIR = join(BACKLOG_DIR, "tasks");
 
 /**
- * The source text of `scripts/<name>`, as the author wrote it (TL-653).
+ * The checkout whose SOURCE TEXT a guard reads (TL-653, TL-702).
  *
- * Inside a mutation run the file under `SCRIPTS_DIR` is Stryker's instrumented
- * copy, in which every string literal is wrapped in a mutant switch; a test
- * that matches the source with a regex then fails in the initial run and no
- * mutant is ever tried. `mutation-run.mjs` names the tree it started in
- * through `SOURCE_ROOT_ENV`, and this reads from there. Outside a run the
- * variable is absent and this is `SCRIPTS_DIR` itself. Use it for a guard
- * about the code's TEXT; a test of its behaviour imports the module instead.
+ * Inside a mutation run the files under `SCRIPTS_DIR` and `bin/` are Stryker's
+ * instrumented copies, in which every string literal is wrapped in a mutant
+ * switch; a test that matches the source with a regex then fails in the
+ * initial run and no mutant is ever tried. `mutation-run.mjs` names the tree
+ * it started in through `SOURCE_ROOT_ENV`, and this returns it. Outside a run
+ * the variable is absent and this is `REPO_ROOT` itself.
+ *
+ * A guard that WALKS a directory of modules (`scripts/`, `bin/`) joins its
+ * path onto this root, so the listing and every file it reads come from the
+ * same tree. A test of the code's behaviour imports or spawns the module
+ * instead, and must keep doing so from `SCRIPTS_DIR`: that is the copy a
+ * mutant is switched on in.
+ */
+export function sourceRoot(env = process.env) {
+  return env[SOURCE_ROOT_ENV] || REPO_ROOT;
+}
+
+/**
+ * The source text of `scripts/<name>`, as the author wrote it (TL-653). Use it
+ * for a guard about the code's TEXT; see `sourceRoot` for why.
  */
 export function scriptSource(name, env = process.env) {
-  return readFileSync(join(env[SOURCE_ROOT_ENV] || REPO_ROOT, "scripts", name), "utf8");
+  return readFileSync(join(sourceRoot(env), "scripts", name), "utf8");
 }
 
 

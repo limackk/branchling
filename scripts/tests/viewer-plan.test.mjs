@@ -19,8 +19,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { readFileSync } from "node:fs";
-
 import { describeHold, planState } from "../plan.mjs";
 import { estimateHours } from "../estimate.mjs";
 import {
@@ -36,7 +34,7 @@ import {
   statusChanges,
 } from "../viewer-plan.mjs";
 
-import { isolateHome } from "./_repo.mjs";
+import { isolateHome, scriptSource } from "./_repo.mjs";
 
 // THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
 // file in its own process, so one call covers every case in it. Without this a
@@ -487,7 +485,7 @@ test("a wave that is not held still names what it withholds, as `plan` does", ()
 });
 
 test("both of the page's plan computations go through pagePlanState", () => {
-  const src = readFileSync(new URL("../build-viewer.mjs", import.meta.url), "utf8");
+  const src = scriptSource("build-viewer.mjs");
   assert.equal((src.match(/pagePlanState\(PLAN\.plan, /g) || []).length, 2);
   assert.ok(!/[^.\w]planState\(PLAN\.plan/.test(src), "a call with a partial configuration bypasses the holds");
 });

@@ -22,7 +22,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -31,7 +31,7 @@ import { fileURLToPath } from "node:url";
 import { CHECK_GUARDS, parseCheckArgs } from "../cli.mjs";
 import { KINDS } from "../json-envelope.mjs";
 
-import { isolateHome } from "./_repo.mjs";
+import { isolateHome, scriptSource } from "./_repo.mjs";
 
 // THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
 // file in its own process, so one call covers every case in it. Without this a
@@ -215,7 +215,7 @@ test("`new` takes the number from a FIELD, not from the last line of stdout", ()
   // against a regex so that a scanner printing anything unexpected could not
   // produce a `TASK-NaN-*.md`. That regex was the only thing standing between
   // the two.
-  const source = readFileSync(join(HERE, "..", "new-task.mjs"), "utf8");
+  const source = scriptSource("new-task.mjs");
   assert.match(source, /next-backlog-id\.mjs".*"--json"|"--json"/s,
     "`new` no longer asks for JSON");
   assert.equal(/split\("\\n"\)\.pop\(\)/.test(source), false,

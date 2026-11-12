@@ -29,7 +29,7 @@ import { join } from "node:path";
 
 import { plural } from "../ui.mjs";
 import { buildHtml, computeStats, readTasks } from "../build-viewer.mjs";
-import { REPO_ROOT, SCRIPTS_DIR, isolateHome } from "./_repo.mjs";
+import { isolateHome, sourceRoot } from "./_repo.mjs";
 
 isolateHome("no-paren-plural");
 
@@ -174,7 +174,7 @@ export function parenPlurals(source) {
 }
 
 function sources() {
-  const dirs = [SCRIPTS_DIR, join(REPO_ROOT, "bin")];
+  const dirs = [join(sourceRoot(), "scripts"), join(sourceRoot(), "bin")];
   const files = [];
   for (const dir of dirs) {
     for (const name of readdirSync(dir)) {
@@ -217,7 +217,7 @@ test("no message in scripts/ or bin/ counts with noun(s)", () => {
   for (const file of files) {
     const source = readFileSync(file, "utf8");
     literals += stringLiterals(source).length;
-    for (const f of parenPlurals(source)) findings.push(file.slice(REPO_ROOT.length + 1) + ":" + f.line + " " + f.match);
+    for (const f of parenPlurals(source)) findings.push(file.slice(sourceRoot().length + 1) + ":" + f.line + " " + f.match);
   }
   // The sample, stated: a guard over zero files or zero literals is green
   // with no evidentiary force.

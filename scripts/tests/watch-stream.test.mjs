@@ -24,7 +24,7 @@ import { join } from "node:path";
 
 import { diffSnapshots } from "../backlog-watch.mjs";
 import { FIELD_BODY } from "../task-fields.mjs";
-import { SCRIPTS_DIR, isolateHome, isolateState } from "./_repo.mjs";
+import { SCRIPTS_DIR, isolateHome, isolateState, scriptSource } from "./_repo.mjs";
 
 isolateHome("watch");
 isolateState("watch");
@@ -189,7 +189,7 @@ test("the diff: body, creation and deletion are reported; a rewrite that moved n
 });
 
 test("serve watches through the shared module, not a copy of its own", () => {
-  const src = readFileSync(join(SCRIPTS_DIR, "serve-backlog.mjs"), "utf8");
+  const src = scriptSource("serve-backlog.mjs");
   assert.match(src, /from "\.\/backlog-watch\.mjs"/);
   assert.match(src, /watchBacklog\(/);
   assert.doesNotMatch(src, /\bwatch\(\s*(TASKS_DIR|BACKLOG_DIR)/, "serve still sets up fs.watch itself");

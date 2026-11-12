@@ -11,9 +11,6 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import {
   ELSEWHERE_HINT,
@@ -25,15 +22,13 @@ import {
 import { describeDivergence } from "../branch-scan.mjs";
 import { buildHtml, computeStats } from "../build-viewer.mjs";
 
-import { isolateHome } from "./_repo.mjs";
+import { isolateHome, scriptSource } from "./_repo.mjs";
 
 // THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
 // file in its own process, so one call covers every case in it. Without this a
 // test reads the DEVELOPER's `<config>/config.yaml` — their actor, their model
 // endpoint — and the suite answers differently on different machines.
 isolateHome("viewer-elsewhere-card");
-
-const SCRIPTS = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 test("a task seen differently elsewhere gets marked", () => {
   const attrs = elsewhereCardAttrs({ elsewhere: [{ source: "feature/x", status: "in_progress" }] });
@@ -113,7 +108,7 @@ test("viewer: the page carries the source of elsewhere.mjs and calls it on every
   }];
   const html = buildHtml(tasks, computeStats(tasks));
 
-  const src = readFileSync(join(SCRIPTS, "elsewhere.mjs"), "utf8");
+  const src = scriptSource("elsewhere.mjs");
   const marker = "export function elsewhereCardAttrs";
   assert.ok(src.includes(marker), "the module changed shape — fix the marker in this test");
   assert.ok(html.includes(marker.replace("export ", "")), "the source of elsewhere.mjs did not reach the page");

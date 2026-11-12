@@ -18,13 +18,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync, readdirSync } from "node:fs";
+import { readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { colorAllowed, failure, line, plain, priorityPaint, statusPaint, table } from "../ui.mjs";
 
-import { isolateHome, plainOutput } from "./_repo.mjs";
+import { isolateHome, plainOutput, scriptSource, sourceRoot } from "./_repo.mjs";
 
 // THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
 // file in its own process, so one call covers every case in it. Without this a
@@ -148,12 +148,12 @@ test("a child killed by its budget is recognised as killed, not as output", () =
 const ESC_IN_SOURCE = "\\u001b";
 
 function writesSequences(file) {
-  const text = readFileSync(join(SCRIPTS, file), "utf8");
+  const text = scriptSource(file);
   return text.includes(ESC) || text.includes(ESC_IN_SOURCE);
 }
 
 test("escape sequences are written ONLY by ui.mjs", () => {
-  const files = readdirSync(SCRIPTS).filter((f) => f.endsWith(".mjs") && f !== "ui.mjs");
+  const files = readdirSync(join(sourceRoot(), "scripts")).filter((f) => f.endsWith(".mjs") && f !== "ui.mjs");
   const offenders = files.filter(writesSequences);
   assert.deepEqual(offenders, [],
     "these files write their own escape, so NO_COLOR stops being a property of the program: " + offenders.join(", "));
@@ -171,10 +171,10 @@ test("messages introduce themselves by the COMMAND name, not by a filename", () 
     "[backlog-history]", "[backlog-serve]", "check-backlog-refs:"];
   // `ui.mjs` is excluded deliberately: its comment LISTS those prefixes as an
   // example of what we no longer do. The ban applies to messages, not to prose.
-  const files = readdirSync(SCRIPTS).filter((f) => f.endsWith(".mjs") && f !== "ui.mjs");
+  const files = readdirSync(join(sourceRoot(), "scripts")).filter((f) => f.endsWith(".mjs") && f !== "ui.mjs");
   const bad = [];
   for (const f of files) {
-    const text = readFileSync(join(SCRIPTS, f), "utf8");
+    const text = scriptSource(f);
     for (const p of leaked) {
       if (text.includes('"' + p) || text.includes("`" + p)) bad.push(f + " → " + p);
     }

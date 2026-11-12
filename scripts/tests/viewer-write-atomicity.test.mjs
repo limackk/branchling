@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { historyPath, loadSnapshot, recordEdit } from "../history.mjs";
-import { isolateHome, isolateState } from "./_repo.mjs";
+import { isolateHome, isolateState, scriptSource } from "./_repo.mjs";
 
 isolateHome("viewer-write-atomicity");
 isolateState("viewer-write-atomicity");
@@ -53,7 +53,7 @@ test("an append failure restores the snapshot and writes no false transition", (
 });
 
 test("the immutable append is the final persistence operation in recordEdit", () => {
-  const source = readFileSync(new URL("../history.mjs", import.meta.url), "utf8");
+  const source = scriptSource("history.mjs");
   const block = source.slice(source.indexOf("export function recordEdit"), source.indexOf("export function reconcile"));
   const append = block.lastIndexOf("appendEntries(backlogDir, taskId, entries)");
   assert.ok(append > block.lastIndexOf("saveSnapshot(backlogDir, snap)"));

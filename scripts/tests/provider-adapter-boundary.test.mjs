@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { HOME_ENV, agentProfilesPath } from "../home.mjs";
-import { isolateHome, REPO_ROOT, SCRIPTS_DIR } from "./_repo.mjs";
+import { isolateHome, REPO_ROOT, SCRIPTS_DIR, scriptSource } from "./_repo.mjs";
 
 isolateHome("provider-adapter-boundary");
 
@@ -131,9 +131,9 @@ test("an unavailable executable or absent declared secret fails before a task is
 });
 
 test("the core ships neither provider adapters nor their setup, discovery or launch lifecycle", () => {
-  const profiles = readFileSync(join(SCRIPTS_DIR, "agent-profiles.mjs"), "utf8");
-  const runner = readFileSync(join(SCRIPTS_DIR, "run-loop.mjs"), "utf8");
-  const cli = readFileSync(join(SCRIPTS_DIR, "cli.mjs"), "utf8");
+  const profiles = scriptSource("agent-profiles.mjs");
+  const runner = scriptSource("run-loop.mjs");
+  const cli = scriptSource("cli.mjs");
   const manifest = readFileSync(join(REPO_ROOT, "package.json"), "utf8");
   const lock = readFileSync(join(REPO_ROOT, "package-lock.json"), "utf8");
 

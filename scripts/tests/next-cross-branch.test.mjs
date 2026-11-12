@@ -27,7 +27,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { isolateHome } from "./_repo.mjs";
+import { isolateHome, scriptSource } from "./_repo.mjs";
 
 // THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
 // file in its own process, so one call covers every case in it. Without this a
@@ -272,7 +272,7 @@ test("a task only ANOTHER branch calls startable is not started here", () => {
 test("`next` reads the SHARED scan module, not a copy of its own", () => {
   // Structural, because the cost of a second copy is not a failing test: it is
   // the dispatcher and the listing disagreeing about which branches exist.
-  const src = readFileSync(join(SCRIPTS, "next-task.mjs"), "utf8");
+  const src = scriptSource("next-task.mjs");
   assert.match(src, /from ['"]\.\/branch-scan\.mjs['"]/, "the dispatcher reads one checkout again");
   assert.doesNotMatch(src, /child_process/, "the dispatcher grew git calls of its own");
 });

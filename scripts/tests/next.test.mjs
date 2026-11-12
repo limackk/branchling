@@ -32,7 +32,7 @@ import { acquireLock, isExpired, listLocks, lockScope, readLock, releaseLock, st
 import { loadConfig, parseConfigYaml } from "../config.mjs";
 import { callerSpecies, lastHandoff, queueStatuses, selectCandidates, servesExecutor } from "../next-task.mjs";
 import { readTaskRecords } from "../task-select.mjs";
-import { isolateHome, plainOutput } from "./_repo.mjs";
+import { isolateHome, plainOutput, scriptSource } from "./_repo.mjs";
 
 // The suite must not read the DEVELOPER's preferences: since TL-157 the actor
 // chain reads the user layer, so a machine with `actor:` in its own config file
@@ -400,7 +400,7 @@ test("positive control: without a SHARED reservation everybody picks the same ta
 // ── The structure the acceptance criteria ask for ─────────────────────────
 
 test("`next` has no reservation path of its own", () => {
-  const source = readFileSync(join(SCRIPTS, "next-task.mjs"), "utf8");
+  const source = scriptSource("next-task.mjs");
   assert.match(source, /takeTask/, "next does not call the take primitive at all");
   for (const forbidden of ["acquireLock", "writeFileSync", "recordEdit", "setFrontmatterField"]) {
     assert.ok(source.indexOf(forbidden) < 0,
@@ -408,15 +408,15 @@ test("`next` has no reservation path of its own", () => {
   }
   // POSITIVE CONTROL: those names have to exist SOMEWHERE, or the loop above is
   // checking for words this codebase never uses.
-  const primitive = readFileSync(join(SCRIPTS, "take-task.mjs"), "utf8");
+  const primitive = scriptSource("take-task.mjs");
   for (const required of ["acquireLock", "writeFileSync", "recordEdit", "setFrontmatterField"]) {
     assert.match(primitive, new RegExp(required), "take-task.mjs does not " + required);
   }
 });
 
 test("query and next choose over the same code", () => {
-  const query = readFileSync(join(SCRIPTS, "query.mjs"), "utf8");
-  const next = readFileSync(join(SCRIPTS, "next-task.mjs"), "utf8");
+  const query = scriptSource("query.mjs");
+  const next = scriptSource("next-task.mjs");
   for (const source of [query, next]) {
     assert.match(source, /from "\.\/task-select\.mjs"/, "a second copy of the filters");
   }

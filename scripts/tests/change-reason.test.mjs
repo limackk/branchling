@@ -28,7 +28,7 @@ import { auditReasons } from "../check-backlog-reasons.mjs";
 import { OBSERVED_SOURCES } from "../task-fields.mjs";
 import { loadConfig } from "../config.mjs";
 import { TEMPLATE_FILENAME } from "../paths.mjs";
-import { BACKLOG_DIR, REPO_ROOT, isolateHome } from "./_repo.mjs";
+import { BACKLOG_DIR, REPO_ROOT, isolateHome, scriptSource } from "./_repo.mjs";
 // The suite must not read the DEVELOPER's preferences: since TL-157 the actor
 // chain reads the user layer, so a machine with `actor:` in its own config file
 // would otherwise see every default-actor assertion below fail.
@@ -359,13 +359,13 @@ test("`unknown` is an outside change only under an observing source (TL-663)", (
 test("the observing sources have one definition, and every reader takes it from there", () => {
   assert.deepEqual([...OBSERVED_SOURCES], ["external", "manual", "boot"]);
   for (const name of ["pr-summary.mjs", "jira-proof.mjs", "check-backlog-reasons.mjs"]) {
-    const src = readFileSync(join(ROOT, "scripts", name), "utf8");
+    const src = scriptSource(name);
     assert.match(src, /import \{[^}]*\bOBSERVED_SOURCES\b[^}]*\} from "\.\/task-fields\.mjs"/,
       name + " does not import OBSERVED_SOURCES from task-fields.mjs");
     assert.doesNotMatch(src, /\b(const|let|var)\s+OBSERVED_SOURCES\b/, name + " defines its own OBSERVED_SOURCES");
   }
   // Positive control: the pattern does see a local definition where one exists.
-  assert.match(readFileSync(join(ROOT, "scripts", "task-fields.mjs"), "utf8"),
+  assert.match(scriptSource("task-fields.mjs"),
     /export const OBSERVED_SOURCES\b/);
 });
 

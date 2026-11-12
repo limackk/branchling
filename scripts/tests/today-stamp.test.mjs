@@ -26,7 +26,7 @@ import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { REPO_ROOT, SCRIPTS_DIR, isolateHome } from "./_repo.mjs";
+import { REPO_ROOT, SCRIPTS_DIR, isolateHome, scriptSource, sourceRoot } from "./_repo.mjs";
 
 // The suite must not read the DEVELOPER's preferences: `new` and `done` are
 // driven as child processes below, and they inherit this process's home.
@@ -173,7 +173,7 @@ const HOME = "today.mjs";
 test("the shape of a date stamp is written once, in one file", () => {
   // The controls: both patterns must be able to match, or a clean scan below
   // would only mean the regular expressions are broken.
-  assert.match(readFileSync(join(SCRIPTS_DIR, HOME), "utf8"), UTC_STAMP);
+  assert.match(scriptSource(HOME), UTC_STAMP);
   assert.match(
     "return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());",
     LOCAL_STAMP,
@@ -182,10 +182,10 @@ test("the shape of a date stamp is written once, in one file", () => {
 
   const offenders = [];
   let scanned = 0;
-  for (const name of readdirSync(SCRIPTS_DIR)) {
+  for (const name of readdirSync(join(sourceRoot(), "scripts"))) {
     if (!name.endsWith(".mjs") || name === HOME) continue;
     scanned += 1;
-    const text = readFileSync(join(SCRIPTS_DIR, name), "utf8");
+    const text = scriptSource(name);
     if (UTC_STAMP.test(text)) offenders.push(name + ": builds the UTC day itself");
     if (LOCAL_STAMP.test(text)) offenders.push(name + ": builds the LOCAL day itself");
   }
@@ -207,9 +207,9 @@ test("the shape of a date stamp is written once, in one file", () => {
 test("every file that calls the function also imports it", () => {
   const callers = [];
   const missing = [];
-  for (const name of readdirSync(SCRIPTS_DIR)) {
+  for (const name of readdirSync(join(sourceRoot(), "scripts"))) {
     if (!name.endsWith(".mjs") || name === HOME) continue;
-    const text = readFileSync(join(SCRIPTS_DIR, name), "utf8");
+    const text = scriptSource(name);
     if (!/\btodayStamp\s*\(/.test(text)) continue;
     callers.push(name);
     if (!/from "\.\/today\.mjs"/.test(text)) missing.push(name);

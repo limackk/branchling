@@ -31,7 +31,7 @@ import { loadConfig } from "../config.mjs";
 import { createTask } from "../new-task.mjs";
 import { contractFor, findCycles, parsePlan, parseSeedArgs, renderBody, writePlan } from "../seed-backlog.mjs";
 
-import { isolateHome } from "./_repo.mjs";
+import { isolateHome, sourceRoot } from "./_repo.mjs";
 
 // THE HOME IS ISOLATED FOR THE WHOLE FILE (TL-166). `node --test` runs each
 // file in its own process, so one call covers every case in it. Without this a
@@ -531,12 +531,12 @@ function importGraph(entry) {
 }
 
 test("seed reaches no network and no model", () => {
-  const { files, externals } = importGraph(join(SCRIPTS, "seed-backlog.mjs"));
+  const { files, externals } = importGraph(join(sourceRoot(), "scripts", "seed-backlog.mjs"));
   assert.ok(files.size > 5, "the graph walk found almost nothing — the measurement is broken");
 
   // Positive control on the WALK: the server does reach the network, so a walk
   // that cannot see `node:http` there proves nothing about not seeing it here.
-  const server = importGraph(join(SCRIPTS, "serve-backlog.mjs"));
+  const server = importGraph(join(sourceRoot(), "scripts", "serve-backlog.mjs"));
   assert.ok([...server.externals].some((s) => /^node:(http|https|net)$/.test(s)),
     "the walk cannot see a network import even where there is one");
 

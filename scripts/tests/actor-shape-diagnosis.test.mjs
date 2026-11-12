@@ -36,7 +36,7 @@ import { actorRefusal as actorRefusalFromHistory } from "../history.mjs";
 import { loadConfig, validateConfig } from "../config.mjs";
 import { parseImportArgs } from "../import.mjs";
 import { parseSeedArgs } from "../seed-backlog.mjs";
-import { isolateHome, REPO_ROOT, SCRIPTS_DIR } from "./_repo.mjs";
+import { isolateHome, SCRIPTS_DIR, sourceRoot } from "./_repo.mjs";
 
 isolateHome("actor-shape-diagnosis");
 
@@ -360,7 +360,7 @@ test("every writing command lets a valid actor past the actor check", () => {
 
 test("the namespace refusal is written in one module, not copied into the writers", () => {
   const OLD = /has no valid namespace|must use a declared namespace/;
-  const roots = [SCRIPTS_DIR, join(REPO_ROOT, "bin")];
+  const roots = [join(sourceRoot(), "scripts"), join(sourceRoot(), "bin")];
   const holders = [];
   let scanned = 0;
   for (const root of roots) {

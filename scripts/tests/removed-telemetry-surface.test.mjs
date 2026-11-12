@@ -14,7 +14,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { REPO_ROOT, SCRIPTS_DIR, isolateHome } from "./_repo.mjs";
+import { SCRIPTS_DIR, isolateHome, sourceRoot } from "./_repo.mjs";
 
 isolateHome("removed-telemetry-surface");
 
@@ -42,7 +42,7 @@ test("positive control: a retired telemetry promise is caught", () => {
 
 test("production rationale does not promise removed telemetry", () => {
   const offenders = PRODUCT_SOURCES.flatMap((file) =>
-    retiredPromises(file, readFileSync(join(REPO_ROOT, file), "utf8")));
+    retiredPromises(file, readFileSync(join(sourceRoot(), file), "utf8")));
   assert.equal(PRODUCT_SOURCES.length, 4, "the production-source sample is empty");
   assert.deepEqual(offenders, []);
 });

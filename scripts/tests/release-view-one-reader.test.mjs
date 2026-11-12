@@ -41,7 +41,7 @@ import { releaseTaskRecords } from "../release-gaps.mjs";
 import { releaseViewData } from "../release-view.mjs";
 import { computeStatus } from "../release-status.mjs";
 import { readTaskRecords } from "../task-select.mjs";
-import { SCRIPTS_DIR, isolateHome } from "./_repo.mjs";
+import { SCRIPTS_DIR, isolateHome, scriptSource } from "./_repo.mjs";
 
 isolateHome("release-view-one-reader");
 
@@ -170,7 +170,7 @@ test("a caller's task objects cannot steer the viewer's gap panel", () => {
 test("neither caller parses task files on its own", () => {
   // A second reader is what TL-519 was; the shared one lives in release-gaps.mjs.
   for (const name of ["release-view.mjs", "check-release-gaps.mjs", "release-status.mjs"]) {
-    const src = readFileSync(join(SCRIPTS_DIR, name), "utf8");
+    const src = scriptSource(name);
     assert.match(src, /\breleaseTaskRecords\(/, name + " does not read through releaseTaskRecords()");
     assert.doesNotMatch(src, /\b(readTaskRecords|parseTaskRecord|extractMeta|readTaskMetas)\b/, name + " carries a reader of its own");
     assert.doesNotMatch(src, /\bgapTaskOf\b/, name);

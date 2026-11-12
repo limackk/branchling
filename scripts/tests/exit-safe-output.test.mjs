@@ -25,7 +25,7 @@ import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 
-import { REPO_ROOT, isolateHome } from "./_repo.mjs";
+import { isolateHome, sourceRoot } from "./_repo.mjs";
 
 isolateHome("exit-safe-output");
 
@@ -75,7 +75,7 @@ export function unsafeWrites(text) {
 }
 
 /** Scan the executable source surface, not tests or generated artifacts. */
-export function auditTree(root = REPO_ROOT) {
+export function auditTree(root = sourceRoot()) {
   const findings = [];
   let filesChecked = 0;
   for (const dir of ["scripts", "bin"]) {
