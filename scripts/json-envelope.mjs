@@ -64,8 +64,10 @@ export const KINDS = {
   // `declared`, the values that field accepts — the shape `set` refuses with
   // since TL-543. `details` names every rejected value when more than one was.
   // A query that answered carries `ok: true`.
+  // `worktrees` (TL-700) is null unless `--worktrees` asked, then `{ reason,
+  // self, trees }`: which sibling trees were read, and why none could be.
   "task-list": {
-    ok: null, tasks: [], total: null, limit: null, scope: null, scan: null, modifiedFile: null, deploy: null, elsewhereOnly: [],
+    ok: null, tasks: [], total: null, limit: null, scope: null, scan: null, modifiedFile: null, deploy: null, worktrees: null, elsewhereOnly: [],
     refusalKind: null, refusal: null, details: [], rejected: null, declared: [],
   },
   // `<command> --help --json` (TL-83). `flags` describes the input surface, and
