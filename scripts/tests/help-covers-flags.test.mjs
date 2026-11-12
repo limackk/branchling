@@ -41,7 +41,7 @@ import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { COMMANDS, describeFlags } from "../cli.mjs";
+import { COMMANDS, commandHelpJson, describeFlags, mappingArg } from "../cli.mjs";
 
 import { isolateHome } from "./_repo.mjs";
 
@@ -219,4 +219,73 @@ test("the exemption list does not outlive the defect it records", () => {
   // An exemption for a flag that IS documented now is a lie about the state of
   // the tool, and it would hide a genuine regression on that same flag.
   assert.deepEqual(exemptionProblems(UNDOCUMENTED), []);
+});
+
+/**
+ * A `<from>=<to>` flag is described as a PAIR (TL-693).
+ *
+ * `import --status <from>=<to>` was reported as `arg: "<from>"` with the
+ * project's closed statuses, so a form built from the answer offered a
+ * drop-down of statuses for the whole value — every one of which `import`
+ * refuses as "not a mapping". `<from>` is a foreign name; only `<to>` draws on
+ * the vocabulary.
+ *
+ * The vocabulary is a FIXTURE sharing nothing with the defaults, handed to the
+ * same function `--help --json` prints, so the assertion is about the shape
+ * and not about this repository's values.
+ */
+const MAPPING_FIXTURE = {
+  statuses: ["icebox", "surveying", "charted"],
+  priorities: ["urgent", "someday"],
+  labels: ["coast", "inland"],
+  labelsClosed: true,
+};
+
+test("import --help --json describes each mapping flag as a pair whose vocabulary is the target's", () => {
+  const flags = commandHelpJson("import", COMMANDS.import, MAPPING_FIXTURE).flags;
+  const expected = {
+    "--status": ["statuses", MAPPING_FIXTURE.statuses],
+    "--priority": ["priorities", MAPPING_FIXTURE.priorities],
+    "--label": ["labels", MAPPING_FIXTURE.labels],
+  };
+  for (const [flag, [dictionary, values]] of Object.entries(expected)) {
+    const entry = flags.find((f) => f.flag === flag);
+    assert.ok(entry, flag + " is not in import --help --json");
+    assert.equal(entry.arg, "<from>=<to>", flag + " is not described as a pair");
+    assert.equal(entry.dictionary, null, flag + ": the whole value was given a vocabulary");
+    assert.equal(entry.values, null, flag + ": the whole value was given values");
+    assert.equal(entry.closed, null, flag + ": the whole value was declared closed");
+    assert.deepEqual(entry.target, { arg: "<to>", dictionary, values, closed: true },
+      flag + ": the target side does not carry the vocabulary");
+  }
+});
+
+test("positive control: new --priority still reports the closed priorities vocabulary", () => {
+  // Without this the test above would pass if vocabularies were dropped from
+  // every flag — the pair would be "free text" because nothing has a dictionary.
+  const entry = commandHelpJson("new", COMMANDS.new, MAPPING_FIXTURE).flags.find((f) => f.flag === "--priority");
+  assert.ok(entry, "--priority is not in new --help --json");
+  assert.notEqual(entry.arg, null);
+  assert.ok(!entry.arg.includes("="), "new --priority was read as a pair: " + entry.arg);
+  assert.equal(entry.dictionary, "priorities");
+  assert.deepEqual(entry.values, MAPPING_FIXTURE.priorities);
+  assert.equal(entry.closed, true);
+  assert.equal(entry.target, null);
+});
+
+test("describeFlags reads a <from>=<to> argument whole, in the synopsis and on a flag line", () => {
+  const flags = describeFlags("x go [--status <from>=<to>] [--to <r>]\n\n  --label <a>=<b>  one pair");
+  assert.equal(flags.find((f) => f.flag === "--status").arg, "<from>=<to>");
+  assert.equal(flags.find((f) => f.flag === "--label").arg, "<a>=<b>");
+  assert.equal(flags.find((f) => f.flag === "--to").arg, "<r>");
+});
+
+test("mappingArg recognises a WHOLE <left>=<right> argument and nothing around it", () => {
+  assert.deepEqual(mappingArg("<from>=<to>"), { from: "<from>", to: "<to>" });
+  // Anchored at both ends: text before or after the pair makes it something
+  // else, and reading it as a pair would describe a vocabulary it does not take.
+  assert.equal(mappingArg("x<from>=<to>"), null);
+  assert.equal(mappingArg("<from>=<to>y"), null);
+  assert.equal(mappingArg("<from>"), null);
+  assert.equal(mappingArg(null), null);
 });

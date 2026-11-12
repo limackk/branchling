@@ -2152,6 +2152,23 @@ export function commandHelpText(name, spec) {
  *
  * @returns {Array<{flag: string, arg: string|null, required: boolean}>}
  */
+const FLAG_ARG = '(?:[ =]"?(<[^>]+>(?:=<[^>]+>)?)"?)?';
+
+/**
+ * The two placeholders of a `<from>=<to>` argument, or null for any other one.
+ *
+ * Such a flag takes a PAIR: `<from>` is a name in the system being imported
+ * from, which is by definition not in this project's vocabulary, and only
+ * `<to>` is (TL-693). Reading the argument as `<from>` alone, as the
+ * derivation did, attached the target's closed vocabulary to the whole value,
+ * and every value an interface built from it would offer is one the command
+ * refuses as "not a mapping".
+ */
+export function mappingArg(arg) {
+  const m = /^(<[^>]+>)=(<[^>]+>)$/.exec(arg || "");
+  return m ? { from: m[1], to: m[2] } : null;
+}
+
 export function describeFlags(usage) {
   const found = new Map();
   const add = (flag, arg, required) => {
@@ -2178,7 +2195,7 @@ export function describeFlags(usage) {
       // flags it does not want. The optional quotes catch `--title "<text>"`,
       // quoted in the synopsis because a caller has to quote it too.
       let depth = 0;
-      const re = /\[|\]|(--[a-z][a-z0-9-]*)(?:[ =]"?(<[^>]+>)"?)?/g;
+      const re = new RegExp("\\[|\\]|(--[a-z][a-z0-9-]*)" + FLAG_ARG, "g");
       for (const m of line.matchAll(re)) {
         if (m[0] === "[") { depth++; continue; }
         if (m[0] === "]") { depth = Math.max(0, depth - 1); continue; }
@@ -2187,7 +2204,7 @@ export function describeFlags(usage) {
       continue;
     }
 
-    const m = line.match(/^(--[a-z][a-z0-9-]*)(?:[ =]"?(<[^>]+>)"?)?/);
+    const m = line.match(new RegExp("^(--[a-z][a-z0-9-]*)" + FLAG_ARG));
     if (m) add(m[1], m[2], false);
   }
   return [...found.values()].sort((a, b) => a.flag.localeCompare(b.flag));
@@ -2264,7 +2281,17 @@ export function commandHelpJson(name, spec, config) {
   const flags = describeFlags(spec.usage).map((f) => {
     const dictionary = FLAG_DICTIONARY[f.flag] || null;
     const { values, closed } = dictionary ? vocabulary(dictionary, config, name) : { values: null, closed: null };
-    return { ...f, dictionary, values, closed };
+    // A `<from>=<to>` pair draws on no vocabulary as a whole; the field's
+    // vocabulary applies to `<to>` alone, so it moves under `target` and the
+    // flag's own `dictionary`, `values` and `closed` say "free text" (TL-693).
+    const pair = mappingArg(f.arg);
+    if (pair) {
+      return {
+        ...f, dictionary: null, values: null, closed: null,
+        target: { arg: pair.to, dictionary, values, closed },
+      };
+    }
+    return { ...f, dictionary, values, closed, target: null };
   });
   return {
     command: name,

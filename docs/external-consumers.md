@@ -435,6 +435,21 @@ Common to all of them:
 and which draw on a vocabulary — with that project's values — so an interface
 builds its forms from the answer rather than from this table.
 
+Each flag entry is `{ flag, arg, required, dictionary, values, closed, target }`.
+A flag whose argument is a pair written `<left>=<right>` carries that whole
+argument in `arg`, `null` in `dictionary`, `values` and `closed`, and its
+right-hand side under `target`, as `{ arg, dictionary, values, closed }`; a
+flag with any other argument carries `target: null`. For `import --status`,
+`--priority` and `--label` (`<from>=<to>`) the value as a whole is free text —
+`<from>` is a name in the system being imported from, never in this project's
+vocabulary — and `target` carries the vocabulary `<to>` must belong to. A pair
+whose right-hand side draws on no vocabulary (`declare --stage
+<name>=<ref>`) has `target.dictionary: null`. Until TL-693 such a flag was reported as
+`arg: "<from>"` with the target's closed vocabulary on the whole value — a form
+built from it offered only values that `import` refuses as not a mapping. The
+change corrects those three entries and adds a key, so `schemaVersion` did not
+move.
+
 ## Pinning a version
 
 Two numbers, for two different promises:
