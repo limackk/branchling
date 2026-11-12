@@ -270,6 +270,40 @@ export function promotionGate(config) {
 }
 
 /**
+ * How a follow-up names its wave (TL-689) — the ONE source of that advice;
+ * `followUpWave` indents it into the `task-execution` column.
+ *
+ * WHY NOT `new --wave`. It edits the wave's one-line `tasks:` list in
+ * plan.yaml in the tree it runs in, so parallel worktrees filing follow-ups
+ * into one wave edited the same line, and their merges conflicted (measured on
+ * 2026-11-10). The hint is written into the new task's own file, which no
+ * other branch touches, and `plan place` folds it in where the plan has one
+ * writer.
+ */
+export const FOLLOW_UP_WAVE = [
+  "This backlog has a plan: name the wave a follow-up",
+  "belongs to in the task's OWN file, not in plan.yaml:",
+  "",
+  "  " + N + " new --title \"…\" --wave-hint \"<wave>\"",
+  "",
+  "`--wave` edits the wave's line in plan.yaml, so two",
+  "branches filing into one wave conflict when they merge.",
+  "The hint travels with the task; `" + N + " plan place`",
+  "folds it into the plan where plan.yaml is edited.",
+];
+
+/**
+ * The `task-execution` paragraph about filing a follow-up into a wave, or ""
+ * for a backlog with no plan.yaml — there `--wave-hint` is refused, so it is
+ * not advice to give.
+ */
+export function followUpWave(config) {
+  const planPath = config.paths && config.paths.planPath;
+  if (!planPath || !existsSync(planPath)) return "";
+  return [""].concat(FOLLOW_UP_WAVE).map((line) => (line ? " ".repeat(23) + line : "")).join("\n") + "\n";
+}
+
+/**
  * The paragraph `task-creation` prints about planning a task for a release
  * (TL-584), or "" for a backlog that declares no `releases:` — there a task
  * naming one FAILS, so the field is not something to offer.
@@ -396,6 +430,7 @@ export function vocabulary(config) {
     promotion_gate: promotionGate(config),
     release_planning: releasePlanning(config),
     target_planning: targetPlanning(config),
+    follow_up_wave: followUpWave(config),
   };
 }
 
@@ -623,7 +658,7 @@ WHILE YOU WORK.
                        do not ask first — see the criterion in \`{{tool}}
                        instructions overview\`. Adding it to the task in flight
                        blurs both, and a blurred task has no verification.
-  You hit a blocker    Move the task to the status this backlog uses for that and
+{{follow_up_wave}}  You hit a blocker    Move the task to the status this backlog uses for that and
                        name the blocking id in \`blocked_by:\`. That status with an
                        empty \`blocked_by\` tells the next reader nothing. The
                        writing commands REFUSE rather than ask when a status

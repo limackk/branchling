@@ -276,7 +276,7 @@ export const KINDS = {
   // `next` and `handoff` refuse with, and exit 1 as theirs. A target of THIS
   // repository stays `usage`: its name is declared, so nothing is unknown.
   "task-new": {
-    ok: null, id: null, file: null, board: null, wave: null, idSource: null, actorSource: null,
+    ok: null, id: null, file: null, board: null, wave: null, waveHint: null, idSource: null, actorSource: null,
     nearDuplicates: [],
     refusalKind: null, refusal: null, details: [], rejected: null, declared: [],
   },
@@ -285,6 +285,9 @@ export const KINDS = {
   // so its absence is an answer and not an error to be told apart from one.
   // `unplanned` and `stale` are lists rather than counts on purpose: a plan rots
   // by accumulating work nobody scheduled, and a number cannot be acted on.
+  // `waiting` is `{ id, status, wave }` for each open task the plan does not
+  // schedule yet whose file names its wave in `wave_hint:` (TL-689) — placed on
+  // a branch, folded into the plan by `plan place`.
   // A plan that cannot be read or executed is `ok: false` (TL-534) with
   // `refusalKind` `plan-unparsable` or `plan-contradicts-blocked-by` (or
   // `plan-contradicts-tree` for an unknown, duplicated or misgrouped id) and
@@ -292,7 +295,7 @@ export const KINDS = {
   // blocked_by, known, open, executor }`, closed tasks included.
   plan: {
     ok: null, root: null, exists: null, updated: null, rationale: null, waves: [],
-    activeWave: null, nextUp: [], inProgress: [], unplanned: [], coverage: null, stale: [],
+    activeWave: null, nextUp: [], inProgress: [], unplanned: [], waiting: [], coverage: null, stale: [],
     inProgressStatus: null,
     refusalKind: null, refusal: null, problems: [],
   },

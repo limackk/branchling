@@ -41,7 +41,7 @@ import { backlogPaths, resolveBacklogDir, resolveBacklogDirOrExit, takeDirFlag }
 import { describeHold, loadPlan, planState, validatePlan } from "./plan.mjs";
 import { readHistory } from "./history.mjs";
 import { crossBranchState, divergences } from "./branch-scan.mjs";
-import { EDIT_SUBCOMMANDS, runPlanEdit, runPlanInit } from "./plan-write.mjs";
+import { EDIT_SUBCOMMANDS, runPlanEdit, runPlanInit, runPlanPlace } from "./plan-write.mjs";
 import { reportPlanErrors } from "./check-backlog-plan.mjs";
 import { readTaskMetas } from "./task-io.mjs";
 import { MARK, color, failure, heading, refusal, statusPaint, table, width } from "./ui.mjs";
@@ -192,6 +192,16 @@ export function renderPlan(state, config, opts = {}) {
   }
   out.push("");
 
+  // Placed on a branch, in the task's own file (TL-689), and not yet in the
+  // plan: neither unplanned nor scheduled, so a section of its own. Printed
+  // even when empty, like every other section.
+  const waiting = state.waiting || [];
+  out.push("waiting to be placed — a wave named in the task's own file: " + (waiting.length
+    ? waiting.length + " (`" + N + " plan place` puts each in its wave)"
+    : paint.dim("none")));
+  for (const t of waiting) out.push("  " + paint.id(t.id) + "  " + t.wave);
+  out.push("");
+
   out.push("stale — closed in a wave after the active one: " + (state.stale.length || paint.dim("none")));
   if (state.stale.length) {
     out.push(...wrapIds(state.stale.map((t) => t.id + " (wave " + (t.wave + 1) + ")"), "  ", columns));
@@ -209,9 +219,10 @@ function main(argv) {
   const first = argv[0];
   if (first !== undefined && !first.startsWith("-")) {
     if (first === "init") return runPlanInit(argv.slice(1));
+    if (first === "place") return runPlanPlace(argv.slice(1));
     if (EDIT_SUBCOMMANDS.indexOf(first) < 0) {
       console.error(failure(N + " plan", "unknown subcommand: " + first,
-        ["available: init, " + EDIT_SUBCOMMANDS.join(", ") + ", or no subcommand at all to READ the plan"],
+        ["available: init, place, " + EDIT_SUBCOMMANDS.join(", ") + ", or no subcommand at all to READ the plan"],
         [N + " plan --help"]));
       return 2;
     }

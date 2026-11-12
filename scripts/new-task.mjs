@@ -37,7 +37,9 @@ import { withBacklogMutex } from "./lock.mjs";
 import { editPlanText, newPlanErrors, waveTargetProblem } from "./plan-write.mjs";
 import { detectPrefixMismatch, prefixMismatchMessage, taskIdPatterns } from "./task-id.mjs";
 import { answerBacklogDirRefusal, backlogPaths, isBacklogDirRefusal, resolveBacklogDir, takeDirFlag } from "./paths.mjs";
-import { auditVocabulary, extractMeta, lineEnding, splitFrontmatter, withLineEnding } from "./task-fields.mjs";
+import {
+  WAVE_HINT_FIELD, auditVocabulary, extractMeta, lineEnding, setFrontmatterField, splitFrontmatter, withLineEnding,
+} from "./task-fields.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { readStdinText } from "./stdin.mjs";
 import { parseTaskDocument, taskContent } from "./task-input.mjs";
@@ -229,6 +231,10 @@ const FLAGS = {
   // NOT a frontmatter field: it schedules the task in `plan.yaml` (TL-213). The
   // value is checked against the waves that exist BEFORE anything is written.
   "--wave": "wave",
+  // The wave written into the task's OWN file as `wave_hint:` instead of into
+  // plan.yaml (TL-689), for a branch that must not edit the plan's shared
+  // lines. `plan place` folds it in where the plan has one writer.
+  "--wave-hint": "waveHint",
   // NOT a frontmatter field either: it names the file the task DOCUMENT is read
   // from, in place of stdin (TL-237).
   "--body-file": "bodyFile",
@@ -881,6 +887,18 @@ export async function main(argv) {
     if (target.problem) return refuse(said(target.problem, target.hint, "plan-refused"));
     scheduling = { text: target.text };
   }
+  // The hint is checked against the same plan, in this tree, for the same
+  // reason: a wave named by a typo is refused before a number is reserved,
+  // not discovered by `plan place` after the branch has merged.
+  if (opts.wave && opts.waveHint) {
+    return refuse(said("`--wave` and `--wave-hint` both name a wave",
+      "`--wave` schedules the task in plan.yaml now; `--wave-hint` writes the wave into the task's own file for `" +
+        N + " plan place` to fold in later — use one"));
+  }
+  if (opts.waveHint) {
+    const target = waveTargetProblem(paths.planPath, [opts.waveHint], "--wave-hint");
+    if (target.problem) return refuse(said(target.problem, target.hint, "plan-refused"));
+  }
 
   const pat = taskIdPatterns(config.taskIdPrefix);
 
@@ -954,6 +972,9 @@ export async function main(argv) {
     throw e;
   }
   const { path: full, taskId, source } = created;
+  if (opts.waveHint) {
+    writeFileSync(full, setFrontmatterField(readFileSync(full, "utf8"), WAVE_HINT_FIELD, opts.waveHint), "utf8");
+  }
 
   // THE BIRTH IS RECORDED BY WHOEVER CAUSED IT (TL-187). Left to reconciliation,
   // the `__created__` entry is written by whichever tree diffs the tasks
@@ -999,7 +1020,7 @@ export async function main(argv) {
 
   if (opts.json) {
     printJson("task-new", {
-      ok: true, id: taskId, file: full, board, wave: scheduling ? opts.wave : null, idSource: source, actorSource,
+      ok: true, id: taskId, file: full, board, wave: scheduling ? opts.wave : null, waveHint: opts.waveHint || null, idSource: source, actorSource,
       nearDuplicates,
     });
     return 0;
@@ -1013,6 +1034,10 @@ export async function main(argv) {
   }
   console.log("  board: " + board + (opts.board ? "" : " (the registry default)"));
   if (scheduling) console.log("  wave: " + opts.wave + " — scheduled in " + paths.planPath);
+  if (opts.waveHint) {
+    console.log("  wave hint: " + opts.waveHint + " — written into the task's file; `" + N +
+      " plan place` schedules it where plan.yaml is edited");
+  }
   // On stderr: the task WAS created, and this is something to know about it.
   for (const line of nearDuplicateNote(nearDuplicates)) console.error(line);
   // The one moment an estimate can still change a decision is while it is being

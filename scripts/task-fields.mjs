@@ -742,6 +742,22 @@ export const FIELD_SHAPES = [
 export const CONFLICT_GROUP_SOURCES = Object.freeze(["epic", "board", "labels", "type", "role"]);
 
 /**
+ * THE WAVE A TASK ASKS TO BE PLACED IN, carried by the task's own file (TL-689).
+ *
+ * `new --wave` edits the one-line `tasks:` list of a wave in plan.yaml, so two
+ * worktrees filing follow-ups into the same wave edit the same line and their
+ * merges conflict. The intended wave therefore travels in the NEW file, which no
+ * other branch touches, and `plan place` folds it into plan.yaml where the plan
+ * has one writer — then removes the line, because the plan is the only record
+ * of membership and a hint left behind would be a second one.
+ *
+ * Not in `FIELD_SHAPES` on purpose: it is not a property of the work that
+ * `set` edits or the viewer draws, it is a pending scheduling act, written by
+ * `new --wave-hint` and consumed by `plan place`.
+ */
+export const WAVE_HINT_FIELD = "wave_hint";
+
+/**
  * The canonical key order, used ONLY when a key is missing and has to be
  * inserted. Existing keys are never reordered — task files in the wild differ in
  * their order (some have `epic` before `board`), and rewriting it would turn
@@ -750,7 +766,7 @@ export const CONFLICT_GROUP_SOURCES = Object.freeze(["epic", "board", "labels", 
 export const FRONTMATTER_ORDER = [
   "id", "title", "type", "labels", "board", "epic", "release", "target", "priority", "status",
   "owner", "role", "conflict_group", "estimate", "confidence", "created", "updated",
-  "blocked_by", "blocks", "related_docs", "verification",
+  "blocked_by", "blocks", "related_docs", WAVE_HINT_FIELD, "verification",
 ];
 
 /** The fields a parsed task carries and the history compares. */
@@ -1016,6 +1032,7 @@ export function extractMeta(frontmatter) {
     blocks: getInlineList("blocks"),
     related_docs: getBlockList("related_docs"),
     conflict_group: getInlineList("conflict_group"),
+    wave_hint: get(WAVE_HINT_FIELD) || "",
   };
 }
 
@@ -1246,6 +1263,25 @@ export function setFrontmatterField(text, key, value, spec) {
   }
 
   return open + lines.join(eol) + close + body;
+}
+
+/**
+ * Remove one top-level key, with its indented continuation lines, from the
+ * frontmatter, leaving every other byte as it was. A key that is not there
+ * returns the text unchanged. Throws, like `setFrontmatterField`, on a file
+ * with no frontmatter.
+ */
+export function removeFrontmatterField(text, key) {
+  const match = text.match(/^(---\r?\n)([\s\S]*?)(\r?\n---\r?\n)([\s\S]*)$/);
+  if (!match) throw new Error("The file has no YAML frontmatter");
+  const [, open, fm, close, body] = match;
+  const lines = fm.split(/\r?\n/);
+  const start = lines.findIndex((line) => line.startsWith(key + ":"));
+  if (start < 0) return text;
+  let end = start + 1;
+  while (end < lines.length && /^\s+\S/.test(lines[end])) end++;
+  lines.splice(start, end - start);
+  return open + lines.join(lineEnding(open)) + close + body;
 }
 
 /**
