@@ -23,6 +23,7 @@
  *   query --text sync --limit 10
  *   query --blocked-by TASK-003 --files | xargs code
  *   query --ids TASK-003,TASK-007 --json   (several known tasks, by exact id)
+ *   query --conflict-group mutation        (the area the dispatcher holds apart)
  *   query --modified-file scripts/cli.mjs        (as part of what was it touched)
  *   query --modified-file scripts/               (the whole directory)
  *   query --status done --text audit --count
@@ -34,6 +35,9 @@
  *   --blocked-by
  *   --ids            exact task ids (TL-680). An id outside the configured prefix
  *                    is refused; one that matches no task is named on stderr
+ *   --conflict-group the group `next` and `run` schedule by (TL-687): the
+ *                    task's own `conflict_group:`, else the field
+ *                    `conflict_group_from` names. `""` = the tasks in none
  *   --modified-file  which task touched this file — COMPUTED from commit
  *                    messages naming the task id, so there is nothing to keep
  *                    up to date. Paths are relative to the REPOSITORY root; a
@@ -76,6 +80,7 @@ import { BACKLOG_DIR_REFUSAL_EXIT, BACKLOG_DIR_REFUSAL_PHRASE, backlogPaths, res
 import { PRODUCT_NAME as N } from "./product.mjs";
 import { SORT_KEYS, filterTasks, readTaskRecords, sortTasks, splitList, unknownFilterValues } from "./task-select.mjs";
 import { ANY_TASK_ID } from "./task-id.mjs";
+import { conflictGroups } from "./next-task.mjs";
 import { refusal } from "./ui.mjs";
 import { agentEstimate } from "./agent-time.mjs";
 import { readAgentTime } from "./agent-time-read.mjs";
@@ -97,7 +102,7 @@ function collectBacklog(root, opts = {}) {
 const VALUE_FLAGS = new Set([
   "--status", "--priority", "--board", "--label", "--epic", "--owner", "--type",
   "--role", "--executor", "--release", "--blocked-by", "--ids", "--text", "--limit", "--sort", "--tasks", "--dir",
-  "--modified-file", "--env", "--not-env", "--scope",
+  "--modified-file", "--env", "--not-env", "--scope", "--conflict-group",
 ]);
 const BOOL_FLAGS = new Set(["--json", "--files", "--count", "--help", "-h"]);
 
@@ -239,6 +244,10 @@ const f = {
   executor: opts.executor === undefined ? null : (splitList(opts.executor) || [""]),
   release: opts.release === undefined ? null : (splitList(opts.release) || [""]),
   blockedBy: splitList(opts["blocked-by"]),
+  // `--conflict-group ""` asks for the tasks in no group, the same reading as
+  // `--role ""`. NOT checked against a vocabulary: the values are free text the
+  // project writes on its tasks, and config.yaml declares no list of them.
+  conflictGroup: opts["conflict-group"] === undefined ? null : (splitList(opts["conflict-group"]) || [""]),
   ids: splitList(opts.ids),
   text: opts.text,
 };
@@ -361,6 +370,17 @@ for (const one of COLLECTED) {
   // APPLIED AFTER the shared filters, and deliberately not inside `filterTasks`:
   // that module is the one `next` also uses to choose work, and a criterion that
   // needs a git process has no business in the dispatcher's hot path.
+  // THE DISPATCHER'S GROUP, not the raw field (TL-687): `next` and `run` hold a
+  // task back by `conflictGroups()`, which falls back to `conflict_group_from`,
+  // so a query answering from `conflict_group:` alone would disagree with the
+  // scheduler it is asked about in every project that relies on the fallback.
+  // Applied here rather than in `filterTasks`, which takes no configuration.
+  if (f.conflictGroup) {
+    some = some.filter((t) => {
+      const groups = conflictGroups(t, one.config);
+      return f.conflictGroup.some((g) => (g === "" ? groups.length === 0 : groups.includes(g)));
+    });
+  }
   if (one.index) some = some.filter((t) => touches(one.index.byTask.get(t.id) || new Set(), FILE_QUERY));
   // A task that touched no target declaring the stage, or whose answer hangs
   // on a ref that did not resolve, matches NEITHER filter: it is not "in
