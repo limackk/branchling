@@ -222,6 +222,24 @@ export function splitList(value) {
 const anyOf = (values, actual) =>
   values.some((v) => v.toLowerCase() === String(actual || "").toLowerCase());
 
+/**
+ * The owner axis, where a value ending in `*` is a PREFIX (TL-700).
+ *
+ * Owners are namespaced actors (`agent:loop-1`, `user:jane`), and the
+ * question a coordinator asks is about a family of them — "every loop" — not
+ * one name. An exact-only match answered `--owner 'agent:loop-*'` with zero
+ * rows, which reads like "nobody holds anything". Only a TRAILING `*` is a
+ * wildcard: a pattern language would be a second vocabulary to learn, and a
+ * `*` anywhere else is matched literally, as it was before.
+ */
+export function ownerMatches(values, actual) {
+  const have = String(actual || "").toLowerCase();
+  return values.some((v) => {
+    const want = String(v).toLowerCase();
+    return want.endsWith("*") ? have.startsWith(want.slice(0, -1)) : want === have;
+  });
+}
+
 /** Every status this task is seen to have — the local one plus whatever the
  *  other branches say (TL-73). `--status in_progress` asked from `main` has to
  *  find a task another branch has already started; matching the local value
@@ -247,7 +265,7 @@ export function filterTasks(tasks, f, archived) {
     if (f.status && !allStatuses(t).some((s) => anyOf(f.status, s))) return false;
     if (f.priority && !anyOf(f.priority, t.priority)) return false;
     if (f.board && !anyOf(f.board, t.board)) return false;
-    if (f.owner && !anyOf(f.owner, t.owner)) return false;
+    if (f.owner && !ownerMatches(f.owner, t.owner)) return false;
     if (f.type && !anyOf(f.type, t.type)) return false;
     // `role` is the ONE axis where the empty value is a question somebody asks:
     // "what is open to anybody". `[""]` is therefore a filter, not an absent one

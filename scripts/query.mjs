@@ -28,6 +28,7 @@
  *   query --modified-file scripts/               (the whole directory)
  *   query --status done --text audit --count
  *   query --status done --not-env production   (finished, not yet in production)
+ *   query --owner 'agent:loop-*' --worktrees   (every loop's claim, committed or not)
  *
  * Filters (AND between axes, OR inside an axis — comma-separated values):
  *   --status --priority --board --label --epic --owner --type --role --executor
@@ -43,6 +44,10 @@
  *                    up to date. Paths are relative to the REPOSITORY root; a
  *                    trailing `/` matches a whole directory
  *   --text
+ *   --owner          a value ending in `*` matches as a prefix (TL-700)
+ *   --worktrees      also read the task files of every other working tree of
+ *                    this repository; a copy that differs from this tree's,
+ *                    or that this tree lacks, is a row naming its worktree
  *   --env / --not-env  a deployment stage (`stage` or `target/stage`) the task
  *                    has reached in full, or has not — COMPUTED from git refs
  *                    declared in `deploy_targets:` (TL-501). A task of a
@@ -66,7 +71,7 @@
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { absentHere, crossBranchState, describeDivergence, divergences, scanNote } from "./branch-scan.mjs";
+import { absentHere, crossBranchState, describeDivergence, divergences, scanNote, siblingTreeTasks } from "./branch-scan.mjs";
 import { DEFAULTS, loadConfigOrExit } from "./config.mjs";
 import { externalTargetsOf } from "./deploy-targets.mjs";
 import { printJson } from "./json-envelope.mjs";
@@ -104,7 +109,7 @@ const VALUE_FLAGS = new Set([
   "--role", "--executor", "--release", "--blocked-by", "--ids", "--text", "--limit", "--sort", "--tasks", "--dir",
   "--modified-file", "--env", "--not-env", "--scope", "--conflict-group",
 ]);
-const BOOL_FLAGS = new Set(["--json", "--files", "--count", "--help", "-h"]);
+const BOOL_FLAGS = new Set(["--json", "--files", "--count", "--worktrees", "--help", "-h"]);
 
 // An unknown flag MUST fail. Zero results caused by a typo are indistinguishable
 // from "there is no such thing" — and they read like an answer.
@@ -195,6 +200,11 @@ if (opts.tasks) {
     console.error("  the stages are declared in `deploy_targets:` in config.yaml");
     process.exit(2);
   }
+  if (opts.worktrees) {
+    console.error("✗ --worktrees needs the repository, which `--tasks <dir>` bypasses");
+    console.error("  the sibling working trees are the ones `git worktree list` names");
+    process.exit(2);
+  }
   if (FILE_QUERY !== undefined) {
     console.error("✗ --modified-file needs the configuration, which `--tasks <dir>` bypasses");
     console.error("  the task id prefix is what links a commit message to a task");
@@ -222,6 +232,22 @@ if (opts.tasks) {
   // through quietly would change the ANSWER, not the appearance.
   const one = collectBacklog(ROOT, { modifiedFile: FILE_QUERY, config: loadConfigOrExit(ROOT) });
   COLLECTED = [one];
+}
+
+// THE OTHER WORKING TREES, opt-in (TL-700). Appended to this tree's records
+// BEFORE any criterion runs, so every axis, the scope, `--limit` and the sort
+// treat them as rows like any other; each names the tree it was read in. A
+// local row names this tree under the flag, so the column is never ambiguous.
+let WORKTREES = null;
+if (opts.worktrees) {
+  const one = COLLECTED[0];
+  WORKTREES = siblingTreeTasks(one.root, one.config, one.tasks);
+  for (const t of one.tasks) t.worktree = WORKTREES.self;
+  one.tasks = one.tasks.concat(WORKTREES.tasks);
+  // A task only a sibling tree has is now a row; naming it again as "not in
+  // this tree" would count it twice.
+  const asRows = new Set(WORKTREES.tasks.map((t) => t.id));
+  one.elsewhereOnly = one.elsewhereOnly.filter((t) => !asRows.has(t.id));
 }
 
 // A FILTER VALUE OUTSIDE THE VOCABULARY FAILS, as an unknown flag does
@@ -338,7 +364,12 @@ let TRUNK = null;
   }
 }
 if (opts.json) {
-  for (const one of COLLECTED) for (const t of one.tasks) if (t.deploy === undefined) t.deploy = null;
+  for (const one of COLLECTED) {
+    for (const t of one.tasks) {
+      if (t.deploy === undefined) t.deploy = null;
+      if (t.worktree === undefined) t.worktree = null;
+    }
+  }
 }
 
 // FILTERED PER PROJECT, THEN CONCATENATED. Which status counts as closed is a
@@ -486,6 +517,7 @@ if (opts.count) {
   // backlog with work on an unmerged branch indistinguishable from one without.
   for (const line of elsewhereOnlyLines) console.error("# " + line);
   for (const line of deployNotes()) console.error("# " + line);
+  for (const line of worktreeNotes()) console.error("# " + line);
   process.exit(0);
 }
 if (opts.json) {
@@ -521,6 +553,10 @@ if (opts.json) {
     // `trunk.source` says whether it is the remote's default branch or the
     // `HEAD` fallback, as in `show --json` (TL-517).
     deploy: DEPLOY ? deployEnvelope() : null,
+    // `null` unless `--worktrees` asked (TL-700), and then which trees were
+    // read and, when none could be, why — an answer from this tree alone must
+    // not look like one in which no sibling holds anything.
+    worktrees: WORKTREES ? { reason: WORKTREES.reason, self: WORKTREES.self, trees: WORKTREES.trees } : null,
     // WHAT THE PASS COULD NOT REACH (TL-36). In the RESULT and not only on
     // stderr: a consumer reading this envelope would otherwise count an
     // incomplete set as complete, and "you moved the repository" would arrive
@@ -547,6 +583,7 @@ if (opts.files) {
     if (why) console.error("# " + why);
   }
   for (const line of deployNotes()) console.error("# " + line);
+  for (const line of worktreeNotes()) console.error("# " + line);
   process.exit(0);
 }
 
@@ -569,6 +606,7 @@ for (const t of shown) {
   if (t.elsewhere.length) {
     cells.push(`elsewhere: [${t.elsewhere.map(describeDivergence).join(", ")}]`);
   }
+  if (t.worktree) cells.push(`worktree: ${q(t.worktree)}`);
   cells.push(`title: ${q(t.title)}`);
   printLine(`- {${cells.join(", ")}}`);
 }
@@ -604,6 +642,17 @@ if (INDEX) {
 // The same rule for deployment state: an unresolved ref is unknown, and an
 // empty answer says which empty it is.
 for (const line of deployNotes()) printLine("# " + line);
+for (const line of worktreeNotes()) printLine("# " + line);
+
+// Said only when the sibling trees could NOT be read: otherwise `--worktrees`
+// answering from this tree alone would read as "no other tree holds a match".
+function worktreeNotes() {
+  if (!WORKTREES || !WORKTREES.reason) return [];
+  const where = WORKTREES.reason === "not-a-repository"
+    ? "the backlog is not in a git repository"
+    : "the backlog lies outside the repository";
+  return ["--worktrees read this tree only — " + where];
+}
 
 function deployEnvelope() {
   const scan = deploymentScanJson(DEPLOY);
