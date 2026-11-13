@@ -62,6 +62,22 @@ test("every source is named, not just the first", () => {
   assert.match(attrs.title, /b: done/);
 });
 
+test("the card title is worded exactly, with every source separated", () => {
+  // The assertions above match fragments; a separator or the hint emptied out
+  // would leave each fragment in place while the sentence stops reading as one.
+  assert.match(ELSEWHERE_HINT, /status differs/, "the hint no longer says what differs");
+  const attrs = elsewhereCardAttrs({
+    elsewhere: [{ source: "a", status: "doing" }, { source: "b", status: "done" }],
+  });
+  assert.equal(attrs.title, ELSEWHERE_HINT + " — a: doing, b: done");
+});
+
+test("an observation is rendered as source, colon, status, and a missing status as a dash", () => {
+  assert.equal(describeElsewhere({ source: "feature/x", status: "in_progress" }), "feature/x: in_progress");
+  assert.equal(describeElsewhere({ source: "feature/x", status: "" }), "feature/x: —");
+  assert.equal(describeElsewhere({ source: "feature/x" }), "feature/x: —");
+});
+
 // ── "Somebody is working on it, elsewhere" (TL-210) ───────────────────────
 //
 // A narrower question than the one above, asked by the Execution view: not
@@ -75,6 +91,10 @@ test("the in-progress status comes from the caller, never from a name in here", 
   // for every divergence and both halves would still look right.
   assert.equal(runningElsewhere(task, "in_progress"), null);
   assert.equal(runningElsewhere(task, ""), null, "a project with no in-progress status has no work in flight");
+  // An observation with no status at all must not match an absent in-progress
+  // status: both read as "", and without the early return they would be equal.
+  assert.equal(runningElsewhere({ elsewhere: [{ source: "/w/side" }] }, ""), null);
+  assert.equal(runningElsewhere({ elsewhere: [{ source: "/w/side", status: "" }] }, ""), null);
 });
 
 test("a divergence that is not work in flight is not reported as one", () => {
@@ -91,6 +111,10 @@ test("a worktree is named by its directory, a branch by the whole of its name", 
   // one word.
   assert.equal(elsewhereSourceLabel({ source: "/home/a/worktrees/tl-210-side", kind: "worktree" }), "tl-210-side");
   assert.equal(elsewhereSourceLabel({ source: "/home/a/worktrees/tl-210-side/", kind: "worktree" }), "tl-210-side");
+  // More than one trailing separator is still a trailing separator, not an
+  // empty directory name that would fall back to the whole path.
+  assert.equal(elsewhereSourceLabel({ source: "/home/a/worktrees/tl-210-side//", kind: "worktree" }), "tl-210-side");
+  assert.equal(elsewhereSourceLabel({ source: "C:\\w\\tl-210-side\\\\", kind: "worktree" }), "tl-210-side");
   assert.equal(elsewhereSourceLabel({ source: "feature/x", kind: "branch" }), "feature/x");
   assert.equal(elsewhereSourceLabel(null), "");
 });

@@ -15,6 +15,7 @@ import {
   TASKS_HASH_ROUTE,
   SORT_DEFAULT,
   encodeTasksHash,
+  isTasksHash,
   parseTasksHash,
 } from "../viewer-url.mjs";
 
@@ -108,6 +109,49 @@ test("an empty search and empty filters do not clutter the link", () => {
   assert.doesNotMatch(hash, /(^|[?&])sort=/);
   assert.doesNotMatch(hash, /(^|[?&])id=/);
   assert.doesNotMatch(hash, /(^|[?&])status=/);
+});
+
+test("every ordering the sort bar offers comes back from the link as itself", () => {
+  // Only `id_desc` travels in the round trip above. An ordering missing from the
+  // accepted list would be read back as the default: the recipient sees the list
+  // in a different order than the sender, with no sign that anything was lost.
+  for (const sort of ["id_asc", "id_desc"]) {
+    const hash = encodeTasksHash(view({ sortBy: sort }));
+    assert.equal(parseTasksHash(query(hash), PARAMS).sortBy, sort);
+  }
+});
+
+test("an empty sort= falls back to the default rather than to an empty ordering", () => {
+  // `sort=` is present but empty: an empty string must not count as a known
+  // ordering, or the list would be sorted by a key no button names.
+  assert.equal(parseTasksHash("sort=", PARAMS).sortBy, SORT_DEFAULT);
+});
+
+test("a view with no board still writes board= with an empty value", () => {
+  // The board travels ALWAYS (rule 2 of the contract); with no scope at all it
+  // travels empty, never as some placeholder a recipient would read as a board.
+  assert.match(encodeTasksHash(view({ board: "" })), /(^|[?&])board=($|&)/);
+  assert.match(encodeTasksHash(view({ board: undefined })), /(^|[?&])board=($|&)/);
+});
+
+test("a filter that arrives with no values list adds nothing to the link", () => {
+  const hash = encodeTasksHash(view({ filters: [{ param: "status" }] }));
+  assert.equal(hash, TASKS_HASH_ROUTE + "?board=__all__");
+});
+
+test("without filter names the parsed state has no filter keys at all", () => {
+  // The caller resets every filter from this map; a key it never asked for
+  // would name a filter the page does not have.
+  assert.deepEqual(parseTasksHash("status=done").filters, {});
+  assert.deepEqual(parseTasksHash("status=done", []).filters, {});
+});
+
+test("only the tasks route is recognised as the tasks view", () => {
+  assert.equal(isTasksHash(TASKS_HASH_ROUTE), true);
+  assert.equal(isTasksHash("tasks"), true);
+  assert.equal(isTasksHash("execution"), false);
+  assert.equal(isTasksHash("BL-1390"), false);
+  assert.equal(isTasksHash(""), false);
 });
 
 // ─── The link between the module and the page ─────────────────────────────
