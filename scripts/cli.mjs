@@ -2471,18 +2471,44 @@ export function foldAppendFlags(argv, accepts = () => true) {
  * `paths.mjs` (TL-247): a global flag past the separator is a VALUE, and the
  * dispatcher may not read the line by a grammar the command below does not
  * share. `--no-color -- --color` stays on `--no-color`; the second word is text.
+ *
+ * `literalValueFlags` are the command's flags whose next token is a value
+ * whatever it spells (TL-718), the list `wantsHelp()` honours since TL-691:
+ * `query --text --color` searches for "--color". Without the skip the value
+ * was removed here and `--text` took the next flag as its value, so the
+ * command failed on a token the user never meant as an argument.
  */
-export function takeColorFlags(argv) {
+export function takeColorFlags(argv, literalValueFlags = []) {
   const rest = [];
   let force = null;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--") { rest.push(...argv.slice(i)); break; }
+    if (literalValueFlags.includes(a)) {
+      rest.push(a);
+      if (i + 1 < argv.length) rest.push(argv[++i]);
+      continue;
+    }
     if (a === "--no-color") { force = false; continue; }
     if (a === "--color") { force = true; continue; }
     rest.push(a);
   }
   return { argv: rest, force };
+}
+
+/**
+ * The `literalValueFlags` of the command a raw line names, read BEFORE the
+ * colour flags are taken off it (TL-718). The command is the first token that
+ * is not a colour flag, which is where `resolveCommand()` finds it once they
+ * are gone; no subcommand means the server. An unknown command has no list —
+ * `resolveCommand()` refuses it a step later.
+ */
+export function literalValueFlagsFor(argv) {
+  const first = argv.find((a) => a !== "--color" && a !== "--no-color");
+  const spec = first === undefined || first.startsWith("-")
+    ? COMMANDS.serve
+    : Object.prototype.hasOwnProperty.call(COMMANDS, first) ? COMMANDS[first] : null;
+  return (spec && spec.literalValueFlags) || [];
 }
 
 function childEnv(force) {
@@ -2898,7 +2924,7 @@ export function main(argv) {
     return 0;
   }
 
-  const tinted = takeColorFlags(argv);
+  const tinted = takeColorFlags(argv, literalValueFlagsFor(argv));
   let resolved;
   try {
     resolved = resolveCommand(tinted.argv);
@@ -2922,7 +2948,8 @@ export function main(argv) {
         // the `--dir=` spelling would find it not at all — two answers to one
         // question, in the one place that describes the interface.
         config = loadConfig(resolveBacklogDir({
-          dir: takeDirFlag(resolved.args).dir || undefined, moduleDir: HERE,
+          dir: takeDirFlag(resolved.args, { literalValueFlags: resolved.spec.literalValueFlags }).dir || undefined,
+          moduleDir: HERE,
         }).root);
       } catch {
         // No backlog here, or one that will not load. Neither stops the answer.
