@@ -244,7 +244,7 @@ function closure(page, name, skip) {
 
 /** `task-fields.mjs` as the page inlines it. */
 function inlinedTaskFields() {
-  return readFileSync(join(SCRIPTS_DIR, "task-fields.mjs"), "utf8")
+  return readFileSync(join(SCRIPTS_DIR, "task-fields.mjs"), "utf8") // source-read: allow — executed, as the page inlines it
     .replace(/^import [^;]*;\n/gm, "")
     .replace(/^export /gm, "");
 }
