@@ -857,13 +857,13 @@ test("a position naming an unknown wave, two positions, or a wave that exists is
     assert.match(r.problems.join("\n"), message);
     assert.equal(r.text, PLAN, "a refusal returns the input byte for byte");
   }
-  const move = edit(PLAN, { op: "move", id: "TL-1", wave: "Writers", why: NEW_WHY, after: "Consumers" });
-  assert.equal(move.kind, "usage");
-  assert.match(move.problems.join("\n"), /^`--after` places a wave `add` creates, so it says nothing about a move$/);
-  assert.equal(move.text, PLAN);
-  const remove = edit(PLAN, { op: "remove", id: "TL-1", before: "Consumers" });
-  assert.equal(remove.kind, "usage");
-  assert.match(remove.problems.join("\n"), /^`--before` places a wave `add` creates, so it says nothing about a removal$/);
+  for (const place of [{ before: "Consumers" }, { after: "Consumers" }]) {
+    const remove = edit(PLAN, { op: "remove", id: "TL-1", ...place });
+    assert.equal(remove.kind, "usage");
+    assert.match(remove.problems.join("\n"),
+      new RegExp("^`--" + Object.keys(place)[0] + "` places a wave `add` or `move` creates, so it says nothing about a removal$"));
+    assert.equal(remove.text, PLAN);
+  }
 });
 
 test("a position given as null is no position at all", () => {
@@ -960,4 +960,133 @@ test("`plan --help` and the usage of a wrong call document --before and --after"
   const wrong = run(["plan", "add", "TL-5", "--beside", "A"]);
   assert.equal(wrong.code, 2);
   assert.match(wrong.err, /\[--before "<wave>" \| --after "<wave>"\]/);
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// `plan move` places the wave it creates (TL-712)
+// ──────────────────────────────────────────────────────────────────────────
+//
+// `move --why` creates its target wave exactly as `add --why` does, yet the
+// position flags were refused for it, so a wave a move created still landed
+// at the end of the order, behind the human publication gates.
+
+test("move --before places the wave it creates above a named wave and its paragraph", () => {
+  const r = edit(PLAN, { op: "move", id: "TL-2", wave: "Writers", why: NEW_WHY, before: "Foundation", today: "2026-09-04" });
+  assert.deepEqual(r.problems, []);
+  assert.equal(r.kind, null);
+  const plan = parsed(r.text);
+  assert.deepEqual(names(plan), ["Writers", "Foundation", "Consumers"]);
+  assert.deepEqual(ids(plan), [["TL-2"], ["TL-1"], ["TL-3", "TL-4"]]);
+  const lines = r.text.split("\n");
+  assert.equal(lines[lines.indexOf('  - name: "Foundation"') - 1], "  # Above a wave: why this one stands first.");
+  const all = comments(r.text);
+  assert.ok(all.indexOf("# " + NEW_WHY) < all.indexOf("# Above a wave: why this one stands first."));
+  assert.deepEqual(all.filter((c) => c !== "# " + NEW_WHY), comments(PLAN));
+  assert.match(r.text, /^updated: 2026-09-04$/m);
+});
+
+test("move --after places the wave it creates below a named wave, before the next one", () => {
+  // TL-1 carries a comment beside it, which stays behind in Foundation.
+  const r = edit(PLAN, { op: "move", id: "TL-1", wave: "Writers", why: NEW_WHY, after: "Foundation", today: "2026-09-04" });
+  assert.deepEqual(r.problems, []);
+  const plan = parsed(r.text);
+  assert.deepEqual(names(plan), ["Foundation", "Writers", "Consumers"]);
+  assert.deepEqual(ids(plan), [["TL-2"], ["TL-1"], ["TL-3", "TL-4"]]);
+  const all = comments(r.text);
+  assert.ok(all.indexOf("# a program could not have.") < all.indexOf("# " + NEW_WHY));
+  assert.deepEqual(all.filter((c) => c !== "# " + NEW_WHY), comments(PLAN));
+});
+
+test("move with no position, or --after the last wave, still creates its wave at the end", () => {
+  const plain = edit(PLAN, { op: "move", id: "TL-2", wave: "Writers", why: NEW_WHY, today: "2026-09-04" });
+  const last = edit(PLAN, { op: "move", id: "TL-2", wave: "Writers", why: NEW_WHY, after: "Consumers", today: "2026-09-04" });
+  assert.deepEqual(plain.problems, []);
+  assert.deepEqual(last.problems, []);
+  assert.deepEqual(names(parsed(plain.text)), ["Foundation", "Consumers", "Writers"], "the default is unchanged");
+  assert.deepEqual(ids(parsed(plain.text)), [["TL-1"], ["TL-3", "TL-4"], ["TL-2"]]);
+  assert.equal(last.text, plain.text);
+});
+
+test("move: the exact text of a created wave before a wave, after one, and at the end", () => {
+  const move = (place) => edit(TIGHT, { op: "move", id: "TL-2", wave: "W", why: "why W", today: "2026-09-04", ...place });
+  const W = ["  # why W", '  - name: "W"', "    tasks: [TL-2]"];
+  const A = TIGHT.split("\n").slice(1, 5);
+  const B = ["  # B's argument.", '  - name: "B"', "    tasks: []"];
+  assert.equal(move({ before: "A" }).text, ["waves:", ...W, "", ...A, ...B, ""].join("\n"));
+  assert.equal(move({ after: "A" }).text, ["waves:", ...A, "", ...W, "", ...B, ""].join("\n"));
+  assert.equal(move({ before: "B" }).text, move({ after: "A" }).text);
+  assert.equal(move({}).text, ["waves:", ...A, ...B, "", ...W, ""].join("\n"));
+  assert.equal(move({ after: "B" }).text, move({}).text);
+});
+
+test("move may place its new wave next to the very wave the id leaves", () => {
+  const r = edit(TIGHT, { op: "move", id: "TL-1", wave: "W", why: "why W", before: "A", today: "2026-09-04" });
+  assert.deepEqual(r.problems, []);
+  assert.deepEqual(names(parsed(r.text)), ["W", "A", "B"]);
+  assert.deepEqual(ids(parsed(r.text)), [["TL-1"], [], ["TL-2"]]);
+});
+
+test("move: an unknown neighbour, two positions, an empty one, or a wave that exists is refused", () => {
+  const cases = [
+    [{ wave: "Writers", why: NEW_WHY, before: "Nowhere" }, /^there is no wave `Nowhere` to place the new wave before\n[^\n]*Foundation \| Consumers$/],
+    [{ wave: "Writers", why: NEW_WHY, after: "Nowhere" }, /^there is no wave `Nowhere` to place the new wave after\n/],
+    [{ wave: "Writers", why: NEW_WHY, before: "Foundation", after: "Consumers" }, /one neighbour/],
+    [{ wave: "Writers", why: NEW_WHY, after: " " }, /^`--after` is empty/],
+    [{ wave: "Consumers", after: "Foundation" }, /^the wave `Consumers` already exists, and `--after` places a wave this call creates\n/],
+    // The wave the id already stands in: the position is still the wrong half
+    // of the call, so it is a usage error and not "already in wave".
+    [{ wave: "Foundation", before: "Consumers" }, /^the wave `Foundation` already exists, and `--before` places a wave this call creates\n/],
+    // A position does not stand in for the sentence a new wave requires.
+    [{ wave: "Writers", before: "Consumers" }, /^there is no wave `Writers` in this plan\n/],
+  ];
+  for (const [spec, message] of cases) {
+    const r = edit(PLAN, { op: "move", id: "TL-1", today: "2026-09-04", ...spec });
+    assert.equal(r.kind, "usage", JSON.stringify(spec));
+    assert.match(r.problems.join("\n"), message, JSON.stringify(spec));
+    assert.equal(r.text, PLAN, "a refusal returns the input byte for byte");
+  }
+  // POSITIVE CONTROL: the same id and the same new wave, with one known
+  // neighbour, is accepted — the refusals above are about the position.
+  assert.deepEqual(edit(PLAN, { op: "move", id: "TL-1", wave: "Writers", why: NEW_WHY, before: "Consumers" }).problems, []);
+  // Without a position, a move into the wave the id stands in is a state refusal.
+  const same = edit(PLAN, { op: "move", id: "TL-1", wave: "Foundation" });
+  assert.equal(same.kind, "state");
+  assert.match(same.problems.join("\n"), /^TL-1 is already in wave 1 \(Foundation\)$/);
+});
+
+test("`plan move --before` writes the wave in place; an unknown neighbour writes nothing", () =>
+  withSandbox((dir) => {
+    const before = planOf(dir);
+    const bad = run(["plan", "move", "TL-2", "--wave", "Writers", "--why", NEW_WHY, "--before", "Nowhere", "--dir", dir]);
+    assert.equal(bad.code, 2, bad.out + bad.err);
+    assert.equal(bad.out, "");
+    assert.match(bad.err, /no wave `Nowhere`/);
+    assert.equal(planOf(dir), before, "a refused command wrote to the file anyway");
+
+    const r = run(["plan", "move", "TL-2", "--wave", "Writers", "--why", NEW_WHY, "--before", "Foundation", "--dir", dir]);
+    assert.equal(r.code, 0, r.out + r.err);
+    assert.match(r.out, /TL-2 moved to wave 1 \(Writers\)/);
+    assert.match(r.out, /the wave was created, with your sentence above it/);
+    assert.deepEqual(names(parsed(planOf(dir))), ["Writers", "Foundation", "Consumers"]);
+    assert.deepEqual(ids(parsed(planOf(dir))), [["TL-2"], ["TL-1"], ["TL-3", "TL-4"]]);
+
+    const late = run(["plan", "move", "TL-1", "--wave", "Late", "--why", NEW_WHY, "--after", "Foundation", "--dir", dir]);
+    assert.equal(late.code, 0, late.out + late.err);
+    assert.deepEqual(names(parsed(planOf(dir))), ["Writers", "Foundation", "Late", "Consumers"]);
+    assert.equal(run(["check", "--plan", "--dir", dir]).code, 0);
+
+    const removal = run(["plan", "remove", "TL-1", "--after", "Writers", "--dir", dir]);
+    assert.equal(removal.code, 2, removal.out + removal.err);
+    assert.match(removal.err, /says nothing about a removal/);
+  }));
+
+test("`plan --help` and the usage of a wrong call document the position flags for move", () => {
+  const help = run(["plan", "--help"]);
+  assert.equal(help.code, 0);
+  const shape = /plan move <ID> --wave "<name>" \[--why "<sentence>"\]\n\s+\[--before "<wave>" \| --after "<wave>"\]/;
+  assert.match(help.out, shape);
+  assert.match(help.out, /--before <wave>\s+place the wave `add` or `move` CREATES/);
+  const wrong = run(["plan", "move", "TL-5", "--beside", "A"]);
+  assert.equal(wrong.code, 2);
+  assert.match(wrong.err, shape);
 });

@@ -343,7 +343,8 @@ const shapeOf = (waves) =>
  * @param {{op: "add"|"move"|"remove", id: string, wave?: string, why?: string,
  *          before?: string, after?: string, today?: string}} spec
  *        `before` / `after` name an EXISTING wave the new one is placed next
- *        to; they are `add`-only and only for a wave this edit creates
+ *        to; they are for `add` and `move`, and only for a wave this edit
+ *        creates
  * @returns {{text: string, problems: string[], kind: "usage"|"state"|null}}
  */
 export function editPlanText(text, spec = {}) {
@@ -365,8 +366,10 @@ export function editPlanText(text, spec = {}) {
   if (spec.before != null && spec.after != null) {
     return refuse("usage", ["`--before` and `--after` both place the new wave — name one neighbour, not two"]);
   }
-  if (placeFlag && op !== "add") {
-    return refuse("usage", ["`" + placeFlag + "` places a wave `add` creates, so it says nothing about a " + (op === "move" ? "move" : "removal")]);
+  // `move --why` creates its target wave exactly as `add --why` does, so it may
+  // place it too (TL-712); a removal creates nothing to place.
+  if (placeFlag && op === "remove") {
+    return refuse("usage", ["`" + placeFlag + "` places a wave `add` or `move` creates, so it says nothing about a removal"]);
   }
   if (placeFlag && !anchor) {
     return refuse("usage", ["`" + placeFlag + "` is empty — it names the existing wave the new one stands next to"]);
@@ -439,15 +442,17 @@ export function editPlanText(text, spec = {}) {
         "to CREATE one, say why it stands where it does: --why \"…\"",
       ]);
     }
-    if (target >= 0 && target === holder) {
-      return refuse("state", [id + " is already in wave " + waveLabel(plan, target)]);
-    }
     creating = target < 0;
+    // Ahead of the same-wave check, as the `--why` refusal is: a position given
+    // for a wave that exists is a wrong invocation wherever the id now stands.
     if (placeFlag && !creating) {
       return refuse("usage", [
         "the wave `" + wave + "` already exists, and `" + placeFlag + "` places a wave this call creates",
         "an existing wave is moved by a hand edit somebody reviews, not as a side effect of scheduling one id",
       ]);
+    }
+    if (target >= 0 && target === holder) {
+      return refuse("state", [id + " is already in wave " + waveLabel(plan, target)]);
     }
     if (placeFlag && names.indexOf(anchor) < 0) {
       return refuse("usage", [
@@ -656,6 +661,7 @@ export function runPlanEdit(op, argv) {
     "usage: " + N + " plan add <ID>... --wave \"<name>\" [--why \"<sentence>\"]",
     "         [--before \"<wave>\" | --after \"<wave>\"]",
     "       " + N + " plan move <ID> --wave \"<name>\" [--why \"<sentence>\"]",
+    "         [--before \"<wave>\" | --after \"<wave>\"]",
     "       " + N + " plan remove <ID>",
   ];
   if (parsed.error) return fail(command, parsed.error, usage, [N + " plan --help"]);
