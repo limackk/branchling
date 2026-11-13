@@ -10,6 +10,10 @@
  * The assertions are on the SIZE of what a green close prints, not only on its
  * last line: a test that checked for `closed` alone would stay green while the
  * transcript grew back.
+ *
+ * The `--json` payload of a refusal is asserted here as well (TL-710): what a
+ * program reads instead of the prose is output too, and a mutation run showed
+ * that nothing read it beyond `refusalKind`.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -24,6 +28,7 @@ import { isolateHome, SCRIPTS_DIR } from "./_repo.mjs";
 isolateHome("done-output");
 
 import { suppressedNote } from "../done-task.mjs";
+import { STATE_DIR_ENV } from "../lock.mjs";
 
 const CLI = join(SCRIPTS_DIR, "cli.mjs");
 
@@ -32,7 +37,7 @@ const CLI = join(SCRIPTS_DIR, "cli.mjs");
 const NOISY_PASS = "seq 1 300";
 const NOISY_FAIL = "seq 1 300; echo the-failing-line >&2; exit 1";
 
-function task(verification) {
+function task(verification, status = "pending") {
   return [
     "---",
     "id: TASK-1",
@@ -42,7 +47,7 @@ function task(verification) {
     "board: main",
     'epic: ""',
     "priority: P1",
-    "status: pending",
+    "status: " + status,
     "owner: unassigned",
     "estimate: 2h",
     "confidence: high",
@@ -61,31 +66,32 @@ function task(verification) {
   ].join("\n");
 }
 
-function withBacklog(verification, fn) {
+function withBacklog(verification, fn, { config = "", status } = {}) {
   const dir = fixtureDir(join(tmpdir(), "branchling-done-output-"));
   try {
     mkdirSync(join(dir, "tasks"));
     writeFileSync(join(dir, "_template.md"), "---\nid: TASK-NNN\n---\n", "utf8");
     writeFileSync(join(dir, "boards.yaml"), 'default: main\nboards:\n  - slug: main\n    name: "Main"\n', "utf8");
-    writeFileSync(join(dir, "config.yaml"), 'task_id_prefix: "TASK"\n', "utf8");
-    writeFileSync(join(dir, "tasks", "TASK-1-x.md"), task(verification), "utf8");
+    writeFileSync(join(dir, "config.yaml"), 'task_id_prefix: "TASK"\n' + config, "utf8");
+    writeFileSync(join(dir, "tasks", "TASK-1-x.md"), task(verification, status), "utf8");
     return fn(dir);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 }
 
-function done(dir, args) {
-  const r = spawnSync(process.execPath, [CLI, "done", "TASK-1", ...args, "--dir", dir], {
+function done(dir, args, { id = "TASK-1", env = {} } = {}) {
+  const r = spawnSync(process.execPath, [CLI, "done", id, ...args, "--dir", dir], {
     encoding: "utf8",
     input: "",
-    env: { ...process.env, NO_COLOR: "1" },
+    env: { ...process.env, NO_COLOR: "1", ...env },
   });
   return { code: r.status, stdout: r.stdout || "", stderr: r.stderr || "" };
 }
 
 const lines = (s) => s.split("\n").filter((l) => l.length).length;
-const statusOf = (dir) => (readFileSync(join(dir, "tasks", "TASK-1-x.md"), "utf8").match(/^status: (.+)$/m) || [])[1];
+const taskText = (dir) => readFileSync(join(dir, "tasks", "TASK-1-x.md"), "utf8");
+const statusOf = (dir) => (taskText(dir).match(/^status: (.+)$/m) || [])[1];
 
 test("a green close does not print the passing entry's output, and says how much it withheld", () => {
   withBacklog(["  - id: noisy", `    bash: "${NOISY_PASS}"`], (dir) => {
@@ -152,4 +158,74 @@ test("suppressedNote counts non-empty lines and is silent for a silent or stream
   assert.equal(suppressedNote("\n\n"), "");
   assert.equal(suppressedNote("one\n"), ", 1 line not shown");
   assert.equal(suppressedNote("a\nb\nc"), ", 3 lines not shown");
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// The --json payload of a refusal (TL-710)
+// ──────────────────────────────────────────────────────────────────────────
+
+const GREEN = ["  - id: noisy", '    bash: "true"'];
+
+// Every refusal `done` makes before a single entry runs. A consumer reads
+// `entries` as the list of what ran, so these must publish an EMPTY list, not
+// merely some list: filling it with an entry nobody ran survived a mutation
+// run, because only `refusalKind` was ever read. The missing task's headline
+// and empty details are read too: no other test reads that refusal's text, so
+// emptying its words or filling its details also survived.
+const EARLY_REFUSALS = [
+  { kind: "no-such-task", verification: GREEN, id: "TASK-404",
+    headline: /^there is no task TASK-404 in .*tasks$/, details: [] },
+  { kind: "already-closed", verification: GREEN, status: "done" },
+  { kind: "unreadable-contract", verification: ["  - id: noisy", '    shell: "true"'] },
+  { kind: "no-contract", verification: [] },
+  { kind: "closing-contract-collision", verification: GREEN,
+    config: 'closing_contract:\n  - id: noisy\n    bash: "true"\n' },
+];
+
+for (const c of EARLY_REFUSALS) {
+  test("--json: the " + c.kind + " refusal publishes its kind and no entries, since nothing ran", () => {
+    withBacklog(c.verification, (dir) => {
+      const before = taskText(dir);
+      const r = done(dir, ["--json"], { id: c.id });
+      assert.equal(r.code, 1, r.stdout + r.stderr);
+      const parsed = JSON.parse(r.stdout);
+      assert.equal(parsed.kind, "verification-run");
+      assert.equal(parsed.refusalKind, c.kind);
+      assert.equal(parsed.ok, false);
+      assert.equal(parsed.closed, false);
+      assert.deepEqual(parsed.entries, []);
+      assert.ok(parsed.refusal, "a refusal with no headline");
+      if (c.headline) assert.match(parsed.refusal, c.headline);
+      if (c.details) assert.deepEqual(parsed.details, c.details);
+      assert.equal(taskText(dir), before, "a refusal before the run touched the task file");
+    }, { config: c.config, status: c.status });
+  });
+}
+
+// The history write comes AFTER the task file is written, so its refusal is
+// the one that has to undo a write — and the one whose cause a reader cannot
+// guess: the details are the error that stopped the write. A regular file
+// where the state directory should be makes the history's cross-worktree
+// mutex fail, the way `cli.test.mjs` provokes it for `regen-hook`.
+//
+// It is also the positive control for the table above: a refusal made after
+// the run publishes what ran, so an empty `entries` there is the refusal's
+// answer and not a list `refuse` always empties.
+test("--json: history-unwritable restores the task and names the error in its details", () => {
+  withBacklog(GREEN, (dir) => {
+    const stateFile = join(dir, "state-file");
+    writeFileSync(stateFile, "not a directory", "utf8");
+    const before = taskText(dir);
+    const r = done(dir, ["--json"], { env: { [STATE_DIR_ENV]: stateFile } });
+    assert.equal(r.code, 1, r.stdout + r.stderr);
+    const parsed = JSON.parse(r.stdout);
+    assert.equal(parsed.refusalKind, "history-unwritable");
+    assert.equal(parsed.closed, false);
+    assert.equal(parsed.refusal, "TASK-1: history could not be recorded; the task was restored");
+    assert.equal(parsed.details.length, 1, JSON.stringify(parsed.details));
+    assert.ok(parsed.details[0].includes(stateFile),
+      "the details do not carry the error that stopped the history write: " + JSON.stringify(parsed.details));
+    assert.deepEqual(parsed.entries.map((e) => [e.id, e.ok]), [["noisy", true]]);
+    assert.equal(taskText(dir), before, "the task file was not restored");
+  });
 });

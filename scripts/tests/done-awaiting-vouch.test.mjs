@@ -15,22 +15,29 @@
  * Positive controls: a person at a terminal who types `confirm` still closes
  * the task under the same configuration, and `--confirm-manual` still closes
  * it, so the park cannot be green by swallowing every manual entry.
+ *
+ * `--json` is the one case started as a child process: its answer is written
+ * to file descriptor 1 directly, past the console this file intercepts.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { fixtureDir } from "./_fixture-dir.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { isolateHome, isolateState, plainOutput } from "./_repo.mjs";
+import { isolateHome, isolateState, plainOutput, SCRIPTS_DIR } from "./_repo.mjs";
 
 isolateHome("done-awaiting-vouch");
 isolateState("done-awaiting-vouch");
 plainOutput();
 
 import { HOME_ENV } from "../home.mjs";
+import { STATE_DIR_ENV } from "../lock.mjs";
 import { EXIT_AWAITING_VOUCH, run } from "../done-task.mjs";
+
+const CLI = join(SCRIPTS_DIR, "cli.mjs");
 
 const VOUCH = "awaiting_vouch";
 const ACTOR = "agent:supervisor";
@@ -170,6 +177,58 @@ test("configured: `--dry-run` reports the park and writes nothing", () =>
     assert.match(r.out, new RegExp("would set: status in_progress → " + VOUCH));
     assert.equal(taskOf(backlog), before);
     assert.deepEqual(history(backlog), []);
+  }));
+
+// The park writes the task file and THEN the history, so a history that
+// cannot be written has to undo the park (TL-710). A regular file where the
+// state directory should be makes the history's mutex fail; the variable is
+// read at the write, so it is swapped around this one run and put back. The
+// path is the evidence that the details carry the error itself — the contract
+// prints `<dir>/ran-last`, never `<dir>/state-file`.
+test("configured: a park whose history cannot be written is refused, and the task restored", () =>
+  withFixture({ declareVouch: true }, async ({ dir, backlog, env }) => {
+    const stateFile = join(dir, "state-file");
+    writeFileSync(stateFile, "not a directory", "utf8");
+    const before = taskOf(backlog);
+    const saved = process.env[STATE_DIR_ENV];
+    process.env[STATE_DIR_ENV] = stateFile;
+    let r;
+    try {
+      r = await done(["TASK-1", "--dir", backlog, "--actor", ACTOR], noTerminal(env));
+    } finally {
+      process.env[STATE_DIR_ENV] = saved;
+    }
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /TASK-1: history could not be recorded; the task was restored/);
+    assert.ok(r.out.split("\n").some((l) => l.includes(stateFile)),
+      "the refusal does not name the error that stopped the history write:\n" + r.out);
+    assert.doesNotMatch(r.out, /parked as/);
+    assert.equal(taskOf(backlog), before, "the park was not undone");
+    assert.deepEqual(history(backlog), [], "an unanswered entry was recorded for a park that did not happen");
+  }));
+
+// What `--json` answers under `awaiting_vouch_status` (TL-710). It does NOT
+// park: `--json` refuses at the first `manual:` entry, before a terminal is
+// looked for, so the park's own JSON answer (`awaitingVouch: true`, kind
+// `awaiting-vouch`) is never reached from `run`. This refusal is what `run`
+// parks on — `run-loop.mjs` maps `manual-needs-person` to the awaiting-vouch
+// status itself (TL-212) — so it is the answer a program gets, and the one
+// asserted here.
+test("configured: `--json` answers with the refusal `run` parks on, and parks nothing", () =>
+  withFixture({ declareVouch: true }, ({ backlog, env }) => {
+    const r = spawnSync(process.execPath, [CLI, "done", "TASK-1", "--dir", backlog, "--actor", ACTOR, "--json"], {
+      encoding: "utf8",
+      input: "",
+      env: { ...process.env, ...env },
+    });
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    const parsed = JSON.parse(r.stdout);
+    assert.equal(parsed.kind, "verification-run");
+    assert.equal(parsed.refusalKind, "manual-needs-person");
+    assert.equal(parsed.closed, false);
+    assert.equal(Object.hasOwn(parsed, "awaitingVouch"), false, "a refusal claims a park");
+    assert.deepEqual(parsed.entries.map((e) => [e.id, e.ok]), [["first", true], ["eyeballed", false]]);
+    assert.equal(statusOf(backlog), "in_progress");
   }));
 
 test("not configured: the refusal stands, and names leaving it for a person", () =>
