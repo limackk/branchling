@@ -22,7 +22,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { REPO_ROOT, SCRIPTS_DIR, isolateHome, isolateState, scriptSource, sourceRoot } from "./_repo.mjs";
 import {
-  DEFAULT_BUDGET_MINUTES, MIN_SWEEP_MARKER, SOURCE_ROOT_ENV, STOP_GRACE_MS, countMutants, estimateSeconds, formatDuration, leftoverProcesses,
+  ALLOCATION_FAILURE, DEFAULT_BUDGET_MINUTES, DEFAULT_MEMORY_CAP, MIN_SWEEP_MARKER, formatCap, memoryCapReport, parseMemoryCap, SOURCE_ROOT_ENV, STOP_GRACE_MS, countMutants, estimateSeconds, formatDuration, leftoverProcesses,
   SANDBOX_GIT_INIT, SILENT_LOGGER, keepReport, changedLineRanges, directorySymlinks, importClosure, loadInstrumenter, main, mutateDescriptions,
   parseArgs, reachesCli, runStryker, sandboxCommand, selectTests, strykerConfig, strykerEnv, summarise, sweepLeftovers, timeTests, timingLimitSeconds, costReport, usage, workerTestArgs,
 } from "../mutation-run.mjs";
@@ -283,7 +283,7 @@ test("an unknown flag fails", () => {
   assert.equal(r.code, 2);
   assert.deepEqual(r.err.replace(/\x1b\[[0-9;]*m/g, "").split("\n").slice(0, 3), [
     '✗ node scripts/mutation-run.mjs: unknown argument "--everything"',
-    "  known flags: --base --files --tests --concurrency --budget --keep-report --plan --json --named-only --changed-lines --no-wait",
+    "  known flags: --base --files --tests --concurrency --budget --keep-report --memory-cap --plan --json --named-only --changed-lines --no-wait",
     "  → node scripts/mutation-run.mjs --help",
   ]);
 });
@@ -381,7 +381,7 @@ test("scriptSource reads the tree a mutation run names, and this one otherwise",
 
 test("the test command runs inside the containing process group, under this process's node", () => {
   const cmd = sandboxCommand([], ["scripts/tests/a.test.mjs"], "/x/contain.mjs", 4);
-  assert.equal(cmd, SANDBOX_GIT_INIT + " && " + [process.execPath, "/x/contain.mjs", process.execPath, "--test", "--test-concurrency=4",
+  assert.equal(cmd, SANDBOX_GIT_INIT + " && ulimit -d 4194304 && " + [process.execPath, "/x/contain.mjs", process.execPath, "--test", "--test-concurrency=4",
     "scripts/tests/a.test.mjs"].map((s) => "'" + s + "'").join(" "));
 });
 
@@ -412,6 +412,87 @@ test("the bound is passed only to a node that accepts --test-concurrency, and ne
   assert.equal(testFileConcurrency({ version: "22.0.0", cores: 1 }), 1, "one core still runs one file");
   // Without a version, the running node's.
   assert.equal(testFileConcurrency({ cores: 32 }), testFileConcurrency({ version: process.versions.node, cores: 32 }));
+});
+
+// TL-726: on 2026-11-13 one test process of a mutation run reached 30 GB off
+// the V8 heap in under a minute and the OOM killer took the whole terminal.
+test("the sandbox command sets the data cap right before node --test, and none leaves it out", () => {
+  assert.equal(DEFAULT_MEMORY_CAP, "4G");
+  const capped = sandboxCommand([], ["t.test.mjs"], "/c.mjs", 4, 524288);
+  const node = [process.execPath, "/c.mjs", process.execPath, "--test", "--test-concurrency=4", "t.test.mjs"].map((s) => "'" + s + "'").join(" ");
+  assert.equal(capped, SANDBOX_GIT_INIT + " && ulimit -d 524288 && " + node);
+  assert.equal(sandboxCommand([], ["t.test.mjs"], "/c.mjs", 4, null), SANDBOX_GIT_INIT + " && " + node);
+  assert.equal(sandboxCommand([], ["t.test.mjs"], "/c.mjs", 4), sandboxCommand([], ["t.test.mjs"], "/c.mjs", 4, 4 * 1024 * 1024),
+    "the default is 4 GiB in KiB, the unit ulimit -d takes");
+  const p = { mutate: ["scripts/lib.mjs"], tests: [{ file: "t.test.mjs" }] };
+  assert.match(strykerConfig(p, { concurrency: 1 }, [], "/work").commandRunner.command, / && ulimit -d 4194304 && /);
+  assert.match(strykerConfig(p, { concurrency: 1, memoryCap: 1024 }, [], "/work").commandRunner.command, / && ulimit -d 1024 && /);
+  assert.doesNotMatch(strykerConfig(p, { concurrency: 1, memoryCap: null }, [], "/work").commandRunner.command, /ulimit/);
+});
+
+test("--memory-cap reads binary sizes, none and 0 disable it, anything else fails", () => {
+  assert.equal(parseArgs([]).opts.memoryCap, 4194304);
+  assert.equal(parseArgs(["--memory-cap", "512M"]).opts.memoryCap, 524288);
+  assert.equal(parseArgs(["--memory-cap", "2g"]).opts.memoryCap, 2097152);
+  assert.equal(parseArgs(["--memory-cap", "64KiB"]).opts.memoryCap, 64);
+  assert.equal(parseArgs(["--memory-cap", "1GB"]).opts.memoryCap, 1048576);
+  assert.equal(parseArgs(["--memory-cap", "none"]).opts.memoryCap, null);
+  assert.equal(parseArgs(["--memory-cap", "0"]).opts.memoryCap, null);
+  for (const bad of ["4", "4T", "-1G", "0G", "04G", "G", "lots", "4 G", ""]) {
+    assert.deepEqual(parseArgs(["--memory-cap", bad]),
+      { error: "--memory-cap takes a size such as 512M or 4G, or none, not " + JSON.stringify(bad) }, bad);
+  }
+  assert.deepEqual(parseArgs(["--memory-cap"]), { error: "--memory-cap needs a value" });
+  assert.deepEqual(parseMemoryCap("3M"), 3072);
+});
+
+test("the cap is printed in the unit a reader would write, and says where it is only advisory", () => {
+  assert.equal(formatCap(4194304), "4 GiB");
+  assert.equal(formatCap(524288), "512 MiB");
+  assert.equal(formatCap(1536 * 1024), "1536 MiB");
+  assert.equal(formatCap(100), "100 KiB");
+  assert.equal(memoryCapReport(4194304, "linux"), "memory cap: 4 GiB of data per test process (ulimit -d)");
+  assert.equal(memoryCapReport(4194304, "darwin"),
+    "memory cap: 4 GiB of data per test process (ulimit -d); macOS does not enforce it, so here it is advisory");
+  assert.match(memoryCapReport(null, "linux"), /^memory cap: none \(--memory-cap none\)/);
+  assert.match(usage(), /--memory-cap <size> +data cap \(ulimit -d\) of every test process.*default: 4G; none or 0 disables; not enforced on macOS/);
+});
+
+// Bounded on purpose: without the cap this allocates 1 GiB and passes, so a
+// mutant that drops the cap is caught without letting anything run away.
+const ALLOCATES_ONE_GIB = `
+import { test } from "node:test";
+test("allocates 1 GiB in 32 MiB buffers", () => {
+  const held = [];
+  for (let i = 0; i < 32; i++) held.push(Buffer.alloc(32 * 1024 * 1024, 1));
+});
+`;
+
+test("POSITIVE CONTROL: a test process that allocates beyond the command's cap dies of an allocation failure",
+  { skip: process.platform !== "linux" && "only Linux enforces RLIMIT_DATA" }, () => {
+  const dir = gitlessSandbox();
+  write(dir, "scripts/tests/hog.test.mjs", ALLOCATES_ONE_GIB);
+  const started = Date.now();
+  const r = runIn(dir, sandboxCommand([], ["scripts/tests/hog.test.mjs"], undefined, 1, 256 * 1024));
+  assert.notEqual(r.status, 0, "the process grew past the cap: " + r.stdout + r.stderr);
+  assert.match(r.stdout + r.stderr, ALLOCATION_FAILURE);
+  assert.ok(Date.now() - started < 30_000, "it died, but not before Stryker's own timeout");
+  const free = runIn(dir, sandboxCommand([], ["scripts/tests/hog.test.mjs"], undefined, 1, 2 * 1024 * 1024));
+  assert.equal(free.status, 0, "under a cap the allocation fits, the same test passes: " + free.stdout + free.stderr);
+});
+
+test("a mutant killed by an allocation failure is named apart from those an assertion killed", () => {
+  const at = (line, status, statusReason) => ({ status, statusReason, mutatorName: "M", replacement: "r", location: { start: { line } } });
+  const s = summarise({ files: { "scripts/a.mjs": { mutants: [
+    at(1, "Killed", "not ok 1 - x\n  error: 'Expected values to be strictly equal'"),
+    at(2, "Killed", "RangeError: Array buffer allocation failed"),
+    at(3, "Killed", "FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory"),
+    at(4, "Survived", "Array buffer allocation failed"),
+    at(5, "Killed", undefined),
+  ] } } });
+  assert.deepEqual(s.cappedOut.map((m) => m.line), [2, 3]);
+  assert.deepEqual(s.survivors.map((m) => m.line), [4]);
+  assert.equal(s.files["scripts/a.mjs"].Killed, 4, "still counted as detected");
 });
 
 test("a node that accepts the flag runs the tests under the bounded command",
@@ -899,9 +980,60 @@ function costDeps({ mutants, seconds }) {
     countMutants: async (_root, mutate) => ({ total: mutants, files: Object.fromEntries(mutate.map((m) => [m, mutants])) }),
     timeTests: (_root, files) => { calls.timed.push(files); return { seconds, passed: true }; },
     runStryker: () => { calls.stryker++; return { code: 0, leftovers: [], report: ONE_KILLED }; },
+    // The machine's own hard limit is not this fixture's business.
+    hardDataLimit: () => Infinity,
   };
   return { deps, calls };
 }
+
+test("the run states its memory cap and names each mutant an allocation failure killed (TL-726)", async () => {
+  const root = fixture();
+  try {
+    const { deps } = costDeps({ mutants: 2, seconds: 1 });
+    deps.runStryker = (_root, _p, opts) => {
+      assert.equal(opts.memoryCap, 524288, "the run was not handed the cap it was given");
+      return { code: 0, leftovers: [], report: { files: { "scripts/lib.mjs": { mutants: [
+        { status: "Killed", statusReason: "RangeError: Array buffer allocation failed", location: { start: { line: 1 } }, mutatorName: "ArrowFunction", replacement: "() => undefined" },
+        { status: "Killed", statusReason: "not ok 1", location: { start: { line: 1 } }, mutatorName: "BooleanLiteral", replacement: "false" },
+      ] } } } };
+    };
+    const r = await inProcess(["--files", "scripts/lib.mjs", "--concurrency", "1", "--memory-cap", "512M"], root, deps);
+    assert.equal(r.code, 0, r.err);
+    assert.match(r.err, /^memory cap: 512 MiB of data per test process \(ulimit -d\)/m);
+    assert.deepEqual(r.out.split("\n").filter((l) => l.startsWith("hit the memory cap")),
+      ["hit the memory cap  scripts/lib.mjs:1  ArrowFunction → () => undefined"]);
+    assert.match(r.err, /1 mutant was killed by an allocation failure at the memory cap, not by an assertion/);
+
+    deps.runStryker = (_root, _p, opts) => {
+      assert.equal(opts.memoryCap, null);
+      return { code: 0, leftovers: [], report: ONE_KILLED };
+    };
+    const none = await inProcess(["--files", "scripts/lib.mjs", "--concurrency", "1", "--memory-cap", "none"], root, deps);
+    assert.match(none.err, /^memory cap: none \(--memory-cap none\)/m);
+    assert.doesNotMatch(none.out + none.err, /hit the memory cap|allocation failure/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a cap above the hard data limit is refused before Stryker starts, naming one that fits (TL-726)", async () => {
+  const root = fixture();
+  try {
+    const { deps, calls } = costDeps({ mutants: 2, seconds: 1 });
+    deps.hardDataLimit = () => 2 * 1024 * 1024;
+    const refused = await inProcess(["--files", "scripts/lib.mjs", "--concurrency", "1"], root, deps);
+    assert.equal(refused.code, 1, refused.err);
+    assert.equal(calls.stryker, 0);
+    assert.match(refused.err, /--memory-cap 4 GiB is above this shell's hard data limit of 2 GiB$/m);
+    assert.match(refused.err, /^  → node scripts\/mutation-run\.mjs --memory-cap 2G$/m);
+    // POSITIVE CONTROL: at the limit, and with no cap at all, the run starts.
+    assert.equal((await inProcess(["--files", "scripts/lib.mjs", "--concurrency", "1", "--memory-cap", "2G"], root, deps)).code, 0);
+    assert.equal((await inProcess(["--files", "scripts/lib.mjs", "--concurrency", "1", "--memory-cap", "none"], root, deps)).code, 0);
+    assert.equal(calls.stryker, 2);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 // A run that judged one mutant: the smallest report that is evidence (TL-698).
 const ONE_KILLED = {
@@ -1435,15 +1567,15 @@ test("the mutant count is Stryker's instrumenter over exactly the lines asked fo
 // test that runs with the defaults cannot tell a dropped flag from an unused one.
 test("every flag lands in the option the run reads, and a malformed value is named", () => {
   const defaults = {
-    base: "main", files: null, tests: null, concurrency: null, budget: null, keepReport: null,
+    base: "main", files: null, tests: null, concurrency: null, budget: null, keepReport: null, memoryCap: 4194304,
     plan: false, json: false, namedOnly: false, changedLines: false, noWait: false,
   };
   assert.deepEqual(parseArgs([]), { opts: defaults });
   assert.deepEqual(parseArgs([
     "--base", "dev", "--files", " a.mjs , ,b.mjs:3-4 ", "--tests", "t.test.mjs", "--concurrency", "10", "--budget", "7",
-    "--keep-report", "out/m.json", "--plan", "--json", "--named-only", "--changed-lines", "--no-wait",
+    "--keep-report", "out/m.json", "--memory-cap", "1G", "--plan", "--json", "--named-only", "--changed-lines", "--no-wait",
   ]), { opts: {
-    base: "dev", files: ["a.mjs", "b.mjs:3-4"], tests: ["t.test.mjs"], concurrency: 10, budget: 7, keepReport: "out/m.json",
+    base: "dev", files: ["a.mjs", "b.mjs:3-4"], tests: ["t.test.mjs"], concurrency: 10, budget: 7, keepReport: "out/m.json", memoryCap: 1048576,
     plan: true, json: true, namedOnly: true, changedLines: true, noWait: true,
   } });
   assert.deepEqual(parseArgs(["--base"]), { error: "--base needs a value" });
@@ -1479,7 +1611,7 @@ test("the summary counts every status per file, scores only the valid ones, and 
   assert.equal(s.timeouts, 1);
   assert.equal(s.mutants, 10, "an Ignored mutant is not one the run produced (TL-698)");
   assert.deepEqual(s.timedOut, [{ file: "a.mjs", line: 3, mutator: "M", replacement: "r" }]);
-  assert.deepEqual(summarise({}), { files: {}, survivors: [], timedOut: [], noCoverage: 0, timeouts: 0, mutants: 0 });
+  assert.deepEqual(summarise({}), { files: {}, survivors: [], timedOut: [], cappedOut: [], noCoverage: 0, timeouts: 0, mutants: 0 });
 });
 
 /** A stand-in for Stryker that returns `result` and records what it was handed. */

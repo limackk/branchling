@@ -136,7 +136,7 @@
  *   node scripts/mutation-run.mjs [--base <ref>] [--files <a,b>] [--tests <a,b>]
  *                                 [--concurrency <n>] [--named-only] [--changed-lines]
  *                                 [--no-wait] [--budget <minutes>] [--keep-report <path>]
- *                                 [--plan] [--json] [--help]
+ *                                 [--memory-cap <size>] [--plan] [--json] [--help]
  *
  * A RUN WITH NO MUTANT FAILS, NAMING WHAT IT WAS ASKED TO MUTATE (TL-698).
  * Lines can change without holding mutable code — a comment, CSS inside a
@@ -166,6 +166,20 @@
  * the cores, and the worker count is budgeted with that bound. The slot, the
  * count and the bound live in `mutation-slot.mjs`, which says what was measured.
  *
+ * A RUNAWAY MUTANT DIES ALONE (TL-726). Every test command starts under
+ * `ulimit -d` (RLIMIT_DATA, `--memory-cap`, 4G by default), which every
+ * worker's `node --test` and everything it spawns inherit. On 2026-11-13 one
+ * test process reached 30 GB in under a minute, off the V8 heap, so
+ * `--max-old-space-size` would not have stopped it and Stryker's timeout came
+ * too late; the OOM killer then took the terminal and every session in it.
+ * Under the cap such a process fails its allocation within seconds, while the
+ * whole suite's largest process peaked at about 121 MB. RLIMIT_DATA counts
+ * only writable private mappings, so V8's PROT_NONE reservations do not trip
+ * it; RLIMIT_AS would, which is why it is not used. macOS does not enforce
+ * RLIMIT_DATA, so there the cap is advisory, and `--help` says so. A mutant
+ * killed by an allocation failure was detected by the cap, not by an
+ * assertion, so it is named after the run, like a Timeout.
+ *
  * NO PROCESS OUTLIVES THE RUN (TL-646). A test that spawns git with a timeout
  * kills git, not git's hook children; they are reparented to PID 1, out of
  * reach of Stryker's kill, which walks the tree by parent. Each test command
@@ -191,11 +205,16 @@ import { processTreeDetached, stopProcessTree } from "./process-tree.mjs";
 import { fail, warn, plural } from "./ui.mjs";
 
 const COMMAND = "node scripts/mutation-run.mjs";
-const FLAGS_WITH_VALUE = new Set(["--base", "--files", "--tests", "--concurrency", "--budget", "--keep-report"]);
+const FLAGS_WITH_VALUE = new Set(["--base", "--files", "--tests", "--concurrency", "--budget", "--keep-report", "--memory-cap"]);
 const FLAGS_BARE = new Set(["--plan", "--json", "--named-only", "--changed-lines", "--no-wait"]);
 const BARE_KEYS = { "--named-only": "namedOnly", "--changed-lines": "changedLines", "--no-wait": "noWait" };
 const STRYKER_PIN = "@stryker-mutator/core";
 const INSTRUMENTER = "@stryker-mutator/instrumenter";
+/** The per-process data cap of every test command without `--memory-cap`: about 30 times the suite's largest process. */
+export const DEFAULT_MEMORY_CAP = "4G";
+const CAP_UNITS = { K: 1, M: 1024, G: 1024 * 1024 };
+/** What a test command prints when it failed an allocation, not an assertion. */
+export const ALLOCATION_FAILURE = /Array buffer allocation failed|JavaScript heap out of memory|Allocation failed - process out of memory/;
 /** The longest estimated run started without `--budget`, in minutes. */
 export const DEFAULT_BUDGET_MINUTES = 45;
 /** Beyond this share of the candidate test files, naming a module selects nothing narrower than the suite. */
@@ -237,6 +256,7 @@ const FLAG_HELP = {
   "--concurrency": ["<n>", "Stryker workers (default: chosen from free memory, at most half the cores)"],
   "--budget": ["<minutes>", "refuse a run whose estimate exceeds this (default: " + DEFAULT_BUDGET_MINUTES + ")"],
   "--keep-report": ["<path>", "copy Stryker's mutation.json to this path before the run's directory is removed"],
+  "--memory-cap": ["<size>", "data cap (ulimit -d) of every test process, e.g. 512M or 4G (default: " + DEFAULT_MEMORY_CAP + "; none or 0 disables; not enforced on macOS)"],
   "--plan": ["", "print the modules, the selected tests, the mutant count and the estimate; run nothing"],
   "--json": ["", "print the plan or the result as JSON on stdout"],
   "--named-only": ["", "select only the test files that name the module: a fast lower bound"],
@@ -275,8 +295,42 @@ function lines(text) {
   return text.split("\n").map((l) => l.trim()).filter(Boolean);
 }
 
+/**
+ * `--memory-cap` in KiB, the unit `ulimit -d` takes: `<n>K`, `<n>M` or `<n>G`
+ * (binary units, an optional `iB`), `null` for `none` or `0`, or `{ error }`.
+ * A bare number is refused: bytes or KiB would both be a plausible reading.
+ */
+export function parseMemoryCap(value) {
+  if (value === "none" || value === "0") return null;
+  const m = /^([1-9]\d*)([KMG])(?:i?B)?$/i.exec(value);
+  if (!m) return { error: "--memory-cap takes a size such as 512M or 4G, or none, not " + JSON.stringify(value) };
+  return Number(m[1]) * CAP_UNITS[m[2].toUpperCase()];
+}
+
+/** The cap as a reader would write it: whole GiB, else whole MiB, else KiB. */
+export function formatCap(kib) {
+  if (kib % CAP_UNITS.G === 0) return kib / CAP_UNITS.G + " GiB";
+  if (kib % CAP_UNITS.M === 0) return kib / CAP_UNITS.M + " MiB";
+  return kib + " KiB";
+}
+
+/** The line the run prints about the cap, beside its concurrency. */
+export function memoryCapReport(kib, platform = process.platform) {
+  if (kib === null) return "memory cap: none (--memory-cap none): a runaway test process can take all the memory it reaches";
+  return "memory cap: " + formatCap(kib) + " of data per test process (ulimit -d)"
+    + (platform === "darwin" ? "; macOS does not enforce it, so here it is advisory" : "");
+}
+
+/** The hard RLIMIT_DATA of a shell started from here, in KiB; Infinity when unlimited or unknown. */
+export function hardDataLimit() {
+  const r = spawnSync("sh", ["-c", "ulimit -H -d"], { encoding: "utf8" });
+  const v = (r.stdout || "").trim();
+  return /^\d+$/.test(v) ? Number(v) : Infinity;
+}
+
 export function parseArgs(argv) {
   const opts = {
+    memoryCap: parseMemoryCap(DEFAULT_MEMORY_CAP),
     base: "main", files: null, tests: null, concurrency: null, budget: null, keepReport: null,
     plan: false, json: false, namedOnly: false, changedLines: false, noWait: false,
   };
@@ -293,6 +347,10 @@ export function parseArgs(argv) {
       else if (key === "concurrency" || key === "budget") {
         if (!/^[1-9]\d*$/.test(value)) return { error: flag + " takes a positive integer, not " + JSON.stringify(value) };
         opts[key] = Number(value);
+      } else if (key === "memory-cap") {
+        const cap = parseMemoryCap(value);
+        if (cap && cap.error) return { error: cap.error };
+        opts.memoryCap = cap;
       } else opts[key] = value;
     } else {
       return { error: "unknown argument " + JSON.stringify(flag) };
@@ -719,6 +777,7 @@ export function summarise(report) {
   const files = {};
   const survivors = [];
   const timedOut = [];
+  const cappedOut = [];
   let noCoverage = 0;
   let timeouts = 0;
   let mutants = 0;
@@ -729,6 +788,7 @@ export function summarise(report) {
       const where = { file, line: m.location.start.line, mutator: m.mutatorName, replacement: m.replacement };
       if (m.status === "Survived") survivors.push(where);
       else if (m.status === "Timeout") timedOut.push(where);
+      else if (m.status === "Killed" && ALLOCATION_FAILURE.test(m.statusReason || "")) cappedOut.push(where);
     }
     noCoverage += c.NoCoverage;
     timeouts += c.Timeout;
@@ -737,7 +797,7 @@ export function summarise(report) {
     const valid = detected + c.Survived + c.NoCoverage;
     files[file] = { ...c, score: valid ? Math.round((detected / valid) * 10000) / 100 : null };
   }
-  return { files, survivors, timedOut, noCoverage, timeouts, mutants };
+  return { files, survivors, timedOut, cappedOut, noCoverage, timeouts, mutants };
 }
 
 /**
@@ -974,14 +1034,19 @@ export function workerTestArgs(testFiles, fileConcurrency = testFileConcurrency(
  * The tests run under this process's own node, not whatever `node` is first
  * on PATH: whether `--test-concurrency` is passed is decided from this
  * process's version, so it must be the node that receives it.
+ *
+ * `memoryCap` (KiB) is set with `ulimit -d` right before them, so every test
+ * process and everything it spawns inherits it (TL-726); `null` sets none.
  */
-export function sandboxCommand(links, testFiles, contain = CONTAIN_ENTRY, fileConcurrency = testFileConcurrency()) {
+export function sandboxCommand(links, testFiles, contain = CONTAIN_ENTRY, fileConcurrency = testFileConcurrency(),
+  memoryCap = parseMemoryCap(DEFAULT_MEMORY_CAP)) {
   const steps = [SANDBOX_GIT_INIT];
   steps.push(...links.map((l) => {
     const p = shellQuote(l.path);
     const parent = shellQuote(dirname(l.path));
     return "{ mkdir -p " + parent + " && { ln -s " + shellQuote(l.target) + " " + p + " 2>/dev/null; [ -L " + p + " ]; }; }";
   }));
+  if (memoryCap !== null) steps.push("ulimit -d " + memoryCap);
   steps.push([process.execPath, contain, process.execPath, ...workerTestArgs(testFiles, fileConcurrency)].map(shellQuote).join(" "));
   return steps.join(" && ");
 }
@@ -1056,7 +1121,10 @@ export function sweepLeftovers(marker, { ps = null, kill = process.kill, self = 
 export function strykerConfig(p, opts, links, work) {
   return {
     testRunner: "command",
-    commandRunner: { command: sandboxCommand(links, p.tests.map((t) => t.file)) },
+    commandRunner: {
+      command: sandboxCommand(links, p.tests.map((t) => t.file), CONTAIN_ENTRY, testFileConcurrency(),
+        opts.memoryCap === undefined ? parseMemoryCap(DEFAULT_MEMORY_CAP) : opts.memoryCap),
+    },
     coverageAnalysis: "off",
     mutate: p.mutate,
     // Exactly the links, anchored, never their parent: see directorySymlinks.
@@ -1286,6 +1354,16 @@ export async function main(argv, cwd = process.cwd(), deps = {}) {
         [], 1);
     }
   }
+  if (opts.memoryCap !== null && !opts.plan) {
+    // A cap above the hard limit fails `ulimit -d` in every test command, and
+    // Stryker would report that as a failed initial run, naming nothing.
+    const hard = (deps.hardDataLimit || hardDataLimit)();
+    if (opts.memoryCap > hard) {
+      return fail(COMMAND, "--memory-cap " + formatCap(opts.memoryCap) + " is above this shell's hard data limit of " + formatCap(hard),
+        ["ulimit -d cannot raise a hard limit, so every test command would fail before its tests ran. Stryker was not started."],
+        [COMMAND + " --memory-cap " + formatCap(hard).replace(/ ([KMG])iB$/, "$1")], 1);
+    }
+  }
   let root;
   try {
     root = git(cwd, ["rev-parse", "--show-toplevel"]).trim();
@@ -1397,6 +1475,7 @@ export async function main(argv, cwd = process.cwd(), deps = {}) {
     // Chosen here, after the wait: memory the previous holder used is free now.
     const concurrency = chooseConcurrency({ concurrency: opts.concurrency, testFiles: p.tests.length });
     console.error("concurrency " + concurrency.value + ": " + concurrency.reason);
+    console.error(memoryCapReport(opts.memoryCap));
     run = await (deps.runStryker || runStryker)(root, p, { ...opts, concurrency: concurrency.value }, slot);
   } finally {
     releaseSlot(slot);
@@ -1415,6 +1494,7 @@ export async function main(argv, cwd = process.cwd(), deps = {}) {
   } else {
     for (const s of summary.survivors) console.log("survived  " + s.file + ":" + s.line + "  " + s.mutator + " → " + s.replacement);
     for (const s of summary.timedOut) console.log("timed out  " + s.file + ":" + s.line + "  " + s.mutator + " → " + s.replacement);
+    for (const s of summary.cappedOut) console.log("hit the memory cap  " + s.file + ":" + s.line + "  " + s.mutator + " → " + s.replacement);
     if (p.lines) for (const l of rangeReport(p)) console.log(l);
     for (const l of templateTextReport(p)) console.log(l);
   }
@@ -1435,6 +1515,11 @@ export async function main(argv, cwd = process.cwd(), deps = {}) {
     console.error(warn(summary.timeouts + " " +
       plural(summary.timeouts, "mutant timed out and is", "mutants timed out and are") + " counted as detected; "
       + "rerun with a lower --concurrency before trusting the score"));
+  }
+  if (summary.cappedOut.length > 0) {
+    console.error(warn(summary.cappedOut.length + " " +
+      plural(summary.cappedOut.length, "mutant was", "mutants were") + " killed by an allocation failure at the memory cap, "
+      + "not by an assertion; each one is a mutant that allocates without bound"));
   }
   if (keepFailed) return 1;
   return run.code === 0 ? 0 : run.code || 1;
