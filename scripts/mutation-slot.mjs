@@ -39,7 +39,9 @@
  * WHY THE DEFAULT CONCURRENCY FOLLOWS FREE MEMORY. Half the cores (the earlier
  * default) is 16 workers on a 32-core machine, whatever else that machine is
  * running. A worker's footprint is the test files `node --test` runs at once,
- * each with the CLI processes it spawns; see `PER_TEST_FILE_BYTES`.
+ * each with the CLI processes it spawns; see `PER_TEST_FILE_BYTES`. How many
+ * that is, is bounded by `testFileConcurrency()` (TL-706), so a worker's
+ * footprint no longer grows with the machine's core count.
  *
  * Tests: scripts/tests/mutation-run.test.mjs.
  */
@@ -62,10 +64,43 @@ export const SLOT_POLL_MS = 2000;
  * its own process and the CLI processes it spawns. Measured on 2026-11-11 on
  * a 32-core machine, sampling the whole process tree every 100 ms: 40 test
  * files at node's default concurrency (31 at once) peaked at 4852 MB, about
- * 156 MB per file; 8 files at 8 at once peaked at 1427 MB, about 178 MB. The
- * larger figure is taken, rounded up.
+ * 156 MB per file; 8 files at 8 at once peaked at 1427 MB, about 178 MB; the
+ * same 40 files at 4 at once peaked at 1392 MB, about 348 MB per file.
+ *
+ * The figure per file is not constant: the fewer files run at once, the more
+ * the peak is set by the heaviest few of them running together. A worker now
+ * runs `WORKER_TEST_FILES` at once (TL-706), so the largest figure is taken,
+ * rounded up. Where node runs its own default instead — a node without
+ * `--test-concurrency`, which the pinned Stryker does not run on either: its
+ * version 10 declares Node 22 or later — this overestimates, which errs
+ * toward fewer workers, never toward the OOM killer.
  */
-export const PER_TEST_FILE_BYTES = 180 * 1024 * 1024;
+export const PER_TEST_FILE_BYTES = 360 * 1024 * 1024;
+
+/**
+ * How many test files one worker's `node --test` runs at once, at most
+ * (TL-706). Node's own default is cores - 1: 31 files, and 4852 MB, for ONE
+ * worker on a 32-core machine, where 4 at once peaked at 1392 MB. Four is the
+ * figure the parallel loops ran inside memory with, and it is fixed rather
+ * than derived from cores / workers, because what it bounds is one worker's
+ * memory, which the core count says nothing about.
+ */
+export const WORKER_TEST_FILES = 4;
+
+/**
+ * The `--test-concurrency` a worker passes to `node --test`, or null where
+ * the running node does not accept the flag (it exists from Node 20.10 and
+ * 21; package.json allows 18). Never above node's own default of cores - 1,
+ * so a small machine is not asked to run more at once than it would anyway.
+ *
+ * @param {{version?: string, cores?: number}} [opts]
+ * @returns {number|null}
+ */
+export function testFileConcurrency({ version = process.versions.node, cores = cpuCount() } = {}) {
+  const [major, minor] = String(version).split(".").map(Number);
+  if (!(major > 20 || (major === 20 && minor >= 10))) return null;
+  return Math.max(1, Math.min(WORKER_TEST_FILES, cores - 1));
+}
 
 /** The test runner itself, before any file starts. */
 export const PER_WORKER_BASE_BYTES = 64 * 1024 * 1024;
@@ -94,24 +129,29 @@ function gb(bytes) {
 /**
  * The concurrency a run uses, and the sentence that says why.
  *
- * Each worker is budgeted as `node --test` running `min(testFiles, cores - 1)`
- * files at once — node's own default — at `PER_TEST_FILE_BYTES` each. A `node`
- * on PATH that caps that number (the loops' wrapper) makes the budget an
- * overestimate, which errs toward fewer workers, never toward the OOM killer.
- * The result is never above half the cores (see `strykerConfig` in
- * mutation-run.mjs for why) and never below one.
+ * Each worker is budgeted as `node --test` running `min(testFiles,
+ * fileConcurrency)` files at once — the bound a worker passes as
+ * `--test-concurrency` — at `PER_TEST_FILE_BYTES` each. Where the running node
+ * has no such flag (`fileConcurrency` null), node's own default of cores - 1
+ * is budgeted instead, and the reason says so. The result is never above half
+ * the cores (see `strykerConfig` in mutation-run.mjs for why) and never below
+ * one.
  *
- * @param {{concurrency?: number|null, testFiles: number, freeBytes?: number, cores?: number}} opts
+ * @param {{concurrency?: number|null, testFiles: number, freeBytes?: number, cores?: number,
+ *          fileConcurrency?: number|null}} opts
  * @returns {{value: number, reason: string}}
  */
-export function chooseConcurrency({ concurrency = null, testFiles, freeBytes = os.freemem(), cores = cpuCount() }) {
+export function chooseConcurrency({ concurrency = null, testFiles, freeBytes = os.freemem(), cores = cpuCount(),
+  fileConcurrency = testFileConcurrency({ cores }) }) {
   if (concurrency) return { value: concurrency, reason: "given by --concurrency" };
   const cap = Math.max(1, Math.floor(cores / 2));
-  const atOnce = Math.max(1, Math.min(testFiles, cores - 1));
+  const atOnce = Math.max(1, Math.min(testFiles, fileConcurrency || cores - 1));
   const perWorker = PER_WORKER_BASE_BYTES + atOnce * PER_TEST_FILE_BYTES;
   const byMemory = Math.floor((freeBytes * FREE_MEMORY_SHARE) / perWorker);
+  const why = fileConcurrency ? "--test-concurrency=" + fileConcurrency
+    : "node's default of cores - 1: this node has no --test-concurrency";
   const budget = gb(freeBytes) + " free, " + Math.round(FREE_MEMORY_SHARE * 100) + "% of it at " + gb(perWorker)
-    + " per worker (" + atOnce + " test " + (atOnce === 1 ? "file" : "files") + " at once)";
+    + " per worker (" + atOnce + " test " + (atOnce === 1 ? "file" : "files") + " at once, " + why + ")";
   if (byMemory >= cap) return { value: cap, reason: "half of " + cores + " cores; " + budget + " would allow " + byMemory };
   if (byMemory < 1) return { value: 1, reason: budget + " allows none; one worker is the least a run can use" };
   return { value: byMemory, reason: budget + ", below the cap of " + cap + " (half of " + cores + " cores)" };
