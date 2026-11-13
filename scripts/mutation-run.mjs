@@ -144,8 +144,11 @@
  * takes the machine's mutation slot before starting Stryker and waits, naming
  * the holder, while another run has it; `--no-wait` refuses instead. Without
  * `--concurrency` the number of workers follows free memory, never above half
- * the cores, and the run prints the value and why. Both live in
- * `mutation-slot.mjs`, which says what was measured.
+ * the cores, and the run prints the value and why. Each worker's `node --test`
+ * runs a bounded number of test files at once where the running node accepts
+ * `--test-concurrency` (TL-706), so what one worker costs does not grow with
+ * the cores, and the worker count is budgeted with that bound. The slot, the
+ * count and the bound live in `mutation-slot.mjs`, which says what was measured.
  *
  * NO PROCESS OUTLIVES THE RUN (TL-646). A test that spawns git with a timeout
  * kills git, not git's hook children; they are reparented to PID 1, out of
@@ -167,7 +170,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { SLOT_TOKEN_ENV, acquireSlot, chooseConcurrency, describeHolder, releaseSlot } from "./mutation-slot.mjs";
+import { SLOT_TOKEN_ENV, acquireSlot, chooseConcurrency, describeHolder, releaseSlot, testFileConcurrency } from "./mutation-slot.mjs";
 import { fail, warn, plural } from "./ui.mjs";
 
 const COMMAND = "node scripts/mutation-run.mjs";
@@ -789,7 +792,7 @@ export async function countMutants(root, mutate, instrumenter) {
  */
 export function timeTests(root, testFiles) {
   const started = performance.now();
-  const r = spawnSync(process.execPath, [CONTAIN_ENTRY, "node", "--test", ...testFiles], {
+  const r = spawnSync(process.execPath, [CONTAIN_ENTRY, process.execPath, ...workerTestArgs(testFiles)], {
     cwd: root, env: strykerEnv(process.env, root), stdio: "ignore",
   });
   return { seconds: (performance.now() - started) / 1000, passed: r.status === 0 };
@@ -902,20 +905,34 @@ export function directorySymlinks(root, rel = "") {
 export const SANDBOX_GIT_INIT = "{ [ -e .git ] || env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE git init -q . >/dev/null 2>&1 || true; }";
 
 /**
+ * The arguments of one worker's `node --test`: at most `fileConcurrency` test
+ * files at once (TL-706), or node's own default where the flag is null
+ * because the running node does not accept it. `chooseConcurrency()` budgets
+ * each worker with the same figure.
+ */
+export function workerTestArgs(testFiles, fileConcurrency = testFileConcurrency()) {
+  return ["--test", ...(fileConcurrency ? ["--test-concurrency=" + fileConcurrency] : []), ...testFiles];
+}
+
+/**
  * The command the runner executes in the sandbox: give it a git repository
  * (`SANDBOX_GIT_INIT`), recreate each ignored link with its own relative
  * target, then run the tests in a process group of their own
  * (`mutation-contain.mjs`). Every worker shares one sandbox, so a link another
  * worker made first is not an error; the check after `ln` is what decides.
+ *
+ * The tests run under this process's own node, not whatever `node` is first
+ * on PATH: whether `--test-concurrency` is passed is decided from this
+ * process's version, so it must be the node that receives it.
  */
-export function sandboxCommand(links, testFiles, contain = CONTAIN_ENTRY) {
+export function sandboxCommand(links, testFiles, contain = CONTAIN_ENTRY, fileConcurrency = testFileConcurrency()) {
   const steps = [SANDBOX_GIT_INIT];
   steps.push(...links.map((l) => {
     const p = shellQuote(l.path);
     const parent = shellQuote(dirname(l.path));
     return "{ mkdir -p " + parent + " && { ln -s " + shellQuote(l.target) + " " + p + " 2>/dev/null; [ -L " + p + " ]; }; }";
   }));
-  steps.push([process.execPath, contain, "node", "--test", ...testFiles].map(shellQuote).join(" "));
+  steps.push([process.execPath, contain, process.execPath, ...workerTestArgs(testFiles, fileConcurrency)].map(shellQuote).join(" "));
   return steps.join(" && ");
 }
 

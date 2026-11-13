@@ -24,9 +24,11 @@ import { REPO_ROOT, SCRIPTS_DIR, isolateHome, isolateState, scriptSource, source
 import {
   DEFAULT_BUDGET_MINUTES, MIN_SWEEP_MARKER, SOURCE_ROOT_ENV, countMutants, estimateSeconds, formatDuration, leftoverProcesses,
   SANDBOX_GIT_INIT, SILENT_LOGGER, keepReport, changedLineRanges, directorySymlinks, importClosure, loadInstrumenter, main, mutateDescriptions,
-  parseArgs, reachesCli, runStryker, sandboxCommand, selectTests, strykerConfig, strykerEnv, summarise, sweepLeftovers, timeTests, usage,
+  parseArgs, reachesCli, runStryker, sandboxCommand, selectTests, strykerConfig, strykerEnv, summarise, sweepLeftovers, timeTests, usage, workerTestArgs,
 } from "../mutation-run.mjs";
-import { SLOT_TOKEN_ENV, chooseConcurrency, describeHolder, releaseSlot, slotPath, tryAcquireSlot } from "../mutation-slot.mjs";
+import {
+  SLOT_TOKEN_ENV, WORKER_TEST_FILES, chooseConcurrency, describeHolder, releaseSlot, slotPath, testFileConcurrency, tryAcquireSlot,
+} from "../mutation-slot.mjs";
 import { STATE_DIR_ENV } from "../lock.mjs";
 
 const HOME = isolateHome("mutation-run");
@@ -377,10 +379,47 @@ test("scriptSource reads the tree a mutation run names, and this one otherwise",
   rmSync(root, { recursive: true, force: true });
 });
 
-test("the test command runs inside the containing process group", () => {
-  const cmd = sandboxCommand([], ["scripts/tests/a.test.mjs"], "/x/contain.mjs");
-  assert.equal(cmd, SANDBOX_GIT_INIT + " && " + [process.execPath, "/x/contain.mjs", "node", "--test", "scripts/tests/a.test.mjs"]
-    .map((s) => "'" + s + "'").join(" "));
+test("the test command runs inside the containing process group, under this process's node", () => {
+  const cmd = sandboxCommand([], ["scripts/tests/a.test.mjs"], "/x/contain.mjs", 4);
+  assert.equal(cmd, SANDBOX_GIT_INIT + " && " + [process.execPath, "/x/contain.mjs", process.execPath, "--test", "--test-concurrency=4",
+    "scripts/tests/a.test.mjs"].map((s) => "'" + s + "'").join(" "));
+});
+
+// TL-706: node's default runs cores - 1 test files at once, 4852 MB for ONE
+// worker on a 32-core machine; at 4 at once the same files peaked at 1392 MB.
+test("a worker's test command bounds the files run at once, and leaves the flag out where node has none", () => {
+  assert.deepEqual(workerTestArgs(["a.test.mjs", "b.test.mjs"], 4), ["--test", "--test-concurrency=4", "a.test.mjs", "b.test.mjs"]);
+  assert.deepEqual(workerTestArgs(["a.test.mjs"], null), ["--test", "a.test.mjs"], "Node 18 would refuse the flag");
+  const without = sandboxCommand([], ["scripts/tests/a.test.mjs"], "/x/contain.mjs", null);
+  assert.ok(without.endsWith(" '" + process.execPath + "' '--test' 'scripts/tests/a.test.mjs'"), without);
+  assert.ok(!without.includes("--test-concurrency"), without);
+  // The default is this node's own answer, in the command and the arguments alike.
+  assert.equal(sandboxCommand([], ["t.test.mjs"], "/c.mjs"), sandboxCommand([], ["t.test.mjs"], "/c.mjs", testFileConcurrency()));
+  assert.deepEqual(workerTestArgs(["t.test.mjs"]), workerTestArgs(["t.test.mjs"], testFileConcurrency()));
+});
+
+test("the bound is passed only to a node that accepts --test-concurrency, and never above cores - 1", () => {
+  for (const version of ["18.0.0", "18.20.4", "19.9.0", "20.0.0", "20.9.0"]) {
+    assert.equal(testFileConcurrency({ version, cores: 32 }), null, version + " has no --test-concurrency");
+  }
+  for (const version of ["20.10.0", "20.18.1", "21.0.0", "22.22.0", "24.1.0"]) {
+    assert.equal(testFileConcurrency({ version, cores: 32 }), WORKER_TEST_FILES, version);
+  }
+  assert.equal(WORKER_TEST_FILES, 4);
+  assert.equal(testFileConcurrency({ version: "22.0.0", cores: 5 }), 4);
+  assert.equal(testFileConcurrency({ version: "22.0.0", cores: 4 }), 3, "node's own default on four cores is three");
+  assert.equal(testFileConcurrency({ version: "22.0.0", cores: 2 }), 1);
+  assert.equal(testFileConcurrency({ version: "22.0.0", cores: 1 }), 1, "one core still runs one file");
+  // Without a version, the running node's.
+  assert.equal(testFileConcurrency({ cores: 32 }), testFileConcurrency({ version: process.versions.node, cores: 32 }));
+});
+
+test("a node that accepts the flag runs the tests under the bounded command",
+  { skip: testFileConcurrency({ cores: 32 }) === null && "this node has no --test-concurrency" }, () => {
+  const dir = gitlessSandbox();
+  const r = runIn(dir, sandboxCommand([], ["scripts/tests/git.test.mjs"], undefined, 2));
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /# pass 1/);
 });
 
 // TL-674: Stryker's sandbox is a copy of the tree without `.git`, and a test
@@ -507,44 +546,76 @@ const GiB = 1024 ** 3;
 const MiB = 1024 ** 2;
 
 test("the default concurrency follows free memory, capped at half the cores", () => {
-  // 3 test files at once: 64 MiB + 3 × 180 MiB = 604 MiB per worker.
-  const roomy = chooseConcurrency({ testFiles: 3, freeBytes: 16 * GiB, cores: 16 });
-  assert.equal(roomy.value, 8, "16 GiB fits 20 such workers; the cap is half of 16 cores");
-  assert.match(roomy.reason, /^half of 16 cores; 16\.0 GB free, 75% of it at 0\.6 GB per worker \(3 test files at once\) would allow 20$/);
+  // 3 test files at once: 64 MiB + 3 × 360 MiB = 1144 MiB per worker.
+  const roomy = chooseConcurrency({ testFiles: 3, freeBytes: 16 * GiB, cores: 16, fileConcurrency: 4 });
+  assert.equal(roomy.value, 8, "16 GiB fits 10 such workers; the cap is half of 16 cores");
+  assert.match(roomy.reason,
+    /^half of 16 cores; 16\.0 GB free, 75% of it at 1\.1 GB per worker \(3 test files at once, --test-concurrency=4\) would allow 10$/);
 
-  const tight = chooseConcurrency({ testFiles: 3, freeBytes: 4 * GiB, cores: 16 });
-  assert.equal(tight.value, 5, "3 GiB usable over 604 MiB per worker");
-  assert.match(tight.reason, /^4\.0 GB free, 75% of it at 0\.6 GB per worker \(3 test files at once\), below the cap of 8 \(half of 16 cores\)$/);
+  const tight = chooseConcurrency({ testFiles: 3, freeBytes: 4 * GiB, cores: 16, fileConcurrency: 4 });
+  assert.equal(tight.value, 2, "3 GiB usable over 1144 MiB per worker");
+  assert.match(tight.reason,
+    /^4\.0 GB free, 75% of it at 1\.1 GB per worker \(3 test files at once, --test-concurrency=4\), below the cap of 8 \(half of 16 cores\)$/);
 
-  // Files beyond cores - 1 do not run at once, so they cost nothing more.
-  assert.equal(chooseConcurrency({ testFiles: 40, freeBytes: 32 * GiB, cores: 16 }).value,
-    chooseConcurrency({ testFiles: 15, freeBytes: 32 * GiB, cores: 16 }).value);
-  assert.equal(chooseConcurrency({ testFiles: 15, freeBytes: 32 * GiB, cores: 16 }).value, 8,
-    "24 GiB over 64 + 15 × 180 MiB is 8 workers");
-  assert.equal(chooseConcurrency({ testFiles: 15, freeBytes: 16 * GiB, cores: 16 }).value, 4);
-
-  const starved = chooseConcurrency({ testFiles: 3, freeBytes: 512 * MiB, cores: 16 });
+  const starved = chooseConcurrency({ testFiles: 3, freeBytes: 512 * MiB, cores: 16, fileConcurrency: 4 });
   assert.equal(starved.value, 1);
   assert.match(starved.reason, /allows none; one worker is the least a run can use$/);
-  assert.equal(chooseConcurrency({ testFiles: 1, freeBytes: 64 * GiB, cores: 1 }).value, 1, "one core still runs one worker");
-  assert.match(chooseConcurrency({ testFiles: 1, freeBytes: 64 * GiB, cores: 1 }).reason, /\(1 test file at once\)/);
+  assert.equal(chooseConcurrency({ testFiles: 1, freeBytes: 64 * GiB, cores: 1, fileConcurrency: 1 }).value, 1, "one core still runs one worker");
+  assert.match(chooseConcurrency({ testFiles: 1, freeBytes: 64 * GiB, cores: 1, fileConcurrency: 1 }).reason, /\(1 test file at once, /);
 
-  assert.deepEqual(chooseConcurrency({ concurrency: 3, testFiles: 3, freeBytes: 512 * MiB, cores: 16 }),
+  assert.deepEqual(chooseConcurrency({ concurrency: 3, testFiles: 3, freeBytes: 512 * MiB, cores: 16, fileConcurrency: 4 }),
     { value: 3, reason: "given by --concurrency" });
 
   // The boundaries: memory for exactly the cap is the cap, and for exactly one
-  // worker is one worker, not "none".
-  const exact = chooseConcurrency({ testFiles: 3, freeBytes: 6443 * MiB, cores: 16 });
+  // worker is one worker, not "none". 8 × 1144 / 0.75 = 12202.7 MiB.
+  const exact = chooseConcurrency({ testFiles: 3, freeBytes: 12203 * MiB, cores: 16, fileConcurrency: 4 });
   assert.equal(exact.value, 8);
   assert.match(exact.reason, /^half of 16 cores; .* would allow 8$/);
-  const one = chooseConcurrency({ testFiles: 3, freeBytes: 1 * GiB, cores: 16 });
+  assert.equal(chooseConcurrency({ testFiles: 3, freeBytes: 12202 * MiB, cores: 16, fileConcurrency: 4 }).value, 7);
+  const one = chooseConcurrency({ testFiles: 3, freeBytes: 1526 * MiB, cores: 16, fileConcurrency: 4 });
   assert.equal(one.value, 1);
   assert.match(one.reason, /, below the cap of 8 \(half of 16 cores\)$/);
+  assert.match(chooseConcurrency({ testFiles: 3, freeBytes: 1525 * MiB, cores: 16, fileConcurrency: 4 }).reason, /allows none/);
 
   // Without a figure for the cores, the machine's own is used.
   // availableParallelism is Node 18.14+, so it is looked up, never imported by name.
   const cores = typeof os.availableParallelism === "function" ? os.availableParallelism() : os.cpus().length;
   assert.match(chooseConcurrency({ testFiles: 1, freeBytes: 1024 * GiB }).reason, new RegExp("^half of " + cores + " cores; "));
+});
+
+// TL-706: the worker count is budgeted with the bound the workers run under.
+test("a worker is budgeted at its --test-concurrency, so its share does not grow with the cores", () => {
+  // 4 files at once: 64 + 4 × 360 = 1504 MiB; 6 GiB usable over that is 4 workers.
+  const small = chooseConcurrency({ testFiles: 40, freeBytes: 8 * GiB, cores: 16, fileConcurrency: 4 });
+  const large = chooseConcurrency({ testFiles: 40, freeBytes: 8 * GiB, cores: 32, fileConcurrency: 4 });
+  assert.equal(small.value, 4);
+  assert.equal(large.value, 4, "twice the cores, the same memory per worker");
+  assert.match(large.reason, /at 1\.5 GB per worker \(4 test files at once, --test-concurrency=4\), below the cap of 16/);
+  assert.deepEqual(chooseConcurrency({ testFiles: 4, freeBytes: 8 * GiB, cores: 32, fileConcurrency: 4 }), large,
+    "files beyond the bound do not run at once, so they cost nothing more");
+  assert.equal(chooseConcurrency({ testFiles: 2, freeBytes: 8 * GiB, cores: 32, fileConcurrency: 4 }).value, 7,
+    "fewer files than the bound: 64 + 2 × 360 = 784 MiB per worker");
+
+  // The default is the bound this node's workers will run under.
+  const bound = testFileConcurrency({ cores: 32 });
+  assert.equal(chooseConcurrency({ testFiles: 40, freeBytes: 8 * GiB, cores: 32 }).value,
+    chooseConcurrency({ testFiles: 40, freeBytes: 8 * GiB, cores: 32, fileConcurrency: bound }).value);
+  // ...for the cores given, not the machine's: on four cores node's own default is three.
+  assert.deepEqual(chooseConcurrency({ testFiles: 40, freeBytes: 8 * GiB, cores: 4 }),
+    chooseConcurrency({ testFiles: 40, freeBytes: 8 * GiB, cores: 4, fileConcurrency: testFileConcurrency({ cores: 4 }) }));
+});
+
+test("where node has no --test-concurrency, a worker is budgeted at node's default and the reason says so", () => {
+  // 15 files at once on 16 cores: 64 + 15 × 360 = 5464 MiB; 24 GiB usable is 4 workers.
+  const old = chooseConcurrency({ testFiles: 15, freeBytes: 32 * GiB, cores: 16, fileConcurrency: null });
+  assert.equal(old.value, 4);
+  assert.match(old.reason, /\(15 test files at once, node's default of cores - 1: this node has no --test-concurrency\)/);
+  assert.equal(chooseConcurrency({ testFiles: 40, freeBytes: 32 * GiB, cores: 16, fileConcurrency: null }).value, 4,
+    "files beyond cores - 1 do not run at once, so they cost nothing more");
+  // The same 40 files on 32 cores: 31 at once fit no worker in 8 GiB, where the bounded run fits 4.
+  assert.match(chooseConcurrency({ testFiles: 40, freeBytes: 8 * GiB, cores: 32, fileConcurrency: null }).reason, /allows none/);
+  assert.equal(chooseConcurrency({ testFiles: 3, freeBytes: 64 * GiB, cores: 1, fileConcurrency: null }).value, 1);
+  assert.match(chooseConcurrency({ testFiles: 3, freeBytes: 64 * GiB, cores: 1, fileConcurrency: null }).reason, /\(1 test file at once, /);
 });
 
 test("the slot is one file per machine, in the state directory, under a name runs of other versions agree on", () => {
