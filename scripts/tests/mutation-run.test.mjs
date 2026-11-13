@@ -398,6 +398,29 @@ test("a worker's test command bounds the files run at once, and leaves the flag 
   assert.deepEqual(workerTestArgs(["t.test.mjs"]), workerTestArgs(["t.test.mjs"], testFileConcurrency()));
 });
 
+// TL-732: Stryker's command runner hands its command a stdin pipe that is never
+// closed. A mutant that leaves node without a script made node read its program
+// from that pipe until Stryker's timeout. The containing entry closes stdin.
+test("a test command whose node is left without a script ends at once, though its stdin stays open", async () => {
+  const contain = join(SCRIPTS_DIR, "mutation-contain.mjs");
+  const run = (args) => new Promise((resolve) => {
+    // stdin is a pipe this test never writes to or ends: Stryker's `exec()`.
+    const child = spawn(process.execPath, [contain, process.execPath, ...args], { stdio: ["pipe", "ignore", "ignore"] });
+    const timer = setTimeout(() => { child.kill("SIGKILL"); resolve("hung"); }, 20_000);
+    child.on("exit", (code) => { clearTimeout(timer); resolve(code); });
+  });
+  const [bare, emptyScript] = await Promise.all([run([]), run(["", "--test-concurrency=4"])]);
+  assert.equal(bare, 0, "node with no arguments waited on stdin");
+  assert.equal(emptyScript, 0, "node with an empty script name waited on stdin");
+  // POSITIVE CONTROL: the same open pipe, inherited, really does hold node.
+  const held = await new Promise((resolve) => {
+    const child = spawn(process.execPath, [], { stdio: ["pipe", "ignore", "ignore"] });
+    const timer = setTimeout(() => { child.kill("SIGKILL"); resolve("hung"); }, 2_000);
+    child.on("exit", () => { clearTimeout(timer); resolve("ended"); });
+  });
+  assert.equal(held, "hung", "an open stdin no longer holds a script-less node, so this test proves nothing");
+});
+
 test("the bound is passed only to a node that accepts --test-concurrency, and never above cores - 1", () => {
   for (const version of ["18.0.0", "18.20.4", "19.9.0", "20.0.0", "20.9.0"]) {
     assert.equal(testFileConcurrency({ version, cores: 32 }), null, version + " has no --test-concurrency");
