@@ -567,6 +567,42 @@ export function absentHere(byId, knownIds) {
 }
 
 /**
+ * Which of `absentHere`'s tasks a query may name (TL-715). PURE.
+ *
+ * The scan reads an elsewhere-only task's id and its status on each branch,
+ * nothing else, so only those criteria can EXCLUDE it: an id `--ids` does not
+ * list, and a status no branch gives it that `--status` or `--scope` does not
+ * search. Every other criterion (`--text`, `--priority`, …) cannot be judged
+ * against it either way. Naming such a task anyway put the same line under
+ * every query in the repository; dropping it silently would bring back the
+ * absence TL-145 exists to stop. So it is COUNTED in `unchecked`, and the
+ * caller says how many once — unless `--ids` lists it, which is the question
+ * the reader asked by name.
+ *
+ * @param {Array<{id: string, elsewhere: Array<{status: string}>}>} list
+ * @param {{ids?: string[]|null, statuses?: string[]|null, scope?: string|null,
+ *   archived?: Set<string>, unevaluable?: string[]}} criteria
+ * @returns {{named: Array<object>, unchecked: Array<object>}}
+ */
+export function elsewhereOnlyMatching(list, criteria) {
+  const c = criteria || {};
+  const archived = c.archived || new Set();
+  const unevaluable = c.unevaluable || [];
+  const named = [];
+  const unchecked = [];
+  for (const task of list || []) {
+    if (c.ids && !c.ids.includes(task.id)) continue;
+    const statuses = (task.elsewhere || []).map((o) => String(o.status || ""));
+    if (c.statuses && !statuses.some((s) => c.statuses.some((w) => w.toLowerCase() === s.toLowerCase()))) continue;
+    if (c.scope === "active" && !statuses.some((s) => !archived.has(s))) continue;
+    if (c.scope === "archived" && !statuses.some((s) => archived.has(s))) continue;
+    if (unevaluable.length && !c.ids) unchecked.push(task);
+    else named.push(task);
+  }
+  return { named, unchecked };
+}
+
+/**
  * The whole scan for one backlog, decided by its configuration.
  *
  * `reason` is non-null exactly when the scan did NOT run, and it is a reason the

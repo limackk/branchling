@@ -71,7 +71,7 @@
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { absentHere, crossBranchState, describeDivergence, divergences, scanNote, siblingTreeTasks } from "./branch-scan.mjs";
+import { absentHere, crossBranchState, describeDivergence, divergences, elsewhereOnlyMatching, scanNote, siblingTreeTasks } from "./branch-scan.mjs";
 import { DEFAULTS, loadConfigOrExit } from "./config.mjs";
 import { externalTargetsOf } from "./deploy-targets.mjs";
 import { printJson } from "./json-envelope.mjs";
@@ -449,7 +449,32 @@ const PRIMARY = COLLECTED[0] || { config: null, scan: { scanned: false, reason: 
 const CFG = PRIMARY.config;
 const SCAN = PRIMARY.scan;
 const INDEX = PRIMARY.index;
+// THE ELSEWHERE-ONLY TASKS THIS QUERY COULD MATCH (TL-715). The scan knows
+// their id and status only; the flags below are the criteria it cannot judge,
+// so a task they would decide is counted rather than named.
+const UNEVALUABLE = [
+  ["--priority", f.priority], ["--board", f.board], ["--label", f.label], ["--epic", f.epic],
+  ["--owner", f.owner], ["--type", f.type], ["--role", f.role], ["--executor", f.executor],
+  ["--release", f.release], ["--blocked-by", f.blockedBy], ["--conflict-group", f.conflictGroup],
+  ["--text", f.text || null], ["--modified-file", FILE_QUERY], ["--env", opts.env], ["--not-env", opts["not-env"]],
+].filter(([, value]) => value !== null && value !== undefined).map(([flag]) => flag);
+let ELSEWHERE_UNCHECKED = 0;
+for (const one of COLLECTED) {
+  const selected = elsewhereOnlyMatching(one.elsewhereOnly, {
+    ids: f.ids, statuses: f.status, scope: SCOPE, unevaluable: UNEVALUABLE,
+    archived: new Set(one.config ? one.config.archivedStatuses : ["done", "cancelled"]),
+  });
+  one.elsewhereOnly = selected.named;
+  ELSEWHERE_UNCHECKED += selected.unchecked.length;
+}
 const ELSEWHERE_ONLY = COLLECTED.flatMap((c) => c.elsewhereOnly);
+// Said once, whatever the output shape: a task left out because nothing could
+// judge it must not read as a task that does not exist.
+if (ELSEWHERE_UNCHECKED) {
+  console.error("# " + ELSEWHERE_UNCHECKED + (ELSEWHERE_UNCHECKED === 1 ? " task exists" : " tasks exist") +
+    " only on another branch and " + (ELSEWHERE_UNCHECKED === 1 ? "was" : "were") + " not checked against " +
+    UNEVALUABLE.join(", ") + " (the branch scan reads only id and status; --ids names one regardless)");
+}
 
 // EVERY LISTED ID THAT MATCHED NOTHING IS NAMED (TL-680), on stderr so stdout
 // stays rows, JSON or paths. A list that comes back one short is otherwise a
