@@ -22,7 +22,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { REPO_ROOT, SCRIPTS_DIR, isolateHome, isolateState, scriptSource, sourceRoot } from "./_repo.mjs";
 import {
-  DEFAULT_BUDGET_MINUTES, MIN_SWEEP_MARKER, SOURCE_ROOT_ENV, countMutants, estimateSeconds, formatDuration, leftoverProcesses,
+  DEFAULT_BUDGET_MINUTES, MIN_SWEEP_MARKER, SOURCE_ROOT_ENV, STOP_GRACE_MS, countMutants, estimateSeconds, formatDuration, leftoverProcesses,
   SANDBOX_GIT_INIT, SILENT_LOGGER, keepReport, changedLineRanges, directorySymlinks, importClosure, loadInstrumenter, main, mutateDescriptions,
   parseArgs, reachesCli, runStryker, sandboxCommand, selectTests, strykerConfig, strykerEnv, summarise, sweepLeftovers, timeTests, timingLimitSeconds, costReport, usage, workerTestArgs,
 } from "../mutation-run.mjs";
@@ -1671,12 +1671,27 @@ if (mode === "vanish") {
   rmSync(dirname(configPath), { recursive: true, force: true });
   process.exit(0);
 }
+if (mode === "obeys" || mode === "stubborn") {
+  // A helper in Stryker's own group whose command line names nothing of the
+  // run, so only a kill aimed at the group reaches it, not the sweep. Each
+  // records the SIGTERM it receives; under "obeys" Stryker ends on it and the
+  // helper does not, under "stubborn" the other way round.
+  const record = (name, exit) => "process.on('SIGTERM', () => { require('fs').writeFileSync('" + name + "', ''); "
+    + (exit ? "process.exit(0); " : "") + "}); setInterval(() => {}, 1000);";
+  const helper = spawn(process.execPath, ["-e", record("helper-termed", mode === "stubborn")], { stdio: "ignore" });
+  if (mode === "stubborn") {
+    for (const s of ["SIGTERM", "SIGINT"]) process.on(s, () => writeFileSync("stryker-termed", ""));
+  }
+  // Written once the helper's handler can run, so a signal sent on seeing it is never early.
+  setTimeout(() => writeFileSync("sleeping.json", JSON.stringify({ work: dirname(configPath), helper: helper.pid, stryker: process.pid })), 300);
+  setInterval(() => {}, 1000);
+}
 process.stdout.write("progress text\\n");
 process.stderr.write("progress on stderr\\n");
 writeFileSync(config.jsonReporter.fileName, JSON.stringify({ files: { "scripts/lib.mjs": { mutants: [] } } }));
 `;
 
-test("Stryker is handed its configuration, an environment of its own and the slot, and its directory is removed", () => {
+test("Stryker is handed its configuration, an environment of its own and the slot, and its directory is removed", async () => {
   const root = fixture();
   const bin = join(root, "fake-stryker.mjs");
   write(root, "fake-stryker.mjs", FAKE_STRYKER);
@@ -1685,7 +1700,10 @@ test("Stryker is handed its configuration, an environment of its own and the slo
   try {
     write(root, "mode.txt", "report");
     process.env.__STRYKER_ACTIVE_MUTANT__ = "41";
-    const r = runStryker(root, p, { concurrency: 1, json: true }, { token: "tok-1" }, () => bin);
+    const listening = ["SIGTERM", "SIGINT"].map((s) => process.listenerCount(s));
+    const r = await runStryker(root, p, { concurrency: 1, json: true }, { token: "tok-1" }, () => bin);
+    assert.deepEqual(["SIGTERM", "SIGINT"].map((s) => process.listenerCount(s)), listening,
+      "a finished run still listens for signals, and would act on a Stryker long gone");
     process.env.__STRYKER_ACTIVE_MUTANT__ = saved.mutant;
     if (saved.mutant === undefined) delete process.env.__STRYKER_ACTIVE_MUTANT__;
     assert.deepEqual(r, { code: 0, leftovers: [], kept: null, report: { files: { "scripts/lib.mjs": { mutants: [] } } } });
@@ -1702,20 +1720,20 @@ test("Stryker is handed its configuration, an environment of its own and the slo
     assert.equal(existsSync(dirname(seen.configPath)), false, "the run's work directory outlived it");
 
     write(root, "mode.txt", "stray");
-    const stray = runStryker(root, p, { concurrency: 1, json: true }, { token: "tok-2" }, () => bin);
+    const stray = await runStryker(root, p, { concurrency: 1, json: true }, { token: "tok-2" }, () => bin);
     const sandbox = JSON.parse(readFileSync(join(root, "seen.json"), "utf8")).config.tempDirName;
     assert.equal(stray.leftovers.length, 1, "a process naming the work directory was not swept: " + JSON.stringify(stray.leftovers));
     assert.ok(stray.leftovers[0].args.includes(sandbox), stray.leftovers[0].args);
 
     write(root, "mode.txt", "noreport");
-    const none = runStryker(root, p, { concurrency: 1, json: true }, { token: "tok-3" }, () => bin);
+    const none = await runStryker(root, p, { concurrency: 1, json: true }, { token: "tok-3" }, () => bin);
     assert.equal(none.code, 3);
     assert.equal(none.problem, "Stryker produced no report");
     assert.deepEqual(none.details, ["line 3", "line 4", "line 5", "line 6", "line 7", "line 8", "line 9", "line 10", "line 11", "out one"],
       "the details are not the last ten lines Stryker printed, trimmed and without blanks");
     assert.equal(existsSync(dirname(JSON.parse(readFileSync(join(root, "seen.json"), "utf8")).configPath)), false);
     // A text run hands Stryker the terminal, so its progress reaches the reader and nothing is captured.
-    const shown = runStryker(root, p, { concurrency: 1, json: false }, { token: "tok-4" }, () => bin);
+    const shown = await runStryker(root, p, { concurrency: 1, json: false }, { token: "tok-4" }, () => bin);
     assert.equal(shown.code, 3);
     assert.deepEqual(shown.details, [], "a text run captured what Stryker printed instead of showing it");
 
@@ -1726,7 +1744,7 @@ test("Stryker is handed its configuration, an environment of its own and the slo
     console.error = (...a) => errors.push(a.join(" "));
     let blind;
     try {
-      blind = runStryker(root, p, { concurrency: 1, json: true }, { token: "tok-5" }, () => bin, () => { throw new Error("ps: denied"); });
+      blind = await runStryker(root, p, { concurrency: 1, json: true }, { token: "tok-5" }, () => bin, () => { throw new Error("ps: denied"); });
     } finally {
       console.error = error;
     }
@@ -1737,14 +1755,89 @@ test("Stryker is handed its configuration, an environment of its own and the slo
 
     // A work directory that is already gone when the run ends is not an error of the run.
     write(root, "mode.txt", "vanish");
-    const vanished = runStryker(root, p, { concurrency: 1, json: true }, { token: "tok-6" }, () => bin, () => []);
+    const vanished = await runStryker(root, p, { concurrency: 1, json: true }, { token: "tok-6" }, () => bin, () => []);
     assert.equal(vanished.problem, "Stryker produced no report");
 
-    assert.deepEqual(runStryker(root, p, { concurrency: 1 }, { token: "t" }, () => null),
+    assert.deepEqual(await runStryker(root, p, { concurrency: 1 }, { token: "t" }, () => null),
       { code: 2, problem: "@stryker-mutator/core is not installed", next: ["npm install"] });
   } finally {
     if (saved.mutant === undefined) delete process.env.__STRYKER_ACTIVE_MUTANT__;
     else process.env.__STRYKER_ACTIVE_MUTANT__ = saved.mutant;
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// TL-713. A run cut off by `timeout` or Ctrl-C used to die inside spawnSync
+// with its work directory, a sandbox copy of the repository, left behind.
+test("a run terminated by a signal stops Stryker's group and removes its work directory", async () => {
+  const root = fixture();
+  const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+  const settle = async (check, ms = 10000) => {
+    for (let i = 0; i < ms / 50 && !check(); i++) await new Promise((r) => setTimeout(r, 50));
+    return check();
+  };
+  // Everything a run started, so a mutant that breaks the cleanup under test
+  // leaves nothing running or on disk after this test.
+  const started = { helpers: [], strykers: [], works: [] };
+  const probes = [];
+  try {
+    write(root, "fake-stryker.mjs", FAKE_STRYKER);
+    write(root, "probe.mjs", "import { runStryker } from " + JSON.stringify(pathToFileURL(ENTRY).href) + ";\n"
+      + "const r = await runStryker(process.cwd(), { mutate: [\"scripts/lib.mjs\"], tests: [{ file: \"scripts/tests/named.test.mjs\"}] },\n"
+      + "  { concurrency: 1, json: true }, { token: \"t\" }, () => process.argv[2]);\n"
+      + "process.stdout.write(JSON.stringify(r));\n"
+      + "process.exitCode = r.code;\n");
+    const cases = [["obeys", "SIGTERM", 143], ["obeys", "SIGINT", 130], ["stubborn", "SIGTERM", 143]];
+    for (const [mode, signal, code] of cases) {
+      const label = signal + " (Stryker " + mode + ")";
+      for (const f of ["sleeping.json", "helper-termed", "stryker-termed"]) rmSync(join(root, f), { force: true });
+      write(root, "mode.txt", mode);
+      const probe = spawn(process.execPath, [join(root, "probe.mjs"), join(root, "fake-stryker.mjs")], { cwd: root });
+      probes.push(probe);
+      let out = "";
+      probe.stdout.on("data", (c) => { out += c; });
+      probe.stderr.on("data", (c) => { out += c; });
+      let end = null;
+      probe.on("exit", (status, sig) => { end = { status, sig }; });
+      assert.ok(await settle(() => existsSync(join(root, "sleeping.json"))), "the fake Stryker never started: " + out);
+      const { work, helper, stryker } = JSON.parse(readFileSync(join(root, "sleeping.json"), "utf8"));
+      started.helpers.push(helper);
+      started.strykers.push(stryker);
+      started.works.push(work);
+      // POSITIVE CONTROL: before the signal the directory, a process naming
+      // it and the helper in Stryker's group all exist, so the checks below
+      // can fail.
+      assert.ok(existsSync(work), "the work directory did not exist while the run was going");
+      assert.ok(leftoverProcesses(work).length > 0, "no process named the work directory while the run was going");
+      assert.ok(alive(helper), "the helper in Stryker's group was not running");
+
+      const sent = Date.now();
+      probe.kill(signal);
+      assert.ok(await settle(() => end !== null, STOP_GRACE_MS + 10000), label + " did not end the run: " + out);
+      const took = Date.now() - sent;
+      assert.deepEqual(end, { status: code, sig: null }, label + " did not end the run with its conventional code: " + out);
+      const r = JSON.parse(out);
+      assert.equal(r.signal, signal);
+      assert.equal(r.problem, "the run was terminated by " + signal + "; Stryker was stopped and its work directory removed");
+      assert.equal(existsSync(work), false, "the work directory outlived " + label);
+      assert.deepEqual(leftoverProcesses(work), [], "a process naming the work directory outlived " + label);
+      assert.equal(alive(helper), false, "the helper in Stryker's group outlived " + label);
+      // SIGTERM first, so a test run's own group is stopped by the
+      // mutation-contain.mjs that leads it, which a SIGKILL would not let run.
+      assert.ok(existsSync(join(root, "helper-termed")), "Stryker's group was not sent SIGTERM before SIGKILL: " + label);
+      if (mode === "obeys") {
+        // Stryker ended on SIGTERM, so its group is killed then, not after the grace period.
+        assert.ok(took < STOP_GRACE_MS, label + " waited out the grace period although Stryker had ended: " + took + " ms");
+      } else {
+        assert.ok(existsSync(join(root, "stryker-termed")), "Stryker was not sent SIGTERM: " + label);
+        assert.ok(took >= STOP_GRACE_MS, "a Stryker that ignores SIGTERM ended before the grace period: " + took + " ms");
+      }
+    }
+  } finally {
+    for (const probe of probes) probe.kill("SIGKILL");
+    for (const pid of started.strykers) { try { process.kill(-pid, "SIGKILL"); } catch { /* already gone */ } }
+    for (const pid of [...started.strykers, ...started.helpers]) { try { process.kill(pid, "SIGKILL"); } catch { /* already gone */ } }
+    for (const work of started.works) rmSync(work, { recursive: true, force: true });
     rmSync(root, { recursive: true, force: true });
   }
 });
@@ -2018,7 +2111,7 @@ test("a text run hands Stryker the terminal, so what it prints reaches the reade
     write(root, "fake-stryker.mjs", FAKE_STRYKER);
     write(root, "mode.txt", "report");
     write(root, "probe.mjs", "import { runStryker } from " + JSON.stringify(pathToFileURL(ENTRY).href) + ";\n"
-      + "const r = runStryker(process.cwd(), { mutate: [\"scripts/lib.mjs\"], tests: [{ file: \"scripts/tests/named.test.mjs\" }] },\n"
+      + "const r = await runStryker(process.cwd(), { mutate: [\"scripts/lib.mjs\"], tests: [{ file: \"scripts/tests/named.test.mjs\" }] },\n"
       + "  { concurrency: 1, json: false }, { token: \"t\" }, () => process.argv[2], () => []);\n"
       + "process.exitCode = r.code;\n");
     const r = spawnSync(process.execPath, [join(root, "probe.mjs"), join(root, "fake-stryker.mjs")], { cwd: root, encoding: "utf8" });
