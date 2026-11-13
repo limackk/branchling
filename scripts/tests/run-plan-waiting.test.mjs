@@ -26,6 +26,13 @@
  *                           without the flag takes nothing (the control).
  *   the sentence          — pure cases for every clause, including the spill
  *                           whose counts describe a different wave.
+ *   the field (TL-729)    — `planWaiting` in the envelope carries the kind, the
+ *                           waiting wave and its ids for a claimed and a
+ *                           merge-awaiting wave, and is null for a
+ *                           nothing-to-take wave, for a run without --plan,
+ *                           and for a run that waited on a wave, took a task
+ *                           and then stopped on --max-tasks with no later
+ *                           `next` answer to overwrite the field.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -36,7 +43,7 @@ import { join } from "node:path";
 
 import { fixtureDir } from "./_fixture-dir.mjs";
 import { isolateHome, posixPath, SCRIPTS_DIR } from "./_repo.mjs";
-import { planStop, planWaiting } from "../run-loop.mjs";
+import { planStop, planWaiting, planWaitingWave } from "../run-loop.mjs";
 
 isolateHome("run-plan-waiting");
 
@@ -179,6 +186,37 @@ test("a wave waiting on a merge is polled under --wait, and the run resumes once
   assert.equal(report.tally.closed, 1, report.stopped);
   assert.equal(statusOf(f.backlog, f.ids.c), "done");
   assert.equal(report.stopped, "every wave of the plan is finished");
+  // The run did not STOP on the waiting wave, so the field it waited on is gone.
+  assert.equal(report.planWaiting, null);
+});
+
+test("a run that waited on a merge, then took a task and stopped on --max-tasks, reports planWaiting null", () => {
+  // The previous case ends on another `next` answer, which overwrites the
+  // field by itself. Here the run stops at the top of the loop after the take,
+  // so no later answer can clear what the wait left behind: only the take can.
+  const f = tree({ feature: (t) => setField(t.backlog, t.ids.a, "status", "done") });
+  const calls = posixPath(join(f.dir, "calls"));
+  const gate = script(f.dir, "gate.sh", [
+    "echo x >> " + JSON.stringify(calls),
+    "n=$(wc -l < " + JSON.stringify(calls) + " | tr -d ' ')",
+    'if [ "$n" -eq 2 ]; then git merge -q --ff-only feature >/dev/null 2>&1 || exit 9; fi',
+  ].join("\n"));
+  const report = run(f, ["--before-next", gate, "--wait", "1", "--wait-max", "60", "--max-tasks", "1"]);
+  assert.equal(report.waited.polls, 1, "the run did not wait on the merge first: " + report.stopped);
+  assert.deepEqual(report.tasks.map((t) => t.id), [f.ids.c]);
+  assert.match(report.stopped, /--max-tasks 1/);
+  assert.equal(report.planWaiting, null, "the wave the run waited on before its take survived the take");
+});
+
+test("planWaiting names a wave waiting on a merge as a field", () => {
+  const f = tree({ feature: (t) => setField(t.backlog, t.ids.a, "status", "done") });
+  const report = run(f);
+  assert.equal(report.tally.taken, 0);
+  assert.match(report.stopped, /\(wave-awaits-merge\)/);
+  assert.deepEqual(report.planWaiting, {
+    kind: "wave-awaits-merge", wave: 1, name: "First",
+    claimedElsewhere: [], awaitingMerge: [f.ids.a], waitingBehind: [],
+  });
 });
 
 test("a wave waiting on a claim is named with its kind and ids, and --wait-max ends the wait", () => {
@@ -194,6 +232,10 @@ test("a wave waiting on a claim is named with its kind and ids, and --wait-max e
       "; 1 open task in later waves is not reached yet" +
       "; waited 2s (--wait-max) and nothing was freed");
   assert.equal(statusOf(f.backlog, f.ids.c), "pending", "the run reached past the waiting wave without --spill");
+  assert.deepEqual(report.planWaiting, {
+    kind: "wave-claimed-elsewhere", wave: 1, name: "First",
+    claimedElsewhere: [f.ids.a], awaitingMerge: [], waitingBehind: [],
+  });
 
   const text = cli(["run", "--dir", f.backlog, "--actor", RUN_ACTOR, "--agent", worker(f.dir), "--plan"],
     f.env, { cwd: f.repoRoot });
@@ -222,6 +264,20 @@ test("a wave `next` calls nothing-to-take ends the run at once under --wait", ()
     "plan wave 1 (First) is not finished — 1 of 1 task in it is still open and none was free to take" +
       ", 1 open task in later waves is not reached yet");
   assert.equal(statusOf(f.backlog, f.ids.a), "blocked");
+  assert.equal(report.planWaiting, null, "a nothing-to-take wave was reported as waiting");
+});
+
+test("planWaiting is null for a run without --plan, even where the plan has a waiting wave", () => {
+  // The same claimed wave that fills the field under --plan: without the flag
+  // the run takes wave 2's task and stops on an empty queue.
+  const f = tree({ setup: claimedHere });
+  const r = cli(["run", "--dir", f.backlog, "--actor", RUN_ACTOR, "--agent", worker(f.dir), "--json"],
+    f.env, { cwd: f.repoRoot });
+  assert.equal(r.code, 0, r.out + r.err);
+  const report = JSON.parse(r.out);
+  assert.ok(Object.hasOwn(report, "planWaiting"), "the envelope does not declare planWaiting");
+  assert.equal(report.planWaiting, null);
+  assert.deepEqual(report.tasks.map((t) => t.id), [f.ids.c]);
 });
 
 // ── `--spill` reaches `next` ───────────────────────────────────────────────
@@ -258,6 +314,11 @@ test("--spill into a wave with nothing free says so", () => {
     "plan wave 1 (First) is waiting on claims held in another tree or session (wave-claimed-elsewhere)" +
       " — claimed in another tree or session: " + f.ids.a +
       "; `--spill` drew from wave 2 (Second) and none of its tasks was free to take");
+  // The field names the WAITING wave, not wave 2 the run drew from.
+  assert.deepEqual(report.planWaiting, {
+    kind: "wave-claimed-elsewhere", wave: 1, name: "First",
+    claimedElsewhere: [f.ids.a], awaitingMerge: [], waitingBehind: [],
+  });
 });
 
 test("--spill is refused without --plan and with --dry-run, and run --help declares it", () => {
@@ -368,6 +429,31 @@ test("planStop with no id lists or wave names still says what it knows", () => {
   })), "plan wave 1 (unnamed) is waiting on claims held in another tree or session (wave-claimed-elsewhere)" +
     " — claimed in another tree or session: X-1; `--spill` drew from wave 2 (unnamed) and none of its tasks" +
     " was free to take");
+});
+
+test("planWaitingWave: the waiting wave's kind and ids, and null for every other answer", () => {
+  assert.deepEqual(planWaitingWave(answer("wave-claimed-elsewhere", {
+    claimedElsewhere: ["X-1"], awaitingMerge: ["X-2"], waitingBehind: ["X-3"],
+  })), {
+    kind: "wave-claimed-elsewhere", wave: 1, name: "First",
+    claimedElsewhere: ["X-1"], awaitingMerge: ["X-2"], waitingBehind: ["X-3"],
+  });
+  // Under --spill `plan.wave` is the wave drawn from; the field names the one waited on.
+  assert.deepEqual(planWaitingWave(answer("wave-awaits-merge", {
+    wave: 2, name: "Second", awaitingMerge: ["X-2"],
+    spill: { from: 1, fromName: "First", refusalKind: "wave-awaits-merge", claimedElsewhere: [],
+      awaitingMerge: ["X-2"], wave: 2, name: "Second" },
+  })), {
+    kind: "wave-awaits-merge", wave: 1, name: "First",
+    claimedElsewhere: [], awaitingMerge: ["X-2"], waitingBehind: [],
+  });
+  // An answer with the kind and no id lists still gives lists, never undefined.
+  assert.deepEqual(planWaitingWave({ refusalKind: "wave-awaits-merge", plan: { wave: 3 } }), {
+    kind: "wave-awaits-merge", wave: 3, name: "", claimedElsewhere: [], awaitingMerge: [], waitingBehind: [],
+  });
+  assert.equal(planWaitingWave(answer("nothing-to-take")), null);
+  assert.equal(planWaitingWave({ refusalKind: "wave-claimed-elsewhere", plan: null }), null);
+  assert.equal(planWaitingWave(null), null);
 });
 
 test("planStop keeps the old sentence for nothing-to-take, and for a finished plan", () => {

@@ -122,6 +122,13 @@ export const KINDS = {
     // `{count, ids}` of the tasks another tree of this clone holds open, read
     // from the last "nothing to take" answer (TL-491).
     heldInOtherTrees: null,
+    // `{kind, wave, name, claimedElsewhere, awaitingMerge, waitingBehind}` of
+    // the wave the run stopped on when `next --plan` called it waiting
+    // (TL-729): `kind` is `wave-claimed-elsewhere` or `wave-awaits-merge`, and
+    // `wave` the waiting one even under `--spill`. Null when the run ran
+    // without `--plan`, did not stop on a "nothing to take" answer, or stopped
+    // on one whose kind was `nothing-to-take`.
+    planWaiting: null,
     // `{polls, seconds, gaveUp}` under `--wait` (TL-491).
     waited: null,
     // Which rung named the run's actor (TL-550): `flag`, `env`, `config`,
