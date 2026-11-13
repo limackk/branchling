@@ -19,7 +19,8 @@ import { join } from "node:path";
 
 import { fixtureDir } from "./_fixture-dir.mjs";
 import { SCRIPTS_DIR, isolateHome, plainOutput } from "./_repo.mjs";
-import { wantsHelp, COMMANDS } from "../cli.mjs";
+import { wantsHelp, COMMANDS, takeColorFlags, literalValueFlagsFor } from "../cli.mjs";
+import { takeDirFlag } from "../paths.mjs";
 
 isolateHome("query-text-dash");
 plainOutput();
@@ -95,4 +96,89 @@ test("--help elsewhere on the line still asks for help", () => {
   assert.equal(wantsHelp(["--help", "--text", "x"], literal), true);
   // A command without the list keeps the old scan.
   assert.equal(wantsHelp(["--text", "--help"]), true);
+});
+
+/**
+ * A value that spells a DISPATCHER flag (TL-718). `--color` and `--no-color`
+ * are taken off the line by `takeColorFlags()` before the command runs, and
+ * the help path reads `--dir` with `takeDirFlag()`; both now skip the token
+ * after a flag in the command's `literalValueFlags`, as query's parser does.
+ *
+ * The fixture holds one title per spelling and one without, so a search that
+ * lost its value (and took the next flag as it, or matched everything) fails.
+ */
+const DISPATCHER_TITLES = [
+  "Explain what --color forces",
+  "Explain what --no-color turns off",
+  "Explain where --dir points",
+  "Plain title with no flag",
+];
+
+function dispatcherFixture() {
+  const dir = fixtureDir(join(tmpdir(), "branchling-query-text-dispatcher-"));
+  assert.equal(run(["init", "--dir", dir, "--no-example"]).status, 0);
+  const ids = [];
+  for (const title of DISPATCHER_TITLES) {
+    const r = run(["new", "--dir", dir, "--title", title]);
+    assert.equal(r.status, 0, r.stderr);
+    ids.push(r.stdout.match(/[A-Z]+-\d+/)[0]);
+  }
+  return { dir, ids };
+}
+
+test("query --text takes --color, --no-color and --dir as its value", () => {
+  const { dir, ids } = dispatcherFixture();
+  // Positive control: all four tasks are there and a plain search narrows.
+  assert.equal(ask(dir).length, 4);
+  assert.deepEqual(ask(dir, "--text", "no flag"), [ids[3]]);
+
+  // "--no-color" does not contain "--color" (the dashes precede "no"), so
+  // each value matches exactly its own title.
+  assert.deepEqual(ask(dir, "--text", "--color", "--scope", "all"), [ids[0]]);
+  assert.deepEqual(ask(dir, "--text", "--no-color", "--scope", "all"), [ids[1]]);
+  assert.deepEqual(ask(dir, "--text", "--dir", "--scope", "all"), [ids[2]]);
+
+  // The colour flag still works where it IS a flag, on the same line.
+  assert.deepEqual(ask(dir, "--no-color", "--text", "--color"), [ids[0]]);
+  // The line from the report: a count, and no "unexpected argument".
+  const r = run(["query", "--dir", dir, "--text", "--color", "--scope", "all", "--count"]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout.trim(), "1");
+});
+
+test("the dispatcher's readers skip the token after a literal-value flag", () => {
+  const literal = COMMANDS.query.literalValueFlags;
+  assert.deepEqual(literalValueFlagsFor(["query", "--text", "x"]), literal);
+  assert.deepEqual(literalValueFlagsFor(["--no-color", "query"]), literal);
+  assert.deepEqual(literalValueFlagsFor(["new", "--title", "x"]), []);
+  assert.deepEqual(literalValueFlagsFor(["frobnicate"]), []);
+
+  assert.deepEqual(takeColorFlags(["query", "--text", "--color", "--no-color"], literal),
+    { argv: ["query", "--text", "--color"], force: false });
+  assert.deepEqual(takeColorFlags(["query", "--text", "--no-color"], literal),
+    { argv: ["query", "--text", "--no-color"], force: null });
+  // Without the list the old reading holds: every colour flag is taken.
+  assert.deepEqual(takeColorFlags(["query", "--text", "--color"]),
+    { argv: ["query", "--text"], force: true });
+
+  assert.deepEqual(takeDirFlag(["--dir", "A", "--text", "--dir"], { literalValueFlags: literal }),
+    { dir: "A", argv: ["--text", "--dir"] });
+  assert.deepEqual(takeDirFlag(["--text", "--dir", "--dir", "B"], { literalValueFlags: literal }),
+    { dir: "B", argv: ["--text", "--dir"] });
+  assert.deepEqual(takeDirFlag(["--text", "--dir", "B"]), { dir: "B", argv: ["--text"] });
+  // A literal-value flag closing the line hands on no phantom value: the
+  // command's own parser reports the missing value, not an `undefined` one.
+  assert.deepEqual(takeDirFlag(["--dir", "A", "--text"], { literalValueFlags: literal }),
+    { dir: "A", argv: ["--text"] });
+  assert.deepEqual(takeColorFlags(["query", "--text"], literal),
+    { argv: ["query", "--text"], force: null });
+});
+
+test("help --json reads --dir past a --text value that spells it", () => {
+  const { dir } = dispatcherFixture();
+  // `--text --dir` is a search value, so `--dir <fixture>` names the backlog;
+  // read as a flag, the second `--dir` would point the help at "--help".
+  const r = run(["query", "--dir", dir, "--text", "--dir", "--help", "--json"]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(JSON.parse(r.stdout).configured, true);
 });

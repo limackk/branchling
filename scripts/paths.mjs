@@ -297,8 +297,13 @@ export function resolveBacklogPaths(opts = {}) {
  * `opts.missing` lets a command retain the wording it already used for a bare
  * `--dir`. The grammar is shared; the diagnostic remains part of that command's
  * established interface.
+ *
+ * `opts.literalValueFlags` names flags whose next token is a value whatever it
+ * spells (TL-691, TL-718): `query --text --dir` searches for "--dir", so that
+ * token is handed on with its flag rather than read as this one.
  */
 export function takeDirFlag(argv, opts = {}) {
+  const literal = opts.literalValueFlags || [];
   const rest = [];
   let dir = null;
   for (let i = 0; i < argv.length; i++) {
@@ -307,6 +312,11 @@ export function takeDirFlag(argv, opts = {}) {
       // is a flag name is only distinguishable from a flag by its presence.
       rest.push(...argv.slice(i));
       break;
+    }
+    if (literal.includes(argv[i])) {
+      rest.push(argv[i]);
+      if (i + 1 < argv.length) rest.push(argv[++i]);
+      continue;
     }
     if (argv[i] === "--dir") {
       dir = argv[++i] || null;
