@@ -2272,6 +2272,19 @@ for (const shape of FIELD_SHAPES) {
 }
 
 /**
+ * The vocabulary the LEFT side of a `<left>=<right>` flag draws on (TL-719).
+ *
+ * `FLAG_DICTIONARY` names a pair flag's vocabulary by the field it writes, and
+ * for `import --status <from>=<to>` that field is reached through the RIGHT
+ * side: `<from>` is a name in the system being imported from. `run --agent-for
+ * <role>=<command>` is the mirror image — the left side is one of this
+ * project's roles and the right is a command line — so the side cannot be
+ * inferred from the flag being a pair and is declared here, per flag. A pair
+ * flag absent from this table has a free-text left side.
+ */
+const PAIR_SOURCE_DICTIONARY = { "--agent-for": "roles", "--profile-for": "roles" };
+
+/**
  * A vocabulary's values, and whether it is CLOSED — that is, whether a value
  * outside it is refused.
  *
@@ -2314,19 +2327,25 @@ function vocabulary(dictionary, config, command) {
  */
 export function commandHelpJson(name, spec, config) {
   const flags = describeFlags(spec.usage).map((f) => {
+    const side = (arg, dictionary) => ({
+      arg, dictionary,
+      ...(dictionary ? vocabulary(dictionary, config, name) : { values: null, closed: null }),
+    });
     const dictionary = FLAG_DICTIONARY[f.flag] || null;
-    const { values, closed } = dictionary ? vocabulary(dictionary, config, name) : { values: null, closed: null };
     // A `<from>=<to>` pair draws on no vocabulary as a whole; the field's
     // vocabulary applies to `<to>` alone, so it moves under `target` and the
     // flag's own `dictionary`, `values` and `closed` say "free text" (TL-693).
+    // The left side is described under `source`, from its own table (TL-719).
     const pair = mappingArg(f.arg);
     if (pair) {
       return {
         ...f, dictionary: null, values: null, closed: null,
-        target: { arg: pair.to, dictionary, values, closed },
+        source: side(pair.from, PAIR_SOURCE_DICTIONARY[f.flag] || null),
+        target: side(pair.to, dictionary),
       };
     }
-    return { ...f, dictionary, values, closed, target: null };
+    const { values, closed } = side(f.arg, dictionary);
+    return { ...f, dictionary, values, closed, source: null, target: null };
   });
   return {
     command: name,

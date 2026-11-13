@@ -435,11 +435,12 @@ Common to all of them:
 and which draw on a vocabulary — with that project's values — so an interface
 builds its forms from the answer rather than from this table.
 
-Each flag entry is `{ flag, arg, required, dictionary, values, closed, target }`.
-A flag whose argument is a pair written `<left>=<right>` carries that whole
-argument in `arg`, `null` in `dictionary`, `values` and `closed`, and its
-right-hand side under `target`, as `{ arg, dictionary, values, closed }`; a
-flag with any other argument carries `target: null`. For `import --status`,
+Each flag entry is `{ flag, arg, required, dictionary, values, closed, source,
+target }`. A flag whose argument is a pair written `<left>=<right>` carries that
+whole argument in `arg`, `null` in `dictionary`, `values` and `closed`, its
+left-hand side under `source` and its right-hand side under `target`, each as
+`{ arg, dictionary, values, closed }`; a flag with any other argument carries
+`source: null` and `target: null`. For `import --status`,
 `--priority` and `--label` (`<from>=<to>`) the value as a whole is free text —
 `<from>` is a name in the system being imported from, never in this project's
 vocabulary — and `target` carries the vocabulary `<to>` must belong to. A pair
@@ -449,6 +450,15 @@ whose right-hand side draws on no vocabulary (`declare --stage
 built from it offered only values that `import` refuses as not a mapping. The
 change corrects those three entries and adds a key, so `schemaVersion` did not
 move.
+
+`run --agent-for <role>=<command>` and `--profile-for <role>=<name>` are the
+mirror image: the left side is one of this project's `roles:`, so `source`
+carries `dictionary: "roles"` with the project's roles and `closed: true`,
+while `target` describes the command or profile name as free text. For the
+`import` mapping flags `source.dictionary` is `null`, since `<from>` is a
+foreign name. Until TL-719 the left side was not described at all, and both
+sides of these two flags read as free text; `source` is a new key under the
+same `schemaVersion`.
 
 ## Pinning a version
 
