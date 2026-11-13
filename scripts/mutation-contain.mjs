@@ -36,11 +36,19 @@ else {
   process.exitCode = 2;
 }
 
+// stdin is closed, not inherited (TL-732). Stryker's command runner starts
+// its command with `exec()`, which hands it a pipe nothing ever writes to or
+// closes. A node left without a script — a mutant that drops `--test` from
+// the test command — reads its program from stdin, so it waited on that pipe
+// until Stryker's timeout and was reported as a Timeout, indistinguishable
+// from an overloaded machine. No test command, and no git a test runs, reads
+// stdin; with it closed that node runs an empty program and ends at once.
+//
 // `process.exitCode`, never `process.exit()`: an exit drops stderr still
 // queued on an asynchronous pipe (TL-440). Nothing but the child keeps this
 // process alive, so it ends when the child does.
 function contain(command, args) {
-  const child = spawn(command, args, { stdio: "inherit", detached: processTreeDetached() });
+  const child = spawn(command, args, { stdio: ["ignore", "inherit", "inherit"], detached: processTreeDetached() });
   const reap = () => stopProcessTree(child, "SIGKILL");
 
   // A signal stops the whole group; the child's `exit` then ends this process.
