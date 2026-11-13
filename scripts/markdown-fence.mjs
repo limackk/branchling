@@ -1,12 +1,15 @@
 /**
  * Which lines of a markdown text are code inside a fenced block (TL-669).
  *
- * One rule, two readers: `demoteHeadings()` in `import-body.mjs` must not
+ * One rule, three readers: `demoteHeadings()` in `import-body.mjs` must not
  * shift a heading-shaped line that is code, and `parseCriteria()` in
  * `criteria.mjs` must not take one for the criteria section or for the
- * heading that ends it. Written once so the two cannot disagree about where a
- * block ends — a body the importer left alone as code would otherwise be read
- * by the parser as a contract.
+ * heading that ends it. Written once so the readers cannot disagree about
+ * where a block ends — a body the importer left alone as code would otherwise
+ * be read by the parser as a contract. `auditText()` in
+ * `check-no-foreign-context.mjs` reads by it too (TL-708): a measurement inside
+ * a block is the command that reproduces it, so the guard has to end a block
+ * where the others do.
  *
  * The rule is CommonMark's: an opening line is up to three spaces, then three
  * or more backticks or tildes; the block closes on a line of the SAME

@@ -73,6 +73,7 @@ import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadUserConfig, USER_KEYS } from "./home.mjs";
+import { fencedLines } from "./markdown-fence.mjs";
 import { MARK, color, errColor, plural } from "./ui.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -112,13 +113,6 @@ export function stripLinkTargets(line) {
   return String(line).replace(/\]\([^)]*\)/g, "]()");
 }
 
-/** A line of a fenced block, and the fence itself, are not prose. A command
- *  that PRINTS a big number is the replacement this guard is asking for, so
- *  flagging it would forbid the fix. */
-function fenceState(line, inside) {
-  return /^\s*```/.test(line) ? !inside : inside;
-}
-
 /**
  * PURE — audits already-read text so a test can exercise it without a tree.
  *
@@ -131,11 +125,16 @@ export function auditText(text, words = [], { measurements = true } = {}) {
   const forbidden = (words || []).filter(Boolean)
     .map((w) => new RegExp("\\b" + w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "i"));
   const problems = [];
-  let inFence = false;
+  // A line of a fenced block, and the fence itself, are not prose. A command
+  // that PRINTS a big number is the replacement this guard is asking for, so
+  // flagging it would forbid the fix. WHICH lines those are is `fencedLines()`,
+  // the CommonMark rule the criteria parser and the importer read by (TL-708):
+  // a private toggle on any backtick line missed tilde fences and let an inner
+  // ``` close a ```` block, so code was judged as prose, and prose after a
+  // block closed in the wrong place escaped the guard.
+  const code = fencedLines(lines);
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const wasInFence = inFence;
-    inFence = fenceState(line, inFence);
     const allowed = line.includes(ALLOW_MARKER) || (i > 0 && lines[i - 1].includes(ALLOW_MARKER));
     if (allowed) continue;
     // A NAME IS SEARCHED EVERYWHERE, a measurement only in prose. A command in
@@ -163,7 +162,7 @@ export function auditText(text, words = [], { measurements = true } = {}) {
       problems.push({ line: i + 1, text: line.trim(), reason: "email" });
       continue;
     }
-    if (wasInFence || inFence) continue;
+    if (code[i]) continue;
     if (!measurements) continue;
     if (BIG_COUNT.test(line)) {
       problems.push({ line: i + 1, text: line.trim(), reason: "measurement" });

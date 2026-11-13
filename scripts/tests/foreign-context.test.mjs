@@ -82,6 +82,37 @@ test("a fenced block is exempt — the command IS the replacement", () => {
     "flagging the fix would leave nothing to replace a measurement with");
 });
 
+// WHICH LINES ARE A FENCE is the CommonMark rule in `markdown-fence.mjs`, the
+// one the criteria parser and the importer read by (TL-708). The guard used to
+// toggle on any line starting with ```, so a tilde block was prose and an inner
+// ``` closed a ```` block. Each case pairs the line inside the block with the
+// SAME line outside it: an exemption proved only by silence would also pass a
+// guard that had stopped reporting measurements altogether.
+const MEASURED = "branchling query --status done --count   # prints 1362 tasks";
+const measuredAt = (text) => auditText(text, []).filter((p) => p.reason === "measurement").map((p) => p.line);
+
+test("POSITIVE CONTROL: the line the fence cases exempt is a measurement in prose", () => {
+  assert.deepEqual(reasons(MEASURED), ["measurement"]);
+});
+
+test("a tilde fence is a fenced block, and the same line after it is prose again", () => {
+  const doc = ["Measure it yourself:", "~~~bash", MEASURED, "~~~", MEASURED].join("\n");
+  assert.deepEqual(measuredAt(doc), [5],
+    "line 3 is code inside `~~~`; line 5 is the same text in prose after the block closed");
+});
+
+test("a ```` fence holds an inner ``` line, and the same line after it is prose again", () => {
+  // A document that SHOWS how to write a fenced block: the outer four-backtick
+  // fence closes only on a line of at least four backticks.
+  const doc = ["How to write it:", "````markdown", "```bash", MEASURED, "```", "````", MEASURED].join("\n");
+  assert.deepEqual(measuredAt(doc), [7],
+    "line 4 is code — the inner ``` opens nothing; line 7 is prose after the ```` closed");
+  // An inner ``` with no partner of its own: a toggle closes the block on it and
+  // reopens it on the ````, which judges line 3 as prose and hides line 6.
+  const unpaired = ["````markdown", "```bash", MEASURED, "````", "", MEASURED].join("\n");
+  assert.deepEqual(measuredAt(unpaired), [6]);
+});
+
 test("a name inside a fence is still caught — a fence exempts numbers, not identity", () => {
   const doc = ["```bash", "cd /home/jane/acme", "```"].join("\n");
   assert.deepEqual(reasons(doc), ["personal-path"]);
