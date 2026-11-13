@@ -1,0 +1,2 @@
+{"id":"01M7A2PW8CFDNSTR3WDH9ZPPTC","ts":"2026-11-13T09:09:39.212Z","task":"TL-731","field":"__created__","from":"","to":"run --dry-run --plan --spill projects past a waiting wave","actor":"agent:loop-1","source":"new","reason":"unknown"}
+{"id":"01M7A2Q7NDY9WV91E4ZRPQTE0W","ts":"2026-11-13T09:09:50.893Z","task":"TL-731","field":"blocked_by","from":[],"to":["TL-707"],"actor":"agent:loop-1","source":"set","reason":"builds on the waiting-kind handling TL-707 adds to run-loop.mjs"}

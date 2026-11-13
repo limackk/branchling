@@ -89,7 +89,7 @@ import { roleBrief } from "./instructions.mjs";
 import { userConfigPath } from "./home.mjs";
 import { lockScope, releaseLock, stateRoot } from "./lock.mjs";
 import { clearStop, requestStop, STOP_SINCE_ENV, stopRequestedSince } from "./run-stop.mjs";
-import { callerSpecies, deadlockIdentity, describeConflict, describeDeadlock, isOverSized, parkedByRun, queueStatuses, readDispatchRecords, selectCandidates, servesExecutor } from "./next-task.mjs";
+import { callerSpecies, deadlockIdentity, describeConflict, describeDeadlock, isOverSized, parkedByRun, queueStatuses, readDispatchRecords, selectCandidates, servesExecutor, WAVE_AWAITS_MERGE, WAVE_CLAIMED_ELSEWHERE, waitingIds, waitingPhrase } from "./next-task.mjs";
 import { answerBacklogDirRefusal, backlogPaths, isBacklogDirRefusal, repositoryRoot, resolveBacklogDir } from "./paths.mjs";
 import { loadPlanForDispatch, planState, projectionWall } from "./plan.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
@@ -125,6 +125,7 @@ export const RUN_FLAGS = [
   "--dir", "--actor", "--agent", "--agent-for", "--profile", "--profile-for", "--max-attempts", "--max-tasks", "--timeout",
   "--log-dir", "--stuck-status", "--delegation", "--allow-uncontrolled-delegation", "--json", "--dry-run", "--plan", "--probe",
   "--board", "--label", "--priority", "--epic", "--stop", "--clear", "--before-next", "--commit-state", "--wait", "--wait-max",
+  "--spill",
 ];
 
 /** What `--stop` may be combined with: it names a clone and who asks, nothing a
@@ -144,7 +145,7 @@ export function parseRunArgs(args) {
     dir: null, actor: null, agent: null, profile: null, agentFor: {}, profileFor: {}, json: false, dryRun: false, usePlan: false,
     maxAttempts: DEFAULT_MAX_ATTEMPTS, maxTasks: 0, timeout: DEFAULT_TIMEOUT_SECONDS, probe: false, delegation: "provider", allowUncontrolledDelegation: false,
     logDir: null, stuckStatus: null, board: null, label: null, priority: null, epic: null, stop: false, clear: false,
-    beforeNext: null, commitState: false, wait: 0, waitMax: 0,
+    beforeNext: null, commitState: false, wait: 0, waitMax: 0, spill: false,
   };
   const given = [];
   const numbers = { "--max-attempts": "maxAttempts", "--max-tasks": "maxTasks", "--timeout": "timeout", "--wait": "wait", "--wait-max": "waitMax" };
@@ -158,6 +159,7 @@ export function parseRunArgs(args) {
     if (a === "--probe") { plan.probe = true; continue; }
     if (a === "--allow-uncontrolled-delegation") { plan.allowUncontrolledDelegation = true; continue; }
     if (a === "--plan") { plan.usePlan = true; continue; }
+    if (a === "--spill") { plan.spill = true; continue; }
     if (a === "--commit-state") { plan.commitState = true; continue; }
     if (RUN_FLAGS.indexOf(a) >= 0) {
       const value = args[++i] || null;
@@ -226,11 +228,22 @@ export function parseRunArgs(args) {
   // A bound on nothing is a typo for the flag it bounds, and a silent no-op.
   if (plan.waitMax && !plan.wait) throw new Error("`--wait-max` bounds `--wait`, which was not given");
   if (plan.wait && !plan.waitMax) plan.waitMax = DEFAULT_WAIT_MAX_SECONDS;
-  // These act on the live loop only: a dry run calls no `next` to gate, writes
-  // no state to commit and has no claim to wait for, and a flag that silently
-  // did nothing would read as a gate that passed (TL-489, TL-491).
+  // `--spill` changes which wave `next --plan` draws from (TL-707). Without
+  // `--plan` the run would never pass it on, and a flag dropped in silence
+  // reads exactly like one that was honoured.
+  if (plan.spill && !plan.usePlan) {
+    throw new Error(
+      "`--spill` with no `--plan`\n" +
+        "It lets `--plan` draw from the next wave while the active one waits on other\n" +
+        "trees; on its own there is no wave to spill out of."
+    );
+  }
+  // These act on the live loop only: a dry run calls no `next` to gate, to
+  // spill or to wait for, and writes no state to commit, and a flag that
+  // silently did nothing would read as a gate that passed (TL-489, TL-491,
+  // TL-707).
   if (plan.dryRun) {
-    const live = given.filter((f) => ["--before-next", "--commit-state", "--wait", "--wait-max"].includes(f));
+    const live = given.filter((f) => ["--before-next", "--commit-state", "--wait", "--wait-max", "--spill"].includes(f));
     if (live.length) {
       throw new Error("`--dry-run` claims nothing, so " + live.join(" and ") + " has nothing to act on");
     }
@@ -312,12 +325,20 @@ export function servedRoles(plan) {
  * re-asks `next` in the foreground while the wave is in flight; without it only
  * the sentence changes.
  *
+ * A WAVE `next` CALLS WAITING IS NAMED AS WAITING (TL-707): the kind, in words
+ * and as `next`'s own token, and every open id it waits on — the ids come from
+ * the answer, so the sentence lists what `next` judged, not what this loop
+ * would have judged. Under `--spill` the waiting wave is `plan.spill.from`;
+ * `plan.wave` is then the one drawn from.
+ *
  * @param {object|null} answer the `task-take` envelope `next` printed on exit 3
  * @returns {string|null} the sentence, or null when that answer carries no plan
  */
 export function planStop(answer) {
   const plan = answer && answer.plan;
   if (!plan) return null;
+  const kind = planWaiting(answer);
+  if (kind) return waitingStop(plan, kind);
   // Never silent: open work this run stepped over is exactly the part a reader
   // would otherwise take "the queue is empty" to cover.
   //
@@ -330,20 +351,68 @@ export function planStop(answer) {
   // Work waiting for its turn is reported separately, and only where there is a
   // turn to wait for.
   const unplanned = plan.skippedUnplanned;
-  const unplannedClause = unplanned
-    ? ", and " + unplanned + " open " + plural(unplanned, "task", "tasks") + " the plan does not schedule " +
-      plural(unplanned, "was", "were") + " left alone"
-    : "";
+  const unplannedClause = unplanned ? ", and " + leftUnplanned(unplanned) : "";
   if (!plan.wave) return "every wave of the plan is finished" + unplannedClause;
-  const later = typeof plan.skippedOutsideWave === "number" && typeof unplanned === "number"
-    ? plan.skippedOutsideWave - unplanned
-    : 0;
+  const later = laterOpen(plan);
   return "plan wave " + plan.wave + " (" + (plan.name || "unnamed") + ") is not finished — " +
     plan.open + " of " + plan.scheduled + " " + plural(plan.scheduled, "task", "tasks") + " in it " +
     plural(plan.open, "is", "are") + " still open and none was free to take" +
-    (later ? ", " + later + " open " +
-      plural(later, "task in later waves is", "tasks in later waves are") + " not reached yet" : "") +
+    (later ? ", " + notReached(later) : "") +
     unplannedClause;
+}
+
+/** The open tasks in waves after the one `plan` describes. PURE. */
+function laterOpen(plan) {
+  return typeof plan.skippedOutsideWave === "number" && typeof plan.skippedUnplanned === "number"
+    ? plan.skippedOutsideWave - plan.skippedUnplanned
+    : 0;
+}
+
+function notReached(later) {
+  return later + " open " + plural(later, "task in later waves is", "tasks in later waves are") + " not reached yet";
+}
+
+function leftUnplanned(unplanned) {
+  return unplanned + " open " + plural(unplanned, "task", "tasks") + " the plan does not schedule " +
+    plural(unplanned, "was", "were") + " left alone";
+}
+
+/**
+ * Did `next --plan` call the active wave WAITING (TL-683)? PURE (TL-707).
+ *
+ * Read from the refusal kind and from nothing else. `run --wait` used to infer
+ * the same state from `plan.open > 0`, so a wave `next` called
+ * `nothing-to-take` — an open task held back by a role, an executor or a
+ * protected status, which no claim released elsewhere will ever hand out — was
+ * polled until `--wait-max` as if another tree were finishing it.
+ *
+ * @param {object|null} answer the envelope `next` printed on exit 3
+ * @returns {string|null} `wave-claimed-elsewhere`, `wave-awaits-merge`, or null
+ */
+export function planWaiting(answer) {
+  const kind = answer && answer.refusalKind;
+  return kind === WAVE_CLAIMED_ELSEWHERE || kind === WAVE_AWAITS_MERGE ? kind : null;
+}
+
+/** `planStop` for a wave `next` called waiting. PURE. */
+function waitingStop(plan, kind) {
+  const spill = plan.spill || null;
+  const from = spill ? spill.from : plan.wave;
+  const fromName = spill ? spill.fromName : plan.name;
+  const ids = waitingIds({ claimed: plan.claimedElsewhere, awaitingMerge: plan.awaitingMerge, behind: plan.waitingBehind });
+  const clauses = ["plan wave " + from + " (" + (fromName || "unnamed") + ") " + waitingPhrase(kind) +
+    " (" + kind + ")" + (ids.length ? " — " + ids.join("; ") : "")];
+  if (spill && spill.wave) {
+    // The counts in `plan` describe the wave drawn from, and its
+    // `skippedOutsideWave` includes the waiting wave itself, so no "later
+    // waves" clause can be built from it here.
+    clauses.push("`--spill` drew from wave " + spill.wave + " (" + (spill.name || "unnamed") + ") and none of its " +
+      "tasks was free to take");
+  } else if (laterOpen(plan)) {
+    clauses.push(notReached(laterOpen(plan)));
+  }
+  if (plan.skippedUnplanned) clauses.push(leftUnplanned(plan.skippedUnplanned));
+  return clauses.join("; ");
 }
 
 /**
@@ -1854,6 +1923,9 @@ export async function run(argv) {
   // just closed is left behind at once. A wave computed here would be the one
   // that was active when the run started.
   if (planned) passthrough.push("--plan");
+  // Passed through rather than re-implemented (TL-707): which wave `next` draws
+  // from is `next`'s to decide, and it re-decides it on every call.
+  if (planned && plan.spill) passthrough.push("--spill");
   // THE HAND GETS ITS TARGET (TL-268): with `--probe`, `next` hands the task
   // over with the contract's live result appended to the text the agent reads,
   // in the place a refused `done` arrives from the second attempt on.
@@ -2173,7 +2245,9 @@ export async function run(argv) {
       // new actor by a supervisor that believed it.
       const held = heldInOtherTrees(answer, config.archivedStatuses);
       heldNow = { count: held.length, ids: held };
-      const inFlight = !!(planned && answer && answer.plan && answer.plan.wave && answer.plan.open > 0);
+      // A WAVE IN FLIGHT IS ONE `next` CALLED WAITING (TL-707), by its refusal
+      // kind — not one this loop judged open on its own. See `planWaiting`.
+      const inFlight = !!(planned && planWaiting(answer));
       let gaveUp = false;
       if (waited && (held.length || inFlight)) {
         // SEQUENTIAL, IN THE FOREGROUND (TL-381): the same loop asks `next`

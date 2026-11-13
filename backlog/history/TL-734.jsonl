@@ -1,0 +1,2 @@
+{"id":"01M7A5Y5K1ZQTPCM2RJAB0NXVA","ts":"2026-11-13T10:06:03.873Z","task":"TL-734","field":"__created__","from":"","to":"a wave task held back by a waiting task's conflict group waits","actor":"agent:loop-1","source":"new","reason":"unknown"}
+{"id":"01M7A5YEEJTX0DGNSD5754R6QJ","ts":"2026-11-13T10:06:12.946Z","task":"TL-734","field":"blocked_by","from":[],"to":["TL-707"],"actor":"agent:loop-1","source":"set","reason":"its run-side test needs run --plan --wait to read next's refusal kind, which TL-707 adds"}
