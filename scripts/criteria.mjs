@@ -227,9 +227,10 @@ export function parseCriteria(body) {
   // template, or an imported description carrying a fenced `## Acceptance
   // criteria` (which `demoteHeadings` leaves alone precisely because it is
   // code), would otherwise hand `done` the quoted list as the contract. The
-  // same holds for the heading that ENDS the section: a fenced `## Notes`
-  // between two criteria is not the next section. Lines are only skipped,
-  // never removed, so every index below is still the file's own.
+  // same holds for the heading that ENDS the section — a fenced `## Notes`
+  // between two criteria is not the next section — and for a fenced `- [ ]`,
+  // which is not a criterion (TL-709). Lines are only skipped, never removed,
+  // so every index below is still the file's own.
   const code = fencedLines(lines);
 
   let start = -1;
@@ -271,6 +272,22 @@ export function parseCriteria(body) {
   for (let i = start; i < lines.length; i++) {
     const raw = lines[i];
     if (!code[i] && /^#{2,}\s+\S/.test(raw)) { close(); break; }   // the next section
+    // A FENCED LINE IS THE SAMPLE'S CONTENT, NOT THE LIST'S STRUCTURE (TL-709).
+    // A `- [ ]` inside a code block is a criterion's shape being shown, and
+    // reading it as an item gave `done` a phantom to demand and `applyProofs`
+    // a line inside the sample to tick. For the same reason a blank line or a
+    // list marker inside the block does not end the criterion the sample
+    // illustrates — that would strand the rest of its sentence, and its
+    // `[proof:]`, outside it. Indentation still decides, as for any other
+    // line: an unindented opening fence ends the criterion before it, and the
+    // rest of that block then belongs to nothing.
+    if (code[i]) {
+      if (!current) continue;
+      if (/^\S/.test(raw)) { close(); continue; }      // unindented, not blank
+      current.parts.push(raw.trim());
+      current.item.endLine = i;
+      continue;
+    }
     const m = raw.match(/^\s*-\s*\[([ xX])\]\s*(.*)$/);
     if (m) {
       close();

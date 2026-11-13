@@ -556,3 +556,99 @@ test("the heading that ends the section is a line START, whatever spacing follow
   ].join("\n"));
   assert.deepEqual(items.map((i) => i.text), ["Mentions ## Notes mid-line and stays a criterion."]);
 });
+
+// A FENCED LIST ITEM IS CODE, NOT A CRITERION (TL-709). TL-669 taught the
+// parser to skip fenced HEADINGS, but the item loop still matched `- [ ]` on
+// every line of the section: a code sample showing a criterion's shape added a
+// phantom criterion that `done` would refuse to close on while unticked, and
+// that `applyProofs` ticked inside the sample whenever the proof it named
+// passed.
+const fencedItem = [
+  "## Acceptance criteria",
+  "",
+  "- [ ] The real one. [proof: real]",
+  "",
+  "```md",
+  "- [ ] Phantom inside a code sample. [proof: real]",
+  "```",
+  "",
+  "- [ ] Another real one, after the sample. [proof: real]",
+].join("\n");
+
+test("a fenced `- [ ]` line inside the criteria section is not an item", () => {
+  const { items } = parseCriteria(fencedItem);
+  assert.deepEqual(items.map((i) => i.text), ["The real one.", "Another real one, after the sample."],
+    "a line inside the fence was read as a criterion");
+  assert.deepEqual(items.map((i) => i.line), [2, 8]);
+});
+
+test("`applyProofs` never ticks a fenced `- [ ]` line", () => {
+  const raw = "---\nid: MAP-3\n---\n" + fencedItem;
+  const { text, ticked } = applyProofs(raw, ["real"]);
+  assert.deepEqual(ticked, ["The real one.", "Another real one, after the sample."]);
+  assert.match(text, /^- \[ \] Phantom inside a code sample\./m, "a line inside the fence was rewritten");
+  assert.match(text, /^- \[x\] The real one\./m);
+  assert.match(text, /^- \[x\] Another real one, after the sample\./m);
+});
+
+test("POSITIVE CONTROL: the same `- [ ]` line outside the fence is still an item", () => {
+  // Without this, "never read an item after a blank line" would pass both tests above.
+  const unfenced = fencedItem.replace("```md\n", "").replace("```\n", "");
+  assert.ok(!unfenced.includes("```"), "the control still carries a fence");
+  const { items } = parseCriteria(unfenced);
+  assert.deepEqual(items.map((i) => i.text),
+    ["The real one.", "Phantom inside a code sample.", "Another real one, after the sample."]);
+});
+
+// A code sample INSIDE a criterion belongs to it. A blank line, a list marker
+// or a `- [ ]` within the sample is the sample's content, not the list's
+// structure, so none of them may cut the criterion short and strand the rest of
+// its sentence — and the `[proof:]` at the end of its last line — outside it.
+const sampleInsideCriterion = [
+  "## Acceptance criteria",
+  "",
+  "- [ ] A criterion that shows the shape it guards:",
+  "  ```md",
+  "  - [ ] phantom [proof: real]",
+  "",
+  "  - a plain bullet",
+  "  ```",
+  "  and goes on after the sample. [proof: real]",
+  "- [ ] The next criterion. [proof: real]",
+].join("\n");
+
+test("a criterion's own code sample neither opens nor closes a criterion", () => {
+  const { items } = parseCriteria(sampleInsideCriterion);
+  assert.equal(items.length, 2, JSON.stringify(items.map((i) => i.text)));
+  assert.deepEqual(items.map((i) => i.line), [2, 9]);
+  assert.equal(items[0].endLine, 8, "the sample cut the criterion short");
+  assert.deepEqual(items[0].proofs, ["real"], "the proof after the sample was stranded");
+  assert.match(items[0].text, /^A criterion that shows the shape it guards: /);
+  assert.match(items[0].text, / and goes on after the sample\.$/);
+
+  const { text, ticked } = applyProofs("---\nid: MAP-4\n---\n" + sampleInsideCriterion, ["real"]);
+  assert.equal(ticked.length, 2);
+  assert.match(text, /^ {2}- \[ \] phantom/m, "a line inside the sample was rewritten");
+});
+
+test("an UNINDENTED fence still ends the criterion before it", () => {
+  // The ordinary continuation rule decides whether a block belongs to the
+  // criterion: an unindented line ends a list item, and an opening fence is no
+  // exception. Without this, "a fenced line always continues" would pass the
+  // test above and append a stray sample to the criterion above it, burying its
+  // `[proof:]` in the middle of the joined text.
+  const { items } = parseCriteria([
+    "## Acceptance criteria",
+    "",
+    "- [ ] Ends at its own line. [proof: real]",
+    "```",
+    "  - [ ] phantom",
+    "  indented like a continuation",
+    "",
+    "```",
+    "  not a continuation either: the criterion ended at the fence",
+  ].join("\n"));
+  assert.deepEqual(items.map((i) => i.text), ["Ends at its own line."]);
+  assert.deepEqual(items[0].proofs, ["real"]);
+  assert.equal(items[0].endLine, 2);
+});

@@ -4,9 +4,10 @@
  * One rule, three readers: `demoteHeadings()` in `import-body.mjs` must not
  * shift a heading-shaped line that is code, and `parseCriteria()` in
  * `criteria.mjs` must not take one for the criteria section or for the
- * heading that ends it. Written once so the readers cannot disagree about
- * where a block ends — a body the importer left alone as code would otherwise
- * be read by the parser as a contract. `auditText()` in
+ * heading that ends it, nor take a fenced `- [ ]` for a criterion (TL-709).
+ * Written once so the readers cannot disagree about where a block ends — a
+ * body the importer left alone as code would otherwise be read by the parser
+ * as a contract. `auditText()` in
  * `check-no-foreign-context.mjs` reads by it too (TL-708): a measurement inside
  * a block is the command that reproduces it, so the guard has to end a block
  * where the others do.
