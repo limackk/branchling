@@ -19,9 +19,13 @@
  * `const`, `let` and `var` bindings, `for … of` loop variables, and function
  * parameters, which take their default and, for a named function, the argument
  * of every call to it in the same file. A value with several alternatives keeps
- * them all. A call whose path lands in `scripts/` outside `scripts/tests/` is a
- * direct read and fails. `sourceRoot()` evaluates to a different root, so a
+ * them all. A call whose path lands in `scripts/` outside `scripts/tests/`, or
+ * in `bin/`, is a direct read and fails: `mutation-run.mjs` mutates both
+ * directories (TL-722). `sourceRoot()` evaluates to a different root, so a
  * directory walk that joins onto it passes, as `_repo.mjs` documents it should.
+ * A `readdirSync` of either directory is not judged: a listing carries no
+ * instrumented text, and the files a walk then reads are judged at their own
+ * `readFileSync`.
  *
  * WHY NOT A TRACE. TL-702 found the reads with a preload that wrapped
  * `readFileSync` and ran the whole suite. As a guard that would run the suite a
@@ -37,8 +41,8 @@
  * files, 26 of them among the 33 test files that commit changed. Of the other
  * seven, three read through a stack of paths a walk pops, one through an
  * object-literal map, one through an anonymous callback over a list, one
- * through a helper's return value, and one reads `bin/`, which this guard does
- * not judge.
+ * through a helper's return value, and one read `bin/`, which this guard did
+ * not judge until TL-722.
  *
  * THE MARKER. A read that must come from the copy under test, because it
  * executes the module rather than matching its text, carries a line comment
@@ -62,6 +66,13 @@ const REPO = "/repo";
 const SOURCE = "/source";
 const SCRIPTS = REPO + "/scripts/";
 const TESTS = REPO + "/scripts/tests";
+const BIN = REPO + "/bin/";
+
+/** Whether `path` names code a mutation run instruments: `scripts/` but not its tests, or `bin/`. */
+function isMutatedSource(path) {
+  if (path.startsWith(BIN)) return true;
+  return path.startsWith(SCRIPTS) && path !== TESTS && !path.startsWith(TESTS + "/");
+}
 /** One path segment whose value the scan cannot know. */
 const WILD = "\u0000";
 const UNKNOWN = Symbol("unknown");
@@ -640,7 +651,7 @@ function directSourceReads(src, rel) {
       if (!paths.length) continue;
       resolved++;
       for (const path of new Set(paths)) {
-        if (!path.startsWith(SCRIPTS) || path === TESTS || path.startsWith(TESTS + "/")) continue;
+        if (!isMutatedSource(path)) continue;
         found.push({ line: lineOf(t.pos), path: path.slice(REPO.length + 1).split(WILD).join("*") });
       }
     }
@@ -703,6 +714,11 @@ test("a direct read of a script's source is reported, whatever shape builds its 
   assert.deepEqual(
     reported('readFileSync(join(HERE, "..", "..", "some-module.mjs"), "utf8");', "scripts/tests/nested/x.test.mjs"),
     ["scripts/some-module.mjs"], "a nested test reaches scripts/ through one more ..");
+  for (const body of [
+    'readFileSync(join(REPO_ROOT, "bin", "some-entry.mjs"), "utf8");',
+    'readFileSync(join(SCRIPTS_DIR, "..", "bin", "some-entry.mjs"), "utf8");',
+    'readFileSync(new URL("../../bin/some-entry.mjs", import.meta.url), "utf8");',
+  ]) assert.deepEqual(reported(body), ["bin/some-entry.mjs"], "bin/ is mutated as well (TL-722): " + body);
 
   const aliased = 'import { readFileSync as read } from "node:fs";\nimport { SCRIPTS_DIR as S } from "./_repo.mjs";\n' +
     'import * as path from "node:path";\nread(path.join(S, "some-module.mjs"), "utf8");';
@@ -716,6 +732,8 @@ test("a read through scriptSource, sourceRoot or of anything outside scripts/ is
   const cases = [
     'scriptSource("some-module.mjs");',
     'readFileSync(join(sourceRoot(), "scripts", "some-module.mjs"), "utf8");',
+    'readFileSync(join(sourceRoot(), "bin", "some-entry.mjs"), "utf8");',
+    'readFileSync(join(REPO_ROOT, "binaries", "notes.md"), "utf8");',
     'const sources = join(sourceRoot(), "scripts");\nfor (const f of names) readFileSync(join(sources, f), "utf8");',
     'readFileSync(join(SCRIPTS_DIR, "..", "_template.md"), "utf8");',
     'readFileSync(join(REPO_ROOT, "docs", "guide.md"), "utf8");',
