@@ -813,6 +813,38 @@ the queue is ordered by priority. With the flag and no plan file the call
 **fails**: a filter matching everything reads exactly like a plan that schedules
 everything.
 
+**A wave that is waiting is not a wave that is finished.** Exit 3 under
+`--plan` means nothing was taken, and `--json` says why in `refusalKind`, one of
+three:
+
+| `refusalKind` | what it means | what to do |
+| --- | --- | --- |
+| `nothing-to-take` | no open task of the active wave will be handed to this caller, and waiting would not change that — or nothing is left at all | stop |
+| `wave-claimed-elsewhere` | every open task of the active wave is claimed in another tree or session, or blocked only by one that is | ask again when those claims are closed and merged |
+| `wave-awaits-merge` | the active wave's open work is closed on a branch not merged here, and the merge is all that is missing | ask again after the merge |
+
+The waiting kinds require EVERY open task of the wave to be accounted for: one
+task held back by a role, an executor or a protected status keeps the answer at
+`nothing-to-take`, because no claim released elsewhere will ever hand it out.
+The refusal names the ids it waits on, under `claimedElsewhere`,
+`awaitingMerge` and `waitingBehind` in `plan`.
+
+`--spill`, on `next` and on `run`, lets a caller work while it waits: when the
+active wave is waiting, `next` draws from the next wave that holds open work
+instead of answering exit 3. A spilled wave is not exempt from anything else —
+its tasks' blockers and conflict groups still hold them back, and when none of
+them is free the answer is still the waiting kind of the active wave, which is
+the one whose arrival the caller is waiting for. `--json` names the spill as
+`plan.spill`. Without `--plan` the flag is refused, since there is no wave to
+spill out of.
+
+`run --plan` acts on the kind `next` reports. On a waiting wave its stop
+sentence names the kind and the ids the wave waits on; with `--wait <s>` it asks
+`next` again every `<s>` seconds, bounded by `--wait-max`, and resumes on the
+first task freed. A `nothing-to-take` wave is never waited for: it ends the run,
+because polling it would only spend `--wait-max` on work no other tree is
+finishing. `run --plan --spill` passes the flag on to every `next` it asks.
+
 ## Seeding a backlog from a plan
 
 `branchling seed` reads a structured plan on **standard input** and turns it into
