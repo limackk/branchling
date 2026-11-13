@@ -372,7 +372,7 @@ test("scriptSource reads the tree a mutation run names, and this one otherwise",
   const root = fixtureDir(join(tmpdir(), "branchling-test-mutation-source-root-"));
   write(root, "scripts/build-viewer.mjs", "// the original, uninstrumented\n");
   assert.equal(scriptSource("build-viewer.mjs", { [SOURCE_ROOT_ENV]: root }), "// the original, uninstrumented\n");
-  assert.equal(scriptSource("mutation-run.mjs", {}), readFileSync(ENTRY, "utf8"));
+  assert.equal(scriptSource("mutation-run.mjs", {}), readFileSync(ENTRY, "utf8")); // source-read: allow — the copy scriptSource must equal
   // A guard that walks scripts/ or bin/ joins onto the same root (TL-702).
   assert.equal(sourceRoot({ [SOURCE_ROOT_ENV]: root }), root);
   assert.equal(sourceRoot({}), REPO_ROOT);
