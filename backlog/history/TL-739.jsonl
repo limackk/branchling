@@ -1,0 +1,2 @@
+{"id":"01M7ARDAQQWTFF26BP3S7RG8YD","ts":"2026-11-13T15:28:55.031Z","task":"TL-739","field":"__created__","from":"","to":"Kill the 32 surviving mutants of check-no-foreign-context.mjs lines 123-216","actor":"agent:loop-2","source":"new","reason":"unknown"}
+{"id":"01M7AREB2PQ8F6ZZ5MB9HR47EZ","ts":"2026-11-13T15:29:28.150Z","task":"TL-739","field":"priority","from":"P1","to":"P3","actor":"agent:loop-2","source":"set","reason":"unknown"}
