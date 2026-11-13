@@ -113,6 +113,22 @@
  * often than a ceiling. Without Stryker installed nothing is counted and the
  * plan says so.
  *
+ * THE TIMED RUN STOPS WHERE THE VERDICT IS SETTLED (TL-716). A selection can
+ * hold a test that starts a real Stryker run of its own — the files under
+ * `scripts/tests/mutation/` that judge this module do — and such a run also
+ * waits for the machine's mutation slot, which nobody hands it here. On
+ * 2026-11-12 a `--plan` for a change to this file was killed by a 30-minute
+ * timeout without printing anything: the step whose job is to say a run will
+ * not fit never returned. The timed run is therefore stopped, its process
+ * group with it, once it has lasted `budget / (1 + ⌈mutants / workers⌉)`:
+ * from that moment the estimate exceeds the budget whatever the rest of the
+ * run would have taken, so waiting longer measures nothing the verdict needs.
+ * The plan reports the estimate as AT LEAST that bound and the run is refused
+ * over budget; a larger `--budget` raises the bound with it. Rejected:
+ * leaving files outside the default glob out of `--named-only` — they are the
+ * tests that kill this module's mutants (TL-591), and a bound that covers
+ * every slow selection is not a rule about one directory.
+ *
  * Stryker is a pinned devDependency, not a runtime one: the published package
  * keeps zero dependencies, and this file does not ship (`files` in
  * package.json). It is a tool for working on this repository.
@@ -789,13 +805,30 @@ export async function countMutants(root, mutate, instrumenter) {
  * One run of `testFiles` as Stryker's command runner makes it — in its own
  * process group, in the environment Stryker is handed — timed. A failing run
  * is reported, not hidden: Stryker's initial run would fail on it too.
+ *
+ * A run still going after `limitSeconds` is stopped — SIGTERM to the
+ * containment wrapper, which kills its whole process group — and reported
+ * `cut`, with `passed: null`, since no verdict was reached.
  */
-export function timeTests(root, testFiles) {
+export function timeTests(root, testFiles, { limitSeconds = Infinity } = {}) {
   const started = performance.now();
+  const bounded = Number.isFinite(limitSeconds);
   const r = spawnSync(process.execPath, [CONTAIN_ENTRY, process.execPath, ...workerTestArgs(testFiles)], {
     cwd: root, env: strykerEnv(process.env, root), stdio: "ignore",
+    ...(bounded ? { timeout: Math.max(1, Math.ceil(limitSeconds * 1000)), killSignal: "SIGTERM" } : {}),
   });
-  return { seconds: (performance.now() - started) / 1000, passed: r.status === 0 };
+  const seconds = (performance.now() - started) / 1000;
+  if (r.error && r.error.code === "ETIMEDOUT") return { seconds, passed: null, cut: true };
+  return { seconds, passed: r.status === 0, cut: false };
+}
+
+/**
+ * How long one run of the tests may last before the estimate of `mutants`,
+ * `concurrency` at a time, exceeds `budgetMinutes` whatever it takes: the
+ * point after which the timed run settles nothing more (TL-716).
+ */
+export function timingLimitSeconds({ mutants, concurrency, budgetMinutes }) {
+  return (budgetMinutes * 60) / (1 + Math.ceil(mutants / Math.max(1, concurrency)));
 }
 
 /**
@@ -827,13 +860,22 @@ export async function measureCost(root, p, opts, deps = {}) {
   const budgetMinutes = opts.budget || DEFAULT_BUDGET_MINUTES;
   if (!count) return { counted: false, budgetMinutes };
   const concurrency = chooseConcurrency({ concurrency: opts.concurrency, testFiles: p.tests.length }).value;
-  const initial = count.total === 0 ? { seconds: 0, passed: true } : (deps.timeTests || timeTests)(root, p.tests.map((t) => t.file));
-  const estimate = estimateSeconds({ mutants: count.total, testSeconds: initial.seconds, concurrency });
+  const limitSeconds = timingLimitSeconds({ mutants: count.total, concurrency, budgetMinutes });
+  const initial = count.total === 0
+    ? { seconds: 0, passed: true, cut: false }
+    : (deps.timeTests || timeTests)(root, p.tests.map((t) => t.file), { limitSeconds });
+  const cut = initial.cut === true;
+  // A cut run is known only to outlast the limit; the moment it was stopped
+  // adds the cost of stopping it, not information about the tests.
+  const testSeconds = cut ? limitSeconds : initial.seconds;
+  const estimate = estimateSeconds({ mutants: count.total, testSeconds, concurrency });
   return {
     counted: true, mutants: count.total, mutantsPerFile: count.files,
-    initialRunSeconds: Math.round(initial.seconds * 100) / 100, initialRunPassed: initial.passed,
+    initialRunSeconds: Math.round(testSeconds * 100) / 100, initialRunPassed: cut ? null : initial.passed,
+    initialRunCut: cut,
     concurrency, estimateSeconds: Math.round(estimate * 100) / 100, budgetMinutes,
-    overBudget: estimate > budgetMinutes * 60,
+    // A cut run was still going at the limit, so its estimate lies strictly beyond the budget.
+    overBudget: cut || estimate > budgetMinutes * 60,
   };
 }
 
@@ -852,10 +894,17 @@ function failNoMutant(p, when) {
 export function costReport(cost) {
   if (!cost.counted) return ["mutants: not counted — " + STRYKER_PIN + " is not installed (npm install)"];
   const out = ["mutants (" + cost.mutants + "): " + Object.entries(cost.mutantsPerFile).map(([f, n]) => f + " " + n).join(", ")];
-  out.push("estimate: " + formatDuration(cost.estimateSeconds) + " — one run of the selected tests took "
-    + formatDuration(cost.initialRunSeconds) + ", run once more for each mutant, " + cost.concurrency + " at a time; budget "
-    + cost.budgetMinutes + " min" + (cost.overBudget ? ", exceeded: a run is refused without a larger --budget" : ""));
-  if (!cost.initialRunPassed) out.push("the selected tests failed without a mutant, so Stryker's initial run will fail too");
+  if (cost.initialRunCut) {
+    out.push("estimate: more than " + formatDuration(cost.estimateSeconds) + " — one run of the selected tests was stopped after "
+      + formatDuration(cost.initialRunSeconds) + ", by which point " + cost.mutants + " " + plural(cost.mutants, "mutant", "mutants")
+      + ", " + cost.concurrency + " at a time, exceed the budget of " + cost.budgetMinutes
+      + " min: a run is refused without a larger --budget");
+  } else {
+    out.push("estimate: " + formatDuration(cost.estimateSeconds) + " — one run of the selected tests took "
+      + formatDuration(cost.initialRunSeconds) + ", run once more for each mutant, " + cost.concurrency + " at a time; budget "
+      + cost.budgetMinutes + " min" + (cost.overBudget ? ", exceeded: a run is refused without a larger --budget" : ""));
+  }
+  if (cost.initialRunPassed === false) out.push("the selected tests failed without a mutant, so Stryker's initial run will fail too");
   if (cost.mutants === 0) out.push("no mutant: " + NO_MUTANT_REASON + "; a run is refused");
   return out;
 }
@@ -1245,11 +1294,13 @@ export async function main(argv, cwd = process.cwd(), deps = {}) {
     const rest = withoutBudget(argv);
     const next = [];
     if (!opts.changedLines) next.push([COMMAND, ...rest, "--changed-lines"].join(" "));
-    next.push([COMMAND, ...rest, "--budget", String(Math.ceil(cost.estimateSeconds / 60))].join(" "));
-    return fail(COMMAND, "the run is estimated at " + formatDuration(cost.estimateSeconds) + ", over the budget of "
-      + cost.budgetMinutes + " min: " + cost.mutants + " " + plural(cost.mutants, "mutant", "mutants") + " × "
-      + formatDuration(cost.initialRunSeconds) + " of tests, " + cost.concurrency + " at a time",
+    // A cut run gives a floor, not a length: any budget it names could be cut again.
+    next.push([COMMAND, ...rest, "--budget", cost.initialRunCut ? "<minutes>" : String(Math.ceil(cost.estimateSeconds / 60))].join(" "));
+    return fail(COMMAND, "the run is estimated at " + (cost.initialRunCut ? "more than " : "") + formatDuration(cost.estimateSeconds)
+      + ", over the budget of " + cost.budgetMinutes + " min: " + cost.mutants + " " + plural(cost.mutants, "mutant", "mutants") + " × "
+      + (cost.initialRunCut ? "more than " : "") + formatDuration(cost.initialRunSeconds) + " of tests, " + cost.concurrency + " at a time",
     ["A run cut off by a timeout settles nothing, so Stryker was not started.",
+      ...(cost.initialRunCut ? ["The timed run of the selected tests was stopped once the budget was certain to be exceeded, so its full length is unknown."] : []),
       (opts.changedLines ? "" : "--changed-lines mutates only the lines this change wrote; ")
         + "--budget <minutes> admits a longer run deliberately."],
     next, 1);

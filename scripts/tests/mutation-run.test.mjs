@@ -24,7 +24,7 @@ import { REPO_ROOT, SCRIPTS_DIR, isolateHome, isolateState, scriptSource, source
 import {
   DEFAULT_BUDGET_MINUTES, MIN_SWEEP_MARKER, SOURCE_ROOT_ENV, countMutants, estimateSeconds, formatDuration, leftoverProcesses,
   SANDBOX_GIT_INIT, SILENT_LOGGER, keepReport, changedLineRanges, directorySymlinks, importClosure, loadInstrumenter, main, mutateDescriptions,
-  parseArgs, reachesCli, runStryker, sandboxCommand, selectTests, strykerConfig, strykerEnv, summarise, sweepLeftovers, timeTests, usage, workerTestArgs,
+  parseArgs, reachesCli, runStryker, sandboxCommand, selectTests, strykerConfig, strykerEnv, summarise, sweepLeftovers, timeTests, timingLimitSeconds, costReport, usage, workerTestArgs,
 } from "../mutation-run.mjs";
 import {
   SLOT_TOKEN_ENV, WORKER_TEST_FILES, chooseConcurrency, describeHolder, releaseSlot, slotPath, testFileConcurrency, tryAcquireSlot,
@@ -948,6 +948,7 @@ test("a run over budget is refused before Stryker starts, naming --changed-lines
     assert.match(refused.err, /: the run is estimated at 51 min, over the budget of 45 min: 600 mutants × 10 s of tests, 2 at a time$/m);
     assert.match(refused.err, /^  A run cut off by a timeout settles nothing, so Stryker was not started\.$/m);
     assert.match(refused.err, /^  --changed-lines mutates only the lines this change wrote; --budget <minutes> admits a longer run deliberately\.$/m);
+    assert.doesNotMatch(refused.err, /was stopped|full length is unknown/, "a fully timed run was reported cut (TL-716)");
     assert.deepEqual(refused.err.split("\n").filter((l) => l.startsWith("  →")), [
       "  → node scripts/mutation-run.mjs --files scripts/lib.mjs --concurrency 2 --changed-lines",
       "  → node scripts/mutation-run.mjs --files scripts/lib.mjs --concurrency 2 --budget 51",
@@ -1155,6 +1156,114 @@ test("the timed run is the selected tests' own verdict and duration (TL-682)", (
     // Run from inside node --test, as this is: a run that inherited the test
     // context would report through it and exit 0 on a failure.
     assert.equal(timeTests(root, ["scripts/tests/red.test.mjs"]).passed, false, "a failing selection was reported passed");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// TL-716. A test that records its pid and then outlives any reasonable plan:
+// the shape of the real-run tests under scripts/tests/mutation/, which start
+// Stryker and wait for the machine's mutation slot.
+function slowTest(pidFile) {
+  return 'import { test } from "node:test";\nimport { writeFileSync } from "node:fs";\n'
+    + "writeFileSync(" + JSON.stringify(pidFile) + ", String(process.pid));\n"
+    + 'const named = "lib.mjs";\n'
+    + 'test("outlives the plan", () => new Promise((r) => setTimeout(r, 300000)));\n';
+}
+
+function alive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+test("a timed run still going at its limit is stopped with its process group, and reported cut (TL-716)", () => {
+  const root = fixtureDir(join(tmpdir(), "branchling-test-mutation-cut-"));
+  const pidFile = join(root, "slow.pid");
+  try {
+    write(root, "scripts/tests/mutation/slow.test.mjs", slowTest(pidFile));
+    const before = performance.now();
+    const r = timeTests(root, ["scripts/tests/mutation/slow.test.mjs"], { limitSeconds: 2 });
+    const outside = (performance.now() - before) / 1000;
+    assert.equal(r.cut, true, "a run past its limit was not reported cut: " + JSON.stringify(r));
+    assert.equal(r.passed, null, "a run with no verdict was given one");
+    assert.ok(r.seconds >= 1.9 && outside < 30, "stopped after " + r.seconds + " s, returned after " + outside + " s");
+    // POSITIVE CONTROL: the test file really ran, so its absence afterwards is the kill, not a run that never started.
+    assert.ok(existsSync(pidFile), "the slow test never started");
+    const pid = Number(readFileSync(pidFile, "utf8"));
+    const deadline = Date.now() + 5000;
+    while (alive(pid) && Date.now() < deadline) spawnSync("sleep", ["0.1"]);
+    assert.equal(alive(pid), false, "the test process " + pid + " outlived the cut run");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a timed run that cannot start is a failure, not a cut (TL-716)", () => {
+  // A spawn error other than the timeout: the working directory does not exist.
+  const r = timeTests(join(tmpdir(), "branchling-test-mutation-absent-" + process.pid), ["scripts/tests/x.test.mjs"], { limitSeconds: 30 });
+  assert.equal(r.cut, false, "a run that never started was reported cut: " + JSON.stringify(r));
+  assert.equal(r.passed, false);
+});
+
+test("a cut estimate names one mutant in the singular (TL-716)", () => {
+  const lines = costReport({ counted: true, mutants: 1, mutantsPerFile: { "scripts/lib.mjs": 1 }, initialRunSeconds: 30,
+    initialRunPassed: null, initialRunCut: true, concurrency: 1, estimateSeconds: 60, budgetMinutes: 1, overBudget: true });
+  assert.ok(lines.includes("estimate: more than 1 min — one run of the selected tests was stopped after 30 s, by which point "
+    + "1 mutant, 1 at a time, exceed the budget of 1 min: a run is refused without a larger --budget"), lines.join("\n"));
+  assert.ok(!lines.some((l) => /failed without a mutant/.test(l)), "a cut run was reported failed");
+});
+
+test("the timing limit is the run length at which the estimate reaches the budget (TL-716)", () => {
+  assert.equal(timingLimitSeconds({ mutants: 40, concurrency: 2, budgetMinutes: 45 }), 2700 / 21);
+  assert.equal(timingLimitSeconds({ mutants: 41, concurrency: 2, budgetMinutes: 45 }), 2700 / 22, "a remainder costs a whole round");
+  assert.equal(timingLimitSeconds({ mutants: 59, concurrency: 1, budgetMinutes: 1 }), 1);
+  for (const [mutants, concurrency, budgetMinutes] of [[40, 2, 45], [7, 3, 10], [1, 8, 1]]) {
+    const testSeconds = timingLimitSeconds({ mutants, concurrency, budgetMinutes });
+    assert.ok(Math.abs(estimateSeconds({ mutants, testSeconds, concurrency }) - budgetMinutes * 60) < 1e-9);
+  }
+});
+
+test("--plan over a selection holding a real-run test returns at the timing limit, not after the test (TL-716)", async () => {
+  const root = fixture();
+  const pidFile = join(root, "slow.pid");
+  try {
+    write(root, "scripts/tests/mutation/slow.test.mjs", slowTest(pidFile));
+    // The real timeTests: only the instrumenter is replaced. 59 mutants, one
+    // at a time, within 1 minute: one run of the tests may last 1 s.
+    const deps = {
+      loadInstrumenter: async () => ({}),
+      countMutants: async (_root, mutate) => ({ total: 59, files: Object.fromEntries(mutate.map((m) => [m, 59])) }),
+      runStryker: () => { throw new Error("Stryker was started"); },
+    };
+    const argv = ["--files", "scripts/lib.mjs", "--named-only", "--concurrency", "1", "--budget", "1"];
+    const before = performance.now();
+    const plan = await inProcess([...argv, "--plan"], root, deps);
+    const took = (performance.now() - before) / 1000;
+    assert.equal(plan.code, 0, plan.err);
+    assert.ok(took < 30, "--plan took " + took + " s");
+    assert.match(plan.out, /^  scripts\/tests\/mutation\/slow\.test\.mjs  — lib\.mjs named$/m, "the real-run test was not in the selection");
+    assert.match(plan.out, /^estimate: more than 1 min — one run of the selected tests was stopped after 1 s, by which point 59 mutants, 1 at a time, exceed the budget of 1 min: a run is refused without a larger --budget$/m);
+    assert.doesNotMatch(plan.out, /failed without a mutant/, "a cut run was reported failed");
+    assert.ok(existsSync(pidFile), "the slow test never started");
+
+    const json = JSON.parse((await inProcess([...argv, "--plan", "--json"], root, deps)).out).cost;
+    assert.equal(json.initialRunCut, true);
+    assert.equal(json.initialRunPassed, null);
+    assert.equal(json.overBudget, true);
+    assert.equal(json.estimateSeconds, 60);
+
+    const refused = await inProcess(argv, root, deps);
+    assert.equal(refused.code, 1, refused.out + refused.err);
+    assert.match(refused.err, /: the run is estimated at more than 1 min, over the budget of 1 min: 59 mutants × more than 1 s of tests, 1 at a time$/m);
+    assert.match(refused.err, /^  The timed run of the selected tests was stopped once the budget was certain to be exceeded, so its full length is unknown\.$/m);
+    assert.deepEqual(refused.err.split("\n").filter((l) => l.startsWith("  →")), [
+      "  → node scripts/mutation-run.mjs --files scripts/lib.mjs --named-only --concurrency 1 --changed-lines",
+      "  → node scripts/mutation-run.mjs --files scripts/lib.mjs --named-only --concurrency 1 --budget <minutes>",
+    ], "a cut run named a budget it cannot know");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
