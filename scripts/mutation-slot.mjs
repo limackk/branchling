@@ -43,13 +43,22 @@
  * that is, is bounded by `testFileConcurrency()` (TL-706), so a worker's
  * footprint no longer grows with the machine's core count.
  *
+ * WHY FREE MEMORY IS ALSO READ FROM THE CGROUP. `os.freemem()` reports the
+ * machine. A session started under `systemd-run --scope -p MemoryMax=32G`
+ * lives in a cgroup that holds 32 GiB while the machine reports 55 free
+ * (observed 2026-11-13, TL-725). When that cgroup fills, the kernel's memcg
+ * OOM killer removes its largest process, which may be a Stryker worker, and
+ * Stryker reads the killed test run as a killed mutant: a wrong score with no
+ * error. The budget is therefore the smaller of the machine's free memory and
+ * the headroom the cgroup v2 hierarchy leaves (`cgroupHeadroom()`).
+ *
  * Tests: scripts/tests/mutation-run.test.mjs.
  */
 
 import { randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, unlinkSync } from "node:fs";
 import os, { hostname } from "node:os";
-import { join } from "node:path";
+import { join, posix } from "node:path";
 
 import { createExclusively, pidAlive, readHolder, removeIfUnchanged, stateRoot } from "./lock.mjs";
 
@@ -127,6 +136,58 @@ function gb(bytes) {
 }
 
 /**
+ * The memory the cgroup this process runs in can still take, or null where no
+ * limit is known.
+ *
+ * On cgroup v2 the `0::<path>` line of `procFile` names the process's cgroup;
+ * a limit may sit on it or on any ancestor, so every level up to the root is
+ * read, and the smallest `memory.max - memory.current` wins. A level reading
+ * `max` has no limit, and a level whose files cannot be read is not a limit
+ * either: a missing file says nothing about memory. Without a `0::` line
+ * (cgroup v1, or no /proc at all, as on macOS) the answer is null, and the
+ * caller budgets from the machine alone.
+ *
+ * @param {{procFile?: string, root?: string}} [opts] `root` is where the
+ *   cgroup v2 hierarchy is mounted; a test points both at a fixture.
+ * @returns {{bytes: number, path: string}|null} `path` is the level that set it.
+ */
+export function cgroupHeadroom({ procFile = "/proc/self/cgroup", root = "/sys/fs/cgroup" } = {}) {
+  let own;
+  try {
+    own = readFileSync(procFile, "utf8").split("\n").find((line) => line.startsWith("0::"));
+  } catch {
+    // No /proc: nothing is known about a limit.
+  }
+  if (!own) return null;
+  let level = posix.normalize("/" + own.slice(3));
+  let best = null;
+  for (;;) {
+    const headroom = levelHeadroom(join(root, level));
+    // On a tie the level nearest the process is named: it is the one a person would raise.
+    if (headroom !== null && (best === null || headroom < best.bytes)) best = { bytes: headroom, path: level };
+    if (level === "/") return best;
+    level = posix.dirname(level);
+  }
+}
+
+function levelHeadroom(dir) {
+  const max = readBytes(join(dir, "memory.max"));
+  const current = readBytes(join(dir, "memory.current"));
+  if (max === null || current === null) return null;
+  return Math.max(0, max - current);
+}
+
+/** A cgroup memory file as a byte count; null for `max`, for anything else, and for a file that cannot be read. */
+function readBytes(file) {
+  try {
+    const text = readFileSync(file, "utf8").trim();
+    return /^\d+$/.test(text) ? Number(text) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * The concurrency a run uses, and the sentence that says why.
  *
  * Each worker is budgeted as `node --test` running `min(testFiles,
@@ -137,20 +198,33 @@ function gb(bytes) {
  * the cores (see `strykerConfig` in mutation-run.mjs for why) and never below
  * one.
  *
+ * The memory budgeted is the smaller of `freeBytes` and `cgroup.bytes`, and
+ * the reason names which of the two set it. A caller that passes `freeBytes`
+ * states the figure itself, so the live cgroup is read only when it does not;
+ * `cgroup` may be passed either way.
+ *
  * @param {{concurrency?: number|null, testFiles: number, freeBytes?: number, cores?: number,
- *          fileConcurrency?: number|null}} opts
+ *          fileConcurrency?: number|null, cgroup?: {bytes: number, path: string}|null}} opts
  * @returns {{value: number, reason: string}}
  */
-export function chooseConcurrency({ concurrency = null, testFiles, freeBytes = os.freemem(), cores = cpuCount(),
-  fileConcurrency = testFileConcurrency({ cores }) }) {
+export function chooseConcurrency({ concurrency = null, testFiles, freeBytes, cores = cpuCount(),
+  fileConcurrency = testFileConcurrency({ cores }), cgroup = freeBytes === undefined ? cgroupHeadroom() : null }) {
   if (concurrency) return { value: concurrency, reason: "given by --concurrency" };
+  const machine = freeBytes === undefined ? os.freemem() : freeBytes;
+  const byCgroup = cgroup !== null && cgroup.bytes < machine;
+  const budgetBytes = byCgroup ? cgroup.bytes : machine;
   const cap = Math.max(1, Math.floor(cores / 2));
   const atOnce = Math.max(1, Math.min(testFiles, fileConcurrency || cores - 1));
   const perWorker = PER_WORKER_BASE_BYTES + atOnce * PER_TEST_FILE_BYTES;
-  const byMemory = Math.floor((freeBytes * FREE_MEMORY_SHARE) / perWorker);
+  const byMemory = Math.floor((budgetBytes * FREE_MEMORY_SHARE) / perWorker);
   const why = fileConcurrency ? "--test-concurrency=" + fileConcurrency
     : "node's default of cores - 1: this node has no --test-concurrency";
-  const budget = gb(freeBytes) + " free, " + Math.round(FREE_MEMORY_SHARE * 100) + "% of it at " + gb(perWorker)
+  const free = byCgroup
+    ? gb(budgetBytes) + " free under the memory.max of cgroup " + cgroup.path + " (" + gb(machine) + " free on the machine)"
+    : cgroup !== null
+      ? gb(budgetBytes) + " free on the machine (cgroup " + cgroup.path + " leaves " + gb(cgroup.bytes) + ")"
+      : gb(budgetBytes) + " free";
+  const budget = free + ", " + Math.round(FREE_MEMORY_SHARE * 100) + "% of it at " + gb(perWorker)
     + " per worker (" + atOnce + " test " + (atOnce === 1 ? "file" : "files") + " at once, " + why + ")";
   if (byMemory >= cap) return { value: cap, reason: "half of " + cores + " cores; " + budget + " would allow " + byMemory };
   if (byMemory < 1) return { value: 1, reason: budget + " allows none; one worker is the least a run can use" };

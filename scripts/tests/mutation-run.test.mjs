@@ -27,7 +27,7 @@ import {
   parseArgs, reachesCli, runStryker, sandboxCommand, selectTests, strykerConfig, strykerEnv, summarise, sweepLeftovers, timeTests, timingLimitSeconds, costReport, usage, workerTestArgs,
 } from "../mutation-run.mjs";
 import {
-  SLOT_TOKEN_ENV, WORKER_TEST_FILES, chooseConcurrency, describeHolder, releaseSlot, slotPath, testFileConcurrency, tryAcquireSlot,
+  SLOT_TOKEN_ENV, WORKER_TEST_FILES, cgroupHeadroom, chooseConcurrency, describeHolder, releaseSlot, slotPath, testFileConcurrency, tryAcquireSlot,
 } from "../mutation-slot.mjs";
 import { STATE_DIR_ENV } from "../lock.mjs";
 
@@ -697,6 +697,111 @@ test("where node has no --test-concurrency, a worker is budgeted at node's defau
   assert.match(chooseConcurrency({ testFiles: 40, freeBytes: 8 * GiB, cores: 32, fileConcurrency: null }).reason, /allows none/);
   assert.equal(chooseConcurrency({ testFiles: 3, freeBytes: 64 * GiB, cores: 1, fileConcurrency: null }).value, 1);
   assert.match(chooseConcurrency({ testFiles: 3, freeBytes: 64 * GiB, cores: 1, fileConcurrency: null }).reason, /\(1 test file at once, /);
+});
+
+// TL-725: a run inside a memory-capped cgroup budgets from what the cgroup can still take.
+function cgroupFixture(own, levels) {
+  const dir = fixtureDir(join(tmpdir(), "branchling-test-cgroup-"));
+  write(dir, "proc-cgroup", own);
+  for (const [path, max, current] of levels) {
+    write(dir, join("fs", path, "memory.max"), max + "\n");
+    write(dir, join("fs", path, "memory.current"), current + "\n");
+  }
+  return { procFile: join(dir, "proc-cgroup"), root: join(dir, "fs") };
+}
+
+const SCOPE = "/user.slice/app.slice/run.scope";
+
+test("a cgroup limit below free memory lowers the concurrency, and the reason names the cgroup", () => {
+  const paths = cgroupFixture("0::" + SCOPE + "\n", [
+    [SCOPE, 8 * GiB, 2 * GiB], ["/user.slice/app.slice", "max", 30 * GiB], ["/user.slice", "max", 31 * GiB],
+  ]);
+  const cgroup = cgroupHeadroom(paths);
+  assert.deepEqual(cgroup, { bytes: 6 * GiB, path: SCOPE });
+  // 6 GiB headroom: 4.5 GiB usable over 1504 MiB per worker is 3; 55 GiB free alone allows the cap of 16.
+  const machineOnly = chooseConcurrency({ testFiles: 40, freeBytes: 55 * GiB, cores: 32, fileConcurrency: 4 });
+  assert.equal(machineOnly.value, 16);
+  const capped = chooseConcurrency({ testFiles: 40, freeBytes: 55 * GiB, cores: 32, fileConcurrency: 4, cgroup });
+  assert.equal(capped.value, 3);
+  assert.equal(capped.reason, "6.0 GB free under the memory.max of cgroup " + SCOPE + " (55.0 GB free on the machine), "
+    + "75% of it at 1.5 GB per worker (4 test files at once, --test-concurrency=4), below the cap of 16 (half of 32 cores)");
+
+  // A cgroup with more room than the machine has free leaves the machine's figure in charge, and says so.
+  const roomy = chooseConcurrency({ testFiles: 40, freeBytes: 4 * GiB, cores: 32, fileConcurrency: 4, cgroup });
+  assert.equal(roomy.value, chooseConcurrency({ testFiles: 40, freeBytes: 4 * GiB, cores: 32, fileConcurrency: 4 }).value);
+  assert.match(roomy.reason, new RegExp("^4\\.0 GB free on the machine \\(cgroup " + SCOPE + " leaves 6\\.0 GB\\), "));
+});
+
+test("a limit on an ancestor of the cgroup, not on the cgroup itself, still counts", () => {
+  const cgroup = cgroupHeadroom(cgroupFixture("0::" + SCOPE + "\n", [
+    [SCOPE, "max", 1 * GiB], ["/user.slice/app.slice", 12 * GiB, 9 * GiB], ["/user.slice", 20 * GiB, 10 * GiB],
+  ]));
+  assert.deepEqual(cgroup, { bytes: 3 * GiB, path: "/user.slice/app.slice" }, "the smallest headroom on the way to the root");
+  assert.equal(chooseConcurrency({ testFiles: 40, freeBytes: 55 * GiB, cores: 32, fileConcurrency: 4, cgroup }).value, 1);
+  // The smallest headroom wins wherever it sits, and on a tie the level nearest the process is named.
+  assert.deepEqual(cgroupHeadroom(cgroupFixture("0::/a/b\n", [["/a/b", 10 * GiB, 0], ["/a", 5 * GiB, 2 * GiB]])),
+    { bytes: 3 * GiB, path: "/a" });
+  assert.deepEqual(cgroupHeadroom(cgroupFixture("0::/a/b\n", [["/a/b", 4 * GiB, GiB], ["/a", 5 * GiB, 2 * GiB]])),
+    { bytes: 3 * GiB, path: "/a/b" });
+  // A current above max (memory.high reclaim lag) is no room, not negative room.
+  assert.deepEqual(cgroupHeadroom(cgroupFixture("0::/a\n", [["/a", 2 * GiB, 3 * GiB]])), { bytes: 0, path: "/a" });
+});
+
+test("without a finite cgroup v2 limit the budget is free memory, as before", () => {
+  const before = chooseConcurrency({ testFiles: 40, freeBytes: 8 * GiB, cores: 32, fileConcurrency: 4 });
+  const unlimited = cgroupHeadroom(cgroupFixture("0::" + SCOPE + "\n", [
+    [SCOPE, "max", 2 * GiB], ["/user.slice/app.slice", "max", 2 * GiB], ["/user.slice", "max", 2 * GiB],
+  ]));
+  assert.equal(unlimited, null, "max at every level is no limit");
+  assert.deepEqual(chooseConcurrency({ testFiles: 40, freeBytes: 8 * GiB, cores: 32, fileConcurrency: 4, cgroup: unlimited }), before);
+  // cgroup v1: no 0:: line.
+  assert.equal(cgroupHeadroom(cgroupFixture("4:memory:/user.slice\n1:name=systemd:/user.slice\n", [["/user.slice", GiB, 0]])), null);
+  // No /proc at all (macOS), and a hierarchy whose files cannot be read: not a limit.
+  assert.equal(cgroupHeadroom({ procFile: join(tmpdir(), "branchling-no-such-proc-cgroup"), root: "/" }), null);
+  const unreadable = cgroupFixture("0::" + SCOPE + "\n", []);
+  assert.equal(cgroupHeadroom(unreadable), null);
+  // A level whose memory.current is missing is skipped, not read as zero use.
+  const half = cgroupFixture("0::/a/b\n", [["/a", 4 * GiB, GiB]]);
+  write(half.root, join("a", "b", "memory.max"), String(GiB));
+  assert.deepEqual(cgroupHeadroom(half), { bytes: 3 * GiB, path: "/a" });
+  // A value that is not a plain byte count is not a limit, however it starts or ends.
+  for (const [max, current] of [["8G", 0], ["x8", 0], [8 * GiB, "1G"], [8 * GiB, "x1"]]) {
+    assert.equal(cgroupHeadroom(cgroupFixture("0::/a\n", [["/a", max, current]])), null, max + " / " + current);
+  }
+  // The positive control: the same fixture shape with one finite limit is read.
+  assert.notEqual(cgroupHeadroom(cgroupFixture("0::" + SCOPE + "\n", [[SCOPE, 4 * GiB, GiB]])), null);
+});
+
+test("a run that states no free memory reads this process's own cgroup; one that states it is taken at its word", () => {
+  const live = cgroupHeadroom();
+  const measured = chooseConcurrency({ testFiles: 40, cores: 32, fileConcurrency: 4 }).reason;
+  // Inside a capped scope (the supervised loops run in one) the live path is
+  // named; elsewhere either the machine is named beside it or no cgroup is.
+  if (live === null) assert.doesNotMatch(measured, /cgroup/);
+  else assert.match(measured, new RegExp("cgroup " + live.path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "[ )]"));
+  // ...and the machine's free memory is still read when no figure is given.
+  assert.match(measured, /^(half of 32 cores; )?\d+\.\d GB free/);
+  assert.doesNotMatch(chooseConcurrency({ testFiles: 40, freeBytes: 8 * GiB, cores: 32, fileConcurrency: 4 }).reason, /cgroup/);
+
+  // Where this process does sit under a finite cgroup v2 limit, the default
+  // paths find it. Read here independently; where there is none (CI, macOS)
+  // this half has nothing to observe.
+  let own = null;
+  try { own = readFileSync("/proc/self/cgroup", "utf8").split("\n").find((l) => l.startsWith("0::")); } catch { /* none */ }
+  if (own) {
+    const limited = [];
+    for (let level = own.slice(3); ; level = dirname(level)) {
+      try { if (/^\d+$/.test(readFileSync(join("/sys/fs/cgroup", level, "memory.max"), "utf8").trim())) limited.push(level); } catch { /* none */ }
+      if (level === "/") break;
+    }
+    if (limited.length) assert.ok(live && limited.includes(live.path), "a finite memory.max at " + limited.join(", "));
+  }
+});
+
+test("when the cgroup leaves exactly what the machine has free, the machine is named", () => {
+  const reason = chooseConcurrency({ testFiles: 40, freeBytes: 8 * GiB, cores: 32, fileConcurrency: 4,
+    cgroup: { bytes: 8 * GiB, path: "/s" } }).reason;
+  assert.match(reason, /^8\.0 GB free on the machine \(cgroup \/s leaves 8\.0 GB\), /);
 });
 
 test("the slot is one file per machine, in the state directory, under a name runs of other versions agree on", () => {
