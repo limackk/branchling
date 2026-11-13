@@ -1163,6 +1163,14 @@ export async function main(argv, cwd = process.cwd(), deps = {}) {
       return fail(COMMAND, "--keep-report " + opts.keepReport + ": " + parent + " is not a directory",
         ["The report would be lost when the run's directory is removed, so the run is not started."], [], 1);
     }
+    // A directory passes the parent check, then the copy onto it fails with
+    // EISDIR after the run. Refused rather than written into, so the flag
+    // keeps one meaning: the path is the report's own (TL-717).
+    if (existsSync(opts.keepReport) && statSync(opts.keepReport).isDirectory()) {
+      return fail(COMMAND, "--keep-report " + opts.keepReport + " is a directory",
+        ["The flag names the report's own file, and a copy onto a directory fails only after the run, so the run is not started."],
+        [], 1);
+    }
   }
   let root;
   try {
