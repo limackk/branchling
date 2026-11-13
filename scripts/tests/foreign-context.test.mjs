@@ -38,6 +38,24 @@ isolateHome("foreign-context");
 
 const reasons = (text, words) => auditText(text, words).map((p) => p.reason);
 
+/**
+ * "No findings", asserted at a cost that does not grow with the findings.
+ *
+ * `assert.deepEqual(findings, [])` fails by diffing the inspected array
+ * against `[]`, and node's diff keeps one typed array per edit step: memory
+ * grows with the SQUARE of the findings' printed lines, off the V8 heap. A
+ * mutant that makes every line a finding (`if (PERSONAL_PATH.test(line))` →
+ * `if (true)`, TL-727) turns every line of the real tree, tens of thousands,
+ * into a finding, and that one failing assertion grew a test process to
+ * 30 GB on 2026-11-13 before the kernel stopped the machine. A count with a
+ * message fails in milliseconds and still names what was found.
+ */
+const SHOWN_FINDINGS = 5;
+function assertNoFindings(findings, what) {
+  assert.equal(findings.length, 0, what + " carries " + findings.length + " finding(s), the first: "
+    + JSON.stringify(findings.slice(0, SHOWN_FINDINGS)));
+}
+
 // ── personal paths ────────────────────────────────────────────────────────
 
 test("a personal absolute path is caught, and a schematic one is not", () => {
@@ -142,7 +160,24 @@ test("the marker excuses the line it is on, and the line below it", () => {
 test("this repository's public documents pass", () => {
   const { findings, filesChecked } = auditTree(REPO_ROOT, []);
   assert.ok(filesChecked > 5, "the walk read " + filesChecked + " documents — it is looking at the wrong tree");
-  assert.deepEqual(findings, []);
+  assertNoFindings(findings, "the public documents");
+});
+
+test("a tree in which every line is a finding fails by assertion, not by memory (TL-727)", () => {
+  // The shape the runaway mutants produced: one finding per line of the real
+  // tree. The failure has to be an AssertionError whose message stays the
+  // same size however many findings there are — the diff it replaced needed
+  // more than the 4 GiB per-process cap for this many.
+  const { linesChecked } = auditTree(REPO_ROOT, []);
+  assert.ok(linesChecked > 10000, "the walk read " + linesChecked + " lines — not the tree the runaway was measured on");
+  const everyLine = Array.from({ length: linesChecked }, (_, i) =>
+    ({ file: "docs/x.md", line: i + 1, text: "a line", reason: "personal-path" }));
+  assert.throws(() => assertNoFindings(everyLine, "the tree"), (err) => {
+    assert.equal(err.name, "AssertionError");
+    assert.match(err.message, new RegExp("carries " + linesChecked + " finding"));
+    assert.ok(err.message.length < 1000, "the message grew to " + err.message.length + " characters");
+    return true;
+  });
 });
 
 test("POSITIVE CONTROL: a violation inserted into a real document IS caught", () => {
@@ -150,7 +185,7 @@ test("POSITIVE CONTROL: a violation inserted into a real document IS caught", ()
   // text. A guard proved only against hand-written strings could still be
   // failing to read the files it claims to read.
   const text = readFileSync(join(REPO_ROOT, "docs", "branchling-global-tool.md"), "utf8");
-  assert.deepEqual(auditText(text, []), []);
+  assertNoFindings(auditText(text, []), "docs/branchling-global-tool.md");
   assert.deepEqual(reasons(text + "\nThe backlog holds 1363 tasks.\n"), ["measurement"]);
   assert.deepEqual(reasons(text + "\nSee /Users/jane/workspace.\n"), ["personal-path"]);
   // `northwind` and not `acme`: this document already uses `acme` as its
