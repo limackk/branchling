@@ -413,7 +413,7 @@ Common to all of them:
 | Command | Required input | Kind |
 |---|---|---|
 | `new --title "…"` | the title; the body as one JSON document on stdin (`goal`, non-empty `verification`) or the template is written; `--actor` names who records the creation | `task-new` with `--json`, a refusal included (`ok: false`, TL-568) |
-| `take <ID>` | the id; `--reason` when the target status requires one, and with `--take-over` | `task-take` |
+| `take <ID>` | the id; `--reason` when the target status requires one, and with `--take-over` or `--reopen` | `task-take` |
 | `next` | nothing; the same filters `query` takes narrow the choice | `task-take` |
 | `set <ID> <field> <value>` | a field `set` writes (not `status` or `owner`) and a value from the vocabulary; `--reason` where required | `task-set` |
 | `body <ID>` | `--reason`; the new body on stdin or `--body-file`; `--base <hash>` to refuse a stale edit | `task-body` |

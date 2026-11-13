@@ -189,10 +189,12 @@ test("an own closing merged into main keeps the reopen refusal", () => {
   const r = run(dir, ["take", id, "--dir", ".", "--actor", "agent:a"]);
   assert.equal(r.status, 1, r.stderr);
   assert.match(r.stderr, /Reopen it deliberately/);
-  assert.doesNotMatch(r.stderr, / resume |→/);
+  assert.doesNotMatch(r.stderr, / resume /);
   const out = takeJson(dir, id, "agent:a");
   assert.equal(out.refusalKind, "closed");
-  assert.deepEqual(out.details, ["Reopen it deliberately — a closed task is a decision, not a free slot."]);
+  assert.equal(out.details.length, 2, out.details.join("\n"));
+  assert.equal(out.details[0], "Reopen it deliberately — a closed task is a decision, not a free slot. The reason is recorded:");
+  assert.match(out.details[1], new RegExp(" take " + id + " --reopen --reason \"…\" --actor agent:a$"));
 });
 
 test("a closing by somebody else keeps the reopen refusal even unmerged", () => {

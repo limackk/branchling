@@ -36,10 +36,25 @@
  * refuses without `--reason`, hands the reservation over rather than deleting
  * it, and writes a `__takeover__` event naming the session taken from.
  *
+ * REOPENING A CLOSED TASK (TL-714). A closing rejected in review used to have no
+ * route back: this command refused a closed task with "reopen it deliberately",
+ * `release` refuses anything not in progress and `set` refuses `status`, so the
+ * rework ran on a task the file and the history still called proven. The route
+ * is `--reopen`, a flag here and not a command of its own, because the
+ * transition it needs — a closed status to in progress, under an owner, behind
+ * the reservation — is exactly the write this function already makes; a
+ * separate command would be the second reservation path the paragraph above
+ * rules out. `--take-over` is the precedent: a deliberate crossing of one gate,
+ * refused without `--reason`. The record needs no event of its own — the
+ * status transition OUT of a closed status is the withdrawal, it carries the
+ * reason, `audit` counts it as a reopening and `provenClosing` stops treating
+ * the earlier closing as current.
+ *
  * Tests: `node --test scripts/tests/next.test.mjs`
  *        `node --test scripts/tests/takeover.test.mjs`
  *        `node --test scripts/tests/take-atomicity.test.mjs`
  *        `node --test scripts/tests/take-closed-resume.test.mjs`
+ *        `node --test scripts/tests/take-reopen.test.mjs`
  */
 
 import { spawnSync } from "node:child_process";
@@ -69,7 +84,7 @@ import { todayStamp } from "./today.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-export const TAKE_FLAGS = ["--dir", "--actor", "--role", "--reason", "--json", "--probe", "--take-over", "--require-actor"];
+export const TAKE_FLAGS = ["--dir", "--actor", "--role", "--reason", "--json", "--probe", "--take-over", "--reopen", "--require-actor"];
 
 /**
  * Replace a task without exposing the truncate-and-write interval to another
@@ -100,7 +115,7 @@ function discardStaged(staged) {
 export function parseTakeArgs(args) {
   const taken = takeDirFlag(args, { missing: "`--dir` with no value" });
   args = taken.argv;
-  const plan = { id: null, dir: taken.dir, actor: null, role: null, reason: null, json: false, probe: false, takeOver: false, requireActor: false };
+  const plan = { id: null, dir: taken.dir, actor: null, role: null, reason: null, json: false, probe: false, takeOver: false, reopen: false, requireActor: false };
   let literal = false;
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -108,6 +123,7 @@ export function parseTakeArgs(args) {
     if (!literal && a === "--json") { plan.json = true; continue; }
     if (!literal && a === "--probe") { plan.probe = true; continue; }
     if (!literal && a === "--take-over") { plan.takeOver = true; continue; }
+    if (!literal && a === "--reopen") { plan.reopen = true; continue; }
     if (!literal && a === "--require-actor") { plan.requireActor = true; continue; }
     if (!literal && (a === "--actor" || a === "--role" || a === "--reason")) {
       const value = args[++i] || null;
@@ -137,6 +153,15 @@ export function parseTakeArgs(args) {
       "`--take-over` without `--reason`\n" +
         "Crossing somebody's claim is the one take that cannot be quiet: the session\n" +
         "it is taken from finds only the record you leave behind."
+    );
+  }
+  // A reopening withdraws somebody's decision, and the reason is the one thing
+  // the record of that withdrawal cannot be reconstructed without (TL-714).
+  if (plan.reopen && plan.reason === null) {
+    throw new Error(
+      "`--reopen` without `--reason`\n" +
+        "Withdrawing a closing is a decision of its own: the history keeps the reason\n" +
+        "on the transition out of the closed status, and nowhere else says why."
     );
   }
   return plan;
@@ -213,12 +238,15 @@ function lockedRefusal(id, holder, config) {
  *
  * @param {{root: string, config: object, id: string, actor: string, role?: string,
  *          reason?: string, source?: string, now?: number, env?: object,
- *          dryRun?: boolean}} opts
+ *          dryRun?: boolean, takeOver?: boolean, reopen?: boolean}} opts
  *        `role` is the role the CALLER declares they are acting as. It never
  *        blocks the take — see FIELD_ROLE_OVERRIDE — it only decides whether the
  *        history gets an entry saying the take was outside the task's role.
  *        `dryRun` answers whether the take would succeed and writes nothing:
  *        the result carries `dryRun: true` and the task as it stands now.
+ *        `reopen` withdraws a closing (TL-714): a closed task is taken back to
+ *        in progress instead of refused, and a task that is not closed is
+ *        refused as `not-closed`; the caller supplies the `reason`.
  * @returns {{ok: boolean, kind?: string, message?: string, details?: string[],
  *            id?: string, file?: string, text?: string, before?: object,
  *            after?: object, lock?: object, warnings?: string[]}}
@@ -241,7 +269,12 @@ export function takeTask(opts) {
   const id = record.id;
   const file = join(paths.tasksDir, record.file.replace(/^tasks\//, ""));
 
-  if (config.archivedStatuses.indexOf(record.status) >= 0) {
+  // `reopen` is the caller's declaration that the closing is withdrawn
+  // (TL-714), so it passes BOTH closed refusals: the unmerged-closing one
+  // guesses that a session died before its commit, and a closing rejected in
+  // review leaves exactly that state in the tree it was rejected in.
+  const closed = config.archivedStatuses.indexOf(record.status) >= 0;
+  if (closed && !opts.reopen) {
     const own = ownUnmergedClosing(root, config, id, file, actor);
     if (own) {
       return {
@@ -259,11 +292,24 @@ export function takeTask(opts) {
     return {
       ok: false, kind: "closed", id,
       message: id + " is closed (status: " + record.status + ")",
-      details: ["Reopen it deliberately — a closed task is a decision, not a free slot."],
+      details: ["Reopen it deliberately — a closed task is a decision, not a free slot. The reason is recorded:"],
+      next: [N + " take " + id + " --reopen --reason \"…\" --actor " + actor],
     };
   }
 
   const inProgress = inProgressStatus(config);
+  // A reopening of a task nobody closed would be a plain take carrying a
+  // sentence about a withdrawal that never happened. The one exception is the
+  // task already in progress under this actor: a retried `--reopen` answers
+  // "already yours" like any retried take, rather than refusing its own result.
+  if (opts.reopen && !closed && !(record.status === inProgress && record.owner === actor)) {
+    return {
+      ok: false, kind: "not-closed", id,
+      message: id + " is not closed (status: " + record.status + "), so `--reopen` has no closing to withdraw",
+      details: ["Take it without the flag:"],
+      next: [N + " take " + id + " --actor " + actor],
+    };
+  }
   if (!inProgress) {
     return {
       ok: false, kind: "no-in-progress-status", id,
@@ -553,6 +599,7 @@ export function takeTask(opts) {
 
   return {
     ok: true, id, file, text, before, after, lock: lock.lock,
+    reopened: closed,
     reclaimed: reclaim ? before.owner : null,
     tookOver: [...crossed].map(([who, halves]) => ({ actor: who, crossed: halves })),
     warnings,
@@ -619,8 +666,8 @@ export function renderTake(result, root, opts = {}) {
       ? [result.reclaimed || overTaken.actor, result.after.owner]
       : [result.before.status, result.after.status];
     out.push(
-      paint.ok(MARK.ok) + " " + paint.id(result.id) + " taken by " + result.after.owner +
-        " — " + from + " " + MARK.arrow + " " + to
+      paint.ok(MARK.ok) + " " + paint.id(result.id) + (result.reopened ? " reopened by " : " taken by ") +
+        result.after.owner + " — " + from + " " + MARK.arrow + " " + to
     );
   }
   out.push("  " + paint.dim(shown));
@@ -768,7 +815,7 @@ export function run(argv) {
     );
   }
 
-  const result = takeTask({ root, config, id: plan.id, actor, role: plan.role, reason: plan.reason, takeOver: plan.takeOver });
+  const result = takeTask({ root, config, id: plan.id, actor, role: plan.role, reason: plan.reason, takeOver: plan.takeOver, reopen: plan.reopen });
   // THE CONTRACT'S LIVE STATE TRAVELS WITH THE HANDOVER when asked (TL-268).
   // Opt-in: a contract may cost the whole suite, and a loop wanting the task
   // in a second is not made to wait for it.
