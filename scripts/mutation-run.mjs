@@ -179,14 +179,15 @@
  *        scripts/tests/mutation/no-orphan-processes.test.mjs (nothing left behind).
  */
 
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
+import { constants as osConstants, tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { SLOT_TOKEN_ENV, acquireSlot, chooseConcurrency, describeHolder, releaseSlot, testFileConcurrency } from "./mutation-slot.mjs";
+import { processTreeDetached, stopProcessTree } from "./process-tree.mjs";
 import { fail, warn, plural } from "./ui.mjs";
 
 const COMMAND = "node scripts/mutation-run.mjs";
@@ -1133,9 +1134,52 @@ export function keepReport(from, to) {
   }
 }
 
-export function runStryker(root, p, opts, slot, stryker = strykerBin, sweep = sweepLeftovers) {
+/** The signals a run cleans up after, as an interrupted or timed-out run receives them. */
+const CLEANUP_SIGNALS = ["SIGTERM", "SIGINT"];
+/** How long a terminated Stryker group has to stop on SIGTERM before it is killed. */
+export const STOP_GRACE_MS = 2000;
+
+/**
+ * Run Stryker in a work directory of its own and remove that directory, and
+ * every process naming it, whether the run returns or is terminated (TL-713).
+ *
+ * WHY ASYNC, AND WHY STRYKER LEADS ITS OWN GROUP. A run is cut off by a
+ * signal more often than by anything else: every supervised loop wraps it in
+ * `timeout`, and a person interrupts it with Ctrl-C. Under `spawnSync` the
+ * event loop is blocked until Stryker returns, so a handler can never run and
+ * the default disposition ends this process with the `finally` below unrun:
+ * on 2026-11-11 six `mutation-run-*` directories, each holding a sandbox copy
+ * of the repository, were left in the temporary directory that way. Spawned
+ * asynchronously, the handler runs; spawned detached, Stryker and the test
+ * processes it starts form one group that a single kill reaches, and that
+ * group is not the terminal's, so Ctrl-C reaches this process alone and the
+ * order of the shutdown is decided here. A terminated run sends that group
+ * SIGTERM first, because `mutation-contain.mjs` in it stops each test run's
+ * own group only on a signal it can handle, and SIGKILL after a grace period
+ * or once Stryker has closed. It then sweeps whatever escaped the group,
+ * removes the directory, and returns the signal's conventional code (128 +
+ * its number), so the slot is released by the caller as on any other return.
+ */
+export async function runStryker(root, p, opts, slot, stryker = strykerBin, sweep = sweepLeftovers) {
   const bin = stryker();
   if (!bin) return { code: 2, problem: STRYKER_PIN + " is not installed", next: ["npm install"] };
+  // Listening before the directory exists: without a listener a signal ends
+  // this process at once, with nothing removed. With one, the handler waits
+  // for the event loop, which nothing below yields to before the spawn, so
+  // `child` is always set when it runs.
+  let child = null;
+  let terminatedBy = null;
+  let grace = null;
+  const stop = () => {
+    stopProcessTree(child, "SIGTERM");
+    grace = setTimeout(() => stopProcessTree(child, "SIGKILL"), STOP_GRACE_MS);
+  };
+  const onSignal = (signal) => {
+    if (terminatedBy) return;
+    terminatedBy = signal;
+    stop();
+  };
+  for (const s of CLEANUP_SIGNALS) process.on(s, onSignal);
   const links = directorySymlinks(root);
   const work = mkdtempSync(join(tmpdir(), "mutation-run-"));
   try {
@@ -1143,18 +1187,38 @@ export function runStryker(root, p, opts, slot, stryker = strykerBin, sweep = sw
     const reportPath = config.jsonReporter.fileName;
     const configPath = join(work, "stryker.config.json");
     writeFileSync(configPath, JSON.stringify(config, null, 2));
-    const r = spawnSync(process.execPath, [bin, "run", configPath], {
-      cwd: root,
-      // The token lets a run a test starts inside this one share its slot.
-      env: { ...strykerEnv(process.env, root), [SLOT_TOKEN_ENV]: slot.token },
-      stdio: ["ignore", opts.json ? "pipe" : "inherit", opts.json ? "pipe" : "inherit"],
-      encoding: "utf8",
+    const r = await new Promise((done) => {
+      const out = { stdout: "", stderr: "" };
+      child = spawn(process.execPath, [bin, "run", configPath], {
+        cwd: root,
+        // The token lets a run a test starts inside this one share its slot.
+        env: { ...strykerEnv(process.env, root), [SLOT_TOKEN_ENV]: slot.token },
+        stdio: ["ignore", opts.json ? "pipe" : "inherit", opts.json ? "pipe" : "inherit"],
+        detached: processTreeDetached(),
+      });
+      for (const stream of ["stdout", "stderr"]) {
+        if (!child[stream]) continue;
+        child[stream].setEncoding("utf8");
+        child[stream].on("data", (chunk) => { out[stream] += chunk; });
+      }
+      child.on("error", (e) => done({ status: null, ...out, stderr: out.stderr + e.message }));
+      child.on("close", (status) => {
+        if (terminatedBy) {
+          clearTimeout(grace);
+          stopProcessTree(child, "SIGKILL");
+        }
+        done({ status, ...out });
+      });
     });
     let leftovers = [];
     try {
       leftovers = sweep(work + sep);
     } catch (e) {
       console.error(warn("cannot look for processes the run left behind: " + e.message));
+    }
+    if (terminatedBy) {
+      return { code: 128 + osConstants.signals[terminatedBy], signal: terminatedBy, leftovers,
+        problem: "the run was terminated by " + terminatedBy + "; Stryker was stopped and its work directory removed" };
     }
     if (!existsSync(reportPath)) {
       return { code: r.status || 1, problem: "Stryker produced no report", leftovers,
@@ -1164,7 +1228,8 @@ export function runStryker(root, p, opts, slot, stryker = strykerBin, sweep = sw
     const kept = opts.keepReport ? keepReport(reportPath, opts.keepReport) : null;
     return { code: r.status, leftovers, kept, report: JSON.parse(readFileSync(reportPath, "utf8")) };
   } finally {
-    rmSync(work, { recursive: true, force: true });
+    for (const s of CLEANUP_SIGNALS) process.off(s, onSignal);
+    rmSync(work, { recursive: true, force: true, maxRetries: 3 });
   }
 }
 
@@ -1332,7 +1397,7 @@ export async function main(argv, cwd = process.cwd(), deps = {}) {
     // Chosen here, after the wait: memory the previous holder used is free now.
     const concurrency = chooseConcurrency({ concurrency: opts.concurrency, testFiles: p.tests.length });
     console.error("concurrency " + concurrency.value + ": " + concurrency.reason);
-    run = (deps.runStryker || runStryker)(root, p, { ...opts, concurrency: concurrency.value }, slot);
+    run = await (deps.runStryker || runStryker)(root, p, { ...opts, concurrency: concurrency.value }, slot);
   } finally {
     releaseSlot(slot);
   }
