@@ -1,0 +1,2 @@
+{"id":"01M7A8PBPQEK6C45JDRYHKGVEW","ts":"2026-11-13T10:54:13.719Z","task":"TL-736","field":"__created__","from":"","to":"done --json park answer is reachable or removed","actor":"agent:loop-3","source":"new","reason":"unknown"}
+{"id":"01M7A98SRS2QVJ2ZKTRMKS7WQM","ts":"2026-11-13T11:04:17.945Z","task":"TL-736","field":"blocked_by","from":[],"to":["TL-710"],"actor":"agent:loop-3","source":"set","reason":"TL-736 changes or removes the --json answer whose current shape the TL-710 test in done-awaiting-vouch.test.mjs pins"}
