@@ -257,7 +257,42 @@ test("import --help --json describes each mapping flag as a pair whose vocabular
     assert.equal(entry.closed, null, flag + ": the whole value was declared closed");
     assert.deepEqual(entry.target, { arg: "<to>", dictionary, values, closed: true },
       flag + ": the target side does not carry the vocabulary");
+    assert.deepEqual(entry.source, { arg: "<from>", dictionary: null, values: null, closed: null },
+      flag + ": the foreign <from> side was given a vocabulary");
   }
+});
+
+/**
+ * A pair whose vocabulary is on the LEFT (TL-719).
+ *
+ * `run --agent-for <role>=<command>` takes one of the project's roles before
+ * the `=` and a command line after it — the mirror image of `import`. The
+ * roles are a fixture sharing nothing with this repository's, so the
+ * assertion is about the shape and not about any project's values.
+ */
+const ROLES_FIXTURE = { ...MAPPING_FIXTURE, roles: ["cartographer", "surveyor"] };
+
+test("run --help --json describes the left side of --agent-for and --profile-for with the roles", () => {
+  const flags = commandHelpJson("run", COMMANDS.run, ROLES_FIXTURE).flags;
+  for (const [flag, right] of [["--agent-for", "<command>"], ["--profile-for", "<name>"]]) {
+    const entry = flags.find((f) => f.flag === flag);
+    assert.ok(entry, flag + " is not in run --help --json");
+    assert.equal(entry.arg, "<role>=" + right, flag + " is not described as a pair");
+    assert.equal(entry.dictionary, null, flag + ": the whole value was given a vocabulary");
+    assert.deepEqual(entry.source, { arg: "<role>", dictionary: "roles", values: ROLES_FIXTURE.roles, closed: true },
+      flag + ": the left side does not carry the roles");
+    assert.deepEqual(entry.target, { arg: right, dictionary: null, values: null, closed: null },
+      flag + ": the right side, a free-text " + right + ", was given a vocabulary");
+  }
+});
+
+test("positive control: import --status keeps its vocabulary on the target beside a roles fixture", () => {
+  // Without this, a table keyed by side rather than by flag — putting every
+  // pair's vocabulary on the left — would pass the test above.
+  const entry = commandHelpJson("import", COMMANDS.import, ROLES_FIXTURE).flags.find((f) => f.flag === "--status");
+  assert.ok(entry, "--status is not in import --help --json");
+  assert.deepEqual(entry.target, { arg: "<to>", dictionary: "statuses", values: ROLES_FIXTURE.statuses, closed: true });
+  assert.equal(entry.source.dictionary, null, "import --status <from> was given a vocabulary");
 });
 
 test("positive control: new --priority still reports the closed priorities vocabulary", () => {
@@ -271,6 +306,7 @@ test("positive control: new --priority still reports the closed priorities vocab
   assert.deepEqual(entry.values, MAPPING_FIXTURE.priorities);
   assert.equal(entry.closed, true);
   assert.equal(entry.target, null);
+  assert.equal(entry.source, null);
 });
 
 test("describeFlags reads a <from>=<to> argument whole, in the synopsis and on a flag line", () => {
