@@ -394,6 +394,36 @@ export function planWaiting(answer) {
   return kind === WAVE_CLAIMED_ELSEWHERE || kind === WAVE_AWAITS_MERGE ? kind : null;
 }
 
+/**
+ * The waiting wave of a `next --plan` answer, as the `run` envelope's
+ * `planWaiting` field (TL-729). PURE.
+ *
+ * The same facts `planStop` puts into words, so a supervisor deciding between
+ * relaunching later and stopping reads a field instead of parsing the
+ * sentence. Built from the answer alone, like the sentence: `wave` and `name`
+ * are the WAITING wave — `plan.spill.from` under `--spill`, where `plan.wave`
+ * is the one drawn from — and the id lists are the ones `next` judged that
+ * wave from.
+ *
+ * @param {object|null} answer the envelope `next` printed on exit 3
+ * @returns {object|null} `{kind, wave, name, claimedElsewhere, awaitingMerge,
+ *   waitingBehind}`, or null when `next` did not call the wave waiting
+ */
+export function planWaitingWave(answer) {
+  const kind = planWaiting(answer);
+  const plan = answer && answer.plan;
+  if (!kind || !plan) return null;
+  const spill = plan.spill || null;
+  return {
+    kind,
+    wave: spill ? spill.from : plan.wave,
+    name: (spill ? spill.fromName : plan.name) || "",
+    claimedElsewhere: plan.claimedElsewhere || [],
+    awaitingMerge: plan.awaitingMerge || [],
+    waitingBehind: plan.waitingBehind || [],
+  };
+}
+
 /** `planStop` for a wave `next` called waiting. PURE. */
 function waitingStop(plan, kind) {
   const spill = plan.spill || null;
@@ -2122,6 +2152,7 @@ export async function run(argv) {
   // `{count, ids}` from the last "nothing to take" answer (TL-491); null when
   // the run ended before `next` gave one.
   let heldNow = null;
+  let planWaitingNow = null;
   // `{polls, seconds, gaveUp}` under `--wait`, null without it. `waitingSince`
   // is when the current stretch of waiting began; a task handed out ends it.
   const waited = plan.wait ? { polls: 0, seconds: 0, gaveUp: false } : null;
@@ -2245,6 +2276,10 @@ export async function run(argv) {
       // new actor by a supervisor that believed it.
       const held = heldInOtherTrees(answer, config.archivedStatuses);
       heldNow = { count: held.length, ids: held };
+      // Every "nothing to take" answer replaces it, a poll under `--wait`
+      // included, and a task handed out clears it below: what survives is the
+      // waiting wave the run STOPPED on, never one it waited on and got past.
+      planWaitingNow = planned ? planWaitingWave(answer) : null;
       // A WAVE IN FLIGHT IS ONE `next` CALLED WAITING (TL-707), by its refusal
       // kind — not one this loop judged open on its own. See `planWaiting`.
       const inFlight = !!(planned && planWaiting(answer));
@@ -2277,8 +2312,12 @@ export async function run(argv) {
       if (gaveUp) stopped += "; waited " + plan.waitMax + "s (--wait-max) and nothing was freed";
       break;
     }
-    // A task was handed out, so the next wait is a new one with its own bound.
+    // A task was handed out, so the next wait is a new one with its own bound,
+    // and the wave waited on before it no longer describes the run: a stop at
+    // the top of the loop (`--max-tasks`, a stop request, the gate) asks no
+    // `next` that could clear it.
     waitingSince = null;
+    planWaitingNow = null;
     if (handed.status !== 0) {
       console.error(handed.stderr || handed.stdout);
       stopped = "`" + N + " next` refused (exit " + handed.status + ")";
@@ -2582,6 +2621,9 @@ export async function run(argv) {
       // `{count, ids}` of the tasks another tree of this clone holds open, from
       // the last "nothing to take" answer (TL-491); null when none was given.
       heldInOtherTrees: heldNow,
+      // `{kind, wave, name, claimedElsewhere, awaitingMerge, waitingBehind}`
+      // when the run stopped on a wave `next --plan` called waiting (TL-729).
+      planWaiting: planWaitingNow,
       // `{polls, seconds, gaveUp}` under `--wait` (TL-491); null without it.
       waited,
       tally: { ...tally, taken: taken.length },
