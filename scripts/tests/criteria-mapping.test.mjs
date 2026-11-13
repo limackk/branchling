@@ -544,6 +544,137 @@ test("the fence rule flags both fence lines and everything between them", () => 
   assert.deepEqual(fencedLines(["~~~~", "~~~", "~~~~ ", "c"]), [true, true, true, false]);
 });
 
+// A FENCE INSIDE A LIST ITEM (TL-728). CommonMark counts a fence's zero to
+// three spaces from the content column of the list item it sits in, so in a
+// nested item a fence indented four or more spaces from column 0 is still a
+// fence. Read from column 0 the block below was prose, and its heading- and
+// checkbox-shaped lines reached every reader of the rule.
+test("a fence inside a nested list item indented four or more spaces is code", () => {
+  assert.deepEqual(
+    fencedLines(["- item", "  - step", "", "    ```", "    ## x", "    - [ ] y", "    ```", "after"]),
+    [false, false, false, true, true, true, true, false],
+  );
+  // Five spaces under a three-column item: one past its content column.
+  assert.deepEqual(
+    fencedLines(["1. one", "   1. two", "", "      ~~~", "      ## x", "      ~~~", "after"]),
+    [false, false, false, true, true, true, false],
+  );
+});
+
+test("POSITIVE CONTROL: a four-space fence outside any list item is not a fence", () => {
+  // Without this, "any indentation opens a fence" would pass the test above.
+  assert.deepEqual(
+    fencedLines(["para", "", "    ```", "    ## x", "    ```", "after"]),
+    [false, false, false, false, false, false],
+  );
+  // A paragraph at column 0 ends the item, so the same fence after it is
+  // measured from column 0 again.
+  assert.deepEqual(
+    fencedLines(["  - step", "back at column 0", "", "    ```", "    ## x", "    ```", "after"]),
+    [false, false, false, false, false, false, false],
+  );
+  // An indented paragraph is not a list item, so it moves no column.
+  assert.deepEqual(
+    fencedLines(["  text", "     ```", "     ## x", "     ```"]),
+    [false, false, false, false],
+  );
+});
+
+test("a line indented less than the item's content ends a block opened inside it", () => {
+  // The item closes, and the block with it; the line is prose, as CommonMark
+  // reads it, rather than code up to the next fence-shaped line.
+  assert.deepEqual(
+    fencedLines(["- a", "  - b", "    ```", "    code", "after", "## heading"]),
+    [false, false, true, true, false, false],
+  );
+});
+
+test("the content column follows CommonMark's spacing after the list marker", () => {
+  // Each case puts a fence exactly three spaces past the item's content
+  // column, where it is still a fence, unless the comment says otherwise.
+  const block = (item, pad) => fencedLines([item, "", `${pad}\`\`\``, `${pad}y`, `${pad}\`\`\``, "after"]);
+  const fenced = [false, false, true, true, true, false];
+  const prose = [false, false, false, false, false, false];
+  // Three spaces after the marker: content at column 4.
+  assert.deepEqual(block("-   a", " ".repeat(7)), fenced);
+  // Four spaces: content at column 5.
+  assert.deepEqual(block("-    a", " ".repeat(8)), fenced);
+  // Five spaces: the content is indented code, so the column is the marker
+  // plus one space (2), and a fence at five spaces is three past it.
+  assert.deepEqual(block("-     code", " ".repeat(5)), fenced);
+  // A two-digit ordinal is a marker as well: content at column 4.
+  assert.deepEqual(block("10. ten", " ".repeat(4)), fenced);
+  // A marker that does not start the line is not a list item.
+  assert.deepEqual(block("text - x", " ".repeat(4)), prose);
+});
+
+test("an item that starts empty has its content one space past the marker", () => {
+  assert.deepEqual(
+    fencedLines(["-", "     ```", "     y", "     ```", "after"]),
+    [false, true, true, true, false],
+  );
+  assert.deepEqual(
+    fencedLines(["-", "    ```", "    y", "    ```", "after"]),
+    [false, true, true, true, false],
+  );
+});
+
+test("a fence may open on the list item's own line and ends with the item", () => {
+  assert.deepEqual(
+    fencedLines(["- ```js", "  code", "  ```", "after"]),
+    [true, true, true, false],
+  );
+  // Left open, it still ends where the item ends.
+  assert.deepEqual(fencedLines(["- ```", "  code", "after", "x"]), [true, true, false, false]);
+});
+
+test("a fence run in mid-line is not a fence", () => {
+  assert.deepEqual(fencedLines(["a ```", "## x", "b"]), [false, false, false]);
+});
+
+test("a fence at three spaces is a fence, at the top level and in an item", () => {
+  assert.deepEqual(fencedLines(["   ```", "x", "   ```", "y"]), [true, true, true, false]);
+  assert.deepEqual(fencedLines(["- a", "     ```", "x", "after"]), [false, true, false, false]);
+});
+
+test("the closing fence of a block in a list item is measured from its content column", () => {
+  assert.deepEqual(
+    fencedLines([
+      "- a",
+      "  - b",
+      "    ```",
+      "        ```",          // four past the content column: code, not a close
+      "    y",
+      "    ``` not a close",  // text after the run: code, not a close
+      "  ",                   // whitespace only: blank, does not end the item
+      "    ~~~",              // the other fence character: code, not a close
+      "       ```",           // three past the content column: the close
+      "    after",
+    ]),
+    [false, false, true, true, true, true, true, true, true, false],
+  );
+});
+
+test("an indented top-level fence stays open past an unindented line", () => {
+  // The block belongs to no list item, so no line can end it but its close.
+  assert.deepEqual(fencedLines(["  ```", "x", "  ```", "y"]), [true, true, true, false]);
+});
+
+test("a fence inside a nested list item hides a checkbox from the criteria parser", () => {
+  const { items } = parseCriteria([
+    "## Acceptance criteria",
+    "",
+    "- [ ] Real. [proof: a]",
+    "  - example:",
+    "",
+    "    ```md",
+    "    - [ ] Quoted, not a contract. [proof: a]",
+    "    ```",
+    "- [ ] Also real. [proof: a]",
+  ].join("\n"));
+  assert.deepEqual(items.map((i) => i.text), ["Real.", "Also real."]);
+});
+
 test("the heading that ends the section is a line START, whatever spacing follows `##`", () => {
   const { items } = parseCriteria([
     "## Acceptance criteria",
